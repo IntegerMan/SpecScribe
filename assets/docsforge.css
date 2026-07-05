@@ -559,6 +559,46 @@ body {
 .ac-list .kw { font-family: 'Courier New', monospace; font-weight: bold; color: var(--gold); }
 .ac-block { margin-bottom: 0.5rem; }
 
+/* Acceptance Criteria panel — each criterion is independently anchored (id="ac-N") so the "(AC: #N)"
+   references scattered through the tasks below can deep-link straight to it. */
+.ac-panel .ac-criteria { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.ac-criterion {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.55rem 0.7rem;
+  border-radius: 4px;
+  /* Keep the highlighted criterion clear of the sticky nav when jumped to via a "#ac-N" link. */
+  scroll-margin-top: 5rem;
+}
+
+/* When a "(AC: #N)" link jumps here, flag which criterion the reader landed on. */
+.ac-criterion:target { background: #f5ecd4; box-shadow: inset 3px 0 0 var(--gold); }
+
+.ac-anchor {
+  flex: 0 0 auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  font-weight: bold;
+  color: var(--gold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ac-anchor:hover { color: var(--rust); }
+
+.ac-criterion-body { font-size: 0.86rem; color: var(--ink-faded); line-height: 1.6; }
+.ac-criterion-body strong { color: var(--ink); }
+
+/* Inline "(AC: #N)" reference link back up to the criterion panel. */
+.ac-ref {
+  color: var(--teal);
+  text-decoration: none;
+  font-weight: bold;
+  border-bottom: 1px dotted var(--teal);
+}
+.ac-ref:hover { color: var(--rust); border-bottom-color: var(--rust); }
+
 .requirements-inventory summary {
   cursor: pointer;
   font-size: 1rem;
@@ -590,6 +630,7 @@ body {
 
 .status-badge.done { background: #e8f0e4; color: var(--moss); border-color: var(--moss-light); }
 .status-badge.active { background: #e0ecea; color: var(--teal); border-color: var(--teal); }
+.status-badge.review { background: #d9e6ea; color: var(--teal-deep); border-color: var(--teal-deep); }
 .status-badge.ready,
 .status-badge.drafted { background: #f5ecd4; color: var(--gold); border-color: var(--gold-light); }
 
@@ -623,6 +664,7 @@ body {
 .sb-seg:hover { opacity: 0.75; }
 .sb-done { fill: var(--moss-light); }
 .sb-active { fill: var(--teal); }
+.sb-review { fill: var(--teal-deep); }
 .sb-ready { fill: var(--gold-light); }
 .sb-drafted { fill: #e8d9a8; }
 .sb-pending { fill: #b8b2a8; }
@@ -645,6 +687,7 @@ body {
 .sunburst-legend .sb-drafted-sw { background: #e8d9a8; }
 .sunburst-legend .sb-ready-sw { background: var(--gold-light); }
 .sunburst-legend .sb-active-sw { background: var(--teal); }
+.sunburst-legend .sb-review-sw { background: var(--teal-deep); }
 .sunburst-legend .sb-done-sw { background: var(--moss-light); }
 
 .sunburst-hint { margin-top: 0.4rem; font-size: 0.72rem; color: var(--ink-light); font-style: italic; }
@@ -667,6 +710,22 @@ body {
 .next-steps-desc { display: block; margin-top: 0.25rem; font-size: 0.78rem; color: var(--ink-light); line-height: 1.5; }
 
 /* ====================== DEV AGENT RECORD TABLE ====================== */
+/* Collapsed by default — agent bookkeeping, not the first thing a reader wants. The summary is styled to
+   read like a chart-panel <h3> so the collapsed panel matches the ones around it. */
+.dev-agent-details > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0;
+}
+.dev-agent-details > summary::-webkit-details-marker { display: none; }
+.dev-agent-details > summary::before { content: "▸ "; color: var(--gold); }
+.dev-agent-details[open] > summary::before { content: "▾ "; }
+.dev-agent-details[open] > summary { margin-bottom: 0.9rem; }
+
 .dev-agent-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 
 .dev-agent-table th {
@@ -716,21 +775,41 @@ body {
 
 .now-next-card:hover { box-shadow: 0 3px 10px var(--shadow); }
 .now-next-card.active { border-left-color: var(--teal); }
+.now-next-card.review { border-left-color: var(--teal-deep); }
 .now-next-card.ready { border-left-color: var(--gold-light); }
 .now-next-card.drafted { border-left-color: var(--parchment-deep); }
 .now-next-card.pending { border-left-color: var(--parchment-deep); }
 
 .now-next-kicker { font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-light); }
 .now-next-card.active .now-next-kicker { color: var(--teal); }
+.now-next-card.review .now-next-kicker { color: var(--teal-deep); }
 .now-next-card.ready .now-next-kicker { color: var(--gold); }
 .now-next-title { font-size: 0.84rem; font-weight: bold; color: var(--ink); line-height: 1.35; }
 
 .all-done-note { font-size: 0.84rem; color: var(--ink-light); font-style: italic; }
 
-/* Markdig-rendered task-list checkboxes (## Tasks / Subtasks in implementation artifacts) */
+/* Markdig-rendered task-list checkboxes (## Tasks / Subtasks in implementation artifacts).
+   The checkboxes render as disabled <input>s, so we replace the native (grey) appearance:
+   completed tasks get a filled green checkmark, incomplete tasks a plain empty box. */
 .doc-body ul li input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1em;
+  height: 1em;
   margin-right: 0.5rem;
-  accent-color: var(--moss);
+  vertical-align: -0.15em;
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  background: var(--warm-white);
+}
+
+.doc-body ul li input[type="checkbox"]:checked {
+  border-color: var(--moss);
+  background: var(--moss);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23faf7f2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 90%;
 }
 
 /* ====================== DASHBOARD ====================== */
@@ -828,6 +907,7 @@ body {
 .donut-legend .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.4rem; }
 .donut-legend .swatch.done { background: var(--moss-light); }
 .donut-legend .swatch.active { background: var(--teal); }
+.donut-legend .swatch.review { background: var(--teal-deep); }
 .donut-legend .swatch.ready,
 .donut-legend .swatch.drafted { background: var(--gold-light); }
 .donut-legend .swatch.pending { background: var(--parchment-deep); }
@@ -870,6 +950,7 @@ body {
 .donut-seg { fill: none; stroke-width: 10; transform: rotate(-90deg); transform-origin: center; }
 .donut-seg.done { stroke: var(--moss-light); }
 .donut-seg.active { stroke: var(--teal); }
+.donut-seg.review { stroke: var(--teal-deep); }
 .donut-seg.ready,
 .donut-seg.drafted { stroke: var(--gold-light); }
 .donut-seg.pending { stroke: var(--parchment-deep); }
@@ -994,6 +1075,11 @@ body {
 }
 
 .story-card-header .story-title { font-weight: bold; color: var(--ink); font-size: 0.9rem; flex: 1; }
+
+/* The plain status badge (baseline = its text) and the task badge (inline-flex wrapping a taller
+   mini-donut) resolve different baselines, so in this baseline-aligned row they'd sit at different
+   heights. Center both badges on the cross axis so they line up with each other. */
+.story-card-header .status-badge { align-self: center; }
 
 .story-card .per-story-progress { margin-top: 0.7rem; max-width: 320px; }
 

@@ -42,6 +42,11 @@ public sealed class EpicInfo
     public required IReadOnlyList<StoryInfo> Stories { get; init; }
 }
 
+/// <summary>One numbered acceptance criterion pulled from a story artifact's "## Acceptance Criteria"
+/// section. <see cref="Html"/> renders it in its own anchored panel row (<c>id="ac-N"</c>);
+/// <see cref="PlainText"/> is the tooltip a "(AC: #N)" task reference shows when it links back to it.</summary>
+public sealed record AcceptanceCriterion(int Number, string Html, string PlainText);
+
 public sealed class EpicsModel
 {
     public required string OverviewHtml { get; init; }

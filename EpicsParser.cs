@@ -70,10 +70,11 @@ public static class EpicsParser
     }
 
     /// <summary>Splits a story implementation-artifact into its lead "## Story" blurb (the As-a/I-want/
-    /// So-that narrative) and the rest of the plan (Acceptance Criteria onward), stopping before
-    /// "## Dev Agent Record" — that section is pulled out separately as a table via
-    /// <see cref="ExtractDevAgentRecord"/>. Lets the story page put the narrative ahead of its charts
-    /// without duplicating either section.</summary>
+    /// So-that narrative) and the rest of the plan, stopping before "## Dev Agent Record". Both the
+    /// "## Acceptance Criteria" section (surfaced as its own anchored panel via
+    /// <see cref="ExtractAcceptanceCriteria"/>) and "## Dev Agent Record" (a table via
+    /// <see cref="ExtractDevAgentRecord"/>) are excised here so they aren't rendered twice. Lets the story
+    /// page put the narrative and ACs ahead of the full plan without duplicating any section.</summary>
     public static (string BlurbHtml, string RemainderHtml) SplitStoryArtifact(string raw)
     {
         var lines = raw.Replace("\r\n", "\n").Split('\n');
@@ -104,9 +105,35 @@ public static class EpicsParser
             if (lines[i].TrimEnd() == "## Dev Agent Record") { remainderEnd = i; break; }
         }
 
-        var remainderMd = string.Join("\n", lines[remainderStart..remainderEnd]);
+        // Carve the Acceptance Criteria section out of the remainder — it now leads the page as its own
+        // panel, so leaving it here would duplicate it.
+        var (acStart, acEnd) = FindSection(lines, "## Acceptance Criteria", remainderStart, remainderEnd);
+        var remainderLines = acStart >= 0
+            ? lines[remainderStart..acStart].Concat(lines[acEnd..remainderEnd])
+            : lines[remainderStart..remainderEnd];
+
+        var remainderMd = string.Join("\n", remainderLines);
         remainderMd = SourceCitationBrackets.Replace(remainderMd, "$1");
         return (blurbHtml, MarkdownConverter.RenderBlock(remainderMd));
+    }
+
+    /// <summary>Locates a "## Heading" section within [start, limit), returning its heading index and the
+    /// index of the next H2 (or <paramref name="limit"/>). Returns (-1, -1) when the heading isn't found.</summary>
+    private static (int Start, int End) FindSection(string[] lines, string exactHeading, int start, int limit)
+    {
+        var headingIdx = -1;
+        for (var i = start; i < limit; i++)
+        {
+            if (lines[i].TrimEnd() == exactHeading) { headingIdx = i; break; }
+        }
+        if (headingIdx < 0) return (-1, -1);
+
+        var end = limit;
+        for (var i = headingIdx + 1; i < limit; i++)
+        {
+            if (lines[i].StartsWith("## ", StringComparison.Ordinal)) { end = i; break; }
+        }
+        return (headingIdx, end);
     }
 
     // "[Source: _bmad-output/path.md — note]" is a plain bracketed citation, not markdown link syntax —
@@ -151,6 +178,63 @@ public static class EpicsParser
         }
 
         return result;
+    }
+
+    private static readonly Regex AcNumberedItem = new(@"^(\d+)\.\s+(.*)$", RegexOptions.Compiled);
+
+    /// <summary>Parses the "## Acceptance Criteria" numbered list into per-criterion (number, html, plain
+    /// text) tuples, so the story page can render each one in its own anchored panel row and turn
+    /// "(AC: #N)" task references into tooltip-bearing links back to it.</summary>
+    public static IReadOnlyList<AcceptanceCriterion> ExtractAcceptanceCriteria(string raw)
+    {
+        var lines = raw.Replace("\r\n", "\n").Split('\n');
+        var (start, end) = FindSection(lines, "## Acceptance Criteria", 0, lines.Length);
+        if (start < 0) return Array.Empty<AcceptanceCriterion>();
+
+        var itemStarts = new List<(int Index, int Number)>();
+        for (var i = start + 1; i < end; i++)
+        {
+            var m = AcNumberedItem.Match(lines[i]);
+            if (m.Success) itemStarts.Add((i, int.Parse(m.Groups[1].Value)));
+        }
+
+        var result = new List<AcceptanceCriterion>();
+        for (var s = 0; s < itemStarts.Count; s++)
+        {
+            var (idx, number) = itemStarts[s];
+            var itemEnd = s + 1 < itemStarts.Count ? itemStarts[s + 1].Index : end;
+
+            // Strip the leading "N. " marker and keep any continuation/sub-bullet lines that follow.
+            var bodyLines = new List<string> { AcNumberedItem.Match(lines[idx]).Groups[2].Value };
+            for (var i = idx + 1; i < itemEnd; i++) bodyLines.Add(lines[i]);
+            var bodyMd = SourceCitationBrackets.Replace(string.Join("\n", bodyLines).Trim(), "$1");
+
+            var html = MarkdownConverter.RenderInline(bodyMd);
+            result.Add(new AcceptanceCriterion(number, html, PathUtil.StripHtmlTags(html)));
+        }
+
+        return result;
+    }
+
+    // "AC: #1" or "AC #1, #2" — the leading "AC" with an optional colon, then one or more "#N" numbers.
+    private static readonly Regex AcReferenceGroup = new(@"\bAC:?\s*#\d+(?:\s*,\s*#\d+)*", RegexOptions.Compiled);
+    private static readonly Regex AcReferenceNumber = new(@"#(\d+)", RegexOptions.Compiled);
+
+    /// <summary>Rewrites every "(AC: #N)" reference in already-rendered story HTML into a link to the
+    /// matching criterion's "#ac-N" anchor, with that criterion's full text as a hover tooltip. Numbers
+    /// with no matching criterion are left as plain text.</summary>
+    public static string LinkifyAcReferences(string html, IReadOnlyDictionary<int, string> criteriaByNumber)
+    {
+        if (html.Length == 0 || criteriaByNumber.Count == 0) return html;
+
+        return AcReferenceGroup.Replace(html, group =>
+            AcReferenceNumber.Replace(group.Value, num =>
+            {
+                var n = int.Parse(num.Groups[1].Value);
+                return criteriaByNumber.TryGetValue(n, out var text)
+                    ? $"<a class=\"ac-ref\" href=\"#ac-{n}\" title=\"{PathUtil.Html(text)}\">#{n}</a>"
+                    : num.Value;
+            }));
     }
 
     private static string ExtractSectionHtml(string[] lines, string exactHeading)

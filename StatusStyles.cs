@@ -13,7 +13,8 @@ public static class StatusStyles
         {
             var s = status.Trim().ToLowerInvariant();
             if (s.Contains("done") || s.Contains("complete")) return "done";
-            if (s.Contains("progress") || s.Contains("in-dev") || s.Contains("review")) return "active";
+            if (s.Contains("review")) return "review";
+            if (s.Contains("progress") || s.Contains("in-dev")) return "active";
             if (s.Contains("ready")) return "ready";
         }
 
@@ -29,7 +30,7 @@ public static class StatusStyles
 
         var storyClasses = epic.Stories.Select(ForStory).ToList();
         if (storyClasses.All(c => c == "done")) return "done";
-        if (storyClasses.Any(c => c is "active" or "done")) return "active";
+        if (storyClasses.Any(c => c is "active" or "review" or "done")) return "active";
         return "drafted";
     }
 

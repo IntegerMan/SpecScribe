@@ -146,6 +146,7 @@ public static class EpicsTemplater
         string artifactSourceRelativePath,
         string blurbHtml,
         string remainderHtml,
+        IReadOnlyList<AcceptanceCriterion> acceptanceCriteria,
         IReadOnlyList<(string Label, string ContentHtml)> devAgentRecord,
         IReadOnlyList<TaskItem> tasks,
         SiteNav nav)
@@ -194,19 +195,36 @@ public static class EpicsTemplater
             sb.Append(Charts.TaskSunburst(tasks));
             sb.Append("</div>\n");
         }
-        sb.Append(BmadCommands.RenderNextSteps(story, artifactSourceRelativePath));
+        sb.Append(BmadCommands.RenderNextSteps(story));
         sb.Append("</div>\n");
 
-        // Dev Agent Record used to be four mostly-empty headings buried at the very bottom — a compact
-        // table near the top surfaces "has an agent actually worked this yet?" at a glance.
+        // Acceptance Criteria leads the plan as its own panel (ahead of the Dev Agent Record): each
+        // criterion is independently anchored (id="ac-N") so the "(AC: #N)" references peppered through
+        // the tasks below can deep-link straight to it.
+        if (acceptanceCriteria.Count > 0)
+        {
+            sb.Append("<div class=\"chart-panel ac-panel\">\n<h3>Acceptance Criteria</h3>\n<div class=\"ac-criteria\">\n");
+            foreach (var ac in acceptanceCriteria)
+            {
+                sb.Append($"  <div class=\"ac-criterion\" id=\"ac-{ac.Number}\">\n");
+                sb.Append($"    <a class=\"ac-anchor\" href=\"#ac-{ac.Number}\">AC #{ac.Number}</a>\n");
+                sb.Append($"    <div class=\"ac-criterion-body\">{ac.Html}</div>\n");
+                sb.Append("  </div>\n");
+            }
+            sb.Append("</div>\n</div>\n");
+        }
+
+        // Dev Agent Record used to be four mostly-empty headings buried at the very bottom. It's now a
+        // compact table, collapsed by default (agent bookkeeping, not the first thing a reader wants) but
+        // one click away when you need to check whether an agent has actually worked this story.
         if (devAgentRecord.Count > 0)
         {
-            sb.Append("<div class=\"chart-panel\">\n<h3>Dev Agent Record</h3>\n<table class=\"dev-agent-table\">\n");
+            sb.Append("<details class=\"chart-panel dev-agent-details\">\n<summary>Dev Agent Record</summary>\n<table class=\"dev-agent-table\">\n");
             foreach (var (label, contentHtml) in devAgentRecord)
             {
                 sb.Append($"  <tr><th>{PathUtil.Html(label)}</th><td>{contentHtml}</td></tr>\n");
             }
-            sb.Append("</table>\n</div>\n");
+            sb.Append("</table>\n</details>\n");
         }
         sb.Append("</section>\n\n");
 
@@ -379,7 +397,7 @@ public static class EpicsTemplater
     /// fully done.</summary>
     private static void AppendUpNextCard(StringBuilder sb, EpicInfo epic, string prefix)
     {
-        var active = epic.Stories.FirstOrDefault(s => StatusStyles.ForStory(s) == "active");
+        var active = epic.Stories.FirstOrDefault(s => StatusStyles.ForStory(s) is "active" or "review");
         var ready = active is null ? epic.Stories.FirstOrDefault(s => StatusStyles.ForStory(s) == "ready") : null;
         var undetailed = active is null && ready is null
             ? epic.Stories.FirstOrDefault(s => s.ArtifactOutputPath is null)
@@ -392,7 +410,8 @@ public static class EpicsTemplater
             return;
         }
 
-        var (cssClass, kicker) = active is not null ? ("active", "In development")
+        var (cssClass, kicker) = active is not null
+                ? StatusStyles.ForStory(active) == "review" ? ("review", "In review") : ("active", "In development")
             : ready is not null ? ("ready", "Ready for dev")
             : ("drafted", "Not yet drafted");
         var href = target.ArtifactOutputPath is { } ap ? prefix + ap : $"#{StoryAnchorId(target.Id)}";

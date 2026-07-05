@@ -226,18 +226,26 @@ public sealed class SiteGenerator
                     var artifactRaw = MarkdownConverter.ReadAllTextShared(artifactFullPath);
                     var tasks = TaskListParser.Parse(artifactRaw);
                     var (blurbHtml, remainderHtml) = EpicsParser.SplitStoryArtifact(artifactRaw);
+                    var acceptanceCriteria = EpicsParser.ExtractAcceptanceCriteria(artifactRaw);
                     var devAgentRecord = EpicsParser.ExtractDevAgentRecord(artifactRaw);
 
                     // Turn "[Source: _bmad-output/path.md]" citations into real links to the generated page.
                     var storyPrefix = PathUtil.RelativePrefix(story.ArtifactOutputPath);
                     blurbHtml = SourceLinkifier.Linkify(blurbHtml, referenceMap, storyPrefix);
                     remainderHtml = SourceLinkifier.Linkify(remainderHtml, referenceMap, storyPrefix);
+                    acceptanceCriteria = acceptanceCriteria
+                        .Select(ac => ac with { Html = SourceLinkifier.Linkify(ac.Html, referenceMap, storyPrefix) })
+                        .ToList();
                     devAgentRecord = devAgentRecord
                         .Select(e => (e.Label, ContentHtml: SourceLinkifier.Linkify(e.ContentHtml, referenceMap, storyPrefix)))
                         .ToList();
 
+                    // Deep-link every "(AC: #N)" reference in the plan to its criterion panel above.
+                    var criteriaByNumber = acceptanceCriteria.ToDictionary(ac => ac.Number, ac => ac.PlainText);
+                    remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
+
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, devAgentRecord, tasks, nav);
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, nav);
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyRequirementLinks(storyHtml, story.ArtifactOutputPath!));
                 }
             }

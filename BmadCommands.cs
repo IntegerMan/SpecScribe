@@ -12,8 +12,8 @@ public static class BmadCommands
 {
     private sealed record Suggestion(string Command, string Description);
 
-    public static string RenderNextSteps(StoryInfo story, string artifactSourcePath) =>
-        RenderPanel(ForStory(story, artifactSourcePath));
+    public static string RenderNextSteps(StoryInfo story) =>
+        RenderPanel(ForStory(story));
 
     public static string RenderEpicNextSteps(EpicInfo epic) =>
         RenderPanel(ForEpic(epic));
@@ -48,16 +48,15 @@ public static class BmadCommands
         return sb.ToString();
     }
 
-    private static List<Suggestion> ForStory(StoryInfo story, string artifactSourcePath)
+    private static List<Suggestion> ForStory(StoryInfo story)
     {
-        var path = PathUtil.NormalizeSlashes(Path.Combine("_bmad-output", artifactSourcePath));
         var status = story.Status?.Trim().ToLowerInvariant() ?? string.Empty;
 
         if (status.Contains("ready"))
         {
             return new List<Suggestion>
             {
-                new($"/gds-dev-story {path}",
+                new($"/gds-dev-story {story.Id}",
                     "Implements the story exactly as specified — tasks, acceptance criteria, and dev notes drive the work."),
                 new("/gds-code-review",
                     "Adversarial multi-layer review of the changes once implementation lands."),
@@ -68,7 +67,7 @@ public static class BmadCommands
         {
             return new List<Suggestion>
             {
-                new($"/gds-dev-story {path}",
+                new($"/gds-dev-story {story.Id}",
                     "Resumes implementation from the unchecked tasks in the story plan."),
                 new("/gds-code-review",
                     "Review the work so far — worth running before marking the story done."),
@@ -129,11 +128,22 @@ public static class BmadCommands
 
         if (epicClass == "active")
         {
-            return new List<Suggestion>
+            var active = new List<Suggestion>
             {
                 new("/gds-sprint-status",
                     "Surfaces this epic's current risks and the recommended next action — see the in-development story's own page for its specific dev command."),
             };
+
+            // Even mid-epic, the next story without a plan is worth drafting so it's ready when the
+            // current front line closes.
+            var nextToDetail = epic.Stories.FirstOrDefault(s => s.ArtifactOutputPath is null);
+            if (nextToDetail is not null)
+            {
+                active.Add(new($"/gds-create-story {nextToDetail.Id}",
+                    "Drafts the next story in this epic that doesn't have an implementation plan yet."));
+            }
+
+            return active;
         }
 
         // "drafted" — stories are listed but none has a detailed implementation plan yet.

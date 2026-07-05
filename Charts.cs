@@ -172,6 +172,7 @@ public static class Charts
               <span><span class="swatch sb-drafted-sw"></span>Drafted</span>
               <span><span class="swatch sb-ready-sw"></span>Ready for dev</span>
               <span><span class="swatch sb-active-sw"></span>In development</span>
+              <span><span class="swatch sb-review-sw"></span>In review</span>
               <span><span class="swatch sb-done-sw"></span>Done</span>
             </div>
             <div class="sunburst-hint">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>
@@ -262,6 +263,7 @@ public static class Charts
               <span><span class="swatch sb-drafted-sw"></span>Drafted</span>
               <span><span class="swatch sb-ready-sw"></span>Ready for dev</span>
               <span><span class="swatch sb-active-sw"></span>In development</span>
+              <span><span class="swatch sb-review-sw"></span>In review</span>
               <span><span class="swatch sb-done-sw"></span>Done</span>
             </div>
             <div class="sunburst-hint">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>
