@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Renders the two requirements page types: the requirements index (all FRs &amp; NFRs, with
 /// FR/NFR progress donuts) and one detail page per requirement (definition, covering epic + its progress,
@@ -12,7 +12,7 @@ public static class RequirementsTemplater
         var outputPath = SiteNav.RequirementsOutputPath;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Requirements — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + "docsforge.css"));
+        sb.Append(PathUtil.RenderHeadOpen($"Requirements — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName));
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Requirements", null) }));
 
@@ -78,7 +78,7 @@ public static class RequirementsTemplater
         var kindLabel = req.Kind == RequirementKind.Functional ? "Functional Requirement" : "Non-Functional Requirement";
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"{req.Id} — {nav.SiteTitle}", prefix + "docsforge.css"));
+        sb.Append(PathUtil.RenderHeadOpen($"{req.Id} — {nav.SiteTitle}", prefix + ForgeOptions.StylesheetName));
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {

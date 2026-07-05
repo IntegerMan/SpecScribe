@@ -1,4 +1,4 @@
-namespace DocsForge;
+namespace SpecScribe;
 
 public enum EpicStatus { Drafted, Pending }
 

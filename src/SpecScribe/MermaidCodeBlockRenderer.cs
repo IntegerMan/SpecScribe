@@ -3,7 +3,7 @@ using Markdig.Renderers;
 using Markdig.Renderers.Html;
 using Markdig.Syntax;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Renders a <c>```mermaid</c> fenced code block as <c>&lt;pre class="mermaid"&gt;</c> — the shape the
 /// client-side mermaid.js renderer picks up (see <see cref="Mermaid"/>) — instead of Markdig's default

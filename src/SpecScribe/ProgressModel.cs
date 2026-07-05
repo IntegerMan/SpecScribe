@@ -1,4 +1,4 @@
-namespace DocsForge;
+namespace SpecScribe;
 
 public sealed class EpicProgress
 {

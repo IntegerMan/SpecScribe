@@ -1,4 +1,4 @@
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>An Architecture Decision Record surfaced on the index. ADRs are hand-authored under
 /// <c>docs/adrs/</c> (not <c>_bmad-output</c>), so they carry no BMad frontmatter — the number comes from the

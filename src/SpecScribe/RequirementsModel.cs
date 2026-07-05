@@ -1,4 +1,4 @@
-namespace DocsForge;
+namespace SpecScribe;
 
 public enum RequirementKind { Functional, NonFunctional }
 

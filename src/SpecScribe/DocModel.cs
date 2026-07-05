@@ -1,4 +1,4 @@
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>A single heading extracted from the rendered body, used for the in-page contents strip.</summary>
 public sealed record Heading(int Level, string Text, string Id);

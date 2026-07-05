@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Rewrites the Markdown-authored <c>.md</c> links inside a rendered ADR body so they point at the
 /// generated pages instead of the raw source. ADRs cross-link heavily — to sibling records

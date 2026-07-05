@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>A lightweight snapshot of repo activity, for the dashboard's "project pulse".</summary>
 public sealed record GitPulse(

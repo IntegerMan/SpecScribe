@@ -78,7 +78,7 @@ dotnet test             # run the unit tests
 dotnet run --project src/SpecScribe -- generate    # run without installing
 ```
 
-The solution is `SpecScribe.sln`; the tool lives in `src/SpecScribe`, tests in `tests/SpecScribe.Tests`.
+The solution is `SpecScribe.slnx`; the tool lives in `src/SpecScribe`, tests in `tests/SpecScribe.Tests`.
 
 ## License
 

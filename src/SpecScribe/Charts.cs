@@ -1,10 +1,10 @@
 using System.Globalization;
 using System.Text;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Pure inline SVG + CSS chart builders — no JS, no external dependencies, themed entirely via
-/// the CSS variables already defined in docsforge.css. Every builder degrades gracefully at zero/low data
+/// the CSS variables already defined in specscribe.css. Every builder degrades gracefully at zero/low data
 /// (a hallmark of a project that's just getting started).</summary>
 public static class Charts
 {
@@ -31,7 +31,7 @@ public static class Charts
     }
 
     /// <summary>A donut chart from labeled segments; each segment's CSS class picks its color
-    /// (e.g. "done"/"pending") via .donut-seg.done { stroke: ... } rules in docsforge.css.</summary>
+    /// (e.g. "done"/"pending") via .donut-seg.done { stroke: ... } rules in specscribe.css.</summary>
     public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120)
     {
         var total = segments.Sum(s => Math.Max(0, s.Value));

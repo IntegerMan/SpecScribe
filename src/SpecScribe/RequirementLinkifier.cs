@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Turns plain "FR25"/"NFR7" references — inert text Markdig has no reason to linkify — into
 /// real links to that requirement's generated page, wherever they appear in a rendered body. Runs as a

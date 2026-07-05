@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>A single checkbox line from a story's "## Tasks / Subtasks" list.</summary>
 public sealed record TaskItem(string Text, bool Done, IReadOnlyList<TaskItem> Subtasks);

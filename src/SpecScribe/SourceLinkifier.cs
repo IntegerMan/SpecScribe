@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Turns "[Source: _bmad-output/path/to/doc.md#Some Heading]" citations — plain bracketed text
 /// Markdig has no reason to linkify — into real links to the corresponding generated page, wherever they

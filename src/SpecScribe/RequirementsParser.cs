@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Parses the "## Requirements Inventory" section of a BMad epics.md into a structured
 /// <see cref="RequirementsModel"/>.

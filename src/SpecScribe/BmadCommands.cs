@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Suggests the BMad (GDS module) commands that make sense as next steps for a story or epic,
 /// given its current status — rendered as a "Next Steps" panel so the workflow prompt is always one

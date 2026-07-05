@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Builds the mermaid.js epic-roadmap diagram. Rendering happens client-side via a CDN-loaded
 /// module script (see <see cref="InitScript"/>) — the offline SVG/CSS charts in <see cref="Charts"/> are

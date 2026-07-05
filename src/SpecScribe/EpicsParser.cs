@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Parses a BMad epics.md into a structured <see cref="EpicsModel"/>.
 ///

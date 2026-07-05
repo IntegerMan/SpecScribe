@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SpecScribe</RootNamespace>
+    <AssemblyName>specscribe</AssemblyName>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Global tool packaging">
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>specscribe</ToolCommandName>
+    <PackageId>SpecScribe</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Matt Eland</Authors>
+    <Description>Human-readable web pages from spec-driven-development artifacts (BMad/GDS today; SpecKit and GSD planned).</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="1.3.2" />
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
+    <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <!-- Embedded rather than copied content so the stylesheet survives global-tool packaging intact. -->
+    <EmbeddedResource Include="assets\specscribe.css" />
+  </ItemGroup>
+
+</Project>

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>The site-wide header nav (Home, GDD, Narrative, Game Architecture, Epics) plus breadcrumb rendering.
 /// Nav targets are discovered by well-known filename, so a missing doc is simply omitted rather than

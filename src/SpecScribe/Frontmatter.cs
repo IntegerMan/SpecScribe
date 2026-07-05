@@ -1,4 +1,4 @@
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Parsed YAML frontmatter from a BMad markdown doc. Fields are optional — BMad docs vary widely in what they set.</summary>
 public sealed class Frontmatter

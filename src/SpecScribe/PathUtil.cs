@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Small stateless helpers shared by every page-rendering class (relative-link math, HTML escaping, the common page shell).</summary>
 public static class PathUtil

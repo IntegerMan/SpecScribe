@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Renders the three epics page types: the epics index, one page per epic, and one page per story
 /// (for stories with a resolved implementation-artifacts detail file).</summary>
@@ -11,7 +11,7 @@ public static class EpicsTemplater
         const string outputPath = SiteNav.EpicsOutputPath;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Epics & Stories — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + "docsforge.css"));
+        sb.Append(PathUtil.RenderHeadOpen($"Epics & Stories — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName));
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Epics", null) }));
 
@@ -66,7 +66,7 @@ public static class EpicsTemplater
         var epicClass = StatusStyles.ForEpic(epic);
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + "docsforge.css"));
+        sb.Append(PathUtil.RenderHeadOpen($"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName));
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
@@ -159,7 +159,7 @@ public static class EpicsTemplater
         var storyClass = StatusStyles.ForStory(story);
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + "docsforge.css"));
+        sb.Append(PathUtil.RenderHeadOpen($"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName));
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {

@@ -1,13 +1,13 @@
 using Spectre.Console;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>All Spectre.Console presentation, kept separate from generation logic.</summary>
 public static class ConsoleUi
 {
     public static void PrintBanner(ForgeOptions options)
     {
-        AnsiConsole.Write(new FigletText("DocsForge").Color(Color.Orange3));
+        AnsiConsole.Write(new FigletText("SpecScribe").Color(Color.Orange3));
         AnsiConsole.MarkupLine("[grey]BMad markdown -> stylized HTML, live.[/]");
         AnsiConsole.Write(new Rule().RuleStyle("grey37"));
 

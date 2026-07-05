@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 public enum GenerationOutcome { Generated, Updated, Removed, Skipped, Error }
 
@@ -448,10 +448,11 @@ public sealed class SiteGenerator
     {
         Directory.CreateDirectory(_options.OutputRoot);
         var cssDest = Path.Combine(_options.OutputRoot, ForgeOptions.StylesheetName);
-        if (File.Exists(_options.StylesheetSourcePath))
-        {
-            File.Copy(_options.StylesheetSourcePath, cssDest, overwrite: true);
-        }
+        // The stylesheet ships as an embedded resource so the global-tool package needs no loose asset files.
+        using var css = typeof(SiteGenerator).Assembly.GetManifestResourceStream("SpecScribe.assets.specscribe.css")
+            ?? throw new InvalidOperationException("Embedded stylesheet 'SpecScribe.assets.specscribe.css' is missing from the assembly.");
+        using var dest = File.Create(cssDest);
+        css.CopyTo(dest);
     }
 
     private List<string> EnumerateSourceFiles() =>

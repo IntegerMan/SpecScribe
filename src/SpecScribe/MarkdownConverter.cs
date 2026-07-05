@@ -7,7 +7,7 @@ using Markdig.Syntax;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Converts a single BMad markdown file (frontmatter + body) into a <see cref="DocModel"/>. Never opens files exclusively — BMad tooling may still be writing them.</summary>
 public static class MarkdownConverter

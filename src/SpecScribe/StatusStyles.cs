@@ -1,4 +1,4 @@
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>The single source of truth for status → color semantics across every chart, chip, and badge:
 /// parchment = pending · gold = drafted/ready (planned, no dev yet) · teal = active dev · green = done only.

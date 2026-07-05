@@ -1,6 +1,5 @@
 <Solution>
-  <Folder Name="/src/" />
-  <Folder Name="/src/SpecScribe/">
-    <Project Path="src/SpecScribe/DocsForge.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/SpecScribe/SpecScribe.csproj" />
   </Folder>
 </Solution>

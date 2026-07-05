@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Resolved absolute paths and settings for a run.</summary>
 public sealed class ForgeOptions
@@ -8,57 +8,69 @@ public sealed class ForgeOptions
     public required string RepoRoot { get; init; }
     public required string SourceRoot { get; init; }
 
-    /// <summary>Hand-authored Architecture Decision Records (<c>docs/adrs</c>). A read-only second source: DocsForge
+    /// <summary>Hand-authored Architecture Decision Records (<c>docs/adrs</c>). A read-only second source: SpecScribe
     /// renders these into the live site but never writes back to this folder.</summary>
     public required string AdrSourceRoot { get; init; }
     public required string OutputRoot { get; init; }
-    public required string StylesheetSourcePath { get; init; }
 
-    /// <summary>The game's name, read from _bmad/config.toml's project_name — the site is branded with
+    /// <summary>The project's name, read from _bmad/config.toml's project_name — the site is branded with
     /// this rather than a generic tool name.</summary>
     public required string SiteTitle { get; init; }
 
-    public const string StylesheetName = "docsforge.css";
+    public const string StylesheetName = "specscribe.css";
     public const string DefaultSiteTitle = "BMad Live Docs";
+    public const string SourceDirName = "_bmad-output";
 
     /// <summary>Subdirectory of the output root where rendered ADR pages land.</summary>
     public const string AdrOutputSubdir = "adrs";
     public static readonly TimeSpan DebounceInterval = TimeSpan.FromMilliseconds(400);
 
-    /// <summary>Walks up from the executable/working directory to find the repo root (marked by the presence of _bmad-output).</summary>
-    public static ForgeOptions Resolve()
+    /// <summary>Resolves paths for a run. Explicit values win; anything omitted is derived from the repo root,
+    /// which is either the parent of an explicit <paramref name="source"/> or found by walking up from
+    /// <paramref name="startDirectory"/> (defaults to the current working directory) until a directory
+    /// containing <c>_bmad-output</c> is found.</summary>
+    public static ForgeOptions Resolve(
+        string? source = null,
+        string? adrs = null,
+        string? output = null,
+        string? projectName = null,
+        string? startDirectory = null)
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "_bmad-output")))
+        string repoRoot;
+        string sourceRoot;
+        if (source is { Length: > 0 })
         {
-            dir = dir.Parent;
+            sourceRoot = Path.GetFullPath(source);
+            repoRoot = Path.GetDirectoryName(sourceRoot) ?? sourceRoot;
         }
-
-        if (dir is null)
+        else
         {
-            // Fall back to walking up from the current working directory (covers `dotnet run`).
-            dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-            while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "_bmad-output")))
+            // Deliberately walks up from the cwd only — never the executable directory, which for an
+            // installed global tool lives in the tool store under the user profile.
+            var dir = new DirectoryInfo(startDirectory ?? Directory.GetCurrentDirectory());
+            while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, SourceDirName)))
             {
                 dir = dir.Parent;
             }
+
+            if (dir is null)
+            {
+                throw new DirectoryNotFoundException(
+                    $"Could not locate a repo root (a directory containing '{SourceDirName}') at or above the " +
+                    "current directory. Run from inside a BMad project, or pass --source to point at your artifacts.");
+            }
+
+            repoRoot = dir.FullName;
+            sourceRoot = Path.Combine(repoRoot, SourceDirName);
         }
 
-        if (dir is null)
-        {
-            throw new DirectoryNotFoundException(
-                "Could not locate the repo root (a directory containing '_bmad-output') from the executable or working directory.");
-        }
-
-        var repoRoot = dir.FullName;
         return new ForgeOptions
         {
             RepoRoot = repoRoot,
-            SourceRoot = Path.Combine(repoRoot, "_bmad-output"),
-            AdrSourceRoot = Path.Combine(repoRoot, "docs", "adrs"),
-            OutputRoot = Path.Combine(repoRoot, "docs", "live"),
-            StylesheetSourcePath = Path.Combine(AppContext.BaseDirectory, "assets", StylesheetName),
-            SiteTitle = ReadProjectName(repoRoot) ?? DefaultSiteTitle,
+            SourceRoot = sourceRoot,
+            AdrSourceRoot = adrs is { Length: > 0 } ? Path.GetFullPath(adrs) : Path.Combine(repoRoot, "docs", "adrs"),
+            OutputRoot = output is { Length: > 0 } ? Path.GetFullPath(output) : Path.Combine(repoRoot, "docs", "live"),
+            SiteTitle = projectName is { Length: > 0 } ? projectName : ReadProjectName(repoRoot) ?? DefaultSiteTitle,
         };
     }
 

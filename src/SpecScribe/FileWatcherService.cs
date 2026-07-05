@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Watches _bmad-output (and the hand-authored docs/adrs) for *.md changes and drives the
 /// SiteGenerator, debouncing the burst of events a single save typically produces. Reads are always shared

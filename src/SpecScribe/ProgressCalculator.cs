@@ -1,4 +1,4 @@
-namespace DocsForge;
+namespace SpecScribe;
 
 /// <summary>Tallies epic/story/task progress from a parsed <see cref="EpicsModel"/> and its resolved
 /// implementation artifacts. As a side effect, fills in each <see cref="StoryInfo"/>'s TasksDone/TasksTotal
