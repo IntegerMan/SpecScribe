@@ -7,6 +7,10 @@ public sealed class ForgeOptions
 {
     public required string RepoRoot { get; init; }
     public required string SourceRoot { get; init; }
+
+    /// <summary>Hand-authored Architecture Decision Records (<c>docs/adrs</c>). A read-only second source: DocsForge
+    /// renders these into the live site but never writes back to this folder.</summary>
+    public required string AdrSourceRoot { get; init; }
     public required string OutputRoot { get; init; }
     public required string StylesheetSourcePath { get; init; }
 
@@ -16,6 +20,9 @@ public sealed class ForgeOptions
 
     public const string StylesheetName = "docsforge.css";
     public const string DefaultSiteTitle = "BMad Live Docs";
+
+    /// <summary>Subdirectory of the output root where rendered ADR pages land.</summary>
+    public const string AdrOutputSubdir = "adrs";
     public static readonly TimeSpan DebounceInterval = TimeSpan.FromMilliseconds(400);
 
     /// <summary>Walks up from the executable/working directory to find the repo root (marked by the presence of _bmad-output).</summary>
@@ -48,6 +55,7 @@ public sealed class ForgeOptions
         {
             RepoRoot = repoRoot,
             SourceRoot = Path.Combine(repoRoot, "_bmad-output"),
+            AdrSourceRoot = Path.Combine(repoRoot, "docs", "adrs"),
             OutputRoot = Path.Combine(repoRoot, "docs", "live"),
             StylesheetSourcePath = Path.Combine(AppContext.BaseDirectory, "assets", StylesheetName),
             SiteTitle = ReadProjectName(repoRoot) ?? DefaultSiteTitle,

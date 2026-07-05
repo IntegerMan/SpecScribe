@@ -105,12 +105,25 @@ public static class EpicsParser
             if (lines[i].TrimEnd() == "## Dev Agent Record") { remainderEnd = i; break; }
         }
 
-        // Carve the Acceptance Criteria section out of the remainder — it now leads the page as its own
-        // panel, so leaving it here would duplicate it.
-        var (acStart, acEnd) = FindSection(lines, "## Acceptance Criteria", remainderStart, remainderEnd);
-        var remainderLines = acStart >= 0
-            ? lines[remainderStart..acStart].Concat(lines[acEnd..remainderEnd])
-            : lines[remainderStart..remainderEnd];
+        // Carve out the sections that render as their own panels elsewhere on the page, so they aren't
+        // duplicated inside the remainder: Acceptance Criteria (leads the page), plus Review Findings and
+        // Change Log (surfaced near the top / at the very bottom respectively). Change Log and Review
+        // Findings normally sit after Dev Agent Record and are already past remainderEnd, but carving them
+        // explicitly keeps the remainder clean regardless of section order.
+        var carved = new[] { "## Acceptance Criteria", "## Review Findings", "## Change Log" }
+            .Select(h => FindSection(lines, h, remainderStart, remainderEnd))
+            .Where(s => s.Start >= 0)
+            .OrderBy(s => s.Start)
+            .ToList();
+
+        var remainderLines = new List<string>();
+        var cursor = remainderStart;
+        foreach (var (secStart, secEnd) in carved)
+        {
+            if (secStart > cursor) remainderLines.AddRange(lines[cursor..secStart]);
+            cursor = secEnd;
+        }
+        if (cursor < remainderEnd) remainderLines.AddRange(lines[cursor..remainderEnd]);
 
         var remainderMd = string.Join("\n", remainderLines);
         remainderMd = SourceCitationBrackets.Replace(remainderMd, "$1");
@@ -235,6 +248,20 @@ public static class EpicsParser
                     ? $"<a class=\"ac-ref\" href=\"#ac-{n}\" title=\"{PathUtil.Html(text)}\">#{n}</a>"
                     : num.Value;
             }));
+    }
+
+    /// <summary>Renders a named "## Heading" section of a raw story artifact to block HTML (heading itself
+    /// excluded, up to the next H2), with "[Source: ...]" citation brackets stripped as in the remainder.
+    /// Returns "" when the section is absent. Used to surface Review Findings and Change Log as their own
+    /// panels on the story page.</summary>
+    public static string ExtractNamedSectionHtml(string raw, string exactHeading)
+    {
+        var lines = raw.Replace("\r\n", "\n").Split('\n');
+        var (start, end) = FindSection(lines, exactHeading, 0, lines.Length);
+        if (start < 0) return string.Empty;
+
+        var slice = SourceCitationBrackets.Replace(string.Join("\n", lines[(start + 1)..end]).Trim(), "$1");
+        return slice.Length == 0 ? string.Empty : MarkdownConverter.RenderBlock(slice);
     }
 
     private static string ExtractSectionHtml(string[] lines, string exactHeading)

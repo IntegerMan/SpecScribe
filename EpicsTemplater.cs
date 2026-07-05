@@ -149,6 +149,8 @@ public static class EpicsTemplater
         IReadOnlyList<AcceptanceCriterion> acceptanceCriteria,
         IReadOnlyList<(string Label, string ContentHtml)> devAgentRecord,
         IReadOnlyList<TaskItem> tasks,
+        string reviewFindingsHtml,
+        string changeLogHtml,
         SiteNav nav)
     {
         var outputPath = story.ArtifactOutputPath
@@ -228,9 +230,24 @@ public static class EpicsTemplater
         }
         sb.Append("</section>\n\n");
 
+        // Review Findings ride high on the page — a code-review outcome is one of the first things a reader
+        // wants, ahead of the full plan. Rendered outside the plan article so it reads as its own callout.
+        if (reviewFindingsHtml.Length > 0)
+        {
+            sb.Append("<section class=\"chart-panel review-findings\">\n<h3>Review Findings</h3>\n");
+            sb.Append($"<div class=\"doc-body\">{reviewFindingsHtml}</div>\n</section>\n\n");
+        }
+
         sb.Append("<article class=\"doc-body epic-card\">\n");
         sb.Append(remainderHtml);
         sb.Append("\n</article>\n\n");
+
+        // Change Log (revision history) anchors the very bottom of the page as its own section.
+        if (changeLogHtml.Length > 0)
+        {
+            sb.Append("<section class=\"chart-panel change-log\">\n<h3>Change Log</h3>\n");
+            sb.Append($"<div class=\"doc-body\">{changeLogHtml}</div>\n</section>\n\n");
+        }
 
         sb.Append(PathUtil.RenderFooter($"{PathUtil.Html(nav.SiteTitle)} &middot; Source: <code>{PathUtil.Html(PathUtil.NormalizeSlashes(artifactSourceRelativePath))}</code>"));
         sb.Append("</body>\n</html>\n");

@@ -132,9 +132,14 @@ body {
   color: var(--ink-faded);
 }
 
-.pill.status-complete { border-color: var(--moss-light); color: var(--moss); }
+.pill.status-complete,
+.pill.status-accepted { border-color: var(--moss-light); color: var(--moss); }
 .pill.status-draft,
+.pill.status-proposed,
 .pill.status-in-progress { border-color: var(--gold-light); color: var(--gold); }
+/* Superseded/deprecated ADRs read as muted — the record stays for history but no longer applies. */
+.pill.status-superseded,
+.pill.status-deprecated { border-color: var(--border); color: var(--ink-light); text-decoration: line-through; }
 
 /* ====================== TOC STRIP ====================== */
 .toc-strip {
@@ -235,26 +240,28 @@ body {
   padding: 0;
 }
 
-.doc-body table {
+/* Every markdown-generated table carries .md-table (see MarkdownConverter.TagTables), so this styles
+   pipe tables consistently everywhere — inside .doc-body and in stand-alone panels like Change Log. */
+.md-table {
   width: 100%;
   border-collapse: collapse;
   margin: 1.2rem 0;
   font-size: 0.88rem;
 }
 
-.doc-body th,
-.doc-body td {
+.md-table th,
+.md-table td {
   border: 1px solid var(--border);
   padding: 0.5rem 0.7rem;
   text-align: left;
 }
 
-.doc-body th {
+.md-table th {
   background: var(--parchment-dark);
   color: var(--ink);
 }
 
-.doc-body tr:nth-child(even) td { background: var(--warm-white); }
+.md-table tr:nth-child(even) td { background: var(--warm-white); }
 
 .doc-body hr {
   border: none;
@@ -289,6 +296,19 @@ body {
 }
 
 .index-section-title:first-of-type { margin-top: 0; }
+
+/* Section header that pairs a centered title with a "view all" link (e.g. the ADR band). */
+.index-section-title-row {
+  max-width: 1100px;
+  margin: 2.2rem auto 1rem;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.8rem;
+}
+.index-section-title-row .index-section-title { margin: 0; padding: 0; }
+.index-section-title-row .view-epic-link { margin-top: 0; white-space: nowrap; }
 
 .index-grid {
   max-width: 1100px;
@@ -751,6 +771,20 @@ body {
 
 .dev-agent-table td p { margin: 0; }
 .dev-agent-empty { color: var(--ink-light); font-style: italic; }
+
+/* ============ REVIEW FINDINGS / CHANGE LOG (story-page callouts) ============ */
+/* Both reuse the .doc-body inner wrapper for list/checkbox/table styling; the outer .chart-panel gives
+   the card frame. A left accent bar distinguishes each from the plan body around them. */
+/* Combined selector so the accent beats .chart-panel's `border` shorthand regardless of source order. */
+.chart-panel.review-findings { border-left: 3px solid var(--rust); }
+.chart-panel.change-log { border-left: 3px solid var(--teal); }
+
+.review-findings > .doc-body,
+.change-log > .doc-body { margin-top: 0.4rem; }
+
+/* These sections have no headings of their own, so trim the leading margin the first block would add. */
+.review-findings > .doc-body > :first-child,
+.change-log > .doc-body > :first-child { margin-top: 0; }
 
 /* ====================== NOW & NEXT ====================== */
 .now-next {

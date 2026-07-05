@@ -2,15 +2,15 @@ using System.Collections.Concurrent;
 
 namespace DocsForge;
 
-/// <summary>Watches _bmad-output for *.md changes and drives the SiteGenerator, debouncing the burst of
-/// events a single save typically produces. Reads are always shared (see MarkdownConverter), so this
-/// never takes a write lock on anything under the watched tree.</summary>
+/// <summary>Watches _bmad-output (and the hand-authored docs/adrs) for *.md changes and drives the
+/// SiteGenerator, debouncing the burst of events a single save typically produces. Reads are always shared
+/// (see MarkdownConverter), so this never takes a write lock on anything under the watched tree.</summary>
 public sealed class FileWatcherService : IDisposable
 {
     private readonly ForgeOptions _options;
     private readonly SiteGenerator _generator;
     private readonly Action<GenerationEvent> _onEvent;
-    private readonly FileSystemWatcher _watcher;
+    private readonly List<FileSystemWatcher> _watchers = new();
     private readonly ConcurrentDictionary<string, Timer> _pending = new(StringComparer.OrdinalIgnoreCase);
 
     public FileWatcherService(ForgeOptions options, SiteGenerator generator, Action<GenerationEvent> onEvent)
@@ -20,7 +20,16 @@ public sealed class FileWatcherService : IDisposable
         _onEvent = onEvent;
 
         Directory.CreateDirectory(options.SourceRoot);
-        _watcher = new FileSystemWatcher(options.SourceRoot)
+        _watchers.Add(CreateWatcher(options.SourceRoot));
+
+        // The hand-authored ADRs are a second, read-only source; watch them too so edits live-reload.
+        Directory.CreateDirectory(options.AdrSourceRoot);
+        _watchers.Add(CreateWatcher(options.AdrSourceRoot));
+    }
+
+    private FileSystemWatcher CreateWatcher(string root)
+    {
+        var watcher = new FileSystemWatcher(root)
         {
             IncludeSubdirectories = true,
             Filter = "*.md",
@@ -28,21 +37,28 @@ public sealed class FileWatcherService : IDisposable
             InternalBufferSize = 65536,
         };
 
-        _watcher.Changed += (_, e) => Debounce(e.FullPath);
-        _watcher.Created += (_, e) => Debounce(e.FullPath);
-        _watcher.Deleted += (_, e) => Debounce(e.FullPath);
-        _watcher.Renamed += (_, e) =>
+        watcher.Changed += (_, e) => Debounce(e.FullPath);
+        watcher.Created += (_, e) => Debounce(e.FullPath);
+        watcher.Deleted += (_, e) => Debounce(e.FullPath);
+        watcher.Renamed += (_, e) =>
         {
             Debounce(e.OldFullPath);
             Debounce(e.FullPath);
         };
-        _watcher.Error += (_, e) =>
+        watcher.Error += (_, e) =>
             _onEvent(new GenerationEvent(GenerationOutcome.Error, "<watcher>", TimeSpan.Zero, e.GetException().Message));
+        return watcher;
     }
 
-    public void Start() => _watcher.EnableRaisingEvents = true;
+    public void Start()
+    {
+        foreach (var w in _watchers) w.EnableRaisingEvents = true;
+    }
 
-    public void Stop() => _watcher.EnableRaisingEvents = false;
+    public void Stop()
+    {
+        foreach (var w in _watchers) w.EnableRaisingEvents = false;
+    }
 
     private void Debounce(string fullPath)
     {
@@ -71,11 +87,13 @@ public sealed class FileWatcherService : IDisposable
 
             // Decide the action from ground truth at fire time, not from which event triggered it —
             // a save can emit Changed/Created/Deleted in any order before the debounce settles.
-            var ev = _generator.IsEpicsRelated(fullPath)
-                ? _generator.RegenerateEpics()
-                : File.Exists(fullPath)
-                    ? _generator.GenerateOne(fullPath)
-                    : _generator.RemoveFor(fullPath);
+            var ev = _generator.IsAdr(fullPath)
+                ? _generator.RegenerateAdrs()
+                : _generator.IsEpicsRelated(fullPath)
+                    ? _generator.RegenerateEpics()
+                    : File.Exists(fullPath)
+                        ? _generator.GenerateOne(fullPath)
+                        : _generator.RemoveFor(fullPath);
             _onEvent(ev);
         }, null, ForgeOptions.DebounceInterval, Timeout.InfiniteTimeSpan);
         return timer;
@@ -83,7 +101,7 @@ public sealed class FileWatcherService : IDisposable
 
     public void Dispose()
     {
-        _watcher.Dispose();
+        foreach (var w in _watchers) w.Dispose();
         foreach (var kv in _pending)
         {
             kv.Value.Dispose();

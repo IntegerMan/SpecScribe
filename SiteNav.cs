@@ -10,6 +10,7 @@ public sealed class SiteNav
     public const string HomeOutputPath = "index.html";
     public const string EpicsOutputPath = "epics.html";
     public const string RequirementsOutputPath = "requirements.html";
+    public const string AdrsLandingOutputPath = "adrs/index.html";
 
     public required IReadOnlyList<(string Label, string OutputRelativePath)> Items { get; init; }
 
@@ -20,7 +21,9 @@ public sealed class SiteNav
 
     public bool HasEpics => Items.Any(i => i.Label == "Epics");
 
-    public static SiteNav Build(IReadOnlyList<string> sourceRelativePaths, string siteTitle)
+    public bool HasAdrs => Items.Any(i => i.Label == "ADRs");
+
+    public static SiteNav Build(IReadOnlyList<string> sourceRelativePaths, string siteTitle, bool hasAdrs = false)
     {
         var items = new List<(string, string)> { ("Home", HomeOutputPath) };
 
@@ -37,6 +40,13 @@ public sealed class SiteNav
         AddIfFound("gdd.md", "GDD");
         AddIfFound("narrative-design.md", "Narrative");
         AddIfFound("game-architecture.md", "Game Architecture");
+
+        // ADRs sit next to the architecture doc conceptually; they live in docs/adrs, not _bmad-output,
+        // so their availability is signalled by the caller rather than the source-file list.
+        if (hasAdrs)
+        {
+            items.Add(("ADRs", AdrsLandingOutputPath));
+        }
 
         if (sourceRelativePaths.Any(p => string.Equals(Path.GetFileName(p), "epics.md", StringComparison.OrdinalIgnoreCase)))
         {

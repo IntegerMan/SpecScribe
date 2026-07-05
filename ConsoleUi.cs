@@ -15,6 +15,7 @@ public static class ConsoleUi
         grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
         grid.AddColumn();
         grid.AddRow("[bold]Watching[/]", $"[yellow]{Markup.Escape(options.SourceRoot)}[/]");
+        grid.AddRow("[bold]ADRs[/]", $"[yellow]{Markup.Escape(options.AdrSourceRoot)}[/]");
         grid.AddRow("[bold]Output[/]", $"[green]{Markup.Escape(options.OutputRoot)}[/]");
         AnsiConsole.Write(grid);
         AnsiConsole.WriteLine();

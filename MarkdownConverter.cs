@@ -31,8 +31,11 @@ public static class MarkdownConverter
         using var writer = new StringWriter();
         var renderer = new HtmlRenderer(writer);
         Pipeline.Setup(renderer);
+        UseMermaidCodeBlocks(renderer);
         renderer.Render(document);
         writer.Flush();
+
+        var hasMermaid = MermaidCodeBlockRenderer.HasMermaid(document);
 
         var headings = document.Descendants<HeadingBlock>()
             .Where(h => h.Level is >= 1 and <= 3)
@@ -50,9 +53,22 @@ public static class MarkdownConverter
             OutputRelativePath = outputRelativePath,
             Title = title,
             Frontmatter = frontmatter,
-            BodyHtml = writer.ToString(),
+            BodyHtml = TagTables(writer.ToString()),
             Headings = headings,
+            HasMermaid = hasMermaid,
         };
+    }
+
+    /// <summary>Replaces the default fenced-code renderer with one that emits mermaid blocks as
+    /// <c>&lt;pre class="mermaid"&gt;</c>. Must run after <see cref="MarkdownPipeline.Setup(IMarkdownRenderer)"/>
+    /// so the default renderer it wraps is already registered.</summary>
+    private static void UseMermaidCodeBlocks(HtmlRenderer renderer)
+    {
+        var existing = renderer.ObjectRenderers.OfType<CodeBlockRenderer>().FirstOrDefault();
+        if (existing is null) return;
+
+        renderer.ObjectRenderers.Remove(existing);
+        renderer.ObjectRenderers.Add(new MermaidCodeBlockRenderer(existing));
     }
 
     /// <summary>Opens with FileShare.ReadWrite so an editor or the BMad tooling can hold/write the file concurrently without us blocking it.</summary>
@@ -81,7 +97,13 @@ public static class MarkdownConverter
 
     /// <summary>Renders a markdown fragment as full block HTML (paragraphs, headings, lists) — used for
     /// multi-paragraph slices pulled out of a larger doc, e.g. the Overview section of epics.md.</summary>
-    public static string RenderBlock(string markdown) => Markdown.ToHtml(markdown, Pipeline);
+    public static string RenderBlock(string markdown) => TagTables(Markdown.ToHtml(markdown, Pipeline));
+
+    /// <summary>Tags every Markdig-generated <c>&lt;table&gt;</c> with class <c>md-table</c> so a single CSS
+    /// rule styles markdown tables consistently everywhere — including sections rendered outside the
+    /// <c>.doc-body</c> article (Change Log, Review Findings, etc.). Markdig emits bare, attribute-less
+    /// <c>&lt;table&gt;</c> tags for pipe tables, so the plain replace is unambiguous.</summary>
+    private static string TagTables(string html) => html.Replace("<table>", "<table class=\"md-table\">");
 
     private static readonly Regex FrontmatterPattern = new(
         @"\A---\r?\n(?<yaml>.*?)\r?\n---\r?\n?",

@@ -12,4 +12,8 @@ public sealed class DocModel
     public required Frontmatter Frontmatter { get; init; }
     public required string BodyHtml { get; init; }
     public required IReadOnlyList<Heading> Headings { get; init; }
+
+    /// <summary>True when the rendered body contains a mermaid diagram, so the page template knows to inject the
+    /// client-side mermaid init script (see <see cref="Mermaid.InitScript"/>).</summary>
+    public bool HasMermaid { get; init; }
 }

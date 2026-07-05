@@ -12,6 +12,9 @@ public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativeP
 public sealed class SiteGenerator
 {
     private static readonly Regex ArtifactFilenamePattern = new(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
+    private static readonly Regex AdrNumberPattern = new(@"^(?<num>\d+)", RegexOptions.Compiled);
+    private static readonly Regex AdrStatusPattern = new(@"^\*\*Status:\*\*\s*(?<status>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex MarkdownLinkPattern = new(@"\[(?<text>[^\]]+)\]\([^)]+\)", RegexOptions.Compiled);
 
     private readonly ForgeOptions _options;
     private readonly Dictionary<string, DocModel> _docs = new(StringComparer.OrdinalIgnoreCase);
@@ -21,6 +24,7 @@ public sealed class SiteGenerator
     private EpicsModel? _epicsModel;
     private ProgressModel? _progress;
     private RequirementsModel? _requirements;
+    private List<AdrEntry> _adrs = new();
 
     public SiteGenerator(ForgeOptions options)
     {
@@ -45,7 +49,7 @@ public sealed class SiteGenerator
             EnsureScaffold();
             _docs.Clear();
 
-            var nav = SiteNav.Build(sourceRelatives, _options.SiteTitle);
+            var nav = BuildNav(sourceRelatives);
             _nav = nav;
 
             var epicsSourceFile = FindEpicsSourceFile(files);
@@ -73,6 +77,8 @@ public sealed class SiteGenerator
                 events.Add(GenerateOneInternal(file, nav));
             }
 
+            events.AddRange(GenerateAdrsInternal(nav));
+
             WriteIndex(nav);
         }
         return events;
@@ -83,7 +89,7 @@ public sealed class SiteGenerator
         lock (_gate)
         {
             EnsureScaffold();
-            var nav = _nav ?? SiteNav.Build(Array.Empty<string>(), _options.SiteTitle);
+            var nav = _nav ?? BuildNav(Array.Empty<string>());
             var ev = GenerateOneInternal(sourceFullPath, nav);
             WriteIndex(nav);
             return ev;
@@ -106,7 +112,7 @@ public sealed class SiteGenerator
                 }
 
                 _docs.Remove(relative);
-                WriteIndex(_nav ?? SiteNav.Build(Array.Empty<string>(), _options.SiteTitle));
+                WriteIndex(_nav ?? BuildNav(Array.Empty<string>()));
                 return new GenerationEvent(GenerationOutcome.Removed, relative, sw.Elapsed);
             }
 
@@ -139,7 +145,7 @@ public sealed class SiteGenerator
             EnsureScaffold();
 
             var files = EnumerateSourceFiles();
-            var nav = SiteNav.Build(files.Select(ToSourceRelative).ToList(), _options.SiteTitle);
+            var nav = BuildNav(files.Select(ToSourceRelative).ToList());
             _nav = nav;
 
             var epicsSourceFile = FindEpicsSourceFile(files);
@@ -162,6 +168,100 @@ public sealed class SiteGenerator
 
             return new GenerationEvent(GenerationOutcome.Updated, ToSourceRelative(epicsSourceFile), sw.Elapsed, $"{consumed.Count} stories");
         }
+    }
+
+    /// <summary>True for any file under the ADR source root — routes watch-mode events to
+    /// <see cref="RegenerateAdrs"/> rather than the _bmad-output pipeline.</summary>
+    public bool IsAdr(string sourceFullPath)
+    {
+        var full = Path.GetFullPath(sourceFullPath);
+        var root = Path.GetFullPath(_options.AdrSourceRoot);
+        return full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Re-renders every ADR page (and the index that lists them). ADRs cross-link to one another,
+    /// so a single edit is rebuilt as a set rather than one page in isolation.</summary>
+    public GenerationEvent RegenerateAdrs()
+    {
+        var sw = Stopwatch.StartNew();
+        lock (_gate)
+        {
+            EnsureScaffold();
+            var nav = _nav ?? BuildNav(Array.Empty<string>());
+            var events = GenerateAdrsInternal(nav);
+            WriteIndex(nav);
+
+            var errored = events.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
+            if (errored is not null)
+            {
+                return errored;
+            }
+
+            return new GenerationEvent(GenerationOutcome.Updated, "adrs", sw.Elapsed, $"{_adrs.Count} ADRs");
+        }
+    }
+
+    /// <summary>Renders each hand-authored record under <c>docs/adrs</c> into <c>docs/live/adrs</c>. README.md
+    /// becomes the landing page (index.html); numbered records also become cards on the home index. The whole
+    /// ADR output directory is rebuilt each pass so a deleted or renamed record can't leave a stale page behind.</summary>
+    private List<GenerationEvent> GenerateAdrsInternal(SiteNav nav)
+    {
+        var events = new List<GenerationEvent>();
+
+        var adrOutputDir = Path.Combine(_options.OutputRoot, ForgeOptions.AdrOutputSubdir);
+        if (Directory.Exists(adrOutputDir))
+        {
+            Directory.Delete(adrOutputDir, recursive: true);
+        }
+
+        var entries = new List<AdrEntry>();
+        foreach (var file in EnumerateAdrFiles())
+        {
+            var sw = Stopwatch.StartNew();
+            var fileName = Path.GetFileName(file);
+            var isReadme = string.Equals(fileName, "README.md", StringComparison.OrdinalIgnoreCase);
+
+            // README is the landing page; numbered files are the records; everything else (e.g. TEMPLATE.md)
+            // still renders so its cross-links resolve, but never becomes a card.
+            var outputName = isReadme ? "index.html" : Path.ChangeExtension(fileName, ".html");
+            var outputRelative = PathUtil.NormalizeSlashes($"{ForgeOptions.AdrOutputSubdir}/{outputName}");
+            var sourceRelative = PathUtil.NormalizeSlashes($"{ForgeOptions.AdrOutputSubdir}/{fileName}");
+
+            try
+            {
+                var raw = MarkdownConverter.ReadAllTextShared(file);
+                var parsed = MarkdownConverter.Convert(file, sourceRelative, outputRelative);
+                var doc = new DocModel
+                {
+                    SourceRelativePath = parsed.SourceRelativePath,
+                    OutputRelativePath = parsed.OutputRelativePath,
+                    Title = parsed.Title,
+                    Frontmatter = parsed.Frontmatter,
+                    BodyHtml = AdrLinkRewriter.Rewrite(parsed.BodyHtml),
+                    Headings = parsed.Headings,
+                    HasMermaid = parsed.HasMermaid,
+                };
+
+                var outputFullPath = Path.Combine(_options.OutputRoot, ForgeOptions.AdrOutputSubdir, outputName);
+                Directory.CreateDirectory(Path.GetDirectoryName(outputFullPath)!);
+                File.WriteAllText(outputFullPath, ApplyRequirementLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+
+                var number = ParseAdrNumber(fileName);
+                if (!isReadme && number is not null)
+                {
+                    entries.Add(new AdrEntry(doc.Title, outputRelative, sourceRelative, ExtractAdrStatus(raw), number));
+                }
+
+                events.Add(new GenerationEvent(GenerationOutcome.Generated, sourceRelative, sw.Elapsed));
+            }
+            catch (Exception ex)
+            {
+                events.Add(new GenerationEvent(GenerationOutcome.Error, sourceRelative, sw.Elapsed, ex.Message));
+            }
+        }
+
+        _adrs = entries.OrderBy(e => e.Number).ToList();
+        return events;
     }
 
     private List<GenerationEvent> GenerateEpicsInternal(
@@ -228,11 +328,15 @@ public sealed class SiteGenerator
                     var (blurbHtml, remainderHtml) = EpicsParser.SplitStoryArtifact(artifactRaw);
                     var acceptanceCriteria = EpicsParser.ExtractAcceptanceCriteria(artifactRaw);
                     var devAgentRecord = EpicsParser.ExtractDevAgentRecord(artifactRaw);
+                    var reviewFindingsHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Review Findings");
+                    var changeLogHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Change Log");
 
                     // Turn "[Source: _bmad-output/path.md]" citations into real links to the generated page.
                     var storyPrefix = PathUtil.RelativePrefix(story.ArtifactOutputPath);
                     blurbHtml = SourceLinkifier.Linkify(blurbHtml, referenceMap, storyPrefix);
                     remainderHtml = SourceLinkifier.Linkify(remainderHtml, referenceMap, storyPrefix);
+                    reviewFindingsHtml = SourceLinkifier.Linkify(reviewFindingsHtml, referenceMap, storyPrefix);
+                    changeLogHtml = SourceLinkifier.Linkify(changeLogHtml, referenceMap, storyPrefix);
                     acceptanceCriteria = acceptanceCriteria
                         .Select(ac => ac with { Html = SourceLinkifier.Linkify(ac.Html, referenceMap, storyPrefix) })
                         .ToList();
@@ -245,7 +349,7 @@ public sealed class SiteGenerator
                     remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, nav);
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, reviewFindingsHtml, changeLogHtml, nav);
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyRequirementLinks(storyHtml, story.ArtifactOutputPath!));
                 }
             }
@@ -304,7 +408,7 @@ public sealed class SiteGenerator
     {
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs);
         File.WriteAllText(indexPath, ApplyRequirementLinks(html, "index.html"));
     }
 
@@ -357,6 +461,37 @@ public sealed class SiteGenerator
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .ToList()
             : new List<string>();
+
+    private List<string> EnumerateAdrFiles() =>
+        Directory.Exists(_options.AdrSourceRoot)
+            ? Directory.EnumerateFiles(_options.AdrSourceRoot, "*.md", SearchOption.TopDirectoryOnly)
+                .Where(p => !IsIgnored(p))
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+            : new List<string>();
+
+    /// <summary>Builds the site nav, folding in whether any ADRs exist (they live outside the _bmad-output
+    /// file list the nav is otherwise derived from).</summary>
+    private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives) =>
+        SiteNav.Build(sourceRelatives, _options.SiteTitle, AdrsExist());
+
+    private bool AdrsExist() => EnumerateAdrFiles().Any(f => ParseAdrNumber(Path.GetFileName(f)) is not null);
+
+    private static int? ParseAdrNumber(string fileName)
+    {
+        var m = AdrNumberPattern.Match(fileName);
+        return m.Success && int.TryParse(m.Groups["num"].Value, out var n) ? n : null;
+    }
+
+    /// <summary>Pulls the "**Status:** …" line out of an ADR body and flattens any markdown link in it to plain
+    /// text (e.g. "Superseded by [0002](0002-x.md)" → "Superseded by 0002"), for the index card.</summary>
+    private static string? ExtractAdrStatus(string raw)
+    {
+        var m = AdrStatusPattern.Match(raw);
+        if (!m.Success) return null;
+        var status = MarkdownLinkPattern.Replace(m.Groups["status"].Value, "${text}").Trim();
+        return status.Length == 0 ? null : status;
+    }
 
     private static string? FindEpicsSourceFile(IEnumerable<string> files) =>
         files.FirstOrDefault(f => string.Equals(Path.GetFileName(f), "epics.md", StringComparison.OrdinalIgnoreCase));
