@@ -31,10 +31,12 @@ public sealed class SiteGenerator
         _options = options;
     }
 
-    public IReadOnlyList<GenerationEvent> GenerateAll()
+    public IReadOnlyList<GenerationEvent> GenerateAll(IGenerationReporter? reporter = null)
     {
+        reporter?.BeginPhase(GenerationPhase.Scan);
         var files = EnumerateSourceFiles();
         var sourceRelatives = files.Select(ToSourceRelative).ToList();
+        reporter?.EndPhase(GenerationPhase.Scan);
 
         var events = new List<GenerationEvent>();
         lock (_gate)
@@ -58,28 +60,32 @@ public sealed class SiteGenerator
 
             if (epicsSourceFile is not null)
             {
+                reporter?.BeginPhase(GenerationPhase.Epics);
                 events.AddRange(GenerateEpicsInternal(epicsSourceFile, files, artifactMap, consumedArtifacts, nav));
+                reporter?.EndPhase(GenerationPhase.Epics);
             }
 
-            foreach (var file in files)
+            // Epic/story artifacts were rendered as detail pages above; everything else renders standalone.
+            var pageFiles = files
+                .Where(file => epicsSourceFile is null || !string.Equals(file, epicsSourceFile, StringComparison.OrdinalIgnoreCase))
+                .Where(file => !consumedArtifacts.Contains(ToSourceRelative(file)))
+                .ToList();
+
+            reporter?.BeginPhase(GenerationPhase.Pages, pageFiles.Count);
+            foreach (var file in pageFiles)
             {
-                if (epicsSourceFile is not null && string.Equals(file, epicsSourceFile, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue; // handled by GenerateEpicsInternal above
-                }
-
-                var rel = ToSourceRelative(file);
-                if (consumedArtifacts.Contains(rel))
-                {
-                    continue; // rendered as a story detail page already
-                }
-
                 events.Add(GenerateOneInternal(file, nav));
+                reporter?.Tick(GenerationPhase.Pages);
             }
+            reporter?.EndPhase(GenerationPhase.Pages);
 
+            reporter?.BeginPhase(GenerationPhase.Adrs);
             events.AddRange(GenerateAdrsInternal(nav));
+            reporter?.EndPhase(GenerationPhase.Adrs);
 
+            reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav);
+            reporter?.EndPhase(GenerationPhase.Index);
         }
         return events;
     }
