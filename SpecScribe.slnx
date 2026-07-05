@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/SpecScribe/SpecScribe.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SpecScribe.Tests/SpecScribe.Tests.csproj" />
+  </Folder>
 </Solution>
