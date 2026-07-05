@@ -142,6 +142,18 @@ public static class HtmlTemplater
         if (epicsModel is not null)
         {
             AppendNowAndNext(sb, epicsModel);
+
+            // The sunburst sits immediately under Now & Next — the "where do I look" panel and the
+            // whole-project map read as a pair, so keep them adjacent rather than separated by the
+            // status donuts and requirements panels.
+            // The dedicated "Epics & Stories" index card felt redundant once the whole dashboard was
+            // effectively an epics/stories overview — this CTA lives where the sunburst already is one.
+            sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3>");
+            sb.Append("<a class=\"view-epic-link\" href=\"epics.html\">View Epics &amp; Stories &rarr;</a></div>\n");
+            sb.Append(Charts.Sunburst(epicsModel));
+            sb.Append("</div>\n\n");
+
             sb.Append(BmadCommands.RenderProjectNextSteps(epicsModel));
         }
 
@@ -167,17 +179,6 @@ public static class HtmlTemplater
         sb.Append("</div>\n\n");
 
         AppendRequirementsPanel(sb, requirements);
-
-        if (epicsModel is not null)
-        {
-            // The dedicated "Epics & Stories" index card felt redundant once the whole dashboard was
-            // effectively an epics/stories overview — this CTA lives where the sunburst already is one.
-            sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
-            sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3>");
-            sb.Append("<a class=\"view-epic-link\" href=\"epics.html\">View Epics &amp; Stories &rarr;</a></div>\n");
-            sb.Append(Charts.Sunburst(epicsModel));
-            sb.Append("</div>\n\n");
-        }
 
         if (p.PerEpic.Count > 0)
         {
@@ -235,10 +236,22 @@ public static class HtmlTemplater
     {
         var allStories = epicsModel.Epics.SelectMany(e => e.Stories.Select(s => (Epic: e, Story: s))).ToList();
         var inDev = allStories.Where(x => StatusStyles.ForStory(x.Story) == "active").ToList();
+        var inReview = allStories.Where(x => StatusStyles.ForStory(x.Story) == "review").ToList();
         var upNext = allStories.Where(x => StatusStyles.ForStory(x.Story) == "ready").ToList();
+
+        // The lowest-numbered story that's been listed in a drafted epic but has no artifact yet — the
+        // next stub to flesh out. Pending epics are covered by nextEpicToDraft, so exclude them here.
+        var nextStoryToDraft = allStories
+            .Where(x => x.Epic.Status == EpicStatus.Drafted && StatusStyles.ForStory(x.Story) == "drafted")
+            .OrderBy(x => x.Epic.Number)
+            .ThenBy(x => StoryMinor(x.Story.Id))
+            .Select(x => (x.Epic, x.Story))
+            .FirstOrDefault();
+
         var nextEpicToDraft = epicsModel.Epics.OrderBy(e => e.Number).FirstOrDefault(e => e.Status == EpicStatus.Pending);
 
-        if (inDev.Count == 0 && upNext.Count == 0 && nextEpicToDraft is null) return;
+        if (inDev.Count == 0 && inReview.Count == 0 && upNext.Count == 0
+            && nextStoryToDraft.Story is null && nextEpicToDraft is null) return;
 
         sb.Append("<div class=\"chart-panel\">\n<h3>Now &amp; Next</h3>\n<div class=\"now-next\">\n");
 
@@ -249,9 +262,24 @@ public static class HtmlTemplater
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
         }
 
+        foreach (var (epic, story) in inReview)
+        {
+            AppendNowNextCard(sb, "review", "In review",
+                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
+        }
+
         foreach (var (epic, story) in upNext)
         {
             AppendNowNextCard(sb, "ready", "Up next",
+                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
+        }
+
+        if (nextStoryToDraft.Story is not null)
+        {
+            var (epic, story) = nextStoryToDraft;
+            AppendNowNextCard(sb, "drafted", "Next story to draft",
                 $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
         }
@@ -264,6 +292,14 @@ public static class HtmlTemplater
         }
 
         sb.Append("</div>\n</div>\n\n");
+    }
+
+    /// <summary>The "M" from a story id "N.M", for ordering stories within an epic; falls back to
+    /// <see cref="int.MaxValue"/> for ids that don't parse so they sort last rather than throw.</summary>
+    private static int StoryMinor(string storyId)
+    {
+        var dot = storyId.LastIndexOf('.');
+        return dot >= 0 && int.TryParse(storyId.AsSpan(dot + 1), out var minor) ? minor : int.MaxValue;
     }
 
     private static void AppendNowNextCard(StringBuilder sb, string cssClass, string kicker, string title, string href)

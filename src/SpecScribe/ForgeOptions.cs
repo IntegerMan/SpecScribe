@@ -11,6 +11,11 @@ public sealed class ForgeOptions
     /// <summary>Hand-authored Architecture Decision Records (<c>docs/adrs</c>). A read-only second source: SpecScribe
     /// renders these into the live site but never writes back to this folder.</summary>
     public required string AdrSourceRoot { get; init; }
+
+    /// <summary>True when the ADR directory was set explicitly (via <c>--adrs</c>) rather than defaulted. ADRs are
+    /// always optional, but an explicit-yet-missing directory is surfaced as a warning since it likely signals a typo.</summary>
+    public required bool AdrSourceExplicit { get; init; }
+
     public required string OutputRoot { get; init; }
 
     /// <summary>The project's name, read from _bmad/config.toml's project_name — the site is branded with
@@ -69,6 +74,7 @@ public sealed class ForgeOptions
             RepoRoot = repoRoot,
             SourceRoot = sourceRoot,
             AdrSourceRoot = adrs is { Length: > 0 } ? Path.GetFullPath(adrs) : Path.Combine(repoRoot, "docs", "adrs"),
+            AdrSourceExplicit = adrs is { Length: > 0 },
             OutputRoot = output is { Length: > 0 } ? Path.GetFullPath(output) : Path.Combine(repoRoot, "docs", "live"),
             SiteTitle = projectName is { Length: > 0 } ? projectName : ReadProjectName(repoRoot) ?? DefaultSiteTitle,
         };

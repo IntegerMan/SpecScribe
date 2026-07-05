@@ -24,6 +24,7 @@ public sealed class GenerateCommand : Command<SiteSettings>
         var events = ConsoleUi.RunWithProgress(generator);
         sw.Stop();
         ConsoleUi.PrintInitialSummary(events, sw.Elapsed);
+        ConsoleUi.PrintOutputLink(options);
         return generator;
     }
 }
@@ -81,6 +82,13 @@ public sealed class InteractiveCommand : Command<SiteSettings>
     {
         ConsoleUi.PrintLogo();
         ConsoleUi.PrintUsage();
+
+        // Restore any previously saved paths, letting explicit CLI options take precedence.
+        if (SettingsStore.TryLoad() is { } saved)
+        {
+            SettingsStore.ApplyTo(saved, settings);
+            ConsoleUi.PrintSettingsLoaded(SettingsStore.ResolvePath(), saved);
+        }
 
         while (true)
         {
@@ -143,6 +151,12 @@ public sealed class InteractiveCommand : Command<SiteSettings>
             new TextPrompt<string>("Project name:")
                 .DefaultValue(settings.ProjectName ?? defaults?.SiteTitle ?? ForgeOptions.DefaultSiteTitle));
         settings.ProjectName = name.Trim();
+
+        // Persist the choices so they're restored on the next run.
+        if (SettingsStore.TrySave(settings) is { } savedPath)
+        {
+            ConsoleUi.PrintSettingsSaved(savedPath);
+        }
     }
 
     private static ForgeOptions? TryResolveSilently(SiteSettings settings)

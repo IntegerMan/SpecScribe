@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Godot editor sidecar files (this tool once lived inside a Godot repo)
 *.uid
+
+# SpecScribe per-user saved interactive settings
+.specscribe
