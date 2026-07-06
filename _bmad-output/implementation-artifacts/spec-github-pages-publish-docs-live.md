@@ -1,18 +1,18 @@
 ---
-title: 'Publish docs/live to GitHub Pages'
+title: 'Publish SpecScribeOutput to GitHub Pages'
 type: 'chore'
 created: '2026-07-05T00:00:00Z'
 status: 'done'
 route: 'one-shot'
 ---
 
-# Publish docs/live to GitHub Pages
+# Publish SpecScribeOutput to GitHub Pages
 
 ## Intent
 
-**Problem:** The repository did not have an automated deployment pipeline for the generated static site in `docs/live`, making documentation publishing manual and inconsistent.
+**Problem:** The repository did not have an automated deployment pipeline for generated static site output, making documentation publishing manual and inconsistent.
 
-**Approach:** Add a GitHub Actions workflow that generates the static site, validates expected output, uploads it as a Pages artifact, and deploys it to GitHub Pages on `main` changes and manual dispatch.
+**Approach:** Add a GitHub Actions workflow that generates the static site into `SpecScribeOutput`, validates expected output, uploads it as a Pages artifact, and deploys it to GitHub Pages on `main` changes and manual dispatch.
 
 ## Suggested Review Order
 

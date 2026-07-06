@@ -41,19 +41,19 @@ jobs:
           dotnet run --project src/SpecScribe -- generate \
             --source _bmad-output \
             --adrs docs/adrs \
-            --output docs/live \
+            --output SpecScribeOutput \
             --project-name SpecScribe
 
       - name: Validate generated output
         run: |
-          test -d docs/live
-          test -s docs/live/index.html
+          test -d SpecScribeOutput
+          test -s SpecScribeOutput/index.html
 
       - name: Upload static files as artifact
         id: upload
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/live
+          path: SpecScribeOutput
 
   deploy:
     environment:
