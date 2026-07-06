@@ -65,7 +65,7 @@ public static class RequirementsTemplater
 
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
@@ -127,7 +127,7 @@ public static class RequirementsTemplater
         sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + SiteNav.RequirementsOutputPath)}\">&larr; All requirements</a>\n");
         sb.Append("</div>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }

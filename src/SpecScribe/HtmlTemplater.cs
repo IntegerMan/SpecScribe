@@ -47,7 +47,7 @@ public static class HtmlTemplater
         sb.Append(doc.BodyHtml);
         sb.Append("\n</article>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         if (doc.HasMermaid)
         {
             sb.Append(Mermaid.InitScript());
@@ -56,7 +56,7 @@ public static class HtmlTemplater
         return sb.ToString();
     }
 
-    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs)
+    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands)
     {
         var groups = new (string Title, string Prefix)[]
         {
@@ -73,7 +73,7 @@ public static class HtmlTemplater
         sb.Append($"  <h1>{Html(nav.SiteTitle)}</h1>\n");
         sb.Append("</header>\n\n");
 
-        AppendDashboard(sb, progress, epicsModel, requirements, nav);
+        AppendDashboard(sb, progress, epicsModel, requirements, nav, commands);
 
         var used = new HashSet<DocModel>();
         foreach (var (groupTitle, groupPrefix) in groups)
@@ -111,12 +111,12 @@ public static class HtmlTemplater
 
         AppendAdrSection(sb, adrs);
 
-        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
 
-    private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav)
+    private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav, CommandCatalog commands)
     {
         sb.Append("<section class=\"dashboard\">\n");
 
@@ -155,7 +155,7 @@ public static class HtmlTemplater
             sb.Append(Charts.Sunburst(epicsModel));
             sb.Append("</div>\n\n");
 
-            sb.Append(BmadCommands.RenderProjectNextSteps(epicsModel));
+            sb.Append(BmadCommands.RenderProjectNextSteps(epicsModel, commands));
         }
 
         sb.Append("<div class=\"chart-row\">\n");
@@ -193,19 +193,18 @@ public static class HtmlTemplater
 
     private static void AppendDashboardQuickLinks(StringBuilder sb, SiteNav nav)
     {
-        var links = nav.Items
-            .Where(i => !string.Equals(i.Label, "Home", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (links.Count == 0) return;
+        if (nav.QuickLinks.Count == 0)
+        {
+            return;
+        }
 
         sb.Append("<div class=\"chart-panel dashboard-quick-links\">\n<h3>Explore Key Views</h3>\n");
         sb.Append("<div class=\"quick-link-grid\">\n");
-        foreach (var item in links)
+        foreach (var (label, outputPath, description) in nav.QuickLinks)
         {
-            sb.Append($"  <a class=\"quick-link-card\" href=\"{Html(item.OutputRelativePath)}\">\n");
-            sb.Append($"    <span class=\"quick-link-title\">{Html(QuickLinkTitle(item.Label))}</span>\n");
-            sb.Append($"    <span class=\"quick-link-sub\">{Html(QuickLinkDescription(item.Label))}</span>\n");
+            sb.Append($"  <a class=\"quick-link-card\" href=\"{Html(outputPath)}\">\n");
+            sb.Append($"    <span class=\"quick-link-title\">{Html(QuickLinkTitle(label))}</span>\n");
+            sb.Append($"    <span class=\"quick-link-sub\">{Html(description)}</span>\n");
             sb.Append("  </a>\n");
         }
         sb.Append("</div>\n</div>\n\n");
@@ -215,17 +214,6 @@ public static class HtmlTemplater
     {
         "Epics" => "Epics & Stories",
         _ => label,
-    };
-
-    private static string QuickLinkDescription(string label) => label switch
-    {
-        "Epics" => "Track epic and story delivery progress.",
-        "Requirements" => "Review FR/NFR coverage and status.",
-        "ADRs" => "Browse architecture decisions.",
-        "GDD" => "Open the game design baseline.",
-        "Narrative" => "Inspect narrative design artifacts.",
-        "Game Architecture" => "Inspect source-derived architecture notes.",
-        _ => "Open this generated documentation page.",
     };
 
     /// <summary>FR/NFR progress at a glance: a status donut for each kind, rolled up from covering-epic

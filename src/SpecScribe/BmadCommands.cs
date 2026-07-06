@@ -2,44 +2,44 @@ using System.Text;
 
 namespace SpecScribe;
 
-/// <summary>Suggests the BMad (GDS module) commands that make sense as next steps for a story or epic,
-/// given its current status — rendered as a "Next Steps" panel so the workflow prompt is always one
-/// copy-paste away. Mappings are grounded in the actual GDS production-phase workflow chain recorded in
-/// _bmad/gds/module-help.csv (preceded-by column): sprint-planning -> create-story -> dev-story ->
-/// code-review -> retrospective, with create-epics-and-stories -> check-implementation-readiness feeding
-/// it from the planning phase.</summary>
+/// <summary>Suggests the workflow commands that make sense as next steps for a story or epic, given its
+/// current status — rendered as a "Next Steps" panel so the workflow prompt is always one copy-paste away.
+/// The command strings come from the detected module's <see cref="CommandCatalog"/> (parsed from its
+/// module-help.csv), so a BMad Method project shows <c>/bmad-*</c> commands and a Game Dev Studio project
+/// shows <c>/gds-*</c> — the status-to-step logic is shared; only the concrete command names differ. A step
+/// the active module doesn't expose is omitted rather than printed as a command that doesn't exist.</summary>
 public static class BmadCommands
 {
     private sealed record Suggestion(string Command, string Description);
 
-    public static string RenderNextSteps(StoryInfo story) =>
-        RenderPanel(ForStory(story));
+    public static string RenderNextSteps(StoryInfo story, CommandCatalog commands) =>
+        RenderPanel(ForStory(story, commands), commands);
 
-    public static string RenderEpicNextSteps(EpicInfo epic) =>
-        RenderPanel(ForEpic(epic));
+    public static string RenderEpicNextSteps(EpicInfo epic, CommandCatalog commands) =>
+        RenderPanel(ForEpic(epic, commands), commands);
 
-    public static string RenderProjectNextSteps(EpicsModel model) =>
-        RenderPanel(ForProject(model));
+    public static string RenderProjectNextSteps(EpicsModel model, CommandCatalog commands) =>
+        RenderPanel(ForProject(model, commands), commands);
 
     /// <summary>The heading + list on their own (no chart-panel wrapper), for callers that want to fold
     /// the Next Steps into a shared panel rather than give it a standalone one.</summary>
-    public static string RenderEpicNextStepsInner(EpicInfo epic) =>
-        RenderInner(ForEpic(epic));
+    public static string RenderEpicNextStepsInner(EpicInfo epic, CommandCatalog commands) =>
+        RenderInner(ForEpic(epic, commands), commands);
 
-    private static string RenderPanel(List<Suggestion> suggestions)
+    private static string RenderPanel(List<Suggestion> suggestions, CommandCatalog commands)
     {
-        var inner = RenderInner(suggestions);
+        var inner = RenderInner(suggestions, commands);
         return inner.Length == 0
             ? string.Empty
             : $"<div class=\"chart-panel next-steps\">\n{inner}</div>\n\n";
     }
 
-    private static string RenderInner(List<Suggestion> suggestions)
+    private static string RenderInner(List<Suggestion> suggestions, CommandCatalog commands)
     {
         if (suggestions.Count == 0) return string.Empty;
 
         var sb = new StringBuilder();
-        sb.Append("<h3>Next Steps (BMad)</h3>\n<ul class=\"next-steps-list\">\n");
+        sb.Append($"<h3>Next Steps ({PathUtil.Html(commands.ModuleLabel)})</h3>\n<ul class=\"next-steps-list\">\n");
         foreach (var s in suggestions)
         {
             sb.Append($"  <li><code>{PathUtil.Html(s.Command)}</code><span class=\"next-steps-desc\">{PathUtil.Html(s.Description)}</span></li>\n");
@@ -48,116 +48,110 @@ public static class BmadCommands
         return sb.ToString();
     }
 
-    private static List<Suggestion> ForStory(StoryInfo story)
+    /// <summary>Appends a suggestion only when the module exposes that command — a missing step is dropped
+    /// so we never render a command that isn't installed.</summary>
+    private static void Add(List<Suggestion> list, string? command, string description)
+    {
+        if (command is not null)
+        {
+            list.Add(new Suggestion(command, description));
+        }
+    }
+
+    private static List<Suggestion> ForStory(StoryInfo story, CommandCatalog commands)
     {
         var status = story.Status?.Trim().ToLowerInvariant() ?? string.Empty;
+        var suggestions = new List<Suggestion>();
 
         if (status.Contains("ready"))
         {
-            return new List<Suggestion>
-            {
-                new($"/gds-dev-story {story.Id}",
-                    "Implements the story exactly as specified — tasks, acceptance criteria, and dev notes drive the work."),
-                new("/gds-code-review",
-                    "Adversarial multi-layer review of the changes once implementation lands."),
-            };
+            Add(suggestions, commands.Command("dev-story", story.Id),
+                "Implements the story exactly as specified — tasks, acceptance criteria, and dev notes drive the work.");
+            Add(suggestions, commands.Command("code-review"),
+                "Adversarial multi-layer review of the changes once implementation lands.");
+            return suggestions;
         }
 
         if (status.Contains("progress") || status.Contains("in-dev"))
         {
-            return new List<Suggestion>
-            {
-                new($"/gds-dev-story {story.Id}",
-                    "Resumes implementation from the unchecked tasks in the story plan."),
-                new("/gds-code-review",
-                    "Review the work so far — worth running before marking the story done."),
-            };
+            Add(suggestions, commands.Command("dev-story", story.Id),
+                "Resumes implementation from the unchecked tasks in the story plan.");
+            Add(suggestions, commands.Command("code-review"),
+                "Review the work so far — worth running before marking the story done.");
+            return suggestions;
         }
 
         if (status.Contains("done") || status.Contains("complete") || status.Contains("review"))
         {
-            return new List<Suggestion>
-            {
-                new("/gds-code-review",
-                    "Final adversarial pass over the story's changes."),
-                new("/gds-create-story",
-                    "Drafts the next story file with full context for implementation."),
-                new($"/gds-retrospective {story.EpicNumber}",
-                    "Post-epic retrospective once the epic's last story closes."),
-            };
+            Add(suggestions, commands.Command("code-review"),
+                "Final adversarial pass over the story's changes.");
+            Add(suggestions, commands.Command("create-story"),
+                "Drafts the next story file with full context for implementation.");
+            Add(suggestions, commands.Command("retrospective", story.EpicNumber.ToString()),
+                "Post-epic retrospective once the epic's last story closes.");
+            return suggestions;
         }
 
-        // No recognizable status — the plan doesn't exist yet.
-        var suggestions = new List<Suggestion>();
-
-        // Before the epic's first story starts, it's worth confirming GDD/UX/architecture/epics still
-        // agree with each other — cheaper to catch a misalignment here than mid-implementation.
+        // No recognizable status — the plan doesn't exist yet. Before the epic's first story starts, it's
+        // worth confirming the plan artifacts still agree — cheaper to catch a misalignment here than
+        // mid-implementation.
         if (story.Id.EndsWith(".1", StringComparison.Ordinal))
         {
-            suggestions.Add(new("/gds-check-implementation-readiness",
-                "Verifies the GDD, UX spec, architecture, and epics stay aligned before this epic's first story begins."));
+            Add(suggestions, commands.Command("check-implementation-readiness"),
+                "Verifies the requirements, UX, architecture, and epics stay aligned before this epic's first story begins.");
         }
 
-        suggestions.Add(new($"/gds-create-story {story.Id}",
-            "Generates the dedicated story file with full implementation context."));
+        Add(suggestions, commands.Command("create-story", story.Id),
+            "Generates the dedicated story file with full implementation context.");
 
         return suggestions;
     }
 
-    private static List<Suggestion> ForEpic(EpicInfo epic)
+    private static List<Suggestion> ForEpic(EpicInfo epic, CommandCatalog commands)
     {
         var epicClass = StatusStyles.ForEpic(epic);
+        var suggestions = new List<Suggestion>();
 
         if (epicClass == "pending")
         {
-            return new List<Suggestion>
-            {
-                new("/gds-create-epics-and-stories",
-                    $"Drafts the story breakdown for Epic {epic.Number} from the GDD and architecture — it doesn't have one yet."),
-            };
+            Add(suggestions, commands.Command("create-epics-and-stories"),
+                $"Drafts the story breakdown for Epic {epic.Number} from the plan and architecture — it doesn't have one yet.");
+            return suggestions;
         }
 
         if (epicClass == "done")
         {
-            return new List<Suggestion>
-            {
-                new($"/gds-retrospective {epic.Number}",
-                    "Runs a retrospective now that every story in this epic is done."),
-            };
+            Add(suggestions, commands.Command("retrospective", epic.Number.ToString()),
+                "Runs a retrospective now that every story in this epic is done.");
+            return suggestions;
         }
 
         if (epicClass == "active")
         {
-            var active = new List<Suggestion>
-            {
-                new("/gds-sprint-status",
-                    "Surfaces this epic's current risks and the recommended next action — see the in-development story's own page for its specific dev command."),
-            };
+            Add(suggestions, commands.Command("sprint-status"),
+                "Surfaces this epic's current risks and the recommended next action — see the in-development story's own page for its specific dev command.");
 
             // Even mid-epic, the next story without a plan is worth drafting so it's ready when the
             // current front line closes.
             var nextToDetail = epic.Stories.FirstOrDefault(s => s.ArtifactOutputPath is null);
             if (nextToDetail is not null)
             {
-                active.Add(new($"/gds-create-story {nextToDetail.Id}",
-                    "Drafts the next story in this epic that doesn't have an implementation plan yet."));
+                Add(suggestions, commands.Command("create-story", nextToDetail.Id),
+                    "Drafts the next story in this epic that doesn't have an implementation plan yet.");
             }
 
-            return active;
+            return suggestions;
         }
 
         // "drafted" — stories are listed but none has a detailed implementation plan yet.
-        var suggestions = new List<Suggestion>
-        {
-            new("/gds-sprint-planning",
-                "Refreshes sprint tracking from the current epics/stories — the prerequisite gds-create-story expects."),
-        };
+        Add(suggestions, commands.Command("sprint-planning"),
+            "Refreshes sprint tracking from the current epics/stories — the prerequisite create-story expects.");
 
         var nextUndetailed = epic.Stories.FirstOrDefault(s => s.ArtifactOutputPath is null);
         if (nextUndetailed is not null)
         {
-            suggestions.Add(new($"/gds-create-story {nextUndetailed.Id}",
-                "Generates the implementation plan for the next story in this epic."));
+            Add(suggestions, commands.Command("create-story", nextUndetailed.Id),
+                "Generates the implementation plan for the next story in this epic.");
         }
 
         return suggestions;
@@ -169,18 +163,18 @@ public static class BmadCommands
     /// mutually exclusive) so the home page shows the whole "what's next for the project" picture at once —
     /// story-level chores like code review live on the individual story pages, not here. Falls back to a
     /// project-wide retrospective only once every epic is drafted and every story detailed.</summary>
-    private static List<Suggestion> ForProject(EpicsModel model)
+    private static List<Suggestion> ForProject(EpicsModel model, CommandCatalog commands)
     {
         var suggestions = new List<Suggestion>();
         var allStories = model.Epics.SelectMany(e => e.Stories).ToList();
 
         // The current front line — a story that's ready or already in development. Referenced by its short
-        // id (e.g. "1.1"), which the gds-dev-story command resolves to the plan itself.
+        // id (e.g. "1.1"), which the dev-story command resolves to the plan itself.
         var actionable = allStories.FirstOrDefault(s => StatusStyles.ForStory(s) is "ready" or "active");
         if (actionable is not null)
         {
-            suggestions.Add(new($"/gds-dev-story {actionable.Id}",
-                $"Story {actionable.Id} is the current front line — implements it per its plan."));
+            Add(suggestions, commands.Command("dev-story", actionable.Id),
+                $"Story {actionable.Id} is the current front line — implements it per its plan.");
         }
 
         // The next story that still needs an implementation plan drawn up, in a drafted epic.
@@ -189,22 +183,22 @@ public static class BmadCommands
         if (epicNeedingStory is not null)
         {
             var nextStory = epicNeedingStory.Stories.First(s => s.ArtifactOutputPath is null);
-            suggestions.Add(new($"/gds-create-story {nextStory.Id}",
-                $"Drafts the implementation plan for Epic {epicNeedingStory.Number}'s next story ({nextStory.Id}) — it doesn't have one yet."));
+            Add(suggestions, commands.Command("create-story", nextStory.Id),
+                $"Drafts the implementation plan for Epic {epicNeedingStory.Number}'s next story ({nextStory.Id}) — it doesn't have one yet.");
         }
 
         // The next epic still waiting to be broken down into stories.
         var pendingEpic = model.Epics.FirstOrDefault(e => e.Status == EpicStatus.Pending);
         if (pendingEpic is not null)
         {
-            suggestions.Add(new("/gds-create-epics-and-stories",
-                $"Breaks Epic {pendingEpic.Number} down into stories — the next epic still awaiting a story breakdown."));
+            Add(suggestions, commands.Command("create-epics-and-stories"),
+                $"Breaks Epic {pendingEpic.Number} down into stories — the next epic still awaiting a story breakdown.");
         }
 
         if (suggestions.Count == 0)
         {
-            suggestions.Add(new("/gds-retrospective",
-                "Every epic is drafted and every story detailed — a good point for a project-wide retrospective."));
+            Add(suggestions, commands.Command("retrospective"),
+                "Every epic is drafted and every story detailed — a good point for a project-wide retrospective.");
         }
 
         return suggestions;

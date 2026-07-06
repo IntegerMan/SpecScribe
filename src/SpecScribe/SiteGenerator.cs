@@ -21,6 +21,7 @@ public sealed class SiteGenerator
     private readonly object _gate = new();
 
     private SiteNav? _nav;
+    private ModuleContext _module = ModuleContext.None;
     private EpicsModel? _epicsModel;
     private ProgressModel? _progress;
     private RequirementsModel? _requirements;
@@ -82,6 +83,12 @@ public sealed class SiteGenerator
             reporter?.BeginPhase(GenerationPhase.Adrs);
             events.AddRange(GenerateAdrsInternal(nav));
             reporter?.EndPhase(GenerationPhase.Adrs);
+
+            var readmeEvent = GenerateReadmeInternal(nav);
+            if (readmeEvent is not null)
+            {
+                events.Add(readmeEvent);
+            }
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav);
@@ -321,7 +328,7 @@ public sealed class SiteGenerator
 
             foreach (var epic in model.Epics)
             {
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyRequirementLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav), $"epics/epic-{epic.Number}.html"));
+                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyRequirementLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands), $"epics/epic-{epic.Number}.html"));
 
                 foreach (var story in epic.Stories)
                 {
@@ -355,7 +362,7 @@ public sealed class SiteGenerator
                     remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, reviewFindingsHtml, changeLogHtml, nav);
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, reviewFindingsHtml, changeLogHtml, nav, _module.Commands);
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyRequirementLinks(storyHtml, story.ArtifactOutputPath!));
                 }
             }
@@ -414,8 +421,36 @@ public sealed class SiteGenerator
     {
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands);
         File.WriteAllText(indexPath, ApplyRequirementLinks(html, "index.html"));
+    }
+
+    /// <summary>Path to the repo-root README that feeds the optional Readme page.</summary>
+    private string ReadmeSourcePath => Path.Combine(_options.RepoRoot, "README.md");
+
+    /// <summary>True when a README page should be produced: the feature is enabled and the file exists.
+    /// The nav is derived from this so a missing/disabled README simply omits the card and link.</summary>
+    private bool ReadmeAvailable => _options.IncludeReadme && File.Exists(ReadmeSourcePath);
+
+    /// <summary>Renders the repo-root README.md into a standalone stylized <c>readme.html</c>. Kept out of
+    /// <see cref="_docs"/> so it never doubles up as a document-grid card — it is surfaced only via the nav
+    /// and the Readme quick link. Returns null (no event) when the feature is disabled or no README exists.</summary>
+    private GenerationEvent? GenerateReadmeInternal(SiteNav nav)
+    {
+        if (!ReadmeAvailable) return null;
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var doc = MarkdownConverter.Convert(ReadmeSourcePath, "README.md", SiteNav.ReadmeOutputPath);
+            var outputFullPath = Path.Combine(_options.OutputRoot, SiteNav.ReadmeOutputPath);
+            File.WriteAllText(outputFullPath, ApplyRequirementLinks(HtmlTemplater.RenderPage(doc, nav), SiteNav.ReadmeOutputPath));
+            return new GenerationEvent(GenerationOutcome.Generated, "README.md", sw.Elapsed);
+        }
+        catch (Exception ex)
+        {
+            return new GenerationEvent(GenerationOutcome.Error, "README.md", sw.Elapsed, ex.Message);
+        }
     }
 
     /// <summary>Writes requirements.html plus one detail page per FR/NFR. Each page is linkified against the
@@ -478,9 +513,13 @@ public sealed class SiteGenerator
             : new List<string>();
 
     /// <summary>Builds the site nav, folding in whether any ADRs exist (they live outside the _bmad-output
-    /// file list the nav is otherwise derived from).</summary>
-    private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives) =>
-        SiteNav.Build(sourceRelatives, _options.SiteTitle, AdrsExist());
+    /// file list the nav is otherwise derived from). Also detects the active BMad module so the nav shows
+    /// that module's planning docs and the templaters emit that module's workflow commands.</summary>
+    private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives)
+    {
+        _module = ModuleContext.Detect(_options.RepoRoot, sourceRelatives);
+        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable);
+    }
 
     private bool AdrsExist() => EnumerateAdrFiles().Any(f => ParseAdrNumber(Path.GetFileName(f)) is not null);
 

@@ -2,7 +2,7 @@ using System.Text;
 
 namespace SpecScribe;
 
-/// <summary>The site-wide header nav (Home, GDD, Narrative, Game Architecture, Epics) plus breadcrumb rendering.
+/// <summary>The site-wide header nav (Home, module planning docs, ADRs, Epics) plus breadcrumb rendering.
 /// Nav targets are discovered by well-known filename, so a missing doc is simply omitted rather than
 /// producing a broken link.</summary>
 public sealed class SiteNav
@@ -11,8 +11,13 @@ public sealed class SiteNav
     public const string EpicsOutputPath = "epics.html";
     public const string RequirementsOutputPath = "requirements.html";
     public const string AdrsLandingOutputPath = "adrs/index.html";
+    public const string ReadmeOutputPath = "readme.html";
 
     public required IReadOnlyList<(string Label, string OutputRelativePath)> Items { get; init; }
+
+    /// <summary>Every discoverable key view for the dashboard's quick-link grid. A superset of the nav bar:
+    /// it also carries module docs kept out of the top nav (brief, UX) plus a short description per entry.</summary>
+    public required IReadOnlyList<(string Label, string OutputRelativePath, string Description)> QuickLinks { get; init; }
 
     /// <summary>The project name (from _bmad/config.toml) — used for the nav brand and page-title suffixes.</summary>
     public required string SiteTitle { get; init; }
@@ -23,23 +28,45 @@ public sealed class SiteNav
 
     public bool HasAdrs => Items.Any(i => i.Label == "ADRs");
 
-    public static SiteNav Build(IReadOnlyList<string> sourceRelativePaths, string siteTitle, bool hasAdrs = false)
+    public bool HasReadme => Items.Any(i => i.Label == "Readme");
+
+    public static SiteNav Build(
+        IReadOnlyList<string> sourceRelativePaths,
+        string siteTitle,
+        IReadOnlyList<ModuleDoc>? moduleDocs = null,
+        bool hasAdrs = false,
+        bool hasReadme = false)
     {
         var items = new List<(string, string)> { ("Home", HomeOutputPath) };
+        var quickLinks = new List<(string, string, string)>();
 
-        void AddIfFound(string filename, string label)
+        // The README is the project's front-door narrative, so it sits first after Home.
+        if (hasReadme)
         {
-            var match = sourceRelativePaths.FirstOrDefault(p =>
-                string.Equals(Path.GetFileName(p), filename, StringComparison.OrdinalIgnoreCase));
-            if (match is not null)
-            {
-                items.Add((label, PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(match))));
-            }
+            items.Add(("Readme", ReadmeOutputPath));
+            quickLinks.Add(("Readme", ReadmeOutputPath, "Read the project overview."));
         }
 
-        AddIfFound("gdd.md", "GDD");
-        AddIfFound("narrative-design.md", "Narrative");
-        AddIfFound("game-architecture.md", "Game Architecture");
+        // Module docs (PRD/Architecture, or GDD/Narrative/etc.) are matched by filename anywhere in the
+        // source tree, so a missing doc is simply skipped rather than producing a broken link. In-nav docs
+        // ride the top nav; all discovered docs appear in the dashboard quick links.
+        foreach (var doc in moduleDocs ?? Array.Empty<ModuleDoc>())
+        {
+            var match = sourceRelativePaths.FirstOrDefault(p =>
+                string.Equals(Path.GetFileName(p), doc.FileName, StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+            {
+                continue;
+            }
+
+            var outputPath = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(match));
+            if (doc.InNav)
+            {
+                items.Add((doc.Label, outputPath));
+            }
+
+            quickLinks.Add((doc.Label, outputPath, doc.Description));
+        }
 
         // ADRs sit next to the architecture doc conceptually; they live in docs/adrs, not _bmad-output,
         // so their availability is signalled by the caller rather than the source-file list.
@@ -48,14 +75,22 @@ public sealed class SiteNav
             items.Add(("ADRs", AdrsLandingOutputPath));
         }
 
-        if (sourceRelativePaths.Any(p => string.Equals(Path.GetFileName(p), "epics.md", StringComparison.OrdinalIgnoreCase)))
+        var hasEpics = sourceRelativePaths.Any(p => string.Equals(Path.GetFileName(p), "epics.md", StringComparison.OrdinalIgnoreCase));
+        if (hasEpics)
         {
             items.Add(("Epics", EpicsOutputPath));
             // Requirements are parsed out of epics.md, so they share its availability guard.
             items.Add(("Requirements", RequirementsOutputPath));
+            quickLinks.Add(("Epics", EpicsOutputPath, "Track epic and story delivery progress."));
+            quickLinks.Add(("Requirements", RequirementsOutputPath, "Review FR/NFR coverage and status."));
         }
 
-        return new SiteNav { Items = items, SiteTitle = siteTitle };
+        if (hasAdrs)
+        {
+            quickLinks.Add(("ADRs", AdrsLandingOutputPath, "Browse architecture decisions."));
+        }
+
+        return new SiteNav { Items = items, QuickLinks = quickLinks, SiteTitle = siteTitle };
     }
 
     public string RenderNavBar(string currentOutputRelativePath)

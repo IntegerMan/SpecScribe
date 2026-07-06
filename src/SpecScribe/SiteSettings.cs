@@ -22,7 +22,11 @@ public class SiteSettings : CommandSettings
     [Description("Name the site is branded with. Default: project_name from _bmad/config.toml.")]
     public string? ProjectName { get; set; }
 
+    [CommandOption("--no-readme")]
+    [Description("Exclude the repository README.md from the generated site. Default: the README is included.")]
+    public bool NoReadme { get; set; }
+
     /// <summary>Resolves these settings into absolute paths. Throws <see cref="DirectoryNotFoundException"/>
     /// with an actionable message when auto-discovery fails.</summary>
-    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName);
+    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme);
 }

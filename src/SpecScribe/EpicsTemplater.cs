@@ -54,13 +54,13 @@ public static class EpicsTemplater
             sb.Append("</details>\n\n");
         }
 
-        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append(Mermaid.InitScript());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
 
-    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav)
+    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var epicClass = StatusStyles.ForEpic(epic);
@@ -96,7 +96,7 @@ public static class EpicsTemplater
         }
 
         var prefix = PathUtil.RelativePrefix(outputPath);
-        var nextStepsHtml = BmadCommands.RenderEpicNextSteps(epic);
+        var nextStepsHtml = BmadCommands.RenderEpicNextSteps(epic, commands);
 
         if (progress.StoryCount > 0)
         {
@@ -113,7 +113,7 @@ public static class EpicsTemplater
                 sb.Append(Charts.ProgressBar("Tasks", progress.TasksDone, progress.TasksTotal));
             }
             sb.Append("</div>\n\n");
-            AppendNextActionsPanel(sb, epic, prefix);
+            AppendNextActionsPanel(sb, epic, prefix, commands);
             sb.Append("</div>\n\n");
 
             sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Story Breakdown</h3>\n");
@@ -135,7 +135,7 @@ public static class EpicsTemplater
             AppendStoryCard(sb, story, prefix);
         }
 
-        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
@@ -151,7 +151,8 @@ public static class EpicsTemplater
         IReadOnlyList<TaskItem> tasks,
         string reviewFindingsHtml,
         string changeLogHtml,
-        SiteNav nav)
+        SiteNav nav,
+        CommandCatalog commands)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"RenderStory called for story {story.Id} with no resolved artifact.");
@@ -197,7 +198,7 @@ public static class EpicsTemplater
             sb.Append(Charts.TaskSunburst(tasks));
             sb.Append("</div>\n");
         }
-        sb.Append(BmadCommands.RenderNextSteps(story));
+        sb.Append(BmadCommands.RenderNextSteps(story, commands));
         sb.Append("</div>\n");
 
         // Acceptance Criteria leads the plan as its own panel (ahead of the Dev Agent Record): each
@@ -249,7 +250,7 @@ public static class EpicsTemplater
             sb.Append($"<div class=\"doc-body\">{changeLogHtml}</div>\n</section>\n\n");
         }
 
-        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
@@ -396,12 +397,12 @@ public static class EpicsTemplater
     /// separate stacked panels — folding them together keeps the target and its workflow prompt in one
     /// place. Fills the vertical space the progress-bar column otherwise left empty beside the taller
     /// sunburst.</summary>
-    private static void AppendNextActionsPanel(StringBuilder sb, EpicInfo epic, string prefix)
+    private static void AppendNextActionsPanel(StringBuilder sb, EpicInfo epic, string prefix, CommandCatalog commands)
     {
         sb.Append("<div class=\"chart-panel\">\n<h3>Up Next</h3>\n");
         AppendUpNextCard(sb, epic, prefix);
 
-        var nextStepsInner = BmadCommands.RenderEpicNextStepsInner(epic);
+        var nextStepsInner = BmadCommands.RenderEpicNextStepsInner(epic, commands);
         if (nextStepsInner.Length > 0)
         {
             sb.Append(nextStepsInner);

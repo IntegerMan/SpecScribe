@@ -22,6 +22,10 @@ public sealed class ForgeOptions
     /// this rather than a generic tool name.</summary>
     public required string SiteTitle { get; init; }
 
+    /// <summary>When true (the default), a <c>README.md</c> found at the repo root is rendered into the site
+    /// as a stylized page and surfaced from the home index. Disabled via <c>--no-readme</c>.</summary>
+    public required bool IncludeReadme { get; init; }
+
     public const string StylesheetName = "specscribe.css";
     public const string DefaultSiteTitle = "BMad Live Docs";
     public const string SourceDirName = "_bmad-output";
@@ -39,7 +43,8 @@ public sealed class ForgeOptions
         string? adrs = null,
         string? output = null,
         string? projectName = null,
-        string? startDirectory = null)
+        string? startDirectory = null,
+        bool includeReadme = true)
     {
         string repoRoot;
         string sourceRoot;
@@ -77,6 +82,7 @@ public sealed class ForgeOptions
             AdrSourceExplicit = adrs is { Length: > 0 },
             OutputRoot = output is { Length: > 0 } ? Path.GetFullPath(output) : Path.Combine(repoRoot, "docs", "live"),
             SiteTitle = projectName is { Length: > 0 } ? projectName : ReadProjectName(repoRoot) ?? DefaultSiteTitle,
+            IncludeReadme = includeReadme,
         };
     }
 

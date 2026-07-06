@@ -21,11 +21,54 @@ public class SiteNavTests
             "narrative-design.md",
             "game-architecture.md",
             "planning-artifacts/epics.md",
-        }, "SpecScribe", hasAdrs: true);
+        }, "SpecScribe", ModuleContext.DocsFor(BmadModule.GameDevStudio), hasAdrs: true);
 
         Assert.Equal(
             new[] { "Home", "GDD", "Narrative", "Game Architecture", "ADRs", "Epics", "Requirements" },
             nav.Items.Select(i => i.Label).ToArray());
+    }
+
+    [Fact]
+    public void Build_IncludesReadmeRightAfterHomeWhenAvailable()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: true);
+
+        Assert.Equal(new[] { "Home", "Readme", "Epics", "Requirements" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(SiteNav.ReadmeOutputPath, nav.Items.First(i => i.Label == "Readme").OutputRelativePath);
+        Assert.True(nav.HasReadme);
+    }
+
+    [Fact]
+    public void Build_OmitsReadmeWhenNotAvailable()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: false);
+
+        Assert.DoesNotContain("Readme", nav.Items.Select(i => i.Label));
+        Assert.False(nav.HasReadme);
+    }
+
+    [Fact]
+    public void Build_PutsBmadMethodDocsInNavAndQuickLinks()
+    {
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/prds/prd-x/prd.md",
+            "planning-artifacts/briefs/brief-x/brief.md",
+            "planning-artifacts/ux-designs/ux-x/DESIGN.md",
+            "specs/spec-x/ARCHITECTURE-SPINE.md",
+            "planning-artifacts/epics.md",
+        }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false);
+
+        // PRD + Architecture ride the top nav; the brief and UX docs are quick-links only.
+        Assert.Equal(
+            new[] { "Home", "PRD", "Architecture", "Epics", "Requirements" },
+            nav.Items.Select(i => i.Label).ToArray());
+
+        var quickLabels = nav.QuickLinks.Select(q => q.Label).ToArray();
+        Assert.Contains("PRD", quickLabels);
+        Assert.Contains("Product Brief", quickLabels);
+        Assert.Contains("UX Design", quickLabels);
+        Assert.DoesNotContain("Product Brief", nav.Items.Select(i => i.Label));
     }
 
     [Fact]
