@@ -248,6 +248,14 @@ body {
   border-radius: 3px;
 }
 
+/* Color-value swatches (see ColorSwatchRewriter): background + foreground are set inline per value;
+   the border keeps near-page-color swatches visible, and unsetting the rust color lets the inline
+   contrast-safe foreground govern. */
+.doc-body code.color-swatch {
+  color: inherit;
+  border: 1px solid var(--border);
+}
+
 .doc-body pre {
   margin: 1rem 0;
   padding: 1rem 1.2rem;

@@ -53,7 +53,7 @@ public static class MarkdownConverter
             OutputRelativePath = outputRelativePath,
             Title = title,
             Frontmatter = frontmatter,
-            BodyHtml = TagTables(writer.ToString()),
+            BodyHtml = ColorSwatchRewriter.Rewrite(TagTables(writer.ToString())),
             Headings = headings,
             HasMermaid = hasMermaid,
         };
@@ -92,12 +92,12 @@ public static class MarkdownConverter
         {
             html = html[3..^4];
         }
-        return html;
+        return ColorSwatchRewriter.Rewrite(html);
     }
 
     /// <summary>Renders a markdown fragment as full block HTML (paragraphs, headings, lists) — used for
     /// multi-paragraph slices pulled out of a larger doc, e.g. the Overview section of epics.md.</summary>
-    public static string RenderBlock(string markdown) => TagTables(Markdown.ToHtml(markdown, Pipeline));
+    public static string RenderBlock(string markdown) => ColorSwatchRewriter.Rewrite(TagTables(Markdown.ToHtml(markdown, Pipeline)));
 
     /// <summary>Tags every Markdig-generated <c>&lt;table&gt;</c> with class <c>md-table</c> so a single CSS
     /// rule styles markdown tables consistently everywhere — including sections rendered outside the

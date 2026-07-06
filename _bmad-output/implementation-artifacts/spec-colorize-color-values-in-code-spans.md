@@ -2,7 +2,7 @@
 title: 'Colorize color values in inline code spans'
 type: 'feature'
 created: '2026-07-06'
-status: 'in-progress'
+status: 'in-review'
 review_loop_iteration: 0
 context: []
 baseline_commit: '08c210ea88086a02c18d24edcae37f57bdf80a42'
@@ -49,10 +49,10 @@ baseline_commit: '08c210ea88086a02c18d24edcae37f57bdf80a42'
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/SpecScribe/ColorSwatchRewriter.cs` -- Add static rewriter: regex-match inline `<code>value</code>` (no attributes, not inside `<pre>`), parse hex/rgb()/rgba()/CSS-named to RGBA, composite over white, compute WCAG relative luminance, pick black/white foreground, emit `<code class="color-swatch" style="background:VALUE;color:FG">value</code>`. Unrecognized values pass through unchanged.
-- [ ] `src/SpecScribe/MarkdownConverter.cs` -- Wrap the three markdown→HTML outputs (`Convert` BodyHtml, `RenderBlock`, `RenderInline`) with `ColorSwatchRewriter.Rewrite`.
-- [ ] `src/SpecScribe/assets/specscribe.css` -- Add `.doc-body code.color-swatch` styling (1px border using `--border`, `color` unset so inline style governs, keep radius/padding/monospace).
-- [ ] `tests/SpecScribe.Tests/ColorSwatchRewriterTests.cs` -- Unit-test each I/O matrix row incl. the contrast foreground choice and pass-through cases.
+- [x] `src/SpecScribe/ColorSwatchRewriter.cs` -- Add static rewriter: regex-match inline `<code>value</code>` (no attributes, not inside `<pre>`), parse hex/rgb()/rgba()/CSS-named to RGBA, composite over white, compute WCAG relative luminance, pick black/white foreground, emit `<code class="color-swatch" style="background:VALUE;color:FG">value</code>`. Unrecognized values pass through unchanged.
+- [x] `src/SpecScribe/MarkdownConverter.cs` -- Wrap the three markdown→HTML outputs (`Convert` BodyHtml, `RenderBlock`, `RenderInline`) with `ColorSwatchRewriter.Rewrite`.
+- [x] `src/SpecScribe/assets/specscribe.css` -- Add `.doc-body code.color-swatch` styling (1px border using `--border`, `color` unset so inline style governs, keep radius/padding/monospace).
+- [x] `tests/SpecScribe.Tests/ColorSwatchRewriterTests.cs` -- Unit-test each I/O matrix row incl. the contrast foreground choice and pass-through cases.
 
 **Acceptance Criteria:**
 - Given a doc with `` `#1a1208` `` and `` `#f5f0e8` `` in a table, when the site is generated, then each cell's code span shows its background as the actual color with a readable (max-contrast black/white) foreground.
