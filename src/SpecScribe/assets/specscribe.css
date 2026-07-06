@@ -248,11 +248,10 @@ body {
   border-radius: 3px;
 }
 
-/* Color-value swatches (see ColorSwatchRewriter): background + foreground are set inline per value;
-   the border keeps near-page-color swatches visible, and unsetting the rust color lets the inline
-   contrast-safe foreground govern. */
-.doc-body code.color-swatch {
-  color: inherit;
+/* Color-value swatches (see ColorSwatchRewriter): background + foreground are set inline per value.
+   The border keeps near-page-color swatches visible; it is intentionally not scoped to .doc-body so
+   swatches in Change Log / AC lines / other panels stay legible too. */
+code.color-swatch {
   border: 1px solid var(--border);
 }
 

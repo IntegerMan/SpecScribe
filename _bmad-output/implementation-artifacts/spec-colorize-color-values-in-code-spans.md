@@ -2,7 +2,7 @@
 title: 'Colorize color values in inline code spans'
 type: 'feature'
 created: '2026-07-06'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 context: []
 baseline_commit: '08c210ea88086a02c18d24edcae37f57bdf80a42'
@@ -71,3 +71,38 @@ Matching: `(?<!<pre>)<code>([^<]*)</code>` isolates inline code (Markdig emits a
 - `dotnet build SpecScribe.slnx` -- expected: builds clean.
 - `dotnet test SpecScribe.slnx` -- expected: new `ColorSwatchRewriterTests` pass, no regressions.
 - `dotnet run --project src/SpecScribe -- generate --source _bmad-output --adrs docs/adrs --output docs/live --project-name SpecScribe` -- expected: regenerates site; color-token tables render with painted swatches.
+
+## Suggested Review Order
+
+**Colorization core**
+
+- Entry point: the whole-HTML pass that finds inline color code spans and paints them.
+  [`ColorSwatchRewriter.cs:32`](../../src/SpecScribe/ColorSwatchRewriter.cs#L32)
+
+- Parsing gate — only hex, rgb()/rgba(), and CSS-named values pass; alpha/RGB bounds enforced.
+  [`ColorSwatchRewriter.cs:56`](../../src/SpecScribe/ColorSwatchRewriter.cs#L56)
+
+- Readability guarantee — WCAG luminance picks max-contrast black/white foreground.
+  [`ColorSwatchRewriter.cs:120`](../../src/SpecScribe/ColorSwatchRewriter.cs#L120)
+
+- Static CSS named-color map backing the named-color path.
+  [`ColorSwatchRewriter.cs:148`](../../src/SpecScribe/ColorSwatchRewriter.cs#L148)
+
+**Pipeline wiring**
+
+- Applied to the main doc body so every rendered page benefits.
+  [`MarkdownConverter.cs:56`](../../src/SpecScribe/MarkdownConverter.cs#L56)
+
+- Same pass on inline/block fragments (AC lines, epic overviews) for consistency.
+  [`MarkdownConverter.cs:95`](../../src/SpecScribe/MarkdownConverter.cs#L95)
+
+**Presentation**
+
+- Swatch border (unscoped) keeps near-page-color swatches visible everywhere.
+  [`specscribe.css:254`](../../src/SpecScribe/assets/specscribe.css#L254)
+
+**Tests**
+
+- Covers the I/O matrix plus hardened edge cases (block code, out-of-range alpha).
+  [`ColorSwatchRewriterTests.cs:1`](../../tests/SpecScribe.Tests/ColorSwatchRewriterTests.cs#L1)
+

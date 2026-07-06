@@ -12,10 +12,12 @@ namespace SpecScribe;
 public static class ColorSwatchRewriter
 {
     // Inline code only: Markdig emits attribute-less <code> for inline spans and <code class="language-…"> /
-    // <pre><code> for blocks. The negative lookbehind excludes indented <pre><code>; the fenced variant carries a
-    // class so it never matches <code> with no attributes. Content is HTML-escaped text with no nested tags.
+    // <pre><code> for blocks. The negative lookbehind excludes a <code> that opens a block (indented code emits
+    // <pre><code>); it tolerates attributes on <pre> and whitespace between the tags so the exclusion doesn't
+    // hinge on Markdig's exact spacing. The fenced variant carries a class so it never matches attribute-less
+    // <code>. Content is HTML-escaped text with no nested tags.
     private static readonly Regex InlineCodePattern = new(
-        @"(?<!<pre>)<code>(?<value>[^<]*)</code>",
+        @"(?<!<pre[^>]*>\s*)<code>(?<value>[^<]*)</code>",
         RegexOptions.Compiled);
 
     private static readonly Regex HexPattern = new(
@@ -23,7 +25,7 @@ public static class ColorSwatchRewriter
         RegexOptions.Compiled);
 
     private static readonly Regex RgbFunctionPattern = new(
-        @"^rgba?\(\s*(?<r>\d{1,3})\s*,\s*(?<g>\d{1,3})\s*,\s*(?<b>\d{1,3})\s*(?:,\s*(?<a>[0-9]*\.?[0-9]+)\s*)?\)$",
+        @"^rgba?\(\s*(?<r>\d{1,3})\s*,\s*(?<g>\d{1,3})\s*,\s*(?<b>\d{1,3})\s*(?:,\s*(?<a>\d{1,3}(?:\.\d{1,6})?|\.\d{1,6})\s*)?\)$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <param name="html">Already-rendered HTML to scan.</param>
@@ -45,7 +47,7 @@ public static class ColorSwatchRewriter
             }
 
             var foreground = ContrastForeground(rgba);
-            return $"<code class=\"color-swatch\" style=\"background:{PathUtil.Html(trimmed)};color:{foreground}\">{value}</code>";
+            return $"<code class=\"color-swatch\" style=\"background-color:{PathUtil.Html(trimmed)};color:{foreground}\">{value}</code>";
         });
     }
 
@@ -72,12 +74,14 @@ public static class ColorSwatchRewriter
             }
 
             var a = 1.0;
-            if (fn.Groups["a"].Success && !double.TryParse(fn.Groups["a"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out a))
+            if (fn.Groups["a"].Success
+                && (!double.TryParse(fn.Groups["a"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out a) || a > 1.0))
             {
+                // Reject out-of-range alpha, mirroring the RGB channel bounds check above.
                 return false;
             }
 
-            rgba = (r, g, b, Math.Clamp(a, 0.0, 1.0));
+            rgba = (r, g, b, a);
             return true;
         }
 
@@ -139,7 +143,8 @@ public static class ColorSwatchRewriter
         return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
     }
 
-    /// <summary>The 148 standard CSS named colors (CSS Color Module Level 4), keyed case-insensitively.</summary>
+    /// <summary>The standard CSS named colors (CSS Color Module Level 4), keyed case-insensitively. Excludes
+    /// <c>transparent</c>, which has no meaningful swatch.</summary>
     private static readonly IReadOnlyDictionary<string, string> NamedColors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["aliceblue"] = "#f0f8ff", ["antiquewhite"] = "#faebd7", ["aqua"] = "#00ffff", ["aquamarine"] = "#7fffd4",

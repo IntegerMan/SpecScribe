@@ -9,7 +9,7 @@ public class ColorSwatchRewriterTests
     {
         var html = ColorSwatchRewriter.Rewrite("<code>#1a1208</code>");
 
-        Assert.Equal("<code class=\"color-swatch\" style=\"background:#1a1208;color:#fff\">#1a1208</code>", html);
+        Assert.Equal("<code class=\"color-swatch\" style=\"background-color:#1a1208;color:#fff\">#1a1208</code>", html);
     }
 
     [Fact]
@@ -17,7 +17,7 @@ public class ColorSwatchRewriterTests
     {
         var html = ColorSwatchRewriter.Rewrite("<code>#f5f0e8</code>");
 
-        Assert.Contains("background:#f5f0e8", html);
+        Assert.Contains("background-color:#f5f0e8", html);
         Assert.Contains("color:#000", html);
     }
 
@@ -27,7 +27,7 @@ public class ColorSwatchRewriterTests
         var html = ColorSwatchRewriter.Rewrite("<code>#fff</code>");
 
         Assert.Contains("class=\"color-swatch\"", html);
-        Assert.Contains("background:#fff", html);
+        Assert.Contains("background-color:#fff", html);
         Assert.Contains("color:#000", html);
     }
 
@@ -36,7 +36,7 @@ public class ColorSwatchRewriterTests
     {
         var html = ColorSwatchRewriter.Rewrite("<code>rgba(26, 18, 8, 0.94)</code>");
 
-        Assert.Contains("background:rgba(26, 18, 8, 0.94)", html);
+        Assert.Contains("background-color:rgba(26, 18, 8, 0.94)", html);
         Assert.Contains("color:#fff", html);
     }
 
@@ -46,7 +46,7 @@ public class ColorSwatchRewriterTests
         var html = ColorSwatchRewriter.Rewrite("<code>teal</code>");
 
         Assert.Contains("class=\"color-swatch\"", html);
-        Assert.Contains("background:teal", html);
+        Assert.Contains("background-color:teal", html);
         Assert.Contains("color:#fff", html);
     }
 
@@ -99,10 +99,34 @@ public class ColorSwatchRewriterTests
     }
 
     [Fact]
+    public void Rewrite_OutOfRangeAlpha_IsLeftUntouched()
+    {
+        const string input = "<code>rgba(0, 0, 0, 5)</code>";
+
+        Assert.Equal(input, ColorSwatchRewriter.Rewrite(input));
+    }
+
+    [Fact]
+    public void Rewrite_BlockCodeWithPreAttributes_IsLeftUntouched()
+    {
+        const string input = "<pre class=\"language-css\"><code>#fff</code></pre>";
+
+        Assert.Equal(input, ColorSwatchRewriter.Rewrite(input));
+    }
+
+    [Fact]
+    public void Rewrite_BlockCodeWithWhitespaceBeforeCode_IsLeftUntouched()
+    {
+        const string input = "<pre>\n<code>#fff</code></pre>";
+
+        Assert.Equal(input, ColorSwatchRewriter.Rewrite(input));
+    }
+
+    [Fact]
     public void Rewrite_PreservesSurroundingHtmlAndOnlyPaintsColors()
     {
         var html = ColorSwatchRewriter.Rewrite("<p>Use <code>#008080</code> not <code>hello</code>.</p>");
 
-        Assert.Contains("<p>Use <code class=\"color-swatch\" style=\"background:#008080;color:#fff\">#008080</code> not <code>hello</code>.</p>", html);
+        Assert.Contains("<p>Use <code class=\"color-swatch\" style=\"background-color:#008080;color:#fff\">#008080</code> not <code>hello</code>.</p>", html);
     }
 }
