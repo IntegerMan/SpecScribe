@@ -26,7 +26,9 @@ public sealed class CommandCatalog
         _byStep = byStep;
     }
 
-    /// <summary>Human label for the module (e.g. "BMad Method"), used in the "Next Steps" panel heading.</summary>
+    /// <summary>Human label for the module (e.g. "BMad Method"), parsed from module-help.csv. Kept as
+    /// module metadata for callers that want to name the detected methodology; the "Next Steps" heading no
+    /// longer renders it.</summary>
     public string ModuleLabel { get; }
 
     public bool IsEmpty => _byStep.Count == 0;
