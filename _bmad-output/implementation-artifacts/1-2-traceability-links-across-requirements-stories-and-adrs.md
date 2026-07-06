@@ -4,7 +4,7 @@ baseline_commit: 8e9244cdd8c87182d8804d1d50ff34c4f5992db7
 
 # Story 1.2: Traceability Links Across Requirements, Stories, and ADRs
 
-Status: review
+Status: done
 
 ## Story
 
@@ -259,3 +259,20 @@ GPT-5.4
 
 - 2026-07-05: Created Story 1.2 implementation context with traceability-specific architecture, code-seam, regeneration, and testing guidance.
 - 2026-07-06: Implemented Story 1.2 as a verify-and-harden pass — confirmed the existing linkifier/reference-map/ADR-regeneration seams satisfy both ACs, added generation-level and unit regression coverage (14 new tests, 127 total passing), and validated a clean end-to-end generation pass. No production code changes required.
+- 2026-07-06: Code review completed (0 decision-needed, 7 patch, 2 defer, 7 dismissed). No production defects; findings target test robustness/completeness of the new regression coverage.
+
+## Review Findings
+
+<!-- Adversarial code review 2026-07-06: Blind Hunter + Edge Case Hunter + Acceptance Auditor. This was a
+test-only change; all findings concern the strength/coverage of the new tests, not shipped behavior (production
+seams verified working, 127 tests green, clean generation pass). -->
+
+- [x] [Review][Patch] Only 3 of the 6 story-citation slices are exercised — production linkifies blurb, remainder, review-findings, change-log, acceptance-criteria, and dev-agent-record (SiteGenerator.cs:361-369), but the fixture cited only blurb/AC/change-log. FIXED: fixture now cites a distinct target from all six slices and there is a routing assertion per slice (remainder→rendering.html, dev-agent-record→architecture.html, review-findings→brief.html added). [tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs]
+- [x] [Review][Patch] Absence-only assertions lack positive controls and can pass vacuously. FIXED: SkipsSelfLink now asserts FR6 is present as text; LeavesUnknownRequirementId now asserts FR99 is not any anchor's label; RemovesStalePageAndIndexCard now asserts the surviving 0001 card remains; ReflectsChangedStatus now asserts the old "Proposed" status is gone. [tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs]
+- [x] [Review][Patch] No test inspected the returned GenerationEvent list for Error outcomes. FIXED: a `GenerateSite()` helper asserts `GenerateAll` produced no `GenerationOutcome.Error`, and each `RegenerateAdrs` call now asserts a non-Error outcome. [tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs]
+- [x] [Review][Patch] Untouched-ADR survival after delete/rename was unasserted. FIXED: delete test asserts 0001 card + "Accepted" pill survive; rename test asserts 0001-first.html still exists. [tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs]
+- [x] [Review][Patch] Fragment preservation was verified only at unit level. FIXED: added generation-level tests — a source citation `architecture.md#Overview` keeps `#Overview` outside the link, and an ADR cross-link `0002-second.md#Context` rewrites to `0002-second.html#Context`. [tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs]
+- [x] [Review][Patch] Loose ADR status match. FIXED: assertion scoped to the actual status pill markup `status-accepted">Accepted</span>`. [tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs]
+- [x] [Review][Patch] Dispose() ran an unguarded `Directory.Delete`. FIXED: wrapped in best-effort try/catch for IOException/UnauthorizedAccessException so a transient file lock can't flake the run or leak the temp tree. [tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs]
+- [x] [Review][Defer] Case-insensitive requirement lookup is claimed as must-preserve but the input pattern `\b(FR|NFR)(\d+)\b` is uppercase-only (no IgnoreCase), so lowercase `fr6` is silently never matched; untested. Pre-existing production behavior, not introduced by this change. [src/SpecScribe/RequirementLinkifier.cs:17] — deferred, pre-existing
+- [x] [Review][Defer] Multi-digit partial-token boundary (FR60 must not match FR6) is not pinned — the existing partial-token test covers only non-digit adjacency (FR1x/XFR1). Correct today via `\b...\d+\b`; a regression pin would be nice-to-have. [tests/SpecScribe.Tests/LinkifierTests.cs:61] — deferred, pre-existing
