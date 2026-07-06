@@ -265,6 +265,148 @@ public class HtmlTemplaterTests
         Assert.DoesNotContain("Done (0)", html);
     }
 
+    private static DocModel Doc(string sourceRel, string outputRel, string title, Frontmatter fm, string bodyHtml = "") => new()
+    {
+        SourceRelativePath = sourceRel,
+        OutputRelativePath = outputRel,
+        Title = title,
+        Frontmatter = fm,
+        BodyHtml = bodyHtml,
+        Headings = Array.Empty<Heading>(),
+    };
+
+    private static ProgressModel ProgressWith(int epicsDrafted, int epicsTotal, int storiesTotal, int storiesWithArtifact, int tasksDone, int tasksTotal) => new()
+    {
+        EpicsTotal = epicsTotal,
+        EpicsDrafted = epicsDrafted,
+        EpicsPending = epicsTotal - epicsDrafted,
+        StoriesTotal = storiesTotal,
+        StoriesWithArtifact = storiesWithArtifact,
+        TasksDone = tasksDone,
+        TasksTotal = tasksTotal,
+        PerEpic = Array.Empty<EpicProgress>(),
+    };
+
+    private static CommandCatalog BmadCatalog() => new("BMad", new Dictionary<string, string>
+    {
+        ["create-story"] = "/bmad-create-story",
+        ["create-epics-and-stories"] = "/bmad-create-epics-and-stories",
+    });
+
+    [Fact]
+    public void RenderIndex_SurfacesQuickDevAndDeferredAsFirstClassWorkWithStatusBadge()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var quickDev = Doc("implementation-artifacts/spec-foo.md", "implementation-artifacts/spec-foo.html", "A quick fix",
+            new Frontmatter { Status = "done", Route = "one-shot", Type = "chore" });
+        var deferred = Doc("implementation-artifacts/deferred-work.md", "implementation-artifacts/deferred-work.html", "Deferred Work",
+            Frontmatter.Empty, "<ul><li>one</li><li>two</li></ul>");
+        var plain = Doc("implementation-artifacts/some-note.md", "implementation-artifacts/some-note.html", "Some Note", Frontmatter.Empty);
+        var docs = new[] { quickDev, deferred, plain };
+
+        var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
+
+        // Dedicated first-class section with a status badge (not flat text) for the quick-dev entry.
+        Assert.Contains("Direct &amp; Quick-Dev Work", html);
+        Assert.Contains("<span class=\"status-badge done\">done</span>", html);
+        // Deferred-work callout with its open-item count.
+        Assert.Contains("work-callout", html);
+        Assert.Contains("2 open items", html);
+        // Not double-listed: the quick-dev + deferred docs are promoted out of the generic grid (their page
+        // link appears exactly once), while the plain artifact stays in the grid. [Story 2.1 Task 2]
+        Assert.Equal(1, CountOccurrences(html, "href=\"implementation-artifacts/spec-foo.html\""));
+        Assert.Equal(1, CountOccurrences(html, "href=\"implementation-artifacts/deferred-work.html\""));
+        Assert.Contains("href=\"implementation-artifacts/some-note.html\"", html);
+    }
+
+    [Fact]
+    public void RenderIndex_ShowsSeparateDirectChangesStatWithoutAlteringEpicStoryTaskTallies()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var progress = ProgressWith(epicsDrafted: 1, epicsTotal: 2, storiesTotal: 5, storiesWithArtifact: 3, tasksDone: 4, tasksTotal: 10);
+        var quickDev = Doc("implementation-artifacts/spec-foo.md", "implementation-artifacts/spec-foo.html", "A quick fix",
+            new Frontmatter { Status = "done", Route = "one-shot" });
+        var docs = new[] { quickDev };
+
+        var withWork = HtmlTemplater.RenderIndex(docs, nav, progress, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
+        var withoutWork = HtmlTemplater.RenderIndex(Array.Empty<DocModel>(), nav, progress, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Empty);
+
+        // The separate "Direct changes" signal is present, counting the quick-dev work.
+        Assert.Contains("Direct changes", withWork);
+        Assert.Contains(">1</div><div class=\"stat-label\">Direct changes</div>", withWork);
+        // ...but the epic/story/task tallies are byte-for-byte unchanged whether or not the quick-dev doc is
+        // present — quick-dev work must never inflate epic/story completion. [Story 2.1 Task 3]
+        foreach (var tally in new[]
+        {
+            ">1/2</div><div class=\"stat-label\">Epics drafted</div>",
+            ">5</div><div class=\"stat-label\">Stories defined</div>",
+            ">4/10</div><div class=\"stat-label\">Planned tasks done</div>",
+        })
+        {
+            Assert.Contains(tally, withWork);
+            Assert.Contains(tally, withoutWork);
+        }
+        // And no "Direct changes" card at all when there's no such work (four-card row preserved).
+        Assert.DoesNotContain("Direct changes", withoutWork);
+    }
+
+    [Fact]
+    public void RenderEpicsIndex_EmptyModelEmitsCreateEpicsGuidanceWhenModuleExposesIt()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var empty = new EpicsModel { OverviewHtml = string.Empty, RequirementsInventoryHtml = string.Empty, Epics = Array.Empty<EpicInfo>() };
+
+        var withCmd = EpicsTemplater.RenderIndex(empty, ProgressModel.Empty, nav, BmadCatalog());
+        Assert.Contains("/bmad-create-epics-and-stories", withCmd);
+        Assert.Contains("data-copy=\"/bmad-create-epics-and-stories\"", withCmd);
+
+        // A module that exposes no such command prints guidance WITHOUT inventing a command.
+        var noCmd = EpicsTemplater.RenderIndex(empty, ProgressModel.Empty, nav, CommandCatalog.Empty);
+        Assert.DoesNotContain("/bmad-create-epics-and-stories", noCmd);
+        Assert.DoesNotContain("data-copy", noCmd);
+        Assert.Contains("No epics yet", noCmd);
+    }
+
+    [Fact]
+    public void RenderEpicsIndex_PendingEpicCardPairsGuidanceWithCreateEpicsCommand()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var model = ModelWith(EpicStatus.Pending); // pending epic, no stories
+
+        var html = EpicsTemplater.RenderIndex(model, ProgressModel.Empty, nav, BmadCatalog());
+
+        Assert.Contains("Stories not yet drafted — draft them with", html);
+        Assert.Contains("/bmad-create-epics-and-stories", html);
+    }
+
+    [Fact]
+    public void RenderEpic_UndraftedStoryCardPairsGuidanceWithCreateStoryCommand()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var epic = new EpicInfo
+        {
+            Number = 1,
+            Title = "First Epic",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.VerticalSlice,
+            Stories = new[] { Story("1.1", status: null) }, // listed, no artifact/plan yet
+        };
+        var progress = new EpicProgress
+        {
+            Number = 1, Title = "First Epic", StoryCount = 1, StoriesWithArtifact = 0,
+            TasksDone = 0, TasksTotal = 0, Status = EpicStatus.Drafted,
+        };
+
+        var html = EpicsTemplater.RenderEpic(epic, progress, nav, BmadCatalog());
+
+        Assert.Contains("No detailed story plan yet — draft it with", html);
+        Assert.Contains("/bmad-create-story 1.1", html);
+    }
+
     [Fact]
     public void RenderEpic_EmitsSkipLinkAndSingleMainLandmark()
     {

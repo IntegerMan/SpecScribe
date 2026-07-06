@@ -37,6 +37,28 @@ public class MarkdownConverterTests : IDisposable
     }
 
     [Fact]
+    public void Convert_ParsesRouteAndTypeWhenPresentElseNull()
+    {
+        // A bmad-quick-dev artifact carries route/type; they classify it as direct/one-shot work. [Story 2.1 Task 1]
+        var quickDev = Convert("""
+            ---
+            title: A quick fix
+            status: done
+            route: one-shot
+            type: chore
+            ---
+            # Body
+            """);
+        Assert.Equal("one-shot", quickDev.Frontmatter.Route);
+        Assert.Equal("chore", quickDev.Frontmatter.Type);
+
+        // A normal doc without those fields leaves them null (they're optional; most BMad docs don't set them).
+        var plain = Convert("---\ntitle: Normal\n---\n# Body\n");
+        Assert.Null(plain.Frontmatter.Route);
+        Assert.Null(plain.Frontmatter.Type);
+    }
+
+    [Fact]
     public void Convert_FallsBackToFirstH1ThenFilenameForTitle()
     {
         Assert.Equal("From Heading", Convert("# From Heading\n\ntext").Title);

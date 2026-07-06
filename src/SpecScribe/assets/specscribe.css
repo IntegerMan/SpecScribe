@@ -875,6 +875,19 @@ code.color-swatch {
 .sb-drafted { fill: var(--status-drafted); }
 .sb-pending { fill: var(--status-pending); }
 
+/* E4 placeholder arc: a story with no task plan yet. Faint dashed OUTLINE (transparent fill) reads as
+   "nothing here yet — a next action", distinct from both a filled task slice and a story off the edge of the
+   data. Static (the dashes don't animate); the whole-chart aria-label + the segment <title>/aria carry the
+   "No task plan yet — run …" call to action. [Story 2.1 UXO E4] */
+.sb-noplan {
+  fill: transparent;
+  stroke: var(--status-pending);
+  stroke-width: 1;
+  stroke-dasharray: 3 2.5;
+  opacity: 0.7;
+}
+.sunburst .sb-noplan:hover { fill: var(--parchment-dark); opacity: 1; stroke: var(--gold-light); stroke-width: 1.5; }
+
 .sunburst-center-num { font-size: 1.9rem; font-weight: bold; fill: var(--rust); font-family: 'Courier New', monospace; }
 .sunburst-center-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; fill: var(--ink-light); }
 
@@ -1378,6 +1391,55 @@ code.color-swatch {
   font-style: italic;
   margin-top: 0.6rem;
 }
+
+/* ====================== INLINE AUTHORING GUIDANCE (Story 2.1 Task 6) ======================
+   A partial/empty planning surface's dead-end note ("Stories not yet drafted.") pairs its next-action
+   command inline. De-emphasized so it reads as help, not clutter; the command reuses the shared copy button. */
+.inline-cmd {
+  font-family: 'Courier New', monospace;
+  font-size: 0.82em;
+  background: var(--parchment-dark);
+  color: var(--rust);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-style: normal;
+  white-space: nowrap;
+}
+.pending-note .copy-btn,
+.not-detailed-note .copy-btn { margin-left: 0.4rem; vertical-align: baseline; font-style: normal; }
+.empty-state { max-width: 860px; margin: 1.2rem auto; }
+
+/* ====================== FIRST-CLASS WORK TYPES (Story 2.1 Task 2) ======================
+   Quick-dev / one-shot cards carry a status BADGE (not flat text); the deferred-work callout is a distinct
+   full-width bar so parked work reads as tracked, not lost. */
+.quick-dev-card .work-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+}
+
+.work-callout {
+  max-width: 1100px;
+  margin: 0 auto 1.5rem;
+  padding: 0.7rem 1.5rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--status-deferred);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.work-callout:hover { box-shadow: 0 3px 10px var(--shadow); transform: translateY(-1px); }
+.work-callout:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.work-callout-label { font-weight: bold; color: var(--ink); letter-spacing: 0.04em; }
+.work-callout-count { font-size: 0.8rem; color: var(--ink-light); font-family: 'Courier New', monospace; }
 
 /* ====================== REQUIREMENTS ====================== */
 /* Inline FR/NFR reference links, kept subtle so dense "FRs covered" lines stay readable. */

@@ -71,4 +71,21 @@ public class StatusStylesTests
     [InlineData("pending", "Pending")]
     public void EpicLabel_MapsEachTier(string cssClass, string expected)
         => Assert.Equal(expected, StatusStyles.EpicLabel(cssClass));
+
+    [Theory]
+    [InlineData("done", "Done")]
+    [InlineData("review", "In review")]
+    [InlineData("active", "In development")]
+    [InlineData("ready", "Ready for dev")]
+    [InlineData("drafted", "Drafted")]
+    [InlineData("pending", "Pending")]
+    public void StoryLabel_MapsEachStage(string cssClass, string expected)
+        => Assert.Equal(expected, StatusStyles.StoryLabel(cssClass));
+
+    [Theory]
+    [InlineData("done", "done")]
+    [InlineData("ready-for-dev", "ready")]
+    [InlineData(null, "drafted")]
+    public void ForStatus_MapsRawStatusText(string? status, string expected)
+        => Assert.Equal(expected, StatusStyles.ForStatus(status));
 }

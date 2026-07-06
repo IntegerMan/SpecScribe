@@ -58,8 +58,10 @@ public static class HtmlTemplater
         return sb.ToString();
     }
 
-    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands)
+    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null)
     {
+        var inventory = work ?? WorkInventory.Empty;
+
         var groups = new (string Title, string Prefix)[]
         {
             ("Overview", ""),
@@ -81,9 +83,21 @@ public static class HtmlTemplater
         sb.Append($"  <h1>{Html(nav.SiteTitle)}</h1>\n");
         sb.Append("</header>\n\n");
 
-        AppendDashboard(sb, progress, epicsModel, requirements, nav, commands);
+        AppendDashboard(sb, progress, epicsModel, requirements, nav, commands, inventory);
 
-        var used = new HashSet<DocModel>();
+        // Quick-dev + deferred work is surfaced in its own first-class section (below); promote those docs
+        // out of the generic "Implementation Artifacts" grid so they aren't double-listed. Their standalone
+        // pages still exist and stay navigable — this only affects the index grouping (mirrors how README is
+        // kept out of the grid). [Story 2.1 Task 2]
+        AppendWorkTypesSection(sb, inventory);
+
+        var promotedOutputs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var q in inventory.QuickDev) promotedOutputs.Add(q.OutputPath);
+        if (inventory.Deferred is { } def) promotedOutputs.Add(def.OutputPath);
+
+        var used = new HashSet<DocModel>(
+            docs.Where(d => promotedOutputs.Contains(PathUtil.NormalizeSlashes(d.OutputRelativePath))));
+
         foreach (var (groupTitle, groupPrefix) in groups)
         {
             var inGroup = docs
@@ -125,7 +139,7 @@ public static class HtmlTemplater
         return sb.ToString();
     }
 
-    private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav, CommandCatalog commands)
+    private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav, CommandCatalog commands, WorkInventory work)
     {
         sb.Append("<section class=\"dashboard\">\n");
 
@@ -144,6 +158,18 @@ public static class HtmlTemplater
             ? Charts.StatCard(git.TotalCommits.ToString(), Charts.Plural(git.TotalCommits, "Commit", "Commits"), CommitStatSub(git),
                 "Total commits in the repository; the sub-line shows active days and how recently work landed.")
             : Charts.StatCard("—", "Commits", "no git history"));
+        // Quick-dev / deferred work as a SEPARATE whole-project signal so the picture is complete — never
+        // folded into the epic/story/task tallies above (that would misrepresent completion; AC #1). The card
+        // is conditional, so a project with no such work keeps the existing four-card row byte-for-byte. [Story 2.1 Task 3]
+        if (!work.IsEmpty)
+        {
+            var deferredCount = work.Deferred?.OpenItemCount ?? 0;
+            var sub = work.Deferred is not null
+                ? $"{deferredCount} deferred {Charts.Plural(deferredCount, "item", "items")}"
+                : "outside the epic plan";
+            sb.Append(Charts.StatCard(work.QuickDev.Count.ToString(), "Direct changes", sub,
+                "Quick-dev / one-shot changes and deferred-work notes — tracked separately from the epic/story plan, never counted as epic or story completion."));
+        }
         sb.Append("</div>\n\n");
 
         // What's active / what's next leads the dashboard (F1): the single most valuable panel is no longer
@@ -155,7 +181,7 @@ public static class HtmlTemplater
             sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3>");
             sb.Append("<a class=\"view-epic-link\" href=\"epics.html\">View Epics &amp; Stories &rarr;</a></div>\n");
-            sb.Append(Charts.Sunburst(epicsModel));
+            sb.Append(Charts.Sunburst(epicsModel, commands));
             sb.Append("</div>\n\n");
 
             sb.Append(BmadCommands.RenderProjectNextSteps(epicsModel, commands));
@@ -458,6 +484,55 @@ public static class HtmlTemplater
         sb.Append($"    <span class=\"now-next-kicker\">{Html(kicker)}</span>\n");
         sb.Append($"    <span class=\"now-next-title\">{Html(title)}</span>\n");
         sb.Append("  </a>\n");
+    }
+
+    /// <summary>The first-class "Direct &amp; Quick-Dev Work" band: quick-dev one-shot changes as status-badged
+    /// cards plus a deferred-work callout, so these work classes read as distinct, tracked work rather than
+    /// undifferentiated cards buried in the generic artifact grid. Omitted entirely (no empty header, no broken
+    /// link) when there is no such work, preserving Story 1.1's graceful omission. [Story 2.1 Task 2]</summary>
+    private static void AppendWorkTypesSection(StringBuilder sb, WorkInventory work)
+    {
+        if (work.IsEmpty) return;
+
+        sb.Append("<div class=\"index-section-title\">Direct &amp; Quick-Dev Work</div>\n");
+
+        if (work.QuickDev.Count > 0)
+        {
+            sb.Append("<div class=\"index-grid\">\n");
+            foreach (var entry in work.QuickDev)
+            {
+                sb.Append($"  <a class=\"index-card quick-dev-card\" href=\"{Html(entry.OutputPath)}\">\n");
+                sb.Append($"    <h2>{Html(entry.Title)}</h2>\n");
+
+                var badges = new StringBuilder();
+                if (entry.Status is { Length: > 0 } status)
+                {
+                    // Status as a BADGE using the site's status semantics, not flat text. [Story 2.1 Task 2]
+                    badges.Append($"<span class=\"status-badge {StatusStyles.ForStatus(status)}\">{Html(status)}</span>");
+                }
+                if (entry.Type is { Length: > 0 } type)
+                {
+                    badges.Append($"<span class=\"pill\">{Html(type)}</span>");
+                }
+                if (badges.Length > 0)
+                {
+                    sb.Append($"    <p class=\"work-card-badges\">{badges}</p>\n");
+                }
+
+                sb.Append("    <span class=\"index-card-path\">Quick-dev · one-shot</span>\n");
+                sb.Append("  </a>\n");
+            }
+            sb.Append("</div>\n\n");
+        }
+
+        if (work.Deferred is { } deferred)
+        {
+            var count = deferred.OpenItemCount;
+            sb.Append($"<a class=\"work-callout\" href=\"{Html(deferred.OutputPath)}\">\n");
+            sb.Append("  <span class=\"work-callout-label\">Deferred Work</span>\n");
+            sb.Append($"  <span class=\"work-callout-count\">{count} open {Charts.Plural(count, "item", "items")}</span>\n");
+            sb.Append("</a>\n\n");
+        }
     }
 
     /// <summary>The "Architecture Decision Records" band on the home index: a titled section with a link to the

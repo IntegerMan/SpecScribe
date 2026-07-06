@@ -54,6 +54,20 @@ public static class BmadCommands
         return sb.ToString();
     }
 
+    /// <summary>A de-emphasized inline "next action" for a partial/empty planning surface: a short lead-in
+    /// followed by the copy-pasteable command, turning a dead-end note ("Stories not yet drafted.") into a
+    /// signposted action. Returns <paramref name="fallback"/> unchanged when the module doesn't expose the
+    /// command, so we never print a command that isn't installed (the same discipline <see cref="Add"/>
+    /// enforces). The command carries the shared copy button wired by specscribe.js. [Story 2.1 Task 6]</summary>
+    public static string InlineGuidance(string? command, string lead, string fallback)
+    {
+        if (command is null) return fallback;
+
+        var cmd = PathUtil.Html(command);
+        return $"{PathUtil.Html(lead)} <code class=\"inline-cmd\">{cmd}</code>" +
+               $"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>";
+    }
+
     /// <summary>Appends a suggestion only when the module exposes that command — a missing step is dropped
     /// so we never render a command that isn't installed.</summary>
     private static void Add(List<Suggestion> list, string? command, string description)

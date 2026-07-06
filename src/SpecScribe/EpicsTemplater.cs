@@ -6,7 +6,7 @@ namespace SpecScribe;
 /// (for stories with a resolved implementation-artifacts detail file).</summary>
 public static class EpicsTemplater
 {
-    public static string RenderIndex(EpicsModel model, ProgressModel progress, SiteNav nav)
+    public static string RenderIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands)
     {
         const string outputPath = SiteNav.EpicsOutputPath;
 
@@ -26,7 +26,7 @@ public static class EpicsTemplater
         sb.Append("<section class=\"dashboard\">\n");
         AppendProgressPanel(sb, progress);
         sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
-        sb.Append(Charts.Sunburst(model));
+        sb.Append(Charts.Sunburst(model, commands));
         sb.Append("</div>\n");
         sb.Append("</section>\n\n");
 
@@ -35,13 +35,23 @@ public static class EpicsTemplater
             sb.Append($"<div class=\"banner\">{model.OverviewHtml}</div>\n\n");
         }
 
+        // Empty state: epics.md exists (so this page is even linked) but lists no epics. Rather than headers
+        // over an empty sunburst, signpost the one command that seeds the plan. [Story 2.1 Task 6]
+        if (model.Epics.Count == 0)
+        {
+            AppendEmptyEpicsGuidance(sb, commands);
+        }
+
         AppendChipSection(sb, "Vertical Slice", model.Epics.Where(e => e.Section == EpicSection.VerticalSlice).ToList());
         AppendChipSection(sb, "Further Development", model.Epics.Where(e => e.Section == EpicSection.FurtherDevelopment).ToList());
 
-        sb.Append("<div class=\"section-divider\">All Epics</div>\n\n");
-        foreach (var epic in model.Epics)
+        if (model.Epics.Count > 0)
         {
-            AppendEpicCard(sb, epic);
+            sb.Append("<div class=\"section-divider\">All Epics</div>\n\n");
+            foreach (var epic in model.Epics)
+            {
+                AppendEpicCard(sb, epic, commands);
+            }
         }
 
         // The build-order flowchart, demoted to the bottom — the sunburst above is the primary viz.
@@ -130,7 +140,7 @@ public static class EpicsTemplater
             main.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Story Breakdown</h3>\n");
             main.Append(Charts.EpicSunburst(epic, story => story.ArtifactOutputPath is { } ap
                 ? prefix + ap
-                : $"#{StoryAnchorId(story.Id)}"));
+                : $"#{StoryAnchorId(story.Id)}", commands));
             main.Append("</div>\n");
             main.Append("</div>\n</section>\n\n");
         }
@@ -143,7 +153,7 @@ public static class EpicsTemplater
 
         foreach (var story in epic.Stories)
         {
-            AppendStoryCard(main, story, prefix);
+            AppendStoryCard(main, story, prefix, commands);
             toc.Add(new Toc.Entry(2, $"Story {story.Id}", StoryAnchorId(story.Id)));
         }
 
@@ -310,7 +320,7 @@ public static class EpicsTemplater
         return sb.ToString();
     }
 
-    private static void AppendStoryCard(StringBuilder sb, StoryInfo story, string prefix)
+    private static void AppendStoryCard(StringBuilder sb, StoryInfo story, string prefix, CommandCatalog commands)
     {
         var storyClass = StatusStyles.ForStory(story);
 
@@ -362,7 +372,13 @@ public static class EpicsTemplater
         }
         else
         {
-            sb.Append("  <p class=\"not-detailed-note\">No detailed story plan yet.</p>\n");
+            // An undrafted story's dead-end note becomes a next action: draft it with create-story N.N when
+            // the module exposes that command. [Story 2.1 Task 6]
+            var note = BmadCommands.InlineGuidance(
+                commands.Command("create-story", story.Id),
+                "No detailed story plan yet — draft it with",
+                "No detailed story plan yet.");
+            sb.Append($"  <p class=\"not-detailed-note\">{note}</p>\n");
         }
 
         sb.Append("</div>\n\n");
@@ -409,7 +425,7 @@ public static class EpicsTemplater
         sb.Append("</div>\n\n");
     }
 
-    private static void AppendEpicCard(StringBuilder sb, EpicInfo epic)
+    private static void AppendEpicCard(StringBuilder sb, EpicInfo epic, CommandCatalog commands)
     {
         var statusCls = StatusStyles.ForEpic(epic);
         sb.Append($"<div class=\"epic-card\" id=\"epic-{epic.Number}\">\n");
@@ -425,10 +441,27 @@ public static class EpicsTemplater
         }
         if (epic.Status == EpicStatus.Pending)
         {
-            sb.Append("  <p class=\"pending-note\">Stories not yet drafted.</p>\n");
+            // A pending epic's dead-end note becomes a next action when the module exposes the command. [Story 2.1 Task 6]
+            var note = BmadCommands.InlineGuidance(
+                commands.Command("create-epics-and-stories"),
+                "Stories not yet drafted — draft them with",
+                "Stories not yet drafted.");
+            sb.Append($"  <p class=\"pending-note\">{note}</p>\n");
         }
         sb.Append($"  <a class=\"view-epic-link\" href=\"epics/epic-{epic.Number}.html\">View Epic {epic.Number} stories &rarr;</a>\n");
         sb.Append("</div>\n\n");
+    }
+
+    /// <summary>The zero-epic empty state for the epics index: epics.md exists but breaks down into no epics,
+    /// so point at the command that seeds the plan. Omits the command cleanly if the module doesn't expose
+    /// it. [Story 2.1 Task 6]</summary>
+    private static void AppendEmptyEpicsGuidance(StringBuilder sb, CommandCatalog commands)
+    {
+        var note = BmadCommands.InlineGuidance(
+            commands.Command("create-epics-and-stories"),
+            "No epics yet. Break your plan into epics and stories with",
+            "No epics yet — add them to your plan to see them here.");
+        sb.Append($"<div class=\"epic-card empty-state\">\n  <p class=\"pending-note\">{note}</p>\n</div>\n\n");
     }
 
     /// <summary>Breadcrumb label like "1 · World Rendering & Interac…" — the number alone told you nothing.</summary>

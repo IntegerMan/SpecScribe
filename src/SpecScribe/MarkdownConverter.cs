@@ -149,6 +149,8 @@ public static class MarkdownConverter
                 Author = GetString(map, "author"),
                 Version = GetString(map, "version"),
                 Status = GetString(map, "status"),
+                Route = GetString(map, "route"),
+                Type = GetString(map, "type"),
             };
             return (fm, body);
         }

@@ -331,7 +331,7 @@ public sealed class SiteGenerator
             var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
             var referenceMap = BuildReferenceMap(files, model, artifactMap, PathUtil.NormalizeSlashes(epicsSourceRelative));
 
-            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyRequirementLinks(EpicsTemplater.RenderIndex(model, progress, nav), "epics.html"));
+            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyRequirementLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands), "epics.html"));
 
             var epicsDir = Path.Combine(_options.OutputRoot, "epics");
             Directory.CreateDirectory(epicsDir);
@@ -433,7 +433,8 @@ public sealed class SiteGenerator
     {
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands);
+        var work = WorkInventory.Build(docs);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, work);
         File.WriteAllText(indexPath, ApplyRequirementLinks(html, "index.html"));
     }
 

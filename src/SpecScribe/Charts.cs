@@ -114,9 +114,12 @@ public static class Charts
 
     /// <summary>The project sunburst: inner ring = epics (angular weight max(1, story count) so pending
     /// epics stay visible), middle ring = stories, thin outer ring = task done/remaining slices where a
-    /// story has a task plan. Every epic/story segment is a real link; colors come from
-    /// <see cref="StatusStyles"/> via .sb-* CSS classes. Pure SVG — no JS.</summary>
-    public static string Sunburst(EpicsModel model, int size = 380)
+    /// story has a task plan — or a faint dashed PLACEHOLDER arc where a story has no task plan yet, so an
+    /// unplanned story reads as "no plan" (a call to action) rather than looking identical to a story off the
+    /// edge of the data. Every epic/story segment (and the placeholder) is a real link; colors come from
+    /// <see cref="StatusStyles"/> via .sb-* CSS classes. When <paramref name="commands"/> exposes a
+    /// create-story command, the placeholder tooltip names it. Pure SVG — no JS. [UXO E4]</summary>
+    public static string Sunburst(EpicsModel model, CommandCatalog? commands = null, int size = 380)
     {
         var epics = model.Epics.OrderBy(e => e.Number).ToList();
         if (epics.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
@@ -186,6 +189,10 @@ public static class Charts
                             sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining</title></path></a>\n");
                         }
                     }
+                    else
+                    {
+                        AppendNoPlanArc(sb, story, storyHref, c, taskInner, taskOuter, storyAngle + pad, storyAngle + storySweep - pad, commands);
+                    }
 
                     storyAngle += storySweep;
                 }
@@ -215,6 +222,24 @@ public static class Charts
         return sb.ToString();
     }
 
+    /// <summary>The E4 placeholder arc: a faint dashed outer-ring sector for a story that has no task plan
+    /// yet, turning an otherwise-blank gap into a call to action. Kept a real link (to the story/epic) and
+    /// carries a <c>&lt;title&gt;</c> + <c>aria-label</c> so it reads "No task plan yet — run
+    /// /…-create-story N.N" for pointer, keyboard and screen-reader users alike; the command is only named
+    /// when the active module actually exposes it (never a command that doesn't exist). Pure SVG + CSS — the
+    /// dashed look is the <c>.sb-noplan</c> class, not a JS effect. [UXO E4]</summary>
+    private static void AppendNoPlanArc(StringBuilder sb, StoryInfo story, string href, double c, double rInner, double rOuter, double a0, double a1, CommandCatalog? commands)
+    {
+        var command = commands?.Command("create-story", story.Id);
+        var title = command is { Length: > 0 }
+            ? $"Story {story.Id}: no task plan yet — run {command}"
+            : $"Story {story.Id}: no task plan yet";
+        var aria = $"Story {story.Id}: no task plan yet";
+
+        sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(aria)}\"><path class=\"sb-seg sb-noplan\" d=\"{AnnularSector(c, rInner, rOuter, a0, a1)}\">");
+        sb.Append($"<title>{Html(title)}</title></path></a>\n");
+    }
+
     /// <summary>SVG path for an annular sector (donut slice) between two angles at two radii.</summary>
     private static string AnnularSector(double c, double rInner, double rOuter, double a0, double a1)
     {
@@ -234,8 +259,9 @@ public static class Charts
     /// status), outer ring = task done/remaining per story where a task plan exists. A cropped version of
     /// the project-wide <see cref="Sunburst"/> — no epic ring needed since we're already on that epic's
     /// page. Every segment is a real link: to the story's detail page when one exists, otherwise an
-    /// in-page anchor down to its story card (supplied via <paramref name="hrefBuilder"/>).</summary>
-    public static string EpicSunburst(EpicInfo epic, Func<StoryInfo, string> hrefBuilder, int size = 320)
+    /// in-page anchor down to its story card (supplied via <paramref name="hrefBuilder"/>). A story with no
+    /// task plan yet gets the same faint dashed placeholder arc as the project sunburst. [UXO E4]</summary>
+    public static string EpicSunburst(EpicInfo epic, Func<StoryInfo, string> hrefBuilder, CommandCatalog? commands = null, int size = 320)
     {
         if (epic.Stories.Count == 0) return "<div class=\"chart-empty\">No stories drafted for this epic yet.</div>";
 
@@ -280,6 +306,10 @@ public static class Charts
                     sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(remainAria)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad + doneSweep, angle + anglePerStory - pad)}\">");
                     sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining</title></path></a>\n");
                 }
+            }
+            else
+            {
+                AppendNoPlanArc(sb, story, href, c, taskInner, taskOuter, angle + pad, angle + anglePerStory - pad, commands);
             }
 
             angle += anglePerStory;
@@ -374,9 +404,12 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>A grid of clickable per-epic mini-donuts — story-detail coverage at a glance, with the
-    /// epic's full name always visible (no more decoding "e07" abbreviations) and a direct link to the
-    /// epic page. Pending epics (no stories yet) show an empty ring rather than a misleading 0% fill.</summary>
+    /// <summary>A grid of clickable per-epic mini-donuts — per-story DELIVERY status at a glance (done /
+    /// in-review / in-dev / ready / drafted / pending, same palette + tokens as the sunburst via
+    /// <see cref="StatusStyles"/>), with the epic's full name always visible and a direct link to the epic
+    /// page. The "N/N detailed" figure is demoted to the sub-label so a mid-development epic no longer draws
+    /// a full ring that reads as "complete." Pending epics (no stories yet) show an empty ring rather than a
+    /// misleading 0%/full fill. [UXO A6]</summary>
     public static string EpicMosaic(IReadOnlyList<EpicProgress> epics, Func<EpicProgress, string> hrefBuilder)
     {
         if (epics.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
@@ -391,12 +424,7 @@ public static class Charts
             sb.Append($"  <a class=\"epic-mosaic-card\" href=\"{Html(href)}\">\n");
             sb.Append("    <div class=\"epic-mosaic-donut\">\n");
             sb.Append(hasStories
-                ? Donut(new (string, int, string)[]
-                    {
-                        // "Detailed" = has a task plan (ready), not finished — gold, never green.
-                        ("Detailed", epic.StoriesWithArtifact, "ready"),
-                        ("Not yet detailed", epic.StoryCount - epic.StoriesWithArtifact, "pending"),
-                    }, size: 64)
+                ? Donut(DeliverySegments(epic.StoryStatusCounts), size: 64)
                 : Donut(Array.Empty<(string, int, string)>(), size: 64));
             sb.Append("    </div>\n");
             sb.Append("    <div class=\"epic-mosaic-label\">\n");
@@ -410,6 +438,15 @@ public static class Charts
         sb.Append("</div>\n");
         return sb.ToString();
     }
+
+    /// <summary>Turns an epic's per-status story tally into ordered donut segments (done → … → pending) for
+    /// the delivery mosaic, colored by the shared status tokens. Zero-count stages are dropped so the ring
+    /// carries only the stages actually present. [UXO A6]</summary>
+    private static (string Label, int Value, string CssClass)[] DeliverySegments(IReadOnlyDictionary<string, int> counts) =>
+        StatusStyles.StoryStages
+            .Select(stage => (Label: StatusStyles.StoryLabel(stage), Value: counts.GetValueOrDefault(stage), CssClass: stage))
+            .Where(s => s.Value > 0)
+            .ToArray();
 
     /// <summary>A GitHub-style commit heatmap: one column per week, one row per day-of-week (Sun top to
     /// Sat bottom), shaded by commit count, with month labels along the top and Mon/Wed/Fri labels on the

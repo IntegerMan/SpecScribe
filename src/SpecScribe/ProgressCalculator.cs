@@ -35,6 +35,12 @@ public static class ProgressCalculator
             tasksDone += epicTasksDone;
             tasksTotal += epicTasksTotal;
 
+            // Per-status delivery tally for the mosaic (A6). Story.Status was filled above, so ForStory now
+            // reflects each story's real lifecycle stage rather than "has an artifact or not."
+            var statusCounts = epic.Stories
+                .GroupBy(StatusStyles.ForStory)
+                .ToDictionary(g => g.Key, g => g.Count());
+
             perEpic.Add(new EpicProgress
             {
                 Number = epic.Number,
@@ -44,6 +50,7 @@ public static class ProgressCalculator
                 TasksDone = epicTasksDone,
                 TasksTotal = epicTasksTotal,
                 Status = epic.Status,
+                StoryStatusCounts = statusCounts,
             });
         }
 

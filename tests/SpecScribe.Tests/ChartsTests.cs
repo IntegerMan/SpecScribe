@@ -103,6 +103,116 @@ public class ChartsTests
         Assert.DoesNotContain(">tasks</text>", svg);
     }
 
+    private static CommandCatalog Catalog() => new("BMad", new Dictionary<string, string>
+    {
+        ["create-story"] = "/bmad-create-story",
+        ["create-epics-and-stories"] = "/bmad-create-epics-and-stories",
+    });
+
+    [Fact]
+    public void Sunburst_UnplannedStoryGetsDashedPlaceholderArcWithCreateStoryCta()
+    {
+        // A story with a plan and one without: only the unplanned one gets the dashed placeholder arc, and
+        // its tooltip names the module's create-story command for that id. [Story 2.1 UXO E4]
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Planned", "in progress", 2, 5), Story("1.2", "Unplanned", "ready", 0, 0)) },
+        };
+
+        var svg = Charts.Sunburst(model, Catalog());
+
+        // The placeholder arc exists, is a real link, and carries the call-to-action tooltip + aria fallback.
+        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("<title>Story 1.2: no task plan yet — run /bmad-create-story 1.2</title>", svg);
+        Assert.Contains("aria-label=\"Story 1.2: no task plan yet\"", svg);
+        // The planned story keeps its real task ring, not a placeholder.
+        Assert.Contains("aria-label=\"Story 1.1: 2 of 5 tasks done\"", svg);
+    }
+
+    [Fact]
+    public void Sunburst_PlaceholderOmitsCommandWhenModuleLacksIt()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Unplanned", "ready", 0, 0)) },
+        };
+
+        // No catalog → no command is invented; the placeholder still reads as a next action, just unnamed.
+        var svg = Charts.Sunburst(model);
+
+        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("<title>Story 1.1: no task plan yet</title>", svg);
+        Assert.DoesNotContain("run /", svg);
+    }
+
+    [Fact]
+    public void EpicSunburst_UnplannedStoryGetsDashedPlaceholderArc()
+    {
+        var epic = Epic(Story("1.1", "Unplanned", "ready", 0, 0));
+
+        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", Catalog());
+
+        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("<title>Story 1.1: no task plan yet — run /bmad-create-story 1.1</title>", svg);
+        // The story segment itself stays a real link (the placeholder doesn't replace navigation).
+        Assert.Contains("aria-label=\"Story 1.1: Unplanned — ready\"", svg);
+    }
+
+    [Fact]
+    public void EpicMosaic_SegmentsByDeliveryStatusNotDetailedCoverage()
+    {
+        // A mid-development epic: one story done, one in-dev, one ready. The ring must show the real delivery
+        // mix (done + active + ready segments), NOT a single full "detailed/ready" ring, and keep "N/N
+        // detailed" as the sub-label only. [Story 2.1 UXO A6]
+        var epic = new EpicProgress
+        {
+            Number = 1,
+            Title = "Mid-dev epic",
+            StoryCount = 3,
+            StoriesWithArtifact = 3,
+            TasksDone = 4,
+            TasksTotal = 10,
+            Status = EpicStatus.Drafted,
+            StoryStatusCounts = new Dictionary<string, int> { ["done"] = 1, ["active"] = 1, ["ready"] = 1 },
+        };
+
+        var html = Charts.EpicMosaic(new[] { epic }, _ => "epics/epic-1.html");
+
+        Assert.Contains("donut-seg done", html);
+        Assert.Contains("donut-seg active", html);
+        Assert.Contains("donut-seg ready", html);
+        // "N/N detailed" survives as the sub-label.
+        Assert.Contains("3 / 3 stories detailed", html);
+    }
+
+    [Fact]
+    public void EpicMosaic_PendingEpicKeepsEmptyRingAndNotYetDrafted()
+    {
+        var pending = new EpicProgress
+        {
+            Number = 2,
+            Title = "Pending epic",
+            StoryCount = 0,
+            StoriesWithArtifact = 0,
+            TasksDone = 0,
+            TasksTotal = 0,
+            Status = EpicStatus.Pending,
+            StoryStatusCounts = new Dictionary<string, int>(),
+        };
+
+        var html = Charts.EpicMosaic(new[] { pending }, _ => "epics/epic-2.html");
+
+        // Empty ring (no colored delivery segments), and the "Not yet drafted" label rather than a 0%/full fill.
+        Assert.Contains("Not yet drafted", html);
+        Assert.DoesNotContain("donut-seg done", html);
+        Assert.DoesNotContain("donut-seg active", html);
+        Assert.DoesNotContain("donut-seg ready", html);
+    }
+
     [Fact]
     public void Donut_WithAriaLabel_IsRoleImgWithName()
     {

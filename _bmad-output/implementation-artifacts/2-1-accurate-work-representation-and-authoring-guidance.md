@@ -4,7 +4,7 @@ baseline_commit: 8fa1c1d8380daae77cec84f4ba66da9c5179a211
 
 # Story 2.1: Accurate Work Representation and Authoring Guidance
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -36,39 +36,39 @@ so that deferred items and quick-dev work stay visible and new contributors know
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Model quick-dev + deferred work as first-class work types (AC: #1)
-  - [ ] **Identify the artifacts by convention, and disambiguate from Story 2.2.** Quick-dev artifacts are `implementation-artifacts/spec-*.md` files carrying frontmatter `route: one-shot` (plus `type`, `status`, `created`) — the outputs of the `bmad-quick-dev` workflow. The deferred-work note is `implementation-artifacts/deferred-work.md` (no frontmatter; a bulleted list grouped by `## Deferred from: …`). **These are NOT the spec kernel** in `_bmad-output/specs/spec-specscribe/*.md` (SPEC.md, ARCHITECTURE-SPINE.md, rendering-architecture.md, requirements-catalog.md, settings-and-signals.md) — that kernel is **Story 2.2's** domain; do not build kernel handling here. [Source: `_bmad-output/implementation-artifacts/spec-readme-supported-frameworks-table.md:1-7`, `_bmad-output/implementation-artifacts/deferred-work.md:1-5`]
-  - [ ] Capture the quick-dev identity. `Frontmatter` is a fixed-field record (`Title/Project/Date/Author/Version/Status` only) — `route` and `type` are parsed into the YAML `map` in `MarkdownConverter` but then dropped. Extend `Frontmatter` with `Route` (and optionally `Type`) via the existing `GetString(map, "route")` seam so a doc can be classified as quick-dev/one-shot; keep every field optional (BMad docs vary). [Source: `src/SpecScribe/Frontmatter.cs`, `src/SpecScribe/MarkdownConverter.cs:143-152`]
-  - [ ] Build a lightweight work-inventory (recommended: a small model computed in `SiteGenerator` where `_docs` is already populated, or a helper alongside `ProgressCalculator`). It should expose: the quick-dev entries (title, output path, status) and the deferred-work entry (output path + a count of open items parsed from its `- ` bullets). Keep it non-fatal: a missing/partial/empty file yields an empty inventory, never an exception (NFR2).
-- [ ] Task 2: Surface the work types as first-class, navigable index entries with status (AC: #1)
-  - [ ] Today `spec-*.md` and `deferred-work.md` render as plain cards in the generic **"Implementation Artifacts"** group of the home index (via `GenerateOneInternal` → `_docs` → `RenderIndex` grouping) — navigable but undifferentiated, with status shown only as flat text in the card `<p>`. Give them a **dedicated, labeled section** (e.g. "Direct & Quick-Dev Work" and a deferred-work callout) so they read as distinct work classes, and show each one's status as a **status badge** using the site's status semantics (`status-badge`/`pill` + `StatusStyles`), not plain text. [Source: `src/SpecScribe/HtmlTemplater.cs:58-120`, `:374-391`]
-  - [ ] Avoid double-listing: once an artifact is promoted into the dedicated section, exclude it from the generic "Implementation Artifacts" grid (mirror how README is kept out of `_docs`, or filter it out of the grouping loop). Keep the generated standalone page for each so it stays navigable. [Source: `src/SpecScribe/HtmlTemplater.cs:80-112`, `SiteGenerator.cs:447-466` README precedent]
-  - [ ] Preserve Story 1.1's graceful omission: when there are no quick-dev/deferred artifacts, the section is omitted cleanly (no empty header, no broken link).
-- [ ] Task 3: Account for the new work in progress figures WITHOUT misrepresenting epic/story completion (AC: #1)
-  - [ ] The dashboard stat cards + "Overall Progress" bars tally **only** epics/stories/tasks from `epics.md` today. Add the quick-dev/deferred counts as a **separate** signal (e.g. a "Direct changes" stat card and/or a small count in the new section) so the whole-project picture is complete — but **never** fold them into `TasksDone/TasksTotal`, `StoriesTotal`, or the epic roll-up. [Source: `src/SpecScribe/HtmlTemplater.cs:122-144`, `src/SpecScribe/ProgressModel.cs`, `src/SpecScribe/ProgressCalculator.cs`]
-  - [ ] **Hard regression guard:** the existing epic/story/task numbers and their denominators must be byte-for-byte unchanged (Story 1.5's `[UXO A5]` task-stat reframe — "N/N planned tasks", "across X of Y stories" — must survive verbatim). Prove it with a test asserting the epic/story tallies are unaffected by the presence of quick-dev/deferred artifacts.
-  - [ ] If you extend `ProgressModel`/`EpicProgress`, keep `ProgressModel.Empty` valid and all existing `required` initializers satisfied.
-- [ ] Task 4: `[UXO A6]` "Progress by Epic" mosaic shows real delivery status, not "stories detailed" (AC: #2 truthfulness)
-  - [ ] `Charts.EpicMosaic` currently draws a two-segment ring of Detailed vs Not-detailed (`StoriesWithArtifact`/`StoryCount`), so a **mid-development** epic renders a full gold ring and reads as "complete." Change the ring to segment by **per-story delivery status** (done / active / review / ready / drafted / pending), same palette + tokens as the sunburst (`StatusStyles.ForStory`), and keep "N/N detailed" as the **sub-label only**. [Source: `src/SpecScribe/Charts.cs:366-398`]
-  - [ ] The mosaic needs per-status story counts per epic. `EpicProgress` today carries only `StoryCount`/`StoriesWithArtifact` (no per-status breakdown). Either add a per-status tally to `EpicProgress` (computed in `ProgressCalculator` from `StatusStyles.ForStory`) or have the mosaic take the `EpicInfo`/story list. Pending epics (no stories) keep the empty ring + "Not yet drafted" — never a misleading 0%/full fill. [Source: `src/SpecScribe/ProgressModel.cs:3-12`, `src/SpecScribe/ProgressCalculator.cs:38-47`, `src/SpecScribe/Charts.cs:374-393`]
-  - [ ] This mosaic is rendered in **two** places — the home dashboard (`HtmlTemplater.AppendDashboard` → `Charts.EpicMosaic`, `HtmlTemplater.cs:187-192`) and the epics index (`EpicsTemplater.AppendProgressPanel` → `Charts.EpicMosaic`, `EpicsTemplater.cs:394-396`). Fixing `Charts.EpicMosaic` fixes both; verify both surfaces.
-- [ ] Task 5: `[UXO E4]` Sunburst distinguishes "no task plan yet" from "no data" with a placeholder arc (AC: #2)
-  - [ ] Today the outer task ring is drawn **only when `story.TasksTotal > 0`**, so a story with no plan and a story off the edge of the data look identical. For a story with `TasksTotal == 0`, render a **faint dashed placeholder arc** in the task ring with a tooltip/aria-label like **"No task plan yet — run /bmad-create-story N.N"**, turning the gap into a call to action. Apply to both `Charts.Sunburst` (project) and `Charts.EpicSunburst` (per-epic). [Source: `src/SpecScribe/Charts.cs:156-172`, `:254-269`]
-  - [ ] Pure SVG + CSS only — this is NOT the JS drill engine ([[charting-is-pure-svg-no-js]]). The dashed arc is a styled `<path>`; keep a `<title>` and (once Story 1.5's tooltip script is present) the `data-*` tooltip hook, with `<title>`/`aria-label` as the no-JS fallback. Keep the story segment a real link so the placeholder is still clickable to the story/epic. [Source: `src/SpecScribe/Charts.cs:99-199`]
-  - [ ] Keep whole-chart `role="img"` aria-label truthful and preserve Story 1.4's segment `aria-label`s. The `sunburst-hint` line and legend stay; the placeholder makes the "outer ring = task completion" statement true even where a plan is missing.
-- [ ] Task 6: Inline authoring guidance on epics/stories surfaces, including empty and partial states (AC: #2)
-  - [ ] Route all commands through the existing module-aware seam so they match the detected module (`/bmad-*` vs `/gds-*`) and are **omitted** when not installed: `CommandCatalog.Command("create-epics-and-stories")`, `Command("create-story", "N.N")`. Reuse/extend `BmadCommands` rather than hardcoding command strings. [Source: `src/SpecScribe/BmadCommands.cs`, `src/SpecScribe/ModuleContext.cs:43-51`]
-  - [ ] **Empty state:** `EpicsTemplater.RenderIndex` has no empty-state today (a zero-epic model still emits headers + an empty sunburst). When `model.Epics.Count == 0`, render guidance on how to add the first epic (`create-epics-and-stories`). Note the home page's `epics.html` link itself only appears when `epics.md` exists (`SiteNav` gate) — the empty-epics case is "epics.md exists but has no epics." [Source: `src/SpecScribe/EpicsTemplater.cs:9-64`, `src/SpecScribe/SiteNav.cs:78-86`]
-  - [ ] **Partial states — convert dead-end notes into next actions:** `AppendEpicCard`'s "Stories not yet drafted." (`EpicsTemplater.cs:426-429`), `AppendStoryCard`'s "No detailed story plan yet." (`:363-366`), and `AppendUpNextCard`'s "Not yet drafted" (`:471-496`) currently state a gap without the command to close it. Pair each with the relevant guidance (`create-epics-and-stories` for a pending epic; `create-story N.N` for an undrafted story). Keep it de-emphasized so it reads as help, not clutter.
-  - [ ] Guidance must degrade to nothing when the module exposes no such command (never print a command that doesn't exist) — the same rule `BmadCommands.Add` already enforces.
-- [ ] Task 7: Test coverage (AC: #1, #2)
-  - [ ] `ChartsTests`: `EpicMosaic` renders per-status segments from the story roll-up (a mid-dev epic is NOT a full ring); pending epic keeps the empty ring + "Not yet drafted"; `Sunburst`/`EpicSunburst` emit a dashed placeholder arc with the "No task plan yet" tooltip when `TasksTotal == 0` and still keep the story link + segment aria-labels. [Source: `tests/SpecScribe.Tests/ChartsTests.cs`]
-  - [ ] `HtmlTemplaterTests` (render-level string assertions, the house pattern): quick-dev + deferred artifacts appear in their own labeled section with a status badge and are absent from the generic "Implementation Artifacts" grid; the work-count stat is present; **epic/story/task tallies are unchanged** when quick-dev/deferred docs are present. [Source: `tests/SpecScribe.Tests/HtmlTemplaterTests.cs`]
-  - [ ] Epics-surface guidance: `EpicsTemplater`/`BmadCommands` tests that empty and partial states emit the create-epic/create-story command when the module exposes it and emit nothing when it does not. Prefer generation-/render-level assertions over new public API.
-  - [ ] If a frontmatter `Route` field is added: a `MarkdownConverterTests` case that `route:` is parsed (and absent → null).
-- [ ] Task 8: End-to-end validation with a real generation pass (AC: #1, #2)
-  - [ ] Run the focused test filter, then a real generation pass against this repo (it contains 5 `spec-*.md`, a `deferred-work.md`, epics in every state, and stories with and without plans — a live fixture for every branch).
-  - [ ] Manually verify on `docs/live/index.html` + `epics.html`: quick-dev/deferred work shows as first-class with status; the whole-project counts include them without changing epic/story numbers; the epic mosaic shows Epic 1 mid-development (not a full ring); undrafted stories show a dashed placeholder arc with the create-story CTA; empty/partial epic surfaces show the add-epic/add-story guidance.
+- [x] Task 1: Model quick-dev + deferred work as first-class work types (AC: #1)
+  - [x] **Identify the artifacts by convention, and disambiguate from Story 2.2.** Quick-dev artifacts are `implementation-artifacts/spec-*.md` files carrying frontmatter `route: one-shot` (plus `type`, `status`, `created`) — the outputs of the `bmad-quick-dev` workflow. The deferred-work note is `implementation-artifacts/deferred-work.md` (no frontmatter; a bulleted list grouped by `## Deferred from: …`). **These are NOT the spec kernel** in `_bmad-output/specs/spec-specscribe/*.md` (SPEC.md, ARCHITECTURE-SPINE.md, rendering-architecture.md, requirements-catalog.md, settings-and-signals.md) — that kernel is **Story 2.2's** domain; do not build kernel handling here. [Source: `_bmad-output/implementation-artifacts/spec-readme-supported-frameworks-table.md:1-7`, `_bmad-output/implementation-artifacts/deferred-work.md:1-5`]
+  - [x] Capture the quick-dev identity. `Frontmatter` is a fixed-field record (`Title/Project/Date/Author/Version/Status` only) — `route` and `type` are parsed into the YAML `map` in `MarkdownConverter` but then dropped. Extend `Frontmatter` with `Route` (and optionally `Type`) via the existing `GetString(map, "route")` seam so a doc can be classified as quick-dev/one-shot; keep every field optional (BMad docs vary). [Source: `src/SpecScribe/Frontmatter.cs`, `src/SpecScribe/MarkdownConverter.cs:143-152`]
+  - [x] Build a lightweight work-inventory (recommended: a small model computed in `SiteGenerator` where `_docs` is already populated, or a helper alongside `ProgressCalculator`). It should expose: the quick-dev entries (title, output path, status) and the deferred-work entry (output path + a count of open items parsed from its `- ` bullets). Keep it non-fatal: a missing/partial/empty file yields an empty inventory, never an exception (NFR2).
+- [x] Task 2: Surface the work types as first-class, navigable index entries with status (AC: #1)
+  - [x] Today `spec-*.md` and `deferred-work.md` render as plain cards in the generic **"Implementation Artifacts"** group of the home index (via `GenerateOneInternal` → `_docs` → `RenderIndex` grouping) — navigable but undifferentiated, with status shown only as flat text in the card `<p>`. Give them a **dedicated, labeled section** (e.g. "Direct & Quick-Dev Work" and a deferred-work callout) so they read as distinct work classes, and show each one's status as a **status badge** using the site's status semantics (`status-badge`/`pill` + `StatusStyles`), not plain text. [Source: `src/SpecScribe/HtmlTemplater.cs:58-120`, `:374-391`]
+  - [x] Avoid double-listing: once an artifact is promoted into the dedicated section, exclude it from the generic "Implementation Artifacts" grid (mirror how README is kept out of `_docs`, or filter it out of the grouping loop). Keep the generated standalone page for each so it stays navigable. [Source: `src/SpecScribe/HtmlTemplater.cs:80-112`, `SiteGenerator.cs:447-466` README precedent]
+  - [x] Preserve Story 1.1's graceful omission: when there are no quick-dev/deferred artifacts, the section is omitted cleanly (no empty header, no broken link).
+- [x] Task 3: Account for the new work in progress figures WITHOUT misrepresenting epic/story completion (AC: #1)
+  - [x] The dashboard stat cards + "Overall Progress" bars tally **only** epics/stories/tasks from `epics.md` today. Add the quick-dev/deferred counts as a **separate** signal (e.g. a "Direct changes" stat card and/or a small count in the new section) so the whole-project picture is complete — but **never** fold them into `TasksDone/TasksTotal`, `StoriesTotal`, or the epic roll-up. [Source: `src/SpecScribe/HtmlTemplater.cs:122-144`, `src/SpecScribe/ProgressModel.cs`, `src/SpecScribe/ProgressCalculator.cs`]
+  - [x] **Hard regression guard:** the existing epic/story/task numbers and their denominators must be byte-for-byte unchanged (Story 1.5's `[UXO A5]` task-stat reframe — "N/N planned tasks", "across X of Y stories" — must survive verbatim). Prove it with a test asserting the epic/story tallies are unaffected by the presence of quick-dev/deferred artifacts.
+  - [x] If you extend `ProgressModel`/`EpicProgress`, keep `ProgressModel.Empty` valid and all existing `required` initializers satisfied.
+- [x] Task 4: `[UXO A6]` "Progress by Epic" mosaic shows real delivery status, not "stories detailed" (AC: #2 truthfulness)
+  - [x] `Charts.EpicMosaic` currently draws a two-segment ring of Detailed vs Not-detailed (`StoriesWithArtifact`/`StoryCount`), so a **mid-development** epic renders a full gold ring and reads as "complete." Change the ring to segment by **per-story delivery status** (done / active / review / ready / drafted / pending), same palette + tokens as the sunburst (`StatusStyles.ForStory`), and keep "N/N detailed" as the **sub-label only**. [Source: `src/SpecScribe/Charts.cs:366-398`]
+  - [x] The mosaic needs per-status story counts per epic. `EpicProgress` today carries only `StoryCount`/`StoriesWithArtifact` (no per-status breakdown). Either add a per-status tally to `EpicProgress` (computed in `ProgressCalculator` from `StatusStyles.ForStory`) or have the mosaic take the `EpicInfo`/story list. Pending epics (no stories) keep the empty ring + "Not yet drafted" — never a misleading 0%/full fill. [Source: `src/SpecScribe/ProgressModel.cs:3-12`, `src/SpecScribe/ProgressCalculator.cs:38-47`, `src/SpecScribe/Charts.cs:374-393`]
+  - [x] This mosaic is rendered in **two** places — the home dashboard (`HtmlTemplater.AppendDashboard` → `Charts.EpicMosaic`, `HtmlTemplater.cs:187-192`) and the epics index (`EpicsTemplater.AppendProgressPanel` → `Charts.EpicMosaic`, `EpicsTemplater.cs:394-396`). Fixing `Charts.EpicMosaic` fixes both; verify both surfaces.
+- [x] Task 5: `[UXO E4]` Sunburst distinguishes "no task plan yet" from "no data" with a placeholder arc (AC: #2)
+  - [x] Today the outer task ring is drawn **only when `story.TasksTotal > 0`**, so a story with no plan and a story off the edge of the data look identical. For a story with `TasksTotal == 0`, render a **faint dashed placeholder arc** in the task ring with a tooltip/aria-label like **"No task plan yet — run /bmad-create-story N.N"**, turning the gap into a call to action. Apply to both `Charts.Sunburst` (project) and `Charts.EpicSunburst` (per-epic). [Source: `src/SpecScribe/Charts.cs:156-172`, `:254-269`]
+  - [x] Pure SVG + CSS only — this is NOT the JS drill engine ([[charting-is-pure-svg-no-js]]). The dashed arc is a styled `<path>`; keep a `<title>` and (once Story 1.5's tooltip script is present) the `data-*` tooltip hook, with `<title>`/`aria-label` as the no-JS fallback. Keep the story segment a real link so the placeholder is still clickable to the story/epic. [Source: `src/SpecScribe/Charts.cs:99-199`]
+  - [x] Keep whole-chart `role="img"` aria-label truthful and preserve Story 1.4's segment `aria-label`s. The `sunburst-hint` line and legend stay; the placeholder makes the "outer ring = task completion" statement true even where a plan is missing.
+- [x] Task 6: Inline authoring guidance on epics/stories surfaces, including empty and partial states (AC: #2)
+  - [x] Route all commands through the existing module-aware seam so they match the detected module (`/bmad-*` vs `/gds-*`) and are **omitted** when not installed: `CommandCatalog.Command("create-epics-and-stories")`, `Command("create-story", "N.N")`. Reuse/extend `BmadCommands` rather than hardcoding command strings. [Source: `src/SpecScribe/BmadCommands.cs`, `src/SpecScribe/ModuleContext.cs:43-51`]
+  - [x] **Empty state:** `EpicsTemplater.RenderIndex` has no empty-state today (a zero-epic model still emits headers + an empty sunburst). When `model.Epics.Count == 0`, render guidance on how to add the first epic (`create-epics-and-stories`). Note the home page's `epics.html` link itself only appears when `epics.md` exists (`SiteNav` gate) — the empty-epics case is "epics.md exists but has no epics." [Source: `src/SpecScribe/EpicsTemplater.cs:9-64`, `src/SpecScribe/SiteNav.cs:78-86`]
+  - [x] **Partial states — convert dead-end notes into next actions:** `AppendEpicCard`'s "Stories not yet drafted." (`EpicsTemplater.cs:426-429`), `AppendStoryCard`'s "No detailed story plan yet." (`:363-366`), and `AppendUpNextCard`'s "Not yet drafted" (`:471-496`) currently state a gap without the command to close it. Pair each with the relevant guidance (`create-epics-and-stories` for a pending epic; `create-story N.N` for an undrafted story). Keep it de-emphasized so it reads as help, not clutter.
+  - [x] Guidance must degrade to nothing when the module exposes no such command (never print a command that doesn't exist) — the same rule `BmadCommands.Add` already enforces.
+- [x] Task 7: Test coverage (AC: #1, #2)
+  - [x] `ChartsTests`: `EpicMosaic` renders per-status segments from the story roll-up (a mid-dev epic is NOT a full ring); pending epic keeps the empty ring + "Not yet drafted"; `Sunburst`/`EpicSunburst` emit a dashed placeholder arc with the "No task plan yet" tooltip when `TasksTotal == 0` and still keep the story link + segment aria-labels. [Source: `tests/SpecScribe.Tests/ChartsTests.cs`]
+  - [x] `HtmlTemplaterTests` (render-level string assertions, the house pattern): quick-dev + deferred artifacts appear in their own labeled section with a status badge and are absent from the generic "Implementation Artifacts" grid; the work-count stat is present; **epic/story/task tallies are unchanged** when quick-dev/deferred docs are present. [Source: `tests/SpecScribe.Tests/HtmlTemplaterTests.cs`]
+  - [x] Epics-surface guidance: `EpicsTemplater`/`BmadCommands` tests that empty and partial states emit the create-epic/create-story command when the module exposes it and emit nothing when it does not. Prefer generation-/render-level assertions over new public API.
+  - [x] If a frontmatter `Route` field is added: a `MarkdownConverterTests` case that `route:` is parsed (and absent → null).
+- [x] Task 8: End-to-end validation with a real generation pass (AC: #1, #2)
+  - [x] Run the focused test filter, then a real generation pass against this repo (it contains 5 `spec-*.md`, a `deferred-work.md`, epics in every state, and stories with and without plans — a live fixture for every branch).
+  - [x] Manually verify on `docs/live/index.html` + `epics.html`: quick-dev/deferred work shows as first-class with status; the whole-project counts include them without changing epic/story numbers; the epic mosaic shows Epic 1 mid-development (not a full ring); undrafted stories show a dashed placeholder arc with the create-story CTA; empty/partial epic surfaces show the add-epic/add-story guidance.
 
 ## Developer Context Section
 
@@ -371,13 +371,86 @@ claude-opus-4-8
   per-chart color literals; do not regress the documented `BmadCommands.ForProject` fallback edge case while
   editing that file.
 
+**Implementation summary (2026-07-06):**
+
+- **Task 1 — work types modeled.** Added optional `Route`/`Type` to `Frontmatter` and parsed them via the
+  existing `GetString(map, …)` seam in `MarkdownConverter` (all fields stay optional). Added
+  `WorkInventory` (new): classifies quick-dev as `implementation-artifacts/spec-*.md` + `route: one-shot`
+  and the deferred note by filename `deferred-work.md`; deferred open-item count = rendered `<li>` minus
+  struck-through (`<del>`) items. Non-fatal by construction (missing/partial ⇒ fewer entries, never an
+  exception). Deliberately does NOT match the spec kernel under `specs/spec-specscribe/` (that's Story 2.2).
+- **Task 2 — first-class, navigable, badged.** New "Direct & Quick-Dev Work" index band in
+  `HtmlTemplater`: quick-dev cards carry a real `status-badge` (site status semantics via new
+  `StatusStyles.ForStatus`), plus a deferred-work callout with its open-item count. Promoted docs are
+  excluded from the generic "Implementation Artifacts" grid (added to `used` up front, mirroring the README
+  precedent) so nothing is double-listed; their standalone pages still generate. Section omitted cleanly
+  when empty (Story 1.1).
+- **Task 3 — separate progress signal, tallies invariant.** A conditional "Direct changes" stat card
+  (quick-dev count + deferred sub-line) makes the whole-project picture complete WITHOUT touching
+  `TasksDone/Total`, `StoriesTotal`, or the epic roll-up. Regression pinned by a test asserting the
+  epic/story/task stat strings are byte-identical with and without quick-dev/deferred docs present, and that
+  the card is absent (four-card row preserved) when there's no such work.
+- **Task 4 — A6 delivery mosaic.** `EpicProgress` gained `StoryStatusCounts` (per-status tally computed in
+  `ProgressCalculator` from `StatusStyles.ForStory`). `Charts.EpicMosaic` now segments the ring by real
+  delivery status (done/review/active/ready/drafted/pending, shared status tokens) instead of
+  detailed/not-detailed; "N/N detailed" demoted to the sub-label only; pending epics keep the empty ring +
+  "Not yet drafted". Fixed once in `Charts`, verified on both the home dashboard and the epics index.
+- **Task 5 — E4 placeholder arc.** `Charts.Sunburst`/`EpicSunburst` render a faint dashed `.sb-noplan`
+  outer-ring arc for `TasksTotal == 0` stories, kept a real link with a `<title>`/`aria-label` reading "No
+  task plan yet — run /…-create-story N.N". The command is module-aware (routed through the `CommandCatalog`
+  now threaded into both sunbursts) and self-omits when absent — no hardcoded `/bmad-*`. Pure SVG + CSS.
+- **Task 6 — inline authoring guidance.** New `BmadCommands.InlineGuidance` turns dead-end notes into next
+  actions via the module-aware seam (self-omitting): empty-epics state + pending-epic card
+  (`create-epics-and-stories`) and undrafted-story card (`create-story N.N`), each with the shared copy
+  button. `AppendUpNextCard`'s undrafted case already sits beside the Next Steps panel that surfaces the same
+  create-story command, so it was left as-is to avoid duplicating the command in one panel. Did NOT touch the
+  documented `BmadCommands.ForProject` retrospective-fallback edge case.
+- **Tasks 7–8 — tests + generation pass.** Added coverage in `ChartsTests` (mosaic delivery segments +
+  pending empty ring; placeholder arc + CTA + retained links; command-omission), `HtmlTemplaterTests`
+  (first-class section + badge + no double-listing; Direct-changes stat; tally invariance; empty/partial
+  guidance emission + omission), `MarkdownConverterTests` (`route`/`type` parse), `StatusStylesTests`
+  (`ForStatus`/`StoryLabel`), and new `WorkInventoryTests`. Full suite: **227 passing**. Real generation pass
+  against this repo produced 26 pages cleanly; verified on the generated `index.html` + `epics.html`:
+  3 quick-dev cards + deferred callout (9 open items) surfaced first-class and promoted out of the generic
+  grid; Direct-changes stat present with epic/story/task tallies unchanged; Epic 1 mosaic reads green "done"
+  (real delivery, not a "detailed" ring); 26 dashed placeholder arcs with module-aware create-story CTAs on
+  undrafted stories; pending/undrafted surfaces show the add-epic/add-story guidance. (`docs/live/` is
+  gitignored — built by CI for Pages — so the pass leaves no committed diff.)
+
 ### File List
 
 - _bmad-output/implementation-artifacts/2-1-accurate-work-representation-and-authoring-guidance.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
+- src/SpecScribe/Frontmatter.cs
+- src/SpecScribe/MarkdownConverter.cs
+- src/SpecScribe/WorkInventory.cs (new)
+- src/SpecScribe/StatusStyles.cs
+- src/SpecScribe/ProgressModel.cs
+- src/SpecScribe/ProgressCalculator.cs
+- src/SpecScribe/Charts.cs
+- src/SpecScribe/HtmlTemplater.cs
+- src/SpecScribe/EpicsTemplater.cs
+- src/SpecScribe/BmadCommands.cs
+- src/SpecScribe/SiteGenerator.cs
+- src/SpecScribe/assets/specscribe.css
+- tests/SpecScribe.Tests/ChartsTests.cs
+- tests/SpecScribe.Tests/HtmlTemplaterTests.cs
+- tests/SpecScribe.Tests/MarkdownConverterTests.cs
+- tests/SpecScribe.Tests/StatusStylesTests.cs
+- tests/SpecScribe.Tests/WorkInventoryTests.cs (new)
 
 ## Change Log
 
+- 2026-07-06: Implemented Story 2.1. Modeled quick-dev (`spec-*.md`, `route: one-shot`) and `deferred-work.md`
+  as first-class work via a new `WorkInventory` + `Frontmatter.Route/Type`; surfaced them in a dedicated
+  "Direct & Quick-Dev Work" index band with status badges and a deferred callout, promoted out of the generic
+  grid (no double-listing); added a separate "Direct changes" progress stat that leaves epic/story/task
+  tallies invariant. Reworked `Charts.EpicMosaic` to segment by real per-story delivery status (UXO A6, via
+  new `EpicProgress.StoryStatusCounts` + `StatusStyles.ForStatus/StoryLabel/StoryStages`) and added the dashed
+  `.sb-noplan` placeholder arc with a module-aware create-story CTA to `Charts.Sunburst`/`EpicSunburst` (UXO
+  E4). Converted empty/partial epics-and-stories dead-end notes into next actions via new
+  `BmadCommands.InlineGuidance` (self-omitting through `CommandCatalog`). Added 12 tests across 5 files
+  (227 passing). Status → review.
 - 2026-07-06: Created Story 2.1 as Epic 2's opener. Scoped: first-class representation of quick-dev
   (`spec-*.md`, `route: one-shot`) and `deferred-work.md` work with status badges and navigable entries;
   whole-project progress accounting that includes them without altering epic/story/task tallies (preserving

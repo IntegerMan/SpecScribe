@@ -9,6 +9,11 @@ public sealed class EpicProgress
     public required int TasksDone { get; init; }
     public required int TasksTotal { get; init; }
     public required EpicStatus Status { get; init; }
+
+    /// <summary>Per-story delivery-status tally for this epic, keyed by <see cref="StatusStyles"/> css class
+    /// (done/review/active/ready/drafted/pending). Feeds the "Progress by Epic" delivery mosaic so a mid-dev
+    /// epic renders its real mix rather than a full "detailed" ring. Empty for an epic with no stories.</summary>
+    public IReadOnlyDictionary<string, int> StoryStatusCounts { get; init; } = new Dictionary<string, int>();
 }
 
 /// <summary>A single computed snapshot of project progress — epics/stories/tasks tallied from the parsed

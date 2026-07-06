@@ -7,11 +7,17 @@ public static class StatusStyles
 {
     /// <summary>CSS class for a story: from its artifact's Status line when present, else whether it's
     /// been drafted at all.</summary>
-    public static string ForStory(StoryInfo story)
+    public static string ForStory(StoryInfo story) => ForStatus(story.Status);
+
+    /// <summary>Maps a raw "Status:" string (a story's, or a quick-dev doc's frontmatter status) onto the
+    /// shared six-stage lifecycle css class, so every chart/badge routes through this one classifier rather
+    /// than reimplementing the keyword match. An empty/unrecognized status falls back to "drafted" (listed,
+    /// not yet classified) — the same fallback a drafted-but-unstarted story has always used.</summary>
+    public static string ForStatus(string? status)
     {
-        if (story.Status is { Length: > 0 } status)
+        if (status is { Length: > 0 } value)
         {
-            var s = status.Trim().ToLowerInvariant();
+            var s = value.Trim().ToLowerInvariant();
             if (s.Contains("done") || s.Contains("complete")) return "done";
             if (s.Contains("review")) return "review";
             if (s.Contains("progress") || s.Contains("in-dev")) return "active";
@@ -21,6 +27,23 @@ public static class StatusStyles
         // Drafted in epics.md but no implementation artifact yet.
         return "drafted";
     }
+
+    /// <summary>Human label for a story-lifecycle css class — the accessible/tooltip name for the delivery
+    /// mosaic's per-status ring segments. Mirrors <see cref="EpicLabel"/> but from the story's point of view
+    /// ("Drafted", not "Stories drafted").</summary>
+    public static string StoryLabel(string cssClass) => cssClass switch
+    {
+        "done" => "Done",
+        "review" => "In review",
+        "active" => "In development",
+        "ready" => "Ready for dev",
+        "drafted" => "Drafted",
+        _ => "Pending",
+    };
+
+    /// <summary>The story-lifecycle css classes in narrative order (done → … → pending), the canonical order
+    /// the delivery mosaic and any status roll-up iterate so segments and legends read consistently.</summary>
+    public static readonly IReadOnlyList<string> StoryStages = new[] { "done", "review", "active", "ready", "drafted", "pending" };
 
     /// <summary>CSS class for an epic, derived from its stories: green only when every story is done;
     /// teal once any story has entered dev; gold "ready" once any story is ready-for-dev (mirroring the
