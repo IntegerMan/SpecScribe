@@ -17,7 +17,7 @@ public sealed class SiteNav
     /// <summary>The project name (from _bmad/config.toml) — used for the nav brand and page-title suffixes.</summary>
     public required string SiteTitle { get; init; }
 
-    public string Brand => $"{SiteTitle} · Live Docs";
+    public string Brand => SiteTitle;
 
     public bool HasEpics => Items.Any(i => i.Label == "Epics");
 
@@ -66,7 +66,8 @@ public sealed class SiteNav
         var sb = new StringBuilder();
         sb.Append("<nav class=\"site-nav\" aria-label=\"Document navigation\">\n");
         sb.Append($"  <span class=\"site-nav-brand\">{PathUtil.Html(Brand)}</span>\n");
-        sb.Append("  <div class=\"site-nav-links\">\n");
+        sb.Append("  <button class=\"site-nav-toggle\" type=\"button\" aria-label=\"Toggle navigation\" aria-controls=\"site-nav-links\" aria-expanded=\"false\">Menu</button>\n");
+        sb.Append("  <div class=\"site-nav-links\" id=\"site-nav-links\">\n");
         foreach (var (label, outputPath) in Items)
         {
             var href = prefix + outputPath;
@@ -74,7 +75,8 @@ public sealed class SiteNav
             var attrs = isActive ? " class=\"active\" aria-current=\"page\"" : string.Empty;
             sb.Append($"    <a href=\"{PathUtil.Html(href)}\"{attrs}>{PathUtil.Html(label)}</a>\n");
         }
-        sb.Append("  </div>\n</nav>\n\n");
+        sb.Append("  </div>\n</nav>\n");
+        sb.Append("<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>\n\n");
         return sb.ToString();
     }
 
@@ -97,7 +99,7 @@ public sealed class SiteNav
             }
             else
             {
-                sb.Append($"  <span class=\"crumb-current\">{PathUtil.Html(label)}</span>\n");
+                sb.Append($"  <span class=\"crumb-current\" aria-current=\"page\">{PathUtil.Html(label)}</span>\n");
             }
         }
         sb.Append("</div>\n\n");

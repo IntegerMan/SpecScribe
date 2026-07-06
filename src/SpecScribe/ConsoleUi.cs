@@ -8,7 +8,7 @@ public static class ConsoleUi
     public static void PrintLogo()
     {
         AnsiConsole.Write(new FigletText("SpecScribe").Color(Color.Orange3));
-        AnsiConsole.MarkupLine("[grey]Spec-driven-development artifacts -> human-readable HTML, live.[/]");
+        AnsiConsole.MarkupLine("[grey][link=https://github.com/IntegerMan/SpecScribe]Interactive documentation generator for Spec-Driven Development[/] · Created by [link=https://MattEland.dev]Matthew-Hope Eland[/][/]");
         AnsiConsole.Write(new Rule().RuleStyle("grey37"));
     }
 

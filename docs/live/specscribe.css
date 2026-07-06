@@ -295,13 +295,28 @@ body {
 /* ====================== FOOTER ====================== */
 .doc-footer {
   max-width: 860px;
-  margin: 0 auto;
-  padding: 1.5rem;
+  margin: 2.2rem auto 2rem;
+  padding: 0.95rem 1.25rem;
   text-align: center;
   font-size: 0.78rem;
   color: var(--ink-light);
   font-style: italic;
-  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--warm-white), var(--cream));
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--parchment-deep);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.doc-footer a {
+  color: var(--teal-deep);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--teal);
+}
+
+.doc-footer a:hover {
+  color: var(--rust);
+  border-bottom-color: var(--rust-light);
 }
 
 /* ====================== INDEX PAGE ====================== */

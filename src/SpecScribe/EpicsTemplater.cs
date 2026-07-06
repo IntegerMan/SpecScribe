@@ -54,7 +54,7 @@ public static class EpicsTemplater
             sb.Append("</details>\n\n");
         }
 
-        sb.Append(PathUtil.RenderFooter($"{PathUtil.Html(nav.SiteTitle)} &middot; Epics &amp; Stories &middot; last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append(Mermaid.InitScript());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
@@ -135,7 +135,7 @@ public static class EpicsTemplater
             AppendStoryCard(sb, story, prefix);
         }
 
-        sb.Append(PathUtil.RenderFooter($"{PathUtil.Html(nav.SiteTitle)} &middot; Epic {epic.Number}"));
+        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
@@ -249,7 +249,7 @@ public static class EpicsTemplater
             sb.Append($"<div class=\"doc-body\">{changeLogHtml}</div>\n</section>\n\n");
         }
 
-        sb.Append(PathUtil.RenderFooter($"{PathUtil.Html(nav.SiteTitle)} &middot; Source: <code>{PathUtil.Html(PathUtil.NormalizeSlashes(artifactSourceRelativePath))}</code>"));
+        sb.Append(PathUtil.RenderFooter($"Last rebuilt {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }

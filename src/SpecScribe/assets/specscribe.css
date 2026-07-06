@@ -59,6 +59,27 @@ body {
   color: var(--gold-light);
 }
 
+.site-nav-toggle {
+  display: none;
+  font: inherit;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  background: transparent;
+  border: 1px solid rgba(212, 184, 150, 0.45);
+  border-radius: 4px;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+}
+
+.site-nav-toggle:hover,
+.site-nav-toggle:focus-visible {
+  border-color: #f5c842;
+  color: #f5c842;
+  outline: none;
+}
+
 .site-nav-links { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; }
 
 .site-nav a {
@@ -274,13 +295,28 @@ body {
 /* ====================== FOOTER ====================== */
 .doc-footer {
   max-width: 860px;
-  margin: 0 auto;
-  padding: 1.5rem;
+  margin: 2.2rem auto 2rem;
+  padding: 0.95rem 1.25rem;
   text-align: center;
   font-size: 0.78rem;
   color: var(--ink-light);
   font-style: italic;
-  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--warm-white), var(--cream));
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--parchment-deep);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.doc-footer a {
+  color: var(--teal-deep);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--teal);
+}
+
+.doc-footer a:hover {
+  color: var(--rust);
+  border-bottom-color: var(--rust-light);
 }
 
 /* ====================== INDEX PAGE ====================== */
@@ -822,6 +858,44 @@ body {
 
 .all-done-note { font-size: 0.84rem; color: var(--ink-light); font-style: italic; }
 
+.quick-link-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.quick-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-decoration: none;
+  color: inherit;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-light);
+  border-radius: 6px;
+  padding: 0.7rem 0.85rem;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.quick-link-card:hover {
+  border-color: var(--rust-light);
+  box-shadow: 0 3px 10px var(--shadow);
+  transform: translateY(-1px);
+}
+
+.quick-link-title {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--ink);
+}
+
+.quick-link-sub {
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--ink-light);
+}
+
 /* Markdig-rendered task-list checkboxes (## Tasks / Subtasks in implementation artifacts).
    The checkboxes render as disabled <input>s, so we replace the native (grey) appearance:
    completed tasks get a filled green checkmark, incomplete tasks a plain empty box. */
@@ -1236,8 +1310,22 @@ body {
 .coverage-note { margin-top: 0.6rem; }
 
 @media (max-width: 640px) {
-  .site-nav { font-size: 0.72rem; padding: 0.5rem 0.8rem; }
-  .site-nav-brand { flex-basis: 100%; margin-right: 0; }
+  .site-nav {
+    font-size: 0.72rem;
+    padding: 0.5rem 0.8rem;
+    align-items: center;
+  }
+  .site-nav-brand { margin-right: auto; }
+  .site-nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .site-nav-links {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding-top: 0.45rem;
+  }
+  .site-nav.site-nav-open .site-nav-links { display: flex; }
+  .site-nav a { padding: 0.28rem 0; }
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }

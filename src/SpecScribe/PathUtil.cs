@@ -35,7 +35,8 @@ public static class PathUtil
         return sb.ToString();
     }
 
-    public static string RenderFooter(string innerHtml) => $"<footer class=\"doc-footer\">\n  {innerHtml}\n</footer>\n\n";
+    public static string RenderFooter(string trailingHtml)
+        => $"<footer class=\"doc-footer\">\n  <a href=\"https://github.com/IntegerMan/SpecScribe\">SpecScribe</a> by <a href=\"https://MattEland.dev\">Matthew-Hope Eland</a> &middot; {trailingHtml}\n</footer>\n\n";
 
     private static readonly Regex TagStripRegex = new("<.*?>", RegexOptions.Compiled);
 
