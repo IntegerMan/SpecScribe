@@ -50,9 +50,18 @@ so that generated pages preserve planning intent and implementation context.
   - [ ] Extend `MarkdownConverterTests` for task-list checkbox output (checked vs. unchecked) and, if Task 1's fix lands, for mermaid inside `RenderBlock` fragments
   - [ ] Extend `EpicsParserTests` for `LinkifyAcReferences` edge cases (comma-grouped numbers, unresolved numbers, tooltip text) and AC-anchor extraction
   - [ ] Add a focused generation-level assertion (alongside `SiteGeneratorTraceabilityTests`) that a rendered story page contains `id="ac-N"` anchors and matching `href="#ac-N"` references, and that a document page with a mermaid fence carries the init script
-- [ ] Task 5: Validate end-to-end rendered behavior with the real generation path (AC: #1, #2)
+- [ ] Task 5: Validate end-to-end rendered behavior with the real generation path (AC: #1, #2, #3)
   - [ ] Run the focused test filter for the touched behavior
-  - [ ] Run a real generation pass and confirm mermaid diagrams, task checklists, and AC deep-links render correctly with no console errors and no broken anchors
+  - [ ] Run a real generation pass and confirm mermaid diagrams, task checklists, AC deep-links, and the sidebar TOC render correctly with no console errors and no broken anchors
+- [ ] Task 6: Relocate the table of contents into an independently-scrolling sidebar across all TOC-bearing pages (AC: #3)
+  - [ ] Introduce a two-column page layout (main content + TOC sidebar) shared by the generic page shell and the epic/story detail templater, so the TOC lives beside the content instead of as a top strip
+  - [ ] Make the sidebar sticky beneath the sticky nav and give it its own vertical overflow so it stays in view and scrolls independently when longer than the viewport; the main content scrolls normally
+  - [ ] Replace `.toc-strip` with a `.toc-sidebar` presentation via one shared TOC-rendering seam that takes an ordered list of `(level, text, anchorId)` entries — do not fork per page type
+  - [ ] Generic doc pages, ADRs, and README: source render order already equals `DocModel.Headings` order, so feed those headings to the shared TOC seam (verify heading ids exist for every entry so no link is dead)
+  - [ ] Epic/story detail pages: build the TOC entries in the templater's **actual section-emission order** (e.g. User Story → Task Breakdown → Acceptance Criteria → Dev Agent Record → Review Findings → remainder headings → Change Log). Give each templater-emitted panel a stable `id` + human label, and collect the remainder fragment's rendered headings in order so they appear as TOC entries too
+  - [ ] Add `scroll-margin-top` (accounting for the sticky nav height) to headings/section anchors so clicking a TOC link lands the target below the nav rather than hidden under it
+  - [ ] Implement responsive behavior: on narrow (mobile/tablet) breakpoints the sidebar collapses to a stacked/top or toggled form that remains usable and does not crush the main content
+  - [ ] Preserve the accessible `<nav aria-label="On this page">` semantics; keep entries as real in-page anchor links (keyboard-activatable). Scroll-spy/active-section highlighting is optional polish, not required by AC #3
 
 ## Developer Context Section
 
@@ -95,6 +104,28 @@ Existing tests to preserve and build on:
 2. `EpicsTemplater.RenderStory` / `RenderEpic` never call `Mermaid.InitScript()`, so even a correctly-classed block would not initialize on those pages.
 
 For this repository's own artifacts the primary mermaid case is `ARCHITECTURE-SPINE.md` (a generic doc page routed through `Convert()`), which renders fine. The dev must decide whether BMad implementation artifacts realistically carry mermaid in their bodies. If yes, fix the fragment path (share the mermaid-aware renderer and inject the init script on story/epic pages when a fragment contains mermaid). If no, document it explicitly as an accepted, non-fatal limitation with rationale. Either way, make the decision deliberately and cover it with a test or a note — do not leave it silently ambiguous.
+
+### Table-of-Contents Sidebar (AC #3)
+
+A reading-fidelity enhancement layered onto this story per direction: the on-page TOC must move from its current top strip to an independently-scrolling sidebar, and must be extended to detail pages that lack one today. Current state at baseline:
+
+- **Existing TOC:** `HtmlTemplater.RenderPage` emits `<nav class="toc-strip">` — a horizontal strip of links above the article — for docs with level-2/3 headings, sourced from `DocModel.Headings` (collected in document order by `MarkdownConverter.Convert`). Styled at `specscribe.css:167-198` (`max-width: 860px`, centered, flex-wrapped). [Source: `src/SpecScribe/HtmlTemplater.cs:33-44`, `src/SpecScribe/assets/specscribe.css:167-198`]
+- **Which pages have it:** generic document pages, **ADRs**, and **README** all render through `RenderPage`, so all three already carry the top-strip TOC. Requirements index/detail pages use `RequirementsTemplater` (no TOC). **Epic and story detail pages** render through `EpicsTemplater` and currently have **no TOC**.
+- **No layout wrapper exists:** `RenderPage` and the detail templaters emit a flat sequence (nav → breadcrumb → header → [toc] → article/panels → footer); the article/`.doc-body` is a single 860px-centered column. The site nav is `position: sticky` at the top. A sidebar requires introducing a two-column layout container around the main content + TOC. [Source: `src/SpecScribe/PathUtil.cs:26-39`, `src/SpecScribe/assets/specscribe.css` layout rules]
+
+Design guidance (keep it central, do not fork per page type):
+
+- Add one shared TOC-rendering seam (e.g. a `RenderTocSidebar(IReadOnlyList<(int Level, string Text, string AnchorId)>)` helper on `PathUtil`/`HtmlTemplater`) plus a two-column layout wrapper (grid or flex): main content in one column, `<nav class="toc-sidebar" aria-label="On this page">` in the other.
+- Sidebar is `position: sticky; top: <nav height>; max-height: calc(100vh - <nav height>); overflow-y: auto;` so it stays visible and scrolls on its own; the main column scrolls with the page. That is the mechanism for "main content scrolls independently of the TOC."
+- Add `scroll-margin-top` to heading/section anchors so a clicked TOC link is not hidden behind the sticky nav.
+- Responsive: on mobile/tablet breakpoints (UX-DR13 already establishes breakpoints), collapse the sidebar to a stacked top position or a toggle — do not squeeze the content column.
+
+The hard part — "rendered order" (AC #3, and the reason source order is insufficient):
+
+- **Generic / ADR / README pages:** `RenderPage` renders `doc.BodyHtml` straight through, so `DocModel.Headings` order already equals rendered order. These just need the layout swap; no reordering logic.
+- **Detail pages (epic/story):** `EpicsTemplater` composes the page out of order relative to the source markdown — the Acceptance Criteria panel leads, Dev Agent Record is a collapsed table, Review Findings ride high, the markdown remainder renders in the middle (`RenderBlock`, which does NOT populate a Headings list), and Change Log anchors the bottom. So the detail-page TOC must be assembled from the templater's **actual emission order**, not from any single source-order heading list. Concretely: give each emitted panel a stable `id` and label (Task Breakdown, Acceptance Criteria, Dev Agent Record, Review Findings, Change Log), and additionally collect the remainder fragment's rendered headings (they receive ids from Markdig's auto-identifier extension, but are not currently gathered) so they slot into the TOC between the panels in the order they render. [Source: `src/SpecScribe/EpicsTemplater.cs:143-256`, `src/SpecScribe/SiteGenerator.cs:341-379`]
+
+Scope note: this is fundamentally a navigation/readability layout change (closer in spirit to Story 1.1 / UX-DR13, UX-DR16) rather than markdown-content fidelity, but it is scoped into Story 1.3 by the product owner's direction. It can be implemented independently of Tasks 1–5; sequence it after the verify-and-harden work so a rendering regression and a layout regression are never entangled in one change.
 
 ### Previous Story Intelligence
 
@@ -150,12 +181,21 @@ Primary UPDATE candidates (touch only as needed):
   - Must preserve: unresolved-number plain-text fallback; comma-group handling; source-citation bracket stripping.
 
 - `src/SpecScribe/HtmlTemplater.cs`
-  - Current state: `.doc-body`-wrapped body; `HasMermaid`-gated init script on full pages.
-  - Story change focus: none expected unless the init-script gating strategy changes.
+  - Current state: `.doc-body`-wrapped body; `HasMermaid`-gated init script on full pages; emits the top-strip TOC (`.toc-strip`) from `doc.Headings`.
+  - Story change focus (AC #3): wrap the main content + TOC in a two-column layout and render the TOC via the shared sidebar seam instead of the top strip.
+
+- `src/SpecScribe/EpicsTemplater.cs` (AC #3, in addition to the AC-panel note above)
+  - Story change focus: add a rendered-order TOC sidebar to `RenderEpic`/`RenderStory` using the same two-column layout and shared TOC seam; assign stable ids + labels to each emitted panel and include remainder headings in emission order.
+
+- `src/SpecScribe/PathUtil.cs` and/or a small TOC helper/model
+  - Story change focus (AC #3): host the shared TOC-sidebar rendering seam and the two-column page-shell wrapper so every page type reuses one implementation. Keep `RenderHeadOpen`/`RenderFooter` shell conventions intact.
+
+- `src/SpecScribe/DocModel.cs` / `MarkdownConverter.cs`
+  - Story change focus (AC #3): if detail-page remainder headings must feed the TOC, surface an ordered heading list for fragment rendering (extend `RenderBlock` to optionally return headings, or extract heading ids from the rendered fragment). Preserve existing `Headings` collection for full-page conversion.
 
 - `src/SpecScribe/assets/specscribe.css`
-  - Current state: styles for task-list checkboxes (`.doc-body ul li input[type="checkbox"]`), `.ac-criterion`/`.ac-anchor`/`.ac-ref`, `.mermaid`, and `.ac-criterion:target`.
-  - Story change focus: adjust only if a rendering fidelity/visibility defect is found.
+  - Current state: styles for task-list checkboxes (`.doc-body ul li input[type="checkbox"]`), `.ac-criterion`/`.ac-anchor`/`.ac-ref`, `.mermaid`, `.ac-criterion:target`, and the top-strip TOC (`.toc-strip`, lines 167-198).
+  - Story change focus (AC #3): add `.toc-sidebar` + two-column layout styles (sticky, independent overflow, responsive collapse) and `scroll-margin-top` on anchors; retire/repurpose `.toc-strip`. Also adjust only if a rendering fidelity/visibility defect is found for AC #1/#2.
 
 Primary TEST candidates:
 
@@ -178,6 +218,7 @@ Primary TEST candidates:
   - `LinkifyAcReferences` comma-grouped numbers, unresolved numbers left as text, and tooltip text correctness,
   - a generation-level assertion tying `(AC: #N)` references to their `id="ac-N"` anchors on a real rendered story page,
   - if Task 1's fix lands: mermaid inside a `RenderBlock` fragment renders as `<pre class="mermaid">` and the hosting page gets the init script.
+  - AC #3: the shared TOC seam renders a `.toc-sidebar` (not `.toc-strip`); a generic/ADR page's TOC entries match `doc.Headings` order; a detail page's TOC entries follow the templater's emission order (panel labels + remainder headings) with every entry pointing at an id that actually exists on the page (no dead links).
 - Run targeted tests, then a real generation pass:
   - `dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj --filter "FullyQualifiedName~MarkdownConverter|FullyQualifiedName~EpicsParser|FullyQualifiedName~TaskList|FullyQualifiedName~SiteGenerator"`
   - `dotnet run --project src/SpecScribe -- generate --source _bmad-output --adrs docs/adrs --output docs/live --project-name SpecScribe`
@@ -189,6 +230,7 @@ Primary TEST candidates:
 - Status/state must never be color-only. Task completion pairs the green fill with a checkmark glyph (shape, not just color); keep that redundancy. [Source: `_bmad-output/planning-artifacts/epics.md` UX-DR17; `_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.md`]
 - Motion: mermaid initialization and any highlight transitions must respect `prefers-reduced-motion` and stay non-looping. Do not introduce new unbounded animation. [Source: `_bmad-output/planning-artifacts/epics.md` UX-DR18]
 - Use the established token/color system and existing component styles rather than ad hoc per-feature styling. [Source: `_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.md`]
+- The TOC sidebar (AC #3) must keep its accessible `<nav aria-label="On this page">` landmark with real, keyboard-activatable in-page anchor links, and must remain usable across mobile/tablet/desktop breakpoints (sidebar collapses/stacks on narrow viewports rather than crushing content). Sticky positioning and any scroll behavior must respect `prefers-reduced-motion`. [Source: `_bmad-output/planning-artifacts/epics.md` UX-DR13, UX-DR16, UX-DR18]
 
 ## Reinvention and Regression Guardrails
 
@@ -198,6 +240,7 @@ Primary TEST candidates:
 - Do not make baseline generation depend on the mermaid CDN being reachable.
 - Do not regress Story 1.1 navigation/breadcrumbs or Story 1.2 requirement/source/ADR linkification while touching rendering.
 - Keep changes host-neutral so HTML/webview parity is not made harder.
+- For the TOC sidebar (AC #3): do not fork the TOC renderer per page type — build one shared seam. Do not build the detail-page TOC from source-order headings (it will mis-order); assemble it from the templater's actual emission order. Do not emit TOC entries whose anchor id is not present on the page. Do not break the existing sticky-nav offset when adding a sticky sidebar.
 
 ## Git Intelligence Summary
 
@@ -253,7 +296,8 @@ claude-opus-4-8
 
 - Story context assembled from epics.md (FR7 + Story 1.3 ACs + UX-DR17/18), PRD, UX design/experience, architecture spine (AD-1/AD-2, inherited invariants), rendering architecture, ADRs 0002/0004, Story 1.2 intelligence, current code seams, and recent git history.
 - Confirmed at baseline commit `fb9fb88`: Mermaid full-page rendering, epics-index roadmap diagram, task-list checkbox styling + parser, AC `id="ac-N"` anchors, and `(AC: #N)` → `#ac-N` linkification with plain-text tooltips are all already implemented.
-- Primary open work is the fragment-render mermaid gap (`RenderBlock`/`RenderInline` bypass the mermaid renderer; story/epic pages omit the init script) plus regression coverage — production changes may be minimal or none if BMad artifacts never carry mermaid in bodies.
+- Primary open work for AC #1/#2 is the fragment-render mermaid gap (`RenderBlock`/`RenderInline` bypass the mermaid renderer; story/epic pages omit the init script) plus regression coverage — production changes may be minimal or none if BMad artifacts never carry mermaid in bodies.
+- AC #3 (added per product-owner direction) is net-new build, not verify-and-harden: relocate the top-strip TOC (`.toc-strip`) into an independently-scrolling sidebar shared across generic/ADR/README pages and add a rendered-order TOC to epic/story detail pages (which have none today). The detail-page TOC must follow the templater's emission order, not source-heading order. This is a navigation/readability change and is sequenced after Tasks 1–5.
 
 ### File List
 
@@ -263,3 +307,4 @@ claude-opus-4-8
 ## Change Log
 
 - 2026-07-06: Created Story 1.3 implementation context with markdown-fidelity-specific architecture, current-state analysis (both ACs largely implemented), the mermaid-in-artifact-body hardening gap, code-seam guidance, and testing requirements.
+- 2026-07-06: Added AC #3 and Task 6 per product-owner direction — relocate the on-page TOC from a top strip into an independently-scrolling sidebar across generic/ADR/README pages and extend a rendered-order TOC to epic/story detail pages. Documented current TOC state (`.toc-strip` in `HtmlTemplater.RenderPage`; detail pages have none), the two-column/sticky layout approach, the rendered-vs-source order requirement (critical for the reordered detail-page layout), and responsive/accessibility guardrails.
