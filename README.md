@@ -50,6 +50,82 @@ Both `generate` and `watch` accept:
 With no options, SpecScribe auto-discovers a BMad project from wherever you run it — so inside a
 BMad repo, plain `specscribe generate` just works.
 
+## Publishing to GitHub Pages
+
+You can publish SpecScribe output for any repository, not just this one.
+
+### Option A: Build and deploy with GitHub Actions (recommended)
+
+Create `.github/workflows/publish-specscribe-pages.yml`:
+
+```yaml
+name: Publish SpecScribe Docs
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Generate static site
+        run: |
+          dotnet tool restore
+          specscribe generate \
+            --source _bmad-output \
+            --adrs docs/adrs \
+            --output SpecScribeOutput \
+            --project-name "My Project"
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: SpecScribeOutput
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+Notes:
+- Replace paths and project name for your project layout.
+- If you are not using a local tool manifest, install SpecScribe in the workflow before running `specscribe`.
+- Full repository example workflow: https://github.com/IntegerMan/SpecScribe/blob/main/.github/workflows/publish-docs-live-pages.yml
+
+### Option B: Commit generated output and publish from that folder
+
+If you commit generated site files, you can keep output in a single top-level folder like `SpecScribeOutput`
+and configure GitHub Pages to serve that published content from version control.
+
+For this mode:
+- Run SpecScribe with `--output SpecScribeOutput`.
+- Commit and push the generated `SpecScribeOutput` files.
+- Configure GitHub Pages in repository settings to publish from the branch/folder setup that serves that directory.
+
+This is useful if you prefer static output tracked in git instead of artifact-based deployment.
+
 ## What it renders
 
 - **Dashboard** — project-wide progress, epic/story completion gauges, git activity stats
