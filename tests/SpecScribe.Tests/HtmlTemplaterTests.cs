@@ -115,4 +115,37 @@ public class HtmlTemplaterTests
         Assert.DoesNotContain("href=\"requirements.html\"", html);
         Assert.DoesNotContain("href=\"adrs/index.html\"", html);
     }
+
+    [Fact]
+    public void RenderEpic_EmitsSkipLinkAndSingleMainLandmark()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var epic = new EpicInfo
+        {
+            Number = 1,
+            Title = "First Epic",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.VerticalSlice,
+            Stories = Array.Empty<StoryInfo>(),
+        };
+        var progress = new EpicProgress
+        {
+            Number = 1,
+            Title = "First Epic",
+            StoryCount = 0,
+            StoriesWithArtifact = 0,
+            TasksDone = 0,
+            TasksTotal = 0,
+            Status = EpicStatus.Drafted,
+        };
+
+        var html = EpicsTemplater.RenderEpic(epic, progress, nav, CommandCatalog.Empty);
+
+        // The heavily-refactored detail templater must carry the same skip link + exactly one main landmark
+        // as the dashboard — guards against a duplicate/zero-landmark regression in RenderEpic. [Story 1.4 AC #1, UX-DR16]
+        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        Assert.Contains("<main id=\"main-content\">", html);
+        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
 }

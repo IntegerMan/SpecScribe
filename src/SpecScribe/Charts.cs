@@ -21,7 +21,9 @@ public static class Charts
         var right = rightLabel ?? $"{value} / {max}";
         // Screen-reader semantics: the bar is a progressbar whose value is the filled percentage (0–100),
         // named by the same label+fraction a sighted reader sees. The visible fraction text stays. [Story 1.4 AC #1]
-        var pctNow = (int)Math.Round(pct);
+        // Announce 100 only when genuinely complete and 0 only when genuinely empty; clamp any partial fill to
+        // 1–99 so rounding never says "complete" (99.7→100) or "no progress" (0.3→0) mid-way.
+        var pctNow = pct >= 100 && max > 0 ? 100 : pct <= 0 ? 0 : Math.Clamp((int)Math.Round(pct), 1, 99);
         var ariaLabel = Html($"{label}: {right}");
 
         return $"""
@@ -131,10 +133,10 @@ public static class Charts
 
             // aria-label carries the same name+status+count as the hover-only <title>, so keyboard and
             // screen-reader users get it on focus without a pointer; the <title> stays for pointer tooltips.
-            var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} stories";
+            var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}";
             sb.Append($"  <a href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(epicAria)}\">\n");
             sb.Append($"    <path class=\"sb-seg sb-{epicClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, angle + pad, angle + sweep - pad)}\">");
-            sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} stories</title></path>\n");
+            sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}</title></path>\n");
             sb.Append("  </a>\n");
 
             if (epic.Stories.Count > 0)
@@ -159,15 +161,15 @@ public static class Charts
                         var doneSweep = (storySweep - 2 * pad) * story.TasksDone / story.TasksTotal;
                         if (story.TasksDone > 0)
                         {
-                            var doneAria = $"Story {story.Id}: {story.TasksDone} of {story.TasksTotal} tasks done";
+                            var doneAria = $"Story {story.Id}: {story.TasksDone} of {story.TasksTotal} {Plural(story.TasksTotal, "task", "tasks")} done";
                             sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(doneAria)}\"><path class=\"sb-seg sb-done\" d=\"{AnnularSector(c, taskInner, taskOuter, storyAngle + pad, storyAngle + pad + doneSweep)}\">");
-                            sb.Append($"<title>Story {story.Id}: {story.TasksDone} of {story.TasksTotal} tasks done</title></path></a>\n");
+                            sb.Append($"<title>Story {story.Id}: {story.TasksDone} of {story.TasksTotal} {Plural(story.TasksTotal, "task", "tasks")} done</title></path></a>\n");
                         }
                         if (story.TasksDone < story.TasksTotal)
                         {
-                            var remainAria = $"Story {story.Id}: {story.TasksTotal - story.TasksDone} tasks remaining";
+                            var remainAria = $"Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining";
                             sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(remainAria)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, storyAngle + pad + doneSweep, storyAngle + storySweep - pad)}\">");
-                            sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} tasks remaining</title></path></a>\n");
+                            sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining</title></path></a>\n");
                         }
                     }
 
@@ -256,15 +258,15 @@ public static class Charts
                 var doneSweep = (anglePerStory - 2 * pad) * story.TasksDone / story.TasksTotal;
                 if (story.TasksDone > 0)
                 {
-                    var doneAria = $"Story {story.Id}: {story.TasksDone} of {story.TasksTotal} tasks done";
+                    var doneAria = $"Story {story.Id}: {story.TasksDone} of {story.TasksTotal} {Plural(story.TasksTotal, "task", "tasks")} done";
                     sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(doneAria)}\"><path class=\"sb-seg sb-done\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad, angle + pad + doneSweep)}\">");
-                    sb.Append($"<title>Story {story.Id}: {story.TasksDone} of {story.TasksTotal} tasks done</title></path></a>\n");
+                    sb.Append($"<title>Story {story.Id}: {story.TasksDone} of {story.TasksTotal} {Plural(story.TasksTotal, "task", "tasks")} done</title></path></a>\n");
                 }
                 if (story.TasksDone < story.TasksTotal)
                 {
-                    var remainAria = $"Story {story.Id}: {story.TasksTotal - story.TasksDone} tasks remaining";
+                    var remainAria = $"Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining";
                     sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(remainAria)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad + doneSweep, angle + anglePerStory - pad)}\">");
-                    sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} tasks remaining</title></path></a>\n");
+                    sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining</title></path></a>\n");
                 }
             }
 
@@ -501,6 +503,10 @@ public static class Charts
     }
 
     private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    /// <summary>Grammatical pluralization for accessible names — a one-count segment reads "1 story", not
+    /// "1 stories", so screen-reader announcements aren't grating. [Story 1.4 AC #1]</summary>
+    private static string Plural(int n, string singular, string plural) => n == 1 ? singular : plural;
 
     private static string Html(string s) => PathUtil.Html(s);
 }

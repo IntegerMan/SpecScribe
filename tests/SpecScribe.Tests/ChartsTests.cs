@@ -44,7 +44,7 @@ public class ChartsTests
         var svg = Charts.Sunburst(model);
 
         // Epic + story segment <a>s carry a descriptive aria-label (keyboard/SR name)...
-        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 stories\"", svg);
+        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story\"", svg);
         Assert.Contains("aria-label=\"Story 1.1: Do the thing — in progress\"", svg);
         // ...the task ring links are named too...
         Assert.Contains("aria-label=\"Story 1.1: 2 of 5 tasks done\"", svg);

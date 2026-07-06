@@ -4,7 +4,7 @@ baseline_commit: 53432af8b8410d16eacd7dda01025098153d6067
 
 # Story 1.4: Accessible High-Polish Interaction Baseline
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -276,9 +276,9 @@ claude-opus-4-8
 
 Code review 2026-07-06 (Blind Hunter + Edge Case Hunter + Acceptance Auditor, scoped to Story 1.4's File List). Both ACs met; no guardrail violated (no JS, no `<title>` stripped, no chart color/data change, no `outline:none` without a replacement, stat-cards left non-focusable, zero/low-data degradation intact). Findings below.
 
-- [ ] [Review][Patch] `ProgressBar` `aria-valuenow` can announce 100% on an incomplete bar (and 0% on a barely-started one) — `(int)Math.Round(pct)` rounds 99.5–99.9 up to 100 while the fill stays `partial`, and rounds 0<pct<0.5 down to 0. Screen reader hears "100"/"complete" (or "0") though the fraction says otherwise. [src/SpecScribe/Charts.cs:24]
-- [ ] [Review][Patch] Sunburst/epic-sunburst aria-labels and `<title>`s never singularize — a one-story epic announces "1 stories" and a one-task remainder "1 tasks remaining"; the heatmap label in the same change *does* pluralize, so it's inconsistent. Test `ChartsTests.cs:47` currently enshrines the "1 stories" grammar. [src/SpecScribe/Charts.cs:134] (also :137, :162, :168, :170; test tests/SpecScribe.Tests/ChartsTests.cs:47)
-- [ ] [Review][Patch] No test asserts exactly one `<main id="main-content">` on the epic/story **detail** pages — the templaters most heavily refactored by this story (`sb`→`main` split). `HtmlTemplaterTests.cs:68` covers only `RenderIndex`. A duplicate/zero-landmark regression in `RenderEpic`/`RenderStory` would ship untested (both paths traced clean today). [tests/SpecScribe.Tests/HtmlTemplaterTests.cs:68]
+- [x] [Review][Patch] `ProgressBar` `aria-valuenow` can announce 100% on an incomplete bar (and 0% on a barely-started one) — `(int)Math.Round(pct)` rounds 99.5–99.9 up to 100 while the fill stays `partial`, and rounds 0<pct<0.5 down to 0. Screen reader hears "100"/"complete" (or "0") though the fraction says otherwise. [src/SpecScribe/Charts.cs:24] — **Fixed:** clamp partial fills to 1–99; emit 100 only when complete, 0 only when empty.
+- [x] [Review][Patch] Sunburst/epic-sunburst aria-labels and `<title>`s never singularize — a one-story epic announces "1 stories" and a one-task remainder "1 tasks remaining"; the heatmap label in the same change *does* pluralize, so it's inconsistent. Test `ChartsTests.cs:47` currently enshrines the "1 stories" grammar. [src/SpecScribe/Charts.cs:134] (also :137, :162, :168, :170; test tests/SpecScribe.Tests/ChartsTests.cs:47) — **Fixed:** added a `Plural()` helper; applied to epic story-counts and task done/remaining counts in both `Sunburst` and `EpicSunburst`; test updated to expect "1 story".
+- [x] [Review][Patch] No test asserts exactly one `<main id="main-content">` on the epic/story **detail** pages — the templaters most heavily refactored by this story (`sb`→`main` split). `HtmlTemplaterTests.cs:68` covers only `RenderIndex`. A duplicate/zero-landmark regression in `RenderEpic`/`RenderStory` would ship untested (both paths traced clean today). [tests/SpecScribe.Tests/HtmlTemplaterTests.cs:68] — **Fixed:** added `RenderEpic_EmitsSkipLinkAndSingleMainLandmark` asserting skip link + exactly one `#main-content` on the epic detail page.
 - [x] [Review][Defer] Detail-page `<h1>` renders `epic.Title`/`story.Title` unescaped while index pages route titles through `Html()` — deferred, pre-existing (diff moved the line, did not introduce the gap); controlled heading content, low injection risk. [src/SpecScribe/EpicsTemplater.cs RenderEpic/RenderStory]
 - [x] [Review][Defer] Heatmap `heatAria` and per-cell `<title>` format dates with ambient culture (`{first:yyyy-MM-dd}`) rather than `InvariantCulture` like the month labels — deferred, pre-existing pattern shared with the cell titles; only diverges under a non-Gregorian ambient calendar on the build host. [src/SpecScribe/Charts.cs:435, :473]
 
