@@ -486,3 +486,5 @@ $RECYCLE.BIN/
 
 # SpecScribe per-user saved interactive settings
 .specscribe
+
+docs/live/
