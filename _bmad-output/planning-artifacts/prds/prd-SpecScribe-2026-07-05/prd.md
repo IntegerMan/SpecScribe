@@ -228,3 +228,40 @@ SpecScribe can expose the Generated Portal information model in a VS Code webvie
 ## 11. Assumptions Index
 - [ASSUMPTION] Deep git analytics remain opt-in.
 - [ASSUMPTION] Extension delivery starts read-only and local-first before any authoring workflows.
+
+## 12. Alignment Addendum (2026-07-05)
+
+This addendum records accepted direction updates so PRD and SPEC remain synchronized.
+
+### 12.1 Configuration and Settings
+- All user-facing features must be configurable through interactive options and equivalent CLI parameters.
+- This includes git insights and ADR coverage controls.
+- Settings are persisted via a directory-scoped settings file for the active source repository.
+
+### 12.2 Local-Only and Read-Only Posture
+- Product posture remains local-only and read-only.
+- Future IDE integration may include helper buttons that generate next-step prompts/commands (for example, code review prompts) but must not mutate source planning artifacts.
+
+### 12.3 Documentation Communication Standard
+- README must communicate user-facing options primarily via tables plus short descriptive text.
+
+### 12.4 Framework and Module Coverage
+- Support target is all current popular spec-driven-development frameworks and modules with explicit popularity criteria.
+
+### 12.5 Concrete Relevance Signals (Extension Timing)
+- "Concrete relevance signals" means measurable triggers for beginning extension work.
+- Minimum gate: demand or workflow-friction evidence, plus reliability and maintainer-capacity readiness.
+
+### 12.6 Dual-Output Architecture Planning
+- Plan for one shared projection/rendering core that feeds both generated HTML files and a future VS Code webview.
+- Keep parser/projection logic shared across surfaces; keep output adapters focused on delivery concerns.
+
+### 12.7 Extension Relevance Fit with Current Workflow
+- Extension timing should account for real editor usage mix.
+- If work is predominantly in non-VS-Code desktop tooling, extension investment remains lower priority.
+- If context switching to browser/watch management becomes frequent and VS Code-family usage rises, extension relevance increases.
+
+### 12.8 Module Boundary Sketch
+- A shared projection/rendering core should expose host-neutral view models.
+- Delivery adapters should target static HTML and VS Code webview separately without duplicating parser/projection logic.
+- Read-only helper actions in webview may generate prompts/commands but must not directly mutate planning artifacts.
