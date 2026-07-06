@@ -23,6 +23,8 @@ inputDocuments:
 
 This document provides the complete epic and story breakdown for SpecScribe, decomposing the requirements from the PRD, UX Design if it exists, and Architecture requirements into implementable stories.
 
+The epics are ordered by delivery phase: (1) a polished, richly-functional BMad-only portal, (2) deeper insight surfaces and UX, (3) expansion to additional frameworks, (4) reliable operations/configuration and OSS-ready documentation, and (5) the editor surface plus code-and-git exploration.
+
 ## Requirements Inventory
 
 ### Functional Requirements
@@ -41,6 +43,13 @@ FR11: Analyze canonical agent/workflow files to surface structural insights such
 FR12: Deliver a CLI-first workflow for one-shot generation and watch mode, with auto-discovery defaults plus explicit path overrides.
 FR13: Provide a follow-on VS Code webview surface that reuses shared parsing and projection logic and remains read-only in v1.
 FR14: Provide project tree views and structural visualizations in generated outputs so users can inspect directory/layout shape and trace where planning and implementation artifacts live.
+FR15: Render project source/code files as browsable in-portal pages and resolve source citations and code references (for example `[Source: path:line]` and "View source" links) to those pages rather than raw or dead links.
+FR16: Provide temporal/timeline views of project activity, including per-date activity pages, and link dates (commit dates, heatmap cells, artifact timestamps) to them.
+FR17: Add adapter coverage for additional spec-driven frameworks (for example SpecFlow, Squad, and Superpowers) through the shared adapter contract.
+FR18: Provide OSS-ready onboarding and reference documentation (getting started, configuration/CLI reference, and contribution guidance) for community sharing.
+FR19: Provide advanced code-and-git coverage on code pages (for example history/blame annotations and change-coupling/hotspots) as an opt-in extension of code exploration.
+
+<!-- FR15–FR19 added post-PRD (2026-07-06) to seat the reordered roadmap (Epics 4/5/7); sync back into the PRD for full traceability when convenient. -->
 
 ### NonFunctional Requirements
 
@@ -96,19 +105,24 @@ UX-DR20: Include high-impact but purposeful visual polish for insight modules (f
 ### FR Coverage Map
 
 FR1: Epic 4 - Shared adapter contract and projection model for multi-framework ingestion.
-FR2: Epic 1 - Preserve first-class BMad parsing and rendering behavior.
+FR2: Epics 1 & 2 - Preserve and complete first-class BMad parsing and rendering behavior.
 FR3: Epic 4 - Spec Kit baseline ingestion and projection coverage.
 FR4: Epic 4 - GSD and GSD-Pi baseline ingestion and projection coverage.
-FR5: Epic 1 - Coherent navigation, dashboards, and major artifact surfacing.
+FR5: Epics 1 & 2 - Coherent navigation/dashboards plus complete artifact-class representation.
 FR6: Epic 1 - Requirements, story, and ADR cross-linking integrity.
-FR7: Epic 1 - Markdown fidelity including Mermaid and task list rendering.
-FR8: Epic 2 - Reliable watch regeneration and rapid-edit safety.
+FR7: Epics 1 & 2 - Markdown fidelity including Mermaid, task lists, and comment annotations.
+FR8: Epic 5 - Reliable watch regeneration and rapid-edit safety.
 FR9: Epic 3 - Baseline git pulse metrics in the portal.
 FR10: Epic 3 - Optional deeper git analytics toggle path.
 FR11: Epic 3 - Agent and workflow structural insights with freshness and gap signals.
-FR12: Epic 2 - CLI-first generate and watch with auto-discovery and explicit overrides.
-FR13: Epic 5 - Read-only VS Code webview reusing shared core logic.
+FR12: Epic 5 - CLI-first generate and watch with auto-discovery and explicit overrides.
+FR13: Epic 6 - Read-only VS Code webview reusing shared core logic.
 FR14: Epic 3 - Tree views and structural visualizations in generated outputs.
+FR15: Epic 7 - In-portal code file browsing and source-citation linking to code pages.
+FR16: Epic 7 - Activity timeline and per-date pages linked from dates.
+FR17: Epic 4 - Additional framework adapters (SpecFlow, Squad, Superpowers) via the shared contract.
+FR18: Epic 5 - OSS onboarding and reference documentation.
+FR19: Epic 7 - Advanced code-and-git coverage on code pages.
 
 ## Epic List
 
@@ -116,21 +130,29 @@ FR14: Epic 3 - Tree views and structural visualizations in generated outputs.
 Deliver a polished, immediately useful portal for current BMad projects so maintainers and contributors can understand status, traceability, and progress at a glance.
 **FRs covered:** FR2, FR5, FR6, FR7
 
-### Epic 2: Reliable Local Operations and Config Control
-Make generation and watch highly dependable and easy to run and configure so users can trust daily usage in real repositories.
-**FRs covered:** FR8, FR12
+### Epic 2: Complete and Faithful BMad Artifact Representation
+Surface and truthfully represent every BMad artifact class and work type — deferred and quick-dev work, specs, sprint status, planning documents, iconography, and authored comments — so the portal reflects the whole project rather than only epics and stories.
+**FRs covered:** FR2, FR5, FR7
 
 ### Epic 3: Insight Surfaces and Tree-View Discovery
 Add richer analytical insight, including tree views and structural visualizations, so users can understand project shape, gaps, and momentum quickly.
 **FRs covered:** FR9, FR10, FR11, FR14
 
 ### Epic 4: Multi-Framework Coverage Expansion
-Expand beyond BMad to include Spec Kit and GSD/GSD-Pi so mixed-framework teams can use one coherent portal.
-**FRs covered:** FR1, FR3, FR4
+Expand beyond BMad to additional spec-driven frameworks (Spec Kit, GSD/GSD-Pi, SpecFlow, Squad, Superpowers) through one shared adapter contract, first generalizing the renderer away from any single project's personal structure.
+**FRs covered:** FR1, FR3, FR4, FR17
 
-### Epic 5: VS Code Read-Only Companion Surface
+### Epic 5: Reliable Operations, Configuration, and OSS Documentation
+Make generation and watch dependable and easy to configure, and provide OSS-ready documentation, so the tool is trustworthy for daily use and ready to share with the broader community.
+**FRs covered:** FR8, FR12, FR18
+
+### Epic 6: VS Code Read-Only Companion Surface
 Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects.
 **FRs covered:** FR13
+
+### Epic 7: Code and Git Exploration
+Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth.
+**FRs covered:** FR15, FR16, FR19
 
 <!-- Repeat for each epic in epics_list (N = 1, 2, 3...) -->
 
@@ -220,71 +242,153 @@ So that I can quickly understand progress regardless of input method.
 **Then** non-essential animation is minimized
 **And** information remains clear without relying on animation.
 
-## Epic 2: Reliable Local Operations and Config Control
+_Scope note: this story is the accessibility + motion baseline (focus states, chart accessible names, skip link/landmark/progressbar ARIA, reduced motion, contrast). The dashboard's visual polish and truthfulness work split out into Story 1.5._
 
-Make generation and watch highly dependable and easy to run and configure so users can trust daily usage in real repositories.
+### Story 1.5: Dashboard Insight Polish and Visual Truthfulness
 
-**FRs covered:** FR8, FR12
-
-### Story 2.1: CLI Generate and Watch Modes with Smart Defaults
-
-As a maintainer,
-I want one-shot generate and continuous watch commands with sensible defaults,
-So that I can produce and refresh docs quickly in real projects.
+As a stakeholder scanning the dashboard,
+I want charts and stats that are visually polished and tell the truth,
+So that I can trust what I see and read it at a glance.
 
 **Acceptance Criteria:**
 
 1.
-**Given** a supported repository layout
-**When** I run generate or watch with no required flags
-**Then** source and output roots are auto-discovered
-**And** generation succeeds with clear terminal feedback.
+**Given** the dashboard renders stats and charts
+**When** I view any panel
+**Then** status is shown in one consistent color vocabulary with on-brand, instant tooltips reachable by keyboard, focus, and touch
+**And** no chart overstates progress (epic status reflects the story roll-up, task counts are clearly scoped, and future dates are not shown as zero-activity).
 
 2.
-**Given** a non-standard repository layout
-**When** I supply explicit source, ADR, and output options
-**Then** those overrides are honored for the run
-**And** help output documents available command options clearly.
+**Given** I am looking for what to do next
+**When** the dashboard loads
+**Then** the most active and next work is surfaced ahead of secondary link grids
+**And** key next-step commands can be copied in a single action.
 
-### Story 2.2: Directory-Scoped Settings with Interactive and CLI Parity
+## Epic 2: Complete and Faithful BMad Artifact Representation
 
-As a repeat user,
-I want settings persisted per repository and overridable per run,
-So that I can keep preferred behavior without hidden global side effects.
+Surface and truthfully represent every BMad artifact class and work type — deferred and quick-dev work, specs, sprint status, planning documents, iconography, and authored comments — so the portal reflects the whole project rather than only epics and stories.
+
+**FRs covered:** FR2, FR5, FR7
+
+### Story 2.1: Accurate Work Representation and Authoring Guidance
+
+As a maintainer using multiple BMad workflows,
+I want the portal to represent all work types accurately and to guide me in adding more,
+So that deferred items and quick-dev work stay visible and new contributors know how to extend the plan.
 
 **Acceptance Criteria:**
 
 1.
-**Given** I configure settings interactively
-**When** I run generation later in the same repository
-**Then** configured defaults are reused from directory-scoped settings
-**And** behavior matches equivalent CLI arguments.
+**Given** the project contains deferred-work notes and quick-dev spec artifacts alongside epics, stories, and tasks
+**When** the site is generated
+**Then** those work items are represented as first-class, navigable entries with their status
+**And** task and progress figures account for them without misrepresenting epic or story completion.
 
 2.
-**Given** I pass CLI overrides for a run
-**When** generation starts
-**Then** the effective config resolves once with overrides taking precedence
-**And** provenance is available for diagnostics.
+**Given** an epics or stories surface (including empty or partial states)
+**When** I view it
+**Then** clear inline guidance explains how to add an epic or a story, with the relevant commands
+**And** sunburst and task visuals distinguish "no plan yet" from "no data" so gaps read as next actions.
 
-### Story 2.3: Watch Regeneration Safety and Scope-Aware Rebuilds
+### Story 2.2: First-Class Rendering of Spec Artifacts
 
-As a developer editing artifacts rapidly,
-I want watch mode to regenerate safely under change bursts,
-So that output stays coherent without blocking file edits.
+As a maintainer using the spec-driven workflow,
+I want the spec kernel and its companion documents surfaced as a first-class artifact class,
+So that specs are navigable and understandable rather than dumped in a generic "Other" list.
 
 **Acceptance Criteria:**
 
 1.
-**Given** multiple rapid saves occur in watched sources
-**When** watch mode processes changes
-**Then** output remains consistent and non-corrupt
-**And** source files are read with shared access without write-lock side effects.
+**Given** the project contains a specs folder with a SPEC kernel and companion documents (for example architecture spine, rendering architecture, requirements catalog, settings and signals)
+**When** the site is generated
+**Then** specs render under their own labeled section and navigation with clear titles
+**And** they no longer fall into the generic "Other" bucket.
 
 2.
-**Given** rename, delete, or topology changes happen
-**When** watch mode recomputes output
-**Then** stale pages are removed or refreshed appropriately
-**And** rebuild scope escalates when required for coherence.
+**Given** spec documents cross-reference each other and other artifacts
+**When** I open a spec page
+**Then** its structure is readable (headings and table of contents) and recognized references resolve
+**And** a missing or partial spec set degrades gracefully without broken navigation.
+
+### Story 2.3: Sprint Status Page and Dashboard Widget
+
+As a maintainer tracking delivery,
+I want a sprint status view in the portal plus an at-a-glance widget on the home page,
+So that I can see where every epic and story sits without opening the tracking file.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a sprint-status tracking file exists
+**When** the site is generated
+**Then** a sprint status page lists epics and stories with their lifecycle status (backlog → ready-for-dev → in-progress → review → done) and surfaces open retrospective action items
+**And** missing or partial tracking data degrades gracefully without broken navigation.
+
+2.
+**Given** the dashboard home page
+**When** it loads
+**Then** a compact sprint widget summarizes current status (counts by lifecycle stage and what is in progress) and links to the full sprint page
+**And** the widget is omitted cleanly when no tracking file exists.
+
+### Story 2.4: Planning Artifacts Grouping, Status Badges, and PRD Prominence
+
+As a reader arriving at the portal,
+I want the planning artifacts organized meaningfully with the PRD front and center,
+So that the most important planning documents are easy to find and their status is obvious at a glance.
+
+**Acceptance Criteria:**
+
+1.
+**Given** planning artifacts of different kinds (product brief, PRD, PRD quality review, UX design, UX experience)
+**When** I view the home planning section
+**Then** artifacts are grouped meaningfully (for example the PRD as a prominent primary document, UX design and experience together, the brief distinct)
+**And** each artifact's status is shown as a badge consistent with the site's status semantics, not plain text.
+
+2.
+**Given** the PRD has an associated quality-review / rubric document
+**When** I view the planning section
+**Then** the quality review does not appear as a standalone top-level card
+**And** it is reachable as a branching/linked reference from the PRD (from the PRD card or its page).
+
+### Story 2.5: Standardized Iconography for Artifact Types and Status
+
+As a user scanning the portal,
+I want consistent icons for standardized concepts where they aid recognition,
+So that artifact types and statuses are quicker to parse without adding clutter.
+
+**Acceptance Criteria:**
+
+1.
+**Given** recurring standardized concepts (artifact types, statuses, navigation sections)
+**When** pages render
+**Then** appropriate, consistent icons accompany labels where they aid recognition
+**And** icons are always paired with text (never icon-only) so meaning is preserved for all users.
+
+2.
+**Given** the antiquarian design system and the accessibility conventions from Stories 1.4 and 1.5
+**When** icons are used
+**Then** they follow the established visual language and remain crisp and theme-consistent
+**And** decorative icons are hidden from assistive technology while meaningful icons carry accessible labels.
+
+### Story 2.6: Render Markdown Comments as Visible Annotations
+
+As a reader of generated documents,
+I want authored HTML comments surfaced as visible, de-emphasized annotations,
+So that the context authors leave in comments (for example "sync this back into the PRD later") is not lost in the rendered portal.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a source document contains HTML comments (`<!-- ... -->`) that today render as invisible raw HTML
+**When** the page is generated
+**Then** those comments render as visible, de-emphasized annotations (italicized or blockquote-styled asides) in their original document position
+**And** both multi-line block comments and inline comments render coherently.
+
+2.
+**Given** a document mixes prose, headings, and comments
+**When** it renders
+**Then** comment annotations use a consistent side-note style clearly distinct from body text and do not disrupt the surrounding markdown
+**And** malformed, nested, or unterminated comments degrade non-fatally without breaking the page.
 
 ## Epic 3: Insight Surfaces and Tree-View Discovery
 
@@ -392,11 +496,31 @@ So that demos and day-to-day usage both benefit from clarity and impact.
 **Then** equivalent text and non-color cues remain present
 **And** reduced-motion settings preserve full informational meaning.
 
+### Story 3.6: Refinement Funnel on the Dashboard
+
+As a stakeholder assessing planning maturity,
+I want a funnel graphic showing epic → story → task refinement on the home page,
+So that I can see how far the project has been refined at a glance.
+
+**Acceptance Criteria:**
+
+1.
+**Given** epics, stories, and task plans have been parsed
+**When** I view the dashboard
+**Then** a funnel visualizes the refinement stages (epics → drafted stories → stories with a task plan → tasks) with counts at each stage
+**And** the narrowing communicates how much detail work remains.
+
+2.
+**Given** the accessibility and truthfulness conventions established in Stories 1.4 and 1.5
+**When** the funnel renders
+**Then** each stage carries a text label and value (never color-only) and reduced-motion is respected
+**And** an empty or early-stage project renders a sensible funnel rather than a broken or misleading one.
+
 ## Epic 4: Multi-Framework Coverage Expansion
 
-Expand beyond BMad to include Spec Kit and GSD/GSD-Pi so mixed-framework teams can use one coherent portal.
+Expand beyond BMad to additional spec-driven frameworks (Spec Kit, GSD/GSD-Pi, SpecFlow, Squad, Superpowers) through one shared adapter contract, first generalizing the renderer away from any single project's personal structure.
 
-**FRs covered:** FR1, FR3, FR4
+**FRs covered:** FR1, FR3, FR4, FR17
 
 ### Story 4.1: Shared Framework Adapter Contract and Projection Path
 
@@ -418,7 +542,27 @@ So that new framework support does not require rewriting core rendering.
 **Then** unsupported items are categorized and reported as non-fatal
 **And** successful artifacts still render.
 
-### Story 4.2: Spec Kit Baseline Adapter Coverage
+### Story 4.2: Decouple Rendering from Personal Project-Structure Assumptions
+
+As a maintainer of a BMad project that is organized differently from the tool author's own repositories,
+I want generation to avoid hardcoded personal-structure assumptions,
+So that my ADRs, folders, and groupings render correctly without matching one specific layout.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a BMad project whose ADRs, folder names, or artifact groupings differ from this repository's personal conventions
+**When** the site is generated
+**Then** rendering adapts to the detected structure rather than depending on fixed personal assumptions (ADR location/format, hardcoded group-prefix names, specific filenames)
+**And** unrecognized structure degrades gracefully rather than mis-grouping or dropping content.
+
+2.
+**Given** ADRs authored in non-standard formats or locations
+**When** they are parsed
+**Then** recognized decision records still render with title, status, and links where derivable
+**And** format and organization variance is handled tolerantly (non-fatal), without assuming a single numbering or directory scheme.
+
+### Story 4.3: Spec Kit Baseline Adapter Coverage
 
 As a team using Spec Kit,
 I want core Spec Kit artifacts interpreted in the portal,
@@ -438,7 +582,7 @@ So that I can track planning progress without switching tools.
 **Then** they are surfaced as explicit non-fatal notices
 **And** generation continues for supported content.
 
-### Story 4.3: GSD and GSD-Pi Baseline Adapter Coverage
+### Story 4.4: GSD and GSD-Pi Baseline Adapter Coverage
 
 As a team using GSD workflows,
 I want key GSD and GSD-Pi artifacts rendered coherently,
@@ -458,13 +602,159 @@ So that progress and scope remain understandable in one portal.
 **Then** coverage tier labeling communicates interpretation boundaries clearly
 **And** unsupported items never block full-site generation.
 
-## Epic 5: VS Code Read-Only Companion Surface
+### Story 4.5: SpecFlow Baseline Adapter Coverage
+
+As a team using SpecFlow,
+I want core SpecFlow artifacts interpreted in the portal,
+So that I can track planning and specification progress without switching tools.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative SpecFlow repositories
+**When** generation runs
+**Then** core planning and specification artifacts render without fatal failures via the shared adapter contract
+**And** each discovered artifact is labeled rendered, summarized, or unsupported.
+
+2.
+**Given** unsupported SpecFlow artifact variants
+**When** they are detected
+**Then** they are surfaced as explicit non-fatal notices
+**And** generation continues for supported content and remains coherent with other framework surfaces.
+
+### Story 4.6: Squad Baseline Adapter Coverage
+
+As a team using Squad,
+I want core Squad artifacts interpreted in the portal,
+So that I can track planning progress without switching tools.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative Squad repositories
+**When** generation runs
+**Then** core planning and tracking artifacts render without fatal failures via the shared adapter contract
+**And** each discovered artifact is labeled rendered, summarized, or unsupported.
+
+2.
+**Given** unsupported Squad artifact variants
+**When** they are detected
+**Then** they are surfaced as explicit non-fatal notices
+**And** generation continues for supported content and remains coherent with other framework surfaces.
+
+### Story 4.7: Superpowers Baseline Adapter Coverage
+
+As a team using Superpowers,
+I want core Superpowers artifacts interpreted in the portal,
+So that I can track planning progress without switching tools.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative Superpowers repositories
+**When** generation runs
+**Then** core planning and tracking artifacts render without fatal failures via the shared adapter contract
+**And** each discovered artifact is labeled rendered, summarized, or unsupported.
+
+2.
+**Given** unsupported Superpowers artifact variants
+**When** they are detected
+**Then** they are surfaced as explicit non-fatal notices
+**And** generation continues for supported content and remains coherent with other framework surfaces.
+
+## Epic 5: Reliable Operations, Configuration, and OSS Documentation
+
+Make generation and watch dependable and easy to configure, and provide OSS-ready documentation, so the tool is trustworthy for daily use and ready to share with the broader community.
+
+**FRs covered:** FR8, FR12, FR18
+
+### Story 5.1: CLI Generate and Watch Modes with Smart Defaults
+
+As a maintainer,
+I want one-shot generate and continuous watch commands with sensible defaults,
+So that I can produce and refresh docs quickly in real projects.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a supported repository layout
+**When** I run generate or watch with no required flags
+**Then** source and output roots are auto-discovered
+**And** generation succeeds with clear terminal feedback.
+
+2.
+**Given** a non-standard repository layout
+**When** I supply explicit source, ADR, and output options
+**Then** those overrides are honored for the run
+**And** help output documents available command options clearly.
+
+### Story 5.2: Directory-Scoped Settings with Interactive and CLI Parity
+
+As a repeat user,
+I want settings persisted per repository and overridable per run,
+So that I can keep preferred behavior without hidden global side effects.
+
+**Acceptance Criteria:**
+
+1.
+**Given** I configure settings interactively
+**When** I run generation later in the same repository
+**Then** configured defaults are reused from directory-scoped settings
+**And** behavior matches equivalent CLI arguments.
+
+2.
+**Given** I pass CLI overrides for a run
+**When** generation starts
+**Then** the effective config resolves once with overrides taking precedence
+**And** provenance is available for diagnostics.
+
+### Story 5.3: Watch Regeneration Safety and Scope-Aware Rebuilds
+
+As a developer editing artifacts rapidly,
+I want watch mode to regenerate safely under change bursts,
+So that output stays coherent without blocking file edits.
+
+**Acceptance Criteria:**
+
+1.
+**Given** multiple rapid saves occur in watched sources
+**When** watch mode processes changes
+**Then** output remains consistent and non-corrupt
+**And** source files are read with shared access without write-lock side effects.
+
+2.
+**Given** rename, delete, or topology changes happen
+**When** watch mode recomputes output
+**Then** stale pages are removed or refreshed appropriately
+**And** rebuild scope escalates when required for coherence.
+
+### Story 5.4: OSS Onboarding and Reference Documentation
+
+As a prospective adopter from the OSS community,
+I want clear getting-started, configuration, and contribution documentation,
+So that I can install, run, configure, and contribute to SpecScribe without insider knowledge.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a new user arrives at the repository
+**When** they follow the documentation
+**Then** getting-started steps, a configuration/CLI reference, and contribution guidance are complete, accurate, and current
+**And** examples reflect real, working commands.
+
+2.
+**Given** the documentation coexists with the tool and generated portal
+**When** it is produced
+**Then** docs stay consistent with actual behavior (options, defaults, commands) and are easy to keep in sync
+**And** missing or partial docs are surfaced rather than silently absent.
+
+## Epic 6: VS Code Read-Only Companion Surface
 
 Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects.
 
 **FRs covered:** FR13
 
-### Story 5.1: Shared View-Model Contract for HTML and Webview Adapters
+### Story 6.1: Shared View-Model Contract for HTML and Webview Adapters
 
 As a maintainer,
 I want both HTML and VS Code surfaces powered by the same view-model contract,
@@ -484,7 +774,7 @@ So that feature semantics stay consistent and parser logic is not duplicated.
 **Then** semantic regressions between surfaces are detectable
 **And** differences are documented as host-specific exceptions only.
 
-### Story 5.2: Read-Only VS Code Dashboard and Epics Experience
+### Story 6.2: Read-Only VS Code Dashboard and Epics Experience
 
 As a VS Code user,
 I want an in-editor status surface for dashboard and epics,
@@ -504,7 +794,7 @@ So that I can inspect project state without context-switching to a browser.
 **Then** visible status refreshes in place without full panel reset
 **And** drill/breadcrumb context remains coherent.
 
-### Story 5.3: Host-Aware Theming and Explicit Helper Actions
+### Story 6.3: Host-Aware Theming and Explicit Helper Actions
 
 As a maintainer using multiple themes,
 I want webview visuals to align with VS Code chrome while preserving SpecScribe semantics,
@@ -523,3 +813,89 @@ So that the experience feels native without losing product identity.
 **When** I trigger a helper
 **Then** it generates explicit commands or prompts only
 **And** no source planning artifacts are mutated by the helper path.
+
+## Epic 7: Code and Git Exploration
+
+Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth — so the portal explains not just what is planned, but what exists and what happened when.
+
+**FRs covered:** FR15, FR16, FR19
+
+### Story 7.1: In-Portal Code File Browsing
+
+As a reviewer,
+I want project source files rendered as readable pages,
+So that I can inspect referenced code without leaving the portal.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the project has source files referenced by planning or implementation artifacts
+**When** the site is generated
+**Then** referenced code files render as syntax-readable, navigable pages
+**And** non-referenced or excluded files are omitted gracefully without broken navigation.
+
+2.
+**Given** a rendered code file page
+**When** I open it
+**Then** I can navigate to specific lines via stable anchors
+**And** the page degrades safely for very large, binary, or unreadable files.
+
+### Story 7.2: Source-Citation and Comment Linking to Code Pages
+
+As a contributor,
+I want source citations and "View source" links to resolve to in-portal code pages,
+So that traceability leads somewhere useful instead of to a raw or dead link.
+
+**Acceptance Criteria:**
+
+1.
+**Given** artifacts contain source citations (for example `[Source: path:line]`) and view-source links
+**When** pages render
+**Then** recognized references link to the corresponding code file page, including a line anchor when a line is cited
+**And** unresolved references degrade to plain text without broken links.
+
+2.
+**Given** a code reference resolves to a code page
+**When** I follow it
+**Then** I land on the cited file at the cited location
+**And** I can navigate back to the citing artifact.
+
+### Story 7.3: Activity Timeline and Date Pages
+
+As a maintainer,
+I want a timeline of project activity with per-date pages,
+So that I can see what happened on any given day.
+
+**Acceptance Criteria:**
+
+1.
+**Given** git history and artifact timestamps are available
+**When** I view the timeline surface
+**Then** activity is shown over time and each active date links to a date page
+**And** dates with no activity are not misrepresented as activity.
+
+2.
+**Given** a date page
+**When** I open it
+**Then** it summarizes what happened that day (commits and artifact changes) and links back to the related epics, stories, or code pages
+**And** it degrades gracefully when history is unavailable.
+
+### Story 7.4: Advanced Code and Git Coverage
+
+As an advanced user exploring the codebase,
+I want deeper code-and-git coverage on code pages,
+So that I can see how files have changed and where change concentrates.
+
+**Acceptance Criteria:**
+
+1.
+**Given** code pages and git history are available
+**When** advanced coverage is enabled
+**Then** code pages surface history/blame-style annotations and change-coupling/hotspot signals as an opt-in extension
+**And** baseline code and portal generation performance is unaffected when it is disabled.
+
+2.
+**Given** git history is unavailable or partial
+**When** advanced coverage runs
+**Then** it degrades non-fatally
+**And** code pages still render their baseline content.
