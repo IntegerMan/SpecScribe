@@ -13,33 +13,33 @@ public static class BmadCommands
     private sealed record Suggestion(string Command, string Description);
 
     public static string RenderNextSteps(StoryInfo story, CommandCatalog commands) =>
-        RenderPanel(ForStory(story, commands), commands);
+        RenderPanel(ForStory(story, commands));
 
     public static string RenderEpicNextSteps(EpicInfo epic, CommandCatalog commands) =>
-        RenderPanel(ForEpic(epic, commands), commands);
+        RenderPanel(ForEpic(epic, commands));
 
     public static string RenderProjectNextSteps(EpicsModel model, CommandCatalog commands) =>
-        RenderPanel(ForProject(model, commands), commands);
+        RenderPanel(ForProject(model, commands));
 
     /// <summary>The heading + list on their own (no chart-panel wrapper), for callers that want to fold
     /// the Next Steps into a shared panel rather than give it a standalone one.</summary>
     public static string RenderEpicNextStepsInner(EpicInfo epic, CommandCatalog commands) =>
-        RenderInner(ForEpic(epic, commands), commands);
+        RenderInner(ForEpic(epic, commands));
 
-    private static string RenderPanel(List<Suggestion> suggestions, CommandCatalog commands)
+    private static string RenderPanel(List<Suggestion> suggestions)
     {
-        var inner = RenderInner(suggestions, commands);
+        var inner = RenderInner(suggestions);
         return inner.Length == 0
             ? string.Empty
             : $"<div class=\"chart-panel next-steps\">\n{inner}</div>\n\n";
     }
 
-    private static string RenderInner(List<Suggestion> suggestions, CommandCatalog commands)
+    private static string RenderInner(List<Suggestion> suggestions)
     {
         if (suggestions.Count == 0) return string.Empty;
 
         var sb = new StringBuilder();
-        sb.Append($"<h3>Next Steps ({PathUtil.Html(commands.ModuleLabel)})</h3>\n<ul class=\"next-steps-list\">\n");
+        sb.Append("<h3>Next Steps</h3>\n<ul class=\"next-steps-list\">\n");
         foreach (var s in suggestions)
         {
             sb.Append($"  <li><code>{PathUtil.Html(s.Command)}</code><span class=\"next-steps-desc\">{PathUtil.Html(s.Description)}</span></li>\n");
@@ -158,15 +158,29 @@ public static class BmadCommands
     }
 
     /// <summary>The project-level moves that make sense right now, in the order a developer would reason
-    /// through them: build the story that's the current front line, draft the next story that still lacks a
-    /// plan, and break down the next epic that hasn't been sharded into stories. These are stacked (not
-    /// mutually exclusive) so the home page shows the whole "what's next for the project" picture at once —
-    /// story-level chores like code review live on the individual story pages, not here. Falls back to a
-    /// project-wide retrospective only once every epic is drafted and every story detailed.</summary>
+    /// through them: review any story that's sitting in code review, build the story that's the current
+    /// front line, draft the next story that still lacks a plan, and break down the next epic that hasn't
+    /// been sharded into stories. These are stacked (not mutually exclusive) so the home page shows the whole
+    /// "what's next for the project" picture at once. Falls back to a project-wide retrospective only once
+    /// every epic is drafted and every story detailed.</summary>
     private static List<Suggestion> ForProject(EpicsModel model, CommandCatalog commands)
     {
         var suggestions = new List<Suggestion>();
         var allStories = model.Epics.SelectMany(e => e.Stories).ToList();
+
+        // Stories sitting in code review are the most immediate move — surface a single review prompt (the
+        // action) that lists the awaiting-review story ids, so a reader sees from the dashboard which changes
+        // are waiting on an adversarial pass. Grouped by action rather than one row per story, since the
+        // command itself takes no story argument. Dropped silently when the module exposes no code-review.
+        var awaitingReview = allStories.Where(s => StatusStyles.ForStory(s) == "review").Select(s => s.Id).ToList();
+        if (awaitingReview.Count > 0)
+        {
+            var noun = awaitingReview.Count == 1 ? "Story" : "Stories";
+            var verb = awaitingReview.Count == 1 ? "is" : "are";
+            var possessive = awaitingReview.Count == 1 ? "its" : "their";
+            Add(suggestions, commands.Command("code-review"),
+                $"{noun} {string.Join(", ", awaitingReview)} {verb} awaiting code review — adversarial multi-layer review of {possessive} changes.");
+        }
 
         // The current front line — a story that's ready or already in development. Referenced by its short
         // id (e.g. "1.1"), which the dev-story command resolves to the plan itself.

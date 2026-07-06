@@ -135,7 +135,8 @@ public class BmadCommandsTests
 
         Assert.Contains("/bmad-dev-story 1.2", html);
         Assert.Contains("/bmad-code-review", html);
-        Assert.Contains("Next Steps (BMad Method)", html);
+        Assert.Contains("Next Steps", html);
+        Assert.DoesNotContain("(BMad Method)", html);
         Assert.DoesNotContain("/gds-", html);
     }
 
@@ -145,5 +146,76 @@ public class BmadCommandsTests
         var html = BmadCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), CommandCatalog.Empty);
 
         Assert.Equal(string.Empty, html);
+    }
+
+    private static EpicsModel Project(params StoryInfo[] stories) => new()
+    {
+        OverviewHtml = string.Empty,
+        RequirementsInventoryHtml = string.Empty,
+        Epics = new[]
+        {
+            new EpicInfo
+            {
+                Number = 1,
+                Title = "First Epic",
+                GoalHtml = string.Empty,
+                Status = EpicStatus.Drafted,
+                Section = EpicSection.VerticalSlice,
+                Stories = stories,
+            },
+        },
+    };
+
+    [Fact]
+    public void RenderProjectNextSteps_ListsCodeReviewForStoryAwaitingReview()
+    {
+        var html = BmadCommands.RenderProjectNextSteps(
+            Project(Story("1.3", "done"), Story("1.4", "review")), BmmCatalog);
+
+        Assert.Contains("/bmad-code-review", html);
+        Assert.Contains("Story 1.4 is awaiting code review", html);
+        // The done story is not the front line and produces no dev/review prompt of its own here.
+        Assert.DoesNotContain("Story 1.3", html);
+    }
+
+    [Fact]
+    public void RenderProjectNextSteps_GroupsReviewStoriesIntoOneNamedPrompt_BeforeTheFrontLine()
+    {
+        // Two stories awaiting review plus a ready front-line story: a single code-review prompt lists both
+        // ids (grouped by action, not one row per story), and it precedes the dev-story front line.
+        var html = BmadCommands.RenderProjectNextSteps(
+            Project(Story("1.4", "review"), Story("2.1", "review"), Story("1.5", "ready-for-dev")), BmmCatalog);
+
+        Assert.Contains("Stories 1.4, 2.1 are awaiting code review", html);
+        Assert.Contains("/bmad-dev-story 1.5", html);
+        // Exactly one code-review row, not one per review story.
+        Assert.Equal(1, html.Split("/bmad-code-review").Length - 1);
+        Assert.True(html.IndexOf("awaiting code review", StringComparison.Ordinal)
+                    < html.IndexOf("/bmad-dev-story", StringComparison.Ordinal),
+            "review prompt should render before the front-line dev-story prompt");
+    }
+
+    [Fact]
+    public void RenderProjectNextSteps_OmitsCodeReviewWhenNoStoryInReview()
+    {
+        var html = BmadCommands.RenderProjectNextSteps(
+            Project(Story("1.4", "ready-for-dev")), BmmCatalog);
+
+        Assert.DoesNotContain("code-review", html);
+        Assert.DoesNotContain("awaiting code review", html);
+    }
+
+    [Fact]
+    public void RenderProjectNextSteps_OmitsCodeReviewWhenModuleLacksCommand()
+    {
+        var noReviewCatalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/bmad-dev-story",
+        });
+
+        var html = BmadCommands.RenderProjectNextSteps(Project(Story("1.4", "review")), noReviewCatalog);
+
+        Assert.DoesNotContain("code-review", html);
+        Assert.DoesNotContain("awaiting code review", html);
     }
 }
