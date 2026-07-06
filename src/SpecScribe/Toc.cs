@@ -22,8 +22,13 @@ public static class Toc
         var sb = new StringBuilder();
         sb.Append("<nav class=\"toc-sidebar\" aria-label=\"On this page\">\n");
         sb.Append("  <span class=\"toc-label\">On this page</span>\n");
+        // Detail-page TOCs merge hardcoded panel ids (sec-*, ac-N) with remainder-heading auto-ids into one
+        // namespace; keep only the first entry per AnchorId so we never render two links to the same anchor
+        // (a browser jumps to the first matching id, making the later link a silent dead end).
+        var seen = new HashSet<string>();
         foreach (var e in entries)
         {
+            if (!seen.Add(e.AnchorId)) continue;
             var cls = e.Level >= 3 ? "toc-link toc-h3" : "toc-link";
             sb.Append($"  <a class=\"{cls}\" href=\"#{PathUtil.Html(e.AnchorId)}\">{PathUtil.Html(e.Text)}</a>\n");
         }

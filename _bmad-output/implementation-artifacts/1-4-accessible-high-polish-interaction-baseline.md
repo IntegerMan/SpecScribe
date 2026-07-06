@@ -4,7 +4,7 @@ baseline_commit: 53432af8b8410d16eacd7dda01025098153d6067
 
 # Story 1.4: Accessible High-Polish Interaction Baseline
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -37,36 +37,36 @@ so that I can quickly understand progress regardless of input method.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Establish a consistent visible focus-state system for every interactive element (AC: #1)
-  - [ ] Add a single shared `:focus-visible` treatment (on-brand: `outline: 2px solid var(--teal); outline-offset: 2px;` per the UX index-card focus spec) covering the interactive surfaces that today have only `:hover` styling: `.index-card`, `.now-next-card`, `.quick-link-card`, `.epic-mosaic-card`, `.site-nav a`, `.toc-strip a` (or 1.3's `.toc-sidebar a`), `.breadcrumb a`, `.ac-anchor`, `.ac-ref`, and the `.view-epic-link` CTAs
-  - [ ] Add a focus-visible indicator for the SVG segment links driven off the segment path (e.g. a `stroke`/`stroke-width` bump in `--gold-light`), since default outlines are unreliable on SVG across browsers
-  - [ ] Use `:focus-visible` (not bare `:focus`) so a mouse click leaves no lingering outline; verify no rule sets `outline: none` without a visible replacement (only `.site-nav-toggle:focus-visible` does today, swapping in border+color — preserve that pattern)
-  - [ ] Verify Tab order is logical on the dashboard and that every clickable card and chart segment is reachable and visibly focused
-- [ ] Task 2: Give charts accessible names so hover-only info is reachable without a pointer (AC: #1)
-  - [ ] `Charts.Sunburst` / `Charts.EpicSunburst`: each segment is an `<a href>` wrapping a `<path>` whose descriptive text is a hover-only `<title>`. Add an `aria-label` to the `<a>` carrying the same "Epic N: Title — status, N stories" / "Story N.N: Title — status" / task done/remaining text, so keyboard/screen-reader users get name+status+count on focus. Keep the `<title>` too (pointer tooltip) [Source: `src/SpecScribe/Charts.cs:121-154`, `:232-247`]
-  - [ ] `[UXO E6/H3]` Add whole-chart `role="img"` + `aria-label` to the donut and heatmap SVGs, which lack them today (only the sunburst has them). Examples: donut → "Epic status: N drafted, M pending"; heatmap → "Commit activity: N commits across M active days, {first}–{last}" [Source: `src/SpecScribe/Charts.cs:43` (Donut), `:409` (CommitHeatmap)]
-  - [ ] `Charts.TaskSunburst` segments are tooltip-only `<path>`s (no page to drill to). Do NOT make them focusable; the story page already renders the task checklist as real text — that is the non-pointer equivalent. Keep the chart's `role="img"`+`aria-label` and note the equivalence
-  - [ ] Preserve swatch+text legends and text-bearing status pills — status is conveyed by shape/label, not color alone; do not regress (UX-DR17). (Unifying the *colors* across charts is Story 1.5's job — do not tackle it here; just keep the text redundancy intact.)
-- [ ] Task 3: Reinforce the keyboard/screen-reader accessibility floor (AC: #1; UX-DR16)
-  - [ ] Add a skip-to-content link as the first focusable element on every page (`<a class="skip-link" href="#main-content">Skip to content</a>`, visually hidden until focused) via the shared shell (`PathUtil.RenderHeadOpen` / start of `<body>`), with matching `.skip-link` CSS
-  - [ ] Wrap each page's primary content in a single `<main id="main-content">` landmark: dashboard (`HtmlTemplater.RenderIndex`), generic doc pages (`HtmlTemplater.RenderPage`), epic/story detail (`EpicsTemplater`). `RequirementsTemplater` already emits `<main class="req-index">` — add `id="main-content"`. Ensure exactly one `<main>` per page and that it coexists with 1.3's TOC-sidebar layout
-  - [ ] Add `role="progressbar"` + `aria-valuenow`/`aria-valuemin="0"`/`aria-valuemax="100"` + an `aria-label` matching the visible label to `Charts.ProgressBar`; keep the visible `progress-value` fraction text [Source: `src/SpecScribe/Charts.cs:17-31`]
-  - [ ] Verify (do not rebuild) the existing nav `aria-current="page"` and the mobile drawer's Escape/focus handling are not regressed [Source: `src/SpecScribe/SiteNav.cs:96-116`]
-- [ ] Task 4: Add reduced-motion compliance (AC: #2)
-  - [ ] Add a single `@media (prefers-reduced-motion: reduce)` block to `specscribe.css` neutralizing non-essential motion: the card-lift `transform`/`transition` on `.index-card`/`.now-next-card`/`.quick-link-card`/`.epic-mosaic-card`/`.stat-card`; the `.sb-seg` opacity transition; the `.progress-fill` width transition; and any smooth-scroll 1.3 adds. Follow the EXPERIENCE.md Accessibility-Floor pattern (durations collapsed to ~0.01ms) [Source: `src/SpecScribe/assets/specscribe.css:360-375`, `:724-725`, `:1049`, `:1095`]
-  - [ ] Confirm no information is motion-dependent: status is color+text+shape, progress is filled width + `progress-value` fraction text — all readable with transitions off. Document this so the "information remains clear without animation" half of AC #2 is demonstrably met
-  - [ ] Note: Story 1.5 adds `@media (prefers-reduced-motion: no-preference)` entrance animations that pair with this block — leave a clear seam (this block is the "reduce" half) so 1.5 can add the complementary half without rework
-- [ ] Task 5: Accessibility contrast and chart micro-text fixes (AC: #1) `[UXO H1, H2]`
-  - [ ] `[UXO H1]` Fix `.index-card-path` contrast: `#d4b896` on `#faf7f2` is ≈1.6:1 (WCAG needs 4.5:1). Darken to at least `--ink-light` (`#7a6250`) [Source: `src/SpecScribe/assets/specscribe.css` `.index-card-path`]
-  - [ ] `[UXO H2]` Bump the smallest chart text for legibility: `.sunburst-hint` to `0.78rem` non-italic; heatmap 8px day/month labels (a minimal bump — the full heatmap rescale is Story 1.5's E1, so keep this to a readability nudge, not a layout change) [Source: `src/SpecScribe/assets/specscribe.css:734`]
-- [ ] Task 6: Regression and new test coverage (AC: #1, #2)
-  - [ ] Extend `HtmlTemplaterTests` (rendered-HTML assertions): skip link + `<main id="main-content">` present on index/dashboard; progress bars carry `role="progressbar"` with `aria-valuenow`
-  - [ ] Add `Charts`-level tests: sunburst/epic-sunburst segment `<a>` carry a non-empty `aria-label`; donut/heatmap SVGs carry `role="img"`+`aria-label`; legend text labels remain
-  - [ ] Add a stylesheet-content assertion that a `@media (prefers-reduced-motion: reduce)` block and a `:focus-visible` outline rule exist (cheap guards against silent removal)
-  - [ ] Prefer generation-/render-level assertions over new public API (mirrors Story 1.2/1.3)
-- [ ] Task 7: End-to-end validation with a real generation pass (AC: #1, #2)
-  - [ ] Run the focused test filter, then a real generation pass
-  - [ ] Manually verify: Tab reaches every card and chart segment with a visible focus ring; a focused sunburst segment announces its name/status via `aria-label`; the skip link appears on first Tab and jumps to `#main-content`; enabling OS reduce-motion removes card-lift/opacity/width transitions while all status and progress information stays legible; no console errors; no broken anchors
+- [x] Task 1: Establish a consistent visible focus-state system for every interactive element (AC: #1)
+  - [x] Add a single shared `:focus-visible` treatment (on-brand: `outline: 2px solid var(--teal); outline-offset: 2px;` per the UX index-card focus spec) covering the interactive surfaces that today have only `:hover` styling: `.index-card`, `.now-next-card`, `.quick-link-card`, `.epic-mosaic-card`, `.site-nav a`, `.toc-strip a` (or 1.3's `.toc-sidebar a`), `.breadcrumb a`, `.ac-anchor`, `.ac-ref`, and the `.view-epic-link` CTAs
+  - [x] Add a focus-visible indicator for the SVG segment links driven off the segment path (e.g. a `stroke`/`stroke-width` bump in `--gold-light`), since default outlines are unreliable on SVG across browsers
+  - [x] Use `:focus-visible` (not bare `:focus`) so a mouse click leaves no lingering outline; verify no rule sets `outline: none` without a visible replacement (only `.site-nav-toggle:focus-visible` does today, swapping in border+color — preserve that pattern)
+  - [x] Verify Tab order is logical on the dashboard and that every clickable card and chart segment is reachable and visibly focused
+- [x] Task 2: Give charts accessible names so hover-only info is reachable without a pointer (AC: #1)
+  - [x] `Charts.Sunburst` / `Charts.EpicSunburst`: each segment is an `<a href>` wrapping a `<path>` whose descriptive text is a hover-only `<title>`. Add an `aria-label` to the `<a>` carrying the same "Epic N: Title — status, N stories" / "Story N.N: Title — status" / task done/remaining text, so keyboard/screen-reader users get name+status+count on focus. Keep the `<title>` too (pointer tooltip) [Source: `src/SpecScribe/Charts.cs:121-154`, `:232-247`]
+  - [x] `[UXO E6/H3]` Add whole-chart `role="img"` + `aria-label` to the donut and heatmap SVGs, which lack them today (only the sunburst has them). Examples: donut → "Epic status: N drafted, M pending"; heatmap → "Commit activity: N commits across M active days, {first}–{last}" [Source: `src/SpecScribe/Charts.cs:43` (Donut), `:409` (CommitHeatmap)]
+  - [x] `Charts.TaskSunburst` segments are tooltip-only `<path>`s (no page to drill to). Do NOT make them focusable; the story page already renders the task checklist as real text — that is the non-pointer equivalent. Keep the chart's `role="img"`+`aria-label` and note the equivalence
+  - [x] Preserve swatch+text legends and text-bearing status pills — status is conveyed by shape/label, not color alone; do not regress (UX-DR17). (Unifying the *colors* across charts is Story 1.5's job — do not tackle it here; just keep the text redundancy intact.)
+- [x] Task 3: Reinforce the keyboard/screen-reader accessibility floor (AC: #1; UX-DR16)
+  - [x] Add a skip-to-content link as the first focusable element on every page (`<a class="skip-link" href="#main-content">Skip to content</a>`, visually hidden until focused) via the shared shell (`PathUtil.RenderHeadOpen` / start of `<body>`), with matching `.skip-link` CSS
+  - [x] Wrap each page's primary content in a single `<main id="main-content">` landmark: dashboard (`HtmlTemplater.RenderIndex`), generic doc pages (`HtmlTemplater.RenderPage`), epic/story detail (`EpicsTemplater`). `RequirementsTemplater` already emits `<main class="req-index">` — add `id="main-content"`. Ensure exactly one `<main>` per page and that it coexists with 1.3's TOC-sidebar layout
+  - [x] Add `role="progressbar"` + `aria-valuenow`/`aria-valuemin="0"`/`aria-valuemax="100"` + an `aria-label` matching the visible label to `Charts.ProgressBar`; keep the visible `progress-value` fraction text [Source: `src/SpecScribe/Charts.cs:17-31`]
+  - [x] Verify (do not rebuild) the existing nav `aria-current="page"` and the mobile drawer's Escape/focus handling are not regressed [Source: `src/SpecScribe/SiteNav.cs:96-116`]
+- [x] Task 4: Add reduced-motion compliance (AC: #2)
+  - [x] Add a single `@media (prefers-reduced-motion: reduce)` block to `specscribe.css` neutralizing non-essential motion: the card-lift `transform`/`transition` on `.index-card`/`.now-next-card`/`.quick-link-card`/`.epic-mosaic-card`/`.stat-card`; the `.sb-seg` opacity transition; the `.progress-fill` width transition; and any smooth-scroll 1.3 adds. Follow the EXPERIENCE.md Accessibility-Floor pattern (durations collapsed to ~0.01ms) [Source: `src/SpecScribe/assets/specscribe.css:360-375`, `:724-725`, `:1049`, `:1095`]
+  - [x] Confirm no information is motion-dependent: status is color+text+shape, progress is filled width + `progress-value` fraction text — all readable with transitions off. Document this so the "information remains clear without animation" half of AC #2 is demonstrably met
+  - [x] Note: Story 1.5 adds `@media (prefers-reduced-motion: no-preference)` entrance animations that pair with this block — leave a clear seam (this block is the "reduce" half) so 1.5 can add the complementary half without rework
+- [x] Task 5: Accessibility contrast and chart micro-text fixes (AC: #1) `[UXO H1, H2]`
+  - [x] `[UXO H1]` Fix `.index-card-path` contrast: `#d4b896` on `#faf7f2` is ≈1.6:1 (WCAG needs 4.5:1). Darken to at least `--ink-light` (`#7a6250`) [Source: `src/SpecScribe/assets/specscribe.css` `.index-card-path`]
+  - [x] `[UXO H2]` Bump the smallest chart text for legibility: `.sunburst-hint` to `0.78rem` non-italic; heatmap 8px day/month labels (a minimal bump — the full heatmap rescale is Story 1.5's E1, so keep this to a readability nudge, not a layout change) [Source: `src/SpecScribe/assets/specscribe.css:734`]
+- [x] Task 6: Regression and new test coverage (AC: #1, #2)
+  - [x] Extend `HtmlTemplaterTests` (rendered-HTML assertions): skip link + `<main id="main-content">` present on index/dashboard; progress bars carry `role="progressbar"` with `aria-valuenow`
+  - [x] Add `Charts`-level tests: sunburst/epic-sunburst segment `<a>` carry a non-empty `aria-label`; donut/heatmap SVGs carry `role="img"`+`aria-label`; legend text labels remain
+  - [x] Add a stylesheet-content assertion that a `@media (prefers-reduced-motion: reduce)` block and a `:focus-visible` outline rule exist (cheap guards against silent removal)
+  - [x] Prefer generation-/render-level assertions over new public API (mirrors Story 1.2/1.3)
+- [x] Task 7: End-to-end validation with a real generation pass (AC: #1, #2)
+  - [x] Run the focused test filter, then a real generation pass
+  - [x] Manually verify: Tab reaches every card and chart segment with a visible focus ring; a focused sunburst segment announces its name/status via `aria-label`; the skip link appears on first Tab and jumps to `#main-content`; enabling OS reduce-motion removes card-lift/opacity/width transitions while all status and progress information stays legible; no console errors; no broken anchors
 
 ## Developer Context Section
 
@@ -241,12 +241,33 @@ claude-opus-4-8
 - Scope split: this story is a11y + motion; Story 1.5 owns tooltips/tokens/truthfulness/IA/meta; Story 2.1 owns deferred/quick-dev representation + authoring guidance + sunburst task accuracy (E4/A6). Only strictly-accessibility UX items (E6/H3 whole-chart aria-labels, H1 contrast, H2 micro-text) remain here.
 - Coordination flag: Story 1.3 is `in-progress` on the same CSS/templaters — sequence after or rebase; fold its smooth-scroll into the reduced-motion block; make `<main>` coexist with its TOC sidebar. Leave seams for Story 1.5.
 
+#### Implementation (2026-07-06)
+
+- **Focus-visible system (Task 1):** Added one shared on-brand `:focus-visible` ring (`outline: 2px solid var(--teal)`) covering `.index-card`, `.now-next-card`, `.quick-link-card`, `.epic-mosaic-card`, `.epic-chip`, `.story-title-link`, `.req-id-link`, `.req-epic`, `.toc-sidebar a`, `.breadcrumb a`, `.ac-anchor`, `.ac-ref`, `.view-epic-link`; a gold `.site-nav a:focus-visible` variant for the dark nav; and a `.sunburst a:focus-visible .sb-seg` stroke bump (gold-light, width 3) since SVG-link default outlines are unreliable. `.site-nav-toggle:focus-visible` preserved; no `outline:none` without a visible replacement. Non-interactive `.stat-card` divs left non-focusable.
+- **Chart accessible names (Task 2):** `aria-label`s added to every sunburst/epic-sunburst segment `<a>` (epic, story, and both task-ring links), mirroring the retained hover-only `<title>`. `Donut` gained an optional `ariaLabel` → `role="img"`+name when supplied (Epic Status + requirement donuts), `aria-hidden="true"` when decorative (mosaic/coverage/group donuts already inside labeled cards, avoiding double-announcement). `CommitHeatmap` now carries `role="img"`+"Commit activity: N commits across M active days, first–last". `TaskSunburst` keeps `role="img"` with an enriched "Task breakdown: X of Y done" name; its checklist text is the non-pointer equivalent. Legends/pills untouched (UX-DR17 redundancy intact).
+- **A11y floor (Task 3):** Skip link emitted at `<body>` start by `PathUtil.RenderHeadOpen` on every page; single `<main id="main-content">` landmark added to dashboard, generic/ADR/README pages (`RenderPage`), epics index, epic detail, story detail, requirements index (added `id` to the existing `<main>`), and requirement detail. `Charts.ProgressBar` now emits `role="progressbar"` + `aria-valuenow`(percent)/`aria-valuemin="0"`/`aria-valuemax="100"` + `aria-label`, keeping the visible fraction. Nav `aria-current`/drawer Escape handling verified unchanged.
+- **Reduced motion (Task 4):** One `@media (prefers-reduced-motion: reduce)` block collapses all transition/animation durations to ~0.01ms and neutralizes the card-lift transforms. No 1.3 smooth-scroll existed to fold in. No information is motion-dependent (status = color+text+shape; progress = filled width + fraction text), so AC #2's "information remains clear without animation" holds. Left as the explicit "reduce" seam for Story 1.5's `no-preference` entrance animations.
+- **Contrast + micro-text (Task 5):** `.index-card-path` recolored `--parchment-deep` → `--ink-light` (clears WCAG 4.5:1). `.sunburst-hint` bumped to `0.78rem` non-italic; heatmap day/month labels 8px → 9px (readability nudge only, not the 1.5 rescale).
+- **Tests (Task 6):** Extended `HtmlTemplaterTests` (skip link, single `<main id>`, progressbar ARIA); new `ChartsTests` (segment aria-labels + retained titles, donut role=img vs decorative, heatmap name, TaskSunburst/EpicSunburst names, ProgressBar ARIA, legend text); new `StylesheetTests` (embedded-CSS guards for reduced-motion block, `:focus-visible`, `.skip-link`). All render-/generation-level, no new public API beyond the `Donut` `ariaLabel` overload.
+- **Validation (Task 7):** Full suite 176/176 green. Real generation pass to `docs/live` (22 pages) verified: 62/62 pages carry both the skip link and exactly one `#main-content` target (zero broken skip targets); Epic Status donut, commit heatmap, sunburst segments, task sunburst, and progress bars all carry their ARIA names in the emitted HTML; generated `specscribe.css` contains the reduced-motion block, 18 `:focus-visible` occurrences, `.skip-link`, and the `--ink-light` card-path color. No JS added; no chart colors/data changed. Note: SpecScribe is a static-site generator (no dev server), so verification was against the generated HTML rather than a live preview.
+
 ### File List
 
 - _bmad-output/implementation-artifacts/1-4-accessible-high-polish-interaction-baseline.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
+- src/SpecScribe/Charts.cs
+- src/SpecScribe/PathUtil.cs
+- src/SpecScribe/HtmlTemplater.cs
+- src/SpecScribe/EpicsTemplater.cs
+- src/SpecScribe/RequirementsTemplater.cs
+- src/SpecScribe/assets/specscribe.css
+- tests/SpecScribe.Tests/HtmlTemplaterTests.cs
+- tests/SpecScribe.Tests/ChartsTests.cs
+- tests/SpecScribe.Tests/StylesheetTests.cs
+- docs/live/** (regenerated site output)
 
 ## Change Log
 
 - 2026-07-06: Created Story 1.4 implementation context — accessible high-polish interaction baseline. Documented the pure-SVG-links (no-JS) charting reality vs. the UX drill spec, the AC #1 gaps (no focus-visible; segment info hover-only), the AC #2 gap (no reduced-motion query), and the UX-DR16 floor.
 - 2026-07-06: Briefly expanded to absorb the full Story 1.4 UX review, then split by product-owner direction: this story narrowed back to the accessibility + motion baseline; dashboard polish/truthfulness moved to new Story 1.5; work-type representation + authoring guidance moved to new Story 2.1. Retained only the strictly-accessibility UX-review items here (whole-chart aria-labels E6/H3, index-card-path contrast H1, chart micro-text H2). Added explicit scope boundaries and seam notes so Story 1.5 can extend the focus-visible/reduced-motion/aria-label work without rework.
+- 2026-07-06: Implemented the accessibility + motion baseline. Added a shared `:focus-visible` ring (+ dark-nav and SVG-segment variants), a skip link + single `<main id="main-content">` landmark on every page type, chart accessible names (sunburst/epic-sunburst segment `aria-label`s, `role="img"` names on donuts/heatmap/task-sunburst), `role="progressbar"` ARIA on progress bars, a `@media (prefers-reduced-motion: reduce)` block, and the H1 contrast / H2 micro-text fixes. New/extended tests (HtmlTemplater, Charts, Stylesheet); full suite 176/176 green; real generation pass verified in `docs/live`. No JavaScript added; chart colors/data unchanged (Story 1.5's scope). Status → review.

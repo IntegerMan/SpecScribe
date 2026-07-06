@@ -49,6 +49,54 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderIndex_EmitsSkipLinkAndSingleMainLandmark()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressModel.Empty,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // Skip link is first-focusable and targets the one main landmark. [Story 1.4 AC #1, UX-DR16]
+        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        Assert.Contains("<main id=\"main-content\">", html);
+        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
+
+    [Fact]
+    public void RenderIndex_ProgressBarsCarryProgressbarAria()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressModel.Empty,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // The dashboard's overall-progress bars must expose progressbar semantics with a current value. [Story 1.4 AC #1]
+        Assert.Contains("role=\"progressbar\"", html);
+        Assert.Contains("aria-valuenow=", html);
+        Assert.Contains("aria-valuemin=\"0\"", html);
+        Assert.Contains("aria-valuemax=\"100\"", html);
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        int count = 0, i = 0;
+        while ((i = haystack.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { count++; i += needle.Length; }
+        return count;
+    }
+
+    [Fact]
     public void RenderIndex_OmitsQuickLinksPanelWhenOnlyHomeExists()
     {
         var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe", hasAdrs: false);

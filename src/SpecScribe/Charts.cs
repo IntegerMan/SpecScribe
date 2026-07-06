@@ -19,11 +19,15 @@ public static class Charts
         var pct = max <= 0 ? 0 : Math.Clamp((double)value / max * 100, 0, 100);
         var cls = pct >= 100 && max > 0 ? "done" : pct > 0 ? "partial" : "empty";
         var right = rightLabel ?? $"{value} / {max}";
+        // Screen-reader semantics: the bar is a progressbar whose value is the filled percentage (0–100),
+        // named by the same label+fraction a sighted reader sees. The visible fraction text stays. [Story 1.4 AC #1]
+        var pctNow = (int)Math.Round(pct);
+        var ariaLabel = Html($"{label}: {right}");
 
         return $"""
             <div class="progress-row">
               <div class="progress-label">{Html(label)}</div>
-              <div class="progress-bar"><div class="progress-fill {cls}" style="width:{F(pct)}%"></div></div>
+              <div class="progress-bar" role="progressbar" aria-valuenow="{pctNow}" aria-valuemin="0" aria-valuemax="100" aria-label="{ariaLabel}"><div class="progress-fill {cls}" style="width:{F(pct)}%"></div></div>
               <div class="progress-value">{Html(right)}</div>
             </div>
 
@@ -31,16 +35,23 @@ public static class Charts
     }
 
     /// <summary>A donut chart from labeled segments; each segment's CSS class picks its color
-    /// (e.g. "done"/"pending") via .donut-seg.done { stroke: ... } rules in specscribe.css.</summary>
-    public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120)
+    /// (e.g. "done"/"pending") via .donut-seg.done { stroke: ... } rules in specscribe.css. When
+    /// <paramref name="ariaLabel"/> is supplied the whole chart carries <c>role="img"</c>+that name so it is
+    /// reachable without a pointer; when omitted the donut is decorative (<c>aria-hidden</c>) — used where an
+    /// enclosing labeled card/legend already names it, so screen readers don't hear it twice. [Story 1.4 AC #1]</summary>
+    public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120, string? ariaLabel = null)
     {
         var total = segments.Sum(s => Math.Max(0, s.Value));
         var radius = size / 2.0 - 10;
         var circumference = 2 * Math.PI * radius;
         var center = size / 2.0;
 
+        var a11y = ariaLabel is { Length: > 0 }
+            ? $" role=\"img\" aria-label=\"{Html(ariaLabel)}\""
+            : " aria-hidden=\"true\"";
+
         var sb = new StringBuilder();
-        sb.Append($"<svg class=\"donut\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\">\n");
+        sb.Append($"<svg class=\"donut\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\"{a11y}>\n");
         sb.Append($"  <circle cx=\"{F(center)}\" cy=\"{F(center)}\" r=\"{F(radius)}\" class=\"donut-track\" />\n");
 
         var offset = 0.0;
@@ -118,7 +129,10 @@ public static class Charts
             var epicClass = StatusStyles.ForEpic(epic);
             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
 
-            sb.Append($"  <a href=\"epics/epic-{epic.Number}.html\">\n");
+            // aria-label carries the same name+status+count as the hover-only <title>, so keyboard and
+            // screen-reader users get it on focus without a pointer; the <title> stays for pointer tooltips.
+            var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} stories";
+            sb.Append($"  <a href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(epicAria)}\">\n");
             sb.Append($"    <path class=\"sb-seg sb-{epicClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, angle + pad, angle + sweep - pad)}\">");
             sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} stories</title></path>\n");
             sb.Append("  </a>\n");
@@ -134,7 +148,8 @@ public static class Charts
                     var storyTitle = PathUtil.StripHtmlTags(story.Title);
                     var statusNote = story.Status is { Length: > 0 } s ? $" — {s}" : string.Empty;
 
-                    sb.Append($"  <a href=\"{Html(storyHref)}\">\n");
+                    var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}";
+                    sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(storyAria)}\">\n");
                     sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, storyAngle + pad, storyAngle + storySweep - pad)}\">");
                     sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}</title></path>\n  </a>\n");
 
@@ -144,12 +159,14 @@ public static class Charts
                         var doneSweep = (storySweep - 2 * pad) * story.TasksDone / story.TasksTotal;
                         if (story.TasksDone > 0)
                         {
-                            sb.Append($"  <a href=\"{Html(storyHref)}\"><path class=\"sb-seg sb-done\" d=\"{AnnularSector(c, taskInner, taskOuter, storyAngle + pad, storyAngle + pad + doneSweep)}\">");
+                            var doneAria = $"Story {story.Id}: {story.TasksDone} of {story.TasksTotal} tasks done";
+                            sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(doneAria)}\"><path class=\"sb-seg sb-done\" d=\"{AnnularSector(c, taskInner, taskOuter, storyAngle + pad, storyAngle + pad + doneSweep)}\">");
                             sb.Append($"<title>Story {story.Id}: {story.TasksDone} of {story.TasksTotal} tasks done</title></path></a>\n");
                         }
                         if (story.TasksDone < story.TasksTotal)
                         {
-                            sb.Append($"  <a href=\"{Html(storyHref)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, storyAngle + pad + doneSweep, storyAngle + storySweep - pad)}\">");
+                            var remainAria = $"Story {story.Id}: {story.TasksTotal - story.TasksDone} tasks remaining";
+                            sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(remainAria)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, storyAngle + pad + doneSweep, storyAngle + storySweep - pad)}\">");
                             sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} tasks remaining</title></path></a>\n");
                         }
                     }
@@ -229,7 +246,8 @@ public static class Charts
             var storyTitle = PathUtil.StripHtmlTags(story.Title);
             var statusNote = story.Status is { Length: > 0 } s ? $" — {s}" : string.Empty;
 
-            sb.Append($"  <a href=\"{Html(href)}\">\n");
+            var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}";
+            sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(storyAria)}\">\n");
             sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, angle + pad, angle + anglePerStory - pad)}\">");
             sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}</title></path>\n  </a>\n");
 
@@ -238,12 +256,14 @@ public static class Charts
                 var doneSweep = (anglePerStory - 2 * pad) * story.TasksDone / story.TasksTotal;
                 if (story.TasksDone > 0)
                 {
-                    sb.Append($"  <a href=\"{Html(href)}\"><path class=\"sb-seg sb-done\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad, angle + pad + doneSweep)}\">");
+                    var doneAria = $"Story {story.Id}: {story.TasksDone} of {story.TasksTotal} tasks done";
+                    sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(doneAria)}\"><path class=\"sb-seg sb-done\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad, angle + pad + doneSweep)}\">");
                     sb.Append($"<title>Story {story.Id}: {story.TasksDone} of {story.TasksTotal} tasks done</title></path></a>\n");
                 }
                 if (story.TasksDone < story.TasksTotal)
                 {
-                    sb.Append($"  <a href=\"{Html(href)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad + doneSweep, angle + anglePerStory - pad)}\">");
+                    var remainAria = $"Story {story.Id}: {story.TasksTotal - story.TasksDone} tasks remaining";
+                    sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(remainAria)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad + doneSweep, angle + anglePerStory - pad)}\">");
                     sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} tasks remaining</title></path></a>\n");
                 }
             }
@@ -294,7 +314,10 @@ public static class Charts
         var doneCheckboxes = tasks.Sum(t => (t.Done ? 1 : 0) + t.Subtasks.Count(s => s.Done));
 
         var sb = new StringBuilder();
-        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"Task breakdown\">\n");
+        // The chart itself is not focusable (no task pages to drill to); the story page renders the task
+        // checklist as real text as the non-pointer equivalent. Its role="img" name carries the tally so the
+        // whole chart is still announced. [Story 1.4 AC #1]
+        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html($"Task breakdown: {doneCheckboxes} of {totalCheckboxes} done")}\">\n");
 
         var angle = -Math.PI / 2;
         foreach (var task in tasks)
@@ -405,8 +428,14 @@ public static class Charts
         var width = leftGutter + weeks * (cell + gap);
         var height = topGutter + 7 * (cell + gap);
 
+        // Whole-chart accessible name so the per-cell <title> tooltips (pointer-only) aren't the sole way to
+        // read the heatmap: total commits, active days, and the date span. [Story 1.4 AC #1, UXO E6/H3]
+        var totalCommits = series.Sum(s => s.Count);
+        var activeDays = series.Count(s => s.Count > 0);
+        var heatAria = $"Commit activity: {totalCommits} commit{(totalCommits == 1 ? string.Empty : "s")} across {activeDays} active day{(activeDays == 1 ? string.Empty : "s")}, {firstCommit:yyyy-MM-dd}–{lastCommit:yyyy-MM-dd}";
+
         var sb = new StringBuilder();
-        sb.Append($"<svg class=\"heatmap\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\">\n");
+        sb.Append($"<svg class=\"heatmap\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" role=\"img\" aria-label=\"{Html(heatAria)}\">\n");
 
         var dayLabels = new (int Row, string Label)[] { (1, "Mon"), (3, "Wed"), (5, "Fri") };
         foreach (var (row, label) in dayLabels)

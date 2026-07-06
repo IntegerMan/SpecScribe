@@ -38,6 +38,67 @@ body {
   flex-direction: column;
 }
 
+/* ====================== ACCESSIBILITY (skip link + focus ring) ====================== */
+/* Skip link: the first focusable element on every page (emitted at <body> start by RenderHeadOpen),
+   visually hidden until focused, then pinned top-left so a keyboard user can jump straight past the nav
+   to #main-content. [Story 1.4 AC #1, UX-DR16] */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 200;
+  padding: 0.5rem 0.9rem;
+  background: var(--teal-deep);
+  color: var(--warm-white);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.85rem;
+  text-decoration: none;
+  border-radius: 0 0 6px 0;
+}
+
+.skip-link:focus {
+  left: 0;
+  outline: 2px solid var(--gold-light);
+  outline-offset: 2px;
+}
+
+/* One shared on-brand focus ring for the interactive surfaces that today carry only :hover styling.
+   :focus-visible (not bare :focus) so a mouse click leaves no lingering outline; teal, ≥2px, offset so
+   it reads on the light cards. The dark nav and SVG segments get their own treatments below. */
+.index-card:focus-visible,
+.now-next-card:focus-visible,
+.quick-link-card:focus-visible,
+.epic-mosaic-card:focus-visible,
+.epic-chip:focus-visible,
+.story-title-link:focus-visible,
+.req-id-link:focus-visible,
+.req-epic:focus-visible,
+.toc-sidebar a:focus-visible,
+.breadcrumb a:focus-visible,
+.ac-anchor:focus-visible,
+.ac-ref:focus-visible,
+.view-epic-link:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* The nav rides a near-black bar where a teal ring barely shows — use the same gold its hover/toggle
+   already use so a focused nav link is unmistakable. */
+.site-nav a:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* SVG <a> segments: the default focus outline renders unreliably around SVG links across browsers, so
+   express focus on the <path> itself with a bright gold stroke bump (driven off the path, per the story). */
+.sunburst a:focus-visible { outline: none; }
+.sunburst a:focus-visible .sb-seg {
+  stroke: var(--gold-light);
+  stroke-width: 3;
+}
+
 /* ====================== NAV ====================== */
 .site-nav {
   position: sticky;
@@ -167,7 +228,7 @@ body {
 .pill.status-deprecated { border-color: var(--border); color: var(--ink-light); text-decoration: line-through; }
 
 /* ====================== TOC SIDEBAR + PAGE SHELL ======================
-   The on-page contents live in an independently-scrolling right rail beside the main content (AC #3).
+   The on-page contents live in an independently-scrolling left rail beside the main content (AC #3).
    Every TOC-bearing page (generic docs, ADRs, README, epic/story detail) shares this one layout via the
    Toc seam — the TOC is never forked per page type. */
 .page-shell {
@@ -175,7 +236,7 @@ body {
   margin: 0 auto;
   padding: 0 1.5rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 14rem;
+  grid-template-columns: 14rem minmax(0, 1fr);
   gap: 2rem;
   align-items: start;
 }
@@ -183,6 +244,11 @@ body {
 /* Let the content column shrink below its intrinsic width instead of overflowing the grid track. Its
    inner 860px blocks (.doc-body, .dashboard-narrow, header) stay centered within it. */
 .page-main { min-width: 0; }
+
+/* Main content stays first in the DOM (reading/tab order after the site nav); `order` pulls the TOC rail
+   into the first (left) grid track so its independent scrollbar no longer sits against the viewport's own
+   scrollbar on the right. On mobile the same `order: -1` (below) stacks the rail above the content. */
+.toc-sidebar { order: -1; }
 
 /* Sticky beneath the sticky site nav with its own overflow, so it stays in view and scrolls on its own
    when longer than the viewport while the main column scrolls with the page. */
@@ -298,6 +364,10 @@ body {
   color: var(--rust);
   padding: 0.1rem 0.35rem;
   border-radius: 3px;
+  /* Long inline commands/paths (e.g. a full `dotnet test … --filter …` line) wrap within the content
+     column instead of forcing horizontal page overflow. Block code in <pre> keeps white-space: pre, so
+     this has no effect there — those still scroll via `.doc-body pre { overflow-x: auto }`. */
+  overflow-wrap: anywhere;
 }
 
 /* Color-value swatches (see ColorSwatchRewriter): background + foreground are set inline per value.
@@ -447,7 +517,8 @@ code.color-swatch {
   margin-top: 0.6rem;
   font-family: 'Courier New', monospace;
   font-size: 0.68rem;
-  color: var(--parchment-deep);
+  /* Was --parchment-deep (#d4b896) on --warm-white ≈1.6:1 — fails WCAG. --ink-light clears 4.5:1. [UXO H1] */
+  color: var(--ink-light);
 }
 
 /* ====================== BREADCRUMB ====================== */
@@ -803,7 +874,8 @@ code.color-swatch {
 .sunburst-legend .sb-review-sw { background: var(--teal-deep); }
 .sunburst-legend .sb-done-sw { background: var(--moss-light); }
 
-.sunburst-hint { margin-top: 0.4rem; font-size: 0.72rem; color: var(--ink-light); font-style: italic; }
+/* Non-italic and nudged up from 0.72rem for legibility (small italic serif at that size was hard to read). [UXO H2] */
+.sunburst-hint { margin-top: 0.4rem; font-size: 0.78rem; color: var(--ink-light); font-style: normal; }
 
 /* ====================== NEXT STEPS (BMad commands) ====================== */
 .next-steps-list { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
@@ -839,7 +911,9 @@ code.color-swatch {
 .dev-agent-details[open] > summary::before { content: "▾ "; }
 .dev-agent-details[open] > summary { margin-bottom: 0.9rem; }
 
-.dev-agent-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+/* Fixed layout + wrapping so long file paths / identifiers in the record wrap inside the content column
+   instead of forcing the table wider than its grid track (which would spill horizontally off the page). */
+.dev-agent-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; table-layout: fixed; }
 
 .dev-agent-table th {
   width: 11rem;
@@ -857,6 +931,7 @@ code.color-swatch {
   padding: 0.5rem 0;
   color: var(--ink-faded);
   border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
 }
 
 .dev-agent-table tr:last-child th,
@@ -1175,7 +1250,8 @@ code.color-swatch {
 
 /* ====================== COMMIT HEATMAP (GitHub-style) ====================== */
 .heatmap-daylabel, .heatmap-monthlabel {
-  font-size: 8px;
+  /* Nudged 8px → 9px for legibility; a readability bump only, not the full heatmap rescale (Story 1.5 E1). [UXO H2] */
+  font-size: 9px;
   fill: var(--ink-light);
   font-family: 'Courier New', monospace;
 }
@@ -1386,4 +1462,28 @@ code.color-swatch {
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ====================== REDUCED MOTION ======================
+   The "reduce" half of the motion contract (Story 1.4 AC #2, UX-DR18/8): collapse every non-essential
+   transition/animation to a hair so nothing lurches for users who ask for less motion. No information is
+   motion-dependent — status is color+text+shape and progress is a filled width plus its fraction text, so
+   everything stays legible with motion off. Story 1.5 adds the complementary @media (prefers-reduced-motion:
+   no-preference) entrance animations; this block is the seam it pairs with — leave it intact. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Neutralize the card-lift transforms explicitly so a focused/hovered card no longer jumps. */
+  .index-card:hover,
+  .now-next-card:hover,
+  .quick-link-card:hover,
+  .epic-mosaic-card:hover,
+  .stat-card:hover {
+    transform: none;
+  }
 }

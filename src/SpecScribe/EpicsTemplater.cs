@@ -16,6 +16,8 @@ public static class EpicsTemplater
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Epics", null) }));
 
         var drafted = model.Epics.Count(e => e.Status == EpicStatus.Drafted);
+        // Single <main id="main-content"> landmark / skip-link target for the epics index. [Story 1.4 AC #1]
+        sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>Epics &amp; Stories</h1>\n");
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {model.Epics.Count} epics &middot; {drafted} with stories drafted</div>\n");
@@ -54,6 +56,7 @@ public static class EpicsTemplater
             sb.Append("</details>\n\n");
         }
 
+        sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append(Mermaid.InitScript());
         sb.Append("</body>\n</html>\n");
@@ -144,7 +147,9 @@ public static class EpicsTemplater
             toc.Add(new Toc.Entry(2, $"Story {story.Id}", StoryAnchorId(story.Id)));
         }
 
+        sb.Append("<main id=\"main-content\">\n");
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
+        sb.Append("</main>\n\n");
 
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         // A ```mermaid fence authored inside an artifact body (story remainder, dev-agent record, review
@@ -288,7 +293,9 @@ public static class EpicsTemplater
             toc.Add(new Toc.Entry(2, "Change Log", "sec-change-log"));
         }
 
+        sb.Append("<main id=\"main-content\">\n");
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
+        sb.Append("</main>\n\n");
 
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         // A ```mermaid fence authored inside an artifact body (story remainder, dev-agent record, review
@@ -376,7 +383,7 @@ public static class EpicsTemplater
         {
             ("Drafted", progress.EpicsDrafted, "drafted"),
             ("Pending", progress.EpicsPending, "pending"),
-        }));
+        }, ariaLabel: $"Epic status: {progress.EpicsDrafted} drafted, {progress.EpicsPending} pending"));
         sb.Append("<div class=\"donut-legend\">\n");
         sb.Append($"  <span><span class=\"swatch drafted\"></span>Drafted ({progress.EpicsDrafted})</span>\n");
         sb.Append($"  <span><span class=\"swatch pending\"></span>Pending ({progress.EpicsPending})</span>\n");

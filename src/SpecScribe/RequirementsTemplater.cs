@@ -33,7 +33,7 @@ public static class RequirementsTemplater
             groups.Add(("Non-Functional Requirements", model.NonFunctional));
         }
 
-        sb.Append("<main class=\"req-index\">\n\n");
+        sb.Append("<main id=\"main-content\" class=\"req-index\">\n\n");
 
         sb.Append("<section class=\"dashboard\">\n<div class=\"chart-row\">\n");
         AppendStatusDonut(sb, "Functional", model.Functional);
@@ -87,6 +87,8 @@ public static class RequirementsTemplater
             (req.Id, null),
         }));
 
+        // Single <main id="main-content"> landmark / skip-link target for the requirement detail page. [Story 1.4 AC #1]
+        sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <div class=\"story-kicker\">{PathUtil.Html(kindLabel)}</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(req.Id)}</h1>\n");
@@ -127,6 +129,7 @@ public static class RequirementsTemplater
         sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + SiteNav.RequirementsOutputPath)}\">&larr; All requirements</a>\n");
         sb.Append("</div>\n\n");
 
+        sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
@@ -209,7 +212,7 @@ public static class RequirementsTemplater
 
         sb.Append("<div class=\"chart-panel\">\n");
         sb.Append($"<h3>{PathUtil.Html(label)} ({reqs.Count})</h3>\n<div class=\"donut-and-legend\">\n");
-        sb.Append(Charts.Donut(StatusSegments(reqs)));
+        sb.Append(Charts.Donut(StatusSegments(reqs), ariaLabel: $"{label} requirements: {done} done, {ready} ready for dev, {planned} planned, {deferred} deferred"));
         sb.Append("<div class=\"donut-legend\">\n");
         sb.Append($"  <span><span class=\"swatch done\"></span>Done ({done})</span>\n");
         sb.Append($"  <span><span class=\"swatch ready\"></span>Ready for dev ({ready})</span>\n");

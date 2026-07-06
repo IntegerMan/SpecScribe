@@ -4,7 +4,7 @@ baseline_commit: fb9fb88b7d5ba6d07055a42cbf84a37b21cb4fd0
 
 # Story 1.3: Markdown Fidelity for Core Artifact Patterns
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -338,7 +338,7 @@ Other:
 
 Adversarial code review (2026-07-06, three parallel layers: Blind Hunter, Edge Case Hunter, Acceptance Auditor). All three ACs verified satisfied; no high/medium defects. 6 findings dismissed as false positives/by-design.
 
-- [ ] [Review][Patch] TOC seam has no duplicate-anchor-id guard when panel ids and remainder-heading auto-ids share a namespace [src/SpecScribe/Toc.cs:37], [src/SpecScribe/EpicsTemplater.cs:281] — Low. Detail pages build the TOC as `[hardcoded sec-*/ac-N panel ids] + Toc.ExtractHeadings(remainderHtml)`. Neither `WrapWithSidebar`/`RenderSidebar` nor `ExtractHeadings` dedupes `AnchorId`. If an artifact author writes a remainder heading with an explicit `{#id}` (or one that slugs to a `sec-*`/`ac-N`/`story-<id>` id), the page emits two elements with the same id and two sidebar links to it; browsers jump only to the first. Reachability is low (the `sec-` prefix is deliberately namespaced and Markdig auto-dedupes identical slugs), but a keep-first dedupe in the seam is cheap and aligns with the story's "no dead links" theme.
+- [x] [Review][Patch] TOC seam has no duplicate-anchor-id guard when panel ids and remainder-heading auto-ids share a namespace [src/SpecScribe/Toc.cs:37], [src/SpecScribe/EpicsTemplater.cs:281] — Low. **FIXED 2026-07-06:** added a keep-first `HashSet<string>` dedupe by `AnchorId` in `Toc.RenderSidebar` + regression test `RenderSidebar_DeduplicatesEntriesSharingAnAnchorIdKeepingTheFirst`. Detail pages build the TOC as `[hardcoded sec-*/ac-N panel ids] + Toc.ExtractHeadings(remainderHtml)`. Neither `WrapWithSidebar`/`RenderSidebar` nor `ExtractHeadings` dedupes `AnchorId`. If an artifact author writes a remainder heading with an explicit `{#id}` (or one that slugs to a `sec-*`/`ac-N`/`story-<id>` id), the page emits two elements with the same id and two sidebar links to it; browsers jump only to the first. Reachability is low (the `sec-` prefix is deliberately namespaced and Markdig auto-dedupes identical slugs), but a keep-first dedupe in the seam is cheap and aligns with the story's "no dead links" theme.
 - [x] [Review][Defer] Inconsistent `scroll-margin-top` offsets for sticky-nav clearance [src/SpecScribe/assets/specscribe.css:686] — deferred, pre-existing. Three magic values target the same "land below the sticky nav" intent: `var(--nav-offset)` (3.75rem) on TOC-targeted sections, `5rem` on `.ac-criterion`, `4.5rem` on `.req-index .section-divider[id]`. Each still clears the nav, so no correctness bug — but if the nav height changes only the `var()`-driven anchors follow. Unify onto `var(--nav-offset)` when this CSS is next touched.
 - [x] [Review][Defer] Diff carries changes unrelated to Story 1.3 scope [.github/workflows/publish-docs-live-pages.yml], [README.md] — deferred, out-of-scope. The GitHub Pages deploy-retry workflow and README edits are harmless and match a prior commit's intent, but are not part of Story 1.3's ACs. Confirm they belong in this story's commit or split them out.
 

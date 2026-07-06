@@ -42,8 +42,9 @@ public static class HtmlTemplater
             .Where(h => h.Level is 2 or 3)
             .Select(h => new Toc.Entry(h.Level, h.Text, h.Id))
             .ToList();
+        sb.Append("<main id=\"main-content\">\n");
         sb.Append(Toc.WrapWithSidebar(main.ToString(), tocEntries));
-        sb.Append('\n');
+        sb.Append("</main>\n\n");
 
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         if (doc.HasMermaid)
@@ -67,6 +68,9 @@ public static class HtmlTemplater
         sb.Append(PathUtil.RenderHeadOpen(nav.SiteTitle, ForgeOptions.StylesheetName));
         sb.Append(nav.RenderNavBar(SiteNav.HomeOutputPath));
 
+        // Single <main id="main-content"> landmark wrapping the dashboard + index sections — the skip
+        // link's target and the one main region on the page. [Story 1.4 AC #1, UX-DR16]
+        sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <h1>{Html(nav.SiteTitle)}</h1>\n");
         sb.Append("</header>\n\n");
@@ -109,6 +113,7 @@ public static class HtmlTemplater
 
         AppendAdrSection(sb, adrs);
 
+        sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
@@ -163,7 +168,7 @@ public static class HtmlTemplater
         {
             ("Drafted", p.EpicsDrafted, "drafted"),
             ("Pending", p.EpicsPending, "pending"),
-        }));
+        }, ariaLabel: $"Epic status: {p.EpicsDrafted} drafted, {p.EpicsPending} pending"));
         sb.Append("<div class=\"donut-legend\">\n");
         sb.Append($"  <span><span class=\"swatch drafted\"></span>Drafted ({p.EpicsDrafted})</span>\n");
         sb.Append($"  <span><span class=\"swatch pending\"></span>Pending ({p.EpicsPending})</span>\n");
@@ -245,7 +250,7 @@ public static class HtmlTemplater
             ("Ready for dev", ready, "ready"),
             ("Planned", planned, "pending"),
             ("Deferred", deferred, "deferred"),
-        }));
+        }, ariaLabel: $"{label} requirements: {done} done, {ready} ready for dev, {planned} planned, {deferred} deferred"));
         sb.Append("<div class=\"donut-legend\">\n");
         sb.Append($"  <span><span class=\"swatch done\"></span>Done ({done})</span>\n");
         sb.Append($"  <span><span class=\"swatch ready\"></span>Ready ({ready})</span>\n");

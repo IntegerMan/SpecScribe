@@ -33,6 +33,24 @@ public class TocTests
     }
 
     [Fact]
+    public void RenderSidebar_DeduplicatesEntriesSharingAnAnchorIdKeepingTheFirst()
+    {
+        // Detail pages merge hardcoded panel ids with remainder-heading auto-ids; a collision must not emit two
+        // links to the same anchor (a browser only jumps to the first, so the later one is a dead link).
+        var html = Toc.RenderSidebar(new[]
+        {
+            new Toc.Entry(2, "Acceptance Criteria", "sec-acceptance-criteria"),
+            new Toc.Entry(2, "Acceptance Criteria (dup)", "sec-acceptance-criteria"),
+        });
+
+        Assert.Contains("<a class=\"toc-link\" href=\"#sec-acceptance-criteria\">Acceptance Criteria</a>", html);
+        Assert.DoesNotContain("Acceptance Criteria (dup)", html);
+        // Exactly one link to the shared anchor.
+        var occurrences = html.Split("href=\"#sec-acceptance-criteria\"").Length - 1;
+        Assert.Equal(1, occurrences);
+    }
+
+    [Fact]
     public void WrapWithSidebar_NoEntriesReturnsContentUnwrapped()
     {
         const string main = "<article>content</article>";

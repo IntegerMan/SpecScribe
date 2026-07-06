@@ -32,6 +32,9 @@ public static class PathUtil
         sb.Append($"<title>{Html(title)}</title>\n");
         sb.Append($"<link rel=\"stylesheet\" href=\"{Html(cssHref)}\">\n");
         sb.Append("</head>\n<body>\n");
+        // Skip link is the first focusable element on every page — a keyboard user can jump straight past
+        // the nav to the page's single <main id="main-content"> landmark. [Story 1.4 AC #1, UX-DR16]
+        sb.Append("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>\n");
         return sb.ToString();
     }
 
