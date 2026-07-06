@@ -27,6 +27,13 @@ public sealed class ForgeOptions
     public required bool IncludeReadme { get; init; }
 
     public const string StylesheetName = "specscribe.css";
+
+    /// <summary>The one sanctioned progressive-enhancement script (on-brand chart tooltips + Next Steps copy
+    /// buttons). Delivered self-contained the same way the stylesheet is — an embedded resource copied to the
+    /// output root — so the global-tool package needs no loose asset files. Degrades to native
+    /// <c>&lt;title&gt;</c>/<c>aria-label</c> when JS is unavailable. [Story 1.5 Task 3]</summary>
+    public const string ScriptName = "specscribe.js";
+
     public const string DefaultSiteTitle = "BMad Live Docs";
     public const string SourceDirName = "_bmad-output";
 

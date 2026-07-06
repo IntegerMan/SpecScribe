@@ -53,4 +53,16 @@ public class SiteGeneratorReadmeTests : IDisposable
 
         Assert.False(File.Exists(Path.Combine(_root, "site", "readme.html")));
     }
+
+    [Fact]
+    public void GenerateAll_EmitsSelfContainedScriptAsset()
+    {
+        new SiteGenerator(Options(includeReadme: true)).GenerateAll();
+
+        // The tooltip/copy script is copied to the output root the same way the stylesheet is, and pages link
+        // it — so the site stays self-contained on a static host. [Story 1.5 Task 3]
+        Assert.True(File.Exists(Path.Combine(_root, "site", ForgeOptions.ScriptName)));
+        var index = File.ReadAllText(Path.Combine(_root, "site", "index.html"));
+        Assert.Contains($"<script src=\"{ForgeOptions.ScriptName}\" defer></script>", index);
+    }
 }

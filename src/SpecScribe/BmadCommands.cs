@@ -42,7 +42,13 @@ public static class BmadCommands
         sb.Append("<h3>Next Steps</h3>\n<ul class=\"next-steps-list\">\n");
         foreach (var s in suggestions)
         {
-            sb.Append($"  <li><code>{PathUtil.Html(s.Command)}</code><span class=\"next-steps-desc\">{PathUtil.Html(s.Description)}</span></li>\n");
+            // Each command carries a copy button (F2) so the exact next command is one click onto the
+            // clipboard. The visible <code> stays selectable as the no-JS fallback; the button is wired by
+            // specscribe.js. The command text is HTML-escaped both as visible text and as the data attribute.
+            var cmd = PathUtil.Html(s.Command);
+            sb.Append($"  <li><code>{cmd}</code>" +
+                      $"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>" +
+                      $"<span class=\"next-steps-desc\">{PathUtil.Html(s.Description)}</span></li>\n");
         }
         sb.Append("</ul>\n");
         return sb.ToString();
@@ -190,7 +196,7 @@ public static class BmadCommands
         if (actionable is not null)
         {
             Add(suggestions, commands.Command("dev-story", actionable.Id),
-                $"Story {actionable.Id} is the current front line — implements it per its plan.");
+                $"Story {actionable.Id} is the current front line — implement it per its plan.");
         }
 
         // The next story that still needs an implementation plan drawn up, in a drafted epic.

@@ -500,12 +500,18 @@ public sealed class SiteGenerator
     private void EnsureScaffold()
     {
         Directory.CreateDirectory(_options.OutputRoot);
-        var cssDest = Path.Combine(_options.OutputRoot, ForgeOptions.StylesheetName);
-        // The stylesheet ships as an embedded resource so the global-tool package needs no loose asset files.
-        using var css = typeof(SiteGenerator).Assembly.GetManifestResourceStream("SpecScribe.assets.specscribe.css")
-            ?? throw new InvalidOperationException("Embedded stylesheet 'SpecScribe.assets.specscribe.css' is missing from the assembly.");
-        using var dest = File.Create(cssDest);
-        css.CopyTo(dest);
+        // The stylesheet + script ship as embedded resources so the global-tool package needs no loose asset files.
+        CopyEmbeddedAsset("SpecScribe.assets.specscribe.css", ForgeOptions.StylesheetName);
+        CopyEmbeddedAsset("SpecScribe.assets.specscribe.js", ForgeOptions.ScriptName);
+    }
+
+    private void CopyEmbeddedAsset(string resourceName, string outputFileName)
+    {
+        var dest = Path.Combine(_options.OutputRoot, outputFileName);
+        using var source = typeof(SiteGenerator).Assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded asset '{resourceName}' is missing from the assembly.");
+        using var destStream = File.Create(dest);
+        source.CopyTo(destStream);
     }
 
     private List<string> EnumerateSourceFiles() =>

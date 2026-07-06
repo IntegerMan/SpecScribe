@@ -4,7 +4,7 @@ baseline_commit: 53432af8b8410d16eacd7dda01025098153d6067
 
 # Story 1.5: Dashboard Insight Polish and Visual Truthfulness
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -35,49 +35,49 @@ so that I can trust what I see and read it at a glance.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Data-correctness quick fix (AC: #1 trust) `[UXO A2]`
-  - [ ] Pluralize count-bearing stat labels: the hardcoded `"Commits"` reads "1 Commits". Pluralize `Commit`/`Commits` and audit every `Charts.StatCard` caller in `HtmlTemplater.AppendDashboard` for the same defect [Source: `src/SpecScribe/HtmlTemplater.cs:124-131`]
-  - [ ] (Verify-only) `[UXO A1]` The live-site "1 commit / empty heatmap" bug was the CI shallow clone; `fetch-depth: 0` is already present in `.github/workflows/publish-docs-live-pages.yml:34`. Confirm a local full-history generation shows real counts so the truthfulness work is validated against correct data
-- [ ] Task 2: Unify status vocabulary and tokenize one color per lifecycle stage (AC: #1) `[UXO B1–B5]`
-  - [ ] `[UXO B2/B3]` Introduce one CSS variable per lifecycle stage (`--status-pending`, `--status-drafted`, `--status-ready`, `--status-active`, `--status-review`, `--status-done`) and route every chart/legend/badge/accent through it. Today the sunburst and donuts disagree (sunburst drafted `#e8d9a8` vs donut `.ready`/`.drafted` both `--gold-light`; sunburst pending `#b8b2a8` vs donut pending `--parchment-deep`). One stage → one token everywhere; keep `StatusStyles` as the single status→stage source [Source: `src/SpecScribe/assets/specscribe.css:724-731`, `:1062-1069`; `src/SpecScribe/StatusStyles.cs`]
-  - [ ] `[UXO B1]` Adopt the sunburst legend's six-stage lifecycle (Pending → Drafted → Ready for dev → In development → In review → Done) as the single vocabulary in all panels; alias requirements "Planned" → "Pending" in labels
-  - [ ] `[UXO B4]` Suppress zero-count legend rows (e.g. requirements donuts listing "Done (0), Ready (0), Deferred (0)") — render only non-zero entries (or collapse/dim zeros)
-  - [ ] `[UXO B5]` Accent the "Explore Key Views" quick-link cards by artifact family (planning=gold, architecture=teal, epics/stories=moss, requirements=rust) so color literacy carries across the site
-- [ ] Task 3: On-brand instant tooltip system replacing native `<title>`-only behavior (AC: #1) `[UXO C1 (flagship), C2, C4, D5]`
-  - [ ] **Guardrail note:** Story 1.4 forbids new JS; **this story deliberately introduces exactly one small, dependency-free, progressive-enhancement script** for tooltips (and the Task 6 copy buttons). This is NOT the drill engine the top-level guardrail targets. Native `<title>` + the 1.4 segment `aria-label`s remain the no-JS / screen-reader fallback, so output stays static-host-safe
-  - [ ] `[UXO C2]` HTML elements (stat cards, legend items) get a **CSS-only** tooltip via `data-tooltip` + `::after` (instant, focus-accessible, on-brand parchment card) — no JS. Give each stat card a definition tooltip (UX-DR4): "3 active days" (since first commit), "4 with a task plan" (stories with a BMad task checklist), "Tasks done" (checkbox items across planned stories)
-  - [ ] `[UXO C1/D5]` SVG chart segments and heatmap cells get an on-brand tooltip via a ~30-line shared vanilla script (`data-*` on the segments; the script positions a single styled tooltip element near the pointer/focus). Keep `<title>`+`aria-label` present as fallback
-  - [ ] `[UXO C4]` Touch: the script shows the tooltip on first tap and navigates on second (or long-press), so touch users finally get chart detail
-  - [ ] Deliver the script as a self-contained embedded asset alongside the CSS (add `ForgeOptions.ScriptName`; mirror the CSS asset-copy seam in `SiteGenerator`), linked once from the shared shell. No third-party JS
-- [ ] Task 4: Consistent interaction grammar and entrance animations (AC: #1, #2 companion) `[UXO D1–D4, D2]`
-  - [ ] `[UXO D1]` Define one interaction grammar and apply it uniformly: *interactive → lift + accent-border + shadow; data-hover → highlight + tooltip; static → nothing.* Give now-next cards the lift they lack; give donut segments a stroke-width bump on hover
-  - [ ] `[UXO D3]` Invert the sunburst hover: today `.sb-seg:hover` fades the hovered segment to 0.75 (reads as dimming what you point at). Instead dim siblings and emphasize the hovered/focused segment (`.sunburst:hover .sb-seg { opacity:.5 } .sb-seg:hover { opacity:1 }` + the `--gold-light` stroke) — CSS only, matched to the 1.4 focus treatment [Source: `src/SpecScribe/assets/specscribe.css:724-725`]
-  - [ ] `[UXO D4]` Emphasize the "In development" Now card (the single most important answer on the page): subtle background wash / bolder accent; any pulsing must be reduced-motion-gated
-  - [ ] `[UXO D2]` Add one-time entrance animations gated behind `@media (prefers-reduced-motion: no-preference)` — progress bar width `0 → N%`, donut `stroke-dashoffset` sweep — pure CSS `@keyframes`, no JS. This is the complementary half of Story 1.4's `reduce` block (leave the two media queries side by side)
-- [ ] Task 5: Chart truthfulness for existing metrics (AC: #1) `[UXO A3, A4, A5, E1, E2, E3]`
-  - [ ] `[UXO A3]` Fix the Epic Status donut so it stops contradicting the sunburst: derive its segments from `StatusStyles.ForEpic` (the same story-roll-up the sunburst uses: done/active/drafted/pending), not the binary `ProgressModel.EpicsDrafted/EpicsPending`. This makes the donut genuinely multi-segment (also resolves E2 for that donut) [Source: `src/SpecScribe/HtmlTemplater.cs:163-172`, `src/SpecScribe/StatusStyles.cs:27-35`]
-  - [ ] `[UXO A5]` Reframe "64/103 Tasks done" so the big number doesn't imply 62% of the project is done (the denominator only covers 4 of 18 stories): make the number "64/103 planned tasks" and/or pair with a second stat ("4/18 stories planned") [Source: `src/SpecScribe/HtmlTemplater.cs:126-128`]
-  - [ ] `[UXO A4]` Mute future days in the commit heatmap (cells after the generation date) — no fill, no tooltip — so they don't read as real zero-commit days [Source: `src/SpecScribe/Charts.cs:431-446`]
-  - [ ] `[UXO E1]` Let the heatmap scale up (`width:100%; max-width:420px; height:auto`; render 12–16 weeks) and add a headline ("N commits · M active days · last commit {date}"). It is the primary "how has the work gone" visual and is currently the smallest thing on the page [Source: `src/SpecScribe/Charts.cs:401-458`]
-  - [ ] `[UXO E3]` Donut center numbers should read as progress, not scores: show a `done/total` fraction or percentage (e.g. "4/14") rather than a bare total [Source: `src/SpecScribe/Charts.cs:63`]
-  - [ ] `[UXO E2]` For requirements, prefer compact stacked bars (one row per group) over two single-value donuts where a group has <2 non-zero segments — denser and comparable (coordinate with B4 zero-row suppression)
-  - [ ] Note: the **"Progress by Epic" mosaic showing delivery status (UXO A6)** and the **unplanned-story placeholder arc (UXO E4)** are **Story 2.1**, not here — they are sunburst/task-representation accuracy. Do not implement them in this story
-- [ ] Task 6: Dashboard information architecture and "what's next" storytelling (AC: #2) `[UXO F1, F2, F3]`
-  - [ ] `[UXO F1]` Reorder the dashboard so the most valuable panel isn't buried: stats → Now & Next → Project at a Glance (sunburst) → progress panels. Slim "Explore Key Views" (it duplicates the top nav and the bottom index sections) to a compact single row of pills [Source: `src/SpecScribe/HtmlTemplater.cs:119-192`]
-  - [ ] `[UXO F2]` Add a per-command copy button to the "Next Steps" commands (`/bmad-dev-story 1.4` is exactly what the user wants on their clipboard) — same tiny progressive-enhancement JS budget as Task 3, static-safe. Fix the grammar: "implements it per its plan" → "implement it per its plan" [Source: `src/SpecScribe/BmadCommands.cs`]
-  - [ ] `[UXO F3]` Add a recency signal above the fold: "last commit N days ago" in the Commits stat sub-line and/or an "updated today" chip on active Now & Next cards
-- [ ] Task 7: Head and meta polish (AC: #1 trust) `[UXO G1, G2]`
-  - [ ] `[UXO G1]` Emit a small inline-SVG favicon (parchment quill/spark, gold on dark) from the generator so tabs aren't the browser default and `/favicon.ico` stops 404-ing
-  - [ ] `[UXO G2]` Home page `<title>` should be "SpecScribe — Project Dashboard" (sub-pages are already suffixed); add `<meta name="description">` and minimal Open Graph tags (title/description/type) so shared links don't render bare [Source: `src/SpecScribe/PathUtil.cs:26-36`, `src/SpecScribe/HtmlTemplater.cs:69`]
-- [ ] Task 8: Regression and new test coverage (AC: #1, #2)
-  - [ ] Extend `HtmlTemplaterTests`: stat "Commit(s)" pluralizes correctly (1 vs many); favicon + home `<title>`/description present; dashboard order (Now & Next before Explore Key Views); quick-link family accents present
-  - [ ] Add `Charts` tests: Epic-Status donut segments reflect `StatusStyles.ForEpic` roll-up (A3); heatmap mutes future days (A4); donut center shows a fraction (E3); per-status token classes used
-  - [ ] Add stylesheet-content assertions: `@media (prefers-reduced-motion: no-preference)` entrance block exists; per-status color tokens exist; on-brand `data-tooltip`/`::after` styles exist
-  - [ ] Prefer generation-/render-level assertions over new public API
-- [ ] Task 9: End-to-end validation with a real generation pass (AC: #1, #2) `[UXO F4]`
-  - [ ] Run the focused test filter, then a real generation pass
-  - [ ] Manually verify: one consistent status color across all charts; on-brand tooltip appears instantly on hover/focus/touch; entrance animations play once and are removed under reduce-motion; charts are truthful (multi-segment epic donut, scaled heatmap with muted future days, fraction donut centers, scoped task stat); Now & Next is above the link grid; Next Steps commands copy in one click
-  - [ ] `[UXO F4]` Definition-of-polish pass: for each dashboard panel, confirm it answers one of the four questions — where things **stand**, what's **left**, what's **next**, how the work has **gone** (the dashboard is now the demo of the dashboard)
+- [x] Task 1: Data-correctness quick fix (AC: #1 trust) `[UXO A2]`
+  - [x] Pluralize count-bearing stat labels: the hardcoded `"Commits"` reads "1 Commits". Pluralize `Commit`/`Commits` and audit every `Charts.StatCard` caller in `HtmlTemplater.AppendDashboard` for the same defect [Source: `src/SpecScribe/HtmlTemplater.cs:124-131`]
+  - [x] (Verify-only) `[UXO A1]` The live-site "1 commit / empty heatmap" bug was the CI shallow clone; `fetch-depth: 0` is already present in `.github/workflows/publish-docs-live-pages.yml:34`. Confirm a local full-history generation shows real counts so the truthfulness work is validated against correct data
+- [x] Task 2: Unify status vocabulary and tokenize one color per lifecycle stage (AC: #1) `[UXO B1–B5]`
+  - [x] `[UXO B2/B3]` Introduce one CSS variable per lifecycle stage (`--status-pending`, `--status-drafted`, `--status-ready`, `--status-active`, `--status-review`, `--status-done`) and route every chart/legend/badge/accent through it. Today the sunburst and donuts disagree (sunburst drafted `#e8d9a8` vs donut `.ready`/`.drafted` both `--gold-light`; sunburst pending `#b8b2a8` vs donut pending `--parchment-deep`). One stage → one token everywhere; keep `StatusStyles` as the single status→stage source [Source: `src/SpecScribe/assets/specscribe.css:724-731`, `:1062-1069`; `src/SpecScribe/StatusStyles.cs`]
+  - [x] `[UXO B1]` Adopt the sunburst legend's six-stage lifecycle (Pending → Drafted → Ready for dev → In development → In review → Done) as the single vocabulary in all panels; alias requirements "Planned" → "Pending" in labels
+  - [x] `[UXO B4]` Suppress zero-count legend rows (e.g. requirements donuts listing "Done (0), Ready (0), Deferred (0)") — render only non-zero entries (or collapse/dim zeros)
+  - [x] `[UXO B5]` Accent the "Explore Key Views" quick-link cards by artifact family (planning=gold, architecture=teal, epics/stories=moss, requirements=rust) so color literacy carries across the site
+- [x] Task 3: On-brand instant tooltip system replacing native `<title>`-only behavior (AC: #1) `[UXO C1 (flagship), C2, C4, D5]`
+  - [x] **Guardrail note:** Story 1.4 forbids new JS; **this story deliberately introduces exactly one small, dependency-free, progressive-enhancement script** for tooltips (and the Task 6 copy buttons). This is NOT the drill engine the top-level guardrail targets. Native `<title>` + the 1.4 segment `aria-label`s remain the no-JS / screen-reader fallback, so output stays static-host-safe
+  - [x] `[UXO C2]` HTML elements (stat cards, legend items) get a **CSS-only** tooltip via `data-tooltip` + `::after` (instant, focus-accessible, on-brand parchment card) — no JS. Give each stat card a definition tooltip (UX-DR4): "3 active days" (since first commit), "4 with a task plan" (stories with a BMad task checklist), "Tasks done" (checkbox items across planned stories)
+  - [x] `[UXO C1/D5]` SVG chart segments and heatmap cells get an on-brand tooltip via a ~30-line shared vanilla script (`data-*` on the segments; the script positions a single styled tooltip element near the pointer/focus). Keep `<title>`+`aria-label` present as fallback
+  - [x] `[UXO C4]` Touch: the script shows the tooltip on first tap and navigates on second (or long-press), so touch users finally get chart detail
+  - [x] Deliver the script as a self-contained embedded asset alongside the CSS (add `ForgeOptions.ScriptName`; mirror the CSS asset-copy seam in `SiteGenerator`), linked once from the shared shell. No third-party JS
+- [x] Task 4: Consistent interaction grammar and entrance animations (AC: #1, #2 companion) `[UXO D1–D4, D2]`
+  - [x] `[UXO D1]` Define one interaction grammar and apply it uniformly: *interactive → lift + accent-border + shadow; data-hover → highlight + tooltip; static → nothing.* Give now-next cards the lift they lack; give donut segments a stroke-width bump on hover
+  - [x] `[UXO D3]` Invert the sunburst hover: today `.sb-seg:hover` fades the hovered segment to 0.75 (reads as dimming what you point at). Instead dim siblings and emphasize the hovered/focused segment (`.sunburst:hover .sb-seg { opacity:.5 } .sb-seg:hover { opacity:1 }` + the `--gold-light` stroke) — CSS only, matched to the 1.4 focus treatment [Source: `src/SpecScribe/assets/specscribe.css:724-725`]
+  - [x] `[UXO D4]` Emphasize the "In development" Now card (the single most important answer on the page): subtle background wash / bolder accent; any pulsing must be reduced-motion-gated
+  - [x] `[UXO D2]` Add one-time entrance animations gated behind `@media (prefers-reduced-motion: no-preference)` — progress bar width `0 → N%`, donut `stroke-dashoffset` sweep — pure CSS `@keyframes`, no JS. This is the complementary half of Story 1.4's `reduce` block (leave the two media queries side by side)
+- [x] Task 5: Chart truthfulness for existing metrics (AC: #1) `[UXO A3, A4, A5, E1, E2, E3]`
+  - [x] `[UXO A3]` Fix the Epic Status donut so it stops contradicting the sunburst: derive its segments from `StatusStyles.ForEpic` (the same story-roll-up the sunburst uses: done/active/drafted/pending), not the binary `ProgressModel.EpicsDrafted/EpicsPending`. This makes the donut genuinely multi-segment (also resolves E2 for that donut) [Source: `src/SpecScribe/HtmlTemplater.cs:163-172`, `src/SpecScribe/StatusStyles.cs:27-35`]
+  - [x] `[UXO A5]` Reframe "64/103 Tasks done" so the big number doesn't imply 62% of the project is done (the denominator only covers 4 of 18 stories): make the number "64/103 planned tasks" and/or pair with a second stat ("4/18 stories planned") [Source: `src/SpecScribe/HtmlTemplater.cs:126-128`]
+  - [x] `[UXO A4]` Mute future days in the commit heatmap (cells after the generation date) — no fill, no tooltip — so they don't read as real zero-commit days [Source: `src/SpecScribe/Charts.cs:431-446`]
+  - [x] `[UXO E1]` Let the heatmap scale up (`width:100%; max-width:420px; height:auto`; render 12–16 weeks) and add a headline ("N commits · M active days · last commit {date}"). It is the primary "how has the work gone" visual and is currently the smallest thing on the page [Source: `src/SpecScribe/Charts.cs:401-458`]
+  - [x] `[UXO E3]` Donut center numbers should read as progress, not scores: show a `done/total` fraction or percentage (e.g. "4/14") rather than a bare total [Source: `src/SpecScribe/Charts.cs:63`]
+  - [x] `[UXO E2]` For requirements, prefer compact stacked bars (one row per group) over two single-value donuts where a group has <2 non-zero segments — denser and comparable (coordinate with B4 zero-row suppression)
+  - [x] Note: the **"Progress by Epic" mosaic showing delivery status (UXO A6)** and the **unplanned-story placeholder arc (UXO E4)** are **Story 2.1**, not here — they are sunburst/task-representation accuracy. Do not implement them in this story
+- [x] Task 6: Dashboard information architecture and "what's next" storytelling (AC: #2) `[UXO F1, F2, F3]`
+  - [x] `[UXO F1]` Reorder the dashboard so the most valuable panel isn't buried: stats → Now & Next → Project at a Glance (sunburst) → progress panels. Slim "Explore Key Views" (it duplicates the top nav and the bottom index sections) to a compact single row of pills [Source: `src/SpecScribe/HtmlTemplater.cs:119-192`]
+  - [x] `[UXO F2]` Add a per-command copy button to the "Next Steps" commands (`/bmad-dev-story 1.4` is exactly what the user wants on their clipboard) — same tiny progressive-enhancement JS budget as Task 3, static-safe. Fix the grammar: "implements it per its plan" → "implement it per its plan" [Source: `src/SpecScribe/BmadCommands.cs`]
+  - [x] `[UXO F3]` Add a recency signal above the fold: "last commit N days ago" in the Commits stat sub-line and/or an "updated today" chip on active Now & Next cards
+- [x] Task 7: Head and meta polish (AC: #1 trust) `[UXO G1, G2]`
+  - [x] `[UXO G1]` Emit a small inline-SVG favicon (parchment quill/spark, gold on dark) from the generator so tabs aren't the browser default and `/favicon.ico` stops 404-ing
+  - [x] `[UXO G2]` Home page `<title>` should be "SpecScribe — Project Dashboard" (sub-pages are already suffixed); add `<meta name="description">` and minimal Open Graph tags (title/description/type) so shared links don't render bare [Source: `src/SpecScribe/PathUtil.cs:26-36`, `src/SpecScribe/HtmlTemplater.cs:69`]
+- [x] Task 8: Regression and new test coverage (AC: #1, #2)
+  - [x] Extend `HtmlTemplaterTests`: stat "Commit(s)" pluralizes correctly (1 vs many); favicon + home `<title>`/description present; dashboard order (Now & Next before Explore Key Views); quick-link family accents present
+  - [x] Add `Charts` tests: Epic-Status donut segments reflect `StatusStyles.ForEpic` roll-up (A3); heatmap mutes future days (A4); donut center shows a fraction (E3); per-status token classes used
+  - [x] Add stylesheet-content assertions: `@media (prefers-reduced-motion: no-preference)` entrance block exists; per-status color tokens exist; on-brand `data-tooltip`/`::after` styles exist
+  - [x] Prefer generation-/render-level assertions over new public API
+- [x] Task 9: End-to-end validation with a real generation pass (AC: #1, #2) `[UXO F4]`
+  - [x] Run the focused test filter, then a real generation pass
+  - [x] Manually verify: one consistent status color across all charts; on-brand tooltip appears instantly on hover/focus/touch; entrance animations play once and are removed under reduce-motion; charts are truthful (multi-segment epic donut, scaled heatmap with muted future days, fraction donut centers, scoped task stat); Now & Next is above the link grid; Next Steps commands copy in one click
+  - [x] `[UXO F4]` Definition-of-polish pass: for each dashboard panel, confirm it answers one of the four questions — where things **stand**, what's **left**, what's **next**, how the work has **gone** (the dashboard is now the demo of the dashboard)
 
 ## Developer Context Section
 
@@ -253,11 +253,48 @@ claude-opus-4-8
 - Kept out per the review + guardrails: JS drill engine, dark mode/theme toggle, velocity/deep git (Story 3.1), interactive legends/flashy visuals (Story 3.5), footer SHA/404/print (backlog).
 - Coordination flags: sequence after Story 1.4; rebase onto in-flight Story 1.3; reconcile dashboard reorder with 1.3's TOC layout and 1.4's `<main>` landmark.
 
+#### Implementation summary (this session)
+
+- **Task 1 (A2/A1):** Pluralized the count-bearing `Commit(s)` stat label via a now-public `Charts.Plural`; audited all `StatCard` callers. Verified [A1] against a real full-history generation — the heatmap shows 53 commits / real active days, so the truthfulness work validated against correct data.
+- **Task 2 (B1–B5):** Added six per-lifecycle-stage CSS tokens (`--status-pending/…/--status-done` + `--status-deferred`) in `:root` and routed every chart fill, legend swatch, and status accent (sunburst, donuts, now-next, epic-chip, req-card, coverage-card, progress-fill) through them — the sunburst and donuts no longer disagree. Adopted the sunburst's six-stage vocabulary everywhere (Epic Status donut now says "In development"/"Stories drafted"; requirements alias "Planned"→"Pending"). Zero-count legend rows suppressed (Epic Status + Requirements). Quick-links accented by artifact family (planning/architecture/epics/requirements).
+- **Task 3 (C1/C2/C4/D5):** Introduced exactly one dependency-free progressive-enhancement script (`assets/specscribe.js`) delivered as an embedded asset (new `ForgeOptions.ScriptName`, mirrored the CSS copy seam in `SiteGenerator.EnsureScaffold`, linked once with `defer` from `RenderHeadOpen`). HTML elements get CSS-only `data-tooltip`/`::after` tooltips (stat-card definitions, quick-link pills); SVG segments/heatmap cells get an on-brand tooltip positioned by the script reading their existing `<title>` — native `<title>`+aria-labels remain the no-JS/SR fallback. Touch: first tap shows, second follows.
+- **Task 4 (D1–D4/D2):** One interaction grammar — now-next cards get the lift they lacked, donut slices bump stroke on hover; inverted the sunburst hover so it emphasizes (not dims) the hovered/focused segment with the gold focus stroke; the "In development" Now card gets a subtle teal wash + bolder accent; added `@media (prefers-reduced-motion: no-preference)` entrance animations (progress bars sweep 0→N%, donuts/sunburst fade+scale) side-by-side with Story 1.4's `reduce` block.
+- **Task 5 (A3/A4/A5/E1/E2/E3):** Epic Status donut now derives from the `StatusStyles.ForEpic` story roll-up (multi-segment, fraction center) instead of binary drafted/pending; task stat reframed to "Planned tasks done" + "N/M stories planned" so it can't read as whole-project %; heatmap mutes future days (no fill/tooltip), scales up to a ~15-week window with a headline; donut centers show a done/total fraction; requirements use a compact stacked bar when a group sits in a single status. Left A6/E4 for Story 2.1.
+- **Task 6 (F1–F3):** Reordered the dashboard so stats → Now & Next → Project at a Glance → progress panels lead, with "Explore Key Views" slimmed to a pill row and moved below the substance; added per-command copy buttons to Next Steps (+ grammar fix "implements"→"implement"); added a "last commit N days ago" recency signal to the Commits stat sub-line (chose the honest commit-recency path over a fabricated per-story "updated today" chip).
+- **Task 7 (G1/G2):** Emit an inline-SVG favicon (gold quill-spark on dark) so tabs aren't default and `/favicon.ico` stops 404-ing; home `<title>` is now "SpecScribe — Project Dashboard"; added `<meta name="description">` + minimal Open Graph tags to every page.
+- **Tasks 8–9:** Added render-/Charts-/stylesheet-/generation-level tests (pluralization, favicon/title/description, dashboard order, quick-link family accents, epic-status roll-up, donut fraction, future-day muting, heatmap headline, per-status tokens, no-preference entrance block, tooltip/copy-button styles, embedded+emitted script asset). Full suite: **197 passing**. Real generation pass: 24 pages, 0 errors; verified F4 four-questions coverage (every panel answers where things stand / what's left / what's next / how the work has gone).
+- Story 1.4 accessibility preserved and extended, not rewritten: the `reduce` block, `:focus-visible` ring, skip link, single `<main>` landmark, whole-chart/segment aria-labels and `<title>`s all remain (guarded by the existing + new tests).
+
 ### File List
 
+Story/tracking:
 - _bmad-output/implementation-artifacts/1-5-dashboard-insight-polish-and-visual-truthfulness.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
 
+Source (modified):
+- src/SpecScribe/ForgeOptions.cs (new `ScriptName` const)
+- src/SpecScribe/SiteGenerator.cs (emit JS asset via shared `CopyEmbeddedAsset`)
+- src/SpecScribe/PathUtil.cs (`RenderHeadOpen`: favicon + description/OG + script link)
+- src/SpecScribe/HtmlTemplater.cs (dashboard reorder; epic-status roll-up; stat pluralization/reframe/recency; stat-card tooltips; quick-link pills + family accents; requirement stacked-bar/fraction/zero-row suppression; home title/description)
+- src/SpecScribe/Charts.cs (Donut `centerText`; heatmap future-day muting + ~15-week scale + headline; public `Plural`; stat-card `data-tooltip`)
+- src/SpecScribe/BmadCommands.cs (Next Steps copy buttons + grammar fix)
+- src/SpecScribe/EpicsTemplater.cs (script href in `RenderHeadOpen` calls)
+- src/SpecScribe/RequirementsTemplater.cs (script href in `RenderHeadOpen` calls)
+- src/SpecScribe/SpecScribe.csproj (embed `specscribe.js`)
+- src/SpecScribe/assets/specscribe.css (status tokens; tooltip system; sunburst hover invert; interaction grammar; entrance animations; quick-link pills; copy buttons; heatmap scale/headline; stacked-bar styles)
+
+Source (new):
+- src/SpecScribe/assets/specscribe.js (dependency-free tooltip + copy-button progressive-enhancement script)
+
+Tests (modified):
+- tests/SpecScribe.Tests/HtmlTemplaterTests.cs (pluralization; favicon/title/description; dashboard order; quick-link family accents; epic-status roll-up)
+- tests/SpecScribe.Tests/ChartsTests.cs (donut fraction; future-day muting; heatmap headline)
+- tests/SpecScribe.Tests/StylesheetTests.cs (no-preference block; per-status tokens; tooltip/copy-button styles; embedded script)
+- tests/SpecScribe.Tests/SiteGeneratorReadmeTests.cs (self-contained script asset emitted + linked)
+- tests/SpecScribe.Tests/PathUtilTests.cs (new `RenderHeadOpen` signature; favicon/description/OG/script)
+- tests/SpecScribe.Tests/ModuleContextTests.cs (copy-button markup adjusts the code-review row count assertion)
+
 ## Change Log
 
+- 2026-07-06: Implemented Story 1.5. Landed the six per-stage status tokens and routed every chart/legend/badge through them (B1–B5); added the one sanctioned progressive-enhancement script for on-brand tooltips + Next Steps copy buttons, delivered as a self-contained embedded asset (C1/C2/C4/D5, F2); unified interaction grammar with sunburst hover-invert, In-development card emphasis, and `no-preference` entrance animations beside 1.4's `reduce` block (D1–D4/D2); made the existing charts truthful — epic-status donut from the story roll-up, reframed task stat, future-day-muted + rescaled heatmap with a headline, fraction donut centers, requirements stacked bars, zero-row suppression (A2/A3/A4/A5/E1/E2/E3); reordered the dashboard to lead with Now & Next + the sunburst and slimmed Explore Key Views to a pill row, added a commit-recency signal (F1/F3); emitted a favicon + home title/description/OG (G1/G2). Preserved and extended Story 1.4's accessibility floor. Added render/Charts/stylesheet/generation tests (197 passing); real generation pass produced 24 pages with 0 errors. Set Status → review.
 - 2026-07-06: Created Story 1.5 by splitting the Story 1.4 UX review into its polish/truthfulness half. Scoped: status-color tokenization + unified vocabulary + zero-row suppression + quick-link accents (B1–B5); on-brand tooltip system with one sanctioned progressive-enhancement script (C1/C2/C4/D5); interaction grammar + sunburst sibling-dim + Now emphasis + `no-preference` entrance animations (D1–D4/D2); chart truthfulness for existing metrics (A2 pluralization, A3 epic-donut roll-up, A4 future-day muting, A5 task-stat reframe, E1 heatmap rescale/headline, E2 requirements stacked bars, E3 donut fractions); dashboard reorder + Next Steps copy/grammar + recency (F1–F3); favicon + home title/meta/OG (G1/G2). Routed A6/E4 to Story 2.1 and the accessibility items to Story 1.4; documented dependency on Story 1.4's seams and coordination with in-flight Story 1.3.

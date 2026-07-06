@@ -30,8 +30,9 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-    <!-- Embedded rather than copied content so the stylesheet survives global-tool packaging intact. -->
+    <!-- Embedded rather than copied content so the stylesheet + script survive global-tool packaging intact. -->
     <EmbeddedResource Include="assets\specscribe.css" />
+    <EmbeddedResource Include="assets\specscribe.js" />
   </ItemGroup>
 
 </Project>

@@ -189,8 +189,9 @@ public class BmadCommandsTests
 
         Assert.Contains("Stories 1.4, 2.1 are awaiting code review", html);
         Assert.Contains("/bmad-dev-story 1.5", html);
-        // Exactly one code-review row, not one per review story.
-        Assert.Equal(1, html.Split("/bmad-code-review").Length - 1);
+        // Exactly one code-review row, not one per review story. Count the rendered <code> command (each row
+        // now also carries a data-copy attribute with the same string for its copy button). [Story 1.5 F2]
+        Assert.Equal(1, html.Split("<code>/bmad-code-review").Length - 1);
         // Multiple review stories keep the bare command — no single id is appended.
         Assert.DoesNotContain("/bmad-code-review 1.4", html);
         Assert.True(html.IndexOf("awaiting code review", StringComparison.Ordinal)

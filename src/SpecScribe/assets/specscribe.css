@@ -24,6 +24,20 @@
   --shadow: rgba(42, 31, 14, 0.15);
   /* Approximate sticky-nav height — the sticky TOC sidebar sits below the nav and anchored jumps clear it. */
   --nav-offset: 3.75rem;
+
+  /* ---- Status lifecycle tokens (Story 1.5 B2/B3) ----
+     ONE token per lifecycle stage, consumed by every chart, legend, swatch and badge so a stage reads as
+     the same color everywhere. StatusStyles remains the single status→stage source; this is the single
+     stage→color source. Adopts the sunburst's six-stage vocabulary (B1): drafted and pending are their own
+     tokens (previously the donuts collapsed drafted→ready and pending→parchment, disagreeing with the
+     sunburst). Do not reintroduce per-chart literal colors — route new status color through these. */
+  --status-pending: #b8b2a8;   /* tan-grey — listed, no plan yet */
+  --status-drafted: #e8d9a8;   /* pale gold — stories drafted */
+  --status-ready: var(--gold-light);   /* gold — has a plan, ready to build */
+  --status-active: var(--teal);        /* teal — in development */
+  --status-review: var(--teal-deep);   /* deep teal — in review */
+  --status-done: var(--moss-light);    /* green — done ONLY */
+  --status-deferred: var(--ink-light); /* grey — requirements shelved for later */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -584,9 +598,9 @@ code.color-swatch {
 }
 
 /* Status semantics everywhere: parchment = pending · gold = drafted/ready · teal = active dev · green = done ONLY. */
-.epic-chip.done { border-left: 3px solid var(--moss-light); }
-.epic-chip.active { border-left: 3px solid var(--teal); }
-.epic-chip.drafted { border-left: 3px solid var(--gold-light); }
+.epic-chip.done { border-left: 3px solid var(--status-done); }
+.epic-chip.active { border-left: 3px solid var(--status-active); }
+.epic-chip.drafted { border-left: 3px solid var(--status-drafted); }
 .epic-chip.pending { border-left: 3px solid var(--ink-light); opacity: 0.8; }
 
 .section-divider {
@@ -844,14 +858,18 @@ code.color-swatch {
 .chart-panel-header-row .view-epic-link { margin-top: 0; white-space: nowrap; }
 .sunburst { display: block; margin: 0 auto; max-width: 100%; height: auto; }
 
-.sb-seg { stroke: var(--warm-white); stroke-width: 1; transition: opacity 0.12s; }
-.sb-seg:hover { opacity: 0.75; }
-.sb-done { fill: var(--moss-light); }
-.sb-active { fill: var(--teal); }
-.sb-review { fill: var(--teal-deep); }
-.sb-ready { fill: var(--gold-light); }
-.sb-drafted { fill: #e8d9a8; }
-.sb-pending { fill: #b8b2a8; }
+.sb-seg { stroke: var(--warm-white); stroke-width: 1; transition: opacity 0.12s, stroke 0.12s, stroke-width 0.12s; }
+/* Interaction grammar (Story 1.5 D3): hovering a segment must EMPHASIZE it, not dim it. The old rule faded
+   the hovered segment to 0.75 (reads as dimming what you point at). Instead dim the siblings and lift the
+   hovered/focused one with the same gold stroke the focus ring uses — pointer and keyboard treatments match. */
+.sunburst:hover .sb-seg { opacity: 0.5; }
+.sunburst .sb-seg:hover { opacity: 1; stroke: var(--gold-light); stroke-width: 2.5; }
+.sb-done { fill: var(--status-done); }
+.sb-active { fill: var(--status-active); }
+.sb-review { fill: var(--status-review); }
+.sb-ready { fill: var(--status-ready); }
+.sb-drafted { fill: var(--status-drafted); }
+.sb-pending { fill: var(--status-pending); }
 
 .sunburst-center-num { font-size: 1.9rem; font-weight: bold; fill: var(--rust); font-family: 'Courier New', monospace; }
 .sunburst-center-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; fill: var(--ink-light); }
@@ -867,12 +885,12 @@ code.color-swatch {
 }
 
 .sunburst-legend .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.35rem; }
-.sunburst-legend .sb-pending-sw { background: #b8b2a8; }
-.sunburst-legend .sb-drafted-sw { background: #e8d9a8; }
-.sunburst-legend .sb-ready-sw { background: var(--gold-light); }
-.sunburst-legend .sb-active-sw { background: var(--teal); }
-.sunburst-legend .sb-review-sw { background: var(--teal-deep); }
-.sunburst-legend .sb-done-sw { background: var(--moss-light); }
+.sunburst-legend .sb-pending-sw { background: var(--status-pending); }
+.sunburst-legend .sb-drafted-sw { background: var(--status-drafted); }
+.sunburst-legend .sb-ready-sw { background: var(--status-ready); }
+.sunburst-legend .sb-active-sw { background: var(--status-active); }
+.sunburst-legend .sb-review-sw { background: var(--status-review); }
+.sunburst-legend .sb-done-sw { background: var(--status-done); }
 
 /* Non-italic and nudged up from 0.72rem for legibility (small italic serif at that size was hard to read). [UXO H2] */
 .sunburst-hint { margin-top: 0.4rem; font-size: 0.78rem; color: var(--ink-light); font-style: normal; }
@@ -975,12 +993,21 @@ code.color-swatch {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.now-next-card:hover { box-shadow: 0 3px 10px var(--shadow); }
-.now-next-card.active { border-left-color: var(--teal); }
-.now-next-card.review { border-left-color: var(--teal-deep); }
-.now-next-card.ready { border-left-color: var(--gold-light); }
-.now-next-card.drafted { border-left-color: var(--parchment-deep); }
-.now-next-card.pending { border-left-color: var(--parchment-deep); }
+/* Interactive grammar (Story 1.5 D1): Now & Next cards are links, so they get the same lift the other
+   interactive cards have (they previously only got a shadow). */
+.now-next-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--rust-light); transform: translateY(-1px); }
+.now-next-card.active { border-left-color: var(--status-active); }
+.now-next-card.review { border-left-color: var(--status-review); }
+.now-next-card.ready { border-left-color: var(--status-ready); }
+.now-next-card.drafted { border-left-color: var(--status-drafted); }
+.now-next-card.pending { border-left-color: var(--status-pending); }
+
+/* The "In development" card is the single most important answer on the page — where the work is right now.
+   Give it a subtle teal wash and a slightly bolder accent so the eye lands there first (Story 1.5 D4). */
+.now-next-card.active {
+  background: linear-gradient(180deg, #e4efec, var(--cream));
+  border-left-width: 4px;
+}
 
 .now-next-kicker { font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-light); }
 .now-next-card.active .now-next-kicker { color: var(--teal); }
@@ -1145,12 +1172,12 @@ code.color-swatch {
 .donut-and-legend { display: flex; align-items: center; gap: 1.2rem; }
 .donut-legend { font-size: 0.8rem; color: var(--ink-faded); display: flex; flex-direction: column; gap: 0.4rem; }
 .donut-legend .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.4rem; }
-.donut-legend .swatch.done { background: var(--moss-light); }
-.donut-legend .swatch.active { background: var(--teal); }
-.donut-legend .swatch.review { background: var(--teal-deep); }
-.donut-legend .swatch.ready,
-.donut-legend .swatch.drafted { background: var(--gold-light); }
-.donut-legend .swatch.pending { background: var(--parchment-deep); }
+.donut-legend .swatch.done { background: var(--status-done); }
+.donut-legend .swatch.active { background: var(--status-active); }
+.donut-legend .swatch.review { background: var(--status-review); }
+.donut-legend .swatch.ready { background: var(--status-ready); }
+.donut-legend .swatch.drafted { background: var(--status-drafted); }
+.donut-legend .swatch.pending { background: var(--status-pending); }
 
 /* ====================== PROGRESS BARS ====================== */
 .progress-row {
@@ -1174,8 +1201,8 @@ code.color-swatch {
 }
 
 .progress-fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
-.progress-fill.done { background: var(--moss-light); }
-.progress-fill.partial { background: var(--gold-light); }
+.progress-fill.done { background: var(--status-done); }
+.progress-fill.partial { background: var(--status-ready); }
 .progress-fill.empty { background: transparent; }
 
 .progress-value {
@@ -1187,14 +1214,18 @@ code.color-swatch {
 
 /* ====================== DONUT (SVG) ====================== */
 .donut-track { fill: none; stroke: var(--parchment-dark); stroke-width: 10; }
-.donut-seg { fill: none; stroke-width: 10; transform: rotate(-90deg); transform-origin: center; }
-.donut-seg.done { stroke: var(--moss-light); }
-.donut-seg.active { stroke: var(--teal); }
-.donut-seg.review { stroke: var(--teal-deep); }
-.donut-seg.ready,
-.donut-seg.drafted { stroke: var(--gold-light); }
-.donut-seg.pending { stroke: var(--parchment-deep); }
+.donut-seg { fill: none; stroke-width: 10; transform: rotate(-90deg); transform-origin: center; transition: stroke-width 0.12s; }
+/* Data-hover grammar (Story 1.5 D1): a hovered donut slice bumps its stroke width to read as "highlighted". */
+.donut-seg:hover { stroke-width: 13; }
+.donut-seg.done { stroke: var(--status-done); }
+.donut-seg.active { stroke: var(--status-active); }
+.donut-seg.review { stroke: var(--status-review); }
+.donut-seg.ready { stroke: var(--status-ready); }
+.donut-seg.drafted { stroke: var(--status-drafted); }
+.donut-seg.pending { stroke: var(--status-pending); }
 .donut-center-text { font-size: 1.4rem; font-weight: bold; fill: var(--ink); font-family: 'Courier New', monospace; }
+/* The donut center now reads as progress (a done/total fraction), so size it to fit "12/34" comfortably. */
+.donut-center-text.donut-center-fraction { font-size: 1.05rem; }
 
 .mini-donut { vertical-align: middle; }
 .mini-donut .donut-track,
@@ -1249,6 +1280,19 @@ code.color-swatch {
 .epic-mosaic-sub { font-size: 0.7rem; color: var(--ink-light); }
 
 /* ====================== COMMIT HEATMAP (GitHub-style) ====================== */
+/* The heatmap is the primary "how has the work gone" visual, so let it scale up to fill its panel rather
+   than sit as a fixed postage stamp (Story 1.5 E1). Capped so a long history doesn't stretch cells huge. */
+.heatmap { display: block; width: 100%; max-width: 460px; height: auto; }
+
+/* Headline above the grid: total commits · active days · last commit — the one-line summary a stakeholder
+   reads first (Story 1.5 E1). */
+.heatmap-headline {
+  font-size: 0.82rem;
+  color: var(--ink-faded);
+  margin-bottom: 0.6rem;
+}
+.heatmap-headline strong { color: var(--rust); font-family: 'Courier New', monospace; }
+
 .heatmap-daylabel, .heatmap-monthlabel {
   /* Nudged 8px → 9px for legibility; a readability bump only, not the full heatmap rescale (Story 1.5 E1). [UXO H2] */
   font-size: 9px;
@@ -1352,11 +1396,11 @@ code.color-swatch {
   padding: 0.85rem 1.25rem;
   box-shadow: 0 2px 8px var(--shadow);
 }
-.req-card.done { border-left-color: var(--moss-light); }
-.req-card.active { border-left-color: var(--teal); }
-.req-card.ready { border-left-color: var(--gold-light); }
-.req-card.pending { border-left-color: var(--parchment-deep); }
-.req-card.deferred { border-left-color: var(--ink-light); opacity: 0.85; }
+.req-card.done { border-left-color: var(--status-done); }
+.req-card.active { border-left-color: var(--status-active); }
+.req-card.ready { border-left-color: var(--status-ready); }
+.req-card.pending { border-left-color: var(--status-pending); }
+.req-card.deferred { border-left-color: var(--status-deferred); opacity: 0.85; }
 
 .req-card-head {
   display: flex;
@@ -1397,10 +1441,40 @@ code.color-swatch {
   margin-bottom: 0.4rem;
 }
 
+/* Compact stacked bar for a requirement group that sits entirely in one status — denser than a one-slice
+   donut (Story 1.5 E2). Segments use the same per-status tokens as every other chart. */
+.req-stacked { display: flex; flex-direction: column; gap: 0.5rem; }
+.req-stacked-bar {
+  display: flex;
+  height: 0.7rem;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--parchment-dark);
+}
+.req-stacked-bar .seg { height: 100%; }
+.req-stacked-bar .seg.done { background: var(--status-done); }
+.req-stacked-bar .seg.ready { background: var(--status-ready); }
+.req-stacked-bar .seg.pending { background: var(--status-pending); }
+.req-stacked-bar .seg.deferred { background: var(--status-deferred); }
+
+.req-stacked-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  font-size: 0.78rem;
+  color: var(--ink-faded);
+}
+.req-stacked-legend .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.4rem; }
+.req-stacked-legend .swatch.done { background: var(--status-done); }
+.req-stacked-legend .swatch.ready { background: var(--status-ready); }
+.req-stacked-legend .swatch.pending { background: var(--status-pending); }
+.req-stacked-legend .swatch.deferred { background: var(--status-deferred); }
+
 /* The one genuinely new status color: grey for requirements shelved for later. */
 .status-badge.deferred { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
-.donut-seg.deferred { stroke: var(--ink-light); }
-.donut-legend .swatch.deferred { background: var(--ink-light); }
+.donut-seg.deferred { stroke: var(--status-deferred); }
+.donut-legend .swatch.deferred { background: var(--status-deferred); }
 
 /* Requirements index: every section shares one flush 860px column so the dashboard, group navigator,
    dividers, and cards all line up on the same left/right edges (the shared .dashboard/.section-divider
@@ -1435,10 +1509,10 @@ code.color-swatch {
   border-left: 3px solid var(--border);
   align-items: flex-start;
 }
-.coverage-card.done { border-left-color: var(--moss-light); }
-.coverage-card.active { border-left-color: var(--teal); }
-.coverage-card.drafted { border-left-color: var(--gold-light); }
-.coverage-card.pending { border-left-color: var(--ink-light); }
+.coverage-card.done { border-left-color: var(--status-done); }
+.coverage-card.active { border-left-color: var(--status-active); }
+.coverage-card.drafted { border-left-color: var(--status-drafted); }
+.coverage-card.pending { border-left-color: var(--status-pending); }
 .coverage-card .status-badge { margin: 0.15rem 0; }
 .coverage-note { margin-top: 0.6rem; }
 
@@ -1462,6 +1536,139 @@ code.color-swatch {
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ====================== ON-BRAND TOOLTIPS (Story 1.5 C1/C2) ======================
+   Two delivery paths, both on-brand (parchment card, gold hairline) and instant (no OS ~1s delay):
+   - HTML elements (stat cards, legend items) use a CSS-only `data-tooltip` + `::after`. No JS, focus-visible.
+   - SVG chart segments + heatmap cells are driven by specscribe.js, which reads each element's existing
+     <title> and positions the single `.ss-tooltip` node near the pointer/focus. The native <title> +
+     Story 1.4 aria-labels stay as the no-JS / screen-reader fallback, so nothing is JS-dependent. */
+[data-tooltip] { position: relative; }
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 60;
+  width: max-content;
+  max-width: 220px;
+  padding: 0.4rem 0.65rem;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--gold-light);
+  border-radius: 5px;
+  box-shadow: 0 3px 10px var(--shadow);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* A stat card carrying a definition tooltip becomes keyboard-focusable (tabindex=0 in markup); show the
+   same on-brand focus ring the other interactive surfaces use. */
+.stat-card[data-tooltip]:focus-visible,
+.donut-legend [data-tooltip]:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* The single JS-positioned tooltip node for SVG segments (parchment card, matches the CSS one). */
+.ss-tooltip {
+  position: absolute;
+  z-index: 300;
+  max-width: 260px;
+  padding: 0.4rem 0.65rem;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--gold-light);
+  border-radius: 5px;
+  box-shadow: 0 3px 12px var(--shadow);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.ss-tooltip[hidden] { display: none; }
+
+/* ====================== QUICK-LINK PILLS (Story 1.5 F1 slim + B5 family accents) ======================
+   "Explore Key Views" duplicated the top nav and the bottom index sections, so it's slimmed from a card
+   grid to a compact single row of pills, moved below the substance. Each pill is accented by artifact
+   family so color literacy (planning=gold, architecture=teal, epics=moss, requirements=rust) carries here
+   too. */
+.quick-link-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.quick-link-pill {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 0.78rem;
+  color: var(--ink-faded);
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.quick-link-pill:hover { box-shadow: 0 2px 8px var(--shadow); transform: translateY(-1px); }
+.quick-link-pill.family-planning { border-left-color: var(--gold-light); }
+.quick-link-pill.family-architecture { border-left-color: var(--teal); }
+.quick-link-pill.family-epics { border-left-color: var(--moss-light); }
+.quick-link-pill.family-requirements { border-left-color: var(--rust-light); }
+
+.quick-link-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* ====================== COPY BUTTONS (Story 1.5 F2) ====================== */
+.next-steps-list li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }
+.next-steps-list li > code { order: 1; }
+.next-steps-list li .next-steps-desc { order: 3; flex-basis: 100%; }
+
+.copy-btn {
+  order: 2;
+  flex: 0 0 auto;
+  font: inherit;
+  font-family: 'Courier New', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--teal-deep);
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.copy-btn:hover,
+.copy-btn:focus-visible { border-color: var(--gold-light); color: var(--rust); outline: none; }
+.copy-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.copy-btn.copied { color: var(--moss); border-color: var(--moss-light); background: #e8f0e4; }
+.copy-btn.copied::after { content: " \2713"; }
+
+/* ====================== ENTRANCE ANIMATIONS (Story 1.5 D2) ======================
+   The complementary "no-preference" half of the motion contract — one-time entrances that play only when
+   the user hasn't asked for reduced motion. Nothing loops and no information is motion-dependent; the
+   reduce block just below neutralizes all of this. Left side-by-side with that block on purpose. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Progress bars sweep 0 → N% once. The inline width stays the target; the keyframe only overrides the
+     start, and `both` holds the final width so nothing snaps back. */
+  .progress-fill { animation: progress-grow 0.9s ease-out both; }
+  @keyframes progress-grow { from { width: 0; } }
+
+  /* Donuts and the sunburst fade + settle in as their segments draw — a light reveal, never a loop. */
+  .donut,
+  .sunburst { animation: chart-enter 0.6s ease-out both; }
+  @keyframes chart-enter {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+  }
 }
 
 /* ====================== REDUCED MOTION ======================

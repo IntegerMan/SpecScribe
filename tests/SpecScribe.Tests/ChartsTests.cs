@@ -109,6 +109,63 @@ public class ChartsTests
     }
 
     [Fact]
+    public void Donut_WithCenterText_ShowsFractionInsteadOfBareTotal()
+    {
+        var svg = Charts.Donut(new (string, int, string)[]
+        {
+            ("Done", 4, "done"),
+            ("Pending", 10, "pending"),
+        }, centerText: "4/14");
+
+        // The center reads as progress (a fraction), not a bare total that looks like a score. [Story 1.5 E3]
+        Assert.Contains("donut-center-fraction", svg);
+        Assert.Contains(">4/14</text>", svg);
+    }
+
+    [Fact]
+    public void Donut_WithoutCenterText_ShowsTotal()
+    {
+        var svg = Charts.Donut(new (string, int, string)[]
+        {
+            ("Done", 4, "done"),
+            ("Pending", 10, "pending"),
+        });
+
+        Assert.Contains(">14</text>", svg);
+        Assert.DoesNotContain("donut-center-fraction", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_MutesFutureDays()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var series = new (DateOnly Day, int Count)[] { (today.AddDays(-3), 2) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        // A real past day is rendered with its tooltip...
+        Assert.Contains($"<title>{today.AddDays(-3):yyyy-MM-dd}: 2 commits</title>", svg);
+        // ...but tomorrow is never rendered — future days aren't zero-commit days. [Story 1.5 A4]
+        Assert.DoesNotContain($"{today.AddDays(1):yyyy-MM-dd}:", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_HasHeadline()
+    {
+        var series = new (DateOnly Day, int Count)[]
+        {
+            (new DateOnly(2026, 1, 5), 3),
+            (new DateOnly(2026, 1, 7), 1),
+        };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        // The primary "how has the work gone" visual carries a one-line summary headline. [Story 1.5 E1]
+        Assert.Contains("heatmap-headline", svg);
+        Assert.Contains("last commit 2026-01-07", svg);
+    }
+
+    [Fact]
     public void ProgressBar_CarriesProgressbarAria()
     {
         var html = Charts.ProgressBar("Implementation", 2, 4);

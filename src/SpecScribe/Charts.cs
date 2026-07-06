@@ -8,10 +8,14 @@ namespace SpecScribe;
 /// (a hallmark of a project that's just getting started).</summary>
 public static class Charts
 {
-    public static string StatCard(string number, string label, string? sub = null)
+    /// <summary>A dashboard stat card. When <paramref name="tooltip"/> is supplied the card gains an on-brand
+    /// CSS definition tooltip (via <c>data-tooltip</c>) and becomes keyboard-focusable so it's reachable by
+    /// hover, focus and touch — used to define what a number actually counts (UX-DR4). [Story 1.5 C2]</summary>
+    public static string StatCard(string number, string label, string? sub = null, string? tooltip = null)
     {
         var subHtml = sub is { Length: > 0 } ? $"<div class=\"stat-sub\">{Html(sub)}</div>" : string.Empty;
-        return $"<div class=\"stat-card\"><div class=\"stat-number\">{Html(number)}</div><div class=\"stat-label\">{Html(label)}</div>{subHtml}</div>";
+        var tipAttrs = tooltip is { Length: > 0 } ? $" data-tooltip=\"{Html(tooltip)}\" tabindex=\"0\"" : string.Empty;
+        return $"<div class=\"stat-card\"{tipAttrs}><div class=\"stat-number\">{Html(number)}</div><div class=\"stat-label\">{Html(label)}</div>{subHtml}</div>";
     }
 
     public static string ProgressBar(string label, int value, int max, string? rightLabel = null)
@@ -41,7 +45,7 @@ public static class Charts
     /// <paramref name="ariaLabel"/> is supplied the whole chart carries <c>role="img"</c>+that name so it is
     /// reachable without a pointer; when omitted the donut is decorative (<c>aria-hidden</c>) — used where an
     /// enclosing labeled card/legend already names it, so screen readers don't hear it twice. [Story 1.4 AC #1]</summary>
-    public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120, string? ariaLabel = null)
+    public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120, string? ariaLabel = null, string? centerText = null)
     {
         var total = segments.Sum(s => Math.Max(0, s.Value));
         var radius = size / 2.0 - 10;
@@ -73,7 +77,12 @@ public static class Charts
             }
         }
 
-        sb.Append($"  <text x=\"{F(center)}\" y=\"{F(center)}\" class=\"donut-center-text\" text-anchor=\"middle\" dominant-baseline=\"central\">{total}</text>\n");
+        // The center reads as progress, not a score: when a caller supplies a done/total fraction (E3) show
+        // that; otherwise fall back to the bare total. The fraction variant gets a smaller type class so
+        // "12/34" fits the ring. [Story 1.5 E3]
+        var centerContent = centerText is { Length: > 0 } ? Html(centerText) : total.ToString();
+        var centerClass = centerText is { Length: > 0 } ? "donut-center-text donut-center-fraction" : "donut-center-text";
+        sb.Append($"  <text x=\"{F(center)}\" y=\"{F(center)}\" class=\"{centerClass}\" text-anchor=\"middle\" dominant-baseline=\"central\">{centerContent}</text>\n");
         sb.Append("</svg>\n");
         return sb.ToString();
     }
@@ -412,7 +421,9 @@ public static class Charts
         var today = DateOnly.FromDateTime(DateTime.Now);
 
         var end = lastCommit > today ? lastCommit : today;
-        var minStart = end.AddDays(-7 * 7);
+        // The heatmap is the primary "how has the work gone" visual, so show a fuller ~15-week window (it
+        // scales up to fill its panel via CSS) rather than the old 7-week postage stamp. [Story 1.5 E1]
+        var minStart = end.AddDays(-7 * 15);
         var start = firstCommit < minStart ? firstCommit : minStart;
 
         // Snap to full weeks (Sunday..Saturday) so the grid is rectangular.
@@ -437,6 +448,9 @@ public static class Charts
         var heatAria = $"Commit activity: {totalCommits} commit{(totalCommits == 1 ? string.Empty : "s")} across {activeDays} active day{(activeDays == 1 ? string.Empty : "s")}, {firstCommit:yyyy-MM-dd}–{lastCommit:yyyy-MM-dd}";
 
         var sb = new StringBuilder();
+        // Visible one-line headline so a stakeholder reads the summary before scanning the grid. [Story 1.5 E1]
+        sb.Append($"<div class=\"heatmap-headline\"><strong>{totalCommits}</strong> {Plural(totalCommits, "commit", "commits")} &middot; " +
+                  $"<strong>{activeDays}</strong> active {Plural(activeDays, "day", "days")} &middot; last commit {lastCommit:yyyy-MM-dd}</div>\n");
         sb.Append($"<svg class=\"heatmap\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" role=\"img\" aria-label=\"{Html(heatAria)}\">\n");
 
         var dayLabels = new (int Row, string Label)[] { (1, "Mon"), (3, "Wed"), (5, "Fri") };
@@ -465,6 +479,9 @@ public static class Charts
             {
                 var day = start.AddDays(w * 7 + d);
                 if (day > end) continue;
+                // Days after generation aren't zero-commit days, they haven't happened — render nothing (no
+                // fill, no tooltip) so a partial final week doesn't read as a run of inactivity. [Story 1.5 A4]
+                if (day > today) continue;
 
                 var count = byDay.GetValueOrDefault(day, 0);
                 var level = HeatLevel(count, maxCount);
@@ -504,9 +521,9 @@ public static class Charts
 
     private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
-    /// <summary>Grammatical pluralization for accessible names — a one-count segment reads "1 story", not
-    /// "1 stories", so screen-reader announcements aren't grating. [Story 1.4 AC #1]</summary>
-    private static string Plural(int n, string singular, string plural) => n == 1 ? singular : plural;
+    /// <summary>Grammatical pluralization for accessible names and count-bearing labels — a one-count value
+    /// reads "1 story"/"1 commit", not "1 stories"/"1 commits". Shared with dashboard stat labels. [Story 1.4 AC #1, Story 1.5 A2]</summary>
+    public static string Plural(int n, string singular, string plural) => n == 1 ? singular : plural;
 
     private static string Html(string s) => PathUtil.Html(s);
 }
