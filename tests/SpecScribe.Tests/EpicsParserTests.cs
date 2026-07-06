@@ -165,6 +165,66 @@ public class EpicsParserTests
     }
 
     [Fact]
+    public void LinkifyAcReferences_LinksEveryKnownNumberInACommaGroup()
+    {
+        var criteria = new Dictionary<int, string> { [1] = "First", [2] = "Second", [3] = "Third" };
+        var html = EpicsParser.LinkifyAcReferences("<li>Task (AC: #1, #2, #3)</li>", criteria);
+
+        Assert.Contains("href=\"#ac-1\" title=\"First\">#1</a>", html);
+        Assert.Contains("href=\"#ac-2\" title=\"Second\">#2</a>", html);
+        Assert.Contains("href=\"#ac-3\" title=\"Third\">#3</a>", html);
+    }
+
+    [Fact]
+    public void LinkifyAcReferences_HandlesSpacelessAndColonlessForms()
+    {
+        var criteria = new Dictionary<int, string> { [4] = "Fourth" };
+        // "AC #4" (no colon) and "AC:#4" (no space) are both real authored forms in the artifacts.
+        Assert.Contains("href=\"#ac-4\"", EpicsParser.LinkifyAcReferences("<li>x (AC #4)</li>", criteria));
+        Assert.Contains("href=\"#ac-4\"", EpicsParser.LinkifyAcReferences("<li>x (AC:#4)</li>", criteria));
+    }
+
+    [Fact]
+    public void LinkifyAcReferences_UsesFullCriterionTextAsTooltip()
+    {
+        var criteria = new Dictionary<int, string> { [1] = "Given X, when Y, then Z & W" };
+        var html = EpicsParser.LinkifyAcReferences("<li>See (AC: #1)</li>", criteria);
+
+        // The tooltip is the criterion's plain text, HTML-escaped so an ampersand is safe in the attribute.
+        Assert.Contains("title=\"Given X, when Y, then Z &amp; W\"", html);
+    }
+
+    [Fact]
+    public void LinkifyAcReferences_LeavesUnresolvedNumberAsPlainTextNeverAnchored()
+    {
+        var criteria = new Dictionary<int, string> { [1] = "Only one" };
+        var html = EpicsParser.LinkifyAcReferences("<li>Task (AC: #7)</li>", criteria);
+
+        Assert.Contains("#7", html);
+        Assert.DoesNotContain("href=\"#ac-7\"", html);
+        Assert.DoesNotContain(">#7</a>", html);
+    }
+
+    [Fact]
+    public void LinkifyAcReferences_IsIdempotentAndDoesNotDoubleLinkify()
+    {
+        var criteria = new Dictionary<int, string> { [1] = "The build passes" };
+        var once = EpicsParser.LinkifyAcReferences("<li>Do the thing (AC: #1)</li>", criteria);
+        var twice = EpicsParser.LinkifyAcReferences(once, criteria);
+
+        // An already-rendered "#ac-1" reference link must not be re-wrapped into a nested anchor.
+        Assert.Equal(once, twice);
+        Assert.DoesNotContain("<a class=\"ac-ref\" href=\"#ac-1\" title=\"The build passes\"><a", twice);
+    }
+
+    [Fact]
+    public void LinkifyAcReferences_NoOpWhenNoCriteria()
+    {
+        var html = "<li>Do the thing (AC: #1)</li>";
+        Assert.Equal(html, EpicsParser.LinkifyAcReferences(html, new Dictionary<int, string>()));
+    }
+
+    [Fact]
     public void ExtractDevAgentRecord_ReturnsLabelContentPairs()
     {
         var record = EpicsParser.ExtractDevAgentRecord(SampleArtifact);

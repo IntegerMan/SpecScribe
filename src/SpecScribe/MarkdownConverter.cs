@@ -28,12 +28,7 @@ public static class MarkdownConverter
 
         var document = Markdown.Parse(body, Pipeline);
 
-        using var writer = new StringWriter();
-        var renderer = new HtmlRenderer(writer);
-        Pipeline.Setup(renderer);
-        UseMermaidCodeBlocks(renderer);
-        renderer.Render(document);
-        writer.Flush();
+        var bodyHtml = RenderDocumentHtml(document);
 
         var hasMermaid = MermaidCodeBlockRenderer.HasMermaid(document);
 
@@ -53,10 +48,26 @@ public static class MarkdownConverter
             OutputRelativePath = outputRelativePath,
             Title = title,
             Frontmatter = frontmatter,
-            BodyHtml = ColorSwatchRewriter.Rewrite(TagTables(writer.ToString())),
+            BodyHtml = ColorSwatchRewriter.Rewrite(TagTables(bodyHtml)),
             Headings = headings,
             HasMermaid = hasMermaid,
         };
+    }
+
+    /// <summary>Renders a parsed markdown document to HTML with the mermaid-aware code-block renderer applied,
+    /// so <c>```mermaid</c> fences become <c>&lt;pre class="mermaid"&gt;</c> here exactly as they do in full-page
+    /// <see cref="Convert"/>. Shared by <see cref="Convert"/> and <see cref="RenderBlock"/> so fragment rendering
+    /// (story remainder, dev-agent record, review findings, change log, epics overview/inventory) carries the same
+    /// mermaid fidelity as a full page — otherwise a fence authored inside an artifact body renders inert.</summary>
+    private static string RenderDocumentHtml(MarkdownDocument document)
+    {
+        using var writer = new StringWriter();
+        var renderer = new HtmlRenderer(writer);
+        Pipeline.Setup(renderer);
+        UseMermaidCodeBlocks(renderer);
+        renderer.Render(document);
+        writer.Flush();
+        return writer.ToString();
     }
 
     /// <summary>Replaces the default fenced-code renderer with one that emits mermaid blocks as
@@ -96,8 +107,15 @@ public static class MarkdownConverter
     }
 
     /// <summary>Renders a markdown fragment as full block HTML (paragraphs, headings, lists) — used for
-    /// multi-paragraph slices pulled out of a larger doc, e.g. the Overview section of epics.md.</summary>
-    public static string RenderBlock(string markdown) => ColorSwatchRewriter.Rewrite(TagTables(Markdown.ToHtml(markdown, Pipeline)));
+    /// multi-paragraph slices pulled out of a larger doc, e.g. the Overview section of epics.md, the story
+    /// remainder, or the dev-agent record. Applies the mermaid-aware renderer so a <c>```mermaid</c> fence
+    /// inside a fragment renders as a client-side diagram, not inert <c>&lt;code&gt;</c>; the hosting templater
+    /// injects the init script when the composed page carries a mermaid block (see <see cref="Mermaid.ContainsBlock"/>).</summary>
+    public static string RenderBlock(string markdown)
+    {
+        var document = Markdown.Parse(markdown, Pipeline);
+        return ColorSwatchRewriter.Rewrite(TagTables(RenderDocumentHtml(document)));
+    }
 
     /// <summary>Tags every Markdig-generated <c>&lt;table&gt;</c> with class <c>md-table</c> so a single CSS
     /// rule styles markdown tables consistently everywhere — including sections rendered outside the

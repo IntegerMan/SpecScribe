@@ -4,7 +4,7 @@ baseline_commit: fb9fb88b7d5ba6d07055a42cbf84a37b21cb4fd0
 
 # Story 1.3: Markdown Fidelity for Core Artifact Patterns
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -34,34 +34,34 @@ so that generated pages preserve planning intent and implementation context.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Verify and harden Mermaid client-side rendering across every rendered page type (AC: #1)
-  - [ ] Confirm ` ```mermaid ` fences on full document pages (generic docs + ADRs) still emit `<pre class="mermaid">` via `MermaidCodeBlockRenderer` and are decoded correctly by the client init (`Mermaid.InitScript`)
-  - [ ] Confirm the init script is injected exactly on pages that need it: generic/ADR pages when `DocModel.HasMermaid` is true, and the epics index (which always emits the roadmap diagram)
-  - [ ] Resolve the fragment-render gap: Mermaid fences authored **inside story/epic artifact bodies** are rendered through `MarkdownConverter.RenderBlock`/`RenderInline`, which do NOT apply the mermaid code-block renderer, so they emit `<code class="language-mermaid">` and never render as diagrams. Decide and implement the smallest correct fix (route fragment rendering through the mermaid-aware renderer and inject the init script on story/epic pages when a fragment actually contains mermaid), or explicitly document it as out-of-scope with rationale if BMad artifacts never carry mermaid in bodies
-- [ ] Task 2: Verify and harden task-checklist completion-state rendering (AC: #1)
-  - [ ] Confirm GitHub-style `- [ ]`/`- [x]` lists in document bodies render as disabled checkboxes (Markdig `UseTaskLists` via the shared pipeline) with the completed/incomplete swatch styling from `specscribe.css`
-  - [ ] Confirm the "## Tasks / Subtasks" section on story pages shows completion states both as the styled checklist (inside `.doc-body`) and as the task sunburst fed by `TaskListParser`
-  - [ ] Confirm mixed-case marks (`- [X]`) and nested/subtask indentation render completion state correctly and that non-checkbox bullets are unaffected
-- [ ] Task 3: Verify and harden AC-reference deep-linking and tooltips (AC: #2)
-  - [ ] Confirm each acceptance criterion renders in its own panel row with a stable `id="ac-N"` anchor and an `.ac-anchor` self-link, and that `:target` highlight styling still fires on navigation
-  - [ ] Confirm `EpicsParser.LinkifyAcReferences` rewrites `(AC: #N)` / `(AC #N, #M)` references in the story remainder to `<a class="ac-ref" href="#ac-N" title="…">#N</a>` with the criterion's plain text as the `title` tooltip
-  - [ ] Confirm unresolved AC numbers (no matching criterion) remain plain text and never become broken anchors, and that references already inside other markup are not double-linkified
-- [ ] Task 4: Add/extend regression coverage for markdown-fidelity behavior at unit and generation levels (AC: #1, #2)
-  - [ ] Extend `MarkdownConverterTests` for task-list checkbox output (checked vs. unchecked) and, if Task 1's fix lands, for mermaid inside `RenderBlock` fragments
-  - [ ] Extend `EpicsParserTests` for `LinkifyAcReferences` edge cases (comma-grouped numbers, unresolved numbers, tooltip text) and AC-anchor extraction
-  - [ ] Add a focused generation-level assertion (alongside `SiteGeneratorTraceabilityTests`) that a rendered story page contains `id="ac-N"` anchors and matching `href="#ac-N"` references, and that a document page with a mermaid fence carries the init script
-- [ ] Task 5: Validate end-to-end rendered behavior with the real generation path (AC: #1, #2, #3)
-  - [ ] Run the focused test filter for the touched behavior
-  - [ ] Run a real generation pass and confirm mermaid diagrams, task checklists, AC deep-links, and the sidebar TOC render correctly with no console errors and no broken anchors
-- [ ] Task 6: Relocate the table of contents into an independently-scrolling sidebar across all TOC-bearing pages (AC: #3)
-  - [ ] Introduce a two-column page layout (main content + TOC sidebar) shared by the generic page shell and the epic/story detail templater, so the TOC lives beside the content instead of as a top strip
-  - [ ] Make the sidebar sticky beneath the sticky nav and give it its own vertical overflow so it stays in view and scrolls independently when longer than the viewport; the main content scrolls normally
-  - [ ] Replace `.toc-strip` with a `.toc-sidebar` presentation via one shared TOC-rendering seam that takes an ordered list of `(level, text, anchorId)` entries — do not fork per page type
-  - [ ] Generic doc pages, ADRs, and README: source render order already equals `DocModel.Headings` order, so feed those headings to the shared TOC seam (verify heading ids exist for every entry so no link is dead)
-  - [ ] Epic/story detail pages: build the TOC entries in the templater's **actual section-emission order** (e.g. User Story → Task Breakdown → Acceptance Criteria → Dev Agent Record → Review Findings → remainder headings → Change Log). Give each templater-emitted panel a stable `id` + human label, and collect the remainder fragment's rendered headings in order so they appear as TOC entries too
-  - [ ] Add `scroll-margin-top` (accounting for the sticky nav height) to headings/section anchors so clicking a TOC link lands the target below the nav rather than hidden under it
-  - [ ] Implement responsive behavior: on narrow (mobile/tablet) breakpoints the sidebar collapses to a stacked/top or toggled form that remains usable and does not crush the main content
-  - [ ] Preserve the accessible `<nav aria-label="On this page">` semantics; keep entries as real in-page anchor links (keyboard-activatable). Scroll-spy/active-section highlighting is optional polish, not required by AC #3
+- [x] Task 1: Verify and harden Mermaid client-side rendering across every rendered page type (AC: #1)
+  - [x] Confirm ` ```mermaid ` fences on full document pages (generic docs + ADRs) still emit `<pre class="mermaid">` via `MermaidCodeBlockRenderer` and are decoded correctly by the client init (`Mermaid.InitScript`)
+  - [x] Confirm the init script is injected exactly on pages that need it: generic/ADR pages when `DocModel.HasMermaid` is true, and the epics index (which always emits the roadmap diagram)
+  - [x] Resolve the fragment-render gap: routed `MarkdownConverter.RenderBlock` through the shared mermaid-aware renderer (`RenderDocumentHtml`) so a fence inside a story/epic artifact body now emits `<pre class="mermaid">`, and made `EpicsTemplater.RenderStory`/`RenderEpic` inject `Mermaid.InitScript()` when the composed page actually contains a mermaid block (`Mermaid.ContainsBlock`). `RenderInline` intentionally left untouched — mermaid is a block construct that cannot appear in a single-line inline fragment
+- [x] Task 2: Verify and harden task-checklist completion-state rendering (AC: #1)
+  - [x] Confirm GitHub-style `- [ ]`/`- [x]` lists in document bodies render as disabled checkboxes (Markdig `UseTaskLists` via the shared pipeline) with the completed/incomplete swatch styling from `specscribe.css`
+  - [x] Confirm the "## Tasks / Subtasks" section on story pages shows completion states both as the styled checklist (inside `.doc-body`) and as the task sunburst fed by `TaskListParser`
+  - [x] Confirm mixed-case marks (`- [X]`) and nested/subtask indentation render completion state correctly and that non-checkbox bullets are unaffected
+- [x] Task 3: Verify and harden AC-reference deep-linking and tooltips (AC: #2)
+  - [x] Confirm each acceptance criterion renders in its own panel row with a stable `id="ac-N"` anchor and an `.ac-anchor` self-link, and that `:target` highlight styling still fires on navigation
+  - [x] Confirm `EpicsParser.LinkifyAcReferences` rewrites `(AC: #N)` / `(AC #N, #M)` references in the story remainder to `<a class="ac-ref" href="#ac-N" title="…">#N</a>` with the criterion's plain text as the `title` tooltip
+  - [x] Confirm unresolved AC numbers (no matching criterion) remain plain text and never become broken anchors, and that references already inside other markup are not double-linkified
+- [x] Task 4: Add/extend regression coverage for markdown-fidelity behavior at unit and generation levels (AC: #1, #2)
+  - [x] Extend `MarkdownConverterTests` for task-list checkbox output (checked vs. unchecked) and, if Task 1's fix lands, for mermaid inside `RenderBlock` fragments
+  - [x] Extend `EpicsParserTests` for `LinkifyAcReferences` edge cases (comma-grouped numbers, unresolved numbers, tooltip text) and AC-anchor extraction
+  - [x] Add a focused generation-level assertion (in `SiteGeneratorFidelityTests`) that a rendered story page contains `id="ac-N"` anchors and matching `href="#ac-N"` references, and that a document page with a mermaid fence carries the init script
+- [x] Task 5: Validate end-to-end rendered behavior with the real generation path (AC: #1, #2, #3)
+  - [x] Run the focused test filter for the touched behavior
+  - [x] Run a real generation pass and confirm mermaid diagrams, task checklists, AC deep-links, and the sidebar TOC render correctly with no console errors and no broken anchors
+- [x] Task 6: Relocate the table of contents into an independently-scrolling sidebar across all TOC-bearing pages (AC: #3)
+  - [x] Introduce a two-column page layout (main content + TOC sidebar) shared by the generic page shell and the epic/story detail templater, so the TOC lives beside the content instead of as a top strip
+  - [x] Make the sidebar sticky beneath the sticky nav and give it its own vertical overflow so it stays in view and scrolls independently when longer than the viewport; the main content scrolls normally
+  - [x] Replace `.toc-strip` with a `.toc-sidebar` presentation via one shared TOC-rendering seam that takes an ordered list of `(level, text, anchorId)` entries — do not fork per page type
+  - [x] Generic doc pages, ADRs, and README: source render order already equals `DocModel.Headings` order, so feed those headings to the shared TOC seam (verify heading ids exist for every entry so no link is dead)
+  - [x] Epic/story detail pages: build the TOC entries in the templater's **actual section-emission order** (e.g. User Story → Task Breakdown → Acceptance Criteria → Dev Agent Record → Review Findings → remainder headings → Change Log). Give each templater-emitted panel a stable `id` + human label, and collect the remainder fragment's rendered headings in order so they appear as TOC entries too
+  - [x] Add `scroll-margin-top` (accounting for the sticky nav height) to headings/section anchors so clicking a TOC link lands the target below the nav rather than hidden under it
+  - [x] Implement responsive behavior: on narrow (mobile/tablet) breakpoints the sidebar collapses to a stacked/top or toggled form that remains usable and does not crush the main content
+  - [x] Preserve the accessible `<nav aria-label="On this page">` semantics; keep entries as real in-page anchor links (keyboard-activatable). Scroll-spy/active-section highlighting is optional polish, not required by AC #3
 
 ## Developer Context Section
 
@@ -299,8 +299,38 @@ claude-opus-4-8
 - Primary open work for AC #1/#2 is the fragment-render mermaid gap (`RenderBlock`/`RenderInline` bypass the mermaid renderer; story/epic pages omit the init script) plus regression coverage — production changes may be minimal or none if BMad artifacts never carry mermaid in bodies.
 - AC #3 (added per product-owner direction) is net-new build, not verify-and-harden: relocate the top-strip TOC (`.toc-strip`) into an independently-scrolling sidebar shared across generic/ADR/README pages and add a rendered-order TOC to epic/story detail pages (which have none today). The detail-page TOC must follow the templater's emission order, not source-heading order. This is a navigation/readability change and is sequenced after Tasks 1–5.
 
+### Implementation Completion Notes (dev-story run 2026-07-06)
+
+**AC #1 — Mermaid fidelity (Task 1):** Resolved the fragment-render gap centrally. Extracted a shared `MarkdownConverter.RenderDocumentHtml(MarkdownDocument)` helper (mermaid-aware `HtmlRenderer` setup) now used by both `Convert()` and `RenderBlock()`, so a ` ```mermaid ` fence authored inside a story/epic artifact body renders as `<pre class="mermaid">` instead of inert `<code class="language-mermaid">`. Added `Mermaid.BlockMarker` + `Mermaid.ContainsBlock(html)`, and `EpicsTemplater.RenderStory`/`RenderEpic` now inject `Mermaid.InitScript()` only when the composed page actually contains a diagram — mirroring the existing `HasMermaid` gate on full pages. `RenderInline` intentionally left untouched (mermaid is a block construct). Verified in the real generation pass: epics roadmap + `ARCHITECTURE-SPINE` render to SVG (`data-processed="true"`), and no page carries a spurious init script.
+
+**AC #1 — Task checklists (Task 2):** Confirmed no production change needed — Markdig `UseAdvancedExtensions()` renders `- [x]`/`- [X]`/`- [ ]` as disabled checkboxes (checked vs. unchecked) with the existing `specscribe.css` swatch styling; non-checkbox bullets unaffected. Added regression coverage (`RenderBlock` checkbox + non-checkbox theories) and confirmed 42 rendered checkboxes on the real story-1-3 page.
+
+**AC #2 — AC deep-linking (Task 3):** Confirmed no production change needed — `id="ac-N"` anchors + `.ac-anchor` self-links + `:target` highlight and `EpicsParser.LinkifyAcReferences` all behave. Added edge-case coverage (comma groups, colonless/spaceless forms, unresolved-number plain-text fallback, tooltip escaping, idempotence/no double-linkify, empty-criteria no-op). Verified in-browser: `#ac-1` targets the criterion and the `:target` highlight fires.
+
+**AC #3 — TOC sidebar (Task 6, net-new):** Introduced one shared seam `Toc` (`RenderSidebar`, `WrapWithSidebar`, `ExtractHeadings`) plus a two-column `.page-shell`/`.toc-sidebar` layout — no per-page-type fork. Generic docs/ADRs/README feed `DocModel.Headings` (source==render order); epic/story detail pages build the TOC in the templater's actual emission order (panels get stable `sec-*` ids + labels; remainder-fragment headings are gathered via `Toc.ExtractHeadings` and slotted in rendered order). Sidebar is `position: sticky` under the nav with its own `overflow-y: auto` (independent scroll); `scroll-margin-top: var(--nav-offset)` on anchors; collapses to a stacked strip below 900px. Verified in-browser at 1280px (grid `876px 224px`, sticky top 60px, 0 horizontal overflow) and 375px (collapsed, widest TOC link 274px, 0 overflow); 310 TOC anchors across 28 generated pages with **0 dead links**; no console errors.
+
+**Root-cause fix (found during AC #3 validation):** `PathUtil.StripHtmlTags` used a non-`Singleline` `<.*?>` regex, so a heading whose linkified `(AC: #N)` reference carried a multi-line `title` attribute wasn't stripped — leaking raw anchor markup into the TOC entry text (and a ~3500px overflowing link on mobile). Made the strip regex `Singleline`; added a `Toc.ExtractHeadings` regression test for a heading anchor whose attribute spans newlines.
+
 ### File List
 
+Production:
+- src/SpecScribe/MarkdownConverter.cs — extracted shared mermaid-aware `RenderDocumentHtml`; `RenderBlock` now mermaid-aware
+- src/SpecScribe/Mermaid.cs — added `BlockMarker` + `ContainsBlock`
+- src/SpecScribe/EpicsTemplater.cs — `RenderStory`/`RenderEpic` compose main content + emission-order TOC into the shared two-column shell; conditional mermaid init injection
+- src/SpecScribe/HtmlTemplater.cs — `RenderPage` uses the shared TOC sidebar/shell instead of the top strip
+- src/SpecScribe/Toc.cs — NEW shared TOC seam (sidebar renderer, two-column shell wrapper, rendered-order heading extractor)
+- src/SpecScribe/PathUtil.cs — `StripHtmlTags` regex made `Singleline` (multi-line-attribute tag stripping)
+- src/SpecScribe/assets/specscribe.css — `--nav-offset`; `.page-shell`/`.page-main`/`.toc-sidebar` two-column layout, sticky/independent-scroll, scroll-margin, responsive collapse; retired `.toc-strip`
+
+Tests:
+- tests/SpecScribe.Tests/MarkdownConverterTests.cs — fragment-mermaid + task-list checkbox coverage
+- tests/SpecScribe.Tests/EpicsParserTests.cs — `LinkifyAcReferences` edge cases
+- tests/SpecScribe.Tests/TocTests.cs — NEW seam unit coverage
+- tests/SpecScribe.Tests/SiteGeneratorFidelityTests.cs — NEW generation-level fidelity + TOC coverage
+
+Other:
+- .claude/launch.json — NEW static-preview config (serves docs/live) used for AC #3 visual validation
+- docs/live/** — regenerated site output
 - _bmad-output/implementation-artifacts/1-3-markdown-fidelity-for-core-artifact-patterns.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
 
@@ -308,3 +338,4 @@ claude-opus-4-8
 
 - 2026-07-06: Created Story 1.3 implementation context with markdown-fidelity-specific architecture, current-state analysis (both ACs largely implemented), the mermaid-in-artifact-body hardening gap, code-seam guidance, and testing requirements.
 - 2026-07-06: Added AC #3 and Task 6 per product-owner direction — relocate the on-page TOC from a top strip into an independently-scrolling sidebar across generic/ADR/README pages and extend a rendered-order TOC to epic/story detail pages. Documented current TOC state (`.toc-strip` in `HtmlTemplater.RenderPage`; detail pages have none), the two-column/sticky layout approach, the rendered-vs-source order requirement (critical for the reordered detail-page layout), and responsive/accessibility guardrails.
+- 2026-07-06: Implemented Story 1.3. AC #1: closed the mermaid-in-fragment gap (shared mermaid-aware `RenderBlock` + gated init-script injection on detail pages) and confirmed task-checklist fidelity. AC #2: confirmed AC anchors/deep-links, added edge-case coverage. AC #3: built the shared `Toc` seam + two-column sticky sidebar across all TOC-bearing pages with rendered-order detail-page TOCs. Fixed a latent `PathUtil.StripHtmlTags` multi-line-tag bug surfaced during validation. Added 32 tests (164 total, all green); real generation pass clean (20 pages, 310 TOC anchors, 0 dead links, no console errors).

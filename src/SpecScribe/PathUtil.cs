@@ -38,7 +38,10 @@ public static class PathUtil
     public static string RenderFooter(string trailingHtml)
         => $"<footer class=\"doc-footer\">\n  Generated using <a href=\"https://github.com/IntegerMan/SpecScribe\">SpecScribe</a> {trailingHtml}\n</footer>\n\n";
 
-    private static readonly Regex TagStripRegex = new("<.*?>", RegexOptions.Compiled);
+    // Singleline so a tag whose attributes contain newlines still strips cleanly — e.g. an "(AC: #N)"
+    // reference linkified inside a heading carries a multi-line `title` (the criterion's Given/When/Then
+    // text), and without Singleline the `.` would stop at the first newline and leave the raw tag behind.
+    private static readonly Regex TagStripRegex = new("<.*?>", RegexOptions.Compiled | RegexOptions.Singleline);
 
     /// <summary>Strips HTML tags AND decodes entities, leaving true plain text — used where
     /// already-rendered inline HTML (e.g. an epic title with an embedded &lt;code&gt; span) needs to appear

@@ -105,4 +105,63 @@ public class MarkdownConverterTests : IDisposable
     [Fact]
     public void RenderBlock_TagsMarkdownTables()
         => Assert.Contains("<table class=\"md-table\">", MarkdownConverter.RenderBlock("| a | b |\n|---|---|\n| 1 | 2 |"));
+
+    [Fact]
+    public void RenderBlock_RendersMermaidFencesAsClientRenderBlocks()
+    {
+        // Fragments (story remainder, dev-agent record, etc.) must carry the same mermaid fidelity as a full
+        // page — a fence authored inside an artifact body used to render as inert <code class="language-mermaid">.
+        var html = MarkdownConverter.RenderBlock("""
+            Some intro text.
+
+            ```mermaid
+            graph TD
+              A --> B
+            ```
+            """);
+
+        Assert.Contains("<pre class=\"mermaid\">", html);
+        Assert.DoesNotContain("<code class=\"language-mermaid\">", html);
+        Assert.True(Mermaid.ContainsBlock(html));
+    }
+
+    [Fact]
+    public void RenderBlock_OrdinaryCodeFenceInFragmentIsUntouched()
+    {
+        var html = MarkdownConverter.RenderBlock("```csharp\nvar x = 1;\n```");
+
+        Assert.Contains("language-csharp", html);
+        Assert.False(Mermaid.ContainsBlock(html));
+    }
+
+    [Theory]
+    [InlineData("- [x] Done task", "checked")]
+    [InlineData("- [X] Done task uppercase", "checked")]
+    [InlineData("- [ ] Pending task", "unchecked")]
+    public void RenderBlock_RendersTaskListCheckboxesWithCompletionState(string markdown, string expectation)
+    {
+        // GitHub-style task lists render as disabled <input type="checkbox">; a completed item carries the
+        // `checked` attribute (styled into a green checkmark by specscribe.css), an incomplete one does not.
+        var html = MarkdownConverter.RenderBlock(markdown);
+
+        Assert.Contains("type=\"checkbox\"", html);
+        Assert.Contains("disabled", html);
+        if (expectation == "checked")
+        {
+            Assert.Contains("checked", html);
+        }
+        else
+        {
+            Assert.DoesNotContain("checked", html);
+        }
+    }
+
+    [Fact]
+    public void RenderBlock_LeavesNonCheckboxBulletsUnaffected()
+    {
+        var html = MarkdownConverter.RenderBlock("- plain bullet\n- another bullet");
+
+        Assert.DoesNotContain("type=\"checkbox\"", html);
+        Assert.Contains("<li>plain bullet</li>", html);
+    }
 }

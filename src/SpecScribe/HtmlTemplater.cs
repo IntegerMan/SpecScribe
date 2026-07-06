@@ -16,36 +16,34 @@ public static class HtmlTemplater
         sb.Append(nav.RenderNavBar(doc.OutputRelativePath));
         sb.Append(SiteNav.RenderBreadcrumb(doc.OutputRelativePath, new (string, string?)[] { ("Home", "index.html"), (doc.Title, null) }));
 
-        sb.Append("<header class=\"doc-header\">\n");
-        sb.Append($"  <h1>{Html(doc.Title)}</h1>\n");
+        // Main content (header + article) is composed separately so it can be wrapped in the two-column page
+        // shell alongside the TOC sidebar. Source render order equals DocModel.Headings order for a straight
+        // full-page render, so those headings feed the shared TOC seam directly.
+        var main = new StringBuilder();
+        main.Append("<header class=\"doc-header\">\n");
+        main.Append($"  <h1>{Html(doc.Title)}</h1>\n");
         if (doc.Frontmatter.Project is { Length: > 0 } project)
         {
-            sb.Append($"  <div class=\"doc-subtitle\">{Html(project)}</div>\n");
+            main.Append($"  <div class=\"doc-subtitle\">{Html(project)}</div>\n");
         }
-        sb.Append("  <div class=\"meta-pills\">\n");
-        AppendPill(sb, doc.Frontmatter.Author, "author");
-        AppendPill(sb, doc.Frontmatter.Date, "date");
-        AppendPill(sb, doc.Frontmatter.Version, v => $"v{v}");
-        AppendStatusPill(sb, doc.Frontmatter.Status);
-        sb.Append($"    <span class=\"pill\">{Html(PathUtil.NormalizeSlashes(doc.SourceRelativePath))}</span>\n");
-        sb.Append("  </div>\n</header>\n\n");
+        main.Append("  <div class=\"meta-pills\">\n");
+        AppendPill(main, doc.Frontmatter.Author, "author");
+        AppendPill(main, doc.Frontmatter.Date, "date");
+        AppendPill(main, doc.Frontmatter.Version, v => $"v{v}");
+        AppendStatusPill(main, doc.Frontmatter.Status);
+        main.Append($"    <span class=\"pill\">{Html(PathUtil.NormalizeSlashes(doc.SourceRelativePath))}</span>\n");
+        main.Append("  </div>\n</header>\n\n");
 
-        var tocHeadings = doc.Headings.Where(h => h.Level is 2 or 3).ToList();
-        if (tocHeadings.Count > 0)
-        {
-            sb.Append("<nav class=\"toc-strip\" aria-label=\"On this page\">\n");
-            sb.Append("  <span class=\"toc-label\">On this page</span>\n");
-            foreach (var h in tocHeadings)
-            {
-                var cls = h.Level == 3 ? " toc-h3" : string.Empty;
-                sb.Append($"  <a class=\"{cls.Trim()}\" href=\"#{Html(h.Id)}\">{Html(h.Text)}</a>\n");
-            }
-            sb.Append("</nav>\n\n");
-        }
+        main.Append("<article class=\"doc-body\">\n");
+        main.Append(doc.BodyHtml);
+        main.Append("\n</article>\n");
 
-        sb.Append("<article class=\"doc-body\">\n");
-        sb.Append(doc.BodyHtml);
-        sb.Append("\n</article>\n\n");
+        var tocEntries = doc.Headings
+            .Where(h => h.Level is 2 or 3)
+            .Select(h => new Toc.Entry(h.Level, h.Text, h.Id))
+            .ToList();
+        sb.Append(Toc.WrapWithSidebar(main.ToString(), tocEntries));
+        sb.Append('\n');
 
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         if (doc.HasMermaid)

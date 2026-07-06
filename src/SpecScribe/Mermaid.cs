@@ -47,10 +47,20 @@ public static class Mermaid
 
     private static string EscapeLabel(string text) => text.Replace('"', '\'').Replace('\n', ' ').Trim();
 
+    /// <summary>The opening tag every rendered mermaid diagram carries (from <see cref="Block"/> and the
+    /// mermaid-aware code-block renderer). Templaters that compose fragment HTML use <see cref="ContainsBlock"/>
+    /// to decide whether a page needs the client-side init script injected.</summary>
+    public const string BlockMarker = "<pre class=\"mermaid\">";
+
     /// <summary>Wraps raw mermaid source for the client-side renderer to pick up. HTML-encoding here is
     /// correct, not redundant: mermaid.js reads the element's textContent, which the browser decodes back
     /// to plain text — this just prevents the raw source from being parsed as markup in the meantime.</summary>
-    public static string Block(string mermaidSource) => $"<pre class=\"mermaid\">\n{PathUtil.Html(mermaidSource)}\n</pre>\n\n";
+    public static string Block(string mermaidSource) => $"{BlockMarker}\n{PathUtil.Html(mermaidSource)}\n</pre>\n\n";
+
+    /// <summary>True when already-rendered HTML contains at least one mermaid diagram block — used by
+    /// detail-page templaters to inject <see cref="InitScript"/> only when a fragment actually carries a
+    /// diagram, mirroring the <c>HasMermaid</c>-gated injection on full pages.</summary>
+    public static bool ContainsBlock(string html) => html.Contains(BlockMarker, StringComparison.Ordinal);
 
     public static string InitScript() => """
         <script type="module">

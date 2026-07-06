@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "live-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "docs/live", "-l", "4321"],
+      "port": 4321
+    }
+  ]
+}

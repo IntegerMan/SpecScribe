@@ -22,6 +22,8 @@
   --gold-light: #d4a017;
   --border: #d4c4a8;
   --shadow: rgba(42, 31, 14, 0.15);
+  /* Approximate sticky-nav height — the sticky TOC sidebar sits below the nav and anchored jumps clear it. */
+  --nav-offset: 3.75rem;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -164,38 +166,88 @@ body {
 .pill.status-superseded,
 .pill.status-deprecated { border-color: var(--border); color: var(--ink-light); text-decoration: line-through; }
 
-/* ====================== TOC STRIP ====================== */
-.toc-strip {
-  max-width: 860px;
-  margin: 0 auto 2rem;
+/* ====================== TOC SIDEBAR + PAGE SHELL ======================
+   The on-page contents live in an independently-scrolling right rail beside the main content (AC #3).
+   Every TOC-bearing page (generic docs, ADRs, README, epic/story detail) shares this one layout via the
+   Toc seam — the TOC is never forked per page type. */
+.page-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14rem;
+  gap: 2rem;
+  align-items: start;
+}
+
+/* Let the content column shrink below its intrinsic width instead of overflowing the grid track. Its
+   inner 860px blocks (.doc-body, .dashboard-narrow, header) stay centered within it. */
+.page-main { min-width: 0; }
+
+/* Sticky beneath the sticky site nav with its own overflow, so it stays in view and scrolls on its own
+   when longer than the viewport while the main column scrolls with the page. */
+.toc-sidebar {
+  position: sticky;
+  top: var(--nav-offset);
+  max-height: calc(100vh - var(--nav-offset) - 1rem);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  margin-top: 2.5rem;
   background: var(--parchment-dark);
   border: 1px solid var(--parchment-deep);
   border-radius: 4px;
-  padding: 0.7rem 1.3rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.9rem;
-  align-items: center;
 }
 
-.toc-strip .toc-label {
+.toc-sidebar .toc-label {
   font-size: 0.6rem;
   letter-spacing: 0.25em;
   text-transform: uppercase;
   color: var(--ink-light);
-  margin-right: 0.3rem;
-  white-space: nowrap;
+  margin-bottom: 0.35rem;
 }
 
-.toc-strip a {
+.toc-sidebar a {
   font-size: 0.78rem;
+  line-height: 1.35;
   color: var(--rust);
   text-decoration: none;
-  white-space: nowrap;
+  padding: 0.1rem 0;
 }
 
-.toc-strip a:hover { text-decoration: underline; }
-.toc-strip a.toc-h3 { color: var(--ink-light); font-size: 0.73rem; }
+.toc-sidebar a:hover { text-decoration: underline; }
+.toc-sidebar a.toc-h3 { color: var(--ink-light); font-size: 0.73rem; padding-left: 0.85rem; }
+
+/* Clicked TOC links must land the target below the sticky nav, not hidden under it. */
+.doc-body h2[id], .doc-body h3[id],
+.page-main .chart-panel[id], .page-main section[id],
+.page-main .story-lead[id], .page-main .story-card[id], .page-main .epic-intro[id] {
+  scroll-margin-top: var(--nav-offset);
+}
+
+/* Below the two-column breakpoint the rail collapses to a stacked strip above the content — usable and
+   never crushing the main column (AC #3 graceful degradation). */
+@media (max-width: 900px) {
+  .page-shell { grid-template-columns: 1fr; gap: 0; }
+  .toc-sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    order: -1;
+    margin: 0 auto 2rem;
+    max-width: 860px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.9rem;
+  }
+  .toc-sidebar .toc-label { margin-bottom: 0; margin-right: 0.3rem; white-space: nowrap; }
+  /* Links wrap rather than forcing horizontal overflow when a heading is longer than a narrow screen. */
+  .toc-sidebar a { overflow-wrap: anywhere; }
+  .toc-sidebar a.toc-h3 { padding-left: 0; }
+}
 
 /* ====================== ARTICLE BODY ====================== */
 .doc-body {
