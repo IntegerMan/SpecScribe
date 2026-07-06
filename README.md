@@ -101,17 +101,30 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
+      # GitHub's Pages backend intermittently returns "Deployment failed, try
+      # again later." The first attempt may fail without failing the job; the
+      # guarded retry re-invokes the deploy only when that happens.
       - id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+
+      - if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
 ```
 
 Notes:
 - Replace paths and project name for your project layout.
 - If you are not using a local tool manifest, install SpecScribe in the workflow before running `specscribe`.
+- The deploy step is retried once because GitHub's Pages backend occasionally reports a transient `Deployment failed, try again later.` error; the retry avoids a full rebuild.
 - Full repository example workflow: https://github.com/IntegerMan/SpecScribe/blob/main/.github/workflows/publish-docs-live-pages.yml
 
 ### Option B: Commit generated output and publish from that folder
