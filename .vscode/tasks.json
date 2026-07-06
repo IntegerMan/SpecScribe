@@ -1,0 +1,75 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "SpecScribe: Build",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "SpecScribe.slnx"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$msCompile"
+      ]
+    },
+    {
+      "label": "SpecScribe: Generate Site",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "src/SpecScribe",
+        "--",
+        "generate",
+        "--source",
+        "_bmad-output",
+        "--adrs",
+        "docs/adrs",
+        "--output",
+        "docs/live",
+        "--project-name",
+        "SpecScribe"
+      ],
+      "group": "build",
+      "problemMatcher": [
+        "$msCompile"
+      ]
+    },
+    {
+      "label": "SpecScribe: Watch Site",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "src/SpecScribe",
+        "--",
+        "watch",
+        "--source",
+        "_bmad-output",
+        "--adrs",
+        "docs/adrs",
+        "--output",
+        "docs/live",
+        "--project-name",
+        "SpecScribe"
+      ],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    }
+  ]
+}
