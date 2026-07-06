@@ -14,7 +14,7 @@ baseline_commit: '8ca412d83066bc7ebc0d97ed0f9f87da696f029e'
 
 **Problem:** The "Next Steps" panels render their heading as `Next Steps (BMad Method)` — the module label is noise. Separately, the home/project panel deliberately omits code-review, so a reader can't see that a story is sitting in `review` status awaiting an adversarial review from the dashboard.
 
-**Approach:** Drop the `({ModuleLabel})` suffix from the shared Next Steps heading (affects home, epic, and story panels uniformly). In the project-level suggestions, add a single `/bmad-code-review` (module-appropriate) entry grouped by action — the code-review prompt once, with the ids of every story currently in `review` status listed in its description so the reviewer knows which changes are waiting.
+**Approach:** Drop the `({ModuleLabel})` suffix from the shared Next Steps heading (affects home, epic, and story panels uniformly). In the project-level suggestions, surface awaiting-review stories: a lone review story passes its id straight to the command (`/bmad-code-review 1.4`); when several are in review, group them into one action row (bare command) whose description lists every awaiting-review id, since one invocation can't take them all.
 
 ## Boundaries & Constraints
 
@@ -22,15 +22,15 @@ baseline_commit: '8ca412d83066bc7ebc0d97ed0f9f87da696f029e'
 
 **Ask First:** (none — decisions resolved: remove the label on every panel, not just home.)
 
-**Never:** Do not add code-review to the per-epic or per-story next steps (those already handle it). Do not add a story-id argument to the code-review command — `module-help.csv` gives it no `args`. Do not change status vocabulary or `StatusStyles`.
+**Never:** Do not add code-review to the per-epic or per-story next steps (those already handle it). Do not append story ids to the *grouped* multi-review command — only the single-review case passes an id. Do not change status vocabulary or `StatusStyles`.
 
 ## I/O & Edge-Case Matrix
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
 | Any Next Steps panel | any suggestions | Heading is `<h3>Next Steps</h3>` — no `(BMad Method)` suffix | N/A |
-| Home, one story in `review` | EpicsModel with a story whose status maps to `review`; catalog exposes code-review | Project Next Steps list includes a `/bmad-code-review` item whose description names that story | N/A |
-| Home, multiple stories in `review` | several review-status stories | A single `/bmad-code-review` item whose description lists all awaiting-review story ids (grouped by action, not one row per story) | N/A |
+| Home, one story in `review` | EpicsModel with a story whose status maps to `review`; catalog exposes code-review | Project Next Steps list includes a `/bmad-code-review {id}` item (story id passed to the command) whose description names that story | N/A |
+| Home, multiple stories in `review` | several review-status stories | A single bare `/bmad-code-review` item whose description lists all awaiting-review story ids (grouped by action, not one row per story) | N/A |
 | Home, no stories in `review` | no review-status stories | No code-review item appears among project suggestions | N/A |
 | Module lacks code-review command | catalog without `code-review` key | Code-review item omitted; no broken command rendered | N/A |
 
@@ -46,7 +46,7 @@ baseline_commit: '8ca412d83066bc7ebc0d97ed0f9f87da696f029e'
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `src/SpecScribe/BmadCommands.cs` -- In `RenderInner`, change the heading to `<h3>Next Steps</h3>` (remove the `({ModuleLabel})` interpolation). In `ForProject`, before the existing front-line logic, collect the ids of stories where `StatusStyles.ForStory(s) == "review"`; if any, `Add(...)` a single code-review suggestion whose description lists those ids (singular/plural aware), e.g. `"Stories 1.4, 2.1 are awaiting code review — adversarial multi-layer review of their changes."`. Update the `ForProject` doc comment so it no longer claims code review is excluded here.
+- [x] `src/SpecScribe/BmadCommands.cs` -- In `RenderInner`, change the heading to `<h3>Next Steps</h3>` (remove the `({ModuleLabel})` interpolation). In `ForProject`, before the existing front-line logic, collect the ids of stories where `StatusStyles.ForStory(s) == "review"`. For exactly one, `Add(...)` a suggestion using `commands.Command("code-review", id)` so the id is appended to the command. For more than one, `Add(...)` a single suggestion using the bare `commands.Command("code-review")` whose description lists every id, e.g. `"Stories 1.4, 2.1 are awaiting code review — adversarial multi-layer review of their changes."`. Update the `ForProject` doc comment so it no longer claims code review is excluded here.
 - [x] `tests/SpecScribe.Tests/ModuleContextTests.cs` -- Update the story-level test: replace `Assert.Contains("Next Steps (BMad Method)", html)` with `Assert.Contains("Next Steps", html)` plus `Assert.DoesNotContain("(BMad Method)", html)`. Add `RenderProjectNextSteps` tests (with a small EpicsModel/EpicInfo helper modeled on `ChartsTests`): (a) a `review`-status story yields a `/bmad-code-review` item naming that story; (b) no review story yields no code-review item; (c) an empty-of-code-review catalog omits it.
 
 **Acceptance Criteria:**

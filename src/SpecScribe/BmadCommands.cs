@@ -168,18 +168,20 @@ public static class BmadCommands
         var suggestions = new List<Suggestion>();
         var allStories = model.Epics.SelectMany(e => e.Stories).ToList();
 
-        // Stories sitting in code review are the most immediate move — surface a single review prompt (the
-        // action) that lists the awaiting-review story ids, so a reader sees from the dashboard which changes
-        // are waiting on an adversarial pass. Grouped by action rather than one row per story, since the
-        // command itself takes no story argument. Dropped silently when the module exposes no code-review.
+        // Stories sitting in code review are the most immediate move. A single review story passes its id
+        // straight to the command (`/bmad-code-review 1.4`) so it's one copy-paste away; multiple stories are
+        // grouped into one action row that lists their ids in the description (a single invocation can't
+        // meaningfully take them all). Dropped silently when the module exposes no code-review command.
         var awaitingReview = allStories.Where(s => StatusStyles.ForStory(s) == "review").Select(s => s.Id).ToList();
-        if (awaitingReview.Count > 0)
+        if (awaitingReview.Count == 1)
         {
-            var noun = awaitingReview.Count == 1 ? "Story" : "Stories";
-            var verb = awaitingReview.Count == 1 ? "is" : "are";
-            var possessive = awaitingReview.Count == 1 ? "its" : "their";
+            Add(suggestions, commands.Command("code-review", awaitingReview[0]),
+                $"Story {awaitingReview[0]} is awaiting code review — adversarial multi-layer review of its changes.");
+        }
+        else if (awaitingReview.Count > 1)
+        {
             Add(suggestions, commands.Command("code-review"),
-                $"{noun} {string.Join(", ", awaitingReview)} {verb} awaiting code review — adversarial multi-layer review of {possessive} changes.");
+                $"Stories {string.Join(", ", awaitingReview)} are awaiting code review — adversarial multi-layer review of their changes.");
         }
 
         // The current front line — a story that's ready or already in development. Referenced by its short

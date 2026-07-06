@@ -172,7 +172,8 @@ public class BmadCommandsTests
         var html = BmadCommands.RenderProjectNextSteps(
             Project(Story("1.3", "done"), Story("1.4", "review")), BmmCatalog);
 
-        Assert.Contains("/bmad-code-review", html);
+        // A lone review story passes its id straight to the command.
+        Assert.Contains("/bmad-code-review 1.4", html);
         Assert.Contains("Story 1.4 is awaiting code review", html);
         // The done story is not the front line and produces no dev/review prompt of its own here.
         Assert.DoesNotContain("Story 1.3", html);
@@ -190,6 +191,8 @@ public class BmadCommandsTests
         Assert.Contains("/bmad-dev-story 1.5", html);
         // Exactly one code-review row, not one per review story.
         Assert.Equal(1, html.Split("/bmad-code-review").Length - 1);
+        // Multiple review stories keep the bare command — no single id is appended.
+        Assert.DoesNotContain("/bmad-code-review 1.4", html);
         Assert.True(html.IndexOf("awaiting code review", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-dev-story", StringComparison.Ordinal),
             "review prompt should render before the front-line dev-story prompt");
