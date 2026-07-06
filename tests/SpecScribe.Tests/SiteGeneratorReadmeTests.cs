@@ -63,6 +63,8 @@ public class SiteGeneratorReadmeTests : IDisposable
         // it — so the site stays self-contained on a static host. [Story 1.5 Task 3]
         Assert.True(File.Exists(Path.Combine(_root, "site", ForgeOptions.ScriptName)));
         var index = File.ReadAllText(Path.Combine(_root, "site", "index.html"));
-        Assert.Contains($"<script src=\"{ForgeOptions.ScriptName}\" defer></script>", index);
+        // Linked with a build-versioned cache-busting query so a cached copy can't mask a redeployed script.
+        Assert.Contains($"<script src=\"{ForgeOptions.ScriptName}?v=", index);
+        Assert.Contains("\" defer></script>", index);
     }
 }

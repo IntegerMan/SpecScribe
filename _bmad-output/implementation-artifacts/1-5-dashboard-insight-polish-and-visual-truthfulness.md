@@ -4,7 +4,7 @@ baseline_commit: 53432af8b8410d16eacd7dda01025098153d6067
 
 # Story 1.5: Dashboard Insight Polish and Visual Truthfulness
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -296,5 +296,32 @@ Tests (modified):
 
 ## Change Log
 
+- 2026-07-06: Code review (adversarial multi-layer). Diagnosed the three reported visual artifacts as a stale cached pre-1.5 `specscribe.css` (not a source defect). Applied 8 patches: build-versioned cache-busting on the css/js hrefs (the durable fix); percent-encoded favicon data URI; copy-button `aria-label` no longer sticks on "Copied" after rapid re-clicks; fallback Epic-Status donut no longer fabricates a "0/total" fraction; heatmap grid no longer extends into the future and its heat scale excludes suppressed future days; empty requirement group renders an explicit empty state; tooltip positioning fixed for horizontal scroll + touch dismissal; and the on-brand tooltip is now keyboard-focusable (donut `tabindex`) and touch-reachable on donut/heatmap segments, not just the sunburst. 2 items deferred (unmapped `ForEpic` class; `HeatLevel` maxCount≤1 collapse), 5 dismissed. Full suite 197 passing; regenerated site verified in-browser. Status → done.
 - 2026-07-06: Implemented Story 1.5. Landed the six per-stage status tokens and routed every chart/legend/badge through them (B1–B5); added the one sanctioned progressive-enhancement script for on-brand tooltips + Next Steps copy buttons, delivered as a self-contained embedded asset (C1/C2/C4/D5, F2); unified interaction grammar with sunburst hover-invert, In-development card emphasis, and `no-preference` entrance animations beside 1.4's `reduce` block (D1–D4/D2); made the existing charts truthful — epic-status donut from the story roll-up, reframed task stat, future-day-muted + rescaled heatmap with a headline, fraction donut centers, requirements stacked bars, zero-row suppression (A2/A3/A4/A5/E1/E2/E3); reordered the dashboard to lead with Now & Next + the sunburst and slimmed Explore Key Views to a pill row, added a commit-recency signal (F1/F3); emitted a favicon + home title/description/OG (G1/G2). Preserved and extended Story 1.4's accessibility floor. Added render/Charts/stylesheet/generation tests (197 passing); real generation pass produced 24 pages with 0 errors. Set Status → review.
 - 2026-07-06: Created Story 1.5 by splitting the Story 1.4 UX review into its polish/truthfulness half. Scoped: status-color tokenization + unified vocabulary + zero-row suppression + quick-link accents (B1–B5); on-brand tooltip system with one sanctioned progressive-enhancement script (C1/C2/C4/D5); interaction grammar + sunburst sibling-dim + Now emphasis + `no-preference` entrance animations (D1–D4/D2); chart truthfulness for existing metrics (A2 pluralization, A3 epic-donut roll-up, A4 future-day muting, A5 task-stat reframe, E1 heatmap rescale/headline, E2 requirements stacked bars, E3 donut fractions); dashboard reorder + Next Steps copy/grammar + recency (F1–F3); favicon + home title/meta/OG (G1/G2). Routed A6/E4 to Story 2.1 and the accessibility items to Story 1.4; documented dependency on Story 1.4's seams and coordination with in-flight Story 1.3.
+
+## Review Findings
+
+Code review 2026-07-06 (adversarial multi-layer: Blind Hunter, Edge Case Hunter, Acceptance Auditor + inline diagnosis). Triaged: 1 decision-needed, 7 patch, 2 defer, 5 dismissed.
+
+> **Root cause of the three reported visual artifacts (unstyled copy buttons, inconsistent epic/story colors, "Explore Key Views" as raw links):** a **stale, browser-/CDN-cached pre-1.5 `specscribe.css`** served against freshly-regenerated post-1.5 HTML. Verified: fresh CSS/JS are byte-identical to source and render correctly when served clean; the pre-1.5 CSS has 0 `.copy-btn`/`.quick-link-pill`/`--status-*` rules, so new markup falls back to browser defaults and old collapsed colors. Not a defect in the 1.5 source — see Patch P1 for the durable fix (cache-busting) and hard-refresh for the immediate remedy.
+
+### decision-needed
+
+_(resolved 2026-07-06 → reclassified as patch P8 below: extend the on-brand tooltip to bare donut/heatmap segments.)_
+
+### patch
+
+- [x] [Review][Patch] Extend the on-brand tooltip to keyboard/touch on the donut & heatmap charts (AC #1 / Task 3 [UXO C1/C4/D5]): make the JS `focusin`/`touchstart` handlers also match bare `.donut-seg`/`.heatmap-cell` (not just `closest("a")`) and add `tabindex="0"` so those segments are focusable — today only the `<a>`-wrapped sunburst delivers the on-brand tooltip to keyboard/touch users [src/SpecScribe/assets/specscribe.js:1047-1071; src/SpecScribe/Charts.cs (donut/heatmap segment emit)]
+- [x] [Review][Patch] Assets linked without cache-busting → stale cached CSS produces the three reported artifacts on redeploy/regeneration; add a content-hash or version query to the css/js hrefs (e.g. `specscribe.css?v={hash}`) [src/SpecScribe/PathUtil.cs:47-50]
+- [x] [Review][Patch] Copy-button `aria-label` permanently stuck on "Copied" for screen readers after rapid re-click within 1600ms (pending timeout not cleared; `prev` captured while already "Copied") [src/SpecScribe/assets/specscribe.js:1103-1111]
+- [x] [Review][Patch] Fallback Epic Status donut hard-codes center to "0/total" done (unreachable-when-`epicsModel`-null path shows zero progress even for complete epics) [src/SpecScribe/HtmlTemplater.cs:239]
+- [x] [Review][Patch] Future-dated commits (clock/timezone skew) break the heatmap: headline names a date the grid suppresses, `maxCount` includes suppressed future days (depresses the visible heat scale), a lone future-dated commit renders an all-blank grid, and `CommitStatSub` reports "last commit today" — A4 future-day suppression not reconciled with E1 headline & F3 recency [src/SpecScribe/Charts.cs:435,453,484; src/SpecScribe/HtmlTemplater.cs:202]
+- [x] [Review][Patch] Favicon data URI is emitted without attribute/percent encoding — raw spaces and `<`/`>` inside `href="data:image/svg+xml,…"` (only `#` was `%23`-encoded), so the icon may fail to load in stricter browsers; run the SVG through `Uri.EscapeDataString` / percent-encode spaces [src/SpecScribe/PathUtil.cs:29-33,48]
+- [x] [Review][Patch] Empty requirement group (a kind with 0 requirements) renders a hollow empty stacked bar + empty legend instead of an explicit empty state — the `nonZero.Count < 2` branch conflates "one status" with "no statuses" [src/SpecScribe/HtmlTemplater.cs:337]
+- [x] [Review][Patch] Tooltip positioning edge cases in specscribe.js: first-show reads a stale bounding rect; `left` omits `window.scrollX` while `top` adds `scrollY` (mispositions on horizontal scroll); touch second-tap leaves a stale tooltip on same-page anchor nav [src/SpecScribe/assets/specscribe.js:1011-1023,1060-1071]
+
+### defer
+
+- [x] [Review][Defer] `AppendEpicStatusPanel` silently drops epics whose `ForEpic` class is outside {done,active,drafted,pending} — latent only; no unmapped epic class exists today [src/SpecScribe/HtmlTemplater.cs:221-226] — deferred, pre-existing
+- [x] [Review][Defer] `HeatLevel` collapses every cell to the darkest level when `maxCount <= 1` (a uniform 1-commit/day history reads as heavy activity) — pre-existing; the E1 15-week window makes it more visible [src/SpecScribe/Charts.cs:508] — deferred, pre-existing

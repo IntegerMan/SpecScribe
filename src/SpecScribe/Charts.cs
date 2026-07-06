@@ -60,6 +60,11 @@ public static class Charts
         sb.Append($"<svg class=\"donut\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\"{a11y}>\n");
         sb.Append($"  <circle cx=\"{F(center)}\" cy=\"{F(center)}\" r=\"{F(radius)}\" class=\"donut-track\" />\n");
 
+        // When the donut is non-decorative (a caller supplied an aria-label / role="img"), make each slice
+        // keyboard-focusable so the on-brand tooltip is reachable by focus, not just hover/pointer. Decorative
+        // donuts (aria-hidden) stay out of the tab order. [Story 1.5 review — tooltip keyboard reach]
+        var segFocus = ariaLabel is { Length: > 0 } ? " tabindex=\"0\"" : string.Empty;
+
         var offset = 0.0;
         if (total > 0)
         {
@@ -70,7 +75,7 @@ public static class Charts
                 var dash = fraction * circumference;
                 var gap = circumference - dash;
                 sb.Append(
-                    $"  <circle cx=\"{F(center)}\" cy=\"{F(center)}\" r=\"{F(radius)}\" class=\"donut-seg {cssClass}\" " +
+                    $"  <circle cx=\"{F(center)}\" cy=\"{F(center)}\" r=\"{F(radius)}\" class=\"donut-seg {cssClass}\"{segFocus} " +
                     $"stroke-dasharray=\"{F(dash)} {F(gap)}\" stroke-dashoffset=\"-{F(offset)}\">" +
                     $"<title>{Html(label)}: {value}</title></circle>\n");
                 offset += dash;
@@ -420,7 +425,10 @@ public static class Charts
         var lastCommit = series.Max(s => s.Day);
         var today = DateOnly.FromDateTime(DateTime.Now);
 
-        var end = lastCommit > today ? lastCommit : today;
+        // The grid never runs past the generation date: future-dated commits (clock/timezone skew) would
+        // otherwise extend it into all-blank suppressed weeks and let the headline name a day the grid can't
+        // show. [Story 1.5 A4 + review]
+        var end = today;
         // The heatmap is the primary "how has the work gone" visual, so show a fuller ~15-week window (it
         // scales up to fill its panel via CSS) rather than the old 7-week postage stamp. [Story 1.5 E1]
         var minStart = end.AddDays(-7 * 15);
@@ -432,7 +440,9 @@ public static class Charts
 
         var totalDays = end.DayNumber - start.DayNumber + 1;
         var weeks = (int)Math.Ceiling(totalDays / 7.0);
-        var maxCount = series.Max(s => s.Count);
+        // Scale the heat over only the days the grid actually renders (<= today). A future-dated commit is
+        // suppressed from the cells, so it must not inflate maxCount and depress every visible cell's level. [review]
+        var maxCount = series.Where(s => s.Day <= today).Select(s => s.Count).DefaultIfEmpty(0).Max();
 
         const int cell = 11;
         const int gap = 3;

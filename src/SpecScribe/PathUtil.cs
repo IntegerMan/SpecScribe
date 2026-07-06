@@ -26,11 +26,23 @@ public static class PathUtil
     /// <summary>A small inline-SVG favicon (gold quill-spark on a dark parchment-ink tile) emitted as a
     /// data URI so every page carries a real tab icon and <c>/favicon.ico</c> stops 404-ing — no extra asset
     /// file to ship. [Story 1.5 G1]</summary>
-    private const string FaviconDataUri =
-        "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>" +
-        "<rect width='32' height='32' rx='6' fill='%231a1208'/>" +
-        "<path d='M16 4 L18.4 13.6 L28 16 L18.4 18.4 L16 28 L13.6 18.4 L4 16 L13.6 13.6 Z' fill='%23d4a017'/>" +
+    private const string FaviconSvg =
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>" +
+        "<rect width='32' height='32' rx='6' fill='#1a1208'/>" +
+        "<path d='M16 4 L18.4 13.6 L28 16 L18.4 18.4 L16 28 L13.6 18.4 L4 16 L13.6 13.6 Z' fill='#d4a017'/>" +
         "</svg>";
+
+    // Percent-encode the whole SVG so the data URI is valid per RFC 3986 — raw spaces and '<'/'>' inside the
+    // href can break the icon in stricter browsers/validators (only '#' was encoded before). [Story 1.5 G1 review]
+    private static readonly string FaviconDataUri = "data:image/svg+xml," + Uri.EscapeDataString(FaviconSvg);
+
+    // A short cache-busting token appended to the shared css/js hrefs so a redeployed stylesheet/script is
+    // never masked by a browser- or CDN-cached copy of the previous build (the failure mode behind stale-CSS
+    // "unstyled new elements + old colors" artifacts). Deterministic builds (SDK default) make the module
+    // version id a content hash of the assembly — which embeds the css+js — so it changes exactly when those
+    // assets change. [Story 1.5 review — cache-busting]
+    private static readonly string AssetVersion =
+        typeof(PathUtil).Assembly.ManifestModule.ModuleVersionId.ToString("N").Substring(0, 8);
 
     public static string RenderHeadOpen(string title, string cssHref, string scriptHref, string? description = null)
     {
@@ -46,10 +58,11 @@ public static class PathUtil
         sb.Append($"<meta property=\"og:title\" content=\"{Html(title)}\">\n");
         sb.Append($"<meta property=\"og:description\" content=\"{Html(desc)}\">\n");
         sb.Append($"<link rel=\"icon\" href=\"{FaviconDataUri}\">\n");
-        sb.Append($"<link rel=\"stylesheet\" href=\"{Html(cssHref)}\">\n");
+        sb.Append($"<link rel=\"stylesheet\" href=\"{Html(cssHref)}?v={AssetVersion}\">\n");
         // The one sanctioned progressive-enhancement script (on-brand tooltips + copy buttons); `defer` so it
         // never blocks render and runs after the DOM is parsed. Degrades to <title>/aria-label with JS off. [Story 1.5 Task 3]
-        sb.Append($"<script src=\"{Html(scriptHref)}\" defer></script>\n");
+        // Both shared assets carry a build-versioned query so a cached copy can't mask a redeployed one.
+        sb.Append($"<script src=\"{Html(scriptHref)}?v={AssetVersion}\" defer></script>\n");
         sb.Append("</head>\n<body>\n");
         // Skip link is the first focusable element on every page — a keyboard user can jump straight past
         // the nav to the page's single <main id="main-content"> landmark. [Story 1.4 AC #1, UX-DR16]

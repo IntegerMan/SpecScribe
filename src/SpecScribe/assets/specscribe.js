@@ -34,12 +34,14 @@
     var t = ensureTip();
     t.textContent = text;
     t.hidden = false;
-    // Clamp within the viewport so an edge segment's tooltip never spills off-screen.
+    // Clamp within the viewport so an edge segment's tooltip never spills off-screen. `x`/`y` are viewport
+    // (client) coords; the tooltip is absolutely positioned against the body, so convert BOTH axes to page
+    // coords with scrollX/scrollY — otherwise a horizontally-scrolled page misplaces the tooltip.
     var pad = 12;
     var rect = t.getBoundingClientRect();
     var left = Math.min(Math.max(pad, x + 14), window.innerWidth - rect.width - pad);
     var top = Math.max(pad, y - rect.height - 12);
-    t.style.left = left + "px";
+    t.style.left = (left + window.scrollX) + "px";
     t.style.top = (top + window.scrollY) + "px";
   }
 
@@ -63,10 +65,14 @@
     if (seg) hideTip();
   });
 
-  // Keyboard focus: a focused chart link shows the tooltip anchored to its own box.
+  // Keyboard focus: a focused chart segment shows the tooltip anchored to its own box. This covers both the
+  // link-wrapped sunburst segments AND directly-focusable segments (donut slices carry tabindex=0), so the
+  // on-brand tooltip is keyboard-reachable beyond the sunburst. Heatmap cells stay non-focusable by design
+  // (a ~100-cell tab order would be a trap) — their whole-chart aria-label is the keyboard/SR affordance.
   document.addEventListener("focusin", function (e) {
-    var link = e.target.closest ? e.target.closest("a") : null;
-    var seg = link ? link.querySelector(SEG) : null;
+    if (!e.target.closest) return;
+    var link = e.target.closest("a");
+    var seg = link ? link.querySelector(SEG) : e.target.closest(SEG);
     if (seg) {
       var r = seg.getBoundingClientRect();
       showTip(seg, r.left + r.width / 2, r.top);
@@ -75,18 +81,31 @@
   document.addEventListener("focusout", hideTip);
   document.addEventListener("scroll", hideTip, true);
 
-  // Touch: first tap on a chart link shows the tooltip; a second tap on the same link follows it. Gives
-  // touch users the chart detail that used to hide behind a hover-only <title>.
+  // Touch: give touch users the chart detail that used to hide behind a hover-only <title>. For a link-wrapped
+  // segment (sunburst) the first tap shows the tooltip and a second tap on the same link follows it; for a bare
+  // segment (donut slice, heatmap cell) a tap simply shows the tooltip. Either way, a tap elsewhere dismisses it.
   var lastTapped = null;
   document.addEventListener("touchstart", function (e) {
-    var link = e.target.closest ? e.target.closest("a") : null;
-    var seg = link ? link.querySelector(SEG) : (e.target.closest ? e.target.closest(SEG) : null);
+    if (!e.target.closest) return;
+    var link = e.target.closest("a");
+    var seg = link ? link.querySelector(SEG) : e.target.closest(SEG);
     if (!seg) { hideTip(); lastTapped = null; return; }
-    if (link && lastTapped !== link) {
-      e.preventDefault();
-      var r = seg.getBoundingClientRect();
-      showTip(seg, r.left + r.width / 2, r.top);
-      lastTapped = link;
+    if (link) {
+      if (lastTapped !== link) {
+        // First tap on this link: show the tooltip instead of navigating.
+        e.preventDefault();
+        var r = seg.getBoundingClientRect();
+        showTip(seg, r.left + r.width / 2, r.top);
+        lastTapped = link;
+      } else {
+        // Second tap: let the navigation proceed, but don't strand the tooltip on the way out.
+        hideTip();
+      }
+    } else {
+      // Bare segment with no link — just reveal its detail on tap.
+      var rb = seg.getBoundingClientRect();
+      showTip(seg, rb.left + rb.width / 2, rb.top);
+      lastTapped = null;
     }
   }, { passive: false });
 
@@ -121,12 +140,19 @@
     var text = btn.getAttribute("data-copy");
     if (!text) return;
     copyText(text).then(function () {
-      var prev = btn.getAttribute("aria-label") || "Copy";
+      // Capture the resting label ONCE (the first click), so a rapid second click within the reset window
+      // doesn't record "Copied" as the label to restore — which would leave the button announcing "Copied"
+      // to screen readers permanently. Also clear any pending reset before scheduling a fresh one.
+      if (!btn.hasAttribute("data-copy-label")) {
+        btn.setAttribute("data-copy-label", btn.getAttribute("aria-label") || "Copy");
+      }
+      if (btn._copyResetTimer) { window.clearTimeout(btn._copyResetTimer); }
       btn.classList.add("copied");
       btn.setAttribute("aria-label", "Copied");
-      window.setTimeout(function () {
+      btn._copyResetTimer = window.setTimeout(function () {
         btn.classList.remove("copied");
-        btn.setAttribute("aria-label", prev);
+        btn.setAttribute("aria-label", btn.getAttribute("data-copy-label"));
+        btn._copyResetTimer = null;
       }, 1600);
     }).catch(function () { /* best-effort — the visible command is still selectable */ });
   });

@@ -215,7 +215,7 @@ public static class HtmlTemplater
         sb.Append("<div class=\"chart-panel\">\n<h3>Epic Status</h3>\n<div class=\"donut-and-legend\">\n");
 
         List<(string Label, int Value, string CssClass)> segments;
-        string centerText;
+        string? centerText;
         if (epicsModel is not null && epicsModel.Epics.Count > 0)
         {
             var classes = epicsModel.Epics.Select(StatusStyles.ForEpic).ToList();
@@ -236,7 +236,9 @@ public static class HtmlTemplater
                 ("Stories drafted", p.EpicsDrafted, "drafted"),
                 ("Pending", p.EpicsPending, "pending"),
             };
-            centerText = $"{0}/{p.EpicsTotal}";
+            // Without a parsed epics model the per-epic done state is unknown, so show the epic count rather
+            // than fabricating a "0/N" fraction that would assert zero progress even for completed epics. [review]
+            centerText = null;
         }
 
         var nonZero = segments.Where(s => s.Value > 0).ToList();
@@ -312,6 +314,16 @@ public static class HtmlTemplater
     /// gets a compact stacked bar instead, since a one-slice donut wastes space (E2).</summary>
     private static void AppendRequirementBreakdown(StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs)
     {
+        if (reqs.Count == 0)
+        {
+            // A kind with no requirements gets an explicit empty state, not a hollow zero-segment stacked bar
+            // (the single-status branch below would otherwise render an empty bar + empty legend). [review E2]
+            sb.Append("<div class=\"chart-col\">\n");
+            sb.Append($"  <div class=\"req-donut-label\">{Html(label)} (0)</div>\n");
+            sb.Append("  <div class=\"chart-empty\">None tracked yet.</div>\n</div>\n");
+            return;
+        }
+
         int done = reqs.Count(r => r.Status == RequirementStatus.Done);
         int ready = reqs.Count(r => r.Status == RequirementStatus.Ready);
         int planned = reqs.Count(r => r.Status == RequirementStatus.Planned);

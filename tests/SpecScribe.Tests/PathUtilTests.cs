@@ -35,8 +35,10 @@ public class PathUtilTests
     {
         var html = PathUtil.RenderHeadOpen("Cats & Dogs", "../style.css", "../specscribe.js");
         Assert.Contains("<title>Cats &amp; Dogs</title>", html);
-        Assert.Contains("href=\"../style.css\"", html);
-        Assert.Contains("<script src=\"../specscribe.js\" defer></script>", html);
+        // The css/js hrefs carry a build-versioned cache-busting query so a cached copy can't mask a redeploy.
+        Assert.Contains("href=\"../style.css?v=", html);
+        Assert.Contains("<script src=\"../specscribe.js?v=", html);
+        Assert.Contains("\" defer></script>", html);
         // Favicon + description/OG land in <head> so tabs get an icon and shared links aren't bare. [Story 1.5 G1/G2]
         Assert.Contains("<link rel=\"icon\"", html);
         Assert.Contains("<meta name=\"description\"", html);
