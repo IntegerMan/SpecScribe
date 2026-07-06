@@ -179,19 +179,20 @@ public class BmadCommandsTests
     }
 
     [Fact]
-    public void RenderProjectNextSteps_ListsOneReviewPromptPerStory_BeforeTheFrontLine()
+    public void RenderProjectNextSteps_GroupsReviewStoriesIntoOneNamedPrompt_BeforeTheFrontLine()
     {
-        // Two stories awaiting review plus a ready front-line story: each review story gets its own named
-        // prompt, and the review prompts precede the dev-story front line (review is the most immediate move).
+        // Two stories awaiting review plus a ready front-line story: a single code-review prompt lists both
+        // ids (grouped by action, not one row per story), and it precedes the dev-story front line.
         var html = BmadCommands.RenderProjectNextSteps(
             Project(Story("1.4", "review"), Story("2.1", "review"), Story("1.5", "ready-for-dev")), BmmCatalog);
 
-        Assert.Contains("Story 1.4 is awaiting code review", html);
-        Assert.Contains("Story 2.1 is awaiting code review", html);
+        Assert.Contains("Stories 1.4, 2.1 are awaiting code review", html);
         Assert.Contains("/bmad-dev-story 1.5", html);
+        // Exactly one code-review row, not one per review story.
+        Assert.Equal(1, html.Split("/bmad-code-review").Length - 1);
         Assert.True(html.IndexOf("awaiting code review", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-dev-story", StringComparison.Ordinal),
-            "review prompts should render before the front-line dev-story prompt");
+            "review prompt should render before the front-line dev-story prompt");
     }
 
     [Fact]

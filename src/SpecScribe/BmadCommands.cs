@@ -168,13 +168,18 @@ public static class BmadCommands
         var suggestions = new List<Suggestion>();
         var allStories = model.Epics.SelectMany(e => e.Stories).ToList();
 
-        // Any story sitting in code review is the most immediate move — surface a review prompt per story so
-        // a reader sees from the dashboard that a change is waiting on an adversarial pass. Dropped silently
-        // when the module doesn't expose a code-review command.
-        foreach (var awaitingReview in allStories.Where(s => StatusStyles.ForStory(s) == "review"))
+        // Stories sitting in code review are the most immediate move — surface a single review prompt (the
+        // action) that lists the awaiting-review story ids, so a reader sees from the dashboard which changes
+        // are waiting on an adversarial pass. Grouped by action rather than one row per story, since the
+        // command itself takes no story argument. Dropped silently when the module exposes no code-review.
+        var awaitingReview = allStories.Where(s => StatusStyles.ForStory(s) == "review").Select(s => s.Id).ToList();
+        if (awaitingReview.Count > 0)
         {
+            var noun = awaitingReview.Count == 1 ? "Story" : "Stories";
+            var verb = awaitingReview.Count == 1 ? "is" : "are";
+            var possessive = awaitingReview.Count == 1 ? "its" : "their";
             Add(suggestions, commands.Command("code-review"),
-                $"Story {awaitingReview.Id} is awaiting code review — adversarial multi-layer review of its changes.");
+                $"{noun} {string.Join(", ", awaitingReview)} {verb} awaiting code review — adversarial multi-layer review of {possessive} changes.");
         }
 
         // The current front line — a story that's ready or already in development. Referenced by its short
