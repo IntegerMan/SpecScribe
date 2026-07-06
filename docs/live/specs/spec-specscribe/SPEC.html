@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpecScribe — SpecScribe</title>
+<link rel="stylesheet" href="../../specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="../../index.html">Home</a>
+    <a href="../../adrs/index.html">ADRs</a>
+    <a href="../../epics.html">Epics</a>
+    <a href="../../requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="../../index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">SpecScribe</span>
+</div>
+
+<header class="doc-header">
+  <h1>SpecScribe</h1>
+  <div class="meta-pills">
+    <span class="pill">specs/spec-specscribe/SPEC.md</span>
+  </div>
+</header>
+
+<nav class="toc-strip" aria-label="On this page">
+  <span class="toc-label">On this page</span>
+  <a class="" href="#why">Why</a>
+  <a class="" href="#capabilities">Capabilities</a>
+  <a class="" href="#constraints">Constraints</a>
+  <a class="" href="#non-goals">Non-goals</a>
+  <a class="" href="#success-signal">Success signal</a>
+  <a class="" href="#assumptions">Assumptions</a>
+  <a class="" href="#open-questions">Open Questions</a>
+</nav>
+
+<article class="doc-body">
+<blockquote>
+<p><strong>Canonical contract.</strong> This SPEC and the files in <code>companions:</code> are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only.</p>
+</blockquote>
+<h1 id="specscribe">SpecScribe</h1>
+<h2 id="why">Why</h2>
+<p>SpecScribe exists to turn dense, agent-oriented planning artifacts into a human-readable status surface so maintainers, contributors, and reviewers can understand project state quickly without traversing large markdown trees. The immediate priority is a reliable, local-only, CLI-first static portal where every feature can be controlled interactively or by command-line parameters and persisted by directory-scoped settings, with in-editor surfaces remaining read-only and helper-oriented.</p>
+<h2 id="capabilities">Capabilities</h2>
+<ul>
+<li><p><strong>CAP-1</strong></p>
+<ul>
+<li><strong>intent:</strong> Ingest artifacts from current, popular spec-driven-development frameworks and modules into one projection model so mixed-framework repositories remain interpretable.</li>
+<li><strong>success:</strong> Representative repositories across supported popular frameworks/modules render core planning and tracking views without fatal generation failures.</li>
+</ul>
+</li>
+<li><p><strong>CAP-2</strong></p>
+<ul>
+<li><strong>intent:</strong> Generate a readable static portal with coherent navigation and traceability across epics, stories, requirements, ADRs, and configurable ADR coverage outputs.</li>
+<li><strong>success:</strong> The portal index links discovered major artifact classes and recognized IDs resolve to stable pages without broken generated links.</li>
+</ul>
+</li>
+<li><p><strong>CAP-3</strong></p>
+<ul>
+<li><strong>intent:</strong> Keep generated output current via reliable watch-mode regeneration during normal save/edit loops.</li>
+<li><strong>success:</strong> Rapid successive source edits regenerate without output corruption or source-file lock side effects.</li>
+</ul>
+</li>
+<li><p><strong>CAP-4</strong></p>
+<ul>
+<li><strong>intent:</strong> Provide local insight modules for repository momentum and artifact-structure coverage with configurable git and ADR analysis depth without blocking baseline generation.</li>
+<li><strong>success:</strong> Dashboard output includes configurable git pulse and ADR coverage views, and insight failures degrade gracefully to non-fatal notices.</li>
+</ul>
+</li>
+<li><p><strong>CAP-5</strong></p>
+<ul>
+<li><strong>intent:</strong> Deliver and prioritize a CLI-first surface now, then expose the same shared projection through separate presentation adapters for HTML files and a follow-on VS Code webview, with IDE interactions remaining read-only and helper-oriented.</li>
+<li><strong>success:</strong> Zero-required-flag CLI flows work in supported layouts, HTML and webview surfaces consume the same rendering core without duplicate parser logic, IDE helpers only generate prompt text/commands, and extension work starts when context-switch pain and editor usage patterns meet explicit relevance gates.</li>
+</ul>
+</li>
+</ul>
+<h2 id="constraints">Constraints</h2>
+<ul>
+<li>Adapter architecture must decouple framework parsing from rendering so new frameworks do not require core template rewrites.</li>
+<li>Projection and rendering architecture must separate core document/view models from delivery adapters so HTML generation and VS Code webview can evolve without forking parsing logic.</li>
+<li>Partial, malformed, or unsupported artifacts must degrade gracefully via non-fatal notices instead of stopping full generation.</li>
+<li>Every user-facing feature, including git insights and ADR coverage, must be configurable through interactive options or CLI parameters and persistable in a directory-scoped settings file.</li>
+<li>Baseline generation must remain responsive; deeper analytics must be optional and independently toggleable.</li>
+<li>Core operation is local-first and must not require remote telemetry or hosted control planes.</li>
+<li>User-facing behavior and options must be documented in README tables with short explanatory descriptions.</li>
+</ul>
+<h2 id="non-goals">Non-goals</h2>
+<ul>
+<li>Build a hosted SaaS control plane (accounts, RBAC, multi-tenant governance) in this effort.</li>
+<li>Replace issue trackers, project management suites, or source-control platforms.</li>
+<li>Add framework authoring/editing workflows; this contract is for readability and insight projection.</li>
+</ul>
+<h2 id="success-signal">Success signal</h2>
+<p>A maintainer can run default CLI generation or watch in representative supported popular framework repositories, configure all features (including git and ADR coverage) via interactive options or CLI flags with directory-scoped settings persistence, and answer near-term planning/status questions from the generated portal and documented README tables without reading raw artifact files; generation remains resilient, responsive, local-only, and read-only.</p>
+<h2 id="assumptions">Assumptions</h2>
+<ul>
+<li>Deep git analytics remain opt-in to protect baseline responsiveness.</li>
+<li>Initial VS Code extension delivery is read-only and local-first before any authoring controls.</li>
+</ul>
+<h2 id="open-questions">Open Questions</h2>
+<ul>
+<li>How should coverage tiers (rendered, summarized, unsupported) be communicated so users understand interpretation boundaries?</li>
+<li>Which additional agent-file families should be promoted to plugin candidates after core plus orchestration coverage stabilizes?</li>
+<li>Should deeper git analysis be configured by CLI flag, settings profile, or both?</li>
+<li>What popularity threshold (for frameworks/modules) determines &quot;decent degree of popularity&quot; for first-class adapter support?</li>
+</ul>
+
+</article>
+
+<footer class="doc-footer">
+  Auto-generated by SpecScribe from <code>specs/spec-specscribe/SPEC.md</code> &middot; 2026-07-05 22:41
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADR 0002: Preserve a Shared Rendering Core with Host-Neutral View Models — SpecScribe</title>
+<link rel="stylesheet" href="../specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="../index.html">Home</a>
+    <a href="../adrs/index.html">ADRs</a>
+    <a href="../epics.html">Epics</a>
+    <a href="../requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="../index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">ADR 0002: Preserve a Shared Rendering Core with Host-Neutral View Models</span>
+</div>
+
+<header class="doc-header">
+  <h1>ADR 0002: Preserve a Shared Rendering Core with Host-Neutral View Models</h1>
+  <div class="meta-pills">
+    <span class="pill">adrs/0002-shared-rendering-core-and-host-neutral-view-models.md</span>
+  </div>
+</header>
+
+<nav class="toc-strip" aria-label="On this page">
+  <span class="toc-label">On this page</span>
+  <a class="" href="#context">Context</a>
+  <a class="" href="#decision">Decision</a>
+  <a class="" href="#consequences">Consequences</a>
+  <a class="" href="#considered-options">Considered Options</a>
+  <a class="toc-h3" href="#separate-renderer-per-surface">Separate renderer per surface</a>
+  <a class="toc-h3" href="#shared-core-with-delivery-adapters-only-chosen">Shared core with delivery adapters only (chosen)</a>
+  <a class="" href="#references">References</a>
+</nav>
+
+<article class="doc-body">
+<h1 id="adr-0002-preserve-a-shared-rendering-core-with-host-neutral-view-models">ADR 0002: Preserve a Shared Rendering Core with Host-Neutral View Models</h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-07-05
+<strong>Deciders:</strong> Matt Eland</p>
+<h2 id="context">Context</h2>
+<p>SpecScribe already parses BMad artifacts and is explicitly committed in the PRD and SPEC to support a future VS Code webview without forking the parsing brain. The codebase currently has one CLI and one HTML site generator, but the product direction now includes two delivery surfaces: static HTML now, webview later.</p>
+<p>The architectural risk is predictable drift. If HTML templates, webview presentation, or parser/projection logic each evolve independently, the tool will eventually answer the same question differently depending on where the user looks.</p>
+<h2 id="decision">Decision</h2>
+<p>Keep one shared projection/rendering core that produces host-neutral view models. HTML and VS Code webview remain delivery adapters only.</p>
+<pre class="mermaid">
+flowchart LR
+    A[Artifacts and settings] --&gt; B[Framework adapters]
+    B --&gt; C[Projection pipeline]
+    C --&gt; D[Shared view models]
+    D --&gt; E[HTML adapter]
+    D --&gt; F[Webview adapter]
+</pre>
+
+<h2 id="consequences">Consequences</h2>
+<p><strong>Positive</strong></p>
+<ul>
+<li>Traceability, navigation, and coverage semantics stay consistent across delivery surfaces.</li>
+<li>New rendering behavior is implemented once and exposed everywhere that needs it.</li>
+<li>Contract tests can focus on the core model instead of duplicating surface-specific expectations.</li>
+</ul>
+<p><strong>Negative / trade-offs</strong></p>
+<ul>
+<li>The shared core will need stronger interface discipline than a surface-specific renderer.</li>
+<li>Some host-specific concerns will stay awkward until the adapter layer is fleshed out.</li>
+</ul>
+<h2 id="considered-options">Considered Options</h2>
+<h3 id="separate-renderer-per-surface">Separate renderer per surface</h3>
+<p>Build a dedicated HTML renderer and a separate webview renderer with only loose coordination.</p>
+<ul>
+<li><strong>Pros:</strong> Easy to start in each surface.</li>
+<li><strong>Cons:</strong> High drift risk and duplicate logic for navigation, traceability, and coverage semantics.</li>
+</ul>
+<h3 id="shared-core-with-delivery-adapters-only-chosen">Shared core with delivery adapters only (chosen)</h3>
+<p>One rendering brain, multiple delivery paths.</p>
+<ul>
+<li><strong>Pros:</strong> Single source of truth for user-visible semantics; easier parity enforcement.</li>
+<li><strong>Cons:</strong> Requires a careful adapter boundary and slightly more up-front design work.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="../specs/spec-specscribe/ARCHITECTURE-SPINE.html">SpecScribe Architecture Spine</a></li>
+<li><a href="../specs/spec-specscribe/SPEC.html">SPEC: SpecScribe</a></li>
+</ul>
+
+</article>
+
+<footer class="doc-footer">
+  Auto-generated by SpecScribe from <code>adrs/0002-shared-rendering-core-and-host-neutral-view-models.md</code> &middot; 2026-07-05 22:41
+</footer>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    flowchart: { useMaxWidth: false },
+    themeVariables: {
+      background: '#faf7f2',
+      primaryColor: '#f4ead5',
+      primaryTextColor: '#2a1f0e',
+      primaryBorderColor: '#d4c4a8',
+      lineColor: '#8b3a1a',
+      secondaryColor: '#e8d5b0',
+      tertiaryColor: '#faf7f2',
+      fontFamily: 'Georgia, "Times New Roman", serif'
+    }
+  });
+</script>
+</body>
+</html>

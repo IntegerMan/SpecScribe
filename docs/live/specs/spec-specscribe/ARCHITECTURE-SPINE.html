@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpecScribe Architecture Spine — SpecScribe</title>
+<link rel="stylesheet" href="../../specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="../../index.html">Home</a>
+    <a href="../../adrs/index.html">ADRs</a>
+    <a href="../../epics.html">Epics</a>
+    <a href="../../requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="../../index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">SpecScribe Architecture Spine</span>
+</div>
+
+<header class="doc-header">
+  <h1>SpecScribe Architecture Spine</h1>
+  <div class="meta-pills">
+    <span class="pill status-final">final</span>
+    <span class="pill">specs/spec-specscribe/ARCHITECTURE-SPINE.md</span>
+  </div>
+</header>
+
+<nav class="toc-strip" aria-label="On this page">
+  <span class="toc-label">On this page</span>
+  <a class="" href="#paradigm">Paradigm</a>
+  <a class="" href="#inherited-invariants">Inherited Invariants</a>
+  <a class="" href="#architecture-decisions">Architecture Decisions</a>
+  <a class="toc-h3" href="#ad-1-adopted-one-shared-projectionrendering-core-feeds-every-surface">AD-1 [ADOPTED] One shared projection/rendering core feeds every surface</a>
+  <a class="toc-h3" href="#ad-2-adopted-host-neutral-view-models-are-the-contract-between-core-and-adapters">AD-2 [ADOPTED] Host-neutral view models are the contract between core and adapters</a>
+  <a class="toc-h3" href="#ad-3-adopted-settings-resolve-once-from-directory-scope-plus-run-overrides">AD-3 [ADOPTED] Settings resolve once from directory scope plus run overrides</a>
+  <a class="toc-h3" href="#ad-4-adopted-optional-insight-providers-may-enrich-output-but-never-own-baseline-success">AD-4 [ADOPTED] Optional insight providers may enrich output but never own baseline success</a>
+  <a class="toc-h3" href="#ad-5-adopted-watch-mode-treats-changed-scope-as-the-unit-of-recomputation">AD-5 [ADOPTED] Watch mode treats changed scope as the unit of recomputation</a>
+  <a class="toc-h3" href="#ad-6-adopted-ide-helpers-stay-read-only-and-explicit">AD-6 [ADOPTED] IDE helpers stay read-only and explicit</a>
+  <a class="toc-h3" href="#ad-7-adopted-presentation-tokens-are-shared-host-chrome-is-host-owned">AD-7 [ADOPTED] Presentation tokens are shared; host chrome is host-owned</a>
+  <a class="toc-h3" href="#ad-8-adopted-interaction-state-contract-is-canonical-update-transport-is-adapter-specific">AD-8 [ADOPTED] Interaction state contract is canonical; update transport is adapter-specific</a>
+  <a class="" href="#seed-not-invariant">Seed, Not Invariant</a>
+  <a class="" href="#runtime-flow">Runtime Flow</a>
+  <a class="" href="#deferred">Deferred</a>
+</nav>
+
+<article class="doc-body">
+<h1 id="specscribe-architecture-spine">SpecScribe Architecture Spine</h1>
+<h2 id="paradigm">Paradigm</h2>
+<p>Shared-core, adapter-per-surface, local-first, read-only.</p>
+<p>The architectural invariant is simple: parsing, projection, enrichment, and view-model shaping happen once; delivery varies by host.</p>
+<h2 id="inherited-invariants">Inherited Invariants</h2>
+<ul>
+<li>SpecScribe remains local-only and read-only.</li>
+<li>All user-facing features stay configurable through interactive options and equivalent CLI parameters.</li>
+<li>Settings persist in a directory-scoped settings file and CLI overrides win for a run.</li>
+<li>Baseline generation stays responsive; deep analytics remain optional.</li>
+<li>Unsupported or malformed artifacts degrade gracefully instead of blocking generation.</li>
+<li>CLI, static HTML, and VS Code webview surfaces must consume the same shared projection/rendering core.</li>
+<li>Shared HTML/webview views (dashboard and epics drill) must preserve the same interaction/state semantics even when transport differs.</li>
+<li>Accessibility semantics (keyboard drill behavior, labels, and status text redundancy) are part of the rendering contract, not optional skinning.</li>
+</ul>
+<h2 id="architecture-decisions">Architecture Decisions</h2>
+<h3 id="ad-1-adopted-one-shared-projectionrendering-core-feeds-every-surface">AD-1 [ADOPTED] One shared projection/rendering core feeds every surface</h3>
+<p>Binds: framework adapters, projection, traceability, coverage classification, insight enrichment, and presentation-ready view models.</p>
+<p>Prevents: duplicated parser logic, HTML/webview feature drift, and surface-specific traceability bugs.</p>
+<p>Rule: framework parsing and projection live in one core pipeline; adapters only translate that core output into host delivery concerns.</p>
+<h3 id="ad-2-adopted-host-neutral-view-models-are-the-contract-between-core-and-adapters">AD-2 [ADOPTED] Host-neutral view models are the contract between core and adapters</h3>
+<p>Binds: page models, navigation graph, asset manifest, and render metadata.</p>
+<p>Prevents: HTML template details leaking into the webview path and webview host APIs back-propagating into the CLI renderer.</p>
+<p>Rule: the shared renderer emits stable typed view models; adapters consume them without reinterpreting source artifacts.</p>
+<h3 id="ad-3-adopted-settings-resolve-once-from-directory-scope-plus-run-overrides">AD-3 [ADOPTED] Settings resolve once from directory scope plus run overrides</h3>
+<p>Binds: source/output paths, framework enables, git depth, ADR coverage controls, and other user-facing toggles.</p>
+<p>Prevents: hidden runtime state, inconsistent CLI versus interactive behavior, and per-adapter configuration forks.</p>
+<p>Rule: the effective config is resolved before generation/watch starts, then passed through the pipeline with provenance preserved.</p>
+<h3 id="ad-4-adopted-optional-insight-providers-may-enrich-output-but-never-own-baseline-success">AD-4 [ADOPTED] Optional insight providers may enrich output but never own baseline success</h3>
+<p>Binds: git pulse, ADR coverage, agent-file structure signals, and future local insights.</p>
+<p>Prevents: deep analytics from blocking baseline generation or turning optional analysis failures into fatal errors.</p>
+<p>Rule: insight providers are additive, non-blocking, and independently toggleable from the core render path.</p>
+<h3 id="ad-5-adopted-watch-mode-treats-changed-scope-as-the-unit-of-recomputation">AD-5 [ADOPTED] Watch mode treats changed scope as the unit of recomputation</h3>
+<p>Binds: incremental file change handling, epics/story regeneration, ADR refresh, and output atomics.</p>
+<p>Prevents: stale output from rename/delete events and unnecessary full-tree rebuilds on leaf edits.</p>
+<p>Rule: watch mode may rebuild narrowly when safe, but topology changes can trigger a broader refresh to keep output coherent.</p>
+<h3 id="ad-6-adopted-ide-helpers-stay-read-only-and-explicit">AD-6 [ADOPTED] IDE helpers stay read-only and explicit</h3>
+<p>Binds: prompt-generation buttons, command handoff helpers, and future webview affordances.</p>
+<p>Prevents: editor actions from mutating source planning artifacts or becoming a hidden authoring path.</p>
+<p>Rule: helpers can generate prompts or commands, but any write action remains an explicit external choice.</p>
+<h3 id="ad-7-adopted-presentation-tokens-are-shared-host-chrome-is-host-owned">AD-7 [ADOPTED] Presentation tokens are shared; host chrome is host-owned</h3>
+<p>Binds: brand/status token families, component-level visual semantics, and cross-surface readability.</p>
+<p>Prevents: ad hoc per-surface styling drift and accidental dependence on browser-only or webview-only theme primitives.</p>
+<p>Rule: SpecScribe owns its presentation tokens for content semantics; webview maps host variables for container/chrome while preserving SpecScribe semantic accents.</p>
+<h3 id="ad-8-adopted-interaction-state-contract-is-canonical-update-transport-is-adapter-specific">AD-8 [ADOPTED] Interaction state contract is canonical; update transport is adapter-specific</h3>
+<p>Binds: drill depth semantics, breadcrumb/state transitions, focus/keyboard behavior, and freshness signaling.</p>
+<p>Prevents: dashboard behavior divergence between static HTML and webview and re-implementation of interaction logic per host.</p>
+<p>Rule: interaction state shape is shared (for example drill scope and status semantics); static HTML may hydrate via URL hash plus sidecar polling, while webview uses extension host push.</p>
+<h2 id="seed-not-invariant">Seed, Not Invariant</h2>
+<ul>
+<li>Exact namespace or package split is a seed choice, not a contract; the current monolithic implementation can be refactored as long as the shared-core contract stays intact.</li>
+<li>Exact adapter loading mechanics and exact file layout for HTML/webview delivery are implementation seeds.</li>
+<li>Coverage-tier wording and the next promoted Agent Files remain open until the portal wording proves stable in use.</li>
+<li>Exact visual polish values (timings, shadows, micro-motion tuning) are seed-level as long as shared semantics and accessibility invariants remain intact.</li>
+</ul>
+<h2 id="runtime-flow">Runtime Flow</h2>
+<pre class="mermaid">
+flowchart LR
+    A[Source artifacts\nand settings] --&gt; B[Ingestion adapters]
+    B --&gt; C[Projection pipeline]
+    C --&gt; D[Host-neutral\nview models]
+    C --&gt; E[Optional insight\nproviders]
+    E --&gt; C
+    D --&gt; F[HTML delivery\nadapter]
+    D --&gt; G[VS Code webview\nadapter]
+    H[Watch events] --&gt; B
+</pre>
+
+<h2 id="deferred">Deferred</h2>
+<ul>
+<li>Exact presentation wording for rendered, summarized, and unsupported tiers.</li>
+<li>The concrete package split for core, rendering, and delivery layers.</li>
+<li>The adapter discovery mechanism for future framework modules.</li>
+<li>The promotion criteria for additional Agent Files once Core + Orchestration coverage is stable.</li>
+</ul>
+
+</article>
+
+<footer class="doc-footer">
+  Auto-generated by SpecScribe from <code>specs/spec-specscribe/ARCHITECTURE-SPINE.md</code> &middot; 2026-07-05 22:41
+</footer>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    flowchart: { useMaxWidth: false },
+    themeVariables: {
+      background: '#faf7f2',
+      primaryColor: '#f4ead5',
+      primaryTextColor: '#2a1f0e',
+      primaryBorderColor: '#d4c4a8',
+      lineColor: '#8b3a1a',
+      secondaryColor: '#e8d5b0',
+      tertiaryColor: '#faf7f2',
+      fontFamily: 'Georgia, "Times New Roman", serif'
+    }
+  });
+</script>
+</body>
+</html>

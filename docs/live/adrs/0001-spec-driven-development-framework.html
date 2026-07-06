@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADR 0001: Adopt BMAD-METHOD as SpecScribe&#39;s Spec-Driven Development Framework — SpecScribe</title>
+<link rel="stylesheet" href="../specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="../index.html">Home</a>
+    <a href="../adrs/index.html">ADRs</a>
+    <a href="../epics.html">Epics</a>
+    <a href="../requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="../index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">ADR 0001: Adopt BMAD-METHOD as SpecScribe&#39;s Spec-Driven Development Framework</span>
+</div>
+
+<header class="doc-header">
+  <h1>ADR 0001: Adopt BMAD-METHOD as SpecScribe&#39;s Spec-Driven Development Framework</h1>
+  <div class="meta-pills">
+    <span class="pill">adrs/0001-spec-driven-development-framework.md</span>
+  </div>
+</header>
+
+<nav class="toc-strip" aria-label="On this page">
+  <span class="toc-label">On this page</span>
+  <a class="" href="#context">Context</a>
+  <a class="" href="#decision">Decision</a>
+  <a class="" href="#considered-options">Considered Options</a>
+  <a class="toc-h3" href="#bmad-method-chosen">BMAD-METHOD (chosen)</a>
+  <a class="toc-h3" href="#github-spec-kit">GitHub Spec Kit</a>
+  <a class="toc-h3" href="#gsd-pi">GSD-Pi</a>
+  <a class="" href="#consequences">Consequences</a>
+  <a class="" href="#references">References</a>
+</nav>
+
+<article class="doc-body">
+<h1 id="adr-0001-adopt-bmad-method-as-specscribes-spec-driven-development-framework">ADR 0001: Adopt BMAD-METHOD as SpecScribe's Spec-Driven Development Framework</h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-07-05
+<strong>Deciders:</strong> Matt Eland</p>
+<h2 id="context">Context</h2>
+<p>SpecScribe is a tool that renders spec-driven-development (SDD) artifacts — PRDs, GDDs,
+epics, stories, requirements inventories, ADRs, and mermaid diagrams — into a styled,
+navigable, cross-linked static HTML site. Its whole reason to exist is that SDD frameworks
+produce a wealth of markdown written for AI agents and power users, not for humans skimming
+project status.</p>
+<p>To grow SpecScribe deliberately rather than by ad-hoc feature accretion, the project needs
+its <em>own</em> SDD framework: one methodology used to plan and drive SpecScribe's future
+development, so the tool's own requirements, epics, stories, and decisions live as durable,
+reviewable artifacts. Three candidates were considered:
+<a href="https://github.com/bmad-code-org/BMAD-METHOD">BMAD-METHOD</a>,
+<a href="https://github.com/github/spec-kit">GitHub Spec Kit</a>, and
+<a href="https://github.com/open-gsd/gsd-pi">GSD-Pi</a>.</p>
+<p>This decision is about <strong>which framework SpecScribe adopts to develop itself (dogfooding)</strong>.
+It is explicitly <strong>not</strong> a decision about which frameworks SpecScribe supports as <em>input</em>:
+the roadmap already commits to rendering BMad, Spec Kit, and GSD artifacts alike, and that
+work proceeds independently of this ADR.</p>
+<h2 id="decision">Decision</h2>
+<p>Adopt <strong>BMAD-METHOD</strong> as the spec-driven development framework for planning and building
+SpecScribe.</p>
+<p>The dogfooding argument is decisive: SpecScribe already parses BMad artifacts end-to-end
+(<code>EpicsParser</code>, <code>RequirementsParser</code>, <code>_bmad-output/</code> discovery in <code>ForgeOptions</code>, and ADR
+handling in <code>SiteGenerator</code>). Authoring SpecScribe's own planning documents in BMad means
+the tool renders its own repository <em>today</em> — turning the project into a live, self-hosted
+demonstration of exactly what it does for everyone else. Choosing any other framework would
+require building that framework's renderer <em>before</em> we could self-render at all, a
+chicken-and-egg problem that stalls dogfooding at the starting line.</p>
+<h2 id="considered-options">Considered Options</h2>
+<h3 id="bmad-method-chosen">BMAD-METHOD (chosen)</h3>
+<p>An open-source agentic framework with specialized agents (Analyst, PM, Architect, Scrum
+Master, Dev) that produce PRDs, architecture documents, epics, and stories, then shard those
+plans into focused development units.</p>
+<ul>
+<li><strong>Pros:</strong> Already fully renderable by SpecScribe, so dogfooding is immediate. Produces the
+richest artifact set (PRD/GDD, epics, stories, requirements traceability, ADRs, mermaid),
+which exercises the broadest slice of SpecScribe's rendering surface. Mature, agile,
+multi-epic structure suited to a project meant to grow.</li>
+<li><strong>Cons:</strong> More process ceremony than a solo/small project strictly needs; the full
+agent-driven planning flow can be heavyweight for small changes.</li>
+</ul>
+<h3 id="github-spec-kit">GitHub Spec Kit</h3>
+<p>A GitHub-backed toolkit built around a lightweight <code>constitution → specify → plan → tasks</code>
+command flow that layers onto coding agents such as Copilot, Claude Code, and Codex.</p>
+<ul>
+<li><strong>Pros:</strong> Lightweight and approachable; backed by GitHub; the <code>constitution.md</code> concept is
+a clean way to capture non-negotiable project principles.</li>
+<li><strong>Cons:</strong> Thinner artifact set than BMad, so it exercises less of SpecScribe's renderer. Not
+yet parseable by SpecScribe — dogfooding would be blocked until that support is built.</li>
+</ul>
+<h3 id="gsd-pi">GSD-Pi</h3>
+<p>A local-first, terminal-driven system for autonomous, long-running agent sessions that
+breaks work into milestones, slices, and tasks and stores project memory under <code>.gsd/</code>.</p>
+<ul>
+<li><strong>Pros:</strong> Strong for long autonomous agent runs and worktree-aware Git automation; local
+project memory keeps requirements, decisions, and validation evidence together.</li>
+<li><strong>Cons:</strong> Newest and still consolidating (migrated from <code>gsd-2</code> to <code>gsd-pi</code>). Its <code>.gsd/</code>
+artifacts are not yet renderable by SpecScribe, so it too blocks immediate dogfooding.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<p><strong>Positive</strong></p>
+<ul>
+<li>SpecScribe renders its own project docs from day one — an immediate, zero-extra-work live
+demo running on the tool's own repository.</li>
+<li>Dogfooding BMad exercises the widest range of SpecScribe's rendering features, so real
+self-usage continuously surfaces gaps and drives coverage.</li>
+<li>The project inherits a mature, structured agile methodology for planning its roadmap.</li>
+</ul>
+<p><strong>Negative / trade-offs</strong></p>
+<ul>
+<li>BMad's ceremony is heavier than Spec Kit's lightweight flow; we accept that overhead in
+exchange for the richer artifacts and immediate self-rendering.</li>
+<li>Choosing BMad as the <em>development</em> methodology does not discharge the roadmap commitment to
+render Spec Kit and GSD-Pi artifacts as <em>inputs</em>; those parsers still need to be built.</li>
+<li>This choice should be revisited once SpecScribe's Spec Kit and GSD-Pi renderers land — at
+that point the dogfooding advantage that decided this ADR would apply to any of the three.</li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="https://github.com/bmad-code-org/BMAD-METHOD">BMAD-METHOD</a></li>
+<li><a href="https://github.com/github/spec-kit">GitHub Spec Kit</a></li>
+<li><a href="https://github.com/open-gsd/gsd-pi">GSD-Pi</a></li>
+</ul>
+
+</article>
+
+<footer class="doc-footer">
+  Auto-generated by SpecScribe from <code>adrs/0001-spec-driven-development-framework.md</code> &middot; 2026-07-05 22:41
+</footer>
+
+</body>
+</html>

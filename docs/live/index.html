@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpecScribe — Live Docs</title>
+<link rel="stylesheet" href="specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="index.html" class="active" aria-current="page">Home</a>
+    <a href="adrs/index.html">ADRs</a>
+    <a href="epics.html">Epics</a>
+    <a href="requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<header class="doc-header">
+  <h1>SpecScribe</h1>
+  <div class="doc-subtitle">Live Docs — auto-generated from _bmad-output on every save</div>
+</header>
+
+<section class="dashboard">
+<div class="stat-grid">
+<div class="stat-card"><div class="stat-number">5/5</div><div class="stat-label">Epics drafted</div></div><div class="stat-card"><div class="stat-number">18</div><div class="stat-label">Stories defined</div><div class="stat-sub">1 with a task plan</div></div><div class="stat-card"><div class="stat-number">20/20</div><div class="stat-label">Tasks done</div><div class="stat-sub">across 1 of 18 stories</div></div><div class="stat-card"><div class="stat-number">17</div><div class="stat-label">Commits</div><div class="stat-sub">2 active days</div></div></div>
+
+<div class="chart-panel dashboard-quick-links">
+<h3>Explore Key Views</h3>
+<div class="quick-link-grid">
+  <a class="quick-link-card" href="adrs/index.html">
+    <span class="quick-link-title">ADRs</span>
+    <span class="quick-link-sub">Browse architecture decisions.</span>
+  </a>
+  <a class="quick-link-card" href="epics.html">
+    <span class="quick-link-title">Epics &amp; Stories</span>
+    <span class="quick-link-sub">Track epic and story delivery progress.</span>
+  </a>
+  <a class="quick-link-card" href="requirements.html">
+    <span class="quick-link-title">Requirements</span>
+    <span class="quick-link-sub">Review FR/NFR coverage and status.</span>
+  </a>
+</div>
+</div>
+
+<div class="chart-panel">
+<h3>Overall Progress</h3>
+<div class="progress-row">
+  <div class="progress-label">Planning</div>
+  <div class="progress-bar"><div class="progress-fill done" style="width:100%"></div></div>
+  <div class="progress-value">5 / 5 epics</div>
+</div>
+<div class="progress-row">
+  <div class="progress-label">Implementation</div>
+  <div class="progress-bar"><div class="progress-fill done" style="width:100%"></div></div>
+  <div class="progress-value">20 / 20 tasks (1 of 18 stories planned)</div>
+</div>
+</div>
+
+<div class="chart-panel">
+<h3>Now &amp; Next</h3>
+<div class="now-next">
+  <a class="now-next-card review" href="epics/story-1-1.html">
+    <span class="now-next-kicker">In review</span>
+    <span class="now-next-title">Story 1.1 &#183; Dashboard Navigation and Readability Foundation</span>
+  </a>
+  <a class="now-next-card drafted" href="epics/epic-1.html">
+    <span class="now-next-kicker">Next story to draft</span>
+    <span class="now-next-title">Story 1.2 &#183; Traceability Links Across Requirements, Stories, and ADRs</span>
+  </a>
+</div>
+</div>
+
+<div class="chart-panel sunburst-panel">
+<div class="chart-panel-header-row"><h3>Project at a Glance</h3><a class="view-epic-link" href="epics.html">View Epics &amp; Stories &rarr;</a></div>
+<svg class="sunburst" viewBox="0 0 380 380" width="380" height="380" role="img" aria-label="Project progress sunburst">
+  <a href="epics/epic-1.html">
+    <path class="sb-seg sb-active" d="M 190.64 83.6 A 106.4 106.4 0 0 1 294.67 170.9 L 249.81 179.08 A 60.8 60.8 0 0 0 190.36 129.2 Z"><title>Epic 1: High-Clarity BMad Portal Experience — In development, 4 stories</title></path>
+  </a>
+  <a href="epics/story-1-1.html">
+    <path class="sb-seg sb-review" d="M 190.95 32.3 A 157.7 157.7 0 0 1 243.05 41.49 L 226.43 88.01 A 108.3 108.3 0 0 0 190.65 81.7 Z"><title>Story 1.1: Dashboard Navigation and Readability Foundation — review</title></path>
+  </a>
+  <a href="epics/story-1-1.html"><path class="sb-seg sb-done" d="M 191.06 13.3 A 176.7 176.7 0 0 1 249.44 23.6 L 243.69 39.7 A 159.6 159.6 0 0 0 190.96 30.4 Z"><title>Story 1.1: 20 of 20 tasks done</title></path></a>
+  <a href="epics/epic-1.html">
+    <path class="sb-seg sb-drafted" d="M 244.82 42.14 A 157.7 157.7 0 0 1 290.64 68.59 L 259.11 106.62 A 108.3 108.3 0 0 0 227.65 88.46 Z"><title>Story 1.2: Traceability Links Across Requirements, Stories, and ADRs</title></path>
+  </a>
+  <a href="epics/epic-1.html">
+    <path class="sb-seg sb-drafted" d="M 292.09 69.81 A 157.7 157.7 0 0 1 326.1 110.33 L 283.46 135.29 A 108.3 108.3 0 0 0 260.11 107.46 Z"><title>Story 1.3: Markdown Fidelity for Core Artifact Patterns</title></path>
+  </a>
+  <a href="epics/epic-1.html">
+    <path class="sb-seg sb-drafted" d="M 327.04 111.97 A 157.7 157.7 0 0 1 345.14 161.68 L 296.54 170.55 A 108.3 108.3 0 0 0 284.11 136.41 Z"><title>Story 1.4: Accessible High-Polish Interaction Baseline</title></path>
+  </a>
+  <a href="epics/epic-2.html">
+    <path class="sb-seg sb-drafted" d="M 294.89 172.15 A 106.4 106.4 0 0 1 258.88 271.1 L 229.36 236.34 A 60.8 60.8 0 0 0 249.94 179.8 Z"><title>Epic 2: Reliable Local Operations and Config Control — Stories drafted, 3 stories</title></path>
+  </a>
+  <a href="epics/epic-2.html">
+    <path class="sb-seg sb-drafted" d="M 345.47 163.55 A 157.7 157.7 0 0 1 345.47 216.45 L 296.77 208.17 A 108.3 108.3 0 0 0 296.77 171.83 Z"><title>Story 2.1: CLI Generate and Watch Modes with Smart Defaults</title></path>
+  </a>
+  <a href="epics/epic-2.html">
+    <path class="sb-seg sb-drafted" d="M 345.14 218.32 A 157.7 157.7 0 0 1 327.04 268.03 L 284.11 243.59 A 108.3 108.3 0 0 0 296.54 209.45 Z"><title>Story 2.2: Directory-Scoped Settings with Interactive and CLI Parity</title></path>
+  </a>
+  <a href="epics/epic-2.html">
+    <path class="sb-seg sb-drafted" d="M 326.1 269.67 A 157.7 157.7 0 0 1 292.09 310.19 L 260.11 272.54 A 108.3 108.3 0 0 0 283.46 244.71 Z"><title>Story 2.3: Watch Regeneration Safety and Scope-Aware Rebuilds</title></path>
+  </a>
+  <a href="epics/epic-3.html">
+    <path class="sb-seg sb-drafted" d="M 257.9 271.92 A 106.4 106.4 0 0 1 98.18 243.75 L 137.53 220.72 A 60.8 60.8 0 0 0 228.8 236.81 Z"><title>Epic 3: Insight Surfaces and Tree-View Discovery — Stories drafted, 5 stories</title></path>
+  </a>
+  <a href="epics/epic-3.html">
+    <path class="sb-seg sb-drafted" d="M 290.64 311.41 A 157.7 157.7 0 0 1 244.82 337.86 L 227.65 291.54 A 108.3 108.3 0 0 0 259.11 273.38 Z"><title>Story 3.1: Baseline Git Pulse Insights on Dashboard</title></path>
+  </a>
+  <a href="epics/epic-3.html">
+    <path class="sb-seg sb-drafted" d="M 243.05 338.51 A 157.7 157.7 0 0 1 190.95 347.7 L 190.65 298.3 A 108.3 108.3 0 0 0 226.43 291.99 Z"><title>Story 3.2: Optional Deep Git Analytics Controls</title></path>
+  </a>
+  <a href="epics/epic-3.html">
+    <path class="sb-seg sb-drafted" d="M 189.05 347.7 A 157.7 157.7 0 0 1 136.95 338.51 L 153.57 291.99 A 108.3 108.3 0 0 0 189.35 298.3 Z"><title>Story 3.3: Agent and Workflow Structure Coverage Insights</title></path>
+  </a>
+  <a href="epics/epic-3.html">
+    <path class="sb-seg sb-drafted" d="M 135.18 337.86 A 157.7 157.7 0 0 1 89.36 311.41 L 120.89 273.38 A 108.3 108.3 0 0 0 152.35 291.54 Z"><title>Story 3.4: Interactive Tree Views for Project and Artifact Structure</title></path>
+  </a>
+  <a href="epics/epic-3.html">
+    <path class="sb-seg sb-drafted" d="M 87.91 310.19 A 157.7 157.7 0 0 1 53.9 269.67 L 96.54 244.71 A 108.3 108.3 0 0 0 119.89 272.54 Z"><title>Story 3.5: Flashy but Purposeful Insight Visual Language</title></path>
+  </a>
+  <a href="epics/epic-4.html">
+    <path class="sb-seg sb-drafted" d="M 97.54 242.65 A 106.4 106.4 0 0 1 97.54 137.35 L 137.16 159.92 A 60.8 60.8 0 0 0 137.16 220.08 Z"><title>Epic 4: Multi-Framework Coverage Expansion — Stories drafted, 3 stories</title></path>
+  </a>
+  <a href="epics/epic-4.html">
+    <path class="sb-seg sb-drafted" d="M 52.96 268.03 A 157.7 157.7 0 0 1 34.86 218.32 L 83.46 209.45 A 108.3 108.3 0 0 0 95.89 243.59 Z"><title>Story 4.1: Shared Framework Adapter Contract and Projection Path</title></path>
+  </a>
+  <a href="epics/epic-4.html">
+    <path class="sb-seg sb-drafted" d="M 34.53 216.45 A 157.7 157.7 0 0 1 34.53 163.55 L 83.23 171.83 A 108.3 108.3 0 0 0 83.23 208.17 Z"><title>Story 4.2: Spec Kit Baseline Adapter Coverage</title></path>
+  </a>
+  <a href="epics/epic-4.html">
+    <path class="sb-seg sb-drafted" d="M 34.86 161.68 A 157.7 157.7 0 0 1 52.96 111.97 L 95.89 136.41 A 108.3 108.3 0 0 0 83.46 170.55 Z"><title>Story 4.3: GSD and GSD-Pi Baseline Adapter Coverage</title></path>
+  </a>
+  <a href="epics/epic-5.html">
+    <path class="sb-seg sb-drafted" d="M 98.18 136.25 A 106.4 106.4 0 0 1 189.36 83.6 L 189.64 129.2 A 60.8 60.8 0 0 0 137.53 159.28 Z"><title>Epic 5: VS Code Read-Only Companion Surface — Stories drafted, 3 stories</title></path>
+  </a>
+  <a href="epics/epic-5.html">
+    <path class="sb-seg sb-drafted" d="M 53.9 110.33 A 157.7 157.7 0 0 1 87.91 69.81 L 119.89 107.46 A 108.3 108.3 0 0 0 96.54 135.29 Z"><title>Story 5.1: Shared View-Model Contract for HTML and Webview Adapters</title></path>
+  </a>
+  <a href="epics/epic-5.html">
+    <path class="sb-seg sb-drafted" d="M 89.36 68.59 A 157.7 157.7 0 0 1 135.18 42.14 L 152.35 88.46 A 108.3 108.3 0 0 0 120.89 106.62 Z"><title>Story 5.2: Read-Only VS Code Dashboard and Epics Experience</title></path>
+  </a>
+  <a href="epics/epic-5.html">
+    <path class="sb-seg sb-drafted" d="M 136.95 41.49 A 157.7 157.7 0 0 1 189.05 32.3 L 189.35 81.7 A 108.3 108.3 0 0 0 153.57 88.01 Z"><title>Story 5.3: Host-Aware Theming and Explicit Helper Actions</title></path>
+  </a>
+  <text x="190" y="182" class="sunburst-center-num" text-anchor="middle">18</text>
+  <text x="190" y="202" class="sunburst-center-label" text-anchor="middle">stories</text>
+</svg>
+<div class="sunburst-legend">
+  <span><span class="swatch sb-pending-sw"></span>Pending</span>
+  <span><span class="swatch sb-drafted-sw"></span>Drafted</span>
+  <span><span class="swatch sb-ready-sw"></span>Ready for dev</span>
+  <span><span class="swatch sb-active-sw"></span>In development</span>
+  <span><span class="swatch sb-review-sw"></span>In review</span>
+  <span><span class="swatch sb-done-sw"></span>Done</span>
+</div>
+<div class="sunburst-hint">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>
+</div>
+
+<div class="chart-panel next-steps">
+<h3>Next Steps (BMad)</h3>
+<ul class="next-steps-list">
+  <li><code>/gds-create-story 1.2</code><span class="next-steps-desc">Drafts the implementation plan for Epic 1&#39;s next story (1.2) — it doesn&#39;t have one yet.</span></li>
+</ul>
+</div>
+
+<div class="chart-row">
+<div class="chart-panel">
+<h3>Epic Status</h3>
+<div class="donut-and-legend">
+<svg class="donut" viewBox="0 0 120 120" width="120" height="120">
+  <circle cx="60" cy="60" r="50" class="donut-track" />
+  <circle cx="60" cy="60" r="50" class="donut-seg drafted" stroke-dasharray="314.16 0" stroke-dashoffset="-0"><title>Drafted: 5</title></circle>
+  <text x="60" y="60" class="donut-center-text" text-anchor="middle" dominant-baseline="central">5</text>
+</svg>
+<div class="donut-legend">
+  <span><span class="swatch drafted"></span>Drafted (5)</span>
+  <span><span class="swatch pending"></span>Pending (0)</span>
+</div>
+</div>
+</div>
+
+<div class="chart-panel">
+<h3>Commit Activity</h3>
+<svg class="heatmap" viewBox="0 0 138 114" width="138" height="114">
+  <text x="0" y="39" class="heatmap-daylabel">Mon</text>
+  <text x="0" y="67" class="heatmap-daylabel">Wed</text>
+  <text x="0" y="95" class="heatmap-daylabel">Fri</text>
+  <text x="26" y="11" class="heatmap-monthlabel">May</text>
+  <text x="68" y="11" class="heatmap-monthlabel">Jun</text>
+  <text x="124" y="11" class="heatmap-monthlabel">Jul</text>
+  <rect x="26" y="16" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-17: 0 commits</title></rect>
+  <rect x="26" y="30" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-18: 0 commits</title></rect>
+  <rect x="26" y="44" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-19: 0 commits</title></rect>
+  <rect x="26" y="58" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-20: 0 commits</title></rect>
+  <rect x="26" y="72" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-21: 0 commits</title></rect>
+  <rect x="26" y="86" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-22: 0 commits</title></rect>
+  <rect x="26" y="100" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-23: 0 commits</title></rect>
+  <rect x="40" y="16" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-24: 0 commits</title></rect>
+  <rect x="40" y="30" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-25: 0 commits</title></rect>
+  <rect x="40" y="44" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-26: 0 commits</title></rect>
+  <rect x="40" y="58" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-27: 0 commits</title></rect>
+  <rect x="40" y="72" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-28: 0 commits</title></rect>
+  <rect x="40" y="86" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-29: 0 commits</title></rect>
+  <rect x="40" y="100" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-30: 0 commits</title></rect>
+  <rect x="54" y="16" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-05-31: 0 commits</title></rect>
+  <rect x="54" y="30" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-01: 0 commits</title></rect>
+  <rect x="54" y="44" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-02: 0 commits</title></rect>
+  <rect x="54" y="58" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-03: 0 commits</title></rect>
+  <rect x="54" y="72" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-04: 0 commits</title></rect>
+  <rect x="54" y="86" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-05: 0 commits</title></rect>
+  <rect x="54" y="100" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-06: 0 commits</title></rect>
+  <rect x="68" y="16" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-07: 0 commits</title></rect>
+  <rect x="68" y="30" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-08: 0 commits</title></rect>
+  <rect x="68" y="44" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-09: 0 commits</title></rect>
+  <rect x="68" y="58" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-10: 0 commits</title></rect>
+  <rect x="68" y="72" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-11: 0 commits</title></rect>
+  <rect x="68" y="86" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-12: 0 commits</title></rect>
+  <rect x="68" y="100" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-13: 0 commits</title></rect>
+  <rect x="82" y="16" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-14: 0 commits</title></rect>
+  <rect x="82" y="30" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-15: 0 commits</title></rect>
+  <rect x="82" y="44" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-16: 0 commits</title></rect>
+  <rect x="82" y="58" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-17: 0 commits</title></rect>
+  <rect x="82" y="72" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-18: 0 commits</title></rect>
+  <rect x="82" y="86" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-19: 0 commits</title></rect>
+  <rect x="82" y="100" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-20: 0 commits</title></rect>
+  <rect x="96" y="16" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-21: 0 commits</title></rect>
+  <rect x="96" y="30" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-22: 0 commits</title></rect>
+  <rect x="96" y="44" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-23: 0 commits</title></rect>
+  <rect x="96" y="58" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-24: 0 commits</title></rect>
+  <rect x="96" y="72" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-25: 0 commits</title></rect>
+  <rect x="96" y="86" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-26: 0 commits</title></rect>
+  <rect x="96" y="100" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-27: 0 commits</title></rect>
+  <rect x="110" y="16" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-28: 0 commits</title></rect>
+  <rect x="110" y="30" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-29: 0 commits</title></rect>
+  <rect x="110" y="44" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-06-30: 0 commits</title></rect>
+  <rect x="110" y="58" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-01: 0 commits</title></rect>
+  <rect x="110" y="72" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-02: 0 commits</title></rect>
+  <rect x="110" y="86" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-03: 0 commits</title></rect>
+  <rect x="110" y="100" width="11" height="11" rx="2" class="heatmap-cell level-1"><title>2026-07-04: 2 commits</title></rect>
+  <rect x="124" y="16" width="11" height="11" rx="2" class="heatmap-cell level-4"><title>2026-07-05: 15 commits</title></rect>
+  <rect x="124" y="30" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-06: 0 commits</title></rect>
+  <rect x="124" y="44" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-07: 0 commits</title></rect>
+  <rect x="124" y="58" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-08: 0 commits</title></rect>
+  <rect x="124" y="72" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-09: 0 commits</title></rect>
+  <rect x="124" y="86" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-10: 0 commits</title></rect>
+  <rect x="124" y="100" width="11" height="11" rx="2" class="heatmap-cell level-0"><title>2026-07-11: 0 commits</title></rect>
+</svg>
+<div class="heatmap-legend">Less <span class="heatmap-legend-swatch level-0"></span><span class="heatmap-legend-swatch level-1"></span><span class="heatmap-legend-swatch level-2"></span><span class="heatmap-legend-swatch level-3"></span><span class="heatmap-legend-swatch level-4"></span> More</div>
+</div>
+
+</div>
+
+<div class="chart-panel">
+<div class="chart-panel-header-row"><h3>Requirements Progress</h3><a class="view-epic-link" href="requirements.html">View Requirements &rarr;</a></div>
+<div class="chart-row">
+<div class="chart-col">
+  <div class="req-donut-label">Functional (14)</div>
+  <div class="donut-and-legend">
+<svg class="donut" viewBox="0 0 120 120" width="120" height="120">
+  <circle cx="60" cy="60" r="50" class="donut-track" />
+  <circle cx="60" cy="60" r="50" class="donut-seg ready" stroke-dasharray="89.76 224.4" stroke-dashoffset="-0"><title>Ready for dev: 4</title></circle>
+  <circle cx="60" cy="60" r="50" class="donut-seg pending" stroke-dasharray="224.4 89.76" stroke-dashoffset="-89.76"><title>Planned: 10</title></circle>
+  <text x="60" y="60" class="donut-center-text" text-anchor="middle" dominant-baseline="central">14</text>
+</svg>
+<div class="donut-legend">
+  <span><span class="swatch done"></span>Done (0)</span>
+  <span><span class="swatch ready"></span>Ready (4)</span>
+  <span><span class="swatch pending"></span>Planned (10)</span>
+  <span><span class="swatch deferred"></span>Deferred (0)</span>
+</div>
+  </div>
+</div>
+<div class="chart-col">
+  <div class="req-donut-label">Non-functional (7)</div>
+  <div class="donut-and-legend">
+<svg class="donut" viewBox="0 0 120 120" width="120" height="120">
+  <circle cx="60" cy="60" r="50" class="donut-track" />
+  <circle cx="60" cy="60" r="50" class="donut-seg pending" stroke-dasharray="314.16 0" stroke-dashoffset="-0"><title>Planned: 7</title></circle>
+  <text x="60" y="60" class="donut-center-text" text-anchor="middle" dominant-baseline="central">7</text>
+</svg>
+<div class="donut-legend">
+  <span><span class="swatch done"></span>Done (0)</span>
+  <span><span class="swatch ready"></span>Ready (0)</span>
+  <span><span class="swatch pending"></span>Planned (7)</span>
+  <span><span class="swatch deferred"></span>Deferred (0)</span>
+</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="chart-panel">
+<h3>Progress by Epic</h3>
+<div class="epic-mosaic">
+  <a class="epic-mosaic-card" href="epics/epic-1.html">
+    <div class="epic-mosaic-donut">
+<svg class="donut" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="22" class="donut-track" />
+  <circle cx="32" cy="32" r="22" class="donut-seg ready" stroke-dasharray="34.56 103.67" stroke-dashoffset="-0"><title>Detailed: 1</title></circle>
+  <circle cx="32" cy="32" r="22" class="donut-seg pending" stroke-dasharray="103.67 34.56" stroke-dashoffset="-34.56"><title>Not yet detailed: 3</title></circle>
+  <text x="32" y="32" class="donut-center-text" text-anchor="middle" dominant-baseline="central">4</text>
+</svg>
+    </div>
+    <div class="epic-mosaic-label">
+      <span class="epic-mosaic-num">Epic 1</span>
+      <span class="epic-mosaic-title">High-Clarity BMad Portal Experience</span>
+      <span class="epic-mosaic-sub">1 / 4 stories detailed</span>
+    </div>
+  </a>
+  <a class="epic-mosaic-card" href="epics/epic-2.html">
+    <div class="epic-mosaic-donut">
+<svg class="donut" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="22" class="donut-track" />
+  <circle cx="32" cy="32" r="22" class="donut-seg pending" stroke-dasharray="138.23 0" stroke-dashoffset="-0"><title>Not yet detailed: 3</title></circle>
+  <text x="32" y="32" class="donut-center-text" text-anchor="middle" dominant-baseline="central">3</text>
+</svg>
+    </div>
+    <div class="epic-mosaic-label">
+      <span class="epic-mosaic-num">Epic 2</span>
+      <span class="epic-mosaic-title">Reliable Local Operations and Config Control</span>
+      <span class="epic-mosaic-sub">0 / 3 stories detailed</span>
+    </div>
+  </a>
+  <a class="epic-mosaic-card" href="epics/epic-3.html">
+    <div class="epic-mosaic-donut">
+<svg class="donut" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="22" class="donut-track" />
+  <circle cx="32" cy="32" r="22" class="donut-seg pending" stroke-dasharray="138.23 0" stroke-dashoffset="-0"><title>Not yet detailed: 5</title></circle>
+  <text x="32" y="32" class="donut-center-text" text-anchor="middle" dominant-baseline="central">5</text>
+</svg>
+    </div>
+    <div class="epic-mosaic-label">
+      <span class="epic-mosaic-num">Epic 3</span>
+      <span class="epic-mosaic-title">Insight Surfaces and Tree-View Discovery</span>
+      <span class="epic-mosaic-sub">0 / 5 stories detailed</span>
+    </div>
+  </a>
+  <a class="epic-mosaic-card" href="epics/epic-4.html">
+    <div class="epic-mosaic-donut">
+<svg class="donut" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="22" class="donut-track" />
+  <circle cx="32" cy="32" r="22" class="donut-seg pending" stroke-dasharray="138.23 0" stroke-dashoffset="-0"><title>Not yet detailed: 3</title></circle>
+  <text x="32" y="32" class="donut-center-text" text-anchor="middle" dominant-baseline="central">3</text>
+</svg>
+    </div>
+    <div class="epic-mosaic-label">
+      <span class="epic-mosaic-num">Epic 4</span>
+      <span class="epic-mosaic-title">Multi-Framework Coverage Expansion</span>
+      <span class="epic-mosaic-sub">0 / 3 stories detailed</span>
+    </div>
+  </a>
+  <a class="epic-mosaic-card" href="epics/epic-5.html">
+    <div class="epic-mosaic-donut">
+<svg class="donut" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="22" class="donut-track" />
+  <circle cx="32" cy="32" r="22" class="donut-seg pending" stroke-dasharray="138.23 0" stroke-dashoffset="-0"><title>Not yet detailed: 3</title></circle>
+  <text x="32" y="32" class="donut-center-text" text-anchor="middle" dominant-baseline="central">3</text>
+</svg>
+    </div>
+    <div class="epic-mosaic-label">
+      <span class="epic-mosaic-num">Epic 5</span>
+      <span class="epic-mosaic-title">VS Code Read-Only Companion Surface</span>
+      <span class="epic-mosaic-sub">0 / 3 stories detailed</span>
+    </div>
+  </a>
+</div>
+</div>
+
+</section>
+
+<div class="index-section-title">Planning Artifacts</div>
+<div class="index-grid">
+  <a class="index-card" href="planning-artifacts/prds/prd-SpecScribe-2026-07-05/review-rubric.html">
+    <h2>PRD Quality Review - SpecScribe 2026-07-05</h2>
+    <span class="index-card-path">planning-artifacts/prds/prd-SpecScribe-2026-07-05/review-rubric.md</span>
+  </a>
+  <a class="index-card" href="planning-artifacts/briefs/brief-SpecScribe-2026-07-05/brief.html">
+    <h2>Product Brief - SpecScribe</h2>
+    <p>draft</p>
+    <span class="index-card-path">planning-artifacts/briefs/brief-SpecScribe-2026-07-05/brief.md</span>
+  </a>
+  <a class="index-card" href="planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.html">
+    <h2>SpecScribe</h2>
+    <p>final</p>
+    <span class="index-card-path">planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.md</span>
+  </a>
+  <a class="index-card" href="planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.html">
+    <h2>SpecScribe Design</h2>
+    <p>final</p>
+    <span class="index-card-path">planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.md</span>
+  </a>
+  <a class="index-card" href="planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.html">
+    <h2>SpecScribe Experience</h2>
+    <p>final</p>
+    <span class="index-card-path">planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md</span>
+  </a>
+</div>
+
+<div class="index-section-title">Other</div>
+<div class="index-grid">
+  <a class="index-card" href="specs/spec-specscribe/rendering-architecture.html">
+    <h2>Rendering Architecture Sketch</h2>
+    <span class="index-card-path">specs/spec-specscribe/rendering-architecture.md</span>
+  </a>
+  <a class="index-card" href="specs/spec-specscribe/requirements-catalog.html">
+    <h2>Requirements Catalog</h2>
+    <span class="index-card-path">specs/spec-specscribe/requirements-catalog.md</span>
+  </a>
+  <a class="index-card" href="specs/spec-specscribe/settings-and-signals.html">
+    <h2>Settings and Signals</h2>
+    <span class="index-card-path">specs/spec-specscribe/settings-and-signals.md</span>
+  </a>
+  <a class="index-card" href="specs/spec-specscribe/SPEC.html">
+    <h2>SpecScribe</h2>
+    <span class="index-card-path">specs/spec-specscribe/SPEC.md</span>
+  </a>
+  <a class="index-card" href="specs/spec-specscribe/ARCHITECTURE-SPINE.html">
+    <h2>SpecScribe Architecture Spine</h2>
+    <p>final</p>
+    <span class="index-card-path">specs/spec-specscribe/ARCHITECTURE-SPINE.md</span>
+  </a>
+</div>
+
+<div class="index-section-title-row">
+  <span class="index-section-title">Architecture Decision Records</span>
+  <a class="view-epic-link" href="adrs/index.html">All ADRs &rarr;</a>
+</div>
+<div class="index-grid">
+  <a class="index-card" href="adrs/0001-spec-driven-development-framework.html">
+    <h2>ADR 0001: Adopt BMAD-METHOD as SpecScribe&#39;s Spec-Driven Development Framework</h2>
+    <p><span class="pill status-accepted">Accepted</span></p>
+    <span class="index-card-path">adrs/0001-spec-driven-development-framework.md</span>
+  </a>
+  <a class="index-card" href="adrs/0002-shared-rendering-core-and-host-neutral-view-models.html">
+    <h2>ADR 0002: Preserve a Shared Rendering Core with Host-Neutral View Models</h2>
+    <p><span class="pill status-accepted">Accepted</span></p>
+    <span class="index-card-path">adrs/0002-shared-rendering-core-and-host-neutral-view-models.md</span>
+  </a>
+  <a class="index-card" href="adrs/0003-directory-scoped-settings-and-read-only-helpers.html">
+    <h2>ADR 0003: Keep Settings Directory-Scoped and IDE Helpers Read-Only</h2>
+    <p><span class="pill status-accepted">Accepted</span></p>
+    <span class="index-card-path">adrs/0003-directory-scoped-settings-and-read-only-helpers.md</span>
+  </a>
+  <a class="index-card" href="adrs/0004-cross-surface-interaction-and-theme-contract.html">
+    <h2>ADR 0004: Preserve Cross-Surface Interaction Semantics and Host-Aware Theme Boundaries</h2>
+    <p><span class="pill status-accepted">Accepted</span></p>
+    <span class="index-card-path">adrs/0004-cross-surface-interaction-and-theme-contract.md</span>
+  </a>
+</div>
+
+<footer class="doc-footer">
+  SpecScribe &middot; Live Docs &middot; last rebuilt 2026-07-05 22:41
+</footer>
+
+</body>
+</html>

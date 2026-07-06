@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpecScribe — SpecScribe</title>
+<link rel="stylesheet" href="../../../specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="../../../index.html">Home</a>
+    <a href="../../../adrs/index.html">ADRs</a>
+    <a href="../../../epics.html">Epics</a>
+    <a href="../../../requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="../../../index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">SpecScribe</span>
+</div>
+
+<header class="doc-header">
+  <h1>SpecScribe</h1>
+  <div class="meta-pills">
+    <span class="pill status-final">final</span>
+    <span class="pill">planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.md</span>
+  </div>
+</header>
+
+<nav class="toc-strip" aria-label="On this page">
+  <span class="toc-label">On this page</span>
+  <a class="" href="#document-purpose">0. Document Purpose</a>
+  <a class="" href="#vision">1. Vision</a>
+  <a class="" href="#target-user">2. Target User</a>
+  <a class="toc-h3" href="#jobs-to-be-done">2.1 Jobs To Be Done</a>
+  <a class="toc-h3" href="#non-users-v1">2.2 Non-Users (v1)</a>
+  <a class="toc-h3" href="#key-user-journeys">2.3 Key User Journeys</a>
+  <a class="" href="#glossary">3. Glossary</a>
+  <a class="" href="#features">4. Features</a>
+  <a class="toc-h3" href="#multi-framework-artifact-ingestion">4.1 Multi-Framework Artifact Ingestion</a>
+  <a class="toc-h3" href="#generated-portal-and-traceability">4.2 Generated Portal and Traceability</a>
+  <a class="toc-h3" href="#repository-and-artifact-insights">4.3 Repository and Artifact Insights</a>
+  <a class="toc-h3" href="#distribution-surfaces">4.4 Distribution Surfaces</a>
+  <a class="" href="#non-goals-explicit">5. Non-Goals (Explicit)</a>
+  <a class="" href="#mvp-scope">6. MVP Scope</a>
+  <a class="toc-h3" href="#in-scope">6.1 In Scope</a>
+  <a class="toc-h3" href="#out-of-scope-for-mvp">6.2 Out of Scope for MVP</a>
+  <a class="" href="#success-metrics">7. Success Metrics</a>
+  <a class="" href="#cross-cutting-non-functional-requirements">8. Cross-Cutting Non-Functional Requirements</a>
+  <a class="" href="#open-questions">9. Open Questions</a>
+  <a class="" href="#research-and-experimentation-goals">10. Research and Experimentation Goals</a>
+  <a class="" href="#assumptions-index">11. Assumptions Index</a>
+  <a class="" href="#alignment-addendum-2026-07-05">12. Alignment Addendum (2026-07-05)</a>
+  <a class="toc-h3" href="#configuration-and-settings">12.1 Configuration and Settings</a>
+  <a class="toc-h3" href="#local-only-and-read-only-posture">12.2 Local-Only and Read-Only Posture</a>
+  <a class="toc-h3" href="#documentation-communication-standard">12.3 Documentation Communication Standard</a>
+  <a class="toc-h3" href="#framework-and-module-coverage">12.4 Framework and Module Coverage</a>
+  <a class="toc-h3" href="#concrete-relevance-signals-extension-timing">12.5 Concrete Relevance Signals (Extension Timing)</a>
+  <a class="toc-h3" href="#dual-output-architecture-planning">12.6 Dual-Output Architecture Planning</a>
+  <a class="toc-h3" href="#extension-relevance-fit-with-current-workflow">12.7 Extension Relevance Fit with Current Workflow</a>
+  <a class="toc-h3" href="#module-boundary-sketch">12.8 Module Boundary Sketch</a>
+</nav>
+
+<article class="doc-body">
+<h1 id="prd-specscribe">PRD: SpecScribe</h1>
+<p><em>Working title - confirm.</em></p>
+<h2 id="document-purpose">0. Document Purpose</h2>
+<p>This PRD defines the product contract for SpecScribe as a hobby open-source project that prioritizes practical usefulness over enterprise ceremony. It is written for the maintainer, contributors, and downstream workflows that may produce UX, architecture, and epics. The document is structured around Glossary terms, feature groups with globally stable FR IDs, explicit non-goals, and scoped assumptions tagged inline. It anchors on direct user guidance and observed current product behavior, with <a href="README.md">README.md</a> and <a href="docs/adrs/0001-spec-driven-development-framework.md">docs/adrs/0001-spec-driven-development-framework.md</a> as primary context; the existing brief in <a href="_bmad-output/planning-artifacts/briefs/brief-SpecScribe-2026-07-05/brief.md">_bmad-output/planning-artifacts/briefs/brief-SpecScribe-2026-07-05/brief.md</a> is treated as secondary context only.</p>
+<h2 id="vision">1. Vision</h2>
+<p>SpecScribe turns dense, agent-oriented planning artifacts into a human-readable status surface that helps people understand what is happening in a project without manually traversing dozens of markdown files. The core bet is that spec-driven development should improve clarity, not bury it.</p>
+<p>The near-term product identity is CLI-first: one command to generate a static project portal, and one command to keep it current while files evolve. The generated site should remain easy to host, share, and inspect offline, with structure that maps to how spec-driven teams think (epics, stories, requirements, ADRs, and progress).</p>
+<p>Longer-term, SpecScribe extends this same information model into an in-editor experience. The VS Code extension is a follow-on surface, not a replacement for the static site, and should reuse core parsing and projection logic rather than creating a separate product brain. [ASSUMPTION: Extension delivery begins as read-only visibility before any authoring or workflow controls.]</p>
+<h2 id="target-user">2. Target User</h2>
+<h3 id="jobs-to-be-done">2.1 Jobs To Be Done</h3>
+<ul>
+<li>As a solo open-source maintainer, I want instant visibility into project progress so I can decide what to do next quickly.</li>
+<li>As a contributor, I want to understand requirements, story status, and architectural decisions without reading every raw planning file.</li>
+<li>As a reviewer or community member, I want a browsable project narrative that shows momentum, scope, and decision history.</li>
+<li>As a spec-driven team member, I want one place that reconciles artifacts from multiple frameworks into a coherent view.</li>
+</ul>
+<h3 id="non-users-v1">2.2 Non-Users (v1)</h3>
+<ul>
+<li>Organizations needing hosted multi-tenant governance, RBAC, and enterprise compliance workflows.</li>
+<li>Teams expecting SpecScribe to replace issue trackers, project management suites, or BI platforms.</li>
+<li>Users looking for a markdown editor or requirements authoring tool.</li>
+</ul>
+<h3 id="key-user-journeys">2.3 Key User Journeys</h3>
+<ul>
+<li><strong>UJ-1. Matt checks project health before starting a coding session.</strong> Matt runs SpecScribe in watch mode, opens the generated dashboard, and uses epic, requirement, and ADR links to identify the most constrained next action.</li>
+<li><strong>UJ-2. A new contributor evaluates the repository before opening a PR.</strong> The contributor opens the generated site, follows cross-links between stories and requirements, and quickly understands scope boundaries and current progress.</li>
+<li><strong>UJ-3. A maintainer shares progress externally.</strong> The maintainer publishes static output and uses the generated pages to communicate status and decisions without requiring others to parse raw framework artifacts.</li>
+</ul>
+<h2 id="glossary">3. Glossary</h2>
+<ul>
+<li><strong>Artifact Source</strong> - The directory tree containing spec-driven markdown inputs that SpecScribe parses.</li>
+<li><strong>Framework Adapter</strong> - Parser and mapping logic that converts one framework's artifacts into SpecScribe's common model.</li>
+<li><strong>Projection Model</strong> - Internal normalized representation used to generate dashboard and detail pages.</li>
+<li><strong>Generated Portal</strong> - The static HTML output set produced by SpecScribe.</li>
+<li><strong>Watch Mode</strong> - Continuous regeneration mode triggered by source-file changes.</li>
+<li><strong>Insight Module</strong> - Optional analysis pass that computes repository and artifact intelligence (for example, git activity and agent-file signals).</li>
+<li><strong>Agent Files</strong> - Common coding-agent artifacts and logs (for example, specs, stories, memory files, workflow outputs) scanned for structural/project insights.</li>
+</ul>
+<h2 id="features">4. Features</h2>
+<h3 id="multi-framework-artifact-ingestion">4.1 Multi-Framework Artifact Ingestion</h3>
+<p><strong>Description:</strong> SpecScribe ingests framework outputs and maps them into one Projection Model so the Generated Portal remains coherent even as input styles differ. Realizes UJ-1, UJ-2, UJ-3.</p>
+<p><strong>Functional Requirements:</strong></p>
+<h4 id="fr-1-adapter-contract-with-shared-projection">FR-1: Adapter contract with shared projection</h4>
+<p>SpecScribe can apply a Framework Adapter contract so each supported framework maps into the same Projection Model.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Adding a new adapter does not require rewriting the core HTML templating pipeline.</li>
+<li>Unsupported artifacts are ignored or surfaced as non-fatal notices, not hard failures.</li>
+</ul>
+<h4 id="fr-2-bmad-support-remains-first-class">FR-2: BMad support remains first-class</h4>
+<p>SpecScribe can fully parse and render current BMad-oriented artifacts used by this repository.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Existing BMad epic/story/requirements/ADR rendering behavior remains intact across releases.</li>
+<li>Regressions in BMad parsing are covered by automated tests.</li>
+</ul>
+<h4 id="fr-3-spec-kit-baseline-support">FR-3: Spec Kit baseline support</h4>
+<p>SpecScribe can parse and project the current Spec Kit artifact set and use as many available artifacts as produce useful user-facing insight.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Representative current-version Spec Kit repositories render without fatal errors.</li>
+<li>For each discovered Spec Kit artifact, the Generated Portal either renders a useful view or emits a clear non-fatal unsupported-artifact notice.</li>
+</ul>
+<h4 id="fr-4-gsdgsd-pi-baseline-support">FR-4: GSD/GSD-Pi baseline support</h4>
+<p>SpecScribe can parse and project GSD/GSD-Pi artifacts as broadly as available data supports, prioritizing information that improves user understanding of progress, scope, and activity.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Representative GSD/GSD-Pi repositories render key planning and tracking artifacts without fatal errors.</li>
+<li>Additional discovered artifacts are rendered or summarized with a declared coverage tier (rendered, summarized, unsupported), while unsupported files never block generation.</li>
+</ul>
+<h3 id="generated-portal-and-traceability">4.2 Generated Portal and Traceability</h3>
+<p><strong>Description:</strong> The Generated Portal emphasizes readability, navigation, and cross-linked traceability over raw file dumps. Realizes UJ-1, UJ-2, UJ-3.</p>
+<p><strong>Functional Requirements:</strong></p>
+<h4 id="fr-5-coherent-navigation-and-dashboards">FR-5: Coherent navigation and dashboards</h4>
+<p>SpecScribe can generate a coherent index, section navigation, and progress summaries across parsed artifacts.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>The generated index page links to every major artifact class present in source input.</li>
+<li>Missing classes (for example, no ADRs) degrade gracefully.</li>
+</ul>
+<h4 id="fr-6-requirements-and-decision-traceability">FR-6: Requirements and decision traceability</h4>
+<p>SpecScribe can cross-link requirements, stories, and ADR references where IDs are detectable.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>ADR markdown files are rendered into an ADR index and ADR detail pages in the Generated Portal.</li>
+<li>Recognized requirement IDs resolve to requirement detail pages.</li>
+<li>Broken links are avoided for unresolved IDs.</li>
+</ul>
+<h4 id="fr-7-markdown-fidelity-for-core-authoring-patterns">FR-7: Markdown fidelity for core authoring patterns</h4>
+<p>SpecScribe can render core markdown patterns used in SDD artifacts, including Mermaid blocks and task lists.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Mermaid blocks render on generated pages without manual post-processing.</li>
+<li>GitHub-style checklists appear with completion states.</li>
+</ul>
+<h4 id="fr-8-reliable-watch-mode-regeneration">FR-8: Reliable watch-mode regeneration</h4>
+<p>SpecScribe can regenerate output in Watch Mode when source files change, including rapid edits.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Regeneration completes without corrupting output during quick successive saves.</li>
+<li>Source files are read without write-lock side effects.</li>
+</ul>
+<h3 id="repository-and-artifact-insights">4.3 Repository and Artifact Insights</h3>
+<p><strong>Description:</strong> Insight Modules provide context beyond document rendering, helping users interpret project momentum and risk. Realizes UJ-1, UJ-3.</p>
+<p><strong>Functional Requirements:</strong></p>
+<h4 id="fr-9-baseline-git-pulse">FR-9: Baseline git pulse</h4>
+<p>SpecScribe can compute and display lightweight git activity context as part of the Generated Portal.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Dashboard includes, at minimum, last commit timestamp, 30-day commit count, and top changed files derived from local git history.</li>
+<li>Generation continues when git history is unavailable or command execution fails.</li>
+</ul>
+<h4 id="fr-10-optional-deeper-git-insights">FR-10: Optional deeper git insights</h4>
+<p>SpecScribe can optionally compute deeper repository analytics (for example, hotspots and change coupling) in a way appropriate for local OSS usage. [ASSUMPTION: This is opt-in to control performance impact.]</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Deep metrics can be toggled independently of baseline generation.</li>
+<li>On reference repositories, baseline generation time with deep metrics disabled does not regress more than 10% from current baseline behavior.</li>
+</ul>
+<p><strong>Out of Scope:</strong></p>
+<ul>
+<li>Individual productivity scoring or ranking.</li>
+</ul>
+<h4 id="fr-11-agent-file-structure-insights">FR-11: Agent-file structure insights</h4>
+<p>SpecScribe can analyze common Agent Files and workflow outputs to derive structural/project insights (for example, planning coverage, artifact freshness, and gaps), prioritizing primary source artifacts first and using memlog data as optional enrichment. [NOTE FOR PM: Evaluate whether GitStractor logic can be reused for repository scanning and summarization.]</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>V1 policy is Core + Orchestration: canonical Agent Files include PRD/brief/architecture/spec/epic/story/requirements artifacts and workflow output trees when present.</li>
+<li>Insight output identifies discovered artifact families and missing expected artifacts.</li>
+<li>Primary insight summaries are derivable from source artifacts even when memlog files are absent.</li>
+<li>Memlog and related journals are consumed only as secondary enrichment when available.</li>
+<li>Unknown or custom files do not cause generation failure.</li>
+<li>Full telemetry mode (Core + Orchestration + first-class memlog/journal/activity emphasis) is explicitly deferred to research/experimentation.</li>
+</ul>
+<h3 id="distribution-surfaces">4.4 Distribution Surfaces</h3>
+<p><strong>Description:</strong> CLI remains the primary delivery surface; extension support follows once the core model is stable. Realizes UJ-1, UJ-2.</p>
+<p><strong>Functional Requirements:</strong></p>
+<h4 id="fr-12-cli-first-user-experience">FR-12: CLI-first user experience</h4>
+<p>SpecScribe can be operated via CLI for one-shot generation and watch workflows.</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>A user can generate output with zero required flags in an auto-discoverable supported repository, and with explicit source/output flags in non-default layouts.</li>
+<li>Help output documents command modes and major options.</li>
+</ul>
+<h4 id="fr-13-vs-code-extension-as-follow-on-surface">FR-13: VS Code extension as follow-on surface</h4>
+<p>SpecScribe can expose the Generated Portal information model in a VS Code webview experience after CLI parity is stable. [ASSUMPTION: Initial extension release is read-only and local-first.]</p>
+<p><strong>Consequences (testable):</strong></p>
+<ul>
+<li>Extension view can display core project status pages derived from local artifacts.</li>
+<li>Extension uses shared core parsing/projection logic, not duplicate parser implementations.</li>
+<li>Extension work begins when a maintainer relevance decision is recorded (in ADR or memlog) stating extension work is currently more valuable than incremental CLI/parser work, and no unresolved critical reliability regressions are known in active usage.</li>
+</ul>
+<p><strong>Out of Scope:</strong></p>
+<ul>
+<li>Editing source planning artifacts directly in extension v1. [NON-GOAL for MVP]</li>
+</ul>
+<h2 id="non-goals-explicit">5. Non-Goals (Explicit)</h2>
+<ul>
+<li>Building a hosted SaaS with account management and remote data processing in v1.</li>
+<li>Replacing project management tools, issue trackers, or source control platforms.</li>
+<li>Implementing framework authoring flows (SpecScribe is a readability and insight layer, not a generator of upstream artifacts).</li>
+<li>Shipping extension-first while CLI parity and adapter stability remain unfinished.</li>
+<li>Producing people-ranking productivity metrics from git history.</li>
+</ul>
+<h2 id="mvp-scope">6. MVP Scope</h2>
+<h3 id="in-scope">6.1 In Scope</h3>
+<ul>
+<li>Stable CLI generate/watch workflows.</li>
+<li>First-class BMad support and improved robustness on mixed artifact inputs.</li>
+<li>Current-version Spec Kit and broad GSD/GSD-Pi artifact ingestion, favoring useful coverage over narrow baseline-only support.</li>
+<li>Generated Portal with coherent navigation, traceability links, ADR pages (already supported), Mermaid/task-list rendering.</li>
+<li>Baseline git pulse on dashboard.</li>
+<li>Initial artifact/agent-file insight pass focused on structure and completeness using Core + Orchestration policy, with memlog as secondary enrichment.</li>
+</ul>
+<h3 id="out-of-scope-for-mvp">6.2 Out of Scope for MVP</h3>
+<ul>
+<li>Perfect parity for every edge-case variant of every framework artifact on first release (iterate toward fuller parity through adapter hardening).</li>
+<li>Rich extension interaction patterns beyond read-only visibility. [NOTE FOR PM]</li>
+<li>Heavy analytics that materially slow default generation (deep git metrics remain optional).</li>
+<li>Full telemetry as the default insight mode (promoting memlog/journal/activity streams to first-class primary signals).</li>
+<li>Cloud sync, authentication, or collaborative editing.</li>
+</ul>
+<h2 id="success-metrics">7. Success Metrics</h2>
+<p><strong>Primary</strong></p>
+<ul>
+<li><strong>SM-1</strong>: End-to-end generation reliability - In representative repositories, generate/watch complete without fatal error under normal edits. Validates FR-2, FR-5, FR-8, FR-12.</li>
+<li><strong>SM-2</strong>: Traceability integrity - Recognized requirement/story/ADR references resolve correctly in generated output with low broken-link incidence. Validates FR-6, FR-7.</li>
+</ul>
+<p><strong>Secondary</strong></p>
+<ul>
+<li><strong>SM-3</strong>: Framework breadth - Baseline Spec Kit and GSD/GSD-Pi repositories render core pages in addition to BMad. Validates FR-3, FR-4.</li>
+<li><strong>SM-4</strong>: Insight usefulness - Users can answer at least three common status questions from dashboard + insights without opening raw markdown. Validates FR-9, FR-11.</li>
+</ul>
+<p><strong>Counter-metrics (do not optimize)</strong></p>
+<ul>
+<li><strong>SM-C1</strong>: Dashboard complexity - Avoid maximizing metric count at the expense of readability. Counterbalances SM-4.</li>
+<li><strong>SM-C2</strong>: Analytics overhead - Avoid deep analysis defaults that degrade basic generate/watch responsiveness. Counterbalances SM-2 and SM-4.</li>
+</ul>
+<h2 id="cross-cutting-non-functional-requirements">8. Cross-Cutting Non-Functional Requirements</h2>
+<ul>
+<li><strong>NFR-1 (Performance):</strong> Default generation remains responsive for local OSS repositories; optional deep analysis must be separable from baseline runs.</li>
+<li><strong>NFR-2 (Resilience):</strong> Partial or malformed artifacts should degrade gracefully without crashing full-site generation.</li>
+<li><strong>NFR-3 (Local-first privacy):</strong> Repository and artifact analysis runs locally by default; no remote telemetry is required for core operation.</li>
+<li><strong>NFR-4 (Extensibility):</strong> Adapter architecture supports adding frameworks without core rewrites.</li>
+</ul>
+<h2 id="open-questions">9. Open Questions</h2>
+<ul>
+<li>How should coverage tiers be communicated (fully rendered, summarized, unsupported) so users understand exactly what is and is not interpreted?</li>
+<li>Which additional Agent Files should be plugin candidates after v1 Core + Orchestration coverage is stable?</li>
+<li>Should deeper git analysis be exposed as a CLI flag, settings profile, or both?</li>
+<li>Which concrete relevance signals should trigger extension work first (for example, user demand, contributor bandwidth, or recurring in-editor navigation pain)?</li>
+</ul>
+<h2 id="research-and-experimentation-goals">10. Research and Experimentation Goals</h2>
+<ul>
+<li>Evaluate Option 3 (Full telemetry mode) as an opt-in experiment after v1 Core + Orchestration stabilizes in active usage.</li>
+<li>Test whether memlog/journal/activity-first insights produce materially better user decisions than source-first summaries.</li>
+<li>Define promotion criteria for moving any experimental telemetry signals into default insight behavior.</li>
+</ul>
+<h2 id="assumptions-index">11. Assumptions Index</h2>
+<ul>
+<li>[ASSUMPTION] Deep git analytics remain opt-in.</li>
+<li>[ASSUMPTION] Extension delivery starts read-only and local-first before any authoring workflows.</li>
+</ul>
+<h2 id="alignment-addendum-2026-07-05">12. Alignment Addendum (2026-07-05)</h2>
+<p>This addendum records accepted direction updates so PRD and SPEC remain synchronized.</p>
+<h3 id="configuration-and-settings">12.1 Configuration and Settings</h3>
+<ul>
+<li>All user-facing features must be configurable through interactive options and equivalent CLI parameters.</li>
+<li>This includes git insights and ADR coverage controls.</li>
+<li>Settings are persisted via a directory-scoped settings file for the active source repository.</li>
+</ul>
+<h3 id="local-only-and-read-only-posture">12.2 Local-Only and Read-Only Posture</h3>
+<ul>
+<li>Product posture remains local-only and read-only.</li>
+<li>Future IDE integration may include helper buttons that generate next-step prompts/commands (for example, code review prompts) but must not mutate source planning artifacts.</li>
+</ul>
+<h3 id="documentation-communication-standard">12.3 Documentation Communication Standard</h3>
+<ul>
+<li>README must communicate user-facing options primarily via tables plus short descriptive text.</li>
+</ul>
+<h3 id="framework-and-module-coverage">12.4 Framework and Module Coverage</h3>
+<ul>
+<li>Support target is all current popular spec-driven-development frameworks and modules with explicit popularity criteria.</li>
+</ul>
+<h3 id="concrete-relevance-signals-extension-timing">12.5 Concrete Relevance Signals (Extension Timing)</h3>
+<ul>
+<li>&quot;Concrete relevance signals&quot; means measurable triggers for beginning extension work.</li>
+<li>Minimum gate: demand or workflow-friction evidence, plus reliability and maintainer-capacity readiness.</li>
+</ul>
+<h3 id="dual-output-architecture-planning">12.6 Dual-Output Architecture Planning</h3>
+<ul>
+<li>Plan for one shared projection/rendering core that feeds both generated HTML files and a future VS Code webview.</li>
+<li>Keep parser/projection logic shared across surfaces; keep output adapters focused on delivery concerns.</li>
+</ul>
+<h3 id="extension-relevance-fit-with-current-workflow">12.7 Extension Relevance Fit with Current Workflow</h3>
+<ul>
+<li>Extension timing should account for real editor usage mix.</li>
+<li>If work is predominantly in non-VS-Code desktop tooling, extension investment remains lower priority.</li>
+<li>If context switching to browser/watch management becomes frequent and VS Code-family usage rises, extension relevance increases.</li>
+</ul>
+<h3 id="module-boundary-sketch">12.8 Module Boundary Sketch</h3>
+<ul>
+<li>A shared projection/rendering core should expose host-neutral view models.</li>
+<li>Delivery adapters should target static HTML and VS Code webview separately without duplicating parser/projection logic.</li>
+<li>Read-only helper actions in webview may generate prompts/commands but must not directly mutate planning artifacts.</li>
+</ul>
+
+</article>
+
+<footer class="doc-footer">
+  Auto-generated by SpecScribe from <code>planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.md</code> &middot; 2026-07-05 22:41
+</footer>
+
+</body>
+</html>

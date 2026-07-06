@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FR10 — SpecScribe</title>
+<link rel="stylesheet" href="../specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="../index.html">Home</a>
+    <a href="../adrs/index.html">ADRs</a>
+    <a href="../epics.html">Epics</a>
+    <a href="../requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="../index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <a href="../requirements.html">Requirements</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">FR10</span>
+</div>
+
+<header class="doc-header">
+  <div class="story-kicker">Functional Requirement</div>
+  <h1>FR10</h1>
+  <div class="meta-pills"><span class="status-badge pending">Planned</span></div>
+</header>
+
+<div class="story-lead"><p>Support optional deeper git insights (for example hotspots and change coupling) as independently toggleable analysis.</p></div>
+
+<div class="epic-card">
+  <h3>Coverage</h3>
+  <div class="coverage-cards">
+    <a class="epic-mosaic-card coverage-card drafted" href="../epics/epic-3.html">
+      <div class="epic-mosaic-donut">
+<svg class="donut" viewBox="0 0 72 72" width="72" height="72">
+  <circle cx="36" cy="36" r="26" class="donut-track" />
+  <circle cx="36" cy="36" r="26" class="donut-seg pending" stroke-dasharray="163.36 0" stroke-dashoffset="-0"><title>Not yet detailed: 5</title></circle>
+  <text x="36" y="36" class="donut-center-text" text-anchor="middle" dominant-baseline="central">5</text>
+</svg>
+      </div>
+      <div class="epic-mosaic-label">
+        <span class="epic-mosaic-num">Epic 3</span>
+        <span class="epic-mosaic-title">Insight Surfaces and Tree-View Discovery</span>
+        <span class="status-badge drafted">Stories drafted</span>
+        <span class="epic-mosaic-sub">0 / 5 stories detailed</span>
+      </div>
+    </a>
+  </div>
+  <p class="epic-goal coverage-note">Optional deeper git analytics toggle path.</p>
+  <a class="view-epic-link" href="../requirements.html">&larr; All requirements</a>
+</div>
+
+<footer class="doc-footer">
+  SpecScribe &middot; FR10
+</footer>
+
+</body>
+</html>

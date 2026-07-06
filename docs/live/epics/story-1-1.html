@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Story 1.1: Dashboard Navigation and Readability Foundation — SpecScribe</title>
+<link rel="stylesheet" href="../specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="../index.html">Home</a>
+    <a href="../adrs/index.html">ADRs</a>
+    <a href="../epics.html">Epics</a>
+    <a href="../requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="../index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <a href="../epics.html">Epics</a>
+  <span class="crumb-sep">/</span>
+  <a href="../epics/epic-1.html">1 &#183; High-Clarity BMad Portal E…</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">Story 1.1</span>
+</div>
+
+<header class="doc-header">
+  <div class="kicker-row">
+    <span class="story-kicker">Story 1.1</span>
+    <span class="status-badge review">review</span>
+  </div>
+  <h1>Dashboard Navigation and Readability Foundation</h1>
+</header>
+
+<div class="story-lead user-story"><p>As a project maintainer,
+I want a coherent landing page and navigation model,
+so that I can find key project views in seconds.</p>
+</div>
+
+<section class="dashboard-narrow">
+<div class="chart-row">
+<div class="chart-panel sunburst-panel">
+<h3>Task Breakdown</h3>
+<svg class="sunburst" viewBox="0 0 280 280" width="280" height="280" role="img" aria-label="Task breakdown">
+  <path class="sb-seg sb-done" d="M 141.01 39.21 A 100.8 100.8 0 0 1 235.55 107.89 L 182.47 125.73 A 44.8 44.8 0 0 0 140.45 95.2 Z"><title>Task 1: Preserve and harden top-level navigation composition — done</title></path>
+  <path class="sb-seg sb-done" d="M 141.34 5.61 A 134.4 134.4 0 0 1 193.43 16.68 L 181.19 44.94 A 103.6 103.6 0 0 0 141.04 36.41 Z"><title>Confirm nav item generation remains data-driven and omission-safe for missing classes (`ADRs`, `Epics`, `Requirements`, source-derived pages) — done</title></path>
+  <path class="sb-seg sb-done" d="M 195.89 17.77 A 134.4 134.4 0 0 1 238.97 49.07 L 216.29 69.91 A 103.6 103.6 0 0 0 183.08 45.78 Z"><title>Ensure nav remains coherent across home, epics, requirements, story pages, and ADR pages — done</title></path>
+  <path class="sb-seg sb-done" d="M 240.77 51.07 A 134.4 134.4 0 0 1 267.4 97.19 L 238.2 107 A 103.6 103.6 0 0 0 217.68 71.45 Z"><title>Verify no dead links are emitted when source classes are absent — done</title></path>
+  <path class="sb-seg sb-done" d="M 236.17 109.81 A 100.8 100.8 0 0 1 200.06 220.95 L 166.69 175.98 A 44.8 44.8 0 0 0 182.74 126.58 Z"><title>Task 2: Ensure dashboard discoverability and coherent entry points — done</title></path>
+  <path class="sb-seg sb-done" d="M 268.23 99.75 A 134.4 134.4 0 0 1 273.8 152.71 L 243.14 149.8 A 103.6 103.6 0 0 0 238.84 108.97 Z"><title>Keep Home dashboard as the project landing surface with explicit route into Epics &amp; Stories and Requirements — done</title></path>
+  <path class="sb-seg sb-done" d="M 273.52 155.38 A 134.4 134.4 0 0 1 257.06 206.03 L 230.23 190.9 A 103.6 103.6 0 0 0 242.92 151.86 Z"><title>Confirm ADR index and source-derived cards are discoverable from Home when present — done</title></path>
+  <path class="sb-seg sb-done" d="M 255.72 208.36 A 134.4 134.4 0 0 1 220.08 247.94 L 201.73 223.2 A 103.6 103.6 0 0 0 229.2 192.69 Z"><title>Keep graceful-empty behavior for unavailable classes — done</title></path>
+  <path class="sb-seg sb-done" d="M 198.43 222.14 A 100.8 100.8 0 0 1 81.57 222.14 L 114.03 176.51 A 44.8 44.8 0 0 0 165.97 176.51 Z"><title>Task 3: Enforce active-link and breadcrumb correctness on all generated pages — done</title></path>
+  <path class="sb-seg sb-done" d="M 217.91 249.52 A 134.4 134.4 0 0 1 169.26 271.18 L 162.55 241.12 A 103.6 103.6 0 0 0 200.05 224.42 Z"><title>Validate active nav highlighting and `aria-current=&quot;page&quot;` on every page type — done</title></path>
+  <path class="sb-seg sb-done" d="M 166.63 271.74 A 134.4 134.4 0 0 1 113.37 271.74 L 119.47 241.55 A 103.6 103.6 0 0 0 160.53 241.55 Z"><title>Validate breadcrumb trails from Home -&gt; section -&gt; detail pages — done</title></path>
+  <path class="sb-seg sb-done" d="M 110.74 271.18 A 134.4 134.4 0 0 1 62.09 249.52 L 79.95 224.42 A 103.6 103.6 0 0 0 117.45 241.12 Z"><title>Ensure breadcrumb and nav URLs resolve correctly from nested paths — done</title></path>
+  <path class="sb-seg sb-done" d="M 79.94 220.95 A 100.8 100.8 0 0 1 43.83 109.81 L 97.26 126.58 A 44.8 44.8 0 0 0 113.31 175.98 Z"><title>Task 4: Deliver mobile-usable navigation baseline — done</title></path>
+  <path class="sb-seg sb-done" d="M 59.92 247.94 A 134.4 134.4 0 0 1 24.28 208.36 L 50.8 192.69 A 103.6 103.6 0 0 0 78.27 223.2 Z"><title>Implement/complete mobile navigation behavior for small breakpoints as specified by UX (drawer/hamburger semantics or equivalent usable pattern) — done</title></path>
+  <path class="sb-seg sb-done" d="M 22.94 206.03 A 134.4 134.4 0 0 1 6.48 155.38 L 37.08 151.86 A 103.6 103.6 0 0 0 49.77 190.9 Z"><title>Ensure keyboard and focus behavior is preserved when mobile nav is open/closed — done</title></path>
+  <path class="sb-seg sb-done" d="M 6.2 152.71 A 134.4 134.4 0 0 1 11.77 99.75 L 41.16 108.97 A 103.6 103.6 0 0 0 36.86 149.8 Z"><title>Confirm no regressions to desktop sticky nav behavior — done</title></path>
+  <path class="sb-seg sb-done" d="M 44.45 107.89 A 100.8 100.8 0 0 1 138.99 39.21 L 139.55 95.2 A 44.8 44.8 0 0 0 97.53 125.73 Z"><title>Task 5: Add regression-focused automated tests — done</title></path>
+  <path class="sb-seg sb-done" d="M 12.6 97.19 A 134.4 134.4 0 0 1 39.23 51.07 L 62.32 71.45 A 103.6 103.6 0 0 0 41.8 107 Z"><title>Add tests for nav omission behavior and active-link semantics — done</title></path>
+  <path class="sb-seg sb-done" d="M 41.03 49.07 A 134.4 134.4 0 0 1 84.11 17.77 L 96.92 45.78 A 103.6 103.6 0 0 0 63.71 69.91 Z"><title>Add tests for breadcrumb output for representative page depths — done</title></path>
+  <path class="sb-seg sb-done" d="M 86.57 16.68 A 134.4 134.4 0 0 1 138.66 5.61 L 138.96 36.41 A 103.6 103.6 0 0 0 98.81 44.94 Z"><title>Add tests for dashboard key link presence/absence under varying content availability — done</title></path>
+  <text x="140" y="132" class="sunburst-center-num" text-anchor="middle">20/20</text>
+  <text x="140" y="152" class="sunburst-center-label" text-anchor="middle">tasks</text>
+</svg>
+<div class="sunburst-legend">
+  <span><span class="swatch sb-pending-sw"></span>Not done</span>
+  <span><span class="swatch sb-done-sw"></span>Done</span>
+</div>
+<div class="sunburst-hint">Inner ring: tasks &middot; outer ring: subtasks. Hover a segment for details.</div>
+</div>
+<div class="chart-panel next-steps">
+<h3>Next Steps (BMad)</h3>
+<ul class="next-steps-list">
+  <li><code>/gds-code-review</code><span class="next-steps-desc">Final adversarial pass over the story&#39;s changes.</span></li>
+  <li><code>/gds-create-story</code><span class="next-steps-desc">Drafts the next story file with full context for implementation.</span></li>
+  <li><code>/gds-retrospective 1</code><span class="next-steps-desc">Post-epic retrospective once the epic&#39;s last story closes.</span></li>
+</ul>
+</div>
+
+</div>
+<div class="chart-panel ac-panel">
+<h3>Acceptance Criteria</h3>
+<div class="ac-criteria">
+  <div class="ac-criterion" id="ac-1">
+    <a class="ac-anchor" href="#ac-1">AC #1</a>
+    <div class="ac-criterion-body"><strong>Given</strong> a generated site with epics, requirements, and ADR content
+<strong>When</strong> I open the home page
+<strong>Then</strong> I see a clear dashboard with links to Epics, Requirements, ADRs, and source-derived pages
+<strong>And</strong> missing artifact classes are omitted gracefully without broken navigation entries.</div>
+  </div>
+  <div class="ac-criterion" id="ac-2">
+    <a class="ac-anchor" href="#ac-2">AC #2</a>
+    <div class="ac-criterion-body"><strong>Given</strong> any generated page
+<strong>When</strong> I inspect navigation and breadcrumbs
+<strong>Then</strong> active-page state and breadcrumb path are correct
+<strong>And</strong> navigation remains usable on desktop and mobile breakpoints.</div>
+  </div>
+</div>
+</div>
+<details class="chart-panel dev-agent-details">
+<summary>Dev Agent Record</summary>
+<table class="dev-agent-table">
+  <tr><th>Agent Model Used</th><td><p>GPT-5.3-Codex</p>
+</td></tr>
+  <tr><th>Debug Log References</th><td><ul>
+<li>create-story workflow run on 2026-07-05 for story key <code>1-1-dashboard-navigation-and-readability-foundation</code></li>
+<li><code>dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj --filter &quot;FullyQualifiedName~SiteNavTests|FullyQualifiedName~HtmlTemplaterTests&quot;</code> (red/green cycle for this story)</li>
+<li><code>dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj</code> (full regression pass)</li>
+</ul>
+</td></tr>
+  <tr><th>Implementation Plan</th><td><ul>
+<li>Extend <code>SiteNav.RenderNavBar</code> with mobile navigation toggle semantics and keyboard-safe open/close behavior while preserving omission-safe link generation.</li>
+<li>Add explicit dashboard quick links in <code>HtmlTemplater</code> driven directly from nav composition so discoverability stays data-driven and omission-safe.</li>
+<li>Keep active-link and breadcrumb semantics canonical by retaining route-relative path handling and adding explicit current-page semantics in breadcrumbs.</li>
+<li>Expand regression coverage with focused nav and dashboard template tests.</li>
+</ul>
+</td></tr>
+  <tr><th>Completion Notes List</th><td><ul>
+<li>Story context assembled from epics + PRD + architecture spine + rendering architecture + UX docs + current codebase guardrails.</li>
+<li>Previous-story intelligence not applicable (this is the first story in Epic 1).</li>
+<li>Implemented mobile nav toggle/hamburger behavior for small breakpoints with keyboard close (<code>Escape</code>) and focus return to toggle.</li>
+<li>Added dashboard quick-link panel to improve entry-point discoverability for Epics, Requirements, ADRs, and source-derived pages when available.</li>
+<li>Preserved omission-safe nav composition and verified no dead links are emitted for unavailable classes.</li>
+<li>Enforced breadcrumb current-page semantics with <code>aria-current=&quot;page&quot;</code> and verified nested relative URL behavior.</li>
+<li>Added regression tests in <code>SiteNavTests</code> and <code>HtmlTemplaterTests</code> for omission behavior, active semantics, breadcrumb depth, and dashboard link presence/absence.</li>
+<li>Full regression suite passed: 83 tests.</li>
+</ul>
+</td></tr>
+  <tr><th>File List</th><td><ul>
+<li><a href="../epics/story-1-1.html">_bmad-output/implementation-artifacts/1-1-dashboard-navigation-and-readability-foundation.md</a></li>
+<li>_bmad-output/implementation-artifacts/sprint-status.yaml</li>
+<li>src/SpecScribe/SiteNav.cs</li>
+<li>src/SpecScribe/HtmlTemplater.cs</li>
+<li>src/SpecScribe/assets/specscribe.css</li>
+<li>tests/SpecScribe.Tests/SiteNavTests.cs</li>
+<li>tests/SpecScribe.Tests/HtmlTemplaterTests.cs</li>
+</ul>
+</td></tr>
+</table>
+</details>
+</section>
+
+<article class="doc-body epic-card">
+<h2 id="tasks-subtasks">Tasks / Subtasks</h2>
+<ul class="contains-task-list">
+<li class="task-list-item"><p><input disabled="disabled" type="checkbox" checked="checked" /> Task 1: Preserve and harden top-level navigation composition (AC: <a class="ac-ref" href="#ac-1" title="Given a generated site with epics, requirements, and ADR content
+When I open the home page
+Then I see a clear dashboard with links to Epics, Requirements, ADRs, and source-derived pages
+And missing artifact classes are omitted gracefully without broken navigation entries.">#1</a>, <a class="ac-ref" href="#ac-2" title="Given any generated page
+When I inspect navigation and breadcrumbs
+Then active-page state and breadcrumb path are correct
+And navigation remains usable on desktop and mobile breakpoints.">#2</a>)</p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Confirm nav item generation remains data-driven and omission-safe for missing classes (<code>ADRs</code>, <code>Epics</code>, <code>Requirements</code>, source-derived pages)</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Ensure nav remains coherent across home, epics, requirements, story pages, and ADR pages</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Verify no dead links are emitted when source classes are absent</li>
+</ul>
+</li>
+<li class="task-list-item"><p><input disabled="disabled" type="checkbox" checked="checked" /> Task 2: Ensure dashboard discoverability and coherent entry points (AC: <a class="ac-ref" href="#ac-1" title="Given a generated site with epics, requirements, and ADR content
+When I open the home page
+Then I see a clear dashboard with links to Epics, Requirements, ADRs, and source-derived pages
+And missing artifact classes are omitted gracefully without broken navigation entries.">#1</a>)</p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Keep Home dashboard as the project landing surface with explicit route into Epics &amp; Stories and Requirements</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Confirm ADR index and source-derived cards are discoverable from Home when present</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Keep graceful-empty behavior for unavailable classes</li>
+</ul>
+</li>
+<li class="task-list-item"><p><input disabled="disabled" type="checkbox" checked="checked" /> Task 3: Enforce active-link and breadcrumb correctness on all generated pages (AC: <a class="ac-ref" href="#ac-2" title="Given any generated page
+When I inspect navigation and breadcrumbs
+Then active-page state and breadcrumb path are correct
+And navigation remains usable on desktop and mobile breakpoints.">#2</a>)</p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Validate active nav highlighting and <code>aria-current=&quot;page&quot;</code> on every page type</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Validate breadcrumb trails from Home -&gt; section -&gt; detail pages</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Ensure breadcrumb and nav URLs resolve correctly from nested paths</li>
+</ul>
+</li>
+<li class="task-list-item"><p><input disabled="disabled" type="checkbox" checked="checked" /> Task 4: Deliver mobile-usable navigation baseline (AC: <a class="ac-ref" href="#ac-2" title="Given any generated page
+When I inspect navigation and breadcrumbs
+Then active-page state and breadcrumb path are correct
+And navigation remains usable on desktop and mobile breakpoints.">#2</a>)</p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Implement/complete mobile navigation behavior for small breakpoints as specified by UX (drawer/hamburger semantics or equivalent usable pattern)</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Ensure keyboard and focus behavior is preserved when mobile nav is open/closed</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Confirm no regressions to desktop sticky nav behavior</li>
+</ul>
+</li>
+<li class="task-list-item"><p><input disabled="disabled" type="checkbox" checked="checked" /> Task 5: Add regression-focused automated tests (AC: <a class="ac-ref" href="#ac-1" title="Given a generated site with epics, requirements, and ADR content
+When I open the home page
+Then I see a clear dashboard with links to Epics, Requirements, ADRs, and source-derived pages
+And missing artifact classes are omitted gracefully without broken navigation entries.">#1</a>, <a class="ac-ref" href="#ac-2" title="Given any generated page
+When I inspect navigation and breadcrumbs
+Then active-page state and breadcrumb path are correct
+And navigation remains usable on desktop and mobile breakpoints.">#2</a>)</p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Add tests for nav omission behavior and active-link semantics</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Add tests for breadcrumb output for representative page depths</li>
+<li class="task-list-item"><input disabled="disabled" type="checkbox" checked="checked" /> Add tests for dashboard key link presence/absence under varying content availability</li>
+</ul>
+</li>
+</ul>
+<h2 id="developer-context-section">Developer Context Section</h2>
+<h3 id="epic-context-and-business-value">Epic Context and Business Value</h3>
+<p>Epic 1 is the first user-facing quality gate for SpecScribe. This story establishes navigation and readability foundations that every later story depends on (traceability links, markdown fidelity, and interaction polish).</p>
+<p>If navigation is unclear or brittle at this stage, later visual and insight features become harder to discover and less trustworthy.</p>
+<h3 id="story-foundation-extract">Story Foundation Extract</h3>
+<ul>
+<li>Primary concern: coherent information architecture and predictable wayfinding.</li>
+<li>Scope: generated static site navigation, dashboard entry points, breadcrumb correctness, and mobile usability baseline.</li>
+<li>Out of scope for this story: deep interaction mechanics of advanced visualizations beyond baseline usability.</li>
+</ul>
+<h3 id="architecture-compliance">Architecture Compliance</h3>
+<ul>
+<li>Follow shared rendering core boundaries; do not introduce host-specific logic into core page composition. <a href="../specs/spec-specscribe/ARCHITECTURE-SPINE.html">_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md</a>#architecture-decisions</li>
+<li>Preserve local-first, read-only behavior. <a href="../specs/spec-specscribe/ARCHITECTURE-SPINE.html">_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md</a>#inherited-invariants</li>
+<li>Keep accessibility semantics contractual (keyboard behavior, labels, status redundancy). <a href="../specs/spec-specscribe/ARCHITECTURE-SPINE.html">_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md</a>#inherited-invariants</li>
+<li>Keep navigation/state semantics coherent with future cross-surface contract direction (AD-8). <a href="../specs/spec-specscribe/ARCHITECTURE-SPINE.html">_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md</a>#ad-8-adopted-interaction-state-contract-is-canonical-update-transport-is-adapter-specific</li>
+</ul>
+<h2 id="technical-requirements">Technical Requirements</h2>
+<ul>
+<li>Navigation items must be conditionally included based on discovered content classes; no broken links when class is absent.</li>
+<li>Home dashboard must present clear routing to Epics, Requirements, ADRs, and source-derived content when present.</li>
+<li>Active nav state must be deterministic and assign <code>aria-current=&quot;page&quot;</code> for current page.</li>
+<li>Breadcrumb trail must reflect true document path semantics and be correct for nested routes (<code>epics/...</code>, <code>requirements/...</code>, <code>adrs/...</code>).</li>
+<li>Mobile breakpoint behavior must remain usable and not degrade keyboard navigation.</li>
+</ul>
+<h2 id="file-structure-requirements">File Structure Requirements</h2>
+<p>Primary UPDATE candidates for this story:</p>
+<ul>
+<li><p><code>src/SpecScribe/SiteNav.cs</code></p>
+<ul>
+<li>Current state: central nav construction (<code>Build</code>) and rendering (<code>RenderNavBar</code>, <code>RenderBreadcrumb</code>) with active-link support.</li>
+<li>Story change focus: nav composition rules, active-state guarantees, and responsive behavior support hooks.</li>
+<li>Must preserve: omission-safe nav construction, prefix-aware relative links, <code>aria-current</code> behavior.</li>
+</ul>
+</li>
+<li><p><code>src/SpecScribe/HtmlTemplater.cs</code></p>
+<ul>
+<li>Current state: home/dashboard and generic page rendering, with nav + breadcrumb injection.</li>
+<li>Story change focus: dashboard discoverability and key links under content-available/missing conditions.</li>
+<li>Must preserve: dashboard chart/content composition, existing page metadata and rendering flow.</li>
+</ul>
+</li>
+<li><p><code>src/SpecScribe/EpicsTemplater.cs</code></p>
+<ul>
+<li>Current state: epics index/detail/story pages include nav and breadcrumb wiring.</li>
+<li>Story change focus: ensure wayfinding consistency and breadcrumb correctness across epics hierarchy.</li>
+<li>Must preserve: story/epic page structure used by parsers and AC/linkification features.</li>
+</ul>
+</li>
+<li><p><code>src/SpecScribe/SiteGenerator.cs</code></p>
+<ul>
+<li>Current state: source discovery, page generation orchestration, nav build input population.</li>
+<li>Story change focus: only if needed for dashboard/nav link source discoverability.</li>
+<li>Must preserve: full rebuild semantics, consumed-artifact routing, ADR regeneration behavior.</li>
+</ul>
+</li>
+<li><p><code>src/SpecScribe/assets/specscribe.css</code></p>
+<ul>
+<li>Current state: sticky nav and responsive baseline (<code>@media (max-width: 640px)</code>), no full mobile drawer/focus-trap implementation yet.</li>
+<li>Story change focus: mobile nav usability and readability baseline alignment.</li>
+<li>Must preserve: existing token system and overall visual language.</li>
+</ul>
+</li>
+</ul>
+<p>Potential NEW test files:</p>
+<ul>
+<li><code>tests/SpecScribe.Tests/SiteNavTests.cs</code></li>
+<li><code>tests/SpecScribe.Tests/HtmlTemplaterTests.cs</code></li>
+</ul>
+<h2 id="library-and-framework-requirements">Library and Framework Requirements</h2>
+<ul>
+<li>No new dependency is required for Story 1.1; implement with existing stack unless a concrete blocker appears.</li>
+<li>Current package set is compatible with target runtime <code>net10.0</code> and should be preserved for this story:
+<ul>
+<li><code>Markdig</code> 1.3.2</li>
+<li><code>Spectre.Console</code> 0.57.2</li>
+<li><code>Spectre.Console.Cli</code> 0.55.0</li>
+<li><code>YamlDotNet</code> 18.1.0</li>
+</ul>
+</li>
+<li>Mermaid integration currently uses CDN <code>mermaid@11</code>; avoid changing this in this story unless directly required by navigation/readability scope.</li>
+</ul>
+<h2 id="testing-requirements">Testing Requirements</h2>
+<ul>
+<li>Add/extend unit tests that verify:
+<ul>
+<li>nav item omission when inputs are missing,</li>
+<li>active-page assignment and <code>aria-current</code>,</li>
+<li>breadcrumb trails for home/section/detail pages,</li>
+<li>dashboard routing links presence when data exists.</li>
+</ul>
+</li>
+<li>Run all existing tests to prevent regressions in parsing/rendering:
+<ul>
+<li><code>dotnet test</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="ux-and-accessibility-requirements">UX and Accessibility Requirements</h2>
+<ul>
+<li>Preserve light-first antiquarian visual system and status semantics. <a href="../planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.html">_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.md</a></li>
+<li>Ensure sticky nav usability on desktop and mobile breakpoints. <a href="../planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.html">_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md</a>#sticky-navigation</li>
+<li>Keep keyboard and ARIA semantics for navigational elements, breadcrumbs, and focus behavior. <a href="../planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.html">_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md</a>#accessibility-floor</li>
+</ul>
+<h2 id="reinvention-and-regression-guardrails">Reinvention and Regression Guardrails</h2>
+<ul>
+<li>Do not duplicate navigation logic outside <code>SiteNav</code>; compose through existing model.</li>
+<li>Do not hardcode page paths in multiple template files when shared constants already exist (<code>SiteNav</code> constants).</li>
+<li>Do not regress graceful-missing behavior for absent artifact classes.</li>
+<li>Do not break story artifact parsing section contracts (<code>## Story</code>, <code>## Acceptance Criteria</code>, <code>## Dev Agent Record</code>) while adjusting page templates.</li>
+</ul>
+<h2 id="project-context-reference">Project Context Reference</h2>
+<ul>
+<li>PRD: <code><a href="../planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.html">_bmad-output/planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.md</a></code></li>
+<li>Epics: <code><a href="../epics.html">_bmad-output/planning-artifacts/epics.md</a></code></li>
+<li>Architecture spine: <code><a href="../specs/spec-specscribe/ARCHITECTURE-SPINE.html">_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md</a></code></li>
+<li>Rendering architecture: <code><a href="../specs/spec-specscribe/rendering-architecture.html">_bmad-output/specs/spec-specscribe/rendering-architecture.md</a></code></li>
+<li>UX design: <code><a href="../planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.html">_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.md</a></code></li>
+<li>UX behavior: <code><a href="../planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.html">_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md</a></code></li>
+</ul>
+<h2 id="story-completion-status">Story Completion Status</h2>
+<ul>
+<li>Status set to <code>ready-for-dev</code>.</li>
+<li>Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.</li>
+</ul>
+
+</article>
+
+<section class="chart-panel change-log">
+<h3>Change Log</h3>
+<div class="doc-body"><ul>
+<li>2026-07-05: Implemented Story 1.1 navigation and dashboard discoverability baseline; added mobile nav semantics, breadcrumb current-page semantics, and regression tests.</li>
+</ul>
+</div>
+</section>
+
+<footer class="doc-footer">
+  SpecScribe &middot; Source: <code>implementation-artifacts/1-1-dashboard-navigation-and-readability-foundation.md</code>
+</footer>
+
+</body>
+</html>

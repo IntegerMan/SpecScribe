@@ -1,0 +1,1317 @@
+/* SpecScribe generated-site stylesheet.
+   Palette borrowed from docs/shared-journal.css + docs/shared-warm.css so the
+   auto-generated pages feel like siblings of the hand-crafted docs/ set,
+   while staying generic enough to render any BMad markdown well. */
+
+:root {
+  --parchment: #f4ead5;
+  --parchment-dark: #e8d5b0;
+  --parchment-deep: #d4b896;
+  --cream: #f5f0e8;
+  --warm-white: #faf7f2;
+  --ink: #2a1f0e;
+  --ink-faded: #5a4535;
+  --ink-light: #7a6250;
+  --rust: #8b3a1a;
+  --rust-light: #c4622d;
+  --moss: #4a6741;
+  --moss-light: #6b8f62;
+  --teal-deep: #1e4a5a;
+  --teal: #2e6b7a;
+  --gold: #b8860b;
+  --gold-light: #d4a017;
+  --border: #d4c4a8;
+  --shadow: rgba(42, 31, 14, 0.15);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+/* ====================== NAV ====================== */
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding: 0.7rem 1.5rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.8rem;
+  background: rgba(26, 18, 8, 0.94);
+  border-bottom: 1px solid rgba(212, 184, 150, 0.25);
+  backdrop-filter: blur(4px);
+}
+
+.site-nav-brand {
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  margin-right: auto;
+  white-space: nowrap;
+  color: var(--gold-light);
+}
+
+.site-nav-toggle {
+  display: none;
+  font: inherit;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  background: transparent;
+  border: 1px solid rgba(212, 184, 150, 0.45);
+  border-radius: 4px;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+}
+
+.site-nav-toggle:hover,
+.site-nav-toggle:focus-visible {
+  border-color: #f5c842;
+  color: #f5c842;
+  outline: none;
+}
+
+.site-nav-links { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; }
+
+.site-nav a {
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0.15rem 0;
+  color: #d4b896;
+  border-bottom: 2px solid transparent;
+}
+
+.site-nav a:hover,
+.site-nav a.active { color: #f5c842; border-bottom-color: currentColor; }
+
+/* ====================== PAGE HEADER ====================== */
+.doc-header {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 1.5rem;
+  text-align: center;
+}
+
+.doc-header h1 {
+  font-size: 2rem;
+  color: var(--rust);
+  margin-bottom: 0.4rem;
+}
+
+.doc-header .doc-subtitle {
+  color: var(--ink-light);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+/* A kicker line above the h1 (e.g. "Story 1.1" / "Epic 1") instead of cramming an id + long title onto
+   one line, which used to wrap mid-word on longer titles. The status badge rides alongside it. */
+.story-kicker {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  color: var(--gold);
+  margin-bottom: 0.3rem;
+}
+
+.kicker-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.kicker-row .story-kicker { margin-bottom: 0; }
+
+.meta-pills {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.pill {
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--warm-white);
+  color: var(--ink-faded);
+}
+
+.pill.status-complete,
+.pill.status-accepted { border-color: var(--moss-light); color: var(--moss); }
+.pill.status-draft,
+.pill.status-proposed,
+.pill.status-in-progress { border-color: var(--gold-light); color: var(--gold); }
+/* Superseded/deprecated ADRs read as muted — the record stays for history but no longer applies. */
+.pill.status-superseded,
+.pill.status-deprecated { border-color: var(--border); color: var(--ink-light); text-decoration: line-through; }
+
+/* ====================== TOC STRIP ====================== */
+.toc-strip {
+  max-width: 860px;
+  margin: 0 auto 2rem;
+  background: var(--parchment-dark);
+  border: 1px solid var(--parchment-deep);
+  border-radius: 4px;
+  padding: 0.7rem 1.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  align-items: center;
+}
+
+.toc-strip .toc-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-right: 0.3rem;
+  white-space: nowrap;
+}
+
+.toc-strip a {
+  font-size: 0.78rem;
+  color: var(--rust);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.toc-strip a:hover { text-decoration: underline; }
+.toc-strip a.toc-h3 { color: var(--ink-light); font-size: 0.73rem; }
+
+/* ====================== ARTICLE BODY ====================== */
+.doc-body {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 1.5rem 3rem;
+}
+
+.doc-body h1,
+.doc-body h2,
+.doc-body h3,
+.doc-body h4 {
+  color: var(--rust);
+  margin: 2rem 0 0.8rem;
+  line-height: 1.3;
+}
+
+.doc-body h1 { font-size: 1.6rem; border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; }
+.doc-body h2 { font-size: 1.3rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+.doc-body h3 { font-size: 1.1rem; color: var(--teal); }
+.doc-body h4 { font-size: 1rem; color: var(--ink-faded); }
+
+.doc-body p { margin: 0.8rem 0; color: var(--ink-faded); }
+
+.doc-body ul,
+.doc-body ol { margin: 0.6rem 0 0.8rem 1.4rem; color: var(--ink-faded); }
+.doc-body li { margin: 0.3rem 0; }
+
+.doc-body a { color: var(--teal); }
+.doc-body a:hover { color: var(--rust); }
+
+.doc-body strong { color: var(--ink); }
+.doc-body em { color: var(--ink-faded); }
+
+.doc-body blockquote {
+  margin: 1rem 0;
+  padding: 0.6rem 1.2rem;
+  border-left: 4px solid var(--gold-light);
+  background: var(--warm-white);
+  color: var(--ink-light);
+  font-style: italic;
+}
+
+.doc-body code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85em;
+  background: var(--parchment-dark);
+  color: var(--rust);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+
+.doc-body pre {
+  margin: 1rem 0;
+  padding: 1rem 1.2rem;
+  background: #241a0d;
+  color: #f0e4c8;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.doc-body pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+
+/* Every markdown-generated table carries .md-table (see MarkdownConverter.TagTables), so this styles
+   pipe tables consistently everywhere — inside .doc-body and in stand-alone panels like Change Log. */
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2rem 0;
+  font-size: 0.88rem;
+}
+
+.md-table th,
+.md-table td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+}
+
+.md-table th {
+  background: var(--parchment-dark);
+  color: var(--ink);
+}
+
+.md-table tr:nth-child(even) td { background: var(--warm-white); }
+
+.doc-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2rem 0;
+}
+
+.doc-body img { max-width: 100%; }
+
+/* ====================== FOOTER ====================== */
+.doc-footer {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--ink-light);
+  font-style: italic;
+  border-top: 1px solid var(--border);
+}
+
+/* ====================== INDEX PAGE ====================== */
+.index-section-title {
+  max-width: 1100px;
+  margin: 2.2rem auto 1rem;
+  padding: 0 1.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  text-align: center;
+}
+
+.index-section-title:first-of-type { margin-top: 0; }
+
+/* Section header that pairs a centered title with a "view all" link (e.g. the ADR band). */
+.index-section-title-row {
+  max-width: 1100px;
+  margin: 2.2rem auto 1rem;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.8rem;
+}
+.index-section-title-row .index-section-title { margin: 0; padding: 0; }
+.index-section-title-row .view-epic-link { margin-top: 0; white-space: nowrap; }
+
+.index-grid {
+  max-width: 1100px;
+  margin: 0 auto 1.5rem;
+  padding: 0 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.3rem;
+}
+
+.index-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.3rem 1.4rem;
+  box-shadow: 0 2px 8px var(--shadow);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+
+.index-card:hover {
+  border-color: var(--rust-light);
+  box-shadow: 0 4px 14px var(--shadow);
+  transform: translateY(-2px);
+}
+
+.index-card h2 {
+  font-size: 1rem;
+  color: var(--rust);
+  margin-bottom: 0.5rem;
+}
+
+.index-card p {
+  font-size: 0.82rem;
+  color: var(--ink-light);
+  line-height: 1.5;
+}
+
+.index-card .index-card-path {
+  display: block;
+  margin-top: 0.6rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.68rem;
+  color: var(--parchment-deep);
+}
+
+/* ====================== BREADCRUMB ====================== */
+.breadcrumb {
+  max-width: 860px;
+  margin: 0.8rem auto 0;
+  padding: 0 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.breadcrumb a { color: var(--ink-light); text-decoration: none; }
+.breadcrumb a:hover { color: var(--rust); text-decoration: underline; }
+.breadcrumb .crumb-sep { color: var(--parchment-deep); }
+.breadcrumb .crumb-current { color: var(--ink-faded); font-weight: bold; }
+
+/* ====================== EPICS: BANNER + CHIPS ====================== */
+.banner {
+  max-width: 860px;
+  margin: 0 auto 2rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-light);
+  border-radius: 6px;
+  padding: 1rem 1.4rem;
+  font-size: 0.85rem;
+  color: var(--ink-faded);
+}
+
+.banner p { margin: 0.6rem 0; }
+.banner p:first-child { margin-top: 0; }
+.banner li { margin: 0.3rem 0 0.3rem 1.2rem; }
+
+.epic-overview {
+  max-width: 1100px;
+  margin: 0 auto 2rem;
+  padding: 0 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.epic-chip {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.74rem;
+  text-decoration: none;
+  color: var(--ink-faded);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.epic-chip:hover { border-color: var(--gold-light); box-shadow: 0 2px 8px var(--shadow); }
+
+.epic-chip .num {
+  font-family: 'Courier New', monospace;
+  color: var(--ink-light);
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+/* Status semantics everywhere: parchment = pending · gold = drafted/ready · teal = active dev · green = done ONLY. */
+.epic-chip.done { border-left: 3px solid var(--moss-light); }
+.epic-chip.active { border-left: 3px solid var(--teal); }
+.epic-chip.drafted { border-left: 3px solid var(--gold-light); }
+.epic-chip.pending { border-left: 3px solid var(--ink-light); opacity: 0.8; }
+
+.section-divider {
+  max-width: 1100px;
+  margin: 2.5rem auto 1rem;
+  padding: 0 1.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+}
+
+/* ====================== EPICS: EPIC CARD ====================== */
+.epic-card {
+  max-width: 860px;
+  margin: 0 auto 1.25rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.epic-card h2 {
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin-bottom: 0.3rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.epic-num {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: var(--gold);
+}
+
+.epic-status {
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.5rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+
+.epic-status.done { background: #e8f0e4; color: var(--moss); border: 1px solid var(--moss-light); }
+.epic-status.active { background: #e0ecea; color: var(--teal); border: 1px solid var(--teal); }
+.epic-status.drafted { background: #f5ecd4; color: var(--gold); border: 1px solid var(--gold-light); }
+.epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--border); }
+
+.epic-goal { font-size: 0.85rem; color: var(--ink-faded); line-height: 1.55; margin-bottom: 0.5rem; }
+
+.epic-meta {
+  font-size: 0.72rem;
+  color: var(--ink-light);
+  font-family: 'Courier New', monospace;
+  margin-bottom: 0.5rem;
+}
+
+.pending-note { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
+
+.view-epic-link {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: var(--gold);
+  text-decoration: none;
+  margin-top: 0.25rem;
+}
+
+.view-epic-link:hover { text-decoration: underline; color: var(--rust); }
+
+/* ====================== EPICS: STORY ACCORDION ====================== */
+.story {
+  max-width: 860px;
+  margin: 0.6rem auto 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--cream);
+}
+
+.story summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--ink);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.story summary::-webkit-details-marker { display: none; }
+
+.story summary::before {
+  content: "▸";
+  color: var(--gold);
+  font-size: 0.75rem;
+  transition: transform 0.15s;
+}
+
+.story[open] summary::before { transform: rotate(90deg); }
+
+.story summary .story-id {
+  font-family: 'Courier New', monospace;
+  color: var(--ink-light);
+  font-weight: normal;
+}
+
+.story-body {
+  padding: 0.25rem 1rem 1rem;
+  background: var(--warm-white);
+  border-top: 1px solid var(--border);
+}
+
+.user-story {
+  font-size: 0.85rem;
+  color: var(--ink-faded);
+  font-style: italic;
+  padding: 0.6rem 0.75rem;
+  background: var(--cream);
+  border-radius: 4px;
+  margin: 0.6rem 0 0.75rem;
+  line-height: 1.6;
+}
+
+.user-story p { margin: 0; }
+
+/* The story page's lead blurb reuses .user-story's look but needs its own width constraint —
+   .user-story is normally nested inside an already-constrained .story-card. */
+.story-lead {
+  max-width: 860px;
+  margin: 0 auto 1.5rem;
+  padding: 0 1.5rem;
+}
+
+.story-lead.user-story { padding: 0.9rem 1.4rem; }
+
+.ac-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0.4rem;
+}
+
+.ac-list { font-size: 0.82rem; color: var(--ink-faded); line-height: 1.7; }
+.ac-list .kw { font-family: 'Courier New', monospace; font-weight: bold; color: var(--gold); }
+.ac-block { margin-bottom: 0.5rem; }
+
+/* Acceptance Criteria panel — each criterion is independently anchored (id="ac-N") so the "(AC: #N)"
+   references scattered through the tasks below can deep-link straight to it. */
+.ac-panel .ac-criteria { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.ac-criterion {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.55rem 0.7rem;
+  border-radius: 4px;
+  /* Keep the highlighted criterion clear of the sticky nav when jumped to via a "#ac-N" link. */
+  scroll-margin-top: 5rem;
+}
+
+/* When a "(AC: #N)" link jumps here, flag which criterion the reader landed on. */
+.ac-criterion:target { background: #f5ecd4; box-shadow: inset 3px 0 0 var(--gold); }
+
+.ac-anchor {
+  flex: 0 0 auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  font-weight: bold;
+  color: var(--gold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ac-anchor:hover { color: var(--rust); }
+
+.ac-criterion-body { font-size: 0.86rem; color: var(--ink-faded); line-height: 1.6; }
+.ac-criterion-body strong { color: var(--ink); }
+
+/* Inline "(AC: #N)" reference link back up to the criterion panel. */
+.ac-ref {
+  color: var(--teal);
+  text-decoration: none;
+  font-weight: bold;
+  border-bottom: 1px dotted var(--teal);
+}
+.ac-ref:hover { color: var(--rust); border-bottom-color: var(--rust); }
+
+.requirements-inventory summary {
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--ink);
+  font-weight: bold;
+  list-style: none;
+}
+
+.requirements-inventory summary::-webkit-details-marker { display: none; }
+.requirements-inventory summary::before { content: "▸ "; color: var(--gold); }
+.requirements-inventory[open] summary::before { content: "▾ "; }
+.requirements-inventory .story-body { border-top: none; background: none; padding: 1rem 0 0; }
+.requirements-inventory .story-body h3 { color: var(--teal); font-size: 1rem; margin: 1.2rem 0 0.5rem; }
+.requirements-inventory .story-body p { color: var(--ink-faded); font-size: 0.85rem; margin: 0.5rem 0; }
+
+/* ====================== STATUS BADGES ====================== */
+.status-badge {
+  display: inline-block;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.6rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  background: var(--parchment-dark);
+  color: var(--ink-light);
+  border: 1px solid var(--border);
+}
+
+.status-badge.done { background: #e8f0e4; color: var(--moss); border-color: var(--moss-light); }
+.status-badge.active { background: #e0ecea; color: var(--teal); border-color: var(--teal); }
+.status-badge.review { background: #d9e6ea; color: var(--teal-deep); border-color: var(--teal-deep); }
+.status-badge.ready,
+.status-badge.drafted { background: #f5ecd4; color: var(--gold); border-color: var(--gold-light); }
+
+.status-badge.task-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-transform: none;
+}
+
+.story-title-link { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+.story-title-link:hover { color: var(--rust); border-bottom-style: solid; }
+
+/* ====================== SUNBURST ====================== */
+.sunburst-panel { text-align: center; }
+
+.chart-panel-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  text-align: left;
+  margin-bottom: 0.9rem;
+}
+
+.chart-panel-header-row h3 { margin-bottom: 0; }
+.chart-panel-header-row .view-epic-link { margin-top: 0; white-space: nowrap; }
+.sunburst { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+
+.sb-seg { stroke: var(--warm-white); stroke-width: 1; transition: opacity 0.12s; }
+.sb-seg:hover { opacity: 0.75; }
+.sb-done { fill: var(--moss-light); }
+.sb-active { fill: var(--teal); }
+.sb-review { fill: var(--teal-deep); }
+.sb-ready { fill: var(--gold-light); }
+.sb-drafted { fill: #e8d9a8; }
+.sb-pending { fill: #b8b2a8; }
+
+.sunburst-center-num { font-size: 1.9rem; font-weight: bold; fill: var(--rust); font-family: 'Courier New', monospace; }
+.sunburst-center-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; fill: var(--ink-light); }
+
+.sunburst-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1.1rem;
+  margin-top: 0.8rem;
+  font-size: 0.76rem;
+  color: var(--ink-faded);
+}
+
+.sunburst-legend .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.35rem; }
+.sunburst-legend .sb-pending-sw { background: #b8b2a8; }
+.sunburst-legend .sb-drafted-sw { background: #e8d9a8; }
+.sunburst-legend .sb-ready-sw { background: var(--gold-light); }
+.sunburst-legend .sb-active-sw { background: var(--teal); }
+.sunburst-legend .sb-review-sw { background: var(--teal-deep); }
+.sunburst-legend .sb-done-sw { background: var(--moss-light); }
+
+.sunburst-hint { margin-top: 0.4rem; font-size: 0.72rem; color: var(--ink-light); font-style: italic; }
+
+/* ====================== NEXT STEPS (BMad commands) ====================== */
+.next-steps-list { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
+
+.next-steps-list code {
+  display: inline-block;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  background: var(--parchment-dark);
+  color: var(--rust);
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  word-break: break-all;
+}
+
+.next-steps-desc { display: block; margin-top: 0.25rem; font-size: 0.78rem; color: var(--ink-light); line-height: 1.5; }
+
+/* ====================== DEV AGENT RECORD TABLE ====================== */
+/* Collapsed by default — agent bookkeeping, not the first thing a reader wants. The summary is styled to
+   read like a chart-panel <h3> so the collapsed panel matches the ones around it. */
+.dev-agent-details > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0;
+}
+.dev-agent-details > summary::-webkit-details-marker { display: none; }
+.dev-agent-details > summary::before { content: "▸ "; color: var(--gold); }
+.dev-agent-details[open] > summary::before { content: "▾ "; }
+.dev-agent-details[open] > summary { margin-bottom: 0.9rem; }
+
+.dev-agent-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+
+.dev-agent-table th {
+  width: 11rem;
+  text-align: left;
+  vertical-align: top;
+  padding: 0.5rem 0.8rem 0.5rem 0;
+  color: var(--ink-light);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+
+.dev-agent-table td {
+  padding: 0.5rem 0;
+  color: var(--ink-faded);
+  border-bottom: 1px solid var(--border);
+}
+
+.dev-agent-table tr:last-child th,
+.dev-agent-table tr:last-child td { border-bottom: none; }
+
+.dev-agent-table td p { margin: 0; }
+.dev-agent-empty { color: var(--ink-light); font-style: italic; }
+
+/* ============ REVIEW FINDINGS / CHANGE LOG (story-page callouts) ============ */
+/* Both reuse the .doc-body inner wrapper for list/checkbox/table styling; the outer .chart-panel gives
+   the card frame. A left accent bar distinguishes each from the plan body around them. */
+/* Combined selector so the accent beats .chart-panel's `border` shorthand regardless of source order. */
+.chart-panel.review-findings { border-left: 3px solid var(--rust); }
+.chart-panel.change-log { border-left: 3px solid var(--teal); }
+
+.review-findings > .doc-body,
+.change-log > .doc-body { margin-top: 0.4rem; }
+
+/* These sections have no headings of their own, so trim the leading margin the first block would add. */
+.review-findings > .doc-body > :first-child,
+.change-log > .doc-body > :first-child { margin-top: 0; }
+
+/* ====================== NOW & NEXT ====================== */
+.now-next {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.8rem;
+}
+
+.now-next-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.now-next-card:hover { box-shadow: 0 3px 10px var(--shadow); }
+.now-next-card.active { border-left-color: var(--teal); }
+.now-next-card.review { border-left-color: var(--teal-deep); }
+.now-next-card.ready { border-left-color: var(--gold-light); }
+.now-next-card.drafted { border-left-color: var(--parchment-deep); }
+.now-next-card.pending { border-left-color: var(--parchment-deep); }
+
+.now-next-kicker { font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-light); }
+.now-next-card.active .now-next-kicker { color: var(--teal); }
+.now-next-card.review .now-next-kicker { color: var(--teal-deep); }
+.now-next-card.ready .now-next-kicker { color: var(--gold); }
+.now-next-title { font-size: 0.84rem; font-weight: bold; color: var(--ink); line-height: 1.35; }
+
+.all-done-note { font-size: 0.84rem; color: var(--ink-light); font-style: italic; }
+
+.quick-link-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.quick-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-decoration: none;
+  color: inherit;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-light);
+  border-radius: 6px;
+  padding: 0.7rem 0.85rem;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.quick-link-card:hover {
+  border-color: var(--rust-light);
+  box-shadow: 0 3px 10px var(--shadow);
+  transform: translateY(-1px);
+}
+
+.quick-link-title {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--ink);
+}
+
+.quick-link-sub {
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--ink-light);
+}
+
+/* Markdig-rendered task-list checkboxes (## Tasks / Subtasks in implementation artifacts).
+   The checkboxes render as disabled <input>s, so we replace the native (grey) appearance:
+   completed tasks get a filled green checkmark, incomplete tasks a plain empty box. */
+.doc-body ul li input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.5rem;
+  vertical-align: -0.15em;
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  background: var(--warm-white);
+}
+
+.doc-body ul li input[type="checkbox"]:checked {
+  border-color: var(--moss);
+  background: var(--moss);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23faf7f2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 90%;
+}
+
+/* ====================== DASHBOARD ====================== */
+.dashboard {
+  max-width: 1100px;
+  margin: 0 auto 2.5rem;
+  padding: 0 1.5rem;
+}
+
+/* Single-column pages (epic/story detail) sit next to .epic-card/.story-card/.doc-body, which are all
+   860px — using the wider 1100px .dashboard there produced mismatched left/right edges. This variant
+   keeps the same chart-panel/stat-grid/chart-row styling but at the page's actual content width. No
+   horizontal padding, so its panels' outer edges line up flush with the acceptance-criteria card and
+   story cards below (those put their gutter inside the card, not around it). */
+.dashboard-narrow {
+  max-width: 860px;
+  margin: 0 auto 2.5rem;
+  padding: 0;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  text-align: center;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.stat-number {
+  font-size: 1.9rem;
+  font-weight: bold;
+  color: var(--rust);
+  font-family: 'Courier New', monospace;
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-top: 0.3rem;
+}
+
+.stat-sub { font-size: 0.72rem; color: var(--ink-faded); margin-top: 0.2rem; }
+
+.chart-panel {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.2rem 1.4rem;
+  margin-bottom: 1.2rem;
+  box-shadow: 0 2px 8px var(--shadow);
+  overflow-x: auto;
+}
+
+.chart-panel h3 {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0.9rem;
+}
+
+/* A second heading in one panel (the combined Up-Next + Next-Steps panel) needs breathing room above it
+   so it doesn't butt against the content of the section before it. */
+.chart-panel h3:not(:first-child) { margin-top: 1.3rem; }
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-bottom: 1.2rem;
+  /* Panels size to their own content instead of stretching to match a taller neighbor — a short
+     progress-bar panel next to a tall sunburst used to stretch into a mostly-empty box. */
+  align-items: start;
+}
+
+/* Groups two (or more) short chart-panels into a single chart-row column, stacked — used where a lone
+   short panel would otherwise sit beside a much taller one and leave visible empty space. */
+.chart-col { display: flex; flex-direction: column; gap: 1.2rem; }
+
+.chart-row .chart-panel { margin-bottom: 0; }
+
+.donut-and-legend { display: flex; align-items: center; gap: 1.2rem; }
+.donut-legend { font-size: 0.8rem; color: var(--ink-faded); display: flex; flex-direction: column; gap: 0.4rem; }
+.donut-legend .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.4rem; }
+.donut-legend .swatch.done { background: var(--moss-light); }
+.donut-legend .swatch.active { background: var(--teal); }
+.donut-legend .swatch.review { background: var(--teal-deep); }
+.donut-legend .swatch.ready,
+.donut-legend .swatch.drafted { background: var(--gold-light); }
+.donut-legend .swatch.pending { background: var(--parchment-deep); }
+
+/* ====================== PROGRESS BARS ====================== */
+.progress-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 90px;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.65rem;
+}
+
+.progress-row:last-child { margin-bottom: 0; }
+
+.progress-label { font-size: 0.8rem; color: var(--ink-faded); }
+
+.progress-bar {
+  height: 0.6rem;
+  background: var(--parchment-dark);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
+.progress-fill.done { background: var(--moss-light); }
+.progress-fill.partial { background: var(--gold-light); }
+.progress-fill.empty { background: transparent; }
+
+.progress-value {
+  font-size: 0.74rem;
+  font-family: 'Courier New', monospace;
+  color: var(--ink-light);
+  text-align: right;
+}
+
+/* ====================== DONUT (SVG) ====================== */
+.donut-track { fill: none; stroke: var(--parchment-dark); stroke-width: 10; }
+.donut-seg { fill: none; stroke-width: 10; transform: rotate(-90deg); transform-origin: center; }
+.donut-seg.done { stroke: var(--moss-light); }
+.donut-seg.active { stroke: var(--teal); }
+.donut-seg.review { stroke: var(--teal-deep); }
+.donut-seg.ready,
+.donut-seg.drafted { stroke: var(--gold-light); }
+.donut-seg.pending { stroke: var(--parchment-deep); }
+.donut-center-text { font-size: 1.4rem; font-weight: bold; fill: var(--ink); font-family: 'Courier New', monospace; }
+
+.mini-donut { vertical-align: middle; }
+.mini-donut .donut-track,
+.mini-donut .donut-seg { stroke-width: 4; }
+
+.chart-empty { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
+
+/* ====================== EPIC MOSAIC (per-epic linked mini-donuts) ====================== */
+.epic-mosaic {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.8rem;
+}
+
+.epic-mosaic-card {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.epic-mosaic-card:hover {
+  border-color: var(--gold-light);
+  box-shadow: 0 3px 10px var(--shadow);
+  transform: translateY(-1px);
+}
+
+.epic-mosaic-donut { flex-shrink: 0; line-height: 0; }
+
+.epic-mosaic-label { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+
+.epic-mosaic-num {
+  font-family: 'Courier New', monospace;
+  font-size: 0.68rem;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+}
+
+.epic-mosaic-title {
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.epic-mosaic-sub { font-size: 0.7rem; color: var(--ink-light); }
+
+/* ====================== COMMIT HEATMAP (GitHub-style) ====================== */
+.heatmap-daylabel, .heatmap-monthlabel {
+  font-size: 8px;
+  fill: var(--ink-light);
+  font-family: 'Courier New', monospace;
+}
+
+.heatmap-cell.level-0 { fill: var(--parchment-dark); }
+.heatmap-cell.level-1 { fill: #ecd18f; }
+.heatmap-cell.level-2 { fill: #dfb455; }
+.heatmap-cell.level-3 { fill: var(--gold-light); }
+.heatmap-cell.level-4 { fill: var(--gold); }
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  margin-top: 0.5rem;
+}
+
+.heatmap-legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.heatmap-legend-swatch.level-0 { background: var(--parchment-dark); }
+.heatmap-legend-swatch.level-1 { background: #ecd18f; }
+.heatmap-legend-swatch.level-2 { background: #dfb455; }
+.heatmap-legend-swatch.level-3 { background: var(--gold-light); }
+.heatmap-legend-swatch.level-4 { background: var(--gold); }
+
+/* ====================== MERMAID ====================== */
+.mermaid {
+  max-width: 1100px;
+  margin: 0 auto 1.5rem;
+  padding: 1.2rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-x: auto;
+  text-align: center;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+/* ====================== STORY CARDS (replaces the old <details> accordion) ====================== */
+.story-card {
+  max-width: 860px;
+  margin: 0.6rem auto 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--cream);
+  padding: 0.9rem 1.1rem 1.1rem;
+}
+
+.story-card-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+
+.story-card-header .story-id {
+  font-family: 'Courier New', monospace;
+  color: var(--gold);
+  font-size: 0.85rem;
+}
+
+.story-card-header .story-title { font-weight: bold; color: var(--ink); font-size: 0.9rem; flex: 1; }
+
+/* The plain status badge (baseline = its text) and the task badge (inline-flex wrapping a taller
+   mini-donut) resolve different baselines, so in this baseline-aligned row they'd sit at different
+   heights. Center both badges on the cross axis so they line up with each other. */
+.story-card-header .status-badge { align-self: center; }
+
+.story-card .per-story-progress { margin-top: 0.7rem; max-width: 320px; }
+
+.story-card .not-detailed-note {
+  font-size: 0.76rem;
+  color: var(--ink-light);
+  font-style: italic;
+  margin-top: 0.6rem;
+}
+
+/* ====================== REQUIREMENTS ====================== */
+/* Inline FR/NFR reference links, kept subtle so dense "FRs covered" lines stay readable. */
+.req-ref {
+  color: var(--rust);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rust-light);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.req-ref:hover { color: var(--rust-light); border-bottom-style: solid; }
+
+.req-card {
+  max-width: 860px;
+  margin: 0 auto 0.7rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 6px;
+  padding: 0.85rem 1.25rem;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+.req-card.done { border-left-color: var(--moss-light); }
+.req-card.active { border-left-color: var(--teal); }
+.req-card.ready { border-left-color: var(--gold-light); }
+.req-card.pending { border-left-color: var(--parchment-deep); }
+.req-card.deferred { border-left-color: var(--ink-light); opacity: 0.85; }
+
+.req-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.req-id-link {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: var(--gold);
+  text-decoration: none;
+}
+.req-id-link:hover { color: var(--rust); text-decoration: underline; }
+
+.req-text { font-size: 0.85rem; color: var(--ink-faded); line-height: 1.55; }
+
+.req-epic {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-family: 'Courier New', monospace;
+  color: var(--teal);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.req-epic:hover { text-decoration: underline; }
+.req-epic.deferred { color: var(--ink-light); }
+
+.req-donut-label {
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+  margin-bottom: 0.4rem;
+}
+
+/* The one genuinely new status color: grey for requirements shelved for later. */
+.status-badge.deferred { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
+.donut-seg.deferred { stroke: var(--ink-light); }
+.donut-legend .swatch.deferred { background: var(--ink-light); }
+
+/* Requirements index: every section shares one flush 860px column so the dashboard, group navigator,
+   dividers, and cards all line up on the same left/right edges (the shared .dashboard/.section-divider
+   default to the wider 1100px used on the home page). */
+.req-index .dashboard,
+.req-index .section-divider,
+.req-group-grid {
+  max-width: 860px;
+  padding-left: 0;
+  padding-right: 0;
+}
+/* Anchored group dividers clear the sticky nav when jumped to. */
+.req-index .section-divider[id] { scroll-margin-top: 4.5rem; }
+
+.req-group-grid {
+  margin: 0 auto 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.8rem;
+}
+
+/* Group navigator card sizes its own donut/label like an epic-mosaic card, but its title should read as
+   a normal-case group name, not an epic title. */
+.req-group-card .epic-mosaic-title { text-transform: none; }
+
+/* Covering-epic card on a requirement detail page — reuses the epic-mosaic card, adds a status accent. */
+.coverage-cards { display: flex; flex-wrap: wrap; gap: 0.8rem; margin: 0.3rem 0 0.2rem; }
+.coverage-card {
+  flex: 1 1 320px;
+  max-width: 460px;
+  background: var(--warm-white);
+  border-left: 3px solid var(--border);
+  align-items: flex-start;
+}
+.coverage-card.done { border-left-color: var(--moss-light); }
+.coverage-card.active { border-left-color: var(--teal); }
+.coverage-card.drafted { border-left-color: var(--gold-light); }
+.coverage-card.pending { border-left-color: var(--ink-light); }
+.coverage-card .status-badge { margin: 0.15rem 0; }
+.coverage-note { margin-top: 0.6rem; }
+
+@media (max-width: 640px) {
+  .site-nav {
+    font-size: 0.72rem;
+    padding: 0.5rem 0.8rem;
+    align-items: center;
+  }
+  .site-nav-brand { margin-right: auto; }
+  .site-nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .site-nav-links {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding-top: 0.45rem;
+  }
+  .site-nav.site-nav-open .site-nav-links { display: flex; }
+  .site-nav a { padding: 0.28rem 0; }
+  .doc-header h1 { font-size: 1.5rem; }
+  .chart-row { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}

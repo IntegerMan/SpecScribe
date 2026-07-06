@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Requirements — SpecScribe</title>
+<link rel="stylesheet" href="specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="index.html">Home</a>
+    <a href="adrs/index.html">ADRs</a>
+    <a href="epics.html">Epics</a>
+    <a href="requirements.html" class="active" aria-current="page">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">Requirements</span>
+</div>
+
+<header class="doc-header">
+  <h1>Requirements</h1>
+  <div class="doc-subtitle">SpecScribe &middot; 14 functional &middot; 7 non-functional</div>
+</header>
+
+<main class="req-index">
+
+<section class="dashboard">
+<div class="chart-row">
+<div class="chart-panel">
+<h3>Functional (14)</h3>
+<div class="donut-and-legend">
+<svg class="donut" viewBox="0 0 120 120" width="120" height="120">
+  <circle cx="60" cy="60" r="50" class="donut-track" />
+  <circle cx="60" cy="60" r="50" class="donut-seg ready" stroke-dasharray="89.76 224.4" stroke-dashoffset="-0"><title>Ready for dev: 4</title></circle>
+  <circle cx="60" cy="60" r="50" class="donut-seg pending" stroke-dasharray="224.4 89.76" stroke-dashoffset="-89.76"><title>Planned: 10</title></circle>
+  <text x="60" y="60" class="donut-center-text" text-anchor="middle" dominant-baseline="central">14</text>
+</svg>
+<div class="donut-legend">
+  <span><span class="swatch done"></span>Done (0)</span>
+  <span><span class="swatch ready"></span>Ready for dev (4)</span>
+  <span><span class="swatch pending"></span>Planned (10)</span>
+  <span><span class="swatch deferred"></span>Deferred (0)</span>
+</div>
+</div>
+</div>
+
+<div class="chart-panel">
+<h3>Non-functional (7)</h3>
+<div class="donut-and-legend">
+<svg class="donut" viewBox="0 0 120 120" width="120" height="120">
+  <circle cx="60" cy="60" r="50" class="donut-track" />
+  <circle cx="60" cy="60" r="50" class="donut-seg pending" stroke-dasharray="314.16 0" stroke-dashoffset="-0"><title>Planned: 7</title></circle>
+  <text x="60" y="60" class="donut-center-text" text-anchor="middle" dominant-baseline="central">7</text>
+</svg>
+<div class="donut-legend">
+  <span><span class="swatch done"></span>Done (0)</span>
+  <span><span class="swatch ready"></span>Ready for dev (0)</span>
+  <span><span class="swatch pending"></span>Planned (7)</span>
+  <span><span class="swatch deferred"></span>Deferred (0)</span>
+</div>
+</div>
+</div>
+
+</div>
+</section>
+
+<div class="section-divider">Jump to a group</div>
+<div class="req-group-grid">
+  <a class="epic-mosaic-card req-group-card" href="#grp-functional-requirements">
+    <div class="epic-mosaic-donut">
+<svg class="donut" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="22" class="donut-track" />
+  <circle cx="32" cy="32" r="22" class="donut-seg ready" stroke-dasharray="39.49 98.74" stroke-dashoffset="-0"><title>Ready for dev: 4</title></circle>
+  <circle cx="32" cy="32" r="22" class="donut-seg pending" stroke-dasharray="98.74 39.49" stroke-dashoffset="-39.49"><title>Planned: 10</title></circle>
+  <text x="32" y="32" class="donut-center-text" text-anchor="middle" dominant-baseline="central">14</text>
+</svg>
+    </div>
+    <div class="epic-mosaic-label">
+      <span class="epic-mosaic-title">Functional Requirements</span>
+      <span class="epic-mosaic-sub">14 requirements</span>
+    </div>
+  </a>
+  <a class="epic-mosaic-card req-group-card" href="#grp-non-functional-requirements">
+    <div class="epic-mosaic-donut">
+<svg class="donut" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="22" class="donut-track" />
+  <circle cx="32" cy="32" r="22" class="donut-seg pending" stroke-dasharray="138.23 0" stroke-dashoffset="-0"><title>Planned: 7</title></circle>
+  <text x="32" y="32" class="donut-center-text" text-anchor="middle" dominant-baseline="central">7</text>
+</svg>
+    </div>
+    <div class="epic-mosaic-label">
+      <span class="epic-mosaic-title">Non-Functional Requirements</span>
+      <span class="epic-mosaic-sub">7 requirements</span>
+    </div>
+  </a>
+</div>
+
+<div class="section-divider" id="grp-functional-requirements">Functional Requirements</div>
+
+<div class="req-card pending" id="fr1">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr1.html">FR1</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-4.html">Epic 4</a>
+  </div>
+  <div class="req-text">Implement a framework adapter contract that maps each supported framework into one shared projection model without rewriting the core HTML templating pipeline.</div>
+</div>
+
+<div class="req-card ready" id="fr2">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr2.html">FR2</a>
+    <span class="status-badge ready">Ready for dev</span>
+    <a class="req-epic" href="epics/epic-1.html">Epic 1</a>
+  </div>
+  <div class="req-text">Preserve first-class BMad support so current BMad artifacts in this repository parse and render correctly across releases.</div>
+</div>
+
+<div class="req-card pending" id="fr3">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr3.html">FR3</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-4.html">Epic 4</a>
+  </div>
+  <div class="req-text">Add Spec Kit baseline support so representative current-version Spec Kit repositories render without fatal errors.</div>
+</div>
+
+<div class="req-card pending" id="fr4">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr4.html">FR4</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-4.html">Epic 4</a>
+  </div>
+  <div class="req-text">Add GSD and GSD-Pi baseline support so representative repositories render key planning and tracking artifacts without fatal errors.</div>
+</div>
+
+<div class="req-card ready" id="fr5">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr5.html">FR5</a>
+    <span class="status-badge ready">Ready for dev</span>
+    <a class="req-epic" href="epics/epic-1.html">Epic 1</a>
+  </div>
+  <div class="req-text">Generate coherent navigation, index, and progress dashboards across all discovered artifact classes.</div>
+</div>
+
+<div class="req-card ready" id="fr6">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr6.html">FR6</a>
+    <span class="status-badge ready">Ready for dev</span>
+    <a class="req-epic" href="epics/epic-1.html">Epic 1</a>
+  </div>
+  <div class="req-text">Cross-link requirements, stories, and ADR references when IDs are detectable, while avoiding broken links for unresolved IDs.</div>
+</div>
+
+<div class="req-card ready" id="fr7">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr7.html">FR7</a>
+    <span class="status-badge ready">Ready for dev</span>
+    <a class="req-epic" href="epics/epic-1.html">Epic 1</a>
+  </div>
+  <div class="req-text">Render core markdown authoring patterns used in spec-driven artifacts, including Mermaid blocks and task lists.</div>
+</div>
+
+<div class="req-card pending" id="fr8">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr8.html">FR8</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-2.html">Epic 2</a>
+  </div>
+  <div class="req-text">Provide reliable watch-mode regeneration when source files change, including rapid successive edits.</div>
+</div>
+
+<div class="req-card pending" id="fr9">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr9.html">FR9</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-3.html">Epic 3</a>
+  </div>
+  <div class="req-text">Compute and display baseline git pulse metrics (last commit timestamp, 30-day commit count, top changed files) when available.</div>
+</div>
+
+<div class="req-card pending" id="fr10">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr10.html">FR10</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-3.html">Epic 3</a>
+  </div>
+  <div class="req-text">Support optional deeper git insights (for example hotspots and change coupling) as independently toggleable analysis.</div>
+</div>
+
+<div class="req-card pending" id="fr11">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr11.html">FR11</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-3.html">Epic 3</a>
+  </div>
+  <div class="req-text">Analyze canonical agent/workflow files to surface structural insights such as planning coverage, artifact freshness, and gaps, with memlog as optional enrichment.</div>
+</div>
+
+<div class="req-card pending" id="fr12">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr12.html">FR12</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-2.html">Epic 2</a>
+  </div>
+  <div class="req-text">Deliver a CLI-first workflow for one-shot generation and watch mode, with auto-discovery defaults plus explicit path overrides.</div>
+</div>
+
+<div class="req-card pending" id="fr13">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr13.html">FR13</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-5.html">Epic 5</a>
+  </div>
+  <div class="req-text">Provide a follow-on VS Code webview surface that reuses shared parsing and projection logic and remains read-only in v1.</div>
+</div>
+
+<div class="req-card pending" id="fr14">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/fr14.html">FR14</a>
+    <span class="status-badge pending">Planned</span>
+    <a class="req-epic" href="epics/epic-3.html">Epic 3</a>
+  </div>
+  <div class="req-text">Provide project tree views and structural visualizations in generated outputs so users can inspect directory/layout shape and trace where planning and implementation artifacts live.</div>
+</div>
+
+<div class="section-divider" id="grp-non-functional-requirements">Non-Functional Requirements</div>
+
+<div class="req-card pending" id="nfr1">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/nfr1.html">NFR1</a>
+    <span class="status-badge pending">Planned</span>
+  </div>
+  <div class="req-text">Baseline generation performance remains responsive for local OSS repositories, with deeper analytics separated from baseline runs.</div>
+</div>
+
+<div class="req-card pending" id="nfr2">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/nfr2.html">NFR2</a>
+    <span class="status-badge pending">Planned</span>
+  </div>
+  <div class="req-text">Generation is resilient to partial, malformed, unsupported, or missing artifacts and degrades gracefully with non-fatal notices.</div>
+</div>
+
+<div class="req-card pending" id="nfr3">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/nfr3.html">NFR3</a>
+    <span class="status-badge pending">Planned</span>
+  </div>
+  <div class="req-text">Operation is local-first and privacy-preserving, requiring no remote telemetry for core behavior.</div>
+</div>
+
+<div class="req-card pending" id="nfr4">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/nfr4.html">NFR4</a>
+    <span class="status-badge pending">Planned</span>
+  </div>
+  <div class="req-text">Architecture is extensible so new framework adapters can be added without core rewrites.</div>
+</div>
+
+<div class="req-card pending" id="nfr5">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/nfr5.html">NFR5</a>
+    <span class="status-badge pending">Planned</span>
+  </div>
+  <div class="req-text">Source files are read with shared access and watch mode must not hold write locks on observed files.</div>
+</div>
+
+<div class="req-card pending" id="nfr6">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/nfr6.html">NFR6</a>
+    <span class="status-badge pending">Planned</span>
+  </div>
+  <div class="req-text">Cross-surface accessibility semantics (keyboard drill behavior, labels, status text redundancy) are contractual behavior, not optional styling.</div>
+</div>
+
+<div class="req-card pending" id="nfr7">
+  <div class="req-card-head">
+    <a class="req-id-link" href="requirements/nfr7.html">NFR7</a>
+    <span class="status-badge pending">Planned</span>
+  </div>
+  <div class="req-text">Feature configurability parity is required across interactive menu flows and equivalent CLI parameters, with directory-scoped settings persistence.</div>
+</div>
+
+</main>
+
+<footer class="doc-footer">
+  SpecScribe &middot; Requirements &middot; last rebuilt 2026-07-05 22:41
+</footer>
+
+</body>
+</html>

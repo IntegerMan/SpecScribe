@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Epic 1: High-Clarity BMad Portal Experience — SpecScribe</title>
+<link rel="stylesheet" href="../specscribe.css">
+</head>
+<body>
+<nav class="site-nav" aria-label="Document navigation">
+  <span class="site-nav-brand">SpecScribe &#183; Live Docs</span>
+  <button class="site-nav-toggle" type="button" aria-label="Toggle navigation" aria-controls="site-nav-links" aria-expanded="false">Menu</button>
+  <div class="site-nav-links" id="site-nav-links">
+    <a href="../index.html">Home</a>
+    <a href="../adrs/index.html">ADRs</a>
+    <a href="../epics.html">Epics</a>
+    <a href="../requirements.html">Requirements</a>
+  </div>
+</nav>
+<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>
+
+<div class="breadcrumb" aria-label="Breadcrumb">
+  <a href="../index.html">Home</a>
+  <span class="crumb-sep">/</span>
+  <a href="../epics.html">Epics</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb-current" aria-current="page">1 &#183; High-Clarity BMad Portal E…</span>
+</div>
+
+<header class="doc-header">
+  <div class="kicker-row">
+    <span class="story-kicker">Epic 1</span>
+    <span class="status-badge active">In development</span>
+  </div>
+  <h1>High-Clarity BMad Portal Experience</h1>
+</header>
+
+<div class="epic-card epic-intro">
+  <p class="epic-goal">Deliver a polished, immediately useful portal for current BMad projects so maintainers and contributors can understand status, traceability, and progress at a glance.</p>
+  <div class="epic-meta">FRs: <a class="req-ref" href="../requirements/fr2.html">FR2</a>, <a class="req-ref" href="../requirements/fr5.html">FR5</a>, <a class="req-ref" href="../requirements/fr6.html">FR6</a>, <a class="req-ref" href="../requirements/fr7.html">FR7</a></div>
+</div>
+
+<section class="dashboard-narrow">
+<div class="chart-row">
+<div class="chart-col">
+<div class="chart-panel">
+<h3>Epic Progress</h3>
+<div class="progress-row">
+  <div class="progress-label">Stories detailed</div>
+  <div class="progress-bar"><div class="progress-fill partial" style="width:25%"></div></div>
+  <div class="progress-value">1 / 4</div>
+</div>
+<div class="progress-row">
+  <div class="progress-label">Tasks</div>
+  <div class="progress-bar"><div class="progress-fill done" style="width:100%"></div></div>
+  <div class="progress-value">20 / 20</div>
+</div>
+</div>
+
+<div class="chart-panel">
+<h3>Up Next</h3>
+  <a class="now-next-card review" href="../epics/story-1-1.html">
+    <span class="now-next-kicker">In review</span>
+    <span class="now-next-title">Story 1.1 &middot; Dashboard Navigation and Readability Foundation</span>
+  </a>
+<h3>Next Steps (BMad)</h3>
+<ul class="next-steps-list">
+  <li><code>/gds-sprint-status</code><span class="next-steps-desc">Surfaces this epic&#39;s current risks and the recommended next action — see the in-development story&#39;s own page for its specific dev command.</span></li>
+  <li><code>/gds-create-story 1.2</code><span class="next-steps-desc">Drafts the next story in this epic that doesn&#39;t have an implementation plan yet.</span></li>
+</ul>
+</div>
+
+</div>
+
+<div class="chart-panel sunburst-panel">
+<h3>Story Breakdown</h3>
+<svg class="sunburst" viewBox="0 0 320 320" width="320" height="320" role="img" aria-label="Epic story breakdown">
+  <a href="../epics/story-1-1.html">
+    <path class="sb-seg sb-review" d="M 161.38 44.81 A 115.2 115.2 0 0 1 275.19 158.62 L 211.2 159.39 A 51.2 51.2 0 0 0 160.61 108.8 Z"><title>Story 1.1: Dashboard Navigation and Readability Foundation — review</title></path>
+  </a>
+  <a href="../epics/story-1-1.html"><path class="sb-seg sb-done" d="M 161.77 12.81 A 147.2 147.2 0 0 1 307.19 158.23 L 278.39 158.58 A 118.4 118.4 0 0 0 161.42 41.61 Z"><title>Story 1.1: 20 of 20 tasks done</title></path></a>
+  <a href="#story-1-2">
+    <path class="sb-seg sb-drafted" d="M 275.19 161.38 A 115.2 115.2 0 0 1 161.38 275.19 L 160.61 211.2 A 51.2 51.2 0 0 0 211.2 160.61 Z"><title>Story 1.2: Traceability Links Across Requirements, Stories, and ADRs</title></path>
+  </a>
+  <a href="#story-1-3">
+    <path class="sb-seg sb-drafted" d="M 158.62 275.19 A 115.2 115.2 0 0 1 44.81 161.38 L 108.8 160.61 A 51.2 51.2 0 0 0 159.39 211.2 Z"><title>Story 1.3: Markdown Fidelity for Core Artifact Patterns</title></path>
+  </a>
+  <a href="#story-1-4">
+    <path class="sb-seg sb-drafted" d="M 44.81 158.62 A 115.2 115.2 0 0 1 158.62 44.81 L 159.39 108.8 A 51.2 51.2 0 0 0 108.8 159.39 Z"><title>Story 1.4: Accessible High-Polish Interaction Baseline</title></path>
+  </a>
+  <text x="160" y="152" class="sunburst-center-num" text-anchor="middle">20/20</text>
+  <text x="160" y="172" class="sunburst-center-label" text-anchor="middle">tasks</text>
+</svg>
+<div class="sunburst-legend">
+  <span><span class="swatch sb-pending-sw"></span>Pending</span>
+  <span><span class="swatch sb-drafted-sw"></span>Drafted</span>
+  <span><span class="swatch sb-ready-sw"></span>Ready for dev</span>
+  <span><span class="swatch sb-active-sw"></span>In development</span>
+  <span><span class="swatch sb-review-sw"></span>In review</span>
+  <span><span class="swatch sb-done-sw"></span>Done</span>
+</div>
+<div class="sunburst-hint">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>
+</div>
+</div>
+</section>
+
+<div class="story-card" id="story-1-1">
+  <div class="story-card-header">
+    <span class="story-id">1.1</span>
+    <a class="story-title story-title-link" href="../epics/story-1-1.html">Dashboard Navigation and Readability Foundation</a>
+    <span class="status-badge review">review</span>
+    <span class="status-badge task-badge"><svg class="mini-donut" viewBox="0 0 22 22" width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="8" class="donut-track" /><circle cx="11" cy="11" r="8" class="donut-seg done" stroke-dasharray="50.27 0" stroke-dashoffset="0" /></svg> 20/20 tasks</span>
+  </div>
+  <div class="user-story">As a project maintainer, I want a coherent landing page and navigation model, so that I can find key project views in seconds.</div>
+  <div class="ac-label">Acceptance Criteria</div>
+  <div class="ac-list">
+    <div class="ac-block"><ol>
+<li></li>
+</ol></div>
+    <div class="ac-block"><span class="kw">Given</span> a generated site with epics, requirements, and ADR content<br><span class="kw">When</span> I open the home page<br><span class="kw">Then</span> I see a clear dashboard with links to Epics, Requirements, ADRs, and source-derived pages<br><span class="kw">And</span> missing artifact classes are omitted gracefully without broken navigation entries.<br><ol start="2">
+<li></li>
+</ol></div>
+    <div class="ac-block"><span class="kw">Given</span> any generated page<br><span class="kw">When</span> I inspect navigation and breadcrumbs<br><span class="kw">Then</span> active-page state and breadcrumb path are correct<br><span class="kw">And</span> navigation remains usable on desktop and mobile breakpoints.</div>
+  </div>
+  <div class="per-story-progress">
+<div class="progress-row">
+  <div class="progress-label">Tasks</div>
+  <div class="progress-bar"><div class="progress-fill done" style="width:100%"></div></div>
+  <div class="progress-value">20 / 20</div>
+</div>
+  </div>
+  <a class="view-epic-link" href="../epics/story-1-1.html">View full story plan &rarr;</a>
+</div>
+
+<div class="story-card" id="story-1-2">
+  <div class="story-card-header">
+    <span class="story-id">1.2</span>
+    <span class="story-title">Traceability Links Across Requirements, Stories, and ADRs</span>
+  </div>
+  <div class="user-story">As a contributor, I want requirement IDs and source references to be linkified consistently, so that I can move between planning artifacts without manual searching.</div>
+  <div class="ac-label">Acceptance Criteria</div>
+  <div class="ac-list">
+    <div class="ac-block"><ol>
+<li></li>
+</ol></div>
+    <div class="ac-block"><span class="kw">Given</span> requirement IDs appear in rendered content<br><span class="kw">When</span> I view generated pages<br><span class="kw">Then</span> recognized IDs resolve to requirement detail pages<br><span class="kw">And</span> unresolved IDs do not create broken links.<br><ol start="2">
+<li></li>
+</ol></div>
+    <div class="ac-block"><span class="kw">Given</span> story artifacts include source citations and ADR references<br><span class="kw">When</span> I open epic and story pages<br><span class="kw">Then</span> citations resolve to the appropriate generated pages<br><span class="kw">And</span> ADR status and index cards remain consistent after regeneration.</div>
+  </div>
+  <p class="not-detailed-note">No detailed story plan yet.</p>
+</div>
+
+<div class="story-card" id="story-1-3">
+  <div class="story-card-header">
+    <span class="story-id">1.3</span>
+    <span class="story-title">Markdown Fidelity for Core Artifact Patterns</span>
+  </div>
+  <div class="user-story">As a reviewer, I want markdown patterns rendered faithfully, so that generated pages preserve planning intent and implementation context.</div>
+  <div class="ac-label">Acceptance Criteria</div>
+  <div class="ac-list">
+    <div class="ac-block"><ol>
+<li></li>
+</ol></div>
+    <div class="ac-block"><span class="kw">Given</span> source artifacts contain Mermaid blocks and task checklists<br><span class="kw">When</span> the site is generated<br><span class="kw">Then</span> Mermaid diagrams render client-side and checklists show completion states<br><span class="kw">And</span> rendering works without manual post-processing.<br><ol start="2">
+<li></li>
+</ol></div>
+    <div class="ac-block"><span class="kw">Given</span> story details include acceptance-criteria references<br><span class="kw">When</span> I open a story page<br><span class="kw">Then</span> AC references deep-link to criteria anchors<br><span class="kw">And</span> links include readable tooltip context when available.</div>
+  </div>
+  <p class="not-detailed-note">No detailed story plan yet.</p>
+</div>
+
+<div class="story-card" id="story-1-4">
+  <div class="story-card-header">
+    <span class="story-id">1.4</span>
+    <span class="story-title">Accessible High-Polish Interaction Baseline</span>
+  </div>
+  <div class="user-story">As a user scanning project status, I want interactive dashboard components that are both striking and accessible, so that I can quickly understand progress regardless of input method.</div>
+  <div class="ac-label">Acceptance Criteria</div>
+  <div class="ac-list">
+    <div class="ac-block"><ol>
+<li></li>
+</ol></div>
+    <div class="ac-block"><span class="kw">Given</span> the dashboard contains interactive cards and charts<br><span class="kw">When</span> I use keyboard navigation<br><span class="kw">Then</span> all interactive elements are focusable with visible focus states<br><span class="kw">And</span> drill and hover alternatives are available without pointer-only interaction.<br><ol start="2">
+<li></li>
+</ol></div>
+    <div class="ac-block"><span class="kw">Given</span> motion preferences vary by user<br><span class="kw">When</span> reduced-motion preference is enabled<br><span class="kw">Then</span> non-essential animation is minimized<br><span class="kw">And</span> information remains clear without relying on animation.</div>
+  </div>
+  <p class="not-detailed-note">No detailed story plan yet.</p>
+</div>
+
+<footer class="doc-footer">
+  SpecScribe &middot; Epic 1
+</footer>
+
+</body>
+</html>
