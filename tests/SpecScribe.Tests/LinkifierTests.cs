@@ -66,6 +66,46 @@ public class RequirementLinkifierTests
 
         Assert.DoesNotContain("<a", html);
     }
+
+    [Fact]
+    public void Linkify_LinksEveryOccurrenceOfARepeatedId()
+    {
+        var model = Requirements((RequirementKind.Functional, 6));
+        var html = RequirementLinkifier.Linkify("<p>FR6 then FR6 again.</p>", model, "");
+
+        Assert.Equal(2, CountOccurrences(html, "class=\"req-ref\""));
+    }
+
+    [Fact]
+    public void Linkify_LinksKnownAndSkipsUnknownInSameText()
+    {
+        var model = Requirements((RequirementKind.Functional, 6));
+        var html = RequirementLinkifier.Linkify("<p>FR6 and FR99.</p>", model, "../");
+
+        Assert.Contains("<a class=\"req-ref\" href=\"../requirements/fr6.html\">FR6</a>", html);
+        Assert.Contains("FR99", html);
+        Assert.DoesNotContain("fr99.html", html);
+    }
+
+    [Fact]
+    public void Linkify_ReturnsInputUnchanged_WhenNoRequirementsKnown()
+    {
+        var model = Requirements();
+        const string input = "<p>FR6 has nowhere to go.</p>";
+
+        Assert.Equal(input, RequirementLinkifier.Linkify(input, model, ""));
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        for (var i = haystack.IndexOf(needle, StringComparison.Ordinal); i >= 0;
+             i = haystack.IndexOf(needle, i + needle.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+        return count;
+    }
 }
 
 public class SourceLinkifierTests
@@ -97,6 +137,16 @@ public class SourceLinkifierTests
         var html = SourceLinkifier.Linkify("[Source: _bmad-output/planning-artifacts/epics.md#Epic 1]", Map, "");
 
         Assert.Contains("</a>#Epic 1]", html);
+    }
+
+    [Fact]
+    public void Linkify_LinksMultipleCitationsInOneBlob()
+    {
+        var html = SourceLinkifier.Linkify(
+            "<p>_bmad-output/game-architecture.md and _bmad-output/planning-artifacts/epics.md</p>", Map, "../");
+
+        Assert.Contains("href=\"../game-architecture.html\"", html);
+        Assert.Contains("href=\"../planning-artifacts/epics.html\"", html);
     }
 }
 

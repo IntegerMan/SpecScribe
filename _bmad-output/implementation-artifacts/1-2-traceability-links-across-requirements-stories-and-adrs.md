@@ -4,7 +4,7 @@ baseline_commit: 8e9244cdd8c87182d8804d1d50ff34c4f5992db7
 
 # Story 1.2: Traceability Links Across Requirements, Stories, and ADRs
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -26,29 +26,29 @@ so that I can move between planning artifacts without manual searching.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Preserve and complete requirement-ID traceability through the existing post-render linkification seam (AC: #1)
-  - [ ] Confirm recognized `FR#` and `NFR#` tokens are linkified only when present in `RequirementsModel.ById`
-  - [ ] Preserve anchor-aware behavior so tokens already inside `<a>` tags are never rewritten
-  - [ ] Preserve self-page skip behavior on requirement detail pages so a requirement never links to itself
+- [x] Task 1: Preserve and complete requirement-ID traceability through the existing post-render linkification seam (AC: #1)
+  - [x] Confirm recognized `FR#` and `NFR#` tokens are linkified only when present in `RequirementsModel.ById`
+  - [x] Preserve anchor-aware behavior so tokens already inside `<a>` tags are never rewritten
+  - [x] Preserve self-page skip behavior on requirement detail pages so a requirement never links to itself
 
-- [ ] Task 2: Ensure source citations and ADR references resolve through generated-page URLs rather than raw markdown paths (AC: #2)
-  - [ ] Keep `[Source: _bmad-output/...md]` citations flowing through `SourceLinkifier` using the generated-page reference map
-  - [ ] Confirm story artifact sections that already support source citations remain covered: blurb, remainder, acceptance criteria, dev-agent record, review findings, and change log
-  - [ ] Preserve ADR markdown-link rewriting so sibling ADR links, `_bmad-output` references, and `README.md` continue to resolve to generated HTML targets
+- [x] Task 2: Ensure source citations and ADR references resolve through generated-page URLs rather than raw markdown paths (AC: #2)
+  - [x] Keep `[Source: _bmad-output/...md]` citations flowing through `SourceLinkifier` using the generated-page reference map
+  - [x] Confirm story artifact sections that already support source citations remain covered: blurb, remainder, acceptance criteria, dev-agent record, review findings, and change log
+  - [x] Preserve ADR markdown-link rewriting so sibling ADR links, `_bmad-output` references, and `README.md` continue to resolve to generated HTML targets
 
-- [ ] Task 3: Keep reference-map and regeneration behavior coherent across all relevant page types (AC: #1, #2)
-  - [ ] Verify `epics.md` maps to `epics.html` and consumed implementation artifacts map to their story detail pages rather than generic mirrored output
-  - [ ] Confirm requirement linkification still runs across home, epics index, epic detail, story detail, requirements index/detail, ADR pages, and generic rendered pages after any changes
-  - [ ] Preserve full ADR-set regeneration so renamed or deleted ADRs cannot leave stale detail pages or stale index-card metadata behind
+- [x] Task 3: Keep reference-map and regeneration behavior coherent across all relevant page types (AC: #1, #2)
+  - [x] Verify `epics.md` maps to `epics.html` and consumed implementation artifacts map to their story detail pages rather than generic mirrored output
+  - [x] Confirm requirement linkification still runs across home, epics index, epic detail, story detail, requirements index/detail, ADR pages, and generic rendered pages after any changes
+  - [x] Preserve full ADR-set regeneration so renamed or deleted ADRs cannot leave stale detail pages or stale index-card metadata behind
 
-- [ ] Task 4: Add regression coverage for traceability behavior at both unit and generation-integration levels (AC: #1, #2)
-  - [ ] Extend `LinkifierTests` for any uncovered edge cases introduced by the implementation
-  - [ ] Add focused generation-level tests that validate reference-map coverage and generated output routing for source citations and requirement links
-  - [ ] Add/extend ADR regeneration tests for stale-output safety when ADR files are changed, renamed, or removed
+- [x] Task 4: Add regression coverage for traceability behavior at both unit and generation-integration levels (AC: #1, #2)
+  - [x] Extend `LinkifierTests` for any uncovered edge cases introduced by the implementation
+  - [x] Add focused generation-level tests that validate reference-map coverage and generated output routing for source citations and requirement links
+  - [x] Add/extend ADR regeneration tests for stale-output safety when ADR files are changed, renamed, or removed
 
-- [ ] Task 5: Validate end-to-end rendered behavior with the real generation path (AC: #1, #2)
-  - [ ] Run focused tests for linkifiers and any new generation tests
-  - [ ] Run the site generation command and confirm generated story, requirement, and ADR pages render without broken-link regressions
+- [x] Task 5: Validate end-to-end rendered behavior with the real generation path (AC: #1, #2)
+  - [x] Run focused tests for linkifiers and any new generation tests
+  - [x] Run the site generation command and confirm generated story, requirement, and ADR pages render without broken-link regressions
 
 ## Developer Context Section
 
@@ -239,11 +239,23 @@ GPT-5.4
 - ADR regeneration already rebuilds the full ADR output directory, which is a critical behavior to preserve for AC #2.
 - Generated output is published to GitHub Pages, so all links must remain static-host-safe and relative-path correct.
 
+#### Implementation (2026-07-06)
+
+- Verified all three traceability seams satisfy the ACs as-is; no production code changes were required. The story was completed by adding the missing regression coverage and proving behavior end-to-end.
+- Added generation-level regression tests in `tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs` covering: known/unknown requirement-ID linkification on a generated story page, requirement self-link skip on the FR detail page, `epics.md`→`epics.html` citation routing, consumed-artifact citation routing to `epics/story-1-2.html`, generic mirrored citation routing to `planning-artifacts/prd.html`, ADR sibling/README cross-link rewriting plus status surfacing, and ADR stale-output safety on delete/rename/status-change via `RegenerateAdrs`.
+- Extended `tests/SpecScribe.Tests/LinkifierTests.cs` with unit edge cases: repeated-ID linking, mixed known/unknown IDs in one string, no-op when the requirement set is empty, and multiple source citations in one blob.
+- Full suite: 127 passing (was 113; +14 new). Real generation pass produced 19 pages with no errors.
+- End-to-end verification confirmed in-scope surfaces (ADR pages, epic/story/requirements pages) contain zero residual `.md` links and that story citations resolve to `../epics.html`, `../epics/story-1-1.html`, and mirrored `.html` targets.
+- Out-of-scope observation (not a regression, no code touched): the generic PRD page still contains a few hand-authored `[text](file.md)` links to files outside the generated set (repo `README.md`, ADR source paths, a brief). These are not `[Source:]` citations or ADR-body links and fall outside this story's traceability scope; flag for a future generic cross-doc linking story if desired.
+
 ### File List
 
 - _bmad-output/implementation-artifacts/1-2-traceability-links-across-requirements-stories-and-adrs.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
+- tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs
+- tests/SpecScribe.Tests/LinkifierTests.cs
 
 ## Change Log
 
 - 2026-07-05: Created Story 1.2 implementation context with traceability-specific architecture, code-seam, regeneration, and testing guidance.
+- 2026-07-06: Implemented Story 1.2 as a verify-and-harden pass — confirmed the existing linkifier/reference-map/ADR-regeneration seams satisfy both ACs, added generation-level and unit regression coverage (14 new tests, 127 total passing), and validated a clean end-to-end generation pass. No production code changes required.
