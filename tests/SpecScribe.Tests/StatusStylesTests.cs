@@ -51,6 +51,24 @@ public class StatusStylesTests
     }
 
     [Fact]
-    public void ForEpic_DraftedWhenNoStoryHasStartedDev()
-        => Assert.Equal("drafted", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null), Story("ready-for-dev"))));
+    public void ForEpic_ReadyWhenAnyStoryIsReadyAndNoneFurther()
+    {
+        // Any ready-for-dev story (with none in dev/review/done) lifts the epic to the ready tier, mirroring
+        // the "any active → active" rule. [spec-sunburst-epic-focus-and-ready-rollup]
+        Assert.Equal("ready", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null), Story("ready-for-dev"))));
+        Assert.Equal("ready", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("ready-for-dev"), Story("ready-for-dev"))));
+    }
+
+    [Fact]
+    public void ForEpic_DraftedOnlyWhenNoStoryIsReadyOrFurther()
+        => Assert.Equal("drafted", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null), Story("something else"))));
+
+    [Theory]
+    [InlineData("done", "Done")]
+    [InlineData("active", "In development")]
+    [InlineData("ready", "Ready for dev")]
+    [InlineData("drafted", "Stories drafted")]
+    [InlineData("pending", "Pending")]
+    public void EpicLabel_MapsEachTier(string cssClass, string expected)
+        => Assert.Equal(expected, StatusStyles.EpicLabel(cssClass));
 }

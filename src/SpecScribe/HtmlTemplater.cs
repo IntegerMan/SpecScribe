@@ -224,6 +224,7 @@ public static class HtmlTemplater
             {
                 (StatusStyles.EpicLabel("done"), Count("done"), "done"),
                 (StatusStyles.EpicLabel("active"), Count("active"), "active"),
+                (StatusStyles.EpicLabel("ready"), Count("ready"), "ready"),
                 (StatusStyles.EpicLabel("drafted"), Count("drafted"), "drafted"),
                 (StatusStyles.EpicLabel("pending"), Count("pending"), "pending"),
             };

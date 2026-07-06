@@ -23,7 +23,8 @@ public static class StatusStyles
     }
 
     /// <summary>CSS class for an epic, derived from its stories: green only when every story is done;
-    /// teal once any story has entered dev; gold while merely drafted; parchment when pending.</summary>
+    /// teal once any story has entered dev; gold "ready" once any story is ready-for-dev (mirroring the
+    /// "any active → active" rule); gold "drafted" while merely drafted; parchment when pending.</summary>
     public static string ForEpic(EpicInfo epic)
     {
         if (epic.Status == EpicStatus.Pending || epic.Stories.Count == 0) return "pending";
@@ -31,6 +32,9 @@ public static class StatusStyles
         var storyClasses = epic.Stories.Select(ForStory).ToList();
         if (storyClasses.All(c => c == "done")) return "done";
         if (storyClasses.Any(c => c is "active" or "review" or "done")) return "active";
+        // Any ready-for-dev story (with none further along) lifts the epic to the ready tier the story layer
+        // already distinguishes, so the epic ring stops reading as merely "drafted" under ready stories.
+        if (storyClasses.Any(c => c == "ready")) return "ready";
         return "drafted";
     }
 
@@ -38,6 +42,7 @@ public static class StatusStyles
     {
         "done" => "Done",
         "active" => "In development",
+        "ready" => "Ready for dev",
         "drafted" => "Stories drafted",
         _ => "Pending",
     };

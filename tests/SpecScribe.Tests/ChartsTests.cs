@@ -58,6 +58,35 @@ public class ChartsTests
     }
 
     [Fact]
+    public void Sunburst_CenterReportsEpicCountNotStoryCount()
+    {
+        // The chart is organized around epics, so the center headlines the epic count with an "epic(s)" label
+        // (pluralized), never the story total. [spec-sunburst-epic-focus-and-ready-rollup]
+        StoryInfo S(string id) => Story(id, "S", "done", 1, 1);
+
+        var multi = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(S("1.1"), S("1.2"), S("1.3")), Epic(S("2.1")) },
+        };
+        var multiSvg = Charts.Sunburst(multi);
+        Assert.Contains(">2</text>", multiSvg);
+        Assert.Contains(">epics</text>", multiSvg);
+        Assert.DoesNotContain(">stories</text>", multiSvg);
+
+        var single = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(S("1.1")) },
+        };
+        var singleSvg = Charts.Sunburst(single);
+        Assert.Contains(">1</text>", singleSvg);
+        Assert.Contains(">epic</text>", singleSvg);
+    }
+
+    [Fact]
     public void EpicSunburst_SegmentLinksCarryAriaLabels()
     {
         var epic = Epic(Story("1.1", "A story", "done", done: 3, total: 3));
@@ -67,6 +96,11 @@ public class ChartsTests
         Assert.Contains("aria-label=\"Story 1.1: A story — done\"", svg);
         Assert.Contains("aria-label=\"Story 1.1: 3 of 3 tasks done\"", svg);
         Assert.Contains("role=\"img\"", svg); // whole-chart name retained
+        // Center headlines the epic's story count (singular here), never a task fraction, even when tasks
+        // exist — the outer ring already conveys task completion. [epic-sunburst story-count]
+        Assert.Contains(">1</text>", svg);
+        Assert.Contains(">story</text>", svg);
+        Assert.DoesNotContain(">tasks</text>", svg);
     }
 
     [Fact]

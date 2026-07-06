@@ -2,7 +2,7 @@
 title: 'Project sunburst focuses on epics and shows the ready-for-dev rollup'
 type: 'bugfix'
 created: '2026-07-06'
-status: 'draft'
+status: 'done'
 review_loop_iteration: 0
 context: []
 ---
@@ -48,11 +48,14 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/SpecScribe/StatusStyles.cs` -- in `ForEpic`, after the `active` check add `if (storyClasses.Any(c => c == "ready")) return "ready";` before the `drafted` fallback; add `"ready" => "Ready for dev"` to `EpicLabel`.
-- [ ] `src/SpecScribe/Charts.cs` -- in `Sunburst`, replace the `storiesTotal` center number with `epics.Count` and the label `stories` with `Plural(epics.Count, "epic", "epics")`; remove the now-unused `storiesTotal`.
-- [ ] `src/SpecScribe/assets/specscribe.css` -- add `.epic-status.ready` to the gold `.epic-status.drafted` rule and `.epic-chip.ready` to the gold `.epic-chip.drafted` rule.
-- [ ] `tests/SpecScribe.Tests/StatusStylesTests.cs` -- change the mixed drafted+ready case to expect `ready`; add all-ready → `ready`, all-drafted → `drafted`, and `EpicLabel("ready") == "Ready for dev"`.
-- [ ] `tests/SpecScribe.Tests/ChartsTests.cs` -- add a test that `Sunburst` of a multi-epic model renders the epic count and `epics` in the center (and singular `epic` for one epic).
+- [x] `src/SpecScribe/StatusStyles.cs` -- in `ForEpic`, after the `active` check add `if (storyClasses.Any(c => c == "ready")) return "ready";` before the `drafted` fallback; add `"ready" => "Ready for dev"` to `EpicLabel`.
+- [x] `src/SpecScribe/Charts.cs` -- in `Sunburst`, replace the `storiesTotal` center number with `epics.Count` and the label `stories` with `Plural(epics.Count, "epic", "epics")`; remove the now-unused `storiesTotal`.
+- [x] `src/SpecScribe/assets/specscribe.css` -- add `.epic-status.ready` to the gold `.epic-status.drafted` rule and `.epic-chip.ready` to the gold `.epic-chip.drafted` rule.
+- [x] `src/SpecScribe/HtmlTemplater.cs` (beyond the original code map) -- add a `ready` segment to the Epic Status donut's `AppendEpicStatusPanel` roll-up, else epics that now roll up to `ready` would drop out of the donut (the deferred "unmapped `ForEpic` class" finding). The donut now buckets all five `ForEpic` outputs.
+- [x] `tests/SpecScribe.Tests/StatusStylesTests.cs` -- mixed drafted+ready now expects `ready`; added all-ready → `ready`, all-drafted → `drafted`, and a full `EpicLabel` tier theory including `"ready" => "Ready for dev"`.
+- [x] `tests/SpecScribe.Tests/ChartsTests.cs` -- added a test that `Sunburst` renders the epic count + `epics` in the center (and singular `epic` for one epic), and not `stories`.
+
+**Completion:** Implemented 2026-07-06. Full suite 204 passing; regenerated dashboard verified in-browser — center reads "7 / epics"; Epic 2 (ready-for-dev stories) inner ring renders bright-gold `sb-ready` `rgb(212,160,23)`, distinct from drafted's pale `rgb(232,217,168)`, matching its stories.
 
 **Acceptance Criteria:**
 - Given a project model with 7 epics and 35 stories, when the project sunburst renders, then its center shows `7` above `epics`.

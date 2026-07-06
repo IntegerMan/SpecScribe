@@ -194,9 +194,10 @@ public static class Charts
             angle += sweep;
         }
 
-        var storiesTotal = epics.Sum(e => e.Stories.Count);
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{storiesTotal}</text>\n");
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">stories</text>\n");
+        // The chart is organized around its epics (inner ring), so the center headlines the epic count — the
+        // story/task rings tell the finer-grained story. [spec-sunburst-epic-focus-and-ready-rollup]
+        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{epics.Count}</text>\n");
+        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(epics.Count, "epic", "epics")}</text>\n");
         sb.Append("</svg>\n");
 
         sb.Append("""
@@ -248,9 +249,6 @@ public static class Charts
         var anglePerStory = 2 * Math.PI / count;
         const double pad = 0.012;
 
-        var totalTasks = epic.Stories.Sum(s => s.TasksTotal);
-        var doneTasks = epic.Stories.Sum(s => s.TasksDone);
-
         var sb = new StringBuilder();
         sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"Epic story breakdown\">\n");
 
@@ -287,10 +285,10 @@ public static class Charts
             angle += anglePerStory;
         }
 
-        var centerText = totalTasks > 0 ? $"{doneTasks}/{totalTasks}" : count.ToString();
-        var centerLabel = totalTasks > 0 ? "tasks" : "stories";
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{Html(centerText)}</text>\n");
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Html(centerLabel)}</text>\n");
+        // The inner ring is this epic's stories, so headline the story count (matching the project sunburst's
+        // epic-count center) rather than a task fraction that duplicates the outer ring. [epic-sunburst story-count]
+        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{count}</text>\n");
+        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(count, "story", "stories")}</text>\n");
         sb.Append("</svg>\n");
 
         sb.Append("""

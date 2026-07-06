@@ -600,6 +600,9 @@ code.color-swatch {
 /* Status semantics everywhere: parchment = pending · gold = drafted/ready · teal = active dev · green = done ONLY. */
 .epic-chip.done { border-left: 3px solid var(--status-done); }
 .epic-chip.active { border-left: 3px solid var(--status-active); }
+/* Epic chips/badges intentionally share one gold for ready + drafted (only the sunburst ring shows the
+   brighter ready shade); the label text carries the difference. [spec-sunburst-epic-focus-and-ready-rollup] */
+.epic-chip.ready,
 .epic-chip.drafted { border-left: 3px solid var(--status-drafted); }
 .epic-chip.pending { border-left: 3px solid var(--ink-light); opacity: 0.8; }
 
@@ -652,6 +655,7 @@ code.color-swatch {
 
 .epic-status.done { background: #e8f0e4; color: var(--moss); border: 1px solid var(--moss-light); }
 .epic-status.active { background: #e0ecea; color: var(--teal); border: 1px solid var(--teal); }
+.epic-status.ready,
 .epic-status.drafted { background: #f5ecd4; color: var(--gold); border: 1px solid var(--gold-light); }
 .epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--border); }
 
