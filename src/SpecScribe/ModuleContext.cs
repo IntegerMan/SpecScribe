@@ -132,10 +132,24 @@ public sealed class ModuleContext
                 return None;
             }
 
-            return BuildContext(ChoosePrimary(candidates, sourceRelativePaths)) ?? None;
+            // Try the best-guess primary first, then the remaining candidates — a parse failure on one
+            // installed module must not discard another module whose module-help.csv would have parsed.
+            var primary = ChoosePrimary(candidates, sourceRelativePaths);
+            foreach (var candidate in candidates.OrderByDescending(c => string.Equals(c, primary, StringComparison.Ordinal)))
+            {
+                var context = BuildContext(candidate);
+                if (context is not null)
+                {
+                    return context;
+                }
+            }
+
+            return None;
         }
-        catch (IOException)
+        catch (Exception)
         {
+            // Detection is best-effort: any failure (IO, permissions, malformed data) degrades to None
+            // rather than aborting the whole site build.
             return None;
         }
     }

@@ -55,6 +55,19 @@ public sealed class SiteGenerator
             var nav = BuildNav(sourceRelatives);
             _nav = nav;
 
+            // Render the README up front so that, if it fails, we can drop the Readme nav entry before any
+            // other page is written — the site never links to a readme.html that wasn't actually produced.
+            GenerationEvent? readmeEvent = null;
+            if (ReadmeAvailable)
+            {
+                readmeEvent = GenerateReadmeInternal(nav);
+                if (readmeEvent is { Outcome: GenerationOutcome.Error })
+                {
+                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false);
+                    _nav = nav;
+                }
+            }
+
             var epicsSourceFile = FindEpicsSourceFile(files);
             var artifactMap = BuildArtifactMap(files);
             var consumedArtifacts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -84,7 +97,6 @@ public sealed class SiteGenerator
             events.AddRange(GenerateAdrsInternal(nav));
             reporter?.EndPhase(GenerationPhase.Adrs);
 
-            var readmeEvent = GenerateReadmeInternal(nav);
             if (readmeEvent is not null)
             {
                 events.Add(readmeEvent);
