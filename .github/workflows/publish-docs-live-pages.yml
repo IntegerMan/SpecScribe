@@ -1,0 +1,67 @@
+name: Publish Docs Live to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "_bmad-output/**"
+      - "docs/adrs/**"
+      - "src/SpecScribe/**"
+      - "SpecScribe.slnx"
+      - "src/SpecScribe/SpecScribe.csproj"
+      - ".github/workflows/publish-docs-live-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+          cache: true
+          cache-dependency-path: src/SpecScribe/SpecScribe.csproj
+
+      - name: Build static files
+        id: build
+        run: |
+          dotnet run --project src/SpecScribe -- generate \
+            --source _bmad-output \
+            --adrs docs/adrs \
+            --output docs/live \
+            --project-name SpecScribe
+
+      - name: Validate generated output
+        run: |
+          test -d docs/live
+          test -s docs/live/index.html
+
+      - name: Upload static files as artifact
+        id: upload
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/live
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
