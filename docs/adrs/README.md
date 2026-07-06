@@ -12,3 +12,4 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
 - [ADR 0001 — Adopt BMAD-METHOD as SpecScribe's Spec-Driven Development Framework](0001-spec-driven-development-framework.md) — **Accepted**
 - [ADR 0002 — Preserve a Shared Rendering Core with Host-Neutral View Models](0002-shared-rendering-core-and-host-neutral-view-models.md) — **Accepted**
 - [ADR 0003 — Keep Settings Directory-Scoped and IDE Helpers Read-Only](0003-directory-scoped-settings-and-read-only-helpers.md) — **Accepted**
+- [ADR 0004 — Preserve Cross-Surface Interaction Semantics and Host-Aware Theme Boundaries](0004-cross-surface-interaction-and-theme-contract.md) — **Accepted**

@@ -5,6 +5,8 @@ updated: 2026-07-05
 sources:
   - ../../planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.md
   - SPEC.md
+  - ../../planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md
+  - ../../planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/DESIGN.md
   - .memlog.md
 ---
 
@@ -24,6 +26,8 @@ The architectural invariant is simple: parsing, projection, enrichment, and view
 - Baseline generation stays responsive; deep analytics remain optional.
 - Unsupported or malformed artifacts degrade gracefully instead of blocking generation.
 - CLI, static HTML, and VS Code webview surfaces must consume the same shared projection/rendering core.
+- Shared HTML/webview views (dashboard and epics drill) must preserve the same interaction/state semantics even when transport differs.
+- Accessibility semantics (keyboard drill behavior, labels, and status text redundancy) are part of the rendering contract, not optional skinning.
 
 ## Architecture Decisions
 
@@ -75,11 +79,28 @@ Prevents: editor actions from mutating source planning artifacts or becoming a h
 
 Rule: helpers can generate prompts or commands, but any write action remains an explicit external choice.
 
+### AD-7 [ADOPTED] Presentation tokens are shared; host chrome is host-owned
+
+Binds: brand/status token families, component-level visual semantics, and cross-surface readability.
+
+Prevents: ad hoc per-surface styling drift and accidental dependence on browser-only or webview-only theme primitives.
+
+Rule: SpecScribe owns its presentation tokens for content semantics; webview maps host variables for container/chrome while preserving SpecScribe semantic accents.
+
+### AD-8 [ADOPTED] Interaction state contract is canonical; update transport is adapter-specific
+
+Binds: drill depth semantics, breadcrumb/state transitions, focus/keyboard behavior, and freshness signaling.
+
+Prevents: dashboard behavior divergence between static HTML and webview and re-implementation of interaction logic per host.
+
+Rule: interaction state shape is shared (for example drill scope and status semantics); static HTML may hydrate via URL hash plus sidecar polling, while webview uses extension host push.
+
 ## Seed, Not Invariant
 
 - Exact namespace or package split is a seed choice, not a contract; the current monolithic implementation can be refactored as long as the shared-core contract stays intact.
 - Exact adapter loading mechanics and exact file layout for HTML/webview delivery are implementation seeds.
 - Coverage-tier wording and the next promoted Agent Files remain open until the portal wording proves stable in use.
+- Exact visual polish values (timings, shadows, micro-motion tuning) are seed-level as long as shared semantics and accessibility invariants remain intact.
 
 ## Runtime Flow
 
