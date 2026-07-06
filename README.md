@@ -94,7 +94,7 @@ jobs:
             --project-name "My Project"
 
       - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: SpecScribeOutput
 
