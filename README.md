@@ -9,6 +9,20 @@ skimming project status. SpecScribe watches those artifacts and renders them int
 cross-linked static HTML site: epic and story dashboards with progress gauges, requirements traceability
 pages, rendered mermaid diagrams, and ADR indexes — regenerated live on every save.
 
+## Supported frameworks
+
+SpecScribe renders artifacts from the spec-driven-development frameworks below. Support for additional
+frameworks is planned — see the [Roadmap](#roadmap) for feature-level plans.
+
+| Framework | Version | Status |
+|-----------|---------|--------|
+| [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD) | 6.10.0 | ✅ Supported |
+| BMad GDS (Game Dev Studio) | 0.6.0 | ✅ Supported |
+| [GitHub Spec Kit](https://github.com/github/spec-kit) | — | 🧭 Planned |
+| GSD | — | 🧭 Planned |
+| GSD-Pi | — | 🧭 Planned |
+| Superpowers | — | 🧭 Planned |
+
 ## Install
 
 SpecScribe is a [.NET global tool](https://learn.microsoft.com/dotnet/core/tools/global-tools) targeting .NET 10.
@@ -154,8 +168,9 @@ it observes.
 
 ## Roadmap
 
-- **[Spec Kit](https://github.com/github/spec-kit)** support — render `specify` constitutions, specs, plans, and task lists
-- **GSD** support
+Planned framework support (Spec Kit, GSD, GSD-Pi, Superpowers) is tracked in the
+[Supported frameworks](#supported-frameworks) table above. Feature-level plans:
+
 - **Git insights** — richer history-derived views (velocity, file heatmaps) beyond the current commit stats
 - **Directory-structure insights** — project-layout overviews generated from the tree itself
 
