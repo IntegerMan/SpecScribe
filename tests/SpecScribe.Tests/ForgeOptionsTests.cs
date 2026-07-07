@@ -24,7 +24,7 @@ public class ForgeOptionsTests : IDisposable
         Assert.Equal(Repo, options.RepoRoot);
         Assert.Equal(Path.Combine(Repo, "_bmad-output"), options.SourceRoot);
         Assert.Equal(Path.Combine(Repo, "docs", "adrs"), options.AdrSourceRoot);
-        Assert.Equal(Path.Combine(Repo, "docs", "live"), options.OutputRoot);
+        Assert.Equal(Path.Combine(Repo, "SpecScribeOutput"), options.OutputRoot);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class ForgeOptionsTests : IDisposable
 
         Assert.Equal(source, options.SourceRoot);
         Assert.Equal(Repo, options.RepoRoot); // derived from the source's parent, not discovery
-        Assert.Equal(Path.Combine(Repo, "docs", "live"), options.OutputRoot);
+        Assert.Equal(Path.Combine(Repo, "SpecScribeOutput"), options.OutputRoot);
     }
 
     [Fact]

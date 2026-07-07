@@ -32,7 +32,7 @@
         "--adrs",
         "docs/adrs",
         "--output",
-        "docs/live",
+        "SpecScribeOutput",
         "--project-name",
         "SpecScribe"
       ],
@@ -56,7 +56,7 @@
         "--adrs",
         "docs/adrs",
         "--output",
-        "docs/live",
+        "SpecScribeOutput",
         "--project-name",
         "SpecScribe"
       ],

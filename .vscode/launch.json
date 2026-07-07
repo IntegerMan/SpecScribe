@@ -5,16 +5,16 @@
       "name": "SpecScribe: Open Live Site (Edge)",
       "type": "pwa-msedge",
       "request": "launch",
-      "url": "file:///${workspaceFolder}/docs/live/index.html",
-      "webRoot": "${workspaceFolder}/docs/live",
+      "url": "file:///${workspaceFolder}/SpecScribeOutput/index.html",
+      "webRoot": "${workspaceFolder}/SpecScribeOutput",
       "preLaunchTask": "SpecScribe: Generate Site"
     },
     {
       "name": "SpecScribe: Open Live Site (Chrome)",
       "type": "pwa-chrome",
       "request": "launch",
-      "url": "file:///${workspaceFolder}/docs/live/index.html",
-      "webRoot": "${workspaceFolder}/docs/live",
+      "url": "file:///${workspaceFolder}/SpecScribeOutput/index.html",
+      "webRoot": "${workspaceFolder}/SpecScribeOutput",
       "preLaunchTask": "SpecScribe: Generate Site"
     }
   ]

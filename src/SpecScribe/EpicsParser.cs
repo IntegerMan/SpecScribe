@@ -222,8 +222,10 @@ public static class EpicsParser
             for (var i = idx + 1; i < itemEnd; i++) bodyLines.Add(lines[i]);
             var bodyMd = SourceCitationBrackets.Replace(string.Join("\n", bodyLines).Trim(), "$1");
 
+            // PlainText comes from the pre-styling render: StyleCriterion trims the whitespace between
+            // clauses, which would glue words together ("…completion.When…") once tags are stripped.
             var html = MarkdownConverter.RenderInline(bodyMd);
-            result.Add(new AcceptanceCriterion(number, html, PathUtil.StripHtmlTags(html)));
+            result.Add(new AcceptanceCriterion(number, GherkinStyler.StyleCriterion(html), PathUtil.StripHtmlTags(html)));
         }
 
         return result;
@@ -475,7 +477,7 @@ public static class EpicsParser
         {
             var keyword = m.Groups[1].Value;
             var rest = m.Groups[2].Value;
-            return $"<span class=\"kw\">{keyword}</span> {MarkdownConverter.RenderInline(rest)}";
+            return $"{GherkinStyler.KeywordSpan(keyword)} {MarkdownConverter.RenderInline(rest)}";
         }
         return MarkdownConverter.RenderInline(line);
     }

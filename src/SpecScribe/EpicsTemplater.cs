@@ -320,6 +320,67 @@ public static class EpicsTemplater
         return sb.ToString();
     }
 
+    /// <summary>Renders the placeholder page for a story that exists in epics.md but has no implementation
+    /// artifact yet. Lives at the exact path the real story page will use (see
+    /// <see cref="StoryEpicLinkifier.StoryPagePath"/>), so inline "Story N.M" mentions always resolve and a
+    /// later-drafted artifact overwrites it in place. Shows what the plan already knows (narrative + epics.md
+    /// acceptance criteria) and signposts the create-story command instead of dead-ending.</summary>
+    public static string RenderStoryPlaceholder(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands)
+    {
+        var outputPath = StoryEpicLinkifier.StoryPagePath(story.Id);
+        var epicOutputPath = $"epics/epic-{epic.Number}.html";
+        var prefix = PathUtil.RelativePrefix(outputPath);
+
+        var sb = new StringBuilder();
+        sb.Append(PathUtil.RenderHeadOpen($"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}", prefix + ForgeOptions.StylesheetName, prefix + ForgeOptions.ScriptName));
+        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
+        {
+            ("Home", "index.html"),
+            ("Epics", SiteNav.EpicsOutputPath),
+            (EpicCrumbLabel(epic), epicOutputPath),
+            ($"Story {story.Id}", null),
+        }));
+
+        sb.Append("<main id=\"main-content\">\n");
+        sb.Append("<header class=\"doc-header\">\n");
+        sb.Append("  <div class=\"kicker-row\">\n");
+        sb.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(story.Id)}</span>\n");
+        sb.Append($"    <span class=\"status-badge {StatusStyles.ForStory(story)}\">Not yet drafted</span>\n");
+        sb.Append("  </div>\n");
+        sb.Append($"  <h1>{story.Title}</h1>\n");
+        sb.Append("</header>\n\n");
+
+        if (story.UserStoryHtml.Length > 0)
+        {
+            sb.Append($"<div class=\"story-lead user-story\">{story.UserStoryHtml}</div>\n\n");
+        }
+
+        if (story.AcBlocksHtml.Count > 0)
+        {
+            sb.Append("<div class=\"chart-panel ac-panel\">\n<h3>Acceptance Criteria</h3>\n<div class=\"ac-list\">\n");
+            foreach (var block in story.AcBlocksHtml)
+            {
+                sb.Append($"  <div class=\"ac-block\">{block}</div>\n");
+            }
+            sb.Append("</div>\n</div>\n\n");
+        }
+
+        // The dead-end ("no plan yet") becomes a next action when the module exposes create-story,
+        // mirroring the epic page's undrafted-story note. [Story 2.1 Task 6]
+        var note = BmadCommands.InlineGuidance(
+            commands.Command("create-story", story.Id),
+            "This story hasn't been drafted in detail yet — create its plan with",
+            "This story hasn't been drafted in detail yet.");
+        sb.Append($"<div class=\"epic-card\">\n  <p class=\"pending-note\">{note}</p>\n</div>\n\n");
+
+        sb.Append($"<a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + epicOutputPath)}\">&larr; Back to Epic {epic.Number}</a>\n");
+        sb.Append("</main>\n\n");
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append("</body>\n</html>\n");
+        return sb.ToString();
+    }
+
     private static void AppendStoryCard(StringBuilder sb, StoryInfo story, string prefix, CommandCatalog commands)
     {
         var storyClass = StatusStyles.ForStory(story);

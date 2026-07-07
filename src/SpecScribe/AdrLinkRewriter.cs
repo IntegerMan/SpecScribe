@@ -5,7 +5,7 @@ namespace SpecScribe;
 /// <summary>Rewrites the Markdown-authored <c>.md</c> links inside a rendered ADR body so they point at the
 /// generated pages instead of the raw source. ADRs cross-link heavily — to sibling records
 /// (<c>0004-title.md</c>) and to the architecture doc (<c>../../_bmad-output/game-architecture.md</c>) — and
-/// those hrefs would 404 in <c>docs/live/</c> if left untouched.</summary>
+/// those hrefs would 404 in <c>SpecScribeOutput/</c> if left untouched.</summary>
 public static class AdrLinkRewriter
 {
     // href to any *.md (optionally with a #fragment). Absolute URLs never end in ".md" here, so this
@@ -14,7 +14,7 @@ public static class AdrLinkRewriter
         "href=\"(?<path>[^\":#]+\\.md)(?<frag>#[^\"]*)?\"",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    /// <summary>Rewrites ADR body links. Every ADR page lives one directory deep (<c>docs/live/adrs/</c>), so a
+    /// <summary>Rewrites ADR body links. Every ADR page lives one directory deep (<c>SpecScribeOutput/adrs/</c>), so a
     /// link into <c>_bmad-output</c> resolves to <c>../&lt;mirrored path&gt;.html</c>, a sibling record stays in
     /// the same folder, and <c>README.md</c> maps to the ADR landing (<c>index.html</c>).</summary>
     public static string Rewrite(string bodyHtml) =>

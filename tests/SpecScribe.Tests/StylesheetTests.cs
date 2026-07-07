@@ -64,6 +64,16 @@ public class StylesheetTests
         => Assert.Contains(".copy-btn", ReadStylesheet());
 
     [Fact]
+    public void Stylesheet_HasSendMenuStyles()
+    {
+        // The split-button send menu (native <details>) and its per-destination deep-link rows.
+        var css = ReadStylesheet();
+        Assert.Contains(".send-menu", css);
+        Assert.Contains(".send-toggle", css);
+        Assert.Contains(".send-link", css);
+    }
+
+    [Fact]
     public void Script_IsEmbeddedAlongsideStylesheet()
     {
         // The one sanctioned progressive-enhancement script must ship embedded the way the CSS does, so the

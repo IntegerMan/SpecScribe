@@ -58,7 +58,7 @@ Both `generate` and `watch` accept:
 |--------|---------|
 | `--source <DIR>` | Walks up from the current directory to find `_bmad-output/` |
 | `--adrs <DIR>` | `<repo root>/docs/adrs` |
-| `--output <DIR>` | `<repo root>/docs/live` |
+| `--output <DIR>` | `<repo root>/SpecScribeOutput` |
 | `--project-name <NAME>` | `project_name` from `_bmad/config.toml`, else "BMad Live Docs" |
 
 With no options, SpecScribe auto-discovers a BMad project from wherever you run it — so inside a

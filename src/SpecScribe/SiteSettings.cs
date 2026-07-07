@@ -15,7 +15,7 @@ public class SiteSettings : CommandSettings
     public string? Adrs { get; set; }
 
     [CommandOption("-o|--output <DIR>")]
-    [Description("Directory the HTML site is written to. Default: <repo root>/docs/live.")]
+    [Description("Directory the HTML site is written to. Default: <repo root>/SpecScribeOutput.")]
     public string? Output { get; set; }
 
     [CommandOption("-p|--project-name <NAME>")]

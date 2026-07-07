@@ -150,6 +150,102 @@ public class SourceLinkifierTests
     }
 }
 
+public class StoryEpicLinkifierTests
+{
+    /// <summary>A minimal plan: Epic 1 (stories 1.1, 1.10) and Epic 12 (no stories).</summary>
+    private static EpicsModel Model() => new()
+    {
+        OverviewHtml = string.Empty,
+        RequirementsInventoryHtml = string.Empty,
+        Epics = new[]
+        {
+            Epic(1, Story("1.1", 1), Story("1.10", 1)),
+            Epic(12),
+        },
+    };
+
+    private static EpicInfo Epic(int number, params StoryInfo[] stories) => new()
+    {
+        Number = number,
+        Title = "Epic title",
+        GoalHtml = string.Empty,
+        Status = stories.Length > 0 ? EpicStatus.Drafted : EpicStatus.Pending,
+        Section = EpicSection.VerticalSlice,
+        Stories = stories,
+    };
+
+    private static StoryInfo Story(string id, int epicNumber) => new()
+    {
+        Id = id,
+        EpicNumber = epicNumber,
+        Title = "Story title",
+        UserStoryHtml = string.Empty,
+        AcBlocksHtml = Array.Empty<string>(),
+    };
+
+    [Fact]
+    public void Linkify_TurnsKnownMentionsIntoLinks()
+    {
+        var html = StoryEpicLinkifier.Linkify("<p>See Story 1.1 under Epic 1.</p>", Model(), "../");
+
+        Assert.Contains("<a class=\"story-ref\" href=\"../epics/story-1-1.html\">Story 1.1</a>", html);
+        Assert.Contains("<a class=\"epic-ref\" href=\"../epics/epic-1.html\">Epic 1</a>", html);
+    }
+
+    [Fact]
+    public void Linkify_HandlesMultiDigitIdsWithoutPrefixCollision()
+    {
+        var html = StoryEpicLinkifier.Linkify("<p>Story 1.10 and Epic 12.</p>", Model(), "");
+
+        Assert.Contains("href=\"epics/story-1-10.html\">Story 1.10</a>", html);
+        Assert.Contains("href=\"epics/epic-12.html\">Epic 12</a>", html);
+    }
+
+    [Fact]
+    public void Linkify_LeavesUnknownIdsAlone()
+    {
+        var html = StoryEpicLinkifier.Linkify("<p>Story 9.9 of Epic 99.</p>", Model(), "");
+
+        Assert.DoesNotContain("<a", html);
+    }
+
+    [Fact]
+    public void Linkify_NeverRewritesInsideProtectedSpans()
+    {
+        const string input =
+            "<a href=\"x.html\">Story 1.1</a> <code>create-story Story 1.1</code> " +
+            "<pre class=\"mermaid\">Epic 1</pre> <svg viewBox=\"0 0 1 1\"><title>Story 1.1</title></svg>";
+
+        Assert.Equal(input, StoryEpicLinkifier.Linkify(input, Model(), ""));
+    }
+
+    [Fact]
+    public void Linkify_SkipsThePagesOwnStoryAndEpic()
+    {
+        var html = StoryEpicLinkifier.Linkify("<p>Story 1.1 within Epic 12.</p>", Model(), "",
+            skipStoryId: "1.1", skipEpicNumber: 12);
+
+        Assert.DoesNotContain("<a", html);
+    }
+
+    [Fact]
+    public void Linkify_IsCaseSensitive_SoProseAndCommandsStayPlain()
+    {
+        var html = StoryEpicLinkifier.Linkify("<p>the story 1.1 work in epic 1</p>", Model(), "");
+
+        Assert.DoesNotContain("<a", html);
+    }
+
+    [Fact]
+    public void Linkify_ReturnsInputUnchanged_WhenPlanIsEmpty()
+    {
+        var empty = new EpicsModel { OverviewHtml = "", RequirementsInventoryHtml = "", Epics = Array.Empty<EpicInfo>() };
+        const string input = "<p>Story 1.1 has nowhere to go.</p>";
+
+        Assert.Equal(input, StoryEpicLinkifier.Linkify(input, empty, ""));
+    }
+}
+
 public class AdrLinkRewriterTests
 {
     [Fact]

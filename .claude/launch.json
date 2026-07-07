@@ -4,7 +4,7 @@
     {
       "name": "live-preview",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve", "docs/live", "-l", "4321"],
+      "runtimeArgs": ["--yes", "serve", "SpecScribeOutput", "-l", "4321"],
       "port": 4321
     }
   ]

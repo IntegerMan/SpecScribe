@@ -7,7 +7,7 @@ public enum GenerationOutcome { Generated, Updated, Removed, Skipped, Error }
 
 public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativePath, TimeSpan Elapsed, string? Message = null);
 
-/// <summary>Owns the mapping from _bmad-output/*.md to docs/live/*.html, and keeps the generated index,
+/// <summary>Owns the mapping from _bmad-output/*.md to SpecScribeOutput/*.html, and keeps the generated index,
 /// nav, and epics/story pages in sync.</summary>
 public sealed class SiteGenerator
 {
@@ -226,7 +226,7 @@ public sealed class SiteGenerator
         }
     }
 
-    /// <summary>Renders each hand-authored record under <c>docs/adrs</c> into <c>docs/live/adrs</c>. README.md
+    /// <summary>Renders each hand-authored record under <c>docs/adrs</c> into <c>SpecScribeOutput/adrs</c>. README.md
     /// becomes the landing page (index.html); numbered records also become cards on the home index. The whole
     /// ADR output directory is rebuilt each pass so a deleted or renamed record can't leave a stale page behind.</summary>
     private List<GenerationEvent> GenerateAdrsInternal(SiteNav nav)
@@ -269,7 +269,7 @@ public sealed class SiteGenerator
 
                 var outputFullPath = Path.Combine(_options.OutputRoot, ForgeOptions.AdrOutputSubdir, outputName);
                 Directory.CreateDirectory(Path.GetDirectoryName(outputFullPath)!);
-                File.WriteAllText(outputFullPath, ApplyRequirementLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+                File.WriteAllText(outputFullPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
 
                 var number = ParseAdrNumber(fileName);
                 if (!isReadme && number is not null)
@@ -331,7 +331,7 @@ public sealed class SiteGenerator
             var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
             var referenceMap = BuildReferenceMap(files, model, artifactMap, PathUtil.NormalizeSlashes(epicsSourceRelative));
 
-            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyRequirementLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands), "epics.html"));
+            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands), "epics.html"));
 
             var epicsDir = Path.Combine(_options.OutputRoot, "epics");
             Directory.CreateDirectory(epicsDir);
@@ -340,11 +340,21 @@ public sealed class SiteGenerator
 
             foreach (var epic in model.Epics)
             {
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyRequirementLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands), $"epics/epic-{epic.Number}.html"));
+                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
 
                 foreach (var story in epic.Stories)
                 {
-                    if (story.ArtifactOutputPath is null) continue;
+                    if (story.ArtifactOutputPath is null)
+                    {
+                        // Undrafted story: emit a placeholder page at the exact path its real page will
+                        // use, so "Story N.M" mentions always have a live target and a later-drafted
+                        // artifact overwrites it in place. ArtifactOutputPath stays null — placeholders
+                        // must never count as detailed stories anywhere progress is computed.
+                        var placeholderPath = StoryEpicLinkifier.StoryPagePath(story.Id);
+                        var placeholderHtml = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, _module.Commands);
+                        File.WriteAllText(Path.Combine(_options.OutputRoot, placeholderPath.Replace('/', Path.DirectorySeparatorChar)), ApplyReferenceLinks(placeholderHtml, placeholderPath, skipStoryId: story.Id));
+                        continue;
+                    }
 
                     var artifactFullPath = artifactMap[story.Id];
                     var artifactRelative = ToSourceRelative(artifactFullPath);
@@ -375,7 +385,7 @@ public sealed class SiteGenerator
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                     var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, reviewFindingsHtml, changeLogHtml, nav, _module.Commands);
-                    File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyRequirementLinks(storyHtml, story.ArtifactOutputPath!));
+                    File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
 
@@ -412,7 +422,7 @@ public sealed class SiteGenerator
 
             var outputFullPath = Path.Combine(_options.OutputRoot, outputRelative);
             Directory.CreateDirectory(Path.GetDirectoryName(outputFullPath)!);
-            File.WriteAllText(outputFullPath, ApplyRequirementLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+            File.WriteAllText(outputFullPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
 
             _docs[relative] = doc;
             var outcome = alreadyExisted ? GenerationOutcome.Updated : GenerationOutcome.Generated;
@@ -435,7 +445,7 @@ public sealed class SiteGenerator
         var docs = _docs.Values.ToList();
         var work = WorkInventory.Build(docs);
         var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, work);
-        File.WriteAllText(indexPath, ApplyRequirementLinks(html, "index.html"));
+        File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
     /// <summary>Path to the repo-root README that feeds the optional Readme page.</summary>
@@ -457,7 +467,7 @@ public sealed class SiteGenerator
         {
             var doc = MarkdownConverter.Convert(ReadmeSourcePath, "README.md", SiteNav.ReadmeOutputPath);
             var outputFullPath = Path.Combine(_options.OutputRoot, SiteNav.ReadmeOutputPath);
-            File.WriteAllText(outputFullPath, ApplyRequirementLinks(HtmlTemplater.RenderPage(doc, nav), SiteNav.ReadmeOutputPath));
+            File.WriteAllText(outputFullPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), SiteNav.ReadmeOutputPath));
             return new GenerationEvent(GenerationOutcome.Generated, "README.md", sw.Elapsed);
         }
         catch (Exception ex)
@@ -472,7 +482,7 @@ public sealed class SiteGenerator
     {
         File.WriteAllText(
             Path.Combine(_options.OutputRoot, "requirements.html"),
-            ApplyRequirementLinks(RequirementsTemplater.RenderIndex(requirements, progress, nav), "requirements.html"));
+            ApplyReferenceLinks(RequirementsTemplater.RenderIndex(requirements, progress, nav), "requirements.html"));
 
         var requirementsDir = Path.Combine(_options.OutputRoot, "requirements");
         Directory.CreateDirectory(requirementsDir);
@@ -484,18 +494,27 @@ public sealed class SiteGenerator
                 : null;
             var outputRelative = $"requirements/{req.Slug}.html";
             var html = RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav);
-            File.WriteAllText(Path.Combine(requirementsDir, $"{req.Slug}.html"), ApplyRequirementLinks(html, outputRelative, req.Id));
+            File.WriteAllText(Path.Combine(requirementsDir, $"{req.Slug}.html"), ApplyReferenceLinks(html, outputRelative, skipRequirementId: req.Id));
         }
     }
 
-    /// <summary>Whole-page pass that turns every "FR25"/"NFR7" reference into a link to its detail page.
-    /// A no-op until epics.md has been parsed (so <see cref="_requirements"/> exists); safe to call on
-    /// every page since <see cref="RequirementLinkifier"/> skips tokens already inside links.</summary>
-    private string ApplyRequirementLinks(string html, string outputRelativePath, string? skipId = null)
+    /// <summary>Whole-page pass that turns every "FR25"/"NFR7" reference into a link to its detail page,
+    /// and every "Story N.M"/"Epic N" mention into a link to that story/epic page. A no-op until epics.md
+    /// has been parsed (so <see cref="_requirements"/>/<see cref="_epicsModel"/> exist); safe to call on
+    /// every page since both linkifiers skip tokens already inside links. Story/epic pages pass their own
+    /// id so a page never links to itself.</summary>
+    private string ApplyReferenceLinks(string html, string outputRelativePath, string? skipRequirementId = null, string? skipStoryId = null, int? skipEpicNumber = null)
     {
-        if (_requirements is null) return html;
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
-        return RequirementLinkifier.Linkify(html, _requirements, prefix, skipId);
+        if (_requirements is not null)
+        {
+            html = RequirementLinkifier.Linkify(html, _requirements, prefix, skipRequirementId);
+        }
+        if (_epicsModel is not null)
+        {
+            html = StoryEpicLinkifier.Linkify(html, _epicsModel, prefix, skipStoryId, skipEpicNumber);
+        }
+        return html;
     }
 
     private void EnsureScaffold()

@@ -371,6 +371,30 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderNextSteps_EmitsSplitButtonWithUrlEncodedCursorDeeplink()
+    {
+        var story = Story("1.1", status: "ready-for-dev"); // ready => dev-story <id> suggestion
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/bmad-dev-story",
+            ["code-review"] = "/bmad-code-review",
+        });
+
+        var html = BmadCommands.RenderNextSteps(story, commands);
+
+        // Split-button: the primary Copy (and its data-copy payload) is preserved...
+        Assert.Contains("class=\"cmd-actions\"", html);
+        Assert.Contains("data-copy=\"/bmad-dev-story 1.1\"", html);
+        // ...alongside a native <details> send menu (no new JS).
+        Assert.Contains("<details class=\"send-menu\">", html);
+        Assert.Contains("<summary class=\"send-toggle\"", html);
+        // The Cursor deep link carries the URL-encoded command (slash -> %2F, space -> %20).
+        Assert.Contains(
+            "href=\"cursor://anysphere.cursor-deeplink/prompt?text=%2Fbmad-dev-story%201.1\"", html);
+        Assert.Contains(">Open in Cursor</a>", html);
+    }
+
+    [Fact]
     public void RenderEpicsIndex_PendingEpicCardPairsGuidanceWithCreateEpicsCommand()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

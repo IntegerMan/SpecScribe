@@ -12,6 +12,21 @@ public static class BmadCommands
 {
     private sealed record Suggestion(string Command, string Description);
 
+    /// <summary>A destination the command's "send elsewhere" menu can target. Cursor is the one IDE with a
+    /// public "open with the prompt pre-filled" deeplink (it never auto-runs), so it gets a real link. Every
+    /// other destination — Copilot, Claude Code, Codex — has no such URL today and rides the primary Copy
+    /// button instead (paste the command in yourself). Append here to add a destination: give it a template
+    /// with a <c>{cmd}</c> placeholder that receives the URL-encoded command.
+    /// <para>EXPANSION POINT: SpecScribe is planned to also ship as a VS Code extension. Once hosted
+    /// in-extension, a Copilot target can post the command straight into Copilot Chat (extension command API /
+    /// trusted-webview <c>command:</c> URI) rather than copy — add it to <see cref="SendTargets"/> then.</para></summary>
+    private sealed record SendTarget(string Label, string UriTemplate);
+
+    private static readonly IReadOnlyList<SendTarget> SendTargets = new[]
+    {
+        new SendTarget("Open in Cursor", "cursor://anysphere.cursor-deeplink/prompt?text={cmd}"),
+    };
+
     public static string RenderNextSteps(StoryInfo story, CommandCatalog commands) =>
         RenderPanel(ForStory(story, commands));
 
@@ -42,15 +57,45 @@ public static class BmadCommands
         sb.Append("<h3>Next Steps</h3>\n<ul class=\"next-steps-list\">\n");
         foreach (var s in suggestions)
         {
-            // Each command carries a copy button (F2) so the exact next command is one click onto the
-            // clipboard. The visible <code> stays selectable as the no-JS fallback; the button is wired by
-            // specscribe.js. The command text is HTML-escaped both as visible text and as the data attribute.
+            // Each command carries a split-button: a primary Copy (the universal fallback) plus a menu of
+            // per-destination deep links. The visible <code> stays selectable as the no-JS fallback.
             var cmd = PathUtil.Html(s.Command);
             sb.Append($"  <li><code>{cmd}</code>" +
-                      $"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>" +
+                      RenderCommandActions(s.Command) +
                       $"<span class=\"next-steps-desc\">{PathUtil.Html(s.Description)}</span></li>\n");
         }
         sb.Append("</ul>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The split-button for one command: a primary Copy button (wired by specscribe.js — the
+    /// universal fallback that works with any tool, since you paste the command in yourself) plus a native
+    /// <c>&lt;details&gt;</c> disclosure listing per-destination deep links from <see cref="SendTargets"/>.
+    /// The deep links are plain anchors and the toggle is native, so this adds no new client JS and degrades
+    /// gracefully with scripting off. The command is URL-encoded into each link's <c>href</c> and then the
+    /// whole attribute is HTML-escaped, matching the double-escaping the <c>data-copy</c> attribute uses.</summary>
+    private static string RenderCommandActions(string rawCommand)
+    {
+        var cmd = PathUtil.Html(rawCommand);
+        var sb = new StringBuilder();
+        sb.Append("<span class=\"cmd-actions\">");
+        sb.Append($"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>");
+
+        if (SendTargets.Count > 0)
+        {
+            var encoded = Uri.EscapeDataString(rawCommand);
+            sb.Append("<details class=\"send-menu\">");
+            sb.Append("<summary class=\"send-toggle\" aria-label=\"Other ways to send this command\">▾</summary>");
+            sb.Append($"<div class=\"send-menu-list\" role=\"group\" aria-label=\"Send {cmd} to an editor\">");
+            foreach (var target in SendTargets)
+            {
+                var href = PathUtil.Html(target.UriTemplate.Replace("{cmd}", encoded));
+                sb.Append($"<a class=\"send-link\" href=\"{href}\">{PathUtil.Html(target.Label)}</a>");
+            }
+            sb.Append("</div></details>");
+        }
+
+        sb.Append("</span>");
         return sb.ToString();
     }
 

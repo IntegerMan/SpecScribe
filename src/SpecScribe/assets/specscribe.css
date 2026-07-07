@@ -758,8 +758,33 @@ code.color-swatch {
 }
 
 .ac-list { font-size: 0.82rem; color: var(--ink-faded); line-height: 1.7; }
-.ac-list .kw { font-family: 'Courier New', monospace; font-weight: bold; color: var(--gold); }
 .ac-block { margin-bottom: 0.5rem; }
+
+/* Gherkin keyword markers — the bold **Given/When/Then/And** BMad authors into acceptance criteria
+   render as small uppercase chips, each clause on its own line (.gherkin-line). Accent colors are
+   palette tones, not --status-* tokens: keywords are grammar, not lifecycle stages, so they must never
+   read as progress. The keyword text itself carries the meaning — color is reinforcement only. */
+.gherkin-line { display: block; }
+.gherkin-line + .gherkin-line { margin-top: 0.2rem; }
+
+.gherkin-kw {
+  display: inline-block;
+  font-family: 'Courier New', monospace;
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  padding: 0 0.35rem;
+  border: 1px solid;
+  border-radius: 3px;
+  min-width: 3.4rem;
+  text-align: center;
+}
+.gherkin-kw.kw-given { color: var(--teal); border-color: var(--teal); background: #e0ecea; }
+.gherkin-kw.kw-when { color: var(--gold); border-color: var(--gold-light); background: #f5ecd4; }
+.gherkin-kw.kw-then { color: var(--rust); border-color: var(--rust-light); background: #f3e2d3; }
+.gherkin-kw.kw-and { color: var(--ink-light); border-color: var(--border); background: transparent; }
 
 /* Acceptance Criteria panel — each criterion is independently anchored (id="ac-N") so the "(AC: #N)"
    references scattered through the tasks below can deep-link straight to it. */
@@ -1452,6 +1477,19 @@ code.color-swatch {
 }
 .req-ref:hover { color: var(--rust-light); border-bottom-style: solid; }
 
+/* Inline "Story N.M" / "Epic N" mention links — same subtle dotted treatment as .req-ref, teal to
+   read as navigation rather than requirement traceability. */
+.story-ref,
+.epic-ref {
+  color: var(--teal);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--teal);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.story-ref:hover,
+.epic-ref:hover { color: var(--teal-deep); border-bottom-style: solid; }
+
 .req-card {
   max-width: 860px;
   margin: 0 auto 0.7rem;
@@ -1717,6 +1755,76 @@ code.color-swatch {
 .copy-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .copy-btn.copied { color: var(--moss); border-color: var(--moss-light); background: #e8f0e4; }
 .copy-btn.copied::after { content: " \2713"; }
+
+/* ---- Send-command split button (native <details>, no new JS) ----------------------------
+   Copy stays the primary action; the caret is a <summary> that opens a menu of per-destination
+   deep links (see BmadCommands.SendTargets). The menu is a plain popover of anchors and the toggle
+   is native, so nothing here needs script — it degrades to the caret + selectable <code> with JS off. */
+.next-steps-list li .cmd-actions {
+  order: 2;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  position: relative;
+}
+/* Neutralize .copy-btn's list-level `order: 2` inside the actions group so Copy stays left of the caret. */
+.cmd-actions .copy-btn { order: 0; }
+
+.send-menu { position: relative; display: inline-flex; }
+
+/* The caret shares the Copy button's look; strip the native disclosure triangle. */
+.send-toggle {
+  font: inherit;
+  font-family: 'Courier New', monospace;
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--teal-deep);
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.28rem 0.4rem;
+  cursor: pointer;
+  list-style: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.send-toggle::-webkit-details-marker { display: none; }
+.send-toggle::marker { content: ""; }
+.send-toggle:hover,
+.send-menu[open] .send-toggle { border-color: var(--gold-light); color: var(--rust); }
+.send-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.send-menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 320;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.3rem;
+  background: var(--parchment);
+  border: 1px solid var(--gold-light);
+  border-radius: 5px;
+  box-shadow: 0 3px 12px var(--shadow);
+}
+.send-link {
+  display: block;
+  padding: 0.32rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  color: var(--teal);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.send-link:hover { background: var(--parchment-dark); color: var(--rust); }
+.send-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+
+/* The popover is absolutely positioned, but its .chart-panel ancestor sets overflow-x: auto (which makes
+   the y-axis clip too). Lift the clip only while a menu is open — a next-steps panel has no wide chart to
+   scroll, so nothing else is affected. */
+.chart-panel:has(.send-menu[open]) { overflow: visible; }
 
 /* ====================== ENTRANCE ANIMATIONS (Story 1.5 D2) ======================
    The complementary "no-preference" half of the motion contract — one-time entrances that play only when

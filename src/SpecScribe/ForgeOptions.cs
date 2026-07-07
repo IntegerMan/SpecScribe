@@ -37,6 +37,11 @@ public sealed class ForgeOptions
     public const string DefaultSiteTitle = "BMad Live Docs";
     public const string SourceDirName = "_bmad-output";
 
+    /// <summary>Default output directory (a single top-level folder under the repo root, not nested under
+    /// <c>docs/</c> where the hand-authored ADR source lives). Matches the <c>--output SpecScribeOutput</c>
+    /// convention used by the README and the GitHub Pages workflow.</summary>
+    public const string OutputDirName = "SpecScribeOutput";
+
     /// <summary>Subdirectory of the output root where rendered ADR pages land.</summary>
     public const string AdrOutputSubdir = "adrs";
     public static readonly TimeSpan DebounceInterval = TimeSpan.FromMilliseconds(400);
@@ -87,7 +92,7 @@ public sealed class ForgeOptions
             SourceRoot = sourceRoot,
             AdrSourceRoot = adrs is { Length: > 0 } ? Path.GetFullPath(adrs) : Path.Combine(repoRoot, "docs", "adrs"),
             AdrSourceExplicit = adrs is { Length: > 0 },
-            OutputRoot = output is { Length: > 0 } ? Path.GetFullPath(output) : Path.Combine(repoRoot, "docs", "live"),
+            OutputRoot = output is { Length: > 0 } ? Path.GetFullPath(output) : Path.Combine(repoRoot, OutputDirName),
             SiteTitle = projectName is { Length: > 0 } ? projectName : ReadProjectName(repoRoot) ?? DefaultSiteTitle,
             IncludeReadme = includeReadme,
         };

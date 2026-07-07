@@ -1,0 +1,231 @@
+using SpecScribe;
+
+namespace SpecScribe.Tests;
+
+/// <summary>Generation-level coverage for the story/epic mention links and undrafted-story placeholder
+/// pages: every story defined in epics.md gets a page at epics/story-N-M.html (placeholder when no
+/// implementation artifact exists), inline "Story N.M"/"Epic N" mentions link to those pages, pages never
+/// self-link, protected regions (Mermaid sources, SVG charts) are never rewritten, and a later-drafted
+/// artifact overwrites its placeholder in place. Also covers the Gherkin keyword styling on both AC
+/// surfaces (story-page criterion panels and epic-card AC blocks).</summary>
+public class SiteGeneratorStoryEpicPagesTests : IDisposable
+{
+    private readonly string _root = Directory.CreateTempSubdirectory("specscribe-storypages-").FullName;
+
+    private string Source => Path.Combine(_root, "_bmad-output");
+    private string Site => Path.Combine(_root, "site");
+    private string DraftedStoryPage => Path.Combine(Site, "epics", "story-1-1.html");
+    private string PlaceholderPage => Path.Combine(Site, "epics", "story-1-2.html");
+    private string EpicPage => Path.Combine(Site, "epics", "epic-1.html");
+
+    private const string EpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Stand up the portal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: Drafted Story
+
+        As a contributor,
+        I want a drafted story,
+        So that pages render.
+
+        **Acceptance Criteria:**
+
+        1.
+        **Given** a plan
+        **When** it renders
+        **Then** links appear
+
+        ### Story 1.2: Future Story
+
+        As a contributor,
+        I want a future story,
+        So that placeholders exist.
+
+        **Acceptance Criteria:**
+
+        1.
+        **Given** an undrafted story
+        **When** the site generates
+        **Then** a placeholder page exists
+        """;
+
+    private const string Story11Md = """
+        # Story 1.1: Drafted Story
+
+        Status: ready-for-dev
+
+        ## Story
+
+        As a contributor, I want a drafted story. Sequence this after Story 1.2 (part of Epic 1).
+
+        ## Acceptance Criteria
+
+        1. **Given** deferred notes exist **When** the site is generated **Then** they render **And** Story 1.2 stays reachable.
+
+        ## Tasks / Subtasks
+
+        - [ ] Task 1: Mention Story 9.9, which is not planned anywhere.
+        """;
+
+    private const string Story12Md = """
+        # Story 1.2: Future Story
+
+        Status: ready-for-dev
+
+        ## Story
+
+        As a contributor, I want the placeholder replaced.
+
+        ## Tasks / Subtasks
+
+        - [ ] Task 1: Stub
+        """;
+
+    public SiteGeneratorStoryEpicPagesTests()
+    {
+        Directory.CreateDirectory(Path.Combine(Source, "planning-artifacts"));
+        Directory.CreateDirectory(Path.Combine(Source, "implementation-artifacts"));
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), EpicsMd);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-drafted-story.md"), Story11Md);
+    }
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_root, recursive: true); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private ForgeOptions Options() => ForgeOptions.Resolve(
+        source: Source,
+        adrs: Path.Combine(_root, "docs", "adrs"),
+        output: Site,
+        projectName: "SpecScribe",
+        includeReadme: false);
+
+    private SiteGenerator GenerateSite()
+    {
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        return gen;
+    }
+
+    // ---- Placeholder pages for undrafted stories ----
+
+    [Fact]
+    public void GenerateAll_EmitsPlaceholderPageForUndraftedStory()
+    {
+        GenerateSite();
+
+        Assert.True(File.Exists(PlaceholderPage));
+        var html = File.ReadAllText(PlaceholderPage);
+        Assert.Contains("Not yet drafted", html);
+        Assert.Contains("I want a future story", html);
+        // The dead-end reads as a next action (command form or plain fallback, module-dependent).
+        Assert.Contains("hasn't been drafted in detail yet", html);
+    }
+
+    [Fact]
+    public void GenerateAll_PlaceholderCarriesGherkinStyledAcBlocks()
+    {
+        GenerateSite();
+
+        var html = File.ReadAllText(PlaceholderPage);
+        Assert.Contains("class=\"gherkin-kw kw-given\"", html);
+        Assert.Contains("class=\"gherkin-kw kw-then\"", html);
+    }
+
+    [Fact]
+    public void GenerateAll_PlaceholderDoesNotChangeDetailedStoryAccounting()
+    {
+        GenerateSite();
+
+        // The epic page must still treat 1.2 as undetailed: guidance note present, no full-plan link.
+        var html = File.ReadAllText(EpicPage);
+        Assert.Contains("class=\"not-detailed-note\"", html);
+    }
+
+    [Fact]
+    public void RegenerateEpics_OverwritesPlaceholderOnceArtifactAppears()
+    {
+        var gen = GenerateSite();
+        Assert.Contains("Not yet drafted", File.ReadAllText(PlaceholderPage));
+
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-2-future-story.md"), Story12Md);
+        var ev = gen.RegenerateEpics();
+
+        Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
+        var html = File.ReadAllText(PlaceholderPage);
+        Assert.DoesNotContain("Not yet drafted", html);
+        Assert.Contains("I want the placeholder replaced", html);
+    }
+
+    // ---- Inline Story/Epic mention links ----
+
+    [Fact]
+    public void GenerateAll_LinksStoryAndEpicMentionsOnStoryPage()
+    {
+        GenerateSite();
+
+        var html = File.ReadAllText(DraftedStoryPage);
+        Assert.Contains("<a class=\"story-ref\" href=\"../epics/story-1-2.html\">Story 1.2</a>", html);
+        Assert.Contains("<a class=\"epic-ref\" href=\"../epics/epic-1.html\">Epic 1</a>", html);
+    }
+
+    [Fact]
+    public void GenerateAll_LeavesUnknownStoryMentionsPlain()
+    {
+        GenerateSite();
+
+        var html = File.ReadAllText(DraftedStoryPage);
+        Assert.Contains("Story 9.9", html);
+        Assert.DoesNotContain("story-9-9.html", html);
+    }
+
+    [Fact]
+    public void GenerateAll_NeverSelfLinksAStoryOrEpicPage()
+    {
+        GenerateSite();
+
+        // The story page's own kicker says "Story 1.1"; the epic page's kicker says "Epic 1".
+        Assert.DoesNotContain("class=\"story-ref\" href=\"../epics/story-1-1.html\"", File.ReadAllText(DraftedStoryPage));
+        Assert.DoesNotContain("class=\"epic-ref\" href=\"../epics/epic-1.html\"", File.ReadAllText(EpicPage));
+    }
+
+    [Fact]
+    public void GenerateAll_NeverRewritesMermaidSourcesOrSvgCharts()
+    {
+        GenerateSite();
+
+        // The epics index carries the roadmap Mermaid source (node text "Epic 1") and the sunburst SVG
+        // (<title>Epic 1: …</title>) — injecting anchors into either corrupts the rendered artifact.
+        var html = File.ReadAllText(Path.Combine(Site, "epics.html"));
+        var mermaidStart = html.IndexOf("<pre class=\"mermaid\"", StringComparison.Ordinal);
+        Assert.True(mermaidStart >= 0);
+        var mermaidEnd = html.IndexOf("</pre>", mermaidStart, StringComparison.Ordinal);
+        var mermaid = html[mermaidStart..mermaidEnd];
+        Assert.DoesNotContain("epic-ref", mermaid);
+        Assert.DoesNotContain("<title><a", html);
+    }
+
+    // ---- Gherkin styling on the story page's AC panel ----
+
+    [Fact]
+    public void GenerateAll_StylesGherkinKeywordsInStoryAcPanel()
+    {
+        GenerateSite();
+
+        var html = File.ReadAllText(DraftedStoryPage);
+        Assert.Contains("class=\"gherkin-line\"", html);
+        Assert.Contains("class=\"gherkin-kw kw-when\"", html);
+        Assert.Contains("class=\"gherkin-kw kw-and\"", html);
+        Assert.DoesNotContain("<strong>Given</strong>", html);
+    }
+}
