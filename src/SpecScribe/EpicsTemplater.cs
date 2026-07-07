@@ -372,7 +372,7 @@ public static class EpicsTemplater
             commands.Command("create-story", story.Id),
             "This story hasn't been drafted in detail yet — create its plan with",
             "This story hasn't been drafted in detail yet.");
-        sb.Append($"<div class=\"epic-card\">\n  <p class=\"pending-note\">{note}</p>\n</div>\n\n");
+        sb.Append($"<div class=\"epic-card\">\n  <div class=\"pending-note\">{note}</div>\n</div>\n\n");
 
         sb.Append($"<a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + epicOutputPath)}\">&larr; Back to Epic {epic.Number}</a>\n");
         sb.Append("</main>\n\n");
@@ -432,7 +432,7 @@ public static class EpicsTemplater
                 commands.Command("create-story", story.Id),
                 "No detailed story plan yet — draft it with",
                 "No detailed story plan yet.");
-            sb.Append($"  <p class=\"not-detailed-note\">{note}</p>\n");
+            sb.Append($"  <div class=\"not-detailed-note\">{note}</div>\n");
         }
 
         sb.Append("</div>\n\n");
@@ -518,7 +518,7 @@ public static class EpicsTemplater
                 commands.Command("create-epics-and-stories"),
                 "Stories not yet drafted — draft them with",
                 "Stories not yet drafted.");
-            sb.Append($"  <p class=\"pending-note\">{note}</p>\n");
+            sb.Append($"  <div class=\"pending-note\">{note}</div>\n");
         }
         sb.Append($"  <a class=\"view-epic-link\" href=\"epics/epic-{epic.Number}.html\">View Epic {epic.Number} stories &rarr;</a>\n");
         sb.Append("</div>\n\n");
@@ -533,7 +533,7 @@ public static class EpicsTemplater
             commands.Command("create-epics-and-stories"),
             "No epics yet. Break your plan into epics and stories with",
             "No epics yet — add them to your plan to see them here.");
-        sb.Append($"<div class=\"epic-card empty-state\">\n  <p class=\"pending-note\">{note}</p>\n</div>\n\n");
+        sb.Append($"<div class=\"epic-card empty-state\">\n  <div class=\"pending-note\">{note}</div>\n</div>\n\n");
     }
 
     /// <summary>Breadcrumb label like "1 · World Rendering & Interac…" — the number alone told you nothing.</summary>

@@ -167,13 +167,22 @@
       // to screen readers permanently. Also clear any pending reset before scheduling a fresh one.
       if (!btn.hasAttribute("data-copy-label")) {
         btn.setAttribute("data-copy-label", btn.getAttribute("aria-label") || "Copy");
+        // Remember the resting tooltip too, so the rich tooltip can flip to "Copied" and back. This is the
+        // click-to-copy button's visible confirmation now that the icon no longer swaps to a check.
+        if (btn.hasAttribute("data-tooltip")) {
+          btn.setAttribute("data-tooltip-label", btn.getAttribute("data-tooltip"));
+        }
       }
       if (btn._copyResetTimer) { window.clearTimeout(btn._copyResetTimer); }
       btn.classList.add("copied");
       btn.setAttribute("aria-label", "Copied");
+      if (btn.hasAttribute("data-tooltip")) { btn.setAttribute("data-tooltip", "Copied"); }
       btn._copyResetTimer = window.setTimeout(function () {
         btn.classList.remove("copied");
         btn.setAttribute("aria-label", btn.getAttribute("data-copy-label"));
+        if (btn.hasAttribute("data-tooltip-label")) {
+          btn.setAttribute("data-tooltip", btn.getAttribute("data-tooltip-label"));
+        }
         btn._copyResetTimer = null;
       }, 1600);
     }).catch(function () { /* best-effort — the visible command is still selectable */ });

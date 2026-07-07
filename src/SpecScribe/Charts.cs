@@ -495,30 +495,22 @@ public static class Charts
         // read the heatmap: total commits, active days, and the date span. [Story 1.4 AC #1, UXO E6/H3]
         var totalCommits = series.Sum(s => s.Count);
         var activeDays = series.Count(s => s.Count > 0);
-        var heatAria = $"Commit activity: {totalCommits} commit{(totalCommits == 1 ? string.Empty : "s")} across {activeDays} active day{(activeDays == 1 ? string.Empty : "s")}, {D(firstCommit)}–{D(lastCommit)}";
+        var heatAria = $"Commit activity: {totalCommits} commit{(totalCommits == 1 ? string.Empty : "s")} across {activeDays} active day{(activeDays == 1 ? string.Empty : "s")}, {DReadable(firstCommit)} to {DReadable(lastCommit)}";
 
-        // The drill-down days, resolved up front: they decide each cell's link wrapper, the panel list,
-        // and the SVG role. Only days with a non-empty commit list qualify, so a cell can never link to
-        // an empty "0 commits" panel even on inconsistent inputs.
-        var linkedDays = commitsByDay is null
-            ? new List<DateOnly>()
-            : series
-                .Where(s => s.Count > 0 && s.Day <= today &&
-                            commitsByDay.TryGetValue(s.Day, out var c) && c.Count > 0)
-                .Select(s => s.Day)
-                .OrderBy(d => d)
-                .ToList();
+        // The linked days, resolved up front: they decide each cell's link wrapper and the SVG role. Each
+        // links to its generated per-day page (commits/{date}.html). Shared with the SiteGenerator so the
+        // set of linked cells and the set of generated pages can never disagree.
+        var linkedDays = LinkedCommitDays(series, commitsByDay, today);
         var linkedSet = new HashSet<DateOnly>(linkedDays);
 
         var sb = new StringBuilder();
         // Visible one-line headline so a stakeholder reads the summary before scanning the grid. [Story 1.5 E1]
         sb.Append($"<div class=\"heatmap-headline\"><strong>{totalCommits}</strong> {Plural(totalCommits, "commit", "commits")} &middot; " +
-                  $"<strong>{activeDays}</strong> active {Plural(activeDays, "day", "days")} &middot; last commit {D(lastCommit)}</div>\n");
-        // role="group" only when drill-down links exist (an img role would hide them from assistive
-        // tech); a link-free render keeps role="img" so AT treats it as one named graphic. The id is the
-        // panels' Close-link target, returning both :target and scroll to the chart.
+                  $"<strong>{activeDays}</strong> active {Plural(activeDays, "day", "days")} &middot; last commit {DReadable(lastCommit)}</div>\n");
+        // role="group" only when the day-page links exist (an img role would hide them from assistive
+        // tech); a link-free render keeps role="img" so AT treats it as one named graphic.
         var role = linkedDays.Count > 0 ? "group" : "img";
-        sb.Append($"<svg class=\"heatmap\" id=\"commit-heatmap\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" role=\"{role}\" aria-label=\"{Html(heatAria)}\">\n");
+        sb.Append($"<svg class=\"heatmap\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" role=\"{role}\" aria-label=\"{Html(heatAria)}\">\n");
 
         // Axis labels are aria-hidden: under role="group" they'd otherwise be announced as stray text;
         // the whole-chart aria-label plus per-link names carry the accessible reading. Same for month labels.
@@ -557,18 +549,19 @@ public static class Charts
                 var x = leftGutter + w * (cell + gap);
                 var y = topGutter + d * (cell + gap);
 
-                // Only active days link to a drill-down panel — zero-commit cells stay out of the tab
+                // Only active days link to their per-day page — zero-commit cells stay out of the tab
                 // order (a ~100-cell tab stop run would be a keyboard trap; whole-chart label covers them).
                 // Unlinked cells are aria-hidden so their <title>s don't read as ~100 lines of "0 commits"
-                // noise under role="group"; the <title> still serves the pointer/JS tooltip.
+                // noise under role="group"; the <title> still serves the pointer/JS tooltip. The heatmap
+                // only ever renders on the root index.html, so a root-relative "commits/…" href is correct.
                 var linked = linkedSet.Contains(day);
                 if (linked)
                 {
-                    sb.Append($"  <a href=\"#heat-day-{D(day)}\" aria-label=\"{Html($"{D(day)}: {count} {Plural(count, "commit", "commits")} — view details")}\">");
+                    sb.Append($"  <a href=\"commits/{D(day)}.html\" aria-label=\"{Html($"{DReadable(day)}: {count} {Plural(count, "commit", "commits")} — view details")}\">");
                 }
                 sb.Append(linked ? "<rect" : "  <rect aria-hidden=\"true\"");
                 sb.Append($" x=\"{x}\" y=\"{y}\" width=\"{cell}\" height=\"{cell}\" rx=\"2\" class=\"heatmap-cell level-{level}\">");
-                sb.Append($"<title>{D(day)}: {count} commit{(count == 1 ? string.Empty : "s")}</title></rect>");
+                sb.Append($"<title>{DReadable(day)}: {count} commit{(count == 1 ? string.Empty : "s")}</title></rect>");
                 sb.Append(linked ? "</a>\n" : "\n");
             }
         }
@@ -582,55 +575,33 @@ public static class Charts
         }
         sb.Append(" More</div>\n");
 
-        AppendHeatmapDayPanels(sb, linkedDays, commitsByDay);
-
         return sb.ToString();
     }
 
-    /// <summary>Invariant ISO date for heatmap ids, hrefs, headings and accessible names — a culture-
-    /// sensitive format would emit non-Gregorian dates (and mismatched :target ids) on th-TH/fa-IR hosts.</summary>
-    private static string D(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    /// <summary>Invariant ISO date for heatmap hrefs and per-day page filenames — a culture-sensitive
+    /// format would emit non-Gregorian dates (and mismatched links/filenames) on th-TH/fa-IR hosts.</summary>
+    public static string D(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    /// <summary>The heatmap's per-day drill-down panels: one hidden section per linked day, revealed by
-    /// CSS :target when its cell (or a neighbor panel's prev/next link) is clicked. Commits list newest
-    /// first, matching git log order. Prev/next hop across linked days only, skipping empty days; Close
-    /// re-targets the chart itself, collapsing the panel and scrolling back to the grid.</summary>
-    private static void AppendHeatmapDayPanels(
-        StringBuilder sb,
-        IReadOnlyList<DateOnly> linkedDays,
-        IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>>? commitsByDay)
-    {
-        if (commitsByDay is null || linkedDays.Count == 0) return;
+    /// <summary>Human-readable date for user-visible text (tooltips, headline, page headings), e.g.
+    /// "Mon, Jul 6, 2026". Invariant so it reads the same regardless of host culture.</summary>
+    public static string DReadable(DateOnly day) => day.ToString("ddd, MMM d, yyyy", CultureInfo.InvariantCulture);
 
-        sb.Append("<div class=\"heatmap-days\">\n");
-        for (var i = 0; i < linkedDays.Count; i++)
-        {
-            var day = linkedDays[i];
-            var commits = commitsByDay[day];
-            sb.Append($"<section class=\"heatmap-day\" id=\"heat-day-{D(day)}\" aria-label=\"{Html($"Commits on {D(day)}")}\">\n");
-            sb.Append($"  <h4>{D(day)} &middot; {commits.Count} {Plural(commits.Count, "commit", "commits")}</h4>\n");
-            // tabindex on the scroll container so a heavy day's overflowing list is keyboard-scrollable.
-            sb.Append($"  <ul class=\"heatmap-day-commits\" tabindex=\"0\" aria-label=\"{Html($"Commit list for {D(day)}")}\">\n");
-            foreach (var commit in commits)
-            {
-                sb.Append($"    <li><code>{Html(commit.ShortHash)}</code> {Html(commit.Subject)}</li>\n");
-            }
-            sb.Append("  </ul>\n");
-            sb.Append("  <div class=\"heatmap-day-nav\">\n");
-            if (i > 0)
-            {
-                sb.Append($"    <a class=\"heatmap-day-prev\" href=\"#heat-day-{D(linkedDays[i - 1])}\">&laquo; Previous active day ({D(linkedDays[i - 1])})</a>\n");
-            }
-            if (i < linkedDays.Count - 1)
-            {
-                sb.Append($"    <a class=\"heatmap-day-next\" href=\"#heat-day-{D(linkedDays[i + 1])}\">Next active day ({D(linkedDays[i + 1])}) &raquo;</a>\n");
-            }
-            sb.Append("    <a class=\"heatmap-day-close\" href=\"#commit-heatmap\">Close</a>\n");
-            sb.Append("  </div>\n");
-            sb.Append("</section>\n");
-        }
-        sb.Append("</div>\n");
-    }
+    /// <summary>The single source of truth for which days get a heatmap link AND a generated per-day page:
+    /// active days (count &gt; 0), on or before <paramref name="today"/>, that carry a non-empty commit
+    /// list — returned in ascending order. Both the heatmap (links) and the SiteGenerator (pages) call this
+    /// so a linked cell can never point at a page that wasn't generated, and vice versa.</summary>
+    public static IReadOnlyList<DateOnly> LinkedCommitDays(
+        IReadOnlyList<(DateOnly Day, int Count)> series,
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>>? commitsByDay,
+        DateOnly today) =>
+        commitsByDay is null
+            ? Array.Empty<DateOnly>()
+            : series
+                .Where(s => s.Count > 0 && s.Day <= today &&
+                            commitsByDay.TryGetValue(s.Day, out var c) && c.Count > 0)
+                .Select(s => s.Day)
+                .OrderBy(d => d)
+                .ToList();
 
     private static int HeatLevel(int count, int maxCount)
     {

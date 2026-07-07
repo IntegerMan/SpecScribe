@@ -49,6 +49,20 @@ public class SiteGeneratorSpecKernelTests : IDisposable
         ## Why
 
         Canonical contract body.
+
+        ## Capabilities
+
+        - **CAP-1**
+          - **intent:** Ingest artifacts from many frameworks.
+          - **success:** Repositories render without fatal failures.
+
+        - **CAP-2**
+          - **intent:** Generate a readable portal.
+          - **success:** The index links major artifact classes.
+
+        ## Constraints
+
+        Body.
         """;
 
     public SiteGeneratorSpecKernelTests()
@@ -95,8 +109,10 @@ public class SiteGeneratorSpecKernelTests : IDisposable
         Assert.Contains("<div class=\"index-section-title\">Spec Kernel</div>", index);
         Assert.Contains(">SPEC — Canonical Contract</h2>", index);
         Assert.Contains("href=\"specs/spec-x/SPEC.html\"", index);
-        // The kernel quick-link is present in the dashboard's Explore Key Views pills.
-        Assert.Contains(">Spec Kernel</a>", index);
+        // The dashboard quick-link pill reads the friendlier "Spec", while the home-index band stays the more
+        // descriptive "Spec Kernel". [Story 2.2 polish]
+        Assert.Contains(">Spec</a>", index);
+        Assert.DoesNotContain(">Spec Kernel</a>", index);
     }
 
     [Fact]
@@ -113,6 +129,37 @@ public class SiteGeneratorSpecKernelTests : IDisposable
         Assert.Contains("href=\"../../planning-artifacts/prd.html\"", spec);
         // The listed-but-absent companion emits NO link (resolve-or-omit; never a broken link). [AC #2 / NFR2]
         Assert.DoesNotContain("does-not-exist", spec);
+    }
+
+    [Fact]
+    public void GenerateAll_PlacesCompanionBlockInTheSidebarRailAfterTheToc()
+    {
+        GenerateSite();
+
+        var spec = File.ReadAllText(SpecPage);
+        // The companion block lives inside the two-column page shell's rail, beneath the TOC — not the content
+        // column. Assert it renders after the TOC sidebar, both inside .page-shell. [Story 2.2 polish]
+        var shell = spec.IndexOf("class=\"page-shell\"", StringComparison.Ordinal);
+        var toc = spec.IndexOf("class=\"toc-sidebar\"", StringComparison.Ordinal);
+        var companion = spec.IndexOf("class=\"companion-docs\"", StringComparison.Ordinal);
+        Assert.True(shell >= 0 && toc >= 0 && companion >= 0, "page shell, TOC, and companion block should all render");
+        Assert.True(shell < toc && toc < companion, "companion block should follow the TOC inside the page shell rail");
+    }
+
+    [Fact]
+    public void GenerateAll_RendersCapabilitiesAsDefinitionListCards()
+    {
+        GenerateSite();
+
+        var spec = File.ReadAllText(SpecPage);
+        // The authored CAP-N / intent / success bullet nest is restyled into cards. [Story 2.2 polish]
+        Assert.Contains("<div class=\"capabilities\">", spec);
+        Assert.Contains("<div class=\"capability-id\">CAP-1</div>", spec);
+        Assert.Contains("<dt>intent</dt>", spec);
+        Assert.Contains("<dt>success</dt>", spec);
+        // The raw bold-CAP bullet is gone (it became a card header), and the Capabilities TOC anchor survives.
+        Assert.DoesNotContain("<strong>CAP-1</strong>", spec);
+        Assert.Contains("id=\"capabilities\"", spec);
     }
 
     [Fact]

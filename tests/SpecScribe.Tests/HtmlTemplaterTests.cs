@@ -160,12 +160,12 @@ public class HtmlTemplaterTests
             TasksTotal = 0,
             PerEpic = Array.Empty<EpicProgress>(),
             // CommitsByDay stays consistent with the series (production can never emit a mismatch), so
-            // templater tests exercise the real linked-cells + panels path.
+            // templater tests exercise the real linked-cell path.
             Git = new GitPulse(totalCommits, 1, day, day, new (DateOnly, int)[] { (day, totalCommits) },
                 new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>
                 {
                     [day] = Enumerable.Range(1, totalCommits)
-                        .Select(i => new CommitInfo($"c{i:000}", $"Change {i}"))
+                        .Select(i => new CommitInfo($"c{i:000}", $"Change {i}", "Alice", "12:00"))
                         .ToList(),
                 }),
         };
@@ -192,7 +192,7 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_WiresHeatmapDrilldownThroughDashboard()
+    public void RenderIndex_WiresHeatmapDayLinksThroughDashboard()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -205,10 +205,11 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        // The call-site wiring (CommitsByDay → CommitHeatmap) surfaces linked cells and panels on the page.
-        Assert.Contains("<a href=\"#heat-day-2026-01-05\"", html);
-        Assert.Contains("id=\"heat-day-2026-01-05\"", html);
-        Assert.Contains("<code>c001</code> Change 1", html);
+        // The call-site wiring (CommitsByDay → CommitHeatmap) surfaces the per-day page link on the dashboard.
+        // The commit content itself now lives on commits/2026-01-05.html, not inline.
+        Assert.Contains("<a href=\"commits/2026-01-05.html\"", html);
+        Assert.DoesNotContain("#heat-day-", html);
+        Assert.DoesNotContain("Change 1", html);
     }
 
     [Fact]
@@ -472,8 +473,8 @@ public class HtmlTemplaterTests
         // icon carrying its data-copy payload) is preserved.
         Assert.Contains("class=\"cmd-badge\"", html);
         Assert.Contains("<code class=\"cmd-text\">/bmad-dev-story 1.1</code>", html);
-        Assert.Contains("class=\"copy-btn\" data-copy=\"/bmad-dev-story 1.1\"", html);
-        Assert.Contains("<svg class=\"icon\"", html); // the badge Copy button is an icon, not the word "Copy"
+        Assert.Contains("class=\"cmd-copy\" data-copy=\"/bmad-dev-story 1.1\"", html); // command+icon = one click-to-copy button
+        Assert.Contains("<svg class=\"icon\"", html); // the copy icon sits beside the command
         Assert.Contains("data-tooltip=\"Copy command\"", html); // rich on-brand tooltip on the icon button
         // The send menu leads with a plain "Copy" row (a second copy trigger), then the deep links.
         Assert.Contains("<details class=\"send-menu\">", html);

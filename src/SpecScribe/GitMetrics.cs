@@ -4,8 +4,9 @@ using System.Text;
 
 namespace SpecScribe;
 
-/// <summary>One commit's headline identity: enough for a "what landed that day" list without a full log.</summary>
-public sealed record CommitInfo(string ShortHash, string Subject);
+/// <summary>One commit's headline identity: enough for a "what landed that day" list without a full log.
+/// <paramref name="Time"/> is the author-local "HH:mm" of the commit.</summary>
+public sealed record CommitInfo(string ShortHash, string Subject, string Author, string Time);
 
 /// <summary>A lightweight snapshot of repo activity, for the dashboard's "project pulse".</summary>
 public sealed record GitPulse(
@@ -34,8 +35,11 @@ public static class GitMetrics
             }
 
             // One log call feeds both the daily counts and the per-day commit lists, tab-separated so
-            // the parse never has to guess where a free-text subject begins.
-            var logText = RunGit(repoRoot, "log --pretty=format:%h%x09%ad%x09%s --date=short");
+            // the parse never has to guess where a free-text subject begins. %ad carries date + time
+            // (author-local) so the per-day pages can show when each commit landed. The date format uses a
+            // 'T' separator, not a space: RunGit passes a single argument string that git tokenizes on
+            // whitespace, so a space inside --date=format:… would split it into two broken arguments.
+            var logText = RunGit(repoRoot, "log --pretty=format:%h%x09%ad%x09%an%x09%s --date=format:%Y-%m-%dT%H:%M");
             if (logText is null) return null;
 
             var (series, commitsByDay) = ParseLog(logText);
@@ -55,32 +59,40 @@ public static class GitMetrics
         }
     }
 
-    /// <summary>Parses `git log --pretty=format:%h%x09%ad%x09%s --date=short` output into the ascending
-    /// daily commit series plus per-day commit details. Pure so the format contract is unit-testable
-    /// without a repo; malformed lines are skipped rather than failing the whole pulse.</summary>
+    /// <summary>Parses `git log --pretty=format:%h%x09%ad%x09%an%x09%s --date=format:%Y-%m-%dT%H:%M`
+    /// output into the ascending daily commit series plus per-day commit details (hash, subject, author,
+    /// time). Pure so the format contract is unit-testable without a repo; malformed lines are skipped
+    /// rather than failing the whole pulse.</summary>
     public static (IReadOnlyList<(DateOnly Day, int Count)> Series,
         IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> CommitsByDay) ParseLog(string logText)
     {
         var byDay = new Dictionary<DateOnly, List<CommitInfo>>();
         foreach (var line in logText.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            var parts = line.Split('\t', 3);
-            if (parts.Length < 3) continue;
+            // hash \t "yyyy-MM-dd HH:mm" \t author \t subject — cap at 4 so a tab inside the subject survives.
+            var parts = line.Split('\t', 4);
+            if (parts.Length < 4) continue;
             var hash = parts[0].Trim();
-            // Exact invariant parse: git emits ISO yyyy-MM-dd, and a culture-sensitive parse would
-            // reinterpret it under non-Gregorian default calendars (th-TH, fa-IR), corrupting every date.
-            if (hash.Length == 0 || !DateOnly.TryParseExact(
-                    parts[1].Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            // Exact invariant parse: git emits an ISO date, and a culture-sensitive parse would reinterpret
+            // it under non-Gregorian default calendars (th-TH, fa-IR), corrupting every date.
+            if (hash.Length == 0 || !DateTime.TryParseExact(
+                    parts[1].Trim(), "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var stamp))
             {
                 continue;
             }
+            var day = DateOnly.FromDateTime(stamp);
 
             if (!byDay.TryGetValue(day, out var commits))
             {
                 byDay[day] = commits = new List<CommitInfo>();
             }
-            var subject = parts[2].Trim();
-            commits.Add(new CommitInfo(hash, subject.Length == 0 ? "(no subject)" : subject));
+            var author = parts[2].Trim();
+            var subject = parts[3].Trim();
+            commits.Add(new CommitInfo(
+                hash,
+                subject.Length == 0 ? "(no subject)" : subject,
+                author.Length == 0 ? "Unknown" : author,
+                stamp.ToString("HH:mm", CultureInfo.InvariantCulture)));
         }
 
         var series = byDay

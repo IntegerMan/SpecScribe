@@ -61,7 +61,7 @@ public class StylesheetTests
 
     [Fact]
     public void Stylesheet_HasCopyButtonStyles()
-        => Assert.Contains(".copy-btn", ReadStylesheet());
+        => Assert.Contains(".cmd-copy", ReadStylesheet());
 
     [Fact]
     public void Stylesheet_HasSendMenuStyles()

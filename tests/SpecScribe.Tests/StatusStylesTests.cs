@@ -88,4 +88,34 @@ public class StatusStylesTests
     [InlineData(null, "drafted")]
     public void ForStatus_MapsRawStatusText(string? status, string expected)
         => Assert.Equal(expected, StatusStyles.ForStatus(status));
+
+    [Theory]
+    // development_status lifecycle onto the shared six-stage vocabulary. [Story 2.3 Task 2]
+    [InlineData("done", "done")]
+    [InlineData("review", "review")]
+    [InlineData("in-progress", "active")]
+    [InlineData("ready-for-dev", "ready")]
+    [InlineData("backlog", "pending")]
+    // retrospective + action-item statuses ride the same colors.
+    [InlineData("optional", "pending")]
+    [InlineData("open", "ready")]
+    // unknown/forward-compat + empty → pending, never an invented color.
+    [InlineData("blocked", "pending")]
+    [InlineData("", "pending")]
+    [InlineData(null, "pending")]
+    public void ForSprint_MapsLifecycleOntoSharedColors(string? status, string expected)
+        => Assert.Equal(expected, StatusStyles.ForSprint(status));
+
+    [Theory]
+    [InlineData("done", "Done")]
+    [InlineData("review", "In review")]
+    [InlineData("in-progress", "In progress")]
+    [InlineData("ready-for-dev", "Ready for dev")]
+    [InlineData("backlog", "Backlog")]
+    [InlineData("optional", "Optional")]
+    [InlineData("open", "Open")]
+    // forward-compat value still reads as a real word (title-cased), never a raw token.
+    [InlineData("blocked", "Blocked")]
+    public void SprintLabel_MapsEachLifecycleValueToAWord(string status, string expected)
+        => Assert.Equal(expected, StatusStyles.SprintLabel(status));
 }

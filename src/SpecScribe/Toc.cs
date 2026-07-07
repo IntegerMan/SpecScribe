@@ -36,19 +36,28 @@ public static class Toc
         return sb.ToString();
     }
 
-    /// <summary>Wraps main-content HTML and its TOC sidebar into the shared two-column page shell. With no
-    /// entries the content is returned unwrapped (single column) so pages with nothing to index keep their
-    /// existing full-width layout.</summary>
-    public static string WrapWithSidebar(string mainHtml, IReadOnlyList<Entry> entries)
+    /// <summary>Wraps main-content HTML and its sidebar rail into the shared two-column page shell. The rail
+    /// holds the "On this page" TOC and, optionally, extra rail content stacked beneath it (e.g. a spec page's
+    /// companion-documents block). With no TOC entries and no rail extra the content is returned unwrapped
+    /// (single column) so pages with nothing to index keep their existing full-width layout.</summary>
+    public static string WrapWithSidebar(string mainHtml, IReadOnlyList<Entry> entries, string? railExtra = null)
     {
-        if (entries.Count == 0) return mainHtml;
+        if (entries.Count == 0 && string.IsNullOrEmpty(railExtra)) return mainHtml;
 
         var sb = new StringBuilder();
         sb.Append("<div class=\"page-shell\">\n");
         sb.Append("<div class=\"page-main\">\n");
         sb.Append(mainHtml);
         sb.Append("</div>\n");
+        // The sidebar rail: the TOC and any extra rail content (e.g. a spec page's companion-documents block)
+        // stack in one sticky column so they scroll together and never fight for the same sticky slot.
+        sb.Append("<div class=\"page-rail\">\n");
         sb.Append(RenderSidebar(entries));
+        if (!string.IsNullOrEmpty(railExtra))
+        {
+            sb.Append(railExtra);
+        }
+        sb.Append("</div>\n");
         sb.Append("</div>\n\n");
         return sb.ToString();
     }

@@ -37,32 +37,21 @@ public static class HtmlTemplater
         main.Append($"    <span class=\"pill\">{Html(PathUtil.NormalizeSlashes(doc.SourceRelativePath))}</span>\n");
         main.Append("  </div>\n</header>\n\n");
 
+        // Spec-kernel bodies get the Capabilities list restyled into scannable cards; every other page's body
+        // passes through untouched (the styler no-ops without the authored CAP pattern anyway). [Story 2.2 polish]
+        var bodyHtml = IsSpecKernelPage(doc) ? CapabilityStyler.Style(doc.BodyHtml) : doc.BodyHtml;
         main.Append("<article class=\"doc-body\">\n");
-        main.Append(doc.BodyHtml);
+        main.Append(bodyHtml);
         main.Append("\n</article>\n");
-
-        // Companion/related-docs cross-links (spec-kernel pages only): a de-emphasized nav block so the kernel
-        // is navigable as a set. Each entry was resolved to a real generated page by the SiteGenerator, so a
-        // missing/unresolved reference is already omitted — never a broken link. Rendered only when non-empty,
-        // so every other page is unaffected. The <h2> lives outside doc.Headings, so the TOC is untouched. [Story 2.2 Task 4]
-        if (doc.Companions.Count > 0)
-        {
-            main.Append("<nav class=\"companion-docs\" aria-label=\"Companion documents\">\n");
-            main.Append("  <h2>Companion documents</h2>\n");
-            main.Append("  <ul>\n");
-            foreach (var (label, href) in doc.Companions)
-            {
-                main.Append($"    <li><a href=\"{Html(href)}\">{Html(label)}</a></li>\n");
-            }
-            main.Append("  </ul>\n</nav>\n");
-        }
 
         var tocEntries = doc.Headings
             .Where(h => h.Level is 2 or 3)
             .Select(h => new Toc.Entry(h.Level, h.Text, h.Id))
             .ToList();
         sb.Append("<main id=\"main-content\">\n");
-        sb.Append(Toc.WrapWithSidebar(main.ToString(), tocEntries));
+        // The companion-docs cross-link block (spec-kernel pages only) rides in the sidebar rail beneath the
+        // TOC, not the content column, so it reads as a related-docs sidebar. [Story 2.2 polish]
+        sb.Append(Toc.WrapWithSidebar(main.ToString(), tocEntries, BuildCompanionRail(doc)));
         sb.Append("</main>\n\n");
 
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
@@ -71,6 +60,31 @@ public static class HtmlTemplater
             sb.Append(Mermaid.InitScript());
         }
         sb.Append("</body>\n</html>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>True for a page generated from a doc under the <c>specs/</c> kernel directory — the pages that
+    /// get the capability-card and companion-rail treatment. Keyed by directory, disjoint from Story 2.1's
+    /// <c>implementation-artifacts/spec-*.md</c>. [Story 2.2 polish]</summary>
+    private static bool IsSpecKernelPage(DocModel doc) =>
+        PathUtil.NormalizeSlashes(doc.SourceRelativePath).StartsWith("specs/", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Builds the "Companion documents" related-docs nav for the sidebar rail from a spec page's
+    /// resolved companions, or null when there are none (so the rail shows only the TOC, or nothing). Each
+    /// entry was resolved to a real generated page by the SiteGenerator — never a broken link. [Story 2.2 polish]</summary>
+    private static string? BuildCompanionRail(DocModel doc)
+    {
+        if (doc.Companions.Count == 0) return null;
+
+        var sb = new StringBuilder();
+        sb.Append("<nav class=\"companion-docs\" aria-label=\"Companion documents\">\n");
+        sb.Append("  <span class=\"companion-label\">Companion documents</span>\n");
+        sb.Append("  <ul>\n");
+        foreach (var (label, href) in doc.Companions)
+        {
+            sb.Append($"    <li><a href=\"{Html(href)}\">{Html(label)}</a></li>\n");
+        }
+        sb.Append("  </ul>\n</nav>\n");
         return sb.ToString();
     }
 

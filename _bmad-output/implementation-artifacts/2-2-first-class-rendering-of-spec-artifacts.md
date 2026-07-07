@@ -385,6 +385,13 @@ claude-opus-4-8
 - **Task 6/7 (tests + real pass):** added coverage across `HtmlTemplaterTests`, `SiteNavTests`, `MarkdownConverterTests`, and a new `SiteGeneratorSpecKernelTests`; full suite **283/283** green. Real generation pass against this repo's five-file kernel: home shows the "Spec Kernel" band + quick-link with the clear SPEC card, and `SPEC.html` shows resolvable "Companion documents" links (with `.memlog.md`/missing targets omitted) and the "On this page" TOC.
 - **Left out of scope as planned:** hyphenated `FR-1` linkifier widening (site-wide tokenization change), a `specs.html` landing page. Confirmed the site-wide requirement-ID linkifier already runs on spec pages (verified, not re-touched).
 
+**UX polish pass (2026-07-07):** three review-driven refinements to the spec-page presentation.
+
+- **Capabilities → definition-list cards:** new `CapabilityStyler` (a scoped body-HTML post-processor mirroring `GherkinStyler`) rewrites `SPEC.md`'s `## Capabilities` nested bullet list into `.capability` cards (a gold `CAP-N` id header + `intent`/`success` `dt`/`dd` rows). Anchored on the `id="capabilities"` heading, tolerant of Markdig's loose-list `<p>` wrappers and nested `<ul>`s, and returns the body unchanged when the authored pattern is absent or incomplete. Applied in `RenderPage`, gated on spec pages; TOC (which reads `Headings`) is untouched.
+- **Companion documents → sidebar rail:** the block moved out of the content column into the sticky sidebar rail beneath the "On this page" TOC. `Toc.WrapWithSidebar` now wraps the TOC + optional rail extra in a `.page-rail` container (the sticky/overflow migrated off `.toc-sidebar`), and `RenderPage` passes the companion nav as `railExtra` rather than appending it to `main`. Links restyled to the muted rail treatment (`--rust`, underline-on-hover) — no more foreign blue (`--teal-deep`) web-link look (DESIGN.md link rules).
+- **Quick-link pill "Spec Kernel" → "Spec":** friendlier Explore Key Views label; the home-index section band stays the more descriptive "Spec Kernel".
+- Full suite **327/327** green (incl. new `CapabilityStylerTests` + rail-placement/label assertions); validated with a real generation pass — all five capabilities render as cards, the companion block sits in the rail after the TOC, and the pill reads "Spec".
+
 ### File List
 
 - _bmad-output/implementation-artifacts/2-2-first-class-rendering-of-spec-artifacts.md
@@ -395,11 +402,14 @@ claude-opus-4-8
 - src/SpecScribe/HtmlTemplater.cs
 - src/SpecScribe/SiteNav.cs
 - src/SpecScribe/SiteGenerator.cs
+- src/SpecScribe/CapabilityStyler.cs (new)
+- src/SpecScribe/Toc.cs
 - src/SpecScribe/assets/specscribe.css
 - tests/SpecScribe.Tests/HtmlTemplaterTests.cs
 - tests/SpecScribe.Tests/SiteNavTests.cs
 - tests/SpecScribe.Tests/MarkdownConverterTests.cs
 - tests/SpecScribe.Tests/SiteGeneratorSpecKernelTests.cs (new)
+- tests/SpecScribe.Tests/CapabilityStylerTests.cs (new)
 
 ## Change Log
 
@@ -418,3 +428,9 @@ claude-opus-4-8
   `SiteGenerator.ResolveSpecCompanions`, with a `.companion-docs` style); and verified reuse of the standalone
   TOC and requirement linkifier. Added tests across HtmlTemplater/SiteNav/MarkdownConverter and a new
   SiteGeneratorSpecKernel suite (283/283 pass); validated with a real generation pass. Status → review.
+- 2026-07-07: UX polish pass on the spec pages (review feedback). Reformatted `SPEC.md`'s Capabilities into
+  definition-list cards via a new scoped `CapabilityStyler`; moved the "Companion documents" block into the
+  sidebar rail beneath the TOC (new `.page-rail` wrapper in `Toc.WrapWithSidebar`) with muted rust links
+  instead of the foreign-blue `--teal-deep` treatment; and renamed the Explore Key Views quick-link pill from
+  "Spec Kernel" to "Spec" (the home-index section band unchanged). Added `CapabilityStylerTests` and
+  rail-placement/label assertions; full suite 327/327 green; validated with a real generation pass.

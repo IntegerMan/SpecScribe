@@ -26,6 +26,7 @@ public sealed class SiteGenerator
     private ProgressModel? _progress;
     private RequirementsModel? _requirements;
     private List<AdrEntry> _adrs = new();
+    private List<CommitDayEntry> _commitDays = new();
 
     public SiteGenerator(ForgeOptions options)
     {
@@ -96,6 +97,16 @@ public sealed class SiteGenerator
             reporter?.BeginPhase(GenerationPhase.Adrs);
             events.AddRange(GenerateAdrsInternal(nav));
             reporter?.EndPhase(GenerationPhase.Adrs);
+
+            // Per-day commit pages the heatmap links to. Git is only computed inside GenerateEpicsInternal,
+            // so a project without an epics.md has no pulse here — which is consistent: no heatmap renders
+            // either, so there's nothing to link to.
+            if (_progress?.Git is { } gitPulse)
+            {
+                reporter?.BeginPhase(GenerationPhase.CommitDays);
+                events.AddRange(GenerateCommitDaysInternal(gitPulse, nav));
+                reporter?.EndPhase(GenerationPhase.CommitDays);
+            }
 
             if (readmeEvent is not null)
             {
@@ -286,6 +297,54 @@ public sealed class SiteGenerator
         }
 
         _adrs = entries.OrderBy(e => e.Number).ToList();
+        return events;
+    }
+
+    /// <summary>Emits one <c>commits/{yyyy-MM-dd}.html</c> page per linked day (the exact set the heatmap
+    /// links to, via <see cref="Charts.LinkedCommitDays"/>), each listing that day's commits with prev/next
+    /// links to the adjacent active days. Mirrors <see cref="GenerateAdrsInternal"/>: wipe+recreate the dir,
+    /// render a bespoke page, run reference-linkification so "Story N.M"/"FR25" mentions in subjects become
+    /// links, and write.</summary>
+    private List<GenerationEvent> GenerateCommitDaysInternal(GitPulse git, SiteNav nav)
+    {
+        var events = new List<GenerationEvent>();
+
+        var commitsDir = Path.Combine(_options.OutputRoot, "commits");
+        if (Directory.Exists(commitsDir))
+        {
+            Directory.Delete(commitsDir, recursive: true);
+        }
+
+        var days = Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now));
+        if (days.Count == 0) return events;
+
+        Directory.CreateDirectory(commitsDir);
+        var entries = new List<CommitDayEntry>();
+        for (var i = 0; i < days.Count; i++)
+        {
+            var day = days[i];
+            var sw = Stopwatch.StartNew();
+            var outputRelative = PathUtil.NormalizeSlashes($"commits/{Charts.D(day)}.html");
+            try
+            {
+                var prevDay = i > 0 ? days[i - 1] : (DateOnly?)null;
+                var nextDay = i < days.Count - 1 ? days[i + 1] : (DateOnly?)null;
+                var html = CommitDayTemplater.RenderPage(day, git.CommitsByDay[day], prevDay, nextDay, nav);
+
+                File.WriteAllText(
+                    Path.Combine(commitsDir, $"{Charts.D(day)}.html"),
+                    ApplyReferenceLinks(html, outputRelative));
+
+                entries.Add(new CommitDayEntry(day, outputRelative));
+                events.Add(new GenerationEvent(GenerationOutcome.Generated, outputRelative, sw.Elapsed));
+            }
+            catch (Exception ex)
+            {
+                events.Add(new GenerationEvent(GenerationOutcome.Error, outputRelative, sw.Elapsed, ex.Message));
+            }
+        }
+
+        _commitDays = entries;
         return events;
     }
 

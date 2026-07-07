@@ -100,7 +100,7 @@ public sealed class SiteNav
         if (specKernelHub is not null)
         {
             var specOutputPath = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(specKernelHub));
-            quickLinks.Add(("Spec Kernel", specOutputPath, "Read the canonical SPEC kernel and its companions."));
+            quickLinks.Add(("Spec", specOutputPath, "Read the canonical SPEC kernel and its companions."));
         }
 
         return new SiteNav { Items = items, QuickLinks = quickLinks, SiteTitle = siteTitle };

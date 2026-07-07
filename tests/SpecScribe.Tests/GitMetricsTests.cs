@@ -3,18 +3,18 @@ using SpecScribe;
 
 namespace SpecScribe.Tests;
 
-/// <summary>Contract coverage for the `git log --pretty=format:%h%x09%ad%x09%s --date=short` parse:
-/// the pure helper feeds both the heatmap's daily series and the per-day drill-down lists, and must
-/// skip malformed lines rather than fail the whole pulse (GitMetrics is never-throw).</summary>
+/// <summary>Contract coverage for the `git log --pretty=format:%h%x09%ad%x09%an%x09%s --date=format:%Y-%m-%dT%H:%M`
+/// parse: the pure helper feeds both the heatmap's daily series and the per-day pages (hash, subject, author,
+/// time), and must skip malformed lines rather than fail the whole pulse (GitMetrics is never-throw).</summary>
 public class GitMetricsTests
 {
     [Fact]
-    public void ParseLog_GroupsCommitsByDayInAscendingOrder()
+    public void ParseLog_GroupsCommitsByDayInAscendingOrderWithAuthorAndTime()
     {
         // git log emits newest first; the series must still come out ascending.
-        var log = "ccc3333\t2026-01-07\tThird change\n" +
-                  "bbb2222\t2026-01-05\tSecond change\n" +
-                  "aaa1111\t2026-01-05\tFirst change\n";
+        var log = "ccc3333\t2026-01-07T09:15\tCarol\tThird change\n" +
+                  "bbb2222\t2026-01-05T14:32\tBob\tSecond change\n" +
+                  "aaa1111\t2026-01-05T08:01\tAlice\tFirst change\n";
 
         var (series, commitsByDay) = GitMetrics.ParseLog(log);
 
@@ -26,20 +26,21 @@ public class GitMetricsTests
 
         var jan5 = commitsByDay[new DateOnly(2026, 1, 5)];
         Assert.Equal(2, jan5.Count);
-        // Within a day, git log order (newest first) is preserved for the drill-down list.
-        Assert.Equal(new CommitInfo("bbb2222", "Second change"), jan5[0]);
-        Assert.Equal(new CommitInfo("aaa1111", "First change"), jan5[1]);
-        Assert.Equal(new CommitInfo("ccc3333", "Third change"),
+        // Within a day, git log order (newest first) is preserved; author + time land on each commit.
+        Assert.Equal(new CommitInfo("bbb2222", "Second change", "Bob", "14:32"), jan5[0]);
+        Assert.Equal(new CommitInfo("aaa1111", "First change", "Alice", "08:01"), jan5[1]);
+        Assert.Equal(new CommitInfo("ccc3333", "Third change", "Carol", "09:15"),
             Assert.Single(commitsByDay[new DateOnly(2026, 1, 7)]));
     }
 
     [Fact]
     public void ParseLog_SkipsMalformedLinesWithoutThrowing()
     {
-        var log = "aaa1111\t2026-01-05\tGood commit\n" +
-                  "not-a-real-line\n" +                       // no tabs at all
-                  "bbb2222\tnot-a-date\tBad date\n" +         // unparseable date
-                  "\t2026-01-06\tMissing hash\n";             // empty hash
+        var log = "aaa1111\t2026-01-05T08:01\tAlice\tGood commit\n" +
+                  "not-a-real-line\n" +                              // no tabs at all
+                  "bbb2222\tnot-a-date\tBob\tBad date\n" +           // unparseable date
+                  "\t2026-01-06T10:00\tCarol\tMissing hash\n" +      // empty hash
+                  "ddd4444\t2026-01-05T09:00\tDave\n";               // only 3 fields (no subject column)
 
         var (series, commitsByDay) = GitMetrics.ParseLog(log);
 
@@ -58,9 +59,10 @@ public class GitMetricsTests
             // would shift every ISO date git emits by 543 years.
             CultureInfo.CurrentCulture = new CultureInfo("th-TH");
 
-            var (series, _) = GitMetrics.ParseLog("aaa1111\t2026-01-05\tChange\n");
+            var (series, commitsByDay) = GitMetrics.ParseLog("aaa1111\t2026-01-05T14:32\tAlice\tChange\n");
 
             Assert.Equal(new DateOnly(2026, 1, 5), Assert.Single(series).Day);
+            Assert.Equal("14:32", Assert.Single(commitsByDay[new DateOnly(2026, 1, 5)]).Time);
         }
         finally
         {
@@ -69,19 +71,21 @@ public class GitMetricsTests
     }
 
     [Fact]
-    public void ParseLog_LabelsEmptySubjects()
+    public void ParseLog_LabelsEmptySubjectsAndAuthors()
     {
-        // git commit --allow-empty-message yields an empty %s; the panel row shouldn't render a bare hash.
-        var (_, commitsByDay) = GitMetrics.ParseLog("aaa1111\t2026-01-05\t\n");
+        // git commit --allow-empty-message yields an empty %s; a missing author name yields an empty %an.
+        var (_, commitsByDay) = GitMetrics.ParseLog("aaa1111\t2026-01-05T14:32\t\t\n");
 
-        Assert.Equal("(no subject)", Assert.Single(commitsByDay[new DateOnly(2026, 1, 5)]).Subject);
+        var commit = Assert.Single(commitsByDay[new DateOnly(2026, 1, 5)]);
+        Assert.Equal("(no subject)", commit.Subject);
+        Assert.Equal("Unknown", commit.Author);
     }
 
     [Fact]
     public void ParseLog_KeepsTabsInsideSubject()
     {
-        // Split is capped at 3 parts, so a subject containing a tab survives intact.
-        var log = "aaa1111\t2026-01-05\tsubject\twith tab\n";
+        // Split is capped at 4 parts, so a subject containing a tab survives intact.
+        var log = "aaa1111\t2026-01-05T14:32\tAlice\tsubject\twith tab\n";
 
         var (_, commitsByDay) = GitMetrics.ParseLog(log);
 

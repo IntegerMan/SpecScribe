@@ -87,4 +87,44 @@ public static class StatusStyles
         RequirementStatus.Planned => "Planned",
         _ => "Deferred",
     };
+
+    /// <summary>Maps a <c>sprint-status.yaml</c> lifecycle value onto the SAME six-stage color vocabulary as
+    /// stories/epics — the yaml is the authoritative <em>tracking</em> ledger (distinct from the derived
+    /// artifact status), but a reader who learned the colors on the sunburst must read the sprint page for
+    /// free. Covers development_status (<c>backlog→ready-for-dev→in-progress→review→done</c>), retrospective
+    /// (<c>optional</c>/<c>done</c>), and action-item (<c>open</c>/<c>in-progress</c>/<c>done</c>) values.
+    /// Unknown/forward-compat values fall back to <c>pending</c> (parchment) rather than inventing a color.
+    /// [Story 2.3 Task 2]</summary>
+    public static string ForSprint(string? status) => Normalize(status) switch
+    {
+        "done" => "done",                 // green
+        "review" => "review",             // deep teal
+        "in-progress" => "active",        // teal
+        "ready-for-dev" => "ready",       // gold
+        "open" => "ready",                // action item awaiting action — gold, same "to do" tier as ready
+        "backlog" => "pending",           // parchment
+        "optional" => "pending",          // retrospective not yet done — parchment
+        _ => "pending",
+    };
+
+    /// <summary>Human, on-brand label for a sprint lifecycle value — the visible badge text. Every status is a
+    /// word (UX-DR17), color is reinforcement only. Unknown values are title-cased so a forward-compat status
+    /// (e.g. <c>blocked</c>) still reads as a real word rather than a raw token. [Story 2.3 Task 2]</summary>
+    public static string SprintLabel(string? status) => Normalize(status) switch
+    {
+        "done" => "Done",
+        "review" => "In review",
+        "in-progress" => "In progress",
+        "ready-for-dev" => "Ready for dev",
+        "backlog" => "Backlog",
+        "optional" => "Optional",
+        "open" => "Open",
+        "" => "Unknown",
+        _ => TitleCase(Normalize(status)),
+    };
+
+    private static string Normalize(string? status) => (status ?? string.Empty).Trim().ToLowerInvariant();
+
+    private static string TitleCase(string value) =>
+        System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('-', ' '));
 }

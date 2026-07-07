@@ -259,23 +259,29 @@ body {
    inner 860px blocks (.doc-body, .dashboard-narrow, header) stay centered within it. */
 .page-main { min-width: 0; }
 
-/* Main content stays first in the DOM (reading/tab order after the site nav); `order` pulls the TOC rail
-   into the first (left) grid track so its independent scrollbar no longer sits against the viewport's own
-   scrollbar on the right. On mobile the same `order: -1` (below) stacks the rail above the content. */
-.toc-sidebar { order: -1; }
-
-/* Sticky beneath the sticky site nav with its own overflow, so it stays in view and scrolls on its own
-   when longer than the viewport while the main column scrolls with the page. */
-.toc-sidebar {
+/* Main content stays first in the DOM (reading/tab order after the site nav); `order` pulls the sidebar
+   rail into the first (left) grid track so its independent scrollbar no longer sits against the viewport's
+   own scrollbar on the right. On mobile the same `order: -1` (below) stacks the rail above the content.
+   The rail stacks the TOC and any extra rail content (companion docs) in one sticky, self-scrolling column
+   so they move together beneath the sticky site nav. */
+.page-rail {
+  order: -1;
   position: sticky;
   top: var(--nav-offset);
   max-height: calc(100vh - var(--nav-offset) - 1rem);
   overflow-y: auto;
+  margin-top: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* The TOC card itself — the sticky/overflow now live on the enclosing .page-rail, so this is just the box. */
+.toc-sidebar {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.9rem 1rem;
-  margin-top: 2.5rem;
   background: var(--parchment-dark);
   border: 1px solid var(--parchment-deep);
   border-radius: 4px;
@@ -311,13 +317,15 @@ body {
    never crushing the main column (AC #3 graceful degradation). */
 @media (max-width: 900px) {
   .page-shell { grid-template-columns: 1fr; gap: 0; }
-  .toc-sidebar {
+  .page-rail {
     position: static;
     max-height: none;
     overflow: visible;
-    order: -1;
     margin: 0 auto 2rem;
     max-width: 860px;
+    gap: 0.75rem;
+  }
+  .toc-sidebar {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
@@ -437,26 +445,28 @@ code.color-swatch {
 
 .doc-body img { max-width: 100%; }
 
-/* Companion-documents cross-link block on spec-kernel pages: a de-emphasized related-docs strip that aids
-   navigation without competing with the article. Static (no motion), so prefers-reduced-motion is trivially
-   satisfied, and the links are real focusable anchors. [Story 2.2 Task 4] */
+/* Companion-documents cross-links on spec-kernel pages: a related-docs card that lives in the sidebar rail
+   beneath the TOC (via .page-rail). Mirrors the .toc-sidebar box and its muted rust link treatment so the
+   whole rail reads as one cohesive sidebar — never a foreign blue web link (see DESIGN.md link rules).
+   Static (no motion), so prefers-reduced-motion is trivially satisfied; the links are real focusable
+   anchors. [Story 2.2 polish] */
 .companion-docs {
-  margin: 2rem 0 0;
-  padding: 1rem 1.2rem;
-  background: var(--cream);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem;
+  background: var(--parchment-dark);
   border: 1px solid var(--parchment-deep);
   border-left: 3px solid var(--teal);
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
-.companion-docs h2 {
-  margin: 0 0 0.5rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+.companion-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink-light);
-  border: none;
-  padding: 0;
+  margin-bottom: 0.35rem;
 }
 
 .companion-docs ul {
@@ -464,19 +474,76 @@ code.color-swatch {
   padding: 0;
   list-style: none;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.2rem;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
 .companion-docs li { margin: 0; }
 
 .companion-docs a {
-  color: var(--teal-deep);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--rust);
   text-decoration: none;
-  border-bottom: 1px dotted var(--teal);
+  padding: 0.1rem 0;
 }
 
-.companion-docs a:hover { color: var(--rust); border-bottom-color: var(--rust-light); }
+.companion-docs a:hover { text-decoration: underline; }
+
+/* On mobile the rail is a horizontal strip; the companion links wrap in a row too. */
+@media (max-width: 900px) {
+  .companion-docs { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.9rem; }
+  .companion-docs ul { flex-direction: row; flex-wrap: wrap; gap: 0.25rem 0.9rem; }
+  .companion-label { margin-bottom: 0; margin-right: 0.3rem; white-space: nowrap; }
+}
+
+/* Capabilities section on spec-kernel pages: the authored CAP-N / intent / success bullet nest, restyled by
+   CapabilityStyler into scannable definition-list cards. Palette tokens only — an on-brand parchment card with
+   a gold id header and teal-accented rows, no new colors, no motion. [Story 2.2 polish] */
+.capabilities { display: flex; flex-direction: column; gap: 0.9rem; margin: 1rem 0 1.5rem; }
+
+.capability {
+  padding: 0.8rem 1rem 0.9rem;
+  background: var(--cream);
+  border: 1px solid var(--parchment-deep);
+  border-left: 3px solid var(--teal);
+  border-radius: 6px;
+}
+
+.capability-id {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  margin-bottom: 0.45rem;
+}
+
+.capability-detail { margin: 0; }
+
+.cap-row {
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: 0.2rem 0.8rem;
+  align-items: baseline;
+  padding: 0.25rem 0;
+}
+.cap-row + .cap-row { border-top: 1px solid var(--border); }
+
+.cap-row dt {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: bold;
+  color: var(--teal-deep);
+}
+
+.cap-row dd { margin: 0; font-size: 0.85rem; color: var(--ink-faded); line-height: 1.55; }
+
+/* Narrow screens: stack the label above its body rather than crushing a two-column grid. */
+@media (max-width: 560px) {
+  .cap-row { grid-template-columns: 1fr; gap: 0.1rem; }
+}
 
 /* ====================== FOOTER ====================== */
 .doc-footer {
@@ -925,6 +992,10 @@ code.color-swatch {
 .status-badge.review { background: #d9e6ea; color: var(--teal-deep); border-color: var(--teal-deep); }
 .status-badge.ready,
 .status-badge.drafted { background: #f5ecd4; color: var(--gold); border-color: var(--gold-light); }
+/* backlog/pending rows (sprint tracking) read on-brand — mirrors .status-badge.deferred (parchment/grey).
+   The base .status-badge already carries these values; the explicit rule documents the mapping and pins it
+   against future base changes. [Story 2.3 Task 2] */
+.status-badge.pending { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
 
 .status-badge.task-badge {
   display: inline-flex;
@@ -1419,9 +1490,9 @@ code.color-swatch {
 .heatmap-cell.level-3 { fill: var(--gold-light); }
 .heatmap-cell.level-4 { fill: var(--gold); }
 
-/* Active-day cells are drill-down links. Hover strokes rust (not gold — level-3/4 cells are FILLED gold,
-   which would swallow a gold stroke exactly on the busiest days). Zero-commit cells never sit inside an
-   <a>, so they take no pointer or focus affordance. */
+/* Active-day cells link to their per-day page. Hover strokes rust (not gold — level-3/4 cells are FILLED
+   gold, which would swallow a gold stroke exactly on the busiest days). Zero-commit cells never sit inside
+   an <a>, so they take no pointer or focus affordance. */
 .heatmap a { cursor: pointer; }
 .heatmap a:hover .heatmap-cell { stroke: var(--rust-light); stroke-width: 2; }
 /* SVG <a> focus: default outlines render unreliably around SVG links, so express focus on the rect
@@ -1450,56 +1521,51 @@ code.color-swatch {
 .heatmap-legend-swatch.level-3 { background: var(--gold-light); }
 .heatmap-legend-swatch.level-4 { background: var(--gold); }
 
-/* Per-day drill-down panels: hidden until their cell (or a sibling's prev/next link) targets them —
-   pure CSS :target keeps the drill-down working with JS disabled. */
-.heatmap-day { display: none; }
-.heatmap-day:target {
-  display: block;
-  margin-top: 0.8rem;
-  padding: 0.7rem 0.9rem;
-  background: var(--warm-white);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  scroll-margin-top: var(--nav-offset);
+/* ====================== COMMIT-DAY PAGE (commits/YYYY-MM-DD.html) ====================== */
+/* One row per commit: monospace hash + time, then author, then the subject taking the remaining width.
+   Wraps gracefully on narrow viewports (the subject drops below the meta on mobile). */
+.commit-day-list { list-style: none; margin: 0; padding: 0; }
+.commit-day-item {
+  display: grid;
+  grid-template-columns: auto auto minmax(6rem, max-content) 1fr;
+  align-items: baseline;
+  gap: 0.3rem 0.8rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
 }
-
-.heatmap-day h4 {
+.commit-day-item:last-child { border-bottom: none; }
+.commit-hash {
   font-family: 'Courier New', monospace;
-  font-size: 0.8rem;
-  color: var(--rust);
-  margin-bottom: 0.4rem;
-}
-
-/* A heavy day scrolls inside the panel rather than hard-truncating the commit list. The list carries
-   tabindex="0" so that overflow is keyboard-scrollable; show the shared teal ring when focused. */
-.heatmap-day-commits {
-  list-style: none;
-  max-height: 14rem;
-  overflow-y: auto;
-  font-size: 0.8rem;
-  color: var(--ink-faded);
-}
-.heatmap-day-commits:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
-.heatmap-day-commits li { padding: 0.15rem 0; }
-.heatmap-day-commits code {
-  font-family: 'Courier New', monospace;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--gold);
-  margin-right: 0.35rem;
+}
+.commit-time {
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+  color: var(--ink-light);
+}
+.commit-author { font-size: 0.82rem; color: var(--teal-deep); font-weight: bold; }
+.commit-subject { font-size: 0.9rem; color: var(--ink); }
+
+@media (max-width: 640px) {
+  /* Collapse to hash+time+author on one line, subject wrapping to the next. */
+  .commit-day-item { grid-template-columns: auto auto 1fr; }
+  .commit-subject { grid-column: 1 / -1; }
 }
 
-.heatmap-day-nav {
+/* Prev/next active-day links at the foot of the page. */
+.commit-day-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem 1.1rem;
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
+  margin-top: 1.4rem;
+  font-size: 0.8rem;
 }
-.heatmap-day-nav a { color: var(--teal); text-decoration: none; }
-.heatmap-day-nav a:hover { color: var(--rust); text-decoration: underline; }
-.heatmap-day-nav a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
-/* Close sits alone on the right edge, apart from the prev/next pair. */
-.heatmap-day-nav .heatmap-day-close { margin-left: auto; color: var(--ink-light); }
+.commit-day-nav a { color: var(--teal); text-decoration: none; }
+.commit-day-nav a:hover { color: var(--rust); text-decoration: underline; }
+.commit-day-nav a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+/* When only "next" exists (earliest active day), keep it on the right edge. */
+.commit-day-nav .commit-day-next { margin-left: auto; }
 
 /* ====================== MERMAID ====================== */
 .mermaid {
@@ -1554,19 +1620,7 @@ code.color-swatch {
 
 /* ====================== INLINE AUTHORING GUIDANCE (Story 2.1 Task 6) ======================
    A partial/empty planning surface's dead-end note ("Stories not yet drafted.") pairs its next-action
-   command inline. De-emphasized so it reads as help, not clutter; the command reuses the shared copy button. */
-.inline-cmd {
-  font-family: 'Courier New', monospace;
-  font-size: 0.82em;
-  background: var(--parchment-dark);
-  color: var(--rust);
-  padding: 0.05rem 0.35rem;
-  border-radius: 3px;
-  font-style: normal;
-  white-space: nowrap;
-}
-.pending-note .copy-btn,
-.not-detailed-note .copy-btn { margin-left: 0.4rem; vertical-align: baseline; font-style: normal; }
+   command inline as the same .cmd-badge the "Next Steps" panels use (see BmadCommands.InlineGuidance). */
 .empty-state { max-width: 860px; margin: 1.2rem auto; }
 
 /* ====================== FIRST-CLASS WORK TYPES (Story 2.1 Task 2) ======================
@@ -1869,32 +1923,11 @@ code.color-swatch {
 .next-steps-list li .cmd-badge { order: 1; }
 .next-steps-list li .next-steps-desc { order: 3; flex-basis: 100%; }
 
-/* Standalone copy button — used inline in guidance sentences (InlineGuidance), NOT inside .cmd-badge,
-   which restyles it into a segmented control below. */
-.copy-btn {
-  font: inherit;
-  font-family: 'Courier New', monospace;
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  color: var(--teal-deep);
-  background: var(--warm-white);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.25rem 0.55rem;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.copy-btn:hover,
-.copy-btn:focus-visible { border-color: var(--gold-light); color: var(--rust); outline: none; }
-.copy-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-.copy-btn.copied { color: var(--moss); border-color: var(--moss-light); background: #e8f0e4; }
-.copy-btn.copied::after { content: " \2713"; }
-
 /* ---- Unified command badge + send menu -------------------------------------------------
-   One pill holds the slash command, a vertical separator, then a Copy button and a caret that
-   opens a native <details> menu of per-destination deep links (see BmadCommands.SendTargets).
-   The deep links are plain anchors and the toggle is native; specscribe.js only adds click-away /
-   Escape dismissal. Degrades to selectable command text + native disclosure with JS off. */
+   One tan pill: the slash command + copy icon form a single click-to-copy region, then (past the caret's
+   separator) a caret opens a native <details> menu of per-destination deep links (see BmadCommands.
+   SendTargets). The deep links are plain anchors and the toggle is native; specscribe.js only adds
+   click-away / Escape dismissal. Degrades to selectable command text + native disclosure with JS off. */
 .cmd-badge {
   display: inline-flex;
   align-items: stretch;
@@ -1903,65 +1936,60 @@ code.color-swatch {
   border-radius: 6px;
   background: var(--parchment-dark); /* the whole badge is one tan pill — command + Copy + caret */
   font-family: 'Courier New', monospace;
+  font-style: normal;      /* never inherit italics when placed inside a guidance note */
+  vertical-align: middle;  /* sit centered when it flows inline after lead-in text */
   line-height: 1;
 }
-.cmd-badge .cmd-text {
+/* The command text + copy icon are one clickable copy target — no separator between them; clicking
+   anywhere on the command copies it. Resting icon color is a warm ink (not the cool teal). */
+.cmd-badge .cmd-copy {
   display: inline-flex;
   align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
   padding: 0.4rem 0.65rem;
-  color: var(--ink);
-  font-size: 0.8rem;
-  white-space: nowrap;
-  overflow-x: auto; /* a long command scrolls instead of breaking the badge */
-}
-/* The action cluster sits past the vertical separator (its left border). */
-.cmd-badge-actions {
-  display: inline-flex;
-  align-items: stretch;
-  position: relative; /* anchors the send-menu popover */
-  border-left: 1px solid var(--parchment-deep);
-}
-
-/* Copy + caret blend into the tan badge: no individual border/background/radius, just a lighter hover
-   highlight (parchment is lighter than the parchment-dark badge). Resting color is a warm ink (not the
-   cool teal) so the controls stay in the badge's warm palette; the keyboard focus ring keeps the site-wide
-   teal a11y standard. */
-.cmd-badge .copy-btn,
-.cmd-badge .send-toggle {
-  display: inline-flex;
-  align-items: center;
+  border: none;
+  border-radius: 5px 0 0 5px; /* left end follows the badge */
+  background: transparent;
+  color: var(--ink-light);    /* the icon color; the command text is --ink below */
   font: inherit;
   font-family: 'Courier New', monospace;
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
-  color: var(--ink-light);
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 0.4rem 0.6rem;
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
 }
-.cmd-badge .copy-btn .icon { display: block; }
-.cmd-badge .copy-btn:hover,
-.cmd-badge .send-toggle:hover,
-.cmd-badge .send-menu[open] .send-toggle { background: var(--parchment); color: var(--rust); }
-.cmd-badge .copy-btn:focus-visible,
-.cmd-badge .send-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
-/* Copied state: swap the icon for a check so the icon-only button still confirms. The check uses ::before
-   so ::after stays free for the [data-tooltip] popover on the same button. */
-.cmd-badge .copy-btn.copied { color: var(--moss); background: #e8f0e4; }
-.cmd-badge .copy-btn.copied .icon { display: none; }
-.cmd-badge .copy-btn.copied::before { content: "\2713"; }
+.cmd-badge .cmd-text {
+  color: var(--ink);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow-x: auto;   /* a long command scrolls instead of breaking the badge */
+  user-select: text;  /* stays selectable as the no-JS fallback even inside the button */
+}
+.cmd-copy .icon { display: block; flex: 0 0 auto; }
+.cmd-badge .cmd-copy:hover { background: var(--parchment); }
+.cmd-badge .cmd-copy:hover .icon { color: var(--rust); }
+.cmd-badge .cmd-copy:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+/* Copied: the icon turns moss; the tooltip flips to "Copied" (specscribe.js updates data-tooltip). */
+.cmd-badge .cmd-copy.copied .icon { color: var(--moss); }
 
 .send-menu { position: relative; display: inline-flex; }
-/* The caret: hairline separator from Copy, and its right edge rounds to follow the badge. */
+/* The caret is the only separator now (its left border) — it splits the copy region from the dropdown. */
 .cmd-badge .send-toggle {
+  display: inline-flex;
+  align-items: center;
   list-style: none;
+  border: none;
   border-left: 1px solid var(--parchment-deep);
   border-radius: 0 5px 5px 0;
   padding: 0.4rem 0.45rem;
+  background: transparent;
+  color: var(--ink-light);
+  font: inherit;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
 }
+.cmd-badge .send-toggle:hover,
+.cmd-badge .send-menu[open] .send-toggle { background: var(--parchment); color: var(--rust); }
+.cmd-badge .send-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
 .send-toggle::-webkit-details-marker { display: none; }
 .send-toggle::marker { content: ""; }
 

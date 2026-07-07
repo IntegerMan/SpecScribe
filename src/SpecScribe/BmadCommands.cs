@@ -87,11 +87,11 @@ public static class BmadCommands
         var cmd = PathUtil.Html(rawCommand);
         var sb = new StringBuilder();
         sb.Append("<span class=\"cmd-badge\">");
-        sb.Append($"<code class=\"cmd-text\">{cmd}</code>");
-        sb.Append("<span class=\"cmd-badge-actions\">");
-        // Icon-only Copy button — its rich on-brand tooltip (data-tooltip) names the action since there's no
-        // visible label; the aria-label serves screen readers the same way.
-        sb.Append($"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" data-tooltip=\"Copy command\" aria-label=\"Copy command\">{CopyIconSvg}</button>");
+        // The command text + copy icon are one click-to-copy button (no separator between them); clicking
+        // anywhere on the command copies it. The rich on-brand tooltip (data-tooltip) names the action; the
+        // aria-label serves screen readers. The <code> stays selectable as the no-JS fallback.
+        sb.Append($"<button type=\"button\" class=\"cmd-copy\" data-copy=\"{cmd}\" data-tooltip=\"Copy command\" aria-label=\"Copy command\">");
+        sb.Append($"<code class=\"cmd-text\">{cmd}</code>{CopyIconSvg}</button>");
 
         // The menu leads with a plain "Copy" row (a second, labelled way to copy), then any per-destination
         // deep links. Rendered even if SendTargets is empty, so the caret is always useful. Menu rows are
@@ -112,22 +112,20 @@ public static class BmadCommands
         }
 
         sb.Append("</div></details>");
-        sb.Append("</span></span>");
+        sb.Append("</span>");
         return sb.ToString();
     }
 
-    /// <summary>A de-emphasized inline "next action" for a partial/empty planning surface: a short lead-in
-    /// followed by the copy-pasteable command, turning a dead-end note ("Stories not yet drafted.") into a
-    /// signposted action. Returns <paramref name="fallback"/> unchanged when the module doesn't expose the
-    /// command, so we never print a command that isn't installed (the same discipline <see cref="Add"/>
-    /// enforces). The command carries the shared copy button wired by specscribe.js. [Story 2.1 Task 6]</summary>
+    /// <summary>A short lead-in followed by the same command badge the "Next Steps" panels use, turning a
+    /// dead-end note ("Stories not yet drafted.") into a signposted action — so every "draft it with X" prompt
+    /// (undrafted story cards, pending epics, empty states) renders through one consistent renderer. Returns
+    /// <paramref name="fallback"/> unchanged when the module doesn't expose the command, so we never print a
+    /// command that isn't installed (the same discipline <see cref="Add"/> enforces). [Story 2.1 Task 6]</summary>
     public static string InlineGuidance(string? command, string lead, string fallback)
     {
         if (command is null) return fallback;
 
-        var cmd = PathUtil.Html(command);
-        return $"{PathUtil.Html(lead)} <code class=\"inline-cmd\">{cmd}</code>" +
-               $"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>";
+        return $"{PathUtil.Html(lead)} {RenderCommandBadge(command)}";
     }
 
     /// <summary>Appends a suggestion only when the module exposes that command — a missing step is dropped
