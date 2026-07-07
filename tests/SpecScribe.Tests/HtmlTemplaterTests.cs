@@ -294,6 +294,52 @@ public class HtmlTemplaterTests
         Assert.DoesNotContain("Done (0)", html);
     }
 
+    [Fact]
+    public void RenderIndex_ShowsSprintWidgetWithPerStageCountsAndLinkWhenSprintDataPresent()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: in-progress
+              1-1-a: done
+              1-2-b: in-progress
+              1-3-c: backlog
+            """);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
+            epicsModel: null, requirements: null, adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty, work: null, sprint: sprint);
+
+        // The tracking-file widget: titled, source-labeled, per-stage counts (non-zero only), CTA to the page.
+        Assert.Contains("<h3>Sprint Status</h3>", html);
+        Assert.Contains("from sprint-status.yaml", html);
+        Assert.Contains("href=\"sprint.html\"", html);
+        Assert.Contains("Done (1)", html);
+        Assert.Contains("In progress (1)", html);
+        Assert.Contains("Backlog (1)", html);
+    }
+
+    [Fact]
+    public void RenderIndex_OmitsSprintWidgetWhenNoSprintDataAndLeavesNowAndNextIntact()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
+            epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "ready for dev")),
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty,
+            sprint: null);
+
+        // No sprint widget markers at all (clean omission, not an empty panel)...
+        Assert.DoesNotContain("from sprint-status.yaml", html);
+        Assert.DoesNotContain("View Sprint", html);
+        // ...and the derived Now & Next panel + a11y floor are unaffected.
+        Assert.Contains("Now &amp; Next", html);
+        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
+
     private static DocModel Doc(string sourceRel, string outputRel, string title, Frontmatter fm, string bodyHtml = "") => new()
     {
         SourceRelativePath = sourceRel,

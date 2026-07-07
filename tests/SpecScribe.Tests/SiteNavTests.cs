@@ -48,6 +48,33 @@ public class SiteNavTests
     }
 
     [Fact]
+    public void Build_AddsSprintItemAndQuickLinkNextToDeliveryViewsWhenAvailable()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        // Sprint sits in the delivery-tracking neighborhood (after Epics/Requirements); existing labels stay
+        // exactly as they were, with no duplicates. [Story 2.3 Task 5]
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Sprint" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(SiteNav.SprintOutputPath, nav.Items.First(i => i.Label == "Sprint").OutputRelativePath);
+        Assert.True(nav.HasSprint);
+
+        var sprintQuick = Assert.Single(nav.QuickLinks, q => q.Label == "Sprint");
+        Assert.Equal(SiteNav.SprintOutputPath, sprintQuick.OutputRelativePath);
+    }
+
+    [Fact]
+    public void Build_OmitsSprintWhenNotAvailable()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: false);
+
+        Assert.DoesNotContain("Sprint", nav.Items.Select(i => i.Label));
+        Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Sprint");
+        Assert.False(nav.HasSprint);
+        // The existing delivery views are untouched (no Sprint injected between them).
+        Assert.Equal(new[] { "Home", "Epics", "Requirements" }, nav.Items.Select(i => i.Label).ToArray());
+    }
+
+    [Fact]
     public void Build_PutsBmadMethodDocsInNavAndQuickLinks()
     {
         var nav = SiteNav.Build(new[]

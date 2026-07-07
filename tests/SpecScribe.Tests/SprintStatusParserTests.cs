@@ -119,6 +119,27 @@ public class SprintStatusParserTests
     }
 
     [Fact]
+    public void Parse_SurvivesMalformedSiblingKeys()
+    {
+        // Real BMad-generated files carry `story_location: {project-root}/…`, whose unquoted `{` is invalid
+        // YAML. A whole-document parse would throw on it; development_status must still be read. [Story 2.3]
+        var sprint = SprintStatusParser.Parse("""
+            generated: 2026-07-05T22:16:50-04:00
+            last_updated: 2026-07-06T22:00:00-04:00
+            project: SpecScribe
+            story_location: {project-root}/_bmad-output/implementation-artifacts
+
+            development_status:
+              epic-1: in-progress
+              1-1-foundation: done
+            """);
+
+        Assert.NotNull(sprint);
+        Assert.Equal(new[] { "epic-1", "1-1-foundation" }, sprint!.Entries.Select(e => e.RawKey).ToArray());
+        Assert.Equal("2026-07-06T22:00:00-04:00", sprint.LastUpdated);
+    }
+
+    [Fact]
     public void Parse_ReadsOptionalLastUpdatedScalar()
     {
         Assert.Equal("2026-07-06T22:00:00-04:00", SprintStatusParser.Parse(ValidYaml)!.LastUpdated);

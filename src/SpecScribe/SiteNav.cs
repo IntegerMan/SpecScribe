@@ -10,6 +10,7 @@ public sealed class SiteNav
     public const string HomeOutputPath = "index.html";
     public const string EpicsOutputPath = "epics.html";
     public const string RequirementsOutputPath = "requirements.html";
+    public const string SprintOutputPath = "sprint.html";
     public const string AdrsLandingOutputPath = "adrs/index.html";
     public const string ReadmeOutputPath = "readme.html";
 
@@ -30,12 +31,15 @@ public sealed class SiteNav
 
     public bool HasReadme => Items.Any(i => i.Label == "Readme");
 
+    public bool HasSprint => Items.Any(i => i.Label == "Sprint");
+
     public static SiteNav Build(
         IReadOnlyList<string> sourceRelativePaths,
         string siteTitle,
         IReadOnlyList<ModuleDoc>? moduleDocs = null,
         bool hasAdrs = false,
-        bool hasReadme = false)
+        bool hasReadme = false,
+        bool hasSprint = false)
     {
         var items = new List<(string, string)> { ("Home", HomeOutputPath) };
         var quickLinks = new List<(string, string, string)>();
@@ -83,6 +87,15 @@ public sealed class SiteNav
             items.Add(("Requirements", RequirementsOutputPath));
             quickLinks.Add(("Epics", EpicsOutputPath, "Track epic and story delivery progress."));
             quickLinks.Add(("Requirements", RequirementsOutputPath, "Review FR/NFR coverage and status."));
+        }
+
+        // The sprint tracking file (sprint-status.yaml) is its own first-class delivery view, gated on the
+        // file's presence exactly like ADRs/Readme — signalled by the caller since the yaml isn't in the
+        // *.md source list. Sits in the Epics/Requirements delivery-tracking neighborhood. [Story 2.3 Task 5]
+        if (hasSprint)
+        {
+            items.Add(("Sprint", SprintOutputPath));
+            quickLinks.Add(("Sprint", SprintOutputPath, "See where every epic and story sits."));
         }
 
         if (hasAdrs)

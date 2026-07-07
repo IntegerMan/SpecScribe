@@ -88,7 +88,7 @@ public static class HtmlTemplater
         return sb.ToString();
     }
 
-    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null)
+    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null)
     {
         var inventory = work ?? WorkInventory.Empty;
 
@@ -118,7 +118,7 @@ public static class HtmlTemplater
         sb.Append($"  <h1>{Html(nav.SiteTitle)}</h1>\n");
         sb.Append("</header>\n\n");
 
-        AppendDashboard(sb, progress, epicsModel, requirements, nav, commands, inventory);
+        AppendDashboard(sb, progress, epicsModel, requirements, nav, commands, inventory, sprint);
 
         // Quick-dev + deferred work is surfaced in its own first-class section (below); promote those docs
         // out of the generic "Implementation Artifacts" grid so they aren't double-listed. Their standalone
@@ -174,7 +174,7 @@ public static class HtmlTemplater
         return sb.ToString();
     }
 
-    private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav, CommandCatalog commands, WorkInventory work)
+    private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav, CommandCatalog commands, WorkInventory work, SprintStatus? sprint = null)
     {
         sb.Append("<section class=\"dashboard\">\n");
 
@@ -221,6 +221,11 @@ public static class HtmlTemplater
 
             sb.Append(BmadCommands.RenderProjectNextSteps(epicsModel, commands));
         }
+
+        // The tracking-file counterpart to Now & Next: per-stage counts + what's in progress from
+        // sprint-status.yaml, explicitly source-labeled so the two never read as contradicting (the derived
+        // Now & Next above stays untouched). Omitted entirely when there's no sprint data. [Story 2.3 Task 4]
+        AppendSprintPanel(sb, sprint, epicsModel);
 
         sb.Append("<div class=\"chart-panel\">\n<h3>Overall Progress</h3>\n");
         sb.Append(Charts.ProgressBar("Planning", p.EpicsDrafted, p.EpicsTotal, $"{p.EpicsDrafted} / {p.EpicsTotal} epics"));
@@ -354,6 +359,62 @@ public static class HtmlTemplater
         if (label.Contains("Requirement", StringComparison.OrdinalIgnoreCase))
             return "family-requirements";
         return "family-planning";
+    }
+
+    /// <summary>The gated home "Sprint Status" widget: the tracking-file counterpart to Now &amp; Next. Shows
+    /// per-stage story counts from sprint-status.yaml (a donut, non-zero legend rows only per Story 1.5 B4) and
+    /// what's in progress right now (in-progress + in-review stories, linked), with a CTA to the full sprint
+    /// page. Source-labeled ("from sprint-status.yaml") so the tracked view never reads as contradicting the
+    /// derived Now &amp; Next. Appends nothing when there's no sprint data — same early-return omission as the
+    /// other gated panels. [Story 2.3 Task 4]</summary>
+    private static void AppendSprintPanel(StringBuilder sb, SprintStatus? sprint, EpicsModel? epicsModel)
+    {
+        if (sprint is null || sprint.IsEmpty) return;
+
+        sb.Append("<div class=\"chart-panel sprint-panel\">\n");
+        sb.Append("<div class=\"chart-panel-header-row\"><h3>Sprint Status</h3>");
+        sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View Sprint &rarr;</a></div>\n");
+        // Name the source so the tracked counts never read as contradicting the derived Now & Next. [Story 1.5]
+        sb.Append("<p class=\"panel-source-note\">from sprint-status.yaml</p>\n");
+
+        var counts = SprintTemplater.StoryStageCounts(sprint);
+        var total = counts.Sum(c => c.Count);
+        if (total > 0)
+        {
+            var segments = counts.Select(c => (c.Label, c.Count, c.CssClass)).ToList();
+            var nonZero = segments.Where(s => s.Count > 0).ToList();
+            var done = counts.First(c => c.CssClass == "done").Count;
+            var ariaParts = string.Join(", ", nonZero.Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
+
+            sb.Append("<div class=\"donut-and-legend\">\n");
+            sb.Append(Charts.Donut(segments, ariaLabel: $"Sprint stories: {ariaParts}", centerText: $"{done}/{total}"));
+            sb.Append("<div class=\"donut-legend\">\n");
+            // Non-zero rows only (B4) — no "In review (0)" noise.
+            foreach (var (label, count, cssClass) in nonZero)
+            {
+                sb.Append($"  <span><span class=\"swatch {cssClass}\"></span>{Html(label)} ({count})</span>\n");
+            }
+            sb.Append("</div>\n</div>\n");
+        }
+
+        // What is in progress right now, per the tracking file — linked to each story's page when it exists.
+        var inProgress = SprintTemplater.InProgressStories(sprint, epicsModel);
+        if (inProgress.Count > 0)
+        {
+            sb.Append("<div class=\"sprint-widget-active\">\n");
+            sb.Append("<span class=\"sprint-widget-active-label\">In progress now</span>\n");
+            sb.Append("<ul class=\"sprint-widget-list\">\n");
+            foreach (var (entry, title, href) in inProgress)
+            {
+                var badge = $"<span class=\"status-badge {StatusStyles.ForSprint(entry.Status)}\">{Html(StatusStyles.SprintLabel(entry.Status))}</span>";
+                sb.Append(href is not null
+                    ? $"  <li><a href=\"{Html(href)}\">{title}</a> {badge}</li>\n"
+                    : $"  <li><span>{title}</span> {badge}</li>\n");
+            }
+            sb.Append("</ul>\n</div>\n");
+        }
+
+        sb.Append("</div>\n\n");
     }
 
     /// <summary>FR/NFR progress at a glance: a status donut for each kind, rolled up from covering-epic

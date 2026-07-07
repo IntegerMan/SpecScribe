@@ -27,6 +27,7 @@ public sealed class SiteGenerator
     private RequirementsModel? _requirements;
     private List<AdrEntry> _adrs = new();
     private List<CommitDayEntry> _commitDays = new();
+    private SprintStatus? _sprint;
 
     public SiteGenerator(ForgeOptions options)
     {
@@ -53,6 +54,11 @@ public sealed class SiteGenerator
             EnsureScaffold();
             _docs.Clear();
 
+            // Parse the sprint tracking file once, up front, so its presence drives the nav gate and both the
+            // sprint page and the home widget read the same parsed instance. Missing/malformed → null → the
+            // page, widget, and nav item all omit cleanly. [Story 2.3 Task 1/5]
+            _sprint = SprintStatusParser.ParseFile(SprintSourcePath);
+
             var nav = BuildNav(sourceRelatives);
             _nav = nav;
 
@@ -64,7 +70,7 @@ public sealed class SiteGenerator
                 readmeEvent = GenerateReadmeInternal(nav);
                 if (readmeEvent is { Outcome: GenerationOutcome.Error })
                 {
-                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false);
+                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false, hasSprint: SprintAvailable);
                     _nav = nav;
                 }
             }
@@ -112,6 +118,10 @@ public sealed class SiteGenerator
             {
                 events.Add(readmeEvent);
             }
+
+            // The sprint page reads the epics model (for real story/epic titles + links), so it's written
+            // after the epics phase. Gated on parsed sprint data; a no-op when there is none. [Story 2.3 Task 3/5]
+            WriteSprint(nav);
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav);
@@ -509,8 +519,33 @@ public sealed class SiteGenerator
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
         var work = WorkInventory.Build(docs);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, work);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, work, _sprint);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
+    }
+
+    /// <summary>Path to the sprint tracking file — located by well-known name anywhere under
+    /// <see cref="ForgeOptions.SourceRoot"/> (it is a <c>.yaml</c>, so it is NOT in the <c>*.md</c> source
+    /// enumeration). Null when absent, which drives full graceful omission. [Story 2.3 Task 1]</summary>
+    private string? SprintSourcePath =>
+        Directory.Exists(_options.SourceRoot)
+            ? Directory.EnumerateFiles(_options.SourceRoot, "sprint-status.yaml", SearchOption.AllDirectories)
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault()
+            : null;
+
+    /// <summary>True once the sprint tracking file parsed into usable data — the single signal the sprint
+    /// page, home widget, and nav item all gate on (a present-but-malformed file parses to null and omits
+    /// everywhere, matching NFR2 graceful degradation). [Story 2.3 Task 5]</summary>
+    private bool SprintAvailable => _sprint is not null;
+
+    /// <summary>Writes <c>sprint.html</c> from the cached parsed sprint status, reusing the epics model for
+    /// real titles/links. Reference-linkified like every other page. Omitted entirely (no page) when there is
+    /// no sprint data. [Story 2.3 Task 3/5]</summary>
+    private void WriteSprint(SiteNav nav)
+    {
+        if (_sprint is null) return;
+        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav);
+        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.SprintOutputPath), ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
 
     /// <summary>Path to the repo-root README that feeds the optional Readme page.</summary>
@@ -621,7 +656,7 @@ public sealed class SiteGenerator
     private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives)
     {
         _module = ModuleContext.Detect(_options.RepoRoot, sourceRelatives);
-        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable);
+        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable);
     }
 
     private bool AdrsExist() => EnumerateAdrFiles().Any(f => ParseAdrNumber(Path.GetFileName(f)) is not null);

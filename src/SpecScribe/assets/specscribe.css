@@ -1080,17 +1080,7 @@ code.color-swatch {
 /* ====================== NEXT STEPS (BMad commands) ====================== */
 .next-steps-list { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
 
-.next-steps-list code {
-  display: inline-block;
-  font-family: 'Courier New', monospace;
-  font-size: 0.8rem;
-  background: var(--parchment-dark);
-  color: var(--rust);
-  padding: 0.3rem 0.7rem;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  word-break: break-all;
-}
+/* The command <code> (.cmd-text) carries no pill of its own — the surrounding .cmd-badge is the pill. */
 
 .next-steps-desc { display: block; margin-top: 0.25rem; font-size: 0.78rem; color: var(--ink-light); line-height: 1.5; }
 
@@ -1945,9 +1935,9 @@ code.color-swatch {
 .cmd-badge .cmd-copy {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   min-width: 0;
-  padding: 0.4rem 0.65rem;
+  padding: 0.3rem 0.5rem;
   border: none;
   border-radius: 5px 0 0 5px; /* left end follows the badge */
   background: transparent;
@@ -1980,7 +1970,7 @@ code.color-swatch {
   border: none;
   border-left: 1px solid var(--parchment-deep);
   border-radius: 0 5px 5px 0;
-  padding: 0.4rem 0.45rem;
+  padding: 0.3rem 0.4rem;
   background: transparent;
   color: var(--ink-light);
   font: inherit;
@@ -2085,3 +2075,72 @@ code.color-swatch {
     transform: none;
   }
 }
+
+/* ====================== SPRINT STATUS (Story 2.3) ====================== */
+/* The sprint page + home widget: the sprint-status.yaml tracking view. Reuses the shared dashboard/chart-
+   panel/status-badge/donut vocabulary; only layout for the epic/story rows and the widget source-note is new,
+   all in the existing parchment/teal/gold palette (no new colors). */
+.sprint-page { max-width: 900px; margin: 0 auto; }
+
+.sprint-epic { margin: 0 0 1.4rem; }
+.sprint-epic-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.sprint-epic-title { font-weight: 600; color: var(--ink); text-decoration: none; }
+a.sprint-epic-title { border-bottom: 1px dotted var(--gold-light); }
+a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
+.sprint-retro-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; }
+
+.sprint-story-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.sprint-story-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.35rem 0.2rem 0.35rem 1rem;
+  border-bottom: 1px solid var(--parchment-dark);
+}
+.sprint-story-row:last-child { border-bottom: none; }
+.sprint-story-title { color: var(--ink-faded); text-decoration: none; }
+a.sprint-story-title { color: var(--ink); border-bottom: 1px dotted var(--gold-light); }
+a.sprint-story-title:hover { color: var(--rust); border-bottom-style: solid; }
+
+.sprint-action-items { margin-top: 1.6rem; }
+.sprint-action-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.sprint-action-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.4rem 0.2rem;
+  border-bottom: 1px solid var(--parchment-dark);
+}
+.sprint-action-text { flex: 1 1 60%; color: var(--ink); }
+
+/* Home widget: a de-emphasized source note keeps it from reading as a rival to the derived Now & Next. */
+.panel-source-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; margin: -0.2rem 0 0.6rem; }
+.sprint-widget-active { margin-top: 0.8rem; }
+.sprint-widget-active-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-light);
+  margin-bottom: 0.3rem;
+}
+.sprint-widget-list { list-style: none; margin: 0; padding: 0; }
+.sprint-widget-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+}
+.sprint-widget-list a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+.sprint-widget-list a:hover { color: var(--rust); border-bottom-style: solid; }
