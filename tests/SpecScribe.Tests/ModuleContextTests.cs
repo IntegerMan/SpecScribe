@@ -134,7 +134,7 @@ public class BmadCommandsTests
         var html = BmadCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), BmmCatalog);
 
         Assert.Contains("/bmad-dev-story 1.2", html);
-        Assert.Contains("/bmad-code-review", html);
+        Assert.Contains("/bmad-code-review 1.2", html);
         Assert.Contains("Next Steps", html);
         Assert.DoesNotContain("(BMad Method)", html);
         Assert.DoesNotContain("/gds-", html);
@@ -146,6 +146,43 @@ public class BmadCommandsTests
         var html = BmadCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), CommandCatalog.Empty);
 
         Assert.Equal(string.Empty, html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_ReviewStory_SuggestsOnlyCodeReviewWithStoryId()
+    {
+        // Story pages never suggest drafting other stories or retrospectives — those are epic/project
+        // moves. The catalog includes both commands to prove they're withheld, not merely uninstalled.
+        var catalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+            ["code-review"] = "/bmad-code-review",
+            ["retrospective"] = "/bmad-retrospective",
+        });
+
+        var html = BmadCommands.RenderNextSteps(Story("2.1", "review"), catalog);
+
+        Assert.Contains("/bmad-code-review 2.1", html);
+        Assert.DoesNotContain("/bmad-create-story", html);
+        Assert.DoesNotContain("/bmad-retrospective", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_InProgressStory_CarriesStoryIdOnCodeReview()
+    {
+        var html = BmadCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmCatalog);
+
+        Assert.Contains("/bmad-dev-story 1.2", html);
+        Assert.Contains("/bmad-code-review 1.2", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_UnplannedStory_StillSuggestsDraftingItsOwnPlan()
+    {
+        // The one create-story a story page keeps: drafting the story being viewed, with its own id.
+        var html = BmadCommands.RenderNextSteps(Story("3.2", null), BmmCatalog);
+
+        Assert.Contains("/bmad-create-story 3.2", html);
     }
 
     private static EpicsModel Project(params StoryInfo[] stories) => new()
@@ -189,9 +226,9 @@ public class BmadCommandsTests
 
         Assert.Contains("Stories 1.4, 2.1 are awaiting code review", html);
         Assert.Contains("/bmad-dev-story 1.5", html);
-        // Exactly one code-review row, not one per review story. Count the rendered <code> command (each row
-        // now also carries a data-copy attribute with the same string for its copy button). [Story 1.5 F2]
-        Assert.Equal(1, html.Split("<code>/bmad-code-review").Length - 1);
+        // Exactly one code-review row, not one per review story. Count the rendered command (each row's
+        // badge carries the command in a <code class="cmd-text"> and a data-copy for its copy button). [Story 1.5 F2]
+        Assert.Equal(1, html.Split("<code class=\"cmd-text\">/bmad-code-review").Length - 1);
         // Multiple review stories keep the bare command — no single id is appended.
         Assert.DoesNotContain("/bmad-code-review 1.4", html);
         Assert.True(html.IndexOf("awaiting code review", StringComparison.Ordinal)

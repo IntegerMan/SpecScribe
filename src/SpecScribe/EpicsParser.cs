@@ -16,7 +16,7 @@ public static class EpicsParser
     private static readonly Regex SectionEpicHeading = new(@"^## Epic (\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex StoryHeading = new(@"^### Story (\d+)\.(\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex AcHeading = new(@"^\*\*Acceptance Criteria:?\*\*\s*$", RegexOptions.Compiled);
-    private static readonly Regex AcKeywordLine = new(@"^\*\*(Given|When|Then|And)\*\*\s*(.*)$", RegexOptions.Compiled);
+    private static readonly Regex AcKeywordLine = new(@"^\*\*(Given|When|Then|And|But)\*\*\s*(.*)$", RegexOptions.Compiled);
     private static readonly Regex MetaLine = new(@"^\*\*(FRs|NFRs) covered:\*\*\s*(.*)$", RegexOptions.Compiled);
     private static readonly Regex StatusLine = new(@"^Status:\s*(.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
 

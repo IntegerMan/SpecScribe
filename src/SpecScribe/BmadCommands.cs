@@ -57,28 +57,30 @@ public static class BmadCommands
         sb.Append("<h3>Next Steps</h3>\n<ul class=\"next-steps-list\">\n");
         foreach (var s in suggestions)
         {
-            // Each command carries a split-button: a primary Copy (the universal fallback) plus a menu of
-            // per-destination deep links. The visible <code> stays selectable as the no-JS fallback.
-            var cmd = PathUtil.Html(s.Command);
-            sb.Append($"  <li><code>{cmd}</code>" +
-                      RenderCommandActions(s.Command) +
+            // Each command renders as one unified badge (command text + Copy + send menu); the description
+            // sits on its own line beneath it.
+            sb.Append("  <li>" +
+                      RenderCommandBadge(s.Command) +
                       $"<span class=\"next-steps-desc\">{PathUtil.Html(s.Description)}</span></li>\n");
         }
         sb.Append("</ul>\n");
         return sb.ToString();
     }
 
-    /// <summary>The split-button for one command: a primary Copy button (wired by specscribe.js — the
-    /// universal fallback that works with any tool, since you paste the command in yourself) plus a native
-    /// <c>&lt;details&gt;</c> disclosure listing per-destination deep links from <see cref="SendTargets"/>.
-    /// The deep links are plain anchors and the toggle is native, so this adds no new client JS and degrades
-    /// gracefully with scripting off. The command is URL-encoded into each link's <c>href</c> and then the
-    /// whole attribute is HTML-escaped, matching the double-escaping the <c>data-copy</c> attribute uses.</summary>
-    private static string RenderCommandActions(string rawCommand)
+    /// <summary>The unified command badge for one suggestion: the slash-command text, then (past a vertical
+    /// separator) a primary Copy button and a caret that opens a native <c>&lt;details&gt;</c> menu of
+    /// per-destination deep links from <see cref="SendTargets"/>. Copy items reuse the existing
+    /// <c>.copy-btn</c> handler and the deep links are plain anchors; specscribe.js only adds click-away /
+    /// Escape dismissal for the menu. Degrades to selectable command text + native disclosure with JS off.
+    /// The command is URL-encoded into each link's <c>href</c> and then the whole attribute is HTML-escaped,
+    /// matching the double-escaping the <c>data-copy</c> attribute uses.</summary>
+    private static string RenderCommandBadge(string rawCommand)
     {
         var cmd = PathUtil.Html(rawCommand);
         var sb = new StringBuilder();
-        sb.Append("<span class=\"cmd-actions\">");
+        sb.Append("<span class=\"cmd-badge\">");
+        sb.Append($"<code class=\"cmd-text\">{cmd}</code>");
+        sb.Append("<span class=\"cmd-badge-actions\">");
         sb.Append($"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>");
 
         if (SendTargets.Count > 0)
@@ -95,7 +97,7 @@ public static class BmadCommands
             sb.Append("</div></details>");
         }
 
-        sb.Append("</span>");
+        sb.Append("</span></span>");
         return sb.ToString();
     }
 
@@ -123,6 +125,11 @@ public static class BmadCommands
         }
     }
 
+    /// <summary>A story page only suggests actions on *this* story — drafting other stories and
+    /// retrospectives are epic/project-level moves that belong on those pages (<see cref="ForEpic"/>,
+    /// <see cref="ForProject"/>). The one exception is `create-story` with the story's own id when no plan
+    /// exists yet: that drafts the story being viewed, not a different one. Every code-review suggestion
+    /// carries the story id so the exact command (e.g. <c>/bmad-code-review 2.1</c>) is one copy away.</summary>
     private static List<Suggestion> ForStory(StoryInfo story, CommandCatalog commands)
     {
         var status = story.Status?.Trim().ToLowerInvariant() ?? string.Empty;
@@ -132,7 +139,7 @@ public static class BmadCommands
         {
             Add(suggestions, commands.Command("dev-story", story.Id),
                 "Implements the story exactly as specified — tasks, acceptance criteria, and dev notes drive the work.");
-            Add(suggestions, commands.Command("code-review"),
+            Add(suggestions, commands.Command("code-review", story.Id),
                 "Adversarial multi-layer review of the changes once implementation lands.");
             return suggestions;
         }
@@ -141,19 +148,15 @@ public static class BmadCommands
         {
             Add(suggestions, commands.Command("dev-story", story.Id),
                 "Resumes implementation from the unchecked tasks in the story plan.");
-            Add(suggestions, commands.Command("code-review"),
+            Add(suggestions, commands.Command("code-review", story.Id),
                 "Review the work so far — worth running before marking the story done.");
             return suggestions;
         }
 
         if (status.Contains("done") || status.Contains("complete") || status.Contains("review"))
         {
-            Add(suggestions, commands.Command("code-review"),
+            Add(suggestions, commands.Command("code-review", story.Id),
                 "Final adversarial pass over the story's changes.");
-            Add(suggestions, commands.Command("create-story"),
-                "Drafts the next story file with full context for implementation.");
-            Add(suggestions, commands.Command("retrospective", story.EpicNumber.ToString()),
-                "Post-epic retrospective once the epic's last story closes.");
             return suggestions;
         }
 

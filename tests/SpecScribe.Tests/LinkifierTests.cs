@@ -244,6 +244,60 @@ public class StoryEpicLinkifierTests
 
         Assert.Equal(input, StoryEpicLinkifier.Linkify(input, empty, ""));
     }
+
+    [Fact]
+    public void Linkify_NeverRewritesInsideHeadTitleOrMeta()
+    {
+        const string input =
+            "<head><title>Epic 1 Retrospective</title>" +
+            "<meta name=\"description\" content=\"Reviewing Epic 1 and Story 1.1\"></head>";
+
+        Assert.Equal(input, StoryEpicLinkifier.Linkify(input, Model(), ""));
+    }
+
+    [Fact]
+    public void Linkify_NeverRewritesInsideScriptOrStyle()
+    {
+        const string input =
+            "<script>var s = \"Story 1.1\";</script><style>/* Epic 1 */</style>";
+
+        Assert.Equal(input, StoryEpicLinkifier.Linkify(input, Model(), ""));
+    }
+
+    [Fact]
+    public void Linkify_DoesNotCrashOnHugeDigitRuns()
+    {
+        var html = StoryEpicLinkifier.Linkify("<p>Story 99999999999.1 and Epic 88888888888.</p>", Model(), "");
+
+        Assert.DoesNotContain("<a", html);
+    }
+
+    [Fact]
+    public void Linkify_LeavesLeadingZeroMentionsPlain()
+    {
+        // "Story 1.05" must not be normalized to a link to the existing story 1.5.
+        var html = StoryEpicLinkifier.Linkify("<p>Story 1.05 and Epic 01.</p>", Model(), "");
+
+        Assert.DoesNotContain("<a", html);
+    }
+
+    [Fact]
+    public void Linkify_LeavesThreePartIdsWhollyPlain()
+    {
+        // "Story 1.10.2" must not partially match as "Story 1.10".
+        var html = StoryEpicLinkifier.Linkify("<p>See Story 1.10.2 for detail.</p>", Model(), "");
+
+        Assert.DoesNotContain("<a", html);
+        Assert.Contains("Story 1.10.2", html);
+    }
+
+    [Fact]
+    public void Linkify_LinksMentionsWrappedAcrossASourceLine()
+    {
+        var html = StoryEpicLinkifier.Linkify("<p>See Story\n1.1 below.</p>", Model(), "");
+
+        Assert.Contains("href=\"epics/story-1-1.html\"", html);
+    }
 }
 
 public class AdrLinkRewriterTests

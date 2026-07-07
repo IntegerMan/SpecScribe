@@ -52,6 +52,27 @@ public class GherkinStylerTests
     public void KeywordSpan_LowercasesTheClassButKeepsTheLabel()
         => Assert.Equal("<span class=\"gherkin-kw kw-when\">When</span>", GherkinStyler.KeywordSpan("When"));
 
+    [Fact]
+    public void StyleCriterion_StylesTheButKeyword()
+    {
+        var html = GherkinStyler.StyleCriterion("<strong>Then</strong> ok <strong>But</strong> not empty");
+
+        Assert.Contains("<span class=\"gherkin-kw kw-but\">But</span> not empty", html);
+    }
+
+    [Fact]
+    public void StyleCriterion_DegradesToInPlaceStyling_WhenAKeywordIsNested()
+    {
+        // A keyword nested inside another inline element would make line-slicing emit overlapping tags,
+        // so the styler falls back to styling the markers in place (no gherkin-line wrapping) — never
+        // producing invalid HTML, and never mangling the surrounding <em>.
+        var html = GherkinStyler.StyleCriterion("<em>note <strong>Given</strong> setup</em> <strong>Then</strong> result");
+
+        Assert.DoesNotContain("gherkin-line", html);
+        Assert.Contains("<em>note <span class=\"gherkin-kw kw-given\">Given</span> setup</em>", html);
+        Assert.Contains("<span class=\"gherkin-kw kw-then\">Then</span> result", html);
+    }
+
     private static int Count(string haystack, string needle)
     {
         var count = 0;

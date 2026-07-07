@@ -94,6 +94,9 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         Directory.CreateDirectory(Path.Combine(Source, "implementation-artifacts"));
         File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), EpicsMd);
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-drafted-story.md"), Story11Md);
+        // A plain doc whose title/body mention an epic — its <head> title/meta must not be corrupted by the
+        // linkifier, while the same mention in the body should still link.
+        File.WriteAllText(Path.Combine(Source, "epic-1-retrospective.md"), "# Epic 1 Retrospective\n\nReviewing Epic 1 and Story 1.1.\n");
     }
 
     public void Dispose()
@@ -213,6 +216,44 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         var mermaid = html[mermaidStart..mermaidEnd];
         Assert.DoesNotContain("epic-ref", mermaid);
         Assert.DoesNotContain("<title><a", html);
+    }
+
+    [Fact]
+    public void GenerateAll_NeverCorruptsTheHeadOfADocTitledWithAnEpic()
+    {
+        GenerateSite();
+
+        var html = File.ReadAllText(Path.Combine(Site, "epic-1-retrospective.html"));
+        var headEnd = html.IndexOf("</head>", StringComparison.Ordinal);
+        Assert.True(headEnd > 0);
+        var head = html[..headEnd];
+
+        // The <title> and <meta content="…"> mention "Epic 1"/"Story 1.1" — no anchor may be injected there
+        // (its quotes would terminate the content attribute and break the markup).
+        Assert.DoesNotContain("epic-ref", head);
+        Assert.DoesNotContain("story-ref", head);
+        Assert.Contains("<title>Epic 1 Retrospective", head);
+
+        // Positive control: the same mention in the body IS linked, so the head-skip isn't masking a linkifier
+        // that simply never ran on this page.
+        var body = html[headEnd..];
+        Assert.Contains("class=\"epic-ref\"", body);
+    }
+
+    [Fact]
+    public void RegenerateEpics_PrunesPlaceholderWhenStoryLeavesThePlan()
+    {
+        var gen = GenerateSite();
+        Assert.True(File.Exists(PlaceholderPage));
+
+        // Drop Story 1.2 from epics.md, then regenerate as watch mode would.
+        var trimmed = EpicsMd[..EpicsMd.IndexOf("### Story 1.2:", StringComparison.Ordinal)].TrimEnd() + "\n";
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), trimmed);
+        var ev = gen.RegenerateEpics();
+
+        Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
+        Assert.False(File.Exists(PlaceholderPage));
+        Assert.True(File.Exists(DraftedStoryPage));
     }
 
     // ---- Gherkin styling on the story page's AC panel ----

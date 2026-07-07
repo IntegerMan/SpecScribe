@@ -9,8 +9,13 @@
 
   // ---- On-brand tooltip for SVG segments -------------------------------------------------
   // A single reused tooltip element positioned near the pointer/focus. Text comes from the segment's
-  // <title>, so we never duplicate label strings into markup.
+  // <title>, so we never duplicate label strings into markup. While our tooltip is showing we detach the
+  // <title> node from the DOM — otherwise the browser's own native tooltip fires after its hover delay and
+  // shows alongside ours. The node is reattached on hide/blur so <title> remains the no-JS/SR fallback.
   var tip = null;
+  var activeSeg = null;
+  var activeTitle = null;
+  var activeText = null;
 
   function ensureTip() {
     if (!tip) {
@@ -23,16 +28,28 @@
     return tip;
   }
 
-  function tipText(el) {
+  function activate(el) {
+    if (activeSeg === el) return;
+    deactivate();
     var t = el.querySelector("title");
-    return t ? t.textContent : el.getAttribute("aria-label");
+    activeSeg = el;
+    activeTitle = t;
+    activeText = t ? t.textContent : el.getAttribute("aria-label");
+    if (t) t.remove();
+  }
+
+  function deactivate() {
+    if (activeTitle && activeSeg) activeSeg.insertBefore(activeTitle, activeSeg.firstChild);
+    activeSeg = null;
+    activeTitle = null;
+    activeText = null;
   }
 
   function showTip(el, x, y) {
-    var text = tipText(el);
-    if (!text) return;
+    activate(el);
+    if (!activeText) { deactivate(); return; }
     var t = ensureTip();
-    t.textContent = text;
+    t.textContent = activeText;
     t.hidden = false;
     // Clamp within the viewport so an edge segment's tooltip never spills off-screen. `x`/`y` are viewport
     // (client) coords; the tooltip is absolutely positioned against the body, so convert BOTH axes to page
@@ -47,6 +64,7 @@
 
   function hideTip() {
     if (tip) tip.hidden = true;
+    deactivate();
   }
 
   var SEG = ".sb-seg, .heatmap-cell, .donut-seg";
@@ -155,5 +173,29 @@
         btn._copyResetTimer = null;
       }, 1600);
     }).catch(function () { /* best-effort — the visible command is still selectable */ });
+  });
+
+  // ---- Send-menu dismissal ----------------------------------------------------------------
+  // The send menu is a native <details>, which by itself only closes when you click its own caret.
+  // These handlers give it real menu behavior: a click anywhere outside an open menu closes it (so at
+  // most one is ever open), picking a destination closes it, and Escape closes it. With JS off the
+  // native disclosure still toggles — this only adds the click-away/Escape niceties.
+  function closeSendMenus(except) {
+    var open = document.querySelectorAll("details.send-menu[open]");
+    for (var i = 0; i < open.length; i++) {
+      if (open[i] !== except) open[i].removeAttribute("open");
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+    if (!document.querySelector("details.send-menu[open]")) return;
+    var withinMenu = e.target.closest ? e.target.closest("details.send-menu") : null;
+    // Clicking the caret of one menu closes every other; picking a link (or clicking outside) closes all.
+    var pickedLink = e.target.closest ? e.target.closest(".send-link") : null;
+    closeSendMenus(withinMenu && !pickedLink ? withinMenu : null);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeSendMenus(null);
   });
 })();

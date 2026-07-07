@@ -10,20 +10,31 @@ namespace SpecScribe;
 public static class GherkinStyler
 {
     private static readonly Regex KeywordStrong = new(
-        "<strong>(Given|When|Then|And)</strong>",
+        "<strong>(Given|When|Then|And|But)</strong>",
         RegexOptions.Compiled);
 
     /// <summary>Restructures a rendered criterion (one inline-HTML flow with embedded
     /// <c>&lt;strong&gt;</c> keywords) so each keyword opens a block-level "gherkin-line" span. Prose
     /// before the first keyword stays outside the line structure; prose after the last keyword's clause
     /// (e.g. an "Origin &amp; scope" note) stays inside that final line. Criteria containing no bold
-    /// keywords come back unchanged.</summary>
+    /// keywords come back unchanged.
+    ///
+    /// The block-per-line wrapping only holds when every keyword sits at the top level of the flow (the
+    /// authored convention: a flat "**Given** … **When** …" sequence). If a keyword is nested inside
+    /// another inline element (e.g. an emphasized or linked run), slicing between keyword positions would
+    /// cut across that element and emit overlapping tags — so we degrade to styling the keyword markers in
+    /// place, never producing invalid HTML.</summary>
     public static string StyleCriterion(string html)
     {
         if (string.IsNullOrEmpty(html)) return html;
 
         var matches = KeywordStrong.Matches(html);
         if (matches.Count == 0) return html;
+
+        if (!AllTopLevel(html, matches))
+        {
+            return KeywordStrong.Replace(html, m => KeywordSpan(m.Groups[1].Value));
+        }
 
         var sb = new StringBuilder();
         if (matches[0].Index > 0)
@@ -40,6 +51,57 @@ public static class GherkinStyler
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>True when every keyword match starts at markup depth 0 (not inside another open tag).
+    /// Depth is tracked by scanning tags: an opening <c>&lt;tag&gt;</c> increments, a closing
+    /// <c>&lt;/tag&gt;</c> decrements, and self-closing/void tags (e.g. <c>&lt;br&gt;</c>) are neutral.</summary>
+    private static bool AllTopLevel(string html, MatchCollection matches)
+    {
+        foreach (Match m in matches)
+        {
+            if (DepthAt(html, m.Index) != 0) return false;
+        }
+        return true;
+    }
+
+    private static readonly HashSet<string> VoidTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "br", "img", "hr", "wbr", "input", "meta", "link", "area", "base", "col", "embed", "source", "track",
+    };
+
+    private static int DepthAt(string html, int index)
+    {
+        var depth = 0;
+        for (var i = 0; i < index; i++)
+        {
+            if (html[i] != '<') continue;
+            var close = html.IndexOf('>', i);
+            if (close < 0) break;
+
+            var isEnd = i + 1 < html.Length && html[i + 1] == '/';
+            var selfClose = close > 0 && html[close - 1] == '/';
+            if (isEnd)
+            {
+                depth--;
+            }
+            else if (!selfClose && !VoidTags.Contains(TagName(html, i)))
+            {
+                depth++;
+            }
+            i = close;
+        }
+        return depth;
+    }
+
+    /// <summary>The element name of the tag opening at <paramref name="lt"/> (the '&lt;' index),
+    /// e.g. "strong" for <c>&lt;strong&gt;</c>.</summary>
+    private static string TagName(string html, int lt)
+    {
+        var start = lt + 1;
+        var end = start;
+        while (end < html.Length && (char.IsLetterOrDigit(html[end]) || html[end] == '-')) end++;
+        return html[start..end];
     }
 
     /// <summary>The styled marker for a single keyword, e.g. <c>&lt;span class="gherkin-kw kw-given"&gt;

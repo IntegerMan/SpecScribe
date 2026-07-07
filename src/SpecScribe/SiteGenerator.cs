@@ -333,7 +333,12 @@ public sealed class SiteGenerator
 
             File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands), "epics.html"));
 
+            // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
+            // undrafted story that got a placeholder and then vanished — can't leave a stale page behind,
+            // mirroring the ADR output dir's rebuild. GenerateAll already wiped OutputRoot (no-op here); this
+            // matters for watch-mode RegenerateEpics, which doesn't wipe the whole tree.
             var epicsDir = Path.Combine(_options.OutputRoot, "epics");
+            if (Directory.Exists(epicsDir)) Directory.Delete(epicsDir, recursive: true);
             Directory.CreateDirectory(epicsDir);
 
             WriteRequirements(requirements, model, progress, nav);

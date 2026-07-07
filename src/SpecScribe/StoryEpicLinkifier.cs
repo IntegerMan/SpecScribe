@@ -12,16 +12,26 @@ namespace SpecScribe;
 /// stories now that undrafted ones get a placeholder page there.</summary>
 public static class StoryEpicLinkifier
 {
-    // Captures whole anchor/code/pre/svg spans so Regex.Split hands them back as delimiters we skip over.
-    // pre protects Mermaid sources (roadmap nodes say "Epic 1"); svg protects chart <title>/aria text that
-    // isn't wrapped in its own anchor — injecting an <a> inside either corrupts the rendered artifact.
+    // Captures whole spans that must never receive an injected <a> so Regex.Split hands them back as
+    // delimiters we skip over:
+    //   a    — don't double-link an existing anchor (TOC, breadcrumb, card).
+    //   code — BMad command snippets like `create-story 2.6` must stay copyable plain text.
+    //   pre  — Mermaid sources (roadmap nodes say "Epic 1").
+    //   svg  — chart <title>/aria text ("Epic 2: …") not wrapped in its own anchor.
+    //   head — <title>/<meta content="…"> carry the page title; a doc titled "Epic 1 Retrospective" would
+    //          otherwise get an <a href="…"> injected inside <title> and inside a content="…" attribute,
+    //          whose own double quotes terminate the attribute and corrupt the document head.
+    //   script/style — raw JS/CSS text (Markdig passes embedded HTML through) must not be rewritten.
     private static readonly Regex ProtectedSplit = new(
-        "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<svg\\b[^>]*>.*?</svg>)",
+        "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<svg\\b[^>]*>.*?</svg>"
+        + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
     // Capitalized mention forms only — "Story 1.5" / "Epic 2" — matching how the artifacts are authored.
-    private static readonly Regex StoryPattern = new(@"\bStory (\d+)\.(\d+)\b", RegexOptions.Compiled);
-    private static readonly Regex EpicPattern = new(@"\bEpic (\d+)\b", RegexOptions.Compiled);
+    // \s+ (not a literal space) so a mention hard-wrapped across a source line ("Story\n1.5") still links.
+    // The (?!\.\d) tail stops a three-part id ("Story 1.5.2") from partially matching as "Story 1.5".
+    private static readonly Regex StoryPattern = new(@"\bStory\s+(\d+)\.(\d+)\b(?!\.\d)", RegexOptions.Compiled);
+    private static readonly Regex EpicPattern = new(@"\bEpic\s+(\d+)\b(?!\.\d)", RegexOptions.Compiled);
 
     /// <summary>The generated page path for an epic, relative to the output root.</summary>
     public static string EpicPagePath(int epicNumber) => $"epics/epic-{epicNumber}.html";
@@ -58,7 +68,15 @@ public static class StoryEpicLinkifier
     {
         text = StoryPattern.Replace(text, m =>
         {
-            var id = $"{int.Parse(m.Groups[1].Value)}.{int.Parse(m.Groups[2].Value)}";
+            // Reject leading-zero digit runs ("Story 1.05") rather than silently normalizing them to a
+            // different, confidently-wrong target ("1.5"). TryParse also keeps an absurd digit run
+            // ("Story 99999999999.1") from throwing OverflowException and failing the whole epics pass.
+            if (HasLeadingZero(m.Groups[1].Value) || HasLeadingZero(m.Groups[2].Value)
+                || !int.TryParse(m.Groups[1].Value, out var epic) || !int.TryParse(m.Groups[2].Value, out var story))
+            {
+                return m.Value;
+            }
+            var id = $"{epic}.{story}";
             if (!storyIds.Contains(id) || string.Equals(id, skipStoryId, StringComparison.Ordinal))
             {
                 return m.Value;
@@ -68,7 +86,10 @@ public static class StoryEpicLinkifier
 
         return EpicPattern.Replace(text, m =>
         {
-            var number = int.Parse(m.Groups[1].Value);
+            if (HasLeadingZero(m.Groups[1].Value) || !int.TryParse(m.Groups[1].Value, out var number))
+            {
+                return m.Value;
+            }
             if (!epicNumbers.Contains(number) || number == skipEpicNumber)
             {
                 return m.Value;
@@ -76,4 +97,6 @@ public static class StoryEpicLinkifier
             return $"<a class=\"epic-ref\" href=\"{PathUtil.Html(prefix + EpicPagePath(number))}\">{m.Value}</a>";
         });
     }
+
+    private static bool HasLeadingZero(string digits) => digits.Length > 1 && digits[0] == '0';
 }

@@ -782,9 +782,12 @@ code.color-swatch {
   text-align: center;
 }
 .gherkin-kw.kw-given { color: var(--teal); border-color: var(--teal); background: #e0ecea; }
-.gherkin-kw.kw-when { color: var(--gold); border-color: var(--gold-light); background: #f5ecd4; }
+/* A darker amber than --gold (#b8860b) so the small-caps text clears WCAG AA (4.5:1) on the cream chip;
+   plain --gold measured ~2.8:1 there. The gold-family border keeps the "When" identity. */
+.gherkin-kw.kw-when { color: #7a5600; border-color: var(--gold-light); background: #f5ecd4; }
 .gherkin-kw.kw-then { color: var(--rust); border-color: var(--rust-light); background: #f3e2d3; }
-.gherkin-kw.kw-and { color: var(--ink-light); border-color: var(--border); background: transparent; }
+.gherkin-kw.kw-and,
+.gherkin-kw.kw-but { color: var(--ink-light); border-color: var(--border); background: transparent; }
 
 /* Acceptance Criteria panel — each criterion is independently anchored (id="ac-N") so the "(AC: #N)"
    references scattered through the tasks below can deep-link straight to it. */
@@ -1731,12 +1734,12 @@ code.color-swatch {
 
 /* ====================== COPY BUTTONS (Story 1.5 F2) ====================== */
 .next-steps-list li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }
-.next-steps-list li > code { order: 1; }
+.next-steps-list li .cmd-badge { order: 1; }
 .next-steps-list li .next-steps-desc { order: 3; flex-basis: 100%; }
 
+/* Standalone copy button — used inline in guidance sentences (InlineGuidance), NOT inside .cmd-badge,
+   which restyles it into a segmented control below. */
 .copy-btn {
-  order: 2;
-  flex: 0 0 auto;
   font: inherit;
   font-family: 'Courier New', monospace;
   font-size: 0.68rem;
@@ -1749,77 +1752,107 @@ code.color-swatch {
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-
 .copy-btn:hover,
 .copy-btn:focus-visible { border-color: var(--gold-light); color: var(--rust); outline: none; }
 .copy-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .copy-btn.copied { color: var(--moss); border-color: var(--moss-light); background: #e8f0e4; }
 .copy-btn.copied::after { content: " \2713"; }
 
-/* ---- Send-command split button (native <details>, no new JS) ----------------------------
-   Copy stays the primary action; the caret is a <summary> that opens a menu of per-destination
-   deep links (see BmadCommands.SendTargets). The menu is a plain popover of anchors and the toggle
-   is native, so nothing here needs script — it degrades to the caret + selectable <code> with JS off. */
-.next-steps-list li .cmd-actions {
-  order: 2;
-  flex: 0 0 auto;
+/* ---- Unified command badge + send menu -------------------------------------------------
+   One pill holds the slash command, a vertical separator, then a Copy button and a caret that
+   opens a native <details> menu of per-destination deep links (see BmadCommands.SendTargets).
+   The deep links are plain anchors and the toggle is native; specscribe.js only adds click-away /
+   Escape dismissal. Degrades to selectable command text + native disclosure with JS off. */
+.cmd-badge {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  border: 1px solid var(--parchment-deep);
+  border-radius: 6px;
+  background: var(--warm-white);
+  font-family: 'Courier New', monospace;
+  line-height: 1;
+}
+.cmd-badge .cmd-text {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  position: relative;
+  padding: 0.4rem 0.65rem;
+  background: var(--parchment-dark);
+  color: var(--ink);
+  font-size: 0.8rem;
+  border-radius: 5px 0 0 5px;
+  white-space: nowrap;
+  overflow-x: auto; /* a long command scrolls instead of breaking the badge */
 }
-/* Neutralize .copy-btn's list-level `order: 2` inside the actions group so Copy stays left of the caret. */
-.cmd-actions .copy-btn { order: 0; }
+/* The action cluster sits past the vertical separator (its left border). */
+.cmd-badge-actions {
+  display: inline-flex;
+  align-items: stretch;
+  position: relative; /* anchors the send-menu popover */
+  border-left: 1px solid var(--parchment-deep);
+}
 
-.send-menu { position: relative; display: inline-flex; }
-
-/* The caret shares the Copy button's look; strip the native disclosure triangle. */
-.send-toggle {
+/* Copy + caret blend into the badge: no individual border/background/radius, just hover tints. */
+.cmd-badge .copy-btn,
+.cmd-badge .send-toggle {
   font: inherit;
   font-family: 'Courier New', monospace;
-  font-size: 0.68rem;
-  line-height: 1;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
   color: var(--teal-deep);
-  background: var(--warm-white);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.28rem 0.4rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0.4rem 0.6rem;
   cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.cmd-badge .copy-btn:hover,
+.cmd-badge .send-toggle:hover,
+.cmd-badge .send-menu[open] .send-toggle { background: var(--parchment); color: var(--rust); }
+.cmd-badge .copy-btn:focus-visible,
+.cmd-badge .send-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.cmd-badge .copy-btn.copied { color: var(--moss); background: #e8f0e4; }
+.cmd-badge .copy-btn.copied::after { content: " \2713"; }
+
+.send-menu { position: relative; display: inline-flex; }
+/* The caret: hairline separator from Copy, and its right edge rounds to follow the badge. */
+.cmd-badge .send-toggle {
   list-style: none;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  border-left: 1px solid var(--parchment-deep);
+  border-radius: 0 5px 5px 0;
+  padding: 0.4rem 0.45rem;
 }
 .send-toggle::-webkit-details-marker { display: none; }
 .send-toggle::marker { content: ""; }
-.send-toggle:hover,
-.send-menu[open] .send-toggle { border-color: var(--gold-light); color: var(--rust); }
-.send-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
+/* The submenu: an opaque cream popover, right-aligned to drop below the badge's right edge. */
 .send-menu-list {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   right: 0;
   z-index: 320;
-  min-width: 150px;
+  min-width: 160px;
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.3rem;
-  background: var(--parchment);
-  border: 1px solid var(--gold-light);
-  border-radius: 5px;
-  box-shadow: 0 3px 12px var(--shadow);
+  gap: 0.15rem;
+  padding: 0.35rem;
+  background: var(--warm-white);
+  border: 1px solid var(--parchment-deep);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px var(--shadow);
 }
 .send-link {
   display: block;
-  padding: 0.32rem 0.5rem;
+  padding: 0.4rem 0.6rem;
   border-radius: 4px;
-  font-size: 0.74rem;
-  color: var(--teal);
+  font-size: 0.75rem;
+  color: var(--teal-deep);
   text-decoration: none;
   white-space: nowrap;
 }
 .send-link:hover { background: var(--parchment-dark); color: var(--rust); }
-.send-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.send-link:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
 
 /* The popover is absolutely positioned, but its .chart-panel ancestor sets overflow-x: auto (which makes
    the y-axis clip too). Lift the clip only while a menu is open — a next-steps panel has no wide chart to

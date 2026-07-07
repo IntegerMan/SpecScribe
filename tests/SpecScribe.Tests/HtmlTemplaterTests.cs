@@ -382,10 +382,12 @@ public class HtmlTemplaterTests
 
         var html = BmadCommands.RenderNextSteps(story, commands);
 
-        // Split-button: the primary Copy (and its data-copy payload) is preserved...
-        Assert.Contains("class=\"cmd-actions\"", html);
+        // Unified badge: the command text lives inside the badge, and the primary Copy (with its
+        // data-copy payload) is preserved.
+        Assert.Contains("class=\"cmd-badge\"", html);
+        Assert.Contains("<code class=\"cmd-text\">/bmad-dev-story 1.1</code>", html);
         Assert.Contains("data-copy=\"/bmad-dev-story 1.1\"", html);
-        // ...alongside a native <details> send menu (no new JS).
+        // ...alongside a native <details> send menu.
         Assert.Contains("<details class=\"send-menu\">", html);
         Assert.Contains("<summary class=\"send-toggle\"", html);
         // The Cursor deep link carries the URL-encoded command (slash -> %2F, space -> %20).

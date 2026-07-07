@@ -2,7 +2,7 @@
 title: 'Gherkin AC styling, inline Story/Epic links, and placeholder story pages'
 type: 'feature'
 created: '2026-07-06'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '9fbca5e3aaa8593e0b9e188919acdbe1c130b5ad'
 context: []
@@ -64,15 +64,15 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/SpecScribe/GherkinStyler.cs` -- new static class: rewrite `<strong>(Given|When|Then|And)</strong>` in AC HTML into `<span class="gherkin-kw kw-{keyword}">{Keyword}</span>`, inserting a line-break structure before every keyword except the first -- single shared implementation for both AC surfaces.
-- [ ] `src/SpecScribe/EpicsParser.cs` -- route `ExtractAcceptanceCriteria` HTML and `RenderAcLine` output through `GherkinStyler` (replace the bespoke `.kw` span in `RenderAcLine`) -- consistent treatment on story pages and epic cards.
-- [ ] `src/SpecScribe/StoryEpicLinkifier.cs` -- new anchor-aware post-processor: `\bStory (\d+)\.(\d+)\b` → `epics/story-N-M.html`, `\bEpic (\d+)\b` → `epics/epic-N.html`, only for ids in the model; also skip `<code>`/`<pre>` spans; optional skipStoryId/skipEpicNumber -- mirrors `RequirementLinkifier`.
-- [ ] `src/SpecScribe/SiteGenerator.cs` -- extend the whole-page post-process (`ApplyRequirementLinks` call sites) to also run `StoryEpicLinkifier` when `_epicsModel` exists, passing skip-self for story/epic pages; in `GenerateEpicsInternal`, emit a placeholder page for every story with no artifact -- one hook, every page linkified.
-- [ ] `src/SpecScribe/EpicsTemplater.cs` -- new `RenderStoryPlaceholder(epic, story, nav, commands)`: head/nav/breadcrumb like `RenderStory`, kicker row with "drafted" `status-badge` ("Not yet drafted"), `UserStoryHtml` lead, Gherkin-styled `AcBlocksHtml`, `InlineGuidance(commands.Command("create-story", story.Id), ...)` panel, back-link to the epic page -- the link target for undrafted stories.
-- [ ] `src/SpecScribe/assets/specscribe.css` -- `.gherkin-kw` base style (small-caps/mono marker) + per-keyword accent classes and line-break presentation; placeholder-page note styling reusing `.pending-note` -- polish without JS.
-- [ ] `tests/SpecScribe.Tests/GherkinStylerTests.cs` -- unit-test the I/O matrix Gherkin rows (split, non-keyword bold untouched).
-- [ ] `tests/SpecScribe.Tests/LinkifierTests.cs` -- add StoryEpicLinkifier cases: known/unknown ids, inside-anchor skip, inside-code skip, self-skip, multi-digit.
-- [ ] `tests/SpecScribe.Tests/SiteGeneratorTraceabilityTests.cs` -- end-to-end: undrafted story yields placeholder file; "Story N.M"/"Epic N" mention in a body renders as a link to it.
+- [x] `src/SpecScribe/GherkinStyler.cs` -- new static class: rewrite `<strong>(Given|When|Then|And)</strong>` in AC HTML into `<span class="gherkin-kw kw-{keyword}">{Keyword}</span>`, inserting a line-break structure before every keyword except the first -- single shared implementation for both AC surfaces.
+- [x] `src/SpecScribe/EpicsParser.cs` -- route `ExtractAcceptanceCriteria` HTML and `RenderAcLine` output through `GherkinStyler` (replace the bespoke `.kw` span in `RenderAcLine`) -- consistent treatment on story pages and epic cards. (AC tooltip PlainText is taken from the pre-styling render so stripped text keeps its inter-clause spaces.)
+- [x] `src/SpecScribe/StoryEpicLinkifier.cs` -- new anchor-aware post-processor: `\bStory (\d+)\.(\d+)\b` → `epics/story-N-M.html`, `\bEpic (\d+)\b` → `epics/epic-N.html`, only for ids in the model; also skip `<code>`/`<pre>` spans; optional skipStoryId/skipEpicNumber -- mirrors `RequirementLinkifier`. (Also protects whole `<svg>` spans: chart `<title>`/aria text says "Epic N"/"Story N.M" and Mermaid `<pre>` sources carry epic node labels.)
+- [x] `src/SpecScribe/SiteGenerator.cs` -- extend the whole-page post-process (renamed `ApplyReferenceLinks`) to also run `StoryEpicLinkifier` when `_epicsModel` exists, passing skip-self for story/epic pages; in `GenerateEpicsInternal`, emit a placeholder page for every story with no artifact -- one hook, every page linkified.
+- [x] `src/SpecScribe/EpicsTemplater.cs` -- new `RenderStoryPlaceholder(epic, story, nav, commands)`: head/nav/breadcrumb like `RenderStory`, kicker row with "drafted" `status-badge` ("Not yet drafted"), `UserStoryHtml` lead, Gherkin-styled `AcBlocksHtml`, `InlineGuidance(commands.Command("create-story", story.Id), ...)` panel, back-link to the epic page -- the link target for undrafted stories.
+- [x] `src/SpecScribe/assets/specscribe.css` -- `.gherkin-kw` chip style + per-keyword accent classes (`kw-given` teal, `kw-when` gold, `kw-then` rust, `kw-and` muted outline), `.gherkin-line` block presentation, `.story-ref`/`.epic-ref` links mirroring `.req-ref` -- polish without JS.
+- [x] `tests/SpecScribe.Tests/GherkinStylerTests.cs` -- unit-test the I/O matrix Gherkin rows (split, non-keyword bold untouched).
+- [x] `tests/SpecScribe.Tests/LinkifierTests.cs` -- add StoryEpicLinkifier cases: known/unknown ids, inside-anchor skip, inside-code skip, self-skip, multi-digit.
+- [x] `tests/SpecScribe.Tests/SiteGeneratorStoryEpicPagesTests.cs` -- end-to-end (new sibling of the traceability tests, so its fixture doesn't disturb theirs): undrafted story yields placeholder file; "Story N.M"/"Epic N" mentions link; self/unknown/Mermaid/SVG protected; placeholder overwritten by RegenerateEpics once an artifact appears.
 
 **Acceptance Criteria:**
 - Given a story artifact whose AC contains bold Given/When/Then/And, when its story page renders, then each keyword begins a new visual line with a distinct styled marker and surrounding prose is unchanged.
@@ -100,3 +100,49 @@ Linkifier ordering: run StoryEpicLinkifier before RequirementLinkifier or after 
 
 **Manual checks (if no CLI):**
 - Regenerate the site and open a story page with multi-clause ACs (e.g. story 2.1): keywords on their own lines with markers; "Story 1.5" mention in its AC links to the 1.5 page; open an undrafted story's placeholder (e.g. 2.6) and confirm badge, ACs, and create-story guidance.
+
+## Suggested Review Order
+
+**Inline Story/Epic linkifier (highest-risk: whole-page rewrite)**
+
+- Entry point — the anchor-aware post-processor; read the `ProtectedSplit` comment first (a/code/pre/svg/head/script/style are the never-rewrite regions).
+  [`StoryEpicLinkifier.cs:25`](../../src/SpecScribe/StoryEpicLinkifier.cs#L25)
+
+- Per-mention replacement — leading-zero reject + `int.TryParse` guard so odd tokens never mislink or crash the epics pass.
+  [`StoryEpicLinkifier.cs:67`](../../src/SpecScribe/StoryEpicLinkifier.cs#L67)
+
+- The one hook every page flows through; story/epic pages pass skip-self ids.
+  [`SiteGenerator.cs:511`](../../src/SpecScribe/SiteGenerator.cs#L511)
+
+**Placeholder pages for undrafted stories**
+
+- Emission point — placeholder written at the real page's path; `ArtifactOutputPath` stays null so progress is untouched.
+  [`SiteGenerator.cs:354`](../../src/SpecScribe/SiteGenerator.cs#L354)
+
+- The epics dir is rebuilt each pass so a vanished story can't leave a stale placeholder (watch mode).
+  [`SiteGenerator.cs:336`](../../src/SpecScribe/SiteGenerator.cs#L336)
+
+- The placeholder template — badge, narrative, styled ACs, create-story guidance, back-link.
+  [`EpicsTemplater.cs:328`](../../src/SpecScribe/EpicsTemplater.cs#L328)
+
+**Gherkin AC styling**
+
+- Keyword styler — degrades to in-place marker styling when a keyword is nested, never emitting overlapping tags.
+  [`GherkinStyler.cs:27`](../../src/SpecScribe/GherkinStyler.cs#L27)
+
+- Both AC surfaces route through it: story-page criteria and epic-card lines.
+  [`EpicsParser.cs:228`](../../src/SpecScribe/EpicsParser.cs#L228)
+
+- Chip styling; note the `kw-when` amber chosen for WCAG-AA contrast on the cream background.
+  [`specscribe.css:770`](../../src/SpecScribe/assets/specscribe.css#L770)
+
+**Tests (supporting)**
+
+- Linkifier unit cases: protected spans, overflow, leading-zero, three-part ids, wrapped mentions.
+  [`LinkifierTests.cs`](../../tests/SpecScribe.Tests/LinkifierTests.cs)
+
+- End-to-end: placeholder emission/pruning, head-injection safety, mention links, Gherkin styling.
+  [`SiteGeneratorStoryEpicPagesTests.cs`](../../tests/SpecScribe.Tests/SiteGeneratorStoryEpicPagesTests.cs)
+
+- Gherkin styler unit cases: split, non-keyword bold, But keyword, nested-tag degrade.
+  [`GherkinStylerTests.cs`](../../tests/SpecScribe.Tests/GherkinStylerTests.cs)

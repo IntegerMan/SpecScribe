@@ -66,8 +66,9 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasSendMenuStyles()
     {
-        // The split-button send menu (native <details>) and its per-destination deep-link rows.
+        // The unified command badge and its send menu (native <details>) with per-destination deep-link rows.
         var css = ReadStylesheet();
+        Assert.Contains(".cmd-badge", css);
         Assert.Contains(".send-menu", css);
         Assert.Contains(".send-toggle", css);
         Assert.Contains(".send-link", css);
@@ -85,5 +86,7 @@ public class StylesheetTests
         var js = reader.ReadToEnd();
         Assert.Contains("clipboard", js);
         Assert.Contains("ss-tooltip", js);
+        // The send menu's click-away / Escape dismissal ships in the same sanctioned script.
+        Assert.Contains("send-menu", js);
     }
 }
