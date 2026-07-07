@@ -2,8 +2,9 @@
 title: 'Commit heatmap: fainter zero-commit days + click-a-day commit drill-down'
 type: 'feature'
 created: '2026-07-06'
-status: 'draft'
+status: 'done'
 review_loop_iteration: 0
+baseline_commit: 'fdcb6967838f3c402a8026a3c163838568bcbe09'
 context: []
 ---
 
@@ -56,12 +57,12 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/SpecScribe/GitMetrics.cs` -- Add `public sealed record CommitInfo(string ShortHash, string Subject)`; add `IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> CommitsByDay` to `GitPulse`; switch to `log --pretty=format:%h%x09%ad%x09%s --date=short`. Extract parsing into a pure `public static` helper (log text → series + commits-by-day) so it's unit-testable; `TryCompute` calls it.
-- [ ] `src/SpecScribe/Charts.cs` -- `CommitHeatmap(series, commitsByDay = null)`: wrap each cell with `Count > 0` and details present in `<a href="#heat-day-{date}" aria-label="{date}: N commits — view details">`; change `<svg>` `role="img"` → `role="group"` (keep `aria-label`) so inner links reach AT; after the legend emit one `<section class="heatmap-day" id="heat-day-{date}">` per active day: `<h4>` date + count, `<ul>` of `<code>{hash}</code> {subject}`, nav row with prev/next active-day anchors (omit at ends). Null details ⇒ output identical to today except the role change.
-- [ ] `src/SpecScribe/HtmlTemplater.cs` -- Pass `gitPulse.CommitsByDay` at the call site.
-- [ ] `src/SpecScribe/assets/specscribe.css` -- (a) `.heatmap-cell.level-0` + `.heatmap-legend-swatch.level-0` much fainter (e.g. `fill-opacity: 0.3` on `var(--parchment-dark)` / rgba equivalent for the swatch); (b) `.heatmap-day` hidden by default, shown via `:target`, `scroll-margin-top: var(--nav-offset)`, list `max-height` + `overflow-y: auto`; (c) focus ring for heatmap SVG links mirroring the sunburst pattern + hover stroke/cursor on linked cells only.
-- [ ] `tests/SpecScribe.Tests/ChartsTests.cs` -- Update role assertion to `role="group"`; add I/O-matrix tests: active-day anchors present, zero-day cells unwrapped, panels with escaped subjects, prev/next presence/absence at ends and skipping empty days, no-details call emits no anchors/panels.
-- [ ] `tests/SpecScribe.Tests/GitMetricsTests.cs` -- New file testing the parse helper: tab-separated lines → correct series + per-day commit lists; malformed line skipped without throwing.
+- [x] `src/SpecScribe/GitMetrics.cs` -- Add `public sealed record CommitInfo(string ShortHash, string Subject)`; add `IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> CommitsByDay` to `GitPulse`; switch to `log --pretty=format:%h%x09%ad%x09%s --date=short`. Extract parsing into a pure `public static` helper (log text → series + commits-by-day) so it's unit-testable; `TryCompute` calls it.
+- [x] `src/SpecScribe/Charts.cs` -- `CommitHeatmap(series, commitsByDay = null)`: wrap each cell with `Count > 0` and details present in `<a href="#heat-day-{date}" aria-label="{date}: N commits — view details">`; change `<svg>` `role="img"` → `role="group"` (keep `aria-label`) so inner links reach AT; after the legend emit one `<section class="heatmap-day" id="heat-day-{date}">` per active day: `<h4>` date + count, `<ul>` of `<code>{hash}</code> {subject}`, nav row with prev/next active-day anchors (omit at ends). Null details ⇒ output identical to today except the role change.
+- [x] `src/SpecScribe/HtmlTemplater.cs` -- Pass `gitPulse.CommitsByDay` at the call site.
+- [x] `src/SpecScribe/assets/specscribe.css` -- (a) `.heatmap-cell.level-0` + `.heatmap-legend-swatch.level-0` much fainter (e.g. `fill-opacity: 0.3` on `var(--parchment-dark)` / rgba equivalent for the swatch); (b) `.heatmap-day` hidden by default, shown via `:target`, `scroll-margin-top: var(--nav-offset)`, list `max-height` + `overflow-y: auto`; (c) focus ring for heatmap SVG links mirroring the sunburst pattern + hover stroke/cursor on linked cells only.
+- [x] `tests/SpecScribe.Tests/ChartsTests.cs` -- Update role assertion to `role="group"`; add I/O-matrix tests: active-day anchors present, zero-day cells unwrapped, panels with escaped subjects, prev/next presence/absence at ends and skipping empty days, no-details call emits no anchors/panels.
+- [x] `tests/SpecScribe.Tests/GitMetricsTests.cs` -- New file testing the parse helper: tab-separated lines → correct series + per-day commit lists; malformed line skipped without throwing.
 
 **Acceptance Criteria:**
 - Given the dashboard, when comparing a 1-commit day to a 0-commit day, then the 0-commit cell is much fainter (clear opacity difference, not a subtle hue shift) and the "Less" legend swatch matches.
@@ -80,3 +81,61 @@ context: []
 
 **Manual checks:**
 - Regenerate the site against this repo; confirm faint zero-days, click-to-open panels, prev/next hops across the active days, and identical behavior with JS disabled.
+
+## Suggested Review Order
+
+**Data: one git call → series + per-day details**
+
+- New `CommitInfo` + `CommitsByDay` on the pulse — the drill-down's data contract.
+  [`GitMetrics.cs:8`](../../src/SpecScribe/GitMetrics.cs#L8)
+
+- Pure, invariant-culture, malformed-line-tolerant parse of the tab-separated log format.
+  [`GitMetrics.cs:61`](../../src/SpecScribe/GitMetrics.cs#L61)
+
+- UTF-8 stdout so non-ASCII commit subjects survive Windows codepages.
+  [`GitMetrics.cs:107`](../../src/SpecScribe/GitMetrics.cs#L107)
+
+**Rendering: linked cells, role, panels**
+
+- Linked days resolved up front; they drive cell links, panels, and the SVG role.
+  [`Charts.cs:503`](../../src/SpecScribe/Charts.cs#L503)
+
+- `role="group"` only when links exist; link-free renders keep `role="img"`.
+  [`Charts.cs:520`](../../src/SpecScribe/Charts.cs#L520)
+
+- Active cells get anchor + aria-label; zero-cells stay unlinked and aria-hidden.
+  [`Charts.cs:564`](../../src/SpecScribe/Charts.cs#L564)
+
+- Panels: date heading, hash+subject list, dated prev/next, Close back to the chart.
+  [`Charts.cs:598`](../../src/SpecScribe/Charts.cs#L598)
+
+- One-line call-site wiring on the dashboard.
+  [`HtmlTemplater.cs:223`](../../src/SpecScribe/HtmlTemplater.cs#L223)
+
+**Styling: faintness + :target drill-down**
+
+- Zero-commit cells drop to 0.3 fill-opacity — the discernment fix.
+  [`specscribe.css:1391`](../../src/SpecScribe/assets/specscribe.css#L1391)
+
+- Rust hover stroke (gold would vanish on gold-filled cells); teal focus ring.
+  [`specscribe.css:1400`](../../src/SpecScribe/assets/specscribe.css#L1400)
+
+- `:target`-driven panel visibility — the whole no-JS interaction model.
+  [`specscribe.css:1430`](../../src/SpecScribe/assets/specscribe.css#L1430)
+
+- Legend swatch reuses the token via opacity, never a hand-copied rgba.
+  [`specscribe.css:1422`](../../src/SpecScribe/assets/specscribe.css#L1422)
+
+**Peripherals**
+
+- Drill-down, escaping, nav-edge, and no-details regression tests.
+  [`ChartsTests.cs:238`](../../tests/SpecScribe.Tests/ChartsTests.cs#L238)
+
+- Parse-contract tests incl. Buddhist-calendar culture pin and empty subjects.
+  [`GitMetricsTests.cs:1`](../../tests/SpecScribe.Tests/GitMetricsTests.cs#L1)
+
+- Consistent fixture + dashboard wiring integration test.
+  [`HtmlTemplaterTests.cs:149`](../../tests/SpecScribe.Tests/HtmlTemplaterTests.cs#L149)
+
+- Two stale comments corrected (behavior untouched) — cells are now link-wrapped.
+  [`specscribe.js:86`](../../src/SpecScribe/assets/specscribe.js#L86)

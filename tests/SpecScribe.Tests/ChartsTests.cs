@@ -236,7 +236,7 @@ public class ChartsTests
     }
 
     [Fact]
-    public void CommitHeatmap_CarriesRoleImgAndName()
+    public void CommitHeatmap_WithoutDetailsCarriesRoleImgAndName()
     {
         var series = new (DateOnly Day, int Count)[]
         {
@@ -246,10 +246,134 @@ public class ChartsTests
 
         var svg = Charts.CommitHeatmap(series);
 
+        // A link-free render keeps role="img": one named graphic, children hidden from AT.
         Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"Commit activity: 4 commits across 2 active days, 2026-01-05–2026-01-07\"", svg);
         // Per-cell tooltips remain for pointer users.
         Assert.Contains("<title>2026-01-05: 3 commits</title>", svg);
+    }
+
+    private static IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> Commits(
+        params (DateOnly Day, CommitInfo[] Items)[] days) =>
+        days.ToDictionary(d => d.Day, d => (IReadOnlyList<CommitInfo>)d.Items);
+
+    [Fact]
+    public void CommitHeatmap_LinksActiveDaysAndEmitsPanels()
+    {
+        var d1 = new DateOnly(2026, 1, 5);
+        var d2 = new DateOnly(2026, 1, 7);
+        var series = new (DateOnly Day, int Count)[] { (d1, 2), (d2, 1) };
+        var commits = Commits(
+            (d1, new[] { new CommitInfo("abc1234", "First change"), new CommitInfo("def5678", "Second change") }),
+            (d2, new[] { new CommitInfo("aaa1111", "Third change") }));
+
+        var svg = Charts.CommitHeatmap(series, commits);
+
+        // With drill-down links present, the SVG is role="group" so AT can reach them.
+        Assert.Contains("role=\"group\"", svg);
+        Assert.DoesNotContain("role=\"img\"", svg);
+        // Active-day cells are wrapped in drill-down anchors with accessible names...
+        Assert.Contains("<a href=\"#heat-day-2026-01-05\" aria-label=\"2026-01-05: 2 commits — view details\">", svg);
+        Assert.Contains("<a href=\"#heat-day-2026-01-07\" aria-label=\"2026-01-07: 1 commit — view details\">", svg);
+        // ...and each active day gets a panel listing hash + subject, plus a Close link back to the chart.
+        Assert.Contains("id=\"heat-day-2026-01-05\"", svg);
+        Assert.Contains("<code>abc1234</code> First change", svg);
+        Assert.Contains("<code>aaa1111</code> Third change", svg);
+        Assert.Contains("class=\"heatmap-day-close\" href=\"#commit-heatmap\"", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_ZeroCommitDaysAreNotLinks()
+    {
+        var d1 = new DateOnly(2026, 1, 5);
+        var series = new (DateOnly Day, int Count)[] { (d1, 2) };
+        var commits = Commits((d1, new[] { new CommitInfo("abc1234", "Only change") }));
+
+        var svg = Charts.CommitHeatmap(series, commits);
+
+        // Exactly ONE anchor inside the SVG: the single active day. Zero-commit cells stay unwrapped
+        // (no ~100-stop keyboard trap), so the grid contains no other hrefs.
+        var svgOnly = svg[..svg.IndexOf("</svg>", StringComparison.Ordinal)];
+        Assert.Equal(1, CountOf(svgOnly, "<a href=\"#heat-day-"));
+        // The zero-day tooltip is still present for pointer users.
+        Assert.Contains(": 0 commits</title>", svgOnly);
+    }
+
+    [Fact]
+    public void CommitHeatmap_EscapesCommitSubjects()
+    {
+        var d1 = new DateOnly(2026, 1, 5);
+        var series = new (DateOnly Day, int Count)[] { (d1, 1) };
+        var commits = Commits((d1, new[] { new CommitInfo("abc1234", "fix <div> & \"quotes\"") }));
+
+        var svg = Charts.CommitHeatmap(series, commits);
+
+        Assert.Contains("fix &lt;div&gt; &amp; &quot;quotes&quot;", svg);
+        Assert.DoesNotContain("fix <div>", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_PanelNavSkipsEmptyDaysAndOmitsAtEnds()
+    {
+        // Three active days with gaps between them — prev/next must hop across the gaps.
+        var d1 = new DateOnly(2026, 1, 5);
+        var d2 = new DateOnly(2026, 1, 9);
+        var d3 = new DateOnly(2026, 1, 14);
+        var series = new (DateOnly Day, int Count)[] { (d1, 1), (d2, 1), (d3, 1) };
+        var commits = Commits(
+            (d1, new[] { new CommitInfo("a1", "one") }),
+            (d2, new[] { new CommitInfo("b2", "two") }),
+            (d3, new[] { new CommitInfo("c3", "three") }));
+
+        var svg = Charts.CommitHeatmap(series, commits);
+
+        var p1 = PanelOf(svg, "2026-01-05");
+        var p2 = PanelOf(svg, "2026-01-09");
+        var p3 = PanelOf(svg, "2026-01-14");
+
+        // Earliest: next only, pointing at the adjacent ACTIVE day (not 01-06), naming its date.
+        Assert.DoesNotContain("heatmap-day-prev", p1);
+        Assert.Contains("href=\"#heat-day-2026-01-09\">Next active day (2026-01-09) &raquo;</a>", p1);
+        // Middle: both neighbors.
+        Assert.Contains("href=\"#heat-day-2026-01-05\"", p2);
+        Assert.Contains("href=\"#heat-day-2026-01-14\"", p2);
+        // Latest: previous only.
+        Assert.DoesNotContain("heatmap-day-next", p3);
+        Assert.Contains("href=\"#heat-day-2026-01-09\"", p3);
+        // Every panel carries a Close link even at the ends.
+        Assert.Contains("heatmap-day-close", p1);
+        Assert.Contains("heatmap-day-close", p3);
+    }
+
+    [Fact]
+    public void CommitHeatmap_WithoutDetailsRendersNoLinksOrPanels()
+    {
+        var series = new (DateOnly Day, int Count)[] { (new DateOnly(2026, 1, 5), 3) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        Assert.DoesNotContain("<a href=\"#heat-day-", svg);
+        Assert.DoesNotContain("class=\"heatmap-days\"", svg);
+        Assert.DoesNotContain("class=\"heatmap-day\"", svg);
+    }
+
+    private static int CountOf(string haystack, string needle)
+    {
+        var count = 0;
+        for (var i = haystack.IndexOf(needle, StringComparison.Ordinal); i >= 0;
+             i = haystack.IndexOf(needle, i + needle.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+        return count;
+    }
+
+    private static string PanelOf(string html, string date)
+    {
+        var start = html.IndexOf($"id=\"heat-day-{date}\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"panel for {date} not found");
+        var end = html.IndexOf("</section>", start, StringComparison.Ordinal);
+        return html[start..end];
     }
 
     [Fact]

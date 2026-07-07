@@ -437,6 +437,47 @@ code.color-swatch {
 
 .doc-body img { max-width: 100%; }
 
+/* Companion-documents cross-link block on spec-kernel pages: a de-emphasized related-docs strip that aids
+   navigation without competing with the article. Static (no motion), so prefers-reduced-motion is trivially
+   satisfied, and the links are real focusable anchors. [Story 2.2 Task 4] */
+.companion-docs {
+  margin: 2rem 0 0;
+  padding: 1rem 1.2rem;
+  background: var(--cream);
+  border: 1px solid var(--parchment-deep);
+  border-left: 3px solid var(--teal);
+  border-radius: 6px;
+}
+
+.companion-docs h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  border: none;
+  padding: 0;
+}
+
+.companion-docs ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+}
+
+.companion-docs li { margin: 0; }
+
+.companion-docs a {
+  color: var(--teal-deep);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--teal);
+}
+
+.companion-docs a:hover { color: var(--rust); border-bottom-color: var(--rust-light); }
+
 /* ====================== FOOTER ====================== */
 .doc-footer {
   margin: auto 0 0;
@@ -1345,11 +1386,26 @@ code.color-swatch {
   font-family: 'Courier New', monospace;
 }
 
-.heatmap-cell.level-0 { fill: var(--parchment-dark); }
+/* Level-0 is a faint wash, not a near-peer beige: a single-commit (level-1) day must read as activity
+   at a glance, so empty days drop way back while still tracing the grid shape. */
+.heatmap-cell.level-0 { fill: var(--parchment-dark); fill-opacity: 0.3; }
 .heatmap-cell.level-1 { fill: #ecd18f; }
 .heatmap-cell.level-2 { fill: #dfb455; }
 .heatmap-cell.level-3 { fill: var(--gold-light); }
 .heatmap-cell.level-4 { fill: var(--gold); }
+
+/* Active-day cells are drill-down links. Hover strokes rust (not gold — level-3/4 cells are FILLED gold,
+   which would swallow a gold stroke exactly on the busiest days). Zero-commit cells never sit inside an
+   <a>, so they take no pointer or focus affordance. */
+.heatmap a { cursor: pointer; }
+.heatmap a:hover .heatmap-cell { stroke: var(--rust-light); stroke-width: 2; }
+/* SVG <a> focus: default outlines render unreliably around SVG links, so express focus on the rect
+   itself — same approach as .sunburst a:focus-visible .sb-seg, teal to match the shared ring. */
+.heatmap a:focus-visible { outline: none; }
+.heatmap a:focus-visible .heatmap-cell {
+  stroke: var(--teal);
+  stroke-width: 2;
+}
 
 .heatmap-legend {
   display: flex;
@@ -1361,11 +1417,64 @@ code.color-swatch {
 }
 
 .heatmap-legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-.heatmap-legend-swatch.level-0 { background: var(--parchment-dark); }
+/* Same token + same 0.3 as the level-0 cells (via opacity, not a hand-copied rgba), so retuning
+   --parchment-dark can never desync the "Less" swatch from the grid. */
+.heatmap-legend-swatch.level-0 { background: var(--parchment-dark); opacity: 0.3; }
 .heatmap-legend-swatch.level-1 { background: #ecd18f; }
 .heatmap-legend-swatch.level-2 { background: #dfb455; }
 .heatmap-legend-swatch.level-3 { background: var(--gold-light); }
 .heatmap-legend-swatch.level-4 { background: var(--gold); }
+
+/* Per-day drill-down panels: hidden until their cell (or a sibling's prev/next link) targets them —
+   pure CSS :target keeps the drill-down working with JS disabled. */
+.heatmap-day { display: none; }
+.heatmap-day:target {
+  display: block;
+  margin-top: 0.8rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  scroll-margin-top: var(--nav-offset);
+}
+
+.heatmap-day h4 {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: var(--rust);
+  margin-bottom: 0.4rem;
+}
+
+/* A heavy day scrolls inside the panel rather than hard-truncating the commit list. The list carries
+   tabindex="0" so that overflow is keyboard-scrollable; show the shared teal ring when focused. */
+.heatmap-day-commits {
+  list-style: none;
+  max-height: 14rem;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  color: var(--ink-faded);
+}
+.heatmap-day-commits:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+.heatmap-day-commits li { padding: 0.15rem 0; }
+.heatmap-day-commits code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  color: var(--gold);
+  margin-right: 0.35rem;
+}
+
+.heatmap-day-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+.heatmap-day-nav a { color: var(--teal); text-decoration: none; }
+.heatmap-day-nav a:hover { color: var(--rust); text-decoration: underline; }
+.heatmap-day-nav a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+/* Close sits alone on the right edge, apart from the prev/next pair. */
+.heatmap-day-nav .heatmap-day-close { margin-left: auto; color: var(--ink-light); }
 
 /* ====================== MERMAID ====================== */
 .mermaid {
@@ -1769,7 +1878,7 @@ code.color-swatch {
   max-width: 100%;
   border: 1px solid var(--parchment-deep);
   border-radius: 6px;
-  background: var(--warm-white);
+  background: var(--parchment-dark); /* the whole badge is one tan pill — command + Copy + caret */
   font-family: 'Courier New', monospace;
   line-height: 1;
 }
@@ -1777,10 +1886,8 @@ code.color-swatch {
   display: inline-flex;
   align-items: center;
   padding: 0.4rem 0.65rem;
-  background: var(--parchment-dark);
   color: var(--ink);
   font-size: 0.8rem;
-  border-radius: 5px 0 0 5px;
   white-space: nowrap;
   overflow-x: auto; /* a long command scrolls instead of breaking the badge */
 }
@@ -1792,9 +1899,12 @@ code.color-swatch {
   border-left: 1px solid var(--parchment-deep);
 }
 
-/* Copy + caret blend into the badge: no individual border/background/radius, just hover tints. */
+/* Copy + caret blend into the tan badge: no individual border/background/radius, just a lighter hover
+   highlight (parchment is lighter than the parchment-dark badge). */
 .cmd-badge .copy-btn,
 .cmd-badge .send-toggle {
+  display: inline-flex;
+  align-items: center;
   font: inherit;
   font-family: 'Courier New', monospace;
   font-size: 0.7rem;
@@ -1807,13 +1917,16 @@ code.color-swatch {
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
 }
+.cmd-badge .copy-btn .icon { display: block; }
 .cmd-badge .copy-btn:hover,
 .cmd-badge .send-toggle:hover,
 .cmd-badge .send-menu[open] .send-toggle { background: var(--parchment); color: var(--rust); }
 .cmd-badge .copy-btn:focus-visible,
 .cmd-badge .send-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+/* Copied state: swap the icon for a check so the icon-only button still confirms. */
 .cmd-badge .copy-btn.copied { color: var(--moss); background: #e8f0e4; }
-.cmd-badge .copy-btn.copied::after { content: " \2713"; }
+.cmd-badge .copy-btn.copied .icon { display: none; }
+.cmd-badge .copy-btn.copied::after { content: "\2713"; }
 
 .send-menu { position: relative; display: inline-flex; }
 /* The caret: hairline separator from Copy, and its right edge rounds to follow the badge. */
@@ -1842,17 +1955,33 @@ code.color-swatch {
   border-radius: 6px;
   box-shadow: 0 6px 18px var(--shadow);
 }
-.send-link {
-  display: block;
+/* Menu rows — shared by the "Copy command" <button> and each deep-link <a>, so they line up identically.
+   Resets native <button> chrome so the copy row matches the anchors. */
+.send-menu-list .send-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.4rem 0.6rem;
+  border: none;
+  background: transparent;
   border-radius: 4px;
+  font: inherit;
+  font-family: 'Courier New', monospace;
   font-size: 0.75rem;
+  letter-spacing: 0.03em;
   color: var(--teal-deep);
+  text-align: left;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
-.send-link:hover { background: var(--parchment-dark); color: var(--rust); }
-.send-link:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.send-menu-list .send-item .icon { display: block; flex: 0 0 auto; opacity: 0.8; }
+.send-menu-list .send-item:hover { background: var(--parchment-dark); color: var(--rust); }
+.send-menu-list .send-item:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+/* Brief copied confirmation on the menu row (it usually closes on click, so this is a fallback). */
+.send-menu-list .send-item.copied { color: var(--moss); }
 
 /* The popover is absolutely positioned, but its .chart-panel ancestor sets overflow-x: auto (which makes
    the y-axis clip too). Lift the clip only while a menu is open — a next-steps panel has no wide chart to

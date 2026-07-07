@@ -72,6 +72,35 @@ public class SiteNavTests
     }
 
     [Fact]
+    public void Build_AddsSpecKernelQuickLinkWhenSpecKernelPresentWithoutDuplicatingArchitecture()
+    {
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/prds/prd-x/prd.md",
+            "planning-artifacts/epics.md",
+            "specs/spec-x/SPEC.md",
+            "specs/spec-x/ARCHITECTURE-SPINE.md",
+        }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false);
+
+        // The kernel quick-link points at the SPEC hub's generated page (the natural entry point).
+        var specLink = Assert.Single(nav.QuickLinks, q => q.Label == "Spec Kernel");
+        Assert.Equal("specs/spec-x/SPEC.html", specLink.OutputRelativePath);
+
+        // It is a quick-link only — no new top-nav "Specs" item — and the existing ARCHITECTURE-SPINE
+        // "Architecture" nav entry stays exactly once (not duplicated or removed). [Story 2.2 Task 3]
+        Assert.DoesNotContain("Spec Kernel", nav.Items.Select(i => i.Label));
+        Assert.Equal(new[] { "Home", "PRD", "Architecture", "Epics", "Requirements" }, nav.Items.Select(i => i.Label).ToArray());
+    }
+
+    [Fact]
+    public void Build_OmitsSpecKernelQuickLinkWhenNoSpecKernel()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Spec Kernel");
+    }
+
+    [Fact]
     public void RenderNavBar_AddsMobileToggleAndActivePageSemantics()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true);

@@ -85,8 +85,9 @@
 
   // Keyboard focus: a focused chart segment shows the tooltip anchored to its own box. This covers both the
   // link-wrapped sunburst segments AND directly-focusable segments (donut slices carry tabindex=0), so the
-  // on-brand tooltip is keyboard-reachable beyond the sunburst. Heatmap cells stay non-focusable by design
-  // (a ~100-cell tab order would be a trap) — their whole-chart aria-label is the keyboard/SR affordance.
+  // on-brand tooltip is keyboard-reachable beyond the sunburst. Zero-commit heatmap cells stay non-focusable
+  // by design (a ~100-cell tab order would be a trap; the whole-chart aria-label covers them), while
+  // active-day cells are link-wrapped for the drill-down and ride the same link branch as the sunburst.
   document.addEventListener("focusin", function (e) {
     if (!e.target.closest) return;
     var link = e.target.closest("a");
@@ -100,8 +101,9 @@
   document.addEventListener("scroll", hideTip, true);
 
   // Touch: give touch users the chart detail that used to hide behind a hover-only <title>. For a link-wrapped
-  // segment (sunburst) the first tap shows the tooltip and a second tap on the same link follows it; for a bare
-  // segment (donut slice, heatmap cell) a tap simply shows the tooltip. Either way, a tap elsewhere dismisses it.
+  // segment (sunburst slice, active-day heatmap cell) the first tap shows the tooltip and a second tap on the
+  // same link follows it; for a bare segment (donut slice, zero-commit heatmap cell) a tap simply shows the
+  // tooltip. Either way, a tap elsewhere dismisses it.
   var lastTapped = null;
   document.addEventListener("touchstart", function (e) {
     if (!e.target.closest) return;
@@ -152,7 +154,9 @@
   }
 
   document.addEventListener("click", function (e) {
-    var btn = e.target.closest ? e.target.closest(".copy-btn") : null;
+    // Any element carrying data-copy is a copy trigger: the badge's icon button, the menu's
+    // "Copy command" row, and the inline-guidance button all qualify.
+    var btn = e.target.closest ? e.target.closest("[data-copy]") : null;
     if (!btn) return;
     e.preventDefault();
     var text = btn.getAttribute("data-copy");
@@ -190,9 +194,9 @@
   document.addEventListener("click", function (e) {
     if (!document.querySelector("details.send-menu[open]")) return;
     var withinMenu = e.target.closest ? e.target.closest("details.send-menu") : null;
-    // Clicking the caret of one menu closes every other; picking a link (or clicking outside) closes all.
-    var pickedLink = e.target.closest ? e.target.closest(".send-link") : null;
-    closeSendMenus(withinMenu && !pickedLink ? withinMenu : null);
+    // Clicking the caret of one menu closes every other; picking a menu item (or clicking outside) closes all.
+    var pickedItem = e.target.closest ? e.target.closest(".send-item") : null;
+    closeSendMenus(withinMenu && !pickedItem ? withinMenu : null);
   });
 
   document.addEventListener("keydown", function (e) {

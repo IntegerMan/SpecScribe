@@ -66,12 +66,12 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasSendMenuStyles()
     {
-        // The unified command badge and its send menu (native <details>) with per-destination deep-link rows.
+        // The unified command badge and its send menu (native <details>) with shared menu rows.
         var css = ReadStylesheet();
         Assert.Contains(".cmd-badge", css);
         Assert.Contains(".send-menu", css);
         Assert.Contains(".send-toggle", css);
-        Assert.Contains(".send-link", css);
+        Assert.Contains(".send-item", css);
     }
 
     [Fact]

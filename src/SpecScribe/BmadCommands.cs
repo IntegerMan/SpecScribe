@@ -67,13 +67,21 @@ public static class BmadCommands
         return sb.ToString();
     }
 
+    /// <summary>A dependency-free "copy" glyph (two overlapping pages) that inherits its stroke from the
+    /// button's text color via <c>currentColor</c>. Marked aria-hidden because the button carries the label.</summary>
+    private const string CopyIconSvg =
+        "<svg class=\"icon\" viewBox=\"0 0 16 16\" width=\"13\" height=\"13\" aria-hidden=\"true\" focusable=\"false\">" +
+        "<rect x=\"2\" y=\"5\" width=\"9\" height=\"9\" rx=\"1.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.3\"/>" +
+        "<path d=\"M5 5V3.5A1.5 1.5 0 0 1 6.5 2H13A1.5 1.5 0 0 1 14.5 3.5V10A1.5 1.5 0 0 1 13 11.5H11\" " +
+        "fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.3\"/></svg>";
+
     /// <summary>The unified command badge for one suggestion: the slash-command text, then (past a vertical
-    /// separator) a primary Copy button and a caret that opens a native <c>&lt;details&gt;</c> menu of
-    /// per-destination deep links from <see cref="SendTargets"/>. Copy items reuse the existing
-    /// <c>.copy-btn</c> handler and the deep links are plain anchors; specscribe.js only adds click-away /
-    /// Escape dismissal for the menu. Degrades to selectable command text + native disclosure with JS off.
-    /// The command is URL-encoded into each link's <c>href</c> and then the whole attribute is HTML-escaped,
-    /// matching the double-escaping the <c>data-copy</c> attribute uses.</summary>
+    /// separator) an icon-only Copy button and a caret that opens a native <c>&lt;details&gt;</c> menu. The
+    /// menu leads with a labelled "Copy command" row, then the per-destination deep links from
+    /// <see cref="SendTargets"/>. Copy triggers are any element carrying <c>data-copy</c> (wired by
+    /// specscribe.js, which also adds click-away / Escape dismissal); the deep links are plain anchors and the
+    /// toggle is native, so it degrades to selectable command text + native disclosure with JS off. The command
+    /// is URL-encoded into each link's <c>href</c> and then HTML-escaped, matching the <c>data-copy</c> attribute.</summary>
     private static string RenderCommandBadge(string rawCommand)
     {
         var cmd = PathUtil.Html(rawCommand);
@@ -81,22 +89,26 @@ public static class BmadCommands
         sb.Append("<span class=\"cmd-badge\">");
         sb.Append($"<code class=\"cmd-text\">{cmd}</code>");
         sb.Append("<span class=\"cmd-badge-actions\">");
-        sb.Append($"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>");
+        sb.Append($"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">{CopyIconSvg}</button>");
+
+        // The menu always leads with a "Copy command" row (a second, labelled way to copy), then any
+        // per-destination deep links. Rendered even if SendTargets is empty, so the caret is always useful.
+        sb.Append("<details class=\"send-menu\">");
+        sb.Append("<summary class=\"send-toggle\" aria-label=\"Other ways to send this command\">▾</summary>");
+        sb.Append($"<div class=\"send-menu-list\" role=\"group\" aria-label=\"Send {cmd} to an editor\">");
+        sb.Append($"<button type=\"button\" class=\"send-item\" data-copy=\"{cmd}\" aria-label=\"Copy command\">{CopyIconSvg}<span>Copy command</span></button>");
 
         if (SendTargets.Count > 0)
         {
             var encoded = Uri.EscapeDataString(rawCommand);
-            sb.Append("<details class=\"send-menu\">");
-            sb.Append("<summary class=\"send-toggle\" aria-label=\"Other ways to send this command\">▾</summary>");
-            sb.Append($"<div class=\"send-menu-list\" role=\"group\" aria-label=\"Send {cmd} to an editor\">");
             foreach (var target in SendTargets)
             {
                 var href = PathUtil.Html(target.UriTemplate.Replace("{cmd}", encoded));
-                sb.Append($"<a class=\"send-link\" href=\"{href}\">{PathUtil.Html(target.Label)}</a>");
+                sb.Append($"<a class=\"send-item\" href=\"{href}\">{PathUtil.Html(target.Label)}</a>");
             }
-            sb.Append("</div></details>");
         }
 
+        sb.Append("</div></details>");
         sb.Append("</span></span>");
         return sb.ToString();
     }
@@ -268,7 +280,8 @@ public static class BmadCommands
         {
             var nextStory = epicNeedingStory.Stories.First(s => s.ArtifactOutputPath is null);
             Add(suggestions, commands.Command("create-story", nextStory.Id),
-                $"Drafts the implementation plan for Epic {epicNeedingStory.Number}'s next story ({nextStory.Id}) — it doesn't have one yet.");
+                // "Story N.M" (not a bare "(N.M)") so StoryEpicLinkifier links it to the story's page.
+                $"Drafts the implementation plan for Story {nextStory.Id} — Epic {epicNeedingStory.Number}'s next story that doesn't have one yet.");
         }
 
         // The next epic still waiting to be broken down into stories.

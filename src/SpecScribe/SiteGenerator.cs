@@ -424,6 +424,7 @@ public sealed class SiteGenerator
             var alreadyExisted = _docs.ContainsKey(relative);
             var outputRelative = PathUtil.ToOutputRelative(relative);
             var doc = MarkdownConverter.Convert(sourceFullPath, relative, outputRelative);
+            doc.Companions = ResolveSpecCompanions(doc);
 
             var outputFullPath = Path.Combine(_options.OutputRoot, outputRelative);
             Directory.CreateDirectory(Path.GetDirectoryName(outputFullPath)!);
@@ -637,6 +638,71 @@ public sealed class SiteGenerator
         }
 
         return map;
+    }
+
+    /// <summary>Resolves a spec-kernel doc's frontmatter <c>companions:</c>/<c>sources:</c> references to real
+    /// generated pages, for the "Companion documents" cross-link block. Only docs under <c>specs/</c> carry
+    /// these; every other doc yields an empty list (no block). Each reference is resolved relative to the spec
+    /// doc's own directory; it becomes a link ONLY when the target file exists on disk, sits inside
+    /// <see cref="ForgeOptions.SourceRoot"/>, and isn't an ignored file (so a listed-but-missing companion, or
+    /// an ignored <c>.memlog.md</c> that never generates a page, is silently omitted rather than emitting a
+    /// broken link — AC #2 / NFR2). Resolution is by file existence, not <see cref="_docs"/> membership, so it
+    /// is order-independent during the full-rebuild pass. [Story 2.2 Task 4]</summary>
+    private IReadOnlyList<(string Label, string Href)> ResolveSpecCompanions(DocModel doc)
+    {
+        var sourceRel = PathUtil.NormalizeSlashes(doc.SourceRelativePath);
+        if (!sourceRel.StartsWith("specs/", StringComparison.OrdinalIgnoreCase))
+        {
+            return Array.Empty<(string, string)>();
+        }
+
+        var references = doc.Frontmatter.Companions.Concat(doc.Frontmatter.Sources).ToList();
+        if (references.Count == 0)
+        {
+            return Array.Empty<(string, string)>();
+        }
+
+        var prefix = PathUtil.RelativePrefix(doc.OutputRelativePath);
+        var sourceRootFull = Path.GetFullPath(_options.SourceRoot);
+        var sourceDir = Path.GetDirectoryName(Path.Combine(sourceRootFull, sourceRel.Replace('/', Path.DirectorySeparatorChar))) ?? sourceRootFull;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var resolved = new List<(string Label, string Href)>();
+        foreach (var reference in references)
+        {
+            if (string.IsNullOrWhiteSpace(reference)) continue;
+
+            var candidateFull = Path.GetFullPath(Path.Combine(sourceDir, reference.Replace('/', Path.DirectorySeparatorChar)));
+
+            // Inside SourceRoot, on disk, and generatable (not ignored). Otherwise omit — never a broken link.
+            if (!candidateFull.StartsWith(sourceRootFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!File.Exists(candidateFull) || IsIgnored(candidateFull)) continue;
+
+            var candidateRel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.SourceRoot, candidateFull));
+            // Don't cross-link a doc to itself, and list each target once even if named as both companion and source.
+            if (string.Equals(candidateRel, sourceRel, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!seen.Add(candidateRel)) continue;
+
+            var href = prefix + PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(candidateRel));
+            resolved.Add((PrettyLabel(candidateRel), href));
+        }
+
+        return resolved;
+    }
+
+    /// <summary>A human, title-cased label for a related-doc cross-link, derived from its filename
+    /// (e.g. <c>requirements-catalog.md</c> → "Requirements Catalog"). Kept order-independent — it never reads
+    /// the target's own title, which may not have been generated yet during the rebuild pass. [Story 2.2 Task 4]</summary>
+    private static string PrettyLabel(string sourceRelativePath)
+    {
+        var ti = System.Globalization.CultureInfo.InvariantCulture.TextInfo;
+        var words = Path.GetFileNameWithoutExtension(sourceRelativePath)
+            .Split('-', '_', ' ')
+            .Where(w => w.Length > 0)
+            // Preserve an all-caps token as-is so acronym filenames (PRD, SPEC) don't degrade to "Prd"/"Spec";
+            // title-case everything else (requirements-catalog → "Requirements Catalog").
+            .Select(w => w.All(char.IsUpper) ? w : ti.ToTitleCase(w.ToLowerInvariant()));
+        return string.Join(" ", words);
     }
 
     private string ToSourceRelative(string fullPath) =>

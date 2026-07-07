@@ -41,6 +41,22 @@ public static class HtmlTemplater
         main.Append(doc.BodyHtml);
         main.Append("\n</article>\n");
 
+        // Companion/related-docs cross-links (spec-kernel pages only): a de-emphasized nav block so the kernel
+        // is navigable as a set. Each entry was resolved to a real generated page by the SiteGenerator, so a
+        // missing/unresolved reference is already omitted — never a broken link. Rendered only when non-empty,
+        // so every other page is unaffected. The <h2> lives outside doc.Headings, so the TOC is untouched. [Story 2.2 Task 4]
+        if (doc.Companions.Count > 0)
+        {
+            main.Append("<nav class=\"companion-docs\" aria-label=\"Companion documents\">\n");
+            main.Append("  <h2>Companion documents</h2>\n");
+            main.Append("  <ul>\n");
+            foreach (var (label, href) in doc.Companions)
+            {
+                main.Append($"    <li><a href=\"{Html(href)}\">{Html(label)}</a></li>\n");
+            }
+            main.Append("  </ul>\n</nav>\n");
+        }
+
         var tocEntries = doc.Headings
             .Where(h => h.Level is 2 or 3)
             .Select(h => new Toc.Entry(h.Level, h.Text, h.Id))
@@ -66,6 +82,11 @@ public static class HtmlTemplater
         {
             ("Overview", ""),
             ("Planning Artifacts", "planning-artifacts"),
+            // The spec kernel (SPEC.md + companions under specs/) is its own first-class band — the canonical
+            // contract, so it sits between planning and implementation instead of falling into "Other". Keyed
+            // on the specs/ directory prefix, disjoint from Story 2.1's implementation-artifacts/spec-*.md. The
+            // empty-group guard below omits the section cleanly when no specs/ content exists. [Story 2.2 Task 2]
+            ("Spec Kernel", "specs"),
             ("Implementation Artifacts", "implementation-artifacts"),
         };
 
@@ -199,7 +220,7 @@ public static class HtmlTemplater
 
         sb.Append("<div class=\"chart-panel\">\n<h3>Commit Activity</h3>\n");
         sb.Append(p.Git is { } gitPulse
-            ? Charts.CommitHeatmap(gitPulse.DailySeries)
+            ? Charts.CommitHeatmap(gitPulse.DailySeries, gitPulse.CommitsByDay)
             : "<div class=\"chart-empty\">No git history available.</div>\n");
         sb.Append("</div>\n\n");
 
@@ -571,7 +592,7 @@ public static class HtmlTemplater
     {
         var href = PathUtil.NormalizeSlashes(d.OutputRelativePath);
         sb.Append($"  <a class=\"index-card\" href=\"{Html(href)}\">\n");
-        sb.Append($"    <h2>{Html(d.Title)}</h2>\n");
+        sb.Append($"    <h2>{Html(IndexCardTitle(d))}</h2>\n");
 
         var descParts = new List<string>();
         if (d.Frontmatter.Status is { Length: > 0 } s) descParts.Add(s);
@@ -585,6 +606,15 @@ public static class HtmlTemplater
         sb.Append($"    <span class=\"index-card-path\">{Html(PathUtil.NormalizeSlashes(d.SourceRelativePath))}</span>\n");
         sb.Append("  </a>\n");
     }
+
+    /// <summary>The title to show on a doc's index card. The SPEC kernel hub's own H1 is the generic, project-
+    /// named "SpecScribe" — meaningless as a card in a Spec Kernel band — so a doc carrying an <c>id: SPEC-*</c>
+    /// gets a clear, disambiguating card label instead. This affects the index card ONLY; the page's own
+    /// &lt;h1&gt; is never rewritten. Well-contained to the SPEC hub, not a general renamer. [Story 2.2 Task 2]</summary>
+    private static string IndexCardTitle(DocModel d) =>
+        d.Frontmatter.Id is { Length: > 0 } id && id.StartsWith("SPEC-", StringComparison.OrdinalIgnoreCase)
+            ? "SPEC — Canonical Contract"
+            : d.Title;
 
     private static void AppendPill(StringBuilder sb, string? value, string _)
     {

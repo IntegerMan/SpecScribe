@@ -90,8 +90,27 @@ public sealed class SiteNav
             quickLinks.Add(("ADRs", AdrsLandingOutputPath, "Browse architecture decisions."));
         }
 
+        // The spec kernel (SPEC.md + companions under specs/) is a first-class artifact class: surface a
+        // dashboard quick-link to its canonical SPEC hub — the natural entry point — gated on the specs/
+        // directory the same way epics/ADRs are matched by well-known presence, so an absent kernel simply
+        // omits the link (no broken nav). The existing "Architecture" (ARCHITECTURE-SPINE) module-doc nav
+        // entry is a separate concern and is left untouched — not duplicated here. [Story 2.2 Task 3]
+        var specKernelHub = sourceRelativePaths.FirstOrDefault(p =>
+            IsUnderSpecs(p) && string.Equals(Path.GetFileName(p), "SPEC.md", StringComparison.OrdinalIgnoreCase));
+        if (specKernelHub is not null)
+        {
+            var specOutputPath = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(specKernelHub));
+            quickLinks.Add(("Spec Kernel", specOutputPath, "Read the canonical SPEC kernel and its companions."));
+        }
+
         return new SiteNav { Items = items, QuickLinks = quickLinks, SiteTitle = siteTitle };
     }
+
+    /// <summary>True when a source path lives under the <c>specs/</c> directory (the spec-kernel folder
+    /// convention), keyed by directory prefix rather than the <c>spec</c> filename substring so it stays
+    /// disjoint from Story 2.1's <c>implementation-artifacts/spec-*.md</c> quick-dev files. [Story 2.2 Task 1]</summary>
+    private static bool IsUnderSpecs(string sourceRelativePath) =>
+        PathUtil.NormalizeSlashes(sourceRelativePath).StartsWith("specs/", StringComparison.OrdinalIgnoreCase);
 
     public string RenderNavBar(string currentOutputRelativePath)
     {

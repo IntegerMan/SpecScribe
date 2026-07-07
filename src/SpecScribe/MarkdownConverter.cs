@@ -151,6 +151,9 @@ public static class MarkdownConverter
                 Status = GetString(map, "status"),
                 Route = GetString(map, "route"),
                 Type = GetString(map, "type"),
+                Id = GetString(map, "id"),
+                Companions = GetStringList(map, "companions"),
+                Sources = GetStringList(map, "sources"),
             };
             return (fm, body);
         }
@@ -163,6 +166,26 @@ public static class MarkdownConverter
 
     private static string? GetString(Dictionary<string, object> map, string key)
         => map.TryGetValue(key, out var value) && value is not null ? value.ToString() : null;
+
+    /// <summary>Reads a YAML sequence (e.g. <c>companions:</c>/<c>sources:</c>) as a list of strings.
+    /// YamlDotNet deserializes a sequence into a <see cref="List{Object}"/>, so we project each element via
+    /// <see cref="object.ToString"/>. A scalar or malformed value (not a sequence) degrades to an empty list
+    /// rather than throwing, so a mis-authored frontmatter never breaks generation. [Story 2.2 Task 4]</summary>
+    private static IReadOnlyList<string> GetStringList(Dictionary<string, object> map, string key)
+    {
+        // A YAML string is IEnumerable<char>, not IEnumerable<object>, so a scalar value falls through to the
+        // empty return below — exactly the "scalar degrades to empty" contract.
+        if (map.TryGetValue(key, out var value) && value is IEnumerable<object> items)
+        {
+            return items
+                .Where(x => x is not null)
+                .Select(x => x!.ToString() ?? string.Empty)
+                .Where(s => s.Length > 0)
+                .ToList();
+        }
+
+        return Array.Empty<string>();
+    }
 
     private static string? ExtractFirstH1(string body)
     {

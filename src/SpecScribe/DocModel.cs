@@ -16,4 +16,11 @@ public sealed class DocModel
     /// <summary>True when the rendered body contains a mermaid diagram, so the page template knows to inject the
     /// client-side mermaid init script (see <see cref="Mermaid.InitScript"/>).</summary>
     public bool HasMermaid { get; init; }
+
+    /// <summary>Resolved cross-reference links to this doc's companion/source documents, attached by
+    /// <see cref="SiteGenerator"/> after conversion (spec-kernel pages only, resolved by file existence so a
+    /// missing target is never a broken link). Empty for every other doc, so the templater omits the block.
+    /// Settable post-construction, mirroring how <see cref="StoryInfo.ArtifactOutputPath"/> is filled in the
+    /// generation pass. [Story 2.2 Task 4]</summary>
+    public IReadOnlyList<(string Label, string Href)> Companions { get; set; } = Array.Empty<(string, string)>();
 }

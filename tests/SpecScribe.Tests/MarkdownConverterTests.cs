@@ -59,6 +59,42 @@ public class MarkdownConverterTests : IDisposable
     }
 
     [Fact]
+    public void Convert_ParsesIdAndCompanionSourceListsWhenPresent()
+    {
+        // A spec-kernel doc declares its cross-references as YAML lists (companions:/sources:) plus an id. [Story 2.2 Task 4]
+        var spec = Convert("""
+            ---
+            id: SPEC-specscribe
+            companions:
+              - requirements-catalog.md
+              - settings-and-signals.md
+            sources:
+              - ../../planning-artifacts/prd.md
+            ---
+            # SpecScribe
+            """);
+
+        Assert.Equal("SPEC-specscribe", spec.Frontmatter.Id);
+        Assert.Equal(new[] { "requirements-catalog.md", "settings-and-signals.md" }, spec.Frontmatter.Companions);
+        Assert.Equal(new[] { "../../planning-artifacts/prd.md" }, spec.Frontmatter.Sources);
+    }
+
+    [Fact]
+    public void Convert_CompanionAndSourceListsDefaultEmptyWhenAbsentOrScalar()
+    {
+        // Absent → empty (every non-spec doc is unaffected).
+        var plain = Convert("---\ntitle: Normal\n---\n# Body\n");
+        Assert.Empty(plain.Frontmatter.Companions);
+        Assert.Empty(plain.Frontmatter.Sources);
+        Assert.Null(plain.Frontmatter.Id);
+
+        // A scalar (not a YAML sequence) degrades to empty rather than throwing.
+        var scalar = Convert("---\ncompanions: just-a-string\nsources: also-scalar\n---\n# Body\n");
+        Assert.Empty(scalar.Frontmatter.Companions);
+        Assert.Empty(scalar.Frontmatter.Sources);
+    }
+
+    [Fact]
     public void Convert_FallsBackToFirstH1ThenFilenameForTitle()
     {
         Assert.Equal("From Heading", Convert("# From Heading\n\ntext").Title);

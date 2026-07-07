@@ -159,7 +159,15 @@ public class HtmlTemplaterTests
             TasksDone = 0,
             TasksTotal = 0,
             PerEpic = Array.Empty<EpicProgress>(),
-            Git = new GitPulse(totalCommits, 1, day, day, new (DateOnly, int)[] { (day, totalCommits) }),
+            // CommitsByDay stays consistent with the series (production can never emit a mismatch), so
+            // templater tests exercise the real linked-cells + panels path.
+            Git = new GitPulse(totalCommits, 1, day, day, new (DateOnly, int)[] { (day, totalCommits) },
+                new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>
+                {
+                    [day] = Enumerable.Range(1, totalCommits)
+                        .Select(i => new CommitInfo($"c{i:000}", $"Change {i}"))
+                        .ToList(),
+                }),
         };
     }
 
@@ -181,6 +189,26 @@ public class HtmlTemplaterTests
 
         // "1 Commits" was the reported defect — the count-bearing label must agree in number. [Story 1.5 A2]
         Assert.Contains($"class=\"stat-label\">{expectedLabel}</div>", html);
+    }
+
+    [Fact]
+    public void RenderIndex_WiresHeatmapDrilldownThroughDashboard()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressWithCommits(3),
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // The call-site wiring (CommitsByDay → CommitHeatmap) surfaces linked cells and panels on the page.
+        Assert.Contains("<a href=\"#heat-day-2026-01-05\"", html);
+        Assert.Contains("id=\"heat-day-2026-01-05\"", html);
+        Assert.Contains("<code>c001</code> Change 1", html);
     }
 
     [Fact]
@@ -354,6 +382,64 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderIndex_EmitsSpecKernelSectionWithClearTitleAndKeepsItOutOfOther()
+    {
+        // Nav built without the spec source so this test isolates the index grouping — the kernel quick-link
+        // pill (which also targets SPEC.html) is exercised separately in SiteNavTests.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        // The SPEC hub's own H1 is the generic project name "SpecScribe"; it carries id: SPEC-* frontmatter so
+        // its index card must read as a clear, disambiguating label instead. Companions title clearly from H1.
+        var spec = Doc("specs/spec-x/SPEC.md", "specs/spec-x/SPEC.html", "SpecScribe", new Frontmatter { Id = "SPEC-x" });
+        var companion = Doc("specs/spec-x/requirements-catalog.md", "specs/spec-x/requirements-catalog.html", "Requirements Catalog", Frontmatter.Empty);
+        var docs = new[] { spec, companion };
+
+        var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
+
+        // Labeled "Spec Kernel" band (AC #1), not the generic "Other" bucket.
+        Assert.Contains("<div class=\"index-section-title\">Spec Kernel</div>", html);
+        Assert.DoesNotContain("<div class=\"index-section-title\">Other</div>", html);
+        // Both kernel docs are carded under it; the SPEC hub carries the clear title, not a bare "SpecScribe".
+        Assert.Contains(">SPEC — Canonical Contract</h2>", html);
+        Assert.DoesNotContain(">SpecScribe</h2>", html);
+        Assert.Contains(">Requirements Catalog</h2>", html);
+        // Each kernel doc is listed exactly once (claimed by the Spec Kernel group, not double-listed).
+        Assert.Equal(1, CountOccurrences(html, "href=\"specs/spec-x/SPEC.html\""));
+        Assert.Equal(1, CountOccurrences(html, "href=\"specs/spec-x/requirements-catalog.html\""));
+    }
+
+    [Fact]
+    public void RenderIndex_OmitsSpecKernelSectionWhenNoSpecDocs()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var docs = new[] { Doc("implementation-artifacts/x.md", "implementation-artifacts/x.html", "X", Frontmatter.Empty) };
+
+        var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
+
+        // No specs/ content → the empty-group guard omits the section cleanly (AC #2 graceful degradation).
+        Assert.DoesNotContain("Spec Kernel", html);
+    }
+
+    [Fact]
+    public void RenderPage_RendersCompanionDocsBlockOnlyWhenResolvedCompanionsPresent()
+    {
+        var nav = SiteNav.Build(new[] { "specs/spec-x/SPEC.md" }, "SpecScribe", hasAdrs: false);
+
+        var withCompanions = Doc("specs/spec-x/SPEC.md", "specs/spec-x/SPEC.html", "SpecScribe", new Frontmatter { Id = "SPEC-x" });
+        withCompanions.Companions = new[] { ("Requirements Catalog", "requirements-catalog.html") };
+        var withHtml = HtmlTemplater.RenderPage(withCompanions, nav);
+        Assert.Contains("class=\"companion-docs\"", withHtml);
+        Assert.Contains("Companion documents", withHtml);
+        Assert.Contains("<a href=\"requirements-catalog.html\">Requirements Catalog</a>", withHtml);
+
+        // A doc with no resolved companions renders no block (every non-spec page is unaffected).
+        var plain = Doc("planning-artifacts/prd.md", "planning-artifacts/prd.html", "PRD", Frontmatter.Empty);
+        var plainHtml = HtmlTemplater.RenderPage(plain, nav);
+        Assert.DoesNotContain("companion-docs", plainHtml);
+    }
+
+    [Fact]
     public void RenderEpicsIndex_EmptyModelEmitsCreateEpicsGuidanceWhenModuleExposesIt()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
@@ -382,18 +468,20 @@ public class HtmlTemplaterTests
 
         var html = BmadCommands.RenderNextSteps(story, commands);
 
-        // Unified badge: the command text lives inside the badge, and the primary Copy (with its
-        // data-copy payload) is preserved.
+        // Unified badge: the command text lives inside the badge, and the primary Copy button (now an
+        // icon carrying its data-copy payload) is preserved.
         Assert.Contains("class=\"cmd-badge\"", html);
         Assert.Contains("<code class=\"cmd-text\">/bmad-dev-story 1.1</code>", html);
-        Assert.Contains("data-copy=\"/bmad-dev-story 1.1\"", html);
-        // ...alongside a native <details> send menu.
+        Assert.Contains("class=\"copy-btn\" data-copy=\"/bmad-dev-story 1.1\"", html);
+        Assert.Contains("<svg class=\"icon\"", html); // Copy is an icon, not the word "Copy"
+        // The send menu leads with a "Copy command" row (a second copy trigger), then the deep links.
         Assert.Contains("<details class=\"send-menu\">", html);
         Assert.Contains("<summary class=\"send-toggle\"", html);
+        Assert.Contains("<button type=\"button\" class=\"send-item\" data-copy=\"/bmad-dev-story 1.1\"", html);
+        Assert.Contains("<span>Copy command</span>", html);
         // The Cursor deep link carries the URL-encoded command (slash -> %2F, space -> %20).
         Assert.Contains(
-            "href=\"cursor://anysphere.cursor-deeplink/prompt?text=%2Fbmad-dev-story%201.1\"", html);
-        Assert.Contains(">Open in Cursor</a>", html);
+            "<a class=\"send-item\" href=\"cursor://anysphere.cursor-deeplink/prompt?text=%2Fbmad-dev-story%201.1\">Open in Cursor</a>", html);
     }
 
     [Fact]

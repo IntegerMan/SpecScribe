@@ -32,3 +32,11 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-gherkin-styling-and-story-epic-links.md`
   summary: Undrafted-story placeholder pages are only reachable from inline "Story N.M" prose mentions — the epic-page story cards render undrafted titles as unlinked text and the home "Now & Next" card falls back to the epic page, so the primary navigational surfaces don't route to the placeholder.
   evidence: `EpicsTemplater.AppendStoryCard` leaves an artifact-less story's title as a plain `<span>` (only artifact-backed titles become `story-title-link`), and `HtmlTemplater`'s next-story card uses `story.ArtifactOutputPath ?? epic page`. This story deliberately scoped the placeholder as a link target for mentions; wiring the epic cards / next-story card to placeholders was called out as an "Ask First" boundary in the spec, so it was left for a focused follow-up rather than expanded here.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-commit-heatmap-contrast-and-day-drilldown.md`
+  summary: Bound the commit heatmap's history payload for mature repos (git log window or per-day cap) — the grid and drill-down panels currently span the full history, embedding every commit hash+subject in the dashboard HTML.
+  evidence: Review found `git log` runs uncapped and every active day emits a full panel; fine for young BMAD projects, multi-MB dashboard risk (and 3s git-timeout risk) on repos with tens of thousands of commits. Windowing is a product decision (grid has always spanned full history), so it needs its own intent.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-commit-heatmap-contrast-and-day-drilldown.md`
+  summary: Add a keyboard bypass affordance around the commit heatmap for dense histories where nearly every day is an active-day link (~100 sequential tab stops).
+  evidence: Review noted the zero-commit-cells-unlinked mitigation only helps sparse histories; a repo with daily commits over the 15+ week window produces ~105 tab stops with no skip link before the panels.
