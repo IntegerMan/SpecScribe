@@ -13,21 +13,39 @@ public static class GherkinStyler
         "<strong>(Given|When|Then|And|But)</strong>",
         RegexOptions.Compiled);
 
-    /// <summary>Restructures a rendered criterion (one inline-HTML flow with embedded
-    /// <c>&lt;strong&gt;</c> keywords) so each keyword opens a block-level "gherkin-line" span. Prose
-    /// before the first keyword stays outside the line structure; prose after the last keyword's clause
-    /// (e.g. an "Origin &amp; scope" note) stays inside that final line. Criteria containing no bold
-    /// keywords come back unchanged.
+    // A multi-paragraph criterion body (clauses + a trailing "Origin & scope"-style note) keeps its
+    // Markdig <p> wrappers because RenderInline only strips a single enclosing pair. Chips-per-line must
+    // then be applied within each paragraph's own inline flow — slicing across a <p> boundary would emit
+    // overlapping tags. <p> can't nest in HTML, so the lazy pair-match is unambiguous.
+    private static readonly Regex Paragraph = new(
+        "<p>(.*?)</p>",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+
+    /// <summary>Restructures a rendered criterion so each keyword opens a block-level "gherkin-line"
+    /// span. A bare inline flow (the common case) is processed directly; a multi-paragraph body is
+    /// processed per-paragraph, so the clause paragraph gets per-line chips while a trailing note
+    /// paragraph renders untouched below it. Prose before the first keyword in a flow stays outside the
+    /// line structure; prose after the last keyword's clause stays inside that final line. Criteria
+    /// containing no bold keywords come back unchanged.</summary>
+    public static string StyleCriterion(string html)
+    {
+        if (string.IsNullOrEmpty(html) || !KeywordStrong.IsMatch(html)) return html;
+
+        return html.Contains("<p>", StringComparison.Ordinal)
+            ? Paragraph.Replace(html, m => $"<p>{StyleFlow(m.Groups[1].Value)}</p>")
+            : StyleFlow(html);
+    }
+
+    /// <summary>The per-flow pass: wraps each keyword clause of one inline flow (a whole single-paragraph
+    /// criterion, or one paragraph's inner content) in a "gherkin-line" span.
     ///
     /// The block-per-line wrapping only holds when every keyword sits at the top level of the flow (the
     /// authored convention: a flat "**Given** … **When** …" sequence). If a keyword is nested inside
     /// another inline element (e.g. an emphasized or linked run), slicing between keyword positions would
     /// cut across that element and emit overlapping tags — so we degrade to styling the keyword markers in
     /// place, never producing invalid HTML.</summary>
-    public static string StyleCriterion(string html)
+    private static string StyleFlow(string html)
     {
-        if (string.IsNullOrEmpty(html)) return html;
-
         var matches = KeywordStrong.Matches(html);
         if (matches.Count == 0) return html;
 
@@ -47,7 +65,7 @@ public static class GherkinStyler
             var m = matches[i];
             var clauseEnd = i + 1 < matches.Count ? matches[i + 1].Index : html.Length;
             var clause = html[(m.Index + m.Length)..clauseEnd];
-            sb.Append($"<span class=\"gherkin-line\">{KeywordSpan(m.Groups[1].Value)}{clause.TrimEnd()}</span>");
+            sb.Append($"<span class=\"gherkin-line\">{KeywordSpan(m.Groups[1].Value)}{clause.Trim()}</span>");
         }
 
         return sb.ToString();

@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["--yes", "serve", "SpecScribeOutput", "-l", "4321"],
       "port": 4321
+    },
+    {
+      "name": "badge-verify",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "SpecScribeOutput"],
+      "autoPort": true
     }
   ]
 }

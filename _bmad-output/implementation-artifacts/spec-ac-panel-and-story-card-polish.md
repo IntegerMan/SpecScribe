@@ -2,8 +2,9 @@
 title: 'AC display polish: paragraph-aware Gherkin lines, epic-card AC numbering, story-card task indicator'
 type: 'feature'
 created: '2026-07-06'
-status: 'draft'
+status: 'in-progress'
 review_loop_iteration: 0
+baseline_commit: 'a1010716038364da1a6d95288d5a3b156c4323b8'
 context: []
 ---
 

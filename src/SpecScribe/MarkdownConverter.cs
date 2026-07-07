@@ -94,12 +94,17 @@ public static class MarkdownConverter
     public static string StripFrontmatter(string raw) => SplitFrontmatter(raw).Body;
 
     /// <summary>Renders a single line/run of markdown to inline HTML (bold, code spans, links) with no
-    /// wrapping block element — used for AC lines, goal text, and other fragments pulled out of a larger doc.</summary>
+    /// wrapping block element — used for AC lines, goal text, and other fragments pulled out of a larger doc.
+    /// The unwrap only fires for a single-paragraph result: stripping the first <c>&lt;p&gt;</c> and last
+    /// <c>&lt;/p&gt;</c> of a multi-paragraph body (e.g. an acceptance criterion with a trailing note) would
+    /// leave unbalanced fragments ("clause…&lt;/p&gt;&lt;p&gt;note…") that break downstream HTML-aware
+    /// passes and browser layout alike — those bodies keep their paragraph structure intact.</summary>
     public static string RenderInline(string markdown)
     {
         if (string.IsNullOrWhiteSpace(markdown)) return string.Empty;
         var html = Markdown.ToHtml(markdown, Pipeline).Trim();
-        if (html.StartsWith("<p>", StringComparison.Ordinal) && html.EndsWith("</p>", StringComparison.Ordinal))
+        if (html.StartsWith("<p>", StringComparison.Ordinal) && html.EndsWith("</p>", StringComparison.Ordinal)
+            && html.IndexOf("<p>", 3, StringComparison.Ordinal) < 0)
         {
             html = html[3..^4];
         }

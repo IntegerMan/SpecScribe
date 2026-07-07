@@ -89,14 +89,17 @@ public static class BmadCommands
         sb.Append("<span class=\"cmd-badge\">");
         sb.Append($"<code class=\"cmd-text\">{cmd}</code>");
         sb.Append("<span class=\"cmd-badge-actions\">");
-        sb.Append($"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" aria-label=\"Copy command\">{CopyIconSvg}</button>");
+        // Icon-only Copy button — its rich on-brand tooltip (data-tooltip) names the action since there's no
+        // visible label; the aria-label serves screen readers the same way.
+        sb.Append($"<button type=\"button\" class=\"copy-btn\" data-copy=\"{cmd}\" data-tooltip=\"Copy command\" aria-label=\"Copy command\">{CopyIconSvg}</button>");
 
-        // The menu always leads with a "Copy command" row (a second, labelled way to copy), then any
-        // per-destination deep links. Rendered even if SendTargets is empty, so the caret is always useful.
+        // The menu leads with a plain "Copy" row (a second, labelled way to copy), then any per-destination
+        // deep links. Rendered even if SendTargets is empty, so the caret is always useful. Menu rows are
+        // text-only (no icons) — there's no fitting glyph for the deep-link targets, so none carry one.
         sb.Append("<details class=\"send-menu\">");
-        sb.Append("<summary class=\"send-toggle\" aria-label=\"Other ways to send this command\">▾</summary>");
+        sb.Append("<summary class=\"send-toggle\" data-tooltip=\"More options\" aria-label=\"Other ways to send this command\">▾</summary>");
         sb.Append($"<div class=\"send-menu-list\" role=\"group\" aria-label=\"Send {cmd} to an editor\">");
-        sb.Append($"<button type=\"button\" class=\"send-item\" data-copy=\"{cmd}\" aria-label=\"Copy command\">{CopyIconSvg}<span>Copy command</span></button>");
+        sb.Append($"<button type=\"button\" class=\"send-item\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>");
 
         if (SendTargets.Count > 0)
         {

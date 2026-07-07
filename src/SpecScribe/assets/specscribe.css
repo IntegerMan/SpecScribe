@@ -799,13 +799,28 @@ code.color-swatch {
 }
 
 .ac-list { font-size: 0.82rem; color: var(--ink-faded); line-height: 1.7; }
-.ac-block { margin-bottom: 0.5rem; }
+
+/* Epic-card AC block: the same label+body grammar as the story page's .ac-criterion rows — an optional
+   gold "AC #N" column beside the gherkin lines. */
+.ac-block { display: flex; gap: 0.75rem; align-items: baseline; margin-bottom: 0.6rem; }
+.ac-block-body { flex: 1; min-width: 0; }
+
+.ac-num {
+  flex: 0 0 auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  font-weight: bold;
+  color: var(--gold);
+  white-space: nowrap;
+}
 
 /* Gherkin keyword markers — the bold **Given/When/Then/And** BMad authors into acceptance criteria
    render as small uppercase chips, each clause on its own line (.gherkin-line). Accent colors are
    palette tones, not --status-* tokens: keywords are grammar, not lifecycle stages, so they must never
-   read as progress. The keyword text itself carries the meaning — color is reinforcement only. */
-.gherkin-line { display: block; }
+   read as progress. The keyword text itself carries the meaning — color is reinforcement only.
+   The hanging indent (padding-left + negative text-indent) matches the chip column (3.4rem chip +
+   0.4rem gap), so a wrapped clause aligns under its own first word instead of under the chip. */
+.gherkin-line { display: block; padding-left: 3.8rem; text-indent: -3.8rem; }
 .gherkin-line + .gherkin-line { margin-top: 0.2rem; }
 
 .gherkin-kw {
@@ -820,7 +835,9 @@ code.color-swatch {
   border: 1px solid;
   border-radius: 3px;
   min-width: 3.4rem;
+  margin-right: 0.4rem;
   text-align: center;
+  text-indent: 0;
 }
 .gherkin-kw.kw-given { color: var(--teal); border-color: var(--teal); background: #e0ecea; }
 /* A darker amber than --gold (#b8860b) so the small-caps text clears WCAG AA (4.5:1) on the cream chip;
@@ -860,6 +877,10 @@ code.color-swatch {
 
 .ac-criterion-body { font-size: 0.86rem; color: var(--ink-faded); line-height: 1.6; }
 .ac-criterion-body strong { color: var(--ink); }
+/* A multi-paragraph criterion (clauses + an "Origin & scope"-style note) keeps its <p> wrappers; rein in
+   the default browser margins so the note reads as part of the criterion, not a new section. */
+.ac-criterion-body p { margin: 0; }
+.ac-criterion-body p + p { margin-top: 0.45rem; }
 
 /* Inline "(AC: #N)" reference link back up to the criterion panel. */
 .ac-ref {
@@ -911,6 +932,10 @@ code.color-swatch {
   gap: 0.35rem;
   text-transform: none;
 }
+/* Adaptive task badge states — neutral tones only (green is reserved for lifecycle done status):
+   ✓ N tasks when complete, a muted dashed 0/N when untouched, donut + D/N for partial progress. */
+.status-badge.task-badge.complete { color: var(--ink-faded); border-color: var(--ink-light); }
+.status-badge.task-badge.none-done { color: var(--ink-light); border-style: dashed; }
 
 .story-title-link { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
 .story-title-link:hover { color: var(--rust); border-bottom-style: solid; }
@@ -1520,8 +1545,6 @@ code.color-swatch {
    heights. Center both badges on the cross axis so they line up with each other. */
 .story-card-header .status-badge { align-self: center; }
 
-.story-card .per-story-progress { margin-top: 0.7rem; max-width: 320px; }
-
 .story-card .not-detailed-note {
   font-size: 0.76rem;
   color: var(--ink-light);
@@ -1900,7 +1923,9 @@ code.color-swatch {
 }
 
 /* Copy + caret blend into the tan badge: no individual border/background/radius, just a lighter hover
-   highlight (parchment is lighter than the parchment-dark badge). */
+   highlight (parchment is lighter than the parchment-dark badge). Resting color is a warm ink (not the
+   cool teal) so the controls stay in the badge's warm palette; the keyboard focus ring keeps the site-wide
+   teal a11y standard. */
 .cmd-badge .copy-btn,
 .cmd-badge .send-toggle {
   display: inline-flex;
@@ -1909,7 +1934,7 @@ code.color-swatch {
   font-family: 'Courier New', monospace;
   font-size: 0.7rem;
   letter-spacing: 0.04em;
-  color: var(--teal-deep);
+  color: var(--ink-light);
   background: transparent;
   border: none;
   border-radius: 0;
@@ -1923,10 +1948,11 @@ code.color-swatch {
 .cmd-badge .send-menu[open] .send-toggle { background: var(--parchment); color: var(--rust); }
 .cmd-badge .copy-btn:focus-visible,
 .cmd-badge .send-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
-/* Copied state: swap the icon for a check so the icon-only button still confirms. */
+/* Copied state: swap the icon for a check so the icon-only button still confirms. The check uses ::before
+   so ::after stays free for the [data-tooltip] popover on the same button. */
 .cmd-badge .copy-btn.copied { color: var(--moss); background: #e8f0e4; }
 .cmd-badge .copy-btn.copied .icon { display: none; }
-.cmd-badge .copy-btn.copied::after { content: "\2713"; }
+.cmd-badge .copy-btn.copied::before { content: "\2713"; }
 
 .send-menu { position: relative; display: inline-flex; }
 /* The caret: hairline separator from Copy, and its right edge rounds to follow the badge. */
@@ -1971,22 +1997,23 @@ code.color-swatch {
   font-family: 'Courier New', monospace;
   font-size: 0.75rem;
   letter-spacing: 0.03em;
-  color: var(--teal-deep);
+  color: var(--ink-faded); /* warm, not the cool teal — matches the badge controls */
   text-align: left;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
 }
-.send-menu-list .send-item .icon { display: block; flex: 0 0 auto; opacity: 0.8; }
 .send-menu-list .send-item:hover { background: var(--parchment-dark); color: var(--rust); }
 .send-menu-list .send-item:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
 /* Brief copied confirmation on the menu row (it usually closes on click, so this is a fallback). */
 .send-menu-list .send-item.copied { color: var(--moss); }
 
-/* The popover is absolutely positioned, but its .chart-panel ancestor sets overflow-x: auto (which makes
-   the y-axis clip too). Lift the clip only while a menu is open — a next-steps panel has no wide chart to
-   scroll, so nothing else is affected. */
-.chart-panel:has(.send-menu[open]) { overflow: visible; }
+/* The popover and the copy/caret tooltips are absolutely positioned, but their .chart-panel ancestor sets
+   overflow-x: auto (which makes the y-axis clip too). Lift the clip only while a menu is open or a badge
+   tooltip is showing — a next-steps panel has no wide chart to scroll, so nothing else is affected. */
+.chart-panel:has(.send-menu[open]),
+.chart-panel:has(.cmd-badge [data-tooltip]:hover),
+.chart-panel:has(.cmd-badge [data-tooltip]:focus-visible) { overflow: visible; }
 
 /* ====================== ENTRANCE ANIMATIONS (Story 1.5 D2) ======================
    The complementary "no-preference" half of the motion contract — one-time entrances that play only when

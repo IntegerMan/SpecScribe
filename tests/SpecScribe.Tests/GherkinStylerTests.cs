@@ -10,11 +10,13 @@ public class GherkinStylerTests
         var html = GherkinStyler.StyleCriterion(
             "<strong>Given</strong> a plan <strong>When</strong> it renders <strong>Then</strong> it reads <strong>And</strong> it links");
 
+        // No literal space after the chip — the chip's CSS margin supplies the gap so the hanging
+        // indent lands wrapped text on the same column as the clause's first word.
         Assert.Equal(4, Count(html, "<span class=\"gherkin-line\">"));
-        Assert.Contains("<span class=\"gherkin-kw kw-given\">Given</span> a plan", html);
-        Assert.Contains("<span class=\"gherkin-kw kw-when\">When</span> it renders", html);
-        Assert.Contains("<span class=\"gherkin-kw kw-then\">Then</span> it reads", html);
-        Assert.Contains("<span class=\"gherkin-kw kw-and\">And</span> it links", html);
+        Assert.Contains("<span class=\"gherkin-kw kw-given\">Given</span>a plan", html);
+        Assert.Contains("<span class=\"gherkin-kw kw-when\">When</span>it renders", html);
+        Assert.Contains("<span class=\"gherkin-kw kw-then\">Then</span>it reads", html);
+        Assert.Contains("<span class=\"gherkin-kw kw-and\">And</span>it links", html);
         Assert.DoesNotContain("<strong>Given</strong>", html);
     }
 
@@ -57,7 +59,33 @@ public class GherkinStylerTests
     {
         var html = GherkinStyler.StyleCriterion("<strong>Then</strong> ok <strong>But</strong> not empty");
 
-        Assert.Contains("<span class=\"gherkin-kw kw-but\">But</span> not empty", html);
+        Assert.Contains("<span class=\"gherkin-kw kw-but\">But</span>not empty", html);
+    }
+
+    [Fact]
+    public void StyleCriterion_SplitsLinesWithinEachParagraphOfAMultiParagraphCriterion()
+    {
+        // A criterion with a trailing note keeps Markdig's <p> wrappers (RenderInline only strips one
+        // enclosing pair). The clause paragraph must still get per-line chips; the note paragraph must
+        // pass through untouched as its own paragraph — not glued into the last clause line.
+        var html = GherkinStyler.StyleCriterion(
+            "<p><strong>Given</strong> a surface <strong>When</strong> I view it</p>\n<p><strong>Origin &amp; scope:</strong> a note.</p>");
+
+        Assert.Equal(2, Count(html, "<span class=\"gherkin-line\">"));
+        Assert.Contains("<p><span class=\"gherkin-line\"><span class=\"gherkin-kw kw-given\">Given</span>a surface</span>", html);
+        Assert.Contains("<p><strong>Origin &amp; scope:</strong> a note.</p>", html);
+        Assert.DoesNotContain("<strong>Given</strong>", html);
+    }
+
+    [Fact]
+    public void StyleCriterion_DegradeStaysScopedToTheParagraphWithTheNestedKeyword()
+    {
+        // Nested keyword in paragraph two degrades that paragraph only; paragraph one still gets lines.
+        var html = GherkinStyler.StyleCriterion(
+            "<p><strong>Given</strong> a <strong>Then</strong> b</p>\n<p><em>see <strong>And</strong> this</em></p>");
+
+        Assert.Equal(2, Count(html, "<span class=\"gherkin-line\">"));
+        Assert.Contains("<p><em>see <span class=\"gherkin-kw kw-and\">And</span> this</em></p>", html);
     }
 
     [Fact]

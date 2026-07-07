@@ -404,7 +404,7 @@ public static class EpicsTemplater
         }
         if (story.TasksTotal > 0)
         {
-            sb.Append($"    <span class=\"status-badge task-badge\">{Charts.MiniDonut(story.TasksDone, story.TasksTotal)} {story.TasksDone}/{story.TasksTotal} tasks</span>\n");
+            sb.Append($"    {TaskBadge(story)}\n");
         }
         sb.Append("  </div>\n");
 
@@ -417,13 +417,6 @@ public static class EpicsTemplater
             {
                 sb.Append($"    <div class=\"ac-block\">{block}</div>\n");
             }
-            sb.Append("  </div>\n");
-        }
-
-        if (story.TasksTotal > 0)
-        {
-            sb.Append("  <div class=\"per-story-progress\">\n");
-            sb.Append(Charts.ProgressBar("Tasks", story.TasksDone, story.TasksTotal));
             sb.Append("  </div>\n");
         }
 
@@ -443,6 +436,24 @@ public static class EpicsTemplater
         }
 
         sb.Append("</div>\n\n");
+    }
+
+    /// <summary>The story card's single task indicator (the bottom per-story progress bar was dropped as
+    /// redundant). Task counts are usually all-or-nothing, so the display adapts: a checkmark when every
+    /// task is done, a muted count when none are, and the mini donut only in the one state where a
+    /// fraction visual actually informs — partial progress. Neutral tones throughout; green stays
+    /// reserved for lifecycle done status (the story badge beside it).</summary>
+    private static string TaskBadge(StoryInfo story)
+    {
+        if (story.TasksDone >= story.TasksTotal)
+        {
+            return $"<span class=\"status-badge task-badge complete\">&#10003; {story.TasksTotal} tasks</span>";
+        }
+        if (story.TasksDone == 0)
+        {
+            return $"<span class=\"status-badge task-badge none-done\">0/{story.TasksTotal} tasks</span>";
+        }
+        return $"<span class=\"status-badge task-badge\">{Charts.MiniDonut(story.TasksDone, story.TasksTotal)} {story.TasksDone}/{story.TasksTotal} tasks</span>";
     }
 
     private static void AppendProgressPanel(StringBuilder sb, ProgressModel progress)

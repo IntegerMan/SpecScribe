@@ -17,6 +17,7 @@ public static class EpicsParser
     private static readonly Regex StoryHeading = new(@"^### Story (\d+)\.(\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex AcHeading = new(@"^\*\*Acceptance Criteria:?\*\*\s*$", RegexOptions.Compiled);
     private static readonly Regex AcKeywordLine = new(@"^\*\*(Given|When|Then|And|But)\*\*\s*(.*)$", RegexOptions.Compiled);
+    private static readonly Regex AcBareNumberLine = new(@"^(\d+)\.$", RegexOptions.Compiled);
     private static readonly Regex MetaLine = new(@"^\*\*(FRs|NFRs) covered:\*\*\s*(.*)$", RegexOptions.Compiled);
     private static readonly Regex StatusLine = new(@"^Status:\s*(.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
 
@@ -437,20 +438,37 @@ public static class EpicsParser
         if (acIdx >= 0)
         {
             var currentBlockLines = new List<string>();
+            int? pendingNumber = null;
 
             void FlushBlock()
             {
-                if (currentBlockLines.Count > 0)
-                {
-                    acBlocks.Add(string.Join("<br>", currentBlockLines.Select(RenderAcLine)));
-                    currentBlockLines.Clear();
-                }
+                // An empty flush keeps pendingNumber: a bare "1." line is followed by a **Given** line,
+                // and both trigger a flush before the block's content has accumulated.
+                if (currentBlockLines.Count == 0) return;
+
+                // Same visual grammar as the story page's criterion rows: an optional gold "AC #N" label
+                // column beside a body of block-level gherkin lines (see .ac-block / .gherkin-line CSS).
+                var body = string.Concat(currentBlockLines.Select(l => $"<span class=\"gherkin-line\">{RenderAcLine(l)}</span>"));
+                var label = pendingNumber is { } n ? $"<span class=\"ac-num\">AC #{n}</span>" : string.Empty;
+                acBlocks.Add($"{label}<span class=\"ac-block-body\">{body}</span>");
+                currentBlockLines.Clear();
+                pendingNumber = null;
             }
 
             for (var i = acIdx + 1; i < endIdx; i++)
             {
                 var line = lines[i].Trim();
                 if (line.Length == 0) continue;
+
+                // A bare "1." line numbers the block that follows; as content it would render as an
+                // empty markdown <ol>. Flush whatever came before and let the number ride the next block.
+                if (AcBareNumberLine.Match(line) is { Success: true } num && int.TryParse(num.Groups[1].Value, out var number))
+                {
+                    FlushBlock();
+                    pendingNumber = number;
+                    continue;
+                }
+
                 if (line.StartsWith("**Given**", StringComparison.Ordinal))
                 {
                     FlushBlock();
@@ -477,7 +495,9 @@ public static class EpicsParser
         {
             var keyword = m.Groups[1].Value;
             var rest = m.Groups[2].Value;
-            return $"{GherkinStyler.KeywordSpan(keyword)} {MarkdownConverter.RenderInline(rest)}";
+            // No literal space after the chip — its margin-right supplies a deterministic gap so the
+            // clause text and the .gherkin-line hanging indent land on the same column.
+            return $"{GherkinStyler.KeywordSpan(keyword)}{MarkdownConverter.RenderInline(rest)}";
         }
         return MarkdownConverter.RenderInline(line);
     }

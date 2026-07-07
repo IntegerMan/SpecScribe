@@ -69,6 +69,8 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
 
         1. **Given** deferred notes exist **When** the site is generated **Then** they render **And** Story 1.2 stays reachable.
 
+           **Origin & scope:** trailing note paragraph mentioning Epic 1.
+
         ## Tasks / Subtasks
 
         - [ ] Task 1: Mention Story 9.9, which is not planned anywhere.
@@ -268,5 +270,44 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         Assert.Contains("class=\"gherkin-kw kw-when\"", html);
         Assert.Contains("class=\"gherkin-kw kw-and\"", html);
         Assert.DoesNotContain("<strong>Given</strong>", html);
+    }
+
+    [Fact]
+    public void GenerateAll_MultiParagraphCriterionKeepsPerLineChipsAndSeparateNote()
+    {
+        GenerateSite();
+
+        // The fixture criterion carries a trailing "Origin & scope" paragraph, so its body keeps <p>
+        // wrappers. Chips must still land per-line inside the clause paragraph, and the note must render
+        // as its own untouched paragraph — the exact case that used to degrade to inline chips.
+        var html = File.ReadAllText(DraftedStoryPage);
+        Assert.Contains("<p><span class=\"gherkin-line\">", html);
+        Assert.Contains("<p><strong>Origin &amp; scope:</strong>", html);
+    }
+
+    // ---- Epic-card AC layout and the single task indicator ----
+
+    [Fact]
+    public void GenerateAll_EpicCardAcBlocksCarryLabelsAndNoEmptyLists()
+    {
+        GenerateSite();
+
+        var html = File.ReadAllText(EpicPage);
+        Assert.Contains("<span class=\"ac-num\">AC #1</span>", html);
+        // The bare "1." lines authored in epics.md used to render as stray empty <ol> fragments.
+        Assert.DoesNotContain("<ol>\n<li></li>\n</ol>", html);
+        Assert.Contains("class=\"ac-block-body\"", html);
+    }
+
+    [Fact]
+    public void GenerateAll_StoryCardHasExactlyOneTaskIndicator()
+    {
+        GenerateSite();
+
+        var html = File.ReadAllText(EpicPage);
+        // The bottom per-story progress bar is gone; the header badge is the single indicator.
+        Assert.DoesNotContain("per-story-progress", html);
+        // Fixture story 1.1 has 0/1 tasks done → muted count badge, no donut inside it.
+        Assert.Contains("task-badge none-done\">0/1 tasks", html);
     }
 }

@@ -95,6 +95,57 @@ public class EpicsParserTests
         => Assert.Contains("plan of record", EpicsParser.Parse(SampleEpicsMd).OverviewHtml);
 
     [Fact]
+    public void Parse_AcBlockWithoutANumberLineGetsNoLabel()
+    {
+        var story = EpicsParser.Parse(SampleEpicsMd).Epics[0].Stories[0];
+
+        var block = Assert.Single(story.AcBlocksHtml);
+        Assert.DoesNotContain("ac-num", block);
+        Assert.Contains("class=\"gherkin-line\"", block);
+    }
+
+    private const string NumberedAcEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: Numbered criteria
+
+        As a developer, I want numbered ACs.
+
+        **Acceptance Criteria:**
+
+        1.
+        **Given** nothing
+        **When** it builds
+
+        2.
+        **Given** something
+        **Then** it links
+        """;
+
+    [Fact]
+    public void Parse_BareNumberLinesBecomeAcLabels_NotEmptyLists()
+    {
+        var story = EpicsParser.Parse(NumberedAcEpicsMd).Epics[0].Stories[0];
+
+        Assert.Equal(2, story.AcBlocksHtml.Count);
+        Assert.Contains("<span class=\"ac-num\">AC #1</span>", story.AcBlocksHtml[0]);
+        Assert.Contains("<span class=\"ac-num\">AC #2</span>", story.AcBlocksHtml[1]);
+        // The bare "1."/"2." lines are consumed into labels — never rendered as markdown, where they
+        // become stray empty <ol> fragments.
+        Assert.All(story.AcBlocksHtml, b => Assert.DoesNotContain("<ol", b));
+        Assert.Contains("class=\"ac-block-body\"", story.AcBlocksHtml[0]);
+        Assert.Contains("gherkin-kw kw-given", story.AcBlocksHtml[0]);
+    }
+
+    [Fact]
     public void Parse_EmptyInputYieldsEmptyModel()
         => Assert.Empty(EpicsParser.Parse(string.Empty).Epics);
 

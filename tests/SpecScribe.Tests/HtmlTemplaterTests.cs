@@ -473,12 +473,12 @@ public class HtmlTemplaterTests
         Assert.Contains("class=\"cmd-badge\"", html);
         Assert.Contains("<code class=\"cmd-text\">/bmad-dev-story 1.1</code>", html);
         Assert.Contains("class=\"copy-btn\" data-copy=\"/bmad-dev-story 1.1\"", html);
-        Assert.Contains("<svg class=\"icon\"", html); // Copy is an icon, not the word "Copy"
-        // The send menu leads with a "Copy command" row (a second copy trigger), then the deep links.
+        Assert.Contains("<svg class=\"icon\"", html); // the badge Copy button is an icon, not the word "Copy"
+        Assert.Contains("data-tooltip=\"Copy command\"", html); // rich on-brand tooltip on the icon button
+        // The send menu leads with a plain "Copy" row (a second copy trigger), then the deep links.
         Assert.Contains("<details class=\"send-menu\">", html);
         Assert.Contains("<summary class=\"send-toggle\"", html);
-        Assert.Contains("<button type=\"button\" class=\"send-item\" data-copy=\"/bmad-dev-story 1.1\"", html);
-        Assert.Contains("<span>Copy command</span>", html);
+        Assert.Contains("class=\"send-item\" data-copy=\"/bmad-dev-story 1.1\" aria-label=\"Copy command\">Copy</button>", html);
         // The Cursor deep link carries the URL-encoded command (slash -> %2F, space -> %20).
         Assert.Contains(
             "<a class=\"send-item\" href=\"cursor://anysphere.cursor-deeplink/prompt?text=%2Fbmad-dev-story%201.1\">Open in Cursor</a>", html);
