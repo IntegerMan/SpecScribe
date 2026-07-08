@@ -608,6 +608,88 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderEpic_LinksToExistingRetroWhenPresent()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var epic = new EpicInfo
+        {
+            Number = 1, Title = "First Epic", GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+            Stories = new[] { Story("1.1", status: "In progress") },
+        };
+        var progress = new EpicProgress
+        {
+            Number = 1, Title = "First Epic", StoryCount = 1, StoriesWithArtifact = 1,
+            TasksDone = 0, TasksTotal = 0, Status = EpicStatus.Drafted, StoryStatusCounts = new Dictionary<string, int>(),
+        };
+
+        var html = EpicsTemplater.RenderEpic(epic, progress, nav, CommandCatalog.Empty,
+            epicRetroPath: "implementation-artifacts/epic-1-retro-2026-07-07.html");
+
+        // Retro link resolves at the epic page's depth-1 prefix.
+        Assert.Contains("class=\"epic-retro-link\" href=\"../implementation-artifacts/epic-1-retro-2026-07-07.html\">View Epic 1 Retrospective &rarr;</a>", html);
+    }
+
+    [Fact]
+    public void RenderEpic_CompleteEpicWithoutRetroSuggestsRetrospectiveCommand()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var retroCat = new CommandCatalog("BMad", new Dictionary<string, string> { ["retrospective"] = "/bmad-retrospective" });
+
+        EpicInfo Epic(string storyStatus) => new()
+        {
+            Number = 2, Title = "Done Epic", GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+            Stories = new[] { Story("2.1", status: storyStatus) },
+        };
+        var progress = new EpicProgress
+        {
+            Number = 2, Title = "Done Epic", StoryCount = 1, StoriesWithArtifact = 1,
+            TasksDone = 0, TasksTotal = 0, Status = EpicStatus.Drafted, StoryStatusCounts = new Dictionary<string, int>(),
+        };
+
+        // Complete epic (story done), no retro, command exposed → suggestion.
+        var done = EpicsTemplater.RenderEpic(Epic("Done"), progress, nav, retroCat);
+        Assert.Contains("Epic 2 is complete — capture the lessons with", done);
+        Assert.Contains("/bmad-retrospective", done);
+
+        // Incomplete epic (story in review) → no suggestion.
+        var incomplete = EpicsTemplater.RenderEpic(Epic("In review"), progress, nav, retroCat);
+        Assert.DoesNotContain("capture the lessons", incomplete);
+
+        // Complete epic but the module doesn't expose the command → nothing (graceful).
+        var noCmd = EpicsTemplater.RenderEpic(Epic("Done"), progress, nav, CommandCatalog.Empty);
+        Assert.DoesNotContain("capture the lessons", noCmd);
+    }
+
+    [Fact]
+    public void RenderStoryAndPlaceholder_LinkBackToEpicRetro()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var epic = new EpicInfo
+        {
+            Number = 1, Title = "First Epic", GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice, Stories = Array.Empty<StoryInfo>(),
+        };
+        var retroPath = "implementation-artifacts/epic-1-retro-2026-07-07.html";
+
+        var drafted = new StoryInfo { Id = "1.1", EpicNumber = 1, Title = "Drafted Story", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), ArtifactOutputPath = "epics/story-1-1.html", Status = "Done" };
+        var storyHtml = EpicsTemplater.RenderStory(epic, drafted, "implementation-artifacts/1-1.md",
+            string.Empty, string.Empty, Array.Empty<AcceptanceCriterion>(),
+            Array.Empty<(string, string)>(), Array.Empty<TaskItem>(), string.Empty, string.Empty,
+            nav, CommandCatalog.Empty, epicRetroPath: retroPath);
+        Assert.Contains($"class=\"pill pill-link\" href=\"../{retroPath}\">Epic 1 retro &rarr;</a>", storyHtml);
+
+        var undrafted = new StoryInfo { Id = "1.2", EpicNumber = 1, Title = "Undrafted", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), ArtifactOutputPath = null };
+        var placeholder = EpicsTemplater.RenderStoryPlaceholder(epic, undrafted, nav, CommandCatalog.Empty, epicRetroPath: retroPath);
+        Assert.Contains($"class=\"pill pill-link\" href=\"../{retroPath}\">Epic 1 retro &rarr;</a>", placeholder);
+
+        // No retro path → no back-link.
+        var noLink = EpicsTemplater.RenderStoryPlaceholder(epic, undrafted, nav, CommandCatalog.Empty);
+        Assert.DoesNotContain("Epic 1 retro", noLink);
+    }
+
+    [Fact]
     public void RenderEpic_EmitsSkipLinkAndSingleMainLandmark()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

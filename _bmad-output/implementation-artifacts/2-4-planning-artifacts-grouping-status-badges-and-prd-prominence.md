@@ -4,7 +4,7 @@ baseline_commit: 02c06c8c9bd9d9abfcae4763d6984667a2665943
 
 # Story 2.4: Planning Artifacts Grouping, Status Badges, and PRD Prominence
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -68,6 +68,14 @@ so that the most important planning documents are easy to find and their status 
 - [x] Task 6: End-to-end validation with a real generation pass (AC: #1, #2)
   - [x] Run the focused test filter, then a real generation pass against this repo (it ships the full planning-artifacts fixture: brief `draft`, prd `final`, review-rubric no-frontmatter, DESIGN/EXPERIENCE `final`).
   - [x] Manually verify on `docs/live/index.html`: the Planning Artifacts section shows the **PRD as a prominent primary card** carrying a "Final" badge and a link to its quality review; **UX Design and UX Experience together**; the **Product Brief** as a distinct card with a "Draft" badge; **no** standalone "PRD Quality Review" card. Confirm `docs/live/planning-artifacts/prds/prd-SpecScribe-2026-07-05/review-rubric.html` still exists and the PRD-card link reaches it (no 404). Temporarily rename `review-rubric.md` and re-generate to confirm the PRD card drops the quality-review link cleanly with no broken link.
+
+### Review Findings
+
+- [x] [Review][Patch] `AppendCardStatusBadge` doesn't trim before its presence-check — a whitespace-only `status:` value renders a "Pending" badge instead of no badge, violating the graceful "no status emits no badge" contract [src/SpecScribe/HtmlTemplater.cs:581]
+- [x] [Review][Patch] Dead `&& d != brief` clause in `AppendPlanningSection`'s "others" filter — always true since `brief` is already excluded via `claimed`; remove for clarity [src/SpecScribe/HtmlTemplater.cs:651]
+- [x] [Review][Patch] `AppendPrimaryPrdCard` breaks the "whole card is a link" convention every other index card follows — only the title and optional branch link are clickable, leaving the badge/meta/path as dead space on the most prominent card on the page; fix with a CSS-only full-card overlay link (consistent with the project's no-JS approach) rather than nesting anchors [src/SpecScribe/HtmlTemplater.cs:669-684]
+- [x] [Review][Defer] `FindByFileName` silently keeps only the first doc matching a well-known filename (e.g. a second `prd.md`) with no diagnostic; untested [src/SpecScribe/HtmlTemplater.cs:689-691] — deferred, pre-existing edge case, graceful (not broken), same scope note as Epic 4 generalization
+- [x] [Review][Defer] `SprintSourcePath` picks the alphabetically-first `sprint-status.yaml` under `SourceRoot` with no diagnostic and no try/catch [src/SpecScribe/SiteGenerator.cs:566] — deferred, belongs to Story 2.3's scope, not 2.4's
 
 ## Developer Context Section
 

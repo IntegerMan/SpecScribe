@@ -8,7 +8,7 @@ namespace SpecScribe;
 /// sprint page's flag button and the home "Retro Action Items" callout. [Story 2.3 retro action items]</summary>
 public static class ActionItemsTemplater
 {
-    public static string RenderPage(IReadOnlyList<SprintActionItem> openItems, IReadOnlyDictionary<int, string>? epicRetroMap, CommandCatalog commands, SiteNav nav)
+    public static string RenderPage(IReadOnlyList<SprintActionItem> openItems, IReadOnlyDictionary<int, string>? epicRetroMap, CommandCatalog commands, SiteNav nav, string? deferredWorkHref = null)
     {
         var outputPath = SiteNav.ActionItemsOutputPath;
         var quickDev = commands.Command("quick-dev");
@@ -31,7 +31,7 @@ public static class ActionItemsTemplater
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {openItems.Count} open {Charts.Plural(openItems.Count, "item", "items")} &middot; from retrospectives</div>\n");
         sb.Append("</header>\n\n");
 
-        sb.Append("<main id=\"main-content\">\n<section class=\"dashboard-narrow\">\n");
+        sb.Append("<main id=\"main-content\">\n<section class=\"action-items-wrap\">\n");
         sb.Append("<ul class=\"action-items-list\">\n");
         foreach (var item in openItems)
         {
@@ -54,6 +54,13 @@ public static class ActionItemsTemplater
             {
                 sb.Append($"      <a class=\"action-item-retro\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(retroHref))}\">From Epic {e2} retrospective &rarr;</a>\n");
             }
+
+            // Debt-related items also point at the deferred-work backlog (where the item asks the work be
+            // routed) — only when the text is actually about deferred work / tech debt and a page exists.
+            if (deferredWorkHref is { Length: > 0 } dw && IsDebtRelated(item.Action))
+            {
+                sb.Append($"      <a class=\"action-item-deferred\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(dw))}\">In deferred-work backlog &rarr;</a>\n");
+            }
             sb.Append("    </div>\n");
 
             // "Resolve with AI": a copyable /bmad-quick-dev prompt composed with the action text (when the
@@ -75,4 +82,11 @@ public static class ActionItemsTemplater
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
+
+    /// <summary>True when an action item's text is about deferred work / tech debt — the signal for surfacing a
+    /// link to the deferred-work backlog page beside it.</summary>
+    private static bool IsDebtRelated(string action) =>
+        action.Contains("deferred", StringComparison.OrdinalIgnoreCase) ||
+        action.Contains("tech debt", StringComparison.OrdinalIgnoreCase) ||
+        action.Contains("technical debt", StringComparison.OrdinalIgnoreCase);
 }

@@ -86,21 +86,53 @@ public static class RetroTemplater
 
         if (retro.Participants.Count > 0)
         {
-            main.Append("  <div class=\"retro-participants\" aria-label=\"Participants\">\n");
-            foreach (var p in retro.Participants)
+            main.Append("  <section class=\"retro-personas\" aria-label=\"Personas\">\n");
+            main.Append("    <div class=\"retro-personas-label\">Personas</div>\n");
+            main.Append("    <div class=\"persona-grid\">\n");
+            foreach (var raw in retro.Participants)
             {
-                main.Append($"    <span class=\"participant-pill\">{PathUtil.Html(p)}</span>\n");
+                var p = Personas.Parse(raw);
+                main.Append($"      <span class=\"persona-pill {p.RoleClass}\">{Icons.ForPersona(p.RoleClass)}");
+                main.Append($"<span class=\"persona-name\">{PathUtil.Html(p.Name)}</span>");
+                if (p.Role is { Length: > 0 } role)
+                {
+                    main.Append($"<span class=\"persona-role\">{PathUtil.Html(role)}</span>");
+                }
+                main.Append("</span>\n");
             }
-            main.Append("  </div>\n");
+            main.Append("    </div>\n");
+            main.Append("  </section>\n");
         }
         main.Append("</header>\n\n");
+
+        // The retro is epic-scoped, so surface that epic's stories (each linked to its story/placeholder page)
+        // right under the header — the sprint's stories, reachable from the retro that reviewed them.
+        var toc = new List<Toc.Entry>();
+        var epic = epics?.Epics.FirstOrDefault(e => e.Number == retro.EpicNumber);
+        if (epic is { Stories.Count: > 0 })
+        {
+            main.Append("<section class=\"retro-stories\" id=\"retro-stories\">\n  <h2>Stories in this Epic</h2>\n  <div class=\"retro-story-list\">\n");
+            foreach (var story in epic.Stories)
+            {
+                var storyClass = StatusStyles.ForStory(story);
+                var href = prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id));
+                main.Append($"    <a class=\"retro-story-row {storyClass}\" href=\"{PathUtil.Html(href)}\">\n");
+                main.Append($"      <span class=\"retro-story-id\">Story {PathUtil.Html(story.Id)}</span>\n");
+                main.Append($"      <span class=\"retro-story-title\">{story.Title}</span>\n");
+                main.Append($"      {StatusStyles.Badge(storyClass, StatusStyles.StoryLabel(storyClass))}\n");
+                main.Append("    </a>\n");
+            }
+            main.Append("  </div>\n</section>\n\n");
+            toc.Add(new Toc.Entry(2, "Stories in this Epic", "retro-stories"));
+        }
 
         main.Append("<article class=\"doc-body\">\n");
         main.Append(retro.BodyHtml);
         main.Append("\n</article>\n");
 
+        toc.AddRange(Toc.ExtractHeadings(retro.BodyHtml));
         sb.Append("<main id=\"main-content\">\n");
-        sb.Append(Toc.WrapWithSidebar(main.ToString(), Toc.ExtractHeadings(retro.BodyHtml)));
+        sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
         sb.Append("</main>\n\n");
 
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));

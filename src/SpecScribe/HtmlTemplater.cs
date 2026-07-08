@@ -578,8 +578,8 @@ public static class HtmlTemplater
     /// status emits no badge (graceful). [Story 2.4 Task 2]</summary>
     private static void AppendCardStatusBadge(StringBuilder sb, string? status)
     {
-        if (status is not { Length: > 0 }) return;
-        sb.Append($"    {StatusStyles.Badge(StatusStyles.ForDoc(status), StatusStyles.DocLabel(status))}\n");
+        if (status?.Trim() is not { Length: > 0 } trimmed) return;
+        sb.Append($"    {StatusStyles.Badge(StatusStyles.ForDoc(trimmed), StatusStyles.DocLabel(trimmed))}\n");
     }
 
     /// <summary>The de-emphasized date · author line beneath a card's title/badge. Status has been promoted to
@@ -648,7 +648,7 @@ public static class HtmlTemplater
         // unrecognized docs, and (only when there was no PRD to fold it into) the rubric — as ordinary cards.
         var others = new List<DocModel>();
         if (brief is not null) others.Add(brief);
-        others.AddRange(docs.Where(d => !claimed.Contains(d) && d != brief)
+        others.AddRange(docs.Where(d => !claimed.Contains(d))
             .OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase));
         if (others.Count > 0)
         {
@@ -662,10 +662,12 @@ public static class HtmlTemplater
 
     /// <summary>The PRD's prominent primary card. Unlike an ordinary wrapping-anchor card it may carry a second
     /// affordance — the "Quality review →" branch link — so it is a container with a title link plus an optional
-    /// branch link (nested anchors would be invalid), reusing the shared badge/meta helpers. Both are real
-    /// focusable <c>&lt;a&gt;</c>s, and its prominence is carried by position + the "Primary document" label, not
-    /// color alone (Story 1.4). The rubric link is emitted only when the rubric page exists (never broken; the
-    /// rubric's <c>OutputRelativePath</c> is a real generated page). [Story 2.4 Task 3/4]</summary>
+    /// branch link (nested anchors would be invalid), reusing the shared badge/meta helpers. The title link's CSS
+    /// stretches over the whole card (<c>.index-card--primary h2 a::after</c>) so the card stays fully clickable
+    /// like every other index card, while the branch link layers above it and stays independently clickable. Both
+    /// are real focusable <c>&lt;a&gt;</c>s, and its prominence is carried by position + the "Primary document"
+    /// label, not color alone (Story 1.4). The rubric link is emitted only when the rubric page exists (never
+    /// broken; the rubric's <c>OutputRelativePath</c> is a real generated page). [Story 2.4 Task 3/4]</summary>
     private static void AppendPrimaryPrdCard(StringBuilder sb, DocModel prd, DocModel? rubric)
     {
         var href = PathUtil.NormalizeSlashes(prd.OutputRelativePath);

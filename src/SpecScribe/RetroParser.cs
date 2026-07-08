@@ -17,6 +17,12 @@ public static class RetroParser
         @"<p><strong>(?:Date|Participants):</strong>.*?</p>\s*",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
+    // The leading <h1> (the file's title) — dropped from the body since the styled page header already carries
+    // it; leaving it in duplicated the title as an oversized in-body heading. [Story 2.3 retro standardize]
+    private static readonly Regex LeadingH1 = new(
+        @"\A\s*<h1[^>]*>.*?</h1>\s*",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+
     /// <summary>True for a retrospective notes file (matched by the well-known <c>epic-N-retro-*</c> name).</summary>
     public static bool IsRetroFile(string path) => FileName.IsMatch(Path.GetFileNameWithoutExtension(path));
 
@@ -37,8 +43,10 @@ public static class RetroParser
             ? pm.Groups["v"].Value.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList()
             : new List<string>();
 
-        // Strip the date/participants paragraphs (now shown in the styled header) and badge the action items.
-        var body = RetroActionStyler.Style(RenderedMeta.Replace(doc.BodyHtml, string.Empty));
+        // Strip the leading title h1 + the date/participants paragraphs (all shown in the styled header now)
+        // and badge the action items.
+        var stripped = LeadingH1.Replace(doc.BodyHtml, string.Empty);
+        var body = RetroActionStyler.Style(RenderedMeta.Replace(stripped, string.Empty));
 
         return new RetroModel
         {

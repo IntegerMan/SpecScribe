@@ -62,6 +62,8 @@ public class RetroTests : IDisposable
         Assert.Equal("2026-07-07", retro.DateText);
         Assert.Equal(new[] { "Matt (Lead)", "Amelia (Dev)", "Alice (PO)" }, retro.Participants.ToArray());
 
+        // The leading title h1 is stripped from the body (the styled header already carries the title).
+        Assert.DoesNotContain("<h1", retro.BodyHtml);
         // The date/participants lines are lifted out of the narrative (they move to the styled header).
         Assert.DoesNotContain("<strong>Date:</strong>", retro.BodyHtml);
         Assert.DoesNotContain("<strong>Participants:</strong>", retro.BodyHtml);
@@ -72,7 +74,7 @@ public class RetroTests : IDisposable
     }
 
     [Fact]
-    public void RenderPage_StyledHeaderEpicLinkParticipantsAndSingleMain()
+    public void RenderPage_StyledHeaderEpicLinkPersonasAndSingleMain()
     {
         var retro = Parse();
         var epics = new EpicsModel
@@ -95,11 +97,54 @@ public class RetroTests : IDisposable
         Assert.Contains("class=\"story-kicker\">Epic 1 Retrospective</div>", html);
         Assert.Contains("<h1>Epic 1 Retrospective: Foundation</h1>", html);
         Assert.Contains("<span class=\"pill\">2026-07-07</span>", html);
-        Assert.Contains("class=\"participant-pill\">Matt (Lead)</span>", html);
+        // Participants render as a labeled "Personas" block, each a role-classed pill (icon + name + role).
+        Assert.Contains("<section class=\"retro-personas\" aria-label=\"Personas\">", html);
+        Assert.Contains("<div class=\"retro-personas-label\">Personas</div>", html);
+        Assert.Contains("<span class=\"persona-pill role-lead\">", html);
+        Assert.Contains("<span class=\"persona-name\">Matt</span>", html);
+        Assert.Contains("<span class=\"persona-role\">Lead</span>", html);
+        Assert.Contains("<span class=\"persona-pill role-dev\">", html);   // Amelia (Dev)
+        Assert.Contains("<span class=\"persona-pill role-po\">", html);    // Alice (PO)
+        Assert.Contains("ss-icon", html);                                  // each pill carries a role glyph
         // Epic link resolves at the retro page's depth-1 prefix.
         Assert.Contains("href=\"../epics/epic-1.html\">Epic 1 &rarr;</a>", html);
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
+
+    [Fact]
+    public void RenderPage_ListsEpicStoriesLinkedWithStatus()
+    {
+        var retro = Parse();
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1, Title = "Foundation", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo { Id = "1.1", EpicNumber = 1, Title = "Nav Foundation", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), ArtifactOutputPath = "epics/story-1-1.html", Status = "Done" },
+                        new StoryInfo { Id = "1.2", EpicNumber = 1, Title = "Traceability", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), ArtifactOutputPath = null }, // undrafted → placeholder
+                    },
+                },
+            },
+        };
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = RetroTemplater.RenderPage(retro, epics, nav);
+
+        Assert.Contains("<section class=\"retro-stories\" id=\"retro-stories\">", html);
+        Assert.Contains("Stories in this Epic", html);
+        // Drafted story links to its page; undrafted links to its placeholder path; both at the depth-1 prefix.
+        Assert.Contains("href=\"../epics/story-1-1.html\"", html);
+        Assert.Contains("href=\"../epics/story-1-2.html\"", html);
+        Assert.Contains("<span class=\"retro-story-id\">Story 1.1</span>", html);
+        Assert.Contains("class=\"retro-story-row done\"", html);
     }
 
     [Fact]
@@ -152,6 +197,29 @@ public class RetroTests : IDisposable
         // No quick-dev command exposed → no resolve button (graceful).
         var noCmd = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
         Assert.DoesNotContain("Resolve with AI", noCmd);
+    }
+
+    [Fact]
+    public void ActionItems_RenderPage_WideWrapperAndDeferredLinkOnlyForDebtItems()
+    {
+        var open = new[]
+        {
+            new SprintActionItem("Route deferred tech debt into the backlog", "open", 1, "Dana"),
+            new SprintActionItem("Schedule retros promptly", "open", 1, "Amelia"),
+        };
+        var map = new Dictionary<int, string> { [1] = "implementation-artifacts/epic-1-retro-2026-07-07.html" };
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav, deferredWorkHref: "deferred-work.html");
+
+        // Wider layout wrapper (not the 860 doc column).
+        Assert.Contains("class=\"action-items-wrap\"", html);
+        // The deferred link appears exactly once — only on the debt-related item.
+        Assert.Equal(1, CountOccurrences(html, "class=\"action-item-deferred\" href=\"deferred-work.html\">In deferred-work backlog"));
+
+        // No deferred href → no deferred link at all, even for the debt item.
+        var noHref = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
+        Assert.DoesNotContain("action-item-deferred", noHref);
     }
 
     private static int CountOccurrences(string haystack, string needle)

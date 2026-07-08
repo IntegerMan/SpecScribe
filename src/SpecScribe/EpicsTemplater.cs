@@ -73,7 +73,7 @@ public static class EpicsTemplater
         return sb.ToString();
     }
 
-    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands)
+    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var epicClass = StatusStyles.ForEpic(epic);
@@ -151,6 +151,8 @@ public static class EpicsTemplater
             main.Append("</section>\n\n");
         }
 
+        AppendRetroAffordance(main, epic, epicClass, prefix, commands, epicRetroPath);
+
         foreach (var story in epic.Stories)
         {
             AppendStoryCard(main, story, prefix, commands);
@@ -186,7 +188,8 @@ public static class EpicsTemplater
         string reviewFindingsHtml,
         string changeLogHtml,
         SiteNav nav,
-        CommandCatalog commands)
+        CommandCatalog commands,
+        string? epicRetroPath = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"RenderStory called for story {story.Id} with no resolved artifact.");
@@ -224,6 +227,7 @@ public static class EpicsTemplater
         {
             main.Append($"    {StatusStyles.Badge(storyClass, status)}\n");
         }
+        AppendStoryRetroLink(main, epic.Number, PathUtil.RelativePrefix(outputPath), epicRetroPath);
         main.Append("  </div>\n");
         main.Append($"  <h1>{story.Title}</h1>\n");
         main.Append("</header>\n\n");
@@ -325,7 +329,7 @@ public static class EpicsTemplater
     /// <see cref="StoryEpicLinkifier.StoryPagePath"/>), so inline "Story N.M" mentions always resolve and a
     /// later-drafted artifact overwrites it in place. Shows what the plan already knows (narrative + epics.md
     /// acceptance criteria) and signposts the create-story command instead of dead-ending.</summary>
-    public static string RenderStoryPlaceholder(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands)
+    public static string RenderStoryPlaceholder(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null)
     {
         var outputPath = StoryEpicLinkifier.StoryPagePath(story.Id);
         var epicOutputPath = $"epics/epic-{epic.Number}.html";
@@ -347,6 +351,7 @@ public static class EpicsTemplater
         sb.Append("  <div class=\"kicker-row\">\n");
         sb.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(story.Id)}</span>\n");
         sb.Append($"    {StatusStyles.Badge(StatusStyles.ForStory(story), "Not yet drafted")}\n");
+        AppendStoryRetroLink(sb, epic.Number, prefix, epicRetroPath);
         sb.Append("  </div>\n");
         sb.Append($"  <h1>{story.Title}</h1>\n");
         sb.Append("</header>\n\n");
@@ -563,6 +568,40 @@ public static class EpicsTemplater
     /// <summary>The in-page anchor id for a story card, used by the epic sunburst to jump to a story
     /// that has no detailed artifact (and therefore no separate page to link to).</summary>
     private static string StoryAnchorId(string storyId) => $"story-{storyId.Replace('.', '-')}";
+
+    /// <summary>A small "Epic N retro →" link in the story header's kicker row, shown only when a
+    /// retrospective exists for the story's epic — the reciprocal of the retro page's stories list. Omitted
+    /// entirely otherwise. [Story 2.3 retro cross-links]</summary>
+    private static void AppendStoryRetroLink(StringBuilder sb, int epicNumber, string prefix, string? epicRetroPath)
+    {
+        if (epicRetroPath is not { Length: > 0 }) return;
+        sb.Append($"    <a class=\"pill pill-link\" href=\"{PathUtil.Html(prefix + epicRetroPath)}\">Epic {epicNumber} retro &rarr;</a>\n");
+    }
+
+    /// <summary>The epic page's retrospective affordance: a link to the epic's retro when one exists, or — for a
+    /// complete epic with no retro yet — a signposted suggestion to run it (via the module's retrospective
+    /// command). Nothing renders for an incomplete epic with no retro, or when the command isn't installed.
+    /// [Story 2.3 retro cross-links]</summary>
+    private static void AppendRetroAffordance(StringBuilder sb, EpicInfo epic, string epicClass, string prefix, CommandCatalog commands, string? epicRetroPath)
+    {
+        if (epicRetroPath is { Length: > 0 })
+        {
+            sb.Append("<div class=\"epic-card epic-retro-affordance\">\n");
+            sb.Append($"  <a class=\"epic-retro-link\" href=\"{PathUtil.Html(prefix + epicRetroPath)}\">View Epic {epic.Number} Retrospective &rarr;</a>\n");
+            sb.Append("</div>\n\n");
+            return;
+        }
+
+        // No retro yet: only prompt once the epic is actually complete (every story done) and the module
+        // exposes the retrospective command — otherwise stay silent.
+        if (epicClass != "done") return;
+        var guidance = BmadCommands.InlineGuidance(
+            commands.Command("retrospective"),
+            $"Epic {epic.Number} is complete — capture the lessons with",
+            string.Empty);
+        if (guidance.Length == 0) return;
+        sb.Append($"<div class=\"epic-card epic-retro-affordance\">\n  <div class=\"pending-note\">{guidance}</div>\n</div>\n\n");
+    }
 
     /// <summary>One panel that answers "what next?" end to end: the spotlighted story card on top (what to
     /// look at), then the BMad commands that act on it (how to move it forward). These used to be two

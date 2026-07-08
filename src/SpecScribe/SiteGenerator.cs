@@ -80,6 +80,14 @@ public sealed class SiteGenerator
             var artifactMap = BuildArtifactMap(files);
             var consumedArtifacts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+            // Retrospective notes (epic-N-retro-*.md) are a first-class artifact class. Parse them FIRST (parse
+            // needs no epics model), so the epic/story pages below can cross-link to their epic's retro via
+            // EpicRetroMap; consume them so the generic pages loop doesn't also render them. Their dedicated
+            // pages are written after the epics phase (RenderRetroPages needs the epics model). [Story 2.3 retro pages]
+            var retroFiles = files.Where(RetroParser.IsRetroFile).ToList();
+            foreach (var rf in retroFiles) consumedArtifacts.Add(ToSourceRelative(rf));
+            ParseRetros(retroFiles);
+
             if (epicsSourceFile is not null)
             {
                 reporter?.BeginPhase(GenerationPhase.Epics);
@@ -87,12 +95,7 @@ public sealed class SiteGenerator
                 reporter?.EndPhase(GenerationPhase.Epics);
             }
 
-            // Retrospective notes (epic-N-retro-*.md) are a first-class artifact class: render each as a
-            // dedicated stylized page (RetroTemplater) — needs the epics model above for the epic link — and
-            // consume them so the generic pages loop doesn't also render them. [Story 2.3 retro pages]
-            var retroFiles = files.Where(RetroParser.IsRetroFile).ToList();
-            foreach (var rf in retroFiles) consumedArtifacts.Add(ToSourceRelative(rf));
-            WriteRetros(retroFiles, nav);
+            RenderRetroPages(nav);
 
             // Epic/story artifacts were rendered as detail pages above; everything else renders standalone.
             var pageFiles = files
@@ -424,7 +427,8 @@ public sealed class SiteGenerator
 
             foreach (var epic in model.Epics)
             {
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
+                var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
+                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
 
                 foreach (var story in epic.Stories)
                 {
@@ -435,7 +439,7 @@ public sealed class SiteGenerator
                         // artifact overwrites it in place. ArtifactOutputPath stays null — placeholders
                         // must never count as detailed stories anywhere progress is computed.
                         var placeholderPath = StoryEpicLinkifier.StoryPagePath(story.Id);
-                        var placeholderHtml = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, _module.Commands);
+                        var placeholderHtml = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, _module.Commands, epicRetroPath);
                         File.WriteAllText(Path.Combine(_options.OutputRoot, placeholderPath.Replace('/', Path.DirectorySeparatorChar)), ApplyReferenceLinks(placeholderHtml, placeholderPath, skipStoryId: story.Id));
                         continue;
                     }
@@ -468,7 +472,7 @@ public sealed class SiteGenerator
                     remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, reviewFindingsHtml, changeLogHtml, nav, _module.Commands);
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, reviewFindingsHtml, changeLogHtml, nav, _module.Commands, epicRetroPath);
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
@@ -533,25 +537,34 @@ public sealed class SiteGenerator
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
-    /// <summary>Renders each retrospective note into its dedicated <see cref="RetroTemplater"/> page (at the
-    /// same <c>implementation-artifacts/…html</c> path the generic pipeline would have used, so existing links
-    /// resolve), reference-linkified like every page, and caches the parsed set for the sprint modal + home
-    /// Retrospectives section. [Story 2.3 retro pages]</summary>
-    private void WriteRetros(IReadOnlyList<string> retroFiles, SiteNav nav)
+    /// <summary>Parses the retrospective notes into <see cref="_retros"/> (ordered by epic, then filename) so
+    /// <see cref="EpicRetroMap"/> is available to the epic/story pages and the sprint/home surfaces. Parse only —
+    /// the dedicated pages are written later by <see cref="RenderRetroPages"/>. [Story 2.3 retro pages]</summary>
+    private void ParseRetros(IReadOnlyList<string> retroFiles)
     {
         var retros = new List<RetroModel>();
         foreach (var file in retroFiles)
         {
             var sourceRel = ToSourceRelative(file);
             var outputRel = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(sourceRel));
-            var retro = RetroParser.Parse(file, sourceRel, outputRel);
+            retros.Add(RetroParser.Parse(file, sourceRel, outputRel));
+        }
+        _retros = retros.OrderBy(r => r.EpicNumber).ThenBy(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+    }
 
+    /// <summary>Writes each parsed retrospective into its dedicated <see cref="RetroTemplater"/> page (at the
+    /// same <c>implementation-artifacts/…html</c> path the generic pipeline would have used, so existing links
+    /// resolve), reference-linkified like every page. Runs after the epics phase — the page needs the epics
+    /// model for its epic link and "Stories in this Epic" section. [Story 2.3 retro pages]</summary>
+    private void RenderRetroPages(SiteNav nav)
+    {
+        foreach (var retro in _retros)
+        {
+            var outputRel = retro.OutputRelativePath;
             var outputFull = Path.Combine(_options.OutputRoot, outputRel.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(outputFull)!);
             File.WriteAllText(outputFull, ApplyReferenceLinks(RetroTemplater.RenderPage(retro, _epicsModel, nav), outputRel));
-            retros.Add(retro);
         }
-        _retros = retros.OrderBy(r => r.EpicNumber).ThenBy(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>Maps an epic number to the output path of its (latest, by filename) retrospective page — the
@@ -601,10 +614,13 @@ public sealed class SiteGenerator
     {
         var open = _sprint?.OpenActionItems;
         if (open is null || open.Count == 0) return;
+        // Debt-related items link to the deferred-work backlog page when one exists (root-relative — this page
+        // is at the site root). WorkInventory is rebuilt from the docs generated so far.
+        var deferredHref = WorkInventory.Build(_docs.Values.ToList()).Deferred?.OutputPath;
         // NOT reference-linkified: the "Resolve with AI" data-copy payload embeds the action text (which can
         // contain "Epic N"/"Story N.M" mentions); the linkifier would wrap those in <a> tags INSIDE the
         // attribute value and corrupt the copyable command. [Story 2.3 polish #5]
-        var html = ActionItemsTemplater.RenderPage(open, EpicRetroMap, _module.Commands, nav);
+        var html = ActionItemsTemplater.RenderPage(open, EpicRetroMap, _module.Commands, nav, deferredHref);
         File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.ActionItemsOutputPath), html);
     }
 

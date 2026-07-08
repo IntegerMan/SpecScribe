@@ -455,6 +455,21 @@ claude-opus-4-8
 
 ## Change Log
 
+- 2026-07-08 (polish #6): Humanized the retro pages and cross-linked them with stories/epics. Participants now
+  render as a labeled **Personas** block: a new `Personas` classifier splits "Name (Role)" and maps the role to
+  a css-class, driving a role icon (`Icons.ForPersona`) + a general-palette tint per person (NOT `--status-*` —
+  personas aren't lifecycle states). `RetroParser` strips the leading duplicate `<h1>` (the styled header
+  already carries the title). Each retro now lists **"Stories in this Epic"** (linked to each story's real or
+  placeholder page, with a status badge + TOC entry), and every **story page** carries a reciprocal "Epic N
+  retro →" back-link. **Epic pages** gained a retro affordance: a "View Epic N Retrospective →" link when a
+  retro exists, or — for a complete epic (`StatusStyles.ForEpic == "done"`) with none — a `/bmad-retrospective`
+  suggestion (omitted when the command isn't installed). The **action-items page** got a wider wrapper
+  (`.action-items-wrap`, ~1040px) and, on debt-related items only (text mentions deferred / tech debt), an "In
+  deferred-work backlog →" link to the Deferred Work page. Generation was reordered: `WriteRetros` split into
+  `ParseRetros` (before the epics phase, so `EpicRetroMap` is available to epic/story pages) + `RenderRetroPages`
+  (after, since the page needs the epics model). 429 tests pass; isolated-dir generation verified — Personas
+  block with distinct role colors, no duplicate body `<h1>`, linked stories, epic/story retro links resolving
+  (200), deferred link debt-only, and no new broken links on any touched page.
 - 2026-07-07 (polish #5): Replaced the retrospectives **modal** with real, linkable pages to match the site's
   page-based UX. The sprint page's top strip collapsed to a single `.sprint-topbar` control row (title/subtitle +
   progress wheel + By-status/By-epic tabs + button cluster); the board view toggle now switches with
