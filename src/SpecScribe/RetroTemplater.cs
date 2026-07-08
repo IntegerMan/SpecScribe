@@ -9,6 +9,45 @@ namespace SpecScribe;
 /// shared nav/breadcrumb/footer. [Story 2.3 retro pages]</summary>
 public static class RetroTemplater
 {
+    /// <summary>The retrospectives index page (<c>retros.html</c>): one card per retro (title, date, epic),
+    /// each linking to its dedicated page. Mirrors the shared index-page shell. [Story 2.3 retro pages]</summary>
+    public static string RenderIndex(IReadOnlyList<RetroModel> retros, SiteNav nav)
+    {
+        var outputPath = SiteNav.RetrosOutputPath;
+
+        var sb = new StringBuilder();
+        sb.Append(PathUtil.RenderHeadOpen(
+            $"Retrospectives — {nav.SiteTitle}",
+            ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
+            $"Epic retrospectives for {nav.SiteTitle}."));
+        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Retrospectives", null) }));
+
+        sb.Append("<header class=\"doc-header\">\n");
+        sb.Append("  <h1>Retrospectives</h1>\n");
+        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {retros.Count} {Charts.Plural(retros.Count, "retrospective", "retrospectives")}</div>\n");
+        sb.Append("</header>\n\n");
+
+        sb.Append("<main id=\"main-content\">\n");
+        sb.Append("<div class=\"index-grid\">\n");
+        foreach (var r in retros)
+        {
+            sb.Append($"  <a class=\"index-card\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(r.OutputRelativePath))}\">\n");
+            sb.Append($"    <h2>{PathUtil.Html(r.Title)}</h2>\n");
+            var meta = new List<string> { $"Epic {r.EpicNumber}" };
+            if (r.DateText is { Length: > 0 } d) meta.Add(d);
+            sb.Append($"    <p>{PathUtil.Html(string.Join(" · ", meta))}</p>\n");
+            sb.Append($"    <span class=\"index-card-path\">{PathUtil.Html(PathUtil.NormalizeSlashes(r.SourceRelativePath))}</span>\n");
+            sb.Append("  </a>\n");
+        }
+        sb.Append("</div>\n\n");
+        sb.Append("</main>\n\n");
+
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append("</body>\n</html>\n");
+        return sb.ToString();
+    }
+
     public static string RenderPage(RetroModel retro, EpicsModel? epics, SiteNav nav)
     {
         var outputPath = retro.OutputRelativePath;

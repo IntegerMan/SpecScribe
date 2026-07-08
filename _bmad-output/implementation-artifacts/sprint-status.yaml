@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-07T23:10:00-04:00
+last_updated: 2026-07-07T23:59:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -58,7 +58,7 @@ development_status:
 
   epic-2: in-progress
   2-1-accurate-work-representation-and-authoring-guidance: done
-  2-2-first-class-rendering-of-spec-artifacts: review
+  2-2-first-class-rendering-of-spec-artifacts: done
   2-3-sprint-status-page-and-dashboard-widget: review
   2-4-planning-artifacts-grouping-status-badges-and-prd-prominence: review
   2-5-standardized-iconography-for-artifact-types-and-status: review
@@ -71,7 +71,7 @@ development_status:
   3-3-agent-and-workflow-structure-coverage-insights: backlog
   3-4-interactive-tree-views-for-project-and-artifact-structure: backlog
   3-5-flashy-but-purposeful-insight-visual-language: backlog
-  3-6-refinement-funnel-on-the-dashboard: backlog
+  3-6-refinement-funnel-on-the-dashboard: ready-for-dev
   epic-3-retrospective: optional
 
   epic-4: backlog

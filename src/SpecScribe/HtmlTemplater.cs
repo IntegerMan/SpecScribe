@@ -240,19 +240,14 @@ public static class HtmlTemplater
         }
         sb.Append("</div>\n\n");
 
-        // What's active / what's next leads the dashboard (F1): the single most valuable panel is no longer
-        // buried under a link grid. The sunburst (whole-project map) reads as its pair, so keep them adjacent.
+        // The sunburst (whole-project map) is the dashboard's headline panel.
         if (epicsModel is not null)
         {
-            AppendNowAndNext(sb, epicsModel, sprint);
-
             sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3>");
             sb.Append("<a class=\"view-epic-link\" href=\"epics.html\">View Epics &amp; Stories &rarr;</a></div>\n");
             sb.Append(Charts.Sunburst(epicsModel, commands: commands));
             sb.Append("</div>\n\n");
-
-            sb.Append(BmadCommands.RenderProjectNextSteps(epicsModel, commands));
         }
 
         sb.Append("<div class=\"chart-panel\">\n<h3>Overall Progress</h3>\n");
@@ -474,104 +469,6 @@ public static class HtmlTemplater
         sb.Append("</div>\n  </div>\n</div>\n");
     }
 
-    /// <summary>Surfaces what's in motion right now. When an active sprint is tracked (<paramref name="sprint"/>
-    /// present), this panel BECOMES the sprint board — the authoritative tracked view — capped at 5 cards per
-    /// column with a "+N more" link to the full sprint page. With no sprint it falls back to the derived
-    /// in-dev/review/up-next/next-to-draft view from each story artifact's own status. [Story 2.3 redesign]</summary>
-    private static void AppendNowAndNext(StringBuilder sb, EpicsModel epicsModel, SprintStatus? sprint)
-    {
-        if (sprint is { IsEmpty: false })
-        {
-            sb.Append("<div class=\"chart-panel sprint-board-panel\">\n");
-            // One header row: the title + its source label (inline, so it doesn't cost its own line), a status
-            // progress wheel, and the CTA. [Story 2.3 redesign]
-            sb.Append("<div class=\"chart-panel-header-row sprint-board-header\">\n");
-            sb.Append("  <h3>Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span></h3>\n");
-            sb.Append("  <div class=\"sprint-board-header-aside\">");
-            sb.Append(SprintTemplater.RenderProgressWheel(sprint));
-            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a>");
-            sb.Append("</div>\n</div>\n");
-            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath));
-            sb.Append("</div>\n\n");
-            return;
-        }
-
-        var allStories = epicsModel.Epics.SelectMany(e => e.Stories.Select(s => (Epic: e, Story: s))).ToList();
-        var inDev = allStories.Where(x => StatusStyles.ForStory(x.Story) == "active").ToList();
-        var inReview = allStories.Where(x => StatusStyles.ForStory(x.Story) == "review").ToList();
-        var upNext = allStories.Where(x => StatusStyles.ForStory(x.Story) == "ready").ToList();
-
-        // The lowest-numbered story that's been listed in a drafted epic but has no artifact yet — the
-        // next stub to flesh out. Pending epics are covered by nextEpicToDraft, so exclude them here.
-        var nextStoryToDraft = allStories
-            .Where(x => x.Epic.Status == EpicStatus.Drafted && StatusStyles.ForStory(x.Story) == "drafted")
-            .OrderBy(x => x.Epic.Number)
-            .ThenBy(x => StoryMinor(x.Story.Id))
-            .Select(x => (x.Epic, x.Story))
-            .FirstOrDefault();
-
-        var nextEpicToDraft = epicsModel.Epics.OrderBy(e => e.Number).FirstOrDefault(e => e.Status == EpicStatus.Pending);
-
-        if (inDev.Count == 0 && inReview.Count == 0 && upNext.Count == 0
-            && nextStoryToDraft.Story is null && nextEpicToDraft is null) return;
-
-        sb.Append("<div class=\"chart-panel\">\n<h3>Now &amp; Next</h3>\n<div class=\"now-next\">\n");
-
-        foreach (var (epic, story) in inDev)
-        {
-            AppendNowNextCard(sb, "active", "In development",
-                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
-                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
-        }
-
-        foreach (var (epic, story) in inReview)
-        {
-            AppendNowNextCard(sb, "review", "In review",
-                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
-                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
-        }
-
-        foreach (var (epic, story) in upNext)
-        {
-            AppendNowNextCard(sb, "ready", "Up next",
-                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
-                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
-        }
-
-        if (nextStoryToDraft.Story is not null)
-        {
-            var (epic, story) = nextStoryToDraft;
-            AppendNowNextCard(sb, "drafted", "Next story to draft",
-                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
-                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
-        }
-
-        if (nextEpicToDraft is not null)
-        {
-            AppendNowNextCard(sb, "pending", "Next epic to draft",
-                $"Epic {nextEpicToDraft.Number} · {PathUtil.StripHtmlTags(nextEpicToDraft.Title)}",
-                $"epics/epic-{nextEpicToDraft.Number}.html");
-        }
-
-        sb.Append("</div>\n</div>\n\n");
-    }
-
-    /// <summary>The "M" from a story id "N.M", for ordering stories within an epic; falls back to
-    /// <see cref="int.MaxValue"/> for ids that don't parse so they sort last rather than throw.</summary>
-    private static int StoryMinor(string storyId)
-    {
-        var dot = storyId.LastIndexOf('.');
-        return dot >= 0 && int.TryParse(storyId.AsSpan(dot + 1), out var minor) ? minor : int.MaxValue;
-    }
-
-    private static void AppendNowNextCard(StringBuilder sb, string cssClass, string kicker, string title, string href)
-    {
-        sb.Append($"  <a class=\"now-next-card {cssClass}\" href=\"{Html(href)}\">\n");
-        sb.Append($"    <span class=\"now-next-kicker\">{Html(kicker)}</span>\n");
-        sb.Append($"    <span class=\"now-next-title\">{Html(title)}</span>\n");
-        sb.Append("  </a>\n");
-    }
-
     /// <summary>The first-class "Direct &amp; Quick-Dev Work" band: quick-dev one-shot changes as status-badged
     /// cards plus a deferred-work callout, so these work classes read as distinct, tracked work rather than
     /// undifferentiated cards buried in the generic artifact grid. Omitted entirely (no empty header, no broken
@@ -622,10 +519,10 @@ public static class HtmlTemplater
         }
 
         // Open retrospective action items sit alongside deferred work — the other class of tracked follow-up.
-        // Links to the sprint page, where the Retrospectives modal lists them (each → its retro page). [retro]
+        // Links to the open-action-items page (details + per-item resolve command + retro link). [retro]
         if (openRetro > 0)
         {
-            sb.Append($"<a class=\"work-callout retro-callout\" href=\"{Html(SiteNav.SprintOutputPath)}\">\n");
+            sb.Append($"<a class=\"work-callout retro-callout\" href=\"{Html(SiteNav.ActionItemsOutputPath)}\">\n");
             sb.Append($"  <span class=\"work-callout-label\">{Icons.ForConcept("Retrospective")}Retro Action Items</span>\n");
             sb.Append($"  <span class=\"work-callout-count\">{openRetro} open {Charts.Plural(openRetro, "item", "items")}</span>\n");
             sb.Append("</a>\n\n");

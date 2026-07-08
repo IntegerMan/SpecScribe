@@ -130,6 +130,8 @@ public sealed class SiteGenerator
             // The sprint page reads the epics model (for real story/epic titles + links), so it's written
             // after the epics phase. Gated on parsed sprint data; a no-op when there is none. [Story 2.3 Task 3/5]
             WriteSprint(nav);
+            WriteRetroIndex(nav);
+            WriteActionItems(nav);
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav);
@@ -579,8 +581,31 @@ public sealed class SiteGenerator
     private void WriteSprint(SiteNav nav)
     {
         if (_sprint is null) return;
-        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, EpicRetroMap);
+        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros);
         File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.SprintOutputPath), ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
+    }
+
+    /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the
+    /// sprint page's "Retros" link. [Story 2.3 polish #5]</summary>
+    private void WriteRetroIndex(SiteNav nav)
+    {
+        if (_retros.Count == 0) return;
+        var html = RetroTemplater.RenderIndex(_retros, nav);
+        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.RetrosOutputPath), ApplyReferenceLinks(html, SiteNav.RetrosOutputPath));
+    }
+
+    /// <summary>Writes the open-action-items page (<c>action-items.html</c>) when the sprint tracks open items —
+    /// the target of the sprint page's flag button and the home retro callout. Each item links to its epic's
+    /// retro page and offers a quick-dev "Resolve with AI" command. [Story 2.3 polish #5]</summary>
+    private void WriteActionItems(SiteNav nav)
+    {
+        var open = _sprint?.OpenActionItems;
+        if (open is null || open.Count == 0) return;
+        // NOT reference-linkified: the "Resolve with AI" data-copy payload embeds the action text (which can
+        // contain "Epic N"/"Story N.M" mentions); the linkifier would wrap those in <a> tags INSIDE the
+        // attribute value and corrupt the copyable command. [Story 2.3 polish #5]
+        var html = ActionItemsTemplater.RenderPage(open, EpicRetroMap, _module.Commands, nav);
+        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.ActionItemsOutputPath), html);
     }
 
     /// <summary>Path to the repo-root README that feeds the optional Readme page.</summary>
@@ -803,8 +828,10 @@ public sealed class SiteGenerator
 
             var candidateFull = Path.GetFullPath(Path.Combine(sourceDir, reference.Replace('/', Path.DirectorySeparatorChar)));
 
-            // Inside SourceRoot, on disk, and generatable (not ignored). Otherwise omit — never a broken link.
+            // Inside SourceRoot, a markdown file that actually gets a generated page, and not ignored.
+            // Otherwise omit — never a broken link (only *.md sources are converted into pages).
             if (!candidateFull.StartsWith(sourceRootFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.Equals(Path.GetExtension(candidateFull), ".md", StringComparison.OrdinalIgnoreCase)) continue;
             if (!File.Exists(candidateFull) || IsIgnored(candidateFull)) continue;
 
             var candidateRel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.SourceRoot, candidateFull));
@@ -819,6 +846,14 @@ public sealed class SiteGenerator
         return resolved;
     }
 
+    // Known acronym filename tokens preserved verbatim by PrettyLabel. A blanket "all-caps token" rule also
+    // catches full English words authored in all-caps (e.g. EXPERIENCE.md, DESIGN.md), producing shouty labels —
+    // so only this explicit allowlist is exempted from title-casing. [Story 2.2 review]
+    private static readonly HashSet<string> AcronymLabels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "PRD", "SPEC", "UX", "API", "FR", "NFR", "AC", "TOC",
+    };
+
     /// <summary>A human, title-cased label for a related-doc cross-link, derived from its filename
     /// (e.g. <c>requirements-catalog.md</c> → "Requirements Catalog"). Kept order-independent — it never reads
     /// the target's own title, which may not have been generated yet during the rebuild pass. [Story 2.2 Task 4]</summary>
@@ -828,9 +863,9 @@ public sealed class SiteGenerator
         var words = Path.GetFileNameWithoutExtension(sourceRelativePath)
             .Split('-', '_', ' ')
             .Where(w => w.Length > 0)
-            // Preserve an all-caps token as-is so acronym filenames (PRD, SPEC) don't degrade to "Prd"/"Spec";
-            // title-case everything else (requirements-catalog → "Requirements Catalog").
-            .Select(w => w.All(char.IsUpper) ? w : ti.ToTitleCase(w.ToLowerInvariant()));
+            // Preserve only known acronym tokens (PRD, SPEC, ...) as-is; title-case everything else, including
+            // other all-caps filenames (EXPERIENCE.md → "Experience", not "EXPERIENCE").
+            .Select(w => AcronymLabels.Contains(w) ? w.ToUpperInvariant() : ti.ToTitleCase(w.ToLowerInvariant()));
         return string.Join(" ", words);
     }
 

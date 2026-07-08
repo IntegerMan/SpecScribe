@@ -168,7 +168,7 @@ public class SprintTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_RetrospectivesModalListsRetrosAndOpenItemsLinkedToTheirRetroPage()
+    public void RenderIndex_HasRetrosLinkAndOpenItemsFlagButtonNotAModal()
     {
         var withOpen = SprintStatusParser.Parse("""
             development_status:
@@ -189,21 +189,25 @@ public class SprintTemplaterTests
                 OutputRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.html",
             },
         };
-        var map = new Dictionary<int, string> { [1] = "implementation-artifacts/epic-1-retro-2026-07-07.html" };
 
-        var html = SprintTemplater.RenderIndex(withOpen, null, Nav(), CommandCatalog.Empty, retros, map);
+        var html = SprintTemplater.RenderIndex(withOpen, null, Nav(), SprintCommands(), retros);
 
-        // A header modal (centered .retro-menu) — no bottom section — listing the retro and the open item…
-        Assert.Contains("class=\"cmd-menu retro-menu\"", html);
-        Assert.DoesNotContain("class=\"sprint-action-items\"", html);   // not at the page bottom anymore
-        Assert.Contains("Past retrospectives", html);
-        Assert.Contains("Epic 1 Retrospective", html);
-        // …with the open action item linked to its epic's retro page.
-        Assert.Contains("<a class=\"sprint-action-text\" href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\">Add error-handling review to the checklist</a>", html);
+        // No modal — the buttons are plain links to real pages.
+        Assert.DoesNotContain("retro-menu", html);
+        // "Retros" link → retros.html (with a rich js-tip tooltip).
+        Assert.Contains("<a class=\"cmd-menu-toggle js-tip\" href=\"retros.html\"", html);
+        Assert.Contains("data-tip=\"1 retrospective\nLatest: Epic 1 Retrospective (2026-07-07)\"", html);
+        // "⚑ 1" flag → action-items.html (only when open items exist).
+        Assert.Contains("<a class=\"sprint-flag js-tip\" href=\"action-items.html\"", html);
+        Assert.Contains("⚑ 1", html);
+        // The command popout is relabelled "Commands".
+        Assert.Contains(">Commands ▾</summary>", html);
 
-        // No retros and no open items → no modal at all.
+        // No retros and no open items → neither button appears.
         var none = SprintStatusParser.Parse("development_status:\n  epic-1: in-progress\n  1-1-x: done\n")!;
-        Assert.DoesNotContain("retro-menu", SprintTemplater.RenderIndex(none, null, Nav(), CommandCatalog.Empty));
+        var bare = SprintTemplater.RenderIndex(none, null, Nav(), CommandCatalog.Empty);
+        Assert.DoesNotContain("href=\"retros.html\"", bare);
+        Assert.DoesNotContain("sprint-flag", bare);
     }
 
     [Fact]

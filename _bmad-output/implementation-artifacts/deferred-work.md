@@ -40,3 +40,7 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `_bmad-output/implementation-artifacts/spec-commit-heatmap-contrast-and-day-drilldown.md`
   summary: Add a keyboard bypass affordance around the commit heatmap for dense histories where nearly every day is an active-day link (~100 sequential tab stops).
   evidence: Review noted the zero-commit-cells-unlinked mitigation only helps sparse histories; a repo with daily commits over the 15+ week window produces ~105 tab stops with no skip link before the panels.
+
+## Deferred from: code review of story-2-2 (2026-07-07)
+
+- **Single-spec-kernel assumption in nav quick-link and index-card title.** `SiteNav.Build`'s `specKernelHub` lookup (`src/SpecScribe/SiteNav.cs:111-112`) uses `FirstOrDefault` to pick one `specs/*/SPEC.md`, so a project with more than one spec-kernel bundle only gets a nav quick-link to whichever one enumerates first; `HtmlTemplater.IndexCardTitle` (`src/SpecScribe/HtmlTemplater.cs:697-700`) similarly rewrites the card title to the fixed string "SPEC — Canonical Contract" for any doc with an `id:` starting `SPEC-`, so two kernels would render identical, indistinguishable index cards. Out of AC scope, single-kernel only today — ACs describe exactly one spec kernel per project, this repo has one, no current use case needs more. Revisit if a second kernel is ever authored.

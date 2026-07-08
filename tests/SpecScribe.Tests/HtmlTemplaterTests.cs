@@ -233,7 +233,7 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_SurfacesNowAndNextAheadOfExploreKeyViews()
+    public void RenderIndex_SurfacesProjectAtAGlanceAheadOfExploreKeyViews()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -247,10 +247,10 @@ public class HtmlTemplaterTests
             commands: CommandCatalog.Empty);
 
         // The most valuable panel leads; the slimmed link grid trails it. [Story 1.5 F1]
-        var nowNext = html.IndexOf("Now &amp; Next", StringComparison.Ordinal);
+        var glance = html.IndexOf("Project at a Glance", StringComparison.Ordinal);
         var explore = html.IndexOf("Explore Key Views", StringComparison.Ordinal);
-        Assert.True(nowNext >= 0 && explore >= 0, "both panels should render");
-        Assert.True(nowNext < explore, "Now & Next must appear before Explore Key Views");
+        Assert.True(glance >= 0 && explore >= 0, "both panels should render");
+        Assert.True(glance < explore, "Project at a Glance must appear before Explore Key Views");
     }
 
     [Fact]
@@ -323,7 +323,7 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_OmitsSprintWidgetWhenNoSprintDataAndLeavesNowAndNextIntact()
+    public void RenderIndex_OmitsSprintWidgetWhenNoSprintDataAndLeavesDashboardIntact()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -336,40 +336,9 @@ public class HtmlTemplaterTests
         // No sprint widget markers at all (clean omission, not an empty panel)...
         Assert.DoesNotContain("from sprint-status.yaml", html);
         Assert.DoesNotContain("View Sprint", html);
-        // ...and the derived Now & Next panel + a11y floor are unaffected.
-        Assert.Contains("Now &amp; Next", html);
+        // ...and the sunburst panel + a11y floor are unaffected.
+        Assert.Contains("Project at a Glance", html);
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
-        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
-    }
-
-    [Fact]
-    public void RenderIndex_NowAndNextBecomesSprintBoardWhenSprintPresent()
-    {
-        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
-        var sprint = SprintStatusParser.Parse("""
-            development_status:
-              epic-1: in-progress
-              1-1-a: in-progress
-              1-2-b: backlog
-            """);
-
-        var html = HtmlTemplater.RenderIndex(
-            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
-            epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "in progress"), Story("1.2", "backlog")),
-            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty,
-            work: null, sprint: sprint);
-
-        // The Now & Next panel is now the sprint board (from the yaml), with lanes + a CTA to the full page.
-        Assert.Contains("sprint-board-panel", html);
-        Assert.Contains("class=\"sprint-board\"", html);
-        Assert.Contains("<section class=\"sprint-lane active\"", html);
-        Assert.Contains("View sprint board", html);
-        Assert.Contains("from sprint-status.yaml", html);
-        // Cards link to generated story pages (StoryPagePath), never the epic fallback.
-        Assert.Contains("href=\"epics/story-1-1.html\"", html);
-        // The derived "In development / Up next" kicker labels are NOT used when the board takes over.
-        Assert.DoesNotContain("Next epic to draft", html);
-        // Still exactly one main landmark.
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
     }
 

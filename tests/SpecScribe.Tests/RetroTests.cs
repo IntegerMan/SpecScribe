@@ -102,6 +102,58 @@ public class RetroTests : IDisposable
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
     }
 
+    [Fact]
+    public void RenderIndex_ListsRetrosLinkingToTheirPages()
+    {
+        var retros = new[]
+        {
+            new RetroModel
+            {
+                EpicNumber = 1, Title = "Epic 1 Retrospective", DateText = "2026-07-07",
+                Participants = Array.Empty<string>(), BodyHtml = string.Empty,
+                SourceRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.md",
+                OutputRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.html",
+            },
+        };
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = RetroTemplater.RenderIndex(retros, nav);
+
+        Assert.Contains("<h1>Retrospectives</h1>", html);
+        Assert.Contains("href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\"", html);
+        Assert.Contains("Epic 1", html);
+        Assert.Contains("2026-07-07", html);
+        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
+
+    [Fact]
+    public void ActionItems_RenderPage_ShowsItemsRetroLinkAndResolveCommand()
+    {
+        var open = new[]
+        {
+            new SprintActionItem("Route deferred tech debt", "open", 1, "Dana"),
+            new SprintActionItem("Schedule retros promptly", "in-progress", 1, "Amelia"),
+        };
+        var map = new Dictionary<int, string> { [1] = "implementation-artifacts/epic-1-retro-2026-07-07.html" };
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = ActionItemsTemplater.RenderPage(open, map, commands, nav);
+
+        Assert.Contains("<h1>Open Action Items</h1>", html);
+        Assert.Contains("Route deferred tech debt", html);
+        // Each item links back to its epic's retro page…
+        Assert.Contains("href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\">From Epic 1 retrospective", html);
+        // …and offers a "Resolve with AI" command composed with the action text.
+        Assert.Contains("<span class=\"cmd-text\">Resolve with AI</span>", html);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Route deferred tech debt\"", html);
+        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+
+        // No quick-dev command exposed → no resolve button (graceful).
+        var noCmd = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
+        Assert.DoesNotContain("Resolve with AI", noCmd);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         int count = 0, i = 0;

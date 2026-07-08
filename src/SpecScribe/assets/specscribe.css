@@ -2167,16 +2167,17 @@ code.color-swatch {
    header aligns with the board. */
 .sprint-topbar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 0.8rem 1.5rem;
+  gap: 0.6rem 1.5rem;
   margin: 0.3rem 0 0.8rem;
 }
-.sprint-topbar-head { min-width: 0; }
+.sprint-topbar-head { flex: 1 1 auto; min-width: 0; }
 .sprint-topbar-head h1 { font-size: 1.9rem; margin: 0 0 0.1rem; }
 .sprint-topbar-head .doc-subtitle { margin: 0; text-align: left; max-width: none; }
-.sprint-topbar-aside { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+/* Wheel + view toggle + Commands/Retros/flag buttons on one control row; wrap on narrow. */
+.sprint-topbar-aside { display: flex; align-items: center; flex-wrap: wrap; gap: 0.55rem 0.7rem; flex-shrink: 0; }
 
 /* Compact status progress wheel — a small segmented ring + a "N / M done" label. Shared by the sprint page
    top strip and the home Now & Next header. */
@@ -2206,33 +2207,6 @@ code.color-swatch {
 /* align-items:flex-start so each command badge sizes to its content instead of stretching the popout width. */
 .cmd-menu-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; }
 .cmd-menu-desc { font-size: 0.76rem; color: var(--ink-faded); }
-.cmd-menu-count {
-  font-family: 'Courier New', monospace; font-size: 0.66rem;
-  background: var(--rust); color: var(--warm-white);
-  border-radius: 10px; padding: 0 0.4rem; margin-left: 0.15rem;
-}
-
-/* The Retrospectives popout is a centered modal rather than an anchored dropdown. The dim backdrop lives on
-   the pop's ::before (a <details> element itself doesn't render ::before reliably); it's click-through
-   (pointer-events:none) so an outside click still closes the modal via the shared menu-dismissal JS. */
-.retro-menu .cmd-menu-pop.retro-pop {
-  position: fixed; left: 50%; top: 50%; right: auto; transform: translate(-50%, -50%);
-  width: min(620px, 92vw); max-height: 80vh; overflow-y: auto; z-index: 200;
-}
-.retro-menu .cmd-menu-pop.retro-pop::before {
-  content: ""; position: fixed; inset: 0; z-index: -1;
-  background: rgba(26, 18, 8, 0.35); pointer-events: none;
-}
-.retro-modal-section + .retro-modal-section { margin-top: 1rem; }
-.retro-modal-section h3 { font-size: 0.9rem; margin: 0 0 0.5rem; color: var(--rust); }
-.retro-modal-list { list-style: none; margin: 0; padding: 0; }
-.retro-modal-list li { padding: 0.3rem 0; border-bottom: 1px solid var(--parchment-dark); }
-.retro-modal-list li:last-child { border-bottom: none; }
-.retro-modal-list a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
-.retro-modal-list a:hover { color: var(--rust); }
-.retro-modal-date { font-size: 0.72rem; color: var(--ink-light); font-family: 'Courier New', monospace; margin-left: 0.4rem; }
-a.sprint-action-text { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
-a.sprint-action-text:hover { color: var(--rust); }
 
 /* Retrospective page: participant pills + a linked epic pill. */
 .retro-participants { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
@@ -2371,10 +2345,12 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
   gap: 0.55rem;
 }
 
-/* Pure-CSS view toggle (no JS): hidden radios drive which .board-view shows; labels are the visible tabs. */
-.board-tabs { position: relative; }
+/* Pure-CSS view toggle (no JS): hidden radios drive which .board-view shows; labels are the visible tabs. The
+   tabs live in the control row (not next to the views), so view switching uses :has() on .sprint-page rather
+   than the sibling `~` selector. */
+.board-tabs { position: relative; display: inline-block; }
 .board-tab-radio { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.board-tabbar { display: inline-flex; gap: 0.25rem; margin: 0 0 0.8rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.2rem; background: var(--parchment); }
+.board-tabbar { display: inline-flex; gap: 0.25rem; margin: 0; border: 1px solid var(--border); border-radius: 8px; padding: 0.2rem; background: var(--parchment); }
 .board-tab {
   font-size: 0.78rem;
   padding: 0.25rem 0.8rem;
@@ -2395,8 +2371,33 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 #sv-epic:focus-visible ~ .board-tabbar label[for="sv-epic"] { outline: 2px solid var(--teal); outline-offset: 2px; }
 
 .board-view-epic { display: none; }
-#sv-epic:checked ~ .board-view-status { display: none; }
-#sv-epic:checked ~ .board-view-epic { display: block; }
+.sprint-page:has(#sv-epic:checked) .board-view-status { display: none; }
+.sprint-page:has(#sv-epic:checked) .board-view-epic { display: block; }
+
+/* Retros link + open-items flag buttons in the control row. Retros reuses the .cmd-menu-toggle chrome as an
+   <a>; the flag is a small review-tinted pill with a ⚑ glyph. */
+a.cmd-menu-toggle { text-decoration: none; display: inline-block; }
+a.cmd-menu-toggle:hover { color: var(--rust); border-color: var(--gold-light); }
+.sprint-flag {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.78rem; font-family: 'Courier New', monospace;
+  padding: 0.3rem 0.6rem; border-radius: 6px; text-decoration: none;
+  color: var(--teal-deep); background: #d9e6ea; border: 1px solid var(--status-review);
+}
+.sprint-flag:hover { color: var(--rust); border-color: var(--gold-light); }
+
+/* Open action items page: one card per item with its resolve command + retro link. */
+.action-items-list { list-style: none; margin: 0; padding: 0; }
+.action-item-card {
+  background: var(--warm-white); border: 1px solid var(--border);
+  border-left: 3px solid var(--status-review); border-radius: 6px;
+  padding: 0.9rem 1.1rem; margin-bottom: 0.9rem;
+}
+.action-item-text { color: var(--ink); font-size: 0.92rem; line-height: 1.5; margin-bottom: 0.5rem; }
+.action-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+.action-item-retro { font-size: 0.78rem; color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+.action-item-retro:hover { color: var(--rust); }
+.action-item-resolve { margin-top: 0.2rem; }
 
 .sprint-action-items { margin-top: 1.6rem; }
 .sprint-action-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }

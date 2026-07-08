@@ -44,7 +44,7 @@ public static class SprintTemplater
     }
 
     public static string RenderIndex(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
-        IReadOnlyList<RetroModel>? retros = null, IReadOnlyDictionary<int, string>? epicRetroMap = null)
+        IReadOnlyList<RetroModel>? retros = null)
     {
         var outputPath = SiteNav.SprintOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — sprint.html is at the output root.
@@ -63,10 +63,9 @@ public static class SprintTemplater
         var updated = sprint.LastUpdated is { Length: > 0 } lu ? $" &middot; updated {PathUtil.Html(lu)}" : string.Empty;
         var subtitle = $"{PathUtil.Html(nav.SiteTitle)} &middot; {epicCount} {Charts.Plural(epicCount, "epic", "epics")} &middot; {storyCount} {Charts.Plural(storyCount, "story", "stories")} &middot; from sprint-status.yaml{updated}";
 
-        // One compact top strip INSIDE main so the header shares the board's centered column (alignment) and
-        // the whole chrome costs a single short row: title + subtitle on the left; a compact donut and a
-        // header "Sprint commands" popout (descriptions tucked behind it) on the right — leaving the board the
-        // vertical space. [Story 2.3 redesign]
+        // One consolidated control row INSIDE main: title/subtitle on the left; the wheel, the view toggle, and
+        // the Commands / Retros / flag buttons on the right — the whole chrome in a single row, leaving the
+        // board the vertical space. [Story 2.3 polish #5]
         sb.Append("<main id=\"main-content\" class=\"sprint-page\">\n\n");
         sb.Append("<div class=\"sprint-topbar\">\n");
         sb.Append("  <div class=\"sprint-topbar-head\">\n");
@@ -75,18 +74,20 @@ public static class SprintTemplater
         sb.Append("  </div>\n");
         sb.Append("  <div class=\"sprint-topbar-aside\">\n");
         sb.Append(RenderProgressWheel(sprint));
-        sb.Append(BmadCommands.RenderCommandMenu("Sprint commands", new (string?, string)[]
+        sb.Append(RenderBoardTabs());
+        sb.Append(BmadCommands.RenderCommandMenu("Commands", new (string?, string)[]
         {
             (commands.Command("sprint-planning"), "Plan the sprint from epics"),
             (commands.Command("sprint-status"), "Summarize status & risks"),
             (commands.Command("correct-course"), "Handle a mid-sprint change"),
             (commands.Command("retrospective"), "Capture lessons after an epic"),
         }));
-        sb.Append(RenderRetrospectivesModal(sprint, retros ?? Array.Empty<RetroModel>(), epicRetroMap, prefix));
+        AppendRetroButtons(sb, sprint, retros ?? Array.Empty<RetroModel>());
         sb.Append("  </div>\n");
         sb.Append("</div>\n\n");
 
-        AppendBoardToggle(sb, sprint, epics, prefix);
+        // The toggle radios live in the control row above; the views sit here and toggle via CSS :has().
+        AppendBoardViews(sb, sprint, epics, prefix);
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
@@ -179,23 +180,51 @@ public static class SprintTemplater
     /// <summary>A pure-CSS toggle (no JS) between the status-column board (default) and the epic-grouped view.
     /// Hidden radios drive sibling <c>.board-view</c> visibility via CSS; the labels are the visible tabs.
     /// [Story 2.3 redesign]</summary>
-    private static void AppendBoardToggle(StringBuilder sb, SprintStatus sprint, EpicsModel? epics, string prefix)
+    /// <summary>The pure-CSS view toggle tabs (radios + labels) for the control row. The radios drive the two
+    /// board views via CSS <c>:has()</c> on <c>.sprint-page</c>, so the tabs no longer need to sit next to the
+    /// views. [Story 2.3 polish #5]</summary>
+    private static string RenderBoardTabs()
     {
-        sb.Append("<div class=\"board-tabs\">\n");
-        // Radios first so they precede the views as siblings (the CSS `~` selector switches which view shows).
-        sb.Append("  <input type=\"radio\" id=\"sv-status\" name=\"sprint-view\" class=\"board-tab-radio\" checked>\n");
-        sb.Append("  <input type=\"radio\" id=\"sv-epic\" name=\"sprint-view\" class=\"board-tab-radio\">\n");
-        sb.Append("  <div class=\"board-tabbar\">\n");
-        sb.Append("    <label for=\"sv-status\" class=\"board-tab\">By status</label>\n");
-        sb.Append("    <label for=\"sv-epic\" class=\"board-tab\">By epic</label>\n");
-        sb.Append("  </div>\n");
-        sb.Append("  <div class=\"board-view board-view-status\">\n");
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"board-tabs\">");
+        sb.Append("<input type=\"radio\" id=\"sv-status\" name=\"sprint-view\" class=\"board-tab-radio\" checked>");
+        sb.Append("<input type=\"radio\" id=\"sv-epic\" name=\"sprint-view\" class=\"board-tab-radio\">");
+        sb.Append("<div class=\"board-tabbar\">");
+        sb.Append("<label for=\"sv-status\" class=\"board-tab\">By status</label>");
+        sb.Append("<label for=\"sv-epic\" class=\"board-tab\">By epic</label>");
+        sb.Append("</div></div>");
+        return sb.ToString();
+    }
+
+    private static void AppendBoardViews(StringBuilder sb, SprintStatus sprint, EpicsModel? epics, string prefix)
+    {
+        sb.Append("<div class=\"board-view board-view-status\">\n");
         sb.Append(RenderBoard(sprint, epics, prefix: prefix));
-        sb.Append("  </div>\n");
-        sb.Append("  <div class=\"board-view board-view-epic\">\n");
+        sb.Append("</div>\n");
+        sb.Append("<div class=\"board-view board-view-epic\">\n");
         sb.Append(RenderBoardByEpic(sprint, epics, prefix));
-        sb.Append("  </div>\n");
         sb.Append("</div>\n\n");
+    }
+
+    /// <summary>The control-row buttons that link to the retrospectives index and the open-action-items page.
+    /// "Retros" shows when any retro exists (rich tooltip: count + latest); the flag "⚑ N" shows only when there
+    /// are open action items. Both are plain links to real pages (no modal). [Story 2.3 polish #5]</summary>
+    private static void AppendRetroButtons(StringBuilder sb, SprintStatus sprint, IReadOnlyList<RetroModel> retros)
+    {
+        if (retros.Count > 0)
+        {
+            var latest = retros[^1]; // ordered epic-then-name; the last is the newest.
+            var tip = $"{retros.Count} {Charts.Plural(retros.Count, "retrospective", "retrospectives")}";
+            if (latest.DateText is { Length: > 0 } d) tip += $"\nLatest: {PathUtil.StripHtmlTags(latest.Title)} ({d})";
+            sb.Append($"<a class=\"cmd-menu-toggle js-tip\" href=\"{SiteNav.RetrosOutputPath}\" data-tip=\"{PathUtil.Html(tip)}\">Retros</a>");
+        }
+
+        var open = sprint.OpenActionItems.Count;
+        if (open > 0)
+        {
+            var tip = $"{open} open action {Charts.Plural(open, "item", "items")} — review & resolve";
+            sb.Append($"<a class=\"sprint-flag js-tip\" href=\"{SiteNav.ActionItemsOutputPath}\" data-tip=\"{PathUtil.Html(tip)}\" aria-label=\"{open} open action items\">⚑ {open}</a>");
+        }
     }
 
     /// <summary>A compact status progress wheel: the lifecycle segments as a small donut with NO center number
@@ -224,54 +253,6 @@ public static class SprintTemplater
         return sb.ToString();
     }
 
-    /// <summary>The header-triggered "Retrospectives" modal: a native <c>&lt;details&gt;</c> (reusing the
-    /// command-popout dismissal JS) styled as a centered overlay. Lists past retrospectives (each → its page)
-    /// and the open action items (each linked to its epic's retro page via <paramref name="epicRetroMap"/>).
-    /// Returns empty — no button — when there are no retros AND no open items. [Story 2.3 retro pages]</summary>
-    private static string RenderRetrospectivesModal(SprintStatus sprint, IReadOnlyList<RetroModel> retros,
-        IReadOnlyDictionary<int, string>? epicRetroMap, string prefix)
-    {
-        var open = sprint.OpenActionItems;
-        if (retros.Count == 0 && open.Count == 0) return string.Empty;
-
-        var count = open.Count;
-        var sb = new StringBuilder();
-        sb.Append("<details class=\"cmd-menu retro-menu\">");
-        sb.Append($"<summary class=\"cmd-menu-toggle\" aria-label=\"Retrospectives\">Retrospectives{(count > 0 ? $" <span class=\"cmd-menu-count\">{count}</span>" : string.Empty)} ▾</summary>");
-        sb.Append("<div class=\"cmd-menu-pop retro-pop\" role=\"group\" aria-label=\"Retrospectives\">");
-
-        if (retros.Count > 0)
-        {
-            sb.Append("<div class=\"retro-modal-section\"><h3>Past retrospectives</h3><ul class=\"retro-modal-list\">");
-            foreach (var r in retros)
-            {
-                var meta = r.DateText is { Length: > 0 } d ? $" <span class=\"retro-modal-date\">{PathUtil.Html(d)}</span>" : string.Empty;
-                sb.Append($"<li><a href=\"{PathUtil.Html(prefix + r.OutputRelativePath)}\">{PathUtil.Html(r.Title)}</a>{meta}</li>");
-            }
-            sb.Append("</ul></div>");
-        }
-
-        if (open.Count > 0)
-        {
-            sb.Append("<div class=\"retro-modal-section\"><h3>Open action items</h3><ul class=\"sprint-action-list\">");
-            foreach (var item in open)
-            {
-                sb.Append("<li class=\"sprint-action-row\">");
-                var retroHref = item.EpicNumber is { } en && epicRetroMap is not null && epicRetroMap.TryGetValue(en, out var rp) ? rp : null;
-                sb.Append(retroHref is not null
-                    ? $"<a class=\"sprint-action-text\" href=\"{PathUtil.Html(prefix + retroHref)}\">{PathUtil.Html(item.Action)}</a>"
-                    : $"<span class=\"sprint-action-text\">{PathUtil.Html(item.Action)}</span>");
-                if (item.EpicNumber is { } e2) sb.Append($"<span class=\"pill\">Epic {e2}</span>");
-                if (item.Owner is { Length: > 0 } owner) sb.Append($"<span class=\"pill\">{PathUtil.Html(owner)}</span>");
-                sb.Append(StatusStyles.Badge(StatusStyles.ForSprint(item.Status), StatusStyles.SprintLabel(item.Status)));
-                sb.Append("</li>");
-            }
-            sb.Append("</ul></div>");
-        }
-
-        sb.Append("</div></details>");
-        return sb.ToString();
-    }
 
     /// <summary>One board card for a story: the whole card is a link to the story's generated page (real or
     /// placeholder — always exists for a model story), colored by its tracked lifecycle stage. Falls back to a

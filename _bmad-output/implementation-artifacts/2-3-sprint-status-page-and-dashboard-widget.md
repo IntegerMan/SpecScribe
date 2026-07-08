@@ -455,6 +455,25 @@ claude-opus-4-8
 
 ## Change Log
 
+- 2026-07-07 (polish #5): Replaced the retrospectives **modal** with real, linkable pages to match the site's
+  page-based UX. The sprint page's top strip collapsed to a single `.sprint-topbar` control row (title/subtitle +
+  progress wheel + By-status/By-epic tabs + button cluster); the board view toggle now switches with
+  `:has()` (`.sprint-page:has(#sv-epic:checked) .board-view-status{display:none}`) so the tabs no longer need to
+  sit beside the views. Relabelled "Sprint commands"→**Commands ▾** and "Retrospectives"→a **Retros** link
+  (`<a class="cmd-menu-toggle js-tip" href="retros.html">` with a rich `N retrospectives / Latest: …` tooltip,
+  gated on retros existing). Open action items became a **⚑ N flag** link (`.sprint-flag`, shown only when open
+  items exist) to a new page. New `RetroTemplater.RenderIndex` → **`retros.html`** (index-grid of retro cards)
+  and new `ActionItemsTemplater` → **`action-items.html`** (per open item: action text, Epic/owner pills, status
+  badge, a "From Epic N retrospective" link via `EpicRetroMap`, and a **"Resolve with AI"** command —
+  `BmadCommands.RenderLabeledCommand` whose visible label is "Resolve with AI" but whose copy/deeplink payload is
+  `/bmad-quick-dev Resolve this retrospective action item (Epic N): {action}`, omitted when the module exposes no
+  `quick-dev`). `SiteGenerator` gained `WriteRetroIndex`/`WriteActionItems` (both gated); `SiteNav` gained
+  `RetrosOutputPath`/`ActionItemsOutputPath`. The home "Retro Action Items — N open" callout now points at
+  `action-items.html`. Deleted `RenderRetrospectivesModal` + all `.retro-menu`/`.retro-pop`/modal CSS.
+  **`action-items.html` is intentionally NOT reference-linkified** — the linkifier would rewrite "Epic N" inside
+  the resolve command's `data-copy` attribute into `<a>` tags and corrupt the copyable command. 423 tests pass;
+  isolated-dir generation verified (single control row, `:has()` toggle swaps views, Retros→retros.html,
+  ⚑→action-items.html, clean resolve payload, zero broken links).
 - 2026-07-06: Created Story 2.3 as Epic 2's sprint-status story. Scoped: the first parse of
   `sprint-status.yaml` (via the already-referenced YamlDotNet) into an order-preserving model; a `sprint.html`
   page mirroring `RequirementsTemplater` that lists epics and their grouped stories with lifecycle status

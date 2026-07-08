@@ -92,6 +92,38 @@ public static class BmadCommands
         return sb.ToString();
     }
 
+    /// <summary>A command badge whose VISIBLE text is a short human label (e.g. "Resolve with AI") while its
+    /// copy/deeplink payload is the full composed command — for long prompts that would be ugly shown verbatim.
+    /// Reuses the same copy button + Cursor send-menu as <see cref="RenderCommandBadge"/>. Returns empty when
+    /// the command is null/blank (the module doesn't expose it). [Story 2.3 retro action items]</summary>
+    public static string RenderLabeledCommand(string label, string? rawCommand)
+    {
+        if (string.IsNullOrWhiteSpace(rawCommand)) return string.Empty;
+
+        var cmd = PathUtil.Html(rawCommand);
+        var lbl = PathUtil.Html(label);
+        var sb = new StringBuilder();
+        sb.Append("<span class=\"cmd-badge\">");
+        sb.Append($"<button type=\"button\" class=\"cmd-copy\" data-copy=\"{cmd}\" data-tooltip=\"Copy command\" aria-label=\"{lbl} — copy command\">");
+        sb.Append($"<span class=\"cmd-text\">{lbl}</span>{CopyIconSvg}</button>");
+        sb.Append("<details class=\"send-menu\">");
+        sb.Append("<summary class=\"send-toggle\" data-tooltip=\"More options\" aria-label=\"Other ways to send this command\">▾</summary>");
+        sb.Append($"<div class=\"send-menu-list\" role=\"group\" aria-label=\"Send {lbl} to an editor\">");
+        sb.Append($"<button type=\"button\" class=\"send-item\" data-copy=\"{cmd}\" aria-label=\"Copy command\">Copy</button>");
+        if (SendTargets.Count > 0)
+        {
+            var encoded = Uri.EscapeDataString(rawCommand!);
+            foreach (var target in SendTargets)
+            {
+                var href = PathUtil.Html(target.UriTemplate.Replace("{cmd}", encoded));
+                sb.Append($"<a class=\"send-item\" href=\"{href}\">{PathUtil.Html(target.Label)}</a>");
+            }
+        }
+        sb.Append("</div></details>");
+        sb.Append("</span>");
+        return sb.ToString();
+    }
+
     /// <summary>A dependency-free "copy" glyph (two overlapping pages) that inherits its stroke from the
     /// button's text color via <c>currentColor</c>. Marked aria-hidden because the button carries the label.</summary>
     private const string CopyIconSvg =

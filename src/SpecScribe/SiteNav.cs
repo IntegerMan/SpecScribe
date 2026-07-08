@@ -11,6 +11,8 @@ public sealed class SiteNav
     public const string EpicsOutputPath = "epics.html";
     public const string RequirementsOutputPath = "requirements.html";
     public const string SprintOutputPath = "sprint.html";
+    public const string RetrosOutputPath = "retros.html";
+    public const string ActionItemsOutputPath = "action-items.html";
     public const string AdrsLandingOutputPath = "adrs/index.html";
     public const string ReadmeOutputPath = "readme.html";
 

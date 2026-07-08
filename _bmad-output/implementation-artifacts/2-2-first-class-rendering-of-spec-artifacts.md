@@ -4,7 +4,7 @@ baseline_commit: bba1ef445ab61dbfb64ff0e344182284270d6e5f
 
 # Story 2.2: First-Class Rendering of Spec Artifacts
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -71,7 +71,13 @@ so that specs are navigable and understandable rather than dumped in a generic "
   - [x] Run the focused test filter, then a real generation pass against this repo (it ships the full five-file kernel under `_bmad-output/specs/spec-specscribe/` — a live fixture for every branch).
   - [x] Manually verify on `docs/live/index.html`: the five kernel docs appear under a **"Spec Kernel"** section with clear titles (no "Other" bucket, no bare-"SpecScribe" card); the kernel quick-link is present. On `docs/live/specs/spec-specscribe/SPEC.html`: the "On this page" TOC renders, and the "Companion documents" links resolve to the three companion pages. Confirm removing/renaming a companion leaves no broken link.
 
-## Developer Context Section
+### Review Findings
+
+- [x] [Review][Patch] PrettyLabel produces shouty labels for real, live all-caps filenames — `ARCHITECTURE-SPINE.md`'s own `sources:` list references `EXPERIENCE.md` and `DESIGN.md` (both exist under `_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/`). `PrettyLabel` (`src/SpecScribe/SiteGenerator.cs:825-835`) preserves any all-caps filename token verbatim to protect acronyms like PRD/SPEC, but that same rule renders these two full English words as bare "EXPERIENCE"/"DESIGN" companion-rail labels instead of "Experience"/"Design" — reachable today in this repo's own generated site. **Resolution:** replace the blanket "all-caps → preserve" rule with a short, explicit acronym allowlist (PRD, SPEC, UX, API, ...); everything else is title-cased regardless of authored casing.
+- [x] [Review][Defer] Single-spec-kernel assumption in nav + index-card title [`src/SpecScribe/SiteNav.cs:111-112`, `src/SpecScribe/HtmlTemplater.cs:697-700`] — deferred, out of AC scope, single-kernel only today. `SiteNav.Build`'s `specKernelHub` lookup uses `FirstOrDefault` to pick one `specs/*/SPEC.md`, so a project with more than one spec-kernel bundle only gets a nav quick-link to whichever one enumerates first; `HtmlTemplater.IndexCardTitle` similarly rewrites the card title to the fixed string "SPEC — Canonical Contract" for any doc with an `id:` starting `SPEC-`, so two kernels would render identical, indistinguishable index cards. ACs describe exactly one spec kernel per project; this repo has one; no current use case needs more.
+- [x] [Review][Patch] ResolveSpecCompanions omits the `.md`-only filter, allowing a broken-link regression — `src/SpecScribe/SiteGenerator.cs:806-808` documents "never a broken link" but only checks `File.Exists(candidateFull) && !IsIgnored(candidateFull)`. A `companions:`/`sources:` entry pointing at a real non-markdown file (image, JSON, etc.) passes both checks and gets emitted as a link via `PathUtil.ToOutputRelative` (`Path.ChangeExtension(..., ".html")`), pointing to a page the `*.md`-only generation pipeline never produces — a genuine broken link, contradicting the method's own documented contract.
+
+
 
 ### Epic Context and Business Value
 
