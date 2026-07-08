@@ -91,4 +91,71 @@ public class GitMetricsTests
 
         Assert.Equal("subject\twith tab", Assert.Single(commitsByDay[new DateOnly(2026, 1, 5)]).Subject);
     }
+
+    [Fact]
+    public void ParseChangedFiles_RanksByFrequencyDescendingAndTruncatesToTop()
+    {
+        // `git log --name-only --pretty=format:` emits one file path per line, with a blank line between
+        // commits. Three commits touching these files: Program.cs×3, Charts.cs×2, and one each of the rest.
+        var log = "Program.cs\nCharts.cs\nA.cs\n\n" +
+                  "Program.cs\nCharts.cs\nB.cs\n\n" +
+                  "Program.cs\nC.cs\nD.cs\n";
+
+        var top = GitMetrics.ParseChangedFiles(log, top: 3);
+
+        Assert.Equal(3, top.Count);
+        Assert.Equal(("Program.cs", 3), top[0]);
+        Assert.Equal(("Charts.cs", 2), top[1]);
+        // A/B/C/D all tie at 1; the ordinal tie-break keeps the ranking deterministic (A.cs first).
+        Assert.Equal(("A.cs", 1), top[2]);
+    }
+
+    [Fact]
+    public void ParseChangedFiles_SkipsBlankLinesAndTrimsCarriageReturnsWithoutThrowing()
+    {
+        // Blank separator lines and a stray Windows \r must not become phantom "" / trailing-CR file names.
+        var log = "src/Foo.cs\r\n\r\nsrc/Foo.cs\r\n   \n";
+
+        var files = GitMetrics.ParseChangedFiles(log);
+
+        var only = Assert.Single(files);
+        Assert.Equal(("src/Foo.cs", 2), only);
+    }
+
+    [Fact]
+    public void ParseChangedFiles_ReturnsEmptyForNoFileChanges()
+    {
+        // A window of merge-only / empty commits yields no name-only lines at all.
+        Assert.Empty(GitMetrics.ParseChangedFiles("\n\n   \n"));
+    }
+
+    [Theory]
+    [InlineData(30, 4)]  // exactly 30 days ago is inside the window
+    [InlineData(31, 2)]  // 31 days ago falls outside; only the 15-days-ago and today commits remain
+    public void CountCommitsInLastDays_IncludesBoundaryDayExcludesOlder(int oldestOffset, int expected)
+    {
+        var today = new DateOnly(2026, 2, 1);
+        var series = new (DateOnly Day, int Count)[]
+        {
+            (today.AddDays(-oldestOffset), 2), // the boundary commit under test
+            (today.AddDays(-15), 1),
+            (today, 1),
+        };
+
+        Assert.Equal(expected, GitMetrics.CountCommitsInLastDays(series, today, 30));
+    }
+
+    [Fact]
+    public void CountCommitsInLastDays_ExcludesFutureDatedCommits()
+    {
+        // Clock/timezone skew can produce a commit dated after "today"; it must not inflate the rolling count.
+        var today = new DateOnly(2026, 2, 1);
+        var series = new (DateOnly Day, int Count)[]
+        {
+            (today.AddDays(2), 5), // future-dated — ignored
+            (today, 3),
+        };
+
+        Assert.Equal(3, GitMetrics.CountCommitsInLastDays(series, today, 30));
+    }
 }

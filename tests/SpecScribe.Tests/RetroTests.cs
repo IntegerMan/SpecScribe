@@ -71,6 +71,12 @@ public class RetroTests : IDisposable
         Assert.Contains("status-badge ready", retro.BodyHtml);
         Assert.Contains("status-badge done", retro.BodyHtml);
         Assert.DoesNotContain("<td>open</td>", retro.BodyHtml);
+        // The Owner column is dropped entirely — header + every owner cell (LLM personas, not real assignees).
+        Assert.DoesNotContain("Owner", retro.BodyHtml);
+        Assert.DoesNotContain("Dana", retro.BodyHtml);
+        Assert.DoesNotContain("Amelia", retro.BodyHtml);
+        // The Action text and remaining columns survive.
+        Assert.Contains("Route deferred tech debt", retro.BodyHtml);
     }
 
     [Fact]
@@ -95,7 +101,9 @@ public class RetroTests : IDisposable
         var html = RetroTemplater.RenderPage(retro, epics, nav);
 
         Assert.Contains("class=\"story-kicker\">Epic 1 Retrospective</div>", html);
-        Assert.Contains("<h1>Epic 1 Retrospective: Foundation</h1>", html);
+        // The h1 drops the redundant "Epic 1 Retrospective:" prefix (the kicker above already carries it).
+        Assert.Contains("<h1>Foundation</h1>", html);
+        Assert.DoesNotContain("<h1>Epic 1 Retrospective", html);
         Assert.Contains("<span class=\"pill\">2026-07-07</span>", html);
         // Personas (LLM-generated retro participants) are NOT rendered — noise once the doc exists. [polish #7]
         Assert.DoesNotContain("retro-personas", html);

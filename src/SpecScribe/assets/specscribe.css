@@ -382,8 +382,11 @@ body {
 }
 
 /* Authored HTML comments (<!-- ... -->) surfaced as visible, de-emphasized asides — distinct from blockquote's
-   gold border/warm-white background via a neutral --border rule and a smaller font-size. [Story 2.6] */
-.doc-body .md-comment {
+   gold border/warm-white background via a neutral --border rule and a smaller font-size. Global (not
+   .doc-body-scoped) so RenderInline/RenderBlock fragments rendered outside the .doc-body article (epic goal,
+   AC lines, user-story lines, Gherkin steps, titles) keep the same styling — same reasoning as the global
+   .md-table rule below. [Story 2.6] */
+.md-comment {
   margin: 1rem 0;
   padding: 0.5rem 1rem;
   border-left: 3px solid var(--border);
@@ -393,7 +396,7 @@ body {
   font-size: 0.85rem;
 }
 
-.doc-body .md-comment-inline {
+.md-comment-inline {
   color: var(--ink-light);
   font-style: italic;
   font-size: 0.85em;
@@ -1494,6 +1497,47 @@ code.color-swatch {
 
 .chart-empty { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
 
+/* ====================== GIT PULSE (Story 3.1 baseline git signals) ======================
+   The three FR-9 signals as a pure HTML/CSS panel: a headline signal row (30-day count + exact last-commit
+   timestamp) over a ranked most-changed-files list. Same tokens/typography as the stat cards and heatmap. */
+.git-pulse { display: flex; flex-direction: column; gap: 1.1rem; }
+.git-pulse-signals { display: flex; flex-wrap: wrap; gap: 1.8rem; }
+.git-pulse-signal { display: flex; flex-direction: column; gap: 0.15rem; }
+.git-pulse-num {
+  font-size: 1.7rem;
+  font-weight: bold;
+  color: var(--rust);
+  font-family: 'Courier New', monospace;
+  line-height: 1.1;
+}
+.git-pulse-when { font-size: 1rem; font-weight: bold; color: var(--ink); font-family: 'Courier New', monospace; }
+.git-pulse-caption {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+}
+.git-pulse-files-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0.45rem;
+}
+.git-pulse-file-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.git-pulse-file-list li { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.85rem; }
+.git-pulse-file-path { font-family: 'Courier New', monospace; color: var(--ink); overflow-wrap: anywhere; }
+.git-pulse-file-count { color: var(--ink-faded); white-space: nowrap; }
+/* The no-git-history empty state: the em-dash reads as a stat placeholder (not the italic "chart-empty"
+   sentence), and it carries the UX-spec tooltip so hover/focus explains why. [EXPERIENCE.md:169] */
+.git-pulse-empty {
+  font-size: 1.7rem;
+  font-style: normal;
+  color: var(--ink-light);
+  font-family: 'Courier New', monospace;
+  display: inline-block;
+}
+
 /* ====================== EPIC MOSAIC (per-epic linked mini-donuts) ====================== */
 .epic-mosaic {
   display: grid;
@@ -2127,6 +2171,11 @@ code.color-swatch {
 .chart-panel:has(.send-menu[open]),
 .chart-panel:has(.cmd-badge [data-tooltip]:hover),
 .chart-panel:has(.cmd-badge [data-tooltip]:focus-visible) { overflow: visible; }
+
+/* Same clip-lift for the Git Pulse no-history tooltip: its em-dash lives inside a .chart-panel whose
+   overflow-x: auto would otherwise crop the tooltip that pops above it. [Story 3.1] */
+.chart-panel:has(.git-pulse-empty[data-tooltip]:hover),
+.chart-panel:has(.git-pulse-empty[data-tooltip]:focus-visible) { overflow: visible; }
 
 /* ====================== ENTRANCE ANIMATIONS (Story 1.5 D2) ======================
    The complementary "no-preference" half of the motion contract — one-time entrances that play only when

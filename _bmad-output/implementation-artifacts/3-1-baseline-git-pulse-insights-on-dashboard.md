@@ -1,6 +1,10 @@
+---
+baseline_commit: 7ea1646b9dded83d5828b8160aada238e70931eb
+---
+
 # Story 3.1: Baseline Git Pulse Insights on Dashboard
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -17,22 +21,22 @@ so that I can assess project momentum at a glance.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Extend `GitPulse`/`GitMetrics` with the three new signals (AC: #1, #2)
-  - [ ] Subtask 1.1: Add `LastCommitTimestamp` (`DateTime`) to the `GitPulse` record in [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs). Derive it from data already parsed by `ParseLog` — do **not** add a new git call for this. The last active day's commit list (`CommitsByDay[LastCommitDate]`) is ordered newest-first (per `GitMetricsTests.ParseLog_GroupsCommitsByDayInAscendingOrderWithAuthorAndTime`), so its first entry's `Time` combined with `LastCommitDate` gives the exact last-commit timestamp. Simplest: capture the raw `DateTime stamp` for the very first parsed log line inside `ParseLog` (git emits newest-first) and return it alongside the existing tuple, or thread it through `TryCompute` directly from the first line of `logText`.
-  - [ ] Subtask 1.2: Add `Last30DayCommitCount` (`int`) to `GitPulse`. Compute by summing `DailySeries` entries where `Day` falls within the last 30 days of "today" (`DateOnly.FromDateTime(DateTime.Now)`), inclusive. This needs **no new git call** — the existing single `git log` call already fetches full history.
-  - [ ] Subtask 1.3: Add `TopChangedFiles` (`IReadOnlyList<(string Path, int ChangeCount)>`) to `GitPulse`. This *does* require a new git invocation (name-only log), e.g. `git log --name-only --pretty=format:`. **Cap the window** (e.g. `-n 200` or `--since=90.days`) — [deferred-work.md](../../_bmad-output/implementation-artifacts/deferred-work.md) already flags that uncapped `git log` on the heatmap risks the 3s `RunGit` timeout on large repos; don't repeat that mistake for a new call. Parse into a pure, testable helper (mirror `ParseLog`'s pattern: static method taking raw git output, returning parsed data, skipping malformed lines) so it's unit-testable without a repo. Sort by frequency descending, take top 5.
-  - [ ] Subtask 1.4: Keep `GitMetrics.TryCompute` never-throwing — wrap the new git call in the same try/catch-and-return-null discipline as the existing calls. If the new call fails but the original `rev-list`/`log` calls succeeded, prefer degrading `TopChangedFiles` to an empty list rather than nulling the whole `GitPulse` (partial data beats no data, consistent with AD-4's "insight providers are additive, non-blocking").
-  - [ ] Subtask 1.5: Update the two existing `new GitPulse(...)` call sites for the new positional fields — [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs) (production construction inside `TryCompute`) and [HtmlTemplaterTests.cs:164](../../tests/SpecScribe.Tests/HtmlTemplaterTests.cs) (`ProgressWithCommits` test helper). These are the *only* two construction sites in the repo (confirmed via search) — the record change is otherwise additive and won't ripple further.
+- [x] Task 1: Extend `GitPulse`/`GitMetrics` with the three new signals (AC: #1, #2)
+  - [x] Subtask 1.1: Add `LastCommitTimestamp` (`DateTime`) to the `GitPulse` record in [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs). Derive it from data already parsed by `ParseLog` — do **not** add a new git call for this. The last active day's commit list (`CommitsByDay[LastCommitDate]`) is ordered newest-first (per `GitMetricsTests.ParseLog_GroupsCommitsByDayInAscendingOrderWithAuthorAndTime`), so its first entry's `Time` combined with `LastCommitDate` gives the exact last-commit timestamp. Simplest: capture the raw `DateTime stamp` for the very first parsed log line inside `ParseLog` (git emits newest-first) and return it alongside the existing tuple, or thread it through `TryCompute` directly from the first line of `logText`.
+  - [x] Subtask 1.2: Add `Last30DayCommitCount` (`int`) to `GitPulse`. Compute by summing `DailySeries` entries where `Day` falls within the last 30 days of "today" (`DateOnly.FromDateTime(DateTime.Now)`), inclusive. This needs **no new git call** — the existing single `git log` call already fetches full history.
+  - [x] Subtask 1.3: Add `TopChangedFiles` (`IReadOnlyList<(string Path, int ChangeCount)>`) to `GitPulse`. This *does* require a new git invocation (name-only log), e.g. `git log --name-only --pretty=format:`. **Cap the window** (e.g. `-n 200` or `--since=90.days`) — [deferred-work.md](../../_bmad-output/implementation-artifacts/deferred-work.md) already flags that uncapped `git log` on the heatmap risks the 3s `RunGit` timeout on large repos; don't repeat that mistake for a new call. Parse into a pure, testable helper (mirror `ParseLog`'s pattern: static method taking raw git output, returning parsed data, skipping malformed lines) so it's unit-testable without a repo. Sort by frequency descending, take top 5.
+  - [x] Subtask 1.4: Keep `GitMetrics.TryCompute` never-throwing — wrap the new git call in the same try/catch-and-return-null discipline as the existing calls. If the new call fails but the original `rev-list`/`log` calls succeeded, prefer degrading `TopChangedFiles` to an empty list rather than nulling the whole `GitPulse` (partial data beats no data, consistent with AD-4's "insight providers are additive, non-blocking").
+  - [x] Subtask 1.5: Update the two existing `new GitPulse(...)` call sites for the new positional fields — [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs) (production construction inside `TryCompute`) and [HtmlTemplaterTests.cs:164](../../tests/SpecScribe.Tests/HtmlTemplaterTests.cs) (`ProgressWithCommits` test helper). These are the *only* two construction sites in the repo (confirmed via search) — the record change is otherwise additive and won't ripple further.
 
-- [ ] Task 2: Render the Git Pulse panel on the dashboard (AC: #1, #2)
-  - [ ] Subtask 2.1: Add a rendering helper in [Charts.cs](../../src/SpecScribe/Charts.cs) (mirror `CommitHeatmap`'s pattern: pure inline SVG/HTML + CSS, no JS) that renders last commit timestamp, 30-day commit count, and the top-changed-files list. Reuse `Charts.Plural` for count labels and the existing `Html()` escaping helper.
-  - [ ] Subtask 2.2: Call the new helper from `AppendDashboard` in [HtmlTemplater.cs](../../src/SpecScribe/HtmlTemplater.cs) (~line 246-253, alongside the existing "Commit Activity" heatmap panel in the `chart-row`). Do not duplicate the existing "Commits" stat card (`p.Git.TotalCommits`, line 201-204) or the heatmap (line 250-252) — this is a **new, additional** panel surfacing the three specific signals from AC #1 that neither existing element currently shows (30-day rolling count, top changed files, exact last-commit timestamp vs. the existing "Xd ago" recency string).
-  - [ ] Subtask 2.3: Match the empty-state copy exactly from the UX spec: `"—"` with tooltip `"Run in a git repository to enable commit stats"` [Source: EXPERIENCE.md:169]. Follow the same `p.Git is { } git ? ... : ...` fallback pattern used for the existing Commits stat card (line 201) and heatmap (line 250) so AC #2's "non-fatal fallback state" reads consistently with the rest of the dashboard when `GitMetrics.TryCompute` returns `null`.
+- [x] Task 2: Render the Git Pulse panel on the dashboard (AC: #1, #2)
+  - [x] Subtask 2.1: Add a rendering helper in [Charts.cs](../../src/SpecScribe/Charts.cs) (mirror `CommitHeatmap`'s pattern: pure inline SVG/HTML + CSS, no JS) that renders last commit timestamp, 30-day commit count, and the top-changed-files list. Reuse `Charts.Plural` for count labels and the existing `Html()` escaping helper.
+  - [x] Subtask 2.2: Call the new helper from `AppendDashboard` in [HtmlTemplater.cs](../../src/SpecScribe/HtmlTemplater.cs) (~line 246-253, alongside the existing "Commit Activity" heatmap panel in the `chart-row`). Do not duplicate the existing "Commits" stat card (`p.Git.TotalCommits`, line 201-204) or the heatmap (line 250-252) — this is a **new, additional** panel surfacing the three specific signals from AC #1 that neither existing element currently shows (30-day rolling count, top changed files, exact last-commit timestamp vs. the existing "Xd ago" recency string).
+  - [x] Subtask 2.3: Match the empty-state copy exactly from the UX spec: `"—"` with tooltip `"Run in a git repository to enable commit stats"` [Source: EXPERIENCE.md:169]. Follow the same `p.Git is { } git ? ... : ...` fallback pattern used for the existing Commits stat card (line 201) and heatmap (line 250) so AC #2's "non-fatal fallback state" reads consistently with the rest of the dashboard when `GitMetrics.TryCompute` returns `null`.
 
-- [ ] Task 3: Test coverage (AC: #1, #2)
-  - [ ] Subtask 3.1: Add pure-parser tests in [GitMetricsTests.cs](../../tests/SpecScribe.Tests/GitMetricsTests.cs) for the new name-only-log parsing helper — cover: frequency ordering/top-N truncation, malformed/empty lines skipped (never-throw), and a repo with zero file changes.
-  - [ ] Subtask 3.2: Add a test proving `Last30DayCommitCount` correctly excludes commits older than 30 days from `DailySeries` (boundary case: exactly 30 days ago is included, 31 days ago is not).
-  - [ ] Subtask 3.3: Add `HtmlTemplaterTests.cs` coverage for the new panel: renders real data when `p.Git` is populated, and renders the exact `"—"` / tooltip fallback copy when `p.Git` is `null`.
+- [x] Task 3: Test coverage (AC: #1, #2)
+  - [x] Subtask 3.1: Add pure-parser tests in [GitMetricsTests.cs](../../tests/SpecScribe.Tests/GitMetricsTests.cs) for the new name-only-log parsing helper — cover: frequency ordering/top-N truncation, malformed/empty lines skipped (never-throw), and a repo with zero file changes.
+  - [x] Subtask 3.2: Add a test proving `Last30DayCommitCount` correctly excludes commits older than 30 days from `DailySeries` (boundary case: exactly 30 days ago is included, 31 days ago is not).
+  - [x] Subtask 3.3: Add `HtmlTemplaterTests.cs` coverage for the new panel: renders real data when `p.Git` is populated, and renders the exact `"—"` / tooltip fallback copy when `p.Git` is `null`.
 
 ## Dev Notes
 
@@ -76,10 +80,31 @@ so that I can assess project momentum at a glance.
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Claude Opus 4.8)
 
 ### Debug Log References
 
+- End-to-end verification: ran `dotnet run --project src/SpecScribe -- generate` against this repo and inspected `SpecScribeOutput/index.html`. The Git Pulse panel rendered "77 commits in the last 30 days", "Wed, Jul 8, 2026 at 13:24" as the last commit, and the top-5 changed files with change counts. Cross-checked both derived signals against git directly: `git log -1 --date=format:%Y-%m-%dT%H:%M` → `2026-07-08T13:24` (exact match) and `git rev-list --count --since=30.days HEAD` → `77` (exact match).
+- Full suite green throughout: 437 passed / 0 failed after the final change (was 429 before this story's 8 new test cases).
+
 ### Completion Notes List
 
+- **AC #1 (baseline signals):** `GitPulse` now carries `LastCommitTimestamp`, `Last30DayCommitCount`, and `TopChangedFiles`. The first two are derived from data `ParseLog` already produces (no new git call); `TopChangedFiles` uses a second, bounded `git log --name-only --pretty=format: -n 200` call parsed by the new pure `ParseChangedFiles` helper (frequency-desc, ordinal tie-break, top 5). All three surface in a new "Git Pulse" dashboard panel via `Charts.GitPulsePanel`, rendered beside the existing Commit Activity heatmap. Deliberately kept separate from the existing "Commits" stat card and heatmap, which show different figures — the new panel adds the 30-day rolling count, exact last-commit timestamp, and top changed files.
+- **AC #2 (non-fatal fallback):** the new git call is wrapped in the same never-throw discipline as the existing ones; a failure degrades `TopChangedFiles` to an empty list (panel shows "No file changes in recent history.") rather than nulling the whole pulse — partial data beats none (AD-4). When there is no git history at all, the panel shows the exact UX-spec copy: an em-dash with tooltip "Run in a git repository to enable commit stats" (EXPERIENCE.md:169), mirroring the Commits card / heatmap fallbacks. A `.chart-panel:has(...)` overflow-lift rule (mirroring the existing cmd-badge rule) keeps that tooltip from being clipped by the panel's `overflow-x: auto`.
+- **Scope discipline:** no toggle/settings plumbing (that's FR-10 / Story 3.2); "top changed files" is file paths + change counts only, never per-author rankings (prd.md:178 non-goal); extended `GitMetrics.cs` in place rather than introducing the aspirational `IInsightProvider` seed layout.
+- **Culture/encoding:** last-commit time reconstruction uses `TimeOnly.TryParseExact(..., InvariantCulture, ...)`; the new git call reuses `RunGit` (UTF-8 stdout, 3s timeout, bounded `-n 200`) so non-ASCII paths and large-repo timeout risk are both handled.
+
 ### File List
+
+- `src/SpecScribe/GitMetrics.cs` — extended `GitPulse` record with three fields; added `CountCommitsInLastDays`, `ParseChangedFiles`, and private `LastCommitTimestamp` helpers; wired the bounded name-only git call into `TryCompute`.
+- `src/SpecScribe/Charts.cs` — added `GitPulsePanel` rendering helper (pure HTML/CSS, no JS).
+- `src/SpecScribe/HtmlTemplater.cs` — added the "Git Pulse" panel to `AppendDashboard` with the populated/empty fallback.
+- `src/SpecScribe/assets/specscribe.css` — added the Git Pulse panel styles and the empty-state tooltip overflow-lift rule.
+- `tests/SpecScribe.Tests/GitMetricsTests.cs` — added tests for `ParseChangedFiles` (ranking/top-N, blank/CR skipping, zero changes) and `CountCommitsInLastDays` (30-day boundary, future-date exclusion).
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` — updated `ProgressWithCommits` for the new fields; added panel-populated and no-git-fallback tests.
+
+## Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-08 | Implemented Story 3.1: baseline git pulse (last-commit timestamp, 30-day count, top changed files) on the dashboard, with non-fatal fallback. All tasks complete; 437 tests passing. Status → review. |

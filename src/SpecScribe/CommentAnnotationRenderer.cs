@@ -20,7 +20,7 @@ public sealed class HtmlBlockCommentRenderer : HtmlObjectRenderer<HtmlBlock>
 
     protected override void Write(HtmlRenderer renderer, HtmlBlock obj)
     {
-        if (obj.Type != HtmlBlockType.Comment)
+        if (!renderer.EnableHtmlForBlock || obj.Type != HtmlBlockType.Comment)
         {
             _fallback.Write(renderer, obj);
             return;
@@ -47,13 +47,15 @@ public sealed class HtmlBlockCommentRenderer : HtmlObjectRenderer<HtmlBlock>
     private static string StripCommentMarkers(string text)
     {
         text = text.Trim();
-        if (text.StartsWith("<!--", StringComparison.Ordinal))
+        if (text.StartsWith("<!--", StringComparison.Ordinal) && text.EndsWith("-->", StringComparison.Ordinal))
         {
-            text = text[4..];
-        }
-        if (text.EndsWith("-->", StringComparison.Ordinal))
-        {
-            text = text[..^3];
+            // Overlapping/short malformed comments (e.g. "<!-->", "<!--->") have no room between the
+            // markers for content — slicing on the mutated string here (rather than stripping the leading
+            // marker first, then separately checking the trailing one) avoids leaving a stray character
+            // behind when the two markers overlap.
+            var innerStart = 4;
+            var innerEnd = text.Length - 3;
+            text = innerEnd > innerStart ? text[innerStart..innerEnd] : string.Empty;
         }
         return text.Trim();
     }
@@ -72,9 +74,15 @@ public sealed class HtmlInlineCommentRenderer : HtmlObjectRenderer<HtmlInline>
     protected override void Write(HtmlRenderer renderer, HtmlInline obj)
     {
         var tag = obj.Tag;
-        if (tag is not null && tag.StartsWith("<!--", StringComparison.Ordinal) && tag.EndsWith("-->", StringComparison.Ordinal))
+        if (renderer.EnableHtmlForInline && tag is not null
+            && tag.StartsWith("<!--", StringComparison.Ordinal) && tag.EndsWith("-->", StringComparison.Ordinal))
         {
-            var text = tag[4..^3].Trim();
+            // Overlapping/short malformed tags (e.g. "<!-->", length 5) satisfy both checks above but leave
+            // no room between the markers for content — guard against the negative-length slice that would
+            // otherwise throw ArgumentOutOfRangeException.
+            var innerStart = 4;
+            var innerEnd = tag.Length - 3;
+            var text = (innerEnd > innerStart ? tag[innerStart..innerEnd] : string.Empty).Trim();
             var encoded = PathUtil.Html(text);
             renderer.Write("<span class=\"md-comment-inline\">").Write(encoded).Write("</span>");
             return;

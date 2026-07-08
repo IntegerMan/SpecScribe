@@ -294,4 +294,29 @@ public class MarkdownConverterTests : IDisposable
 
         Assert.DoesNotContain("md-comment", doc.BodyHtml);
     }
+
+    [Fact]
+    public void Convert_ShortOverlappingInlineCommentDoesNotThrow()
+    {
+        var doc = Convert("text <!--> more text");
+
+        Assert.Contains("md-comment-inline", doc.BodyHtml);
+        Assert.Contains("more text", doc.BodyHtml);
+    }
+
+    [Fact]
+    public void Convert_ShortOverlappingBlockCommentDoesNotLeaveStrayMarkerCharacters()
+    {
+        var doc = Convert("<!-->\n\nBody text.");
+
+        Assert.Contains("<aside class=\"md-comment\"></aside>", doc.BodyHtml);
+    }
+
+    [Fact]
+    public void RenderInline_CommentOutsideDocBodyStillCarriesMdCommentClass()
+    {
+        var html = MarkdownConverter.RenderInline("Goal text <!-- sync back later --> continued");
+
+        Assert.Contains("md-comment-inline", html);
+    }
 }

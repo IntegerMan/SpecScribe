@@ -8,14 +8,23 @@ namespace SpecScribe;
 /// <paramref name="Time"/> is the author-local "HH:mm" of the commit.</summary>
 public sealed record CommitInfo(string ShortHash, string Subject, string Author, string Time);
 
-/// <summary>A lightweight snapshot of repo activity, for the dashboard's "project pulse".</summary>
+/// <summary>A lightweight snapshot of repo activity, for the dashboard's "project pulse".
+/// <para><paramref name="LastCommitTimestamp"/> is the exact date+time of the most recent commit,
+/// <paramref name="Last30DayCommitCount"/> the rolling count over the trailing 30 days, and
+/// <paramref name="TopChangedFiles"/> the most-frequently-touched files over a bounded recent window —
+/// the three baseline signals FR-9 requires on the dashboard. <paramref name="TopChangedFiles"/> degrades
+/// to an empty list (never null) when the name-only git call fails even though the rest of the pulse
+/// succeeded, so partial data still renders. [Story 3.1]</para></summary>
 public sealed record GitPulse(
     int TotalCommits,
     int ActiveDays,
     DateOnly FirstCommitDate,
     DateOnly LastCommitDate,
     IReadOnlyList<(DateOnly Day, int Count)> DailySeries,
-    IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> CommitsByDay);
+    IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> CommitsByDay,
+    DateTime LastCommitTimestamp,
+    int Last30DayCommitCount,
+    IReadOnlyList<(string Path, int ChangeCount)> TopChangedFiles);
 
 /// <summary>Shells out to git for a handful of read-only stats. Never throws and never blocks a save —
 /// any failure (git missing, not a repo, slow process) simply yields a null pulse, which callers treat
@@ -45,13 +54,28 @@ public static class GitMetrics
             var (series, commitsByDay) = ParseLog(logText);
             if (series.Count == 0) return null;
 
+            var today = DateOnly.FromDateTime(DateTime.Now);
+
+            // A second, bounded git call for the "top changed files" signal. --name-only prints one path per
+            // commit's touched file; the empty --pretty=format: suppresses the commit header lines so only
+            // paths (and blank inter-commit separators) come back. -n 200 caps the window so this never
+            // repeats the uncapped-history timeout risk deferred-work.md flagged for the heatmap log. If it
+            // fails, degrade this one signal to an empty list rather than nulling the whole pulse (AD-4).
+            var nameOnlyText = RunGit(repoRoot, "log --name-only --pretty=format: -n 200");
+            var topChangedFiles = nameOnlyText is null
+                ? Array.Empty<(string, int)>()
+                : ParseChangedFiles(nameOnlyText);
+
             return new GitPulse(
                 TotalCommits: totalCommits,
                 ActiveDays: series.Count,
                 FirstCommitDate: series[0].Day,
                 LastCommitDate: series[^1].Day,
                 DailySeries: series,
-                CommitsByDay: commitsByDay);
+                CommitsByDay: commitsByDay,
+                LastCommitTimestamp: LastCommitTimestamp(series, commitsByDay),
+                Last30DayCommitCount: CountCommitsInLastDays(series, today, 30),
+                TopChangedFiles: topChangedFiles);
         }
         catch
         {
@@ -101,6 +125,58 @@ public static class GitMetrics
             .ToList();
         var commitsByDay = byDay.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<CommitInfo>)kv.Value);
         return (series, commitsByDay);
+    }
+
+    /// <summary>The exact timestamp of the most recent commit, reconstructed from data <see cref="ParseLog"/>
+    /// already produced — no extra git call. The last day in the ascending series is the most recent, and its
+    /// per-day list is newest-first (see <c>ParseLog</c>'s preserved git order), so its first entry's HH:mm is
+    /// the latest commit time. Falls back to midnight on that day if the time can't be recovered. Invariant
+    /// time parse for the same non-Gregorian-calendar reasons ParseLog is invariant.</summary>
+    private static DateTime LastCommitTimestamp(
+        IReadOnlyList<(DateOnly Day, int Count)> series,
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> commitsByDay)
+    {
+        var lastDay = series[^1].Day;
+        if (commitsByDay.TryGetValue(lastDay, out var commits) && commits.Count > 0 &&
+            TimeOnly.TryParseExact(commits[0].Time, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+        {
+            return lastDay.ToDateTime(time);
+        }
+        return lastDay.ToDateTime(TimeOnly.MinValue);
+    }
+
+    /// <summary>Sums commits in <paramref name="series"/> whose day is within the trailing
+    /// <paramref name="days"/> window ending at <paramref name="today"/> (inclusive on both ends): a day
+    /// exactly <paramref name="days"/> ago still counts, one older does not. Future-dated commits (clock/
+    /// timezone skew) are excluded so they can't inflate the rolling count. Pure so the boundary is
+    /// unit-testable without a repo.</summary>
+    public static int CountCommitsInLastDays(IReadOnlyList<(DateOnly Day, int Count)> series, DateOnly today, int days)
+    {
+        var cutoff = today.AddDays(-days);
+        return series.Where(s => s.Day >= cutoff && s.Day <= today).Sum(s => s.Count);
+    }
+
+    /// <summary>Parses `git log --name-only --pretty=format:` output — one changed-file path per line, blank
+    /// lines separating commits — into the most-changed files, sorted by change count descending (ordinal
+    /// path as a stable tie-break) and truncated to <paramref name="top"/>. Blank/whitespace lines and stray
+    /// carriage returns are skipped, so the parse never throws and never emits phantom entries. Pure, mirroring
+    /// <see cref="ParseLog"/>, so the format contract is unit-testable without a repo.</summary>
+    public static IReadOnlyList<(string Path, int ChangeCount)> ParseChangedFiles(string log, int top = 5)
+    {
+        var counts = new Dictionary<string, int>();
+        foreach (var line in log.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var path = line.Trim();
+            if (path.Length == 0) continue;
+            counts[path] = counts.GetValueOrDefault(path) + 1;
+        }
+
+        return counts
+            .OrderByDescending(kv => kv.Value)
+            .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+            .Take(top)
+            .Select(kv => (kv.Key, kv.Value))
+            .ToList();
     }
 
     private static string? RunGit(string workingDirectory, string arguments)

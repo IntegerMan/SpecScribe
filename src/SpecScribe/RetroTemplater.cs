@@ -71,7 +71,7 @@ public static class RetroTemplater
         var main = new StringBuilder();
         main.Append("<header class=\"doc-header retro-header\">\n");
         main.Append($"  <div class=\"story-kicker\">Epic {retro.EpicNumber} Retrospective</div>\n");
-        main.Append($"  <h1>{PathUtil.Html(retro.Title)}</h1>\n");
+        main.Append($"  <h1>{PathUtil.Html(HeadingTitle(retro))}</h1>\n");
 
         main.Append("  <div class=\"meta-pills\">\n");
         if (retro.DateText is { Length: > 0 } date)
@@ -123,5 +123,18 @@ public static class RetroTemplater
         }
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
+    }
+
+    /// <summary>The h1 title with the redundant "Epic N Retrospective" prefix stripped — the kicker line above
+    /// already carries it, so a title like "Epic 1 Retrospective: High-Clarity …" shows as just "High-Clarity …".
+    /// Falls back to "Retrospective" when nothing follows the prefix, and leaves any other title untouched.</summary>
+    private static string HeadingTitle(RetroModel retro)
+    {
+        var kicker = $"Epic {retro.EpicNumber} Retrospective";
+        var title = retro.Title.TrimStart();
+        if (!title.StartsWith(kicker, StringComparison.OrdinalIgnoreCase)) return retro.Title;
+
+        var rest = title[kicker.Length..].TrimStart(' ', '\t', ':', '-', '–', '—');
+        return rest.Length > 0 ? rest : "Retrospective";
     }
 }

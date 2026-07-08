@@ -4,7 +4,7 @@ baseline_commit: f1781b1e22ce7367a66e65c3652390666fd09704
 
 # Story 2.6: Render Markdown Comments as Visible Annotations
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -361,6 +361,15 @@ Claude (bmad-dev-story execution)
 - `src/SpecScribe/MarkdownConverter.cs` (modified)
 - `src/SpecScribe/assets/specscribe.css` (modified)
 - `tests/SpecScribe.Tests/MarkdownConverterTests.cs` (modified)
+
+### Review Findings
+
+- [x] [Review][Patch] Inline comment renderer crashes on short overlapping comment tags (`<!-->`, `<!--->`) [src/SpecScribe/CommentAnnotationRenderer.cs:77] — fixed: bounds-guarded slice, no throw, falls back to empty content
+- [x] [Review][Patch] `.md-comment`/`.md-comment-inline` CSS is `.doc-body`-scoped but most real call sites (epic goal, AC lines, user-story lines, Gherkin steps, titles) render outside `.doc-body`, so comments there render unstyled [src/SpecScribe/assets/specscribe.css:386, src/SpecScribe/EpicsTemplater.cs:113] — fixed: rules made global, matching the `.md-table` precedent
+- [x] [Review][Patch] Malformed block comment (e.g. `<!-->`) leaves a stray `>` in the rendered `<aside>` [src/SpecScribe/CommentAnnotationRenderer.cs:47-59] — fixed: `StripCommentMarkers` now slices on original bounds instead of sequential mutation
+- [x] [Review][Patch] Comment renderers bypass `renderer.EnableHtmlForInline`/`EnableHtmlForBlock`, contradicting the class docstring's claim that the gate is preserved [src/SpecScribe/CommentAnnotationRenderer.cs:72-84] — fixed: both renderers now check the corresponding `Enable...` flag before intercepting
+- [x] [Review][Defer] `.md-comment` contrast (~3.94:1, ink-light on parchment-dark) falls short of WCAG AA for normal text [src/SpecScribe/assets/specscribe.css:391] — deferred, pre-existing (same token pairing already used in `.epic-status.pending`/`.status-badge.pending`)
+- [x] [Review][Defer] Renderer-swap scan (`OfType<T>().FirstOrDefault()`/`Remove`/`Add`) repeats on every `RenderInline`/`RenderBlock` call [src/SpecScribe/MarkdownConverter.cs:92-107] — deferred, pre-existing pattern from `UseMermaidCodeBlocks`, this story only adds a second pass on top of it
 
 ## Change Log
 

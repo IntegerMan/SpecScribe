@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-08T19:00:00-04:00
+last_updated: 2026-07-08T23:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -62,11 +62,11 @@ development_status:
   2-3-sprint-status-page-and-dashboard-widget: review
   2-4-planning-artifacts-grouping-status-badges-and-prd-prominence: done
   2-5-standardized-iconography-for-artifact-types-and-status: done
-  2-6-render-markdown-comments-as-visible-annotations: review
+  2-6-render-markdown-comments-as-visible-annotations: done
   epic-2-retrospective: optional
 
   epic-3: in-progress
-  3-1-baseline-git-pulse-insights-on-dashboard: ready-for-dev
+  3-1-baseline-git-pulse-insights-on-dashboard: review
   3-2-optional-deep-git-analytics-controls: ready-for-dev
   3-3-agent-and-workflow-structure-coverage-insights: ready-for-dev
   3-4-interactive-tree-views-for-project-and-artifact-structure: ready-for-dev
@@ -87,7 +87,7 @@ development_status:
   epic-5: in-progress
   5-1-cli-generate-and-watch-modes-with-smart-defaults: ready-for-dev
   5-2-directory-scoped-settings-with-interactive-and-cli-parity: ready-for-dev
-  5-3-watch-regeneration-safety-and-scope-aware-rebuilds: backlog
+  5-3-watch-regeneration-safety-and-scope-aware-rebuilds: ready-for-dev
   5-4-oss-onboarding-and-reference-documentation: backlog
   epic-5-retrospective: optional
 

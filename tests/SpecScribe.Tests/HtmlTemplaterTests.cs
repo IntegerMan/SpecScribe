@@ -167,7 +167,10 @@ public class HtmlTemplaterTests
                     [day] = Enumerable.Range(1, totalCommits)
                         .Select(i => new CommitInfo($"c{i:000}", $"Change {i}", "Alice", "12:00"))
                         .ToList(),
-                }),
+                },
+                LastCommitTimestamp: day.ToDateTime(new TimeOnly(12, 0)),
+                Last30DayCommitCount: totalCommits,
+                TopChangedFiles: new (string, int)[] { ("src/Program.cs", 3), ("README.md", 1) }),
         };
     }
 
@@ -210,6 +213,47 @@ public class HtmlTemplaterTests
         Assert.Contains("<a href=\"commits/2026-01-05.html\"", html);
         Assert.DoesNotContain("#heat-day-", html);
         Assert.DoesNotContain("Change 1", html);
+    }
+
+    [Fact]
+    public void RenderIndex_RendersGitPulsePanelWithBaselineSignals()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressWithCommits(7),
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // The three FR-9 baseline signals all surface in the new panel. [Story 3.1 AC #1]
+        Assert.Contains("<h3>Git Pulse</h3>", html);
+        Assert.Contains("in the last 30 days", html);                 // 30-day rolling count
+        Assert.Contains("Mon, Jan 5, 2026 at 12:00", html);           // exact last-commit timestamp
+        Assert.Contains("src/Program.cs", html);                      // top changed file
+        Assert.Contains("Top changed files", html);
+    }
+
+    [Fact]
+    public void RenderIndex_RendersGitPulseFallbackWhenNoGitHistory()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressModel.Empty, // Git is null
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // The exact UX-spec empty-state copy: an em-dash with the specified tooltip. [Story 3.1 AC #2; EXPERIENCE.md:169]
+        Assert.Contains("<h3>Git Pulse</h3>", html);
+        Assert.Contains("data-tooltip=\"Run in a git repository to enable commit stats\"", html);
     }
 
     [Fact]

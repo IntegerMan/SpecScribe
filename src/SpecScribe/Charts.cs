@@ -589,6 +589,47 @@ public static class Charts
         return sb.ToString();
     }
 
+    /// <summary>The dashboard "Git Pulse" panel body: the three FR-9 baseline signals — the trailing-30-day
+    /// commit count, the exact last-commit timestamp, and the most-changed files — as pure HTML/CSS (no JS),
+    /// matching the other chart builders. When the bounded name-only git call came back empty but the rest of
+    /// the pulse succeeded, the file list degrades to a graceful note rather than vanishing (partial data beats
+    /// none; AD-4). The whole-panel null case (no git at all) is the caller's `p.Git is {}` fallback. [Story 3.1]</summary>
+    public static string GitPulsePanel(GitPulse git)
+    {
+        var last = git.LastCommitTimestamp.ToString("ddd, MMM d, yyyy 'at' HH:mm", CultureInfo.InvariantCulture);
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"git-pulse\">\n");
+
+        sb.Append("  <div class=\"git-pulse-signals\">\n");
+        sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-num\">{git.Last30DayCommitCount}</span>" +
+                  $"<span class=\"git-pulse-caption\">{Plural(git.Last30DayCommitCount, "commit", "commits")} in the last 30 days</span></div>\n");
+        sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-when\">{Html(last)}</span>" +
+                  "<span class=\"git-pulse-caption\">last commit</span></div>\n");
+        sb.Append("  </div>\n");
+
+        sb.Append("  <div class=\"git-pulse-files\">\n");
+        sb.Append("    <div class=\"git-pulse-files-title\">Top changed files</div>\n");
+        if (git.TopChangedFiles.Count > 0)
+        {
+            sb.Append("    <ol class=\"git-pulse-file-list\">\n");
+            foreach (var (path, changeCount) in git.TopChangedFiles)
+            {
+                sb.Append($"      <li><span class=\"git-pulse-file-path\">{Html(path)}</span>" +
+                          $"<span class=\"git-pulse-file-count\">{changeCount} {Plural(changeCount, "change", "changes")}</span></li>\n");
+            }
+            sb.Append("    </ol>\n");
+        }
+        else
+        {
+            sb.Append("    <div class=\"chart-empty\">No file changes in recent history.</div>\n");
+        }
+        sb.Append("  </div>\n");
+
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
     /// <summary>Invariant ISO date for heatmap hrefs and per-day page filenames — a culture-sensitive
     /// format would emit non-Gregorian dates (and mismatched links/filenames) on th-TH/fa-IR hosts.</summary>
     public static string D(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

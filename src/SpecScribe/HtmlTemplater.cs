@@ -268,6 +268,17 @@ public static class HtmlTemplater
 
         sb.Append("</div>\n\n");
 
+        // Git Pulse: the three FR-9 baseline signals (30-day count, exact last-commit timestamp, top changed
+        // files) as a new panel beside the commit activity above — deliberately NOT folded into the existing
+        // "Commits" stat card or heatmap, which show different figures. When there's no git history at all the
+        // panel degrades to the UX spec's exact "—" + tooltip, mirroring the Commits card / heatmap fallbacks
+        // so AC #2's non-fatal state reads consistently. [Story 3.1; EXPERIENCE.md:169]
+        sb.Append("<div class=\"chart-panel\">\n<h3>Git Pulse</h3>\n");
+        sb.Append(p.Git is { } pulse
+            ? Charts.GitPulsePanel(pulse)
+            : "<div class=\"chart-empty git-pulse-empty\" data-tooltip=\"Run in a git repository to enable commit stats\" tabindex=\"0\">—</div>\n");
+        sb.Append("</div>\n\n");
+
         AppendRequirementsPanel(sb, requirements);
 
         if (p.PerEpic.Count > 0)

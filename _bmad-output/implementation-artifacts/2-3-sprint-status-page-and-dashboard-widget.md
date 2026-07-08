@@ -455,6 +455,13 @@ claude-opus-4-8
 
 ## Change Log
 
+- 2026-07-08 (polish #8): Extended the owner removal to the retro **body's** `## Action Items` table —
+  `RetroActionStyler` now drops the whole **Owner** column (header + every owner cell) as well as badging the
+  Status cells (the earlier owner removal only covered the separate action-items page). Also de-duplicated the
+  retro **header**: the h1 strips the redundant "Epic N Retrospective" prefix that the kicker line already
+  carries (e.g. "Epic 1 Retrospective: High-Clarity BMad Portal Experience" → h1 "High-Clarity BMad Portal
+  Experience"), falling back to "Retrospective" when nothing follows and leaving unrecognized titles untouched.
+  429 tests pass.
 - 2026-07-08 (polish #7): Removed the retro **Personas** section entirely (and the `Personas` classifier +
   `Icons.ForPersona` + persona CSS it needed) and dropped the **owner** pill from open action items — retro
   participants/owners are LLM-generated personas for the retrospective exercise, not real assignees, so they're
