@@ -467,7 +467,8 @@ public static class Charts
     /// active days). Panel visibility is pure-CSS <c>:target</c>, so the drill-down needs no JS.</para></summary>
     public static string CommitHeatmap(
         IReadOnlyList<(DateOnly Day, int Count)> series,
-        IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>>? commitsByDay = null)
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>>? commitsByDay = null,
+        bool showHeadline = true)
     {
         if (series.Count == 0) return "<div class=\"chart-empty\">No git history available.</div>";
 
@@ -516,8 +517,13 @@ public static class Charts
 
         var sb = new StringBuilder();
         // Visible one-line headline so a stakeholder reads the summary before scanning the grid. [Story 1.5 E1]
-        sb.Append($"<div class=\"heatmap-headline\"><strong>{totalCommits}</strong> {Plural(totalCommits, "commit", "commits")} &middot; " +
-                  $"<strong>{activeDays}</strong> active {Plural(activeDays, "day", "days")} &middot; last commit {DReadable(lastCommit)}</div>\n");
+        // Suppressed when the heatmap is embedded in the consolidated Git Pulse panel, whose signal strip
+        // already carries these figures (avoids a duplicate summary line). [Story 3.1 consolidation]
+        if (showHeadline)
+        {
+            sb.Append($"<div class=\"heatmap-headline\"><strong>{totalCommits}</strong> {Plural(totalCommits, "commit", "commits")} &middot; " +
+                      $"<strong>{activeDays}</strong> active {Plural(activeDays, "day", "days")} &middot; last commit {DReadable(lastCommit)}</div>\n");
+        }
         // role="group" only when the day-page links exist (an img role would hide them from assistive
         // tech); a link-free render keeps role="img" so AT treats it as one named graphic.
         var role = linkedDays.Count > 0 ? "group" : "img";
@@ -589,11 +595,13 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The dashboard "Git Pulse" panel body: the three FR-9 baseline signals — the trailing-30-day
-    /// commit count, the exact last-commit timestamp, and the most-changed files — as pure HTML/CSS (no JS),
-    /// matching the other chart builders. When the bounded name-only git call came back empty but the rest of
-    /// the pulse succeeded, the file list degrades to a graceful note rather than vanishing (partial data beats
-    /// none; AD-4). The whole-panel null case (no git at all) is the caller's `p.Git is {}` fallback. [Story 3.1]</summary>
+    /// <summary>The consolidated dashboard "Git Pulse" panel body — one panel that merges what used to be two
+    /// (the separate "Commit Activity" heatmap and the baseline pulse). A headline signal strip (30-day count,
+    /// exact last-commit timestamp, active days) sits over a two-part body: the activity heatmap and the
+    /// most-changed files rendered as proportional bars. Pure HTML/CSS + inline SVG (no JS), matching the other
+    /// chart builders. When the bounded name-only git call came back empty but the rest of the pulse succeeded,
+    /// the files section degrades to a graceful note rather than vanishing (partial data beats none; AD-4). The
+    /// whole-panel null case (no git at all) is the caller's `p.Git is {}` fallback. [Story 3.1 + consolidation]</summary>
     public static string GitPulsePanel(GitPulse git)
     {
         var last = git.LastCommitTimestamp.ToString("ddd, MMM d, yyyy 'at' HH:mm", CultureInfo.InvariantCulture);
@@ -601,31 +609,50 @@ public static class Charts
         var sb = new StringBuilder();
         sb.Append("<div class=\"git-pulse\">\n");
 
+        // Headline signal strip — the summary a stakeholder reads before scanning the grid. Carries the figures
+        // the heatmap's own headline used to show, so that headline is suppressed below to avoid duplication.
         sb.Append("  <div class=\"git-pulse-signals\">\n");
         sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-num\">{git.Last30DayCommitCount}</span>" +
                   $"<span class=\"git-pulse-caption\">{Plural(git.Last30DayCommitCount, "commit", "commits")} in the last 30 days</span></div>\n");
         sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-when\">{Html(last)}</span>" +
                   "<span class=\"git-pulse-caption\">last commit</span></div>\n");
+        sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-num\">{git.ActiveDays}</span>" +
+                  $"<span class=\"git-pulse-caption\">active {Plural(git.ActiveDays, "day", "days")}</span></div>\n");
         sb.Append("  </div>\n");
 
-        sb.Append("  <div class=\"git-pulse-files\">\n");
-        sb.Append("    <div class=\"git-pulse-files-title\">Top changed files</div>\n");
+        sb.Append("  <div class=\"git-pulse-body\">\n");
+
+        // Activity heatmap (headline suppressed — the signal strip above already carries those numbers).
+        sb.Append("    <div class=\"git-pulse-activity\">\n");
+        sb.Append(CommitHeatmap(git.DailySeries, git.CommitsByDay, showHeadline: false));
+        sb.Append("    </div>\n");
+
+        // Top changed files as proportional bars (bar width relative to the most-changed file).
+        sb.Append("    <div class=\"git-pulse-files\">\n");
+        sb.Append("      <div class=\"git-pulse-files-title\">Top changed files</div>\n");
         if (git.TopChangedFiles.Count > 0)
         {
-            sb.Append("    <ol class=\"git-pulse-file-list\">\n");
+            var maxChanges = git.TopChangedFiles.Max(f => f.ChangeCount);
+            sb.Append("      <ol class=\"git-pulse-bars\">\n");
             foreach (var (path, changeCount) in git.TopChangedFiles)
             {
-                sb.Append($"      <li><span class=\"git-pulse-file-path\">{Html(path)}</span>" +
-                          $"<span class=\"git-pulse-file-count\">{changeCount} {Plural(changeCount, "change", "changes")}</span></li>\n");
+                // Floor the fill so the least-changed file still shows a visible sliver; the exact count stays
+                // in text so the bar is decorative, not the sole information carrier (never color/size-only).
+                var pct = maxChanges <= 0 ? 0 : Math.Clamp((int)Math.Round((double)changeCount / maxChanges * 100), 6, 100);
+                sb.Append(
+                    $"        <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{Html(path)}</span>" +
+                    $"<span class=\"git-pulse-bar-track\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
+                    $"<span class=\"git-pulse-bar-count\">{changeCount} {Plural(changeCount, "change", "changes")}</span></li>\n");
             }
-            sb.Append("    </ol>\n");
+            sb.Append("      </ol>\n");
         }
         else
         {
-            sb.Append("    <div class=\"chart-empty\">No file changes in recent history.</div>\n");
+            sb.Append("      <div class=\"chart-empty\">No file changes in recent history.</div>\n");
         }
-        sb.Append("  </div>\n");
+        sb.Append("    </div>\n");
 
+        sb.Append("  </div>\n");
         sb.Append("</div>\n");
         return sb.ToString();
     }

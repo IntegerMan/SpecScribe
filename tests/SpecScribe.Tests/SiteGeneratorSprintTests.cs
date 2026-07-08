@@ -113,8 +113,10 @@ public class SiteGeneratorSprintTests : IDisposable
         Assert.True(File.Exists(Path.Combine(Site, "epics", "story-1-2.html")), "undrafted story gets a placeholder page");
 
         var index = File.ReadAllText(IndexPage);
-        // The sprint board widget was dropped from the home dashboard; sprint.html remains the source of truth.
-        Assert.DoesNotContain("sprint-board-panel", index);
+        // AC #2: the compact Sprint Status widget renders on the home dashboard (per-stage counts + CTA),
+        // distinct from the derived Now & Next panel above it. [Story 2.3 review]
+        Assert.Contains("<h3>Sprint Status</h3>", index);
+        Assert.Contains("from sprint-status.yaml", index);
         Assert.Contains("href=\"sprint.html\"", index);              // Sprint nav item still links to the board
 
         AssertNoBrokenLocalLinks(SprintPage);

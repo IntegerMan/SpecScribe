@@ -43,6 +43,58 @@ public static class SprintTemplater
             .ToList();
     }
 
+    /// <summary>The compact home-dashboard widget (AC #2): per-stage story counts (non-zero legend rows only,
+    /// mirroring <see cref="StoryStageCounts"/>'s <see cref="StageOrder"/>) plus the in-progress/review stories
+    /// linked, and a CTA to the full board. Labeled as the tracked-yaml view so it never reads as contradicting
+    /// the derived Now &amp; Next panel (Two Status Sources). Returns empty when there are no tracked stories.
+    /// [Story 2.3 review — AC #2 was never wired into the dashboard]</summary>
+    public static string RenderDashboardWidget(SprintStatus sprint, EpicsModel? epics)
+    {
+        var counts = StoryStageCounts(sprint);
+        var total = counts.Sum(c => c.Count);
+        if (total == 0) return string.Empty;
+
+        var nonZero = counts.Where(c => c.Count > 0).ToList();
+        var ariaParts = string.Join(", ", nonZero.Select(c => $"{c.Count} {c.Label.ToLowerInvariant()}"));
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel sprint-widget-panel\">\n");
+        sb.Append("<div class=\"chart-panel-header-row\"><h3>Sprint Status</h3>");
+        sb.Append("<a class=\"view-epic-link\" href=\"sprint.html\">View Sprint Board &rarr;</a></div>\n");
+        sb.Append("<div class=\"doc-subtitle\">from sprint-status.yaml</div>\n");
+
+        sb.Append("<div class=\"donut-and-legend\">\n");
+        sb.Append(Charts.Donut(counts.Select(c => (c.Label, c.Count, c.CssClass)).ToList(),
+            ariaLabel: $"Sprint status: {ariaParts}", centerText: $"{counts.First(c => c.CssClass == "done").Count}/{total}"));
+        sb.Append("<div class=\"donut-legend\">\n");
+        foreach (var (label, count, cssClass) in nonZero)
+        {
+            sb.Append($"  <span><span class=\"swatch {cssClass}\"></span>{Html(label)} ({count})</span>\n");
+        }
+        sb.Append("</div>\n</div>\n");
+
+        var inMotion = sprint.Entries
+            .Where(e => e.Kind == SprintEntryKind.Story && StatusStyles.ForSprint(e.Status) is "active" or "review")
+            .ToList();
+        if (inMotion.Count > 0)
+        {
+            sb.Append("<ul class=\"sprint-widget-list\">\n");
+            foreach (var entry in inMotion)
+            {
+                var (title, href, _) = ResolveStory(entry, epics);
+                var cssClass = StatusStyles.ForSprint(entry.Status);
+                var inner = href is not null ? $"<a href=\"{Html(href)}\">{title}</a>" : title;
+                sb.Append($"  <li>{StatusStyles.Badge(cssClass, StatusStyles.SprintLabel(entry.Status))} {inner}</li>\n");
+            }
+            sb.Append("</ul>\n");
+        }
+
+        sb.Append("</div>\n\n");
+        return sb.ToString();
+    }
+
+    private static string Html(string s) => PathUtil.Html(s);
+
     public static string RenderIndex(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
         IReadOnlyList<RetroModel>? retros = null)
     {
@@ -177,9 +229,6 @@ public static class SprintTemplater
         return sb.ToString();
     }
 
-    /// <summary>A pure-CSS toggle (no JS) between the status-column board (default) and the epic-grouped view.
-    /// Hidden radios drive sibling <c>.board-view</c> visibility via CSS; the labels are the visible tabs.
-    /// [Story 2.3 redesign]</summary>
     /// <summary>The pure-CSS view toggle tabs (radios + labels) for the control row. The radios drive the two
     /// board views via CSS <c>:has()</c> on <c>.sprint-page</c>, so the tabs no longer need to sit next to the
     /// views. [Story 2.3 polish #5]</summary>
@@ -268,8 +317,11 @@ public static class SprintTemplater
         var dataTip = PathUtil.Html(BuildCardTip(entry, story, epics));
         var tag = href is not null ? "a" : "div";
         var hrefAttr = href is not null ? $" href=\"{PathUtil.Html(prefix + href)}\"" : string.Empty;
+        // Unmatched entries (no model story, so no href) still need to be keyboard-reachable — they're
+        // exactly the stale/unmatched cases a maintainer most wants to inspect. [Story 2.3 review]
+        var focusAttr = href is null ? " tabindex=\"0\" role=\"group\"" : string.Empty;
 
-        sb.Append($"      <{tag} class=\"sprint-card js-tip {cssClass}\"{hrefAttr} data-tip=\"{dataTip}\">\n");
+        sb.Append($"      <{tag} class=\"sprint-card js-tip {cssClass}\"{hrefAttr}{focusAttr} data-tip=\"{dataTip}\">\n");
         sb.Append("        <div class=\"sprint-card-head\">\n");
         sb.Append($"          <span class=\"sprint-card-id\">Story {PathUtil.Html(id)}</span>\n");
         sb.Append("        </div>\n");

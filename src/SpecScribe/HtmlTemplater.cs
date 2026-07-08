@@ -240,6 +240,13 @@ public static class HtmlTemplater
         }
         sb.Append("</div>\n\n");
 
+        // Now & Next surfaces what's in motion right now from the derived story-artifact status — kept
+        // distinct from the tracked sprint-yaml widget below (Two Status Sources; Story 2.3 review). [restored]
+        if (epicsModel is not null)
+        {
+            AppendNowAndNext(sb, epicsModel);
+        }
+
         // The sunburst (whole-project map) is the dashboard's headline panel.
         if (epicsModel is not null)
         {
@@ -250,36 +257,40 @@ public static class HtmlTemplater
             sb.Append("</div>\n\n");
         }
 
+        // Two compact panels share a row — the epic-status donut and the overall-progress bars — freeing full
+        // width below for the consolidated Git Pulse panel. [Story 3.1 consolidation]
+        sb.Append("<div class=\"chart-row\">\n");
+        AppendEpicStatusPanel(sb, p, epicsModel);
+
         sb.Append("<div class=\"chart-panel\">\n<h3>Overall Progress</h3>\n");
         sb.Append(Charts.ProgressBar("Planning", p.EpicsDrafted, p.EpicsTotal, $"{p.EpicsDrafted} / {p.EpicsTotal} epics"));
         sb.Append(p.TasksTotal > 0
             ? Charts.ProgressBar("Implementation", p.TasksDone, p.TasksTotal, $"{p.TasksDone} / {p.TasksTotal} tasks ({p.StoriesWithArtifact} of {p.StoriesTotal} stories planned)")
             : Charts.ProgressBar("Implementation", 0, 0, "not started"));
-        sb.Append("</div>\n\n");
-
-        sb.Append("<div class=\"chart-row\">\n");
-        AppendEpicStatusPanel(sb, p, epicsModel);
-
-        sb.Append("<div class=\"chart-panel\">\n<h3>Commit Activity</h3>\n");
-        sb.Append(p.Git is { } gitPulse
-            ? Charts.CommitHeatmap(gitPulse.DailySeries, gitPulse.CommitsByDay)
-            : "<div class=\"chart-empty\">No git history available.</div>\n");
-        sb.Append("</div>\n\n");
+        sb.Append("</div>\n");
 
         sb.Append("</div>\n\n");
 
-        // Git Pulse: the three FR-9 baseline signals (30-day count, exact last-commit timestamp, top changed
-        // files) as a new panel beside the commit activity above — deliberately NOT folded into the existing
-        // "Commits" stat card or heatmap, which show different figures. When there's no git history at all the
-        // panel degrades to the UX spec's exact "—" + tooltip, mirroring the Commits card / heatmap fallbacks
-        // so AC #2's non-fatal state reads consistently. [Story 3.1; EXPERIENCE.md:169]
-        sb.Append("<div class=\"chart-panel\">\n<h3>Git Pulse</h3>\n");
+        // One consolidated Git Pulse panel — headline signal strip + activity heatmap + top-changed-files bars —
+        // replacing the previously separate "Commit Activity" and "Git Pulse" panels (owner review: combine and
+        // make it graphical, not two plain boxes). The "Commits" stat card at the top of the dashboard still
+        // shows the whole-repo total; this panel is the richer at-a-glance activity surface. Single non-fatal
+        // fallback: the UX spec's "—" + tooltip. [Story 3.1 AC #3; EXPERIENCE.md:169]
+        sb.Append("<div class=\"chart-panel git-pulse-panel\">\n<h3>Git Pulse</h3>\n");
         sb.Append(p.Git is { } pulse
             ? Charts.GitPulsePanel(pulse)
             : "<div class=\"chart-empty git-pulse-empty\" data-tooltip=\"Run in a git repository to enable commit stats\" tabindex=\"0\">—</div>\n");
         sb.Append("</div>\n\n");
 
         AppendRequirementsPanel(sb, requirements);
+
+        // The tracked sprint-yaml widget (AC #2) — distinct from the derived Now & Next panel above (Two
+        // Status Sources); omitted cleanly when there's no sprint-status.yaml or no tracked stories.
+        // [Story 2.3 review — was defined but never called]
+        if (sprint is not null)
+        {
+            sb.Append(SprintTemplater.RenderDashboardWidget(sprint, epicsModel));
+        }
 
         if (p.PerEpic.Count > 0)
         {
@@ -355,6 +366,88 @@ public static class HtmlTemplater
             sb.Append($"  <span><span class=\"swatch {cssClass}\"></span>{Html(label)} ({value})</span>\n");
         }
         sb.Append("</div>\n</div>\n</div>\n\n");
+    }
+
+    /// <summary>Surfaces what's in motion right now: stories in dev, stories ready to start, and the
+    /// next epic awaiting story breakdown — the "where do I look next" panel. Derived from each story
+    /// artifact's own <c>Status:</c> frontmatter (the "Derived" signal), distinct from the tracked
+    /// sprint-yaml widget. [restored — Story 2.3 review: must not be removed]</summary>
+    private static void AppendNowAndNext(StringBuilder sb, EpicsModel epicsModel)
+    {
+        var allStories = epicsModel.Epics.SelectMany(e => e.Stories.Select(s => (Epic: e, Story: s))).ToList();
+        var inDev = allStories.Where(x => StatusStyles.ForStory(x.Story) == "active").ToList();
+        var inReview = allStories.Where(x => StatusStyles.ForStory(x.Story) == "review").ToList();
+        var upNext = allStories.Where(x => StatusStyles.ForStory(x.Story) == "ready").ToList();
+
+        // The lowest-numbered story that's been listed in a drafted epic but has no artifact yet — the
+        // next stub to flesh out. Pending epics are covered by nextEpicToDraft, so exclude them here.
+        var nextStoryToDraft = allStories
+            .Where(x => x.Epic.Status == EpicStatus.Drafted && StatusStyles.ForStory(x.Story) == "drafted")
+            .OrderBy(x => x.Epic.Number)
+            .ThenBy(x => StoryMinor(x.Story.Id))
+            .Select(x => (x.Epic, x.Story))
+            .FirstOrDefault();
+
+        var nextEpicToDraft = epicsModel.Epics.OrderBy(e => e.Number).FirstOrDefault(e => e.Status == EpicStatus.Pending);
+
+        if (inDev.Count == 0 && inReview.Count == 0 && upNext.Count == 0
+            && nextStoryToDraft.Story is null && nextEpicToDraft is null) return;
+
+        sb.Append("<div class=\"chart-panel\">\n<h3>Now &amp; Next</h3>\n<div class=\"now-next\">\n");
+
+        foreach (var (epic, story) in inDev)
+        {
+            AppendNowNextCard(sb, "active", "In development",
+                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
+        }
+
+        foreach (var (epic, story) in inReview)
+        {
+            AppendNowNextCard(sb, "review", "In review",
+                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
+        }
+
+        foreach (var (epic, story) in upNext)
+        {
+            AppendNowNextCard(sb, "ready", "Up next",
+                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
+        }
+
+        if (nextStoryToDraft.Story is not null)
+        {
+            var (epic, story) = nextStoryToDraft;
+            AppendNowNextCard(sb, "drafted", "Next story to draft",
+                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html");
+        }
+
+        if (nextEpicToDraft is not null)
+        {
+            AppendNowNextCard(sb, "pending", "Next epic to draft",
+                $"Epic {nextEpicToDraft.Number} · {PathUtil.StripHtmlTags(nextEpicToDraft.Title)}",
+                $"epics/epic-{nextEpicToDraft.Number}.html");
+        }
+
+        sb.Append("</div>\n</div>\n\n");
+    }
+
+    /// <summary>The "M" from a story id "N.M", for ordering stories within an epic; falls back to
+    /// <see cref="int.MaxValue"/> for ids that don't parse so they sort last rather than throw.</summary>
+    private static int StoryMinor(string storyId)
+    {
+        var dot = storyId.LastIndexOf('.');
+        return dot >= 0 && int.TryParse(storyId.AsSpan(dot + 1), out var minor) ? minor : int.MaxValue;
+    }
+
+    private static void AppendNowNextCard(StringBuilder sb, string cssClass, string kicker, string title, string href)
+    {
+        sb.Append($"  <a class=\"now-next-card {cssClass}\" href=\"{Html(href)}\">\n");
+        sb.Append($"    <span class=\"now-next-kicker\">{Html(kicker)}</span>\n");
+        sb.Append($"    <span class=\"now-next-title\">{Html(title)}</span>\n");
+        sb.Append("  </a>\n");
     }
 
     private static void AppendDashboardQuickLinks(StringBuilder sb, SiteNav nav)

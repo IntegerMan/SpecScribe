@@ -46,10 +46,12 @@ public static class RetroActionStyler
     private static string RemoveColumn(string table, string header)
     {
         var index = -1;
+        var headerCellCount = 0;
         foreach (Match r in Row.Matches(table))
         {
             if (!r.Value.Contains("<th", StringComparison.Ordinal)) continue; // the header row
             var cells = Cell.Matches(r.Value);
+            headerCellCount = cells.Count;
             for (var i = 0; i < cells.Count; i++)
             {
                 if (Tags.Replace(cells[i].Value, string.Empty).Trim().Equals(header, StringComparison.OrdinalIgnoreCase))
@@ -65,7 +67,10 @@ public static class RetroActionStyler
         return Row.Replace(table, r =>
         {
             var cells = Cell.Matches(r.Value);
-            if (index >= cells.Count) return r.Value;
+            // A ragged row (cell count doesn't match the header) can't be trusted to align by position —
+            // removing "index" could strip the wrong cell instead of Owner. Leave it fully unchanged rather
+            // than risk misaligning the table. [Story 2.3 review]
+            if (cells.Count != headerCellCount || index >= cells.Count) return r.Value;
             var cell = cells[index];
             var end = cell.Index + cell.Length;
             var removeLen = cell.Length + (end < r.Value.Length && r.Value[end] == '\n' ? 1 : 0); // eat trailing newline

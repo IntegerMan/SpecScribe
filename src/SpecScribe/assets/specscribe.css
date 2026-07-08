@@ -1497,10 +1497,12 @@ code.color-swatch {
 
 .chart-empty { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
 
-/* ====================== GIT PULSE (Story 3.1 baseline git signals) ======================
-   The three FR-9 signals as a pure HTML/CSS panel: a headline signal row (30-day count + exact last-commit
-   timestamp) over a ranked most-changed-files list. Same tokens/typography as the stat cards and heatmap. */
-.git-pulse { display: flex; flex-direction: column; gap: 1.1rem; }
+/* ====================== GIT PULSE (Story 3.1 — consolidated git panel) ======================
+   One panel merging what used to be two ("Commit Activity" heatmap + baseline pulse): a headline signal strip
+   (30-day count, exact last commit, active days) over a two-column body — the activity heatmap and the
+   top-changed files as proportional bars. Same tokens/typography as the stat cards and heatmap; git is not a
+   lifecycle status, so the neutral rust/ink tokens are used, never the --status-* palette. */
+.git-pulse { display: flex; flex-direction: column; gap: 1.2rem; }
 .git-pulse-signals { display: flex; flex-wrap: wrap; gap: 1.8rem; }
 .git-pulse-signal { display: flex; flex-direction: column; gap: 0.15rem; }
 .git-pulse-num {
@@ -1517,17 +1519,42 @@ code.color-swatch {
   text-transform: uppercase;
   color: var(--ink-light);
 }
+
+/* Body: heatmap and file bars stack on narrow screens, sit side-by-side (heatmap wider) on wide ones.
+   min-width:0 lets the heatmap column shrink so its SVG (max-width:100%) scales instead of overflowing. */
+.git-pulse-body { display: grid; grid-template-columns: 1fr; gap: 1.4rem; }
+.git-pulse-activity { min-width: 0; }
+@media (min-width: 760px) {
+  .git-pulse-body { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
+}
+
 .git-pulse-files-title {
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-light);
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.55rem;
 }
-.git-pulse-file-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
-.git-pulse-file-list li { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.85rem; }
-.git-pulse-file-path { font-family: 'Courier New', monospace; color: var(--ink); overflow-wrap: anywhere; }
-.git-pulse-file-count { color: var(--ink-faded); white-space: nowrap; }
+/* Proportional bar list: label (truncates, full path in title) | track+fill | exact count. The count text
+   makes the bar decorative rather than the sole information carrier (never size/color-only). [Story 1.4/1.5] */
+.git-pulse-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.git-pulse-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(70px, 1.3fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+}
+.git-pulse-bar-label {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-pulse-bar-track { background: var(--parchment-dark); border-radius: 3px; height: 0.62rem; overflow: hidden; }
+.git-pulse-bar-fill { display: block; height: 100%; background: var(--rust); border-radius: 3px 0 0 3px; }
+.git-pulse-bar-count { font-family: 'Courier New', monospace; font-size: 0.76rem; color: var(--ink-faded); white-space: nowrap; }
 /* The no-git-history empty state: the em-dash reads as a stat placeholder (not the italic "chart-empty"
    sentence), and it carries the UX-spec tooltip so hover/focus explains why. [EXPERIENCE.md:169] */
 .git-pulse-empty {

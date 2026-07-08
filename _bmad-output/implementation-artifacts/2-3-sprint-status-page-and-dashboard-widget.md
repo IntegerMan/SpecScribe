@@ -4,7 +4,7 @@ baseline_commit: bba1ef445ab61dbfb64ff0e344182284270d6e5f
 
 # Story 2.3: Sprint Status Page and Dashboard Widget
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -77,6 +77,20 @@ so that I can see where every epic and story sits without opening the tracking f
 - [x] Task 7: End-to-end validation with a real generation pass (AC: #1, #2)
   - [x] Run the focused test filter, then a real generation pass against this repo — it ships a live `sprint-status.yaml` (epics 1–7, backlog→in-progress→done spread) as a full fixture.
   - [x] Manually verify on `docs/live/index.html`: a "Sprint Status" widget with per-stage counts + in-progress items, linking to `sprint.html`; a "Sprint" nav entry. On `docs/live/sprint.html`: epics with their status badges, stories grouped underneath with lifecycle badges and working links, and (since the live file has none yet) **no** action-items section. Temporarily rename the yaml and re-generate to confirm the page, widget, and nav all omit cleanly with no broken links.
+
+### Review Findings
+
+- [x] [Review][Patch] Build the compact dashboard sprint widget (AC #2) — `HtmlTemplater.AppendDashboard` never calls `SprintTemplater.RenderBoard`/`StoryStageCounts`; only a nav link to sprint.html existed. Fixed: added `SprintTemplater.RenderDashboardWidget` (donut + non-zero legend + in-progress/review list + CTA), wired into `AppendDashboard`. [src/SpecScribe/HtmlTemplater.cs, src/SpecScribe/SprintTemplater.cs]
+- [x] [Review][Patch] Restore the whole-project "Now & Next" panel on the home dashboard — `AppendNowAndNext`/`AppendNowNextCard` were deleted from `HtmlTemplater.AppendDashboard` with no whole-project replacement. Fixed: restored verbatim from baseline, placed above the sprint widget. [src/SpecScribe/HtmlTemplater.cs]
+- [x] [Review][Patch] `SprintStatusParser` can crash the whole site generation on malformed input. Fixed: `int.Parse` → `int.TryParse` (skip unparseable entries) and `ParseFile`'s catch broadened to `IOException or UnauthorizedAccessException`. [src/SpecScribe/SprintStatusParser.cs:62,66,70,36]
+- [x] [Review][Patch] Unmatched sprint board cards are keyboard-unreachable. Fixed: added `tabindex="0" role="group"` when rendering the non-link `<div>` variant. [src/SpecScribe/SprintTemplater.cs:272]
+- [x] [Review][Patch] `RetroActionStyler.RemoveColumn` silently misaligns ragged table rows. Fixed: a row is only column-stripped when its cell count matches the header's; otherwise left fully unchanged. [src/SpecScribe/RetroActionStyler.cs]
+- [x] [Review][Patch] `SiteGenerator.EpicRetroMap` recomputed per-epic in a loop. Fixed: computed once in `ParseRetros` and cached in a field. [src/SpecScribe/SiteGenerator.cs:430,572]
+- [x] [Review][Patch] `WorkInventory.Build(...)` invoked twice per generation pass. Fixed: computed once in `GenerateAll` and passed into both `WriteActionItems`/`WriteIndex`. [src/SpecScribe/SiteGenerator.cs:535,619]
+- [x] [Review][Patch] `ActionItemsTemplater.IsDebtRelated` is a bare substring match. Fixed: switched to a whole-word regex (`\b(deferred|tech(nical)?\s+debt)\b`). [src/SpecScribe/ActionItemsTemplater.cs]
+- [x] [Review][Patch] Stale duplicate XML doc comment above `SprintTemplater.RenderBoardTabs`. Fixed: removed the stale duplicate. [src/SpecScribe/SprintTemplater.cs]
+- [x] [Review][Defer] `ExtractTopLevelBlock` silently truncates on a duplicate top-level key (e.g. two `development_status:` blocks) rather than erroring or merging — deferred, pre-existing shape of the hand-rolled block-slicer; requires malformed hand-authored yaml, low likelihood. [src/SpecScribe/SprintStatusParser.cs]
+- [x] [Review][Defer] `ExtractLastUpdated` breaks on a YAML block-scalar `last_updated` value (`>`/`|`) — would display the literal indicator character instead of a date — deferred, pre-existing shape of the hand-rolled parser; low-likelihood authoring pattern. [src/SpecScribe/SprintStatusParser.cs]
 
 ## Developer Context Section
 

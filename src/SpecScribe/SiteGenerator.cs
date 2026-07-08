@@ -134,10 +134,12 @@ public sealed class SiteGenerator
             // after the epics phase. Gated on parsed sprint data; a no-op when there is none. [Story 2.3 Task 3/5]
             WriteSprint(nav);
             WriteRetroIndex(nav);
-            WriteActionItems(nav);
+            // Built once and shared with WriteIndex below — both used to rebuild it independently. [Story 2.3 review]
+            var workInventory = WorkInventory.Build(_docs.Values.ToList());
+            WriteActionItems(nav, workInventory);
 
             reporter?.BeginPhase(GenerationPhase.Index);
-            WriteIndex(nav);
+            WriteIndex(nav, workInventory);
             reporter?.EndPhase(GenerationPhase.Index);
         }
         return events;
@@ -528,12 +530,12 @@ public sealed class SiteGenerator
         }
     }
 
-    private void WriteIndex(SiteNav nav)
+    private void WriteIndex(SiteNav nav, WorkInventory? work = null)
     {
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
-        var work = WorkInventory.Build(docs);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, work, _sprint, _retros);
+        var inventory = work ?? WorkInventory.Build(docs);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
@@ -550,6 +552,10 @@ public sealed class SiteGenerator
             retros.Add(RetroParser.Parse(file, sourceRel, outputRel));
         }
         _retros = retros.OrderBy(r => r.EpicNumber).ThenBy(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+        // Computed once here rather than on every access (EpicRetroMap used to be a computed property
+        // re-grouping all retros on every epic in the GenerateEpicsInternal loop). [Story 2.3 review]
+        _epicRetroMap = _retros.GroupBy(r => r.EpicNumber)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).First().OutputRelativePath);
     }
 
     /// <summary>Writes each parsed retrospective into its dedicated <see cref="RetroTemplater"/> page (at the
@@ -568,10 +574,10 @@ public sealed class SiteGenerator
     }
 
     /// <summary>Maps an epic number to the output path of its (latest, by filename) retrospective page — the
-    /// link target for an open action item tagged with that epic. [Story 2.3 retro pages]</summary>
-    private IReadOnlyDictionary<int, string> EpicRetroMap =>
-        _retros.GroupBy(r => r.EpicNumber)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).First().OutputRelativePath);
+    /// link target for an open action item tagged with that epic. Computed once in <see cref="ParseRetros"/>.
+    /// [Story 2.3 retro pages]</summary>
+    private IReadOnlyDictionary<int, string> _epicRetroMap = new Dictionary<int, string>();
+    private IReadOnlyDictionary<int, string> EpicRetroMap => _epicRetroMap;
 
     /// <summary>Path to the sprint tracking file — located by well-known name anywhere under
     /// <see cref="ForgeOptions.SourceRoot"/> (it is a <c>.yaml</c>, so it is NOT in the <c>*.md</c> source
@@ -610,13 +616,13 @@ public sealed class SiteGenerator
     /// <summary>Writes the open-action-items page (<c>action-items.html</c>) when the sprint tracks open items —
     /// the target of the sprint page's flag button and the home retro callout. Each item links to its epic's
     /// retro page and offers a quick-dev "Resolve with AI" command. [Story 2.3 polish #5]</summary>
-    private void WriteActionItems(SiteNav nav)
+    private void WriteActionItems(SiteNav nav, WorkInventory? work = null)
     {
         var open = _sprint?.OpenActionItems;
         if (open is null || open.Count == 0) return;
         // Debt-related items link to the deferred-work backlog page when one exists (root-relative — this page
-        // is at the site root). WorkInventory is rebuilt from the docs generated so far.
-        var deferredHref = WorkInventory.Build(_docs.Values.ToList()).Deferred?.OutputPath;
+        // is at the site root). Reuses the caller's inventory when supplied instead of rebuilding it. [Story 2.3 review]
+        var deferredHref = (work ?? WorkInventory.Build(_docs.Values.ToList())).Deferred?.OutputPath;
         // NOT reference-linkified: the "Resolve with AI" data-copy payload embeds the action text (which can
         // contain "Epic N"/"Story N.M" mentions); the linkifier would wrap those in <a> tags INSIDE the
         // attribute value and corrupt the copyable command. [Story 2.3 polish #5]

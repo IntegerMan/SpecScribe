@@ -33,9 +33,11 @@ public static class SprintStatusParser
         {
             return Parse(MarkdownConverter.ReadAllTextShared(fullPath));
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Mid-write from another tool — treated as "no sprint data" for this pass rather than throwing.
+            // Mid-write from another tool, or a permissions/access issue — treated as "no sprint data" for
+            // this pass rather than throwing. (Deliberately not a bare `catch (Exception)`: a real parser bug
+            // should still surface loudly rather than silently degrade.) [Story 2.3 review]
             return null;
         }
     }
@@ -57,19 +59,23 @@ public static class SprintStatusParser
             var status = value?.ToString()?.Trim();
             if (string.IsNullOrEmpty(status)) continue;
 
+            // TryParse, not Parse: a key with an absurdly long digit run (still matched by the regex) would
+            // otherwise throw OverflowException here and crash the whole site generation, contradicting the
+            // "malformed data degrades to null" contract this parser exists to uphold. [Story 2.3 review]
             if (RetroKey.Match(key) is { Success: true } rm)
             {
-                entries.Add(new SprintEntry(SprintEntryKind.Retrospective, key, int.Parse(rm.Groups["n"].Value), null, status));
+                if (int.TryParse(rm.Groups["n"].Value, out var rn)) entries.Add(new SprintEntry(SprintEntryKind.Retrospective, key, rn, null, status));
             }
             else if (EpicKey.Match(key) is { Success: true } em)
             {
-                entries.Add(new SprintEntry(SprintEntryKind.Epic, key, int.Parse(em.Groups["n"].Value), null, status));
+                if (int.TryParse(em.Groups["n"].Value, out var en)) entries.Add(new SprintEntry(SprintEntryKind.Epic, key, en, null, status));
             }
             else if (StoryKey.Match(key) is { Success: true } sm)
             {
-                entries.Add(new SprintEntry(SprintEntryKind.Story, key, int.Parse(sm.Groups["epic"].Value), int.Parse(sm.Groups["story"].Value), status));
+                if (int.TryParse(sm.Groups["epic"].Value, out var se) && int.TryParse(sm.Groups["story"].Value, out var ss))
+                    entries.Add(new SprintEntry(SprintEntryKind.Story, key, se, ss, status));
             }
-            // Keys matching none of the patterns are ignored (forward-compat).
+            // Keys matching none of the patterns, or with an unparseable number, are ignored (forward-compat).
         }
 
         if (entries.Count == 0) return null;

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SpecScribe;
 
@@ -83,8 +84,10 @@ public static class ActionItemsTemplater
 
     /// <summary>True when an action item's text is about deferred work / tech debt — the signal for surfacing a
     /// link to the deferred-work backlog page beside it.</summary>
-    private static bool IsDebtRelated(string action) =>
-        action.Contains("deferred", StringComparison.OrdinalIgnoreCase) ||
-        action.Contains("tech debt", StringComparison.OrdinalIgnoreCase) ||
-        action.Contains("technical debt", StringComparison.OrdinalIgnoreCase);
+    // Whole-word match, not bare substring: a raw Contains("deferred") would also fire on an unrelated word
+    // that happens to embed it (e.g. "nondeferred"). Still a simple keyword heuristic for a cosmetic badge,
+    // not full free-text classification — phrasing like "pay down the hack" won't match. [Story 2.3 review]
+    private static readonly Regex DebtWords = new(@"\b(deferred|tech(nical)?\s+debt)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static bool IsDebtRelated(string action) => DebtWords.IsMatch(action);
 }

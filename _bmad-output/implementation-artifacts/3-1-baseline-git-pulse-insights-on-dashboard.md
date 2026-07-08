@@ -18,6 +18,7 @@ so that I can assess project momentum at a glance.
 
 1. **Given** git history is available **When** I view the dashboard **Then** I see last commit timestamp, 30-day commit count, and top changed files **And** values are derived from local repository history. [Source: epics.md#Story 3.1; PRD FR-9]
 2. **Given** git history is unavailable or fails to load **When** generation runs **Then** generation still succeeds **And** dashboard shows a non-fatal fallback state. [Source: epics.md#Story 3.1; PRD FR-9]
+3. **Given** git history is available **When** I view the git insights on the dashboard **Then** commit activity and the pulse signals appear as a **single, consolidated, graphical panel** (activity heatmap + headline signal strip + top-changed-files bars) rather than two separate list-style panels **And** the presentation follows the Story 1.4/1.5 accessibility and truthfulness conventions, with a single non-fatal fallback when git history is unavailable. [Owner review feedback 2026-07-08 — the baseline pulse must be attractive and combined, not just present]
 
 ## Tasks / Subtasks
 
@@ -37,6 +38,12 @@ so that I can assess project momentum at a glance.
   - [x] Subtask 3.1: Add pure-parser tests in [GitMetricsTests.cs](../../tests/SpecScribe.Tests/GitMetricsTests.cs) for the new name-only-log parsing helper — cover: frequency ordering/top-N truncation, malformed/empty lines skipped (never-throw), and a repo with zero file changes.
   - [x] Subtask 3.2: Add a test proving `Last30DayCommitCount` correctly excludes commits older than 30 days from `DailySeries` (boundary case: exactly 30 days ago is included, 31 days ago is not).
   - [x] Subtask 3.3: Add `HtmlTemplaterTests.cs` coverage for the new panel: renders real data when `p.Git` is populated, and renders the exact `"—"` / tooltip fallback copy when `p.Git` is `null`.
+
+- [x] Task 4: Consolidate and elevate the git panel presentation (AC: #3) [Owner review follow-up 2026-07-08]
+  - [x] Subtask 4.1: Merge the two separate git panels in `AppendDashboard` ([HtmlTemplater.cs](../../src/SpecScribe/HtmlTemplater.cs)) — the "Commit Activity" heatmap panel (in the `chart-row`) and the standalone "Git Pulse" panel — into **one** full-width "Git Pulse" `chart-panel`. Remove the duplicate "Commit Activity" heading.
+  - [x] Subtask 4.2: Make it more graphical in [Charts.cs](../../src/SpecScribe/Charts.cs) `GitPulsePanel` (pure SVG/HTML + CSS, no JS): a headline signal strip (30-day count, exact last commit, active days), the embedded activity heatmap (suppress its now-duplicate internal headline via a new `showHeadline` flag on `CommitHeatmap`), and the top-changed files as **proportional bars** (bar width ∝ change count) instead of a plain list. Reuse neutral chart tokens (git is not a lifecycle status, so no `--status-*`).
+  - [x] Subtask 4.3: Restructure the dashboard so the freed-up `chart-row` pairs the Epic Status donut with the "Overall Progress" bars, and the richer git panel gets full width below.
+  - [x] Subtask 4.4: Preserve the single non-fatal fallback (`—` + tooltip) and all 1.4/1.5 a11y affordances; update [HtmlTemplaterTests.cs](../../tests/SpecScribe.Tests/HtmlTemplaterTests.cs) for the consolidated panel (heatmap + signals + file bars present; no duplicate "Commit Activity" heading; fallback intact).
 
 ## Dev Notes
 
@@ -108,3 +115,4 @@ claude-opus-4-8 (Claude Opus 4.8)
 | Date | Change |
 | --- | --- |
 | 2026-07-08 | Implemented Story 3.1: baseline git pulse (last-commit timestamp, 30-day count, top changed files) on the dashboard, with non-fatal fallback. All tasks complete; 437 tests passing. Status → review. |
+| 2026-07-08 | Owner review follow-up (AC #3): consolidated the separate "Commit Activity" and "Git Pulse" panels into one graphical panel — headline signal strip (30-day / last commit / active days) over a two-column body (activity heatmap + top-changed-files proportional bars); paired Epic Status with Overall Progress to free full width. Pure SVG/CSS, single non-fatal fallback preserved. 440 tests passing; verified on the regenerated site. Status → review. |

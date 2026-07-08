@@ -235,6 +235,12 @@ public class HtmlTemplaterTests
         Assert.Contains("Mon, Jan 5, 2026 at 12:00", html);           // exact last-commit timestamp
         Assert.Contains("src/Program.cs", html);                      // top changed file
         Assert.Contains("Top changed files", html);
+
+        // Consolidated + graphical presentation. [Story 3.1 AC #3 — owner review follow-up]
+        Assert.Contains("git-pulse-body", html);                      // the merged two-part body
+        Assert.Contains("git-pulse-bar-fill", html);                  // top files as proportional bars
+        Assert.Contains("class=\"heatmap\"", html);                   // activity heatmap embedded in the same panel
+        Assert.DoesNotContain("<h3>Commit Activity</h3>", html);      // the separate heatmap panel is gone
     }
 
     [Fact]
@@ -339,12 +345,13 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_NoStandaloneSprintPaneAndSurfacesOpenRetroItemsWithDeferredWork()
+    public void RenderIndex_ShowsSprintWidgetAndSurfacesOpenRetroItemsWithDeferredWork()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
         var sprint = SprintStatusParser.Parse("""
             development_status:
               epic-1: done
+              1-1-first-story: done
 
             action_items:
               - epic: 1
@@ -357,9 +364,11 @@ public class HtmlTemplaterTests
             epicsModel: null, requirements: null, adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty, work: null, sprint: sprint);
 
-        // The standalone "Sprint Status" donut pane is gone (the Now & Next board + wheel cover it).
-        Assert.DoesNotContain("<h3>Sprint Status</h3>", html);
-        Assert.DoesNotContain("chart-panel sprint-panel", html);
+        // AC #2: the compact "Sprint Status" widget renders on the home dashboard with per-stage counts and a
+        // CTA to the full board, distinct from the derived Now & Next panel. [Story 2.3 review]
+        Assert.Contains("<h3>Sprint Status</h3>", html);
+        Assert.Contains("from sprint-status.yaml", html);
+        Assert.Contains("View Sprint Board", html);
         // Open retro action items are surfaced as a callout (beside deferred work) linking to the sprint page.
         Assert.Contains("work-callout retro-callout", html);
         Assert.Contains("Retro Action Items", html);

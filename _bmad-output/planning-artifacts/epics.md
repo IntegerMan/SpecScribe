@@ -516,26 +516,6 @@ So that I can see how far the project has been refined at a glance.
 **Then** each stage carries a text label and value (never color-only) and reduced-motion is respected
 **And** an empty or early-stage project renders a sensible funnel rather than a broken or misleading one.
 
-### Story 3.7: Consolidated, Graphical Git Pulse Panel
-
-As a maintainer,
-I want the dashboard's git activity consolidated into one richer, more graphical panel,
-So that project momentum reads clearly at a glance and invites me to explore further.
-
-**Acceptance Criteria:**
-
-1.
-**Given** the dashboard currently shows commit activity and baseline git pulse as two separate panels
-**When** the dashboard renders with git history available
-**Then** a single consolidated git panel presents the activity heatmap together with the baseline signals (last commit, 30-day count, top changed files)
-**And** the presentation is more graphical than a plain list while preserving the accessibility and truthfulness conventions from Stories 1.4/1.5.
-
-2.
-**Given** the consolidated panel and the git detail/insight surfaces exist
-**When** I interact with the panel
-**Then** its elements (for example top changed files and activity) link into the corresponding detail or insight pages when those pages are generated
-**And** when git history is unavailable the panel shows a single non-fatal fallback state.
-
 ### Story 3.8: Git Insights Hub Page
 
 As a maintainer,
