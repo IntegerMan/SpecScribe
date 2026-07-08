@@ -97,8 +97,8 @@ development_status:
   6-3-host-aware-theming-and-explicit-helper-actions: backlog
   epic-6-retrospective: optional
 
-  epic-7: backlog
-  7-1-in-portal-code-file-browsing: backlog
+  epic-7: in-progress
+  7-1-in-portal-code-file-browsing: ready-for-dev
   7-2-source-citation-and-comment-linking-to-code-pages: backlog
   7-3-activity-timeline-and-date-pages: backlog
   7-4-advanced-code-and-git-coverage: backlog
