@@ -345,7 +345,7 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_ShowsSprintWidgetAndSurfacesOpenRetroItemsWithDeferredWork()
+    public void RenderIndex_NowAndNextBecomesSprintBoardAndSurfacesOpenRetroItemsWithDeferredWork()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
         var sprint = SprintStatusParser.Parse("""
@@ -361,14 +361,15 @@ public class HtmlTemplaterTests
 
         var html = HtmlTemplater.RenderIndex(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
-            epicsModel: null, requirements: null, adrs: Array.Empty<AdrEntry>(),
+            epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "done")), requirements: null, adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty, work: null, sprint: sprint);
 
-        // AC #2: the compact "Sprint Status" widget renders on the home dashboard with per-stage counts and a
-        // CTA to the full board, distinct from the derived Now & Next panel. [Story 2.3 review]
-        Assert.Contains("<h3>Sprint Status</h3>", html);
-        Assert.Contains("from sprint-status.yaml", html);
-        Assert.Contains("View Sprint Board", html);
+        // AC #2: with sprint data, Now & Next BECOMES the sprint board (the tracked view), labeled with its
+        // source and carrying a CTA to the full sprint page — no separate "Sprint Status" panel. [Story 2.3]
+        Assert.Contains("chart-panel sprint-board-panel", html);
+        Assert.Contains("Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span>", html);
+        Assert.Contains("class=\"sprint-board\"", html);
+        Assert.Contains("href=\"sprint.html\"", html);
         // Open retro action items are surfaced as a callout (beside deferred work) linking to the sprint page.
         Assert.Contains("work-callout retro-callout", html);
         Assert.Contains("Retro Action Items", html);

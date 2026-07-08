@@ -240,11 +240,12 @@ public static class HtmlTemplater
         }
         sb.Append("</div>\n\n");
 
-        // Now & Next surfaces what's in motion right now from the derived story-artifact status — kept
-        // distinct from the tracked sprint-yaml widget below (Two Status Sources; Story 2.3 review). [restored]
+        // Now & Next: when a sprint is tracked this panel BECOMES the sprint board (the authoritative tracked
+        // view, capped at 3/column with a CTA to the full page); with no sprint it falls back to the derived
+        // in-dev/review/up-next view from each story artifact's own status. [Story 2.3]
         if (epicsModel is not null)
         {
-            AppendNowAndNext(sb, epicsModel);
+            AppendNowAndNext(sb, epicsModel, sprint);
         }
 
         // The sunburst (whole-project map) is the dashboard's headline panel.
@@ -283,14 +284,6 @@ public static class HtmlTemplater
         sb.Append("</div>\n\n");
 
         AppendRequirementsPanel(sb, requirements);
-
-        // The tracked sprint-yaml widget (AC #2) — distinct from the derived Now & Next panel above (Two
-        // Status Sources); omitted cleanly when there's no sprint-status.yaml or no tracked stories.
-        // [Story 2.3 review — was defined but never called]
-        if (sprint is not null)
-        {
-            sb.Append(SprintTemplater.RenderDashboardWidget(sprint, epicsModel));
-        }
 
         if (p.PerEpic.Count > 0)
         {
@@ -368,12 +361,30 @@ public static class HtmlTemplater
         sb.Append("</div>\n</div>\n</div>\n\n");
     }
 
-    /// <summary>Surfaces what's in motion right now: stories in dev, stories ready to start, and the
-    /// next epic awaiting story breakdown — the "where do I look next" panel. Derived from each story
-    /// artifact's own <c>Status:</c> frontmatter (the "Derived" signal), distinct from the tracked
-    /// sprint-yaml widget. [restored — Story 2.3 review: must not be removed]</summary>
-    private static void AppendNowAndNext(StringBuilder sb, EpicsModel epicsModel)
+    /// <summary>Surfaces what's in motion right now. When an active sprint is tracked (<paramref name="sprint"/>
+    /// present and non-empty), this panel BECOMES the sprint board — the authoritative tracked view — capped at
+    /// 3 cards per column with a "+N more" link to the full sprint page, plus a progress wheel and a "View sprint
+    /// board" CTA in the header. With no sprint it falls back to the derived in-dev/review/up-next/next-to-draft
+    /// view from each story artifact's own status. The two status sources stay labeled and distinct (Two Status
+    /// Sources). [Story 2.3]</summary>
+    private static void AppendNowAndNext(StringBuilder sb, EpicsModel epicsModel, SprintStatus? sprint)
     {
+        if (sprint is { IsEmpty: false })
+        {
+            sb.Append("<div class=\"chart-panel sprint-board-panel\">\n");
+            // One header row: the title + its source label (inline, so it doesn't cost its own line), a status
+            // progress wheel, and the CTA. [Story 2.3 redesign]
+            sb.Append("<div class=\"chart-panel-header-row sprint-board-header\">\n");
+            sb.Append("  <h3>Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span></h3>\n");
+            sb.Append("  <div class=\"sprint-board-header-aside\">");
+            sb.Append(SprintTemplater.RenderProgressWheel(sprint));
+            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a>");
+            sb.Append("</div>\n</div>\n");
+            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath));
+            sb.Append("</div>\n\n");
+            return;
+        }
+
         var allStories = epicsModel.Epics.SelectMany(e => e.Stories.Select(s => (Epic: e, Story: s))).ToList();
         var inDev = allStories.Where(x => StatusStyles.ForStory(x.Story) == "active").ToList();
         var inReview = allStories.Where(x => StatusStyles.ForStory(x.Story) == "review").ToList();
