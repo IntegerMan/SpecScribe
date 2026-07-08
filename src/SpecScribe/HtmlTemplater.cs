@@ -324,14 +324,11 @@ public static class HtmlTemplater
         {
             var classes = epicsModel.Epics.Select(StatusStyles.ForEpic).ToList();
             int Count(string c) => classes.Count(x => x == c);
-            segments = new List<(string, int, string)>
-            {
-                (StatusStyles.EpicLabel("done"), Count("done"), "done"),
-                (StatusStyles.EpicLabel("active"), Count("active"), "active"),
-                (StatusStyles.EpicLabel("ready"), Count("ready"), "ready"),
-                (StatusStyles.EpicLabel("drafted"), Count("drafted"), "drafted"),
-                (StatusStyles.EpicLabel("pending"), Count("pending"), "pending"),
-            };
+            // Bucket every class ForEpic can return, driven by the single StatusStyles.EpicStages list, so a
+            // future epic tier can never silently drop out of the donut (and disagree with the center fraction).
+            segments = StatusStyles.EpicStages
+                .Select(stage => (StatusStyles.EpicLabel(stage), Count(stage), stage))
+                .ToList();
             centerText = $"{Count("done")}/{classes.Count}";
         }
         else

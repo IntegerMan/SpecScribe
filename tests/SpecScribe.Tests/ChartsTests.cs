@@ -412,6 +412,62 @@ public class ChartsTests
     }
 
     [Fact]
+    public void CommitHeatmap_UniformSingleCommitHistoryRendersLightNotMaxed()
+    {
+        // Every active day has exactly one commit, so the busiest day is a single commit (maxCount == 1) — the
+        // degenerate case that used to collapse HeatLevel to the darkest level. [heatmap-debt-triage]
+        var series = new (DateOnly Day, int Count)[]
+        {
+            (new DateOnly(2026, 1, 5), 1),
+            (new DateOnly(2026, 1, 8), 1),
+            (new DateOnly(2026, 1, 12), 1),
+        };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        // Active cells read as light (level-1), never maxed-out — a sparse project must not look like heavy
+        // activity (visual-truthfulness rule). The cell class is distinct from the legend swatch class, so no
+        // scoping is needed to exclude the always-present level-4 legend swatch.
+        Assert.Contains("class=\"heatmap-cell level-1\"", svg);
+        Assert.DoesNotContain("heatmap-cell level-2", svg);
+        Assert.DoesNotContain("heatmap-cell level-3", svg);
+        Assert.DoesNotContain("heatmap-cell level-4", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_GradedHistoryStillReachesLevel4ForBusiestDay()
+    {
+        // A real graded history (busiest day has 8 commits) is untouched by the sparse-history fix.
+        var series = new (DateOnly Day, int Count)[]
+        {
+            (new DateOnly(2026, 1, 5), 1),   // ratio 1/8 <= 0.25 → level 1
+            (new DateOnly(2026, 1, 8), 8),   // busiest → level 4
+        };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        Assert.Contains("class=\"heatmap-cell level-4\"", svg);
+        Assert.Contains("class=\"heatmap-cell level-1\"", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_FormatsDatesWithInvariantHelpers()
+    {
+        var day = new DateOnly(2026, 1, 5);
+        var series = new (DateOnly Day, int Count)[] { (day, 2) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        // Every heatmap date routes through the invariant Charts.D/DReadable helpers (cell titles + whole-chart
+        // aria) and month labels through InvariantCulture, so cell dates can never drift from the month axis
+        // under a non-Gregorian ambient calendar. [heatmap-debt-triage — verified resolved, pinned here]
+        Assert.Contains($"<title>{Charts.DReadable(day)}: 2 commits</title>", svg);
+        Assert.Contains($"{Charts.DReadable(day)} to {Charts.DReadable(day)}", svg);
+        Assert.Contains(
+            $">{day.ToString("MMM", System.Globalization.CultureInfo.InvariantCulture)}</text>", svg);
+    }
+
+    [Fact]
     public void CommitHeatmap_HasHeadline()
     {
         var series = new (DateOnly Day, int Count)[]

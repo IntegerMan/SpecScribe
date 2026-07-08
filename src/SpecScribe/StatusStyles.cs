@@ -64,6 +64,12 @@ public static class StatusStyles
         return "drafted";
     }
 
+    /// <summary>The complete set of css classes <see cref="ForEpic"/> can return, in narrative order
+    /// (done → … → pending). Mirrors <see cref="StoryStages"/>: one authored list, iterated by every epic
+    /// roll-up consumer (e.g. the Epic Status donut), so a class can never be silently dropped by a consumer
+    /// that forgot to bucket it. Unlike <see cref="StoryStages"/>, "pending" is a real reachable tier here.</summary>
+    public static readonly IReadOnlyList<string> EpicStages = new[] { "done", "active", "ready", "drafted", "pending" };
+
     public static string EpicLabel(string cssClass) => cssClass switch
     {
         "done" => "Done",

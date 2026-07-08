@@ -685,7 +685,11 @@ public static class Charts
     private static int HeatLevel(int count, int maxCount)
     {
         if (count <= 0) return 0;
-        if (maxCount <= 1) return 4;
+        // Uniform single-commit history (busiest day is one commit, so maxCount == 1 and count is necessarily 1):
+        // render light, not maxed. Relative scaling would otherwise paint a sparse one-commit-per-day project as
+        // maximally busy, which the visual-truthfulness rule forbids; level 1 reads it as light activity. Repos
+        // with a busier day (maxCount >= 2) fall through to the ratio buckets below. [heatmap-debt-triage]
+        if (maxCount <= 1) return 1;
         var ratio = (double)count / maxCount;
         return ratio switch
         {

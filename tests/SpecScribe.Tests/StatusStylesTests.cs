@@ -63,6 +63,31 @@ public class StatusStylesTests
     public void ForEpic_DraftedOnlyWhenNoStoryIsReadyOrFurther()
         => Assert.Equal("drafted", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null), Story("something else"))));
 
+    [Fact]
+    public void EpicStages_CoversEveryForEpicOutputAndEachHasALabel()
+    {
+        // Representative epics exercising each reachable ForEpic branch. EpicStages is the single list the Epic
+        // Status donut iterates, so binding ForEpic's real outputs to it (both directions) guarantees a class
+        // can never silently drop from the donut, nor an EpicStages member be dead. [heatmap-debt-triage]
+        var outputs = new[]
+        {
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("done"))),          // done
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("in progress"))),   // active
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("ready-for-dev"))), // ready
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null))),            // drafted
+            StatusStyles.ForEpic(Epic(EpicStatus.Pending, Story("done"))),          // pending
+        };
+
+        Assert.All(outputs, o => Assert.Contains(o, StatusStyles.EpicStages));
+        Assert.Equal(StatusStyles.EpicStages.OrderBy(s => s), outputs.Distinct().OrderBy(s => s));
+        // Each stage maps to its OWN non-empty label. Distinctness is the real guard: a stage added to
+        // EpicStages but missing from EpicLabel's switch would fall through to the `_ => "Pending"` default
+        // and collide with the genuine "pending" label — a plain non-empty check could never catch that.
+        var labels = StatusStyles.EpicStages.Select(StatusStyles.EpicLabel).ToList();
+        Assert.All(labels, l => Assert.False(string.IsNullOrWhiteSpace(l)));
+        Assert.Equal(labels.Count, labels.Distinct().Count());
+    }
+
     [Theory]
     [InlineData("done", "Done")]
     [InlineData("active", "In development")]
