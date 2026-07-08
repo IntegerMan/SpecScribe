@@ -4,7 +4,7 @@ baseline_commit: 9fbca5e3aaa8593e0b9e188919acdbe1c130b5ad
 
 # Story 2.5: Standardized Iconography for Artifact Types and Status
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -80,6 +80,26 @@ so that artifact types and statuses are quicker to parse without adding clutter.
 - [x] Task 7: End-to-end validation with a real generation pass (AC: #1, #2)
   - [x] Run the focused test filter, then a real generation pass against this repo.
   - [x] Manually verify on `docs/live/index.html` and `docs/live/epics.html`: status badges show **icon + colored word** (color, shape, and text all agree); nav/quick-link families carry recognizable icons; section headers read faster; **no icon-only affordance anywhere**; icons are crisp on HiDPI and pick up the surrounding text color (spot-check by toggling `[data-theme]` / a dark container to confirm `currentColor` follows). Confirm assistive-tech: icons are `aria-hidden` so screen readers announce the label text only, once.
+
+### Review Findings
+
+- [x] [Review][Decision] Undisclosed "Story 2.3 redesign" scope bundled into this story's commits, File List incomplete — resolved: File List updated to add `src/SpecScribe/BmadCommands.cs` and `tests/SpecScribe.Tests/SprintTemplaterTests.cs`, and Completion Notes now disclose the bundled Story 2.3 sprint-board redesign (see "Scope note" entry).
+- [x] [Review][Patch] Two new CSS-only `data-tooltip` badges reintroduced the known tooltip-clipping bug inside a scrolling container [src/SpecScribe/SprintTemplater.cs] — checked against current `HEAD`: the `sprint-card-epic` badge no longer exists (removed by a later, out-of-diff commit) and `AppendCardProgress` no longer emits a `data-tooltip` attribute, so the clipping bug is not live in the current codebase. Fixed the stale doc-comment on `AppendCardProgress` that still described the removed `data-tooltip`.
+- [x] [Review][Patch] `AppendCardProgress` percent isn't clamped [src/SpecScribe/SprintTemplater.cs:312] — fixed: wrapped in `Math.Clamp(…, 0, 100)` so `TasksDone > TasksTotal` can no longer overflow the fill width or `aria-valuenow`.
+- [x] [Review][Patch] Duplicate glyphs for "Spec" and "Spec Kernel" [src/SpecScribe/Icons.cs:47,51] — fixed: `Spec Kernel` now uses a distinct locked-scroll glyph instead of reusing `Spec`'s chevron path.
+- [x] [Review][Patch] Completion Notes miscount badge call sites [this file, Completion Notes List] — fixed: "10" corrected to "11" to match the enumerated breakdown and the diff.
+- [x] [Review][Defer] `Icons.ForConcept` key/label dual-representation for ampersand labels [src/SpecScribe/HtmlTemplater.cs:481] — deferred, pre-existing pattern risk (`Icons.ForConcept("Direct & Quick-Dev Work")` raw-ampersand key vs. the separately hand-typed `Direct &amp; Quick-Dev Work` display text; drift between the two silently drops the icon, degrades gracefully, no crash).
+- [x] [Review][Defer] Weakened test assertions no longer prove icon+label share one span [tests/SpecScribe.Tests/HtmlTemplaterTests.cs and others] — deferred, pre-existing test-authoring pattern; strict single-string `Contains` assertions were split into two independent `Contains` checks (class-presence + `>Label</tag>` suffix), which would still pass if the icon/text markup were mis-nested.
+- [x] [Review][Defer] `StatusStyles.Badge(cssClass, label)` interpolates `cssClass` unescaped [src/SpecScribe/StatusStyles.cs:164] — deferred, latent only; every current caller feeds a closed, fixed status-class set, so it's not reachable today.
+- [x] [Review][Defer] `IconsTests`/`StylesheetTests` hex-check only asserts absence of `#` [tests/SpecScribe.Tests/IconsTests.cs, StylesheetTests.cs] — deferred, test-quality nit; doesn't verify `currentColor` is actually wired per-path/rule, just that no literal `#` appears.
+- [x] [Review][Defer] No reverse-coverage test that every label `SiteNav`/`ModuleContext`/index emits has a curated `Icons.ForConcept` case [tests/SpecScribe.Tests/IconsTests.cs] — deferred, coverage gap only; a new nav/section label added later would silently render icon-less with nothing failing.
+
+### Review Findings — Not Flagged
+
+Two items raised by subagent review layers were checked against the diff and dismissed:
+- `StatusStyles.Badge` having no text-only variant — matches AC#1 ("never icon-only"); not a defect.
+- Per-call SVG string reconstruction with no caching — negligible for a static-site build-time generator, not a hot path.
+- `ResolveStory`'s widened `Story` return value being "untested" — false; covered by `SprintTemplaterTests.RenderIndex_CardShowsIdEpicBadgeAndGatedTaskProgressBar`.
 
 ## Developer Context Section
 
@@ -389,12 +409,20 @@ claude-opus-4-8
   glyph anchored to `StatusStyles`, a single badge-render helper (icon + text) routed across all `.status-badge`
   sites, and artifact-type/section icons on nav/quick-links/section headers — every icon paired with its label,
   decorative (`aria-hidden`), and theme-consistent (`currentColor`).
-- Explicitly kept out: comment annotations (2.6), sprint/planning page structure (2.3/2.4 own those), dashboard
-  chart internals, dark-mode implementation, new discovery/parsing/page/nav/dependency, icon font, CDN, JS.
+- Explicitly kept out: comment annotations (2.6), dashboard chart internals, dark-mode implementation, new
+  discovery/parsing/page/nav/dependency, icon font, CDN, JS.
+- **Scope note (added during code review, 2026-07-08):** the `f1781b1`/`dd631cb` commits also carry a
+  sprint-board layout redesign — `.sprint-topbar`, the `<details>`-based `.cmd-menu` command popout
+  (`BmadCommands.RenderCommandBar` → `RenderCommandMenu`), the `.sprint-card` id/epic/progress-bar layout, and
+  `RenderCompactDonut` — plus a `RenderStoryPlaceholder` alignment wrap in `EpicsTemplater.cs`. This is
+  self-labeled `[Story 2.3 redesign]` in-code (Story 2.3 owns the sprint page); it rode along in the same commits
+  as this story's icon work rather than landing separately, so `BmadCommands.cs` and
+  `tests/SpecScribe.Tests/SprintTemplaterTests.cs` are added to the File List below even though the work itself
+  belongs conceptually to Story 2.3, not 2.5.
 - Coordination flags: reuse `StatusStyles` (add `Icon`, no new palette); reuse `SiteNav`/`ModuleContext` labels
   as icon keys (no third taxonomy); one badge-render helper so 2.3/2.4 badges compose (don't fork); `currentColor`
   only (no hard-coded hex, dark-mode-ready); graceful unknown → label-only; never icon-only (UX-DR17).
-- Actually landed 10 badge-render call sites through `StatusStyles.Badge` (not just the ~5 originally scoped):
+- Actually landed 11 badge-render call sites through `StatusStyles.Badge` (not just the ~5 originally scoped):
   `HtmlTemplater` (quick-dev card, doc status badge), `EpicsTemplater` (epic kicker, story kicker, undrafted-story
   badge, story-card header — `task-badge` explicitly skipped), `RequirementsTemplater` (requirement detail header,
   coverage-card epic badge, requirement card), and `SprintTemplater` (sprint epic-lane badge, retrospective
@@ -419,6 +447,7 @@ claude-opus-4-8
 - src/SpecScribe/SprintTemplater.cs
 - src/SpecScribe/SiteNav.cs
 - src/SpecScribe/assets/specscribe.css
+- src/SpecScribe/BmadCommands.cs (bundled Story 2.3 redesign — see Completion Notes scope note)
 - tests/SpecScribe.Tests/IconsTests.cs (NEW)
 - tests/SpecScribe.Tests/StatusStylesTests.cs
 - tests/SpecScribe.Tests/StylesheetTests.cs
@@ -426,6 +455,7 @@ claude-opus-4-8
 - tests/SpecScribe.Tests/SiteNavTests.cs
 - tests/SpecScribe.Tests/PlanningArtifactsGenerationTests.cs
 - tests/SpecScribe.Tests/SiteGeneratorSpecKernelTests.cs
+- tests/SpecScribe.Tests/SprintTemplaterTests.cs (bundled Story 2.3 redesign — see Completion Notes scope note)
 - _bmad-output/implementation-artifacts/2-5-standardized-iconography-for-artifact-types-and-status.md
 
 ## Change Log

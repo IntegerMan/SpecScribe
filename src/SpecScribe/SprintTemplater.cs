@@ -305,11 +305,11 @@ public static class SprintTemplater
     }
 
     /// <summary>The thin per-card task-completion bar: a <c>role="progressbar"</c> track + a
-    /// done/partial/empty-colored fill, with a CSS-only <c>data-tooltip</c> reading "N of M tasks done (P%)".
-    /// [Story 2.3 redesign]</summary>
+    /// done/partial/empty-colored fill, labeled via <c>aria-label</c> (no separate tooltip — the card's own
+    /// body-level <c>js-tip</c> already surfaces task progress). [Story 2.3 redesign]</summary>
     private static void AppendCardProgress(StringBuilder sb, int done, int total)
     {
-        var pct = total > 0 ? (int)Math.Round((double)done / total * 100) : 0;
+        var pct = total > 0 ? Math.Clamp((int)Math.Round((double)done / total * 100), 0, 100) : 0;
         var fill = pct >= 100 ? "done" : pct > 0 ? "partial" : "empty";
         var aria = $"{done} of {total} {Charts.Plural(total, "task", "tasks")} done";
         sb.Append($"        <span class=\"sprint-card-progress\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"{PathUtil.Html(aria)}\">");

@@ -48,7 +48,7 @@ public static class Icons
             "Sprint" => Svg("<path d=\"M3.5 3.6h9v9.8h-9Z\"/><path d=\"M3.5 6.4h9M5.8 2.4v2.4M10.2 2.4v2.4\"/>"),
             "Overview" => Svg("<path d=\"M2.8 2.8h4.4v4.4H2.8Z\"/><path d=\"M8.8 2.8h4.4v4.4H8.8Z\"/><path d=\"M2.8 8.8h4.4v4.4H2.8Z\"/><path d=\"M8.8 8.8h4.4v4.4H8.8Z\"/>"),
             "Planning Artifacts" => Svg("<path d=\"M8 2.6v1.8M8 11.6v1.8M2.6 8h1.8M11.6 8h1.8\"/><circle cx=\"8\" cy=\"8\" r=\"3.4\"/>"),
-            "Spec Kernel" => Svg("<path d=\"M6 3.2 2.7 8l3.3 4.8\"/><path d=\"M10 3.2 13.3 8 10 12.8\"/>"),
+            "Spec Kernel" => Svg("<path d=\"M4.2 7.2h7.6v6H4.2Z\"/><path d=\"M5.8 7.2V5.4a2.2 2.2 0 0 1 4.4 0v1.8\"/>"),
             "Implementation Artifacts" => Svg("<path d=\"M9.6 2.9a3 3 0 0 1 3.5 3.5l-5.4 5.4-3.9.9.9-3.9Z\"/>"),
             "Direct & Quick-Dev Work" => Svg("<path d=\"M8.6 2.5 3.8 9h3.2L7 13.5 12.2 6.6H9Z\"/>", solid: true),
             "Deferred" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.6 5.6 10.4 10.4M10.4 5.6 5.6 10.4\"/>"),
