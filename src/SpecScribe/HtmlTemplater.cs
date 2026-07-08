@@ -509,7 +509,7 @@ public static class HtmlTemplater
             sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a></div>\n");
             // Source-labeled so the tracked board never reads as contradicting the (now sprint-sourced) view.
             sb.Append("<p class=\"panel-source-note\">from sprint-status.yaml</p>\n");
-            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 5, moreHref: SiteNav.SprintOutputPath));
+            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath));
             sb.Append("</div>\n\n");
             return;
         }

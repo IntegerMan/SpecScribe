@@ -60,30 +60,35 @@ public static class SprintTemplater
         var epicCount = sprint.Entries.Count(e => e.Kind == SprintEntryKind.Epic);
         var storyCount = sprint.Entries.Count(e => e.Kind == SprintEntryKind.Story);
 
-        sb.Append("<header class=\"doc-header\">\n");
+        // Compact header: fold the update time into the one subtitle line so the board sits higher on the
+        // page. The source is named so this reads as the tracking-file view (Story 1.5 truthfulness).
+        var updated = sprint.LastUpdated is { Length: > 0 } lu ? $" &middot; updated {PathUtil.Html(lu)}" : string.Empty;
+        sb.Append("<header class=\"doc-header sprint-header\">\n");
         sb.Append("  <h1>Sprint Status</h1>\n");
-        // Name the source explicitly so this reads as the tracking-file view, distinct from the dashboard's
-        // derived Now & Next (Story 1.5 truthfulness — never two panels silently contradicting).
-        var subtitle = $"{PathUtil.Html(nav.SiteTitle)} &middot; {epicCount} {Charts.Plural(epicCount, "epic", "epics")} &middot; {storyCount} {Charts.Plural(storyCount, "story", "stories")} &middot; from sprint-status.yaml";
+        var subtitle = $"{PathUtil.Html(nav.SiteTitle)} &middot; {epicCount} {Charts.Plural(epicCount, "epic", "epics")} &middot; {storyCount} {Charts.Plural(storyCount, "story", "stories")} &middot; from sprint-status.yaml{updated}";
         sb.Append($"  <div class=\"doc-subtitle\">{subtitle}</div>\n");
-        if (sprint.LastUpdated is { Length: > 0 } lu)
-        {
-            sb.Append($"  <div class=\"meta-pills\"><span class=\"pill\">Updated {PathUtil.Html(lu)}</span></div>\n");
-        }
         sb.Append("</header>\n\n");
 
         sb.Append("<main id=\"main-content\" class=\"sprint-page\">\n\n");
 
-        // Standard sprint-lifecycle command buttons (omitted individually when the module doesn't expose them).
-        sb.Append(BmadCommands.RenderCommandBar("Sprint commands", new[]
+        // Command buttons + lifecycle summary share one compact band (side by side on wide screens) so they
+        // cost one short row rather than two stacked panels — keeping the board above the fold. [redesign]
+        var commandBar = BmadCommands.RenderCommandBar("Sprint commands", new[]
         {
             commands.Command("sprint-planning"),
             commands.Command("sprint-status"),
             commands.Command("correct-course"),
             commands.Command("retrospective"),
-        }));
+        });
+        var summary = RenderLifecycleSummary(sprint);
+        if (commandBar.Length > 0 || summary.Length > 0)
+        {
+            sb.Append("<div class=\"sprint-controls\">\n");
+            sb.Append(commandBar);
+            sb.Append(summary);
+            sb.Append("</div>\n\n");
+        }
 
-        AppendLifecycleSummary(sb, sprint);
         AppendBoardToggle(sb, sprint, epics, prefix);
         AppendActionItems(sb, sprint);
 
@@ -197,28 +202,31 @@ public static class SprintTemplater
         sb.Append("</div>\n\n");
     }
 
-    /// <summary>The lifecycle-count summary — the same per-stage story counts the home widget shows (one
-    /// number). A donut (non-zero legend rows only, Story 1.5 B4). Omitted when no stories are tracked. </summary>
-    private static void AppendLifecycleSummary(StringBuilder sb, SprintStatus sprint)
+    /// <summary>The compact lifecycle-count summary — the same per-stage story counts the home widget shows
+    /// (one number). A small donut + non-zero legend (Story 1.5 B4), sized to share the controls band with the
+    /// command buttons. Returns empty when no stories are tracked. [Story 2.3 redesign]</summary>
+    private static string RenderLifecycleSummary(SprintStatus sprint)
     {
         var counts = StoryStageCounts(sprint);
         var total = counts.Sum(c => c.Count);
-        if (total == 0) return;
+        if (total == 0) return string.Empty;
 
         var segments = counts.Select(c => (c.Label, c.Count, c.CssClass)).ToList();
         var nonZero = segments.Where(s => s.Count > 0).ToList();
         var done = counts.First(c => c.CssClass == "done").Count;
         var ariaParts = string.Join(", ", nonZero.Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
 
-        sb.Append("<section class=\"dashboard\">\n<div class=\"chart-panel\">\n");
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel sprint-summary\">\n");
         sb.Append("<h3>Delivery by lifecycle stage</h3>\n<div class=\"donut-and-legend\">\n");
-        sb.Append(Charts.Donut(segments, ariaLabel: $"Sprint stories: {ariaParts}", centerText: $"{done}/{total}"));
+        sb.Append(Charts.Donut(segments, size: 92, ariaLabel: $"Sprint stories: {ariaParts}", centerText: $"{done}/{total}"));
         sb.Append("<div class=\"donut-legend\">\n");
         foreach (var (label, count, cssClass) in nonZero)
         {
             sb.Append($"  <span><span class=\"swatch {cssClass}\"></span>{PathUtil.Html(label)} ({count})</span>\n");
         }
-        sb.Append("</div>\n</div>\n</div>\n</section>\n\n");
+        sb.Append("</div>\n</div>\n</div>\n");
+        return sb.ToString();
     }
 
     /// <summary>The open retrospective action items (open + in-progress) as status-badged rows. Rendered ONLY

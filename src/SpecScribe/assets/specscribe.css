@@ -2134,6 +2134,21 @@ code.color-swatch {
    the --status-* tokens; only the lane layout and the pure-CSS view toggle are new. No new palette. */
 .sprint-page { max-width: 1100px; margin: 0 auto; }
 
+/* Compact sprint-page header so the board sits high on the page (the board is the point). */
+.sprint-header { margin: 0.4rem 0 0.7rem; }
+.sprint-header h1 { font-size: 2rem; margin: 0 0 0.15rem; }
+
+/* Command buttons + lifecycle summary share one short band, side by side on wide screens (stacking on
+   narrow), so they cost one row instead of two stacked panels. */
+.sprint-controls { display: flex; gap: 1rem; align-items: stretch; flex-wrap: wrap; margin-bottom: 0.8rem; }
+/* Give the command buttons the wider share (long slash-commands) and the donut the narrower one. */
+.sprint-controls > .sprint-commands { flex: 2 1 380px; margin: 0; }
+.sprint-controls > .sprint-summary { flex: 1 1 220px; margin: 0; }
+.sprint-commands { padding: 0.7rem 0.9rem; }
+.sprint-commands h3, .sprint-summary h3 { margin-bottom: 0.5rem; }
+.sprint-summary { padding: 0.7rem 0.9rem; }
+.sprint-summary .donut-and-legend { gap: 0.9rem; align-items: center; }
+
 /* Source note (home board + widget) — de-emphasized so the tracked view doesn't read as a rival panel. */
 .panel-source-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; margin: -0.2rem 0 0.6rem; }
 
@@ -2199,6 +2214,14 @@ code.color-swatch {
 }
 .sprint-lane-more:hover { text-decoration: underline; }
 
+/* On the sprint PAGE (not the capped home board), the status board fills the viewport height: the lane
+   header stays fixed while its cards scroll, so the board is the page's focus and never sits below the fold.
+   Scoped to .sprint-page so the home Now & Next board keeps its compact content height. [Story 2.3 redesign] */
+.sprint-page .sprint-board { height: calc(100dvh - 20rem); min-height: 24rem; }
+.sprint-page .sprint-lane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.sprint-page .sprint-lane-head { margin: 0; padding: 0.55rem 0.6rem; background: var(--parchment); }
+.sprint-page .sprint-cards { flex: 1 1 auto; overflow-y: auto; padding: 0.5rem; }
+
 /* Epic-grouped view: a swimlane per epic with its stories as a wrapping row of cards. */
 .sprint-epic-lane { margin: 0 0 1.3rem; }
 .sprint-epic-head {
@@ -2247,9 +2270,9 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 #sv-epic:checked ~ .board-view-status { display: none; }
 #sv-epic:checked ~ .board-view-epic { display: block; }
 
-/* The sprint-commands panel reuses .next-steps styling; lay its badges out in a wrap row. */
-.command-bar-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.command-bar-list li { margin: 0; }
+/* The sprint-commands panel reuses .next-steps styling; override its column flow to a compact wrap row. */
+.command-bar-list { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.5rem; }
+.command-bar-list li { margin: 0; flex-basis: auto; }
 
 .sprint-action-items { margin-top: 1.6rem; }
 .sprint-action-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }
