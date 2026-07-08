@@ -657,72 +657,211 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The opt-in "Deep Analytics" panel body (FR-10): Git Hotspots (most-frequently-changed files as
-    /// proportional bars) beside Change Coupling (file pairs that tend to change together). Deliberately its own
-    /// labeled surface, distinct from the baseline Git Pulse / top-changed-files list (AC #2). Pure HTML/CSS +
-    /// the existing neutral chart tokens — no JS, no new colors, no <c>--status-*</c> tokens (these are file-path
-    /// signals, not lifecycle statuses). Each half degrades to a friendly note rather than a broken chart when
-    /// its signal is absent (e.g. a young repo with no significant coupling). The whole-panel omission when
-    /// <c>DeepGit is null</c> is the caller's job — this only renders when there IS deep data. [Story 3.2]</summary>
-    public static string DeepGitPanel(DeepGitPulse deep)
+    /// <summary>The dashboard "Planning Coverage" panel body — one row per canonical artifact family showing
+    /// its reused <see cref="Icons.ForConcept"/> glyph + label, a present/missing/stale chip, and a freshness
+    /// sub-line. Pure HTML + CSS, no JS (the <see cref="Charts"/> convention). Present/missing/stale is a
+    /// COVERAGE axis, not a lifecycle stage, so it is styled with neutral palette tones — never the
+    /// <c>--status-*</c> lifecycle tokens. Every chip carries a text label (never color-only). Dates use the
+    /// invariant <see cref="DReadable"/> helper so they read the same on any host culture. The caller renders
+    /// this only when <c>!coverage.IsEmpty</c> (graceful omission on an unrecognized repo). [Story 3.3]</summary>
+    public static string ArtifactCoveragePanel(ArtifactCoverage coverage, DateOnly today)
     {
+        var total = coverage.Families.Count;
+        var present = coverage.PresentCount;
+        var stale = coverage.StaleCount(today);
+
         var sb = new StringBuilder();
-        sb.Append("<div class=\"deep-git\">\n");
+        sb.Append("<div class=\"coverage\">\n");
 
-        // Hotspots — proportional bars (reusing the Git Pulse bar language), width relative to the busiest file.
-        sb.Append("  <div class=\"deep-git-section\">\n");
-        sb.Append("    <div class=\"deep-git-title\">Git Hotspots</div>\n");
-        sb.Append("    <div class=\"deep-git-note\">Files changed most often across recent history.</div>\n");
-        if (deep.Hotspots.Count > 0)
+        // Headline: "N of M families present", with a stale count appended only when something is stale.
+        sb.Append($"  <div class=\"coverage-headline\"><strong>{present}</strong> of <strong>{total}</strong> " +
+                  $"{Plural(total, "family", "families")} present");
+        if (stale > 0)
         {
-            var maxChanges = deep.Hotspots.Max(h => h.Changes);
-            sb.Append("    <ol class=\"git-pulse-bars deep-git-hotspots\">\n");
-            foreach (var (path, changes) in deep.Hotspots)
-            {
-                // Floor the fill so the least-changed file still shows a visible sliver; the exact count stays
-                // in text so the bar is decorative, never the sole information carrier (not size/color-only).
-                var pct = maxChanges <= 0 ? 0 : Math.Clamp((int)Math.Round((double)changes / maxChanges * 100), 6, 100);
-                sb.Append(
-                    $"      <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{Html(path)}</span>" +
-                    $"<span class=\"git-pulse-bar-track\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
-                    $"<span class=\"git-pulse-bar-count\">{changes} {Plural(changes, "change", "changes")}</span></li>\n");
-            }
-            sb.Append("    </ol>\n");
+            sb.Append($" &middot; <strong>{stale}</strong> {Plural(stale, "family", "families")} stale");
         }
-        else
-        {
-            sb.Append("    <div class=\"chart-empty\">No file-change history to rank yet.</div>\n");
-        }
-        sb.Append("  </div>\n");
+        sb.Append("</div>\n");
 
-        // Coupling — file pairs that co-change. Not statuses, so no status tokens; a plain ranked list with the
-        // co-change count as a monospace badge, both paths shown as real text (never color/size-only).
-        sb.Append("  <div class=\"deep-git-section\">\n");
-        sb.Append("    <div class=\"deep-git-title\">Change Coupling</div>\n");
-        sb.Append("    <div class=\"deep-git-note\">File pairs that tend to change together.</div>\n");
-        if (deep.Coupling.Count > 0)
+        sb.Append("  <ul class=\"coverage-list\">\n");
+        foreach (var family in coverage.Families)
         {
-            sb.Append("    <ol class=\"deep-git-coupling\">\n");
-            foreach (var (fileA, fileB, coChanges) in deep.Coupling)
+            var isStale = family.IsStale(today);
+            // Row modifier drives the neutral dimming (missing) / warn accent (stale) — text chips still carry
+            // the meaning, so the styling is never the sole information carrier.
+            var rowClass = !family.Present ? "coverage-row missing" : isStale ? "coverage-row stale" : "coverage-row";
+
+            // Chip: a text label so present/missing/stale is readable without color. Stale supersedes Present.
+            var (chipClass, chipText) = !family.Present
+                ? ("missing", "Missing")
+                : isStale ? ("stale", "Stale") : ("present", "Present");
+
+            // Freshness sub-line: the primary source-mtime date, with the secondary memlog date appended only
+            // when a journal recorded one (AC #2 enrichment — never the primary signal).
+            string freshness;
+            if (!family.Present)
             {
-                sb.Append(
-                    "      <li>" +
-                    $"<span class=\"deep-git-pair\"><span class=\"deep-git-file\" title=\"{Html(fileA)}\">{Html(fileA)}</span>" +
-                    "<span class=\"deep-git-link\" aria-hidden=\"true\">&harr;</span>" +
-                    $"<span class=\"deep-git-file\" title=\"{Html(fileB)}\">{Html(fileB)}</span></span>" +
-                    $"<span class=\"deep-git-count\">{coChanges}&times; together</span></li>\n");
+                freshness = "Not found in source";
             }
-            sb.Append("    </ol>\n");
+            else if (family.LastModified is { } modified)
+            {
+                freshness = $"Updated {DReadable(modified)}";
+            }
+            else
+            {
+                freshness = "Present";
+            }
+            if (family.MemlogUpdated is { } journal)
+            {
+                freshness += $" &middot; journal {DReadable(journal)}";
+            }
+
+            sb.Append($"    <li class=\"{rowClass}\">");
+            sb.Append($"<span class=\"coverage-family\">{Icons.ForConcept(family.ConceptIconKey)}{Html(family.Label)}</span>");
+            sb.Append($"<span class=\"coverage-chip {chipClass}\">{Html(chipText)}</span>");
+            sb.Append($"<span class=\"coverage-freshness\">{freshness}</span>");
+            sb.Append("</li>\n");
         }
-        else
-        {
-            sb.Append("    <div class=\"chart-empty\">No significant change coupling detected.</div>\n");
-        }
-        sb.Append("  </div>\n");
+        sb.Append("  </ul>\n");
 
         sb.Append("</div>\n");
         return sb.ToString();
     }
+
+    /// <summary>The opt-in "Git Hotspots" list (FR-10): most-frequently-changed files as proportional bars
+    /// (reusing the Git Pulse bar language), width relative to the busiest file. The exact count stays in text
+    /// so the bar is decorative, never the sole information carrier (not size/color-only). Degrades to a
+    /// friendly note when there is no change history. [Story 3.2]</summary>
+    public static string HotspotBars(IReadOnlyList<(string Path, int Changes)> hotspots)
+    {
+        if (hotspots.Count == 0) return "<div class=\"chart-empty\">No file-change history to rank yet.</div>\n";
+
+        var sb = new StringBuilder();
+        var maxChanges = hotspots.Max(h => h.Changes);
+        sb.Append("<ol class=\"git-pulse-bars deep-git-hotspots\">\n");
+        foreach (var (path, changes) in hotspots)
+        {
+            // Floor the fill so the least-changed file still shows a visible sliver.
+            var pct = maxChanges <= 0 ? 0 : Math.Clamp((int)Math.Round((double)changes / maxChanges * 100), 6, 100);
+            sb.Append(
+                $"  <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{Html(path)}</span>" +
+                $"<span class=\"git-pulse-bar-track\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
+                $"<span class=\"git-pulse-bar-count\">{changes} {Plural(changes, "change", "changes")}</span></li>\n");
+        }
+        sb.Append("</ol>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Change coupling as a text ranked list (the precise, screen-reader-friendly companion to the
+    /// <see cref="CouplingGraph"/>): each coupled file pair with its co-change count, full paths shown as real
+    /// text so the visual graph is never the sole information carrier. Not statuses, so no <c>--status-*</c>
+    /// tokens. Degrades to a friendly note when nothing crosses the coupling threshold. [Story 3.2]</summary>
+    public static string CouplingList(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling)
+    {
+        if (coupling.Count == 0) return "<div class=\"chart-empty\">No significant change coupling detected.</div>\n";
+
+        var sb = new StringBuilder();
+        sb.Append("<ol class=\"deep-git-coupling\">\n");
+        foreach (var (fileA, fileB, coChanges) in coupling)
+        {
+            sb.Append(
+                "  <li>" +
+                $"<span class=\"deep-git-pair\"><span class=\"deep-git-file\" title=\"{Html(fileA)}\">{Html(fileA)}</span>" +
+                "<span class=\"deep-git-link\" aria-hidden=\"true\">&harr;</span>" +
+                $"<span class=\"deep-git-file\" title=\"{Html(fileB)}\">{Html(fileB)}</span></span>" +
+                $"<span class=\"deep-git-count\">{coChanges}&times; together</span></li>\n");
+        }
+        sb.Append("</ol>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Change coupling as a node-link graph: one node per file, one edge per coupled pair. Nodes are
+    /// laid out on a circle (deterministic — ordered by coupling degree, then ordinal path), sized by degree;
+    /// edges are weighted (stroke width + opacity) by co-change count. Layout is computed here at generation
+    /// time, so the whole thing is static inline SVG — no JS, matching the project's chart convention. Coupling
+    /// is symmetric, so edges are undirected (no arrowheads). Colors come from the existing neutral chart
+    /// tokens via CSS classes. Pointer users get per-edge/per-node <c>&lt;title&gt;</c> tooltips; the whole
+    /// graph carries a summarizing <c>role="img"</c> name, and the sibling <see cref="CouplingList"/> is the
+    /// exact text equivalent so the graph is never the sole carrier. [Story 3.2]</summary>
+    public static string CouplingGraph(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling, int size = 460)
+    {
+        if (coupling.Count == 0) return "<div class=\"chart-empty\">No significant change coupling detected.</div>\n";
+
+        // Node degree = total co-change weight on incident edges; drives both node size and layout order.
+        var degree = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var (a, b, w) in coupling)
+        {
+            degree[a] = degree.GetValueOrDefault(a) + w;
+            degree[b] = degree.GetValueOrDefault(b) + w;
+        }
+        var nodes = degree.Keys
+            .OrderByDescending(k => degree[k])
+            .ThenBy(k => k, StringComparer.Ordinal)
+            .ToList();
+        var order = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < nodes.Count; i++) order[nodes[i]] = i;
+
+        var c = size / 2.0;
+        var ringR = size * 0.28;
+        var count = nodes.Count;
+
+        (double X, double Y) Pos(int i)
+        {
+            var ang = -Math.PI / 2 + 2 * Math.PI * i / count;
+            return (c + ringR * Math.Cos(ang), c + ringR * Math.Sin(ang));
+        }
+
+        var maxW = coupling.Max(e => e.CoChanges);
+        var minW = coupling.Min(e => e.CoChanges);
+        double ScaleW(int w, double lo, double hi) =>
+            maxW == minW ? (lo + hi) / 2 : lo + (hi - lo) * (w - minW) / (maxW - minW);
+
+        var maxDeg = degree.Values.Max();
+        var minDeg = degree.Values.Min();
+        double NodeR(int d) => maxDeg == minDeg ? 9 : 6 + 7.0 * (d - minDeg) / (maxDeg - minDeg);
+
+        var sb = new StringBuilder();
+        var aria = $"Change coupling graph: {coupling.Count} coupled file {Plural(coupling.Count, "pair", "pairs")} across {count} {Plural(count, "file", "files")}";
+        sb.Append($"<svg class=\"coupling-graph\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
+
+        // Edges first so nodes render on top of them. Width + opacity scale with the co-change count.
+        foreach (var (a, b, w) in coupling)
+        {
+            var (x1, y1) = Pos(order[a]);
+            var (x2, y2) = Pos(order[b]);
+            sb.Append($"  <line class=\"coupling-edge\" x1=\"{F(x1)}\" y1=\"{F(y1)}\" x2=\"{F(x2)}\" y2=\"{F(y2)}\" " +
+                      $"stroke-width=\"{F(ScaleW(w, 1.5, 6))}\" stroke-opacity=\"{F(ScaleW(w, 0.35, 0.9))}\">" +
+                      $"<title>{Html(Basename(a))} &harr; {Html(Basename(b))}: {w}&times; together</title></line>\n");
+        }
+
+        // Nodes + labels, placed just outside the ring and anchored away from center so text clears the circle.
+        for (var i = 0; i < count; i++)
+        {
+            var (x, y) = Pos(i);
+            var d = degree[nodes[i]];
+            sb.Append($"  <circle class=\"coupling-node\" cx=\"{F(x)}\" cy=\"{F(y)}\" r=\"{F(NodeR(d))}\">" +
+                      $"<title>{Html(nodes[i])} — {d} coupled {Plural(d, "change", "changes")}</title></circle>\n");
+
+            var ang = -Math.PI / 2 + 2 * Math.PI * i / count;
+            var lx = c + (ringR + NodeR(d) + 6) * Math.Cos(ang);
+            var ly = c + (ringR + NodeR(d) + 6) * Math.Sin(ang);
+            var anchor = Math.Cos(ang) >= 0 ? "start" : "end";
+            sb.Append($"  <text class=\"coupling-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(Basename(nodes[i]), 22))}</text>\n");
+        }
+
+        sb.Append("</svg>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The last path segment (filename) of a forward-slash path — compact graph labels while the full
+    /// path stays in the node's tooltip.</summary>
+    private static string Basename(string path)
+    {
+        var i = path.LastIndexOf('/');
+        return i >= 0 && i < path.Length - 1 ? path[(i + 1)..] : path;
+    }
+
+    /// <summary>Ellipsis-truncates a label to <paramref name="max"/> characters for the graph's fixed geometry.</summary>
+    private static string Shorten(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
 
     /// <summary>Invariant ISO date for heatmap hrefs and per-day page filenames — a culture-sensitive
     /// format would emit non-Gregorian dates (and mismatched links/filenames) on th-TH/fa-IR hosts.</summary>

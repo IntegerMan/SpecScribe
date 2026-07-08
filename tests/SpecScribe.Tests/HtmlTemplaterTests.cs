@@ -262,7 +262,7 @@ public class HtmlTemplaterTests
         Assert.Contains("data-tooltip=\"Run in a git repository to enable commit stats\"", html);
     }
 
-    // A ProgressModel with both baseline git and the opt-in deep-git payload populated, for the --deep-git panel.
+    // A ProgressModel with both baseline git and the opt-in deep-git payload populated, for the --deep-git link.
     private static ProgressModel ProgressWithDeepGit()
     {
         var day = new DateOnly(2026, 1, 5);
@@ -291,7 +291,7 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_RendersDeepAnalyticsPanelDistinctlyWhenDeepGitPopulated()
+    public void RenderIndex_ShowsViewDeepAnalyticsLinkFromGitPulseWhenDeepGitPopulated()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -304,19 +304,16 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        // AC #2: the deep insights get their own labeled panel, distinct from the baseline Git Pulse surface.
-        Assert.Contains("deep-git-panel", html);
-        Assert.Contains("Deep Analytics", html);
-        Assert.Contains("Git Hotspots", html);
-        Assert.Contains("Change Coupling", html);
-        // The actual signals render: a hotspot path and a coupling pair with its co-change count.
-        Assert.Contains("src/HtmlTemplater.cs", html);
-        Assert.Contains("src/Charts.cs", html);
-        Assert.Contains("5&times; together", html);
+        // The Git Pulse panel links out to the dedicated deep-analytics page (the entry point in its header).
+        Assert.Contains($"href=\"{SiteNav.DeepAnalyticsOutputPath}\"", html);
+        Assert.Contains("View Deep Analytics", html);
+        // ...and the full hotspots/coupling content is NOT inline on the dashboard anymore — it moved to the page.
+        Assert.DoesNotContain("deep-git-panel", html);
+        Assert.DoesNotContain("5&times; together", html);
     }
 
     [Fact]
-    public void RenderIndex_OmitsDeepAnalyticsPanelEntirelyWhenDeepGitNull()
+    public void RenderIndex_OmitsViewDeepAnalyticsLinkWhenDeepGitNull()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -329,12 +326,61 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        // Subtask 3.4: unlike the baseline "—" placeholders, the deep panel simply does not exist when not
-        // opted into, so the default dashboard is unchanged for users who never pass --deep-git.
-        Assert.DoesNotContain("deep-git-panel", html);
-        Assert.DoesNotContain("Deep Analytics", html);
-        // ...while the baseline Git Pulse panel is still there, proving only the deep surface was omitted.
+        // No opt-in → no link and no page reference, so the default dashboard is unchanged; but the baseline
+        // Git Pulse panel is still there, proving only the deep surface was omitted.
+        Assert.DoesNotContain("View Deep Analytics", html);
+        Assert.DoesNotContain(SiteNav.DeepAnalyticsOutputPath, html);
         Assert.Contains("<h3>Git Pulse</h3>", html);
+    }
+
+    [Fact]
+    public void RenderIndex_RendersPlanningCoveragePanelWithPresentDateAndMissingChip()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        // PRD present with a known mtime, Epics present without one; every other canonical family missing.
+        var prdPath = "planning-artifacts/prds/prd-x/prd.md";
+        var modified = new DateOnly(2026, 6, 20);
+        var coverage = ArtifactCoverage.Build(
+            new[] { prdPath, "planning-artifacts/epics.md" },
+            new Dictionary<string, DateOnly> { [prdPath] = modified },
+            new Dictionary<string, DateOnly>(),
+            new DateOnly(2026, 7, 8));
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressModel.Empty,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty,
+            coverage: coverage);
+
+        Assert.Contains("<h3>Planning Coverage</h3>", html);
+        Assert.Contains("coverage-panel", html);
+        // Present family shows its invariant DReadable freshness date; absent families show a "Missing" chip.
+        Assert.Contains($"Updated {Charts.DReadable(modified)}", html);
+        Assert.Contains(">Missing<", html);
+    }
+
+    [Fact]
+    public void RenderIndex_OmitsPlanningCoveragePanelWhenCoverageEmptyOrNull()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var withEmpty = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty,
+            coverage: ArtifactCoverage.Empty);
+        var withNull = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty);
+
+        // Graceful omission: no recognized families (or no coverage passed) leaves the dashboard unchanged.
+        Assert.DoesNotContain("Planning Coverage", withEmpty);
+        Assert.DoesNotContain("coverage-panel", withEmpty);
+        Assert.DoesNotContain("Planning Coverage", withNull);
     }
 
     [Fact]

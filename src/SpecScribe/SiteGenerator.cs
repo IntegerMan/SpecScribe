@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace SpecScribe;
@@ -29,6 +30,7 @@ public sealed class SiteGenerator
     private List<CommitDayEntry> _commitDays = new();
     private SprintStatus? _sprint;
     private List<RetroModel> _retros = new();
+    private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
 
     public SiteGenerator(ForgeOptions options)
     {
@@ -62,6 +64,11 @@ public sealed class SiteGenerator
 
             var nav = BuildNav(sourceRelatives);
             _nav = nav;
+
+            // Artifact-family coverage insight — computed once here (source relatives are already gathered) and
+            // cached so every WriteIndex call shares one instance. Never-throw: any failure degrades to Empty,
+            // the panel omits, and generation still succeeds (AD-4 / NFR2). [Story 3.3 Task 2]
+            _coverage = BuildArtifactCoverage(sourceRelatives);
 
             // Render the README up front so that, if it fails, we can drop the Readme nav entry before any
             // other page is written — the site never links to a readme.html that wasn't actually produced.
@@ -123,6 +130,26 @@ public sealed class SiteGenerator
                 reporter?.BeginPhase(GenerationPhase.CommitDays);
                 events.AddRange(GenerateCommitDaysInternal(gitPulse, nav));
                 reporter?.EndPhase(GenerationPhase.CommitDays);
+            }
+
+            // Opt-in deep-git analytics page (hotspots + change-coupling graph). Generated only when --deep-git
+            // produced data (DeepGit is only non-null when the flag gated the deep pass on); the dashboard's Git
+            // Pulse panel links here. Non-fatal: a null DeepGit simply means no page and no link. [Story 3.2]
+            if (_progress?.DeepGit is { } deepPulse)
+            {
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    var html = DeepAnalyticsTemplater.RenderPage(deepPulse, nav);
+                    File.WriteAllText(
+                        Path.Combine(_options.OutputRoot, SiteNav.DeepAnalyticsOutputPath),
+                        ApplyReferenceLinks(html, SiteNav.DeepAnalyticsOutputPath));
+                    events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.DeepAnalyticsOutputPath, sw.Elapsed));
+                }
+                catch (Exception ex)
+                {
+                    events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.DeepAnalyticsOutputPath, sw.Elapsed, ex.Message));
+                }
             }
 
             if (readmeEvent is not null)
@@ -539,7 +566,7 @@ public sealed class SiteGenerator
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
         var inventory = work ?? WorkInventory.Build(docs);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
@@ -743,6 +770,104 @@ public sealed class SiteGenerator
     {
         _module = ModuleContext.Detect(_options.RepoRoot, sourceRelatives);
         return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable);
+    }
+
+    private static readonly IReadOnlyDictionary<string, DateOnly> EmptyDates = new Dictionary<string, DateOnly>();
+
+    // The memlog frontmatter's single "updated: <date>" field — a one-line regex read (like ForgeOptions'
+    // project_name read), NOT a full YAML parse. Captures just the yyyy-MM-dd prefix of the timestamp.
+    private static readonly Regex MemlogUpdatedPattern = new(
+        @"^\s*updated:\s*(?<date>\d{4}-\d{2}-\d{2})", RegexOptions.Multiline | RegexOptions.Compiled);
+
+    /// <summary>Gathers the inputs for and builds the cached <see cref="ArtifactCoverage"/> insight. IO lives
+    /// here — source-file last-write-times (the primary freshness signal) and memlog discovery (the secondary
+    /// enrichment); the pure <see cref="ArtifactCoverage.Build"/> owns the coverage/freshness/staleness rules.
+    /// Never throws: any failure degrades to <see cref="ArtifactCoverage.Empty"/> so the panel omits and
+    /// baseline generation still succeeds (AD-4: insight providers never own baseline success; NFR2). [Story 3.3]</summary>
+    private ArtifactCoverage BuildArtifactCoverage(IReadOnlyList<string> sourceRelatives)
+    {
+        try
+        {
+            var today = DateOnly.FromDateTime(DateTime.Now);
+
+            // First pass with empty maps discovers which canonical families are present and their matched
+            // source paths, so we stat ONLY those files (not every markdown doc). All family-matching logic
+            // stays in ArtifactCoverage — the single coverage seam Epic 4 generalizes.
+            var discovered = ArtifactCoverage.Build(sourceRelatives, EmptyDates, EmptyDates, today);
+
+            var mtimes = new Dictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
+            foreach (var family in discovered.Families)
+            {
+                if (family.SourcePath is not { } rel) continue;
+                try
+                {
+                    var full = Path.Combine(_options.SourceRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                    mtimes[rel] = DateOnly.FromDateTime(File.GetLastWriteTime(full));
+                }
+                catch
+                {
+                    // A single unreadable file degrades that one family's freshness to null — never aborts
+                    // the pass (partial data beats none, AD-4).
+                }
+            }
+
+            var memlogByFamily = BuildMemlogMap(discovered);
+
+            return ArtifactCoverage.Build(sourceRelatives, mtimes, memlogByFamily, today);
+        }
+        catch (Exception)
+        {
+            return ArtifactCoverage.Empty;
+        }
+    }
+
+    /// <summary>Discovers <c>.memlog.md</c> journals (dotfiles, so excluded from the <c>*.md</c> source
+    /// enumeration — scanned separately like <see cref="SprintSourcePath"/>), reads each one's
+    /// <c>updated:</c> date, and associates it with the family whose canonical file sits in the closest
+    /// ancestor directory (longest matching memlog dir wins). Strictly additive: no memlogs → an empty map, so
+    /// every family's primary Present/LastModified value is unchanged (AC #2). [Story 3.3 Subtask 2.3]</summary>
+    private IReadOnlyDictionary<string, DateOnly> BuildMemlogMap(ArtifactCoverage discovered)
+    {
+        var result = new Dictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
+        if (!Directory.Exists(_options.SourceRoot)) return result;
+
+        var memlogs = new List<(string Dir, DateOnly Updated)>();
+        foreach (var full in Directory.EnumerateFiles(_options.SourceRoot, ".memlog.md", SearchOption.AllDirectories))
+        {
+            DateOnly updated;
+            try
+            {
+                var text = MarkdownConverter.ReadAllTextShared(full);
+                var m = MemlogUpdatedPattern.Match(text);
+                if (!m.Success || !DateOnly.TryParseExact(
+                        m.Groups["date"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out updated))
+                {
+                    continue; // no parseable updated: date → this memlog adds no enrichment
+                }
+            }
+            catch
+            {
+                continue;
+            }
+
+            var dir = PathUtil.NormalizeSlashes(Path.GetDirectoryName(ToSourceRelative(full)) ?? string.Empty);
+            memlogs.Add((dir, updated));
+        }
+
+        if (memlogs.Count == 0) return result; // strictly additive: the no-memlog primary picture is unchanged
+
+        foreach (var family in discovered.Families)
+        {
+            if (family.SourcePath is not { } rel) continue;
+            var best = memlogs
+                .Where(ml => ml.Dir.Length == 0 || rel.StartsWith(ml.Dir + "/", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(ml => ml.Dir.Length)
+                .Select(ml => (DateOnly?)ml.Updated)
+                .FirstOrDefault();
+            if (best is { } d) result[family.Label] = d;
+        }
+
+        return result;
     }
 
     private bool AdrsExist() => EnumerateAdrFiles().Any(f => ParseAdrNumber(Path.GetFileName(f)) is not null);

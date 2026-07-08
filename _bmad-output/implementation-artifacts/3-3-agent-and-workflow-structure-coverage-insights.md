@@ -1,6 +1,10 @@
+---
+baseline_commit: 80443ba34aa8ef068e7f233663ae9910e66c2c18
+---
+
 # Story 3.3: Agent and Workflow Structure Coverage Insights
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -16,6 +16,11 @@ public sealed class SiteNav
     public const string AdrsLandingOutputPath = "adrs/index.html";
     public const string ReadmeOutputPath = "readme.html";
 
+    /// <summary>The opt-in deep-git analytics page (hotspots + change-coupling graph). Generated only when
+    /// <c>--deep-git</c> is set; the dashboard's Git Pulse panel links here when the data exists. Shared between
+    /// the generator (which writes the file) and the templater (which links to it) so the two can't disagree. [Story 3.2]</summary>
+    public const string DeepAnalyticsOutputPath = "deep-analytics.html";
+
     public required IReadOnlyList<(string Label, string OutputRelativePath)> Items { get; init; }
 
     /// <summary>Every discoverable key view for the dashboard's quick-link grid. A superset of the nav bar:

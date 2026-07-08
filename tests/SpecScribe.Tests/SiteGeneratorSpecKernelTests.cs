@@ -170,7 +170,11 @@ public class SiteGeneratorSpecKernelTests : IDisposable
         GenerateSite();
 
         var index = File.ReadAllText(HomeIndex);
-        Assert.DoesNotContain("Spec Kernel", index);
+        // The Spec Kernel section BAND is omitted (Story 2.2 graceful degradation). Assert the band title
+        // specifically — the Story 3.3 Planning Coverage panel legitimately names Spec Kernel as a *missing*
+        // family (AC #1 "key missing families"), so a blanket string check would be a false positive.
+        Assert.DoesNotContain("Spec Kernel</div>", index);
+        Assert.DoesNotContain("index-section-title\">Spec Kernel", index);
     }
 
     [Fact]

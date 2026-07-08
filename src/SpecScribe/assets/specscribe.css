@@ -1565,6 +1565,48 @@ code.color-swatch {
   display: inline-block;
 }
 
+/* ============ PLANNING COVERAGE (artifact-family coverage insight) ============ */
+/* Present/missing/stale is a COVERAGE axis, NOT a lifecycle stage (a "present, stale PRD" is not a lifecycle
+   status), so it is styled with neutral base-palette tones and never the --status-* lifecycle tokens — those
+   stay the single stage→color source. Same discipline as the keyword styling above: non-lifecycle concepts
+   must never co-opt the status tokens. Family glyphs inherit currentColor via .ss-icon — no per-row hex. [Story 3.3] */
+.coverage { display: flex; flex-direction: column; gap: 1rem; }
+.coverage-headline { font-size: 0.95rem; color: var(--ink-faded); }
+.coverage-headline strong { color: var(--ink); font-family: 'Courier New', monospace; }
+.coverage-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.coverage-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "family chip" "freshness chip";
+  align-items: center;
+  gap: 0.1rem 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--warm-white);
+}
+.coverage-family { grid-area: family; display: inline-flex; align-items: center; gap: 0.45rem; font-weight: bold; color: var(--ink); }
+.coverage-freshness { grid-area: freshness; font-size: 0.78rem; color: var(--ink-light); }
+.coverage-chip {
+  grid-area: chip;
+  justify-self: end;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--ink-faded);
+  white-space: nowrap;
+}
+.coverage-chip.missing { color: var(--ink-light); border-color: var(--ink-light); }
+/* Stale = a warm amber warn accent (base --rust tones, distinct from any lifecycle status token). */
+.coverage-chip.stale { color: var(--rust); border-color: var(--rust-light); background: rgba(196, 98, 45, 0.1); }
+/* Missing rows are dimmed (neutral) so present coverage reads first; stale rows carry a warm left-accent so a
+   freshness problem is visible at a glance without relying on the chip alone. */
+.coverage-row.missing { background: var(--parchment); opacity: 0.72; }
+.coverage-row.stale { border-left: 3px solid var(--rust-light); }
+
 /* ============ DEEP ANALYTICS (opt-in --deep-git: hotspots + change coupling) ============ */
 /* A distinct surface from the baseline Git Pulse above. Two side-by-side sections on wide screens,
    stacked on narrow. Reuses the neutral chart tokens + the Git Pulse bar language for hotspots. [Story 3.2] */
@@ -1621,6 +1663,31 @@ code.color-swatch {
   white-space: nowrap;
   flex: none;
 }
+
+/* Change-coupling node-link graph (deep-analytics page). Layout is computed at generation time; this only
+   themes it with the neutral chart tokens. overflow:visible lets node labels spill past the square viewBox. */
+.coupling-graph { display: block; width: 100%; max-width: 460px; height: auto; margin: 0 auto; overflow: visible; }
+.coupling-edge { stroke: var(--rust); stroke-linecap: round; }
+.coupling-node { fill: var(--parchment-dark); stroke: var(--rust-light); stroke-width: 1.5; }
+.coupling-label { fill: var(--ink-faded); font-family: 'Courier New', monospace; font-size: 0.66rem; }
+
+/* ============ DEEP ANALYTICS PAGE (deep-analytics.html: graph + list + hotspots) ============ */
+.deep-page-section { margin: 0 0 2.4rem; }
+.deep-page-section > h2 {
+  font-size: 1.15rem;
+  color: var(--rust);
+  margin: 0 0 0.3rem;
+  border-bottom: 2px solid var(--parchment-deep);
+  padding-bottom: 0.35rem;
+}
+.deep-page-lead { font-size: 0.9rem; color: var(--ink-faded); line-height: 1.6; max-width: 68ch; margin: 0.5rem 0 1.1rem; }
+.deep-page-coupling { display: grid; grid-template-columns: 1fr; gap: 1.4rem; align-items: start; }
+@media (min-width: 860px) {
+  .deep-page-coupling { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+}
+/* The graph panel needs visible overflow so the coupling-graph's spilled labels aren't clipped by the panel. */
+.deep-page-graph-panel { display: flex; align-items: center; justify-content: center; overflow: visible; }
+.deep-page-list-panel { min-width: 0; }
 
 /* ====================== EPIC MOSAIC (per-epic linked mini-donuts) ====================== */
 .epic-mosaic {

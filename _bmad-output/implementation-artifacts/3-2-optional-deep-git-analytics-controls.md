@@ -54,6 +54,11 @@ so that I can inspect hotspots without degrading default performance.
   - [x] Subtask 5.2: Assert the gate: a `ForgeOptions.Resolve()` test proving `DeepGitAnalytics` defaults to `false`, and that `SiteSettings { DeepGit = true }.Resolve()` produces `DeepGitAnalytics == true`. This pins AC #1's "does not run implicitly" at the option boundary.
   - [x] Subtask 5.3: Templater coverage in [HtmlTemplaterTests.cs](../../tests/SpecScribe.Tests/HtmlTemplaterTests.cs): with `ProgressModel.DeepGit` populated the distinct deep panel renders (heading + at least one coupling pair / hotspot path); with `DeepGit = null` the panel is **absent** and the rest of the dashboard is unchanged. Extend the existing `ProgressWithCommits` helper ([HtmlTemplaterTests.cs:149-172](../../tests/SpecScribe.Tests/HtmlTemplaterTests.cs)) or add a sibling that also sets `DeepGit`.
 
+- [x] Task 6 (owner follow-up): Promote deep analytics from a dashboard panel to a dedicated page with a change-coupling graph (AC: #2)
+  - [x] Subtask 6.1: Move the deep analytics content off the dashboard onto a dedicated `deep-analytics.html` page (new `DeepAnalyticsTemplater`, generated from `SiteGenerator` only when `DeepGit` data exists, gated by `--deep-git`). Add `SiteNav.DeepAnalyticsOutputPath` as the shared path so the generator and the dashboard link can't disagree.
+  - [x] Subtask 6.2: Replace the inline dashboard panel with a "View Deep Analytics →" link in the **Git Pulse panel header** (upper right, reusing the `chart-panel-header-row`/`view-epic-link` affordance from the sunburst panel); shown only when `DeepGit` data exists, so the default dashboard is unchanged.
+  - [x] Subtask 6.3: Represent change coupling as a node-link **graph** (`Charts.CouplingGraph`) — files as nodes (sized by coupling degree), coupled pairs as weighted edges (width + opacity by co-change count), laid out deterministically on a circle. Pure inline SVG computed at generation time (no JS). Coupling is symmetric, so edges are undirected. Keep the ranked text list (`Charts.CouplingList`) beside it as the precise, screen-reader-friendly equivalent so the graph is never the sole information carrier. Note: this is a **first-cut** visualization; the fuller/formalized version (and the broader hub scope) is deferred to Story 3.8 per owner direction.
+
 ## Dev Notes
 
 - **This story is FR-10 only — the opt-in depth layer. It sits on top of Story 3.1 (FR-9, baseline pulse), which is `ready-for-dev` but NOT yet merged.** Do not re-implement baseline signals (last-commit timestamp, 30-day count, top-changed files) here; those are 3.1's job. See the sequencing note below.
@@ -126,7 +131,9 @@ claude-opus-4-8 (Opus 4.8)
 - **Scaling guards:** history bounded with `-n 300` (deferred-work.md's 3s-timeout risk); coupling's O(n²) pair cost guarded by skipping commits touching more than `CouplingFileSetCap` (50) files — those still count toward hotspot frequency, only their pairs are skipped.
 - **No people-ranking:** hotspots/coupling are file-path signals only; `%an` is never surfaced in these panels (PRD non-goal upheld).
 - **NFR7 parity + persistence:** `--deep-git` is also reachable via the interactive "Configure paths" Confirm prompt and persisted to `.specscribe` (`SavedSettings.DeepGit` bool?, tri-state; only `true` is written; `ApplyTo` restores a saved `true` when the CLI didn't request it — CLI still wins).
-- **Verification:** full suite green — 460 tests pass (13 new). No regressions.
+- **Owner follow-up (Task 6): dedicated page + coupling graph.** Per owner direction, the deep analytics moved off the dashboard onto a dedicated `deep-analytics.html` page (`DeepAnalyticsTemplater`, generated only when `DeepGit` data exists). The dashboard's inline panel was replaced by a "View Deep Analytics →" link in the Git Pulse panel header (upper right). Change coupling is now a node-link **graph** (`Charts.CouplingGraph`) — circular deterministic layout, nodes sized by degree, edges weighted by co-change count, pure inline SVG (no JS), with the ranked `CouplingList` beside it as the text equivalent. `DeepGitPanel` was refactored into reusable `HotspotBars` + `CouplingList`. **Scope note:** this is a first-cut visualization; the formalized/expanded version and the broader Git Insights hub are Story 3.8's job (owner-directed split), so I intentionally did not gold-plate the graph here.
+- **Concurrency note:** Story 3.3 (`ArtifactCoveragePanel` / Planning Coverage) landed in the same shared files (`Charts.cs`, `HtmlTemplater.cs`, tests) via the working tree during this session; my edits were kept surgical and both coexist. Only 3.2's files are claimed below.
+- **Verification:** full suite green — 480 tests pass (18 new for 3.2 across both passes). Rendered end-to-end and screenshot-verified: the graph, the ranked list, the hotspot bars, and the dashboard "View Deep Analytics →" link all render on this repo's real data.
 
 ### File List
 
@@ -136,18 +143,26 @@ claude-opus-4-8 (Opus 4.8)
 - `src/SpecScribe/GitMetrics.cs` — `DeepGitPulse` record, `TryComputeDeep`, pure `ParseNumstatLog`, `CouplingFileSetCap`
 - `src/SpecScribe/ProgressModel.cs` — `DeepGit` field + `Empty` default
 - `src/SpecScribe/ProgressCalculator.cs` — optional `DeepGitPulse? deep` param threaded into construction
-- `src/SpecScribe/Charts.cs` — `DeepGitPanel` pure-SVG/HTML builder
-- `src/SpecScribe/HtmlTemplater.cs` — dashboard wiring (renders panel only when `DeepGit` non-null)
+- `src/SpecScribe/Charts.cs` — refactored `DeepGitPanel` into reusable `HotspotBars` + `CouplingList`; added the pure-SVG `CouplingGraph` node-link diagram (+ `Basename`/`Shorten` helpers)
+- `src/SpecScribe/DeepAnalyticsTemplater.cs` — **new** dedicated `deep-analytics.html` page (coupling graph + ranked list + hotspots)
+- `src/SpecScribe/SiteNav.cs` — `DeepAnalyticsOutputPath` shared constant
+- `src/SpecScribe/SiteGenerator.cs` — gated `TryComputeDeep` call; threads `deepGit` into `Compute`; generates the deep-analytics page when `DeepGit` data exists
+- `src/SpecScribe/HtmlTemplater.cs` — dashboard wiring: "View Deep Analytics →" link in the Git Pulse header when `DeepGit` non-null (inline panel removed)
+- `src/SpecScribe/ProgressModel.cs` — `DeepGit` field + `Empty` default
+- `src/SpecScribe/ProgressCalculator.cs` — optional `DeepGitPulse? deep` param threaded into construction
 - `src/SpecScribe/Commands.cs` — interactive deep-git Confirm toggle in `ConfigurePaths`
 - `src/SpecScribe/SettingsStore.cs` — `SavedSettings.DeepGit` persistence (`IsEmpty`/`TrySave`/`ApplyTo`)
-- `src/SpecScribe/assets/specscribe.css` — `.deep-git-*` panel styles (neutral chart tokens, no new colors)
+- `src/SpecScribe/assets/specscribe.css` — `.deep-git-*` list styles, `.coupling-*` graph styles, `.deep-page-*` page-layout styles (neutral chart tokens, no new colors)
 - `tests/SpecScribe.Tests/GitMetricsTests.cs` — `ParseNumstatLog` coverage (hotspots, coupling, cap, malformed, empty)
 - `tests/SpecScribe.Tests/ForgeOptionsTests.cs` — deep-git gate default-off + flag-flow tests
-- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` — deep panel renders when populated / absent when null
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` — "View Deep Analytics" link present when populated / absent when null
+- `tests/SpecScribe.Tests/DeepAnalyticsTemplaterTests.cs` — **new** page shell + coupling-graph/list/hotspots coverage
 - `tests/SpecScribe.Tests/SettingsStoreTests.cs` — `DeepGit` persistence + `ApplyTo` precedence tests
 - `.github/workflows/publish-docs-live-pages.yml` — enable `--deep-git` in the live-docs CI pipeline (relies on the existing `fetch-depth: 0` full-history checkout)
 - `README.md` — document the `--deep-git` option (options table + GitHub Actions example YAML, with `fetch-depth: 0` added so the example produces real git data)
+- `.claude/launch.json` — **new** dev-preview static-server config for `SpecScribeOutput` (used to screenshot-verify the page)
 
 ## Change Log
 
-- 2026-07-08 — Story 3.2 implemented: opt-in `--deep-git` deep git analytics (change coupling + hotspots) as a distinct dashboard panel, gated so baseline generation is unaffected when off. Shared bounded `git log --numstat` foundation, never-throw provider, interactive/CLI parity + `.specscribe` persistence. 13 new tests; full suite 460 green. (claude-opus-4-8)
+- 2026-07-08 — Story 3.2 implemented: opt-in `--deep-git` deep git analytics (change coupling + hotspots), gated so baseline generation is unaffected when off. Shared bounded `git log --numstat` foundation, never-throw provider, interactive/CLI parity + `.specscribe` persistence. (claude-opus-4-8)
+- 2026-07-08 — Owner follow-up: promoted deep analytics to a dedicated `deep-analytics.html` page with a node-link change-coupling graph; replaced the dashboard panel with a "View Deep Analytics →" link in the Git Pulse header. First-cut visualization; formalization deferred to Story 3.8. Full suite 480 green. (claude-opus-4-8)

@@ -88,6 +88,15 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_HasCoveragePanelStyles()
+    {
+        // Cheap guard so the Story 3.3 coverage-panel seam can't be silently deleted in a later refactor.
+        var css = ReadStylesheet();
+        Assert.Contains(".coverage-row", css);
+        Assert.Contains(".coverage-chip", css);
+    }
+
+    [Fact]
     public void Script_IsEmbeddedAlongsideStylesheet()
     {
         // The one sanctioned progressive-enhancement script must ship embedded the way the CSS does, so the

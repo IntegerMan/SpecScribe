@@ -88,7 +88,7 @@ public static class HtmlTemplater
         return sb.ToString();
     }
 
-    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null)
+    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null)
     {
         var inventory = work ?? WorkInventory.Empty;
 
@@ -118,7 +118,7 @@ public static class HtmlTemplater
         sb.Append($"  <h1>{Html(nav.SiteTitle)}</h1>\n");
         sb.Append("</header>\n\n");
 
-        AppendDashboard(sb, progress, epicsModel, requirements, nav, commands, inventory, sprint);
+        AppendDashboard(sb, progress, epicsModel, requirements, nav, commands, inventory, sprint, coverage);
 
         // Quick-dev + deferred work is surfaced in its own first-class section (below); promote those docs
         // out of the generic "Implementation Artifacts" grid so they aren't double-listed. Their standalone
@@ -207,7 +207,7 @@ public static class HtmlTemplater
         sb.Append("</div>\n\n");
     }
 
-    private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav, CommandCatalog commands, WorkInventory work, SprintStatus? sprint = null)
+    private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav, CommandCatalog commands, WorkInventory work, SprintStatus? sprint = null, ArtifactCoverage? coverage = null)
     {
         sb.Append("<section class=\"dashboard\">\n");
 
@@ -277,23 +277,38 @@ public static class HtmlTemplater
         // make it graphical, not two plain boxes). The "Commits" stat card at the top of the dashboard still
         // shows the whole-repo total; this panel is the richer at-a-glance activity surface. Single non-fatal
         // fallback: the UX spec's "—" + tooltip. [Story 3.1 AC #3; EXPERIENCE.md:169]
-        sb.Append("<div class=\"chart-panel git-pulse-panel\">\n<h3>Git Pulse</h3>\n");
+        sb.Append("<div class=\"chart-panel git-pulse-panel\">\n");
+        // When deep analytics were generated (--deep-git), the Git Pulse header gains a "View Deep Analytics →"
+        // link in its upper-right — the entry point to the dedicated deep-git page (hotspots + coupling graph),
+        // mirroring the sunburst panel's "View …" affordance. Absent (plain heading) when the flag is off, so
+        // the default dashboard is unchanged. [Story 3.2]
+        if (p.DeepGit is not null)
+        {
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Git Pulse</h3>");
+            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.DeepAnalyticsOutputPath}\">View Deep Analytics &rarr;</a></div>\n");
+        }
+        else
+        {
+            sb.Append("<h3>Git Pulse</h3>\n");
+        }
         sb.Append(p.Git is { } pulse
             ? Charts.GitPulsePanel(pulse)
             : "<div class=\"chart-empty git-pulse-empty\" data-tooltip=\"Run in a git repository to enable commit stats\" tabindex=\"0\">—</div>\n");
         sb.Append("</div>\n\n");
 
-        // Opt-in Deep Analytics panel (FR-10). Rendered ONLY when --deep-git produced data: unlike the baseline
-        // stat cards that show a "—" placeholder, this panel simply does not exist when not opted into, so the
-        // default dashboard is byte-for-byte unchanged for users who never pass --deep-git. Its own labeled
-        // "Deep Analytics" panel keeps it visibly distinct from the baseline Git Pulse surface above (AC #2).
-        if (p.DeepGit is { } deep)
+        // Planning Coverage — the artifact-family-coverage half of CAP-4, a peer of the Git Pulse panel above.
+        // Rendered ONLY when at least one canonical family was recognized; a repo with no recognized families
+        // keeps today's dashboard byte-for-byte unchanged (graceful omission, Story 1.1). [Story 3.3 AC #1]
+        if (coverage is { IsEmpty: false })
         {
-            sb.Append("<div class=\"chart-panel deep-git-panel\">\n");
-            sb.Append("<h3>Deep Analytics <span class=\"deep-git-badge\">opt-in</span></h3>\n");
-            sb.Append(Charts.DeepGitPanel(deep));
+            sb.Append("<div class=\"chart-panel coverage-panel\">\n<h3>Planning Coverage</h3>\n");
+            sb.Append(Charts.ArtifactCoveragePanel(coverage, DateOnly.FromDateTime(DateTime.Now)));
             sb.Append("</div>\n\n");
         }
+
+        // Deep analytics (hotspots + change-coupling graph) live on their own dedicated page now, not inline on
+        // the dashboard — the Git Pulse header above links out to it when --deep-git produced data. This keeps
+        // the dashboard focused and gives the graph room to breathe. [Story 3.2]
 
         AppendRequirementsPanel(sb, requirements);
 
