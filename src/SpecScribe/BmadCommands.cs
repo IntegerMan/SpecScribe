@@ -166,8 +166,9 @@ public static class BmadCommands
     /// <summary>A story page only suggests actions on *this* story — drafting other stories and
     /// retrospectives are epic/project-level moves that belong on those pages (<see cref="ForEpic"/>,
     /// <see cref="ForProject"/>). The one exception is `create-story` with the story's own id when no plan
-    /// exists yet: that drafts the story being viewed, not a different one. Every code-review suggestion
-    /// carries the story id so the exact command (e.g. <c>/bmad-code-review 2.1</c>) is one copy away.</summary>
+    /// exists yet: that drafts the story being viewed, not a different one. Where a code-review suggestion
+    /// is offered, it carries the story id so the exact command (e.g. <c>/bmad-code-review 2.1</c>) is one
+    /// copy away — but a `ready` story has no changes yet, so it gets no code-review suggestion at all.</summary>
     private static List<Suggestion> ForStory(StoryInfo story, CommandCatalog commands)
     {
         var status = story.Status?.Trim().ToLowerInvariant() ?? string.Empty;
@@ -175,10 +176,10 @@ public static class BmadCommands
 
         if (status.Contains("ready"))
         {
+            // Nothing has been implemented yet, so there's nothing to review — code-review only
+            // enters the list once work starts (see the "progress"/"done" branches below).
             Add(suggestions, commands.Command("dev-story", story.Id),
                 "Implements the story exactly as specified — tasks, acceptance criteria, and dev notes drive the work.");
-            Add(suggestions, commands.Command("code-review", story.Id),
-                "Adversarial multi-layer review of the changes once implementation lands.");
             return suggestions;
         }
 

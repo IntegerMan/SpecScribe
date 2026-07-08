@@ -134,7 +134,8 @@ public class BmadCommandsTests
         var html = BmadCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), BmmCatalog);
 
         Assert.Contains("/bmad-dev-story 1.2", html);
-        Assert.Contains("/bmad-code-review 1.2", html);
+        // Nothing has been implemented yet for a ready-for-dev story, so code review isn't a valid next step.
+        Assert.DoesNotContain("/bmad-code-review 1.2", html);
         Assert.Contains("Next Steps", html);
         Assert.DoesNotContain("(BMad Method)", html);
         Assert.DoesNotContain("/gds-", html);
