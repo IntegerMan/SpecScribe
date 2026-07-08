@@ -4,7 +4,7 @@ baseline_commit: 7ea1646b9dded83d5828b8160aada238e70931eb
 
 # Story 3.1: Baseline Git Pulse Insights on Dashboard
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -44,6 +44,15 @@ so that I can assess project momentum at a glance.
   - [x] Subtask 4.2: Make it more graphical in [Charts.cs](../../src/SpecScribe/Charts.cs) `GitPulsePanel` (pure SVG/HTML + CSS, no JS): a headline signal strip (30-day count, exact last commit, active days), the embedded activity heatmap (suppress its now-duplicate internal headline via a new `showHeadline` flag on `CommitHeatmap`), and the top-changed files as **proportional bars** (bar width ∝ change count) instead of a plain list. Reuse neutral chart tokens (git is not a lifecycle status, so no `--status-*`).
   - [x] Subtask 4.3: Restructure the dashboard so the freed-up `chart-row` pairs the Epic Status donut with the "Overall Progress" bars, and the richer git panel gets full width below.
   - [x] Subtask 4.4: Preserve the single non-fatal fallback (`—` + tooltip) and all 1.4/1.5 a11y affordances; update [HtmlTemplaterTests.cs](../../tests/SpecScribe.Tests/HtmlTemplaterTests.cs) for the consolidated panel (heatmap + signals + file bars present; no duplicate "Commit Activity" heading; fallback intact).
+
+### Review Findings
+
+- [x] [Review][Patch] Missing test coverage for new wiring and fallback branches [src/SpecScribe/Charts.cs, tests/SpecScribe.Tests/ChartsTests.cs] — added `CommitHeatmap_ShowHeadlineFalseSuppressesHeadline`, `GitPulsePanel_RendersProportionalBarsForTopChangedFiles`, and `GitPulsePanel_EmptyTopChangedFilesShowsFallbackNote` to directly test the `showHeadline` flag and both `GitPulsePanel` branches. 443 tests passing (was 440). **Not covered**: an end-to-end test of `GitMetrics.TryCompute` wiring the three new fields (and degrading gracefully when the second git call fails) — the codebase has no existing temp-git-repo test fixture to build one on, and adding that infrastructure is a bigger lift than this patch scope; left as a defer.
+- [x] [Review][Defer] `ParseChangedFiles` undercounts renamed/moved files and is case-sensitive [src/SpecScribe/GitMetrics.cs:193-214] — deferred, pre-existing pattern; no `-M`/`--find-renames` on the name-only git call means a renamed file's history splits across two path keys, and two paths differing only in case count separately. Low-impact polish on a "nice to have" ranking, not required by AC #1.
+- [x] [Review][Defer] "Top changed files" window (`-n 200` commits) and "commits in the last 30 days" (calendar days) are different time horizons shown side-by-side with no distinguishing label [src/SpecScribe/GitMetrics.cs:64; src/SpecScribe/Charts.cs GitPulsePanel] — deferred, pre-existing bounding tradeoff from deferred-work.md; worth a label in a future pass but not blocking.
+- [x] [Review][Defer] `LastCommitTimestamp` assumes each day's commit list is strictly newest-first [src/SpecScribe/GitMetrics.cs:135-146] — deferred; true for git's default linear log order (as documented in the code comment) but unverified for merge-commit/clock-skew cases, and no test pins the assumption.
+- [x] [Review][Defer] Git Pulse file-bar rows have no `aria-label` tying label + bar + count into one accessible unit [src/SpecScribe/Charts.cs GitPulsePanel] — deferred, minor a11y polish; the exact count text already satisfies the "never color/size-only" truthfulness convention.
+- [x] [Review][Defer] `.md-comment`/`.md-comment-inline` CSS selectors widened from `.doc-body`-scoped to global [src/SpecScribe/assets/specscribe.css:385-399] — deferred; out of scope for Story 3.1 (Story 2.6 cleanup bundled into the same commit), flagged independently by two review layers as a latent global-class-collision risk worth a follow-up look.
 
 ## Dev Notes
 

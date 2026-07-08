@@ -428,6 +428,60 @@ public class ChartsTests
     }
 
     [Fact]
+    public void CommitHeatmap_ShowHeadlineFalseSuppressesHeadline()
+    {
+        var series = new (DateOnly Day, int Count)[] { (new DateOnly(2026, 1, 5), 3) };
+
+        var svg = Charts.CommitHeatmap(series, showHeadline: false);
+
+        // GitPulsePanel embeds the heatmap with its own signal strip covering these figures; the flag must
+        // suppress the heatmap's internal headline so the two don't duplicate the same numbers. [Story 3.1]
+        Assert.DoesNotContain("heatmap-headline", svg);
+        // The rest of the heatmap (grid, cell tooltips) still renders — only the headline line is gone.
+        Assert.Contains($"<title>{Charts.DReadable(new DateOnly(2026, 1, 5))}: 3 commits</title>", svg);
+    }
+
+    private static GitPulse SampleGitPulse(IReadOnlyList<(string Path, int ChangeCount)> topChangedFiles) => new(
+        TotalCommits: 5,
+        ActiveDays: 2,
+        FirstCommitDate: new DateOnly(2026, 1, 5),
+        LastCommitDate: new DateOnly(2026, 1, 7),
+        DailySeries: new (DateOnly Day, int Count)[] { (new DateOnly(2026, 1, 5), 3), (new DateOnly(2026, 1, 7), 2) },
+        CommitsByDay: new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>
+        {
+            [new DateOnly(2026, 1, 7)] = new[] { new CommitInfo("aaa1111", "Change", "Alice", "09:15") },
+        },
+        LastCommitTimestamp: new DateTime(2026, 1, 7, 9, 15, 0),
+        Last30DayCommitCount: 5,
+        TopChangedFiles: topChangedFiles);
+
+    [Fact]
+    public void GitPulsePanel_RendersProportionalBarsForTopChangedFiles()
+    {
+        var git = SampleGitPulse(new (string, int)[] { ("src/Program.cs", 3), ("README.md", 1) });
+
+        var html = Charts.GitPulsePanel(git);
+
+        Assert.Contains("git-pulse-bar-fill", html);
+        Assert.Contains("src/Program.cs", html);
+        // Suppresses the embedded heatmap's own headline (the signal strip above already carries the figures).
+        Assert.DoesNotContain("heatmap-headline", html);
+    }
+
+    [Fact]
+    public void GitPulsePanel_EmptyTopChangedFilesShowsFallbackNote()
+    {
+        // A failed (but bounded) name-only git call degrades TopChangedFiles to an empty list rather than
+        // nulling the whole pulse (AD-4: partial data beats none). [Story 3.1]
+        var git = SampleGitPulse(Array.Empty<(string, int)>());
+
+        var html = Charts.GitPulsePanel(git);
+
+        Assert.Contains("No file changes in recent history.", html);
+        Assert.DoesNotContain("git-pulse-bar-fill", html);
+    }
+
+    [Fact]
     public void ProgressBar_CarriesProgressbarAria()
     {
         var html = Charts.ProgressBar("Implementation", 2, 4);
