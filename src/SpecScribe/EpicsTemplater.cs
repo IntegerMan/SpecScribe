@@ -378,7 +378,13 @@ public static class EpicsTemplater
             "This story hasn't been drafted in detail yet.");
         sb.Append($"<div class=\"epic-card\">\n  <div class=\"pending-note\">{note}</div>\n</div>\n\n");
 
-        sb.Append($"<a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + epicOutputPath)}\">&larr; Back to Epic {epic.Number}</a>\n");
+        // .view-epic-link has no width/centering of its own — it inherits alignment from its parent. Every
+        // other block on this page (header, note, AC panel) sits inside an 860px-centered container, so this
+        // link needs the same wrapper or it renders flush against <main>'s full-width left edge instead of
+        // lining up under the content above it.
+        sb.Append("<section class=\"dashboard-narrow\">\n");
+        sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + epicOutputPath)}\">&larr; Back to Epic {epic.Number}</a>\n");
+        sb.Append("</section>\n");
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");

@@ -365,6 +365,13 @@ public class HtmlTemplaterTests
         var ac = html.IndexOf("class=\"chart-panel ac-panel\"", StringComparison.Ordinal);
         Assert.True(sec >= 0 && ac > sec, "AC panel must be wrapped by dashboard-narrow");
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+
+        // The "Back to Epic" link has no width/margin of its own — it must sit inside its own
+        // dashboard-narrow section too, or it renders flush against <main>'s full-width left edge instead
+        // of lining up under the header/note/AC panel above it.
+        var lastSec = html.LastIndexOf("<section class=\"dashboard-narrow\">", StringComparison.Ordinal);
+        var backLink = html.IndexOf("view-epic-link", StringComparison.Ordinal);
+        Assert.True(lastSec >= 0 && lastSec != sec && backLink > lastSec, "Back-to-epic link must be wrapped by its own dashboard-narrow section");
     }
 
     private static DocModel Doc(string sourceRel, string outputRel, string title, Frontmatter fm, string bodyHtml = "") => new()

@@ -58,6 +58,26 @@ public class ChartsTests
     }
 
     [Fact]
+    public void Sunburst_UndraftedStoryLinksToItsPlaceholderPageNotTheEpicPage()
+    {
+        // A story with no ArtifactOutputPath still has a generated placeholder page at StoryPagePath
+        // (SiteGenerator writes one for every undrafted story) — the sunburst must link there, not
+        // fall back to the epic page, so the reader always lands on the story's own detail page.
+        var story = Story("1.2", "Not yet drafted", "pending", done: 0, total: 0);
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(story) },
+        };
+
+        var svg = Charts.Sunburst(model);
+
+        Assert.Contains($"href=\"{StoryEpicLinkifier.StoryPagePath("1.2")}\"", svg);
+        Assert.DoesNotContain("href=\"epics/epic-1.html\" aria-label=\"Story 1.2", svg);
+    }
+
+    [Fact]
     public void Sunburst_CenterReportsEpicCountNotStoryCount()
     {
         // The chart is organized around epics, so the center headlines the epic count with an "epic(s)" label

@@ -168,7 +168,10 @@ public static class Charts
                 foreach (var story in epic.Stories)
                 {
                     var storyClass = StatusStyles.ForStory(story);
-                    var storyHref = story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html";
+                    // Undrafted stories still get a generated placeholder page at StoryPagePath (see
+                    // SiteGenerator's placeholder emission) — link there instead of the epic page so the
+                    // sunburst always drops the reader on the story's own page. [Story 2.3 redesign]
+                    var storyHref = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
                     var storyTitle = PathUtil.StripHtmlTags(story.Title);
                     var statusNote = story.Status is { Length: > 0 } s ? $" — {s}" : string.Empty;
 
