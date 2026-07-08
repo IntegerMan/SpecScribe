@@ -83,43 +83,24 @@ public static class RetroTemplater
             main.Append($"    <a class=\"pill pill-link\" href=\"{PathUtil.Html($"{prefix}epics/epic-{retro.EpicNumber}.html")}\">Epic {retro.EpicNumber} &rarr;</a>\n");
         }
         main.Append("  </div>\n");
-
-        if (retro.Participants.Count > 0)
-        {
-            main.Append("  <section class=\"retro-personas\" aria-label=\"Personas\">\n");
-            main.Append("    <div class=\"retro-personas-label\">Personas</div>\n");
-            main.Append("    <div class=\"persona-grid\">\n");
-            foreach (var raw in retro.Participants)
-            {
-                var p = Personas.Parse(raw);
-                main.Append($"      <span class=\"persona-pill {p.RoleClass}\">{Icons.ForPersona(p.RoleClass)}");
-                main.Append($"<span class=\"persona-name\">{PathUtil.Html(p.Name)}</span>");
-                if (p.Role is { Length: > 0 } role)
-                {
-                    main.Append($"<span class=\"persona-role\">{PathUtil.Html(role)}</span>");
-                }
-                main.Append("</span>\n");
-            }
-            main.Append("    </div>\n");
-            main.Append("  </section>\n");
-        }
         main.Append("</header>\n\n");
 
         // The retro is epic-scoped, so surface that epic's stories (each linked to its story/placeholder page)
-        // right under the header — the sprint's stories, reachable from the retro that reviewed them.
+        // right under the header — the sprint's stories, reachable from the retro that reviewed them. Rendered
+        // as the shared Kanban `.sprint-card` (id + title, status color on the left border) so they read exactly
+        // like the sprint board's cards, in a responsive grid.
         var toc = new List<Toc.Entry>();
         var epic = epics?.Epics.FirstOrDefault(e => e.Number == retro.EpicNumber);
         if (epic is { Stories.Count: > 0 })
         {
-            main.Append("<section class=\"retro-stories\" id=\"retro-stories\">\n  <h2>Stories in this Epic</h2>\n  <div class=\"retro-story-list\">\n");
+            main.Append("<section class=\"retro-stories\" id=\"retro-stories\">\n  <h2>Stories in this Epic</h2>\n  <div class=\"retro-story-grid\">\n");
             foreach (var story in epic.Stories)
             {
                 var storyClass = StatusStyles.ForStory(story);
                 var href = prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id));
-                main.Append($"    <a class=\"retro-story-row {storyClass}\" href=\"{PathUtil.Html(href)}\">\n");
-                main.Append($"      <span class=\"retro-story-id\">Story {PathUtil.Html(story.Id)}</span>\n");
-                main.Append($"      <span class=\"retro-story-title\">{story.Title}</span>\n");
-                main.Append($"      {StatusStyles.Badge(storyClass, StatusStyles.StoryLabel(storyClass))}\n");
+                main.Append($"    <a class=\"sprint-card {storyClass}\" href=\"{PathUtil.Html(href)}\">\n");
+                main.Append($"      <div class=\"sprint-card-head\"><span class=\"sprint-card-id\">Story {PathUtil.Html(story.Id)}</span></div>\n");
+                main.Append($"      <span class=\"sprint-card-title\">{story.Title}</span>\n");
                 main.Append("    </a>\n");
             }
             main.Append("  </div>\n</section>\n\n");

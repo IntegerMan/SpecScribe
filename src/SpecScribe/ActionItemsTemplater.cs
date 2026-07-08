@@ -43,10 +43,8 @@ public static class ActionItemsTemplater
             {
                 sb.Append($"      <span class=\"pill\">Epic {en}</span>\n");
             }
-            if (item.Owner is { Length: > 0 } owner)
-            {
-                sb.Append($"      <span class=\"pill\">{PathUtil.Html(owner)}</span>\n");
-            }
+            // Owner intentionally omitted: retro "owners" are LLM-generated personas for the retrospective
+            // exercise, not real assignees, so they're noise once the retro doc exists. [Story 2.3 polish #7]
             sb.Append($"      {StatusStyles.Badge(StatusStyles.ForSprint(item.Status), StatusStyles.SprintLabel(item.Status))}\n");
 
             // Link back to the retrospective this item came from (matched by epic).

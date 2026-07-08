@@ -56,28 +56,6 @@ public static class Icons
         };
     }
 
-    /// <summary>One glyph per persona <see cref="Personas.RoleClass"/>, paired with the person's name/role text
-    /// on the retro page's Personas pills. Unknown class → a neutral person glyph (never empty here, since a pill
-    /// always renders). [Story 2.3 retro personas]</summary>
-    public static string ForPersona(string roleClass)
-    {
-        // A person silhouette (head + shoulders) is the shared base; role-specific glyphs sit beside it where a
-        // distinct symbol reads clearly (dev = code brackets, qa = check, arch = building, etc.).
-        return roleClass switch
-        {
-            "role-dev" => Svg("<path d=\"M6 5.5 3.2 8 6 10.5\"/><path d=\"M10 5.5 12.8 8 10 10.5\"/>"),
-            "role-qa" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.6 8.2 7.2 9.8 10.6 6\"/>"),
-            "role-po" => Svg("<path d=\"M4.5 3.5h7v9h-7Z\"/><path d=\"M6.2 3.5V2.6h3.6v0.9\"/><path d=\"M6.2 7h3.6M6.2 9.4h3.6\"/>"),
-            "role-arch" => Svg("<path d=\"M3 13V6.4L8 3l5 3.4V13\"/><path d=\"M6.2 13V9h3.6v4\"/>"),
-            "role-ux" => Svg("<path d=\"M10.6 2.9 13 5.3 5.4 12.9 2.6 13.3 3 10.5Z\"/>"),
-            "role-analyst" => Svg("<path d=\"M3 13V3\"/><path d=\"M3 13h10\"/><path d=\"M5.5 11V8M8 11V5.5M10.5 11V7\"/>"),
-            "role-writer" => Svg("<path d=\"M3 2.8h7l3 3v7.4H3Z\"/><path d=\"M5.2 8h5.6M5.2 10.4h3.6\"/>"),
-            "role-lead" => Svg("<path d=\"M8 2.6 9.5 6l3.6 0.3-2.8 2.3 0.9 3.5L8 10.2 4.8 12.1l0.9-3.5L2.9 6.3 6.5 6Z\"/>"),
-            "role-facil" => Svg("<circle cx=\"5.4\" cy=\"6\" r=\"1.8\"/><circle cx=\"10.6\" cy=\"6\" r=\"1.8\"/><path d=\"M2.6 12.4c0-1.9 1.3-3 2.8-3s2.8 1.1 2.8 3\"/><path d=\"M7.8 12.4c0-1.9 1.3-3 2.8-3s2.8 1.1 2.8 3\"/>"),
-            _ => Svg("<circle cx=\"8\" cy=\"5.4\" r=\"2.4\"/><path d=\"M3.4 13c0-2.8 2.1-4.2 4.6-4.2s4.6 1.4 4.6 4.2\"/>"),
-        };
-    }
-
     /// <summary>Wraps glyph markup in the shared decorative-icon shell: <c>aria-hidden</c>/<c>focusable="false"</c>
     /// (the text label carries the meaning), the <c>ss-icon</c> css hook for sizing, and <c>currentColor</c>
     /// stroke/fill so every icon inherits the surrounding label/badge color — never a hard-coded hex.</summary>

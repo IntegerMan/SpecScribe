@@ -74,7 +74,7 @@ public class RetroTests : IDisposable
     }
 
     [Fact]
-    public void RenderPage_StyledHeaderEpicLinkPersonasAndSingleMain()
+    public void RenderPage_StyledHeaderEpicLinkNoPersonasAndSingleMain()
     {
         var retro = Parse();
         var epics = new EpicsModel
@@ -97,15 +97,10 @@ public class RetroTests : IDisposable
         Assert.Contains("class=\"story-kicker\">Epic 1 Retrospective</div>", html);
         Assert.Contains("<h1>Epic 1 Retrospective: Foundation</h1>", html);
         Assert.Contains("<span class=\"pill\">2026-07-07</span>", html);
-        // Participants render as a labeled "Personas" block, each a role-classed pill (icon + name + role).
-        Assert.Contains("<section class=\"retro-personas\" aria-label=\"Personas\">", html);
-        Assert.Contains("<div class=\"retro-personas-label\">Personas</div>", html);
-        Assert.Contains("<span class=\"persona-pill role-lead\">", html);
-        Assert.Contains("<span class=\"persona-name\">Matt</span>", html);
-        Assert.Contains("<span class=\"persona-role\">Lead</span>", html);
-        Assert.Contains("<span class=\"persona-pill role-dev\">", html);   // Amelia (Dev)
-        Assert.Contains("<span class=\"persona-pill role-po\">", html);    // Alice (PO)
-        Assert.Contains("ss-icon", html);                                  // each pill carries a role glyph
+        // Personas (LLM-generated retro participants) are NOT rendered — noise once the doc exists. [polish #7]
+        Assert.DoesNotContain("retro-personas", html);
+        Assert.DoesNotContain("persona-pill", html);
+        Assert.DoesNotContain(">Personas<", html);
         // Epic link resolves at the retro page's depth-1 prefix.
         Assert.Contains("href=\"../epics/epic-1.html\">Epic 1 &rarr;</a>", html);
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
@@ -113,7 +108,7 @@ public class RetroTests : IDisposable
     }
 
     [Fact]
-    public void RenderPage_ListsEpicStoriesLinkedWithStatus()
+    public void RenderPage_ListsEpicStoriesAsSprintCards()
     {
         var retro = Parse();
         var epics = new EpicsModel
@@ -140,11 +135,15 @@ public class RetroTests : IDisposable
 
         Assert.Contains("<section class=\"retro-stories\" id=\"retro-stories\">", html);
         Assert.Contains("Stories in this Epic", html);
-        // Drafted story links to its page; undrafted links to its placeholder path; both at the depth-1 prefix.
-        Assert.Contains("href=\"../epics/story-1-1.html\"", html);
+        Assert.Contains("class=\"retro-story-grid\">", html);
+        // Stories use the shared sprint-card markup (same style as the sprint board), status color on the card.
+        Assert.Contains("<a class=\"sprint-card done\" href=\"../epics/story-1-1.html\">", html);
+        Assert.Contains("<span class=\"sprint-card-id\">Story 1.1</span>", html);
+        Assert.Contains("<span class=\"sprint-card-title\">Nav Foundation</span>", html);
+        // Undrafted story links to its placeholder path.
         Assert.Contains("href=\"../epics/story-1-2.html\"", html);
-        Assert.Contains("<span class=\"retro-story-id\">Story 1.1</span>", html);
-        Assert.Contains("class=\"retro-story-row done\"", html);
+        // No longer a row layout.
+        Assert.DoesNotContain("retro-story-row", html);
     }
 
     [Fact]
@@ -187,6 +186,9 @@ public class RetroTests : IDisposable
 
         Assert.Contains("<h1>Open Action Items</h1>", html);
         Assert.Contains("Route deferred tech debt", html);
+        // Owners are NOT shown — they're LLM-generated retro personas, not real assignees. [polish #7]
+        Assert.DoesNotContain(">Dana</span>", html);
+        Assert.DoesNotContain(">Amelia</span>", html);
         // Each item links back to its epic's retro page…
         Assert.Contains("href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\">From Epic 1 retrospective", html);
         // …and offers a "Resolve with AI" command composed with the action text.

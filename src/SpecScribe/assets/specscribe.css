@@ -2223,66 +2223,14 @@ code.color-swatch {
 .cmd-menu-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; }
 .cmd-menu-desc { font-size: 0.76rem; color: var(--ink-faded); }
 
-/* Retrospective page: a labeled Personas block (role icon + tint per person) + a linked epic pill. */
-.retro-personas { margin-top: 0.8rem; }
-.retro-personas-label {
-  font-size: 0.68rem; letter-spacing: 0.09em; text-transform: uppercase;
-  color: var(--ink-light); margin-bottom: 0.4rem;
-}
-.persona-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.persona-pill {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  font-size: 0.72rem; color: var(--ink-faded);
-  background: var(--parchment); border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
-  border-radius: 6px; padding: 0.2rem 0.55rem;
-}
-.persona-pill .ss-icon { width: 0.9rem; height: 0.9rem; flex: 0 0 auto; }
-.persona-name { font-weight: 600; color: var(--ink); }
-.persona-role { color: var(--ink-light); }
-/* Role tints route through the general palette (NOT the --status-* tokens — personas aren't lifecycle states). */
-.persona-pill.role-lead    { border-left-color: var(--gold); }
-.persona-pill.role-lead    .ss-icon { color: var(--gold); }
-.persona-pill.role-dev     { border-left-color: var(--teal); }
-.persona-pill.role-dev     .ss-icon { color: var(--teal); }
-.persona-pill.role-qa      { border-left-color: var(--moss); }
-.persona-pill.role-qa      .ss-icon { color: var(--moss); }
-.persona-pill.role-po      { border-left-color: var(--rust); }
-.persona-pill.role-po      .ss-icon { color: var(--rust); }
-.persona-pill.role-arch    { border-left-color: var(--teal-deep); }
-.persona-pill.role-arch    .ss-icon { color: var(--teal-deep); }
-.persona-pill.role-ux      { border-left-color: var(--rust-light); }
-.persona-pill.role-ux      .ss-icon { color: var(--rust-light); }
-.persona-pill.role-analyst { border-left-color: var(--gold-light); }
-.persona-pill.role-analyst .ss-icon { color: var(--gold-light); }
-.persona-pill.role-writer  { border-left-color: var(--moss-light); }
-.persona-pill.role-writer  .ss-icon { color: var(--moss-light); }
-.persona-pill.role-facil   { border-left-color: var(--ink-faded); }
-.persona-pill.role-facil   .ss-icon { color: var(--ink-faded); }
-.persona-pill.role-generic .ss-icon { color: var(--ink-light); }
-
 .pill.pill-link { text-decoration: none; color: var(--teal); border: 1px solid var(--teal-light); }
 .pill.pill-link:hover { color: var(--rust); border-color: var(--gold-light); }
 
-/* Retro page: "Stories in this Epic" — linked rows with the story's stage color on the left border. */
+/* Retro page: "Stories in this Epic" — the shared Kanban .sprint-card in a responsive grid (same style as the
+   sprint board), status color on the left border. */
 .retro-stories { margin: 0 0 1.4rem; }
 .retro-stories h2 { margin: 0 0 0.6rem; }
-.retro-story-list { display: flex; flex-direction: column; gap: 0.4rem; }
-.retro-story-row {
-  display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.45rem 0.7rem; text-decoration: none; color: var(--ink);
-  background: var(--parchment); border: 1px solid var(--border);
-  border-left: 3px solid var(--status-drafted); border-radius: 6px;
-  transition: border-color 0.15s, background 0.15s;
-}
-.retro-story-row.done   { border-left-color: var(--status-done); }
-.retro-story-row.review { border-left-color: var(--status-review); }
-.retro-story-row.active { border-left-color: var(--status-active); }
-.retro-story-row.ready  { border-left-color: var(--status-ready); }
-.retro-story-row:hover { background: var(--parchment-dark); border-color: var(--gold-light); }
-.retro-story-id { font-size: 0.74rem; font-weight: 600; color: var(--ink-faded); flex: 0 0 auto; }
-.retro-story-title { flex: 1 1 auto; }
-.retro-story-row .status-badge { flex: 0 0 auto; }
+.retro-story-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.6rem; }
 
 /* Source note: a de-emphasized inline tag in the panel header (no longer its own line) so the tracked view is
    labeled without costing vertical space. */

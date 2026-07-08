@@ -455,6 +455,12 @@ claude-opus-4-8
 
 ## Change Log
 
+- 2026-07-08 (polish #7): Removed the retro **Personas** section entirely (and the `Personas` classifier +
+  `Icons.ForPersona` + persona CSS it needed) and dropped the **owner** pill from open action items — retro
+  participants/owners are LLM-generated personas for the retrospective exercise, not real assignees, so they're
+  noise once the doc exists. Reworked "Stories in this Epic" from custom rows into the shared Kanban
+  **`.sprint-card`** (id + title, status color on the left border) laid out in a responsive
+  `.retro-story-grid`, so they read exactly like the sprint board's cards. 429 tests pass.
 - 2026-07-08 (polish #6): Humanized the retro pages and cross-linked them with stories/epics. Participants now
   render as a labeled **Personas** block: a new `Personas` classifier splits "Name (Role)" and maps the role to
   a css-class, driving a role icon (`Icons.ForPersona`) + a general-palette tint per person (NOT `--status-*` —

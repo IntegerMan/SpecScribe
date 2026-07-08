@@ -72,15 +72,15 @@ so that deferred items and quick-dev work stay visible and new contributors know
 
 ### Review Findings
 
-- [ ] [Review][Patch] New heatmap quick-dev spec is missing `route: one-shot` frontmatter, so `WorkInventory` will never classify it as quick-dev, contradicting its own completion notes' verification claim [_bmad-output/implementation-artifacts/spec-commit-heatmap-contrast-and-day-drilldown.md]
-- [ ] [Review][Patch] `EpicProgress.StoryStatusCounts` is not `required` unlike its sibling properties — a future caller that omits it gets a silently empty mosaic ring for a mid-dev epic, defeating the "no misleading empty ring" guarantee [src/SpecScribe/ProgressModel.cs:16]
-- [ ] [Review][Patch] `WorkInventory.Build` classifies quick-dev/deferred files by filename only with no check they live under `implementation-artifacts/`, contradicting the story's own stated convention [src/SpecScribe/WorkInventory.cs:34-49]
-- [ ] [Review][Patch] `WorkInventory.Build` silently last-write-wins if more than one `deferred-work.md` exists, with no warning or aggregation [src/SpecScribe/WorkInventory.cs:41-44]
-- [ ] [Review][Patch] `CountOpenItems` naively counts `<li`/`<del` across the whole rendered body, which over/under-counts with nested lists or unrelated strikethrough [src/SpecScribe/WorkInventory.cs:63-73]
-- [ ] [Review][Patch] Dev notes and the new Story 2.4 spec repeat the known-stale `--output docs/live` command as the "verified" generation target, contradicting the project's actual output directory convention [story completion notes; Story 2.4 spec]
-- [ ] [Review][Patch] `Charts.Sunburst`/`EpicSunburst` insert the new `commands` parameter before `size` instead of appending at the end — a latent breaking-change risk for future positional callers [src/SpecScribe/Charts.cs:126, :268]
-- [ ] [Review][Patch] `StatusStyles.StoryStages` lists `"pending"` as a valid stage but `ForStatus` can never return it — dead/unreachable stage in the mosaic segment logic [src/SpecScribe/StatusStyles.cs:46]
-- [ ] [Review][Patch] Task 6's own subtask names `AppendUpNextCard`'s "Not yet drafted" case as one of three sites to convert to guidance; only two were touched, yet Task 6 is checked complete without reflecting the deviation [story file Task 6]
+- [x] [Review][Patch] New heatmap quick-dev spec is missing `route: one-shot` frontmatter, so `WorkInventory` will never classify it as quick-dev, contradicting its own completion notes' verification claim [_bmad-output/implementation-artifacts/spec-commit-heatmap-contrast-and-day-drilldown.md]
+- [x] [Review][Patch] `EpicProgress.StoryStatusCounts` is not `required` unlike its sibling properties — a future caller that omits it gets a silently empty mosaic ring for a mid-dev epic, defeating the "no misleading empty ring" guarantee [src/SpecScribe/ProgressModel.cs:16]
+- [x] [Review][Patch] `WorkInventory.Build` classifies quick-dev/deferred files by filename only with no check they live under `implementation-artifacts/`, contradicting the story's own stated convention [src/SpecScribe/WorkInventory.cs:34-49]
+- [x] [Review][Patch] `WorkInventory.Build` silently last-write-wins if more than one `deferred-work.md` exists, with no warning or aggregation [src/SpecScribe/WorkInventory.cs:41-44]
+- [x] [Review][Patch] `CountOpenItems` naively counts `<li`/`<del` across the whole rendered body, which over/under-counts with nested lists or unrelated strikethrough [src/SpecScribe/WorkInventory.cs:63-73]
+- [x] [Review][Patch] Dev notes and the new Story 2.4 spec repeat the known-stale `--output docs/live` command as the "verified" generation target, contradicting the project's actual output directory convention [story completion notes; Story 2.4 spec]
+- [x] [Review][Patch] `Charts.Sunburst`/`EpicSunburst` insert the new `commands` parameter before `size` instead of appending at the end — a latent breaking-change risk for future positional callers [src/SpecScribe/Charts.cs:126, :268]
+- [x] [Review][Patch] `StatusStyles.StoryStages` lists `"pending"` as a valid stage but `ForStatus` can never return it — dead/unreachable stage in the mosaic segment logic [src/SpecScribe/StatusStyles.cs:46]
+- [x] [Review][Patch] Task 6's own subtask names `AppendUpNextCard`'s "Not yet drafted" case as one of three sites to convert to guidance; only two were touched, yet Task 6 is checked complete without reflecting the deviation [story file Task 6]
 
 ## Developer Context Section
 
