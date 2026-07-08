@@ -73,7 +73,7 @@ public static class SprintTemplater
         sb.Append($"    <div class=\"doc-subtitle\">{subtitle}</div>\n");
         sb.Append("  </div>\n");
         sb.Append("  <div class=\"sprint-topbar-aside\">\n");
-        sb.Append(RenderCompactDonut(sprint));
+        sb.Append(RenderProgressWheel(sprint));
         sb.Append(BmadCommands.RenderCommandMenu("Sprint commands", new (string?, string)[]
         {
             (commands.Command("sprint-planning"), "Plan the sprint from epics"),
@@ -197,10 +197,11 @@ public static class SprintTemplater
         sb.Append("</div>\n\n");
     }
 
-    /// <summary>The compact lifecycle donut for the top strip — an at-a-glance done/total overview (the board's
-    /// column headers already carry the per-stage counts, so no legend here). Returns empty when no stories are
-    /// tracked. [Story 2.3 redesign]</summary>
-    private static string RenderCompactDonut(SprintStatus sprint)
+    /// <summary>A compact status progress wheel: the lifecycle segments as a small donut with NO center number
+    /// (the sibling "N / M done" label carries it — a number crammed into a tiny ring just reads as noise) and a
+    /// hover tooltip of the breakdown. Shared by the sprint page's top strip and the home Now &amp; Next header.
+    /// Returns empty when no stories are tracked. [Story 2.3 redesign]</summary>
+    public static string RenderProgressWheel(SprintStatus sprint)
     {
         var counts = StoryStageCounts(sprint);
         var total = counts.Sum(c => c.Count);
@@ -212,9 +213,9 @@ public static class SprintTemplater
         var ariaParts = string.Join(", ", nonZero.Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
 
         var sb = new StringBuilder();
-        sb.Append("<div class=\"sprint-topbar-donut\" data-tooltip=\"" + PathUtil.Html($"Sprint delivery: {ariaParts}") + "\">");
-        sb.Append(Charts.Donut(segments, size: 58, ariaLabel: $"Sprint delivery: {ariaParts}", centerText: $"{done}/{total}"));
-        sb.Append($"<span class=\"sprint-topbar-donut-label\">{done} / {total} done</span>");
+        sb.Append("<div class=\"sprint-wheel\" data-tooltip=\"" + PathUtil.Html($"Sprint delivery: {ariaParts}") + "\">");
+        sb.Append(Charts.Donut(segments, size: 46, showCenterText: false, ariaLabel: $"Sprint delivery: {ariaParts}"));
+        sb.Append($"<span class=\"sprint-wheel-label\">{done} / {total} done</span>");
         sb.Append("</div>");
         return sb.ToString();
     }

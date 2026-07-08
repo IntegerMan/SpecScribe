@@ -54,17 +54,20 @@ public static class MarkdownConverter
         };
     }
 
-    /// <summary>Renders a parsed markdown document to HTML with the mermaid-aware code-block renderer applied,
-    /// so <c>```mermaid</c> fences become <c>&lt;pre class="mermaid"&gt;</c> here exactly as they do in full-page
-    /// <see cref="Convert"/>. Shared by <see cref="Convert"/> and <see cref="RenderBlock"/> so fragment rendering
-    /// (story remainder, dev-agent record, review findings, change log, epics overview/inventory) carries the same
-    /// mermaid fidelity as a full page — otherwise a fence authored inside an artifact body renders inert.</summary>
+    /// <summary>Renders a parsed markdown document to HTML with the mermaid-aware code-block renderer and the
+    /// comment-aware HTML renderers applied, so <c>```mermaid</c> fences become <c>&lt;pre class="mermaid"&gt;</c>
+    /// and <c>&lt;!-- ... --&gt;</c> comments become visible annotations here exactly as they do in full-page
+    /// <see cref="Convert"/>. Shared by <see cref="Convert"/>, <see cref="RenderBlock"/>, and
+    /// <see cref="RenderInline"/> so fragment rendering (story remainder, dev-agent record, review findings,
+    /// change log, epics overview/inventory, titles, AC lines) carries the same fidelity as a full page —
+    /// otherwise a fence or comment authored inside an artifact body renders inert or invisible.</summary>
     private static string RenderDocumentHtml(MarkdownDocument document)
     {
         using var writer = new StringWriter();
         var renderer = new HtmlRenderer(writer);
         Pipeline.Setup(renderer);
         UseMermaidCodeBlocks(renderer);
+        UseCommentAnnotations(renderer);
         renderer.Render(document);
         writer.Flush();
         return writer.ToString();
@@ -80,6 +83,27 @@ public static class MarkdownConverter
 
         renderer.ObjectRenderers.Remove(existing);
         renderer.ObjectRenderers.Add(new MermaidCodeBlockRenderer(existing));
+    }
+
+    /// <summary>Replaces the default HTML block/inline renderers with comment-aware wrappers that render
+    /// <c>&lt;!-- ... --&gt;</c> as a visible, muted annotation; every other HTML block/inline is delegated to the
+    /// wrapped defaults unchanged. Must run after <see cref="MarkdownPipeline.Setup(IMarkdownRenderer)"/> so the
+    /// default renderers it wraps are already registered.</summary>
+    private static void UseCommentAnnotations(HtmlRenderer renderer)
+    {
+        var existingBlock = renderer.ObjectRenderers.OfType<Markdig.Renderers.Html.HtmlBlockRenderer>().FirstOrDefault();
+        if (existingBlock is not null)
+        {
+            renderer.ObjectRenderers.Remove(existingBlock);
+            renderer.ObjectRenderers.Add(new HtmlBlockCommentRenderer(existingBlock));
+        }
+
+        var existingInline = renderer.ObjectRenderers.OfType<Markdig.Renderers.Html.Inlines.HtmlInlineRenderer>().FirstOrDefault();
+        if (existingInline is not null)
+        {
+            renderer.ObjectRenderers.Remove(existingInline);
+            renderer.ObjectRenderers.Add(new HtmlInlineCommentRenderer(existingInline));
+        }
     }
 
     /// <summary>Opens with FileShare.ReadWrite so an editor or the BMad tooling can hold/write the file concurrently without us blocking it.</summary>
@@ -102,7 +126,8 @@ public static class MarkdownConverter
     public static string RenderInline(string markdown)
     {
         if (string.IsNullOrWhiteSpace(markdown)) return string.Empty;
-        var html = Markdown.ToHtml(markdown, Pipeline).Trim();
+        var document = Markdown.Parse(markdown, Pipeline);
+        var html = RenderDocumentHtml(document).Trim();
         if (html.StartsWith("<p>", StringComparison.Ordinal) && html.EndsWith("</p>", StringComparison.Ordinal)
             && html.IndexOf("<p>", 3, StringComparison.Ordinal) < 0)
         {

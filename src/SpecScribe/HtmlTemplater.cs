@@ -505,10 +505,14 @@ public static class HtmlTemplater
         if (sprint is { IsEmpty: false })
         {
             sb.Append("<div class=\"chart-panel sprint-board-panel\">\n");
-            sb.Append("<div class=\"chart-panel-header-row\"><h3>Now &amp; Next</h3>");
-            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a></div>\n");
-            // Source-labeled so the tracked board never reads as contradicting the (now sprint-sourced) view.
-            sb.Append("<p class=\"panel-source-note\">from sprint-status.yaml</p>\n");
+            // One header row: the title + its source label (inline, so it doesn't cost its own line), a status
+            // progress wheel, and the CTA. [Story 2.3 redesign]
+            sb.Append("<div class=\"chart-panel-header-row sprint-board-header\">\n");
+            sb.Append("  <h3>Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span></h3>\n");
+            sb.Append("  <div class=\"sprint-board-header-aside\">");
+            sb.Append(SprintTemplater.RenderProgressWheel(sprint));
+            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a>");
+            sb.Append("</div>\n</div>\n");
             sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath));
             sb.Append("</div>\n\n");
             return;

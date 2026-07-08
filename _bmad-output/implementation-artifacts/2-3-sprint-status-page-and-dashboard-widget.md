@@ -466,6 +466,10 @@ claude-opus-4-8
   discipline (tracked yaml vs. derived artifact `Status:`) to protect Story 1.5 truthfulness; and full
   graceful degradation for missing/partial/malformed tracking data (no page, nav, widget, or broken links).
   Documented the watch-mode `.yaml` live-reload limitation as a known, optionally-extendable boundary.
+- 2026-07-07 (polish #3): Popout command badges size to content instead of stretching the panel; dropped the
+  crammed center number from the tiny status wheel (a "N / M done" label carries it — new `Charts.Donut`
+  `showCenterText` option); the home Now & Next board folds its "from sprint-status.yaml" label inline into the
+  header and gains the shared status progress wheel (public `SprintTemplater.RenderProgressWheel`). 416 tests pass.
 - 2026-07-07 (polish, post-review feedback #2): Compressed the sprint page's top chrome into one strip
   (title/subtitle + a compact donut + a header "Sprint commands ▾" popout that holds each command's
   description behind a native `<details>` dropdown), moved the header inside the board column so it aligns,

@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: 2026-07-07T00:00:00-04:00
+# last_updated: 2026-07-07T12:00:00-04:00
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-07T11:00:00-04:00
+last_updated: 2026-07-07T12:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -54,7 +54,7 @@ development_status:
   1-3-markdown-fidelity-for-core-artifact-patterns: done
   1-4-accessible-high-polish-interaction-baseline: done
   1-5-dashboard-insight-polish-and-visual-truthfulness: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   epic-2: in-progress
   2-1-accurate-work-representation-and-authoring-guidance: review
@@ -62,7 +62,7 @@ development_status:
   2-3-sprint-status-page-and-dashboard-widget: review
   2-4-planning-artifacts-grouping-status-badges-and-prd-prominence: review
   2-5-standardized-iconography-for-artifact-types-and-status: review
-  2-6-render-markdown-comments-as-visible-annotations: ready-for-dev
+  2-6-render-markdown-comments-as-visible-annotations: review
   epic-2-retrospective: optional
 
   epic-3: backlog
@@ -103,3 +103,13 @@ development_status:
   7-3-activity-timeline-and-date-pages: backlog
   7-4-advanced-code-and-git-coverage: backlog
   epic-7-retrospective: optional
+
+action_items:
+  - epic: 1
+    action: "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog for review before Epic 3 planning"
+    owner: "Dana (QA Engineer)"
+    status: open
+  - epic: 1
+    action: "Schedule epic retrospectives promptly on story completion rather than deferring past the epic boundary"
+    owner: "Amelia (Developer)"
+    status: open

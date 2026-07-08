@@ -4,7 +4,7 @@ baseline_commit: f1781b1e22ce7367a66e65c3652390666fd09704
 
 # Story 2.6: Render Markdown Comments as Visible Annotations
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -38,23 +38,23 @@ so that the context authors leave in comments (for example "sync this back into 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add the comment-aware HTML renderers (AC: #1, #2)
-  - [ ] Create `src/SpecScribe/CommentAnnotationRenderer.cs` with two `HtmlObjectRenderer<T>` subclasses, following the exact wrap/fallback shape of `MermaidCodeBlockRenderer` (`src/SpecScribe/MermaidCodeBlockRenderer.cs:12-51`): a private `_fallback` field set from the constructor, `Write` overrides that special-case the comment and otherwise call `_fallback.Write(renderer, obj)` unchanged.
+- [x] Task 1: Add the comment-aware HTML renderers (AC: #1, #2)
+  - [x] Create `src/SpecScribe/CommentAnnotationRenderer.cs` with two `HtmlObjectRenderer<T>` subclasses, following the exact wrap/fallback shape of `MermaidCodeBlockRenderer` (`src/SpecScribe/MermaidCodeBlockRenderer.cs:12-51`): a private `_fallback` field set from the constructor, `Write` overrides that special-case the comment and otherwise call `_fallback.Write(renderer, obj)` unchanged.
     - `HtmlBlockCommentRenderer : HtmlObjectRenderer<HtmlBlock>` wraps the default `Markdig.Renderers.Html.HtmlBlockRenderer`. When `obj.Type == HtmlBlockType.Comment`, extract the raw lines (same `block.Lines.Lines` iteration `MermaidCodeBlockRenderer.ExtractSource` uses, `MermaidCodeBlockRenderer.cs:39-50`), strip the leading `<!--` / trailing `-->` markers and surrounding whitespace, HTML-encode the remaining text with `PathUtil.Html(...)` (`src/SpecScribe/PathUtil.cs:24`), and write `<aside class="md-comment">{encoded text, internal newlines as &lt;br&gt;}</aside>`. Any other `HtmlBlockType` delegates to `_fallback.Write(renderer, obj)`.
     - `HtmlInlineCommentRenderer : HtmlObjectRenderer<HtmlInline>` wraps the default `Markdig.Renderers.Html.Inlines.HtmlInlineRenderer`. When `obj.Tag` starts with `"<!--"` and ends with `"-->"`, strip the markers, HTML-encode the inner text, and write `<span class="md-comment-inline">{encoded text}</span>`. Otherwise delegate to `_fallback.Write(renderer, obj)` (which itself only writes when `renderer.EnableHtmlForInline` — preserve that check by calling the fallback rather than reimplementing it).
-  - [ ] **Graceful degradation is automatic, not bolted on:** an unterminated `<!-- never closed` does not parse as `HtmlBlockType.Comment`/a `<!--...-->`-shaped `HtmlInline.Tag` in Markdig's CommonMark-conformant HTML grammar, so it simply falls through to the existing fallback renderer (today's raw-passthrough behavior) — no exception path to write, just confirm this with a test (Task 4).
+  - [x] **Graceful degradation is automatic, not bolted on:** an unterminated `<!-- never closed` does not parse as `HtmlBlockType.Comment`/a `<!--...-->`-shaped `HtmlInline.Tag` in Markdig's CommonMark-conformant HTML grammar, so it simply falls through to the existing fallback renderer (today's raw-passthrough behavior) — no exception path to write, just confirm this with a test (Task 4).
 
-- [ ] Task 2: Wire both renderers into the one shared pipeline (AC: #1, #2)
-  - [ ] In `src/SpecScribe/MarkdownConverter.cs`, add a `UseCommentAnnotations(HtmlRenderer renderer)` method mirroring `UseMermaidCodeBlocks` (`MarkdownConverter.cs:76-83`): swap out the registered `HtmlBlockRenderer` for `HtmlBlockCommentRenderer` and the registered `HtmlInlineRenderer` for `HtmlInlineCommentRenderer` via `renderer.ObjectRenderers.OfType<T>().FirstOrDefault()` → `Remove` → `Add(new Wrapper(existing))`. Call it from `RenderDocumentHtml` (`MarkdownConverter.cs:62-71`) right after `UseMermaidCodeBlocks(renderer)`, before `renderer.Render(document)` — same "must run after `Pipeline.Setup`" ordering constraint the mermaid swap already documents.
-  - [ ] **Fix the second, currently-unswapped rendering path.** `RenderInline` (`MarkdownConverter.cs:102-112`) calls `Markdown.ToHtml(markdown, Pipeline)` directly — a shortcut that builds its own throwaway `HtmlRenderer` internally and never goes through `RenderDocumentHtml`, so it would keep leaking raw `<!-- -->` even after Task 1/2. Change it to `var document = Markdown.Parse(markdown, Pipeline); var html = RenderDocumentHtml(document).Trim();` so it reuses the exact same renderer-swap path as `Convert`/`RenderBlock`. This is not optional: `EpicsParser` calls `MarkdownConverter.RenderInline` for epic/story titles, goals, blurbs, AC lines, Gherkin steps, and user-story text (9 call sites — `EpicsParser.cs:48,49,228,435,485,500,502,528,529`), and `RequirementsParser.cs:124` uses it for requirement text — all of these are realistic places an author's inline comment could appear. Leave the existing paragraph-unwrap logic (lines 106-110) unchanged — it operates on the resulting HTML string regardless of which call produced it.
-  - [ ] Update the `RenderDocumentHtml` XML doc comment (`MarkdownConverter.cs:57-61`) — it currently says "Shared by `Convert` and `RenderBlock`"; after this task it is also shared by `RenderInline`.
+- [x] Task 2: Wire both renderers into the one shared pipeline (AC: #1, #2)
+  - [x] In `src/SpecScribe/MarkdownConverter.cs`, add a `UseCommentAnnotations(HtmlRenderer renderer)` method mirroring `UseMermaidCodeBlocks` (`MarkdownConverter.cs:76-83`): swap out the registered `HtmlBlockRenderer` for `HtmlBlockCommentRenderer` and the registered `HtmlInlineRenderer` for `HtmlInlineCommentRenderer` via `renderer.ObjectRenderers.OfType<T>().FirstOrDefault()` → `Remove` → `Add(new Wrapper(existing))`. Call it from `RenderDocumentHtml` (`MarkdownConverter.cs:62-71`) right after `UseMermaidCodeBlocks(renderer)`, before `renderer.Render(document)` — same "must run after `Pipeline.Setup`" ordering constraint the mermaid swap already documents.
+  - [x] **Fix the second, currently-unswapped rendering path.** `RenderInline` (`MarkdownConverter.cs:102-112`) calls `Markdown.ToHtml(markdown, Pipeline)` directly — a shortcut that builds its own throwaway `HtmlRenderer` internally and never goes through `RenderDocumentHtml`, so it would keep leaking raw `<!-- -->` even after Task 1/2. Change it to `var document = Markdown.Parse(markdown, Pipeline); var html = RenderDocumentHtml(document).Trim();` so it reuses the exact same renderer-swap path as `Convert`/`RenderBlock`. This is not optional: `EpicsParser` calls `MarkdownConverter.RenderInline` for epic/story titles, goals, blurbs, AC lines, Gherkin steps, and user-story text (9 call sites — `EpicsParser.cs:48,49,228,435,485,500,502,528,529`), and `RequirementsParser.cs:124` uses it for requirement text — all of these are realistic places an author's inline comment could appear. Leave the existing paragraph-unwrap logic (lines 106-110) unchanged — it operates on the resulting HTML string regardless of which call produced it.
+  - [x] Update the `RenderDocumentHtml` XML doc comment (`MarkdownConverter.cs:57-61`) — it currently says "Shared by `Convert` and `RenderBlock`"; after this task it is also shared by `RenderInline`.
 
-- [ ] Task 3: Self-contained CSS for the annotation style (AC: #2)
-  - [ ] Add `.doc-body .md-comment` and `.doc-body .md-comment-inline` rules to `src/SpecScribe/assets/specscribe.css`, placed near the existing `.doc-body blockquote` rule (`specscribe.css:373-380`). Reuse the established muted-text vocabulary (`var(--ink-light)`, `font-style: italic` — the same pattern `.pending-note`/`.dev-agent-empty`/`.sprint-retro-note` already use at `specscribe.css:828,1186,2245`) but keep it **visually distinct from `.doc-body blockquote`** so a reader doesn't mistake an authored comment for an authored quote — e.g. a different border-left token (`--ink-light` or `--border` rather than blockquote's `--gold-light`) and a smaller `font-size`. Do not introduce a new color token; only reuse existing `--ink-*`/`--warm-white`/`--parchment-dark`/`--border` variables (`specscribe.css:6-41`).
-  - [ ] No new stylesheet, no icon, no JS. Icons are explicitly out of scope here — Story 2.5's `Icons`/`StatusStyles.Badge` seam is for artifact-type/status concepts, not prose annotations; do not touch it.
+- [x] Task 3: Self-contained CSS for the annotation style (AC: #2)
+  - [x] Add `.doc-body .md-comment` and `.doc-body .md-comment-inline` rules to `src/SpecScribe/assets/specscribe.css`, placed near the existing `.doc-body blockquote` rule (`specscribe.css:373-380`). Reuse the established muted-text vocabulary (`var(--ink-light)`, `font-style: italic` — the same pattern `.pending-note`/`.dev-agent-empty`/`.sprint-retro-note` already use at `specscribe.css:828,1186,2245`) but keep it **visually distinct from `.doc-body blockquote`** so a reader doesn't mistake an authored comment for an authored quote — e.g. a different border-left token (`--ink-light` or `--border` rather than blockquote's `--gold-light`) and a smaller `font-size`. Do not introduce a new color token; only reuse existing `--ink-*`/`--warm-white`/`--parchment-dark`/`--border` variables (`specscribe.css:6-41`).
+  - [x] No new stylesheet, no icon, no JS. Icons are explicitly out of scope here — Story 2.5's `Icons`/`StatusStyles.Badge` seam is for artifact-type/status concepts, not prose annotations; do not touch it.
 
-- [ ] Task 4: Test coverage in the existing `MarkdownConverterTests.cs` (AC: #1, #2)
-  - [ ] Follow this file's exact house pattern (no new test class — mirror how `Convert_RendersMermaidFencesAsClientRenderBlocks` / `RenderBlock_RendersTaskListCheckboxesWithCompletionState` sit directly in `tests/SpecScribe.Tests/MarkdownConverterTests.cs` rather than a dedicated renderer test file):
+- [x] Task 4: Test coverage in the existing `MarkdownConverterTests.cs` (AC: #1, #2)
+  - [x] Follow this file's exact house pattern (no new test class — mirror how `Convert_RendersMermaidFencesAsClientRenderBlocks` / `RenderBlock_RendersTaskListCheckboxesWithCompletionState` sit directly in `tests/SpecScribe.Tests/MarkdownConverterTests.cs` rather than a dedicated renderer test file):
     - A block comment (`<!--\nnote\n-->` on its own lines) renders `class="md-comment"` and the output does **not** contain the literal `<!--`/`-->` markers.
     - An inline comment (`text <!-- aside --> more text`) renders `class="md-comment-inline"` with the surrounding prose intact.
     - `RenderInline` also converts a comment (regression test for the `Markdown.ToHtml` → `Markdown.Parse`/`RenderDocumentHtml` fix in Task 2) — e.g. `RenderInline("Some **bold** <!-- todo --> text")` contains `md-comment-inline` and no raw `<!--`.
@@ -64,12 +64,12 @@ so that the context authors leave in comments (for example "sync this back into 
     - Ordinary content with no comments is unaffected: assert `Assert.DoesNotContain("md-comment", ...)` for a plain doc, mirroring `RenderBlock_LeavesNonCheckboxBulletsUnaffected` (`MarkdownConverterTests.cs:217-224`).
     - Existing mermaid tests (`Convert_RendersMermaidFencesAsClientRenderBlocks`, `RenderBlock_RendersMermaidFencesAsClientRenderBlocks`, `Convert_OrdinaryCodeFencesAreUntouched`) and task-list tests must keep passing unchanged — the renderer-swap chain now carries three swapped renderer types (code block, HTML block, HTML inline) instead of one; nothing about that changes the code-block path.
 
-- [ ] Task 5: End-to-end validation with a real generation pass (AC: #1, #2)
-  - [ ] Run the focused filter, then a full-suite run, then a real generation pass:
+- [x] Task 5: End-to-end validation with a real generation pass (AC: #1, #2)
+  - [x] Run the focused filter, then a full-suite run, then a real generation pass:
     - `dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj --filter "FullyQualifiedName~MarkdownConverter"`
     - `dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj` (full suite — no regressions)
     - `dotnet run --project src/SpecScribe -- generate --source _bmad-output --adrs docs/adrs --output SpecScribeOutput --project-name SpecScribe` (per memory: `SpecScribeOutput` is the real output dir; `docs/live` is stale/vestigial — do not use it)
-  - [ ] Manually verify: this repo's own `_bmad-output/planning-artifacts/epics.md:52` comment (`<!-- FR15–FR19 added post-PRD (2026-07-06) to seat the reordered roadmap... -->`) now renders as a visible muted annotation wherever the Requirements Inventory section is rendered, instead of vanishing. Spot-check a story/epic page for an inline comment rendering coherently mid-sentence, and confirm no malformed HTML anywhere in the generated output. Delete the scratch `SpecScribeOutput` directory after inspection (gitignored).
+  - [x] Manually verify: this repo's own `_bmad-output/planning-artifacts/epics.md:52` comment (`<!-- FR15–FR19 added post-PRD (2026-07-06) to seat the reordered roadmap... -->`) now renders as a visible muted annotation wherever the Requirements Inventory section is rendered, instead of vanishing. Spot-check a story/epic page for an inline comment rendering coherently mid-sentence, and confirm no malformed HTML anywhere in the generated output. Delete the scratch `SpecScribeOutput` directory after inspection (gitignored).
 
 ## Developer Context Section
 
@@ -336,11 +336,31 @@ Primary TEST updates:
 
 ### Agent Model Used
 
+Claude (bmad-dev-story execution)
+
 ### Debug Log References
+
+- `dotnet build src/SpecScribe/SpecScribe.csproj` — clean build, 0 warnings, 0 errors.
+- `dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj --filter "FullyQualifiedName~MarkdownConverter"` — 25/25 passed.
+- `dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj` (full suite) — 416/416 passed, no regressions.
+- `dotnet run --project src/SpecScribe -- generate --source _bmad-output --adrs docs/adrs --output SpecScribeOutput --project-name SpecScribe` — 36 pages generated. Confirmed `epics.html` now renders the repo's own `epics.md:52` FR15–FR19 comment as `<aside class="md-comment">` with the `<a class="req-ref">` links inside it intact, and `epics/story-1-2.html` renders a multi-line block comment with internal `<br>` line breaks. Scratch `SpecScribeOutput` directory deleted after inspection.
 
 ### Completion Notes List
 
+- Added `src/SpecScribe/CommentAnnotationRenderer.cs` with `HtmlBlockCommentRenderer` and `HtmlInlineCommentRenderer`, mirroring the `MermaidCodeBlockRenderer` wrap/fallback shape exactly — both delegate every non-comment case to the wrapped default renderer unchanged.
+- Wired both into `MarkdownConverter.RenderDocumentHtml` via a new `UseCommentAnnotations`, called after `UseMermaidCodeBlocks` (same "after `Pipeline.Setup`" ordering constraint).
+- Fixed `RenderInline` to route through `Markdown.Parse` + `RenderDocumentHtml` instead of `Markdown.ToHtml(markdown, Pipeline)`, so the renderer swap (mermaid + comment) reaches the highest-traffic entry point (titles, goals, AC lines, Gherkin steps) used by `EpicsParser`/`RequirementsParser`.
+- Added `.doc-body .md-comment` / `.doc-body .md-comment-inline` CSS rules reusing existing `--ink-light`/`--parchment-dark`/`--border` tokens, visually distinct from `.doc-body blockquote` (neutral border color, smaller font-size, no new color token).
+- Added 7 new tests to `MarkdownConverterTests.cs` covering block comment rendering, inline comment rendering, the `RenderInline`/`RenderBlock` regression paths, unterminated-comment non-fatal degrade, HTML-encoding of special characters, and the no-comment-present unaffected case. All pre-existing mermaid/task-list/table tests continue to pass unchanged.
+- Verified end-to-end against this repo's own `epics.md` comment during a real generation pass — it now renders visibly instead of vanishing, with embedded requirement links preserved.
+- Noted (not touched): the working tree already carried unrelated pre-existing uncommitted changes to `BmadCommands.cs`, `Charts.cs`, `HtmlTemplater.cs`, `SprintTemplater.cs`, and `ModuleContextTests.cs` from prior work outside this story's scope — left as-is.
+
 ### File List
+
+- `src/SpecScribe/CommentAnnotationRenderer.cs` (new)
+- `src/SpecScribe/MarkdownConverter.cs` (modified)
+- `src/SpecScribe/assets/specscribe.css` (modified)
+- `tests/SpecScribe.Tests/MarkdownConverterTests.cs` (modified)
 
 ## Change Log
 
@@ -353,3 +373,6 @@ Primary TEST updates:
   from `.doc-body blockquote`; comment text HTML-encoded via the existing `PathUtil.Html` helper; malformed/
   unterminated comments degrade non-fatally by construction (Markdig's own HTML-comment grammar). No new
   dependency, page, nav item, icon, or JS. Baseline `f1781b1`.
+- 2026-07-07: Implemented Story 2.6 — all 5 tasks complete. Full test suite green (416/416), focused
+  `MarkdownConverter` suite green (25/25, including 7 new comment-rendering tests), and a real generation pass
+  confirmed the repo's own `epics.md` FR15–FR19 comment now renders visibly. Status moved to `review`.

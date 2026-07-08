@@ -222,4 +222,76 @@ public class MarkdownConverterTests : IDisposable
         Assert.DoesNotContain("type=\"checkbox\"", html);
         Assert.Contains("<li>plain bullet</li>", html);
     }
+
+    [Fact]
+    public void Convert_RendersBlockCommentAsVisibleAnnotation()
+    {
+        var doc = Convert("""
+            # Doc
+
+            <!--
+            note
+            -->
+
+            Body text.
+            """);
+
+        Assert.Contains("class=\"md-comment\"", doc.BodyHtml);
+        Assert.DoesNotContain("<!--", doc.BodyHtml);
+        Assert.DoesNotContain("-->", doc.BodyHtml);
+    }
+
+    [Fact]
+    public void Convert_RendersInlineCommentWithSurroundingProseIntact()
+    {
+        var doc = Convert("text <!-- aside --> more text");
+
+        Assert.Contains("class=\"md-comment-inline\"", doc.BodyHtml);
+        Assert.Contains("text", doc.BodyHtml);
+        Assert.Contains("more text", doc.BodyHtml);
+    }
+
+    [Fact]
+    public void RenderInline_ConvertsComment()
+    {
+        var html = MarkdownConverter.RenderInline("Some **bold** <!-- todo --> text");
+
+        Assert.Contains("md-comment-inline", html);
+        Assert.DoesNotContain("<!--", html);
+    }
+
+    [Fact]
+    public void RenderBlock_ConvertsComment()
+    {
+        var html = MarkdownConverter.RenderBlock("<!--\nnote\n-->\n\nBody.");
+
+        Assert.Contains("md-comment", html);
+        Assert.DoesNotContain("<!--", html);
+    }
+
+    [Fact]
+    public void Convert_UnterminatedCommentDoesNotThrowAndSurroundingTextRenders()
+    {
+        var doc = Convert("<!-- never closed\n\nMore text.");
+
+        Assert.Contains("More text", doc.BodyHtml);
+    }
+
+    [Fact]
+    public void Convert_CommentTextIsHtmlEncoded()
+    {
+        var doc = Convert("<!-- see <Foo> & \"bar\" -->");
+
+        Assert.Contains("&lt;Foo&gt;", doc.BodyHtml);
+        Assert.Contains("&amp;", doc.BodyHtml);
+        Assert.DoesNotContain("<Foo>", doc.BodyHtml);
+    }
+
+    [Fact]
+    public void Convert_PlainContentWithNoCommentsHasNoMdComment()
+    {
+        var doc = Convert("# Heading\n\nJust ordinary prose, no comments here.");
+
+        Assert.DoesNotContain("md-comment", doc.BodyHtml);
+    }
 }

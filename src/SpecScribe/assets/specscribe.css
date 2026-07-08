@@ -379,6 +379,24 @@ body {
   font-style: italic;
 }
 
+/* Authored HTML comments (<!-- ... -->) surfaced as visible, de-emphasized asides — distinct from blockquote's
+   gold border/warm-white background via a neutral --border rule and a smaller font-size. [Story 2.6] */
+.doc-body .md-comment {
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--border);
+  background: var(--parchment-dark);
+  color: var(--ink-light);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.doc-body .md-comment-inline {
+  color: var(--ink-light);
+  font-style: italic;
+  font-size: 0.85em;
+}
+
 .doc-body code {
   font-family: 'Courier New', monospace;
   font-size: 0.85em;
@@ -2155,9 +2173,12 @@ code.color-swatch {
 .sprint-topbar-head h1 { font-size: 1.9rem; margin: 0 0 0.1rem; }
 .sprint-topbar-head .doc-subtitle { margin: 0; text-align: left; max-width: none; }
 .sprint-topbar-aside { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
-.sprint-topbar-donut { display: flex; align-items: center; gap: 0.5rem; }
-.sprint-topbar-donut .donut { flex-shrink: 0; }
-.sprint-topbar-donut-label { font-size: 0.75rem; color: var(--ink-faded); white-space: nowrap; }
+
+/* Compact status progress wheel — a small segmented ring + a "N / M done" label. Shared by the sprint page
+   top strip and the home Now & Next header. */
+.sprint-wheel { display: flex; align-items: center; gap: 0.45rem; }
+.sprint-wheel .donut { flex-shrink: 0; }
+.sprint-wheel-label { font-size: 0.74rem; color: var(--ink-faded); white-space: nowrap; }
 
 /* Header "Sprint commands ▾" popout — a native <details> dropdown (reuses the send-menu pattern + its JS
    dismissal). The panel is absolutely positioned so it overlays rather than pushing the board down. */
@@ -2178,11 +2199,18 @@ code.color-swatch {
   box-shadow: 0 6px 20px var(--shadow); padding: 0.6rem;
 }
 .cmd-menu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
-.cmd-menu-list li { display: flex; flex-direction: column; gap: 0.2rem; }
+/* align-items:flex-start so each command badge sizes to its content instead of stretching the popout width. */
+.cmd-menu-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; }
 .cmd-menu-desc { font-size: 0.76rem; color: var(--ink-faded); }
 
-/* Source note (home board + widget) — de-emphasized so the tracked view doesn't read as a rival panel. */
+/* Source note: a de-emphasized inline tag in the panel header (no longer its own line) so the tracked view is
+   labeled without costing vertical space. */
 .panel-source-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; margin: -0.2rem 0 0.6rem; }
+.panel-source-inline { font-size: 0.72rem; font-weight: normal; font-style: italic; color: var(--ink-light); margin-left: 0.5rem; }
+
+/* Home Now & Next board header: title (+ inline source) on the left; the progress wheel and CTA on the right. */
+.sprint-board-header { align-items: center; }
+.sprint-board-header-aside { display: flex; align-items: center; gap: 1rem; }
 
 /* Board story card: id top-left, epic badge top-right, title, and a hairline task-progress bar at the bottom.
    Shared by the sprint board and the home Now & Next board. Status color rides the left border. */

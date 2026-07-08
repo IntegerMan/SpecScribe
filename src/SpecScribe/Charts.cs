@@ -45,7 +45,7 @@ public static class Charts
     /// <paramref name="ariaLabel"/> is supplied the whole chart carries <c>role="img"</c>+that name so it is
     /// reachable without a pointer; when omitted the donut is decorative (<c>aria-hidden</c>) — used where an
     /// enclosing labeled card/legend already names it, so screen readers don't hear it twice. [Story 1.4 AC #1]</summary>
-    public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120, string? ariaLabel = null, string? centerText = null)
+    public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120, string? ariaLabel = null, string? centerText = null, bool showCenterText = true)
     {
         var total = segments.Sum(s => Math.Max(0, s.Value));
         var radius = size / 2.0 - 10;
@@ -84,10 +84,14 @@ public static class Charts
 
         // The center reads as progress, not a score: when a caller supplies a done/total fraction (E3) show
         // that; otherwise fall back to the bare total. The fraction variant gets a smaller type class so
-        // "12/34" fits the ring. [Story 1.5 E3]
-        var centerContent = centerText is { Length: > 0 } ? Html(centerText) : total.ToString();
-        var centerClass = centerText is { Length: > 0 } ? "donut-center-text donut-center-fraction" : "donut-center-text";
-        sb.Append($"  <text x=\"{F(center)}\" y=\"{F(center)}\" class=\"{centerClass}\" text-anchor=\"middle\" dominant-baseline=\"central\">{centerContent}</text>\n");
+        // "12/34" fits the ring. A tiny wheel can suppress the center entirely (showCenterText: false) when a
+        // sibling label already carries the number. [Story 1.5 E3]
+        if (showCenterText)
+        {
+            var centerContent = centerText is { Length: > 0 } ? Html(centerText) : total.ToString();
+            var centerClass = centerText is { Length: > 0 } ? "donut-center-text donut-center-fraction" : "donut-center-text";
+            sb.Append($"  <text x=\"{F(center)}\" y=\"{F(center)}\" class=\"{centerClass}\" text-anchor=\"middle\" dominant-baseline=\"central\">{centerContent}</text>\n");
+        }
         sb.Append("</svg>\n");
         return sb.ToString();
     }
