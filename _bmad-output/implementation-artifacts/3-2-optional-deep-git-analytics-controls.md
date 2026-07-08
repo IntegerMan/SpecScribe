@@ -145,6 +145,8 @@ claude-opus-4-8 (Opus 4.8)
 - `tests/SpecScribe.Tests/ForgeOptionsTests.cs` — deep-git gate default-off + flag-flow tests
 - `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` — deep panel renders when populated / absent when null
 - `tests/SpecScribe.Tests/SettingsStoreTests.cs` — `DeepGit` persistence + `ApplyTo` precedence tests
+- `.github/workflows/publish-docs-live-pages.yml` — enable `--deep-git` in the live-docs CI pipeline (relies on the existing `fetch-depth: 0` full-history checkout)
+- `README.md` — document the `--deep-git` option (options table + GitHub Actions example YAML, with `fetch-depth: 0` added so the example produces real git data)
 
 ## Change Log
 

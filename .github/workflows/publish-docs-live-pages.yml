@@ -29,8 +29,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           # Full history (not the default shallow depth-1 clone) so the dashboard's
-          # git metrics — commit count and the Commit Activity heatmap — reflect the
-          # real project history instead of just the tip commit.
+          # git metrics — commit count, the Commit Activity heatmap, and the opt-in
+          # deep analytics (hotspots + change coupling, enabled via --deep-git below) —
+          # reflect the real project history instead of just the tip commit.
           fetch-depth: 0
 
       - name: Setup .NET
@@ -47,7 +48,8 @@ jobs:
             --source _bmad-output \
             --adrs docs/adrs \
             --output SpecScribeOutput \
-            --project-name SpecScribe
+            --project-name SpecScribe \
+            --deep-git
 
       - name: Validate generated output
         run: |

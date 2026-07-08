@@ -60,6 +60,7 @@ Both `generate` and `watch` accept:
 | `--adrs <DIR>` | `<repo root>/docs/adrs` |
 | `--output <DIR>` | `<repo root>/SpecScribeOutput` |
 | `--project-name <NAME>` | `project_name` from `_bmad/config.toml`, else "BMad Live Docs" |
+| `--deep-git` | Off — opt-in deeper git analytics (file hotspots + change coupling) as a distinct dashboard panel; leaving it off keeps baseline generation unaffected |
 
 With no options, SpecScribe auto-discovers a BMad project from wherever you run it — so inside a
 BMad repo, plain `specscribe generate` just works.
@@ -94,6 +95,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so git metrics (commit count, activity heatmap) and the
+          # opt-in deep analytics (--deep-git) reflect real history, not just the tip.
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
@@ -105,7 +110,8 @@ jobs:
             --source _bmad-output \
             --adrs docs/adrs \
             --output SpecScribeOutput \
-            --project-name "My Project"
+            --project-name "My Project" \
+            --deep-git
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v4
