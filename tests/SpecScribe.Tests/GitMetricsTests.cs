@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -157,5 +158,129 @@ public class GitMetricsTests
         };
 
         Assert.Equal(3, GitMetrics.CountCommitsInLastDays(series, today, 30));
+    }
+
+    // ---- ParseNumstatLog (deep git analytics: hotspots + coupling) [Story 3.2] ----
+
+    private const string Sentinel = "\u0001";
+
+    // Builds `git log --numstat --pretty=format:%x01%H` shaped text: each commit is a \x01 sentinel header line
+    // followed by "added\tdeleted\tpath" numstat lines. The counts are irrelevant to this parser (it uses the
+    // file-set only), so a fixed "1\t0" prefix stands in for them.
+    private static string Numstat(params string[][] commits)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < commits.Length; i++)
+        {
+            sb.Append(Sentinel).Append("hash").Append(i).Append('\n');
+            foreach (var path in commits[i])
+            {
+                sb.Append("1\t0\t").Append(path).Append('\n');
+            }
+        }
+        return sb.ToString();
+    }
+
+    [Fact]
+    public void ParseNumstatLog_RanksHotspotsByChangeFrequencyDescendingAndTruncatesToTopN()
+    {
+        // A.cs in all three commits, B.cs and C.cs in one each.
+        var log = Numstat(
+            new[] { "A.cs", "B.cs" },
+            new[] { "A.cs", "C.cs" },
+            new[] { "A.cs" });
+
+        var deep = GitMetrics.ParseNumstatLog(log, topHotspots: 2);
+
+        Assert.Equal(2, deep.Hotspots.Count);
+        Assert.Equal(("A.cs", 3), deep.Hotspots[0]);
+        // B and C tie at 1; the ordinal path tie-break keeps it deterministic (B before C).
+        Assert.Equal(("B.cs", 1), deep.Hotspots[1]);
+    }
+
+    [Fact]
+    public void ParseNumstatLog_CountsCoupledPairsKeepsOnlyThoseAtOrAboveTwoAndTruncates()
+    {
+        // (A,B) co-change in commits 1+2, (A,C) in commits 1+3, (B,C) only in commit 1.
+        var log = Numstat(
+            new[] { "A.cs", "B.cs", "C.cs" },
+            new[] { "A.cs", "B.cs" },
+            new[] { "A.cs", "C.cs" });
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        // (B,C) sits at 1 and is dropped by the >= 2 threshold; (A,B) and (A,C) both survive at 2.
+        Assert.Equal(2, deep.Coupling.Count);
+        Assert.Equal(("A.cs", "B.cs", 2), deep.Coupling[0]);
+        Assert.Equal(("A.cs", "C.cs", 2), deep.Coupling[1]);
+    }
+
+    [Fact]
+    public void ParseNumstatLog_PairsAreUnorderedRegardlessOfWithinCommitFileOrder()
+    {
+        // Same pair, opposite file order across two commits — must be counted as one canonical pair, not two.
+        var log = Numstat(
+            new[] { "Z.cs", "A.cs" },
+            new[] { "A.cs", "Z.cs" });
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        var pair = Assert.Single(deep.Coupling);
+        Assert.Equal(("A.cs", "Z.cs", 2), pair); // canonicalized to ordinal order
+    }
+
+    [Fact]
+    public void ParseNumstatLog_SkipsOversizedCommitsForCouplingButStillCountsThemAsHotspots()
+    {
+        // One bulk commit touching 60 files (> the 50-file cap) plus two small commits that form a real pair.
+        var bulk = Enumerable.Range(0, 60).Select(i => $"bulk/File{i:00}.cs").ToArray();
+        var log = Numstat(
+            bulk,
+            new[] { "A.cs", "B.cs" },
+            new[] { "A.cs", "B.cs" });
+
+        var deep = GitMetrics.ParseNumstatLog(log, topHotspots: 100);
+
+        // The 60-file commit would generate 1770 pairs if not skipped; the only surviving coupling is the real
+        // (A,B) pair from the two small commits — proving the O(n²) guard fired.
+        var pair = Assert.Single(deep.Coupling);
+        Assert.Equal(("A.cs", "B.cs", 2), pair);
+        // ...yet the bulk commit's files still count toward hotspot frequency (the cap is coupling-only).
+        Assert.Contains(("bulk/File00.cs", 1), deep.Hotspots);
+    }
+
+    [Fact]
+    public void ParseNumstatLog_SkipsMalformedAndBlankLinesWithoutThrowing()
+    {
+        // A well-formed commit interleaved with junk: a line with no tabs, an empty-path numstat line, a blank
+        // line, and a binary-file marker ("-\t-\tpath"), which is a legitimate numstat row and must be kept.
+        var log =
+            Sentinel + "hash0\n" +
+            "1\t0\tA.cs\n" +
+            "garbage-with-no-tabs\n" +
+            "\t\t\n" +               // empty path -> skipped
+            "\n" +                    // blank -> skipped
+            "-\t-\tBin.dll\n";        // binary file -> path still taken
+
+        var deep = GitMetrics.ParseNumstatLog(log, topHotspots: 10);
+
+        Assert.Contains(("A.cs", 1), deep.Hotspots);
+        Assert.Contains(("Bin.dll", 1), deep.Hotspots);
+        Assert.Equal(2, deep.Hotspots.Count); // the junk lines produced no phantom entries
+    }
+
+    [Fact]
+    public void ParseNumstatLog_ReturnsEmptyListsWhenNoFilesChanged()
+    {
+        // Merge-only / empty commits: sentinels with no numstat rows, and the fully empty case.
+        var log = Sentinel + "hash0\n" + Sentinel + "hash1\n";
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+        Assert.Empty(deep.Hotspots);
+        Assert.Empty(deep.Coupling);
+
+        var empty = GitMetrics.ParseNumstatLog(string.Empty);
+        Assert.Empty(empty.Hotspots);
+        Assert.Empty(empty.Coupling);
     }
 }

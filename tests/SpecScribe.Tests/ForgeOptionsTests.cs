@@ -77,4 +77,22 @@ public class ForgeOptionsTests : IDisposable
         var options = ForgeOptions.Resolve(startDirectory: Repo);
         Assert.Equal(ForgeOptions.DefaultSiteTitle, options.SiteTitle);
     }
+
+    [Fact]
+    public void Resolve_DeepGitAnalyticsDefaultsToFalse()
+    {
+        // AC #1: deep analysis never runs implicitly — the resolved flag is off unless explicitly requested.
+        var options = ForgeOptions.Resolve(startDirectory: Repo);
+        Assert.False(options.DeepGitAnalytics);
+    }
+
+    [Fact]
+    public void SiteSettings_DeepGitFlagFlowsIntoResolvedOptions()
+    {
+        // The --deep-git bool on SiteSettings must reach ForgeOptions.DeepGitAnalytics, mirroring the
+        // --no-readme/IncludeReadme flow. Source is passed explicitly so resolution doesn't depend on the cwd.
+        var settings = new SiteSettings { Source = Path.Combine(Repo, "_bmad-output"), DeepGit = true };
+
+        Assert.True(settings.Resolve().DeepGitAnalytics);
+    }
 }

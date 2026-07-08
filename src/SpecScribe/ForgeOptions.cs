@@ -26,6 +26,12 @@ public sealed class ForgeOptions
     /// as a stylized page and surfaced from the home index. Disabled via <c>--no-readme</c>.</summary>
     public required bool IncludeReadme { get; init; }
 
+    /// <summary>When true (opt-in via <c>--deep-git</c>), the generator runs the heavier deep-git pass
+    /// (change-coupling + hotspots) and renders its distinct dashboard panel. Off by default: the deep git
+    /// process is never invoked when this is false, so baseline generation performance cannot regress. The
+    /// flag is the FR-10 performance guarantee — the gate, not a timing test. [Story 3.2]</summary>
+    public required bool DeepGitAnalytics { get; init; }
+
     public const string StylesheetName = "specscribe.css";
 
     /// <summary>The one sanctioned progressive-enhancement script (on-brand chart tooltips + Next Steps copy
@@ -56,7 +62,8 @@ public sealed class ForgeOptions
         string? output = null,
         string? projectName = null,
         string? startDirectory = null,
-        bool includeReadme = true)
+        bool includeReadme = true,
+        bool deepGitAnalytics = false)
     {
         string repoRoot;
         string sourceRoot;
@@ -95,6 +102,7 @@ public sealed class ForgeOptions
             OutputRoot = output is { Length: > 0 } ? Path.GetFullPath(output) : Path.Combine(repoRoot, OutputDirName),
             SiteTitle = projectName is { Length: > 0 } ? projectName : ReadProjectName(repoRoot) ?? DefaultSiteTitle,
             IncludeReadme = includeReadme,
+            DeepGitAnalytics = deepGitAnalytics,
         };
     }
 

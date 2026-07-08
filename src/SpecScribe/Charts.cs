@@ -657,6 +657,73 @@ public static class Charts
         return sb.ToString();
     }
 
+    /// <summary>The opt-in "Deep Analytics" panel body (FR-10): Git Hotspots (most-frequently-changed files as
+    /// proportional bars) beside Change Coupling (file pairs that tend to change together). Deliberately its own
+    /// labeled surface, distinct from the baseline Git Pulse / top-changed-files list (AC #2). Pure HTML/CSS +
+    /// the existing neutral chart tokens — no JS, no new colors, no <c>--status-*</c> tokens (these are file-path
+    /// signals, not lifecycle statuses). Each half degrades to a friendly note rather than a broken chart when
+    /// its signal is absent (e.g. a young repo with no significant coupling). The whole-panel omission when
+    /// <c>DeepGit is null</c> is the caller's job — this only renders when there IS deep data. [Story 3.2]</summary>
+    public static string DeepGitPanel(DeepGitPulse deep)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"deep-git\">\n");
+
+        // Hotspots — proportional bars (reusing the Git Pulse bar language), width relative to the busiest file.
+        sb.Append("  <div class=\"deep-git-section\">\n");
+        sb.Append("    <div class=\"deep-git-title\">Git Hotspots</div>\n");
+        sb.Append("    <div class=\"deep-git-note\">Files changed most often across recent history.</div>\n");
+        if (deep.Hotspots.Count > 0)
+        {
+            var maxChanges = deep.Hotspots.Max(h => h.Changes);
+            sb.Append("    <ol class=\"git-pulse-bars deep-git-hotspots\">\n");
+            foreach (var (path, changes) in deep.Hotspots)
+            {
+                // Floor the fill so the least-changed file still shows a visible sliver; the exact count stays
+                // in text so the bar is decorative, never the sole information carrier (not size/color-only).
+                var pct = maxChanges <= 0 ? 0 : Math.Clamp((int)Math.Round((double)changes / maxChanges * 100), 6, 100);
+                sb.Append(
+                    $"      <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{Html(path)}</span>" +
+                    $"<span class=\"git-pulse-bar-track\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
+                    $"<span class=\"git-pulse-bar-count\">{changes} {Plural(changes, "change", "changes")}</span></li>\n");
+            }
+            sb.Append("    </ol>\n");
+        }
+        else
+        {
+            sb.Append("    <div class=\"chart-empty\">No file-change history to rank yet.</div>\n");
+        }
+        sb.Append("  </div>\n");
+
+        // Coupling — file pairs that co-change. Not statuses, so no status tokens; a plain ranked list with the
+        // co-change count as a monospace badge, both paths shown as real text (never color/size-only).
+        sb.Append("  <div class=\"deep-git-section\">\n");
+        sb.Append("    <div class=\"deep-git-title\">Change Coupling</div>\n");
+        sb.Append("    <div class=\"deep-git-note\">File pairs that tend to change together.</div>\n");
+        if (deep.Coupling.Count > 0)
+        {
+            sb.Append("    <ol class=\"deep-git-coupling\">\n");
+            foreach (var (fileA, fileB, coChanges) in deep.Coupling)
+            {
+                sb.Append(
+                    "      <li>" +
+                    $"<span class=\"deep-git-pair\"><span class=\"deep-git-file\" title=\"{Html(fileA)}\">{Html(fileA)}</span>" +
+                    "<span class=\"deep-git-link\" aria-hidden=\"true\">&harr;</span>" +
+                    $"<span class=\"deep-git-file\" title=\"{Html(fileB)}\">{Html(fileB)}</span></span>" +
+                    $"<span class=\"deep-git-count\">{coChanges}&times; together</span></li>\n");
+            }
+            sb.Append("    </ol>\n");
+        }
+        else
+        {
+            sb.Append("    <div class=\"chart-empty\">No significant change coupling detected.</div>\n");
+        }
+        sb.Append("  </div>\n");
+
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
     /// <summary>Invariant ISO date for heatmap hrefs and per-day page filenames — a culture-sensitive
     /// format would emit non-Gregorian dates (and mismatched links/filenames) on th-TH/fa-IR hosts.</summary>
     public static string D(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

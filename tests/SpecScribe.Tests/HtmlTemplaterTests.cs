@@ -262,6 +262,81 @@ public class HtmlTemplaterTests
         Assert.Contains("data-tooltip=\"Run in a git repository to enable commit stats\"", html);
     }
 
+    // A ProgressModel with both baseline git and the opt-in deep-git payload populated, for the --deep-git panel.
+    private static ProgressModel ProgressWithDeepGit()
+    {
+        var day = new DateOnly(2026, 1, 5);
+        return new ProgressModel
+        {
+            EpicsTotal = 1,
+            EpicsDrafted = 1,
+            EpicsPending = 0,
+            StoriesTotal = 1,
+            StoriesWithArtifact = 1,
+            TasksDone = 0,
+            TasksTotal = 0,
+            PerEpic = Array.Empty<EpicProgress>(),
+            Git = new GitPulse(3, 1, day, day, new (DateOnly, int)[] { (day, 3) },
+                new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>
+                {
+                    [day] = new[] { new CommitInfo("c001", "Change", "Alice", "12:00") },
+                },
+                LastCommitTimestamp: day.ToDateTime(new TimeOnly(12, 0)),
+                Last30DayCommitCount: 3,
+                TopChangedFiles: new (string, int)[] { ("src/Program.cs", 3) }),
+            DeepGit = new DeepGitPulse(
+                Hotspots: new (string, int)[] { ("src/HtmlTemplater.cs", 9), ("src/Charts.cs", 4) },
+                Coupling: new (string, string, int)[] { ("src/Charts.cs", "src/HtmlTemplater.cs", 5) }),
+        };
+    }
+
+    [Fact]
+    public void RenderIndex_RendersDeepAnalyticsPanelDistinctlyWhenDeepGitPopulated()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressWithDeepGit(),
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // AC #2: the deep insights get their own labeled panel, distinct from the baseline Git Pulse surface.
+        Assert.Contains("deep-git-panel", html);
+        Assert.Contains("Deep Analytics", html);
+        Assert.Contains("Git Hotspots", html);
+        Assert.Contains("Change Coupling", html);
+        // The actual signals render: a hotspot path and a coupling pair with its co-change count.
+        Assert.Contains("src/HtmlTemplater.cs", html);
+        Assert.Contains("src/Charts.cs", html);
+        Assert.Contains("5&times; together", html);
+    }
+
+    [Fact]
+    public void RenderIndex_OmitsDeepAnalyticsPanelEntirelyWhenDeepGitNull()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressWithCommits(3), // Git present, DeepGit null (the default, no --deep-git)
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // Subtask 3.4: unlike the baseline "—" placeholders, the deep panel simply does not exist when not
+        // opted into, so the default dashboard is unchanged for users who never pass --deep-git.
+        Assert.DoesNotContain("deep-git-panel", html);
+        Assert.DoesNotContain("Deep Analytics", html);
+        // ...while the baseline Git Pulse panel is still there, proving only the deep surface was omitted.
+        Assert.Contains("<h3>Git Pulse</h3>", html);
+    }
+
     [Fact]
     public void RenderIndex_EmitsFaviconDescriptionAndDashboardTitle()
     {

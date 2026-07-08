@@ -283,6 +283,18 @@ public static class HtmlTemplater
             : "<div class=\"chart-empty git-pulse-empty\" data-tooltip=\"Run in a git repository to enable commit stats\" tabindex=\"0\">—</div>\n");
         sb.Append("</div>\n\n");
 
+        // Opt-in Deep Analytics panel (FR-10). Rendered ONLY when --deep-git produced data: unlike the baseline
+        // stat cards that show a "—" placeholder, this panel simply does not exist when not opted into, so the
+        // default dashboard is byte-for-byte unchanged for users who never pass --deep-git. Its own labeled
+        // "Deep Analytics" panel keeps it visibly distinct from the baseline Git Pulse surface above (AC #2).
+        if (p.DeepGit is { } deep)
+        {
+            sb.Append("<div class=\"chart-panel deep-git-panel\">\n");
+            sb.Append("<h3>Deep Analytics <span class=\"deep-git-badge\">opt-in</span></h3>\n");
+            sb.Append(Charts.DeepGitPanel(deep));
+            sb.Append("</div>\n\n");
+        }
+
         AppendRequirementsPanel(sb, requirements);
 
         if (p.PerEpic.Count > 0)

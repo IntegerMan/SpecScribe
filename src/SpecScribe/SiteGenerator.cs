@@ -405,7 +405,11 @@ public sealed class SiteGenerator
             // Computed after artifacts are resolved (above) so task counts land on each StoryInfo before
             // any page renders. Git is invoked once here, not per-page.
             var gitPulse = GitMetrics.TryCompute(_options.RepoRoot);
-            var progress = ProgressCalculator.Compute(model, artifactMap, gitPulse);
+            // Deep git analytics are strictly opt-in: when the flag is off this ternary short-circuits so
+            // TryComputeDeep — and its extra git process — never runs, and baseline generation timing cannot
+            // regress. That gate IS the FR-10 performance guarantee (AC #1). [Story 3.2]
+            var deepGit = _options.DeepGitAnalytics ? GitMetrics.TryComputeDeep(_options.RepoRoot) : null;
+            var progress = ProgressCalculator.Compute(model, artifactMap, gitPulse, deepGit);
             _epicsModel = model;
             _progress = progress;
             // Requirements come from the same epics.md and roll their progress up from the epics above,

@@ -152,6 +152,12 @@ public sealed class InteractiveCommand : Command<SiteSettings>
                 .DefaultValue(settings.ProjectName ?? defaults?.SiteTitle ?? ForgeOptions.DefaultSiteTitle));
         settings.ProjectName = name.Trim();
 
+        // Deep git analytics is a configurable feature, so NFR7 (menu/CLI parity) requires it be reachable from
+        // the interactive menu too, not just the --deep-git flag. Defaults to the current value so re-running
+        // Configure paths doesn't silently flip it. [Story 3.2 Subtask 4.1]
+        settings.DeepGit = AnsiConsole.Confirm(
+            "Enable deep git analytics (change coupling and hotspots)?", defaultValue: settings.DeepGit);
+
         // Persist the choices so they're restored on the next run.
         if (SettingsStore.TrySave(settings) is { } savedPath)
         {

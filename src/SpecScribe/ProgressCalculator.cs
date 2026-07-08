@@ -5,7 +5,7 @@ namespace SpecScribe;
 /// so per-story task bars need no extra plumbing downstream.</summary>
 public static class ProgressCalculator
 {
-    public static ProgressModel Compute(EpicsModel epics, IReadOnlyDictionary<string, string> artifactMap, GitPulse? git)
+    public static ProgressModel Compute(EpicsModel epics, IReadOnlyDictionary<string, string> artifactMap, GitPulse? git, DeepGitPulse? deep = null)
     {
         var perEpic = new List<EpicProgress>();
         int storiesTotal = 0, storiesWithArtifact = 0, tasksDone = 0, tasksTotal = 0;
@@ -65,6 +65,7 @@ public static class ProgressCalculator
             TasksTotal = tasksTotal,
             PerEpic = perEpic,
             Git = git,
+            DeepGit = deep,
         };
     }
 

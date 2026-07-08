@@ -41,4 +41,32 @@ public class SettingsStoreTests
     {
         Assert.False(new SavedSettings { Output = "out" }.IsEmpty);
     }
+
+    [Fact]
+    public void IsEmpty_IsFalseWhenOnlyDeepGitSet()
+    {
+        // A config that persists just the deep-git opt-in is still worth writing. [Story 3.2]
+        Assert.False(new SavedSettings { DeepGit = true }.IsEmpty);
+    }
+
+    [Fact]
+    public void ApplyTo_RestoresPersistedDeepGitWhenCliDidNotRequestIt()
+    {
+        var saved = new SavedSettings { DeepGit = true };
+        var settings = new SiteSettings(); // DeepGit defaults false -> "not requested this run"
+
+        SettingsStore.ApplyTo(saved, settings);
+
+        Assert.True(settings.DeepGit);
+    }
+
+    [Fact]
+    public void ApplyTo_LeavesDeepGitOffWhenNeitherCliNorSavedEnabledIt()
+    {
+        SettingsStore.ApplyTo(new SavedSettings { Output = "out" }, new SiteSettings());
+        // (no saved DeepGit) -> stays the default false
+        var settings = new SiteSettings();
+        SettingsStore.ApplyTo(new SavedSettings(), settings);
+        Assert.False(settings.DeepGit);
+    }
 }

@@ -26,12 +26,27 @@ public sealed record GitPulse(
     int Last30DayCommitCount,
     IReadOnlyList<(string Path, int ChangeCount)> TopChangedFiles);
 
+/// <summary>The opt-in deep-git signals (FR-10): file-path <paramref name="Hotspots"/> (which files change
+/// most often) and <paramref name="Coupling"/> (which file pairs change together). Both are purely file-path
+/// signals — never author/productivity signals (PRD non-goal). Populated only when <c>--deep-git</c> is set;
+/// a null <see cref="DeepGitPulse"/> means "not opted in, or deep analysis failed" and the panel is omitted
+/// entirely rather than shown empty. [Story 3.2]</summary>
+public sealed record DeepGitPulse(
+    IReadOnlyList<(string Path, int Changes)> Hotspots,
+    IReadOnlyList<(string FileA, string FileB, int CoChanges)> Coupling);
+
 /// <summary>Shells out to git for a handful of read-only stats. Never throws and never blocks a save —
 /// any failure (git missing, not a repo, slow process) simply yields a null pulse, which callers treat
 /// as "no git data available" rather than an error.</summary>
 public static class GitMetrics
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
+
+    /// <summary>Per-commit file-set cap for coupling: coupling is O(files²) per commit, so one bulk-import,
+    /// merge, or vendored-drop commit touching thousands of files would explode the pair count. Commits whose
+    /// file set exceeds this are skipped when building coupling pairs (they are almost never meaningful
+    /// co-change signal) — they still count toward hotspot frequency. [Story 3.2 Subtask 2.5]</summary>
+    private const int CouplingFileSetCap = 50;
 
     public static GitPulse? TryCompute(string repoRoot)
     {
@@ -177,6 +192,117 @@ public static class GitMetrics
             .Take(top)
             .Select(kv => (kv.Key, kv.Value))
             .ToList();
+    }
+
+    /// <summary>The opt-in deep-git pass (FR-10). A single bounded <c>git log --numstat</c> call — one shared
+    /// git code path reused across the deep-git surfaces — feeds the pure <see cref="ParseNumstatLog"/> parser.
+    /// Obeys the same never-throw contract as <see cref="TryCompute"/>: any failure yields <c>null</c>, which
+    /// the dashboard treats as "no deep data" and simply omits the panel, never an error. This is a separate
+    /// call from <see cref="TryCompute"/>, so a deep failure leaves the baseline <see cref="GitPulse"/> intact
+    /// (partial data beats none; AD-4). [Story 3.2]</summary>
+    public static DeepGitPulse? TryComputeDeep(string repoRoot)
+    {
+        try
+        {
+            // Bounded with -n so an uncapped log can't blow the 3s RunGit budget on a mature repo
+            // (deferred-work.md flagged this exact scaling trap). --numstat emits one "added\tdeleted\tpath"
+            // line per file per commit; the \x01 sentinel prefixes each commit's header line so the parser can
+            // find commit boundaries unambiguously. --numstat (not bare --name-only) is the shared foundation
+            // the Epic-3 git re-plan designates for the downstream hub/detail stories; this story ignores the
+            // added/deleted columns and uses only the file-set data. [Story 3.2 re-plan]
+            var logText = RunGit(repoRoot, "log --numstat --pretty=format:%x01%H -n 300");
+            if (logText is null) return null;
+
+            return ParseNumstatLog(logText);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Parses `git log --numstat --pretty=format:%x01%H` output into deep-git signals. Each commit is
+    /// introduced by a line beginning with the <c>\x01</c> sentinel; the following <c>added\tdeleted\tpath</c>
+    /// lines are that commit's touched files (binary files show <c>-\t-\tpath</c> — the path is still taken).
+    /// <para><b>Hotspots</b> = per-path change frequency (commits touching the file), sorted desc with an
+    /// ordinal path tie-break, top <paramref name="topHotspots"/>. <b>Coupling</b> = for each commit's file
+    /// set, every unordered co-changed pair, kept only at <c>CoChanges &gt;= 2</c>, sorted desc, top
+    /// <paramref name="topCoupling"/>. Commits touching more than <see cref="CouplingFileSetCap"/> files are
+    /// skipped for coupling (bulk imports).</para>
+    /// Pure and repo-free (mirrors <see cref="ParseLog"/>) so the format contract is unit-testable; malformed
+    /// lines are skipped rather than throwing.</summary>
+    public static DeepGitPulse ParseNumstatLog(string logText, int topHotspots = 10, int topCoupling = 10)
+    {
+        var changeCounts = new Dictionary<string, int>();
+        // Canonicalized (ordinal-ordered) file pair -> number of commits changing both together.
+        var pairCounts = new Dictionary<(string, string), int>();
+        var current = new HashSet<string>(StringComparer.Ordinal);
+
+        void Flush()
+        {
+            if (current.Count == 0) return;
+
+            foreach (var path in current)
+            {
+                changeCounts[path] = changeCounts.GetValueOrDefault(path) + 1;
+            }
+
+            // Guard the O(n²) pair cost: a bulk/merge/vendored commit is not a meaningful co-change signal.
+            if (current.Count >= 2 && current.Count <= CouplingFileSetCap)
+            {
+                var files = current.ToArray();
+                for (var i = 0; i < files.Length; i++)
+                {
+                    for (var j = i + 1; j < files.Length; j++)
+                    {
+                        var a = files[i];
+                        var b = files[j];
+                        // Canonical unordered key: (A,B) and (B,A) map to the same pair.
+                        var key = string.CompareOrdinal(a, b) <= 0 ? (a, b) : (b, a);
+                        pairCounts[key] = pairCounts.GetValueOrDefault(key) + 1;
+                    }
+                }
+            }
+
+            current.Clear();
+        }
+
+        foreach (var line in logText.Split('\n'))
+        {
+            if (line.Length > 0 && line[0] == '\u0001')
+            {
+                // New commit boundary — bank the previous commit's file set before starting the next.
+                Flush();
+                continue;
+            }
+
+            // A numstat data line: added \t deleted \t path. Cap the split at 3 so a path containing a tab
+            // survives intact; skip anything that doesn't have the two leading count columns.
+            var parts = line.Split('\t', 3);
+            if (parts.Length < 3) continue;
+            var filePath = parts[2].Trim();
+            if (filePath.Length == 0) continue;
+            current.Add(filePath);
+        }
+        Flush(); // the final commit has no trailing sentinel to trigger its flush.
+
+        var hotspots = changeCounts
+            .OrderByDescending(kv => kv.Value)
+            .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+            .Take(topHotspots)
+            .Select(kv => (kv.Key, kv.Value))
+            .ToList();
+
+        var coupling = pairCounts
+            .Where(kv => kv.Value >= 2)
+            .OrderByDescending(kv => kv.Value)
+            .ThenBy(kv => kv.Key.Item1, StringComparer.Ordinal)
+            .ThenBy(kv => kv.Key.Item2, StringComparer.Ordinal)
+            .Take(topCoupling)
+            .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
+            .ToList();
+
+        return new DeepGitPulse(hotspots, coupling);
     }
 
     private static string? RunGit(string workingDirectory, string arguments)

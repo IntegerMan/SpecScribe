@@ -26,7 +26,11 @@ public class SiteSettings : CommandSettings
     [Description("Exclude the repository README.md from the generated site. Default: the README is included.")]
     public bool NoReadme { get; set; }
 
+    [CommandOption("--deep-git")]
+    [Description("Enable deeper git analytics (change coupling and hotspots) as an opt-in dashboard panel. Default: off, so baseline generation performance is unaffected.")]
+    public bool DeepGit { get; set; }
+
     /// <summary>Resolves these settings into absolute paths. Throws <see cref="DirectoryNotFoundException"/>
     /// with an actionable message when auto-discovery fails.</summary>
-    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme);
+    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit);
 }

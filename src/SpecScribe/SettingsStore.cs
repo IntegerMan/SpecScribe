@@ -12,9 +12,14 @@ public sealed class SavedSettings
     public string? Output { get; set; }
     public string? ProjectName { get; set; }
 
+    /// <summary>Persisted opt-in for deep git analytics (<c>--deep-git</c>). Nullable for tri-state: null means
+    /// "never configured" (distinct from an explicit false), so a fresh <c>.specscribe</c> stays empty. Only a
+    /// <c>true</c> is ever written — the flag defaults off, so there is nothing to persist for the off case. [Story 3.2]</summary>
+    public bool? DeepGit { get; set; }
+
     /// <summary>True when nothing was configured — an all-null file is not worth writing or logging.</summary>
     [JsonIgnore]
-    public bool IsEmpty => Source is null && Adrs is null && Output is null && ProjectName is null;
+    public bool IsEmpty => Source is null && Adrs is null && Output is null && ProjectName is null && DeepGit is null;
 }
 
 /// <summary>Reads and writes the optional <c>.specscribe</c> settings file in the current directory. Persistence
@@ -61,6 +66,9 @@ public static class SettingsStore
             Adrs = settings.Adrs,
             Output = settings.Output,
             ProjectName = settings.ProjectName,
+            // Persist the opt-in only when it is on; false is the default, so leave it null (nothing to save)
+            // and keep an otherwise-empty config from being written just because the flag is off. [Story 3.2]
+            DeepGit = settings.DeepGit ? true : null,
         };
 
         if (saved.IsEmpty) return null;
@@ -85,5 +93,8 @@ public static class SettingsStore
         settings.Adrs ??= saved.Adrs;
         settings.Output ??= saved.Output;
         settings.ProjectName ??= saved.ProjectName;
+        // The CLI bool defaults false and there is no --no-deep-git, so settings.DeepGit == false unambiguously
+        // means "not requested on this run" — safe to restore a persisted true; an explicit --deep-git stays on.
+        if (!settings.DeepGit && saved.DeepGit == true) settings.DeepGit = true;
     }
 }

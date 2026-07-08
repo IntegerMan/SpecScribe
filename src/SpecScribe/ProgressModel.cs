@@ -31,6 +31,11 @@ public sealed class ProgressModel
     public required IReadOnlyList<EpicProgress> PerEpic { get; init; }
     public GitPulse? Git { get; init; }
 
+    /// <summary>The opt-in deep-git signals (change coupling + hotspots), or null when <c>--deep-git</c> was
+    /// not passed or the deep pass failed. Null means the dashboard omits the deep panel entirely — it is not
+    /// a "—" empty state like the baseline pulse. [Story 3.2]</summary>
+    public DeepGitPulse? DeepGit { get; init; }
+
     public static readonly ProgressModel Empty = new()
     {
         EpicsTotal = 0,
@@ -42,5 +47,6 @@ public sealed class ProgressModel
         TasksTotal = 0,
         PerEpic = Array.Empty<EpicProgress>(),
         Git = null,
+        DeepGit = null,
     };
 }
