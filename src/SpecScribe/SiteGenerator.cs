@@ -544,7 +544,7 @@ public sealed class SiteGenerator
     private void WriteSprint(SiteNav nav)
     {
         if (_sprint is null) return;
-        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav);
+        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands);
         File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.SprintOutputPath), ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
 

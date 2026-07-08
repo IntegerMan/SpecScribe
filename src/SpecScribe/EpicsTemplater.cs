@@ -395,7 +395,9 @@ public static class EpicsTemplater
         }
         else
         {
-            sb.Append($"    <span class=\"story-title\">{story.Title}</span>\n");
+            // Undrafted stories still have a generated placeholder page at StoryPagePath — link to it so the
+            // epic "also links you to this page for them" rather than dead-ending on plain text. [Story 2.3 redesign]
+            sb.Append($"    <a class=\"story-title story-title-link\" href=\"{PathUtil.Html(prefix + StoryEpicLinkifier.StoryPagePath(story.Id))}\">{story.Title}</a>\n");
         }
 
         if (story.Status is { Length: > 0 } status)

@@ -146,6 +146,15 @@ public static class HtmlTemplater
             if (inGroup.Count == 0) continue;
             foreach (var d in inGroup) used.Add(d);
 
+            // The Planning Artifacts band is regrouped by well-known kind (PRD prominent primary, UX Design +
+            // Experience paired, Brief distinct) with the PRD's quality-review rubric folded under the PRD,
+            // rather than dumped alphabetically. Every other band keeps the flat title + grid. [Story 2.4 Task 3/4]
+            if (groupPrefix == "planning-artifacts")
+            {
+                AppendPlanningSection(sb, inGroup);
+                continue;
+            }
+
             sb.Append($"<div class=\"index-section-title\">{Html(groupTitle)}</div>\n");
             sb.Append("<div class=\"index-grid\">\n");
             foreach (var d in inGroup)
@@ -211,7 +220,7 @@ public static class HtmlTemplater
         // buried under a link grid. The sunburst (whole-project map) reads as its pair, so keep them adjacent.
         if (epicsModel is not null)
         {
-            AppendNowAndNext(sb, epicsModel);
+            AppendNowAndNext(sb, epicsModel, sprint);
 
             sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3>");
@@ -397,23 +406,8 @@ public static class HtmlTemplater
             sb.Append("</div>\n</div>\n");
         }
 
-        // What is in progress right now, per the tracking file — linked to each story's page when it exists.
-        var inProgress = SprintTemplater.InProgressStories(sprint, epicsModel);
-        if (inProgress.Count > 0)
-        {
-            sb.Append("<div class=\"sprint-widget-active\">\n");
-            sb.Append("<span class=\"sprint-widget-active-label\">In progress now</span>\n");
-            sb.Append("<ul class=\"sprint-widget-list\">\n");
-            foreach (var (entry, title, href) in inProgress)
-            {
-                var badge = $"<span class=\"status-badge {StatusStyles.ForSprint(entry.Status)}\">{Html(StatusStyles.SprintLabel(entry.Status))}</span>";
-                sb.Append(href is not null
-                    ? $"  <li><a href=\"{Html(href)}\">{title}</a> {badge}</li>\n"
-                    : $"  <li><span>{title}</span> {badge}</li>\n");
-            }
-            sb.Append("</ul>\n</div>\n");
-        }
-
+        // The "what's in progress" detail lives in the sprint board (the Now & Next panel above) now, so this
+        // widget stays a compact donut summary — the at-a-glance overview, with a CTA to the full board.
         sb.Append("</div>\n\n");
     }
 
@@ -502,10 +496,24 @@ public static class HtmlTemplater
         sb.Append("</div>\n  </div>\n</div>\n");
     }
 
-    /// <summary>Surfaces what's in motion right now: stories in dev, stories ready to start, and the
-    /// next epic awaiting story breakdown — the "where do I look next" panel.</summary>
-    private static void AppendNowAndNext(StringBuilder sb, EpicsModel epicsModel)
+    /// <summary>Surfaces what's in motion right now. When an active sprint is tracked (<paramref name="sprint"/>
+    /// present), this panel BECOMES the sprint board — the authoritative tracked view — capped at 5 cards per
+    /// column with a "+N more" link to the full sprint page. With no sprint it falls back to the derived
+    /// in-dev/review/up-next/next-to-draft view from each story artifact's own status. [Story 2.3 redesign]</summary>
+    private static void AppendNowAndNext(StringBuilder sb, EpicsModel epicsModel, SprintStatus? sprint)
     {
+        if (sprint is { IsEmpty: false })
+        {
+            sb.Append("<div class=\"chart-panel sprint-board-panel\">\n");
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Now &amp; Next</h3>");
+            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a></div>\n");
+            // Source-labeled so the tracked board never reads as contradicting the (now sprint-sourced) view.
+            sb.Append("<p class=\"panel-source-note\">from sprint-status.yaml</p>\n");
+            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 5, moreHref: SiteNav.SprintOutputPath));
+            sb.Append("</div>\n\n");
+            return;
+        }
+
         var allStories = epicsModel.Epics.SelectMany(e => e.Stories.Select(s => (Epic: e, Story: s))).ToList();
         var inDev = allStories.Where(x => StatusStyles.ForStory(x.Story) == "active").ToList();
         var inReview = allStories.Where(x => StatusStyles.ForStory(x.Story) == "review").ToList();
@@ -668,19 +676,129 @@ public static class HtmlTemplater
         var href = PathUtil.NormalizeSlashes(d.OutputRelativePath);
         sb.Append($"  <a class=\"index-card\" href=\"{Html(href)}\">\n");
         sb.Append($"    <h2>{Html(IndexCardTitle(d))}</h2>\n");
+        AppendCardStatusBadge(sb, d.Frontmatter.Status);
+        AppendCardMeta(sb, d);
+        sb.Append($"    <span class=\"index-card-path\">{Html(PathUtil.NormalizeSlashes(d.SourceRelativePath))}</span>\n");
+        sb.Append("  </a>\n");
+    }
 
+    /// <summary>The document's own declared status as an on-brand <c>status-badge</c> (AC #1: "a badge …, not
+    /// plain text"), routed through <see cref="StatusStyles.ForDoc"/>/<see cref="StatusStyles.DocLabel"/> — the
+    /// single status-color seam. The badge carries the status word (UX-DR17: never color-only). A doc with no
+    /// status emits no badge (graceful). [Story 2.4 Task 2]</summary>
+    private static void AppendCardStatusBadge(StringBuilder sb, string? status)
+    {
+        if (status is not { Length: > 0 }) return;
+        sb.Append($"    <span class=\"status-badge {StatusStyles.ForDoc(status)}\">{Html(StatusStyles.DocLabel(status))}</span>\n");
+    }
+
+    /// <summary>The de-emphasized date · author line beneath a card's title/badge. Status has been promoted to
+    /// the badge above, so it is intentionally NOT repeated here. Emits nothing when neither is present.</summary>
+    private static void AppendCardMeta(StringBuilder sb, DocModel d)
+    {
         var descParts = new List<string>();
-        if (d.Frontmatter.Status is { Length: > 0 } s) descParts.Add(s);
         if (d.Frontmatter.Date is { Length: > 0 } dt) descParts.Add(dt);
         if (d.Frontmatter.Author is { Length: > 0 } a) descParts.Add(a);
         if (descParts.Count > 0)
         {
             sb.Append($"    <p>{Html(string.Join(" · ", descParts))}</p>\n");
         }
-
-        sb.Append($"    <span class=\"index-card-path\">{Html(PathUtil.NormalizeSlashes(d.SourceRelativePath))}</span>\n");
-        sb.Append("  </a>\n");
     }
+
+    /// <summary>Regroups the home "Planning Artifacts" band by well-known kind so the most-wanted planning
+    /// document reads first: the PRD as a prominent full-width primary card (folding its quality-review rubric
+    /// under it), UX Design + UX Experience paired under a shared sub-label, the Product Brief distinct, and any
+    /// unrecognized planning docs (architecture spine, etc.) as ordinary cards after. Classification is by
+    /// well-known filename (the same <see cref="ModuleContext.WellKnownDocs"/> constants the nav uses), matched
+    /// anywhere in the tree — never by nested folder path. Every sub-block is conditional: a missing PRD/UX/brief
+    /// simply omits that slot, never an empty labeled group or a broken link (NFR2). [Story 2.4 Task 3/4]</summary>
+    private static void AppendPlanningSection(StringBuilder sb, IReadOnlyList<DocModel> docs)
+    {
+        DocModel? prd = FindByFileName(docs, ModuleContext.WellKnownDocs.Prd);
+        DocModel? rubric = FindByFileName(docs, ModuleContext.WellKnownDocs.PrdReviewRubric);
+        DocModel? uxDesign = FindByFileName(docs, ModuleContext.WellKnownDocs.UxDesign);
+        DocModel? uxExperience = FindByFileName(docs, ModuleContext.WellKnownDocs.UxExperience);
+        DocModel? brief = FindByFileName(docs, ModuleContext.WellKnownDocs.Brief);
+
+        // The rubric folds under the PRD only when a PRD exists to carry it; a rubric without a PRD (unexpected)
+        // degrades to an ordinary card rather than being orphan-linked or silently dropped. [Story 2.4 Task 4]
+        var rubricFolded = prd is not null && rubric is not null;
+
+        var claimed = new HashSet<DocModel>();
+        void Claim(DocModel? d) { if (d is not null) claimed.Add(d); }
+        Claim(prd);
+        Claim(uxDesign);
+        Claim(uxExperience);
+        Claim(brief);
+        if (rubricFolded) Claim(rubric);
+
+        sb.Append("<div class=\"index-section-title\">Planning Artifacts</div>\n");
+
+        // PRD: prominent primary card, full-width, carrying its own status badge and — when present — a branch
+        // link to its quality-review rubric page.
+        if (prd is not null)
+        {
+            sb.Append("<div class=\"index-grid\">\n");
+            AppendPrimaryPrdCard(sb, prd, rubricFolded ? rubric : null);
+            sb.Append("</div>\n");
+        }
+
+        // UX Design + UX Experience read as one pair; the "UX" sub-label appears only when at least one UX doc
+        // exists (never an empty labeled group).
+        if (uxDesign is not null || uxExperience is not null)
+        {
+            sb.Append("<div class=\"index-subgroup-label\">UX</div>\n");
+            sb.Append("<div class=\"index-grid\">\n");
+            if (uxDesign is not null) AppendIndexCard(sb, uxDesign);
+            if (uxExperience is not null) AppendIndexCard(sb, uxExperience);
+            sb.Append("</div>\n");
+        }
+
+        // The Product Brief (distinct, first) plus any remaining planning docs — the architecture spine,
+        // unrecognized docs, and (only when there was no PRD to fold it into) the rubric — as ordinary cards.
+        var others = new List<DocModel>();
+        if (brief is not null) others.Add(brief);
+        others.AddRange(docs.Where(d => !claimed.Contains(d) && d != brief)
+            .OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase));
+        if (others.Count > 0)
+        {
+            sb.Append("<div class=\"index-grid\">\n");
+            foreach (var d in others) AppendIndexCard(sb, d);
+            sb.Append("</div>\n");
+        }
+
+        sb.Append("\n");
+    }
+
+    /// <summary>The PRD's prominent primary card. Unlike an ordinary wrapping-anchor card it may carry a second
+    /// affordance — the "Quality review →" branch link — so it is a container with a title link plus an optional
+    /// branch link (nested anchors would be invalid), reusing the shared badge/meta helpers. Both are real
+    /// focusable <c>&lt;a&gt;</c>s, and its prominence is carried by position + the "Primary document" label, not
+    /// color alone (Story 1.4). The rubric link is emitted only when the rubric page exists (never broken; the
+    /// rubric's <c>OutputRelativePath</c> is a real generated page). [Story 2.4 Task 3/4]</summary>
+    private static void AppendPrimaryPrdCard(StringBuilder sb, DocModel prd, DocModel? rubric)
+    {
+        var href = PathUtil.NormalizeSlashes(prd.OutputRelativePath);
+        sb.Append("  <div class=\"index-card index-card--primary\">\n");
+        sb.Append("    <span class=\"index-card-kicker\">Primary document</span>\n");
+        sb.Append($"    <h2><a href=\"{Html(href)}\">{Html(IndexCardTitle(prd))}</a></h2>\n");
+        AppendCardStatusBadge(sb, prd.Frontmatter.Status);
+        AppendCardMeta(sb, prd);
+        sb.Append($"    <span class=\"index-card-path\">{Html(PathUtil.NormalizeSlashes(prd.SourceRelativePath))}</span>\n");
+        if (rubric is not null)
+        {
+            var rubricHref = PathUtil.NormalizeSlashes(rubric.OutputRelativePath);
+            sb.Append($"    <a class=\"index-card-branch\" href=\"{Html(rubricHref)}\">Quality review &rarr;</a>\n");
+        }
+        sb.Append("  </div>\n");
+    }
+
+    /// <summary>The first doc whose filename (anywhere in its source path) matches <paramref name="fileName"/>,
+    /// case-insensitively — the same filename-anywhere discipline <see cref="SiteNav"/> uses, so folder layout
+    /// can vary. Null when absent. [Story 2.4 Task 3]</summary>
+    private static DocModel? FindByFileName(IReadOnlyList<DocModel> docs, string fileName) =>
+        docs.FirstOrDefault(d => string.Equals(
+            Path.GetFileName(PathUtil.NormalizeSlashes(d.SourceRelativePath)), fileName, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The title to show on a doc's index card. The SPEC kernel hub's own H1 is the generic, project-
     /// named "SpecScribe" — meaningless as a card in a Spec Kernel band — so a doc carrying an <c>id: SPEC-*</c>

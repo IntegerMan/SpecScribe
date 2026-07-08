@@ -118,4 +118,35 @@ public class StatusStylesTests
     [InlineData("blocked", "Blocked")]
     public void SprintLabel_MapsEachLifecycleValueToAWord(string status, string expected)
         => Assert.Equal(expected, StatusStyles.SprintLabel(status));
+
+    [Theory]
+    // A planning doc's own free-text frontmatter status onto the shared six-stage colors. [Story 2.4 Task 1]
+    [InlineData("final", "done")]
+    [InlineData("approved", "done")]
+    [InlineData("published", "done")]
+    [InlineData("review", "review")]
+    [InlineData("in-progress", "active")]
+    [InlineData("wip", "active")]
+    [InlineData("ready", "ready")]
+    [InlineData("ready-for-dev", "ready")]
+    [InlineData("draft", "drafted")]
+    [InlineData("proposed", "drafted")]
+    // empty/null/unknown → parchment pending, never an invented color.
+    [InlineData("something-new", "pending")]
+    [InlineData("", "pending")]
+    [InlineData(null, "pending")]
+    public void ForDoc_MapsDocStatusOntoSharedColors(string? status, string expected)
+        => Assert.Equal(expected, StatusStyles.ForDoc(status));
+
+    [Theory]
+    // The label is the doc's own word, title-cased — truthful to what the document declares, not remapped to a
+    // lifecycle noun (Story 1.5). [Story 2.4 Task 1]
+    [InlineData("final", "Final")]
+    [InlineData("draft", "Draft")]
+    [InlineData("ready", "Ready")]
+    [InlineData("ready-for-dev", "Ready For Dev")]
+    [InlineData("", "Pending")]
+    [InlineData(null, "Pending")]
+    public void DocLabel_IsTheHumanCasedSourceWord(string? status, string expected)
+        => Assert.Equal(expected, StatusStyles.DocLabel(status));
 }

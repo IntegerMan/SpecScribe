@@ -67,6 +67,26 @@ public static class BmadCommands
         return sb.ToString();
     }
 
+    /// <summary>Renders an arbitrary, caller-supplied set of resolved commands as a titled panel of the same
+    /// standard command badges (command text + Copy + send menu) the Next Steps panels use — for a fixed
+    /// command list rather than story-derived suggestions (e.g. the sprint page's lifecycle commands). Null
+    /// entries (commands the active module doesn't expose) are dropped, and the panel is omitted entirely when
+    /// none resolve, so we never print a command that isn't installed. [Story 2.3 redesign]</summary>
+    public static string RenderCommandBar(string heading, IEnumerable<string?> commands)
+    {
+        var resolved = commands.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!).ToList();
+        if (resolved.Count == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.Append($"<div class=\"chart-panel sprint-commands\">\n<h3>{PathUtil.Html(heading)}</h3>\n<ul class=\"next-steps-list command-bar-list\">\n");
+        foreach (var command in resolved)
+        {
+            sb.Append("  <li>" + RenderCommandBadge(command) + "</li>\n");
+        }
+        sb.Append("</ul>\n</div>\n\n");
+        return sb.ToString();
+    }
+
     /// <summary>A dependency-free "copy" glyph (two overlapping pages) that inherits its stroke from the
     /// button's text color via <c>currentColor</c>. Marked aria-hidden because the button carries the label.</summary>
     private const string CopyIconSvg =

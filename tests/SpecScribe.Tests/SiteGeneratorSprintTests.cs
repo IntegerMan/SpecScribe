@@ -32,6 +32,10 @@ public class SiteGeneratorSprintTests : IDisposable
         ### Story 1.1: Foundation Story
 
         As a maintainer, I want the foundation.
+
+        ### Story 1.2: Undrafted Story
+
+        As a maintainer, I want the follow-up (no artifact yet).
         """;
 
     private const string Story11Md = """
@@ -59,6 +63,7 @@ public class SiteGeneratorSprintTests : IDisposable
         development_status:
           epic-1: in-progress
           1-1-foundation: in-progress
+          1-2-undrafted: backlog
           epic-1-retrospective: optional
         """;
 
@@ -98,15 +103,26 @@ public class SiteGeneratorSprintTests : IDisposable
         Assert.True(File.Exists(SprintPage), "sprint.html should be generated when the tracking file exists");
         var sprintHtml = File.ReadAllText(SprintPage);
         Assert.Contains("Sprint Status", sprintHtml);
-        Assert.Contains("status-badge active", sprintHtml);          // in-progress → active
-        Assert.Contains("href=\"epics/epic-1.html\"", sprintHtml);   // epic links resolve
-        Assert.Contains("href=\"epics/story-1-1.html\"", sprintHtml);// story with a page links
+        Assert.Contains("class=\"sprint-board\"", sprintHtml);       // Kanban board
+        Assert.Contains("sprint-lane active", sprintHtml);           // in-progress lane
+        Assert.Contains("status-badge active", sprintHtml);          // epic badge (in-progress → active)
+        Assert.Contains("href=\"epics/epic-1.html\"", sprintHtml);   // epic links resolve (epic view)
+        Assert.Contains("href=\"epics/story-1-1.html\"", sprintHtml);// drafted story card links
+        // The undrafted story 1.2 still links — to its generated placeholder page (never dead text).
+        Assert.Contains("href=\"epics/story-1-2.html\"", sprintHtml);
+        Assert.True(File.Exists(Path.Combine(Site, "epics", "story-1-2.html")), "undrafted story gets a placeholder page");
 
         var index = File.ReadAllText(IndexPage);
-        Assert.Contains("from sprint-status.yaml", index);           // the home widget
-        Assert.Contains("href=\"sprint.html\"", index);              // Sprint nav item + widget CTA
+        Assert.Contains("sprint-board-panel", index);                // Now & Next is the sprint board
+        Assert.Contains("class=\"sprint-board\"", index);
+        Assert.Contains("from sprint-status.yaml", index);           // source label
+        Assert.Contains("href=\"sprint.html\"", index);              // Sprint nav item + board CTA
 
         AssertNoBrokenLocalLinks(SprintPage);
+        AssertNoBrokenLocalLinks(IndexPage);
+        // The epic page also links the undrafted story to its placeholder (the "epic links you there too").
+        AssertNoBrokenLocalLinks(Path.Combine(Site, "epics", "epic-1.html"));
+        Assert.Contains("href=\"../epics/story-1-2.html\"", File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html")));
     }
 
     [Fact]
@@ -132,11 +148,10 @@ public class SiteGeneratorSprintTests : IDisposable
         foreach (Match m in Regex.Matches(html, "href=\"([^\"]+)\""))
         {
             var raw = m.Groups[1].Value;
-            // Only local page links are checkable: skip anchors and non-file schemes (http, data: favicon, mailto).
+            // Only local page links are checkable: skip anchors and anything with a URI scheme
+            // (http:, data: favicon, mailto:, cursor:// deep links, etc.).
             if (raw.StartsWith("#", StringComparison.Ordinal)
-                || raw.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-                || raw.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-                || raw.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+                || Regex.IsMatch(raw, "^[a-zA-Z][a-zA-Z0-9+.-]*:"))
                 continue;
 
             var target = raw.Split('#')[0].Split('?')[0];

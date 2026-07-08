@@ -441,8 +441,10 @@ claude-opus-4-8
 - src/SpecScribe/StatusStyles.cs (added ForSprint + SprintLabel)
 - src/SpecScribe/SiteNav.cs (SprintOutputPath const, HasSprint, hasSprint-gated item/quick-link)
 - src/SpecScribe/SiteGenerator.cs (_sprint cache, SprintSourcePath/SprintAvailable, WriteSprint, nav + index threading)
-- src/SpecScribe/HtmlTemplater.cs (SprintStatus? threaded into RenderIndex/AppendDashboard; gated AppendSprintPanel)
-- src/SpecScribe/assets/specscribe.css (.status-badge.pending rule + sprint page/widget styles)
+- src/SpecScribe/HtmlTemplater.cs (SprintStatus? threaded into RenderIndex/AppendDashboard; gated AppendSprintPanel; Now & Next → sprint board when active sprint)
+- src/SpecScribe/BmadCommands.cs (public RenderCommandBar for the sprint command buttons — redesign)
+- src/SpecScribe/EpicsTemplater.cs (undrafted story cards link to their placeholder page — redesign)
+- src/SpecScribe/assets/specscribe.css (.status-badge.pending + sprint board/lane/card/toggle styles + .now-next-card.done)
 - tests/SpecScribe.Tests/SprintStatusParserTests.cs (new)
 - tests/SpecScribe.Tests/SprintTemplaterTests.cs (new)
 - tests/SpecScribe.Tests/SiteGeneratorSprintTests.cs (new)
@@ -464,6 +466,18 @@ claude-opus-4-8
   discipline (tracked yaml vs. derived artifact `Status:`) to protect Story 1.5 truthfulness; and full
   graceful degradation for missing/partial/malformed tracking data (no page, nav, widget, or broken links).
   Documented the watch-mode `.yaml` live-reload limitation as a known, optionally-extendable boundary.
+- 2026-07-07 (redesign, post-review feedback): Reworked the sprint surfaces into a Jira/Kanban board.
+  The home **Now & Next** now *becomes* the sprint board when an active sprint exists — five lifecycle columns
+  (Backlog → Done), each capped at 5 cards with a "+N more →" link to the full page (falls back to the derived
+  Now & Next when no sprint); the donut overview widget stays (trimmed of its redundant list). The **sprint
+  page** gained a Jira look: standard sprint command buttons (`sprint-planning`/`sprint-status`/
+  `correct-course`/`retrospective` via a new public `BmadCommands.RenderCommandBar`), the lifecycle donut, and
+  a **pure-CSS status↔epic toggle** (no JS) between a status-column board and per-epic swimlanes. Every board
+  card links to its story page via `StoryEpicLinkifier.StoryPagePath` — including **placeholder pages for
+  not-yet-drafted stories** — and the epic page now links undrafted stories to those placeholder pages too.
+  Reused the `now-next-card`/`chart-panel`/`status-badge` vocabulary and the `--status-*` tokens (no new
+  palette, no new dependency). Verified: 367 tests pass; live generation shows a 5-column board (home capped
+  with "+20 more", sprint page uncapped), a working CSS toggle, 4 command buttons, and zero broken local links.
 - 2026-07-07: Implemented Story 2.3. Added `SprintStatus`/`SprintStatusParser` (order-preserving
   `development_status` classification into epic/story/retrospective; robust block-isolated YamlDotNet parse
   that survives the invalid `story_location: {project-root}/…` sibling line in real tracking files; optional

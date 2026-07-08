@@ -340,6 +340,37 @@ public class HtmlTemplaterTests
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
     }
 
+    [Fact]
+    public void RenderIndex_NowAndNextBecomesSprintBoardWhenSprintPresent()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: in-progress
+              1-1-a: in-progress
+              1-2-b: backlog
+            """);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
+            epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "in progress"), Story("1.2", "backlog")),
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty,
+            work: null, sprint: sprint);
+
+        // The Now & Next panel is now the sprint board (from the yaml), with lanes + a CTA to the full page.
+        Assert.Contains("sprint-board-panel", html);
+        Assert.Contains("class=\"sprint-board\"", html);
+        Assert.Contains("<section class=\"sprint-lane active\"", html);
+        Assert.Contains("View sprint board", html);
+        Assert.Contains("from sprint-status.yaml", html);
+        // Cards link to generated story pages (StoryPagePath), never the epic fallback.
+        Assert.Contains("href=\"epics/story-1-1.html\"", html);
+        // The derived "In development / Up next" kicker labels are NOT used when the board takes over.
+        Assert.DoesNotContain("Next epic to draft", html);
+        // Still exactly one main landmark.
+        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
+
     private static DocModel Doc(string sourceRel, string outputRel, string title, Frontmatter fm, string bodyHtml = "") => new()
     {
         SourceRelativePath = sourceRel,
@@ -599,5 +630,116 @@ public class HtmlTemplaterTests
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
         Assert.Contains("<main id=\"main-content\">", html);
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
+
+    // ---- Story 2.4: planning-artifacts grouping, badges, PRD prominence, rubric fold ----
+
+    private const string PrdOut = "planning-artifacts/prds/prd-x/prd.html";
+    private const string RubricOut = "planning-artifacts/prds/prd-x/review-rubric.html";
+    private const string BriefOut = "planning-artifacts/briefs/brief.html";
+
+    private static DocModel PrdDoc() => Doc("planning-artifacts/prds/prd-x/prd.md", PrdOut, "SpecScribe PRD",
+        new Frontmatter { Status = "final", Date = "2026-07-05", Author = "John" });
+    private static DocModel RubricDoc() => Doc("planning-artifacts/prds/prd-x/review-rubric.md", RubricOut,
+        "PRD Quality Review — SpecScribe", Frontmatter.Empty);
+    private static DocModel BriefDoc() => Doc("planning-artifacts/briefs/brief.md", BriefOut, "Product Brief",
+        new Frontmatter { Status = "draft" });
+    private static DocModel DesignDoc() => Doc("planning-artifacts/ux-designs/ux-x/DESIGN.md",
+        "planning-artifacts/ux-designs/ux-x/DESIGN.html", "UX Design", new Frontmatter { Status = "final" });
+    private static DocModel ExperienceDoc() => Doc("planning-artifacts/ux-designs/ux-x/EXPERIENCE.md",
+        "planning-artifacts/ux-designs/ux-x/EXPERIENCE.html", "UX Experience", new Frontmatter { Status = "final" });
+
+    private static string RenderPlanning(params DocModel[] docs)
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        return HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
+    }
+
+    [Fact]
+    public void RenderIndex_PlanningSection_BadgesPrdProminentUxPairedRubricFoldedUnderPrd()
+    {
+        var html = RenderPlanning(BriefDoc(), ExperienceDoc(), RubricDoc(), PrdDoc(), DesignDoc());
+
+        // (a) status is an on-brand badge with the mapped class — not the old " · "-joined plain text.
+        Assert.Contains("<span class=\"status-badge done\">Final</span>", html);   // PRD: final → done/"Final"
+        Assert.Contains("<span class=\"status-badge drafted\">Draft</span>", html); // brief: draft → drafted/"Draft"
+        Assert.DoesNotContain("final · 2026-07-05", html);                          // no middot status text run
+
+        // (b) the PRD is a prominent primary card, ahead of the brief and the UX pair.
+        Assert.Contains("class=\"index-card index-card--primary\"", html);
+        Assert.Contains($"<h2><a href=\"{PrdOut}\">SpecScribe PRD</a></h2>", html);
+        var prdPos = html.IndexOf("index-card--primary", StringComparison.Ordinal);
+        Assert.True(prdPos >= 0 && prdPos < html.IndexOf(BriefOut, StringComparison.Ordinal), "PRD leads the band");
+        Assert.True(prdPos < html.IndexOf("index-subgroup-label", StringComparison.Ordinal), "PRD precedes the UX pair");
+
+        // (c) UX Design + UX Experience are grouped under one shared "UX" sub-label, adjacent.
+        Assert.Contains("<div class=\"index-subgroup-label\">UX</div>", html);
+        var design = html.IndexOf("ux-x/DESIGN.html", StringComparison.Ordinal);
+        var experience = html.IndexOf("ux-x/EXPERIENCE.html", StringComparison.Ordinal);
+        Assert.True(design >= 0 && experience >= 0);
+        Assert.True(design < experience, "Design precedes Experience in the pair");
+        Assert.DoesNotContain(BriefOut, html[design..experience]); // nothing else wedged between the UX pair
+
+        // (d) the rubric is NOT a standalone card...
+        Assert.DoesNotContain($"<a class=\"index-card\" href=\"{RubricOut}\">", html);
+        Assert.DoesNotContain("PRD Quality Review", html); // its title never appears as a peer card
+        // (e) ...it is reachable as a branch link from the PRD card.
+        Assert.Contains($"<a class=\"index-card-branch\" href=\"{RubricOut}\">Quality review", html);
+        Assert.Equal(1, CountOccurrences(html, RubricOut)); // exactly one reference: the branch link
+
+        // Story 1.4 a11y floor preserved by reusing the RenderIndex shell.
+        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
+
+    [Fact]
+    public void RenderIndex_PlanningSection_NoPrd_OmitsPrimaryCardAndRubricLinkButStillRenders()
+    {
+        // Rubric present but no PRD to fold it into → it degrades to an ordinary card (never orphan-linked/dropped),
+        // and the section still renders whatever exists with no empty "PRD" slot. [Story 2.4 Task 3/4 graceful]
+        var html = RenderPlanning(BriefDoc(), DesignDoc(), ExperienceDoc(), RubricDoc());
+
+        Assert.Contains("<div class=\"index-section-title\">Planning Artifacts</div>", html);
+        Assert.DoesNotContain("index-card--primary", html);
+        Assert.DoesNotContain("index-card-branch", html);
+        // The unfolded rubric is a normal card, not a broken link.
+        Assert.Contains($"<a class=\"index-card\" href=\"{RubricOut}\">", html);
+        // The UX pair and brief still render.
+        Assert.Contains("<div class=\"index-subgroup-label\">UX</div>", html);
+        Assert.Contains($"href=\"{BriefOut}\"", html);
+    }
+
+    [Fact]
+    public void RenderIndex_PlanningSection_PrdWithoutRubric_ShowsNoQualityReviewLink()
+    {
+        var html = RenderPlanning(PrdDoc(), BriefDoc());
+
+        // PRD is still the prominent primary card, but with no rubric there is no dangling quality-review link.
+        Assert.Contains("index-card--primary", html);
+        Assert.DoesNotContain("index-card-branch", html);
+        Assert.DoesNotContain("Quality review", html);
+        // No UX docs → no empty "UX" labeled group.
+        Assert.DoesNotContain("index-subgroup-label", html);
+    }
+
+    [Fact]
+    public void RenderIndex_PlanningSection_UnrecognizedDocsOnly_RenderAsOrdinaryCardsWithoutEmptyGroups()
+    {
+        var note = Doc("planning-artifacts/misc/note.md", "planning-artifacts/misc/note.html", "A Note", Frontmatter.Empty);
+        var html = RenderPlanning(note);
+
+        Assert.Contains("<div class=\"index-section-title\">Planning Artifacts</div>", html);
+        Assert.Contains("<a class=\"index-card\" href=\"planning-artifacts/misc/note.html\">", html);
+        Assert.DoesNotContain("index-card--primary", html);
+        Assert.DoesNotContain("index-subgroup-label", html);
+    }
+
+    [Fact]
+    public void RenderIndex_PlanningSection_OmittedEntirelyWhenNoPlanningDocs()
+    {
+        var html = RenderPlanning(Doc("implementation-artifacts/x.md", "implementation-artifacts/x.html", "X", Frontmatter.Empty));
+
+        Assert.DoesNotContain("Planning Artifacts", html);
     }
 }

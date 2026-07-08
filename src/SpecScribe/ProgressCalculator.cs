@@ -73,21 +73,14 @@ public static class ProgressCalculator
         try
         {
             var raw = MarkdownConverter.ReadAllTextShared(artifactFullPath);
-            int done = 0, total = 0;
 
-            foreach (var line in raw.Split('\n'))
-            {
-                var trimmed = line.TrimStart();
-                if (trimmed.StartsWith("- [x]", StringComparison.OrdinalIgnoreCase))
-                {
-                    done++;
-                    total++;
-                }
-                else if (trimmed.StartsWith("- [ ]", StringComparison.Ordinal))
-                {
-                    total++;
-                }
-            }
+            // Top-level tasks only — subtasks are counted separately by the per-story TaskSunburst.
+            // Flattening both into one tally previously reported the combined checkbox count as "tasks"
+            // everywhere else (home page, epic page, sunburst outer ring), which reads as the subtask
+            // count on any story with a handful of tasks and many subtasks.
+            var tasks = TaskListParser.Parse(raw);
+            var done = tasks.Count(t => t.Done);
+            var total = tasks.Count;
 
             return (done, total, EpicsParser.ExtractStatus(raw));
         }

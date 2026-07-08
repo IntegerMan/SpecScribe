@@ -123,6 +123,32 @@ public static class StatusStyles
         _ => TitleCase(Normalize(status)),
     };
 
+    /// <summary>Maps a planning <em>document's own</em> frontmatter <c>status:</c> (the free-text words BMad
+    /// docs actually declare — <c>final</c>, <c>draft</c>, <c>ready</c>, …) onto the SAME six-stage badge
+    /// vocabulary as stories/epics/sprint, so a reader who learned the colors elsewhere reads a planning-card
+    /// badge for free. This is a third, independent signal — the document's self-reported state — deliberately
+    /// NOT reconciled with the sprint or derived-artifact status (Story 1.5 truthfulness). Empty/null/unknown
+    /// falls back to <c>pending</c> (parchment) rather than inventing a color. [Story 2.4 Task 1]</summary>
+    public static string ForDoc(string? status) => Normalize(status) switch
+    {
+        "final" or "approved" or "done" or "complete" or "published" => "done",   // green
+        "review" or "in review" or "in-review" => "review",                       // deep teal
+        "in-progress" or "in progress" or "wip" or "active" => "active",           // teal
+        "ready" or "ready-for-dev" => "ready",                                     // gold
+        "draft" or "drafting" or "proposed" => "drafted",                          // gold
+        _ => "pending",                                                            // parchment
+    };
+
+    /// <summary>Human, on-brand badge text for a planning doc's status — the doc's own declared word, title-
+    /// cased ("final" → "Final", "ready-for-dev" → "Ready For Dev"), NOT remapped to a lifecycle noun, so the
+    /// badge stays truthful to what the document itself says (Story 1.5). Empty → "Pending" to match the
+    /// fallback class, though callers omit the badge entirely when a doc carries no status. [Story 2.4 Task 1]</summary>
+    public static string DocLabel(string? status)
+    {
+        var s = Normalize(status);
+        return s.Length == 0 ? "Pending" : TitleCase(s);
+    }
+
     private static string Normalize(string? status) => (status ?? string.Empty).Trim().ToLowerInvariant();
 
     private static string TitleCase(string value) =>

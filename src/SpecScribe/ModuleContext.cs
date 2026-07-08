@@ -68,16 +68,34 @@ public sealed class ModuleContext
         Docs = Array.Empty<ModuleDoc>(),
     };
 
+    /// <summary>Well-known BMad Method planning-doc filenames, matched anywhere in the source tree (folder
+    /// layout varies; Epic 4 will generalize). The single source of truth for these names — <see cref="SiteNav"/>
+    /// (top nav / quick links) and the home index's PRD-prominent planning grouping both classify against these
+    /// constants rather than re-hard-coding the strings. The quality-review rubric is a PRD <em>companion</em>
+    /// (folded under the PRD, not a peer doc), so it lives here too but stays out of <see cref="BmadMethodDocs"/>.</summary>
+    public static class WellKnownDocs
+    {
+        public const string Prd = "prd.md";
+        public const string ArchitectureSpine = "ARCHITECTURE-SPINE.md";
+        public const string Brief = "brief.md";
+        public const string UxDesign = "DESIGN.md";
+        public const string UxExperience = "EXPERIENCE.md";
+
+        /// <summary>The PRD's quality-review rubric — a companion of <see cref="Prd"/>, deliberately absent from
+        /// the nav/quick-link doc list so it never reads as a co-equal planning document. [Story 2.4 Task 4]</summary>
+        public const string PrdReviewRubric = "review-rubric.md";
+    }
+
     // BMad Method publishes its planning artifacts in nested folders (prds/, briefs/, ux-designs/) plus a
     // spec architecture spine; they're matched by filename anywhere in the source tree. PRD + Architecture
     // ride the top nav; the brief and UX docs surface in the dashboard quick links to keep the nav lean.
     private static readonly IReadOnlyList<ModuleDoc> BmadMethodDocs = new[]
     {
-        new ModuleDoc("prd.md", "PRD", "Read the product requirements.", InNav: true),
-        new ModuleDoc("ARCHITECTURE-SPINE.md", "Architecture", "Inspect the architecture spine.", InNav: true),
-        new ModuleDoc("brief.md", "Product Brief", "Review the product brief.", InNav: false),
-        new ModuleDoc("DESIGN.md", "UX Design", "Inspect the UX design system.", InNav: false),
-        new ModuleDoc("EXPERIENCE.md", "UX Experience", "Inspect UX behavior and flows.", InNav: false),
+        new ModuleDoc(WellKnownDocs.Prd, "PRD", "Read the product requirements.", InNav: true),
+        new ModuleDoc(WellKnownDocs.ArchitectureSpine, "Architecture", "Inspect the architecture spine.", InNav: true),
+        new ModuleDoc(WellKnownDocs.Brief, "Product Brief", "Review the product brief.", InNav: false),
+        new ModuleDoc(WellKnownDocs.UxDesign, "UX Design", "Inspect the UX design system.", InNav: false),
+        new ModuleDoc(WellKnownDocs.UxExperience, "UX Experience", "Inspect UX behavior and flows.", InNav: false),
     };
 
     private static readonly IReadOnlyList<ModuleDoc> GameDevStudioDocs = new[]

@@ -354,14 +354,17 @@ public static class Charts
         var anglePerUnit = 2 * Math.PI / totalWeight;
         const double pad = 0.01;
 
-        var totalCheckboxes = tasks.Sum(t => 1 + t.Subtasks.Count);
-        var doneCheckboxes = tasks.Sum(t => (t.Done ? 1 : 0) + t.Subtasks.Count(s => s.Done));
+        // Center headline is the top-level task tally, consistent with every other page's "tasks" figure
+        // (home, epic, project/epic sunburst outer rings) — subtasks stay visible via the outer ring and
+        // tooltips instead of being folded into the number so it no longer reads as a subtask count.
+        var tasksDone = tasks.Count(t => t.Done);
+        var tasksTotal = tasks.Count;
 
         var sb = new StringBuilder();
         // The chart itself is not focusable (no task pages to drill to); the story page renders the task
         // checklist as real text as the non-pointer equivalent. Its role="img" name carries the tally so the
         // whole chart is still announced. [Story 1.4 AC #1]
-        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html($"Task breakdown: {doneCheckboxes} of {totalCheckboxes} done")}\">\n");
+        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html($"Task breakdown: {tasksDone} of {tasksTotal} tasks done")}\">\n");
 
         var angle = -Math.PI / 2;
         foreach (var task in tasks)
@@ -389,7 +392,7 @@ public static class Charts
             angle += sweep;
         }
 
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{doneCheckboxes}/{totalCheckboxes}</text>\n");
+        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{tasksDone}/{tasksTotal}</text>\n");
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">tasks</text>\n");
         sb.Append("</svg>\n");
 

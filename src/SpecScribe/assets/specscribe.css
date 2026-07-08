@@ -643,6 +643,55 @@ code.color-swatch {
   color: var(--ink-light);
 }
 
+/* The status badge sits between the card title and the de-emphasized date·author line; it is inline-block so
+   it needs a little breathing room above the following <p>. [Story 2.4 Task 2] */
+.index-card .status-badge { margin: 0.1rem 0 0.5rem; }
+
+/* Story 2.4 — PRD-prominent planning band. The primary card leads full-width with an eyebrow "Primary
+   document" kicker and a teal accent; a small centered sub-label pairs the UX docs; the branch link folds the
+   PRD's quality review under it. Reuses index-card/index-grid/status-badge — no new palette, no new component. */
+.index-grid > .index-card--primary { grid-column: 1 / -1; }
+
+.index-card--primary {
+  border-left: 3px solid var(--teal);
+  background: var(--cream);
+}
+
+.index-card-kicker {
+  display: block;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal-deep);
+  margin-bottom: 0.35rem;
+}
+
+.index-card--primary h2 { font-size: 1.15rem; }
+.index-card--primary h2 a { color: var(--rust); text-decoration: none; }
+.index-card--primary h2 a:hover { text-decoration: underline; }
+
+.index-card-branch {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--rust);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--gold-light);
+}
+.index-card-branch:hover { text-decoration: underline; }
+
+/* A tighter cousin of .index-section-title for a sub-group heading (e.g. the paired "UX" docs) within a band. */
+.index-subgroup-label {
+  max-width: 1100px;
+  margin: 0.5rem auto 0.7rem;
+  padding: 0 1.5rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  text-align: center;
+}
+
 /* ====================== BREADCRUMB ====================== */
 .breadcrumb {
   max-width: 860px;
@@ -1173,6 +1222,7 @@ code.color-swatch {
 .now-next-card.ready { border-left-color: var(--status-ready); }
 .now-next-card.drafted { border-left-color: var(--status-drafted); }
 .now-next-card.pending { border-left-color: var(--status-pending); }
+.now-next-card.done { border-left-color: var(--status-done); }
 
 /* The "In development" card is the single most important answer on the page — where the work is right now.
    Give it a subtle teal wash and a slightly bolder accent so the eye lands there first (Story 1.5 D4). */
@@ -1952,6 +2002,8 @@ code.color-swatch {
   font-size: 0.8rem;
   white-space: nowrap;
   overflow-x: auto;   /* a long command scrolls instead of breaking the badge */
+  overflow-y: hidden; /* without this, browsers compute overflow-y as auto too (CSS overflow quirk),
+                         showing a spurious vertical scrollbar even though nothing overflows vertically */
   user-select: text;  /* stays selectable as the no-JS fallback even inside the button */
 }
 .cmd-copy .icon { display: block; flex: 0 0 auto; }
@@ -2077,12 +2129,78 @@ code.color-swatch {
 }
 
 /* ====================== SPRINT STATUS (Story 2.3) ====================== */
-/* The sprint page + home widget: the sprint-status.yaml tracking view. Reuses the shared dashboard/chart-
-   panel/status-badge/donut vocabulary; only layout for the epic/story rows and the widget source-note is new,
-   all in the existing parchment/teal/gold palette (no new colors). */
-.sprint-page { max-width: 900px; margin: 0 auto; }
+/* The sprint board (page + home Now & Next) and its epic-grouped view: the sprint-status.yaml tracking view
+   as a Jira/Kanban board. Reuses the shared chart-panel / status-badge / donut / now-next-card vocabulary and
+   the --status-* tokens; only the lane layout and the pure-CSS view toggle are new. No new palette. */
+.sprint-page { max-width: 1100px; margin: 0 auto; }
 
-.sprint-epic { margin: 0 0 1.4rem; }
+/* Source note (home board + widget) — de-emphasized so the tracked view doesn't read as a rival panel. */
+.panel-source-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; margin: -0.2rem 0 0.6rem; }
+
+/* The Kanban board: equal-width lanes on wide screens; horizontally scrollable when the five columns don't
+   fit (small screens / the narrower home panel), so cards never crush. */
+.sprint-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 0.7rem;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+}
+.sprint-lane {
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.5rem 0.6rem;
+  min-width: 150px;
+}
+.sprint-lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.1rem 0.2rem 0.5rem;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+.sprint-lane-label {
+  font-size: 0.68rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-light);
+}
+.sprint-lane-count {
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  color: var(--ink-faded);
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 0.45rem;
+}
+/* Lane header accent picks up the shared status color so a reader who learned the palette elsewhere reads
+   the board for free. */
+.sprint-lane.pending .sprint-lane-head { border-bottom-color: var(--status-pending); }
+.sprint-lane.ready .sprint-lane-head { border-bottom-color: var(--status-ready); }
+.sprint-lane.active .sprint-lane-head { border-bottom-color: var(--status-active); }
+.sprint-lane.review .sprint-lane-head { border-bottom-color: var(--status-review); }
+.sprint-lane.done .sprint-lane-head { border-bottom-color: var(--status-done); }
+
+.sprint-cards { display: flex; flex-direction: column; gap: 0.45rem; }
+/* Board cards reuse .now-next-card; tighten them for the denser lane context. */
+.sprint-cards .now-next-card,
+.sprint-cards-row .now-next-card { padding: 0.5rem 0.6rem; background: var(--warm-white); }
+.sprint-lane-more {
+  display: inline-block;
+  font-size: 0.74rem;
+  color: var(--rust);
+  text-decoration: none;
+  padding: 0.2rem 0.2rem 0;
+}
+.sprint-lane-more:hover { text-decoration: underline; }
+
+/* Epic-grouped view: a swimlane per epic with its stories as a wrapping row of cards. */
+.sprint-epic-lane { margin: 0 0 1.3rem; }
 .sprint-epic-head {
   display: flex;
   align-items: center;
@@ -2090,25 +2208,48 @@ code.color-swatch {
   gap: 0.6rem;
   padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--border);
+  margin-bottom: 0.6rem;
 }
 .sprint-epic-title { font-weight: 600; color: var(--ink); text-decoration: none; }
 a.sprint-epic-title { border-bottom: 1px dotted var(--gold-light); }
 a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 .sprint-retro-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; }
-
-.sprint-story-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }
-.sprint-story-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-  padding: 0.35rem 0.2rem 0.35rem 1rem;
-  border-bottom: 1px solid var(--parchment-dark);
+.sprint-cards-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.55rem;
 }
-.sprint-story-row:last-child { border-bottom: none; }
-.sprint-story-title { color: var(--ink-faded); text-decoration: none; }
-a.sprint-story-title { color: var(--ink); border-bottom: 1px dotted var(--gold-light); }
-a.sprint-story-title:hover { color: var(--rust); border-bottom-style: solid; }
+
+/* Pure-CSS view toggle (no JS): hidden radios drive which .board-view shows; labels are the visible tabs. */
+.board-tabs { position: relative; }
+.board-tab-radio { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.board-tabbar { display: inline-flex; gap: 0.25rem; margin: 0 0 0.8rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.2rem; background: var(--parchment); }
+.board-tab {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.8rem;
+  border-radius: 6px;
+  color: var(--ink-light);
+  cursor: pointer;
+  user-select: none;
+}
+.board-tab:hover { color: var(--rust); }
+#sv-status:checked ~ .board-tabbar label[for="sv-status"],
+#sv-epic:checked ~ .board-tabbar label[for="sv-epic"] {
+  background: var(--warm-white);
+  color: var(--ink);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+/* Keyboard focus ring on the active- possible tab when its (visually hidden) radio is focused. */
+#sv-status:focus-visible ~ .board-tabbar label[for="sv-status"],
+#sv-epic:focus-visible ~ .board-tabbar label[for="sv-epic"] { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.board-view-epic { display: none; }
+#sv-epic:checked ~ .board-view-status { display: none; }
+#sv-epic:checked ~ .board-view-epic { display: block; }
+
+/* The sprint-commands panel reuses .next-steps styling; lay its badges out in a wrap row. */
+.command-bar-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.command-bar-list li { margin: 0; }
 
 .sprint-action-items { margin-top: 1.6rem; }
 .sprint-action-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }
@@ -2121,26 +2262,3 @@ a.sprint-story-title:hover { color: var(--rust); border-bottom-style: solid; }
   border-bottom: 1px solid var(--parchment-dark);
 }
 .sprint-action-text { flex: 1 1 60%; color: var(--ink); }
-
-/* Home widget: a de-emphasized source note keeps it from reading as a rival to the derived Now & Next. */
-.panel-source-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; margin: -0.2rem 0 0.6rem; }
-.sprint-widget-active { margin-top: 0.8rem; }
-.sprint-widget-active-label {
-  display: block;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-light);
-  margin-bottom: 0.3rem;
-}
-.sprint-widget-list { list-style: none; margin: 0; padding: 0; }
-.sprint-widget-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.25rem 0;
-  font-size: 0.85rem;
-}
-.sprint-widget-list a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
-.sprint-widget-list a:hover { color: var(--rust); border-bottom-style: solid; }
