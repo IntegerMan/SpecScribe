@@ -26,7 +26,7 @@ public static class EpicsTemplater
         sb.Append("<section class=\"dashboard\">\n");
         AppendProgressPanel(sb, progress);
         sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
-        sb.Append(Charts.Sunburst(model, commands));
+        sb.Append(Charts.Sunburst(model, commands: commands));
         sb.Append("</div>\n");
         sb.Append("</section>\n\n");
 
@@ -140,7 +140,7 @@ public static class EpicsTemplater
             main.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Story Breakdown</h3>\n");
             main.Append(Charts.EpicSunburst(epic, story => story.ArtifactOutputPath is { } ap
                 ? prefix + ap
-                : $"#{StoryAnchorId(story.Id)}", commands));
+                : $"#{StoryAnchorId(story.Id)}", commands: commands));
             main.Append("</div>\n");
             main.Append("</div>\n</section>\n\n");
         }

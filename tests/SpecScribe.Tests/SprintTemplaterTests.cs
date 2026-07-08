@@ -71,9 +71,9 @@ public class SprintTemplaterTests
         foreach (var cls in new[] { "pending", "ready", "active", "review", "done" })
             Assert.Contains($"<section class=\"sprint-lane {cls}\"", html);
 
-        // Cards carry the story's stage color; done story 1.1 and in-progress 1.2 link out.
-        Assert.Contains("class=\"sprint-card done\"", html);
-        Assert.Contains("class=\"sprint-card active\"", html);
+        // Cards carry the story's stage color + the js-tip hook; done story 1.1 and in-progress 1.2 link out.
+        Assert.Contains("class=\"sprint-card js-tip done\"", html);
+        Assert.Contains("class=\"sprint-card js-tip active\"", html);
         Assert.Contains("href=\"epics/story-1-1.html\"", html);
 
         // Pure-CSS toggle scaffolding (no JS) and both views present.
@@ -92,7 +92,7 @@ public class SprintTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_CardShowsIdEpicBadgeAndGatedTaskProgressBar()
+    public void RenderIndex_CardShowsStoryIdRichTooltipAndGatedTaskProgressBar()
     {
         var sprint = SprintStatusParser.Parse("development_status:\n  epic-2: in-progress\n  2-3-widget: in-progress\n  2-6-later: backlog\n")!;
         var epics = EpicsWith(Epic(2, "Rendering",
@@ -101,19 +101,18 @@ public class SprintTemplaterTests
 
         var html = SprintTemplater.RenderIndex(sprint, epics, Nav(), CommandCatalog.Empty);
 
-        // Id top-left, epic badge top-right (with an "Epic N" tooltip), bare title.
-        Assert.Contains("<span class=\"sprint-card-id\">2.3</span>", html);
-        Assert.Contains("data-tooltip=\"Epic 2\"", html);
-        Assert.Contains(">E2</span>", html);
-        // Progress bar only for the story WITH a task plan: 3/8 = 38%, partial fill, tooltip.
+        // Id is "Story N.M" (no separate epic badge); the rich tooltip lives on the card's data-tip.
+        Assert.Contains("<span class=\"sprint-card-id\">Story 2.3</span>", html);
+        Assert.DoesNotContain("sprint-card-epic", html);
+        // data-tip carries epic name + story name + task info (\n-separated); each card is a js-tip.
+        Assert.Contains("class=\"sprint-card js-tip active\"", html);
+        Assert.Contains("data-tip=\"Epic 2: Rendering\nStory 2.3: Sprint Widget\n3 of 8 tasks done\"", html);
+        Assert.Contains("data-tip=\"Epic 2: Rendering\nStory 2.6: Later Story\nNo task plan yet\"", html);
+        // Progress bar only for the story WITH a task plan: 3/8 = 38%, partial fill; no per-bar tooltip now.
         Assert.Contains("role=\"progressbar\"", html);
         Assert.Contains("aria-valuenow=\"38\"", html);
         Assert.Contains("class=\"sprint-card-progress-fill partial\" style=\"width:38%\"", html);
-        Assert.Contains("data-tooltip=\"3 of 8 tasks done (38%)\"", html);
-        // The no-plan story (2.6) shows a card but no progress bar. Exactly one progressbar on the two views…
-        // (status board + epic board each render the card once, so the with-plan story yields 2 bars, the
-        // no-plan story yields 0). Assert the no-plan card exists without a bar by checking its id renders.
-        Assert.Contains("<span class=\"sprint-card-id\">2.6</span>", html);
+        Assert.DoesNotContain("data-tooltip=", html);
     }
 
     [Fact]
@@ -160,16 +159,16 @@ public class SprintTemplaterTests
 
         Assert.Contains("class=\"sprint-lane-more\" href=\"sprint.html\">+4 more", board);
         // Only the first 2 of 6 done cards are shown before the "more" link.
-        Assert.Equal(2, CountOccurrences(board, "sprint-card done"));
+        Assert.Equal(2, CountOccurrences(board, "sprint-card js-tip done"));
 
         // Uncapped render shows all six.
         var full = SprintTemplater.RenderBoard(sprint, epics);
-        Assert.Equal(6, CountOccurrences(full, "sprint-card done"));
+        Assert.Equal(6, CountOccurrences(full, "sprint-card js-tip done"));
         Assert.DoesNotContain("sprint-lane-more", full);
     }
 
     [Fact]
-    public void RenderIndex_ShowsActionItemsSectionOnlyWhenOpenItemsExist()
+    public void RenderIndex_RetrospectivesModalListsRetrosAndOpenItemsLinkedToTheirRetroPage()
     {
         var withOpen = SprintStatusParser.Parse("""
             development_status:
@@ -180,10 +179,31 @@ public class SprintTemplaterTests
                 action: "Add error-handling review to the checklist"
                 status: open
             """)!;
-        Assert.Contains("Open retrospective action items", SprintTemplater.RenderIndex(withOpen, null, Nav(), CommandCatalog.Empty));
+        var retros = new[]
+        {
+            new RetroModel
+            {
+                EpicNumber = 1, Title = "Epic 1 Retrospective", DateText = "2026-07-07",
+                Participants = Array.Empty<string>(), BodyHtml = string.Empty,
+                SourceRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.md",
+                OutputRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.html",
+            },
+        };
+        var map = new Dictionary<int, string> { [1] = "implementation-artifacts/epic-1-retro-2026-07-07.html" };
 
+        var html = SprintTemplater.RenderIndex(withOpen, null, Nav(), CommandCatalog.Empty, retros, map);
+
+        // A header modal (centered .retro-menu) — no bottom section — listing the retro and the open item…
+        Assert.Contains("class=\"cmd-menu retro-menu\"", html);
+        Assert.DoesNotContain("class=\"sprint-action-items\"", html);   // not at the page bottom anymore
+        Assert.Contains("Past retrospectives", html);
+        Assert.Contains("Epic 1 Retrospective", html);
+        // …with the open action item linked to its epic's retro page.
+        Assert.Contains("<a class=\"sprint-action-text\" href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\">Add error-handling review to the checklist</a>", html);
+
+        // No retros and no open items → no modal at all.
         var none = SprintStatusParser.Parse("development_status:\n  epic-1: in-progress\n  1-1-x: done\n")!;
-        Assert.DoesNotContain("Open retrospective action items", SprintTemplater.RenderIndex(none, null, Nav(), CommandCatalog.Empty));
+        Assert.DoesNotContain("retro-menu", SprintTemplater.RenderIndex(none, null, Nav(), CommandCatalog.Empty));
     }
 
     [Fact]

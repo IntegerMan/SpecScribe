@@ -58,4 +58,42 @@ public class WorkInventoryTests
         var body = "<ul><li>open one</li><li><del>resolved</del> done</li><li>open two</li></ul>";
         Assert.Equal(2, WorkInventory.CountOpenItems(body));
     }
+
+    [Fact]
+    public void CountOpenItems_IgnoresNestedSubBullets()
+    {
+        // Two top-level items; one has a nested sub-list that must not inflate the count. [Review finding]
+        var body = "<ul><li>top one<ul><li>nested a</li><li>nested b</li></ul></li><li>top two</li></ul>";
+        Assert.Equal(2, WorkInventory.CountOpenItems(body));
+    }
+
+    [Fact]
+    public void Build_IgnoresSpecAndDeferredFilesOutsideImplementationArtifacts()
+    {
+        // spec-*.md / deferred-work.md living outside implementation-artifacts/ (e.g. the spec kernel under
+        // specs/spec-specscribe/) must never be swept into quick-dev/deferred work. [Review finding]
+        var docs = new[]
+        {
+            Doc("specs/spec-specscribe/spec-outside.md", "Kernel spec", new Frontmatter { Route = "one-shot" }),
+            Doc("docs/deferred-work.md", "Not the real one", Frontmatter.Empty, "<ul><li>a</li></ul>"),
+        };
+
+        var inv = WorkInventory.Build(docs);
+
+        Assert.True(inv.IsEmpty);
+    }
+
+    [Fact]
+    public void Build_FirstDeferredWorkFileWinsWhenDuplicatesExist()
+    {
+        var docs = new[]
+        {
+            Doc("implementation-artifacts/deferred-work.md", "First", Frontmatter.Empty, "<ul><li>a</li></ul>"),
+            Doc("implementation-artifacts/nested/deferred-work.md", "Second", Frontmatter.Empty, "<ul><li>a</li><li>b</li></ul>"),
+        };
+
+        var inv = WorkInventory.Build(docs);
+
+        Assert.Equal("First", inv.Deferred!.Title);
+    }
 }

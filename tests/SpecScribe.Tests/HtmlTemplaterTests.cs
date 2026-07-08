@@ -295,15 +295,17 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_ShowsSprintWidgetWithPerStageCountsAndLinkWhenSprintDataPresent()
+    public void RenderIndex_NoStandaloneSprintPaneAndSurfacesOpenRetroItemsWithDeferredWork()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
         var sprint = SprintStatusParser.Parse("""
             development_status:
-              epic-1: in-progress
-              1-1-a: done
-              1-2-b: in-progress
-              1-3-c: backlog
+              epic-1: done
+
+            action_items:
+              - epic: 1
+                action: "Route deferred tech debt"
+                status: open
             """);
 
         var html = HtmlTemplater.RenderIndex(
@@ -311,13 +313,13 @@ public class HtmlTemplaterTests
             epicsModel: null, requirements: null, adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty, work: null, sprint: sprint);
 
-        // The tracking-file widget: titled, source-labeled, per-stage counts (non-zero only), CTA to the page.
-        Assert.Contains("<h3>Sprint Status</h3>", html);
-        Assert.Contains("from sprint-status.yaml", html);
-        Assert.Contains("href=\"sprint.html\"", html);
-        Assert.Contains("Done (1)", html);
-        Assert.Contains("In progress (1)", html);
-        Assert.Contains("Backlog (1)", html);
+        // The standalone "Sprint Status" donut pane is gone (the Now & Next board + wheel cover it).
+        Assert.DoesNotContain("<h3>Sprint Status</h3>", html);
+        Assert.DoesNotContain("chart-panel sprint-panel", html);
+        // Open retro action items are surfaced as a callout (beside deferred work) linking to the sprint page.
+        Assert.Contains("work-callout retro-callout", html);
+        Assert.Contains("Retro Action Items", html);
+        Assert.Contains("1 open item", html);
     }
 
     [Fact]
@@ -620,6 +622,7 @@ public class HtmlTemplaterTests
         {
             Number = 1, Title = "First Epic", StoryCount = 1, StoriesWithArtifact = 0,
             TasksDone = 0, TasksTotal = 0, Status = EpicStatus.Drafted,
+            StoryStatusCounts = new Dictionary<string, int>(),
         };
 
         var html = EpicsTemplater.RenderEpic(epic, progress, nav, BmadCatalog());
@@ -650,6 +653,7 @@ public class HtmlTemplaterTests
             TasksDone = 0,
             TasksTotal = 0,
             Status = EpicStatus.Drafted,
+            StoryStatusCounts = new Dictionary<string, int>(),
         };
 
         var html = EpicsTemplater.RenderEpic(epic, progress, nav, CommandCatalog.Empty);

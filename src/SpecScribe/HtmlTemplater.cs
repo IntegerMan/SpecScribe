@@ -88,7 +88,7 @@ public static class HtmlTemplater
         return sb.ToString();
     }
 
-    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null)
+    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null)
     {
         var inventory = work ?? WorkInventory.Empty;
 
@@ -124,7 +124,7 @@ public static class HtmlTemplater
         // out of the generic "Implementation Artifacts" grid so they aren't double-listed. Their standalone
         // pages still exist and stay navigable — this only affects the index grouping (mirrors how README is
         // kept out of the grid). [Story 2.1 Task 2]
-        AppendWorkTypesSection(sb, inventory);
+        AppendWorkTypesSection(sb, inventory, sprint);
 
         var promotedOutputs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var q in inventory.QuickDev) promotedOutputs.Add(q.OutputPath);
@@ -176,11 +176,35 @@ public static class HtmlTemplater
         }
 
         AppendAdrSection(sb, adrs);
+        AppendRetrosSection(sb, retros);
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
+    }
+
+    /// <summary>The home "Retrospectives" band: one card per retrospective note (its dedicated page), so the
+    /// retros stay visible on home now that they're consumed out of the generic artifact grid. Omitted when
+    /// there are none. [Story 2.3 retro pages]</summary>
+    private static void AppendRetrosSection(StringBuilder sb, IReadOnlyList<RetroModel>? retros)
+    {
+        if (retros is null || retros.Count == 0) return;
+
+        sb.Append("<div class=\"index-section-title\">Retrospectives</div>\n");
+        sb.Append("<div class=\"index-grid\">\n");
+        foreach (var r in retros)
+        {
+            sb.Append($"  <a class=\"index-card\" href=\"{Html(PathUtil.NormalizeSlashes(r.OutputRelativePath))}\">\n");
+            sb.Append($"    <h2>{Html(r.Title)}</h2>\n");
+            if (r.DateText is { Length: > 0 } d)
+            {
+                sb.Append($"    <p>{Html(d)}</p>\n");
+            }
+            sb.Append($"    <span class=\"index-card-path\">{Html(PathUtil.NormalizeSlashes(r.SourceRelativePath))}</span>\n");
+            sb.Append("  </a>\n");
+        }
+        sb.Append("</div>\n\n");
     }
 
     private static void AppendDashboard(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, RequirementsModel? requirements, SiteNav nav, CommandCatalog commands, WorkInventory work, SprintStatus? sprint = null)
@@ -225,16 +249,11 @@ public static class HtmlTemplater
             sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3>");
             sb.Append("<a class=\"view-epic-link\" href=\"epics.html\">View Epics &amp; Stories &rarr;</a></div>\n");
-            sb.Append(Charts.Sunburst(epicsModel, commands));
+            sb.Append(Charts.Sunburst(epicsModel, commands: commands));
             sb.Append("</div>\n\n");
 
             sb.Append(BmadCommands.RenderProjectNextSteps(epicsModel, commands));
         }
-
-        // The tracking-file counterpart to Now & Next: per-stage counts + what's in progress from
-        // sprint-status.yaml, explicitly source-labeled so the two never read as contradicting (the derived
-        // Now & Next above stays untouched). Omitted entirely when there's no sprint data. [Story 2.3 Task 4]
-        AppendSprintPanel(sb, sprint, epicsModel);
 
         sb.Append("<div class=\"chart-panel\">\n<h3>Overall Progress</h3>\n");
         sb.Append(Charts.ProgressBar("Planning", p.EpicsDrafted, p.EpicsTotal, $"{p.EpicsDrafted} / {p.EpicsTotal} epics"));
@@ -368,47 +387,6 @@ public static class HtmlTemplater
         if (label.Contains("Requirement", StringComparison.OrdinalIgnoreCase))
             return "family-requirements";
         return "family-planning";
-    }
-
-    /// <summary>The gated home "Sprint Status" widget: the tracking-file counterpart to Now &amp; Next. Shows
-    /// per-stage story counts from sprint-status.yaml (a donut, non-zero legend rows only per Story 1.5 B4) and
-    /// what's in progress right now (in-progress + in-review stories, linked), with a CTA to the full sprint
-    /// page. Source-labeled ("from sprint-status.yaml") so the tracked view never reads as contradicting the
-    /// derived Now &amp; Next. Appends nothing when there's no sprint data — same early-return omission as the
-    /// other gated panels. [Story 2.3 Task 4]</summary>
-    private static void AppendSprintPanel(StringBuilder sb, SprintStatus? sprint, EpicsModel? epicsModel)
-    {
-        if (sprint is null || sprint.IsEmpty) return;
-
-        sb.Append("<div class=\"chart-panel sprint-panel\">\n");
-        sb.Append("<div class=\"chart-panel-header-row\"><h3>Sprint Status</h3>");
-        sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View Sprint &rarr;</a></div>\n");
-        // Name the source so the tracked counts never read as contradicting the derived Now & Next. [Story 1.5]
-        sb.Append("<p class=\"panel-source-note\">from sprint-status.yaml</p>\n");
-
-        var counts = SprintTemplater.StoryStageCounts(sprint);
-        var total = counts.Sum(c => c.Count);
-        if (total > 0)
-        {
-            var segments = counts.Select(c => (c.Label, c.Count, c.CssClass)).ToList();
-            var nonZero = segments.Where(s => s.Count > 0).ToList();
-            var done = counts.First(c => c.CssClass == "done").Count;
-            var ariaParts = string.Join(", ", nonZero.Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
-
-            sb.Append("<div class=\"donut-and-legend\">\n");
-            sb.Append(Charts.Donut(segments, ariaLabel: $"Sprint stories: {ariaParts}", centerText: $"{done}/{total}"));
-            sb.Append("<div class=\"donut-legend\">\n");
-            // Non-zero rows only (B4) — no "In review (0)" noise.
-            foreach (var (label, count, cssClass) in nonZero)
-            {
-                sb.Append($"  <span><span class=\"swatch {cssClass}\"></span>{Html(label)} ({count})</span>\n");
-            }
-            sb.Append("</div>\n</div>\n");
-        }
-
-        // The "what's in progress" detail lives in the sprint board (the Now & Next panel above) now, so this
-        // widget stays a compact donut summary — the at-a-glance overview, with a CTA to the full board.
-        sb.Append("</div>\n\n");
     }
 
     /// <summary>FR/NFR progress at a glance: a status donut for each kind, rolled up from covering-epic
@@ -598,9 +576,10 @@ public static class HtmlTemplater
     /// cards plus a deferred-work callout, so these work classes read as distinct, tracked work rather than
     /// undifferentiated cards buried in the generic artifact grid. Omitted entirely (no empty header, no broken
     /// link) when there is no such work, preserving Story 1.1's graceful omission. [Story 2.1 Task 2]</summary>
-    private static void AppendWorkTypesSection(StringBuilder sb, WorkInventory work)
+    private static void AppendWorkTypesSection(StringBuilder sb, WorkInventory work, SprintStatus? sprint = null)
     {
-        if (work.IsEmpty) return;
+        var openRetro = sprint?.OpenActionItems.Count ?? 0;
+        if (work.IsEmpty && openRetro == 0) return;
 
         sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept("Direct & Quick-Dev Work")}Direct &amp; Quick-Dev Work</div>\n");
 
@@ -639,6 +618,16 @@ public static class HtmlTemplater
             sb.Append($"<a class=\"work-callout\" href=\"{Html(deferred.OutputPath)}\">\n");
             sb.Append($"  <span class=\"work-callout-label\">{Icons.ForConcept("Deferred")}Deferred Work</span>\n");
             sb.Append($"  <span class=\"work-callout-count\">{count} open {Charts.Plural(count, "item", "items")}</span>\n");
+            sb.Append("</a>\n\n");
+        }
+
+        // Open retrospective action items sit alongside deferred work — the other class of tracked follow-up.
+        // Links to the sprint page, where the Retrospectives modal lists them (each → its retro page). [retro]
+        if (openRetro > 0)
+        {
+            sb.Append($"<a class=\"work-callout retro-callout\" href=\"{Html(SiteNav.SprintOutputPath)}\">\n");
+            sb.Append($"  <span class=\"work-callout-label\">{Icons.ForConcept("Retrospective")}Retro Action Items</span>\n");
+            sb.Append($"  <span class=\"work-callout-count\">{openRetro} open {Charts.Plural(openRetro, "item", "items")}</span>\n");
             sb.Append("</a>\n\n");
         }
     }

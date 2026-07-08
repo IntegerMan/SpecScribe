@@ -41,9 +41,12 @@ public static class StatusStyles
         _ => "Pending",
     };
 
-    /// <summary>The story-lifecycle css classes in narrative order (done → … → pending), the canonical order
-    /// the delivery mosaic and any status roll-up iterate so segments and legends read consistently.</summary>
-    public static readonly IReadOnlyList<string> StoryStages = new[] { "done", "review", "active", "ready", "drafted", "pending" };
+    /// <summary>The story-lifecycle css classes in narrative order (done → … → drafted), the canonical order
+    /// the delivery mosaic and any status roll-up iterate so segments and legends read consistently.
+    /// "pending" is excluded: <see cref="ForStory"/>/<see cref="ForStatus"/> never produce it (an
+    /// unrecognized status falls back to "drafted"), so it would only ever be a dead, unreachable stage
+    /// here — unlike <see cref="ForEpic"/>, which does have a real "pending" tier.</summary>
+    public static readonly IReadOnlyList<string> StoryStages = new[] { "done", "review", "active", "ready", "drafted" };
 
     /// <summary>CSS class for an epic, derived from its stories: green only when every story is done;
     /// teal once any story has entered dev; gold "ready" once any story is ready-for-dev (mirroring the

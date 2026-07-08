@@ -43,7 +43,8 @@ public static class SprintTemplater
             .ToList();
     }
 
-    public static string RenderIndex(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands)
+    public static string RenderIndex(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
+        IReadOnlyList<RetroModel>? retros = null, IReadOnlyDictionary<int, string>? epicRetroMap = null)
     {
         var outputPath = SiteNav.SprintOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — sprint.html is at the output root.
@@ -81,11 +82,11 @@ public static class SprintTemplater
             (commands.Command("correct-course"), "Handle a mid-sprint change"),
             (commands.Command("retrospective"), "Capture lessons after an epic"),
         }));
+        sb.Append(RenderRetrospectivesModal(sprint, retros ?? Array.Empty<RetroModel>(), epicRetroMap, prefix));
         sb.Append("  </div>\n");
         sb.Append("</div>\n\n");
 
         AppendBoardToggle(sb, sprint, epics, prefix);
-        AppendActionItems(sb, sprint);
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
@@ -212,40 +213,64 @@ public static class SprintTemplater
         var done = counts.First(c => c.CssClass == "done").Count;
         var ariaParts = string.Join(", ", nonZero.Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
 
+        // Rich single tooltip via the body-level (never-clipped) js-tip node; suppress the donut's per-segment
+        // <title> so the tiny wheel shows just this one clean breakdown. [Story 2.3 polish]
+        var tip = "Sprint delivery\n" + string.Join("\n", nonZero.Select(s => $"{s.Label}: {s.Count}"));
         var sb = new StringBuilder();
-        sb.Append("<div class=\"sprint-wheel\" data-tooltip=\"" + PathUtil.Html($"Sprint delivery: {ariaParts}") + "\">");
-        sb.Append(Charts.Donut(segments, size: 46, showCenterText: false, ariaLabel: $"Sprint delivery: {ariaParts}"));
+        sb.Append($"<div class=\"sprint-wheel js-tip\" data-tip=\"{PathUtil.Html(tip)}\">");
+        sb.Append(Charts.Donut(segments, size: 46, showCenterText: false, segmentTitles: false, ariaLabel: $"Sprint delivery: {ariaParts}"));
         sb.Append($"<span class=\"sprint-wheel-label\">{done} / {total} done</span>");
         sb.Append("</div>");
         return sb.ToString();
     }
 
-    /// <summary>The open retrospective action items (open + in-progress) as status-badged rows. Rendered ONLY
-    /// when there is at least one — no empty header when the tracking file carries no action_items. [Story 2.3]</summary>
-    private static void AppendActionItems(StringBuilder sb, SprintStatus sprint)
+    /// <summary>The header-triggered "Retrospectives" modal: a native <c>&lt;details&gt;</c> (reusing the
+    /// command-popout dismissal JS) styled as a centered overlay. Lists past retrospectives (each → its page)
+    /// and the open action items (each linked to its epic's retro page via <paramref name="epicRetroMap"/>).
+    /// Returns empty — no button — when there are no retros AND no open items. [Story 2.3 retro pages]</summary>
+    private static string RenderRetrospectivesModal(SprintStatus sprint, IReadOnlyList<RetroModel> retros,
+        IReadOnlyDictionary<int, string>? epicRetroMap, string prefix)
     {
         var open = sprint.OpenActionItems;
-        if (open.Count == 0) return;
+        if (retros.Count == 0 && open.Count == 0) return string.Empty;
 
-        sb.Append("<section class=\"sprint-action-items\">\n");
-        sb.Append("  <div class=\"section-divider\">Open retrospective action items</div>\n");
-        sb.Append("  <ul class=\"sprint-action-list\">\n");
-        foreach (var item in open)
+        var count = open.Count;
+        var sb = new StringBuilder();
+        sb.Append("<details class=\"cmd-menu retro-menu\">");
+        sb.Append($"<summary class=\"cmd-menu-toggle\" aria-label=\"Retrospectives\">Retrospectives{(count > 0 ? $" <span class=\"cmd-menu-count\">{count}</span>" : string.Empty)} ▾</summary>");
+        sb.Append("<div class=\"cmd-menu-pop retro-pop\" role=\"group\" aria-label=\"Retrospectives\">");
+
+        if (retros.Count > 0)
         {
-            sb.Append("    <li class=\"sprint-action-row\">\n");
-            sb.Append($"      <span class=\"sprint-action-text\">{PathUtil.Html(item.Action)}</span>\n");
-            if (item.EpicNumber is { } en)
+            sb.Append("<div class=\"retro-modal-section\"><h3>Past retrospectives</h3><ul class=\"retro-modal-list\">");
+            foreach (var r in retros)
             {
-                sb.Append($"      <span class=\"pill\">Epic {en}</span>\n");
+                var meta = r.DateText is { Length: > 0 } d ? $" <span class=\"retro-modal-date\">{PathUtil.Html(d)}</span>" : string.Empty;
+                sb.Append($"<li><a href=\"{PathUtil.Html(prefix + r.OutputRelativePath)}\">{PathUtil.Html(r.Title)}</a>{meta}</li>");
             }
-            if (item.Owner is { Length: > 0 } owner)
-            {
-                sb.Append($"      <span class=\"pill\">{PathUtil.Html(owner)}</span>\n");
-            }
-            sb.Append($"      {StatusStyles.Badge(StatusStyles.ForSprint(item.Status), StatusStyles.SprintLabel(item.Status))}\n");
-            sb.Append("    </li>\n");
+            sb.Append("</ul></div>");
         }
-        sb.Append("  </ul>\n</section>\n\n");
+
+        if (open.Count > 0)
+        {
+            sb.Append("<div class=\"retro-modal-section\"><h3>Open action items</h3><ul class=\"sprint-action-list\">");
+            foreach (var item in open)
+            {
+                sb.Append("<li class=\"sprint-action-row\">");
+                var retroHref = item.EpicNumber is { } en && epicRetroMap is not null && epicRetroMap.TryGetValue(en, out var rp) ? rp : null;
+                sb.Append(retroHref is not null
+                    ? $"<a class=\"sprint-action-text\" href=\"{PathUtil.Html(prefix + retroHref)}\">{PathUtil.Html(item.Action)}</a>"
+                    : $"<span class=\"sprint-action-text\">{PathUtil.Html(item.Action)}</span>");
+                if (item.EpicNumber is { } e2) sb.Append($"<span class=\"pill\">Epic {e2}</span>");
+                if (item.Owner is { Length: > 0 } owner) sb.Append($"<span class=\"pill\">{PathUtil.Html(owner)}</span>");
+                sb.Append(StatusStyles.Badge(StatusStyles.ForSprint(item.Status), StatusStyles.SprintLabel(item.Status)));
+                sb.Append("</li>");
+            }
+            sb.Append("</ul></div>");
+        }
+
+        sb.Append("</div></details>");
+        return sb.ToString();
     }
 
     /// <summary>One board card for a story: the whole card is a link to the story's generated page (real or
@@ -258,27 +283,44 @@ public static class SprintTemplater
         var id = story?.Id
             ?? (entry.EpicNumber is { } e && entry.StoryMinor is { } m ? $"{e}.{m}" : entry.RawKey);
 
+        // Rich, non-clipped hover tooltip (body-level js-tip): epic + story names + high-level task info.
+        var dataTip = PathUtil.Html(BuildCardTip(entry, story, epics));
         var tag = href is not null ? "a" : "div";
         var hrefAttr = href is not null ? $" href=\"{PathUtil.Html(prefix + href)}\"" : string.Empty;
 
-        sb.Append($"      <{tag} class=\"sprint-card {cssClass}\"{hrefAttr}>\n");
+        sb.Append($"      <{tag} class=\"sprint-card js-tip {cssClass}\"{hrefAttr} data-tip=\"{dataTip}\">\n");
         sb.Append("        <div class=\"sprint-card-head\">\n");
-        sb.Append($"          <span class=\"sprint-card-id\">{PathUtil.Html(id)}</span>\n");
-        if (entry.EpicNumber is { } en)
-        {
-            sb.Append($"          <span class=\"sprint-card-epic\" data-tooltip=\"Epic {en}\" aria-label=\"Epic {en}\">E{en}</span>\n");
-        }
+        sb.Append($"          <span class=\"sprint-card-id\">Story {PathUtil.Html(id)}</span>\n");
         sb.Append("        </div>\n");
         sb.Append($"        <span class=\"sprint-card-title\">{title}</span>\n");
 
         // A hairline task-completion bar at the card bottom, only when the story has a task plan (mirrors the
-        // TaskBadge gate). Colors + fraction reuse the shared progress vocabulary; the tooltip is CSS-only. [redesign]
+        // TaskBadge gate). Colors + fraction reuse the shared progress vocabulary. [redesign]
         if (story is { TasksTotal: > 0 })
         {
             AppendCardProgress(sb, story.TasksDone, story.TasksTotal);
         }
 
         sb.Append($"      </{tag}>\n");
+    }
+
+    /// <summary>The rich card tooltip text (plain, <c>\n</c>-separated for the js-tip node): epic name, story
+    /// name, and high-level task progress. [Story 2.3 polish]</summary>
+    private static string BuildCardTip(SprintEntry entry, StoryInfo? story, EpicsModel? epics)
+    {
+        var lines = new List<string>();
+        if (entry.EpicNumber is { } en)
+        {
+            var epicTitle = epics?.Epics.FirstOrDefault(e => e.Number == en)?.Title;
+            lines.Add(epicTitle is { Length: > 0 } et ? $"Epic {en}: {PathUtil.StripHtmlTags(et)}" : $"Epic {en}");
+        }
+        var idText = story?.Id ?? (entry.EpicNumber is { } e2 && entry.StoryMinor is { } m2 ? $"{e2}.{m2}" : entry.RawKey);
+        var storyTitle = story is not null ? PathUtil.StripHtmlTags(story.Title) : PrettifySlug(entry.RawKey);
+        lines.Add($"Story {idText}: {storyTitle}");
+        lines.Add(story is { TasksTotal: > 0 }
+            ? $"{story.TasksDone} of {story.TasksTotal} {Charts.Plural(story.TasksTotal, "task", "tasks")} done"
+            : "No task plan yet");
+        return string.Join("\n", lines);
     }
 
     /// <summary>The thin per-card task-completion bar: a <c>role="progressbar"</c> track + a
@@ -289,7 +331,7 @@ public static class SprintTemplater
         var pct = total > 0 ? (int)Math.Round((double)done / total * 100) : 0;
         var fill = pct >= 100 ? "done" : pct > 0 ? "partial" : "empty";
         var aria = $"{done} of {total} {Charts.Plural(total, "task", "tasks")} done";
-        sb.Append($"        <span class=\"sprint-card-progress\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"{PathUtil.Html(aria)}\" data-tooltip=\"{PathUtil.Html($"{aria} ({pct}%)")}\">");
+        sb.Append($"        <span class=\"sprint-card-progress\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"{PathUtil.Html(aria)}\">");
         sb.Append($"<span class=\"sprint-card-progress-fill {fill}\" style=\"width:{pct}%\"></span></span>\n");
     }
 

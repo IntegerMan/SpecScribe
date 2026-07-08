@@ -13,7 +13,7 @@ public sealed class EpicProgress
     /// <summary>Per-story delivery-status tally for this epic, keyed by <see cref="StatusStyles"/> css class
     /// (done/review/active/ready/drafted/pending). Feeds the "Progress by Epic" delivery mosaic so a mid-dev
     /// epic renders its real mix rather than a full "detailed" ring. Empty for an epic with no stories.</summary>
-    public IReadOnlyDictionary<string, int> StoryStatusCounts { get; init; } = new Dictionary<string, int>();
+    public required IReadOnlyDictionary<string, int> StoryStatusCounts { get; init; }
 }
 
 /// <summary>A single computed snapshot of project progress — epics/stories/tasks tallied from the parsed

@@ -45,7 +45,7 @@ public static class Charts
     /// <paramref name="ariaLabel"/> is supplied the whole chart carries <c>role="img"</c>+that name so it is
     /// reachable without a pointer; when omitted the donut is decorative (<c>aria-hidden</c>) — used where an
     /// enclosing labeled card/legend already names it, so screen readers don't hear it twice. [Story 1.4 AC #1]</summary>
-    public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120, string? ariaLabel = null, string? centerText = null, bool showCenterText = true)
+    public static string Donut(IReadOnlyList<(string Label, int Value, string CssClass)> segments, int size = 120, string? ariaLabel = null, string? centerText = null, bool showCenterText = true, bool segmentTitles = true)
     {
         var total = segments.Sum(s => Math.Max(0, s.Value));
         var radius = size / 2.0 - 10;
@@ -74,10 +74,11 @@ public static class Charts
                 var fraction = (double)value / total;
                 var dash = fraction * circumference;
                 var gap = circumference - dash;
+                var segTitle = segmentTitles ? $"<title>{Html(label)}: {value}</title>" : string.Empty;
                 sb.Append(
                     $"  <circle cx=\"{F(center)}\" cy=\"{F(center)}\" r=\"{F(radius)}\" class=\"donut-seg {cssClass}\"{segFocus} " +
                     $"stroke-dasharray=\"{F(dash)} {F(gap)}\" stroke-dashoffset=\"-{F(offset)}\">" +
-                    $"<title>{Html(label)}: {value}</title></circle>\n");
+                    $"{segTitle}</circle>\n");
                 offset += dash;
             }
         }
@@ -123,7 +124,7 @@ public static class Charts
     /// edge of the data. Every epic/story segment (and the placeholder) is a real link; colors come from
     /// <see cref="StatusStyles"/> via .sb-* CSS classes. When <paramref name="commands"/> exposes a
     /// create-story command, the placeholder tooltip names it. Pure SVG — no JS. [UXO E4]</summary>
-    public static string Sunburst(EpicsModel model, CommandCatalog? commands = null, int size = 380)
+    public static string Sunburst(EpicsModel model, int size = 380, CommandCatalog? commands = null)
     {
         var epics = model.Epics.OrderBy(e => e.Number).ToList();
         if (epics.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
@@ -265,7 +266,7 @@ public static class Charts
     /// page. Every segment is a real link: to the story's detail page when one exists, otherwise an
     /// in-page anchor down to its story card (supplied via <paramref name="hrefBuilder"/>). A story with no
     /// task plan yet gets the same faint dashed placeholder arc as the project sunburst. [UXO E4]</summary>
-    public static string EpicSunburst(EpicInfo epic, Func<StoryInfo, string> hrefBuilder, CommandCatalog? commands = null, int size = 320)
+    public static string EpicSunburst(EpicInfo epic, Func<StoryInfo, string> hrefBuilder, int size = 320, CommandCatalog? commands = null)
     {
         if (epic.Stories.Count == 0) return "<div class=\"chart-empty\">No stories drafted for this epic yet.</div>";
 

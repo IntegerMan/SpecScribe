@@ -466,6 +466,18 @@ claude-opus-4-8
   discipline (tracked yaml vs. derived artifact `Status:`) to protect Story 1.5 truthfulness; and full
   graceful degradation for missing/partial/malformed tracking data (no page, nav, widget, or broken links).
   Documented the watch-mode `.yaml` live-reload limitation as a known, optionally-extendable boundary.
+- 2026-07-07 (polish #4 + retrospectives): Made BMad retrospective notes (`epic-N-retro-*.md`) a first-class
+  artifact class — new `RetroModel`/`RetroParser`/`RetroActionStyler`/`RetroTemplater` render each as a
+  dedicated stylized page (epic-retro kicker, date, epic link, participant pills, status-badged Action Items
+  table); `SiteGenerator` discovers/consumes them (out of the generic grid) via `WriteRetros` and caches an
+  epic→retro map. The sprint page's bottom action-items list became a header-triggered **centered modal**
+  ("Retrospectives ▾", `<details class="cmd-menu retro-menu">` + a pop-`::before` dim backdrop) listing past
+  retros AND open action items, each item linked to its epic's retro page. Home: removed the redundant
+  standalone "Sprint Status" pane; added a "Retrospectives" section + a "Retro Action Items — N open" callout
+  beside Deferred Work. Fixed tooltip clipping by routing rich card/wheel tooltips through the body-level
+  (never-clipped) `.ss-tooltip` JS node via a `data-tip` attribute (`white-space: pre-line`, multi-line: epic +
+  story name + task info); cards now read "Story N.M" and dropped the epic badge; `Charts.Donut` gained a
+  `segmentTitles` toggle so the tiny wheel shows one clean tooltip. 422 tests pass.
 - 2026-07-07 (polish #3): Popout command badges size to content instead of stretching the panel; dropped the
   crammed center number from the tiny status wheel (a "N / M done" label carries it — new `Charts.Donut`
   `showCenterText` option); the home Now & Next board folds its "from sprint-status.yaml" label inline into the

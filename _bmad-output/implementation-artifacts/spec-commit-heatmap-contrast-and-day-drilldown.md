@@ -3,6 +3,7 @@ title: 'Commit heatmap: fainter zero-commit days + click-a-day commit drill-down
 type: 'feature'
 created: '2026-07-06'
 status: 'done'
+route: 'one-shot'
 review_loop_iteration: 0
 baseline_commit: 'fdcb6967838f3c402a8026a3c163838568bcbe09'
 context: []

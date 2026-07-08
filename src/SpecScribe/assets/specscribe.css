@@ -1718,6 +1718,8 @@ code.color-swatch {
 .work-callout:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .work-callout-label { font-weight: bold; color: var(--ink); letter-spacing: 0.04em; }
 .work-callout-count { font-size: 0.8rem; color: var(--ink-light); font-family: 'Courier New', monospace; }
+/* Open retro action items ride the same callout, tinted with the review token to read as its own class. */
+.work-callout.retro-callout { border-left-color: var(--status-review); }
 
 /* ====================== REQUIREMENTS ====================== */
 /* Inline FR/NFR reference links, kept subtle so dense "FRs covered" lines stay readable. */
@@ -1939,7 +1941,7 @@ code.color-swatch {
 .ss-tooltip {
   position: absolute;
   z-index: 300;
-  max-width: 260px;
+  max-width: 300px;
   padding: 0.4rem 0.65rem;
   background: var(--parchment);
   color: var(--ink);
@@ -1949,6 +1951,8 @@ code.color-swatch {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 0.74rem;
   line-height: 1.4;
+  /* Rich js-tip tooltips carry \n line breaks (epic / story / tasks); render them as lines. */
+  white-space: pre-line;
   pointer-events: none;
 }
 .ss-tooltip[hidden] { display: none; }
@@ -2202,6 +2206,43 @@ code.color-swatch {
 /* align-items:flex-start so each command badge sizes to its content instead of stretching the popout width. */
 .cmd-menu-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; }
 .cmd-menu-desc { font-size: 0.76rem; color: var(--ink-faded); }
+.cmd-menu-count {
+  font-family: 'Courier New', monospace; font-size: 0.66rem;
+  background: var(--rust); color: var(--warm-white);
+  border-radius: 10px; padding: 0 0.4rem; margin-left: 0.15rem;
+}
+
+/* The Retrospectives popout is a centered modal rather than an anchored dropdown. The dim backdrop lives on
+   the pop's ::before (a <details> element itself doesn't render ::before reliably); it's click-through
+   (pointer-events:none) so an outside click still closes the modal via the shared menu-dismissal JS. */
+.retro-menu .cmd-menu-pop.retro-pop {
+  position: fixed; left: 50%; top: 50%; right: auto; transform: translate(-50%, -50%);
+  width: min(620px, 92vw); max-height: 80vh; overflow-y: auto; z-index: 200;
+}
+.retro-menu .cmd-menu-pop.retro-pop::before {
+  content: ""; position: fixed; inset: 0; z-index: -1;
+  background: rgba(26, 18, 8, 0.35); pointer-events: none;
+}
+.retro-modal-section + .retro-modal-section { margin-top: 1rem; }
+.retro-modal-section h3 { font-size: 0.9rem; margin: 0 0 0.5rem; color: var(--rust); }
+.retro-modal-list { list-style: none; margin: 0; padding: 0; }
+.retro-modal-list li { padding: 0.3rem 0; border-bottom: 1px solid var(--parchment-dark); }
+.retro-modal-list li:last-child { border-bottom: none; }
+.retro-modal-list a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+.retro-modal-list a:hover { color: var(--rust); }
+.retro-modal-date { font-size: 0.72rem; color: var(--ink-light); font-family: 'Courier New', monospace; margin-left: 0.4rem; }
+a.sprint-action-text { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+a.sprint-action-text:hover { color: var(--rust); }
+
+/* Retrospective page: participant pills + a linked epic pill. */
+.retro-participants { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
+.participant-pill {
+  font-size: 0.72rem; color: var(--ink-faded);
+  background: var(--parchment); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0.1rem 0.6rem;
+}
+.pill.pill-link { text-decoration: none; color: var(--teal); border: 1px solid var(--teal-light); }
+.pill.pill-link:hover { color: var(--rust); border-color: var(--gold-light); }
 
 /* Source note: a de-emphasized inline tag in the panel header (no longer its own line) so the tracked view is
    labeled without costing vertical space. */
@@ -2230,13 +2271,8 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
 .sprint-card.active { border-left-color: var(--status-active); }
 .sprint-card.review { border-left-color: var(--status-review); }
 .sprint-card.done { border-left-color: var(--status-done); }
-.sprint-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
-.sprint-card-id { font-family: 'Courier New', monospace; font-size: 0.72rem; font-weight: bold; color: var(--ink-light); }
-.sprint-card-epic {
-  font-family: 'Courier New', monospace; font-size: 0.62rem; letter-spacing: 0.03em;
-  color: var(--ink-faded); background: var(--parchment); border: 1px solid var(--border);
-  border-radius: 3px; padding: 0 0.3rem;
-}
+.sprint-card-head { display: flex; align-items: center; gap: 0.4rem; }
+.sprint-card-id { font-family: 'Courier New', monospace; font-size: 0.7rem; font-weight: bold; color: var(--ink-light); letter-spacing: 0.02em; }
 .sprint-card-title { font-size: 0.82rem; font-weight: bold; color: var(--ink); line-height: 1.3; }
 /* Hairline task-completion bar; mirrors .progress-fill's done/partial/empty colors at 3px, no border/radius. */
 .sprint-card-progress { display: block; height: 3px; margin-top: 0.15rem; background: var(--parchment-dark); border-radius: 2px; overflow: hidden; }

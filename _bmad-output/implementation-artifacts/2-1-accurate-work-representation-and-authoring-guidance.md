@@ -4,7 +4,7 @@ baseline_commit: 8fa1c1d8380daae77cec84f4ba66da9c5179a211
 
 # Story 2.1: Accurate Work Representation and Authoring Guidance
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -59,7 +59,7 @@ so that deferred items and quick-dev work stay visible and new contributors know
 - [x] Task 6: Inline authoring guidance on epics/stories surfaces, including empty and partial states (AC: #2)
   - [x] Route all commands through the existing module-aware seam so they match the detected module (`/bmad-*` vs `/gds-*`) and are **omitted** when not installed: `CommandCatalog.Command("create-epics-and-stories")`, `Command("create-story", "N.N")`. Reuse/extend `BmadCommands` rather than hardcoding command strings. [Source: `src/SpecScribe/BmadCommands.cs`, `src/SpecScribe/ModuleContext.cs:43-51`]
   - [x] **Empty state:** `EpicsTemplater.RenderIndex` has no empty-state today (a zero-epic model still emits headers + an empty sunburst). When `model.Epics.Count == 0`, render guidance on how to add the first epic (`create-epics-and-stories`). Note the home page's `epics.html` link itself only appears when `epics.md` exists (`SiteNav` gate) — the empty-epics case is "epics.md exists but has no epics." [Source: `src/SpecScribe/EpicsTemplater.cs:9-64`, `src/SpecScribe/SiteNav.cs:78-86`]
-  - [x] **Partial states — convert dead-end notes into next actions:** `AppendEpicCard`'s "Stories not yet drafted." (`EpicsTemplater.cs:426-429`), `AppendStoryCard`'s "No detailed story plan yet." (`:363-366`), and `AppendUpNextCard`'s "Not yet drafted" (`:471-496`) currently state a gap without the command to close it. Pair each with the relevant guidance (`create-epics-and-stories` for a pending epic; `create-story N.N` for an undrafted story). Keep it de-emphasized so it reads as help, not clutter.
+  - [x] **Partial states — convert dead-end notes into next actions:** `AppendEpicCard`'s "Stories not yet drafted." (`EpicsTemplater.cs:426-429`) and `AppendStoryCard`'s "No detailed story plan yet." (`:363-366`) currently state a gap without the command to close it. Pair each with the relevant guidance (`create-epics-and-stories` for a pending epic; `create-story N.N` for an undrafted story). Keep it de-emphasized so it reads as help, not clutter. `AppendUpNextCard`'s "Not yet drafted" (`:471-496`) is deliberately left untouched: it sits beside the Next Steps panel, which already surfaces the same `create-story` command, so pairing it there too would duplicate the CTA in one panel.
   - [x] Guidance must degrade to nothing when the module exposes no such command (never print a command that doesn't exist) — the same rule `BmadCommands.Add` already enforces.
 - [x] Task 7: Test coverage (AC: #1, #2)
   - [x] `ChartsTests`: `EpicMosaic` renders per-status segments from the story roll-up (a mid-dev epic is NOT a full ring); pending epic keeps the empty ring + "Not yet drafted"; `Sunburst`/`EpicSunburst` emit a dashed placeholder arc with the "No task plan yet" tooltip when `TasksTotal == 0` and still keep the story link + segment aria-labels. [Source: `tests/SpecScribe.Tests/ChartsTests.cs`]
@@ -69,6 +69,18 @@ so that deferred items and quick-dev work stay visible and new contributors know
 - [x] Task 8: End-to-end validation with a real generation pass (AC: #1, #2)
   - [x] Run the focused test filter, then a real generation pass against this repo (it contains 5 `spec-*.md`, a `deferred-work.md`, epics in every state, and stories with and without plans — a live fixture for every branch).
   - [x] Manually verify on `docs/live/index.html` + `epics.html`: quick-dev/deferred work shows as first-class with status; the whole-project counts include them without changing epic/story numbers; the epic mosaic shows Epic 1 mid-development (not a full ring); undrafted stories show a dashed placeholder arc with the create-story CTA; empty/partial epic surfaces show the add-epic/add-story guidance.
+
+### Review Findings
+
+- [ ] [Review][Patch] New heatmap quick-dev spec is missing `route: one-shot` frontmatter, so `WorkInventory` will never classify it as quick-dev, contradicting its own completion notes' verification claim [_bmad-output/implementation-artifacts/spec-commit-heatmap-contrast-and-day-drilldown.md]
+- [ ] [Review][Patch] `EpicProgress.StoryStatusCounts` is not `required` unlike its sibling properties — a future caller that omits it gets a silently empty mosaic ring for a mid-dev epic, defeating the "no misleading empty ring" guarantee [src/SpecScribe/ProgressModel.cs:16]
+- [ ] [Review][Patch] `WorkInventory.Build` classifies quick-dev/deferred files by filename only with no check they live under `implementation-artifacts/`, contradicting the story's own stated convention [src/SpecScribe/WorkInventory.cs:34-49]
+- [ ] [Review][Patch] `WorkInventory.Build` silently last-write-wins if more than one `deferred-work.md` exists, with no warning or aggregation [src/SpecScribe/WorkInventory.cs:41-44]
+- [ ] [Review][Patch] `CountOpenItems` naively counts `<li`/`<del` across the whole rendered body, which over/under-counts with nested lists or unrelated strikethrough [src/SpecScribe/WorkInventory.cs:63-73]
+- [ ] [Review][Patch] Dev notes and the new Story 2.4 spec repeat the known-stale `--output docs/live` command as the "verified" generation target, contradicting the project's actual output directory convention [story completion notes; Story 2.4 spec]
+- [ ] [Review][Patch] `Charts.Sunburst`/`EpicSunburst` insert the new `commands` parameter before `size` instead of appending at the end — a latent breaking-change risk for future positional callers [src/SpecScribe/Charts.cs:126, :268]
+- [ ] [Review][Patch] `StatusStyles.StoryStages` lists `"pending"` as a valid stage but `ForStatus` can never return it — dead/unreachable stage in the mosaic segment logic [src/SpecScribe/StatusStyles.cs:46]
+- [ ] [Review][Patch] Task 6's own subtask names `AppendUpNextCard`'s "Not yet drafted" case as one of three sites to convert to guidance; only two were touched, yet Task 6 is checked complete without reflecting the deviation [story file Task 6]
 
 ## Developer Context Section
 
@@ -414,8 +426,10 @@ claude-opus-4-8
   3 quick-dev cards + deferred callout (9 open items) surfaced first-class and promoted out of the generic
   grid; Direct-changes stat present with epic/story/task tallies unchanged; Epic 1 mosaic reads green "done"
   (real delivery, not a "detailed" ring); 26 dashed placeholder arcs with module-aware create-story CTAs on
-  undrafted stories; pending/undrafted surfaces show the add-epic/add-story guidance. (`docs/live/` is
-  gitignored — built by CI for Pages — so the pass leaves no committed diff.)
+  undrafted stories; pending/undrafted surfaces show the add-epic/add-story guidance. (Generated into the
+  gitignored `SpecScribeOutput/` dev output dir, per [[generate-output-dir-is-specscribeoutput]] — not
+  `docs/live`, which is vestigial; CI builds `SpecScribeOutput` and deploys it to Pages directly — so the
+  pass leaves no committed diff.)
 
 ### File List
 

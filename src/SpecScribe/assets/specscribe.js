@@ -31,6 +31,15 @@
   function activate(el) {
     if (activeSeg === el) return;
     deactivate();
+    // HTML elements opt into the (body-level, never-clipped) tooltip via data-tip — used for rich, multi-line
+    // card/wheel tips that a clipped CSS ::after can't show. SVG segments keep the <title> path.
+    var dataTip = el.getAttribute ? el.getAttribute("data-tip") : null;
+    if (dataTip) {
+      activeSeg = el;
+      activeTitle = null;
+      activeText = dataTip;
+      return;
+    }
     var t = el.querySelector("title");
     activeSeg = el;
     activeTitle = t;
@@ -68,18 +77,20 @@
   }
 
   var SEG = ".sb-seg, .heatmap-cell, .donut-seg";
+  // Hover/focus/touch also fire on HTML elements that opt in with .js-tip (rich card/wheel tooltips).
+  var HOVER = SEG + ", .js-tip";
 
   document.addEventListener("mouseover", function (e) {
-    var seg = e.target.closest ? e.target.closest(SEG) : null;
+    var seg = e.target.closest ? e.target.closest(HOVER) : null;
     if (seg) showTip(seg, e.clientX, e.clientY);
   });
   document.addEventListener("mousemove", function (e) {
     if (!tip || tip.hidden) return;
-    var seg = e.target.closest ? e.target.closest(SEG) : null;
+    var seg = e.target.closest ? e.target.closest(HOVER) : null;
     if (seg) showTip(seg, e.clientX, e.clientY);
   });
   document.addEventListener("mouseout", function (e) {
-    var seg = e.target.closest ? e.target.closest(SEG) : null;
+    var seg = e.target.closest ? e.target.closest(HOVER) : null;
     if (seg) hideTip();
   });
 
@@ -90,6 +101,13 @@
   // active-day cells are link-wrapped for the drill-down and ride the same link branch as the sunburst.
   document.addEventListener("focusin", function (e) {
     if (!e.target.closest) return;
+    // A focused .js-tip element (e.g. a card link) is its own tip source; anchor to its box.
+    var jt = e.target.closest(".js-tip");
+    if (jt) {
+      var rj = jt.getBoundingClientRect();
+      showTip(jt, rj.left + rj.width / 2, rj.top);
+      return;
+    }
     var link = e.target.closest("a");
     var seg = link ? link.querySelector(SEG) : e.target.closest(SEG);
     if (seg) {
@@ -108,7 +126,9 @@
   document.addEventListener("touchstart", function (e) {
     if (!e.target.closest) return;
     var link = e.target.closest("a");
-    var seg = link ? link.querySelector(SEG) : e.target.closest(SEG);
+    // A .js-tip element is its own tip source (may itself be the link → two-tap show-then-navigate).
+    var jt = e.target.closest(".js-tip");
+    var seg = jt || (link ? link.querySelector(SEG) : e.target.closest(SEG));
     if (!seg) { hideTip(); lastTapped = null; return; }
     if (link) {
       if (lastTapped !== link) {

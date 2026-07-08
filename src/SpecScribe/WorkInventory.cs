@@ -34,13 +34,17 @@ public sealed class WorkInventory
         foreach (var doc in docs)
         {
             var norm = PathUtil.NormalizeSlashes(doc.SourceRelativePath);
+            if (!norm.StartsWith("implementation-artifacts/", StringComparison.OrdinalIgnoreCase)) continue;
+
             var slash = norm.LastIndexOf('/');
             var fileName = slash >= 0 ? norm[(slash + 1)..] : norm;
             var output = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
 
             if (string.Equals(fileName, "deferred-work.md", StringComparison.OrdinalIgnoreCase))
             {
-                deferred = new DeferredWorkEntry(doc.Title, output, CountOpenItems(doc.BodyHtml));
+                // First match wins if more than one deferred-work.md somehow exists — deterministic rather
+                // than last-write-wins, and still never an exception (NFR2).
+                deferred ??= new DeferredWorkEntry(doc.Title, output, CountOpenItems(doc.BodyHtml));
             }
             else if (fileName.StartsWith("spec-", StringComparison.OrdinalIgnoreCase)
                      && string.Equals(doc.Frontmatter.Route?.Trim(), "one-shot", StringComparison.OrdinalIgnoreCase))
@@ -56,19 +60,27 @@ public sealed class WorkInventory
         };
     }
 
-    /// <summary>Counts the open items in the deferred-work note: every rendered list item, minus those struck
-    /// through (a resolved item is written <c>~~…~~</c>, which Markdig renders as <c>&lt;del&gt;</c>). Purely
-    /// a rough "how much is parked" signal — a partial or unusually-shaped note just yields a smaller count,
-    /// never an error.</summary>
+    /// <summary>Counts the open items in the deferred-work note: top-level rendered list items, minus those
+    /// struck through (a resolved item is written <c>~~…~~</c>, which Markdig renders as <c>&lt;del&gt;</c>).
+    /// Only list depth 1 is tallied so a nested sub-bullet under an open item doesn't inflate the count as if
+    /// it were its own deferred item. Purely a rough "how much is parked" signal — a partial or unusually-
+    /// shaped note just yields a smaller count, never an error.</summary>
     public static int CountOpenItems(string bodyHtml)
     {
-        return Math.Max(0, Count(bodyHtml, "<li") - Count(bodyHtml, "<del"));
-
-        static int Count(string haystack, string needle)
+        int depth = 0, topLevelLi = 0, topLevelDel = 0, i = 0;
+        while (i < bodyHtml.Length)
         {
-            int n = 0, i = 0;
-            while ((i = haystack.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { n++; i += needle.Length; }
-            return n;
+            if (StartsWithAt(bodyHtml, i, "<ul") || StartsWithAt(bodyHtml, i, "<ol")) { depth++; i += 3; }
+            else if (StartsWithAt(bodyHtml, i, "</ul") || StartsWithAt(bodyHtml, i, "</ol")) { depth = Math.Max(0, depth - 1); i += 4; }
+            else if (depth == 1 && StartsWithAt(bodyHtml, i, "<li")) { topLevelLi++; i += 3; }
+            else if (depth == 1 && StartsWithAt(bodyHtml, i, "<del")) { topLevelDel++; i += 4; }
+            else { i++; }
         }
+
+        return Math.Max(0, topLevelLi - topLevelDel);
+
+        static bool StartsWithAt(string haystack, int index, string needle) =>
+            index + needle.Length <= haystack.Length
+            && string.CompareOrdinal(haystack, index, needle, 0, needle.Length) == 0;
     }
 }

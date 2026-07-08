@@ -28,6 +28,7 @@ public sealed class SiteGenerator
     private List<AdrEntry> _adrs = new();
     private List<CommitDayEntry> _commitDays = new();
     private SprintStatus? _sprint;
+    private List<RetroModel> _retros = new();
 
     public SiteGenerator(ForgeOptions options)
     {
@@ -85,6 +86,13 @@ public sealed class SiteGenerator
                 events.AddRange(GenerateEpicsInternal(epicsSourceFile, files, artifactMap, consumedArtifacts, nav));
                 reporter?.EndPhase(GenerationPhase.Epics);
             }
+
+            // Retrospective notes (epic-N-retro-*.md) are a first-class artifact class: render each as a
+            // dedicated stylized page (RetroTemplater) — needs the epics model above for the epic link — and
+            // consume them so the generic pages loop doesn't also render them. [Story 2.3 retro pages]
+            var retroFiles = files.Where(RetroParser.IsRetroFile).ToList();
+            foreach (var rf in retroFiles) consumedArtifacts.Add(ToSourceRelative(rf));
+            WriteRetros(retroFiles, nav);
 
             // Epic/story artifacts were rendered as detail pages above; everything else renders standalone.
             var pageFiles = files
@@ -519,9 +527,36 @@ public sealed class SiteGenerator
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
         var work = WorkInventory.Build(docs);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, work, _sprint);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, work, _sprint, _retros);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
+
+    /// <summary>Renders each retrospective note into its dedicated <see cref="RetroTemplater"/> page (at the
+    /// same <c>implementation-artifacts/…html</c> path the generic pipeline would have used, so existing links
+    /// resolve), reference-linkified like every page, and caches the parsed set for the sprint modal + home
+    /// Retrospectives section. [Story 2.3 retro pages]</summary>
+    private void WriteRetros(IReadOnlyList<string> retroFiles, SiteNav nav)
+    {
+        var retros = new List<RetroModel>();
+        foreach (var file in retroFiles)
+        {
+            var sourceRel = ToSourceRelative(file);
+            var outputRel = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(sourceRel));
+            var retro = RetroParser.Parse(file, sourceRel, outputRel);
+
+            var outputFull = Path.Combine(_options.OutputRoot, outputRel.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(outputFull)!);
+            File.WriteAllText(outputFull, ApplyReferenceLinks(RetroTemplater.RenderPage(retro, _epicsModel, nav), outputRel));
+            retros.Add(retro);
+        }
+        _retros = retros.OrderBy(r => r.EpicNumber).ThenBy(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>Maps an epic number to the output path of its (latest, by filename) retrospective page — the
+    /// link target for an open action item tagged with that epic. [Story 2.3 retro pages]</summary>
+    private IReadOnlyDictionary<int, string> EpicRetroMap =>
+        _retros.GroupBy(r => r.EpicNumber)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).First().OutputRelativePath);
 
     /// <summary>Path to the sprint tracking file — located by well-known name anywhere under
     /// <see cref="ForgeOptions.SourceRoot"/> (it is a <c>.yaml</c>, so it is NOT in the <c>*.md</c> source
@@ -544,7 +579,7 @@ public sealed class SiteGenerator
     private void WriteSprint(SiteNav nav)
     {
         if (_sprint is null) return;
-        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands);
+        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, EpicRetroMap);
         File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.SprintOutputPath), ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
 
