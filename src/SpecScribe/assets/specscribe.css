@@ -1057,6 +1057,12 @@ code.color-swatch {
 .status-badge.task-badge.complete { color: var(--ink-faded); border-color: var(--ink-light); }
 .status-badge.task-badge.none-done { color: var(--ink-light); border-style: dashed; }
 
+/* Shared icon hook (Story 2.5): every glyph is inline SVG colored with currentColor (no per-status hex here —
+   that stays in .status-badge.* above), em-relative so it scales with the surrounding text, sitting on the
+   baseline inside badges/pills/nav links with a small trailing gap before the label. Icons are static, so
+   prefers-reduced-motion is trivially satisfied (no animation to gate). */
+.ss-icon { width: 1em; height: 1em; margin-right: 0.3em; vertical-align: -0.15em; flex-shrink: 0; }
+
 .story-title-link { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
 .story-title-link:hover { color: var(--rust); border-bottom-style: solid; }
 

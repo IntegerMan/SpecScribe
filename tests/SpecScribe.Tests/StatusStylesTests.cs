@@ -149,4 +149,30 @@ public class StatusStylesTests
     [InlineData(null, "Pending")]
     public void DocLabel_IsTheHumanCasedSourceWord(string? status, string expected)
         => Assert.Equal(expected, StatusStyles.DocLabel(status));
+
+    // ---- Story 2.5: status icon anchored to this one seam --------------------------------------
+
+    [Theory]
+    [InlineData("done")]
+    [InlineData("active")]
+    [InlineData("review")]
+    [InlineData("ready")]
+    [InlineData("drafted")]
+    [InlineData("pending")]
+    [InlineData("deferred")]
+    public void Icon_ReturnsAGlyphForEveryKnownCssClass(string cssClass)
+        => Assert.False(string.IsNullOrEmpty(StatusStyles.Icon(cssClass)));
+
+    [Fact]
+    public void Icon_UnknownCssClassReturnsEmpty()
+        => Assert.Equal(string.Empty, StatusStyles.Icon("not-a-real-status"));
+
+    [Fact]
+    public void Badge_RendersIconAndTextInsideTheStatusBadgeSpan()
+    {
+        var badge = StatusStyles.Badge("done", "Done");
+        Assert.Contains("class=\"status-badge done\"", badge);
+        Assert.Contains("aria-hidden=\"true\"", badge); // the icon is decorative
+        Assert.Contains("Done", badge); // the word always stays (UX-DR17: never icon-only)
+    }
 }

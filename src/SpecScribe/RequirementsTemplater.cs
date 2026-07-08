@@ -92,7 +92,7 @@ public static class RequirementsTemplater
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <div class=\"story-kicker\">{PathUtil.Html(kindLabel)}</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(req.Id)}</h1>\n");
-        sb.Append($"  <div class=\"meta-pills\"><span class=\"status-badge {statusClass}\">{PathUtil.Html(StatusStyles.RequirementLabel(req.Status))}</span>");
+        sb.Append($"  <div class=\"meta-pills\">{StatusStyles.Badge(statusClass, StatusStyles.RequirementLabel(req.Status))}");
         if (req.Category is { Length: > 0 } cat)
         {
             sb.Append($"<span class=\"pill\">{PathUtil.Html(cat)}</span>");
@@ -171,7 +171,7 @@ public static class RequirementsTemplater
         sb.Append("      <div class=\"epic-mosaic-label\">\n");
         sb.Append($"        <span class=\"epic-mosaic-num\">Epic {epic.Number}</span>\n");
         sb.Append($"        <span class=\"epic-mosaic-title\">{epic.Title}</span>\n");
-        sb.Append($"        <span class=\"status-badge {statusClass}\">{PathUtil.Html(StatusStyles.EpicLabel(statusClass))}</span>\n");
+        sb.Append($"        {StatusStyles.Badge(statusClass, StatusStyles.EpicLabel(statusClass))}\n");
         var tally = ep switch
         {
             { TasksTotal: > 0 } => $"{ep.TasksDone} / {ep.TasksTotal} tasks · {ep.StoriesWithArtifact} / {ep.StoryCount} stories detailed",
@@ -190,7 +190,7 @@ public static class RequirementsTemplater
         sb.Append($"<div class=\"req-card {statusClass}\" id=\"{PathUtil.Html(req.Slug)}\">\n");
         sb.Append("  <div class=\"req-card-head\">\n");
         sb.Append($"    <a class=\"req-id-link\" href=\"{PathUtil.Html(href)}\">{PathUtil.Html(req.Id)}</a>\n");
-        sb.Append($"    <span class=\"status-badge {statusClass}\">{PathUtil.Html(StatusStyles.RequirementLabel(req.Status))}</span>\n");
+        sb.Append($"    {StatusStyles.Badge(statusClass, StatusStyles.RequirementLabel(req.Status))}\n");
 
         if (req.Deferred)
         {

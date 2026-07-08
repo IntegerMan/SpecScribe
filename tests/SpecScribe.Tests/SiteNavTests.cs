@@ -137,7 +137,25 @@ public class SiteNavTests
 
         Assert.Contains("class=\"site-nav-toggle\"", html);
         Assert.Contains("aria-controls=\"site-nav-links\"", html);
-        Assert.Contains("aria-current=\"page\">Requirements</a>", html);
+        // The active nav item carries its section icon (decorative) ahead of the label text. [Story 2.5 Task 4]
+        Assert.Contains("aria-current=\"page\"><svg", html);
+        Assert.Contains(">Requirements</a>", html);
+    }
+
+    [Fact]
+    public void RenderNavBar_PrependsDecorativeSectionIconToEveryKnownNavItem()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+
+        var html = nav.RenderNavBar(SiteNav.HomeOutputPath);
+
+        // Every nav item this build produces (Home/Readme/ADRs/Epics/Requirements) is a curated concept, so
+        // each carries a decorative icon paired with its still-present text label (never icon-only). [Story 2.5]
+        Assert.Contains("aria-hidden=\"true\" focusable=\"false\"", html);
+        foreach (var label in nav.Items.Select(i => i.Label))
+        {
+            Assert.Contains($">{label}</a>", html);
+        }
     }
 
     [Fact]

@@ -413,9 +413,11 @@ public class HtmlTemplaterTests
         var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
             adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
 
-        // Dedicated first-class section with a status badge (not flat text) for the quick-dev entry.
+        // Dedicated first-class section with a status badge (not flat text) for the quick-dev entry. The badge
+        // carries its icon ahead of the still-present status word (Story 2.5: never icon-only).
         Assert.Contains("Direct &amp; Quick-Dev Work", html);
-        Assert.Contains("<span class=\"status-badge done\">done</span>", html);
+        Assert.Contains("class=\"status-badge done\"", html);
+        Assert.Contains(">done</span>", html);
         // Deferred-work callout with its open-item count.
         Assert.Contains("work-callout", html);
         Assert.Contains("2 open items", html);
@@ -474,8 +476,10 @@ public class HtmlTemplaterTests
         var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
             adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
 
-        // Labeled "Spec Kernel" band (AC #1), not the generic "Other" bucket.
-        Assert.Contains("<div class=\"index-section-title\">Spec Kernel</div>", html);
+        // Labeled "Spec Kernel" band (AC #1), not the generic "Other" bucket. The band's icon (Story 2.5)
+        // rides ahead of the still-present text.
+        Assert.Contains("class=\"index-section-title\">", html);
+        Assert.Contains(">Spec Kernel</div>", html);
         Assert.DoesNotContain("<div class=\"index-section-title\">Other</div>", html);
         // Both kernel docs are carded under it; the SPEC hub carries the clear title, not a bare "SpecScribe".
         Assert.Contains(">SPEC — Canonical Contract</h2>", html);
@@ -661,9 +665,12 @@ public class HtmlTemplaterTests
     {
         var html = RenderPlanning(BriefDoc(), ExperienceDoc(), RubricDoc(), PrdDoc(), DesignDoc());
 
-        // (a) status is an on-brand badge with the mapped class — not the old " · "-joined plain text.
-        Assert.Contains("<span class=\"status-badge done\">Final</span>", html);   // PRD: final → done/"Final"
-        Assert.Contains("<span class=\"status-badge drafted\">Draft</span>", html); // brief: draft → drafted/"Draft"
+        // (a) status is an on-brand badge with the mapped class — not the old " · "-joined plain text. The
+        // badge's decorative icon rides ahead of the still-present status word (Story 2.5).
+        Assert.Contains("class=\"status-badge done\"", html);   // PRD: final → done/"Final"
+        Assert.Contains(">Final</span>", html);
+        Assert.Contains("class=\"status-badge drafted\"", html); // brief: draft → drafted/"Draft"
+        Assert.Contains(">Draft</span>", html);
         Assert.DoesNotContain("final · 2026-07-05", html);                          // no middot status text run
 
         // (b) the PRD is a prominent primary card, ahead of the brief and the UX pair.
@@ -700,7 +707,7 @@ public class HtmlTemplaterTests
         // and the section still renders whatever exists with no empty "PRD" slot. [Story 2.4 Task 3/4 graceful]
         var html = RenderPlanning(BriefDoc(), DesignDoc(), ExperienceDoc(), RubricDoc());
 
-        Assert.Contains("<div class=\"index-section-title\">Planning Artifacts</div>", html);
+        Assert.Contains(">Planning Artifacts</div>", html);
         Assert.DoesNotContain("index-card--primary", html);
         Assert.DoesNotContain("index-card-branch", html);
         // The unfolded rubric is a normal card, not a broken link.
@@ -729,7 +736,7 @@ public class HtmlTemplaterTests
         var note = Doc("planning-artifacts/misc/note.md", "planning-artifacts/misc/note.html", "A Note", Frontmatter.Empty);
         var html = RenderPlanning(note);
 
-        Assert.Contains("<div class=\"index-section-title\">Planning Artifacts</div>", html);
+        Assert.Contains(">Planning Artifacts</div>", html);
         Assert.Contains("<a class=\"index-card\" href=\"planning-artifacts/misc/note.html\">", html);
         Assert.DoesNotContain("index-card--primary", html);
         Assert.DoesNotContain("index-subgroup-label", html);

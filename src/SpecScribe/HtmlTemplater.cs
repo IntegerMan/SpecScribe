@@ -155,7 +155,7 @@ public static class HtmlTemplater
                 continue;
             }
 
-            sb.Append($"<div class=\"index-section-title\">{Html(groupTitle)}</div>\n");
+            sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept(groupTitle)}{Html(groupTitle)}</div>\n");
             sb.Append("<div class=\"index-grid\">\n");
             foreach (var d in inGroup)
             {
@@ -346,7 +346,7 @@ public static class HtmlTemplater
         sb.Append("<div class=\"quick-link-pills\">\n");
         foreach (var (label, outputPath, description) in nav.QuickLinks)
         {
-            sb.Append($"  <a class=\"quick-link-pill {QuickLinkFamily(label)}\" href=\"{Html(outputPath)}\" data-tooltip=\"{Html(description)}\">{Html(QuickLinkTitle(label))}</a>\n");
+            sb.Append($"  <a class=\"quick-link-pill {QuickLinkFamily(label)}\" href=\"{Html(outputPath)}\" data-tooltip=\"{Html(description)}\">{Icons.ForConcept(label)}{Html(QuickLinkTitle(label))}</a>\n");
         }
         sb.Append("</div>\n</div>\n\n");
     }
@@ -598,7 +598,7 @@ public static class HtmlTemplater
     {
         if (work.IsEmpty) return;
 
-        sb.Append("<div class=\"index-section-title\">Direct &amp; Quick-Dev Work</div>\n");
+        sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept("Direct & Quick-Dev Work")}Direct &amp; Quick-Dev Work</div>\n");
 
         if (work.QuickDev.Count > 0)
         {
@@ -612,7 +612,7 @@ public static class HtmlTemplater
                 if (entry.Status is { Length: > 0 } status)
                 {
                     // Status as a BADGE using the site's status semantics, not flat text. [Story 2.1 Task 2]
-                    badges.Append($"<span class=\"status-badge {StatusStyles.ForStatus(status)}\">{Html(status)}</span>");
+                    badges.Append(StatusStyles.Badge(StatusStyles.ForStatus(status), status));
                 }
                 if (entry.Type is { Length: > 0 } type)
                 {
@@ -633,7 +633,7 @@ public static class HtmlTemplater
         {
             var count = deferred.OpenItemCount;
             sb.Append($"<a class=\"work-callout\" href=\"{Html(deferred.OutputPath)}\">\n");
-            sb.Append("  <span class=\"work-callout-label\">Deferred Work</span>\n");
+            sb.Append($"  <span class=\"work-callout-label\">{Icons.ForConcept("Deferred")}Deferred Work</span>\n");
             sb.Append($"  <span class=\"work-callout-count\">{count} open {Charts.Plural(count, "item", "items")}</span>\n");
             sb.Append("</a>\n\n");
         }
@@ -646,7 +646,7 @@ public static class HtmlTemplater
         if (adrs.Count == 0) return;
 
         sb.Append("<div class=\"index-section-title-row\">\n");
-        sb.Append("  <span class=\"index-section-title\">Architecture Decision Records</span>\n");
+        sb.Append($"  <span class=\"index-section-title\">{Icons.ForConcept("ADRs")}Architecture Decision Records</span>\n");
         sb.Append($"  <a class=\"view-epic-link\" href=\"{Html(SiteNav.AdrsLandingOutputPath)}\">All ADRs &rarr;</a>\n");
         sb.Append("</div>\n");
 
@@ -689,7 +689,7 @@ public static class HtmlTemplater
     private static void AppendCardStatusBadge(StringBuilder sb, string? status)
     {
         if (status is not { Length: > 0 }) return;
-        sb.Append($"    <span class=\"status-badge {StatusStyles.ForDoc(status)}\">{Html(StatusStyles.DocLabel(status))}</span>\n");
+        sb.Append($"    {StatusStyles.Badge(StatusStyles.ForDoc(status), StatusStyles.DocLabel(status))}\n");
     }
 
     /// <summary>The de-emphasized date · author line beneath a card's title/badge. Status has been promoted to
@@ -732,7 +732,7 @@ public static class HtmlTemplater
         Claim(brief);
         if (rubricFolded) Claim(rubric);
 
-        sb.Append("<div class=\"index-section-title\">Planning Artifacts</div>\n");
+        sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept("Planning Artifacts")}Planning Artifacts</div>\n");
 
         // PRD: prominent primary card, full-width, carrying its own status badge and — when present — a branch
         // link to its quality-review rubric page.

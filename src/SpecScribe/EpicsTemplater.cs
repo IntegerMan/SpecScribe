@@ -101,7 +101,7 @@ public static class EpicsTemplater
         main.Append("<header class=\"doc-header\">\n");
         main.Append("  <div class=\"kicker-row\">\n");
         main.Append($"    <span class=\"story-kicker\">Epic {epic.Number}</span>\n");
-        main.Append($"    <span class=\"status-badge {epicClass}\">{PathUtil.Html(StatusStyles.EpicLabel(epicClass))}</span>\n");
+        main.Append($"    {StatusStyles.Badge(epicClass, StatusStyles.EpicLabel(epicClass))}\n");
         main.Append("  </div>\n");
         main.Append($"  <h1>{epic.Title}</h1>\n");
         main.Append("</header>\n\n");
@@ -222,7 +222,7 @@ public static class EpicsTemplater
         main.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(story.Id)}</span>\n");
         if (story.Status is { Length: > 0 } status)
         {
-            main.Append($"    <span class=\"status-badge {storyClass}\">{PathUtil.Html(status)}</span>\n");
+            main.Append($"    {StatusStyles.Badge(storyClass, status)}\n");
         }
         main.Append("  </div>\n");
         main.Append($"  <h1>{story.Title}</h1>\n");
@@ -346,7 +346,7 @@ public static class EpicsTemplater
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <div class=\"kicker-row\">\n");
         sb.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(story.Id)}</span>\n");
-        sb.Append($"    <span class=\"status-badge {StatusStyles.ForStory(story)}\">Not yet drafted</span>\n");
+        sb.Append($"    {StatusStyles.Badge(StatusStyles.ForStory(story), "Not yet drafted")}\n");
         sb.Append("  </div>\n");
         sb.Append($"  <h1>{story.Title}</h1>\n");
         sb.Append("</header>\n\n");
@@ -402,7 +402,7 @@ public static class EpicsTemplater
 
         if (story.Status is { Length: > 0 } status)
         {
-            sb.Append($"    <span class=\"status-badge {storyClass}\">{PathUtil.Html(status)}</span>\n");
+            sb.Append($"    {StatusStyles.Badge(storyClass, status)}\n");
         }
         if (story.TasksTotal > 0)
         {

@@ -106,7 +106,7 @@ public class SiteGeneratorSpecKernelTests : IDisposable
 
         var index = File.ReadAllText(HomeIndex);
         // Labeled band + clear SPEC card title, out of "Other".
-        Assert.Contains("<div class=\"index-section-title\">Spec Kernel</div>", index);
+        Assert.Contains(">Spec Kernel</div>", index);
         Assert.Contains(">SPEC — Canonical Contract</h2>", index);
         Assert.Contains("href=\"specs/spec-x/SPEC.html\"", index);
         // The dashboard quick-link pill reads the friendlier "Spec", while the home-index band stays the more

@@ -140,7 +140,7 @@ public sealed class SiteNav
             var href = prefix + outputPath;
             var isActive = string.Equals(PathUtil.NormalizeSlashes(outputPath), current, StringComparison.OrdinalIgnoreCase);
             var attrs = isActive ? " class=\"active\" aria-current=\"page\"" : string.Empty;
-            sb.Append($"    <a href=\"{PathUtil.Html(href)}\"{attrs}>{PathUtil.Html(label)}</a>\n");
+            sb.Append($"    <a href=\"{PathUtil.Html(href)}\"{attrs}>{Icons.ForConcept(label)}{PathUtil.Html(label)}</a>\n");
         }
         sb.Append("  </div>\n</nav>\n");
         sb.Append("<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>\n\n");

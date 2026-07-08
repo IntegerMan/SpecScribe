@@ -161,7 +161,7 @@ public static class SprintTemplater
             }
             if (epicEntry.TryGetValue(n, out var ee))
             {
-                sb.Append($"    <span class=\"status-badge {StatusStyles.ForSprint(ee.Status)}\">{PathUtil.Html(StatusStyles.SprintLabel(ee.Status))}</span>\n");
+                sb.Append($"    {StatusStyles.Badge(StatusStyles.ForSprint(ee.Status), StatusStyles.SprintLabel(ee.Status))}\n");
             }
             if (retroEntry.TryGetValue(n, out var re))
             {
@@ -251,7 +251,7 @@ public static class SprintTemplater
             {
                 sb.Append($"      <span class=\"pill\">{PathUtil.Html(owner)}</span>\n");
             }
-            sb.Append($"      <span class=\"status-badge {StatusStyles.ForSprint(item.Status)}\">{PathUtil.Html(StatusStyles.SprintLabel(item.Status))}</span>\n");
+            sb.Append($"      {StatusStyles.Badge(StatusStyles.ForSprint(item.Status), StatusStyles.SprintLabel(item.Status))}\n");
             sb.Append("    </li>\n");
         }
         sb.Append("  </ul>\n</section>\n\n");

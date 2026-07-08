@@ -149,6 +149,17 @@ public static class StatusStyles
         return s.Length == 0 ? "Pending" : TitleCase(s);
     }
 
+    /// <summary>The status glyph for a lifecycle css-class, delegating to <see cref="Icons"/> so the icon stays
+    /// anchored to this one status seam rather than letting callers reach into <see cref="Icons"/> with ad-hoc
+    /// strings. Adds a shape channel alongside the existing color+text — no new status vocabulary. [Story 2.5]</summary>
+    public static string Icon(string cssClass) => Icons.ForStatus(cssClass);
+
+    /// <summary>Renders a complete <c>.status-badge</c> span with its icon prepended before the text — the one
+    /// place icon+text pairing is defined, so every badge site calls this instead of hand-inlining the icon
+    /// and risking drift (UX-DR17: color + icon + word, never icon-only). [Story 2.5 Task 3]</summary>
+    public static string Badge(string cssClass, string label) =>
+        $"<span class=\"status-badge {cssClass}\">{Icon(cssClass)}{PathUtil.Html(label)}</span>";
+
     private static string Normalize(string? status) => (status ?? string.Empty).Trim().ToLowerInvariant();
 
     private static string TitleCase(string value) =>

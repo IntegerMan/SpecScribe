@@ -75,6 +75,19 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_HasIconSizingRule()
+    {
+        // .ss-icon handles em-relative sizing/alignment only; color comes from currentColor inheritance, so no
+        // per-status hex belongs in this rule (that stays in .status-badge.* above it). [Story 2.5 Task 5]
+        var css = ReadStylesheet();
+        Assert.Contains(".ss-icon", css);
+        var ruleStart = css.IndexOf(".ss-icon {", StringComparison.Ordinal);
+        var ruleEnd = css.IndexOf('}', ruleStart);
+        var rule = css[ruleStart..ruleEnd];
+        Assert.DoesNotContain("#", rule);
+    }
+
+    [Fact]
     public void Script_IsEmbeddedAlongsideStylesheet()
     {
         // The one sanctioned progressive-enhancement script must ship embedded the way the CSS does, so the
