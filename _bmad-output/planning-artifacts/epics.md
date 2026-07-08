@@ -516,6 +516,46 @@ So that I can see how far the project has been refined at a glance.
 **Then** each stage carries a text label and value (never color-only) and reduced-motion is respected
 **And** an empty or early-stage project renders a sensible funnel rather than a broken or misleading one.
 
+### Story 3.7: Consolidated, Graphical Git Pulse Panel
+
+As a maintainer,
+I want the dashboard's git activity consolidated into one richer, more graphical panel,
+So that project momentum reads clearly at a glance and invites me to explore further.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the dashboard currently shows commit activity and baseline git pulse as two separate panels
+**When** the dashboard renders with git history available
+**Then** a single consolidated git panel presents the activity heatmap together with the baseline signals (last commit, 30-day count, top changed files)
+**And** the presentation is more graphical than a plain list while preserving the accessibility and truthfulness conventions from Stories 1.4/1.5.
+
+2.
+**Given** the consolidated panel and the git detail/insight surfaces exist
+**When** I interact with the panel
+**Then** its elements (for example top changed files and activity) link into the corresponding detail or insight pages when those pages are generated
+**And** when git history is unavailable the panel shows a single non-fatal fallback state.
+
+### Story 3.8: Git Insights Hub Page
+
+As a maintainer,
+I want a dedicated aggregate "Git Insights" page,
+So that I can explore repository activity in depth without cluttering the dashboard.
+
+**Acceptance Criteria:**
+
+1.
+**Given** deep git insights are enabled
+**When** generation completes
+**Then** the portal produces an aggregate Git Insights page summarizing file change frequency, activity over time, and contributor attribution
+**And** its tables can be sorted and filtered client-side as a progressive enhancement while remaining readable and navigable without JavaScript.
+
+2.
+**Given** the Git Insights page references individual files and commits
+**When** I select an entry
+**Then** I navigate to the corresponding per-file or per-commit detail page
+**And** when deep insights are disabled the heavier hub and detail-page generation does not run and baseline generation performance is unaffected.
+
 ## Epic 4: Multi-Framework Coverage Expansion
 
 Expand beyond BMad to additional spec-driven frameworks (Spec Kit, GSD/GSD-Pi, SpecFlow, Squad, Superpowers) through one shared adapter contract, first generalizing the renderer away from any single project's personal structure.
@@ -877,7 +917,7 @@ So that I can see what happened on any given day.
 2.
 **Given** a date page
 **When** I open it
-**Then** it summarizes what happened that day (commits and artifact changes) and links back to the related epics, stories, or code pages
+**Then** it summarizes what happened that day (commits and artifact changes) and links back to the related epics, stories, code pages, and per-commit detail pages
 **And** it degrades gracefully when history is unavailable.
 
 ### Story 7.4: Advanced Code and Git Coverage
@@ -891,7 +931,7 @@ So that I can see how files have changed and where change concentrates.
 1.
 **Given** code pages and git history are available
 **When** advanced coverage is enabled
-**Then** code pages surface history/blame-style annotations and change-coupling/hotspot signals as an opt-in extension
+**Then** code pages surface history/blame-style annotations, per-file change frequency, contributor attribution (who changed the file, not a productivity ranking), and change-coupling/hotspot signals as an opt-in extension
 **And** baseline code and portal generation performance is unaffected when it is disabled.
 
 2.
@@ -899,3 +939,23 @@ So that I can see how files have changed and where change concentrates.
 **When** advanced coverage runs
 **Then** it degrades non-fatally
 **And** code pages still render their baseline content.
+
+### Story 7.5: Per-Commit Detail Pages
+
+As a contributor,
+I want a page for each significant commit,
+So that I can read what changed and why without leaving the portal.
+
+**Acceptance Criteria:**
+
+1.
+**Given** git history is available and detail pages are enabled
+**When** I open a commit's page
+**Then** it shows the commit subject, full commit message body, author and date, and the files changed with per-file line churn
+**And** recognized references in the message (for example "Story N.M" or "FR-9") link to their artifacts.
+
+2.
+**Given** a commit page lists changed files and its author
+**When** I follow those links
+**Then** file entries lead to the corresponding file page and the author is shown as attribution, never as a productivity ranking
+**And** page generation is bounded and degrades non-fatally when history is unavailable or partial.

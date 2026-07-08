@@ -72,6 +72,8 @@ development_status:
   3-4-interactive-tree-views-for-project-and-artifact-structure: ready-for-dev
   3-5-flashy-but-purposeful-insight-visual-language: ready-for-dev
   3-6-refinement-funnel-on-the-dashboard: ready-for-dev
+  3-7-consolidated-graphical-git-pulse-panel: ready-for-dev
+  3-8-git-insights-hub-page: backlog
   epic-3-retrospective: optional
 
   epic-4: backlog
@@ -102,6 +104,7 @@ development_status:
   7-2-source-citation-and-comment-linking-to-code-pages: backlog
   7-3-activity-timeline-and-date-pages: backlog
   7-4-advanced-code-and-git-coverage: backlog
+  7-5-per-commit-detail-pages: backlog
   epic-7-retrospective: optional
 
 action_items:

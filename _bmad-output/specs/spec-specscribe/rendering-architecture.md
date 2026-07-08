@@ -81,6 +81,16 @@ This companion defines module boundaries for a single shared rendering core that
 - Adapters only map existing core view models to host primitives.
 - Any temporary adapter-only behavior must be marked as explicitly deferred parity work.
 
+## Client-Side Enhancement Policy (Progressive Enhancement)
+
+- The HTML surface has historically been pure static markup + inline SVG charts with no JavaScript (aside from a tiny tooltip/copy enhancer). That default stands for baseline pages and all chart primitives, which remain pure SVG.
+- **Insight surfaces** (the aggregate Git Insights hub and comparable data-dense pages) MAY use JavaScript as a *progressive enhancement only* — e.g. client-side sorting, filtering, and expand/collapse of tables.
+- Guardrails (align with PRD NFR-5 and the Story 1.4/1.5 accessibility conventions):
+  - Core content and navigation MUST render and work with JavaScript disabled; JS only adds convenience, never information.
+  - Server/generation-time ordering is the source of truth; client sorting is a re-ordering of already-present rows.
+  - Text and non-color cues and reduced-motion support still apply to any enhanced surface.
+  - Webview parity: the webview adapter must reach the same information without depending on the HTML surface's enhancement scripts.
+
 ## Read-Only IDE Helper Pattern
 
 - Webview can expose helper buttons that generate prompt text or command lines.

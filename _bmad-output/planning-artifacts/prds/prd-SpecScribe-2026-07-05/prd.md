@@ -126,15 +126,19 @@ SpecScribe can compute and display lightweight git activity context as part of t
 - Dashboard includes, at minimum, last commit timestamp, 30-day commit count, and top changed files derived from local git history.
 - Generation continues when git history is unavailable or command execution fails.
 
-#### FR-10: Optional deeper git insights
-SpecScribe can optionally compute deeper repository analytics (for example, hotspots and change coupling) in a way appropriate for local OSS usage. [ASSUMPTION: This is opt-in to control performance impact.]
+#### FR-10: Optional deeper git insights and navigable detail surfaces
+SpecScribe can optionally compute deeper repository analytics (for example, hotspots and change coupling) and expose git history as navigable in-portal surfaces, in a way appropriate for local OSS usage. [ASSUMPTION: This is opt-in to control performance impact.]
 
 **Consequences (testable):**
 - Deep metrics can be toggled independently of baseline generation.
 - On reference repositories, baseline generation time with deep metrics disabled does not regress more than 10% from current baseline behavior.
+- When enabled, the portal provides an aggregate "Git Insights" surface (for example, file change frequency and activity over time) plus detail pages for individual commits (subject, full commit message body, and files changed with per-file line churn) and for individual files (change frequency and contributor attribution).
+- Baseline pulse elements and deep insight surfaces link to these detail pages so git context is navigable ("click in to see more") rather than static.
+- Per-file and per-commit surfaces attribute changes to contributors by name (who changed what) as collaboration/attribution context.
+- All deep surfaces degrade non-fatally when git history is unavailable or partial.
 
 **Out of Scope:**
-- Individual productivity scoring or ranking.
+- Per-author productivity scoring, ranking, or leaderboards. Contributor attribution — showing who changed a file or area — is in scope; ranking or scoring people by output is not.
 
 #### FR-11: Agent-file structure insights
 SpecScribe can analyze common Agent Files and workflow outputs to derive structural/project insights (for example, planning coverage, artifact freshness, and gaps), prioritizing primary source artifacts first and using memlog data as optional enrichment. [NOTE FOR PM: Evaluate whether GitStractor logic can be reused for repository scanning and summarization.]
@@ -175,7 +179,7 @@ SpecScribe can expose the Generated Portal information model in a VS Code webvie
 - Replacing project management tools, issue trackers, or source control platforms.
 - Implementing framework authoring flows (SpecScribe is a readability and insight layer, not a generator of upstream artifacts).
 - Shipping extension-first while CLI parity and adapter stability remain unfinished.
-- Producing people-ranking productivity metrics from git history.
+- Producing people-ranking productivity metrics from git history. (Contributor attribution — showing who changed a file or area — is permitted as collaboration context; ranking or scoring people by output is not.)
 
 ## 6. MVP Scope
 
@@ -213,6 +217,7 @@ SpecScribe can expose the Generated Portal information model in a VS Code webvie
 - **NFR-2 (Resilience):** Partial or malformed artifacts should degrade gracefully without crashing full-site generation.
 - **NFR-3 (Local-first privacy):** Repository and artifact analysis runs locally by default; no remote telemetry is required for core operation.
 - **NFR-4 (Extensibility):** Adapter architecture supports adding frameworks without core rewrites.
+- **NFR-5 (Progressive enhancement):** The generated portal's core content and navigation must function without JavaScript. Insight surfaces may use JavaScript as a progressive enhancement only (for example, client-side sorting, filtering, or expand/collapse); disabling JavaScript must not remove information or break navigation, and the established accessibility conventions (text and non-color cues, reduced-motion support) still apply.
 
 ## 9. Open Questions
 - How should coverage tiers be communicated (fully rendered, summarized, unsupported) so users understand exactly what is and is not interpreted?
