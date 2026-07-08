@@ -2140,23 +2140,82 @@ code.color-swatch {
    the --status-* tokens; only the lane layout and the pure-CSS view toggle are new. No new palette. */
 .sprint-page { max-width: 1100px; margin: 0 auto; }
 
-/* Compact sprint-page header so the board sits high on the page (the board is the point). */
-.sprint-header { margin: 0.4rem 0 0.7rem; }
-.sprint-header h1 { font-size: 2rem; margin: 0 0 0.15rem; }
+/* One compact top strip inside the board column: title/subtitle left, donut + commands popout right. This
+   replaces the old full-width header + stacked controls band, and shares .sprint-page's centered column so the
+   header aligns with the board. */
+.sprint-topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.5rem;
+  margin: 0.3rem 0 0.8rem;
+}
+.sprint-topbar-head { min-width: 0; }
+.sprint-topbar-head h1 { font-size: 1.9rem; margin: 0 0 0.1rem; }
+.sprint-topbar-head .doc-subtitle { margin: 0; text-align: left; max-width: none; }
+.sprint-topbar-aside { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+.sprint-topbar-donut { display: flex; align-items: center; gap: 0.5rem; }
+.sprint-topbar-donut .donut { flex-shrink: 0; }
+.sprint-topbar-donut-label { font-size: 0.75rem; color: var(--ink-faded); white-space: nowrap; }
 
-/* Command buttons + lifecycle summary share one short band, side by side on wide screens (stacking on
-   narrow), so they cost one row instead of two stacked panels. */
-.sprint-controls { display: flex; gap: 1rem; align-items: stretch; flex-wrap: wrap; margin-bottom: 0.8rem; }
-/* Give the command buttons the wider share (long slash-commands) and the donut the narrower one. */
-.sprint-controls > .sprint-commands { flex: 2 1 380px; margin: 0; }
-.sprint-controls > .sprint-summary { flex: 1 1 220px; margin: 0; }
-.sprint-commands { padding: 0.7rem 0.9rem; }
-.sprint-commands h3, .sprint-summary h3 { margin-bottom: 0.5rem; }
-.sprint-summary { padding: 0.7rem 0.9rem; }
-.sprint-summary .donut-and-legend { gap: 0.9rem; align-items: center; }
+/* Header "Sprint commands ▾" popout — a native <details> dropdown (reuses the send-menu pattern + its JS
+   dismissal). The panel is absolutely positioned so it overlays rather than pushing the board down. */
+.cmd-menu { position: relative; }
+.cmd-menu-toggle {
+  list-style: none; cursor: pointer; user-select: none;
+  font-size: 0.78rem; font-family: 'Courier New', monospace;
+  padding: 0.3rem 0.7rem; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--parchment); color: var(--ink);
+}
+.cmd-menu-toggle::-webkit-details-marker { display: none; }
+.cmd-menu-toggle:hover { border-color: var(--gold-light); color: var(--rust); }
+.cmd-menu[open] > .cmd-menu-toggle { background: var(--warm-white); box-shadow: 0 1px 3px var(--shadow); }
+.cmd-menu-pop {
+  position: absolute; right: 0; top: calc(100% + 0.4rem); z-index: 20;
+  min-width: 22rem; max-width: min(30rem, 90vw);
+  background: var(--warm-white); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 6px 20px var(--shadow); padding: 0.6rem;
+}
+.cmd-menu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+.cmd-menu-list li { display: flex; flex-direction: column; gap: 0.2rem; }
+.cmd-menu-desc { font-size: 0.76rem; color: var(--ink-faded); }
 
 /* Source note (home board + widget) — de-emphasized so the tracked view doesn't read as a rival panel. */
 .panel-source-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; margin: -0.2rem 0 0.6rem; }
+
+/* Board story card: id top-left, epic badge top-right, title, and a hairline task-progress bar at the bottom.
+   Shared by the sprint board and the home Now & Next board. Status color rides the left border. */
+.sprint-card {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  text-decoration: none; color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--rust-light); transform: translateY(-1px); }
+.sprint-card.pending { border-left-color: var(--status-pending); }
+.sprint-card.ready { border-left-color: var(--status-ready); }
+.sprint-card.active { border-left-color: var(--status-active); }
+.sprint-card.review { border-left-color: var(--status-review); }
+.sprint-card.done { border-left-color: var(--status-done); }
+.sprint-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+.sprint-card-id { font-family: 'Courier New', monospace; font-size: 0.72rem; font-weight: bold; color: var(--ink-light); }
+.sprint-card-epic {
+  font-family: 'Courier New', monospace; font-size: 0.62rem; letter-spacing: 0.03em;
+  color: var(--ink-faded); background: var(--parchment); border: 1px solid var(--border);
+  border-radius: 3px; padding: 0 0.3rem;
+}
+.sprint-card-title { font-size: 0.82rem; font-weight: bold; color: var(--ink); line-height: 1.3; }
+/* Hairline task-completion bar; mirrors .progress-fill's done/partial/empty colors at 3px, no border/radius. */
+.sprint-card-progress { display: block; height: 3px; margin-top: 0.15rem; background: var(--parchment-dark); border-radius: 2px; overflow: hidden; }
+.sprint-card-progress-fill { display: block; height: 100%; }
+.sprint-card-progress-fill.done { background: var(--status-done); }
+.sprint-card-progress-fill.partial { background: var(--status-ready); }
+.sprint-card-progress-fill.empty { background: transparent; }
 
 /* The Kanban board: equal-width lanes on wide screens; horizontally scrollable when the five columns don't
    fit (small screens / the narrower home panel), so cards never crush. */
@@ -2208,9 +2267,6 @@ code.color-swatch {
 .sprint-lane.done .sprint-lane-head { border-bottom-color: var(--status-done); }
 
 .sprint-cards { display: flex; flex-direction: column; gap: 0.45rem; }
-/* Board cards reuse .now-next-card; tighten them for the denser lane context. */
-.sprint-cards .now-next-card,
-.sprint-cards-row .now-next-card { padding: 0.5rem 0.6rem; background: var(--warm-white); }
 .sprint-lane-more {
   display: inline-block;
   font-size: 0.74rem;
@@ -2223,10 +2279,12 @@ code.color-swatch {
 /* On the sprint PAGE (not the capped home board), the status board fills the viewport height: the lane
    header stays fixed while its cards scroll, so the board is the page's focus and never sits below the fold.
    Scoped to .sprint-page so the home Now & Next board keeps its compact content height. [Story 2.3 redesign] */
-.sprint-page .sprint-board { height: calc(100dvh - 20rem); min-height: 24rem; }
+.sprint-page .sprint-board { height: calc(100dvh - 14rem); min-height: 22rem; }
 .sprint-page .sprint-lane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .sprint-page .sprint-lane-head { margin: 0; padding: 0.55rem 0.6rem; background: var(--parchment); }
-.sprint-page .sprint-cards { flex: 1 1 auto; overflow-y: auto; padding: 0.5rem; }
+.sprint-page .sprint-cards { flex: 1 1 auto; overflow-y: auto; padding: 0.5rem; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.sprint-page .sprint-cards::-webkit-scrollbar { width: 8px; }
+.sprint-page .sprint-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 /* Epic-grouped view: a swimlane per epic with its stories as a wrapping row of cards. */
 .sprint-epic-lane { margin: 0 0 1.3rem; }
@@ -2275,10 +2333,6 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 .board-view-epic { display: none; }
 #sv-epic:checked ~ .board-view-status { display: none; }
 #sv-epic:checked ~ .board-view-epic { display: block; }
-
-/* The sprint-commands panel reuses .next-steps styling; override its column flow to a compact wrap row. */
-.command-bar-list { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.5rem; }
-.command-bar-list li { margin: 0; flex-basis: auto; }
 
 .sprint-action-items { margin-top: 1.6rem; }
 .sprint-action-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }

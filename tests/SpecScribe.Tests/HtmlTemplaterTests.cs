@@ -371,6 +371,31 @@ public class HtmlTemplaterTests
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
     }
 
+    [Fact]
+    public void RenderStoryPlaceholder_WrapsAcPanelInDashboardNarrowForAlignment()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var epic = new EpicInfo
+        {
+            Number = 7, Title = "Code and Git", GoalHtml = string.Empty,
+            Status = EpicStatus.Pending, Section = EpicSection.FurtherDevelopment, Stories = Array.Empty<StoryInfo>(),
+        };
+        var story = new StoryInfo
+        {
+            Id = "7.2", EpicNumber = 7, Title = "Source Citation",
+            UserStoryHtml = "<p>As a contributor…</p>", AcBlocksHtml = new[] { "<div>AC 1</div>" },
+        };
+
+        var html = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, CommandCatalog.Empty);
+
+        // The AC panel is wrapped in dashboard-narrow (860 centered) so it aligns with the header/lead/note
+        // instead of spilling edge-to-edge like a bare .chart-panel. [Story 2.3 redesign]
+        var sec = html.IndexOf("<section class=\"dashboard-narrow\">", StringComparison.Ordinal);
+        var ac = html.IndexOf("class=\"chart-panel ac-panel\"", StringComparison.Ordinal);
+        Assert.True(sec >= 0 && ac > sec, "AC panel must be wrapped by dashboard-narrow");
+        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+    }
+
     private static DocModel Doc(string sourceRel, string outputRel, string title, Frontmatter fm, string bodyHtml = "") => new()
     {
         SourceRelativePath = sourceRel,

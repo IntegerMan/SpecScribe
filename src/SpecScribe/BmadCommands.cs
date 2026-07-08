@@ -67,23 +67,28 @@ public static class BmadCommands
         return sb.ToString();
     }
 
-    /// <summary>Renders an arbitrary, caller-supplied set of resolved commands as a titled panel of the same
-    /// standard command badges (command text + Copy + send menu) the Next Steps panels use — for a fixed
-    /// command list rather than story-derived suggestions (e.g. the sprint page's lifecycle commands). Null
-    /// entries (commands the active module doesn't expose) are dropped, and the panel is omitted entirely when
-    /// none resolve, so we never print a command that isn't installed. [Story 2.3 redesign]</summary>
-    public static string RenderCommandBar(string heading, IEnumerable<string?> commands)
+    /// <summary>Renders a caller-supplied set of (command, description) pairs as a native <c>&lt;details&gt;</c>
+    /// dropdown popout triggered from a header button — the same standard command badge (command text + Copy +
+    /// send menu) each Next Steps panel uses, but with a short description beside each, tucked behind a summary
+    /// so it costs no layout height until opened. Null commands (the module doesn't expose them) are dropped;
+    /// the whole menu is omitted when none resolve. Reuses the <c>.send-menu</c> dropdown pattern and its
+    /// specscribe.js click-away/Escape dismissal (which also targets <c>.cmd-menu</c>). Degrades to a native
+    /// disclosure with JS off. [Story 2.3 redesign]</summary>
+    public static string RenderCommandMenu(string label, IEnumerable<(string? Command, string Description)> items)
     {
-        var resolved = commands.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!).ToList();
+        var resolved = items.Where(i => !string.IsNullOrWhiteSpace(i.Command)).ToList();
         if (resolved.Count == 0) return string.Empty;
 
+        var lbl = PathUtil.Html(label);
         var sb = new StringBuilder();
-        sb.Append($"<div class=\"chart-panel sprint-commands\">\n<h3>{PathUtil.Html(heading)}</h3>\n<ul class=\"next-steps-list command-bar-list\">\n");
-        foreach (var command in resolved)
+        sb.Append("<details class=\"cmd-menu\">");
+        sb.Append($"<summary class=\"cmd-menu-toggle\" aria-label=\"{lbl}\">{lbl} ▾</summary>");
+        sb.Append($"<div class=\"cmd-menu-pop\" role=\"group\" aria-label=\"{lbl}\"><ul class=\"cmd-menu-list\">");
+        foreach (var (command, description) in resolved)
         {
-            sb.Append("  <li>" + RenderCommandBadge(command) + "</li>\n");
+            sb.Append("<li>" + RenderCommandBadge(command!) + $"<span class=\"cmd-menu-desc\">{PathUtil.Html(description)}</span></li>");
         }
-        sb.Append("</ul>\n</div>\n\n");
+        sb.Append("</ul></div></details>");
         return sb.ToString();
     }
 

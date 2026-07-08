@@ -358,12 +358,16 @@ public static class EpicsTemplater
 
         if (story.AcBlocksHtml.Count > 0)
         {
+            // Wrap the AC panel in the same 860-centered column the drafted page uses (RenderStory) so it lines
+            // up with the header/lead/note instead of spilling edge-to-edge — .chart-panel has no width of its
+            // own, so a bare child of the unclassed <main> would stretch full width. [Story 2.3 redesign]
+            sb.Append("<section class=\"dashboard-narrow\">\n");
             sb.Append("<div class=\"chart-panel ac-panel\">\n<h3>Acceptance Criteria</h3>\n<div class=\"ac-list\">\n");
             foreach (var block in story.AcBlocksHtml)
             {
                 sb.Append($"  <div class=\"ac-block\">{block}</div>\n");
             }
-            sb.Append("</div>\n</div>\n\n");
+            sb.Append("</div>\n</div>\n</section>\n\n");
         }
 
         // The dead-end ("no plan yet") becomes a next action when the module exposes create-story,

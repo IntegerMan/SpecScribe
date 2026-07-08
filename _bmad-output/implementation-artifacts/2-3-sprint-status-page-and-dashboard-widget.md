@@ -466,6 +466,15 @@ claude-opus-4-8
   discipline (tracked yaml vs. derived artifact `Status:`) to protect Story 1.5 truthfulness; and full
   graceful degradation for missing/partial/malformed tracking data (no page, nav, widget, or broken links).
   Documented the watch-mode `.yaml` live-reload limitation as a known, optionally-extendable boundary.
+- 2026-07-07 (polish, post-review feedback #2): Compressed the sprint page's top chrome into one strip
+  (title/subtitle + a compact donut + a header "Sprint commands ▾" popout that holds each command's
+  description behind a native `<details>` dropdown), moved the header inside the board column so it aligns,
+  and retuned the full-height board (thin scrollbars, fixed column headers). Redesigned the board cards
+  (shared by the sprint + home boards): story id top-left, an "E{n}" epic badge top-right with an "Epic N"
+  tooltip, and a hairline task-completion progress bar at the bottom (colored done/partial/empty, `data-tooltip`
+  "N of M tasks done (P%)", gated on a task plan). Capped the home board at 3/column. Fixed the "not yet
+  drafted" placeholder story page's edge-to-edge AC panel by wrapping it in `dashboard-narrow`. New public
+  `BmadCommands.RenderCommandMenu`; extended the specscribe.js menu-dismissal to the new popout. 409 tests pass.
 - 2026-07-07 (redesign, post-review feedback): Reworked the sprint surfaces into a Jira/Kanban board.
   The home **Now & Next** now *becomes* the sprint board when an active sprint exists — five lifecycle columns
   (Backlog → Done), each capped at 5 cards with a "+N more →" link to the full page (falls back to the derived

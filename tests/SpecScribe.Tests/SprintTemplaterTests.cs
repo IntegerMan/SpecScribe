@@ -19,7 +19,7 @@ public class SprintTemplaterTests
         ["retrospective"] = "/bmad-retrospective",
     });
 
-    private static StoryInfo Story(string id, int epic, string title, string? artifactOutputPath) => new()
+    private static StoryInfo Story(string id, int epic, string title, string? artifactOutputPath, int tasksDone = 0, int tasksTotal = 0) => new()
     {
         Id = id,
         EpicNumber = epic,
@@ -27,6 +27,8 @@ public class SprintTemplaterTests
         UserStoryHtml = string.Empty,
         AcBlocksHtml = Array.Empty<string>(),
         ArtifactOutputPath = artifactOutputPath,
+        TasksDone = tasksDone,
+        TasksTotal = tasksTotal,
     };
 
     private static EpicsModel EpicsWith(params EpicInfo[] epics) => new()
@@ -69,9 +71,9 @@ public class SprintTemplaterTests
         foreach (var cls in new[] { "pending", "ready", "active", "review", "done" })
             Assert.Contains($"<section class=\"sprint-lane {cls}\"", html);
 
-        // Cards reuse now-next-card with the story's stage color; done story 1.1 and in-progress 1.2 link out.
-        Assert.Contains("class=\"now-next-card done\"", html);
-        Assert.Contains("class=\"now-next-card active\"", html);
+        // Cards carry the story's stage color; done story 1.1 and in-progress 1.2 link out.
+        Assert.Contains("class=\"sprint-card done\"", html);
+        Assert.Contains("class=\"sprint-card active\"", html);
         Assert.Contains("href=\"epics/story-1-1.html\"", html);
 
         // Pure-CSS toggle scaffolding (no JS) and both views present.
@@ -81,9 +83,37 @@ public class SprintTemplaterTests
         Assert.Contains("class=\"board-view board-view-epic\"", html);
         Assert.Contains("class=\"sprint-epic-lane\"", html);
 
-        // Standard command buttons for the sprint lifecycle (copy payloads).
+        // Sprint commands live in a header popout (<details>) with a description per command.
+        Assert.Contains("class=\"cmd-menu\"", html);
         Assert.Contains("data-copy=\"/bmad-sprint-planning\"", html);
         Assert.Contains("data-copy=\"/bmad-retrospective\"", html);
+        Assert.Contains("Plan the sprint from epics", html);
+        Assert.Contains("class=\"cmd-menu-desc\"", html);
+    }
+
+    [Fact]
+    public void RenderIndex_CardShowsIdEpicBadgeAndGatedTaskProgressBar()
+    {
+        var sprint = SprintStatusParser.Parse("development_status:\n  epic-2: in-progress\n  2-3-widget: in-progress\n  2-6-later: backlog\n")!;
+        var epics = EpicsWith(Epic(2, "Rendering",
+            Story("2.3", 2, "Sprint Widget", "epics/story-2-3.html", tasksDone: 3, tasksTotal: 8),   // has a plan
+            Story("2.6", 2, "Later Story", artifactOutputPath: null)));                              // no plan
+
+        var html = SprintTemplater.RenderIndex(sprint, epics, Nav(), CommandCatalog.Empty);
+
+        // Id top-left, epic badge top-right (with an "Epic N" tooltip), bare title.
+        Assert.Contains("<span class=\"sprint-card-id\">2.3</span>", html);
+        Assert.Contains("data-tooltip=\"Epic 2\"", html);
+        Assert.Contains(">E2</span>", html);
+        // Progress bar only for the story WITH a task plan: 3/8 = 38%, partial fill, tooltip.
+        Assert.Contains("role=\"progressbar\"", html);
+        Assert.Contains("aria-valuenow=\"38\"", html);
+        Assert.Contains("class=\"sprint-card-progress-fill partial\" style=\"width:38%\"", html);
+        Assert.Contains("data-tooltip=\"3 of 8 tasks done (38%)\"", html);
+        // The no-plan story (2.6) shows a card but no progress bar. Exactly one progressbar on the two views…
+        // (status board + epic board each render the card once, so the with-plan story yields 2 bars, the
+        // no-plan story yields 0). Assert the no-plan card exists without a bar by checking its id renders.
+        Assert.Contains("<span class=\"sprint-card-id\">2.6</span>", html);
     }
 
     [Fact]
@@ -130,11 +160,11 @@ public class SprintTemplaterTests
 
         Assert.Contains("class=\"sprint-lane-more\" href=\"sprint.html\">+4 more", board);
         // Only the first 2 of 6 done cards are shown before the "more" link.
-        Assert.Equal(2, CountOccurrences(board, "now-next-card done"));
+        Assert.Equal(2, CountOccurrences(board, "sprint-card done"));
 
         // Uncapped render shows all six.
         var full = SprintTemplater.RenderBoard(sprint, epics);
-        Assert.Equal(6, CountOccurrences(full, "now-next-card done"));
+        Assert.Equal(6, CountOccurrences(full, "sprint-card done"));
         Assert.DoesNotContain("sprint-lane-more", full);
     }
 

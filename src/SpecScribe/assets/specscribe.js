@@ -193,22 +193,29 @@
   // These handlers give it real menu behavior: a click anywhere outside an open menu closes it (so at
   // most one is ever open), picking a destination closes it, and Escape closes it. With JS off the
   // native disclosure still toggles — this only adds the click-away/Escape niceties.
-  function closeSendMenus(except) {
-    var open = document.querySelectorAll("details.send-menu[open]");
-    for (var i = 0; i < open.length; i++) {
-      if (open[i] !== except) open[i].removeAttribute("open");
-    }
-  }
+  // Covers both the per-command send menu and the header "Sprint commands" popout (.cmd-menu). The popout can
+  // contain command badges that each have their own send-menu, so dismissal is by containment: a click closes
+  // every open menu that does NOT contain the click target — this keeps an ancestor popout open while you use a
+  // badge inside it, and closes unrelated menus. Escape closes all.
+  var MENU_SELECTOR = "details.send-menu[open], details.cmd-menu[open]";
 
   document.addEventListener("click", function (e) {
-    if (!document.querySelector("details.send-menu[open]")) return;
-    var withinMenu = e.target.closest ? e.target.closest("details.send-menu") : null;
-    // Clicking the caret of one menu closes every other; picking a menu item (or clicking outside) closes all.
-    var pickedItem = e.target.closest ? e.target.closest(".send-item") : null;
-    closeSendMenus(withinMenu && !pickedItem ? withinMenu : null);
+    var target = e.target;
+    var open = document.querySelectorAll(MENU_SELECTOR);
+    for (var i = 0; i < open.length; i++) {
+      if (!open[i].contains(target)) open[i].removeAttribute("open");
+    }
+    // Picking a destination inside a per-command send menu closes that send menu (the popout, if any, stays).
+    var item = target.closest ? target.closest(".send-item") : null;
+    if (item) {
+      var menu = item.closest("details.send-menu");
+      if (menu) menu.removeAttribute("open");
+    }
   });
 
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") closeSendMenus(null);
+    if (e.key !== "Escape") return;
+    var open = document.querySelectorAll(MENU_SELECTOR);
+    for (var i = 0; i < open.length; i++) open[i].removeAttribute("open");
   });
 })();

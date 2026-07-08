@@ -59,35 +59,30 @@ public static class SprintTemplater
 
         var epicCount = sprint.Entries.Count(e => e.Kind == SprintEntryKind.Epic);
         var storyCount = sprint.Entries.Count(e => e.Kind == SprintEntryKind.Story);
-
-        // Compact header: fold the update time into the one subtitle line so the board sits higher on the
-        // page. The source is named so this reads as the tracking-file view (Story 1.5 truthfulness).
         var updated = sprint.LastUpdated is { Length: > 0 } lu ? $" &middot; updated {PathUtil.Html(lu)}" : string.Empty;
-        sb.Append("<header class=\"doc-header sprint-header\">\n");
-        sb.Append("  <h1>Sprint Status</h1>\n");
         var subtitle = $"{PathUtil.Html(nav.SiteTitle)} &middot; {epicCount} {Charts.Plural(epicCount, "epic", "epics")} &middot; {storyCount} {Charts.Plural(storyCount, "story", "stories")} &middot; from sprint-status.yaml{updated}";
-        sb.Append($"  <div class=\"doc-subtitle\">{subtitle}</div>\n");
-        sb.Append("</header>\n\n");
 
+        // One compact top strip INSIDE main so the header shares the board's centered column (alignment) and
+        // the whole chrome costs a single short row: title + subtitle on the left; a compact donut and a
+        // header "Sprint commands" popout (descriptions tucked behind it) on the right — leaving the board the
+        // vertical space. [Story 2.3 redesign]
         sb.Append("<main id=\"main-content\" class=\"sprint-page\">\n\n");
-
-        // Command buttons + lifecycle summary share one compact band (side by side on wide screens) so they
-        // cost one short row rather than two stacked panels — keeping the board above the fold. [redesign]
-        var commandBar = BmadCommands.RenderCommandBar("Sprint commands", new[]
+        sb.Append("<div class=\"sprint-topbar\">\n");
+        sb.Append("  <div class=\"sprint-topbar-head\">\n");
+        sb.Append("    <h1>Sprint Status</h1>\n");
+        sb.Append($"    <div class=\"doc-subtitle\">{subtitle}</div>\n");
+        sb.Append("  </div>\n");
+        sb.Append("  <div class=\"sprint-topbar-aside\">\n");
+        sb.Append(RenderCompactDonut(sprint));
+        sb.Append(BmadCommands.RenderCommandMenu("Sprint commands", new (string?, string)[]
         {
-            commands.Command("sprint-planning"),
-            commands.Command("sprint-status"),
-            commands.Command("correct-course"),
-            commands.Command("retrospective"),
-        });
-        var summary = RenderLifecycleSummary(sprint);
-        if (commandBar.Length > 0 || summary.Length > 0)
-        {
-            sb.Append("<div class=\"sprint-controls\">\n");
-            sb.Append(commandBar);
-            sb.Append(summary);
-            sb.Append("</div>\n\n");
-        }
+            (commands.Command("sprint-planning"), "Plan the sprint from epics"),
+            (commands.Command("sprint-status"), "Summarize status & risks"),
+            (commands.Command("correct-course"), "Handle a mid-sprint change"),
+            (commands.Command("retrospective"), "Capture lessons after an epic"),
+        }));
+        sb.Append("  </div>\n");
+        sb.Append("</div>\n\n");
 
         AppendBoardToggle(sb, sprint, epics, prefix);
         AppendActionItems(sb, sprint);
@@ -202,10 +197,10 @@ public static class SprintTemplater
         sb.Append("</div>\n\n");
     }
 
-    /// <summary>The compact lifecycle-count summary — the same per-stage story counts the home widget shows
-    /// (one number). A small donut + non-zero legend (Story 1.5 B4), sized to share the controls band with the
-    /// command buttons. Returns empty when no stories are tracked. [Story 2.3 redesign]</summary>
-    private static string RenderLifecycleSummary(SprintStatus sprint)
+    /// <summary>The compact lifecycle donut for the top strip — an at-a-glance done/total overview (the board's
+    /// column headers already carry the per-stage counts, so no legend here). Returns empty when no stories are
+    /// tracked. [Story 2.3 redesign]</summary>
+    private static string RenderCompactDonut(SprintStatus sprint)
     {
         var counts = StoryStageCounts(sprint);
         var total = counts.Sum(c => c.Count);
@@ -217,15 +212,10 @@ public static class SprintTemplater
         var ariaParts = string.Join(", ", nonZero.Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
 
         var sb = new StringBuilder();
-        sb.Append("<div class=\"chart-panel sprint-summary\">\n");
-        sb.Append("<h3>Delivery by lifecycle stage</h3>\n<div class=\"donut-and-legend\">\n");
-        sb.Append(Charts.Donut(segments, size: 92, ariaLabel: $"Sprint stories: {ariaParts}", centerText: $"{done}/{total}"));
-        sb.Append("<div class=\"donut-legend\">\n");
-        foreach (var (label, count, cssClass) in nonZero)
-        {
-            sb.Append($"  <span><span class=\"swatch {cssClass}\"></span>{PathUtil.Html(label)} ({count})</span>\n");
-        }
-        sb.Append("</div>\n</div>\n</div>\n");
+        sb.Append("<div class=\"sprint-topbar-donut\" data-tooltip=\"" + PathUtil.Html($"Sprint delivery: {ariaParts}") + "\">");
+        sb.Append(Charts.Donut(segments, size: 58, ariaLabel: $"Sprint delivery: {ariaParts}", centerText: $"{done}/{total}"));
+        sb.Append($"<span class=\"sprint-topbar-donut-label\">{done} / {total} done</span>");
+        sb.Append("</div>");
         return sb.ToString();
     }
 
@@ -260,26 +250,46 @@ public static class SprintTemplater
     /// <summary>One board card for a story: the whole card is a link to the story's generated page (real or
     /// placeholder — always exists for a model story), colored by its tracked lifecycle stage. Falls back to a
     /// non-link <c>div</c> only when the yaml key has no matching model story (no page to point at). [Story 2.3]</summary>
-    private static void AppendBoardCard(StringBuilder sb, SprintEntry story, EpicsModel? epics, string prefix)
+    private static void AppendBoardCard(StringBuilder sb, SprintEntry entry, EpicsModel? epics, string prefix)
     {
-        var (title, href) = ResolveStory(story, epics);
-        var cssClass = StatusStyles.ForSprint(story.Status);
-        var kicker = story.EpicNumber is { } en ? $"Epic {en}" : "Story";
+        var (title, href, story) = ResolveStory(entry, epics);
+        var cssClass = StatusStyles.ForSprint(entry.Status);
+        var id = story?.Id
+            ?? (entry.EpicNumber is { } e && entry.StoryMinor is { } m ? $"{e}.{m}" : entry.RawKey);
 
-        if (href is not null)
+        var tag = href is not null ? "a" : "div";
+        var hrefAttr = href is not null ? $" href=\"{PathUtil.Html(prefix + href)}\"" : string.Empty;
+
+        sb.Append($"      <{tag} class=\"sprint-card {cssClass}\"{hrefAttr}>\n");
+        sb.Append("        <div class=\"sprint-card-head\">\n");
+        sb.Append($"          <span class=\"sprint-card-id\">{PathUtil.Html(id)}</span>\n");
+        if (entry.EpicNumber is { } en)
         {
-            sb.Append($"      <a class=\"now-next-card {cssClass}\" href=\"{PathUtil.Html(prefix + href)}\">\n");
-            sb.Append($"        <span class=\"now-next-kicker\">{PathUtil.Html(kicker)}</span>\n");
-            sb.Append($"        <span class=\"now-next-title\">{title}</span>\n");
-            sb.Append("      </a>\n");
+            sb.Append($"          <span class=\"sprint-card-epic\" data-tooltip=\"Epic {en}\" aria-label=\"Epic {en}\">E{en}</span>\n");
         }
-        else
+        sb.Append("        </div>\n");
+        sb.Append($"        <span class=\"sprint-card-title\">{title}</span>\n");
+
+        // A hairline task-completion bar at the card bottom, only when the story has a task plan (mirrors the
+        // TaskBadge gate). Colors + fraction reuse the shared progress vocabulary; the tooltip is CSS-only. [redesign]
+        if (story is { TasksTotal: > 0 })
         {
-            sb.Append($"      <div class=\"now-next-card {cssClass}\">\n");
-            sb.Append($"        <span class=\"now-next-kicker\">{PathUtil.Html(kicker)}</span>\n");
-            sb.Append($"        <span class=\"now-next-title\">{title}</span>\n");
-            sb.Append("      </div>\n");
+            AppendCardProgress(sb, story.TasksDone, story.TasksTotal);
         }
+
+        sb.Append($"      </{tag}>\n");
+    }
+
+    /// <summary>The thin per-card task-completion bar: a <c>role="progressbar"</c> track + a
+    /// done/partial/empty-colored fill, with a CSS-only <c>data-tooltip</c> reading "N of M tasks done (P%)".
+    /// [Story 2.3 redesign]</summary>
+    private static void AppendCardProgress(StringBuilder sb, int done, int total)
+    {
+        var pct = total > 0 ? (int)Math.Round((double)done / total * 100) : 0;
+        var fill = pct >= 100 ? "done" : pct > 0 ? "partial" : "empty";
+        var aria = $"{done} of {total} {Charts.Plural(total, "task", "tasks")} done";
+        sb.Append($"        <span class=\"sprint-card-progress\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"{PathUtil.Html(aria)}\" data-tooltip=\"{PathUtil.Html($"{aria} ({pct}%)")}\">");
+        sb.Append($"<span class=\"sprint-card-progress-fill {fill}\" style=\"width:{pct}%\"></span></span>\n");
     }
 
     /// <summary>Groups the tracked entries by epic number in first-seen (file) order, keeping stories in file
@@ -322,16 +332,16 @@ public static class SprintTemplater
     /// — it links to its generated page via <see cref="StoryEpicLinkifier.StoryPagePath"/>, which always
     /// exists (a placeholder page is emitted for undrafted stories). Only a yaml key with no matching model
     /// story (no page to point at) renders as plain text — never a broken link. [Story 2.3 redesign]</summary>
-    private static (string TitleHtml, string? Href) ResolveStory(SprintEntry entry, EpicsModel? epics)
+    private static (string TitleHtml, string? Href, StoryInfo? Story) ResolveStory(SprintEntry entry, EpicsModel? epics)
     {
         var id = entry.EpicNumber is { } e && entry.StoryMinor is { } m ? $"{e}.{m}" : null;
         var story = id is not null ? epics?.Epics.SelectMany(ep => ep.Stories).FirstOrDefault(s => s.Id == id) : null;
         if (story is not null)
         {
-            var label = $"Story {story.Id} · {story.Title}";
-            return (label, StoryEpicLinkifier.StoryPagePath(story.Id));
+            // Bare title — the id and epic are shown as their own card elements now. [Story 2.3 redesign]
+            return (story.Title, StoryEpicLinkifier.StoryPagePath(story.Id), story);
         }
-        return (PathUtil.Html(PrettifySlug(entry.RawKey)), null);
+        return (PathUtil.Html(PrettifySlug(entry.RawKey)), null, null);
     }
 
     /// <summary>Human title from a yaml story slug: strip the leading <c>N-M-</c> id prefix, replace dashes
