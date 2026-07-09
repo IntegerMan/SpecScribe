@@ -72,7 +72,6 @@ development_status:
   3-4-interactive-tree-views-for-project-and-artifact-structure: retired # artifact tree retired; source-code treemap moved to Story 7.6 (SCP 2026-07-08)
   3-5-flashy-but-purposeful-insight-visual-language: done
   3-6-refinement-funnel-on-the-dashboard: review
-  3-7-requirements-flow-and-status-blocks: backlog
   3-8-git-insights-hub-page: ready-for-dev
   epic-3-retrospective: optional
 

@@ -325,4 +325,201 @@ public class GitMetricsTests
         // Canonical unordered key is ordinal-sorted; "Other.cs" < "new/Renamed.cs" ordinally ('O' < 'n').
         Assert.Contains(("Other.cs", "new/Renamed.cs", 2), deep.Coupling);
     }
+
+    // ---- ParseNumstatRecords + BuildInsights (Git Insights hub aggregates) [Story 3.8] ----
+
+    /// <summary>The \x1f header-field separator of the enriched deep fetch, built from its code point so no
+    /// invisible control character has to live in this source file.</summary>
+    private static readonly string FS = ((char)0x1f).ToString();
+
+    /// <summary>Builds one enriched-format record: sentinel + hash/author/date/subject/body header (\x1f
+    /// separated, trailing \x1f closing the body) followed by numstat rows — the exact shape
+    /// `--pretty=format:%x01%H%x1f%an%x1f%ad%x1f%s%x1f%b%x1f` emits.</summary>
+    private static string Rec(string hash, string author, string date, string subject, string body, params string[] numstatLines)
+        => Sentinel + hash + FS + author + FS + date + FS + subject + FS + body + FS + "\n" +
+           string.Concat(numstatLines.Select(l => l + "\n"));
+
+    [Fact]
+    public void ParseNumstatRecords_ParsesEnrichedHeaderFieldsAndNumstatRows()
+    {
+        var log = Rec("abc123", "Alice", "2026-07-01T09:15", "Fix the thing", "Longer explanation.",
+            "3\t1\tsrc/A.cs",
+            "10\t0\tsrc/B.cs");
+
+        var commit = Assert.Single(GitMetrics.ParseNumstatRecords(log));
+
+        Assert.Equal("abc123", commit.Hash);
+        Assert.Equal("Alice", commit.Author);
+        Assert.Equal(new DateTime(2026, 7, 1, 9, 15, 0), commit.Timestamp);
+        Assert.Equal("Fix the thing", commit.Subject);
+        Assert.Equal("Longer explanation.", commit.Body);
+        Assert.Equal(2, commit.Files.Count);
+        Assert.Equal(new DeepFileChange("src/A.cs", 3, 1), commit.Files[0]);
+        Assert.Equal(new DeepFileChange("src/B.cs", 10, 0), commit.Files[1]);
+    }
+
+    [Fact]
+    public void ParseNumstatRecords_MultiLineBodyNeverBleedsIntoTheFileSet()
+    {
+        // The body deliberately contains a line that LOOKS like a numstat row. The trailing \x1f body
+        // sentinel keeps it inside the message; only the real numstat row lands in Files.
+        var body = "First body line.\n9\t9\tFakeFromBody.cs\nlast line";
+        var log = Rec("abc123", "Alice", "2026-07-01T09:15", "Subject", body, "1\t0\tReal.cs");
+
+        var commit = Assert.Single(GitMetrics.ParseNumstatRecords(log));
+
+        Assert.Equal(body, commit.Body);
+        var file = Assert.Single(commit.Files);
+        Assert.Equal("Real.cs", file.Path);
+    }
+
+    [Fact]
+    public void ParseNumstatRecords_BinaryRowsKeepThePathWithNullCounts()
+    {
+        var log = Rec("abc123", "Alice", "2026-07-01T09:15", "Add image", "", "-\t-\tassets/logo.png");
+
+        var commit = Assert.Single(GitMetrics.ParseNumstatRecords(log));
+
+        var file = Assert.Single(commit.Files);
+        Assert.Equal("assets/logo.png", file.Path);
+        Assert.Null(file.Added);
+        Assert.Null(file.Deleted);
+    }
+
+    [Fact]
+    public void ParseNumstatRecords_AcceptsTheMinimalLegacyHashOnlyShape()
+    {
+        // The pre-3.8 fetch format (%x01%H only): hash line + numstat rows, no \x1f fields.
+        var log = Sentinel + "hash0\n1\t0\tA.cs\n";
+
+        var commit = Assert.Single(GitMetrics.ParseNumstatRecords(log));
+
+        Assert.Equal("hash0", commit.Hash);
+        Assert.Equal("Unknown", commit.Author); // no author field -> attribution-safe placeholder
+        Assert.Null(commit.Timestamp);
+        Assert.Equal("A.cs", Assert.Single(commit.Files).Path);
+    }
+
+    [Fact]
+    public void ParseNumstatRecords_SkipsJunkAndHandlesEmptyInput()
+    {
+        Assert.Empty(GitMetrics.ParseNumstatRecords(string.Empty));
+
+        var log = Rec("abc123", "", "not-a-date", "Subject", "",
+            "garbage-with-no-tabs",
+            "\t\t",          // empty path -> skipped
+            "",               // blank -> skipped
+            "2\t2\tKept.cs");
+
+        var commit = Assert.Single(GitMetrics.ParseNumstatRecords(log));
+
+        Assert.Equal("Unknown", commit.Author);  // empty author -> placeholder
+        Assert.Null(commit.Timestamp);            // unparseable date -> null, never a throw
+        Assert.Equal("Kept.cs", Assert.Single(commit.Files).Path);
+    }
+
+    [Fact]
+    public void BuildInsights_OrdersFilesByChangeCountThenOrdinalPathAndTruncates()
+    {
+        var commits = new[]
+        {
+            Commit("h3", "Alice", "2026-07-03T10:00", ("A.cs", 1, 1), ("C.cs", 1, 0)),
+            Commit("h2", "Alice", "2026-07-02T10:00", ("A.cs", 2, 0), ("B.cs", 1, 0)),
+            Commit("h1", "Alice", "2026-07-01T10:00", ("A.cs", 4, 2)),
+        };
+
+        var insights = GitMetrics.BuildInsights(commits, topFiles: 2);
+
+        Assert.Equal(2, insights.Files.Count);
+        // A.cs: 3 changes, churn summed across all three commits.
+        Assert.Equal(new FileChangeStat("A.cs", 3, 7, 3), insights.Files[0]);
+        // B and C tie at 1; ordinal path tie-break keeps B (C is truncated by topFiles: 2).
+        Assert.Equal("B.cs", insights.Files[1].Path);
+        Assert.Equal(3, insights.CommitCount);
+    }
+
+    [Fact]
+    public void BuildInsights_BinaryRowsCountAsChangesButAddNoChurn()
+    {
+        var commits = new[]
+        {
+            new DeepCommit("h1", "Alice", new DateTime(2026, 7, 1, 10, 0, 0), "s", "", new[]
+            {
+                new DeepFileChange("logo.png", null, null),
+            }),
+        };
+
+        var insights = GitMetrics.BuildInsights(commits);
+
+        Assert.Equal(new FileChangeStat("logo.png", 1, 0, 0), Assert.Single(insights.Files));
+    }
+
+    [Fact]
+    public void BuildInsights_AggregatesContributorAttributionNewestCommitFirst()
+    {
+        // Records arrive in git log order (newest first): Bob's newest commit is hb2.
+        var commits = new[]
+        {
+            Commit("hb2", "Bob", "2026-07-05T10:00", ("B.cs", 1, 0)),
+            Commit("ha1", "Alice", "2026-07-04T10:00", ("A.cs", 1, 0), ("B.cs", 1, 0)),
+            Commit("hb1", "Bob", "2026-07-01T10:00", ("A.cs", 1, 0), ("B.cs", 1, 0)),
+        };
+
+        var insights = GitMetrics.BuildInsights(commits);
+
+        Assert.Equal(2, insights.Contributors.Count);
+        // Bob has more commits so he sorts first — attribution counts, not a "rank" field.
+        Assert.Equal(new ContributorStat("Bob", 2, 2, new DateOnly(2026, 7, 5), "hb2"), insights.Contributors[0]);
+        Assert.Equal(new ContributorStat("Alice", 1, 2, new DateOnly(2026, 7, 4), "ha1"), insights.Contributors[1]);
+    }
+
+    [Fact]
+    public void BuildInsights_BucketsActivityPerDayAscending()
+    {
+        var commits = new[]
+        {
+            Commit("h3", "Alice", "2026-07-03T18:00", ("A.cs", 1, 0)),
+            Commit("h2", "Alice", "2026-07-03T09:00", ("A.cs", 1, 0)),
+            Commit("h1", "Alice", "2026-07-01T10:00", ("A.cs", 1, 0)),
+        };
+
+        var insights = GitMetrics.BuildInsights(commits);
+
+        Assert.Equal(new[]
+        {
+            (new DateOnly(2026, 7, 1), 1),
+            (new DateOnly(2026, 7, 3), 2),
+        }, insights.Activity);
+    }
+
+    [Fact]
+    public void BuildInsights_EmptyInputYieldsEmptyViews()
+    {
+        var insights = GitMetrics.BuildInsights(Array.Empty<DeepCommit>());
+
+        Assert.Empty(insights.Files);
+        Assert.Empty(insights.Contributors);
+        Assert.Empty(insights.Activity);
+        Assert.Equal(0, insights.CommitCount);
+    }
+
+    [Fact]
+    public void ParseNumstatLog_CarriesTheHubInsightsFromTheSameParse()
+    {
+        // One parse, several views: the hotspot/coupling pulse also carries the hub aggregates.
+        var log = Rec("abc123", "Alice", "2026-07-01T09:15", "Subject", "", "1\t0\tA.cs");
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        Assert.NotNull(deep.Insights);
+        Assert.Equal(1, deep.Insights!.CommitCount);
+        Assert.Equal("A.cs", Assert.Single(deep.Insights.Files).Path);
+        Assert.Equal("Alice", Assert.Single(deep.Insights.Contributors).Name);
+    }
+
+    private static DeepCommit Commit(string hash, string author, string date, params (string Path, int Added, int Deleted)[] files)
+        => new(hash, author,
+            DateTime.ParseExact(date, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),
+            "subject", "",
+            files.Select(f => new DeepFileChange(f.Path, f.Added, f.Deleted)).ToList());
 }

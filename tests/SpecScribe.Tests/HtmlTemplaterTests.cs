@@ -383,6 +383,45 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderIndex_ShowsViewAllGitInsightsLinkOnlyWhenHubInsightsPresent()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        // DeepGit without hub insights (e.g. the hub page failed to write and was cleared): no hub link,
+        // but the deep-analytics link still renders.
+        var withoutInsights = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressWithDeepGit(),
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+        Assert.DoesNotContain("View all git insights", withoutInsights);
+        Assert.DoesNotContain(SiteNav.GitInsightsOutputPath, withoutInsights);
+        Assert.Contains("View Deep Analytics", withoutInsights);
+
+        // With the hub aggregates present (the generator only leaves them set when git-insights.html was
+        // actually written), the Git Pulse header carries the hub entry link.
+        var progress = ProgressWithDeepGit();
+        progress.DeepGit!.Insights = new GitInsightsData(
+            Files: new[] { new FileChangeStat("src/Charts.cs", 4, 10, 2) },
+            Contributors: new[] { new ContributorStat("Alice", 4, 1, new DateOnly(2026, 1, 5), "c001") },
+            Activity: new[] { (new DateOnly(2026, 1, 5), 4) },
+            CommitCount: 4);
+        var withInsights = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: progress,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+        Assert.Contains($"href=\"{SiteNav.GitInsightsOutputPath}\"", withInsights);
+        Assert.Contains("View all git insights", withInsights);
+    }
+
+    [Fact]
     public void RenderIndex_OmitsViewDeepAnalyticsLinkWhenDeepGitNull()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

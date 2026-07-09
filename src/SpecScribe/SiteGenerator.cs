@@ -151,6 +151,16 @@ public sealed class SiteGenerator
                 }
             }
 
+            // Aggregate Git Insights hub (file change frequency, activity over time, contributor attribution)
+            // — Story 3.8's deep-git surface. Gated on the same opt-in data as the deep-analytics page above:
+            // Insights is only non-null when --deep-git gated TryComputeDeep on AND the shared numstat fetch
+            // produced data, so with the flag off this block (and every byte of git work behind it) never runs
+            // and baseline generation is untouched (AC #2). Runs after the commit-days phase so the reused
+            // heatmap's per-day links always have their target pages. The file/commit detail-link resolvers
+            // stay unwired until Stories 7.1/7.4/7.5 land their cached page maps — the templater renders those
+            // cells as plain text (guard-all-links-on-target-availability). [Story 3.8]
+            GenerateGitInsightsInternal(nav, events, reporter);
+
             if (readmeEvent is not null)
             {
                 events.Add(readmeEvent);
@@ -422,6 +432,37 @@ public sealed class SiteGenerator
 
         _commitDays = entries;
         return events;
+    }
+
+    /// <summary>Writes the aggregate <c>git-insights.html</c> hub when — and only when — the opt-in deep-git
+    /// pass produced its hub aggregates (<see cref="DeepGitPulse.Insights"/>). A no-op otherwise: with
+    /// <c>--deep-git</c> off the deep pass never ran, <c>DeepGit</c> is null, and no hub work (or page)
+    /// happens at all — that gate IS the AC #2 performance guarantee. Mirrors the deep-analytics page's
+    /// non-fatal contract: a render/write failure logs an <see cref="GenerationOutcome.Error"/> event, clears
+    /// <see cref="DeepGitPulse.Insights"/> so the dashboard's "View all git insights" link can't dangle, and
+    /// never fails the run (AD-4 / NFR2). [Story 3.8]</summary>
+    private void GenerateGitInsightsInternal(SiteNav nav, List<GenerationEvent> events, IGenerationReporter? reporter)
+    {
+        if (_progress?.DeepGit is not { Insights: { } insights }) return;
+
+        reporter?.BeginPhase(GenerationPhase.GitInsights);
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav);
+            File.WriteAllText(
+                Path.Combine(_options.OutputRoot, SiteNav.GitInsightsOutputPath),
+                ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
+            events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
+        }
+        catch (Exception ex)
+        {
+            events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.GitInsightsOutputPath, sw.Elapsed, ex.Message));
+            // The page was never written — clear Insights so the dashboard's "View all git insights" link
+            // (gated on _progress.DeepGit.Insights) doesn't point at a page that doesn't exist.
+            _progress.DeepGit.Insights = null;
+        }
+        reporter?.EndPhase(GenerationPhase.GitInsights);
     }
 
     private List<GenerationEvent> GenerateEpicsInternal(

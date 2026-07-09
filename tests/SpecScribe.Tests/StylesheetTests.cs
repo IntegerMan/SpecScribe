@@ -209,6 +209,33 @@ public class StylesheetTests
         Assert.DoesNotContain("sb-legend-item", js);
     }
 
+    // ---- Story 3.8 seams (Git Insights hub tables + the sanctioned sort/filter enhancer) ----------
+
+    [Fact]
+    public void Stylesheet_HasGitInsightsTableStyles()
+    {
+        // Cheap guard so the hub's accessible-table + scroll-container styling can't be silently deleted:
+        // wide tables scroll inside their own container (the body never scrolls horizontally), and the
+        // sort/filter controls the enhancer creates have on-brand, focus-visible styling.
+        var css = ReadStylesheet();
+        Assert.Contains(".table-scroll { overflow-x: auto; contain: inline-size; }", css);
+        Assert.Contains(".gi-table", css);
+        Assert.Contains(".gi-sort-btn:focus-visible", css);
+        Assert.Contains(".gi-filter", css);
+        Assert.Contains(".gi-row-hidden { display: none; }", css);
+    }
+
+    [Fact]
+    public void Script_HasTableSortFilterEnhancer()
+    {
+        // The Git Insights sort/filter enhancement lives in the ONE sanctioned script (no second file, no
+        // CDN), announces sort state via aria-sort, and only ever targets opt-in js-sortable tables.
+        var js = ReadScript();
+        Assert.Contains("js-sortable", js);
+        Assert.Contains("aria-sort", js);
+        Assert.Contains("data-filter-label", js);
+    }
+
     /// <summary>The body of the single <c>@media (prefers-reduced-motion: no-preference)</c> block.</summary>
     private static string NoPreferenceBlock(string css) => MediaBlock(css, "@media (prefers-reduced-motion: no-preference)");
 

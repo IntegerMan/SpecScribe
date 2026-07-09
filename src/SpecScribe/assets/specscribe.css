@@ -2536,6 +2536,90 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .chart-panel:has(.git-pulse-empty[data-tooltip]:hover),
 .chart-panel:has(.git-pulse-empty[data-tooltip]:focus-visible) { overflow: visible; }
 
+/* ====================== GIT INSIGHTS HUB (Story 3.8) ======================
+   The aggregate git-insights.html page: data-dense sections whose tables are complete and server-sorted
+   with JS off (NFR-5) — these rules carry the no-JS reading; the .gi-sort-btn / .gi-filter rules style the
+   controls the enhancement script creates only when JS runs. Neutral ink/border/parchment tokens only:
+   git activity is not a lifecycle status, so no --status-* tokens here (same rule as the 3.1/3.2 panels). */
+
+/* Wide tables scroll inside their own container — the page body never scrolls horizontally.
+   contain: inline-size zeroes the wrapper's intrinsic inline contribution: without it the table's
+   nowrap min-content propagates up through the shrink-to-fit .deep-page main (margin: 0 auto) and
+   forces the whole page wider than a narrow viewport instead of scrolling here. */
+.table-scroll { overflow-x: auto; contain: inline-size; }
+
+.gi-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.gi-table caption {
+  caption-side: top;
+  text-align: left;
+  color: var(--ink-light);
+  font-size: 0.82rem;
+  font-style: italic;
+  padding-bottom: 0.5rem;
+}
+.gi-table th,
+.gi-table td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: baseline;
+}
+.gi-table thead th {
+  border-bottom: 2px solid var(--parchment-deep);
+  color: var(--ink-faded);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.gi-table tbody th[scope="row"] { font-weight: 600; color: var(--ink); }
+.gi-table th.gi-num,
+.gi-table td.gi-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gi-table td code { font-size: 0.85rem; word-break: break-all; }
+.gi-table tbody tr:hover { background: var(--parchment); }
+
+/* Sort buttons the enhancer swaps into the headers: they inherit the header look and add an activatable
+   affordance. Sort direction is carried by the glyph + aria-sort, never color alone. */
+.gi-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.gi-sort-btn:hover { color: var(--rust); }
+.gi-sort-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+.gi-sort-glyph { font-size: 0.7rem; min-width: 0.8em; }
+
+/* The JS-created filter control (never shipped in the no-JS page, so it can't be a dead control). */
+.gi-filter { display: flex; align-items: baseline; gap: 0.6rem; margin: 0 0 0.6rem; }
+.gi-filter label { font-size: 0.85rem; color: var(--ink-faded); }
+.gi-filter input {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--parchment-deep);
+  border-radius: 4px;
+  background: var(--warm-white);
+  color: var(--ink);
+}
+.gi-filter input:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.gi-filter-count { font-size: 0.8rem; color: var(--ink-light); }
+
+/* Filtered-out rows are hidden via display (no transition, no animation), so the reduced-motion contract
+   is satisfied by construction — there is no new motion to neutralize. */
+.gi-row-hidden { display: none; }
+
+/* The Git Pulse panel header can now carry two "View …" links (hub + deep analytics); keep them on one
+   tidy right-aligned line with breathing room between. */
+.git-pulse-header-links { display: inline-flex; gap: 1rem; flex-wrap: wrap; }
+
 /* ====================== ENTRANCE ANIMATIONS (Story 1.5 D2) ======================
    The complementary "no-preference" half of the motion contract — one-time entrances that play only when
    the user hasn't asked for reduced motion. Nothing loops and no information is motion-dependent; the
