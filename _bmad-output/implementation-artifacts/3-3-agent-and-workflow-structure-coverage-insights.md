@@ -181,3 +181,7 @@ next. Reworked it into an **actionable 2-column card grid** (no new architecture
   a card left-edge; bumped card font sizes; moved the secondary decision-journal date off the card into a rich
   body-level `js-tip` tooltip that spells out "Decision journal (.memlog) updated …" (clarifying the previously
   cryptic "journal" bullet). Verified via computed styles + generated output; full suite green (502).
+- 2026-07-08: Layout tweak — moved the coverage meter into the panel header row (top-right, via the shared
+  `chart-panel-header-row` pattern) and slimmed it (88px, thinner) so it's an unobtrusive at-a-glance summary,
+  not a dominant band; made the intro paragraph full-width (removed the measure cap). New `Charts.CoverageMeter`
+  helper. Full suite green (510).

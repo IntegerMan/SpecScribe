@@ -657,8 +657,90 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The dashboard "Planning Artifacts" panel body — a header coverage meter (present/total as a %)
-    /// over a 2-column card grid, one card per canonical artifact family. A card explains what the artifact is
+    /// <summary>The dashboard refinement funnel — an HONEST elaboration pyramid, not a classic narrowing
+    /// funnel: planning counts GROW down the pipeline (few epics fan out into many stories and far more
+    /// tasks), so each stage's band width is proportional to its true count, normalized to the largest stage,
+    /// and is never rescaled to force a narrowing silhouette (that would overstate progress — Story 1.5's
+    /// "no chart overstates progress" rule, AC #2). "How much detail work remains" is carried by the per-stage
+    /// coverage sub-labels (epics broken into stories, stories with a task plan), and every stage shows its
+    /// real count as text (never width/color-only). A zero-count stage keeps its labeled row with a dashed
+    /// placeholder band, and a nonzero stage is floored to a visible width so a count of 1 beside hundreds
+    /// never renders as a hairline. Pure inline SVG + status-token CSS classes, no JS. [Story 3.6]</summary>
+    public static string RefinementFunnel(ProgressModel p)
+    {
+        if (p.EpicsTotal == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
+
+        // Stage 3's coverage sub-label needs a story denominator; with no stories drafted yet, "0 of 0" would
+        // read as noise, so the sub-label is simply omitted (the 0 count row still renders).
+        var planSub = p.StoriesTotal > 0
+            ? $"{p.StoriesWithArtifact} of {p.StoriesTotal} {Plural(p.StoriesTotal, "story", "stories")} {Plural(p.StoriesWithArtifact, "has", "have")} a task plan"
+            : null;
+        var stages = new (string Css, int Count, string Label, string? Sub)[]
+        {
+            ("funnel-epics", p.EpicsTotal, Plural(p.EpicsTotal, "epic", "epics"), null),
+            ("funnel-stories", p.StoriesTotal, Plural(p.StoriesTotal, "story drafted", "stories drafted"),
+                $"{p.EpicsDrafted} of {p.EpicsTotal} {Plural(p.EpicsTotal, "epic", "epics")} broken into stories"),
+            ("funnel-planned", p.StoriesWithArtifact,
+                Plural(p.StoriesWithArtifact, "story with a task plan", "stories with a task plan"), planSub),
+            ("funnel-tasks", p.TasksTotal, Plural(p.TasksTotal, "task planned", "tasks planned"), null),
+        };
+
+        // Geometry: bands centered in a 640-wide viewBox with 600 usable; nonzero stages floor at 46 so the
+        // smallest stage stays a visible, hoverable band. maxStage >= EpicsTotal >= 1, so no divide-by-zero.
+        const double usableWidth = 600, minWidth = 46, centerX = 320;
+        var maxStage = stages.Max(s => s.Count);
+
+        var aria = "Refinement funnel: " + string.Join(", ", stages.Select(s => $"{s.Count} {s.Label}"));
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"refinement-funnel\">\n");
+        sb.Append($"<svg class=\"funnel\" viewBox=\"0 0 640 252\" width=\"640\" height=\"252\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
+
+        var y = 10.0;
+        foreach (var (css, count, label, sub) in stages)
+        {
+            var subTspan = sub is null ? string.Empty : $"<tspan class=\"funnel-stage-sub\"> &middot; {Html(sub)}</tspan>";
+            sb.Append($"  <text x=\"{F(centerX)}\" y=\"{F(y + 11)}\" class=\"funnel-stage-text\" text-anchor=\"middle\">" +
+                      $"<tspan class=\"funnel-stage-count\">{count}</tspan> {Html(label)}{subTspan}</text>\n");
+
+            var width = count == 0 ? minWidth : Math.Max(minWidth, count / (double)maxStage * usableWidth);
+            var cls = count == 0 ? $"funnel-band {css} funnel-zero" : $"funnel-band {css}";
+            var title = sub is null ? $"{count} {label}" : $"{count} {label} — {sub}";
+            sb.Append($"  <rect class=\"{cls}\" x=\"{F(centerX - width / 2)}\" y=\"{F(y + 20)}\" width=\"{F(width)}\" height=\"26\" rx=\"6\">" +
+                      $"<title>{Html(title)}</title></rect>\n");
+            y += 62;
+        }
+        sb.Append("</svg>\n");
+        sb.Append("<div class=\"funnel-hint\">Each stage breaks the one above into finer detail &mdash; " +
+                  "band width tracks the real count; the sub-labels show how much refinement remains.</div>\n");
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The compact coverage meter for the panel's header row (top-right): the present/total count, a
+    /// small progress bar, and the % present. Kept deliberately narrow so it reads as an at-a-glance summary
+    /// rather than a dominant band. Carries <c>role="progressbar"</c> semantics for assistive tech. [Story 3.3]</summary>
+    public static string CoverageMeter(ArtifactCoverage coverage, DateOnly today)
+    {
+        var total = coverage.Families.Count;
+        var present = coverage.PresentCount;
+        var stale = coverage.StaleCount(today);
+        var pct = total > 0 ? (int)Math.Round(present * 100.0 / total) : 0;
+
+        var count = stale > 0
+            ? $"<strong>{present}</strong>/<strong>{total}</strong> &middot; {stale} stale"
+            : $"<strong>{present}</strong>/<strong>{total}</strong>";
+
+        return "<div class=\"coverage-meter-group\">" +
+               $"<span class=\"coverage-count\">{count}</span>" +
+               $"<span class=\"coverage-meter\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" " +
+               $"aria-label=\"Planning artifact coverage: {present} of {total} present\"><span class=\"coverage-meter-fill\" style=\"width:{pct}%\"></span></span>" +
+               $"<span class=\"coverage-pct\">{pct}%</span></div>";
+    }
+
+    /// <summary>The dashboard "Planning Artifacts" panel body — a full-width intro over a 2-column card grid,
+    /// one card per canonical artifact family (the coverage meter rides the panel header row via
+    /// <see cref="CoverageMeter"/>). A card explains what the artifact is
     /// and carries its family accent color (matching the "Explore Key Views" pills); a PRESENT family's whole
     /// card links to its page, while a MISSING family's card carries a copyable create command (via
     /// <see cref="BmadCommands.InlineGuidance"/>, degrading to guidance text when the module exposes none). Each
@@ -668,25 +750,11 @@ public static class Charts
     /// invariant <see cref="DReadable"/>. Rendered only when <c>!coverage.IsEmpty</c> (graceful omission). [Story 3.3]</summary>
     public static string ArtifactCoveragePanel(ArtifactCoverage coverage, DateOnly today)
     {
-        var total = coverage.Families.Count;
-        var present = coverage.PresentCount;
-        var stale = coverage.StaleCount(today);
-        var pct = total > 0 ? (int)Math.Round(present * 100.0 / total) : 0;
-
         var sb = new StringBuilder();
         sb.Append("<div class=\"coverage\">\n");
 
-        // Header: a compact coverage meter (% present) beside the count, then a one-line intro so a reader
-        // knows what the panel answers and why it's useful.
-        var count = stale > 0
-            ? $"<strong>{present}</strong> of <strong>{total}</strong> present &middot; {stale} stale"
-            : $"<strong>{present}</strong> of <strong>{total}</strong> present";
-        sb.Append("  <div class=\"coverage-summary\">\n");
-        sb.Append($"    <span class=\"coverage-count\">{count}</span>\n");
-        sb.Append($"    <span class=\"coverage-meter\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" " +
-                  $"aria-label=\"Planning artifact coverage: {present} of {total} present\"><span class=\"coverage-meter-fill\" style=\"width:{pct}%\"></span></span>\n");
-        sb.Append($"    <span class=\"coverage-pct\">{pct}%</span>\n");
-        sb.Append("  </div>\n");
+        // Full-width intro so a reader knows what the panel answers and why it's useful. The coverage meter
+        // lives in the panel header row (top-right), rendered by the caller via CoverageMeter.
         sb.Append("  <p class=\"coverage-intro\">The core planning &amp; workflow artifacts this project should have — " +
                   "which exist, how recently they changed, and how to create any that are missing.</p>\n");
 

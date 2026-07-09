@@ -89,6 +89,60 @@ public class HtmlTemplaterTests
         Assert.Contains("aria-valuemax=\"100\"", html);
     }
 
+    [Fact]
+    public void RenderIndex_ShowsRefinementFunnelPanel()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts\\epics.md" }, "SpecScribe", hasAdrs: false);
+        var progress = new ProgressModel
+        {
+            EpicsTotal = 3,
+            EpicsDrafted = 2,
+            EpicsPending = 1,
+            StoriesTotal = 8,
+            StoriesWithArtifact = 4,
+            TasksDone = 5,
+            TasksTotal = 20,
+            PerEpic = Array.Empty<EpicProgress>(),
+        };
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: progress,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // The funnel panel renders on the dashboard with the populated funnel inside. [Story 3.6 AC #1]
+        Assert.Contains("<h3>Refinement Funnel</h3>", html);
+        Assert.Contains("refinement-funnel", html);
+        Assert.Contains("aria-label=\"Refinement funnel: 3 epics, 8 stories drafted, " +
+                        "4 stories with a task plan, 20 tasks planned\"", html);
+    }
+
+    [Fact]
+    public void RenderIndex_EmptyProgressStillRendersFunnelPanelWithPlaceholder()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts\\epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressModel.Empty,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        // The panel is unconditional; the builder's own empty-guard supplies the graceful placeholder,
+        // so the templater never grows a second, divergent fallback. [Story 3.6 AC #2]
+        Assert.Contains("<h3>Refinement Funnel</h3>", html);
+        var panel = html[html.IndexOf("<h3>Refinement Funnel</h3>", StringComparison.Ordinal)..];
+        panel = panel[..panel.IndexOf("</div>", StringComparison.Ordinal)];
+        Assert.Contains("chart-empty", panel);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         int count = 0, i = 0;

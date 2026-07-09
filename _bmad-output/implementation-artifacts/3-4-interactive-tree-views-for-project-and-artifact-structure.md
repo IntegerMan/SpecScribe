@@ -4,7 +4,16 @@ baseline_commit: 2b1a073d1050a8158781065896fb4dfe50f185ed
 
 # Story 3.4: Interactive Tree Views for Project and Artifact Structure
 
-Status: review
+Status: superseded
+
+> **⚠ SUPERSEDED (2026-07-08) — this story was misinterpreted and has been replaced.**
+> Story 3.4 is now **"Source Code Treemap for Codebase Exploration"** (a source-tree treemap
+> sized by lines of code, colorized by git-derived signals, with rich tooltips and zoom) — see
+> the rewritten ACs in [epics.md#Story 3.4](../planning-artifacts/epics.md) and the rationale in
+> [sprint-change-proposal-2026-07-08.md](../planning-artifacts/sprint-change-proposal-2026-07-08.md).
+> The disclosure-tree implementation recorded below is being reverted/repurposed (see Proposal
+> §4E for the per-file disposition). Regenerate a fresh 3.4 story context via `create-story`
+> against the new ACs before `dev-story`. **Do not implement the tasks below.**
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

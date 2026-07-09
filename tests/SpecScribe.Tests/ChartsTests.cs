@@ -592,6 +592,93 @@ public class ChartsTests
         Assert.Contains(">2 / 4</div>", html);
     }
 
+    // ---- Refinement funnel (Story 3.6) -----------------------------------------------------
+
+    private static ProgressModel Progress(int epics, int drafted, int stories, int withPlan, int tasksDone, int tasksTotal) => new()
+    {
+        EpicsTotal = epics,
+        EpicsDrafted = drafted,
+        EpicsPending = epics - drafted,
+        StoriesTotal = stories,
+        StoriesWithArtifact = withPlan,
+        TasksDone = tasksDone,
+        TasksTotal = tasksTotal,
+        PerEpic = Array.Empty<EpicProgress>(),
+    };
+
+    [Fact]
+    public void RefinementFunnel_RendersAllFourStagesWithCountsAndWholeChartName()
+    {
+        var svg = Charts.RefinementFunnel(Progress(epics: 7, drafted: 5, stories: 34, withPlan: 12, tasksDone: 40, tasksTotal: 210));
+
+        // Whole-chart accessible name summarizing every stage and count (mirrors the Donut/heatmap pattern).
+        Assert.Contains("role=\"img\"", svg);
+        Assert.Contains("aria-label=\"Refinement funnel: 7 epics, 34 stories drafted, " +
+                        "12 stories with a task plan, 210 tasks planned\"", svg);
+        // Every stage carries its visible text label + count (never color-only).
+        Assert.Contains(">7</tspan> epics", svg);
+        Assert.Contains(">34</tspan> stories drafted", svg);
+        Assert.Contains(">12</tspan> stories with a task plan", svg);
+        Assert.Contains(">210</tspan> tasks planned", svg);
+        // Coverage sub-labels — not bar width — say how much detail work remains (truthfulness, AC #1/#2).
+        Assert.Contains("5 of 7 epics broken into stories", svg);
+        Assert.Contains("12 of 34 stories have a task plan", svg);
+        // Bands ride the status-token classes, one per stage.
+        Assert.Contains("funnel-band funnel-epics", svg);
+        Assert.Contains("funnel-band funnel-stories", svg);
+        Assert.Contains("funnel-band funnel-planned", svg);
+        Assert.Contains("funnel-band funnel-tasks", svg);
+        // Width is honest: the largest stage (tasks) spans the full usable width, and the tiny epics stage is
+        // floored to a visible band rather than a hairline — never scaled to fake a narrowing silhouette.
+        Assert.Contains("width=\"600\"", svg);
+        Assert.Contains("width=\"46\"", svg);
+    }
+
+    [Fact]
+    public void RefinementFunnel_EmptyModelReturnsChartEmptyPlaceholder()
+    {
+        var html = Charts.RefinementFunnel(ProgressModel.Empty);
+
+        // Zero epics → the shared graceful placeholder, no SVG, no NaN/divide-by-zero artifacts.
+        Assert.Contains("chart-empty", html);
+        Assert.Contains("Nothing to chart yet.", html);
+        Assert.DoesNotContain("<svg", html);
+        Assert.DoesNotContain("NaN", html);
+    }
+
+    [Fact]
+    public void RefinementFunnel_EarlyStageProjectRendersEveryRowIncludingZeroStages()
+    {
+        // "Just getting started": 2 epics, 1 drafted story, no task plans, no tasks. Every stage row still
+        // renders with its real count (including the 0 stages), zero stages get an honest empty placeholder
+        // band (no fill that could read as data), and no width goes NaN/negative. [AC #2]
+        var svg = Charts.RefinementFunnel(Progress(epics: 2, drafted: 1, stories: 1, withPlan: 0, tasksDone: 0, tasksTotal: 0));
+
+        Assert.Contains(">2</tspan> epics", svg);
+        Assert.Contains(">1</tspan> story drafted", svg);
+        Assert.Contains(">0</tspan> stories with a task plan", svg);
+        Assert.Contains(">0</tspan> tasks planned", svg);
+        // Zero-count stages render the dashed placeholder band, not a filled bar.
+        Assert.Contains("funnel-zero", svg);
+        // Epics is the largest stage (2) → full usable width; the single story is half, above the floor.
+        Assert.Contains("width=\"600\"", svg);
+        Assert.Contains("width=\"300\"", svg);
+        Assert.DoesNotContain("NaN", svg);
+        Assert.DoesNotContain("width=\"-", svg);
+    }
+
+    [Fact]
+    public void RefinementFunnel_SingularCountsReadGrammatically()
+    {
+        // 1 epic / 1 story with a plan / 1 task — the labels and the stage-3 verb pluralize correctly.
+        var svg = Charts.RefinementFunnel(Progress(epics: 1, drafted: 1, stories: 3, withPlan: 1, tasksDone: 0, tasksTotal: 1));
+
+        Assert.Contains(">1</tspan> epic", svg);
+        Assert.Contains(">1</tspan> story with a task plan", svg);
+        Assert.Contains(">1</tspan> task planned", svg);
+        Assert.Contains("1 of 3 stories has a task plan", svg);
+    }
+
     // ---- Project structure tree (Story 3.4) ------------------------------------------------
 
     [Fact]

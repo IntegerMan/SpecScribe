@@ -105,6 +105,18 @@ public class StylesheetTests
         Assert.Contains(".tree-branch", css);
     }
 
+    [Fact]
+    public void Stylesheet_FunnelStagesRouteThroughStatusTokens()
+    {
+        // Every funnel stage color resolves to a --status-* token (single stage→color source) — the token
+        // routing can't silently regress to hardcoded hex. [Story 3.6, Story 1.5 B2/B3]
+        var css = ReadStylesheet();
+        Assert.Contains(".funnel-band.funnel-epics { fill: var(--status-drafted); }", css);
+        Assert.Contains(".funnel-band.funnel-stories { fill: var(--status-ready); }", css);
+        Assert.Contains(".funnel-band.funnel-planned { fill: var(--status-active); }", css);
+        Assert.Contains(".funnel-band.funnel-tasks { fill: var(--status-done); }", css);
+    }
+
     // ---- Story 3.5 seams (one tokenized, reduced-motion-safe insight motion vocabulary) ----------
 
     [Fact]

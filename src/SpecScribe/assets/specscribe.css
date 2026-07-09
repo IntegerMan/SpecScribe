@@ -1493,6 +1493,26 @@ code.color-swatch {
 .donut-legend .swatch.drafted { background: var(--status-drafted); }
 .donut-legend .swatch.pending { background: var(--status-pending); }
 
+/* ====================== REFINEMENT FUNNEL (Story 3.6) ======================
+   An honest elaboration pyramid: band width is proportional to each stage's TRUE count (normalized to the
+   largest stage) — never rescaled to fake a narrowing silhouette, which would overstate progress (Story 1.5
+   truthfulness rule). Stage colors route through the --status-* tokens ONLY (single stage→color source):
+   drafted → ready → active → done reads as increasing elaboration down the pipeline. The entrance animation
+   is NOT here — .refinement-funnel is already keyed into the paired reduced-motion blocks (Story 3.5). */
+.refinement-funnel { display: flex; flex-direction: column; gap: 0.4rem; }
+.funnel { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.funnel-band.funnel-epics { fill: var(--status-drafted); }
+.funnel-band.funnel-stories { fill: var(--status-ready); }
+.funnel-band.funnel-planned { fill: var(--status-active); }
+.funnel-band.funnel-tasks { fill: var(--status-done); }
+/* A zero-count stage keeps its labeled row but shows a dashed, unfilled placeholder band — visibly "not
+   there yet" rather than a colored bar that could read as data (AC #2 early-stage honesty). */
+.funnel-band.funnel-zero { fill: none; stroke: var(--ink-light); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.6; }
+.funnel-stage-text { font-size: 13px; fill: var(--ink-faded); }
+.funnel-stage-count { font-weight: 700; fill: var(--ink); }
+.funnel-stage-sub { font-size: 11px; fill: var(--ink-light); }
+.funnel-hint { font-size: 0.72rem; color: var(--ink-light); text-align: center; font-style: italic; }
+
 /* ====================== PROGRESS BARS ====================== */
 .progress-row {
   display: grid;
@@ -1620,16 +1640,19 @@ code.color-swatch {
    status), so it is styled with neutral base-palette tones and never the --status-* lifecycle tokens — those
    stay the single stage→color source. Same discipline as the keyword styling above: non-lifecycle concepts
    must never co-opt the status tokens. Family glyphs inherit currentColor via .ss-icon — no per-row hex. [Story 3.3] */
-.coverage { display: flex; flex-direction: column; gap: 0.85rem; }
+.coverage { display: flex; flex-direction: column; gap: 0.6rem; }
 
-/* Header: the present/total count beside a compact coverage meter showing the % present. */
-.coverage-summary { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.coverage-count { font-size: 0.95rem; color: var(--ink-faded); }
-.coverage-count strong { color: var(--ink); font-family: 'Courier New', monospace; }
-.coverage-meter { flex: 1 1 120px; min-width: 90px; max-width: 260px; height: 0.55rem; background: var(--parchment-dark); border-radius: 999px; overflow: hidden; }
+/* Compact coverage meter, pinned top-right in the panel header row — small and unobtrusive, not a band.
+   Vertically centered against the heading (the shared header row is baseline-aligned for text links). */
+.coverage-panel .chart-panel-header-row { align-items: center; }
+.coverage-meter-group { display: flex; align-items: center; gap: 0.45rem; font-size: 0.78rem; color: var(--ink-light); white-space: nowrap; }
+.coverage-count { color: var(--ink-light); }
+.coverage-count strong { color: var(--ink-faded); font-family: 'Courier New', monospace; }
+.coverage-meter { width: 88px; height: 0.45rem; background: var(--parchment-dark); border-radius: 999px; overflow: hidden; flex: 0 0 auto; }
 .coverage-meter-fill { display: block; height: 100%; background: var(--moss-light); border-radius: 999px; }
-.coverage-pct { font-size: 0.86rem; font-family: 'Courier New', monospace; color: var(--ink-faded); }
-.coverage-intro { font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; max-width: 64ch; }
+.coverage-pct { font-family: 'Courier New', monospace; color: var(--ink-faded); }
+/* Intro spans the full panel width (no measure cap) so it reads as a lead paragraph, not a narrow column. */
+.coverage-intro { font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; }
 
 /* Two-column card grid, collapsing to one column on narrow screens (mirrors .dashboard-quick-links). */
 .coverage-grid { display: grid; grid-template-columns: 1fr; gap: 0.7rem; margin-top: 0.25rem; }

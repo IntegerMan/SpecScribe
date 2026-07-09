@@ -272,6 +272,14 @@ public static class HtmlTemplater
 
         sb.Append("</div>\n\n");
 
+        // Refinement funnel — planning maturity at a glance (epics → drafted stories → task plans → tasks),
+        // a peer of the progress panels above the per-repo activity detail. Rendered unconditionally: the
+        // builder owns the empty-state (ProgressModel.Empty → the shared chart-empty placeholder), so the
+        // templater never grows a second, divergent fallback. [Story 3.6]
+        sb.Append("<div class=\"chart-panel funnel-panel\">\n<h3>Refinement Funnel</h3>\n");
+        sb.Append(Charts.RefinementFunnel(p));
+        sb.Append("</div>\n\n");
+
         // One consolidated Git Pulse panel — headline signal strip + activity heatmap + top-changed-files bars —
         // replacing the previously separate "Commit Activity" and "Git Pulse" panels (owner review: combine and
         // make it graphical, not two plain boxes). The "Commits" stat card at the top of the dashboard still
@@ -301,8 +309,14 @@ public static class HtmlTemplater
         // keeps today's dashboard byte-for-byte unchanged (graceful omission, Story 1.1). [Story 3.3 AC #1]
         if (coverage is { IsEmpty: false })
         {
-            sb.Append("<div class=\"chart-panel coverage-panel\">\n<h3>Planning Artifacts</h3>\n");
-            sb.Append(Charts.ArtifactCoveragePanel(coverage, DateOnly.FromDateTime(DateTime.Now)));
+            var coverageToday = DateOnly.FromDateTime(DateTime.Now);
+            sb.Append("<div class=\"chart-panel coverage-panel\">\n");
+            // Heading left, the compact coverage meter pinned top-right (mirrors the sunburst/requirements
+            // header-row pattern) so the bar is a small at-a-glance summary, not a dominant band.
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Planning Artifacts</h3>");
+            sb.Append(Charts.CoverageMeter(coverage, coverageToday));
+            sb.Append("</div>\n");
+            sb.Append(Charts.ArtifactCoveragePanel(coverage, coverageToday));
             sb.Append("</div>\n\n");
         }
 
