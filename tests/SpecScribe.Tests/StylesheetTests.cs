@@ -118,6 +118,45 @@ public class StylesheetTests
         Assert.Contains(".funnel-band.funnel-done { fill: var(--status-done); }", css);
     }
 
+    // ---- Story 3.7 seams (requirement status blocks + requirements flow) ----------
+
+    [Fact]
+    public void Stylesheet_RequirementStatusBlocksRouteThroughStatusTokens()
+    {
+        // Every status-bearing block fill resolves 1:1 to its --status-* token (single stage→color source),
+        // so the token routing can't silently regress to hardcoded hex. [Story 3.7 Task 4, Story 1.5 B2/B3]
+        var css = ReadStylesheet();
+        Assert.Contains(".req-status-block.done { background: var(--status-done); }", css);
+        Assert.Contains(".req-status-block.ready { background: var(--status-ready); }", css);
+        Assert.Contains(".req-status-block.pending { background: var(--status-pending); }", css);
+        Assert.Contains(".req-status-block.deferred { background: var(--status-deferred); color: var(--warm-white); }", css);
+    }
+
+    [Fact]
+    public void Stylesheet_RequirementFlowStatesRouteThroughStatusTokens()
+    {
+        // The Sankey's terminal state nodes carry the SAME status tokens as every other chart; the structural
+        // definition/epic chrome uses neutral base-palette tones, never a status token. [Story 3.7 Task 4]
+        var css = ReadStylesheet();
+        Assert.Contains(".req-flow-state.done { fill: var(--status-done); }", css);
+        Assert.Contains(".req-flow-state.ready { fill: var(--status-ready); }", css);
+        Assert.Contains(".req-flow-state.pending { fill: var(--status-pending); }", css);
+        Assert.Contains(".req-flow-state.deferred { fill: var(--status-deferred); }", css);
+        // Structural nodes are NOT status tokens — they use the neutral parchment chrome.
+        Assert.Contains(".req-flow-epic { fill: var(--parchment-dark)", css);
+    }
+
+    [Fact]
+    public void Stylesheet_RequirementFlowJoinsBothReducedMotionSeams()
+    {
+        // The flow's entrance lives ONLY in the no-preference half and is explicitly cancelled in the reduce
+        // half — the hard accessibility invariant (AC #3): reduced-motion users get the fully-formed diagram
+        // at rest with zero information loss. [Story 3.7 Task 4.3]
+        var css = ReadStylesheet();
+        Assert.Contains(".req-flow", NoPreferenceBlock(css));
+        Assert.Contains(".req-flow", ReduceBlock(css));
+    }
+
     // ---- Story 3.5 seams (one tokenized, reduced-motion-safe insight motion vocabulary) ----------
 
     [Fact]

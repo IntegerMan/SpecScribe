@@ -30,8 +30,17 @@ public sealed class RequirementInfo
     /// <summary>The bold category header this FR sat under (e.g. "Core Loop & Time"); null for NFRs.</summary>
     public string? Category { get; init; }
 
-    /// <summary>Primary covering epic from the FR Coverage Map; null when deferred or unmapped.</summary>
+    /// <summary>Primary covering epic from the FR Coverage Map; null when deferred or unmapped. This is
+    /// deliberately <see cref="CoverageEpicNumbers"/>'s first element — the load-bearing single-epic value
+    /// every existing consumer (status roll-up, detail-page card, requirements-page link) reads.</summary>
     public int? CoverageEpicNumber { get; init; }
+
+    /// <summary>ALL covering epics from the FR Coverage Map, in source order, de-duplicated; empty when
+    /// deferred or unmapped. A coverage line like "FR2: Epics 1 &amp; 2 - …" yields [1, 2] here where the
+    /// singular <see cref="CoverageEpicNumber"/> keeps only the first (1). This is the "structured FR→story
+    /// mapping" the requirements flow (Story 3.7) stands on — resolve it to stories via
+    /// <see cref="RequirementsParser.StoriesFor"/>. [Story 3.7 Task 1]</summary>
+    public required IReadOnlyList<int> CoverageEpicNumbers { get; init; }
 
     /// <summary>The covering epic's title, rendered as inline HTML; null when deferred or unmapped.</summary>
     public string? CoverageEpicTitleHtml { get; init; }

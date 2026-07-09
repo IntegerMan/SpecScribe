@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-09T14:15:00-04:00
+last_updated: 2026-07-09T16:30:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -72,7 +72,7 @@ development_status:
   3-4-interactive-tree-views-for-project-and-artifact-structure: retired # artifact tree retired; source-code treemap moved to Story 7.6 (SCP 2026-07-08)
   3-5-flashy-but-purposeful-insight-visual-language: done
   3-6-refinement-funnel-on-the-dashboard: done
-  3-7-requirements-flow-and-status-blocks: ready-for-dev
+  3-7-requirements-flow-and-status-blocks: review
   3-8-git-insights-hub-page: ready-for-dev
   epic-3-retrospective: optional
 

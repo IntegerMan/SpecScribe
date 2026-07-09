@@ -9,16 +9,21 @@ namespace SpecScribe;
 /// - "### Functional Requirements" — bold category headers (**Core Loop &amp; Time**) followed by
 ///   "FR{n}: {definition}" lines.
 /// - "### NonFunctional Requirements" — "NFR{n}: {definition}" lines, no categories.
-/// - "### FR Coverage Map" — one "FR{n}: Epic {N} - {note}" or "FR{n}: Deferred - {note}" line per
-///   requirement (NFRs listed the same way). The first "Epic (\d+)" match is the primary covering epic.
-/// Each requirement's <see cref="RequirementStatus"/> is rolled up from its covering epic's progress.</summary>
+/// - "### FR Coverage Map" — one "FR{n}: Epic {N} - {note}", "FR{n}: Epics {N} &amp; {M} - {note}", or
+///   "FR{n}: Deferred - {note}" line per requirement (NFRs listed the same way). ALL named epics are captured
+///   (<see cref="RequirementInfo.CoverageEpicNumbers"/>); the first is the primary covering epic.
+/// Each requirement's <see cref="RequirementStatus"/> is rolled up from its primary covering epic's progress.</summary>
 public static class RequirementsParser
 {
     private static readonly Regex DefLine = new(@"^(FR|NFR)(\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex CategoryLine = new(@"^\*\*(.+?)\*\*$", RegexOptions.Compiled);
-    private static readonly Regex EpicRef = new(@"Epic\s+(\d+)", RegexOptions.Compiled);
+    // Matches the leading "Epic 4" / "Epics 1 & 2" / "Epics 1, 2 and 3" coverage clause and its numbers.
+    // Plural "Epics" and multi-number lists are real in epics.md (FR2/FR5/FR7: "Epics 1 & 2"), which the old
+    // singular "Epic\s+(\d+)" first-match pattern silently dropped entirely (no whitespace after "Epic"s).
+    private static readonly Regex EpicClause = new(@"^Epics?\s+([\d,&\s]*\d)", RegexOptions.Compiled);
+    private static readonly Regex NumberRef = new(@"\d+", RegexOptions.Compiled);
 
-    private sealed record Coverage(int? EpicNumber, bool Deferred, string? Note);
+    private sealed record Coverage(IReadOnlyList<int> EpicNumbers, bool Deferred, string? Note);
 
     public static RequirementsModel Parse(string rawEpicsMd, EpicsModel epics, ProgressModel progress)
     {
@@ -67,14 +72,26 @@ public static class RequirementsParser
             var id = m.Groups[1].Value + m.Groups[2].Value;
             var rest = m.Groups[3].Value.Trim();
             var deferred = rest.StartsWith("Deferred", StringComparison.OrdinalIgnoreCase);
-            var epicMatch = EpicRef.Match(rest);
-            int? epicNumber = !deferred && epicMatch.Success ? int.Parse(epicMatch.Groups[1].Value) : null;
 
-            // Note is whatever follows the first " - " separator, else the whole remainder.
+            // The coverage clause is everything before the " - " note separator ("Epics 1 & 2"); the note is
+            // whatever follows (or the whole remainder when there's no separator).
             var dash = rest.IndexOf(" - ", StringComparison.Ordinal);
+            var clause = (dash >= 0 ? rest[..dash] : rest).Trim();
             var note = dash >= 0 ? rest[(dash + 3)..].Trim() : rest;
 
-            map[id] = new Coverage(epicNumber, deferred, note.Length > 0 ? note : null);
+            // Capture EVERY covering epic, not just the first — "Epics 1 & 2" genuinely covers both, and the
+            // requirements flow (Story 3.7) needs the full set. Ordered by appearance, de-duplicated; empty for
+            // a deferred line or a clause that doesn't name epics (unmapped). The singular primary is this
+            // list's first element (resolved in ParseDefs). [Story 3.7 Task 1.1]
+            var clauseMatch = deferred ? Match.Empty : EpicClause.Match(clause);
+            var epicNumbers = clauseMatch.Success
+                ? NumberRef.Matches(clauseMatch.Groups[1].Value)
+                    .Select(match => int.Parse(match.Value))
+                    .Distinct()
+                    .ToArray()
+                : Array.Empty<int>();
+
+            map[id] = new Coverage(epicNumbers, deferred, note.Length > 0 ? note : null);
         }
         return map;
     }
@@ -113,7 +130,9 @@ public static class RequirementsParser
             var id = def.Groups[1].Value + number;
             coverage.TryGetValue(id, out var cov);
 
-            int? epicNumber = cov?.EpicNumber;
+            var epicNumbers = cov?.EpicNumbers ?? Array.Empty<int>();
+            // Primary = the first covering epic; keeps every existing consumer byte-for-byte unchanged.
+            int? epicNumber = epicNumbers.Count > 0 ? epicNumbers[0] : null;
             var deferred = cov?.Deferred ?? false;
             string? epicTitle = epicNumber is { } en && epicsByNumber.TryGetValue(en, out var e) ? e.Title : null;
 
@@ -124,6 +143,7 @@ public static class RequirementsParser
                 TextHtml = MarkdownConverter.RenderInline(def.Groups[3].Value),
                 Category = withCategories ? category : null,
                 CoverageEpicNumber = epicNumber,
+                CoverageEpicNumbers = epicNumbers,
                 CoverageEpicTitleHtml = epicTitle,
                 CoverageNote = cov?.Note,
                 Deferred = deferred,
@@ -132,6 +152,20 @@ public static class RequirementsParser
         }
 
         return result;
+    }
+
+    /// <summary>Resolves a requirement's covering epics (<see cref="RequirementInfo.CoverageEpicNumbers"/>)
+    /// to their stories, in source order — the story-backed half of the FR→story mapping AC #2 asks for.
+    /// A deferred/unmapped requirement (no covering epics) yields no stories. Deterministic: epics in the
+    /// requirement's coverage order, stories in each epic's declared order. Missing epic numbers are skipped
+    /// (routing is best-effort, never throws). [Story 3.7 Task 1.3]</summary>
+    public static IReadOnlyList<StoryInfo> StoriesFor(RequirementInfo req, EpicsModel epics)
+    {
+        var byNumber = epics.Epics.ToDictionary(e => e.Number);
+        return req.CoverageEpicNumbers
+            .Where(byNumber.ContainsKey)
+            .SelectMany(n => byNumber[n].Stories)
+            .ToList();
     }
 
     /// <summary>Rolls a requirement's status up from its covering epic. Because the FR→Epic map is

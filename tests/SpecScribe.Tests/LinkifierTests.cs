@@ -17,6 +17,7 @@ public class RequirementLinkifierTests
         Kind = kind,
         Number = number,
         TextHtml = "text",
+        CoverageEpicNumbers = Array.Empty<int>(),
     };
 
     [Fact]

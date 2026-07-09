@@ -851,7 +851,7 @@ public sealed class SiteGenerator
     {
         File.WriteAllText(
             Path.Combine(_options.OutputRoot, "requirements.html"),
-            ApplyReferenceLinks(RequirementsTemplater.RenderIndex(requirements, progress, nav), "requirements.html"));
+            ApplyReferenceLinks(RequirementsTemplater.RenderIndex(requirements, model, progress, nav), "requirements.html"));
 
         var requirementsDir = Path.Combine(_options.OutputRoot, "requirements");
         Directory.CreateDirectory(requirementsDir);

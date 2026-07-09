@@ -7,7 +7,7 @@ namespace SpecScribe;
 /// and derived status). Mirrors <see cref="EpicsTemplater"/>.</summary>
 public static class RequirementsTemplater
 {
-    public static string RenderIndex(RequirementsModel model, ProgressModel progress, SiteNav nav)
+    public static string RenderIndex(RequirementsModel model, EpicsModel epics, ProgressModel progress, SiteNav nav)
     {
         var outputPath = SiteNav.RequirementsOutputPath;
 
@@ -39,6 +39,26 @@ public static class RequirementsTemplater
         AppendStatusDonut(sb, "Functional", model.Functional);
         AppendStatusDonut(sb, "Non-functional", model.NonFunctional);
         sb.Append("</div>\n</section>\n\n");
+
+        // Requirements at a glance: every FR/NFR as a colorized status block (AC #1), then the Sankey-style flow
+        // of functional requirements from definition → epic coverage → implementation state (AC #2). The blocks
+        // and the requirement cards below are the flow's text equivalent (AC #3, never diagram-only).
+        var allReqs = model.Functional.Concat(model.NonFunctional).ToList();
+        if (allReqs.Count > 0)
+        {
+            sb.Append("<div class=\"section-divider\">Requirements at a glance</div>\n");
+            sb.Append("<div class=\"chart-panel\">\n");
+            sb.Append(Charts.RequirementStatusGrid(allReqs, prefix: string.Empty));
+            sb.Append("</div>\n\n");
+        }
+
+        if (model.Functional.Count > 0)
+        {
+            sb.Append("<div class=\"section-divider\">Requirements flow</div>\n");
+            sb.Append("<div class=\"chart-panel\">\n");
+            sb.Append(Charts.RequirementFlow(model, epics));
+            sb.Append("</div>\n\n");
+        }
 
         // Jump-to-group navigator: one clickable card per group, each a status pie chart, anchoring down
         // to its section below.

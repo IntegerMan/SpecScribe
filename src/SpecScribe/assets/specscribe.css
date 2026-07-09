@@ -1545,6 +1545,62 @@ code.color-swatch {
 .funnel-stage-sub { font-size: 10px; fill: var(--ink-light); }
 .funnel-hint { font-size: 0.72rem; color: var(--ink-light); text-align: center; font-style: italic; }
 
+/* ====================== REQUIREMENTS STATUS BLOCKS + FLOW (Story 3.7) ======================
+   Two requirements-maturation visuals on requirements.html. The status-block grid: one colorized chip per
+   FR/NFR, its fill routed through the shared --status-* tokens (single stage→color source) and its id shown
+   as text + a status word in the tooltip, so status is never color-only (UX-DR17). The requirements flow: a
+   Sankey of FRs from definition → epic coverage → honest implementation state. State nodes/ribbons carry the
+   SAME --status-* tokens as every other chart; the structural definition/epic nodes and the definition→epic
+   ribbons use neutral base-palette chrome (they are not lifecycle stages), exactly as the funnel connector,
+   coupling graph, and tree already do. No raw hex — route new status color through the tokens. */
+.req-status-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.req-status-block {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.9rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 5px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  transition: transform var(--motion-fast) var(--motion-ease);
+}
+.req-status-block:hover { transform: translateY(-2px); text-decoration: none; }
+.req-status-block:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+/* Every block fill maps 1:1 to its lifecycle token — the single stage→color source, never hardcoded hex. */
+.req-status-block.done { background: var(--status-done); }
+.req-status-block.active { background: var(--status-active); color: var(--warm-white); }
+.req-status-block.review { background: var(--status-review); color: var(--warm-white); }
+.req-status-block.ready { background: var(--status-ready); }
+.req-status-block.pending { background: var(--status-pending); }
+.req-status-block.deferred { background: var(--status-deferred); color: var(--warm-white); }
+
+/* The flow scales to a narrow viewport without horizontal overflow (like .funnel). */
+.req-flow { display: flex; flex-direction: column; gap: 0.4rem; }
+.req-flow-svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.req-flow-header { font-size: 12px; font-weight: 700; fill: var(--ink-faded); }
+.req-flow-nodelabel { font-size: 10px; fill: var(--ink-light); }
+.req-flow-statelabel { font-size: 11px; fill: var(--ink-faded); }
+/* Structural chrome (definition + epic-coverage nodes) — neutral base-palette tones, NOT status tokens. */
+.req-flow-def { fill: var(--parchment-deep); }
+.req-flow-epic { fill: var(--parchment-dark); stroke: var(--border); stroke-width: 0.5; }
+/* Data-free definition→epic ribbons — the same muted neutral as the funnel connector. */
+.req-flow-ribbon { fill: var(--parchment-dark); opacity: 0.55; }
+/* State nodes + the epic→state ribbons carry the real lifecycle color via the shared --status-* tokens. */
+.req-flow-state.done { fill: var(--status-done); }
+.req-flow-state.ready { fill: var(--status-ready); }
+.req-flow-state.pending { fill: var(--status-pending); }
+.req-flow-state.deferred { fill: var(--status-deferred); }
+.req-flow-ribbon.done { fill: var(--status-done); opacity: 0.5; }
+.req-flow-ribbon.ready { fill: var(--status-ready); opacity: 0.5; }
+.req-flow-ribbon.pending { fill: var(--status-pending); opacity: 0.5; }
+.req-flow-ribbon.deferred { fill: var(--status-deferred); opacity: 0.5; }
+.req-flow-hint { font-size: 0.72rem; color: var(--ink-light); text-align: center; font-style: italic; }
+
 /* ====================== PROGRESS BARS ====================== */
 .progress-row {
   display: grid;
@@ -2717,7 +2773,8 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   .git-pulse,
   .coverage,
   .structure-tree,
-  .refinement-funnel { animation: panel-reveal var(--motion-entrance) var(--motion-ease) both; }
+  .refinement-funnel,
+  .req-flow { animation: panel-reveal var(--motion-entrance) var(--motion-ease) both; }
   @keyframes panel-reveal {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: none; }
@@ -2757,9 +2814,13 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   .git-pulse,
   .coverage,
   .structure-tree,
-  .refinement-funnel {
+  .refinement-funnel,
+  .req-flow {
     animation: none;
   }
+
+  /* The status-block hover-lift transform is neutralized here too, matching the other card lifts. */
+  .req-status-block:hover { transform: none; }
 }
 
 /* ====================== SPRINT STATUS (Story 2.3) ====================== */

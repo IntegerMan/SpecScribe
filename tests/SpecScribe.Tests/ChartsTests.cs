@@ -819,4 +819,188 @@ public class ChartsTests
         Assert.Contains("href=\"pages/a&amp;b.html\"", html); // href escaped
         Assert.DoesNotContain("<d>", html);              // no raw unescaped angle brackets leak through
     }
+
+    // ==================== Story 3.7: requirement status-block grid + requirements flow ====================
+
+    private static RequirementInfo Req(
+        RequirementKind kind, int number, RequirementStatus status, bool deferred = false, params int[] epics) => new()
+    {
+        Kind = kind,
+        Number = number,
+        TextHtml = $"Requirement {number}",
+        Status = status,
+        Deferred = deferred,
+        CoverageEpicNumber = epics.Length > 0 ? epics[0] : null,
+        CoverageEpicNumbers = epics,
+    };
+
+    [Fact]
+    public void RequirementStatusGrid_EmitsOneLabeledBlockPerRequirement_NeverColourOnly()
+    {
+        var reqs = new[]
+        {
+            Req(RequirementKind.Functional, 1, RequirementStatus.Done, false, 1),
+            Req(RequirementKind.Functional, 2, RequirementStatus.Ready, false, 1, 2),
+            Req(RequirementKind.NonFunctional, 7, RequirementStatus.Deferred, deferred: true),
+        };
+
+        var html = Charts.RequirementStatusGrid(reqs, prefix: string.Empty);
+
+        // One block per requirement, each linking to its detail page with the correct status class...
+        Assert.Contains("<a class=\"req-status-block done\" href=\"requirements/fr1.html\"", html);
+        Assert.Contains("<a class=\"req-status-block ready\" href=\"requirements/fr2.html\"", html);
+        Assert.Contains("<a class=\"req-status-block deferred\" href=\"requirements/nfr7.html\"", html);
+        // ...its id as visible text (the non-colour reading)...
+        Assert.Contains(">FR1</a>", html);
+        Assert.Contains(">NFR7</a>", html);
+        // ...and a status word in the tooltip (never colour-only, UX-DR17).
+        Assert.Contains("title=\"FR1 — Done\"", html);
+        Assert.Contains("title=\"FR2 — Ready for dev\"", html);
+        Assert.Contains("title=\"NFR7 — Deferred\"", html);
+    }
+
+    [Fact]
+    public void RequirementStatusGrid_PrefixesHrefsAndEscapes()
+    {
+        var reqs = new[] { Req(RequirementKind.Functional, 1, RequirementStatus.Planned, false, 1) };
+        var html = Charts.RequirementStatusGrid(reqs, prefix: "../");
+        Assert.Contains("href=\"../requirements/fr1.html\"", html);
+    }
+
+    [Fact]
+    public void RequirementStatusGrid_EmptyList_RendersNothing()
+        => Assert.Equal(string.Empty, Charts.RequirementStatusGrid(Array.Empty<RequirementInfo>(), prefix: string.Empty));
+
+    [Fact]
+    public void RequirementStatusGrid_SingleRequirement_RendersOneCoherentBlock()
+    {
+        var html = Charts.RequirementStatusGrid(
+            new[] { Req(RequirementKind.Functional, 1, RequirementStatus.Done, false, 1) }, prefix: string.Empty);
+        Assert.Contains("req-status-grid", html);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "req-status-block"));
+    }
+
+    // ---- Requirements flow (Sankey) ----
+
+    private static (RequirementsModel Reqs, EpicsModel Epics) FlowFixture()
+    {
+        const string md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            **Core**
+            FR1: Done requirement
+            FR2: Multi-epic requirement
+            FR3: Deferred requirement
+            FR4: Unmapped requirement
+
+            ### NonFunctional Requirements
+
+            NFR1: A non-functional one
+
+            ### FR Coverage Map
+
+            FR1: Epic 1 - done
+            FR2: Epics 1 & 2 - spans two
+            FR3: Deferred - later
+            FR4: covered but no epic number
+
+            ## Epic List
+
+            ### Epic 1: Foundation
+
+            Base.
+
+            ### Epic 2: Expansion
+
+            More.
+
+            ## Epic 1: Foundation
+
+            ### Story 1.1: Scaffold
+
+            As a dev, I want scaffolding.
+
+            ## Epic 2: Expansion
+
+            ### Story 2.1: Widen
+
+            As a dev, I want more.
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        return (RequirementsParser.Parse(md, epics, progress), epics);
+    }
+
+    [Fact]
+    public void RequirementFlow_CarriesRoleImgAndAriaSummary()
+    {
+        var (reqs, epics) = FlowFixture();
+        var svg = Charts.RequirementFlow(reqs, epics);
+
+        Assert.Contains("role=\"img\"", svg);
+        Assert.Contains("aria-label=\"", svg);
+        // The aria summary names the functional-requirement total and the four honest states.
+        Assert.Contains("4 functional requirements", svg);
+    }
+
+    [Fact]
+    public void RequirementFlow_DeferredAndUnmappedProduceLabeledFlow_NotDropped()
+    {
+        var (reqs, epics) = FlowFixture();
+        var svg = Charts.RequirementFlow(reqs, epics);
+
+        // The explicit honest node — deferred AND unmapped requirements terminate here, never vanish (AC #2).
+        Assert.Contains("Deferred / Unmapped", svg);
+    }
+
+    [Fact]
+    public void RequirementFlow_NamesSecondaryCoveringEpicsInTooltip_NotDropped()
+    {
+        // FR2 is covered by Epics 1 & 2 but routes to its PRIMARY (Epic 1); the secondary Epic 2 must not
+        // vanish from the flow — it's named in the Epic 1 node's tooltip. [Subtask 1.4]
+        var (reqs, epics) = FlowFixture();
+        var svg = Charts.RequirementFlow(reqs, epics);
+        Assert.Contains("some also covered by Epic 2", svg);
+    }
+
+    [Fact]
+    public void RequirementFlow_ConservesEveryRequirement_NothingLostOrDoubleCounted()
+    {
+        var (reqs, epics) = FlowFixture();
+
+        // Conservation is asserted through the public conservation helper the builder uses: the count entering
+        // "definition" equals the sum reaching the four implementation-state buckets.
+        var (entering, byState) = Charts.RequirementFlowConservation(reqs.Functional);
+        Assert.Equal(reqs.Functional.Count, entering);
+        Assert.Equal(entering, byState.Values.Sum());
+    }
+
+    [Fact]
+    public void RequirementFlow_EmptyFunctional_ReturnsChartEmptyPlaceholder()
+    {
+        var epics = new EpicsModel { OverviewHtml = "", RequirementsInventoryHtml = "", Epics = Array.Empty<EpicInfo>() };
+        var reqs = new RequirementsModel { Functional = Array.Empty<RequirementInfo>(), NonFunctional = Array.Empty<RequirementInfo>() };
+
+        var svg = Charts.RequirementFlow(reqs, epics);
+        Assert.Contains("chart-empty", svg);
+    }
+
+    [Fact]
+    public void RequirementFlow_SingleFunctional_RendersWithoutNaN()
+    {
+        var epics = new EpicsModel { OverviewHtml = "", RequirementsInventoryHtml = "", Epics = Array.Empty<EpicInfo>() };
+        var reqs = new RequirementsModel
+        {
+            Functional = new[] { Req(RequirementKind.Functional, 1, RequirementStatus.Deferred, deferred: true) },
+            NonFunctional = Array.Empty<RequirementInfo>(),
+        };
+
+        var svg = Charts.RequirementFlow(reqs, epics);
+        Assert.DoesNotContain("NaN", svg);
+        Assert.Contains("role=\"img\"", svg);
+    }
 }
