@@ -91,3 +91,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 ## Deferred from: code review of story-3.5 (2026-07-08)
 
 - **Both epic-level and story-level `Sunburst` call `Charts.SunburstLegend` with an identical hardcoded 6-tuple array.** `src/SpecScribe/Charts.cs` — nothing keeps the two literal `("pending","Pending"), ("drafted","Drafted"), ...` arrays in sync; a future edit to one label and not the other would silently desync the two legends, and no test catches that divergence. Minor maintainability nit, no functional impact today.
+
+## Deferred from: code review of spec-sprint-board-card-tooltip-html-corruption (2026-07-09)
+
+- source_spec: `spec-sprint-board-card-tooltip-html-corruption.md`
+  summary: `RequirementLinkifier` (`src/SpecScribe/RequirementLinkifier.cs`) has the same attribute-corruption exposure that was just fixed in `StoryEpicLinkifier` — an FR/NFR mention sitting inside a non-anchor tag's attribute value (e.g. a tooltip or aria-label) would get a raw `<a>` injected into it, breaking the tag.
+  evidence: `RequirementLinkifier.AnchorSplit` only protects `<a>…</a>` spans (`RequirementLinkifier.cs:13-15`), unlike the fixed `StoryEpicLinkifier.ProtectedSplit`, which now also skips every standalone tag so only real text nodes are scanned. Not caused by this change — pre-existing since the class was written — and not currently known to be triggered by any live template (no site content today puts "FR"/"NFR" text inside a non-anchor attribute), so it's latent rather than reproducible. Apply the same `<[^>]*>` catch-all alternative to `RequirementLinkifier.AnchorSplit` when that seam is next touched.

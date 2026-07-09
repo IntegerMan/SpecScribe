@@ -22,9 +22,15 @@ public static class StoryEpicLinkifier
     //          otherwise get an <a href="…"> injected inside <title> and inside a content="…" attribute,
     //          whose own double quotes terminate the attribute and corrupt the document head.
     //   script/style — raw JS/CSS text (Markdig passes embedded HTML through) must not be rewritten.
+    //   any other single tag — a mention can also live inside an attribute value (data-tip, aria-label,
+    //   title, alt, …) on a plain element that isn't itself an <a> (e.g. a fallback sprint board card with
+    //   no href renders as a <div data-tip="Epic 3: …">, not an <a>). Rewriting text INSIDE that tag would
+    //   inject a raw <a>…</a> into the attribute value and corrupt the tag. Matching every standalone tag
+    //   here — after the element-pair alternatives above have first claim — restricts replacement to real
+    //   text nodes only, never tag markup. [bugfix: sprint board card tooltip HTML corruption]
     private static readonly Regex ProtectedSplit = new(
         "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<svg\\b[^>]*>.*?</svg>"
-        + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>)",
+        + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>|<[^>]*>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
     // Capitalized mention forms only — "Story 1.5" / "Epic 2" — matching how the artifacts are authored.

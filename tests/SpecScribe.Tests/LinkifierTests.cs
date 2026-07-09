@@ -298,6 +298,31 @@ public class StoryEpicLinkifierTests
 
         Assert.Contains("href=\"epics/story-1-1.html\"", html);
     }
+
+    [Fact]
+    public void Linkify_NeverRewritesInsideAnAttributeValueOnANonAnchorTag()
+    {
+        // Regression: a fallback sprint board card with no href renders as
+        // <div data-tip="Epic 1: ...\nStory 1.1: ...">, not an <a>. A mention inside that attribute
+        // value must never be rewritten — doing so injects a raw <a>...</a> into the attribute and
+        // corrupts the tag (the injected </a>'s '>' closes the div early).
+        const string input = "<div class=\"sprint-card\" data-tip=\"Epic 1: Foo\nStory 1.1: Bar\">text</div>";
+
+        Assert.Equal(input, StoryEpicLinkifier.Linkify(input, Model(), ""));
+    }
+
+    [Fact]
+    public void Linkify_StillLinksAnAnchorAdjacentToOtherTags()
+    {
+        // Guards the alternation order: the specific <a>...</a> alternative must still win over the
+        // generic single-tag catch-all when an anchor sits next to other markup.
+        const string input = "<span>see</span> <a href=\"x.html\">Story 1.1</a> <span>Epic 1</span>";
+
+        var html = StoryEpicLinkifier.Linkify(input, Model(), "");
+
+        Assert.Contains("<a href=\"x.html\">Story 1.1</a>", html);
+        Assert.Contains("<a class=\"epic-ref\" href=\"epics/epic-1.html\">Epic 1</a>", html);
+    }
 }
 
 public class AdrLinkRewriterTests
