@@ -2615,6 +2615,58 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    is satisfied by construction — there is no new motion to neutralize. */
 .gi-row-hidden { display: none; }
 
+/* ---- Files & Contributors master-detail (Story 3.8 redesign) ----
+   File table on the left; selecting a file reveals its contributor panel on the right. The reveal is pure
+   CSS :target (same no-JS mechanism as the commit-heatmap drill-down and the coupling lightbox) — clicking a
+   .gi-file-link sets the fragment, CSS shows the matching #gi-file-N panel, and a general-sibling rule hides
+   the default prompt. No JS is involved in the drill-down; the sort/filter enhancer above is independent. */
+.gi-master-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+/* The detail column tracks the file table as it scrolls, so a selected file's people stay in view. */
+.gi-detail { position: sticky; top: calc(var(--nav-offset) + 0.75rem); }
+
+.gi-file-link { color: var(--teal-deep); text-decoration: none; }
+.gi-file-link:hover { text-decoration: underline; }
+.gi-file-link:hover code { color: var(--rust); }
+.gi-file-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
+/* Every file's panel is in the HTML; only the :target one shows (so the drill-down works with JS off), and
+   the default prompt hides once any panel is targeted. scroll-margin clears the sticky nav on the jump. */
+.gi-contributors-panel { display: none; scroll-margin-top: var(--nav-offset); }
+.gi-contributors-panel:target { display: block; }
+.gi-contributors-panel:target ~ .gi-detail-default { display: none; }
+
+.gi-detail-head { border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.6rem; }
+.gi-detail-title { font-size: 0.95rem; margin: 0; }
+.gi-detail-title code { word-break: break-all; }
+.gi-detail-sub { font-size: 0.8rem; color: var(--ink-light); margin: 0.25rem 0 0; }
+.gi-detail-lead { font-size: 0.85rem; color: var(--ink-faded); margin: 0 0 0.4rem; }
+.gi-detail-prompt { color: var(--ink-light); font-style: italic; }
+.gi-detail-filelink { display: inline-block; margin-top: 0.6rem; }
+
+.gi-contributor-list { list-style: none; margin: 0; padding: 0; }
+.gi-contributor-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.gi-contributor-list li:last-child { border-bottom: none; }
+.gi-contributor-name { font-weight: 600; color: var(--ink); }
+.gi-contributor-meta { color: var(--ink-light); font-size: 0.82rem; white-space: nowrap; }
+
+/* Stack the master and detail on narrow screens; the sticky detail becomes normal flow below the table. */
+@media (max-width: 720px) {
+  .gi-master-detail { grid-template-columns: 1fr; }
+  .gi-detail { position: static; }
+}
+
 /* The Git Pulse panel header can now carry two "View …" links (hub + deep analytics); keep them on one
    tidy right-aligned line with breathing room between. */
 .git-pulse-header-links { display: inline-flex; gap: 1rem; flex-wrap: wrap; }

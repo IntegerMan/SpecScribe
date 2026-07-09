@@ -60,29 +60,35 @@ public sealed record DeepCommit(
     string Body,
     IReadOnlyList<DeepFileChange> Files);
 
-/// <summary>One file's aggregate change stats for the Git Insights hub: how many commits touched it in the
-/// analyzed window plus total line churn. <paramref name="LinesAdded"/>/<paramref name="LinesDeleted"/> sum
-/// only text-file rows (binary rows carry no counts). [Story 3.8]</summary>
-public sealed record FileChangeStat(string Path, int Changes, int LinesAdded, int LinesDeleted);
+/// <summary>One person's attribution to a single file — how many commits by this author touched THIS file in
+/// the window, and when they last did. Framed per-file to answer "who do I talk to about this file?" — the
+/// author appears only in the context of files they worked on, never as a row in a global scoreboard. [Story 3.8]</summary>
+public sealed record FileContributor(string Name, int Commits, DateOnly? LastCommitDate);
 
-/// <summary>One contributor's attribution counts for the Git Insights hub — collaboration context ("who has
-/// been active where"), never a productivity ranking (PRD non-goal). <paramref name="LatestHash"/> is the
-/// contributor's most recent commit in the window (git log order), for the guarded per-commit link. [Story 3.8]</summary>
-public sealed record ContributorStat(
-    string Name,
-    int Commits,
-    int FilesTouched,
-    DateOnly? LastCommitDate,
-    string LatestHash);
+/// <summary>One file's aggregate change stats for the Git Insights hub: how many commits touched it in the
+/// analyzed window, total line churn, its most recent commit (<paramref name="LatestHash"/> /
+/// <paramref name="LastChangeDate"/>, for the guarded per-commit link + "latest change" line), and the
+/// per-file <paramref name="Contributors"/> that power the file→people drill-down. <paramref name="LinesAdded"/>/
+/// <paramref name="LinesDeleted"/> sum only text-file rows (binary rows carry no counts). [Story 3.8]</summary>
+public sealed record FileChangeStat(
+    string Path,
+    int Changes,
+    int LinesAdded,
+    int LinesDeleted,
+    string LatestHash,
+    DateOnly? LastChangeDate,
+    IReadOnlyList<FileContributor> Contributors);
 
 /// <summary>The aggregate views behind the Git Insights hub page (FR-10), all derived from the one shared
-/// bounded numstat fetch: per-file change frequency + churn, per-contributor attribution, and the per-day
-/// activity series for the analyzed window (<paramref name="CommitCount"/> commits). [Story 3.8]</summary>
+/// bounded numstat fetch: per-file change frequency + churn + the file's contributors (the master-detail
+/// "who works on this file" drill-down), and the per-day activity series for the analyzed window
+/// (<paramref name="CommitCount"/> commits, <paramref name="ContributorCount"/> distinct authors — headline
+/// context only, never a ranked people list). [Story 3.8]</summary>
 public sealed record GitInsightsData(
     IReadOnlyList<FileChangeStat> Files,
-    IReadOnlyList<ContributorStat> Contributors,
     IReadOnlyList<(DateOnly Day, int Count)> Activity,
-    int CommitCount);
+    int CommitCount,
+    int ContributorCount);
 
 /// <summary>Shells out to git for a handful of read-only stats. Never throws and never blocks a save —
 /// any failure (git missing, not a repo, slow process) simply yields a null pulse, which callers treat
@@ -429,52 +435,66 @@ public static class GitMetrics
         return commits;
     }
 
-    /// <summary>Aggregates the parsed deep-git records into the Git Insights hub's views (FR-10): per-file
-    /// change frequency + line churn (top <paramref name="topFiles"/>, change-count desc with an ordinal path
-    /// tie-break — the generation-time ordering IS the no-JS reading order), per-contributor attribution
-    /// counts (commits / files touched, commit-count desc with a name tie-break — collaboration context,
-    /// never a productivity ranking, per the PRD boundary), and the ascending per-day activity series for the
-    /// analyzed window. Pure and repo-free so every ordering/counting rule is unit-testable; empty input
-    /// yields empty views, never null. [Story 3.8]</summary>
-    public static GitInsightsData BuildInsights(IReadOnlyList<DeepCommit> commits, int topFiles = 50)
+    /// <summary>Per-file accumulator: change frequency + churn, the file's newest commit (records arrive in
+    /// git log order — newest first — so the first commit seen touching a file is its latest), and per-author
+    /// attribution scoped to THIS file. A small mutable class keeps the multi-field read-modify-write in the
+    /// hot loop readable. [Story 3.8]</summary>
+    private sealed class FileAccum
     {
-        var fileStats = new Dictionary<string, (int Changes, int Added, int Deleted)>(StringComparer.Ordinal);
-        // Author -> counts + distinct file set + latest commit seen. Records arrive in git log order (newest
-        // first), so the first commit seen per author is their most recent — its hash feeds the guarded
-        // per-commit detail link (Story 7.5 seam).
-        var byAuthor = new Dictionary<string, (int Commits, HashSet<string> Files, DateTime? LastStamp, string LatestHash)>(StringComparer.Ordinal);
+        public int Changes;
+        public int Added;
+        public int Deleted;
+        public string LatestHash = string.Empty;
+        public DateOnly? LastChangeDate;
+        // Author -> (commits by that author touching this file, their latest such commit's day).
+        public readonly Dictionary<string, (int Commits, DateOnly? LastDate)> Authors = new(StringComparer.Ordinal);
+    }
+
+    /// <summary>Aggregates the parsed deep-git records into the Git Insights hub's views (FR-10): per-file
+    /// change frequency + line churn + each file's contributor breakdown (top <paramref name="topFiles"/>
+    /// files, change-count desc with an ordinal path tie-break — the generation-time ordering IS the no-JS
+    /// reading order), and the ascending per-day activity series for the analyzed window. Contributors are
+    /// scoped PER FILE (the "who works on this file?" drill-down), never a global ranked people list — the
+    /// only global people figure is a distinct-author count for headline context. Pure and repo-free so every
+    /// ordering/counting rule is unit-testable; empty input yields empty views, never null. [Story 3.8]</summary>
+    public static GitInsightsData BuildInsights(IReadOnlyList<DeepCommit> commits, int topFiles = 50, int topContributorsPerFile = 12)
+    {
+        var fileStats = new Dictionary<string, FileAccum>(StringComparer.Ordinal);
+        var allAuthors = new HashSet<string>(StringComparer.Ordinal);
         var byDay = new Dictionary<DateOnly, int>();
 
         foreach (var commit in commits)
         {
+            allAuthors.Add(commit.Author);
+            var day = commit.Timestamp is { } when ? DateOnly.FromDateTime(when) : (DateOnly?)null;
+            if (day is { } d) byDay[d] = byDay.GetValueOrDefault(d) + 1;
+
             var seenInCommit = new HashSet<string>(StringComparer.Ordinal);
             foreach (var file in commit.Files)
             {
-                // Change frequency counts a file once per commit; churn sums every row's line counts.
-                var stat = fileStats.GetValueOrDefault(file.Path);
-                if (seenInCommit.Add(file.Path)) stat.Changes++;
-                stat.Added += file.Added ?? 0;
-                stat.Deleted += file.Deleted ?? 0;
-                fileStats[file.Path] = stat;
-            }
+                if (!fileStats.TryGetValue(file.Path, out var accum))
+                {
+                    fileStats[file.Path] = accum = new FileAccum();
+                }
 
-            if (byAuthor.TryGetValue(commit.Author, out var entry))
-            {
-                entry.Commits++;
-                entry.Files.UnionWith(seenInCommit);
-                // The newest record set LastStamp/LatestHash already; only backfill a stamp if it had none.
-                entry.LastStamp ??= commit.Timestamp;
-                byAuthor[commit.Author] = entry;
-            }
-            else
-            {
-                byAuthor[commit.Author] = (1, new HashSet<string>(seenInCommit, StringComparer.Ordinal), commit.Timestamp, commit.Hash);
-            }
-
-            if (commit.Timestamp is { } when)
-            {
-                var day = DateOnly.FromDateTime(when);
-                byDay[day] = byDay.GetValueOrDefault(day) + 1;
+                // Churn sums every numstat row; change frequency + per-author attribution count once per
+                // commit (a file listed twice in one commit is still one change by one author).
+                accum.Added += file.Added ?? 0;
+                accum.Deleted += file.Deleted ?? 0;
+                if (seenInCommit.Add(file.Path))
+                {
+                    accum.Changes++;
+                    if (accum.LatestHash.Length == 0)
+                    {
+                        // First (newest) commit touching this file — its identity is the file's "latest change".
+                        accum.LatestHash = commit.Hash;
+                        accum.LastChangeDate = day;
+                    }
+                    var author = accum.Authors.GetValueOrDefault(commit.Author);
+                    author.Commits++;
+                    author.LastDate ??= day; // newest-first: the first date seen for this author+file is latest
+                    accum.Authors[commit.Author] = author;
+                }
             }
         }
 
@@ -482,18 +502,19 @@ public static class GitMetrics
             .OrderByDescending(kv => kv.Value.Changes)
             .ThenBy(kv => kv.Key, StringComparer.Ordinal)
             .Take(topFiles)
-            .Select(kv => new FileChangeStat(kv.Key, kv.Value.Changes, kv.Value.Added, kv.Value.Deleted))
-            .ToList();
-
-        var contributors = byAuthor
-            .OrderByDescending(kv => kv.Value.Commits)
-            .ThenBy(kv => kv.Key, StringComparer.Ordinal)
-            .Select(kv => new ContributorStat(
+            .Select(kv => new FileChangeStat(
                 kv.Key,
-                kv.Value.Commits,
-                kv.Value.Files.Count,
-                kv.Value.LastStamp is { } last ? DateOnly.FromDateTime(last) : null,
-                kv.Value.LatestHash))
+                kv.Value.Changes,
+                kv.Value.Added,
+                kv.Value.Deleted,
+                kv.Value.LatestHash,
+                kv.Value.LastChangeDate,
+                kv.Value.Authors
+                    .OrderByDescending(a => a.Value.Commits)
+                    .ThenBy(a => a.Key, StringComparer.Ordinal)
+                    .Take(topContributorsPerFile)
+                    .Select(a => new FileContributor(a.Key, a.Value.Commits, a.Value.LastDate))
+                    .ToList()))
             .ToList();
 
         var activity = byDay
@@ -501,7 +522,7 @@ public static class GitMetrics
             .Select(kv => (Day: kv.Key, Count: kv.Value))
             .ToList();
 
-        return new GitInsightsData(files, contributors, activity, commits.Count);
+        return new GitInsightsData(files, activity, commits.Count, allAuthors.Count);
     }
 
     /// <summary>Resolves a `--numstat` path field to the file's current path, collapsing git's rename/move

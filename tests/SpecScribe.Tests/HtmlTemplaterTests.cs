@@ -389,10 +389,14 @@ public class HtmlTemplaterTests
         // actually written), the Git Pulse header carries the hub entry link.
         var progress = ProgressWithDeepGit();
         progress.DeepGit!.Insights = new GitInsightsData(
-            Files: new[] { new FileChangeStat("src/Charts.cs", 4, 10, 2) },
-            Contributors: new[] { new ContributorStat("Alice", 4, 1, new DateOnly(2026, 1, 5), "c001") },
+            Files: new[]
+            {
+                new FileChangeStat("src/Charts.cs", 4, 10, 2, "c001", new DateOnly(2026, 1, 5),
+                    new[] { new FileContributor("Alice", 4, new DateOnly(2026, 1, 5)) }),
+            },
             Activity: new[] { (new DateOnly(2026, 1, 5), 4) },
-            CommitCount: 4);
+            CommitCount: 4,
+            ContributorCount: 1);
         var withInsights = HtmlTemplater.RenderIndex(
             docs: Array.Empty<DocModel>(),
             nav: nav,

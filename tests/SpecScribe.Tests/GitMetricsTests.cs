@@ -431,8 +431,14 @@ public class GitMetricsTests
         var insights = GitMetrics.BuildInsights(commits, topFiles: 2);
 
         Assert.Equal(2, insights.Files.Count);
-        // A.cs: 3 changes, churn summed across all three commits.
-        Assert.Equal(new FileChangeStat("A.cs", 3, 7, 3), insights.Files[0]);
+        // A.cs: 3 changes, churn summed across all three commits; h3 is its newest (latest change).
+        var a = insights.Files[0];
+        Assert.Equal("A.cs", a.Path);
+        Assert.Equal(3, a.Changes);
+        Assert.Equal(7, a.LinesAdded);
+        Assert.Equal(3, a.LinesDeleted);
+        Assert.Equal("h3", a.LatestHash);
+        Assert.Equal(new DateOnly(2026, 7, 3), a.LastChangeDate);
         // B and C tie at 1; ordinal path tie-break keeps B (C is truncated by topFiles: 2).
         Assert.Equal("B.cs", insights.Files[1].Path);
         Assert.Equal(3, insights.CommitCount);
@@ -449,15 +455,19 @@ public class GitMetricsTests
             }),
         };
 
-        var insights = GitMetrics.BuildInsights(commits);
+        var file = Assert.Single(GitMetrics.BuildInsights(commits).Files);
 
-        Assert.Equal(new FileChangeStat("logo.png", 1, 0, 0), Assert.Single(insights.Files));
+        Assert.Equal("logo.png", file.Path);
+        Assert.Equal(1, file.Changes);
+        Assert.Equal(0, file.LinesAdded);
+        Assert.Equal(0, file.LinesDeleted);
     }
 
     [Fact]
-    public void BuildInsights_AggregatesContributorAttributionNewestCommitFirst()
+    public void BuildInsights_ScopesContributorsPerFileNotGlobally()
     {
-        // Records arrive in git log order (newest first): Bob's newest commit is hb2.
+        // Records arrive in git log order (newest first). The "who works on this file?" drill-down attributes
+        // each author to the files THEY touched — never a global scoreboard.
         var commits = new[]
         {
             Commit("hb2", "Bob", "2026-07-05T10:00", ("B.cs", 1, 0)),
@@ -467,10 +477,20 @@ public class GitMetricsTests
 
         var insights = GitMetrics.BuildInsights(commits);
 
-        Assert.Equal(2, insights.Contributors.Count);
-        // Bob has more commits so he sorts first — attribution counts, not a "rank" field.
-        Assert.Equal(new ContributorStat("Bob", 2, 2, new DateOnly(2026, 7, 5), "hb2"), insights.Contributors[0]);
-        Assert.Equal(new ContributorStat("Alice", 1, 2, new DateOnly(2026, 7, 4), "ha1"), insights.Contributors[1]);
+        // Global figure is only a distinct-author count for headline context — no ranked people list.
+        Assert.Equal(2, insights.ContributorCount);
+
+        // B.cs was touched by Bob (twice) and Alice (once): Bob sorts first by commit count, and each
+        // contributor's date is their newest commit touching THIS file.
+        var b = insights.Files.Single(f => f.Path == "B.cs");
+        Assert.Equal(new[] { "Bob", "Alice" }, b.Contributors.Select(c => c.Name));
+        Assert.Equal(new FileContributor("Bob", 2, new DateOnly(2026, 7, 5)), b.Contributors[0]);
+        Assert.Equal(new FileContributor("Alice", 1, new DateOnly(2026, 7, 4)), b.Contributors[1]);
+
+        // A.cs was touched by Bob (hb1) and Alice (ha1), once each — Bob's date is his A.cs commit (Jul 1),
+        // NOT his newer B.cs commit, proving the date is file-scoped.
+        var aFile = insights.Files.Single(f => f.Path == "A.cs");
+        Assert.Equal(new FileContributor("Bob", 1, new DateOnly(2026, 7, 1)), aFile.Contributors.Single(c => c.Name == "Bob"));
     }
 
     [Fact]
@@ -498,9 +518,9 @@ public class GitMetricsTests
         var insights = GitMetrics.BuildInsights(Array.Empty<DeepCommit>());
 
         Assert.Empty(insights.Files);
-        Assert.Empty(insights.Contributors);
         Assert.Empty(insights.Activity);
         Assert.Equal(0, insights.CommitCount);
+        Assert.Equal(0, insights.ContributorCount);
     }
 
     [Fact]
@@ -513,8 +533,10 @@ public class GitMetricsTests
 
         Assert.NotNull(deep.Insights);
         Assert.Equal(1, deep.Insights!.CommitCount);
-        Assert.Equal("A.cs", Assert.Single(deep.Insights.Files).Path);
-        Assert.Equal("Alice", Assert.Single(deep.Insights.Contributors).Name);
+        Assert.Equal(1, deep.Insights.ContributorCount);
+        var file = Assert.Single(deep.Insights.Files);
+        Assert.Equal("A.cs", file.Path);
+        Assert.Equal("Alice", Assert.Single(file.Contributors).Name);
     }
 
     private static DeepCommit Commit(string hash, string author, string date, params (string Path, int Added, int Deleted)[] files)

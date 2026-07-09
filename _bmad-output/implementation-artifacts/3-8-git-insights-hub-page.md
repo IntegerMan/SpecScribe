@@ -272,15 +272,25 @@ Claude Fable 5 (claude-fable-5)
 
 ### Debug Log References
 
-- `dotnet test` full suite: 557/557 passing (was 526 before this story; +31 new tests).
-- Real generation passes against this repo: `generate --deep-git` → 44 pages incl. `git-insights.html`; default `generate` → 42 pages, no hub, no dashboard hub link, no stale page (full-wipe covers).
-- Browser verification (served static output): three sections render; sort buttons toggle `aria-sort` + glyph and re-order rows; filter hides non-matching rows with a live "N of M rows" count; zero console errors; at 375px the body does not scroll horizontally while both `.table-scroll` containers do.
+- `dotnet test` full suite: 559/559 passing.
+- Real generation passes against this repo: `generate --deep-git` → 45 pages incl. `git-insights.html`; default `generate` → 42 pages, no hub, no dashboard hub link, no stale page (full-wipe covers).
+- Browser verification (served static output): the files table sorts (aria-sort + glyph) and filters (live count); the file→contributors `:target` drill-down reveals the selected file's contributor panel and hides the default prompt, swaps cleanly between files, and shows per-file counts + latest-change line; zero console errors. Desktop (1280px): 2-column grid (~3:2), sticky detail column, no horizontal body scroll. Mobile (375px): single-column stack, detail becomes static flow, body does not scroll horizontally while the file table scrolls inside its own container.
+
+### Owner-requested redesign (post-first-review)
+
+The first implementation rendered contributors as a **standalone global table** (author → commits/files touched). Owner feedback (Matt): that reads as an app-wide leaderboard, not an answer to "who do I talk to about this file?" Redesigned the contributor surface into a **file→contributors master-detail**:
+- The former "File Change Frequency" and "Contributor Attribution" sections are merged into one **"Files &amp; Contributors"** section. The standalone global contributor table (and `ContributorStat`) is **removed**.
+- Left: the file change-frequency table (unchanged data/sort/filter). Each file name is now a pure-CSS `:target` link to that file's contributor panel.
+- Right: a **sticky** detail column with one contributor panel per file (all present in the HTML; CSS `:target` reveals the selected one, a general-sibling rule hides the default "select a file" prompt). Each panel lists the people who touched **that file** (commits + last-active date), plus the file's latest-change commit link and an optional "view file page" link — both still guarded on resolver availability.
+- The drill-down is **pure-CSS `:target`** — the same no-JS mechanism the commit heatmap and coupling graph already use — so "select a file → see its people" works with JavaScript fully off. The `js-sortable` sort/filter enhancer on the file table is unchanged and independent.
+- Data: contributors are now aggregated **per file** on `FileChangeStat.Contributors`; `GitInsightsData` keeps only a distinct-author **count** (`ContributorCount`) for headline context — no global ranked people list anywhere.
+- The "drill into people to see what they're working on when" idea the owner floated is explicitly **out of scope** here (a possible future story), not built.
 
 ### Completion Notes List
 
 - **One fetch, one parse, several views.** Extended Story 3.2's single deep-git fetch to `log --numstat --date=format:%Y-%m-%dT%H:%M --pretty=format:%x01%H%x1f%an%x1f%ad%x1f%s%x1f%b%x1f -n 300` (still bounded, still one `git log`). New pure `GitMetrics.ParseNumstatRecords` splits on the `\x01`/`\x1f` sentinels (trailing `\x1f` closes the body so multi-line bodies can never bleed into the file set) and also accepts the old `%x01%H`-only shape; `ParseNumstatLog` was refactored to compute hotspots/coupling as one view over those records (all 3.2 tests untouched and green) and now carries the hub aggregates alongside. `DeepCommit` retains `%s`/`%b` so Story 7.5 can reuse the same fetch.
 - **Model seam:** rather than a new `ProgressModel` field, the hub aggregates ride as `DeepGitPulse.Insights` (`GitInsightsData`: per-file frequency+churn top-50, per-contributor attribution counts, per-day activity series, window commit count). Deviation from Subtask 4.2's `_gitInsightsPath` field: the generator instead clears `DeepGit.Insights` when the hub write fails — the exact pattern 3.2 established for `DeepGit` itself — so one signal gates both the page and the dashboard link and can never dangle.
-- **Hub page (`GitInsightsTemplater`)**: CommitDayTemplater-style synthesized shell (`deep-page git-insights` main). File-frequency + contributor sections are accessible, server-sorted `<table>`s (`<caption>`, `<th scope="col">`, contributor names as `scope="row"`); activity-over-time reuses `Charts.CommitHeatmap` (baseline pulse series, so its day links always match the generated `commits/{date}.html` set) with a headline derived from the deep window's activity series. Guarded links via injectable `fileHref`/`commitHref` resolvers, unwired until 7.1/7.4/7.5 land their page maps → plain escaped text today, links light up automatically later. Contributor section framed as attribution ("not a scoreboard"), no rank column.
+- **Hub page (`GitInsightsTemplater`)**: CommitDayTemplater-style synthesized shell (`deep-page git-insights` main). Two sections after the owner redesign: (1) **Files &amp; Contributors** — a master-detail with the accessible, server-sorted file `<table>` (`<caption>`, `<th scope="col">`) on the left and per-file contributor panels on the right, drilled via pure-CSS `:target`; (2) **Activity Over Time** reusing `Charts.CommitHeatmap` (baseline pulse series, so its day links always match the generated `commits/{date}.html` set) with a headline derived from the deep window's activity series. Guarded links via injectable `fileHref`/`commitHref` resolvers, unwired until 7.1/7.4/7.5 land their page maps → plain escaped text today, links light up automatically later. Contributors are file-scoped ("who to talk to about this file"), never a global ranking.
 - **Gating (AC #2):** `GenerateGitInsightsInternal` runs only when `DeepGit.Insights` exists (which itself requires `--deep-git`); flag off ⇒ zero extra git work, zero pages, dashboard byte-identical (pinned by generation tests, not wall-clock timing). Non-fatal render failure → Error event + link cleared, run still succeeds.
 - **Progressive enhancement:** the sanctioned `specscribe.js` gained one `js-sortable` table enhancer — headers become real `<button>`s announcing `aria-sort` (+ glyph, never color-only), rows re-order in place; the labeled filter `<input>` (+ `aria-live` row count) is **created by JS**, so no dead control ships in the no-JS page. Row hiding is `display`-based — no new motion, so the reduced-motion seam needs no new entries.
 - **CSS:** neutral-token `.gi-table`/`.gi-sort-btn`/`.gi-filter` styles; `.table-scroll { overflow-x: auto; contain: inline-size; }` — the `contain` is load-bearing: without it the tables' nowrap min-content propagates through the shrink-to-fit `.deep-page` main and forces body-level horizontal scroll on narrow viewports (found and fixed during browser verification).
@@ -288,16 +298,16 @@ Claude Fable 5 (claude-fable-5)
 
 ### File List
 
-- src/SpecScribe/GitMetrics.cs (modified — enriched shared fetch format; `DeepCommit`/`DeepFileChange`/`FileChangeStat`/`ContributorStat`/`GitInsightsData` records; `ParseNumstatRecords`; `BuildInsights`; `ParseNumstatLog` refactored onto the record parse; `DeepGitPulse.Insights`)
-- src/SpecScribe/GitInsightsTemplater.cs (new — the hub page renderer)
+- src/SpecScribe/GitMetrics.cs (modified — enriched shared fetch format; `DeepCommit`/`DeepFileChange`/`FileContributor`/`FileChangeStat`/`GitInsightsData` records; `ParseNumstatRecords`; `BuildInsights` (per-file contributor aggregation); `ParseNumstatLog` refactored onto the record parse; `DeepGitPulse.Insights`)
+- src/SpecScribe/GitInsightsTemplater.cs (new — the hub page renderer; files-and-contributors master-detail + activity heatmap)
 - src/SpecScribe/SiteGenerator.cs (modified — `GenerateGitInsightsInternal` gated phase, invoked from `GenerateAll` after commit-days/deep-analytics, before `WriteIndex`)
 - src/SpecScribe/GenerationReporter.cs (modified — `GenerationPhase.GitInsights` + label)
 - src/SpecScribe/SiteNav.cs (modified — `GitInsightsOutputPath` constant; no top-nav entry by design)
 - src/SpecScribe/HtmlTemplater.cs (modified — Git Pulse header "View all git insights →" link gated on `DeepGit.Insights`)
 - src/SpecScribe/assets/specscribe.js (modified — `js-sortable` sort/filter enhancer appended to the one sanctioned script)
-- src/SpecScribe/assets/specscribe.css (modified — Git Insights hub section: `.table-scroll`, `.gi-table`, `.gi-sort-btn`, `.gi-filter`, `.gi-row-hidden`, `.git-pulse-header-links`)
-- tests/SpecScribe.Tests/GitMetricsTests.cs (modified — 11 new record-parse/aggregation tests)
-- tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs (new — 7 hub-page unit tests)
+- src/SpecScribe/assets/specscribe.css (modified — Git Insights hub section: `.table-scroll`, `.gi-table`, `.gi-sort-btn`, `.gi-filter`, `.gi-row-hidden`, master-detail `.gi-master-detail`/`.gi-detail`/`.gi-contributors-panel:target`/`.gi-contributor-list`, `.git-pulse-header-links`)
+- tests/SpecScribe.Tests/GitMetricsTests.cs (modified — record-parse + per-file-contributor aggregation tests)
+- tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs (new — hub-page unit tests incl. the file→contributors master-detail)
 - tests/SpecScribe.Tests/SiteGeneratorGitInsightsTests.cs (new — 4 generation-level gate/enabled/degradation/determinism tests)
 - tests/SpecScribe.Tests/HtmlTemplaterTests.cs (modified — hub-link gating test)
 - tests/SpecScribe.Tests/StylesheetTests.cs (modified — Story 3.8 CSS/JS seam guards)
@@ -306,4 +316,5 @@ Claude Fable 5 (claude-fable-5)
 
 ## Change Log
 
-- 2026-07-09: Implemented Story 3.8 — aggregate Git Insights hub (`git-insights.html`) behind the `--deep-git` gate: enriched the one shared numstat fetch with author/date/subject/body sentinels, added pure record-parse + hub aggregation views in GitMetrics, new GitInsightsTemplater page (accessible server-sorted tables, reused commit heatmap, guarded detail links), gated SiteGenerator phase + dashboard "View all git insights →" entry link, progressive-enhancement table sort/filter in the sanctioned script, and full unit/templater/generation test coverage (557 tests green).
+- 2026-07-09: Implemented Story 3.8 — aggregate Git Insights hub (`git-insights.html`) behind the `--deep-git` gate: enriched the one shared numstat fetch with author/date/subject/body sentinels, added pure record-parse + hub aggregation views in GitMetrics, new GitInsightsTemplater page (accessible server-sorted tables, reused commit heatmap, guarded detail links), gated SiteGenerator phase + dashboard "View all git insights →" entry link, progressive-enhancement table sort/filter in the sanctioned script, and full unit/templater/generation test coverage.
+- 2026-07-09: Owner-requested redesign — replaced the standalone global contributor table with a file→contributors master-detail (pure-CSS `:target` drill-down: select a file, see who works on it), removed `ContributorStat`, moved contributor aggregation to per-file `FileChangeStat.Contributors`, kept only a distinct-author count for headline context. 559 tests green; verified across desktop/mobile in-browser.
