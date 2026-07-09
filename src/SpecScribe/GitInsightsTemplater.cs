@@ -4,17 +4,20 @@ using System.Text;
 namespace SpecScribe;
 
 /// <summary>Renders the opt-in aggregate <c>git-insights.html</c> hub (FR-10) — the "click in to see more"
-/// destination behind the dashboard's Git Pulse panel: file change frequency + churn, activity over time
-/// (the reused commit heatmap, whose active days already link to their per-day pages), and contributor
-/// attribution. A synthesized page (no markdown source), so it builds its own shell the way
-/// <see cref="CommitDayTemplater"/> does rather than going through <see cref="HtmlTemplater.RenderPage"/>.
-/// <para>Progressive enhancement contract (NFR-5): every table is complete, escaped, and server-sorted at
-/// generation time — the no-JS reading is the primary artifact. The one sanctioned script upgrades tables
-/// marked <c>js-sortable</c> with client-side sort/filter over the already-present rows; nothing here depends
-/// on it. Outgoing detail links are guarded on target existence via the <c>fileHref</c>/<c>commitHref</c>
-/// resolvers (Stories 7.1/7.4/7.5 seams): no resolver or no target → plain escaped text, never a dead link.
-/// Contributors are attribution ("who has been active where"), never a ranked leaderboard (PRD boundary).
-/// [Story 3.8]</para></summary>
+/// destination behind the dashboard's Git Pulse panel. Two sections: a files-and-contributors master-detail
+/// (a file change-frequency table on the left; selecting a file reveals who has been working on it on the
+/// right — answering "who do I talk to about this file?"), and activity over time (the reused commit heatmap,
+/// whose active days already link to their per-day pages). A synthesized page (no markdown source), so it
+/// builds its own shell the way <see cref="CommitDayTemplater"/> does rather than going through
+/// <see cref="HtmlTemplater.RenderPage"/>.
+/// <para>Progressive enhancement contract (NFR-5): everything reads and works with JS off. The file table is
+/// complete, escaped, and server-sorted at generation time; the file→contributors drill-down is pure-CSS
+/// <c>:target</c> (the same mechanism the commit heatmap and coupling graph use — no JS needed). The one
+/// sanctioned script only upgrades the <c>js-sortable</c> table with client-side sort/filter over the
+/// already-present rows. Contributors are scoped per file (collaboration context), never a global ranked
+/// scoreboard (the PRD boundary). Outgoing detail links are guarded on target existence via the
+/// <c>fileHref</c>/<c>commitHref</c> resolvers (Stories 7.1/7.4/7.5 seams): no resolver or no target → plain
+/// escaped text, never a dead link. [Story 3.8]</para></summary>
 public static class GitInsightsTemplater
 {
     public static string RenderPage(
@@ -32,7 +35,7 @@ public static class GitInsightsTemplater
             $"Git Insights — {nav.SiteTitle}",
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
-            $"Aggregate git insights for {nav.SiteTitle}: file change frequency, activity over time, and contributor attribution."));
+            $"Aggregate git insights for {nav.SiteTitle}: file change frequency, who works on each file, and activity over time."));
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
@@ -47,12 +50,11 @@ public static class GitInsightsTemplater
         sb.Append("  <div class=\"meta-pills\">\n");
         sb.Append($"    <span class=\"pill\">{N(insights.CommitCount)} {Charts.Plural(insights.CommitCount, "commit", "commits")} analyzed</span>\n");
         sb.Append($"    <span class=\"pill\">{N(insights.Files.Count)} {Charts.Plural(insights.Files.Count, "file", "files")}</span>\n");
-        sb.Append($"    <span class=\"pill\">{N(insights.Contributors.Count)} {Charts.Plural(insights.Contributors.Count, "contributor", "contributors")}</span>\n");
+        sb.Append($"    <span class=\"pill\">{N(insights.ContributorCount)} {Charts.Plural(insights.ContributorCount, "contributor", "contributors")}</span>\n");
         sb.Append("  </div>\n</header>\n\n");
 
-        AppendFileFrequencySection(sb, insights.Files, fileHref);
+        AppendFilesAndContributorsSection(sb, insights.Files, fileHref, commitHref);
         AppendActivitySection(sb, insights, git);
-        AppendContributorSection(sb, insights.Contributors, commitHref);
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
@@ -60,47 +62,133 @@ public static class GitInsightsTemplater
         return sb.ToString();
     }
 
-    /// <summary>File change frequency + churn, server-sorted (change count desc, ordinal path tie-break —
-    /// the order <see cref="GitMetrics.BuildInsights"/> already emitted). File cells link to their in-portal
-    /// detail page only when the resolver produces one.</summary>
-    private static void AppendFileFrequencySection(
-        StringBuilder sb, IReadOnlyList<FileChangeStat> files, Func<string, string?>? fileHref)
+    /// <summary>The files-and-contributors master-detail. Left: the change-frequency table (server-sorted,
+    /// change-count desc with an ordinal path tie-break — the order <see cref="GitMetrics.BuildInsights"/>
+    /// already emitted, and the no-JS reading order). Each file name is a pure-CSS <c>:target</c> link to its
+    /// contributor panel on the right, so "select a file → see who works on it" needs no JS. Right: one
+    /// contributor panel per file (all present in the HTML; CSS reveals the targeted one) plus a default
+    /// prompt when nothing is selected. Answers "who do I talk to about this file?" rather than presenting a
+    /// global people ranking.</summary>
+    private static void AppendFilesAndContributorsSection(
+        StringBuilder sb,
+        IReadOnlyList<FileChangeStat> files,
+        Func<string, string?>? fileHref,
+        Func<string, string?>? commitHref)
     {
         sb.Append("<section class=\"deep-page-section git-insights-section\">\n");
-        sb.Append("  <h2>File Change Frequency</h2>\n");
-        sb.Append("  <p class=\"deep-page-lead\">The files that changed most often in the analyzed window, with their total line churn — the parts of the codebase carrying the most recent activity.</p>\n");
-        sb.Append("  <div class=\"chart-panel\">\n");
+        sb.Append("  <h2>Files &amp; Contributors</h2>\n");
+        sb.Append("  <p class=\"deep-page-lead\">The files that changed most often in the analyzed window. Select a file to see who has been working on it — the people to talk to about that area.</p>\n");
 
         if (files.Count == 0)
         {
-            sb.Append("    <div class=\"chart-empty\">No file change data available.</div>\n");
+            sb.Append("  <div class=\"chart-panel\"><div class=\"chart-empty\">No file change data available.</div></div>\n");
+            sb.Append("</section>\n\n");
+            return;
         }
-        else
+
+        sb.Append("  <div class=\"gi-master-detail\">\n");
+
+        // Master: the file change-frequency table.
+        sb.Append("    <div class=\"gi-master chart-panel\">\n");
+        sb.Append("      <div class=\"table-scroll\">\n");
+        sb.Append("      <table class=\"gi-table js-sortable\" data-filter-label=\"Filter files\">\n");
+        sb.Append("        <caption>Files by change frequency — sorted by number of commits touching each file, most-changed first. Select a file for its contributors.</caption>\n");
+        sb.Append("        <thead>\n          <tr>\n");
+        sb.Append("            <th scope=\"col\">File</th>\n");
+        sb.Append("            <th scope=\"col\" class=\"gi-num\" data-sort=\"num\" aria-sort=\"descending\">Changes</th>\n");
+        sb.Append("            <th scope=\"col\" class=\"gi-num\" data-sort=\"num\">Lines added</th>\n");
+        sb.Append("            <th scope=\"col\" class=\"gi-num\" data-sort=\"num\">Lines deleted</th>\n");
+        sb.Append("          </tr>\n        </thead>\n        <tbody>\n");
+        for (var i = 0; i < files.Count; i++)
         {
-            sb.Append("    <div class=\"table-scroll\">\n");
-            sb.Append("    <table class=\"gi-table js-sortable\" data-filter-label=\"Filter files\">\n");
-            sb.Append("      <caption>Files by change frequency — sorted by number of commits touching each file, most-changed first.</caption>\n");
-            sb.Append("      <thead>\n        <tr>\n");
-            sb.Append("          <th scope=\"col\">File</th>\n");
-            sb.Append("          <th scope=\"col\" class=\"gi-num\" data-sort=\"num\" aria-sort=\"descending\">Changes</th>\n");
-            sb.Append("          <th scope=\"col\" class=\"gi-num\" data-sort=\"num\">Lines added</th>\n");
-            sb.Append("          <th scope=\"col\" class=\"gi-num\" data-sort=\"num\">Lines deleted</th>\n");
-            sb.Append("        </tr>\n      </thead>\n      <tbody>\n");
-            foreach (var file in files)
-            {
-                sb.Append("        <tr>\n");
-                sb.Append($"          <td class=\"gi-file\">{GuardedLink(file.Path, fileHref?.Invoke(file.Path), code: true)}</td>\n");
-                sb.Append($"          <td class=\"gi-num\">{N(file.Changes)}</td>\n");
-                sb.Append($"          <td class=\"gi-num\">{N(file.LinesAdded)}</td>\n");
-                sb.Append($"          <td class=\"gi-num\">{N(file.LinesDeleted)}</td>\n");
-                sb.Append("        </tr>\n");
-            }
-            sb.Append("      </tbody>\n    </table>\n");
-            sb.Append("    </div>\n");
+            var file = files[i];
+            sb.Append("          <tr>\n");
+            sb.Append($"            <td class=\"gi-file\"><a class=\"gi-file-link\" href=\"#gi-file-{i}\"><code>{PathUtil.Html(file.Path)}</code></a></td>\n");
+            sb.Append($"            <td class=\"gi-num\">{N(file.Changes)}</td>\n");
+            sb.Append($"            <td class=\"gi-num\">{N(file.LinesAdded)}</td>\n");
+            sb.Append($"            <td class=\"gi-num\">{N(file.LinesDeleted)}</td>\n");
+            sb.Append("          </tr>\n");
         }
+        sb.Append("        </tbody>\n      </table>\n");
+        sb.Append("      </div>\n");
+        sb.Append("    </div>\n");
+
+        // Detail: one contributor panel per file (revealed by :target) + a default prompt.
+        sb.Append("    <div class=\"gi-detail\">\n");
+        for (var i = 0; i < files.Count; i++)
+        {
+            AppendContributorPanel(sb, files[i], i, fileHref, commitHref);
+        }
+        sb.Append("      <div class=\"gi-detail-default chart-panel\">\n");
+        sb.Append("        <p class=\"gi-detail-prompt\">Select a file to see who has been working on it — the people to talk to about that area.</p>\n");
+        sb.Append("      </div>\n");
+        sb.Append("    </div>\n");
 
         sb.Append("  </div>\n");
         sb.Append("</section>\n\n");
+    }
+
+    /// <summary>One file's contributor panel — the detail side of the master-detail, revealed when its file is
+    /// selected (pure-CSS <c>:target</c>). Lists the people who touched this file (commits + when they last
+    /// did), framed as "who to talk to", never a rank. Carries the file's latest-change commit link and an
+    /// optional "view file page" link, both guarded on resolver availability (7.1/7.4/7.5 seams).</summary>
+    private static void AppendContributorPanel(
+        StringBuilder sb,
+        FileChangeStat file,
+        int index,
+        Func<string, string?>? fileHref,
+        Func<string, string?>? commitHref)
+    {
+        sb.Append($"      <div class=\"gi-contributors-panel chart-panel\" id=\"gi-file-{index}\" role=\"region\" aria-label=\"Contributors to {PathUtil.Html(file.Path)}\">\n");
+        sb.Append("        <div class=\"gi-detail-head\">\n");
+        sb.Append($"          <h3 class=\"gi-detail-title\"><code>{PathUtil.Html(file.Path)}</code></h3>\n");
+
+        // Sub-line: change count + the file's latest change (guarded commit link + date).
+        sb.Append("          <p class=\"gi-detail-sub\">");
+        sb.Append($"{N(file.Changes)} {Charts.Plural(file.Changes, "change", "changes")}");
+        if (file.LatestHash.Length > 0)
+        {
+            var shortHash = file.LatestHash.Length > 7 ? file.LatestHash[..7] : file.LatestHash;
+            sb.Append($" &middot; latest {GuardedLink(shortHash, commitHref?.Invoke(file.LatestHash), code: true)}");
+            if (file.LastChangeDate is { } changed)
+            {
+                sb.Append($" on {PathUtil.Html(Charts.DReadable(changed))}");
+            }
+        }
+        sb.Append("</p>\n");
+        sb.Append("        </div>\n");
+
+        if (file.Contributors.Count == 0)
+        {
+            sb.Append("        <p class=\"gi-detail-prompt\">No contributor data available for this file.</p>\n");
+        }
+        else
+        {
+            sb.Append("        <p class=\"gi-detail-lead\">People to talk to about this file:</p>\n");
+            sb.Append("        <ul class=\"gi-contributor-list\">\n");
+            foreach (var contributor in file.Contributors)
+            {
+                var meta = $"{N(contributor.Commits)} {Charts.Plural(contributor.Commits, "commit", "commits")}";
+                if (contributor.LastCommitDate is { } last)
+                {
+                    meta += $" &middot; last {PathUtil.Html(Charts.DReadable(last))}";
+                }
+                sb.Append("          <li>");
+                sb.Append($"<span class=\"gi-contributor-name\">{PathUtil.Html(contributor.Name)}</span>");
+                sb.Append($"<span class=\"gi-contributor-meta\">{meta}</span>");
+                sb.Append("</li>\n");
+            }
+            sb.Append("        </ul>\n");
+        }
+
+        // Optional deep link to the file's own detail page (7.1/7.4), only when a target exists.
+        var href = fileHref?.Invoke(file.Path);
+        if (href is { Length: > 0 })
+        {
+            sb.Append($"        <a class=\"view-epic-link gi-detail-filelink\" href=\"{PathUtil.Html(href)}\">View file page &rarr;</a>\n");
+        }
+
+        sb.Append("      </div>\n");
     }
 
     /// <summary>Activity over time — the existing accessible commit heatmap, reused rather than a parallel
@@ -124,55 +212,6 @@ public static class GitInsightsTemplater
         {
             sb.Append("    <div class=\"chart-empty\">No activity data available.</div>\n");
         }
-        sb.Append("  </div>\n");
-        sb.Append("</section>\n\n");
-    }
-
-    /// <summary>Contributor attribution — who has been active where, as collaboration context. Deliberately
-    /// framed as attribution counts and NOT a leaderboard/productivity score (the amended PRD boundary):
-    /// no rank column, no "top performer" copy. The latest-commit cell links to its per-commit detail page
-    /// only when the resolver produces one (Story 7.5 seam).</summary>
-    private static void AppendContributorSection(
-        StringBuilder sb, IReadOnlyList<ContributorStat> contributors, Func<string, string?>? commitHref)
-    {
-        sb.Append("<section class=\"deep-page-section git-insights-section\">\n");
-        sb.Append("  <h2>Contributor Attribution</h2>\n");
-        sb.Append("  <p class=\"deep-page-lead\">Who has been active where in the analyzed window — collaboration context for \"who knows this area,\" not a scoreboard.</p>\n");
-        sb.Append("  <div class=\"chart-panel\">\n");
-
-        if (contributors.Count == 0)
-        {
-            sb.Append("    <div class=\"chart-empty\">No contributor data available.</div>\n");
-        }
-        else
-        {
-            sb.Append("    <div class=\"table-scroll\">\n");
-            sb.Append("    <table class=\"gi-table js-sortable\" data-filter-label=\"Filter contributors\">\n");
-            sb.Append("      <caption>Contributor attribution — commit and file counts per author in the analyzed window.</caption>\n");
-            sb.Append("      <thead>\n        <tr>\n");
-            sb.Append("          <th scope=\"col\">Contributor</th>\n");
-            sb.Append("          <th scope=\"col\" class=\"gi-num\" data-sort=\"num\" aria-sort=\"descending\">Commits</th>\n");
-            sb.Append("          <th scope=\"col\" class=\"gi-num\" data-sort=\"num\">Files touched</th>\n");
-            sb.Append("          <th scope=\"col\">Last active</th>\n");
-            sb.Append("          <th scope=\"col\">Latest commit</th>\n");
-            sb.Append("        </tr>\n      </thead>\n      <tbody>\n");
-            foreach (var contributor in contributors)
-            {
-                var lastActive = contributor.LastCommitDate is { } d ? Charts.DReadable(d) : "—";
-                var lastActiveSort = contributor.LastCommitDate is { } iso ? Charts.D(iso) : string.Empty;
-                var shortHash = contributor.LatestHash.Length > 7 ? contributor.LatestHash[..7] : contributor.LatestHash;
-                sb.Append("        <tr>\n");
-                sb.Append($"          <th scope=\"row\" class=\"gi-contributor\">{PathUtil.Html(contributor.Name)}</th>\n");
-                sb.Append($"          <td class=\"gi-num\">{N(contributor.Commits)}</td>\n");
-                sb.Append($"          <td class=\"gi-num\">{N(contributor.FilesTouched)}</td>\n");
-                sb.Append($"          <td data-sort-value=\"{PathUtil.Html(lastActiveSort)}\">{PathUtil.Html(lastActive)}</td>\n");
-                sb.Append($"          <td>{GuardedLink(shortHash, commitHref?.Invoke(contributor.LatestHash), code: true)}</td>\n");
-                sb.Append("        </tr>\n");
-            }
-            sb.Append("      </tbody>\n    </table>\n");
-            sb.Append("    </div>\n");
-        }
-
         sb.Append("  </div>\n");
         sb.Append("</section>\n\n");
     }

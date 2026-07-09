@@ -226,6 +226,17 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_HasGitInsightsMasterDetailStyles()
+    {
+        // The file→contributors drill-down is pure-CSS :target (no JS): guard the master-detail grid and the
+        // :target reveal so the no-JS interaction can't silently regress.
+        var css = ReadStylesheet();
+        Assert.Contains(".gi-master-detail", css);
+        Assert.Contains(".gi-contributors-panel:target", css);
+        Assert.Contains(".gi-contributor-list", css);
+    }
+
+    [Fact]
     public void Script_HasTableSortFilterEnhancer()
     {
         // The Git Insights sort/filter enhancement lives in the ONE sanctioned script (no second file, no

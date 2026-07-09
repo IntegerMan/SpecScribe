@@ -95,11 +95,11 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         Assert.True(File.Exists(HubPage), "git-insights.html must be generated when --deep-git has data");
 
         var hub = File.ReadAllText(HubPage);
-        Assert.Contains(">File Change Frequency</h2>", hub);
+        Assert.Contains(">Files &amp; Contributors</h2>", hub);
         Assert.Contains(">Activity Over Time</h2>", hub);
-        Assert.Contains(">Contributor Attribution</h2>", hub);
         Assert.Contains("tracked.txt", hub);          // a known committed file appears in the frequency table
-        Assert.Contains("Insight Tester", hub);        // the committing author appears in attribution
+        Assert.Contains("id=\"gi-file-0\"", hub);      // its contributor drill-down panel is present
+        Assert.Contains("Insight Tester", hub);        // the committing author appears as a file contributor
 
         var index = File.ReadAllText(IndexPage);
         Assert.Contains("href=\"git-insights.html\"", index);
