@@ -267,10 +267,11 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasGitInsightsMasterDetailStyles()
     {
-        // The file→contributors drill-down is pure-CSS :target (no JS): guard the master-detail grid and the
-        // :target reveal so the no-JS interaction can't silently regress.
+        // The file→contributors drill-down is pure-CSS :target (no JS): guard the master-detail grid, the
+        // whole-row stretched select link, and the :target reveal so the no-JS interaction can't regress.
         var css = ReadStylesheet();
         Assert.Contains(".gi-master-detail", css);
+        Assert.Contains(".gi-row-link::after", css);
         Assert.Contains(".gi-contributors-panel:target", css);
         Assert.Contains(".gi-contributor-list", css);
     }

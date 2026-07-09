@@ -102,8 +102,20 @@ public static class GitInsightsTemplater
         for (var i = 0; i < files.Count; i++)
         {
             var file = files[i];
+            var pathHtml = PathUtil.Html(file.Path);
             sb.Append("          <tr>\n");
-            sb.Append($"            <td class=\"gi-file\"><a class=\"gi-file-link\" href=\"#gi-file-{i}\"><code>{PathUtil.Html(file.Path)}</code></a></td>\n");
+            // The whole row is the select target (stretched-link pattern): this invisible anchor's ::after
+            // covers the row, so a click anywhere on it reveals this file's contributors via :target — no JS.
+            // The file NAME is kept separate so it can be reserved for navigating to the file's own page
+            // (Story 7.1/7.4): when a resolver gives it a target it renders as a real link that sits above the
+            // row overlay (navigates); until then it is plain text and the row overlay's click selects.
+            sb.Append("            <td class=\"gi-file\">");
+            sb.Append($"<a class=\"gi-row-link\" href=\"#gi-file-{i}\" aria-label=\"Show contributors for {pathHtml}\"></a>");
+            var nameHref = fileHref?.Invoke(file.Path);
+            sb.Append(nameHref is { Length: > 0 }
+                ? $"<a class=\"gi-file-name\" href=\"{PathUtil.Html(nameHref)}\"><code>{pathHtml}</code></a>"
+                : $"<span class=\"gi-file-name\"><code>{pathHtml}</code></span>");
+            sb.Append("</td>\n");
             sb.Append($"            <td class=\"gi-num\">{N(file.Changes)}</td>\n");
             sb.Append($"            <td class=\"gi-num\">{N(file.LinesAdded)}</td>\n");
             sb.Append($"            <td class=\"gi-num\">{N(file.LinesDeleted)}</td>\n");
