@@ -21,6 +21,12 @@ public sealed class SiteNav
     /// the generator (which writes the file) and the templater (which links to it) so the two can't disagree. [Story 3.2]</summary>
     public const string DeepAnalyticsOutputPath = "deep-analytics.html";
 
+    /// <summary>The opt-in aggregate Git Insights hub (file change frequency, activity over time, contributor
+    /// attribution). Generated only when <c>--deep-git</c> produced deep data; reached from the dashboard's Git
+    /// Pulse panel (not the top nav — nav is built before git is computed, so a nav entry could dangle). Shared
+    /// between the generator (writes the file) and the templaters (link to it) so the two can't disagree. [Story 3.8]</summary>
+    public const string GitInsightsOutputPath = "git-insights.html";
+
     /// <summary>The interactive project/artifact structure tree page. Written only when the source-artifact file
     /// set is non-empty; the nav item and dashboard quick link gate on the same signal so a link is never emitted
     /// to a page that wasn't produced. Shared between the generator (writes the file) and the templater/nav

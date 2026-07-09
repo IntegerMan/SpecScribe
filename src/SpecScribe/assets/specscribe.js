@@ -238,4 +238,105 @@
     var open = document.querySelectorAll(MENU_SELECTOR);
     for (var i = 0; i < open.length; i++) open[i].removeAttribute("open");
   });
+
+  // ---- Sortable / filterable tables (Git Insights hub) [Story 3.8] -------------------------
+  // Progressive enhancement ONLY (NFR-5): every table.js-sortable arrives complete and server-sorted, so
+  // with JS off the page already reads correctly and this block simply never runs. When it does run it
+  // upgrades opt-in tables: column headers become real <button>s that re-order the already-present <tbody>
+  // rows (announcing state via aria-sort + a direction glyph, never color alone), and a labeled filter box
+  // (created HERE, so no dead control ships in the no-JS page) hides non-matching rows. Nothing is fetched
+  // and no new information appears — the server-rendered rows are the single source of truth. Row hiding is
+  // display-based (no animation), so the reduced-motion contract is satisfied by construction.
+  function enhanceSortableTable(table) {
+    var headers = table.querySelectorAll("thead th");
+    var tbody = table.tBodies[0];
+    if (!tbody || headers.length === 0) return;
+
+    function rows() { return Array.prototype.slice.call(tbody.rows); }
+
+    function cellKey(row, index, numeric) {
+      var cell = row.cells[index];
+      if (!cell) return numeric ? -Infinity : "";
+      var explicit = cell.getAttribute("data-sort-value");
+      var text = explicit !== null ? explicit : cell.textContent.trim();
+      if (!numeric) return text.toLowerCase();
+      var n = parseFloat(text.replace(/[^0-9.+-]/g, ""));
+      return isNaN(n) ? -Infinity : n;
+    }
+
+    function applySort(th, dir) {
+      var index = Array.prototype.indexOf.call(th.parentNode.children, th);
+      var numeric = th.getAttribute("data-sort") === "num";
+      var sorted = rows().sort(function (a, b) {
+        var ka = cellKey(a, index, numeric);
+        var kb = cellKey(b, index, numeric);
+        if (ka < kb) return dir === "ascending" ? -1 : 1;
+        if (ka > kb) return dir === "ascending" ? 1 : -1;
+        return 0;
+      });
+      sorted.forEach(function (row) { tbody.appendChild(row); });
+      Array.prototype.forEach.call(headers, function (h) {
+        if (h === th) h.setAttribute("aria-sort", dir);
+        else h.removeAttribute("aria-sort");
+        var glyph = h.querySelector(".gi-sort-glyph");
+        if (glyph) glyph.textContent = h === th ? (dir === "ascending" ? "▲" : "▼") : "";
+      });
+    }
+
+    Array.prototype.forEach.call(headers, function (th) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gi-sort-btn";
+      while (th.firstChild) btn.appendChild(th.firstChild);
+      var glyph = document.createElement("span");
+      glyph.className = "gi-sort-glyph";
+      glyph.setAttribute("aria-hidden", "true");
+      // Reflect the server-rendered initial sort (aria-sort emitted at generation time) in the glyph.
+      var initial = th.getAttribute("aria-sort");
+      glyph.textContent = initial === "descending" ? "▼" : initial === "ascending" ? "▲" : "";
+      btn.appendChild(glyph);
+      th.appendChild(btn);
+      btn.addEventListener("click", function () {
+        var current = th.getAttribute("aria-sort");
+        var numeric = th.getAttribute("data-sort") === "num";
+        // First activation: numbers read best big-first, text A-first; afterwards, toggle.
+        var dir = current ? (current === "descending" ? "ascending" : "descending") : (numeric ? "descending" : "ascending");
+        applySort(th, dir);
+      });
+    });
+
+    // Optional per-table filter, opted in via data-filter-label.
+    var filterLabel = table.getAttribute("data-filter-label");
+    if (filterLabel) {
+      var wrap = document.createElement("div");
+      wrap.className = "gi-filter";
+      var label = document.createElement("label");
+      label.appendChild(document.createTextNode(filterLabel + " "));
+      var input = document.createElement("input");
+      input.type = "search";
+      label.appendChild(input);
+      var count = document.createElement("span");
+      count.className = "gi-filter-count";
+      count.setAttribute("aria-live", "polite");
+      wrap.appendChild(label);
+      wrap.appendChild(count);
+      var host = table.closest(".table-scroll") || table;
+      host.parentNode.insertBefore(wrap, host);
+      input.addEventListener("input", function () {
+        var q = input.value.trim().toLowerCase();
+        var all = rows();
+        var shown = 0;
+        all.forEach(function (row) {
+          var match = !q || row.textContent.toLowerCase().indexOf(q) >= 0;
+          row.classList.toggle("gi-row-hidden", !match);
+          if (match) shown++;
+        });
+        count.textContent = q ? shown + " of " + all.length + " rows" : "";
+      });
+    }
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("table.js-sortable"), function (table) {
+    try { enhanceSortableTable(table); } catch (err) { /* degrade silently — the server-sorted table stands */ }
+  });
 })();

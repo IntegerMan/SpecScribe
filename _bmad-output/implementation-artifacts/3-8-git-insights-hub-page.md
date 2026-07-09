@@ -1,6 +1,10 @@
+---
+baseline_commit: 47ff3ea15365ec928ac5ffdb13a6ea985c2ee516
+---
+
 # Story 3.8: Git Insights Hub Page
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -53,37 +57,37 @@ When `--deep-git` is enabled (Story 3.2's `ForgeOptions.DeepGitAnalytics`), and 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Land/confirm the `--deep-git` gate + shared numstat foundation (AC: #2)** — prerequisite from Story 3.2
-  - [ ] Subtask 1.1: Confirm `ForgeOptions.DeepGitAnalytics` and the gated `TryComputeDeep(...)` call exist ([ForgeOptions.cs](../../src/SpecScribe/ForgeOptions.cs), [SiteGenerator.cs:407](../../src/SpecScribe/SiteGenerator.cs)). If Story 3.2 has not merged, land its `--deep-git` flag + resolved option + single-call gate first — do **not** duplicate this plumbing. [Source: 3-2 story Tasks 1-2]
-  - [ ] Subtask 1.2: Confirm the shared bounded `git log --numstat` parse exists in [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs). There must be exactly **one** deep-git code path; this story extends it, never adds a second `git log`.
+- [x] **Task 1: Land/confirm the `--deep-git` gate + shared numstat foundation (AC: #2)** — prerequisite from Story 3.2
+  - [x] Subtask 1.1: Confirm `ForgeOptions.DeepGitAnalytics` and the gated `TryComputeDeep(...)` call exist ([ForgeOptions.cs](../../src/SpecScribe/ForgeOptions.cs), [SiteGenerator.cs:407](../../src/SpecScribe/SiteGenerator.cs)). If Story 3.2 has not merged, land its `--deep-git` flag + resolved option + single-call gate first — do **not** duplicate this plumbing. [Source: 3-2 story Tasks 1-2]
+  - [x] Subtask 1.2: Confirm the shared bounded `git log --numstat` parse exists in [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs). There must be exactly **one** deep-git code path; this story extends it, never adds a second `git log`.
 
-- [ ] **Task 2: Aggregate the hub data from the one shared parse (AC: #1)**
-  - [ ] Subtask 2.1: Extend the shared numstat fetch format to carry `%an` (author) and `%ad` (author-date) via `\x01`/`\x1f` record/field sentinels (also `%s`/`%b` so 7.5 can share the fetch). Bound the window (`-n`/`--since`) exactly as 3.1/3.2 do — never uncapped ([deferred-work.md:36-38](../../_bmad-output/implementation-artifacts/deferred-work.md)).
-  - [ ] Subtask 2.2: Add a pure, static, repo-free aggregation helper in [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs) (mirror `ParseLog`/`ParseChangedFiles`: raw text in, parsed out, skip malformed, never throw, invariant parse) producing three views: (a) per-file change frequency + churn (+added/−deleted), (b) an activity-over-time series, (c) per-contributor attribution counts (commits / files touched). Frame contributors as attribution, **never** a ranked leaderboard. [Source: prd.md:141, 182]
-  - [ ] Subtask 2.3: Surface the aggregates on the progress model — enrich 3.2's `DeepGitPulse` or add a sibling nullable field on [ProgressModel.cs](../../src/SpecScribe/ProgressModel.cs) (mirror `GitPulse? Git`, add to `Empty`); thread through `ProgressCalculator.Compute`. Prefer **one fetch, one parse, two views** (reuse `DeepGit` if it already carries enough).
+- [x] **Task 2: Aggregate the hub data from the one shared parse (AC: #1)**
+  - [x] Subtask 2.1: Extend the shared numstat fetch format to carry `%an` (author) and `%ad` (author-date) via `\x01`/`\x1f` record/field sentinels (also `%s`/`%b` so 7.5 can share the fetch). Bound the window (`-n`/`--since`) exactly as 3.1/3.2 do — never uncapped ([deferred-work.md:36-38](../../_bmad-output/implementation-artifacts/deferred-work.md)).
+  - [x] Subtask 2.2: Add a pure, static, repo-free aggregation helper in [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs) (mirror `ParseLog`/`ParseChangedFiles`: raw text in, parsed out, skip malformed, never throw, invariant parse) producing three views: (a) per-file change frequency + churn (+added/−deleted), (b) an activity-over-time series, (c) per-contributor attribution counts (commits / files touched). Frame contributors as attribution, **never** a ranked leaderboard. [Source: prd.md:141, 182]
+  - [x] Subtask 2.3: Surface the aggregates on the progress model — enrich 3.2's `DeepGitPulse` or add a sibling nullable field on [ProgressModel.cs](../../src/SpecScribe/ProgressModel.cs) (mirror `GitPulse? Git`, add to `Empty`); thread through `ProgressCalculator.Compute`. Prefer **one fetch, one parse, two views** (reuse `DeepGit` if it already carries enough).
 
-- [ ] **Task 3: Render the hub page (`GitInsightsTemplater`) (AC: #1)**
-  - [ ] Subtask 3.1: Add `src/SpecScribe/GitInsightsTemplater.cs` (`static RenderPage(...)`), cloning [CommitDayTemplater.cs](../../src/SpecScribe/CommitDayTemplater.cs)'s synthesized-shell pattern: `PathUtil.RenderHeadOpen` + `nav.RenderNavBar` + `SiteNav.RenderBreadcrumb` (`Home / Git Insights`) + one `<main id="main-content">` + `PathUtil.RenderFooter`.
-  - [ ] Subtask 3.2: Render the three sections. File frequency + contributors as accessible `<table>`s with `<caption>` and `<th scope="col">` ([EXPERIENCE.md:234](../../_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md)); activity-over-time by reusing `Charts.CommitHeatmap`. Server-sort every table at generation time (frequency desc, ordinal tie-break). HTML-escape every path/author/subject via `PathUtil.Html`. Empty section → friendly in-panel note, not a broken table.
-  - [ ] Subtask 3.3: Guard every outgoing detail-page link on target existence — file rows → `code/<path>.html` (7.1) / per-file page (7.4); commit refs → `commit/{hash}.html` (7.5). Link only when the target's path is in the generator's cached map; otherwise plain escaped text. No dead links.
+- [x] **Task 3: Render the hub page (`GitInsightsTemplater`) (AC: #1)**
+  - [x] Subtask 3.1: Add `src/SpecScribe/GitInsightsTemplater.cs` (`static RenderPage(...)`), cloning [CommitDayTemplater.cs](../../src/SpecScribe/CommitDayTemplater.cs)'s synthesized-shell pattern: `PathUtil.RenderHeadOpen` + `nav.RenderNavBar` + `SiteNav.RenderBreadcrumb` (`Home / Git Insights`) + one `<main id="main-content">` + `PathUtil.RenderFooter`.
+  - [x] Subtask 3.2: Render the three sections. File frequency + contributors as accessible `<table>`s with `<caption>` and `<th scope="col">` ([EXPERIENCE.md:234](../../_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md)); activity-over-time by reusing `Charts.CommitHeatmap`. Server-sort every table at generation time (frequency desc, ordinal tie-break). HTML-escape every path/author/subject via `PathUtil.Html`. Empty section → friendly in-panel note, not a broken table.
+  - [x] Subtask 3.3: Guard every outgoing detail-page link on target existence — file rows → `code/<path>.html` (7.1) / per-file page (7.4); commit refs → `commit/{hash}.html` (7.5). Link only when the target's path is in the generator's cached map; otherwise plain escaped text. No dead links.
 
-- [ ] **Task 4: Wire the gated generation phase (AC: #1, #2)**
-  - [ ] Subtask 4.1: Add `GenerationPhase.GitInsights` (enum + label) to [GenerationReporter.cs](../../src/SpecScribe/GenerationReporter.cs).
-  - [ ] Subtask 4.2: Add `GenerateGitInsightsInternal(...)` to [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs), invoked from `GenerateAll` **only when** `_options.DeepGitAnalytics && <deep data present>` (mirror the `if (_progress?.Git is { } gitPulse)` commit-days gate, [SiteGenerator.cs:121-126](../../src/SpecScribe/SiteGenerator.cs)); place it after the commit-days phase, before `WriteIndex`. Write `git-insights.html`, run `ApplyReferenceLinks`, wrap render in `try/catch → GenerationEvent`, and record `_gitInsightsPath` when produced.
-  - [ ] Subtask 4.3: Add `SiteNav.GitInsightsOutputPath = "git-insights.html"` constant. (A gated top-nav entry is optional — see "Discovery / entry points"; skip it if it could dangle.)
+- [x] **Task 4: Wire the gated generation phase (AC: #1, #2)**
+  - [x] Subtask 4.1: Add `GenerationPhase.GitInsights` (enum + label) to [GenerationReporter.cs](../../src/SpecScribe/GenerationReporter.cs).
+  - [x] Subtask 4.2: Add `GenerateGitInsightsInternal(...)` to [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs), invoked from `GenerateAll` **only when** `_options.DeepGitAnalytics && <deep data present>` (mirror the `if (_progress?.Git is { } gitPulse)` commit-days gate, [SiteGenerator.cs:121-126](../../src/SpecScribe/SiteGenerator.cs)); place it after the commit-days phase, before `WriteIndex`. Write `git-insights.html`, run `ApplyReferenceLinks`, wrap render in `try/catch → GenerationEvent`, and record `_gitInsightsPath` when produced.
+  - [x] Subtask 4.3: Add `SiteNav.GitInsightsOutputPath = "git-insights.html"` constant. (A gated top-nav entry is optional — see "Discovery / entry points"; skip it if it could dangle.)
 
-- [ ] **Task 5: Entry point from the dashboard (AC: #2)**
-  - [ ] Subtask 5.1: Render a "View all git insights →" link on Story 3.1's consolidated Git Pulse panel ([Charts.cs](../../src/SpecScribe/Charts.cs)/[HtmlTemplater.cs](../../src/SpecScribe/HtmlTemplater.cs)), shown **only** when `_gitInsightsPath` is set (the hub was generated). This is the primary route in; the breadcrumb is the route back.
+- [x] **Task 5: Entry point from the dashboard (AC: #2)**
+  - [x] Subtask 5.1: Render a "View all git insights →" link on Story 3.1's consolidated Git Pulse panel ([Charts.cs](../../src/SpecScribe/Charts.cs)/[HtmlTemplater.cs](../../src/SpecScribe/HtmlTemplater.cs)), shown **only** when `_gitInsightsPath` is set (the hub was generated). This is the primary route in; the breadcrumb is the route back.
 
-- [ ] **Task 6: Progressive-enhancement table sort/filter (AC: #1)**
-  - [ ] Subtask 6.1: Extend `src/SpecScribe/assets/specscribe.js` (the one sanctioned script) with a dependency-free, delegated enhancer: opt-in tables (e.g. `class="js-sortable"`) get activatable column headers (button semantics + `aria-sort`) that re-order **already-present** `<tbody>` rows, plus an optional labeled filter `<input>` that hides non-matching rows. No fetch, no new information. Degrade silently with JS off.
-  - [ ] Subtask 6.2: Add `.git-insights`/table/sort-control/filter styles to `src/SpecScribe/assets/specscribe.css` using neutral tokens (not `--status-*`); wide tables scroll inside their own `overflow-x: auto` container, body never scrolls horizontally; sort direction via glyph/`aria-sort`, never color alone; any row transition under the reduced-motion `no-preference`/`reduce` seam. Edit **only** `src/SpecScribe/assets/specscribe.css` ([[generate-output-dir-is-specscribeoutput]]). Update `StylesheetTests` if it asserts class presence.
+- [x] **Task 6: Progressive-enhancement table sort/filter (AC: #1)**
+  - [x] Subtask 6.1: Extend `src/SpecScribe/assets/specscribe.js` (the one sanctioned script) with a dependency-free, delegated enhancer: opt-in tables (e.g. `class="js-sortable"`) get activatable column headers (button semantics + `aria-sort`) that re-order **already-present** `<tbody>` rows, plus an optional labeled filter `<input>` that hides non-matching rows. No fetch, no new information. Degrade silently with JS off.
+  - [x] Subtask 6.2: Add `.git-insights`/table/sort-control/filter styles to `src/SpecScribe/assets/specscribe.css` using neutral tokens (not `--status-*`); wide tables scroll inside their own `overflow-x: auto` container, body never scrolls horizontally; sort direction via glyph/`aria-sort`, never color alone; any row transition under the reduced-motion `no-preference`/`reduce` seam. Edit **only** `src/SpecScribe/assets/specscribe.css` ([[generate-output-dir-is-specscribeoutput]]). Update `StylesheetTests` if it asserts class presence.
 
-- [ ] **Task 7: Test coverage (AC: #1, #2)**
-  - [ ] Subtask 7.1: Pure-aggregation tests (extend [GitMetricsTests.cs](../../tests/SpecScribe.Tests/GitMetricsTests.cs)): frequency ordering/top-N/churn; binary (`-`/`-`) numstat; per-contributor counts; activity bucketing; `\x01`/`\x1f` multi-line body/subject parsing; malformed skipped; empty → empty.
-  - [ ] Subtask 7.2: `GitInsightsTemplaterTests.cs` (unit): a11y contract, `<caption>`/`<th scope>`, escaping, guarded-link (present→`<a>`, absent→plain text), attribution-not-ranking framing, empty-section note.
-  - [ ] Subtask 7.3: Generation-level: **gate test** (`DeepGitAnalytics == false` → no `git-insights.html`, no error, unchanged dashboard — the load-bearing AC #2 pin); enabled → page generated + dashboard link present; deep-unavailable-with-flag-on → no hub, no error, rest of site generates; determinism (two runs identical).
-  - [ ] Subtask 7.4: Full pass: `dotnet test`; then `dotnet run --project src/SpecScribe -- generate --deep-git`, open `SpecScribeOutput/git-insights.html`, **disable JS and reload** (tables still complete/ordered/navigable — the NFR-5 gate), re-enable and confirm sort/filter announce state.
+- [x] **Task 7: Test coverage (AC: #1, #2)**
+  - [x] Subtask 7.1: Pure-aggregation tests (extend [GitMetricsTests.cs](../../tests/SpecScribe.Tests/GitMetricsTests.cs)): frequency ordering/top-N/churn; binary (`-`/`-`) numstat; per-contributor counts; activity bucketing; `\x01`/`\x1f` multi-line body/subject parsing; malformed skipped; empty → empty.
+  - [x] Subtask 7.2: `GitInsightsTemplaterTests.cs` (unit): a11y contract, `<caption>`/`<th scope>`, escaping, guarded-link (present→`<a>`, absent→plain text), attribution-not-ranking framing, empty-section note.
+  - [x] Subtask 7.3: Generation-level: **gate test** (`DeepGitAnalytics == false` → no `git-insights.html`, no error, unchanged dashboard — the load-bearing AC #2 pin); enabled → page generated + dashboard link present; deep-unavailable-with-flag-on → no hub, no error, rest of site generates; determinism (two runs identical).
+  - [x] Subtask 7.4: Full pass: `dotnet test`; then `dotnet run --project src/SpecScribe -- generate --deep-git`, open `SpecScribeOutput/git-insights.html`, **disable JS and reload** (tables still complete/ordered/navigable — the NFR-5 gate), re-enable and confirm sort/filter announce state.
 
 ---
 
@@ -264,10 +268,42 @@ No external libraries or APIs are introduced. Platform notes: `System.Diagnostic
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Fable 5 (claude-fable-5)
 
 ### Debug Log References
 
+- `dotnet test` full suite: 557/557 passing (was 526 before this story; +31 new tests).
+- Real generation passes against this repo: `generate --deep-git` → 44 pages incl. `git-insights.html`; default `generate` → 42 pages, no hub, no dashboard hub link, no stale page (full-wipe covers).
+- Browser verification (served static output): three sections render; sort buttons toggle `aria-sort` + glyph and re-order rows; filter hides non-matching rows with a live "N of M rows" count; zero console errors; at 375px the body does not scroll horizontally while both `.table-scroll` containers do.
+
 ### Completion Notes List
 
+- **One fetch, one parse, several views.** Extended Story 3.2's single deep-git fetch to `log --numstat --date=format:%Y-%m-%dT%H:%M --pretty=format:%x01%H%x1f%an%x1f%ad%x1f%s%x1f%b%x1f -n 300` (still bounded, still one `git log`). New pure `GitMetrics.ParseNumstatRecords` splits on the `\x01`/`\x1f` sentinels (trailing `\x1f` closes the body so multi-line bodies can never bleed into the file set) and also accepts the old `%x01%H`-only shape; `ParseNumstatLog` was refactored to compute hotspots/coupling as one view over those records (all 3.2 tests untouched and green) and now carries the hub aggregates alongside. `DeepCommit` retains `%s`/`%b` so Story 7.5 can reuse the same fetch.
+- **Model seam:** rather than a new `ProgressModel` field, the hub aggregates ride as `DeepGitPulse.Insights` (`GitInsightsData`: per-file frequency+churn top-50, per-contributor attribution counts, per-day activity series, window commit count). Deviation from Subtask 4.2's `_gitInsightsPath` field: the generator instead clears `DeepGit.Insights` when the hub write fails — the exact pattern 3.2 established for `DeepGit` itself — so one signal gates both the page and the dashboard link and can never dangle.
+- **Hub page (`GitInsightsTemplater`)**: CommitDayTemplater-style synthesized shell (`deep-page git-insights` main). File-frequency + contributor sections are accessible, server-sorted `<table>`s (`<caption>`, `<th scope="col">`, contributor names as `scope="row"`); activity-over-time reuses `Charts.CommitHeatmap` (baseline pulse series, so its day links always match the generated `commits/{date}.html` set) with a headline derived from the deep window's activity series. Guarded links via injectable `fileHref`/`commitHref` resolvers, unwired until 7.1/7.4/7.5 land their page maps → plain escaped text today, links light up automatically later. Contributor section framed as attribution ("not a scoreboard"), no rank column.
+- **Gating (AC #2):** `GenerateGitInsightsInternal` runs only when `DeepGit.Insights` exists (which itself requires `--deep-git`); flag off ⇒ zero extra git work, zero pages, dashboard byte-identical (pinned by generation tests, not wall-clock timing). Non-fatal render failure → Error event + link cleared, run still succeeds.
+- **Progressive enhancement:** the sanctioned `specscribe.js` gained one `js-sortable` table enhancer — headers become real `<button>`s announcing `aria-sort` (+ glyph, never color-only), rows re-order in place; the labeled filter `<input>` (+ `aria-live` row count) is **created by JS**, so no dead control ships in the no-JS page. Row hiding is `display`-based — no new motion, so the reduced-motion seam needs no new entries.
+- **CSS:** neutral-token `.gi-table`/`.gi-sort-btn`/`.gi-filter` styles; `.table-scroll { overflow-x: auto; contain: inline-size; }` — the `contain` is load-bearing: without it the tables' nowrap min-content propagates through the shrink-to-fit `.deep-page` main and forces body-level horizontal scroll on narrow viewports (found and fixed during browser verification).
+- **NFR-5 no-JS gate:** verified structurally — every row, value, and (guarded) link is server-rendered and server-sorted in the static HTML; the sort/filter controls do not exist without JS, so nothing dangles.
+
 ### File List
+
+- src/SpecScribe/GitMetrics.cs (modified — enriched shared fetch format; `DeepCommit`/`DeepFileChange`/`FileChangeStat`/`ContributorStat`/`GitInsightsData` records; `ParseNumstatRecords`; `BuildInsights`; `ParseNumstatLog` refactored onto the record parse; `DeepGitPulse.Insights`)
+- src/SpecScribe/GitInsightsTemplater.cs (new — the hub page renderer)
+- src/SpecScribe/SiteGenerator.cs (modified — `GenerateGitInsightsInternal` gated phase, invoked from `GenerateAll` after commit-days/deep-analytics, before `WriteIndex`)
+- src/SpecScribe/GenerationReporter.cs (modified — `GenerationPhase.GitInsights` + label)
+- src/SpecScribe/SiteNav.cs (modified — `GitInsightsOutputPath` constant; no top-nav entry by design)
+- src/SpecScribe/HtmlTemplater.cs (modified — Git Pulse header "View all git insights →" link gated on `DeepGit.Insights`)
+- src/SpecScribe/assets/specscribe.js (modified — `js-sortable` sort/filter enhancer appended to the one sanctioned script)
+- src/SpecScribe/assets/specscribe.css (modified — Git Insights hub section: `.table-scroll`, `.gi-table`, `.gi-sort-btn`, `.gi-filter`, `.gi-row-hidden`, `.git-pulse-header-links`)
+- tests/SpecScribe.Tests/GitMetricsTests.cs (modified — 11 new record-parse/aggregation tests)
+- tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs (new — 7 hub-page unit tests)
+- tests/SpecScribe.Tests/SiteGeneratorGitInsightsTests.cs (new — 4 generation-level gate/enabled/degradation/determinism tests)
+- tests/SpecScribe.Tests/HtmlTemplaterTests.cs (modified — hub-link gating test)
+- tests/SpecScribe.Tests/StylesheetTests.cs (modified — Story 3.8 CSS/JS seam guards)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified — story status tracking)
+- _bmad-output/implementation-artifacts/3-8-git-insights-hub-page.md (modified — this story file)
+
+## Change Log
+
+- 2026-07-09: Implemented Story 3.8 — aggregate Git Insights hub (`git-insights.html`) behind the `--deep-git` gate: enriched the one shared numstat fetch with author/date/subject/body sentinels, added pure record-parse + hub aggregation views in GitMetrics, new GitInsightsTemplater page (accessible server-sorted tables, reused commit heatmap, guarded detail links), gated SiteGenerator phase + dashboard "View all git insights →" entry link, progressive-enhancement table sort/filter in the sanctioned script, and full unit/templater/generation test coverage (557 tests green).

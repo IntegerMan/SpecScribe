@@ -286,14 +286,19 @@ public static class HtmlTemplater
         // shows the whole-repo total; this panel is the richer at-a-glance activity surface. Single non-fatal
         // fallback: the UX spec's "—" + tooltip. [Story 3.1 AC #3; EXPERIENCE.md:169]
         sb.Append("<div class=\"chart-panel git-pulse-panel\">\n");
-        // When deep analytics were generated (--deep-git), the Git Pulse header gains a "View Deep Analytics →"
-        // link in its upper-right — the entry point to the dedicated deep-git page (hotspots + coupling graph),
-        // mirroring the sunburst panel's "View …" affordance. Absent (plain heading) when the flag is off, so
-        // the default dashboard is unchanged. [Story 3.2]
+        // When deep analytics were generated (--deep-git), the Git Pulse header gains its upper-right entry
+        // links: "View all git insights →" to the aggregate hub (Story 3.8 — the primary route in; gated on
+        // DeepGit.Insights, which SiteGenerator clears if the hub page wasn't actually written, so the link
+        // can never dangle) and "View Deep Analytics →" to the coupling/hotspots page (Story 3.2). Both are
+        // absent (plain heading) when the flag is off, so the default dashboard is unchanged.
         if (p.DeepGit is not null)
         {
-            sb.Append("<div class=\"chart-panel-header-row\"><h3>Git Pulse</h3>");
-            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.DeepAnalyticsOutputPath}\">View Deep Analytics &rarr;</a></div>\n");
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Git Pulse</h3><span class=\"git-pulse-header-links\">");
+            if (p.DeepGit.Insights is not null)
+            {
+                sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.GitInsightsOutputPath}\">View all git insights &rarr;</a>");
+            }
+            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.DeepAnalyticsOutputPath}\">View Deep Analytics &rarr;</a></span></div>\n");
         }
         else
         {

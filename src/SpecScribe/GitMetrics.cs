@@ -33,7 +33,56 @@ public sealed record GitPulse(
 /// entirely rather than shown empty. [Story 3.2]</summary>
 public sealed record DeepGitPulse(
     IReadOnlyList<(string Path, int Changes)> Hotspots,
-    IReadOnlyList<(string FileA, string FileB, int CoChanges)> Coupling);
+    IReadOnlyList<(string FileA, string FileB, int CoChanges)> Coupling)
+{
+    /// <summary>The Git Insights hub aggregates (file frequency + churn, contributor attribution, activity)
+    /// computed from the SAME shared numstat parse — one fetch, one parse, several views. Settable (not
+    /// <c>init</c>) for the same reason <see cref="ProgressModel.DeepGit"/> is: <see cref="SiteGenerator"/>
+    /// clears it if writing <c>git-insights.html</c> fails, so the dashboard's "View all git insights" link is
+    /// never left pointing at a page that doesn't exist. [Story 3.8]</summary>
+    public GitInsightsData? Insights { get; set; }
+}
+
+/// <summary>One file's numstat row within a commit. <paramref name="Added"/>/<paramref name="Deleted"/> are
+/// null for binary files (git prints <c>-</c> for both counts) — the path still counts as a change. [Story 3.8]</summary>
+public sealed record DeepFileChange(string Path, int? Added, int? Deleted);
+
+/// <summary>One commit parsed from the shared deep-git numstat fetch: identity (<paramref name="Hash"/>,
+/// <paramref name="Author"/>, <paramref name="Timestamp"/>), message (<paramref name="Subject"/> and the
+/// free-text <paramref name="Body"/>, carried so the per-commit detail pages of Story 7.5 can reuse this one
+/// fetch), and the commit's touched-file set. <paramref name="Timestamp"/> is null when the record predates
+/// the enriched fetch format or the date failed to parse. [Story 3.8]</summary>
+public sealed record DeepCommit(
+    string Hash,
+    string Author,
+    DateTime? Timestamp,
+    string Subject,
+    string Body,
+    IReadOnlyList<DeepFileChange> Files);
+
+/// <summary>One file's aggregate change stats for the Git Insights hub: how many commits touched it in the
+/// analyzed window plus total line churn. <paramref name="LinesAdded"/>/<paramref name="LinesDeleted"/> sum
+/// only text-file rows (binary rows carry no counts). [Story 3.8]</summary>
+public sealed record FileChangeStat(string Path, int Changes, int LinesAdded, int LinesDeleted);
+
+/// <summary>One contributor's attribution counts for the Git Insights hub — collaboration context ("who has
+/// been active where"), never a productivity ranking (PRD non-goal). <paramref name="LatestHash"/> is the
+/// contributor's most recent commit in the window (git log order), for the guarded per-commit link. [Story 3.8]</summary>
+public sealed record ContributorStat(
+    string Name,
+    int Commits,
+    int FilesTouched,
+    DateOnly? LastCommitDate,
+    string LatestHash);
+
+/// <summary>The aggregate views behind the Git Insights hub page (FR-10), all derived from the one shared
+/// bounded numstat fetch: per-file change frequency + churn, per-contributor attribution, and the per-day
+/// activity series for the analyzed window (<paramref name="CommitCount"/> commits). [Story 3.8]</summary>
+public sealed record GitInsightsData(
+    IReadOnlyList<FileChangeStat> Files,
+    IReadOnlyList<ContributorStat> Contributors,
+    IReadOnlyList<(DateOnly Day, int Count)> Activity,
+    int CommitCount);
 
 /// <summary>Shells out to git for a handful of read-only stats. Never throws and never blocks a save —
 /// any failure (git missing, not a repo, slow process) simply yields a null pulse, which callers treat
@@ -206,11 +255,15 @@ public static class GitMetrics
         {
             // Bounded with -n so an uncapped log can't blow the 3s RunGit budget on a mature repo
             // (deferred-work.md flagged this exact scaling trap). --numstat emits one "added\tdeleted\tpath"
-            // line per file per commit; the \x01 sentinel prefixes each commit's header line so the parser can
-            // find commit boundaries unambiguously. --numstat (not bare --name-only) is the shared foundation
-            // the Epic-3 git re-plan designates for the downstream hub/detail stories; this story ignores the
-            // added/deleted columns and uses only the file-set data. [Story 3.2 re-plan]
-            var logText = RunGit(repoRoot, "log --numstat --pretty=format:%x01%H -n 300");
+            // line per file per commit. The \x01 sentinel marks each commit record's start and \x1f separates
+            // its header fields (hash, author, date, subject, body) — free-text-safe delimiters, since bodies
+            // can contain blank lines and tabs. A trailing \x1f closes the body so the numstat rows that follow
+            // can never be mistaken for message text. The date format uses a 'T' separator (not a space) for
+            // the same argument-tokenizing reason TryCompute's does. --numstat (not bare --name-only) plus the
+            // author/date/subject/body fields make this THE one shared fetch feeding the deep panel (3.2), the
+            // Git Insights hub (3.8), and the per-file/per-commit detail pages (7.4/7.5). [Story 3.2 re-plan; Story 3.8]
+            var logText = RunGit(repoRoot,
+                "log --numstat --date=format:%Y-%m-%dT%H:%M --pretty=format:%x01%H%x1f%an%x1f%ad%x1f%s%x1f%b%x1f -n 300");
             if (logText is null) return null;
 
             return ParseNumstatLog(logText);
@@ -221,14 +274,15 @@ public static class GitMetrics
         }
     }
 
-    /// <summary>Parses `git log --numstat --pretty=format:%x01%H` output into deep-git signals. Each commit is
-    /// introduced by a line beginning with the <c>\x01</c> sentinel; the following <c>added\tdeleted\tpath</c>
-    /// lines are that commit's touched files (binary files show <c>-\t-\tpath</c> — the path is still taken).
+    /// <summary>Parses the shared deep-git numstat log (see <see cref="ParseNumstatRecords"/> for the record
+    /// format — the enriched sentinel shape and the minimal <c>%x01%H</c> shape are both accepted) into the
+    /// deep-git signals.
     /// <para><b>Hotspots</b> = per-path change frequency (commits touching the file), sorted desc with an
     /// ordinal path tie-break, top <paramref name="topHotspots"/>. <b>Coupling</b> = for each commit's file
     /// set, every unordered co-changed pair, kept only at <c>CoChanges &gt;= 2</c>, sorted desc, top
     /// <paramref name="topCoupling"/>. Commits touching more than <see cref="CouplingFileSetCap"/> files are
-    /// skipped for coupling (bulk imports).</para>
+    /// skipped for coupling (bulk imports). The returned pulse also carries the Git Insights hub aggregates
+    /// (<see cref="DeepGitPulse.Insights"/>) computed from the same parsed records. [Story 3.8]</para>
     /// Pure and repo-free (mirrors <see cref="ParseLog"/>) so the format contract is unit-testable; malformed
     /// lines are skipped rather than throwing.</summary>
     public static DeepGitPulse ParseNumstatLog(string logText, int topHotspots = 10, int topCoupling = 10)
@@ -236,11 +290,16 @@ public static class GitMetrics
         var changeCounts = new Dictionary<string, int>();
         // Canonicalized (ordinal-ordered) file pair -> number of commits changing both together.
         var pairCounts = new Dictionary<(string, string), int>();
-        var current = new HashSet<string>(StringComparer.Ordinal);
+        // Refactored (Story 3.8) to ride the shared record parse: the raw text is parsed ONCE into
+        // per-commit records, and hotspots/coupling are computed as one view over them — the Git Insights
+        // hub aggregates are a second view over the same records (one fetch, one parse, several views).
+        var commits = ParseNumstatRecords(logText);
 
-        void Flush()
+        foreach (var commit in commits)
         {
-            if (current.Count == 0) return;
+            // A commit's file SET: the same resolved path listed twice within one commit counts once.
+            var current = new HashSet<string>(commit.Files.Select(f => f.Path), StringComparer.Ordinal);
+            if (current.Count == 0) continue;
 
             foreach (var path in current)
             {
@@ -263,28 +322,7 @@ public static class GitMetrics
                     }
                 }
             }
-
-            current.Clear();
         }
-
-        foreach (var line in logText.Split('\n'))
-        {
-            if (line.Length > 0 && line[0] == '\u0001')
-            {
-                // New commit boundary — bank the previous commit's file set before starting the next.
-                Flush();
-                continue;
-            }
-
-            // A numstat data line: added \t deleted \t path. Cap the split at 3 so a path containing a tab
-            // survives intact; skip anything that doesn't have the two leading count columns.
-            var parts = line.Split('\t', 3);
-            if (parts.Length < 3) continue;
-            var filePath = ResolveRenamedPath(parts[2].Trim());
-            if (filePath.Length == 0) continue;
-            current.Add(filePath);
-        }
-        Flush(); // the final commit has no trailing sentinel to trigger its flush.
 
         var hotspots = changeCounts
             .OrderByDescending(kv => kv.Value)
@@ -302,7 +340,168 @@ public static class GitMetrics
             .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
             .ToList();
 
-        return new DeepGitPulse(hotspots, coupling);
+        return new DeepGitPulse(hotspots, coupling) { Insights = BuildInsights(commits) };
+    }
+
+    /// <summary>Commit-record boundary sentinel in the shared deep-git fetch (<c>%x01</c>): marks where each
+    /// commit's header begins. Field/record sentinels are used (not blank lines or tabs) because subjects and
+    /// bodies are free text. [Story 3.8]</summary>
+    private const char RecordSentinel = (char)0x01;
+
+    /// <summary>Header-field separator sentinel in the shared deep-git fetch (<c>%x1f</c>): splits hash /
+    /// author / date / subject / body; a trailing one closes the body so numstat rows can't be mistaken for
+    /// message text. [Story 3.8]</summary>
+    private const char FieldSentinel = (char)0x1F;
+
+    /// <summary>Parses the shared deep-git fetch
+    /// (<c>log --numstat --pretty=format:%x01%H%x1f%an%x1f%ad%x1f%s%x1f%b%x1f</c>) into one
+    /// <see cref="DeepCommit"/> per commit. Records are split on the <see cref="RecordSentinel"/>; within a
+    /// record the <see cref="FieldSentinel"/>s separate hash / author / date / subject / body, and everything
+    /// after the closing body sentinel is that commit's numstat rows — so multi-line bodies (even ones that
+    /// look like numstat rows) can never bleed into the file set. Also accepts the older minimal
+    /// <c>%x01%H</c>-only shape (first line = hash, rest = numstat rows). Pure and repo-free (mirrors
+    /// <see cref="ParseLog"/>): malformed lines are skipped, dates parse invariantly (culture-sensitive parses
+    /// corrupt dates under non-Gregorian default calendars), and it never throws. [Story 3.8]</summary>
+    public static IReadOnlyList<DeepCommit> ParseNumstatRecords(string logText)
+    {
+        var commits = new List<DeepCommit>();
+
+        foreach (var record in logText.Split(RecordSentinel))
+        {
+            if (record.Length == 0) continue; // the empty slice before the first sentinel
+
+            string hash;
+            var author = string.Empty;
+            var subject = string.Empty;
+            var body = string.Empty;
+            DateTime? stamp = null;
+            string numstatBlock;
+
+            var fields = record.Split(FieldSentinel);
+            if (fields.Length >= 6)
+            {
+                // Enriched shape: hash / author / date / subject / body, then the numstat rows.
+                hash = fields[0].Trim();
+                author = fields[1].Trim();
+                if (DateTime.TryParseExact(
+                        fields[2].Trim(), "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+                {
+                    stamp = parsed;
+                }
+                subject = fields[3].Trim();
+                body = fields[4].Trim();
+                numstatBlock = fields[5];
+            }
+            else
+            {
+                // Minimal legacy shape (%x01%H only): first line is the hash, the rest are numstat rows.
+                var newline = record.IndexOf('\n');
+                hash = (newline >= 0 ? record[..newline] : record).Trim();
+                numstatBlock = newline >= 0 ? record[(newline + 1)..] : string.Empty;
+            }
+
+            if (hash.Length == 0) continue;
+
+            var files = new List<DeepFileChange>();
+            foreach (var line in numstatBlock.Split('\n'))
+            {
+                // A numstat data line: added \t deleted \t path. Cap the split at 3 so a path containing a
+                // tab survives intact; skip anything that doesn't have the two leading count columns. Binary
+                // files print "-" for both counts — the path is still a change, the counts stay null.
+                var parts = line.Split('\t', 3);
+                if (parts.Length < 3) continue;
+                var filePath = ResolveRenamedPath(parts[2].Trim());
+                if (filePath.Length == 0) continue;
+                int? added = int.TryParse(parts[0].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var a) ? a : null;
+                int? deleted = int.TryParse(parts[1].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var d) ? d : null;
+                files.Add(new DeepFileChange(filePath, added, deleted));
+            }
+
+            commits.Add(new DeepCommit(
+                hash,
+                author.Length == 0 ? "Unknown" : author,
+                stamp,
+                subject,
+                body,
+                files));
+        }
+
+        return commits;
+    }
+
+    /// <summary>Aggregates the parsed deep-git records into the Git Insights hub's views (FR-10): per-file
+    /// change frequency + line churn (top <paramref name="topFiles"/>, change-count desc with an ordinal path
+    /// tie-break — the generation-time ordering IS the no-JS reading order), per-contributor attribution
+    /// counts (commits / files touched, commit-count desc with a name tie-break — collaboration context,
+    /// never a productivity ranking, per the PRD boundary), and the ascending per-day activity series for the
+    /// analyzed window. Pure and repo-free so every ordering/counting rule is unit-testable; empty input
+    /// yields empty views, never null. [Story 3.8]</summary>
+    public static GitInsightsData BuildInsights(IReadOnlyList<DeepCommit> commits, int topFiles = 50)
+    {
+        var fileStats = new Dictionary<string, (int Changes, int Added, int Deleted)>(StringComparer.Ordinal);
+        // Author -> counts + distinct file set + latest commit seen. Records arrive in git log order (newest
+        // first), so the first commit seen per author is their most recent — its hash feeds the guarded
+        // per-commit detail link (Story 7.5 seam).
+        var byAuthor = new Dictionary<string, (int Commits, HashSet<string> Files, DateTime? LastStamp, string LatestHash)>(StringComparer.Ordinal);
+        var byDay = new Dictionary<DateOnly, int>();
+
+        foreach (var commit in commits)
+        {
+            var seenInCommit = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var file in commit.Files)
+            {
+                // Change frequency counts a file once per commit; churn sums every row's line counts.
+                var stat = fileStats.GetValueOrDefault(file.Path);
+                if (seenInCommit.Add(file.Path)) stat.Changes++;
+                stat.Added += file.Added ?? 0;
+                stat.Deleted += file.Deleted ?? 0;
+                fileStats[file.Path] = stat;
+            }
+
+            if (byAuthor.TryGetValue(commit.Author, out var entry))
+            {
+                entry.Commits++;
+                entry.Files.UnionWith(seenInCommit);
+                // The newest record set LastStamp/LatestHash already; only backfill a stamp if it had none.
+                entry.LastStamp ??= commit.Timestamp;
+                byAuthor[commit.Author] = entry;
+            }
+            else
+            {
+                byAuthor[commit.Author] = (1, new HashSet<string>(seenInCommit, StringComparer.Ordinal), commit.Timestamp, commit.Hash);
+            }
+
+            if (commit.Timestamp is { } when)
+            {
+                var day = DateOnly.FromDateTime(when);
+                byDay[day] = byDay.GetValueOrDefault(day) + 1;
+            }
+        }
+
+        var files = fileStats
+            .OrderByDescending(kv => kv.Value.Changes)
+            .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+            .Take(topFiles)
+            .Select(kv => new FileChangeStat(kv.Key, kv.Value.Changes, kv.Value.Added, kv.Value.Deleted))
+            .ToList();
+
+        var contributors = byAuthor
+            .OrderByDescending(kv => kv.Value.Commits)
+            .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => new ContributorStat(
+                kv.Key,
+                kv.Value.Commits,
+                kv.Value.Files.Count,
+                kv.Value.LastStamp is { } last ? DateOnly.FromDateTime(last) : null,
+                kv.Value.LatestHash))
+            .ToList();
+
+        var activity = byDay
+            .OrderBy(kv => kv.Key)
+            .Select(kv => (Day: kv.Key, Count: kv.Value))
+            .ToList();
+
+        return new GitInsightsData(files, contributors, activity, commits.Count);
     }
 
     /// <summary>Resolves a `--numstat` path field to the file's current path, collapsing git's rename/move
