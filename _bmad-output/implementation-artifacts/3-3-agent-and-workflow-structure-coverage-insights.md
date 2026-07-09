@@ -175,3 +175,9 @@ next. Reworked it into an **actionable 2-column card grid** (no new architecture
   intro, per-family descriptions, whole-card links for present families, and copyable create-commands for
   missing ones. Extended `ArtifactCoverage` (Description/Href/CreateCommand + `CreateStepKeys`), generator href
   and command resolution, and tests. Full suite green (502).
+- 2026-07-08: Second review pass — renamed the panel "Planning Artifacts"; added a header coverage meter
+  (% present, `role=progressbar`); dropped the noisy "Present" chip (only Missing/Stale chip now); applied the
+  "Explore Key Views" family accent colors (planning=gold, architecture=teal, epics=moss, requirements=rust) as
+  a card left-edge; bumped card font sizes; moved the secondary decision-journal date off the card into a rich
+  body-level `js-tip` tooltip that spells out "Decision journal (.memlog) updated …" (clarifying the previously
+  cryptic "journal" bullet). Verified via computed styles + generated output; full suite green (502).

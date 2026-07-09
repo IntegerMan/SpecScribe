@@ -31,10 +31,11 @@ public class DeepAnalyticsTemplaterTests
 
         // Full page shell: skip link + single main landmark + breadcrumb, like the other synthesized pages.
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
-        Assert.Contains("<main id=\"main-content\">", html);
+        Assert.Contains("<main id=\"main-content\" class=\"deep-page\">", html);
         Assert.Contains("Deep Git Analytics", html);        // h1
         Assert.Contains(">Change Coupling</h2>", html);
-        Assert.Contains(">Git Hotspots</h2>", html);
+        // Hotspots moved into the lower row beside the ranked pairs, so it now reads as a panel <h3>.
+        Assert.Contains(">Git Hotspots</h3>", html);
     }
 
     [Fact]

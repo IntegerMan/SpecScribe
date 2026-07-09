@@ -156,18 +156,22 @@ public sealed class SiteNav
         var current = PathUtil.NormalizeSlashes(currentOutputRelativePath);
 
         var sb = new StringBuilder();
+        // The <nav> is the full-bleed sticky bar; an inner wrapper constrains the brand + links to the same
+        // centered content column width as the page body, so the brand and last item line up with the page
+        // gutters instead of floating at the viewport edges. [Deep Analytics polish]
         sb.Append("<nav class=\"site-nav\" aria-label=\"Document navigation\">\n");
-        sb.Append($"  <span class=\"site-nav-brand\">{PathUtil.Html(Brand)}</span>\n");
-        sb.Append("  <button class=\"site-nav-toggle\" type=\"button\" aria-label=\"Toggle navigation\" aria-controls=\"site-nav-links\" aria-expanded=\"false\">Menu</button>\n");
-        sb.Append("  <div class=\"site-nav-links\" id=\"site-nav-links\">\n");
+        sb.Append("  <div class=\"site-nav-inner\">\n");
+        sb.Append($"    <span class=\"site-nav-brand\">{PathUtil.Html(Brand)}</span>\n");
+        sb.Append("    <button class=\"site-nav-toggle\" type=\"button\" aria-label=\"Toggle navigation\" aria-controls=\"site-nav-links\" aria-expanded=\"false\">Menu</button>\n");
+        sb.Append("    <div class=\"site-nav-links\" id=\"site-nav-links\">\n");
         foreach (var (label, outputPath) in Items)
         {
             var href = prefix + outputPath;
             var isActive = string.Equals(PathUtil.NormalizeSlashes(outputPath), current, StringComparison.OrdinalIgnoreCase);
             var attrs = isActive ? " class=\"active\" aria-current=\"page\"" : string.Empty;
-            sb.Append($"    <a href=\"{PathUtil.Html(href)}\"{attrs}>{Icons.ForConcept(label)}{PathUtil.Html(label)}</a>\n");
+            sb.Append($"      <a href=\"{PathUtil.Html(href)}\"{attrs}>{Icons.ForConcept(label)}{PathUtil.Html(label)}</a>\n");
         }
-        sb.Append("  </div>\n</nav>\n");
+        sb.Append("    </div>\n  </div>\n</nav>\n");
         sb.Append("<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>\n\n");
         return sb.ToString();
     }

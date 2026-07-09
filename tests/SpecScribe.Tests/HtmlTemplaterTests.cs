@@ -357,11 +357,15 @@ public class HtmlTemplaterTests
             commands: CommandCatalog.Empty,
             coverage: coverage);
 
-        Assert.Contains("<h3>Planning Coverage</h3>", html);
+        Assert.Contains("<h3>Planning Artifacts</h3>", html);
         Assert.Contains("coverage-panel", html);
+        // Header coverage meter renders with progressbar semantics.
+        Assert.Contains("class=\"coverage-meter\" role=\"progressbar\"", html);
         // Present family shows its invariant DReadable freshness date; absent families show a "Missing" chip.
         Assert.Contains($"Updated {Charts.DReadable(modified)}", html);
         Assert.Contains(">Missing<", html);
+        // A present, fresh family is the quiet default — no "Present" chip noise.
+        Assert.DoesNotContain(">Present<", html);
     }
 
     [Fact]
@@ -374,7 +378,7 @@ public class HtmlTemplaterTests
             {
                 new ArtifactFamily("PRD", "PRD", "The product requirements doc.", Present: true,
                     LastModified: new DateOnly(2026, 6, 20), SourcePath: "planning-artifacts/prds/prd-x/prd.md",
-                    MemlogUpdated: null, Href: "planning-artifacts/prds/prd-x/prd.html"),
+                    MemlogUpdated: new DateOnly(2026, 6, 15), Href: "planning-artifacts/prds/prd-x/prd.html"),
             },
         };
 
@@ -382,9 +386,12 @@ public class HtmlTemplaterTests
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
             requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage);
 
-        // The whole present card is an anchor to the artifact's page, and its one-line description renders.
-        Assert.Contains("<a class=\"coverage-card present\" href=\"planning-artifacts/prds/prd-x/prd.html\">", html);
+        // The whole present card is an anchor to the artifact's page, carries its family accent + a rich
+        // js-tip tooltip, and its one-line description renders.
+        Assert.Contains("<a class=\"coverage-card js-tip present family-planning\" href=\"planning-artifacts/prds/prd-x/prd.html\" data-tip=", html);
         Assert.Contains("The product requirements doc.", html);
+        // The rich tooltip clarifies the decision-journal (memlog) meaning rather than a cryptic inline "journal".
+        Assert.Contains("Decision journal", html);
     }
 
     [Fact]
@@ -432,9 +439,10 @@ public class HtmlTemplaterTests
             requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty);
 
         // Graceful omission: no recognized families (or no coverage passed) leaves the dashboard unchanged.
-        Assert.DoesNotContain("Planning Coverage", withEmpty);
+        // Assert the panel-specific markers (the "Planning Artifacts" heading is also used by the index band).
         Assert.DoesNotContain("coverage-panel", withEmpty);
-        Assert.DoesNotContain("Planning Coverage", withNull);
+        Assert.DoesNotContain("coverage-grid", withEmpty);
+        Assert.DoesNotContain("coverage-panel", withNull);
     }
 
     [Fact]

@@ -58,6 +58,47 @@ public class ChartsTests
     }
 
     [Fact]
+    public void Sunburst_LegendEntriesAreKeyboardReachableAndStatusKeyedForEmphasis()
+    {
+        // The interactive-legend emphasis (Story 3.5 Task 3) is pure CSS, but it needs each legend entry to
+        // carry a status class the :has() rule can target AND a tabindex so keyboard users reach it. Guard
+        // both so the CSS affordance can't be silently unwired at the markup end.
+        var story = Story("1.1", "Do the thing", "in progress", done: 2, total: 5);
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(story) },
+        };
+
+        var svg = Charts.Sunburst(model);
+
+        Assert.Contains("<span class=\"sb-legend-item sb-review-item\" tabindex=\"0\">", svg);
+        Assert.Contains("<span class=\"sb-legend-item sb-done-item\" tabindex=\"0\">", svg);
+        // The always-visible swatch + label remain (status is never emphasis-only / colour-only).
+        Assert.Contains("<span class=\"swatch sb-review-sw\"></span>In review</span>", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_CellsCarryStaggerColumnIndexForEntrance()
+    {
+        // Each cell emits its week index as --col; specscribe.css derives the capped, reduced-motion-safe
+        // staggered entrance delay from it and --motion-stagger. Guard the wiring, not the exact delay
+        // (that's seed-level polish tuned in CSS). [Story 3.5 Task 2]
+        var series = new (DateOnly Day, int Count)[]
+        {
+            (new DateOnly(2026, 1, 5), 3),
+            (new DateOnly(2026, 1, 20), 1),
+        };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        Assert.Contains("style=\"--col:0\"", svg);
+        // The class the future-day/level tests assert stays intact right beside the new style hook.
+        Assert.Contains("class=\"heatmap-cell level-", svg);
+    }
+
+    [Fact]
     public void Sunburst_UndraftedStoryLinksToItsPlaceholderPageNotTheEpicPage()
     {
         // A story with no ArtifactOutputPath still has a generated placeholder page at StoryPagePath

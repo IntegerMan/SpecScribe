@@ -105,6 +105,115 @@ public class StylesheetTests
         Assert.Contains(".tree-branch", css);
     }
 
+    // ---- Story 3.5 seams (one tokenized, reduced-motion-safe insight motion vocabulary) ----------
+
+    [Fact]
+    public void Stylesheet_HasMotionTokens()
+    {
+        // One named motion family — the single-source discipline of --status-* applied to timing, so every
+        // insight surface animates with the same feel instead of scattered literal seconds. [Story 3.5 Task 1]
+        var css = ReadStylesheet();
+        Assert.Contains("--motion-fast:", css);
+        Assert.Contains("--motion-entrance:", css);
+        Assert.Contains("--motion-entrance-long:", css);
+        Assert.Contains("--motion-ease:", css);
+        Assert.Contains("--motion-stagger:", css);
+    }
+
+    [Fact]
+    public void Stylesheet_EntranceAnimationsRideMotionTokens()
+    {
+        // The existing 1.5 entrances were re-routed through the tokens (timings-only refactor), and the new
+        // insight-surface entrances use the same family — no bare-second literals sneaking back in. [Story 3.5 Task 1]
+        var css = ReadStylesheet();
+        Assert.Contains("animation: progress-grow var(--motion-entrance-long)", css);
+        Assert.Contains("animation: chart-enter var(--motion-entrance)", css);
+    }
+
+    [Fact]
+    public void Stylesheet_NoPreferenceCoversInsightSurfaces()
+    {
+        // The heatmap cell reveal (staggered via --col/--motion-stagger) and the shared sibling-panel reveal
+        // live in the no-preference half of the motion contract. [Story 3.5 Task 2]
+        var css = ReadStylesheet();
+        var block = NoPreferenceBlock(css);
+        Assert.Contains(".heatmap .heatmap-cell", block);
+        Assert.Contains("var(--motion-stagger)", block);
+        Assert.Contains("cell-fade", block);
+        Assert.Contains("panel-reveal", block);
+        // Keyed to already-present sibling roots so an unbuilt surface (the funnel until 3.6) is a no-op.
+        Assert.Contains(".git-pulse", block);
+        Assert.Contains(".coverage", block);
+        Assert.Contains(".structure-tree", block);
+        Assert.Contains(".refinement-funnel", block);
+    }
+
+    [Fact]
+    public void Stylesheet_ReduceBlockNeutralizesNewInsightMotion()
+    {
+        // The reduce half is a hard accessibility invariant (AC #2): every new entrance is explicitly cancelled
+        // so reduced-motion users get the fully-formed surfaces at rest with zero information loss. [Story 3.5 Task 4]
+        var css = ReadStylesheet();
+        var block = ReduceBlock(css);
+        Assert.Contains(".heatmap .heatmap-cell", block);
+        Assert.Contains(".refinement-funnel", block);
+        Assert.Contains("animation: none", block);
+    }
+
+    [Fact]
+    public void Stylesheet_HasInteractiveLegendEmphasisRule()
+    {
+        // Pure-CSS interactive-legend emphasis (UXO C3, deferred here by Story 1.5): a legend hover/focus dims
+        // the non-matching sunburst segments via :has(). Class toggle stayed out of JS. [Story 3.5 Task 3]
+        var css = ReadStylesheet();
+        Assert.Contains(".sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(.sb-review)", css);
+        Assert.Contains(".sunburst-panel:has(.sb-done-item:focus) .sb-seg:not(.sb-done)", css);
+        // The focusable legend entries keep the shared on-brand focus ring.
+        Assert.Contains(".sunburst-legend .sb-legend-item:focus-visible", css);
+    }
+
+    [Fact]
+    public void Script_DoesNotImplementLegendEmphasis()
+    {
+        // The no-new-JS contract for insight surfaces: legend emphasis is pure CSS, so the one sanctioned
+        // script must carry none of it — no legend/emphasis handler smuggled in. [Story 3.5 Task 5]
+        var js = ReadScript();
+        Assert.DoesNotContain("emphasize", js);
+        Assert.DoesNotContain("sunburst-legend", js);
+        Assert.DoesNotContain("sb-legend-item", js);
+    }
+
+    /// <summary>The body of the single <c>@media (prefers-reduced-motion: no-preference)</c> block.</summary>
+    private static string NoPreferenceBlock(string css) => MediaBlock(css, "@media (prefers-reduced-motion: no-preference)");
+
+    /// <summary>The body of the single <c>@media (prefers-reduced-motion: reduce)</c> block.</summary>
+    private static string ReduceBlock(string css) => MediaBlock(css, "@media (prefers-reduced-motion: reduce)");
+
+    /// <summary>Extracts a top-level @media block's body by brace-matching from its opening brace, so an
+    /// assertion targets that block rather than incidentally matching a selector elsewhere in the file.</summary>
+    private static string MediaBlock(string css, string header)
+    {
+        var start = css.IndexOf(header, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Missing block: {header}");
+        var open = css.IndexOf('{', start);
+        var depth = 0;
+        for (var i = open; i < css.Length; i++)
+        {
+            if (css[i] == '{') depth++;
+            else if (css[i] == '}' && --depth == 0) return css[open..(i + 1)];
+        }
+        throw new InvalidOperationException($"Unbalanced braces after {header}");
+    }
+
+    private static string ReadScript()
+    {
+        var asm = typeof(Charts).Assembly;
+        using var stream = asm.GetManifestResourceStream("SpecScribe.assets.specscribe.js")
+            ?? throw new InvalidOperationException("Embedded script 'SpecScribe.assets.specscribe.js' is missing.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
     [Fact]
     public void Script_IsEmbeddedAlongsideStylesheet()
     {

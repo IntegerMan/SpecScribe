@@ -38,6 +38,19 @@
   --status-review: var(--teal-deep);   /* deep teal — in review */
   --status-done: var(--moss-light);    /* green — done ONLY */
   --status-deferred: var(--ink-light); /* grey — requirements shelved for later */
+
+  /* ---- Motion vocabulary (Story 3.5 Task 1) ----
+     ONE named set of motion primitives — the same single-source discipline the --status-* tokens enforce for
+     color, applied to timing: every insight-surface entrance/hover reads with the same deliberate feel instead
+     of the scattered literal seconds (0.9s, 0.6s, 0.12s) they replaced. A NEW parallel family — it does NOT
+     touch or reshape the status tokens. Consumed almost entirely inside the two paired prefers-reduced-motion
+     blocks near the end of this file (the reduce half neutralizes everything these drive), plus the shared
+     chart hover transitions. "Flashy but purposeful" is one vocabulary, not per-chart magic numbers. */
+  --motion-fast: 0.12s;         /* hover/opacity feel — .sb-seg + .donut-seg emphasis */
+  --motion-entrance: 0.6s;      /* the chart reveal — donuts, sunburst, heatmap cells, insight panels */
+  --motion-entrance-long: 0.9s; /* the progress-bar width sweep */
+  --motion-ease: ease-out;
+  --motion-stagger: 0.04s;      /* per-item entrance delay unit — heatmap columns wipe left-to-right */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -120,16 +133,26 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 1rem;
-  padding: 0.7rem 1.5rem;
+  padding: 0.7rem 0;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 0.8rem;
   background: rgba(26, 18, 8, 0.94);
   border-bottom: 1px solid rgba(212, 184, 150, 0.25);
   backdrop-filter: blur(4px);
+}
+
+/* The nav content column: same centered max-width + side gutters as the page body, so the brand aligns with
+   the content's left edge and the last nav item with its right edge (the bar itself stays full-bleed). */
+.site-nav-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  box-sizing: border-box;
 }
 
 .site-nav-brand {
@@ -1118,7 +1141,7 @@ code.color-swatch {
 .chart-panel-header-row .view-epic-link { margin-top: 0; white-space: nowrap; }
 .sunburst { display: block; margin: 0 auto; max-width: 100%; height: auto; }
 
-.sb-seg { stroke: var(--warm-white); stroke-width: 1; transition: opacity 0.12s, stroke 0.12s, stroke-width 0.12s; }
+.sb-seg { stroke: var(--warm-white); stroke-width: 1; transition: opacity var(--motion-fast), stroke var(--motion-fast), stroke-width var(--motion-fast); }
 /* Interaction grammar (Story 1.5 D3): hovering a segment must EMPHASIZE it, not dim it. The old rule faded
    the hovered segment to 0.75 (reads as dimming what you point at). Instead dim the siblings and lift the
    hovered/focused one with the same gold stroke the focus ring uses — pointer and keyboard treatments match. */
@@ -1164,6 +1187,33 @@ code.color-swatch {
 .sunburst-legend .sb-active-sw { background: var(--status-active); }
 .sunburst-legend .sb-review-sw { background: var(--status-review); }
 .sunburst-legend .sb-done-sw { background: var(--status-done); }
+
+/* ---- Interactive-legend emphasis (Story 3.5 Task 3; the item Story 1.5 deferred here, UXO C3) ----
+   Hovering OR keyboard-focusing a legend entry isolates its status: matching segments stay full, every other
+   segment dims — the SAME "dim the siblings, emphasize the target" grammar as .sunburst:hover above, driven
+   from the legend so a reader can ask "show me what's in review" at a glance. Pure CSS via :has() on the
+   shared .sunburst-panel (the SVG and its legend are siblings inside it); no JS, no new script. Each legend
+   entry carries a status class (.sb-<status>-item) and tabindex="0" (emitted by Charts.SunburstLegend) so
+   both pointer and keyboard reach it. The opacity change rides --motion-fast via .sb-seg's transition and
+   collapses to instant under prefers-reduced-motion — emphasis is an ENHANCEMENT: the legend, its swatches
+   and every segment <title>/aria-label remain the always-present way to read a status. */
+.sunburst-legend .sb-legend-item { cursor: default; border-radius: 3px; padding: 0 0.15rem; }
+.sunburst-legend .sb-legend-item:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.sunburst-panel:has(.sb-pending-item:hover) .sb-seg:not(.sb-pending),
+.sunburst-panel:has(.sb-pending-item:focus) .sb-seg:not(.sb-pending),
+.sunburst-panel:has(.sb-drafted-item:hover) .sb-seg:not(.sb-drafted),
+.sunburst-panel:has(.sb-drafted-item:focus) .sb-seg:not(.sb-drafted),
+.sunburst-panel:has(.sb-ready-item:hover) .sb-seg:not(.sb-ready),
+.sunburst-panel:has(.sb-ready-item:focus) .sb-seg:not(.sb-ready),
+.sunburst-panel:has(.sb-active-item:hover) .sb-seg:not(.sb-active),
+.sunburst-panel:has(.sb-active-item:focus) .sb-seg:not(.sb-active),
+.sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(.sb-review),
+.sunburst-panel:has(.sb-review-item:focus) .sb-seg:not(.sb-review),
+.sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done),
+.sunburst-panel:has(.sb-done-item:focus) .sb-seg:not(.sb-done) {
+  opacity: 0.28;
+}
 
 /* Non-italic and nudged up from 0.72rem for legibility (small italic serif at that size was hard to read). [UXO H2] */
 .sunburst-hint { margin-top: 0.4rem; font-size: 0.78rem; color: var(--ink-light); font-style: normal; }
@@ -1478,7 +1528,7 @@ code.color-swatch {
 
 /* ====================== DONUT (SVG) ====================== */
 .donut-track { fill: none; stroke: var(--parchment-dark); stroke-width: 10; }
-.donut-seg { fill: none; stroke-width: 10; transform: rotate(-90deg); transform-origin: center; transition: stroke-width 0.12s; }
+.donut-seg { fill: none; stroke-width: 10; transform: rotate(-90deg); transform-origin: center; transition: stroke-width var(--motion-fast); }
 /* Data-hover grammar (Story 1.5 D1): a hovered donut slice bumps its stroke width to read as "highlighted". */
 .donut-seg:hover { stroke-width: 13; }
 .donut-seg.done { stroke: var(--status-done); }
@@ -1570,34 +1620,49 @@ code.color-swatch {
    status), so it is styled with neutral base-palette tones and never the --status-* lifecycle tokens — those
    stay the single stage→color source. Same discipline as the keyword styling above: non-lifecycle concepts
    must never co-opt the status tokens. Family glyphs inherit currentColor via .ss-icon — no per-row hex. [Story 3.3] */
-.coverage { display: flex; flex-direction: column; gap: 0.75rem; }
-.coverage-headline { font-size: 0.95rem; color: var(--ink-faded); }
-.coverage-headline strong { color: var(--ink); font-family: 'Courier New', monospace; }
-.coverage-intro { font-size: 0.82rem; color: var(--ink-light); line-height: 1.5; max-width: 62ch; }
+.coverage { display: flex; flex-direction: column; gap: 0.85rem; }
+
+/* Header: the present/total count beside a compact coverage meter showing the % present. */
+.coverage-summary { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.coverage-count { font-size: 0.95rem; color: var(--ink-faded); }
+.coverage-count strong { color: var(--ink); font-family: 'Courier New', monospace; }
+.coverage-meter { flex: 1 1 120px; min-width: 90px; max-width: 260px; height: 0.55rem; background: var(--parchment-dark); border-radius: 999px; overflow: hidden; }
+.coverage-meter-fill { display: block; height: 100%; background: var(--moss-light); border-radius: 999px; }
+.coverage-pct { font-size: 0.86rem; font-family: 'Courier New', monospace; color: var(--ink-faded); }
+.coverage-intro { font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; max-width: 64ch; }
 
 /* Two-column card grid, collapsing to one column on narrow screens (mirrors .dashboard-quick-links). */
-.coverage-grid { display: grid; grid-template-columns: 1fr; gap: 0.7rem; margin-top: 0.35rem; }
+.coverage-grid { display: grid; grid-template-columns: 1fr; gap: 0.7rem; margin-top: 0.25rem; }
 @media (min-width: 720px) { .coverage-grid { grid-template-columns: 1fr 1fr; } }
 
 .coverage-card {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  padding: 0.7rem 0.85rem;
+  padding: 0.75rem 0.9rem;
   border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
   border-radius: 8px;
   background: var(--warm-white);
 }
-/* Present cards are whole-card links — give them the same hover/lift affordance as the home index cards. */
-a.coverage-card { text-decoration: none; color: inherit; transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; }
-a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--shadow); transform: translateY(-1px); }
+/* Family accents — the same palette as the "Explore Key Views" pills (planning=gold, architecture=teal,
+   epics=moss, requirements=rust), carried onto the coverage cards as a left-edge accent for color literacy. */
+.coverage-card.family-planning { border-left-color: var(--gold-light); }
+.coverage-card.family-architecture { border-left-color: var(--teal); }
+.coverage-card.family-epics { border-left-color: var(--moss-light); }
+.coverage-card.family-requirements { border-left-color: var(--rust-light); }
+
+/* Present cards are whole-card links — give them the same hover/lift affordance as the home index cards
+   (keep the family accent on hover; only lift + shadow change). */
+a.coverage-card { text-decoration: none; color: inherit; transition: box-shadow 0.15s ease, transform 0.15s ease; }
+a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translateY(-1px); }
 
 .coverage-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
-.coverage-family { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: bold; color: var(--ink); }
-.coverage-desc { font-size: 0.8rem; color: var(--ink-faded); line-height: 1.5; }
-.coverage-freshness { font-size: 0.76rem; color: var(--ink-light); }
+.coverage-family { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: bold; font-size: 1rem; color: var(--ink); }
+.coverage-desc { font-size: 0.9rem; color: var(--ink-faded); line-height: 1.5; }
+.coverage-freshness { font-size: 0.84rem; color: var(--ink-light); }
 /* The missing-card call-to-action reuses the Next Steps .cmd-badge; the lead text sits inline before it. */
-.coverage-cta { font-size: 0.8rem; color: var(--ink-faded); display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+.coverage-cta { font-size: 0.88rem; color: var(--ink-faded); display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
 
 .coverage-chip {
   flex: 0 0 auto;
@@ -1613,10 +1678,10 @@ a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--s
 .coverage-chip.missing { color: var(--ink-light); border-color: var(--ink-light); }
 /* Stale = a warm amber warn accent (base --rust tones, distinct from any lifecycle status token). */
 .coverage-chip.stale { color: var(--rust); border-color: var(--rust-light); background: rgba(196, 98, 45, 0.1); }
-/* Missing cards are dimmed (neutral) so present coverage reads first; stale cards carry a warm left-accent so a
-   freshness problem is visible at a glance without relying on the chip alone. */
+/* Missing cards are dimmed (neutral) so present coverage reads first; stale cards override the family accent
+   with the warm warn tone so a freshness problem is visible at a glance without relying on the chip alone. */
 .coverage-card.missing { background: var(--parchment); border-style: dashed; }
-.coverage-card.stale { border-left: 3px solid var(--rust-light); }
+.coverage-card.stale { border-left-color: var(--rust-light); }
 
 /* ============ STRUCTURE TREE (interactive project/artifact tree, structure.html) ============ */
 /* Native <details>/<summary> disclosure — zero JS. Structure/hierarchy is NOT a lifecycle stage, so nothing
@@ -1729,6 +1794,9 @@ a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--s
 .coupling-label { fill: var(--ink-faded); font-family: 'Courier New', monospace; }
 
 /* ============ DEEP ANALYTICS PAGE (deep-analytics.html: graph + table + hotspots) ============ */
+/* The page content column: centered with comfortable side gutters, matching the rest of the site (the
+   synthesized <main> has no markdown wrapper of its own to supply them). */
+.deep-page { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 2.5rem; }
 .deep-page-section { margin: 0 0 2.4rem; }
 .deep-page-section > h2 {
   font-size: 1.15rem;
@@ -1737,10 +1805,12 @@ a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--s
   border-bottom: 2px solid var(--parchment-deep);
   padding-bottom: 0.35rem;
 }
-.deep-page-lead { font-size: 0.9rem; color: var(--ink-faded); line-height: 1.6; max-width: 68ch; margin: 0.5rem 0 1.1rem; }
-.deep-page-coupling { display: grid; grid-template-columns: 1fr; gap: 1.4rem; align-items: start; }
+.deep-page-lead { font-size: 0.9rem; color: var(--ink-faded); line-height: 1.6; margin: 0.5rem 0 1.1rem; }
+/* Lower row: the ranked-pairs table and the hotspots, side by side (equal columns) on wide screens,
+   stacked on narrow. The change-coupling graph above now spans the full content width. */
+.deep-page-lower { display: grid; grid-template-columns: 1fr; gap: 1.4rem; align-items: start; }
 @media (min-width: 860px) {
-  .deep-page-coupling { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .deep-page-lower { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 /* The graph panel stacks the expand affordance, the graph, and the legend; visible overflow so the graph's
    spilled labels aren't clipped by the panel. */
@@ -1751,6 +1821,8 @@ a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--s
 .deep-page-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.6rem; }
 .deep-page-panel-head h3 { font-size: 0.95rem; color: var(--rust); margin: 0; }
 .deep-page-panel-count { font-size: 0.72rem; color: var(--ink-light); font-family: 'Courier New', monospace; white-space: nowrap; }
+/* Short explanatory note under a lower-row panel head (what the table/bars show). */
+.deep-page-note { font-size: 0.82rem; color: var(--ink-light); line-height: 1.55; margin: 0 0 0.9rem; }
 
 /* "Expand" affordance, pinned to the graph panel's top-right; opens the pure-CSS :target lightbox. */
 .coupling-expand {
@@ -2225,9 +2297,9 @@ a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--s
 @media (max-width: 640px) {
   .site-nav {
     font-size: 0.72rem;
-    padding: 0.5rem 0.8rem;
-    align-items: center;
+    padding: 0.5rem 0;
   }
+  .site-nav-inner { padding: 0 0.8rem; }
   .site-nav-brand { margin-right: auto; }
   .site-nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
   .site-nav-links {
@@ -2471,16 +2543,48 @@ a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--s
    reduce block just below neutralizes all of this. Left side-by-side with that block on purpose. */
 @media (prefers-reduced-motion: no-preference) {
   /* Progress bars sweep 0 → N% once. The inline width stays the target; the keyframe only overrides the
-     start, and `both` holds the final width so nothing snaps back. */
-  .progress-fill { animation: progress-grow 0.9s ease-out both; }
+     start, and `both` holds the final width so nothing snaps back. (Story 3.5: timings now ride the shared
+     --motion-* tokens — same feel, no new pixels.) */
+  .progress-fill { animation: progress-grow var(--motion-entrance-long) var(--motion-ease) both; }
   @keyframes progress-grow { from { width: 0; } }
 
   /* Donuts and the sunburst fade + settle in as their segments draw — a light reveal, never a loop. */
   .donut,
-  .sunburst { animation: chart-enter 0.6s ease-out both; }
+  .sunburst { animation: chart-enter var(--motion-entrance) var(--motion-ease) both; }
   @keyframes chart-enter {
     from { opacity: 0; transform: scale(0.94); }
     to { opacity: 1; transform: scale(1); }
+  }
+
+  /* ---- Story 3.5: extend the SAME bounded, single-pass reveal to the Epic 3 insight surfaces ----
+     One motion vocabulary across the whole insight layer. Every rule here is opacity/transform only, rides
+     the shared --motion-* tokens, plays exactly once, and is fully neutralized by the reduce block below.
+
+     Commit heatmap (the hero "how the work went" visual): cells fade in, staggered left-to-right one column
+     at a time. The stagger delay is derived in-CSS from --motion-stagger and the per-cell --col index that
+     Charts.CommitHeatmap emits, capped at 0.4s so the last column never lags noticeably — bounded, never a
+     loop. OPACITY ONLY (no transform) because a CSS transform on an SVG child element honors transform-box
+     quirks that would fly cells in from the SVG origin; opacity is safe and compositor-friendly. Geometry,
+     future-day muting, <title>/aria-label and the :target drill panels are all untouched. */
+  .heatmap .heatmap-cell {
+    animation: cell-fade var(--motion-entrance) var(--motion-ease) both;
+    animation-delay: min(calc(var(--motion-stagger) * var(--col, 0)), 0.4s);
+  }
+  @keyframes cell-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Sibling Epic 3 panels — git pulse (3.1), coverage (3.3), structure tree (3.4), refinement funnel (3.6)
+     — each shipped deliberately static and handed their motion to this story. The reveal is keyed to each
+     surface's already-present root class, so a surface that isn't built yet (the funnel until 3.6 lands) is
+     simply a harmless no-op: no sibling markup is assumed. A gentle rise+fade rather than chart-enter's
+     scale, so a full-width panel never scales past its column edge or nudges layout. When 3.6 ships, its
+     staged per-stage narrowing can hang off this same .refinement-funnel keying. */
+  .git-pulse,
+  .coverage,
+  .structure-tree,
+  .refinement-funnel { animation: panel-reveal var(--motion-entrance) var(--motion-ease) both; }
+  @keyframes panel-reveal {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
   }
 }
 
@@ -2505,6 +2609,20 @@ a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--s
   .epic-mosaic-card:hover,
   .stat-card:hover {
     transform: none;
+  }
+
+  /* Story 3.5: explicitly cancel every new Epic 3 insight entrance. The entrance rules already live inside
+     the no-preference block (so they never apply here) — this is the belt-and-suspenders half of the
+     contract, and it also kills the heatmap cells' inline animation-delay, which fill-mode:both would
+     otherwise honor by holding a cell invisible through its delay. With motion off, every heatmap cell,
+     git-pulse/coverage/tree panel and (future) funnel is fully present at rest — ZERO information lost
+     (AC #2, UX-DR18/8). The legend-emphasis affordance is opacity-only and stays functional but instant. */
+  .heatmap .heatmap-cell,
+  .git-pulse,
+  .coverage,
+  .structure-tree,
+  .refinement-funnel {
+    animation: none;
   }
 }
 

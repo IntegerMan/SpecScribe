@@ -301,7 +301,7 @@ public static class HtmlTemplater
         // keeps today's dashboard byte-for-byte unchanged (graceful omission, Story 1.1). [Story 3.3 AC #1]
         if (coverage is { IsEmpty: false })
         {
-            sb.Append("<div class=\"chart-panel coverage-panel\">\n<h3>Planning Coverage</h3>\n");
+            sb.Append("<div class=\"chart-panel coverage-panel\">\n<h3>Planning Artifacts</h3>\n");
             sb.Append(Charts.ArtifactCoveragePanel(coverage, DateOnly.FromDateTime(DateTime.Now)));
             sb.Append("</div>\n\n");
         }

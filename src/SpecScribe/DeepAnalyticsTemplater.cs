@@ -28,7 +28,7 @@ public static class DeepAnalyticsTemplater
             ("Deep Analytics", null),
         }));
 
-        sb.Append("<main id=\"main-content\">\n");
+        sb.Append("<main id=\"main-content\" class=\"deep-page\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <div class=\"story-kicker\">Deep Analytics &middot; opt-in</div>\n");
         sb.Append("  <h1>Deep Git Analytics</h1>\n");
@@ -37,26 +37,33 @@ public static class DeepAnalyticsTemplater
         sb.Append($"    <span class=\"pill\">{deep.Hotspots.Count} {Charts.Plural(deep.Hotspots.Count, "hotspot", "hotspots")}</span>\n");
         sb.Append("  </div>\n</header>\n\n");
 
-        // Change Coupling — the graph is the centerpiece; the ranked table beside it is the exact, screen-reader
-        // friendly companion so the visualization is never the sole information carrier.
+        // Change Coupling — the graph is the centerpiece, given the full content width to breathe. Its exact,
+        // screen-reader friendly companion (the ranked table) now sits in the lower row beside the hotspots, so
+        // the visualization is never the sole information carrier.
         var hasCoupling = deep.Coupling.Count > 0;
         sb.Append("<section class=\"deep-page-section\">\n");
         sb.Append("  <h2>Change Coupling</h2>\n");
         sb.Append("  <p class=\"deep-page-lead\">Files that tend to change in the same commits. Thicker links and larger nodes mean the files change together more often — a hint at hidden dependencies worth a second look.</p>\n");
-        sb.Append("  <div class=\"deep-page-coupling\">\n");
-        sb.Append("    <div class=\"chart-panel deep-page-graph-panel\">\n");
+        sb.Append("  <div class=\"chart-panel deep-page-graph-panel\">\n");
         // Expand affordance: a pure-CSS :target lightbox (same mechanism as the commit heatmap's drill-down) —
         // no JS. Only offered when there's actually a graph to enlarge.
         if (hasCoupling)
         {
-            sb.Append("      <a class=\"coupling-expand\" href=\"#coupling-zoom\" aria-label=\"Expand the change-coupling graph\">&#10530; Expand</a>\n");
+            sb.Append("    <a class=\"coupling-expand\" href=\"#coupling-zoom\" aria-label=\"Expand the change-coupling graph\">&#10530; Expand</a>\n");
         }
         sb.Append(Charts.CouplingGraph(deep.Coupling));
         if (hasCoupling)
         {
-            sb.Append("      <p class=\"coupling-legend\">Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together.</p>\n");
+            sb.Append("    <p class=\"coupling-legend\">Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together.</p>\n");
         }
-        sb.Append("    </div>\n");
+        sb.Append("  </div>\n");
+        sb.Append("</section>\n\n");
+
+        // Lower row — the precise text companions side by side: the ranked coupling pairs and the change hotspots.
+        // Two equal panels on wide screens, stacked on narrow.
+        sb.Append("<section class=\"deep-page-section\">\n");
+        sb.Append("  <div class=\"deep-page-lower\">\n");
+
         sb.Append("    <div class=\"chart-panel deep-page-list-panel\">\n");
         sb.Append("      <div class=\"deep-page-panel-head\">\n");
         sb.Append("        <h3>Ranked Pairs</h3>\n");
@@ -65,17 +72,22 @@ public static class DeepAnalyticsTemplater
             sb.Append($"        <span class=\"deep-page-panel-count\">{deep.Coupling.Count} {Charts.Plural(deep.Coupling.Count, "pair", "pairs")}</span>\n");
         }
         sb.Append("      </div>\n");
+        sb.Append("      <p class=\"deep-page-note\">Files that changed together most often, with the number of shared commits.</p>\n");
         sb.Append(Charts.CouplingTable(deep.Coupling));
         sb.Append("    </div>\n");
-        sb.Append("  </div>\n");
-        sb.Append("</section>\n\n");
 
-        // Git Hotspots — full width, with room for more entries than the old panel showed.
-        sb.Append("<section class=\"deep-page-section\">\n");
-        sb.Append("  <h2>Git Hotspots</h2>\n");
-        sb.Append("  <p class=\"deep-page-lead\">The files changed most often across recent history — the parts of the codebase carrying the most churn.</p>\n");
-        sb.Append("  <div class=\"chart-panel\">\n");
+        sb.Append("    <div class=\"chart-panel deep-page-list-panel\">\n");
+        sb.Append("      <div class=\"deep-page-panel-head\">\n");
+        sb.Append("        <h3>Git Hotspots</h3>\n");
+        if (deep.Hotspots.Count > 0)
+        {
+            sb.Append($"        <span class=\"deep-page-panel-count\">{deep.Hotspots.Count} {Charts.Plural(deep.Hotspots.Count, "hotspot", "hotspots")}</span>\n");
+        }
+        sb.Append("      </div>\n");
+        sb.Append("      <p class=\"deep-page-note\">The files changed most often across recent history — the parts of the codebase carrying the most churn.</p>\n");
         sb.Append(Charts.HotspotBars(deep.Hotspots));
+        sb.Append("    </div>\n");
+
         sb.Append("  </div>\n");
         sb.Append("</section>\n\n");
 

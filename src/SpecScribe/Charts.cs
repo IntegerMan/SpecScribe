@@ -215,18 +215,28 @@ public static class Charts
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(epics.Count, "epic", "epics")}</text>\n");
         sb.Append("</svg>\n");
 
-        sb.Append("""
-            <div class="sunburst-legend">
-              <span><span class="swatch sb-pending-sw"></span>Pending</span>
-              <span><span class="swatch sb-drafted-sw"></span>Drafted</span>
-              <span><span class="swatch sb-ready-sw"></span>Ready for dev</span>
-              <span><span class="swatch sb-active-sw"></span>In development</span>
-              <span><span class="swatch sb-review-sw"></span>In review</span>
-              <span><span class="swatch sb-done-sw"></span>Done</span>
-            </div>
-            <div class="sunburst-hint">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>
+        sb.Append(SunburstLegend(
+            ("pending", "Pending"), ("drafted", "Drafted"), ("ready", "Ready for dev"),
+            ("active", "In development"), ("review", "In review"), ("done", "Done")));
+        sb.Append("<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
+        return sb.ToString();
+    }
 
-            """);
+    /// <summary>The shared sunburst legend — one focusable entry per status, each carrying a status class
+    /// (<c>sb-&lt;status&gt;-item</c>) and <c>tabindex="0"</c> so the pure-CSS interactive-legend emphasis
+    /// (specscribe.css: <c>.sunburst-panel:has(.sb-&lt;status&gt;-item:hover/:focus) …</c>) is reachable by
+    /// both pointer and keyboard. The always-visible swatch + label keep status readable without the emphasis
+    /// affordance (never color-only). [Story 3.5 Task 3, UXO C3]</summary>
+    private static string SunburstLegend(params (string Status, string Label)[] items)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"sunburst-legend\">\n");
+        foreach (var (status, label) in items)
+        {
+            sb.Append($"  <span class=\"sb-legend-item sb-{status}-item\" tabindex=\"0\">" +
+                      $"<span class=\"swatch sb-{status}-sw\"></span>{label}</span>\n");
+        }
+        sb.Append("</div>\n");
         return sb.ToString();
     }
 
@@ -329,18 +339,10 @@ public static class Charts
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(count, "story", "stories")}</text>\n");
         sb.Append("</svg>\n");
 
-        sb.Append("""
-            <div class="sunburst-legend">
-              <span><span class="swatch sb-pending-sw"></span>Pending</span>
-              <span><span class="swatch sb-drafted-sw"></span>Drafted</span>
-              <span><span class="swatch sb-ready-sw"></span>Ready for dev</span>
-              <span><span class="swatch sb-active-sw"></span>In development</span>
-              <span><span class="swatch sb-review-sw"></span>In review</span>
-              <span><span class="swatch sb-done-sw"></span>Done</span>
-            </div>
-            <div class="sunburst-hint">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>
-
-            """);
+        sb.Append(SunburstLegend(
+            ("pending", "Pending"), ("drafted", "Drafted"), ("ready", "Ready for dev"),
+            ("active", "In development"), ("review", "In review"), ("done", "Done")));
+        sb.Append("<div class=\"sunburst-hint\">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
         return sb.ToString();
     }
 
@@ -404,14 +406,8 @@ public static class Charts
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">tasks</text>\n");
         sb.Append("</svg>\n");
 
-        sb.Append("""
-            <div class="sunburst-legend">
-              <span><span class="swatch sb-pending-sw"></span>Not done</span>
-              <span><span class="swatch sb-done-sw"></span>Done</span>
-            </div>
-            <div class="sunburst-hint">Inner ring: tasks &middot; outer ring: subtasks. Hover a segment for details.</div>
-
-            """);
+        sb.Append(SunburstLegend(("pending", "Not done"), ("done", "Done")));
+        sb.Append("<div class=\"sunburst-hint\">Inner ring: tasks &middot; outer ring: subtasks. Hover a segment for details.</div>\n\n");
         return sb.ToString();
     }
 
@@ -577,7 +573,11 @@ public static class Charts
                     sb.Append($"  <a href=\"commits/{D(day)}.html\" aria-label=\"{Html($"{DReadable(day)}: {count} {Plural(count, "commit", "commits")} — view details")}\">");
                 }
                 sb.Append(linked ? "<rect" : "  <rect aria-hidden=\"true\"");
-                sb.Append($" x=\"{x}\" y=\"{y}\" width=\"{cell}\" height=\"{cell}\" rx=\"2\" class=\"heatmap-cell level-{level}\">");
+                // --col is the week index; specscribe.css derives the staggered entrance delay from it and
+                // --motion-stagger (capped), so cells wipe in left-to-right one column at a time. Purely
+                // decorative: it drives an opacity-only reveal that is fully neutralized under reduced motion,
+                // and carries no meaning of its own. [Story 3.5 Task 2]
+                sb.Append($" x=\"{x}\" y=\"{y}\" width=\"{cell}\" height=\"{cell}\" rx=\"2\" class=\"heatmap-cell level-{level}\" style=\"--col:{w}\">");
                 sb.Append($"<title>{DReadable(day)}: {count} commit{(count == 1 ? string.Empty : "s")}</title></rect>");
                 sb.Append(linked ? "</a>\n" : "\n");
             }
@@ -657,68 +657,72 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The dashboard "Planning Coverage" panel body — a 2-column card grid, one card per canonical
-    /// artifact family. A card explains what the artifact is; a PRESENT family's whole card links to its page,
-    /// while a MISSING family's card carries a copyable create command (via <see cref="BmadCommands.InlineGuidance"/>,
-    /// degrading to guidance text when the module exposes no such command). Pure HTML + CSS (the badge's copy
-    /// button is the existing progressive-enhancement script, not new JS). Present/missing/stale is a COVERAGE
-    /// axis, not a lifecycle stage, so cards use neutral palette tones — never the <c>--status-*</c> tokens.
-    /// Every chip carries a text label (never color-only); dates use the invariant <see cref="DReadable"/>
-    /// helper. The caller renders this only when <c>!coverage.IsEmpty</c> (graceful omission). [Story 3.3]</summary>
+    /// <summary>The dashboard "Planning Artifacts" panel body — a header coverage meter (present/total as a %)
+    /// over a 2-column card grid, one card per canonical artifact family. A card explains what the artifact is
+    /// and carries its family accent color (matching the "Explore Key Views" pills); a PRESENT family's whole
+    /// card links to its page, while a MISSING family's card carries a copyable create command (via
+    /// <see cref="BmadCommands.InlineGuidance"/>, degrading to guidance text when the module exposes none). Each
+    /// card is a body-level <c>js-tip</c> whose rich tooltip explains the dates (source mtime + decision-journal
+    /// memlog). Only the exceptional states (Missing / Stale) get a chip — "present &amp; fresh" is the quiet
+    /// default. Coverage is NOT a lifecycle axis, so cards never use the <c>--status-*</c> tokens; dates use the
+    /// invariant <see cref="DReadable"/>. Rendered only when <c>!coverage.IsEmpty</c> (graceful omission). [Story 3.3]</summary>
     public static string ArtifactCoveragePanel(ArtifactCoverage coverage, DateOnly today)
     {
         var total = coverage.Families.Count;
         var present = coverage.PresentCount;
         var stale = coverage.StaleCount(today);
+        var pct = total > 0 ? (int)Math.Round(present * 100.0 / total) : 0;
 
         var sb = new StringBuilder();
         sb.Append("<div class=\"coverage\">\n");
 
-        // Headline count + a one-line intro so a reader knows what the panel answers and why it's useful.
-        sb.Append($"  <div class=\"coverage-headline\"><strong>{present}</strong> of <strong>{total}</strong> " +
-                  $"{Plural(total, "family", "families")} present");
-        if (stale > 0)
-        {
-            sb.Append($" &middot; <strong>{stale}</strong> stale");
-        }
-        sb.Append("</div>\n");
+        // Header: a compact coverage meter (% present) beside the count, then a one-line intro so a reader
+        // knows what the panel answers and why it's useful.
+        var count = stale > 0
+            ? $"<strong>{present}</strong> of <strong>{total}</strong> present &middot; {stale} stale"
+            : $"<strong>{present}</strong> of <strong>{total}</strong> present";
+        sb.Append("  <div class=\"coverage-summary\">\n");
+        sb.Append($"    <span class=\"coverage-count\">{count}</span>\n");
+        sb.Append($"    <span class=\"coverage-meter\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" " +
+                  $"aria-label=\"Planning artifact coverage: {present} of {total} present\"><span class=\"coverage-meter-fill\" style=\"width:{pct}%\"></span></span>\n");
+        sb.Append($"    <span class=\"coverage-pct\">{pct}%</span>\n");
+        sb.Append("  </div>\n");
         sb.Append("  <p class=\"coverage-intro\">The core planning &amp; workflow artifacts this project should have — " +
-                  "which exist, how recently they changed, and how to create the ones that are missing.</p>\n");
+                  "which exist, how recently they changed, and how to create any that are missing.</p>\n");
 
         sb.Append("  <div class=\"coverage-grid\">\n");
         foreach (var family in coverage.Families)
         {
             var isStale = family.IsStale(today);
-            // Card modifier drives neutral dimming (missing) / a warm accent (stale) — the text chip still
-            // carries the meaning, so styling is never the sole information carrier.
             var stateClass = !family.Present ? "missing" : isStale ? "stale" : "present";
-            var (chipClass, chipText) = !family.Present
-                ? ("missing", "Missing")
-                : isStale ? ("stale", "Stale") : ("present", "Present");
+            var accent = FamilyAccentClass(family.Label);
+            var tip = Html(BuildCoverageTip(family, today));
+
+            // Only the exceptional states carry a chip; a present, fresh family is the quiet default — no chip
+            // noise (review: "we don't need Present much here").
+            var chip = !family.Present ? "<span class=\"coverage-chip missing\">Missing</span>"
+                : isStale ? "<span class=\"coverage-chip stale\">Stale</span>" : string.Empty;
 
             var head =
-                $"<div class=\"coverage-card-head\"><span class=\"coverage-family\">{Icons.ForConcept(family.ConceptIconKey)}{Html(family.Label)}</span>" +
-                $"<span class=\"coverage-chip {chipClass}\">{Html(chipText)}</span></div>";
+                $"<div class=\"coverage-card-head\"><span class=\"coverage-family\">{Icons.ForConcept(family.ConceptIconKey)}{Html(family.Label)}</span>{chip}</div>";
             var desc = $"<div class=\"coverage-desc\">{Html(family.Description)}</div>";
 
             if (family.Present)
             {
-                // Present card: freshness sub-line (primary source-mtime date + optional secondary memlog
-                // date), whole card links to the artifact's page when we resolved one.
+                // Visible freshness = the PRIMARY source mtime only; the secondary decision-journal (memlog)
+                // date and full detail move into the rich tooltip, so the card stays uncluttered and "journal"
+                // is explained on hover/focus rather than shown as a cryptic inline bullet.
                 var freshness = family.LastModified is { } modified ? $"Updated {DReadable(modified)}" : "In the project";
-                if (family.MemlogUpdated is { } journal)
-                {
-                    freshness += $" &middot; journal {DReadable(journal)}";
-                }
                 var body = head + desc + $"<div class=\"coverage-freshness\">{freshness}</div>";
+                var cls = $"coverage-card js-tip {stateClass} {accent}";
 
                 if (family.Href is { Length: > 0 } href)
                 {
-                    sb.Append($"    <a class=\"coverage-card {stateClass}\" href=\"{Html(href)}\">{body}</a>\n");
+                    sb.Append($"    <a class=\"{cls}\" href=\"{Html(href)}\" data-tip=\"{tip}\">{body}</a>\n");
                 }
                 else
                 {
-                    sb.Append($"    <div class=\"coverage-card {stateClass}\">{body}</div>\n");
+                    sb.Append($"    <div class=\"{cls}\" data-tip=\"{tip}\" tabindex=\"0\">{body}</div>\n");
                 }
             }
             else
@@ -727,13 +731,50 @@ public static class Charts
                 // when the detected module exposes none). Not a link — the action is "create it", not "open it".
                 var cta = BmadCommands.InlineGuidance(family.CreateCommand, "Create it with",
                     "Add this artifact through your planning workflow.");
-                sb.Append($"    <div class=\"coverage-card {stateClass}\">{head}{desc}" +
-                          $"<div class=\"coverage-cta\">{cta}</div></div>\n");
+                sb.Append($"    <div class=\"coverage-card js-tip {stateClass} {accent}\" data-tip=\"{tip}\" tabindex=\"0\">" +
+                          $"{head}{desc}<div class=\"coverage-cta\">{cta}</div></div>\n");
             }
         }
         sb.Append("  </div>\n");
 
         sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Maps a coverage family to the same artifact-family accent class the "Explore Key Views" pills use
+    /// (planning=gold, architecture=teal, epics=moss, requirements=rust), so color literacy carries across the
+    /// dashboard. Mirrors <c>HtmlTemplater.QuickLinkFamily</c>'s palette; labels are the fixed
+    /// <see cref="ArtifactCoverage"/> family set.</summary>
+    private static string FamilyAccentClass(string label) => label switch
+    {
+        "Architecture" => "family-architecture",
+        "Epics" or "Stories" => "family-epics",
+        "Requirements" => "family-requirements",
+        _ => "family-planning", // PRD, Product Brief, UX, Spec Kernel — the planning (gold) family
+    };
+
+    /// <summary>The rich, body-level (never-clipped) tooltip text for a coverage card — plain, <c>\n</c>-separated
+    /// for the <c>js-tip</c> node (rendered via <c>white-space: pre-line</c>). Spells out what the inline card
+    /// keeps terse: the source-file freshness, the staleness note, and — clarifying the previously-cryptic
+    /// "journal" — the decision-journal (<c>.memlog</c>) date; or, for a missing family, how to create it.</summary>
+    private static string BuildCoverageTip(ArtifactFamily f, DateOnly today)
+    {
+        var sb = new StringBuilder();
+        if (!f.Present)
+        {
+            sb.Append($"{f.Label} — missing\n{f.Description}\nNot found in this project.");
+            if (f.CreateCommand is { Length: > 0 } c) sb.Append($" Create it with {c}");
+            return sb.ToString();
+        }
+
+        sb.Append($"{f.Label} — present{(f.IsStale(today) ? ", stale" : string.Empty)}\n{f.Description}");
+        if (f.LastModified is { } m)
+        {
+            sb.Append($"\nSource last edited {DReadable(m)}");
+            if (f.IsStale(today)) sb.Append($" — over {ArtifactCoverage.StalenessThresholdDays} days ago");
+        }
+        if (f.MemlogUpdated is { } j) sb.Append($"\nDecision journal (.memlog) updated {DReadable(j)}");
+        if (f.Href is { Length: > 0 }) sb.Append("\nClick to open →");
         return sb.ToString();
     }
 
