@@ -4,7 +4,7 @@ baseline_commit: c0836a1dac7c9f76ae78a177fa26265e7802b1df
 
 # Story 3.6: Refinement Funnel on the Dashboard
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -120,3 +120,12 @@ claude-fable-5 (Claude Fable 5)
 - 2026-07-08: Story 3.6 implemented — refinement funnel (honest elaboration pyramid, Option A) added to the dashboard: `Charts.RefinementFunnel` builder, `AppendDashboard` panel, token-routed CSS, 7 new tests. Full suite 517/517 green. Status → review.
 - 2026-07-08: Review feedback (owner) — redesigned the funnel from a vertical centered-bar pyramid to a sideways funnel (left→right columns, honest band heights, neutral tapered connectors), matching conventional horizontal funnel graphics while keeping every truthfulness/a11y/token/motion guarantee. Tests updated to the new geometry; full suite 517/517 green. Verified live against the generated site (band/connector geometry, no label collisions, token fills, `panel-reveal` motion, mobile scaling).
 - 2026-07-09: Second review round (owner) — the story PIVOTED from requirements maturation to implementation progress. The funnel is now the "Story Pipeline": five CUMULATIVE stages (Drafted → Ready for dev → In development → In review → Done; each band counts stories that have reached at least that stage, tallied by summing the per-epic `StoryStatusCounts` already on `ProgressModel` — no model/parser changes). Cumulative counts are monotonically non-increasing, so the sideways funnel now genuinely narrows and the truthfulness constraint holds by construction. Each stage maps 1:1 to its own `--status-*` token; per-band tooltips ("26 of 37 stories have reached Ready for dev"), %-of-stories sub-labels, and the hint line state the cumulative reading; empty guard is now `StoriesTotal == 0`. Panel heading → "Story Pipeline". epics.md Story 3.6 title/AC revised to match (correct-course, owner-directed), and the displaced requirements-maturation vision was drafted as new Story 3.7 "Requirements Flow and Status Blocks" (epics.md + sprint-status `backlog`; scope explicitly includes the missing FR→story mapping). Tests rewritten for the pipeline semantics; full suite 532/532 green.
+
+## Review Findings
+
+_Code review 2026-07-09 (adversarial: Blind Hunter + Edge Case Hunter + Acceptance Auditor). 0 decision-needed, 2 patch, 2 deferred, 6 dismissed as noise/by-design._
+
+- [x] [Review][Patch] Sub-label renders "0% of stories" for a nonzero stage whose share rounds down to 0% — contradicts the real count shown directly above it (only reachable on a large project with a tiny cumulative stage, e.g. 3 of 1000; cannot occur on this 37-story repo). Fixed 2026-07-09: renders "&lt;1%" when `count > 0` but `pct` rounds to 0. [src/SpecScribe/Charts.cs:768]
+- [x] [Review][Patch] `BandHeight` has a floor (`Math.Max`) but no ceiling — the "never widens / no overstatement" guarantee relies on the caller partitioning `StoriesTotal` (verified to hold today via `ProgressCalculator.cs:19,40-42`) but is unenforced. Fixed 2026-07-09: added `Math.Min(maxHeight, …)` as cheap insurance on the story's one non-negotiable. [src/SpecScribe/Charts.cs:726]
+- [x] [Review][Defer] No-href coverage card lost its focus tooltip (the `.memlog` decision-journal date) for keyboard/AT users when `tabindex` was removed, and the justifying comment is inaccurate — that date lives only in the tooltip, not the card body. Out-of-scope Story 3.3 code, rare page-generation-failure state, secondary info. [src/SpecScribe/Charts.cs:853] — deferred, out-of-scope/low
+- [x] [Review][Defer] Story AC #1, Subtasks 1.2/1.3 and Dev Notes still describe the pre-pivot design (epics → drafted stories → with-a-plan → tasks); only the Change Log records the pivot to the cumulative Story Pipeline. Update the AC to match the shipped design for traceability. [3-6-refinement-funnel-on-the-dashboard.md:19] — deferred, doc drift

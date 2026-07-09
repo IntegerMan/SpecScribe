@@ -723,7 +723,7 @@ public static class Charts
         // band; a zero stage gets a slightly thinner dashed placeholder. The drafted total is the largest
         // stage by construction and >= 1 here, so the height math never divides by zero.
         const double bandWidth = 104, gapWidth = 24, xStart = 12, midY = 132, maxHeight = 136, minHeight = 12, zeroHeight = 10;
-        double BandHeight(int count) => count == 0 ? zeroHeight : Math.Max(minHeight, count / (double)total * maxHeight);
+        double BandHeight(int count) => count == 0 ? zeroHeight : Math.Min(maxHeight, Math.Max(minHeight, count / (double)total * maxHeight));
         double BandX(int i) => xStart + i * (bandWidth + gapWidth);
 
         var aria = "Story pipeline: " + string.Join(", ", stages.Select(s => s.AriaPhrase));
@@ -766,7 +766,10 @@ public static class Charts
             if (i > 0)
             {
                 var pct = (int)Math.Round(count * 100.0 / total);
-                sb.Append($"  <text x=\"{F(cx)}\" y=\"216\" class=\"funnel-stage-sub\" text-anchor=\"middle\">{pct}% of stories</text>\n");
+                // A nonzero stage that rounds down to 0% would contradict the real count shown above it, so
+                // floor it to "<1%" ("&lt;" — the bare "<" would break the SVG parse). [Review][Patch]
+                var pctText = count > 0 && pct == 0 ? "&lt;1%" : $"{pct}%";
+                sb.Append($"  <text x=\"{F(cx)}\" y=\"216\" class=\"funnel-stage-sub\" text-anchor=\"middle\">{pctText} of stories</text>\n");
             }
         }
         sb.Append("</svg>\n");
