@@ -81,13 +81,18 @@ public class GitInsightsTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_FileRowsDrillIntoPerFileContributorPanels()
+    public void RenderPage_WholeRowSelectsThePerFileContributorPanel()
     {
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
 
-        // Each file name is a :target link to its own contributor panel (pure-CSS drill-down, no JS).
-        Assert.Contains("<a class=\"gi-file-link\" href=\"#gi-file-0\">", html);
-        Assert.Contains("<a class=\"gi-file-link\" href=\"#gi-file-1\">", html);
+        // The whole row is the :target select trigger (stretched-link pattern) — not the file name, which is
+        // reserved for eventual file-page navigation. The invisible row link covers the row.
+        Assert.Contains("<a class=\"gi-row-link\" href=\"#gi-file-0\" aria-label=\"Show contributors for src/SpecScribe/Charts.cs\"></a>", html);
+        Assert.Contains("<a class=\"gi-row-link\" href=\"#gi-file-1\"", html);
+        // With no file-page resolver, the file name is plain text (the row overlay's click selects it).
+        Assert.Contains("<span class=\"gi-file-name\"><code>src/SpecScribe/Charts.cs</code></span>", html);
+        Assert.DoesNotContain("gi-file-link", html); // the old file-name-as-drill-link is gone
+
         Assert.Contains("<div class=\"gi-contributors-panel chart-panel\" id=\"gi-file-0\"", html);
         Assert.Contains("<div class=\"gi-contributors-panel chart-panel\" id=\"gi-file-1\"", html);
         // The panel names the people to talk to about that file, with per-file counts.
@@ -158,15 +163,21 @@ public class GitInsightsTemplaterTests
         Assert.DoesNotContain("View file page", unresolved);
         Assert.Contains("<code>abc1234</code>", unresolved); // latest-change short hash, plain
 
-        // With resolvers, the latest-change hash links to its commit page and the panel gains a file-page link.
+        // The file name is plain text (a span) until a file-page resolver gives it a target.
+        Assert.Contains("<span class=\"gi-file-name\">", unresolved);
+        Assert.DoesNotContain("<a class=\"gi-file-name\"", unresolved);
+
+        // With resolvers, the file name becomes a navigation link (above the row overlay), the latest-change
+        // hash links to its commit page, and the panel gains its own file-page link.
         var resolved = GitInsightsTemplater.RenderPage(
             insights, null, Nav(),
             fileHref: path => path == "src/SpecScribe/Charts.cs" ? "code/src/SpecScribe/Charts.cs.html" : null,
             commitHref: hash => hash == "abc1234def" ? "commit/abc1234.html" : null);
+        Assert.Contains("<a class=\"gi-file-name\" href=\"code/src/SpecScribe/Charts.cs.html\"><code>src/SpecScribe/Charts.cs</code></a>", resolved);
         Assert.Contains("<a href=\"commit/abc1234.html\"><code>abc1234</code></a>", resolved);
         Assert.Contains("<a class=\"view-epic-link gi-detail-filelink\" href=\"code/src/SpecScribe/Charts.cs.html\">", resolved);
-        // The unresolved second file stays plain — per-entry guarding, not all-or-nothing.
-        Assert.Contains("<code>fff9999</code>", resolved);
+        // The unresolved second file's name stays a plain span — per-entry guarding, not all-or-nothing.
+        Assert.Contains("<span class=\"gi-file-name\"><code>src/SpecScribe/HtmlTemplater.cs</code></span>", resolved);
         Assert.DoesNotContain("href=\"commit/fff9999", resolved);
     }
 

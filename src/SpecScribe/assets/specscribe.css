@@ -2618,21 +2618,39 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 /* ---- Files & Contributors master-detail (Story 3.8 redesign) ----
    File table on the left; selecting a file reveals its contributor panel on the right. The reveal is pure
    CSS :target (same no-JS mechanism as the commit-heatmap drill-down and the coupling lightbox) — clicking a
-   .gi-file-link sets the fragment, CSS shows the matching #gi-file-N panel, and a general-sibling rule hides
-   the default prompt. No JS is involved in the drill-down; the sort/filter enhancer above is independent. */
+   row's stretched .gi-row-link sets the fragment, CSS shows the matching #gi-file-N panel, and a general-
+   sibling rule hides the default prompt. No JS is involved in the drill-down; the sort/filter enhancer above
+   is independent. */
 .gi-master-detail {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  /* A FIXED-width detail column so revealing or swapping a contributor panel never reflows either column.
+     The earlier fractional (fr) split let the panel's changing content nudge both tracks on every selection —
+     the jarring width shift. A fixed rem width is content-independent: the detail stays put and the master
+     (1fr) fills the constant remainder, so selecting rows only changes the panel's contents, not the layout. */
+  grid-template-columns: minmax(0, 1fr) 20rem;
   gap: 1.25rem;
   align-items: start;
 }
 /* The detail column tracks the file table as it scrolls, so a selected file's people stay in view. */
 .gi-detail { position: sticky; top: calc(var(--nav-offset) + 0.75rem); }
 
-.gi-file-link { color: var(--teal-deep); text-decoration: none; }
-.gi-file-link:hover { text-decoration: underline; }
-.gi-file-link:hover code { color: var(--rust); }
-.gi-file-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+/* Whole-row selection (stretched-link pattern): an invisible anchor in the first cell stretches its ::after
+   across the whole row (the row is the positioned containing block), so a click anywhere on the row reveals
+   that file's contributors via :target — no JS, no reliance on the file name. */
+.gi-table tbody tr { position: relative; }
+.gi-table tbody tr:hover { cursor: pointer; }
+.gi-row-link::after { content: ""; position: absolute; inset: 0; z-index: 0; }
+.gi-row-link:focus-visible::after {
+  outline: 2px solid var(--teal);
+  outline-offset: -2px;
+  border-radius: 3px;
+}
+/* The file name is reserved for navigating to the file's own page (7.1/7.4). When it is a real link it rides
+   above the row overlay (z-index) so it navigates; as plain text it sits below, and the overlay selects. */
+a.gi-file-name { position: relative; z-index: 1; color: var(--teal-deep); text-decoration: none; }
+a.gi-file-name:hover { text-decoration: underline; }
+a.gi-file-name:hover code { color: var(--rust); }
+a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
 
 /* Every file's panel is in the HTML; only the :target one shows (so the drill-down works with JS off), and
    the default prompt hides once any panel is targeted. scroll-margin clears the sticky nav on the jump. */
