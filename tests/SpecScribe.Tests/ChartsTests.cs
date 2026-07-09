@@ -650,54 +650,76 @@ public class ChartsTests
         Assert.Contains(">2 / 4</div>", html);
     }
 
-    // ---- Refinement funnel (Story 3.6) -----------------------------------------------------
+    // ---- Story pipeline funnel (Story 3.6) ---------------------------------------------------
 
-    private static ProgressModel Progress(int epics, int drafted, int stories, int withPlan, int tasksDone, int tasksTotal) => new()
+    private static ProgressModel Pipeline(int stories, Dictionary<string, int> statusCounts) => new()
     {
-        EpicsTotal = epics,
-        EpicsDrafted = drafted,
-        EpicsPending = epics - drafted,
+        EpicsTotal = 2,
+        EpicsDrafted = 2,
+        EpicsPending = 0,
         StoriesTotal = stories,
-        StoriesWithArtifact = withPlan,
-        TasksDone = tasksDone,
-        TasksTotal = tasksTotal,
-        PerEpic = Array.Empty<EpicProgress>(),
+        StoriesWithArtifact = 0,
+        TasksDone = 0,
+        TasksTotal = 0,
+        PerEpic = new[]
+        {
+            new EpicProgress
+            {
+                Number = 1,
+                Title = "E",
+                StoryCount = stories,
+                StoriesWithArtifact = 0,
+                TasksDone = 0,
+                TasksTotal = 0,
+                Status = EpicStatus.Drafted,
+                StoryStatusCounts = statusCounts,
+            },
+        },
     };
 
     [Fact]
-    public void RefinementFunnel_RendersAllFourStagesWithCountsAndWholeChartName()
+    public void RefinementFunnel_RendersFiveCumulativeStagesWithCountsAndWholeChartName()
     {
-        var svg = Charts.RefinementFunnel(Progress(epics: 7, drafted: 5, stories: 34, withPlan: 12, tasksDone: 40, tasksTotal: 210));
+        // Exclusive per-status counts: 11 drafted, 8 ready, 2 active, 4 review, 12 done (37 total).
+        // Cumulative "reached at least" tiers: 37 → 26 → 18 → 16 → 12 — monotonically narrowing.
+        var svg = Charts.RefinementFunnel(Pipeline(37, new Dictionary<string, int>
+        {
+            ["drafted"] = 11, ["ready"] = 8, ["active"] = 2, ["review"] = 4, ["done"] = 12,
+        }));
 
-        // Whole-chart accessible name summarizing every stage and count (mirrors the Donut/heatmap pattern).
+        // Whole-chart accessible name summarizing every stage and cumulative count.
         Assert.Contains("role=\"img\"", svg);
-        Assert.Contains("aria-label=\"Refinement funnel: 7 epics, 34 stories drafted, " +
-                        "12 stories with a task plan, 210 tasks planned\"", svg);
+        Assert.Contains("aria-label=\"Story pipeline: 37 stories drafted, 26 reached ready for dev, " +
+                        "18 reached development, 16 reached review, 12 done\"", svg);
         // Every stage carries its visible count + text label (never color-only).
-        Assert.Contains(">7</text>", svg);
-        Assert.Contains(">epics</text>", svg);
-        Assert.Contains(">34</text>", svg);
-        Assert.Contains(">stories drafted</text>", svg);
+        Assert.Contains(">37</text>", svg);
+        Assert.Contains(">Drafted</text>", svg);
+        Assert.Contains(">26</text>", svg);
+        Assert.Contains(">Ready for dev</text>", svg);
+        Assert.Contains(">18</text>", svg);
+        Assert.Contains(">In development</text>", svg);
+        Assert.Contains(">16</text>", svg);
+        Assert.Contains(">In review</text>", svg);
         Assert.Contains(">12</text>", svg);
-        Assert.Contains(">stories with a task plan</text>", svg);
-        Assert.Contains(">210</text>", svg);
-        Assert.Contains(">tasks planned</text>", svg);
-        // Coverage sub-labels — not band size — say how much detail work remains (truthfulness, AC #1/#2).
-        // The visible sub wraps across two lines; the pointer <title> carries the full phrase.
-        Assert.Contains(">5 of 7 epics</text>", svg);
-        Assert.Contains(">broken into stories</text>", svg);
-        Assert.Contains("<title>34 stories drafted — 5 of 7 epics broken into stories</title>", svg);
-        Assert.Contains("<title>12 stories with a task plan — 12 of 34 stories have a task plan</title>", svg);
-        // Bands ride the status-token classes, one per stage, joined by sideways-funnel connectors.
-        Assert.Contains("funnel-band funnel-epics", svg);
-        Assert.Contains("funnel-band funnel-stories", svg);
-        Assert.Contains("funnel-band funnel-planned", svg);
-        Assert.Contains("funnel-band funnel-tasks", svg);
+        Assert.Contains(">Done</text>", svg);
+        // Per-band tooltips spell out the reached-at-least reading; the %-of-stories sub gives conversion.
+        Assert.Contains("<title>26 of 37 stories have reached Ready for dev</title>", svg);
+        Assert.Contains("<title>12 of 37 stories are done</title>", svg);
+        Assert.Contains(">70% of stories</text>", svg);
+        // Bands ride the 1:1 status-token classes, joined by sideways-funnel connectors.
+        Assert.Contains("funnel-band funnel-drafted", svg);
+        Assert.Contains("funnel-band funnel-ready", svg);
+        Assert.Contains("funnel-band funnel-active", svg);
+        Assert.Contains("funnel-band funnel-review", svg);
+        Assert.Contains("funnel-band funnel-done", svg);
         Assert.Contains("funnel-connector", svg);
-        // Height is honest: the largest stage (tasks) gets the full band height, and the tiny epics/planned
-        // stages floor to a visible band rather than a hairline — never rescaled to fake a narrowing.
+        // Heights track the true cumulative counts (normalized to the drafted total) — a genuinely
+        // monotonic narrowing: 136 ≥ 95.57 ≥ 66.16 ≥ 58.81 ≥ 44.11.
         Assert.Contains("height=\"136\"", svg);
-        Assert.Contains("height=\"12\"", svg);
+        Assert.Contains("height=\"95.57\"", svg);
+        Assert.Contains("height=\"66.16\"", svg);
+        Assert.Contains("height=\"58.81\"", svg);
+        Assert.Contains("height=\"44.11\"", svg);
     }
 
     [Fact]
@@ -705,7 +727,7 @@ public class ChartsTests
     {
         var html = Charts.RefinementFunnel(ProgressModel.Empty);
 
-        // Zero epics → the shared graceful placeholder, no SVG, no NaN/divide-by-zero artifacts.
+        // Zero stories → the shared graceful placeholder, no SVG, no NaN/divide-by-zero artifacts.
         Assert.Contains("chart-empty", html);
         Assert.Contains("Nothing to chart yet.", html);
         Assert.DoesNotContain("<svg", html);
@@ -713,25 +735,24 @@ public class ChartsTests
     }
 
     [Fact]
-    public void RefinementFunnel_EarlyStageProjectRendersEveryRowIncludingZeroStages()
+    public void RefinementFunnel_EarlyStageProjectRendersEveryStageIncludingZeroStages()
     {
-        // "Just getting started": 2 epics, 1 drafted story, no task plans, no tasks. Every stage row still
-        // renders with its real count (including the 0 stages), zero stages get an honest empty placeholder
-        // band (no fill that could read as data), and no width goes NaN/negative. [AC #2]
-        var svg = Charts.RefinementFunnel(Progress(epics: 2, drafted: 1, stories: 1, withPlan: 0, tasksDone: 0, tasksTotal: 0));
+        // "Just getting started": 3 stories, all merely drafted. Every later stage still renders its labeled
+        // column with a real 0 count and an honest dashed placeholder band (no fill that could read as
+        // data), and no height goes NaN/negative. [AC #2]
+        var svg = Charts.RefinementFunnel(Pipeline(3, new Dictionary<string, int> { ["drafted"] = 3 }));
 
-        Assert.Contains(">2</text>", svg);
-        Assert.Contains(">epics</text>", svg);
-        Assert.Contains(">1</text>", svg);
-        Assert.Contains(">story drafted</text>", svg);
+        Assert.Contains(">3</text>", svg);
+        Assert.Contains(">Drafted</text>", svg);
         Assert.Contains(">0</text>", svg);
-        Assert.Contains(">stories with a task plan</text>", svg);
-        Assert.Contains(">tasks planned</text>", svg);
-        // Zero-count stages render the dashed placeholder band, not a filled bar.
-        Assert.Contains("funnel-zero", svg);
-        // Epics is the largest stage (2) → full band height; the single story is half, above the floor.
+        Assert.Contains(">Ready for dev</text>", svg);
+        Assert.Contains(">In development</text>", svg);
+        Assert.Contains(">In review</text>", svg);
+        Assert.Contains(">Done</text>", svg);
+        Assert.Contains(">0% of stories</text>", svg);
+        // All four later stages are zero → four dashed placeholder bands; drafted keeps the full height.
+        Assert.Equal(4, CountOf(svg, "funnel-zero"));
         Assert.Contains("height=\"136\"", svg);
-        Assert.Contains("height=\"68\"", svg);
         Assert.DoesNotContain("NaN", svg);
         Assert.DoesNotContain("height=\"-", svg);
     }
@@ -739,13 +760,14 @@ public class ChartsTests
     [Fact]
     public void RefinementFunnel_SingularCountsReadGrammatically()
     {
-        // 1 epic / 1 story with a plan / 1 task — the labels and the stage-3 verb pluralize correctly.
-        var svg = Charts.RefinementFunnel(Progress(epics: 1, drafted: 1, stories: 3, withPlan: 1, tasksDone: 0, tasksTotal: 1));
+        // A single done story — the aria phrase and the per-band tooltip verbs pluralize correctly.
+        var svg = Charts.RefinementFunnel(Pipeline(1, new Dictionary<string, int> { ["done"] = 1 }));
 
-        Assert.Contains(">epic</text>", svg);
-        Assert.Contains(">story with a task plan</text>", svg);
-        Assert.Contains(">task planned</text>", svg);
-        Assert.Contains("<title>1 story with a task plan — 1 of 3 stories has a task plan</title>", svg);
+        Assert.Contains("aria-label=\"Story pipeline: 1 story drafted, 1 reached ready for dev, " +
+                        "1 reached development, 1 reached review, 1 done\"", svg);
+        Assert.Contains("<title>1 story drafted</title>", svg);
+        Assert.Contains("<title>1 of 1 story has reached Ready for dev</title>", svg);
+        Assert.Contains("<title>1 of 1 story is done</title>", svg);
     }
 
     // ---- Project structure tree (Story 3.4) ------------------------------------------------

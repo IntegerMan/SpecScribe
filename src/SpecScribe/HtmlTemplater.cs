@@ -272,11 +272,12 @@ public static class HtmlTemplater
 
         sb.Append("</div>\n\n");
 
-        // Refinement funnel — planning maturity at a glance (epics → drafted stories → task plans → tasks),
-        // a peer of the progress panels above the per-repo activity detail. Rendered unconditionally: the
-        // builder owns the empty-state (ProgressModel.Empty → the shared chart-empty placeholder), so the
-        // templater never grows a second, divergent fallback. [Story 3.6]
-        sb.Append("<div class=\"chart-panel funnel-panel\">\n<h3>Refinement Funnel</h3>\n");
+        // Story Pipeline — implementation progress at a glance: a sideways funnel of stories that have reached
+        // each delivery stage (cumulative, so it genuinely narrows), a peer of the progress panels above the
+        // per-repo activity detail. Rendered unconditionally: the builder owns the empty-state
+        // (ProgressModel.Empty → the shared chart-empty placeholder), so the templater never grows a second,
+        // divergent fallback. [Story 3.6]
+        sb.Append("<div class=\"chart-panel funnel-panel\">\n<h3>Story Pipeline</h3>\n");
         sb.Append(Charts.RefinementFunnel(p));
         sb.Append("</div>\n\n");
 

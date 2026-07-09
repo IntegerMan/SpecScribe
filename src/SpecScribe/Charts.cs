@@ -677,50 +677,56 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The dashboard refinement funnel — a SIDEWAYS funnel (stages flow left → right: epics →
-    /// drafted stories → task plans → tasks) whose band HEIGHTS are honest: each stage's band height is
-    /// proportional to its true count, normalized to the largest stage, and is never rescaled to force a
-    /// narrowing silhouette (that would overstate progress — Story 1.5's "no chart overstates progress" rule,
-    /// AC #2). Tapered connector polygons between the bands give the classic funnel read; because planning
-    /// counts GROW down the pipeline (few epics fan out into many tasks), the honest shape flares outward —
-    /// "how much detail work remains" is carried by the per-stage coverage sub-labels (epics broken into
-    /// stories, stories with a task plan), and every stage shows its real count as text (never
-    /// height/color-only). A zero-count stage keeps its labeled column with a dashed placeholder band, and a
-    /// nonzero stage is floored to a visible height so a count of 1 beside hundreds never renders as a
-    /// hairline. Pure inline SVG + status-token CSS classes, no JS. [Story 3.6]</summary>
+    /// <summary>The dashboard "Story Pipeline" — a SIDEWAYS funnel of stories flowing through delivery stages
+    /// (Drafted → Ready for dev → In development → In review → Done). Counts are CUMULATIVE: each band counts
+    /// the stories that have reached AT LEAST that stage, so the sequence is monotonically non-increasing and
+    /// the funnel genuinely narrows left → right — the truthful silhouette falls out of the semantics instead
+    /// of being forced (Story 1.5's "no chart overstates progress" rule, AC #2). Band heights are proportional
+    /// to the true cumulative counts (normalized to the drafted total), joined by data-free tapered connector
+    /// polygons; every stage shows its real count as text plus a %-of-stories sub-label (never
+    /// height/color-only), and the hint line + per-band tooltips spell out the reached-at-least reading. A
+    /// zero-count stage keeps its labeled column with a dashed placeholder band, and a nonzero stage is
+    /// floored to a visible height so 1-beside-dozens never renders as a hairline. Stage tallies come from the
+    /// per-epic <see cref="EpicProgress.StoryStatusCounts"/> already on the model — no re-parsing. Pure inline
+    /// SVG + status-token CSS classes, no JS. [Story 3.6, owner-redirected from requirements-maturation]</summary>
     public static string RefinementFunnel(ProgressModel p)
     {
-        if (p.EpicsTotal == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
+        if (p.StoriesTotal == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
 
-        // Stage 3's coverage sub-label needs a story denominator; with no stories drafted yet, "0 of 0" would
-        // read as noise, so the sub-label is simply omitted (the 0 count column still renders). Subs are split
-        // into two visible lines so they fit under their column; the pointer <title> keeps the full phrase.
-        var planSubTop = p.StoriesTotal > 0
-            ? $"{p.StoriesWithArtifact} of {p.StoriesTotal} {Plural(p.StoriesTotal, "story", "stories")}"
-            : null;
-        var planSubBottom = p.StoriesTotal > 0
-            ? $"{Plural(p.StoriesWithArtifact, "has", "have")} a task plan"
-            : null;
-        var stages = new (string Css, int Count, string Label, string? SubTop, string? SubBottom)[]
+        // Whole-project story-status tally: sum the per-epic StoryStatusCounts (every story lands in exactly
+        // one StatusStyles.StoryStages class, so the classes partition StoriesTotal).
+        var byStatus = new Dictionary<string, int>();
+        foreach (var epic in p.PerEpic)
         {
-            ("funnel-epics", p.EpicsTotal, Plural(p.EpicsTotal, "epic", "epics"), null, null),
-            ("funnel-stories", p.StoriesTotal, Plural(p.StoriesTotal, "story drafted", "stories drafted"),
-                $"{p.EpicsDrafted} of {p.EpicsTotal} {Plural(p.EpicsTotal, "epic", "epics")}", "broken into stories"),
-            ("funnel-planned", p.StoriesWithArtifact,
-                Plural(p.StoriesWithArtifact, "story with a task plan", "stories with a task plan"), planSubTop, planSubBottom),
-            ("funnel-tasks", p.TasksTotal, Plural(p.TasksTotal, "task planned", "tasks planned"), null, null),
+            foreach (var (status, n) in epic.StoryStatusCounts)
+            {
+                byStatus[status] = byStatus.GetValueOrDefault(status) + n;
+            }
+        }
+        var done = byStatus.GetValueOrDefault("done");
+        var reachedReview = done + byStatus.GetValueOrDefault("review");
+        var reachedDev = reachedReview + byStatus.GetValueOrDefault("active");
+        var reachedReady = reachedDev + byStatus.GetValueOrDefault("ready");
+
+        var total = p.StoriesTotal;
+        var stages = new (string Css, int Count, string Label, string AriaPhrase)[]
+        {
+            ("funnel-drafted", total, "Drafted", $"{total} {Plural(total, "story", "stories")} drafted"),
+            ("funnel-ready", reachedReady, "Ready for dev", $"{reachedReady} reached ready for dev"),
+            ("funnel-active", reachedDev, "In development", $"{reachedDev} reached development"),
+            ("funnel-review", reachedReview, "In review", $"{reachedReview} reached review"),
+            ("funnel-done", done, "Done", $"{done} done"),
         };
 
-        // Geometry: four 125-wide columns with 30-wide connector gaps in a 640×240 viewBox, bands centered on
+        // Geometry: five 104-wide columns with 24-wide connector gaps in a 640×240 viewBox, bands centered on
         // a shared midline. Nonzero stages floor at 12 tall so the smallest stage stays a visible, hoverable
-        // band; a zero stage gets a slightly thinner dashed placeholder. maxStage >= EpicsTotal >= 1, so the
-        // height math never divides by zero.
-        const double bandWidth = 125, gapWidth = 30, xStart = 25, midY = 132, maxHeight = 136, minHeight = 12, zeroHeight = 10;
-        var maxStage = stages.Max(s => s.Count);
-        double BandHeight(int count) => count == 0 ? zeroHeight : Math.Max(minHeight, count / (double)maxStage * maxHeight);
+        // band; a zero stage gets a slightly thinner dashed placeholder. The drafted total is the largest
+        // stage by construction and >= 1 here, so the height math never divides by zero.
+        const double bandWidth = 104, gapWidth = 24, xStart = 12, midY = 132, maxHeight = 136, minHeight = 12, zeroHeight = 10;
+        double BandHeight(int count) => count == 0 ? zeroHeight : Math.Max(minHeight, count / (double)total * maxHeight);
         double BandX(int i) => xStart + i * (bandWidth + gapWidth);
 
-        var aria = "Refinement funnel: " + string.Join(", ", stages.Select(s => $"{s.Count} {s.Label}"));
+        var aria = "Story pipeline: " + string.Join(", ", stages.Select(s => s.AriaPhrase));
 
         var sb = new StringBuilder();
         sb.Append("<div class=\"refinement-funnel\">\n");
@@ -739,7 +745,7 @@ public static class Charts
 
         for (var i = 0; i < stages.Length; i++)
         {
-            var (css, count, label, subTop, subBottom) = stages[i];
+            var (css, count, label, _) = stages[i];
             var x = BandX(i);
             var cx = x + bandWidth / 2;
             var h = BandHeight(count);
@@ -748,19 +754,24 @@ public static class Charts
             sb.Append($"  <text x=\"{F(cx)}\" y=\"36\" class=\"funnel-stage-label\" text-anchor=\"middle\">{Html(label)}</text>\n");
 
             var cls = count == 0 ? $"funnel-band {css} funnel-zero" : $"funnel-band {css}";
-            var title = subTop is null ? $"{count} {label}" : $"{count} {label} — {subTop} {subBottom}";
+            var title = i == 0
+                ? $"{count} {Plural(count, "story", "stories")} drafted"
+                : i == stages.Length - 1
+                    ? $"{count} of {total} {Plural(count, "story is", "stories are")} done"
+                    : $"{count} of {total} {Plural(count, "story has", "stories have")} reached {label}";
             sb.Append($"  <rect class=\"{cls}\" x=\"{F(x)}\" y=\"{F(midY - h / 2)}\" width=\"{F(bandWidth)}\" height=\"{F(h)}\" rx=\"3\">" +
                       $"<title>{Html(title)}</title></rect>\n");
 
-            if (subTop is not null)
+            // %-of-stories sub-label under every stage after the first — the at-a-glance conversion figure.
+            if (i > 0)
             {
-                sb.Append($"  <text x=\"{F(cx)}\" y=\"216\" class=\"funnel-stage-sub\" text-anchor=\"middle\">{Html(subTop)}</text>\n");
-                sb.Append($"  <text x=\"{F(cx)}\" y=\"230\" class=\"funnel-stage-sub\" text-anchor=\"middle\">{Html(subBottom!)}</text>\n");
+                var pct = (int)Math.Round(count * 100.0 / total);
+                sb.Append($"  <text x=\"{F(cx)}\" y=\"216\" class=\"funnel-stage-sub\" text-anchor=\"middle\">{pct}% of stories</text>\n");
             }
         }
         sb.Append("</svg>\n");
-        sb.Append("<div class=\"funnel-hint\">Left to right: each stage breaks the one before into finer detail &mdash; " +
-                  "band height tracks the real count; the sub-labels show how much refinement remains.</div>\n");
+        sb.Append("<div class=\"funnel-hint\">Left to right: each band counts the stories that have reached at least " +
+                  "that stage &mdash; band height tracks the real count, so the taper shows work still in flight.</div>\n");
         sb.Append("</div>\n");
         return sb.ToString();
     }

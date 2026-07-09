@@ -90,19 +90,35 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_ShowsRefinementFunnelPanel()
+    public void RenderIndex_ShowsStoryPipelinePanel()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts\\epics.md" }, "SpecScribe", hasAdrs: false);
         var progress = new ProgressModel
         {
-            EpicsTotal = 3,
+            EpicsTotal = 2,
             EpicsDrafted = 2,
-            EpicsPending = 1,
+            EpicsPending = 0,
             StoriesTotal = 8,
             StoriesWithArtifact = 4,
             TasksDone = 5,
             TasksTotal = 20,
-            PerEpic = Array.Empty<EpicProgress>(),
+            PerEpic = new[]
+            {
+                new EpicProgress
+                {
+                    Number = 1,
+                    Title = "E",
+                    StoryCount = 8,
+                    StoriesWithArtifact = 4,
+                    TasksDone = 5,
+                    TasksTotal = 20,
+                    Status = EpicStatus.Drafted,
+                    StoryStatusCounts = new Dictionary<string, int>
+                    {
+                        ["drafted"] = 6, ["active"] = 1, ["done"] = 1,
+                    },
+                },
+            },
         };
 
         var html = HtmlTemplater.RenderIndex(
@@ -114,11 +130,11 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        // The funnel panel renders on the dashboard with the populated funnel inside. [Story 3.6 AC #1]
-        Assert.Contains("<h3>Refinement Funnel</h3>", html);
+        // The pipeline panel renders on the dashboard with the populated cumulative funnel inside. [Story 3.6 AC #1]
+        Assert.Contains("<h3>Story Pipeline</h3>", html);
         Assert.Contains("refinement-funnel", html);
-        Assert.Contains("aria-label=\"Refinement funnel: 3 epics, 8 stories drafted, " +
-                        "4 stories with a task plan, 20 tasks planned\"", html);
+        Assert.Contains("aria-label=\"Story pipeline: 8 stories drafted, 2 reached ready for dev, " +
+                        "2 reached development, 1 reached review, 1 done\"", html);
     }
 
     [Fact]
@@ -137,8 +153,8 @@ public class HtmlTemplaterTests
 
         // The panel is unconditional; the builder's own empty-guard supplies the graceful placeholder,
         // so the templater never grows a second, divergent fallback. [Story 3.6 AC #2]
-        Assert.Contains("<h3>Refinement Funnel</h3>", html);
-        var panel = html[html.IndexOf("<h3>Refinement Funnel</h3>", StringComparison.Ordinal)..];
+        Assert.Contains("<h3>Story Pipeline</h3>", html);
+        var panel = html[html.IndexOf("<h3>Story Pipeline</h3>", StringComparison.Ordinal)..];
         panel = panel[..panel.IndexOf("</div>", StringComparison.Ordinal)];
         Assert.Contains("chart-empty", panel);
     }

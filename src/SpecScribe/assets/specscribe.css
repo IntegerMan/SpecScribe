@@ -1520,20 +1520,21 @@ code.color-swatch {
 .donut-legend .swatch.drafted { background: var(--status-drafted); }
 .donut-legend .swatch.pending { background: var(--status-pending); }
 
-/* ====================== REFINEMENT FUNNEL (Story 3.6) ======================
-   A sideways funnel (stages flow left → right) with HONEST band heights: each stage's band height is
-   proportional to its TRUE count (normalized to the largest stage) — never rescaled to fake a narrowing
-   silhouette, which would overstate progress (Story 1.5 truthfulness rule). The neutral connector tapers
-   between bands give the funnel read; they carry no data, so they use a base-palette tone, never a status
-   token. Stage colors route through the --status-* tokens ONLY (single stage→color source): drafted →
-   ready → active → done reads as increasing elaboration down the pipeline. The entrance animation is NOT
-   here — .refinement-funnel is already keyed into the paired reduced-motion blocks (Story 3.5). */
+/* ====================== STORY PIPELINE FUNNEL (Story 3.6) ======================
+   A sideways funnel of stories flowing through delivery stages, with CUMULATIVE counts (stories that have
+   reached at least each stage) — monotonically non-increasing, so the narrowing silhouette is honest by
+   construction (Story 1.5 truthfulness rule). Band heights are proportional to the true counts, normalized
+   to the drafted total. The neutral connector tapers between bands give the funnel read; they carry no
+   data, so they use a base-palette tone, never a status token. Each stage maps 1:1 onto its own lifecycle
+   token (single stage→color source). The entrance animation is NOT here — .refinement-funnel is already
+   keyed into the paired reduced-motion blocks (Story 3.5). */
 .refinement-funnel { display: flex; flex-direction: column; gap: 0.4rem; }
 .funnel { display: block; max-width: 100%; height: auto; margin: 0 auto; }
-.funnel-band.funnel-epics { fill: var(--status-drafted); }
-.funnel-band.funnel-stories { fill: var(--status-ready); }
-.funnel-band.funnel-planned { fill: var(--status-active); }
-.funnel-band.funnel-tasks { fill: var(--status-done); }
+.funnel-band.funnel-drafted { fill: var(--status-drafted); }
+.funnel-band.funnel-ready { fill: var(--status-ready); }
+.funnel-band.funnel-active { fill: var(--status-active); }
+.funnel-band.funnel-review { fill: var(--status-review); }
+.funnel-band.funnel-done { fill: var(--status-done); }
 /* A zero-count stage keeps its labeled column but shows a dashed, unfilled placeholder band — visibly "not
    there yet" rather than a colored bar that could read as data (AC #2 early-stage honesty). */
 .funnel-band.funnel-zero { fill: none; stroke: var(--ink-light); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.6; }

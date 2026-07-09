@@ -459,7 +459,8 @@ So that I can identify missing or stale process artifacts quickly.
 <!-- Story 3.4 retired 2026-07-08 (SCP 2026-07-08). The original artifact disclosure-tree was
      retired, and the source-code treemap it had been rewritten into moved to Story 7.6 (Epic 7) —
      its natural code+git home (LOC + per-file git metrics, drilling into Epic 7 code pages). FR14
-     and UX-DR19 now sit in Epic 7. Story number 3.4 is intentionally vacant (as is 3.7). -->
+     and UX-DR19 now sit in Epic 7. Story number 3.4 is intentionally vacant; 3.7 was filled
+     2026-07-09 by Requirements Flow and Status Blocks. -->
 
 
 ### Story 3.5: Flashy but Purposeful Insight Visual Language
@@ -482,25 +483,61 @@ So that demos and day-to-day usage both benefit from clarity and impact.
 **Then** equivalent text and non-color cues remain present
 **And** reduced-motion settings preserve full informational meaning.
 
-### Story 3.6: Refinement Funnel on the Dashboard
+### Story 3.6: Story Pipeline Funnel on the Dashboard
 
-As a stakeholder assessing planning maturity,
-I want a funnel graphic showing epic → story → task refinement on the home page,
-So that I can see how far the project has been refined at a glance.
+<!-- Redirected 2026-07-09 (owner review of the first funnel build): the original epic→story→task
+     refinement framing read as requirements maturation, not implementation progress, and its counts
+     grow down the pipeline (no honest narrowing). The funnel now shows STORIES flowing through
+     delivery stages with cumulative counts; the requirements-maturation vision moved to Story 3.7. -->
+
+As a stakeholder assessing implementation progress,
+I want a sideways funnel showing stories flowing through the delivery pipeline (drafted → ready for dev → in development → in review → done) on the home page,
+So that I can see how much of the planned work has progressed toward done at a glance.
 
 **Acceptance Criteria:**
 
 1.
-**Given** epics, stories, and task plans have been parsed
+**Given** epics and their stories have been parsed with per-story delivery statuses
 **When** I view the dashboard
-**Then** a funnel visualizes the refinement stages (epics → drafted stories → stories with a task plan → tasks) with counts at each stage
-**And** the narrowing communicates how much detail work remains.
+**Then** a funnel visualizes the pipeline stages with a cumulative count at each stage (stories that have reached at least that stage)
+**And** the counts are monotonically non-increasing so the narrowing is genuine and communicates how much work remains in flight.
 
 2.
 **Given** the accessibility and truthfulness conventions established in Stories 1.4 and 1.5
 **When** the funnel renders
-**Then** each stage carries a text label and value (never color-only) and reduced-motion is respected
+**Then** each stage carries a text label and value (never color-only), the cumulative reading is stated in text, and reduced-motion is respected
 **And** an empty or early-stage project renders a sensible funnel rather than a broken or misleading one.
+
+### Story 3.7: Requirements Flow and Status Blocks
+
+<!-- Added 2026-07-09 (owner direction during Story 3.6 review): the requirements-maturation
+     visualization that Story 3.6 originally drifted toward, now scoped properly. NOTE the data gap:
+     FR coverage today is epic-level only (FR Coverage Map → CoverageEpicNumber in RequirementsParser);
+     FR↔story links are textual linkification, not a data model. AC 2's flow view requires a
+     structured FR→story mapping as part of this story's scope. -->
+
+As a stakeholder tracking requirements maturation,
+I want each FR/NFR shown as a colorized status block and a Sankey-style flow of functional requirements from definition through epic coverage into implementation states,
+So that I can see how requirements are maturing from definition to delivered at a glance.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the requirements inventory has been parsed
+**When** I view the requirements page or the dashboard requirements panel
+**Then** FRs and NFRs render as a grid of colorized status blocks driven by the shared status tokens
+**And** each block carries its id and a text/tooltip status so state is never color-only.
+
+2.
+**Given** functional requirements trace into epics and stories
+**When** the requirements flow view renders
+**Then** a Sankey-style diagram shows FRs flowing from definition through epic coverage into implementation states, backed by a structured FR→story mapping established by this story (extending the epic-level coverage map)
+**And** unmapped or deferred requirements appear as honest, labeled flows rather than being dropped.
+
+3.
+**Given** the accessibility, truthfulness, token, and motion conventions from Stories 1.4, 1.5, and 3.5
+**When** these visualizations render
+**Then** they inherit those conventions in full (status tokens only, text alternatives, reduced-motion seams, no overstated progress).
 
 ### Story 3.8: Git Insights Hub Page
 
