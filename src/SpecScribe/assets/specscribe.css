@@ -1570,30 +1570,41 @@ code.color-swatch {
    status), so it is styled with neutral base-palette tones and never the --status-* lifecycle tokens — those
    stay the single stage→color source. Same discipline as the keyword styling above: non-lifecycle concepts
    must never co-opt the status tokens. Family glyphs inherit currentColor via .ss-icon — no per-row hex. [Story 3.3] */
-.coverage { display: flex; flex-direction: column; gap: 1rem; }
+.coverage { display: flex; flex-direction: column; gap: 0.75rem; }
 .coverage-headline { font-size: 0.95rem; color: var(--ink-faded); }
 .coverage-headline strong { color: var(--ink); font-family: 'Courier New', monospace; }
-.coverage-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-.coverage-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "family chip" "freshness chip";
-  align-items: center;
-  gap: 0.1rem 0.9rem;
-  padding: 0.5rem 0.75rem;
+.coverage-intro { font-size: 0.82rem; color: var(--ink-light); line-height: 1.5; max-width: 62ch; }
+
+/* Two-column card grid, collapsing to one column on narrow screens (mirrors .dashboard-quick-links). */
+.coverage-grid { display: grid; grid-template-columns: 1fr; gap: 0.7rem; margin-top: 0.35rem; }
+@media (min-width: 720px) { .coverage-grid { grid-template-columns: 1fr 1fr; } }
+
+.coverage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--warm-white);
 }
-.coverage-family { grid-area: family; display: inline-flex; align-items: center; gap: 0.45rem; font-weight: bold; color: var(--ink); }
-.coverage-freshness { grid-area: freshness; font-size: 0.78rem; color: var(--ink-light); }
+/* Present cards are whole-card links — give them the same hover/lift affordance as the home index cards. */
+a.coverage-card { text-decoration: none; color: inherit; transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; }
+a.coverage-card:hover { border-color: var(--gold); box-shadow: 0 2px 8px var(--shadow); transform: translateY(-1px); }
+
+.coverage-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.coverage-family { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: bold; color: var(--ink); }
+.coverage-desc { font-size: 0.8rem; color: var(--ink-faded); line-height: 1.5; }
+.coverage-freshness { font-size: 0.76rem; color: var(--ink-light); }
+/* The missing-card call-to-action reuses the Next Steps .cmd-badge; the lead text sits inline before it. */
+.coverage-cta { font-size: 0.8rem; color: var(--ink-faded); display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+
 .coverage-chip {
-  grid-area: chip;
-  justify-self: end;
-  font-size: 0.68rem;
+  flex: 0 0 auto;
+  font-size: 0.66rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.15rem 0.55rem;
+  padding: 0.12rem 0.5rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   color: var(--ink-faded);
@@ -1602,10 +1613,54 @@ code.color-swatch {
 .coverage-chip.missing { color: var(--ink-light); border-color: var(--ink-light); }
 /* Stale = a warm amber warn accent (base --rust tones, distinct from any lifecycle status token). */
 .coverage-chip.stale { color: var(--rust); border-color: var(--rust-light); background: rgba(196, 98, 45, 0.1); }
-/* Missing rows are dimmed (neutral) so present coverage reads first; stale rows carry a warm left-accent so a
+/* Missing cards are dimmed (neutral) so present coverage reads first; stale cards carry a warm left-accent so a
    freshness problem is visible at a glance without relying on the chip alone. */
-.coverage-row.missing { background: var(--parchment); opacity: 0.72; }
-.coverage-row.stale { border-left: 3px solid var(--rust-light); }
+.coverage-card.missing { background: var(--parchment); border-style: dashed; }
+.coverage-card.stale { border-left: 3px solid var(--rust-light); }
+
+/* ============ STRUCTURE TREE (interactive project/artifact tree, structure.html) ============ */
+/* Native <details>/<summary> disclosure — zero JS. Structure/hierarchy is NOT a lifecycle stage, so nothing
+   here routes through the --status-* tokens (those stay the single stage→color source); depth/branch/leaf are
+   styled with neutral base-palette tones + guide-rule borders only. Static, no motion (Story 3.5 owns insight
+   animation), so reduced-motion is trivially satisfied. Family glyphs inherit currentColor via .ss-icon. [Story 3.4] */
+.structure-tree { font-size: 0.9rem; line-height: 1.6; }
+.structure-tree .tree-list { list-style: none; margin: 0; padding: 0; }
+
+/* Every nested list gets a left indent + a hairline guide rule so depth reads at a glance (UX-DR19). The
+   top-level list has no rule (nothing to the left of a root). */
+.structure-tree .tree-list .tree-list {
+  margin-left: 0.55rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--border);
+}
+
+.structure-tree .tree-branch > details > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  color: var(--ink);
+  font-weight: 600;
+}
+/* Reuse the shared caret pattern (.dev-agent-details): hide the native marker, prepend a ▸ that flips to ▾. */
+.structure-tree summary::-webkit-details-marker { display: none; }
+.structure-tree summary::before { content: "\25B8"; color: var(--gold); font-size: 0.8em; width: 0.8em; flex: 0 0 auto; }
+.structure-tree details[open] > summary::before { content: "\25BE"; }
+.structure-tree summary:hover { background: var(--parchment); }
+
+/* Leaf file rows are lighter than the folder branches above them (directory = weight, file = quiet). */
+.structure-tree .tree-leaf { padding: 0.12rem 0.3rem 0.12rem 1.5rem; }
+.structure-tree .tree-leaf .tree-file { color: var(--ink-light); }
+.structure-tree .tree-leaf a.tree-file { color: var(--rust); text-decoration: none; }
+.structure-tree .tree-leaf a.tree-file:hover { text-decoration: underline; }
+
+/* Long paths wrap rather than force horizontal page scroll on mobile (.chart-panel scrolls internally as a
+   last resort per the overflow discipline). [Subtask 4.3] */
+.structure-tree .tree-label,
+.structure-tree .tree-file { overflow-wrap: anywhere; }
 
 /* ============ DEEP ANALYTICS (opt-in --deep-git: hotspots + change coupling) ============ */
 /* A distinct surface from the baseline Git Pulse above. Two side-by-side sections on wide screens,
@@ -1666,12 +1721,14 @@ code.color-swatch {
 
 /* Change-coupling node-link graph (deep-analytics page). Layout is computed at generation time; this only
    themes it with the neutral chart tokens. overflow:visible lets node labels spill past the square viewBox. */
-.coupling-graph { display: block; width: 100%; max-width: 460px; height: auto; margin: 0 auto; overflow: visible; }
+.coupling-graph { display: block; width: 100%; max-width: 500px; height: auto; margin: 0 auto; overflow: visible; }
 .coupling-edge { stroke: var(--rust); stroke-linecap: round; }
 .coupling-node { fill: var(--parchment-dark); stroke: var(--rust-light); stroke-width: 1.5; }
-.coupling-label { fill: var(--ink-faded); font-family: 'Courier New', monospace; font-size: 0.66rem; }
+/* No CSS font-size here on purpose: the label size is an SVG user-unit attribute (font-size="13") so it scales
+   up with the graph when enlarged in the lightbox. A CSS rem here would override that and stay tiny. */
+.coupling-label { fill: var(--ink-faded); font-family: 'Courier New', monospace; }
 
-/* ============ DEEP ANALYTICS PAGE (deep-analytics.html: graph + list + hotspots) ============ */
+/* ============ DEEP ANALYTICS PAGE (deep-analytics.html: graph + table + hotspots) ============ */
 .deep-page-section { margin: 0 0 2.4rem; }
 .deep-page-section > h2 {
   font-size: 1.15rem;
@@ -1685,9 +1742,89 @@ code.color-swatch {
 @media (min-width: 860px) {
   .deep-page-coupling { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
 }
-/* The graph panel needs visible overflow so the coupling-graph's spilled labels aren't clipped by the panel. */
-.deep-page-graph-panel { display: flex; align-items: center; justify-content: center; overflow: visible; }
+/* The graph panel stacks the expand affordance, the graph, and the legend; visible overflow so the graph's
+   spilled labels aren't clipped by the panel. */
+.deep-page-graph-panel { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: visible; }
 .deep-page-list-panel { min-width: 0; }
+
+/* Panel header (e.g. "Ranked Pairs" + a count chip). */
+.deep-page-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.6rem; }
+.deep-page-panel-head h3 { font-size: 0.95rem; color: var(--rust); margin: 0; }
+.deep-page-panel-count { font-size: 0.72rem; color: var(--ink-light); font-family: 'Courier New', monospace; white-space: nowrap; }
+
+/* "Expand" affordance, pinned to the graph panel's top-right; opens the pure-CSS :target lightbox. */
+.coupling-expand {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  z-index: 1;
+  font-size: 0.72rem;
+  color: var(--ink-light);
+  text-decoration: none;
+  border: 1px solid var(--parchment-deep);
+  border-radius: 4px;
+  padding: 0.12rem 0.45rem;
+  background: var(--parchment);
+}
+.coupling-expand:hover, .coupling-expand:focus-visible { color: var(--rust); border-color: var(--rust-light); }
+.coupling-legend { font-size: 0.74rem; color: var(--ink-light); line-height: 1.45; text-align: center; margin: 0.6rem 0 0; max-width: 42ch; }
+
+/* Ranked-pairs table: counts align as a right column; long paths ellipsis-truncate (full value in title). */
+.coupling-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; table-layout: fixed; }
+.coupling-table th {
+  text-align: left;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-light);
+  font-weight: bold;
+  border-bottom: 2px solid var(--parchment-deep);
+  padding: 0 0.5rem 0.4rem 0;
+}
+.coupling-table td { padding: 0.4rem 0.5rem 0.4rem 0; border-bottom: 1px solid var(--parchment-dark); vertical-align: top; }
+.coupling-table tr:last-child td { border-bottom: none; }
+.coupling-table .coupling-file {
+  font-family: 'Courier New', monospace;
+  color: var(--ink);
+  max-width: 0;            /* with table-layout:fixed, lets the cell shrink so ellipsis engages */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coupling-table .coupling-num {
+  text-align: right;
+  width: 4.5rem;
+  font-family: 'Courier New', monospace;
+  color: var(--rust);
+  white-space: nowrap;
+}
+
+/* Pure-CSS :target lightbox for the enlarged graph — hidden until the "Expand" link targets it. */
+.coupling-lightbox { display: none; }
+.coupling-lightbox:target { display: flex; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; }
+.coupling-lightbox-backdrop { position: absolute; inset: 0; background: rgba(42, 31, 14, 0.62); }
+.coupling-lightbox-panel {
+  position: relative;
+  background: var(--parchment);
+  border: 1px solid var(--parchment-deep);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(42, 31, 14, 0.35);
+  padding: 2.2rem;
+  max-width: 94vw;
+  max-height: 94vh;
+  overflow: visible;
+}
+.coupling-lightbox-panel .coupling-graph { width: 86vmin; max-width: 860px; }
+.coupling-lightbox-close {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.7rem;
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--ink-light);
+  text-decoration: none;
+}
+.coupling-lightbox-close:hover, .coupling-lightbox-close:focus-visible { color: var(--rust); }
 
 /* ====================== EPIC MOSAIC (per-epic linked mini-donuts) ====================== */
 .epic-mosaic {

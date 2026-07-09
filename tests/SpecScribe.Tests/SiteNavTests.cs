@@ -75,6 +75,30 @@ public class SiteNavTests
     }
 
     [Fact]
+    public void Build_AddsStructureItemAndQuickLinkWhenAvailable()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasStructure: true);
+
+        // Structure sits in the insight/tracking neighborhood after Epics/Requirements. [Story 3.4 Task 3.2]
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Structure" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(SiteNav.StructureOutputPath, nav.Items.First(i => i.Label == "Structure").OutputRelativePath);
+        Assert.True(nav.HasStructure);
+
+        var quick = Assert.Single(nav.QuickLinks, q => q.Label == "Structure");
+        Assert.Equal(SiteNav.StructureOutputPath, quick.OutputRelativePath);
+    }
+
+    [Fact]
+    public void Build_OmitsStructureWhenNotAvailable()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasStructure: false);
+
+        Assert.DoesNotContain("Structure", nav.Items.Select(i => i.Label));
+        Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Structure");
+        Assert.False(nav.HasStructure);
+    }
+
+    [Fact]
     public void Build_PutsBmadMethodDocsInNavAndQuickLinks()
     {
         var nav = SiteNav.Build(new[]

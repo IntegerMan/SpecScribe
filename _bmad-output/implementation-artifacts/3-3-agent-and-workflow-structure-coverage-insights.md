@@ -94,10 +94,84 @@ so that I can identify missing or stale process artifacts quickly.
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Claude Code / bmad-dev-story)
 
 ### Debug Log References
 
+- `dotnet test` (full suite): 480 passed, 1 failed. The single failure —
+  `HtmlTemplaterTests.RenderIndex_RendersDeepAnalyticsPanelDistinctlyWhenDeepGitPopulated` — is **NOT caused by
+  this story**. It is a stale assertion belonging to Story 3.2: the shared working tree contains uncommitted
+  3.2 rework (new `DeepAnalyticsTemplater.cs`, `SiteNav.cs` changes) that moved deep analytics from an inline
+  dashboard panel to a dedicated page and removed the `deep-git-panel`, without updating that test. Per user
+  decision, it is left for Story 3.2 to reconcile. Every other test (including all Story 3.3 tests) passes:
+  `dotnet test --filter FullyQualifiedName!=...RenderIndex_RendersDeepAnalyticsPanelDistinctlyWhenDeepGitPopulated`
+  → **480 passed, 0 failed**.
+- End-to-end: `dotnet run --project src/SpecScribe -- generate` renders the "Planning Coverage" panel on the
+  dashboard with the headline "8 of 8 families present", per-family "Present" chips, invariant DReadable
+  freshness dates, and additive memlog "journal" enrichment only on families that have a `.memlog.md`.
+
 ### Completion Notes List
 
+- **CAP-4's second half delivered as a peer of the git-pulse panel.** New always-on "Planning Coverage" panel
+  on the dashboard reporting discovered artifact families and key missing families, with freshness/staleness
+  indicators (AC #1).
+- **Source-derived primary, memlog secondary (AC #2).** Coverage (present/missing) and freshness (source-file
+  mtime) come 100% from source artifacts; the memlog `updated:` date is strictly-additive enrichment. Unit test
+  `Build_MemlogIsStrictlyAdditive_PrimaryCoverageIdenticalWithOrWithoutMemlog` proves the primary picture is
+  byte-for-byte identical with or without memlogs.
+- **Pure/IO split preserved.** `ArtifactCoverage.Build` is pure over (paths, mtime map, memlog map, today) —
+  fully unit-testable without a repo; `SiteGenerator` owns all disk reads (mtimes + `.memlog.md` discovery) and
+  degrades any failure to `ArtifactCoverage.Empty` (AD-4 / NFR2 never-throw).
+- **Reused existing seams, invented none.** Family filenames key off `ModuleContext.WellKnownDocs`; glyphs reuse
+  `Icons.ForConcept`; dates use the invariant `Charts.DReadable`; the panel is pure HTML+CSS, no JS.
+- **Coverage axis ≠ lifecycle axis.** Present/missing/stale is styled with neutral base-palette tones
+  (`--ink-light`, `--rust`/`--rust-light`), never the `--status-*` lifecycle tokens.
+- **Family list is the Epic-4 seam.** The canonical family set lives in one place in `ArtifactCoverage` with an
+  XML-doc note that a future framework adapter swaps the family set, not the panel.
+- **Incidental cross-story touch (disclosed):** tightened one assertion in
+  `SiteGeneratorSpecKernelTests.GenerateAll_MissingSpecFolderDegradesGracefully` from a blanket
+  `DoesNotContain("Spec Kernel")` to target the section *band* specifically, because the new coverage panel
+  legitimately names "Spec Kernel" as a *missing* family (AC #1). This is Story 3.3's own behavior, not 3.2's.
+
 ### File List
+
+- `src/SpecScribe/ArtifactCoverage.cs` (new — model + pure builder)
+- `src/SpecScribe/SiteGenerator.cs` (gather inputs, cache `_coverage`, memlog discovery, wire into `WriteIndex`)
+- `src/SpecScribe/Charts.cs` (new `ArtifactCoveragePanel` pure builder)
+- `src/SpecScribe/HtmlTemplater.cs` (`RenderIndex`/`AppendDashboard` optional `coverage` param + panel render)
+- `src/SpecScribe/assets/specscribe.css` (coverage-panel styles, neutral tones)
+- `tests/SpecScribe.Tests/ArtifactCoverageTests.cs` (new — pure Build + staleness + memlog-additivity tests)
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` (panel render + omission tests)
+- `tests/SpecScribe.Tests/StylesheetTests.cs` (coverage-panel CSS seam guard)
+- `tests/SpecScribe.Tests/SiteGeneratorSpecKernelTests.cs` (tightened Spec-Kernel-band omission assertion)
+
+### Review-Driven Enhancement (actionable panel)
+
+Review feedback: the panel read as a passive status list — unclear what it was, why it mattered, or what to do
+next. Reworked it into an **actionable 2-column card grid** (no new architecture; same never-throw / neutral-tone
+/ pure-vs-IO discipline):
+
+- **Panel intro line + per-family one-line description** so every card is self-explanatory.
+- **Present family → whole-card link** to its page. Hrefs resolved in the generator (`ResolveFamilyHref`):
+  Epics/Stories → `epics.html`, Requirements → `requirements.html`, the rest → `ToOutputRelative(source)`.
+  Verified all eight link targets exist in the generated output (no broken links).
+- **Missing family → "what it is" sentence + copyable create-command**, reusing `BmadCommands.InlineGuidance`
+  (the Next Steps command badge). Step keys live in the new `ArtifactCoverage.CreateStepKeys` single-source map,
+  resolved against the detected module via `CommandCatalog.Command`; a step the module doesn't expose (e.g. Spec
+  Kernel) degrades to plain guidance text — no invented commands.
+- Model: `ArtifactFamily` gained `Description` (static, set by pure `Build`) and generator-resolved nullable
+  `Href`/`CreateCommand` (left null by `Build`, so it stays purely source-derived).
+- Verified end-to-end: `generate` shows the 2-col grid with linked present cards; an isolated run with a family
+  removed renders its card as missing with `Create it with /bmad-product-brief` (copyable). Confirmed 2-col
+  desktop / 1-col mobile via computed styles.
+- Full suite: **502 passed, 0 failed** (the earlier external Story 3.2 deep-git test has since been reconciled).
+
+### Change Log
+
+- 2026-07-08: Implemented Story 3.3 — artifact/workflow structure coverage insight ("Planning Coverage"
+  dashboard panel), pure `ArtifactCoverage` model + builder, generator gathering (mtimes + memlog enrichment),
+  panel renderer + CSS, and full test coverage. Status → review.
+- 2026-07-08: Review-driven enhancement — reworked the panel into an actionable 2-column card grid with an
+  intro, per-family descriptions, whole-card links for present families, and copyable create-commands for
+  missing ones. Extended `ArtifactCoverage` (Description/Href/CreateCommand + `CreateStepKeys`), generator href
+  and command resolution, and tests. Full suite green (502).

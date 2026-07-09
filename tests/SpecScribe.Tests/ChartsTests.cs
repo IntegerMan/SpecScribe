@@ -550,4 +550,54 @@ public class ChartsTests
         // Visible fraction text stays.
         Assert.Contains(">2 / 4</div>", html);
     }
+
+    // ---- Project structure tree (Story 3.4) ------------------------------------------------
+
+    [Fact]
+    public void ProjectStructureTree_RendersDirectoriesAsNativeDetailsWithGlyphAndLabel()
+    {
+        var tree = ProjectTree.Build(new[] { "planning-artifacts/epics.md" }, new Dictionary<string, string>());
+
+        var html = Charts.ProjectStructureTree(tree);
+
+        // A directory branch is a native <details>/<summary> disclosure (zero-JS expand/collapse + announced
+        // state), the top-level one open, carrying the decorative Structure glyph beside its label.
+        Assert.Contains("<details open>", html);
+        Assert.Contains("<summary>", html);
+        Assert.Contains("aria-hidden=\"true\"", html); // the Structure glyph is decorative
+        Assert.Contains("<span class=\"tree-label\">planning-artifacts</span>", html);
+        // The whole surface is JS-free — lock the no-script contract.
+        Assert.DoesNotContain("<script", html);
+    }
+
+    [Fact]
+    public void ProjectStructureTree_LinksMappedLeavesAndLeavesOthersAsPlainText()
+    {
+        var tree = ProjectTree.Build(
+            new[] { "planning-artifacts/epics.md", "planning-artifacts/orphan.md" },
+            new Dictionary<string, string> { ["planning-artifacts/epics.md"] = "epics.html" });
+
+        var html = Charts.ProjectStructureTree(tree);
+
+        // Mapped file → an <a> to its generated page (AC #2 routing). structure.html is at the root, so the
+        // output-relative href passes through unprefixed.
+        Assert.Contains("<a class=\"tree-file\" href=\"epics.html\">epics.md</a>", html);
+        // Unmapped file → plain, non-link text — never a broken link.
+        Assert.Contains("<span class=\"tree-file\">orphan.md</span>", html);
+    }
+
+    [Fact]
+    public void ProjectStructureTree_EscapesLabelsAndHrefs()
+    {
+        var tree = ProjectTree.Build(
+            new[] { "a&b/c<d>.md" },
+            new Dictionary<string, string> { ["a&b/c<d>.md"] = "pages/a&b.html" });
+
+        var html = Charts.ProjectStructureTree(tree);
+
+        Assert.Contains("a&amp;b</span>", html);        // directory label escaped
+        Assert.Contains(">c&lt;d&gt;.md</a>", html);     // file label escaped
+        Assert.Contains("href=\"pages/a&amp;b.html\"", html); // href escaped
+        Assert.DoesNotContain("<d>", html);              // no raw unescaped angle brackets leak through
+    }
 }

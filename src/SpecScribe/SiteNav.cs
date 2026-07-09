@@ -21,6 +21,12 @@ public sealed class SiteNav
     /// the generator (which writes the file) and the templater (which links to it) so the two can't disagree. [Story 3.2]</summary>
     public const string DeepAnalyticsOutputPath = "deep-analytics.html";
 
+    /// <summary>The interactive project/artifact structure tree page. Written only when the source-artifact file
+    /// set is non-empty; the nav item and dashboard quick link gate on the same signal so a link is never emitted
+    /// to a page that wasn't produced. Shared between the generator (writes the file) and the templater/nav
+    /// (link to it) so the two can't disagree. [Story 3.4]</summary>
+    public const string StructureOutputPath = "structure.html";
+
     public required IReadOnlyList<(string Label, string OutputRelativePath)> Items { get; init; }
 
     /// <summary>Every discoverable key view for the dashboard's quick-link grid. A superset of the nav bar:
@@ -40,13 +46,16 @@ public sealed class SiteNav
 
     public bool HasSprint => Items.Any(i => i.Label == "Sprint");
 
+    public bool HasStructure => Items.Any(i => i.Label == "Structure");
+
     public static SiteNav Build(
         IReadOnlyList<string> sourceRelativePaths,
         string siteTitle,
         IReadOnlyList<ModuleDoc>? moduleDocs = null,
         bool hasAdrs = false,
         bool hasReadme = false,
-        bool hasSprint = false)
+        bool hasSprint = false,
+        bool hasStructure = false)
     {
         var items = new List<(string, string)> { ("Home", HomeOutputPath) };
         var quickLinks = new List<(string, string, string)>();
@@ -103,6 +112,15 @@ public sealed class SiteNav
         {
             items.Add(("Sprint", SprintOutputPath));
             quickLinks.Add(("Sprint", SprintOutputPath, "See where every epic and story sits."));
+        }
+
+        // The interactive structure tree is its own first-class insight surface, gated on the source-artifact
+        // file set the same way Sprint gates on the yaml. Sits in the Epics/Sprint insight-tracking
+        // neighborhood. Its nav label routes through Icons.ForConcept("Structure"). [Story 3.4 Task 3.2]
+        if (hasStructure)
+        {
+            items.Add(("Structure", StructureOutputPath));
+            quickLinks.Add(("Structure", StructureOutputPath, "Explore the project and artifact structure."));
         }
 
         if (hasAdrs)

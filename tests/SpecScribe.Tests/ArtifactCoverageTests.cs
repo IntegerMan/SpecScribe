@@ -143,6 +143,31 @@ public class ArtifactCoverageTests
     }
 
     [Fact]
+    public void Build_PopulatesDescriptionAndLeavesPresentationFieldsNull()
+    {
+        // Description is static canonical data set by the pure Build; Href/CreateCommand are generator-resolved
+        // (page routing + detected module) so Build must leave them null — it stays purely source-derived.
+        var cov = ArtifactCoverage.Build(AllFamilyPaths(), NoDates, NoMemlog, Today);
+
+        Assert.All(cov.Families, f => Assert.False(string.IsNullOrWhiteSpace(f.Description)));
+        Assert.All(cov.Families, f => Assert.Null(f.Href));
+        Assert.All(cov.Families, f => Assert.Null(f.CreateCommand));
+    }
+
+    [Fact]
+    public void CreateStepKeys_CoverEveryFamilyThatHasAWorkflow()
+    {
+        // The step-key map is the single source the generator uses to resolve a missing family's create
+        // command; every family here should map to a workflow step (Spec Kernel intentionally has one too,
+        // even if a given module may not expose it — resolution degrades at Command() time, not here).
+        var cov = ArtifactCoverage.Build(AllFamilyPaths(), NoDates, NoMemlog, Today);
+        foreach (var f in cov.Families)
+        {
+            Assert.True(ArtifactCoverage.CreateStepKeys.ContainsKey(f.Label), $"no step key for {f.Label}");
+        }
+    }
+
+    [Fact]
     public void Build_MemlogEnrichmentAttachesToMatchingFamily()
     {
         var path = "planning-artifacts/prds/prd-x/prd.md";

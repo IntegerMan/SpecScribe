@@ -365,6 +365,60 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderIndex_PresentFamilyCardIsAWholeCardLinkToItsPage()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var coverage = new ArtifactCoverage
+        {
+            Families = new[]
+            {
+                new ArtifactFamily("PRD", "PRD", "The product requirements doc.", Present: true,
+                    LastModified: new DateOnly(2026, 6, 20), SourcePath: "planning-artifacts/prds/prd-x/prd.md",
+                    MemlogUpdated: null, Href: "planning-artifacts/prds/prd-x/prd.html"),
+            },
+        };
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage);
+
+        // The whole present card is an anchor to the artifact's page, and its one-line description renders.
+        Assert.Contains("<a class=\"coverage-card present\" href=\"planning-artifacts/prds/prd-x/prd.html\">", html);
+        Assert.Contains("The product requirements doc.", html);
+    }
+
+    [Fact]
+    public void RenderIndex_MissingFamilyShowsCopyableCreateCommandOrFallbackGuidance()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var coverage = new ArtifactCoverage
+        {
+            Families = new[]
+            {
+                // A present family so the panel renders at all (!IsEmpty).
+                new ArtifactFamily("PRD", "PRD", "What you're building and why.", Present: true,
+                    LastModified: new DateOnly(2026, 6, 20), SourcePath: "x/prd.md", MemlogUpdated: null, Href: "x/prd.html"),
+                // Missing with a resolved create command → copyable badge.
+                new ArtifactFamily("Architecture", "Architecture", "The architecture spine.", Present: false,
+                    LastModified: null, SourcePath: null, MemlogUpdated: null, CreateCommand: "/bmad-architecture"),
+                // Missing with no command (module exposes none) → plain guidance fallback, no badge.
+                new ArtifactFamily("Spec Kernel", "Spec", "The canonical spec contract.", Present: false,
+                    LastModified: null, SourcePath: null, MemlogUpdated: null),
+            },
+        };
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage);
+
+        // Missing-with-command: the copyable command badge (same data-copy trigger the Next Steps panels use).
+        Assert.Contains("Create it with", html);
+        Assert.Contains("data-copy=\"/bmad-architecture\"", html);
+        // Missing-without-command: degrades to plain guidance, never an invented command.
+        Assert.Contains("Add this artifact through your planning workflow.", html);
+    }
+
+    [Fact]
     public void RenderIndex_OmitsPlanningCoveragePanelWhenCoverageEmptyOrNull()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

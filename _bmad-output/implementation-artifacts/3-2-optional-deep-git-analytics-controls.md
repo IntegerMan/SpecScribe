@@ -143,8 +143,8 @@ claude-opus-4-8 (Opus 4.8)
 - `src/SpecScribe/GitMetrics.cs` — `DeepGitPulse` record, `TryComputeDeep`, pure `ParseNumstatLog`, `CouplingFileSetCap`
 - `src/SpecScribe/ProgressModel.cs` — `DeepGit` field + `Empty` default
 - `src/SpecScribe/ProgressCalculator.cs` — optional `DeepGitPulse? deep` param threaded into construction
-- `src/SpecScribe/Charts.cs` — refactored `DeepGitPanel` into reusable `HotspotBars` + `CouplingList`; added the pure-SVG `CouplingGraph` node-link diagram (+ `Basename`/`Shorten` helpers)
-- `src/SpecScribe/DeepAnalyticsTemplater.cs` — **new** dedicated `deep-analytics.html` page (coupling graph + ranked list + hotspots)
+- `src/SpecScribe/Charts.cs` — refactored `DeepGitPanel` into reusable `HotspotBars` + `CouplingTable` (aligned ranked table); added the pure-SVG `CouplingGraph` node-link diagram with scalable user-unit labels (+ `Basename`/`Shorten` helpers)
+- `src/SpecScribe/DeepAnalyticsTemplater.cs` — **new** dedicated `deep-analytics.html` page (coupling graph + expand/zoom lightbox + ranked table + hotspots)
 - `src/SpecScribe/SiteNav.cs` — `DeepAnalyticsOutputPath` shared constant
 - `src/SpecScribe/SiteGenerator.cs` — gated `TryComputeDeep` call; threads `deepGit` into `Compute`; generates the deep-analytics page when `DeepGit` data exists
 - `src/SpecScribe/HtmlTemplater.cs` — dashboard wiring: "View Deep Analytics →" link in the Git Pulse header when `DeepGit` non-null (inline panel removed)
@@ -166,3 +166,4 @@ claude-opus-4-8 (Opus 4.8)
 
 - 2026-07-08 — Story 3.2 implemented: opt-in `--deep-git` deep git analytics (change coupling + hotspots), gated so baseline generation is unaffected when off. Shared bounded `git log --numstat` foundation, never-throw provider, interactive/CLI parity + `.specscribe` persistence. (claude-opus-4-8)
 - 2026-07-08 — Owner follow-up: promoted deep analytics to a dedicated `deep-analytics.html` page with a node-link change-coupling graph; replaced the dashboard panel with a "View Deep Analytics →" link in the Git Pulse header. First-cut visualization; formalization deferred to Story 3.8. Full suite 480 green. (claude-opus-4-8)
+- 2026-07-08 — Owner polish round on the page: graph labels enlarged and made scalable (SVG user-unit font-size) so they read clearly and grow when zoomed; added a pure-CSS `:target` expand/zoom lightbox (no JS, mirrors the heatmap drill-down); converted the ranked pairs from a list to a proper aligned `<table>` (`Charts.CouplingTable`, replacing `CouplingList`); tidied the panel header ("Ranked Pairs" + count) and added a graph legend. DOM/computed-style verified (labels 13px inline → 20px enlarged; lightbox opens on `:target`). Full suite 494 green. (claude-opus-4-8)

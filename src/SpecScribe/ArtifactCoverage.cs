@@ -2,19 +2,26 @@ using System.Text.RegularExpressions;
 
 namespace SpecScribe;
 
-/// <summary>One canonical planning/workflow artifact family — a row in the dashboard coverage panel. Carries
+/// <summary>One canonical planning/workflow artifact family — a card in the dashboard coverage panel. Carries
 /// whether the family was discovered in the source tree (<see cref="Present"/>), the best-effort freshness
-/// signal (<see cref="LastModified"/>, the source file's last-write-time), the matched source path, and an
-/// optional secondary <see cref="MemlogUpdated"/> enrichment (the family's memlog <c>updated:</c> date).
-/// Freshness/staleness is a DIFFERENT axis from the lifecycle status tokens — a "present, stale PRD" is not a
-/// lifecycle stage — so the panel styles this with neutral palette tones, never <c>--status-*</c>. [Story 3.3]</summary>
+/// signal (<see cref="LastModified"/>, the source file's last-write-time), the matched source path, an
+/// optional secondary <see cref="MemlogUpdated"/> enrichment (the family's memlog <c>updated:</c> date), and a
+/// one-line <see cref="Description"/> of what the artifact is. <see cref="Href"/> (the page a present family
+/// links to) and <see cref="CreateCommand"/> (the slash command that creates a missing family) are resolved by
+/// the generator — the pure <see cref="ArtifactCoverage.Build"/> leaves them null since they depend on page
+/// routing and the detected module. Freshness/staleness is a DIFFERENT axis from the lifecycle status tokens —
+/// a "present, stale PRD" is not a lifecycle stage — so the panel styles this with neutral palette tones, never
+/// <c>--status-*</c>. [Story 3.3]</summary>
 public sealed record ArtifactFamily(
     string Label,
     string ConceptIconKey,
+    string Description,
     bool Present,
     DateOnly? LastModified,
     string? SourcePath,
-    DateOnly? MemlogUpdated)
+    DateOnly? MemlogUpdated,
+    string? Href = null,
+    string? CreateCommand = null)
 {
     /// <summary>Staleness is derived, never stored: a present family whose source file was last written more
     /// than <see cref="ArtifactCoverage.StalenessThresholdDays"/> days before <paramref name="today"/>. A
@@ -55,9 +62,12 @@ public sealed class ArtifactCoverage
 
     public static readonly ArtifactCoverage Empty = new() { Families = Array.Empty<ArtifactFamily>() };
 
-    /// <summary>Pairs a canonical family's label + reused <see cref="Icons.ForConcept"/> glyph key with the
-    /// predicate that recognizes its source file (matched by filename anywhere in the tree).</summary>
-    private sealed record FamilySpec(string Label, string ConceptIconKey, Func<string, bool> Matches);
+    /// <summary>Pairs a canonical family's label + reused <see cref="Icons.ForConcept"/> glyph key + one-line
+    /// description with the predicate that recognizes its source file (matched by filename anywhere in the
+    /// tree). <see cref="StepKey"/> is the workflow-step name (skill minus its module prefix) the generator
+    /// feeds to <see cref="CommandCatalog.Command"/> to surface a create command on a missing family; null
+    /// when no create workflow applies (the missing card then shows guidance text alone).</summary>
+    private sealed record FamilySpec(string Label, string ConceptIconKey, string Description, string? StepKey, Func<string, bool> Matches);
 
     // Canonical filenames not already centralized in ModuleContext.WellKnownDocs. The five that ARE centralized
     // (PRD, Brief, Architecture spine, UX design + experience) are keyed off those constants below rather than
@@ -75,20 +85,36 @@ public sealed class ArtifactCoverage
     /// <see cref="Icons.ForConcept"/> vocabulary so the panel adds no new icon strings.</summary>
     private static readonly IReadOnlyList<FamilySpec> Specs = new[]
     {
-        new FamilySpec("PRD", "PRD", NameIs(ModuleContext.WellKnownDocs.Prd)),
-        new FamilySpec("Product Brief", "Product Brief", NameIs(ModuleContext.WellKnownDocs.Brief)),
-        new FamilySpec("Architecture", "Architecture", NameIs(ModuleContext.WellKnownDocs.ArchitectureSpine)),
+        new FamilySpec("PRD", "PRD", "What you're building and why — the product requirements.", "prd",
+            NameIs(ModuleContext.WellKnownDocs.Prd)),
+        new FamilySpec("Product Brief", "Product Brief", "The early product concept and framing.", "product-brief",
+            NameIs(ModuleContext.WellKnownDocs.Brief)),
+        new FamilySpec("Architecture", "Architecture", "The architecture spine — the invariants features and stories stay consistent with.", "architecture",
+            NameIs(ModuleContext.WellKnownDocs.ArchitectureSpine)),
         // UX is present if EITHER the design system OR the experience/flows doc exists.
-        new FamilySpec("UX", "UX Design",
+        new FamilySpec("UX", "UX Design", "The UX design system and experience flows.", "ux",
             p => NameMatches(p, ModuleContext.WellKnownDocs.UxDesign) || NameMatches(p, ModuleContext.WellKnownDocs.UxExperience)),
         // Spec kernel: SPEC.md living under a specs/ path — disjoint from Story 2.1's implementation-artifacts/spec-*.md quick-dev files.
-        new FamilySpec("Spec Kernel", "Spec", p => NameMatches(p, SpecKernelFile) && HasSegment(p, "specs")),
-        new FamilySpec("Epics", "Epics", NameIs(EpicsFile)),
+        // No standard "create spec" workflow step in the base module, so a missing card shows guidance text alone.
+        new FamilySpec("Spec Kernel", "Spec", "The canonical spec contract downstream work is built from.", "spec",
+            p => NameMatches(p, SpecKernelFile) && HasSegment(p, "specs")),
+        new FamilySpec("Epics", "Epics", "The epic and story breakdown of the work.", "create-epics-and-stories",
+            NameIs(EpicsFile)),
         // Stories: at least one epic/story artifact file (implementation-artifacts/<n>-<n>-*.md).
-        new FamilySpec("Stories", "Implementation Artifacts", IsStoryArtifact),
-        new FamilySpec("Requirements", "Requirements",
+        new FamilySpec("Stories", "Implementation Artifacts", "Per-story implementation plans.", "create-story",
+            IsStoryArtifact),
+        // Requirements (FR/NFR) are produced by the PRD workflow, so the create command points there.
+        new FamilySpec("Requirements", "Requirements", "The FR/NFR catalog behind the plan.", "prd",
             p => NameMatches(p, RequirementsFile) || NameMatches(p, RequirementsCatalogFile)),
     };
+
+    /// <summary>Maps a family <see cref="ArtifactFamily.Label"/> to the workflow step key that creates it —
+    /// the single source the generator feeds to <see cref="CommandCatalog.Command"/> to resolve a missing
+    /// family's create command against the detected module. A label absent here (or a step the module doesn't
+    /// expose) yields no command, so the missing card degrades to guidance text. [Story 3.3 actionable panel]</summary>
+    public static readonly IReadOnlyDictionary<string, string> CreateStepKeys =
+        Specs.Where(s => s.StepKey is not null)
+            .ToDictionary(s => s.Label, s => s.StepKey!, StringComparer.Ordinal);
 
     /// <summary>Builds the coverage view over already-resolved inputs — NO disk access here, so every
     /// coverage/freshness/staleness rule is unit-testable without a repo (the same IO-in-the-caller split as
@@ -125,7 +151,8 @@ public sealed class ArtifactCoverage
 
             var memlog = memlogUpdatedByFamilyLabel.TryGetValue(spec.Label, out var ml) ? ml : (DateOnly?)null;
 
-            families.Add(new ArtifactFamily(spec.Label, spec.ConceptIconKey, match is not null, lastModified, match, memlog));
+            families.Add(new ArtifactFamily(
+                spec.Label, spec.ConceptIconKey, spec.Description, match is not null, lastModified, match, memlog));
         }
 
         return new ArtifactCoverage { Families = families };

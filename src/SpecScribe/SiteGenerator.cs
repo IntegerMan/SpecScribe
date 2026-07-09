@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace SpecScribe;
@@ -78,7 +79,7 @@ public sealed class SiteGenerator
                 readmeEvent = GenerateReadmeInternal(nav);
                 if (readmeEvent is { Outcome: GenerationOutcome.Error })
                 {
-                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false, hasSprint: SprintAvailable);
+                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false, hasSprint: SprintAvailable, hasStructure: sourceRelatives.Count > 0);
                     _nav = nav;
                 }
             }
@@ -160,6 +161,9 @@ public sealed class SiteGenerator
             // The sprint page reads the epics model (for real story/epic titles + links), so it's written
             // after the epics phase. Gated on parsed sprint data; a no-op when there is none. [Story 2.3 Task 3/5]
             WriteSprint(nav);
+            // The structure tree reads the fully-populated _docs (source→output hrefs), so it's written after the
+            // pages phase — like WriteSprint, gated on the same source-artifact signal as its nav item. [Story 3.4]
+            WriteStructure(nav, sourceRelatives);
             WriteRetroIndex(nav);
             // Built once and shared with WriteIndex below — both used to rebuild it independently. [Story 2.3 review]
             var workInventory = WorkInventory.Build(_docs.Values.ToList());
@@ -635,6 +639,97 @@ public sealed class SiteGenerator
         File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.SprintOutputPath), ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
 
+    /// <summary>Writes <c>structure.html</c> — the interactive project/artifact structure tree. Gated on the
+    /// same source-artifact signal as its nav item (<c>sourceRelatives.Count &gt; 0</c>) so the page and its link
+    /// are one signal; a project with no <c>_bmad-output</c> <c>*.md</c> files omits both. Builds the
+    /// output-href map from the fully-populated <see cref="_docs"/> (plus the special <c>epics.md → epics.html</c>
+    /// mapping) so navigable leaves route to real pages and non-navigable ones render as plain text — never a
+    /// broken link. The whole gather+build is wrapped never-throw → <see cref="ProjectTree.Empty"/> so any failure
+    /// degrades to omission and generation still succeeds (AD-4 / NFR2). [Story 3.4 Task 3]</summary>
+    private void WriteStructure(SiteNav nav, IReadOnlyList<string> sourceRelatives)
+    {
+        if (sourceRelatives.Count == 0) return;
+
+        ProjectTree tree;
+        try
+        {
+            tree = ProjectTree.Build(sourceRelatives, BuildStructureHrefMap(sourceRelatives));
+        }
+        catch (Exception)
+        {
+            tree = ProjectTree.Empty;
+        }
+
+        if (tree.IsEmpty) return;
+
+        var html = RenderStructurePage(tree, nav);
+        File.WriteAllText(
+            Path.Combine(_options.OutputRoot, SiteNav.StructureOutputPath),
+            ApplyReferenceLinks(html, SiteNav.StructureOutputPath));
+    }
+
+    /// <summary>Maps each source-artifact path that has a generated page to its output-relative URL, from the
+    /// already-populated <see cref="_docs"/> (source→output) plus <c>epics.md → epics.html</c> (which renders
+    /// specially and is never a generic <see cref="_docs"/> entry). Consumed story artifacts and any file with no
+    /// generated page are simply absent, so <see cref="ProjectTree"/> renders them as plain text. [Story 3.4]</summary>
+    private IReadOnlyDictionary<string, string> BuildStructureHrefMap(IReadOnlyList<string> sourceRelatives)
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var doc in _docs.Values)
+        {
+            map[PathUtil.NormalizeSlashes(doc.SourceRelativePath)] = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
+        }
+
+        // epics.md is consumed into epics.html, so it never appears in _docs — add it only when the epics page
+        // was actually produced (epics.md parsed into a model).
+        if (_epicsModel is not null)
+        {
+            var epicsSource = sourceRelatives.FirstOrDefault(p =>
+                string.Equals(Path.GetFileName(p), "epics.md", StringComparison.OrdinalIgnoreCase));
+            if (epicsSource is not null)
+            {
+                map[PathUtil.NormalizeSlashes(epicsSource)] = SiteNav.EpicsOutputPath;
+            }
+        }
+
+        return map;
+    }
+
+    /// <summary>Assembles the standalone <c>structure.html</c> shell — the same <see cref="PathUtil.RenderHeadOpen"/>
+    /// + nav + breadcrumb + <c>&lt;main id="main-content"&gt;</c> + footer every other <c>Write*</c> page uses —
+    /// with the tree living in a <c>chart-panel</c>. The tree markup itself comes from the pure, no-JS
+    /// <see cref="Charts.ProjectStructureTree"/>. [Story 3.4 Subtask 3.3]</summary>
+    private string RenderStructurePage(ProjectTree tree, SiteNav nav)
+    {
+        var outputPath = SiteNav.StructureOutputPath;
+        var prefix = PathUtil.RelativePrefix(outputPath); // "" — structure.html is at the output root.
+
+        var fileWord = Charts.Plural(tree.FileCount, "file", "files");
+        var dirWord = Charts.Plural(tree.DirectoryCount, "directory", "directories");
+        var headline = $"{tree.FileCount} {fileWord} across {tree.DirectoryCount} {dirWord}";
+
+        var sb = new StringBuilder();
+        sb.Append(PathUtil.RenderHeadOpen(
+            $"Project Structure — {nav.SiteTitle}",
+            prefix + ForgeOptions.StylesheetName,
+            prefix + ForgeOptions.ScriptName,
+            $"Interactive tree of the project and artifact structure for {nav.SiteTitle} — expand and collapse directories and jump to the generated pages."));
+        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Structure", null) }));
+
+        sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
+        sb.Append("<h1>Project Structure</h1>\n");
+        sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {PathUtil.Html(headline)}</p>\n\n");
+        sb.Append("<section class=\"chart-panel\">\n");
+        sb.Append("  <h3>Project &amp; Artifact Structure</h3>\n");
+        sb.Append(Charts.ProjectStructureTree(tree));
+        sb.Append("</section>\n\n");
+        sb.Append("</main>\n\n");
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append("</body>\n</html>\n");
+        return sb.ToString();
+    }
+
     /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the
     /// sprint page's "Retros" link. [Story 2.3 polish #5]</summary>
     private void WriteRetroIndex(SiteNav nav)
@@ -769,7 +864,10 @@ public sealed class SiteGenerator
     private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives)
     {
         _module = ModuleContext.Detect(_options.RepoRoot, sourceRelatives);
-        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable);
+        // StructureAvailable = the source-artifact file set is non-empty — the SINGLE signal that gates both the
+        // nav item/quick link here and the WriteStructure page write, so a Structure link is never emitted to a
+        // page that wasn't produced. [Story 3.4 Subtask 3.4]
+        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasStructure: sourceRelatives.Count > 0);
     }
 
     private static readonly IReadOnlyDictionary<string, DateOnly> EmptyDates = new Dictionary<string, DateOnly>();
@@ -813,12 +911,42 @@ public sealed class SiteGenerator
 
             var memlogByFamily = BuildMemlogMap(discovered);
 
-            return ArtifactCoverage.Build(sourceRelatives, mtimes, memlogByFamily, today);
+            var coverage = ArtifactCoverage.Build(sourceRelatives, mtimes, memlogByFamily, today);
+
+            // Enrich each family with presentation data the pure Build can't know: the page a PRESENT family
+            // links to, and the create command a MISSING family surfaces for the detected module. Resolved
+            // here because both depend on page routing and the module — never on the source-derived truth.
+            var enriched = coverage.Families
+                .Select(f => f with
+                {
+                    Href = f.Present ? ResolveFamilyHref(f) : null,
+                    CreateCommand = !f.Present && ArtifactCoverage.CreateStepKeys.TryGetValue(f.Label, out var step)
+                        ? _module.Commands.Command(step)
+                        : null,
+                })
+                .ToList();
+
+            return new ArtifactCoverage { Families = enriched };
         }
         catch (Exception)
         {
             return ArtifactCoverage.Empty;
         }
+    }
+
+    /// <summary>The page a present family's card links to. Epics/Stories point at the epics-and-stories view and
+    /// Requirements at the curated FR/NFR page (both special-routed, not generic source pages); every other
+    /// family links to its generated page (<c>ToOutputRelative</c> of its matched source, which the generic
+    /// page pipeline writes verbatim). Labels mirror <see cref="ArtifactCoverage"/>'s canonical family set.</summary>
+    private static string? ResolveFamilyHref(ArtifactFamily f)
+    {
+        if (f.SourcePath is not { } src) return null;
+        return f.Label switch
+        {
+            "Epics" or "Stories" => SiteNav.EpicsOutputPath,
+            "Requirements" => SiteNav.RequirementsOutputPath,
+            _ => PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(src)),
+        };
     }
 
     /// <summary>Discovers <c>.memlog.md</c> journals (dotfiles, so excluded from the <c>*.md</c> source

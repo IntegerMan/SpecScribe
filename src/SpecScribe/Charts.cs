@@ -657,13 +657,14 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The dashboard "Planning Coverage" panel body — one row per canonical artifact family showing
-    /// its reused <see cref="Icons.ForConcept"/> glyph + label, a present/missing/stale chip, and a freshness
-    /// sub-line. Pure HTML + CSS, no JS (the <see cref="Charts"/> convention). Present/missing/stale is a
-    /// COVERAGE axis, not a lifecycle stage, so it is styled with neutral palette tones — never the
-    /// <c>--status-*</c> lifecycle tokens. Every chip carries a text label (never color-only). Dates use the
-    /// invariant <see cref="DReadable"/> helper so they read the same on any host culture. The caller renders
-    /// this only when <c>!coverage.IsEmpty</c> (graceful omission on an unrecognized repo). [Story 3.3]</summary>
+    /// <summary>The dashboard "Planning Coverage" panel body — a 2-column card grid, one card per canonical
+    /// artifact family. A card explains what the artifact is; a PRESENT family's whole card links to its page,
+    /// while a MISSING family's card carries a copyable create command (via <see cref="BmadCommands.InlineGuidance"/>,
+    /// degrading to guidance text when the module exposes no such command). Pure HTML + CSS (the badge's copy
+    /// button is the existing progressive-enhancement script, not new JS). Present/missing/stale is a COVERAGE
+    /// axis, not a lifecycle stage, so cards use neutral palette tones — never the <c>--status-*</c> tokens.
+    /// Every chip carries a text label (never color-only); dates use the invariant <see cref="DReadable"/>
+    /// helper. The caller renders this only when <c>!coverage.IsEmpty</c> (graceful omission). [Story 3.3]</summary>
     public static string ArtifactCoveragePanel(ArtifactCoverage coverage, DateOnly today)
     {
         var total = coverage.Families.Count;
@@ -673,55 +674,64 @@ public static class Charts
         var sb = new StringBuilder();
         sb.Append("<div class=\"coverage\">\n");
 
-        // Headline: "N of M families present", with a stale count appended only when something is stale.
+        // Headline count + a one-line intro so a reader knows what the panel answers and why it's useful.
         sb.Append($"  <div class=\"coverage-headline\"><strong>{present}</strong> of <strong>{total}</strong> " +
                   $"{Plural(total, "family", "families")} present");
         if (stale > 0)
         {
-            sb.Append($" &middot; <strong>{stale}</strong> {Plural(stale, "family", "families")} stale");
+            sb.Append($" &middot; <strong>{stale}</strong> stale");
         }
         sb.Append("</div>\n");
+        sb.Append("  <p class=\"coverage-intro\">The core planning &amp; workflow artifacts this project should have — " +
+                  "which exist, how recently they changed, and how to create the ones that are missing.</p>\n");
 
-        sb.Append("  <ul class=\"coverage-list\">\n");
+        sb.Append("  <div class=\"coverage-grid\">\n");
         foreach (var family in coverage.Families)
         {
             var isStale = family.IsStale(today);
-            // Row modifier drives the neutral dimming (missing) / warn accent (stale) — text chips still carry
-            // the meaning, so the styling is never the sole information carrier.
-            var rowClass = !family.Present ? "coverage-row missing" : isStale ? "coverage-row stale" : "coverage-row";
-
-            // Chip: a text label so present/missing/stale is readable without color. Stale supersedes Present.
+            // Card modifier drives neutral dimming (missing) / a warm accent (stale) — the text chip still
+            // carries the meaning, so styling is never the sole information carrier.
+            var stateClass = !family.Present ? "missing" : isStale ? "stale" : "present";
             var (chipClass, chipText) = !family.Present
                 ? ("missing", "Missing")
                 : isStale ? ("stale", "Stale") : ("present", "Present");
 
-            // Freshness sub-line: the primary source-mtime date, with the secondary memlog date appended only
-            // when a journal recorded one (AC #2 enrichment — never the primary signal).
-            string freshness;
-            if (!family.Present)
+            var head =
+                $"<div class=\"coverage-card-head\"><span class=\"coverage-family\">{Icons.ForConcept(family.ConceptIconKey)}{Html(family.Label)}</span>" +
+                $"<span class=\"coverage-chip {chipClass}\">{Html(chipText)}</span></div>";
+            var desc = $"<div class=\"coverage-desc\">{Html(family.Description)}</div>";
+
+            if (family.Present)
             {
-                freshness = "Not found in source";
-            }
-            else if (family.LastModified is { } modified)
-            {
-                freshness = $"Updated {DReadable(modified)}";
+                // Present card: freshness sub-line (primary source-mtime date + optional secondary memlog
+                // date), whole card links to the artifact's page when we resolved one.
+                var freshness = family.LastModified is { } modified ? $"Updated {DReadable(modified)}" : "In the project";
+                if (family.MemlogUpdated is { } journal)
+                {
+                    freshness += $" &middot; journal {DReadable(journal)}";
+                }
+                var body = head + desc + $"<div class=\"coverage-freshness\">{freshness}</div>";
+
+                if (family.Href is { Length: > 0 } href)
+                {
+                    sb.Append($"    <a class=\"coverage-card {stateClass}\" href=\"{Html(href)}\">{body}</a>\n");
+                }
+                else
+                {
+                    sb.Append($"    <div class=\"coverage-card {stateClass}\">{body}</div>\n");
+                }
             }
             else
             {
-                freshness = "Present";
+                // Missing card: the "what it is" sentence, then a copyable create command (or plain guidance
+                // when the detected module exposes none). Not a link — the action is "create it", not "open it".
+                var cta = BmadCommands.InlineGuidance(family.CreateCommand, "Create it with",
+                    "Add this artifact through your planning workflow.");
+                sb.Append($"    <div class=\"coverage-card {stateClass}\">{head}{desc}" +
+                          $"<div class=\"coverage-cta\">{cta}</div></div>\n");
             }
-            if (family.MemlogUpdated is { } journal)
-            {
-                freshness += $" &middot; journal {DReadable(journal)}";
-            }
-
-            sb.Append($"    <li class=\"{rowClass}\">");
-            sb.Append($"<span class=\"coverage-family\">{Icons.ForConcept(family.ConceptIconKey)}{Html(family.Label)}</span>");
-            sb.Append($"<span class=\"coverage-chip {chipClass}\">{Html(chipText)}</span>");
-            sb.Append($"<span class=\"coverage-freshness\">{freshness}</span>");
-            sb.Append("</li>\n");
         }
-        sb.Append("  </ul>\n");
+        sb.Append("  </div>\n");
 
         sb.Append("</div>\n");
         return sb.ToString();
@@ -751,26 +761,32 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>Change coupling as a text ranked list (the precise, screen-reader-friendly companion to the
-    /// <see cref="CouplingGraph"/>): each coupled file pair with its co-change count, full paths shown as real
-    /// text so the visual graph is never the sole information carrier. Not statuses, so no <c>--status-*</c>
-    /// tokens. Degrades to a friendly note when nothing crosses the coupling threshold. [Story 3.2]</summary>
-    public static string CouplingList(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling)
+    /// <summary>Change coupling as a ranked table (the precise, screen-reader-friendly companion to the
+    /// <see cref="CouplingGraph"/>): one row per coupled file pair with its co-change count, headed and aligned
+    /// so the counts scan as a column. Full paths shown as real text (ellipsis-truncated via CSS, full value in
+    /// the cell <c>title</c>) so the visual graph is never the sole information carrier. Not statuses, so no
+    /// <c>--status-*</c> tokens. Degrades to a friendly note when nothing crosses the coupling threshold. [Story 3.2]</summary>
+    public static string CouplingTable(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling)
     {
         if (coupling.Count == 0) return "<div class=\"chart-empty\">No significant change coupling detected.</div>\n";
 
         var sb = new StringBuilder();
-        sb.Append("<ol class=\"deep-git-coupling\">\n");
+        sb.Append("<table class=\"coupling-table\">\n");
+        sb.Append("  <thead><tr>" +
+                  "<th scope=\"col\">File</th>" +
+                  "<th scope=\"col\">Coupled with</th>" +
+                  "<th scope=\"col\" class=\"coupling-num\">Together</th>" +
+                  "</tr></thead>\n");
+        sb.Append("  <tbody>\n");
         foreach (var (fileA, fileB, coChanges) in coupling)
         {
             sb.Append(
-                "  <li>" +
-                $"<span class=\"deep-git-pair\"><span class=\"deep-git-file\" title=\"{Html(fileA)}\">{Html(fileA)}</span>" +
-                "<span class=\"deep-git-link\" aria-hidden=\"true\">&harr;</span>" +
-                $"<span class=\"deep-git-file\" title=\"{Html(fileB)}\">{Html(fileB)}</span></span>" +
-                $"<span class=\"deep-git-count\">{coChanges}&times; together</span></li>\n");
+                "    <tr>" +
+                $"<td class=\"coupling-file\" title=\"{Html(fileA)}\">{Html(fileA)}</td>" +
+                $"<td class=\"coupling-file\" title=\"{Html(fileB)}\">{Html(fileB)}</td>" +
+                $"<td class=\"coupling-num\">{coChanges}&times;</td></tr>\n");
         }
-        sb.Append("</ol>\n");
+        sb.Append("  </tbody>\n</table>\n");
         return sb.ToString();
     }
 
@@ -780,7 +796,7 @@ public static class Charts
     /// time, so the whole thing is static inline SVG — no JS, matching the project's chart convention. Coupling
     /// is symmetric, so edges are undirected (no arrowheads). Colors come from the existing neutral chart
     /// tokens via CSS classes. Pointer users get per-edge/per-node <c>&lt;title&gt;</c> tooltips; the whole
-    /// graph carries a summarizing <c>role="img"</c> name, and the sibling <see cref="CouplingList"/> is the
+    /// graph carries a summarizing <c>role="img"</c> name, and the sibling <see cref="CouplingTable"/> is the
     /// exact text equivalent so the graph is never the sole carrier. [Story 3.2]</summary>
     public static string CouplingGraph(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling, int size = 460)
     {
@@ -842,10 +858,12 @@ public static class Charts
                       $"<title>{Html(nodes[i])} — {d} coupled {Plural(d, "change", "changes")}</title></circle>\n");
 
             var ang = -Math.PI / 2 + 2 * Math.PI * i / count;
-            var lx = c + (ringR + NodeR(d) + 6) * Math.Cos(ang);
-            var ly = c + (ringR + NodeR(d) + 6) * Math.Sin(ang);
+            var lx = c + (ringR + NodeR(d) + 8) * Math.Cos(ang);
+            var ly = c + (ringR + NodeR(d) + 8) * Math.Sin(ang);
             var anchor = Math.Cos(ang) >= 0 ? "start" : "end";
-            sb.Append($"  <text class=\"coupling-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(Basename(nodes[i]), 22))}</text>\n");
+            // font-size is in SVG user units (not a CSS rem) so the labels scale up with the graph when it is
+            // enlarged in the page's expand/zoom lightbox — a fixed rem would stay tiny at any display size.
+            sb.Append($"  <text class=\"coupling-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"13\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(Basename(nodes[i]), 22))}</text>\n");
         }
 
         sb.Append("</svg>\n");
@@ -887,6 +905,57 @@ public static class Charts
                 .Select(s => s.Day)
                 .OrderBy(d => d)
                 .ToList();
+
+    /// <summary>Renders the project/artifact structure tree as native, zero-JS disclosure widgets: every
+    /// directory branch is a <c>&lt;details&gt;</c>/<c>&lt;summary&gt;</c> (focusable, Enter/Space toggles it, and
+    /// the browser natively announces its expanded/collapsed state — AC #1's expand/collapse and AC #2's
+    /// "announced state" with NO JavaScript, exactly like the <c>.dev-agent-details</c> and <c>.story</c>
+    /// disclosures already do), and leaves are <c>&lt;li&gt;</c> rows. A leaf that maps to a generated page is an
+    /// <c>&lt;a href&gt;</c> (route to the page — AC #2); a leaf without one is plain text — routing is
+    /// best-effort, never a broken link. Top-level branches render <c>open</c> (a reviewer landing on the surface
+    /// sees the shape, not a closed root); deeper branches render closed. Static — no motion (Story 3.5 owns
+    /// insight animation), so reduced-motion is trivially satisfied. Every label/href is HTML-escaped. [Story 3.4]</summary>
+    public static string ProjectStructureTree(ProjectTree tree)
+    {
+        // structure.html sits at the output root (prefix ""), but derive the prefix rather than hardcode "no
+        // prefix" so the renderer stays correct if the surface ever moves. [Subtask 2.3]
+        var prefix = PathUtil.RelativePrefix(SiteNav.StructureOutputPath);
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"structure-tree\">\n");
+        sb.Append("<ul class=\"tree-list\">\n");
+        foreach (var node in tree.Roots)
+        {
+            AppendTreeNode(sb, node, prefix, depth: 0);
+        }
+        sb.Append("</ul>\n</div>\n");
+        return sb.ToString();
+    }
+
+    private static void AppendTreeNode(StringBuilder sb, TreeNode node, string prefix, int depth)
+    {
+        if (node.IsDirectory)
+        {
+            // Top-level branches default open so the shape is visible on landing; deeper branches start closed.
+            var open = depth == 0 ? " open" : string.Empty;
+            sb.Append("<li class=\"tree-branch\">");
+            sb.Append($"<details{open}><summary>{Icons.ForConcept("Structure")}<span class=\"tree-label\">{Html(node.Label)}</span></summary>");
+            sb.Append("<ul class=\"tree-list\">");
+            foreach (var child in node.Children)
+            {
+                AppendTreeNode(sb, child, prefix, depth + 1);
+            }
+            sb.Append("</ul></details></li>\n");
+        }
+        else if (node.OutputHref is { Length: > 0 } href)
+        {
+            sb.Append($"<li class=\"tree-leaf\"><a class=\"tree-file\" href=\"{Html(prefix + href)}\">{Html(node.Label)}</a></li>\n");
+        }
+        else
+        {
+            sb.Append($"<li class=\"tree-leaf\"><span class=\"tree-file\">{Html(node.Label)}</span></li>\n");
+        }
+    }
 
     private static int HeatLevel(int count, int maxCount)
     {

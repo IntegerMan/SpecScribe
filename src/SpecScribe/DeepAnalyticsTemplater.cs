@@ -37,18 +37,35 @@ public static class DeepAnalyticsTemplater
         sb.Append($"    <span class=\"pill\">{deep.Hotspots.Count} {Charts.Plural(deep.Hotspots.Count, "hotspot", "hotspots")}</span>\n");
         sb.Append("  </div>\n</header>\n\n");
 
-        // Change Coupling — the graph is the centerpiece; the ranked list beside it is the exact, screen-reader
+        // Change Coupling — the graph is the centerpiece; the ranked table beside it is the exact, screen-reader
         // friendly companion so the visualization is never the sole information carrier.
+        var hasCoupling = deep.Coupling.Count > 0;
         sb.Append("<section class=\"deep-page-section\">\n");
         sb.Append("  <h2>Change Coupling</h2>\n");
         sb.Append("  <p class=\"deep-page-lead\">Files that tend to change in the same commits. Thicker links and larger nodes mean the files change together more often — a hint at hidden dependencies worth a second look.</p>\n");
         sb.Append("  <div class=\"deep-page-coupling\">\n");
         sb.Append("    <div class=\"chart-panel deep-page-graph-panel\">\n");
+        // Expand affordance: a pure-CSS :target lightbox (same mechanism as the commit heatmap's drill-down) —
+        // no JS. Only offered when there's actually a graph to enlarge.
+        if (hasCoupling)
+        {
+            sb.Append("      <a class=\"coupling-expand\" href=\"#coupling-zoom\" aria-label=\"Expand the change-coupling graph\">&#10530; Expand</a>\n");
+        }
         sb.Append(Charts.CouplingGraph(deep.Coupling));
+        if (hasCoupling)
+        {
+            sb.Append("      <p class=\"coupling-legend\">Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together.</p>\n");
+        }
         sb.Append("    </div>\n");
         sb.Append("    <div class=\"chart-panel deep-page-list-panel\">\n");
-        sb.Append("      <div class=\"deep-git-title\">Ranked pairs</div>\n");
-        sb.Append(Charts.CouplingList(deep.Coupling));
+        sb.Append("      <div class=\"deep-page-panel-head\">\n");
+        sb.Append("        <h3>Ranked Pairs</h3>\n");
+        if (hasCoupling)
+        {
+            sb.Append($"        <span class=\"deep-page-panel-count\">{deep.Coupling.Count} {Charts.Plural(deep.Coupling.Count, "pair", "pairs")}</span>\n");
+        }
+        sb.Append("      </div>\n");
+        sb.Append(Charts.CouplingTable(deep.Coupling));
         sb.Append("    </div>\n");
         sb.Append("  </div>\n");
         sb.Append("</section>\n\n");
@@ -63,6 +80,22 @@ public static class DeepAnalyticsTemplater
         sb.Append("</section>\n\n");
 
         sb.Append("</main>\n\n");
+
+        // Pure-CSS :target lightbox holding an enlarged copy of the same graph — activated by the "Expand" link
+        // above, dismissed by clicking the backdrop or the ✕ (both navigate to "#", clearing the :target). No JS,
+        // mirroring the commit-heatmap drill-down convention. The graph is the same SVG; its user-unit labels
+        // scale up with the larger display size, which is the whole point of the zoom.
+        if (hasCoupling)
+        {
+            sb.Append("<div id=\"coupling-zoom\" class=\"coupling-lightbox\" role=\"dialog\" aria-label=\"Change coupling graph, enlarged\">\n");
+            sb.Append("  <a class=\"coupling-lightbox-backdrop\" href=\"#\" aria-label=\"Close enlarged graph\"></a>\n");
+            sb.Append("  <div class=\"coupling-lightbox-panel\">\n");
+            sb.Append("    <a class=\"coupling-lightbox-close\" href=\"#\" aria-label=\"Close enlarged graph\">&times;</a>\n");
+            sb.Append(Charts.CouplingGraph(deep.Coupling));
+            sb.Append("  </div>\n");
+            sb.Append("</div>\n\n");
+        }
+
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();

@@ -92,8 +92,17 @@ public class StylesheetTests
     {
         // Cheap guard so the Story 3.3 coverage-panel seam can't be silently deleted in a later refactor.
         var css = ReadStylesheet();
-        Assert.Contains(".coverage-row", css);
+        Assert.Contains(".coverage-card", css);
         Assert.Contains(".coverage-chip", css);
+    }
+
+    [Fact]
+    public void Stylesheet_HasStructureTreeStyles()
+    {
+        // Cheap guard so the Story 3.4 structure-tree seam can't be silently deleted in a later refactor.
+        var css = ReadStylesheet();
+        Assert.Contains(".structure-tree", css);
+        Assert.Contains(".tree-branch", css);
     }
 
     [Fact]

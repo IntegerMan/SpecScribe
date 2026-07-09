@@ -44,10 +44,15 @@ public class DeepAnalyticsTemplaterTests
 
         // The graph is present...
         Assert.Contains("class=\"coupling-graph\"", html);
-        // ...alongside its precise text companion (the ranked list) and a hotspot path.
-        Assert.Contains("5&times; together", html);
+        // ...alongside its precise text companion (the ranked pairs table) under a headed panel, and a hotspot.
+        Assert.Contains("Ranked Pairs", html);
+        Assert.Contains("class=\"coupling-table\"", html);
+        Assert.Contains("<th scope=\"col\" class=\"coupling-num\">Together</th>", html);
         Assert.Contains("src/SpecScribe/HtmlTemplater.cs", html);
         Assert.Contains("git-pulse-bar-fill", html); // hotspot bars
+        // The expand-to-lightbox affordance + its :target lightbox are wired (pure CSS, no JS).
+        Assert.Contains("href=\"#coupling-zoom\"", html);
+        Assert.Contains("id=\"coupling-zoom\"", html);
     }
 
     [Fact]
