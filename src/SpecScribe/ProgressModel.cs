@@ -33,8 +33,10 @@ public sealed class ProgressModel
 
     /// <summary>The opt-in deep-git signals (change coupling + hotspots), or null when <c>--deep-git</c> was
     /// not passed or the deep pass failed. Null means the dashboard omits the deep panel entirely — it is not
-    /// a "—" empty state like the baseline pulse. [Story 3.2]</summary>
-    public DeepGitPulse? DeepGit { get; init; }
+    /// a "—" empty state like the baseline pulse. Settable (not <c>init</c>): <see cref="SiteGenerator"/> clears
+    /// it after construction if writing <c>deep-analytics.html</c> fails, so the dashboard link is never left
+    /// pointing at a page that doesn't exist. [Story 3.2]</summary>
+    public DeepGitPulse? DeepGit { get; set; }
 
     public static readonly ProgressModel Empty = new()
     {

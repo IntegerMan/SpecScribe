@@ -81,6 +81,15 @@ public class ArtifactCoverageTests
         Assert.True(Family(ArtifactCoverage.Build(withStory, NoDates, NoMemlog, Today), "Stories").Present);
     }
 
+    [Fact]
+    public void Build_StoryFilenameWithEmptyTitleSegmentIsNotAStoryArtifact()
+    {
+        // A malformed "1-2-.md" (empty title after the epic-story prefix) must not count as a story artifact.
+        // [Story 3.3 review]
+        var malformed = new[] { "implementation-artifacts/1-2-.md" };
+        Assert.False(Family(ArtifactCoverage.Build(malformed, NoDates, NoMemlog, Today), "Stories").Present);
+    }
+
     [Theory]
     [InlineData("planning-artifacts/ux-designs/ux-x/DESIGN.md")]
     [InlineData("planning-artifacts/ux-designs/ux-x/EXPERIENCE.md")]
@@ -88,6 +97,56 @@ public class ArtifactCoverageTests
     {
         var cov = ArtifactCoverage.Build(new[] { uxPath }, NoDates, NoMemlog, Today);
         Assert.True(Family(cov, "UX").Present);
+    }
+
+    [Fact]
+    public void Build_UxFamilyWithBothFilesPicksTheMoreRecentlyModifiedOne()
+    {
+        // When both DESIGN.md and EXPERIENCE.md exist, the canonical match is whichever has the fresher mtime
+        // — not just whichever sorts first — so freshness/staleness reflects the file actually most recently
+        // touched instead of silently ignoring the other candidate. [Story 3.3 review]
+        var design = "planning-artifacts/ux-designs/ux-x/DESIGN.md";
+        var experience = "planning-artifacts/ux-designs/ux-x/EXPERIENCE.md";
+        var dates = new Dictionary<string, DateOnly>
+        {
+            [design] = new DateOnly(2026, 6, 1),
+            [experience] = new DateOnly(2026, 7, 1),
+        };
+
+        var cov = ArtifactCoverage.Build(new[] { design, experience }, dates, NoMemlog, Today);
+
+        var ux = Family(cov, "UX");
+        Assert.Equal(experience, ux.SourcePath);
+        Assert.Equal(new DateOnly(2026, 7, 1), ux.LastModified);
+    }
+
+    [Fact]
+    public void Build_DuplicateFamilyFileResolvesDeterministicallyRegardlessOfInputOrder()
+    {
+        // Two files matching the same family (e.g. a stray duplicate prd.md) must resolve to the same
+        // canonical match no matter which order the caller's path list happens to enumerate them in — the
+        // previous "first match" behavior depended on unsorted input order. [Story 3.3 review]
+        var pathA = "planning-artifacts/prds/prd-a/prd.md";
+        var pathB = "planning-artifacts/prds/prd-b/prd.md";
+
+        var forward = ArtifactCoverage.Build(new[] { pathA, pathB }, NoDates, NoMemlog, Today);
+        var reversed = ArtifactCoverage.Build(new[] { pathB, pathA }, NoDates, NoMemlog, Today);
+
+        Assert.Equal(Family(forward, "PRD").SourcePath, Family(reversed, "PRD").SourcePath);
+    }
+
+    [Fact]
+    public void AllCandidatePaths_ReturnsEveryMatchNotJustTheWinner()
+    {
+        var design = "planning-artifacts/ux-designs/ux-x/DESIGN.md";
+        var experience = "planning-artifacts/ux-designs/ux-x/EXPERIENCE.md";
+        var unrelated = "custom/notes.md";
+
+        var candidates = ArtifactCoverage.AllCandidatePaths(new[] { design, experience, unrelated });
+
+        Assert.Contains(design, candidates);
+        Assert.Contains(experience, candidates);
+        Assert.DoesNotContain(unrelated, candidates);
     }
 
     [Fact]

@@ -1196,22 +1196,49 @@ code.color-swatch {
    entry carries a status class (.sb-<status>-item) and tabindex="0" (emitted by Charts.SunburstLegend) so
    both pointer and keyboard reach it. The opacity change rides --motion-fast via .sb-seg's transition and
    collapses to instant under prefers-reduced-motion — emphasis is an ENHANCEMENT: the legend, its swatches
-   and every segment <title>/aria-label remain the always-present way to read a status. */
+   and every segment <title>/aria-label remain the always-present way to read a status. Keyed off
+   :focus-visible (not bare :focus, [review]): a mouse click on a tabindex="0" span otherwise leaves it
+   :focus-matched with no visible indicator, so the dimming would stick after the pointer moves away. */
 .sunburst-legend .sb-legend-item { cursor: default; border-radius: 3px; padding: 0 0.15rem; }
 .sunburst-legend .sb-legend-item:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
 .sunburst-panel:has(.sb-pending-item:hover) .sb-seg:not(.sb-pending),
-.sunburst-panel:has(.sb-pending-item:focus) .sb-seg:not(.sb-pending),
+.sunburst-panel:has(.sb-pending-item:focus-visible) .sb-seg:not(.sb-pending),
 .sunburst-panel:has(.sb-drafted-item:hover) .sb-seg:not(.sb-drafted),
-.sunburst-panel:has(.sb-drafted-item:focus) .sb-seg:not(.sb-drafted),
+.sunburst-panel:has(.sb-drafted-item:focus-visible) .sb-seg:not(.sb-drafted),
 .sunburst-panel:has(.sb-ready-item:hover) .sb-seg:not(.sb-ready),
-.sunburst-panel:has(.sb-ready-item:focus) .sb-seg:not(.sb-ready),
+.sunburst-panel:has(.sb-ready-item:focus-visible) .sb-seg:not(.sb-ready),
 .sunburst-panel:has(.sb-active-item:hover) .sb-seg:not(.sb-active),
-.sunburst-panel:has(.sb-active-item:focus) .sb-seg:not(.sb-active),
+.sunburst-panel:has(.sb-active-item:focus-visible) .sb-seg:not(.sb-active),
 .sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(.sb-review),
-.sunburst-panel:has(.sb-review-item:focus) .sb-seg:not(.sb-review),
+.sunburst-panel:has(.sb-review-item:focus-visible) .sb-seg:not(.sb-review),
 .sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done),
-.sunburst-panel:has(.sb-done-item:focus) .sb-seg:not(.sb-done) {
+.sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done) {
+  opacity: 0.28;
+}
+
+/* ---- Donut half of the same affordance (Subtask 3.1: "sunburst OR donut") ----
+   Identical grammar, scoped to .donut-and-legend/.donut-seg instead of .sunburst-panel/.sb-seg. Entries carry
+   .dn-<status>-item + tabindex="0" (emitted by Charts.DonutLegend). .donut-seg already transitions
+   stroke-width via --motion-fast (see below); opacity here reuses that same token feel by inheriting the
+   general .donut-seg transition, kept instant under reduced motion by the existing wildcard collapse. */
+.donut-legend .dn-legend-item { cursor: default; border-radius: 3px; padding: 0 0.15rem; }
+.donut-legend .dn-legend-item:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.donut-and-legend:has(.dn-pending-item:hover) .donut-seg:not(.pending),
+.donut-and-legend:has(.dn-pending-item:focus-visible) .donut-seg:not(.pending),
+.donut-and-legend:has(.dn-drafted-item:hover) .donut-seg:not(.drafted),
+.donut-and-legend:has(.dn-drafted-item:focus-visible) .donut-seg:not(.drafted),
+.donut-and-legend:has(.dn-ready-item:hover) .donut-seg:not(.ready),
+.donut-and-legend:has(.dn-ready-item:focus-visible) .donut-seg:not(.ready),
+.donut-and-legend:has(.dn-active-item:hover) .donut-seg:not(.active),
+.donut-and-legend:has(.dn-active-item:focus-visible) .donut-seg:not(.active),
+.donut-and-legend:has(.dn-review-item:hover) .donut-seg:not(.review),
+.donut-and-legend:has(.dn-review-item:focus-visible) .donut-seg:not(.review),
+.donut-and-legend:has(.dn-done-item:hover) .donut-seg:not(.done),
+.donut-and-legend:has(.dn-done-item:focus-visible) .donut-seg:not(.done),
+.donut-and-legend:has(.dn-deferred-item:hover) .donut-seg:not(.deferred),
+.donut-and-legend:has(.dn-deferred-item:focus-visible) .donut-seg:not(.deferred) {
   opacity: 0.28;
 }
 
@@ -1494,23 +1521,27 @@ code.color-swatch {
 .donut-legend .swatch.pending { background: var(--status-pending); }
 
 /* ====================== REFINEMENT FUNNEL (Story 3.6) ======================
-   An honest elaboration pyramid: band width is proportional to each stage's TRUE count (normalized to the
-   largest stage) — never rescaled to fake a narrowing silhouette, which would overstate progress (Story 1.5
-   truthfulness rule). Stage colors route through the --status-* tokens ONLY (single stage→color source):
-   drafted → ready → active → done reads as increasing elaboration down the pipeline. The entrance animation
-   is NOT here — .refinement-funnel is already keyed into the paired reduced-motion blocks (Story 3.5). */
+   A sideways funnel (stages flow left → right) with HONEST band heights: each stage's band height is
+   proportional to its TRUE count (normalized to the largest stage) — never rescaled to fake a narrowing
+   silhouette, which would overstate progress (Story 1.5 truthfulness rule). The neutral connector tapers
+   between bands give the funnel read; they carry no data, so they use a base-palette tone, never a status
+   token. Stage colors route through the --status-* tokens ONLY (single stage→color source): drafted →
+   ready → active → done reads as increasing elaboration down the pipeline. The entrance animation is NOT
+   here — .refinement-funnel is already keyed into the paired reduced-motion blocks (Story 3.5). */
 .refinement-funnel { display: flex; flex-direction: column; gap: 0.4rem; }
 .funnel { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 .funnel-band.funnel-epics { fill: var(--status-drafted); }
 .funnel-band.funnel-stories { fill: var(--status-ready); }
 .funnel-band.funnel-planned { fill: var(--status-active); }
 .funnel-band.funnel-tasks { fill: var(--status-done); }
-/* A zero-count stage keeps its labeled row but shows a dashed, unfilled placeholder band — visibly "not
+/* A zero-count stage keeps its labeled column but shows a dashed, unfilled placeholder band — visibly "not
    there yet" rather than a colored bar that could read as data (AC #2 early-stage honesty). */
 .funnel-band.funnel-zero { fill: none; stroke: var(--ink-light); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.6; }
-.funnel-stage-text { font-size: 13px; fill: var(--ink-faded); }
-.funnel-stage-count { font-weight: 700; fill: var(--ink); }
-.funnel-stage-sub { font-size: 11px; fill: var(--ink-light); }
+/* Data-free flow joints between the stage bands — neutral, muted, and behind the bands. */
+.funnel-connector { fill: var(--parchment-dark); opacity: 0.8; }
+.funnel-stage-count { font-size: 16px; font-weight: 700; fill: var(--ink); }
+.funnel-stage-label { font-size: 11px; fill: var(--ink-faded); }
+.funnel-stage-sub { font-size: 10px; fill: var(--ink-light); }
 .funnel-hint { font-size: 0.72rem; color: var(--ink-light); text-align: center; font-style: italic; }
 
 /* ====================== PROGRESS BARS ====================== */
@@ -1548,7 +1579,7 @@ code.color-swatch {
 
 /* ====================== DONUT (SVG) ====================== */
 .donut-track { fill: none; stroke: var(--parchment-dark); stroke-width: 10; }
-.donut-seg { fill: none; stroke-width: 10; transform: rotate(-90deg); transform-origin: center; transition: stroke-width var(--motion-fast); }
+.donut-seg { fill: none; stroke-width: 10; transform: rotate(-90deg); transform-origin: center; transition: stroke-width var(--motion-fast), opacity var(--motion-fast); }
 /* Data-hover grammar (Story 1.5 D1): a hovered donut slice bumps its stroke width to read as "highlighted". */
 .donut-seg:hover { stroke-width: 13; }
 .donut-seg.done { stroke: var(--status-done); }
@@ -1751,62 +1782,6 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .structure-tree .tree-file { overflow-wrap: anywhere; }
 
 /* ============ DEEP ANALYTICS (opt-in --deep-git: hotspots + change coupling) ============ */
-/* A distinct surface from the baseline Git Pulse above. Two side-by-side sections on wide screens,
-   stacked on narrow. Reuses the neutral chart tokens + the Git Pulse bar language for hotspots. [Story 3.2] */
-.deep-git { display: grid; grid-template-columns: 1fr; gap: 1.4rem; }
-@media (min-width: 720px) {
-  .deep-git { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-}
-.deep-git-section { min-width: 0; }
-.deep-git-title {
-  font-size: 0.82rem;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ink-faded);
-  margin-bottom: 0.15rem;
-}
-.deep-git-note { font-size: 0.78rem; color: var(--ink-light); margin-bottom: 0.7rem; line-height: 1.45; }
-/* The "opt-in" heading badge — signals this panel is not part of the default dashboard. */
-.deep-git-badge {
-  font-size: 0.62rem;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-light);
-  border: 1px solid var(--parchment-deep);
-  border-radius: 3px;
-  padding: 0.05rem 0.35rem;
-  vertical-align: middle;
-  margin-left: 0.4rem;
-}
-.deep-git-coupling { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
-.deep-git-coupling li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem 0.7rem;
-}
-.deep-git-pair { display: flex; align-items: center; gap: 0.35rem; min-width: 0; flex: 1 1 auto; }
-.deep-git-file {
-  font-family: 'Courier New', monospace;
-  font-size: 0.78rem;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 45%;
-}
-.deep-git-link { color: var(--rust); font-size: 0.8rem; flex: none; }
-.deep-git-count {
-  font-family: 'Courier New', monospace;
-  font-size: 0.74rem;
-  color: var(--ink-faded);
-  white-space: nowrap;
-  flex: none;
-}
-
 /* Change-coupling node-link graph (deep-analytics page). Layout is computed at generation time; this only
    themes it with the neutral chart tokens. overflow:visible lets node labels spill past the square viewBox. */
 .coupling-graph { display: block; width: 100%; max-width: 500px; height: auto; margin: 0 auto; overflow: visible; }
@@ -2597,10 +2572,11 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 
   /* Sibling Epic 3 panels — git pulse (3.1), coverage (3.3), structure tree (3.4), refinement funnel (3.6)
      — each shipped deliberately static and handed their motion to this story. The reveal is keyed to each
-     surface's already-present root class, so a surface that isn't built yet (the funnel until 3.6 lands) is
-     simply a harmless no-op: no sibling markup is assumed. A gentle rise+fade rather than chart-enter's
-     scale, so a full-width panel never scales past its column edge or nudges layout. When 3.6 ships, its
-     staged per-stage narrowing can hang off this same .refinement-funnel keying. */
+     surface's already-present root class, so a surface that isn't built at review time is simply a harmless
+     no-op: no sibling markup is assumed. A gentle rise+fade rather than chart-enter's scale, so a full-width
+     panel never scales past its column edge or nudges layout. [review, 2026-07-08] Story 3.6 has since landed
+     — .refinement-funnel now renders live (Charts.RefinementFunnel via HtmlTemplater), so this keying is no
+     longer a no-op for it; a future staged per-stage narrowing reveal can still hang off the same class. */
   .git-pulse,
   .coverage,
   .structure-tree,

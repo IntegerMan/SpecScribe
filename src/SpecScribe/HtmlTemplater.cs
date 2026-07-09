@@ -390,13 +390,9 @@ public static class HtmlTemplater
             : "no epics yet";
 
         sb.Append(Charts.Donut(segments, ariaLabel: $"Epic status: {ariaParts}", centerText: centerText));
-        sb.Append("<div class=\"donut-legend\">\n");
         // Only non-zero rows are rendered (B4) — no more "Done (0), Ready (0)" noise.
-        foreach (var (label, value, cssClass) in nonZero)
-        {
-            sb.Append($"  <span><span class=\"swatch {cssClass}\"></span>{Html(label)} ({value})</span>\n");
-        }
-        sb.Append("</div>\n</div>\n</div>\n\n");
+        sb.Append(Charts.DonutLegend(nonZero));
+        sb.Append("</div>\n</div>\n\n");
     }
 
     /// <summary>Surfaces what's in motion right now. When an active sprint is tracked (<paramref name="sprint"/>
@@ -613,13 +609,9 @@ public static class HtmlTemplater
         sb.Append(Charts.Donut(segments,
             ariaLabel: $"{label} requirements: {ariaParts}",
             centerText: $"{done}/{reqs.Count}"));
-        sb.Append("<div class=\"donut-legend\">\n");
         // Only non-zero rows are rendered (B4) — no "Done (0), Ready (0), Deferred (0)" noise.
-        foreach (var (segLabel, value, cssClass) in nonZero)
-        {
-            sb.Append($"  <span><span class=\"swatch {cssClass}\"></span>{Html(segLabel)} ({value})</span>\n");
-        }
-        sb.Append("</div>\n  </div>\n</div>\n");
+        sb.Append(Charts.DonutLegend(nonZero));
+        sb.Append("  </div>\n</div>\n");
     }
 
     /// <summary>The first-class "Direct &amp; Quick-Dev Work" band: quick-dev one-shot changes as status-badged

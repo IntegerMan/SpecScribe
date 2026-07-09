@@ -212,13 +212,10 @@ public static class RequirementsTemplater
 
         sb.Append("<div class=\"chart-panel\">\n");
         sb.Append($"<h3>{PathUtil.Html(label)} ({reqs.Count})</h3>\n<div class=\"donut-and-legend\">\n");
-        sb.Append(Charts.Donut(StatusSegments(reqs), ariaLabel: $"{label} requirements: {done} done, {ready} ready for dev, {planned} planned, {deferred} deferred"));
-        sb.Append("<div class=\"donut-legend\">\n");
-        sb.Append($"  <span><span class=\"swatch done\"></span>Done ({done})</span>\n");
-        sb.Append($"  <span><span class=\"swatch ready\"></span>Ready for dev ({ready})</span>\n");
-        sb.Append($"  <span><span class=\"swatch pending\"></span>Planned ({planned})</span>\n");
-        sb.Append($"  <span><span class=\"swatch deferred\"></span>Deferred ({deferred})</span>\n");
-        sb.Append("</div>\n</div>\n</div>\n\n");
+        var statusSegments = StatusSegments(reqs);
+        sb.Append(Charts.Donut(statusSegments, ariaLabel: $"{label} requirements: {done} done, {ready} ready for dev, {planned} planned, {deferred} deferred"));
+        sb.Append(Charts.DonutLegend(statusSegments));
+        sb.Append("</div>\n</div>\n\n");
     }
 
     /// <summary>A clickable navigator card for one group: a compact status pie chart, the group name, and

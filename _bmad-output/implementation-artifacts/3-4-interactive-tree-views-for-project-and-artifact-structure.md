@@ -4,16 +4,21 @@ baseline_commit: 2b1a073d1050a8158781065896fb4dfe50f185ed
 
 # Story 3.4: Interactive Tree Views for Project and Artifact Structure
 
-Status: superseded
+Status: retired
 
-> **⚠ SUPERSEDED (2026-07-08) — this story was misinterpreted and has been replaced.**
-> Story 3.4 is now **"Source Code Treemap for Codebase Exploration"** (a source-tree treemap
-> sized by lines of code, colorized by git-derived signals, with rich tooltips and zoom) — see
-> the rewritten ACs in [epics.md#Story 3.4](../planning-artifacts/epics.md) and the rationale in
-> [sprint-change-proposal-2026-07-08.md](../planning-artifacts/sprint-change-proposal-2026-07-08.md).
-> The disclosure-tree implementation recorded below is being reverted/repurposed (see Proposal
-> §4E for the per-file disposition). Regenerate a fresh 3.4 story context via `create-story`
-> against the new ACs before `dev-story`. **Do not implement the tasks below.**
+> **⚠ RETIRED (2026-07-08) — this story was misinterpreted; Story 3.4 is now vacant.**
+>
+> Two decisions, same day (SCP [sprint-change-proposal-2026-07-08.md](../planning-artifacts/sprint-change-proposal-2026-07-08.md)):
+> 1. The delivered **artifact disclosure tree** (below) was a misread of an intended **source-code treemap**.
+> 2. On reflection the treemap is a **code + per-file-git** feature, so it was **re-seated into Epic 7 as
+>    Story 7.6 — "Source Code Treemap for Codebase Exploration."** The planning-artifact structural tree
+>    (this story's old FR14/UX-DR19 purpose) was **retired** — there is no artifact structural view.
+>
+> **Successor:** [Story 7.6 in epics.md](../planning-artifacts/epics.md) (file `7-6-source-code-treemap-for-codebase-exploration.md`
+> to be generated via `create-story`). **Story number 3.4 is intentionally vacant** (as is 3.7).
+>
+> The disclosure-tree implementation recorded below is being **reverted** (see Proposal §4E for the
+> per-file disposition). **Do not implement the tasks below.**
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

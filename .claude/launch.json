@@ -8,6 +8,12 @@
       "port": 8099
     },
     {
+      "name": "specscribe-output-review",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8097", "--directory", "SpecScribeOutput"],
+      "port": 8097
+    },
+    {
       "name": "verify-site",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8098", "--directory", "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/87c0719e-0306-427a-84f0-695619c89683/scratchpad/verify-site"],

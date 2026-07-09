@@ -480,6 +480,48 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderIndex_EveryCanonicalFamilyLabelGetsItsExpectedAccentClass()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        // ArtifactCoverage.Specs (the family list) and Charts.FamilyAccentClass (the color mapping) are two
+        // hand-maintained lists of the same labels with no compile-time link between them. Deriving `labels`
+        // from Build (which always returns every canonical family, present or not) rather than hardcoding them
+        // means a family added to Specs without a matching entry in `expectedAccent` below fails this test's
+        // own count assertion — a family added to one list without the other can't silently miscolor. [Story
+        // 3.3 review]
+        var labels = ArtifactCoverage.Build(Array.Empty<string>(), new Dictionary<string, DateOnly>(),
+            new Dictionary<string, DateOnly>(), new DateOnly(2026, 7, 8)).Families.Select(f => f.Label).ToList();
+        var expectedAccent = new Dictionary<string, string>
+        {
+            ["PRD"] = "family-planning",
+            ["Product Brief"] = "family-planning",
+            ["Architecture"] = "family-architecture",
+            ["UX"] = "family-planning",
+            ["Spec Kernel"] = "family-planning",
+            ["Epics"] = "family-epics",
+            ["Stories"] = "family-epics",
+            ["Requirements"] = "family-requirements",
+        };
+        Assert.Equal(labels.Count, expectedAccent.Count);
+
+        var coverage = new ArtifactCoverage
+        {
+            Families = labels.Select(l => new ArtifactFamily(l, l, "d", Present: true,
+                LastModified: new DateOnly(2026, 6, 20), SourcePath: $"{l}.md", MemlogUpdated: null, Href: $"{l}.html")).ToList(),
+        };
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage);
+
+        foreach (var label in labels)
+        {
+            Assert.Contains($"<a class=\"coverage-card js-tip present {expectedAccent[label]}\" href=\"{label}.html\"", html);
+        }
+    }
+
+    [Fact]
     public void RenderIndex_OmitsPlanningCoveragePanelWhenCoverageEmptyOrNull()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

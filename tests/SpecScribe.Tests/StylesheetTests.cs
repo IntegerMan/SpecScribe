@@ -177,11 +177,24 @@ public class StylesheetTests
     {
         // Pure-CSS interactive-legend emphasis (UXO C3, deferred here by Story 1.5): a legend hover/focus dims
         // the non-matching sunburst segments via :has(). Class toggle stayed out of JS. [Story 3.5 Task 3]
+        // Keyed off :focus-visible, not bare :focus (review fix): a mouse click on the tabindex="0" span must
+        // not leave the dim stuck with no visible indicator once the pointer moves away.
         var css = ReadStylesheet();
         Assert.Contains(".sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(.sb-review)", css);
-        Assert.Contains(".sunburst-panel:has(.sb-done-item:focus) .sb-seg:not(.sb-done)", css);
+        Assert.Contains(".sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done)", css);
         // The focusable legend entries keep the shared on-brand focus ring.
         Assert.Contains(".sunburst-legend .sb-legend-item:focus-visible", css);
+    }
+
+    [Fact]
+    public void Stylesheet_HasDonutInteractiveLegendEmphasisRule()
+    {
+        // The donut half of the same affordance (review follow-up: Subtask 3.1 names "sunburst OR donut"
+        // explicitly). Same :has()/:focus-visible grammar, scoped to .donut-and-legend/.donut-seg.
+        var css = ReadStylesheet();
+        Assert.Contains(".donut-and-legend:has(.dn-done-item:hover) .donut-seg:not(.done)", css);
+        Assert.Contains(".donut-and-legend:has(.dn-deferred-item:focus-visible) .donut-seg:not(.deferred)", css);
+        Assert.Contains(".donut-legend .dn-legend-item:focus-visible", css);
     }
 
     [Fact]

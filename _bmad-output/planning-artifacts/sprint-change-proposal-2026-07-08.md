@@ -178,3 +178,18 @@ From the delivered File List:
 - Focusable rectangles with descriptive labels; every metric available as text (color never sole signal); reduced-motion respected.
 - Git metrics sourced by **extending the single numstat pass** — no second `git log`.
 - Spec kernel untouched; full test suite green.
+
+---
+
+## Amendment A (2026-07-08, same day) — Treemap re-seated to Epic 7; Epic 3 artifact tree retired
+
+**Trigger.** Reviewing the redefined Story 3.4 on the dashboard sunburst prompted a scope question: the treemap is a **source-code + per-file-git** feature, whose data domain (code tree, LOC, churn/hotspots) and drill target (in-portal code pages) belong to **Epic 7 (Code and Git Exploration)** — not Epic 3's planning-artifact insight family. Its colorize dimensions *are* FR19's "change-coupling/hotspots" signals, and it depends on the code pages Story 7.1/FR15 builds.
+
+**Decision.** Move the treemap to **Epic 7 as Story 7.6**; **retire the Epic 3 artifact structural tree** (no planning-artifact structural view will ship). This supersedes Sections 3–4's "replace Story 3.4 in place within Epic 3."
+
+**Edits applied.**
+- **epics.md** — removed Story 3.4 from Epic 3 (number now vacant, documented via comment); added **Story 7.6 "Source Code Treemap for Codebase Exploration"** to Epic 7 with the 4 ACs (AC-3 now routes file rectangles into Epic 7 code pages). **FR14** rewritten to the code-treemap and **reassigned Epic 3 → Epic 7** (Epic List, detailed header, and FR Coverage Map). **UX-DR19** already treemap-worded — now realized by 7.6. Epic 3 title/description reverted to "Insight Surfaces" (no structural-viz claim). The "directory-structure insight surfaces" Additional Requirement reworded to the code treemap.
+- **sprint-status.yaml** — `3-4-…` set to `retired`; added `7-6-source-code-treemap-for-codebase-exploration: backlog`.
+- **Delivered story file** — `Status: retired`; banner points to Story 7.6 as successor; disclosure-tree code still pending **revert** (§4E disposition unchanged, minus the "keep page/nav seams to repurpose" note — those seams now belong to Epic 7's treemap work, sequenced after 7.1).
+
+**Unchanged.** PRD, UX design docs, and the **spec kernel** remain untouched. The §5 handoff still holds, retargeted: Architect ruling on the zero-JS exception, then `create-story` for **7.6** (not 3.4), then the revert + build — sequenced **after Story 7.1 (code pages)** so treemap rectangles have a drill target.

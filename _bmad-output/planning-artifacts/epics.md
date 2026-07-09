@@ -42,7 +42,7 @@ FR10: Support optional deeper git insights (for example hotspots and change coup
 FR11: Analyze canonical agent/workflow files to surface structural insights such as planning coverage, artifact freshness, and gaps, with memlog as optional enrichment.
 FR12: Deliver a CLI-first workflow for one-shot generation and watch mode, with auto-discovery defaults plus explicit path overrides.
 FR13: Provide a follow-on VS Code webview surface that reuses shared parsing and projection logic and remains read-only in v1.
-FR14: Provide project treemaps and structural visualizations in generated outputs so users can inspect codebase/layout shape, code mass, and change signals, and trace where planning and implementation artifacts live.
+FR14: Provide a source-code treemap and related structural visualizations in generated outputs so users can inspect codebase shape, code mass (lines of code), and git-derived change signals (change frequency, creation/last-modified recency, average change size).
 FR15: Render project source/code files as browsable in-portal pages and resolve source citations and code references (for example `[Source: path:line]` and "View source" links) to those pages rather than raw or dead links.
 FR16: Provide temporal/timeline views of project activity, including per-date activity pages, and link dates (commit dates, heatmap cells, artifact timestamps) to them.
 FR17: Add adapter coverage for additional spec-driven frameworks (for example SpecFlow, Squad, and Superpowers) through the shared adapter contract.
@@ -77,7 +77,7 @@ NFR7: Feature configurability parity is required across interactive menu flows a
 - Maintain source-citation linkification and requirement-ID linkification during page rendering.
 - Keep existing BMad support fully intact while broadening to bMad proper and other frameworks; current next-step command mapping is strongly GDS-oriented and requires generalization.
 - Keep stylesheet delivery self-contained in tool packaging so runtime does not depend on loose asset files.
-- Include directory-structure insight surfaces (tree-style views and related structural summaries) as first-class dashboard/navigation affordances when source data exists.
+- Include a source-code structural visualization (a treemap sized by lines of code and colorized by git-derived change signals) as a first-class navigation affordance when source and git data exist.
 
 ### UX Design Requirements
 
@@ -117,7 +117,7 @@ FR10: Epic 3 - Optional deeper git analytics toggle path.
 FR11: Epic 3 - Agent and workflow structural insights with freshness and gap signals.
 FR12: Epic 5 - CLI-first generate and watch with auto-discovery and explicit overrides.
 FR13: Epic 6 - Read-only VS Code webview reusing shared core logic.
-FR14: Epic 3 - Treemaps and structural visualizations in generated outputs.
+FR14: Epic 7 - Source-code treemap (LOC-sized, git-colorized) as a structural visualization.
 FR15: Epic 7 - In-portal code file browsing and source-citation linking to code pages.
 FR16: Epic 7 - Activity timeline and per-date pages linked from dates.
 FR17: Epic 4 - Additional framework adapters (SpecFlow, Squad, Superpowers) via the shared contract.
@@ -134,9 +134,9 @@ Deliver a polished, immediately useful portal for current BMad projects so maint
 Surface and truthfully represent every BMad artifact class and work type — deferred and quick-dev work, specs, sprint status, planning documents, iconography, and authored comments — so the portal reflects the whole project rather than only epics and stories.
 **FRs covered:** FR2, FR5, FR7
 
-### Epic 3: Insight Surfaces and Structural Visualization
-Add richer analytical insight, including treemaps and structural visualizations, so users can understand project shape, gaps, and momentum quickly.
-**FRs covered:** FR9, FR10, FR11, FR14
+### Epic 3: Insight Surfaces
+Add richer analytical insight — git momentum, planning coverage and freshness, and purposeful dashboard polish — so users can understand project shape, gaps, and momentum quickly.
+**FRs covered:** FR9, FR10, FR11
 
 ### Epic 4: Multi-Framework Coverage Expansion
 Expand beyond BMad to additional spec-driven frameworks (Spec Kit, GSD/GSD-Pi, SpecFlow, Squad, Superpowers) through one shared adapter contract, first generalizing the renderer away from any single project's personal structure.
@@ -152,7 +152,7 @@ Expose the same shared projection in a read-only VS Code webview for in-editor v
 
 ### Epic 7: Code and Git Exploration
 Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth.
-**FRs covered:** FR15, FR16, FR19
+**FRs covered:** FR14, FR15, FR16, FR19
 
 <!-- Repeat for each epic in epics_list (N = 1, 2, 3...) -->
 
@@ -390,11 +390,11 @@ So that the context authors leave in comments (for example "sync this back into 
 **Then** comment annotations use a consistent side-note style clearly distinct from body text and do not disrupt the surrounding markdown
 **And** malformed, nested, or unterminated comments degrade non-fatally without breaking the page.
 
-## Epic 3: Insight Surfaces and Structural Visualization
+## Epic 3: Insight Surfaces
 
-Add richer analytical insight, including treemaps and structural visualizations, so users can understand project shape, gaps, and momentum quickly.
+Add richer analytical insight — git momentum, planning coverage and freshness, and purposeful dashboard polish — so users can understand project shape, gaps, and momentum quickly.
 
-**FRs covered:** FR9, FR10, FR11, FR14
+**FRs covered:** FR9, FR10, FR11
 
 ### Story 3.1: Baseline Git Pulse Insights on Dashboard
 
@@ -456,38 +456,11 @@ So that I can identify missing or stale process artifacts quickly.
 **Then** memlog data is used as optional enrichment
 **And** source-artifact-derived insights remain primary.
 
-### Story 3.4: Source Code Treemap for Codebase Exploration
+<!-- Story 3.4 retired 2026-07-08 (SCP 2026-07-08). The original artifact disclosure-tree was
+     retired, and the source-code treemap it had been rewritten into moved to Story 7.6 (Epic 7) —
+     its natural code+git home (LOC + per-file git metrics, drilling into Epic 7 code pages). FR14
+     and UX-DR19 now sit in Epic 7. Story number 3.4 is intentionally vacant (as is 3.7). -->
 
-As a project reviewer exploring an unfamiliar codebase,
-I want a treemap of the source tree sized by lines of code and colorable by git-derived change signals,
-So that I can see at a glance where the code mass and the churn live, and drill into any area.
-
-**Acceptance Criteria:**
-
-1.
-**Given** a repository with source files
-**When** I open the code-map surface
-**Then** a treemap renders each source file as a rectangle whose area is proportional to its line count, nested within its directory
-**And** the layout is deterministic, with directory labels and clear boundaries.
-
-2.
-**Given** deep-git analysis is available
-**When** I choose a colorize dimension
-**Then** files are shaded by that dimension — change frequency (commit count), relative creation date, relative last-modified date, or average change size — on a non-lifecycle sequential scale with a legend
-**And** when git data is unavailable the treemap still renders sized-by-LOC with a neutral fill and a clear notice (graceful degradation).
-
-3.
-**Given** I hover or focus a rectangle
-**When** the tooltip appears
-**Then** it shows the file path, line count, and available git metrics
-**And** I can zoom into a directory and back out via a breadcrumb, with drill state deep-linkable (mirroring the sunburst conventions).
-
-4.
-**Given** keyboard and screen-reader navigation
-**When** I traverse the treemap
-**Then** rectangles are focusable with descriptive labels announcing name and metric value
-**And** color is never the sole signal (every metric is available as text)
-**And** reduced-motion is respected, preserving the Story 1.4/1.5 conventions and NFR6.
 
 ### Story 3.5: Flashy but Purposeful Insight Visual Language
 
@@ -851,7 +824,7 @@ So that the experience feels native without losing product identity.
 
 Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth — so the portal explains not just what is planned, but what exists and what happened when.
 
-**FRs covered:** FR15, FR16, FR19
+**FRs covered:** FR14, FR15, FR16, FR19
 
 ### Story 7.1: In-Portal Code File Browsing
 
@@ -952,3 +925,36 @@ So that I can read what changed and why without leaving the portal.
 **When** I follow those links
 **Then** file entries lead to the corresponding file page and the author is shown as attribution, never as a productivity ranking
 **And** page generation is bounded and degrades non-fatally when history is unavailable or partial.
+
+### Story 7.6: Source Code Treemap for Codebase Exploration
+
+As a project reviewer exploring an unfamiliar codebase,
+I want a treemap of the source tree sized by lines of code and colorable by git-derived change signals,
+So that I can see at a glance where the code mass and the churn live, and drill into any area.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a repository with source files
+**When** I open the code-map surface
+**Then** a treemap renders each source file as a rectangle whose area is proportional to its line count, nested within its directory
+**And** the layout is deterministic, with directory labels and clear boundaries.
+
+2.
+**Given** deep-git analysis is available
+**When** I choose a colorize dimension
+**Then** files are shaded by that dimension — change frequency (commit count), relative creation date, relative last-modified date, or average change size — on a non-lifecycle sequential scale with a legend
+**And** when git data is unavailable the treemap still renders sized-by-LOC with a neutral fill and a clear notice (graceful degradation).
+
+3.
+**Given** I hover or focus a rectangle
+**When** the tooltip appears
+**Then** it shows the file path, line count, and available git metrics
+**And** selecting a file routes to its in-portal code page (Story 7.1) when available, and I can zoom into a directory and back out via a breadcrumb, with drill state deep-linkable (mirroring the sunburst conventions).
+
+4.
+**Given** keyboard and screen-reader navigation
+**When** I traverse the treemap
+**Then** rectangles are focusable with descriptive labels announcing name and metric value
+**And** color is never the sole signal (every metric is available as text)
+**And** reduced-motion is respected, preserving the Story 1.4/1.5 conventions and NFR6.

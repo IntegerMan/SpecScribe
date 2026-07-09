@@ -80,6 +80,55 @@ public class ChartsTests
     }
 
     [Fact]
+    public void EpicSunburst_LegendEntriesAreKeyboardReachableAndStatusKeyedForEmphasis()
+    {
+        // Review follow-up: the epic-level Sunburst test above only covers ONE of the three SunburstLegend
+        // call sites. This pins the story-level overload (EpicSunburst), which uses the same 6-tuple set.
+        var epic = Epic(Story("1.1", "A story", "in progress", done: 2, total: 5));
+
+        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+
+        Assert.Contains("<span class=\"sb-legend-item sb-review-item\" tabindex=\"0\">", svg);
+        Assert.Contains("<span class=\"sb-legend-item sb-done-item\" tabindex=\"0\">", svg);
+        Assert.Contains("<span class=\"swatch sb-review-sw\"></span>In review</span>", svg);
+    }
+
+    [Fact]
+    public void TaskSunburst_LegendEntriesAreKeyboardReachableAndStatusKeyedForEmphasis()
+    {
+        // Review follow-up: pins the third SunburstLegend call site (TaskSunburst), which uses the distinct
+        // 2-item "Not done"/"Done" set rather than the six lifecycle statuses.
+        var tasks = new List<TaskItem> { new("Do the thing", Done: true, Subtasks: Array.Empty<TaskItem>()) };
+
+        var svg = Charts.TaskSunburst(tasks);
+
+        Assert.Contains("<span class=\"sb-legend-item sb-pending-item\" tabindex=\"0\">", svg);
+        Assert.Contains("<span class=\"sb-legend-item sb-done-item\" tabindex=\"0\">", svg);
+        // This legend's pending label reads "Not done", not the shared "Pending" text (status is never
+        // colour-only, and the wording matches this chart's own not-done/done framing).
+        Assert.Contains("<span class=\"swatch sb-pending-sw\"></span>Not done</span>", svg);
+        Assert.Contains("<span class=\"swatch sb-done-sw\"></span>Done</span>", svg);
+    }
+
+    [Fact]
+    public void DonutLegend_EntriesAreKeyboardReachableAndStatusKeyedForEmphasis()
+    {
+        // The donut half of the interactive-legend emphasis (Story 3.5 Task 3, review follow-up: Subtask 3.1
+        // names "sunburst OR donut" explicitly). Mirrors the sunburst legend guard: each entry needs a
+        // status class the .donut-and-legend:has(...) rule can target AND a tabindex for keyboard reach.
+        var html = Charts.DonutLegend(new (string Label, int Value, string CssClass)[]
+        {
+            ("Done", 3, "done"),
+            ("Ready for dev", 1, "ready"),
+        });
+
+        Assert.Contains("<span class=\"dn-legend-item dn-done-item\" tabindex=\"0\">", html);
+        Assert.Contains("<span class=\"dn-legend-item dn-ready-item\" tabindex=\"0\">", html);
+        // The always-visible swatch + label + count remain (status is never emphasis-only / colour-only).
+        Assert.Contains("<span class=\"swatch done\"></span>Done (3)</span>", html);
+    }
+
+    [Fact]
     public void CommitHeatmap_CellsCarryStaggerColumnIndexForEntrance()
     {
         // Each cell emits its week index as --col; specscribe.css derives the capped, reduced-motion-safe
@@ -96,6 +145,15 @@ public class ChartsTests
         Assert.Contains("style=\"--col:0\"", svg);
         // The class the future-day/level tests assert stays intact right beside the new style hook.
         Assert.Contains("class=\"heatmap-cell level-", svg);
+
+        // Review follow-up: the assertion above alone would still pass if --col were hardcoded to 0 for every
+        // cell (a broken/flattened stagger). Prove actual differentiation by collecting every distinct --col
+        // value across the ~2-week-apart series and requiring more than one — the columns genuinely advance.
+        var colValues = System.Text.RegularExpressions.Regex.Matches(svg, "--col:(\\d+)")
+            .Select(m => m.Groups[1].Value)
+            .Distinct()
+            .ToList();
+        Assert.True(colValues.Count > 1, $"Expected more than one distinct --col value, got: {string.Join(",", colValues)}");
     }
 
     [Fact]
@@ -615,23 +673,31 @@ public class ChartsTests
         Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"Refinement funnel: 7 epics, 34 stories drafted, " +
                         "12 stories with a task plan, 210 tasks planned\"", svg);
-        // Every stage carries its visible text label + count (never color-only).
-        Assert.Contains(">7</tspan> epics", svg);
-        Assert.Contains(">34</tspan> stories drafted", svg);
-        Assert.Contains(">12</tspan> stories with a task plan", svg);
-        Assert.Contains(">210</tspan> tasks planned", svg);
-        // Coverage sub-labels — not bar width — say how much detail work remains (truthfulness, AC #1/#2).
-        Assert.Contains("5 of 7 epics broken into stories", svg);
-        Assert.Contains("12 of 34 stories have a task plan", svg);
-        // Bands ride the status-token classes, one per stage.
+        // Every stage carries its visible count + text label (never color-only).
+        Assert.Contains(">7</text>", svg);
+        Assert.Contains(">epics</text>", svg);
+        Assert.Contains(">34</text>", svg);
+        Assert.Contains(">stories drafted</text>", svg);
+        Assert.Contains(">12</text>", svg);
+        Assert.Contains(">stories with a task plan</text>", svg);
+        Assert.Contains(">210</text>", svg);
+        Assert.Contains(">tasks planned</text>", svg);
+        // Coverage sub-labels — not band size — say how much detail work remains (truthfulness, AC #1/#2).
+        // The visible sub wraps across two lines; the pointer <title> carries the full phrase.
+        Assert.Contains(">5 of 7 epics</text>", svg);
+        Assert.Contains(">broken into stories</text>", svg);
+        Assert.Contains("<title>34 stories drafted — 5 of 7 epics broken into stories</title>", svg);
+        Assert.Contains("<title>12 stories with a task plan — 12 of 34 stories have a task plan</title>", svg);
+        // Bands ride the status-token classes, one per stage, joined by sideways-funnel connectors.
         Assert.Contains("funnel-band funnel-epics", svg);
         Assert.Contains("funnel-band funnel-stories", svg);
         Assert.Contains("funnel-band funnel-planned", svg);
         Assert.Contains("funnel-band funnel-tasks", svg);
-        // Width is honest: the largest stage (tasks) spans the full usable width, and the tiny epics stage is
-        // floored to a visible band rather than a hairline — never scaled to fake a narrowing silhouette.
-        Assert.Contains("width=\"600\"", svg);
-        Assert.Contains("width=\"46\"", svg);
+        Assert.Contains("funnel-connector", svg);
+        // Height is honest: the largest stage (tasks) gets the full band height, and the tiny epics/planned
+        // stages floor to a visible band rather than a hairline — never rescaled to fake a narrowing.
+        Assert.Contains("height=\"136\"", svg);
+        Assert.Contains("height=\"12\"", svg);
     }
 
     [Fact]
@@ -654,17 +720,20 @@ public class ChartsTests
         // band (no fill that could read as data), and no width goes NaN/negative. [AC #2]
         var svg = Charts.RefinementFunnel(Progress(epics: 2, drafted: 1, stories: 1, withPlan: 0, tasksDone: 0, tasksTotal: 0));
 
-        Assert.Contains(">2</tspan> epics", svg);
-        Assert.Contains(">1</tspan> story drafted", svg);
-        Assert.Contains(">0</tspan> stories with a task plan", svg);
-        Assert.Contains(">0</tspan> tasks planned", svg);
+        Assert.Contains(">2</text>", svg);
+        Assert.Contains(">epics</text>", svg);
+        Assert.Contains(">1</text>", svg);
+        Assert.Contains(">story drafted</text>", svg);
+        Assert.Contains(">0</text>", svg);
+        Assert.Contains(">stories with a task plan</text>", svg);
+        Assert.Contains(">tasks planned</text>", svg);
         // Zero-count stages render the dashed placeholder band, not a filled bar.
         Assert.Contains("funnel-zero", svg);
-        // Epics is the largest stage (2) → full usable width; the single story is half, above the floor.
-        Assert.Contains("width=\"600\"", svg);
-        Assert.Contains("width=\"300\"", svg);
+        // Epics is the largest stage (2) → full band height; the single story is half, above the floor.
+        Assert.Contains("height=\"136\"", svg);
+        Assert.Contains("height=\"68\"", svg);
         Assert.DoesNotContain("NaN", svg);
-        Assert.DoesNotContain("width=\"-", svg);
+        Assert.DoesNotContain("height=\"-", svg);
     }
 
     [Fact]
@@ -673,10 +742,10 @@ public class ChartsTests
         // 1 epic / 1 story with a plan / 1 task — the labels and the stage-3 verb pluralize correctly.
         var svg = Charts.RefinementFunnel(Progress(epics: 1, drafted: 1, stories: 3, withPlan: 1, tasksDone: 0, tasksTotal: 1));
 
-        Assert.Contains(">1</tspan> epic", svg);
-        Assert.Contains(">1</tspan> story with a task plan", svg);
-        Assert.Contains(">1</tspan> task planned", svg);
-        Assert.Contains("1 of 3 stories has a task plan", svg);
+        Assert.Contains(">epic</text>", svg);
+        Assert.Contains(">story with a task plan</text>", svg);
+        Assert.Contains(">task planned</text>", svg);
+        Assert.Contains("<title>1 story with a task plan — 1 of 3 stories has a task plan</title>", svg);
     }
 
     // ---- Project structure tree (Story 3.4) ------------------------------------------------

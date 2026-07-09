@@ -280,7 +280,7 @@ public static class GitMetrics
             // survives intact; skip anything that doesn't have the two leading count columns.
             var parts = line.Split('\t', 3);
             if (parts.Length < 3) continue;
-            var filePath = parts[2].Trim();
+            var filePath = ResolveRenamedPath(parts[2].Trim());
             if (filePath.Length == 0) continue;
             current.Add(filePath);
         }
@@ -303,6 +303,33 @@ public static class GitMetrics
             .ToList();
 
         return new DeepGitPulse(hotspots, coupling);
+    }
+
+    /// <summary>Resolves a `--numstat` path field to the file's current path, collapsing git's rename/move
+    /// display syntax rather than treating it as one literal path. Git renders a rename either as a full
+    /// <c>old/path.cs =&gt; new/path.cs</c> swap, or — when old and new share a prefix/suffix — abbreviated as
+    /// <c>common/{old.cs =&gt; new.cs}/tail</c>. Both forms are collapsed to the new (post-rename) path so
+    /// hotspot/coupling counts track the file's current name instead of embedding the raw arrow text as a
+    /// bogus combined "path". Non-rename lines pass through unchanged.</summary>
+    private static string ResolveRenamedPath(string rawPath)
+    {
+        var braceStart = rawPath.IndexOf('{');
+        var braceEnd = braceStart >= 0 ? rawPath.IndexOf('}', braceStart) : -1;
+        if (braceStart >= 0 && braceEnd > braceStart)
+        {
+            var inner = rawPath[(braceStart + 1)..braceEnd];
+            var braceArrow = inner.IndexOf(" => ", StringComparison.Ordinal);
+            if (braceArrow >= 0)
+            {
+                var prefix = rawPath[..braceStart];
+                var suffix = rawPath[(braceEnd + 1)..];
+                var newInner = inner[(braceArrow + 4)..];
+                return prefix + newInner + suffix;
+            }
+        }
+
+        var arrow = rawPath.IndexOf(" => ", StringComparison.Ordinal);
+        return arrow >= 0 ? rawPath[(arrow + 4)..] : rawPath;
     }
 
     private static string? RunGit(string workingDirectory, string arguments)

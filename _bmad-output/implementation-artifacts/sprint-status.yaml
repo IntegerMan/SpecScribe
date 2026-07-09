@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: 2026-07-08T15:45:00-04:00
+# last_updated: 2026-07-08T22:30:00-04:00
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-08T22:40:00-04:00
+last_updated: 2026-07-08T23:45:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -67,10 +67,10 @@ development_status:
 
   epic-3: in-progress
   3-1-baseline-git-pulse-insights-on-dashboard: done
-  3-2-optional-deep-git-analytics-controls: review
-  3-3-agent-and-workflow-structure-coverage-insights: review
-  3-4-interactive-tree-views-for-project-and-artifact-structure: drafted # superseded -> treemap rewrite, re-draft via create-story (SCP 2026-07-08)
-  3-5-flashy-but-purposeful-insight-visual-language: review
+  3-2-optional-deep-git-analytics-controls: done
+  3-3-agent-and-workflow-structure-coverage-insights: done
+  3-4-interactive-tree-views-for-project-and-artifact-structure: retired # artifact tree retired; source-code treemap moved to Story 7.6 (SCP 2026-07-08)
+  3-5-flashy-but-purposeful-insight-visual-language: done
   3-6-refinement-funnel-on-the-dashboard: review
   3-8-git-insights-hub-page: ready-for-dev
   epic-3-retrospective: optional
@@ -104,6 +104,7 @@ development_status:
   7-3-activity-timeline-and-date-pages: ready-for-dev
   7-4-advanced-code-and-git-coverage: ready-for-dev
   7-5-per-commit-detail-pages: backlog
+  7-6-source-code-treemap-for-codebase-exploration: backlog # moved from Story 3.4 (SCP 2026-07-08)
   epic-7-retrospective: optional
 
 action_items:

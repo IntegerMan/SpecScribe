@@ -137,9 +137,7 @@ public sealed class ArtifactCoverage
         var families = new List<ArtifactFamily>(Specs.Count);
         foreach (var spec in Specs)
         {
-            // Deterministic first-match (like WorkInventory's "first match wins") so a repeated family file
-            // resolves to a single stable row rather than last-write-wins.
-            var match = normalized.FirstOrDefault(spec.Matches);
+            var match = SelectCanonicalMatch(normalized, spec, lastModifiedByPath);
 
             DateOnly? lastModified = null;
             if (match is not null && lastModifiedByPath.TryGetValue(match, out var m))
@@ -158,6 +156,36 @@ public sealed class ArtifactCoverage
         return new ArtifactCoverage { Families = families };
     }
 
+    /// <summary>Every source-relative path that matches ANY canonical family, deduplicated — the set
+    /// <see cref="SiteGenerator.BuildArtifactCoverage"/> stats in its second (mtime) gather pass. Broader than
+    /// just the winning match per family, so a family with two candidates (e.g. both DESIGN.md and
+    /// EXPERIENCE.md present for UX) has both mtimes available when <see cref="Build"/> picks the canonical
+    /// one. [Story 3.3 review]</summary>
+    public static IReadOnlyList<string> AllCandidatePaths(IReadOnlyList<string> sourceRelativePaths)
+    {
+        var normalized = sourceRelativePaths.Select(PathUtil.NormalizeSlashes);
+        return normalized.Where(p => Specs.Any(s => s.Matches(p))).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>Picks the single canonical match for a family among every path satisfying its predicate: the
+    /// most-recently-modified candidate wins (the freshest file is the one worth surfacing), with ties —
+    /// including "no mtime known yet", true during the discovery pass that runs before mtimes are gathered —
+    /// broken by ordinal path order so the choice is stable across runs and filesystems regardless of
+    /// directory-enumeration order. [Story 3.3 review: replaces the previous "first match" which depended on
+    /// unsorted input order and, for OR-predicates like UX's DESIGN.md-or-EXPERIENCE.md, silently ignored the
+    /// second candidate's freshness entirely.]</summary>
+    private static string? SelectCanonicalMatch(
+        IReadOnlyList<string> normalized, FamilySpec spec, IReadOnlyDictionary<string, DateOnly> lastModifiedByPath)
+    {
+        var candidates = normalized.Where(spec.Matches).OrderBy(p => p, StringComparer.Ordinal).ToList();
+        if (candidates.Count <= 1) return candidates.Count == 0 ? null : candidates[0];
+
+        return candidates
+            .OrderByDescending(p => lastModifiedByPath.TryGetValue(p, out var d) ? d : (DateOnly?)null)
+            .ThenBy(p => p, StringComparer.Ordinal)
+            .First();
+    }
+
     private static Func<string, bool> NameIs(string fileName) => p => NameMatches(p, fileName);
 
     private static bool NameMatches(string normalizedPath, string fileName)
@@ -172,7 +200,7 @@ public sealed class ArtifactCoverage
 
     // A story/epic artifact filename: leading <epic>-<story>- (mirrors SiteGenerator.ArtifactFilenamePattern),
     // so epic-N-retrospective.md / deferred-work.md / spec-*.md are correctly excluded.
-    private static readonly Regex StoryFileName = new(@"^\d+-\d+-.*\.md$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex StoryFileName = new(@"^\d+-\d+-.+\.md$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static bool IsStoryArtifact(string normalizedPath)
     {

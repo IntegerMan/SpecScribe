@@ -66,11 +66,6 @@ public sealed class SiteGenerator
             var nav = BuildNav(sourceRelatives);
             _nav = nav;
 
-            // Artifact-family coverage insight — computed once here (source relatives are already gathered) and
-            // cached so every WriteIndex call shares one instance. Never-throw: any failure degrades to Empty,
-            // the panel omits, and generation still succeeds (AD-4 / NFR2). [Story 3.3 Task 2]
-            _coverage = BuildArtifactCoverage(sourceRelatives);
-
             // Render the README up front so that, if it fails, we can drop the Readme nav entry before any
             // other page is written — the site never links to a readme.html that wasn't actually produced.
             GenerationEvent? readmeEvent = null;
@@ -150,6 +145,9 @@ public sealed class SiteGenerator
                 catch (Exception ex)
                 {
                     events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.DeepAnalyticsOutputPath, sw.Elapsed, ex.Message));
+                    // The page was never written — clear DeepGit so the dashboard's "View Deep Analytics" link
+                    // (gated on _progress.DeepGit is not null) doesn't point at a page that doesn't exist.
+                    _progress!.DeepGit = null;
                 }
             }
 
@@ -157,6 +155,13 @@ public sealed class SiteGenerator
             {
                 events.Add(readmeEvent);
             }
+
+            // Artifact-family coverage insight — computed here, AFTER epics/pages have run, so ResolveFamilyHref
+            // can check the now-fully-populated _docs/_epicsModel/_requirements before linking a "present"
+            // family to a page (never a broken link — same ordering WriteStructure relies on for _docs below).
+            // Cached so every WriteIndex call shares one instance. Never-throw: any failure degrades to Empty,
+            // the panel omits, and generation still succeeds (AD-4 / NFR2). [Story 3.3 Task 2; review: reordered]
+            _coverage = BuildArtifactCoverage(sourceRelatives);
 
             // The sprint page reads the epics model (for real story/epic titles + links), so it's written
             // after the epics phase. Gated on parsed sprint data; a no-op when there is none. [Story 2.3 Task 3/5]
@@ -183,6 +188,7 @@ public sealed class SiteGenerator
             EnsureScaffold();
             var nav = _nav ?? BuildNav(Array.Empty<string>());
             var ev = GenerateOneInternal(sourceFullPath, nav);
+            RefreshCoverage();
             WriteIndex(nav);
             return ev;
         }
@@ -204,12 +210,23 @@ public sealed class SiteGenerator
                 }
 
                 _docs.Remove(relative);
+                RefreshCoverage();
                 WriteIndex(_nav ?? BuildNav(Array.Empty<string>()));
                 return new GenerationEvent(GenerationOutcome.Removed, relative, sw.Elapsed);
             }
 
             return new GenerationEvent(GenerationOutcome.Skipped, relative, sw.Elapsed, "not tracked");
         }
+    }
+
+    /// <summary>Recomputes and re-caches <see cref="_coverage"/> from the current on-disk source tree. Called
+    /// by every watch-mode incremental path (<see cref="GenerateOne"/>, <see cref="RemoveFor"/>,
+    /// <see cref="RegenerateEpics"/>, <see cref="RegenerateAdrs"/>) right before their own <c>WriteIndex</c>
+    /// call, so a live edit (new/changed/removed planning artifact) is reflected in the Planning Artifacts
+    /// panel immediately rather than only after the next full <c>generate</c>. [Story 3.3 review]</summary>
+    private void RefreshCoverage()
+    {
+        _coverage = BuildArtifactCoverage(EnumerateSourceFiles().Select(ToSourceRelative).ToList());
     }
 
     /// <summary>True for epics.md itself, or any file under implementation-artifacts/ — both feed the
@@ -243,6 +260,7 @@ public sealed class SiteGenerator
             var epicsSourceFile = FindEpicsSourceFile(files);
             if (epicsSourceFile is null)
             {
+                RefreshCoverage();
                 WriteIndex(nav);
                 return new GenerationEvent(GenerationOutcome.Skipped, "epics.md", sw.Elapsed, "epics.md not found");
             }
@@ -250,6 +268,7 @@ public sealed class SiteGenerator
             var artifactMap = BuildArtifactMap(files);
             var consumed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var epicsEvents = GenerateEpicsInternal(epicsSourceFile, files, artifactMap, consumed, nav);
+            RefreshCoverage();
             WriteIndex(nav);
 
             var errored = epicsEvents.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
@@ -281,6 +300,7 @@ public sealed class SiteGenerator
             EnsureScaffold();
             var nav = _nav ?? BuildNav(Array.Empty<string>());
             var events = GenerateAdrsInternal(nav);
+            RefreshCoverage();
             WriteIndex(nav);
 
             var errored = events.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
@@ -893,10 +913,12 @@ public sealed class SiteGenerator
             // stays in ArtifactCoverage — the single coverage seam Epic 4 generalizes.
             var discovered = ArtifactCoverage.Build(sourceRelatives, EmptyDates, EmptyDates, today);
 
+            // Stat every candidate matching ANY family (not just each family's provisional first match) so an
+            // OR-predicate family (UX: DESIGN.md or EXPERIENCE.md) has both mtimes available when Build picks
+            // the freshest one as canonical below. [Story 3.3 review]
             var mtimes = new Dictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
-            foreach (var family in discovered.Families)
+            foreach (var rel in ArtifactCoverage.AllCandidatePaths(sourceRelatives))
             {
-                if (family.SourcePath is not { } rel) continue;
                 try
                 {
                     var full = Path.Combine(_options.SourceRoot, rel.Replace('/', Path.DirectorySeparatorChar));
@@ -937,15 +959,25 @@ public sealed class SiteGenerator
     /// <summary>The page a present family's card links to. Epics/Stories point at the epics-and-stories view and
     /// Requirements at the curated FR/NFR page (both special-routed, not generic source pages); every other
     /// family links to its generated page (<c>ToOutputRelative</c> of its matched source, which the generic
-    /// page pipeline writes verbatim). Labels mirror <see cref="ArtifactCoverage"/>'s canonical family set.</summary>
-    private static string? ResolveFamilyHref(ArtifactFamily f)
+    /// page pipeline writes verbatim). Labels mirror <see cref="ArtifactCoverage"/>'s canonical family set.
+    /// Only returns an href when the target page was actually produced — <c>_docs</c>/<c>_epicsModel</c>/
+    /// <c>_requirements</c> are populated exclusively on a successful page write, so a source-file conversion
+    /// failure (or an epics-parse failure) degrades the card to non-linked "present" text instead of a broken
+    /// link. Mirrors the same <c>_docs</c>-gated guard <see cref="BuildStructureHrefMap"/> already applies to
+    /// the structure tree. [Story 3.3 review]</summary>
+    private string? ResolveFamilyHref(ArtifactFamily f)
     {
         if (f.SourcePath is not { } src) return null;
         return f.Label switch
         {
-            "Epics" or "Stories" => SiteNav.EpicsOutputPath,
-            "Requirements" => SiteNav.RequirementsOutputPath,
-            _ => PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(src)),
+            "Epics" or "Stories" => _epicsModel is not null ? SiteNav.EpicsOutputPath : null,
+            "Requirements" => _requirements is not null ? SiteNav.RequirementsOutputPath : null,
+            // _docs keys are raw Path.GetRelativePath (OS-native separators); f.SourcePath is normalized to
+            // forward slashes, so both sides must be normalized before comparing (same reasoning
+            // BuildStructureHrefMap already applies). [Story 3.3 review]
+            _ => _docs.Keys.Any(k => string.Equals(PathUtil.NormalizeSlashes(k), src, StringComparison.OrdinalIgnoreCase))
+                ? PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(src))
+                : null,
         };
     }
 
@@ -984,11 +1016,20 @@ public sealed class SiteGenerator
 
         if (memlogs.Count == 0) return result; // strictly additive: the no-memlog primary picture is unchanged
 
+        // A root-level memlog (Dir.Length == 0) only stands in as every family's fallback when it's the ONLY
+        // memlog in the tree — there, it genuinely is the project's one decision journal. Once any nested,
+        // family-scoped memlog exists, the root one no longer blanket-applies to families with no closer
+        // match, so an unrelated project-root journal can't be misattributed as a specific family's own
+        // enrichment. [Story 3.3 review]
+        var hasScopedMemlog = memlogs.Any(ml => ml.Dir.Length > 0);
+
         foreach (var family in discovered.Families)
         {
             if (family.SourcePath is not { } rel) continue;
             var best = memlogs
-                .Where(ml => ml.Dir.Length == 0 || rel.StartsWith(ml.Dir + "/", StringComparison.OrdinalIgnoreCase))
+                .Where(ml => ml.Dir.Length == 0
+                    ? !hasScopedMemlog
+                    : rel.StartsWith(ml.Dir + "/", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(ml => ml.Dir.Length)
                 .Select(ml => (DateOnly?)ml.Updated)
                 .FirstOrDefault();

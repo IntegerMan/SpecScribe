@@ -234,7 +234,27 @@ public static class Charts
         foreach (var (status, label) in items)
         {
             sb.Append($"  <span class=\"sb-legend-item sb-{status}-item\" tabindex=\"0\">" +
-                      $"<span class=\"swatch sb-{status}-sw\"></span>{label}</span>\n");
+                      $"<span class=\"swatch sb-{status}-sw\"></span>{Html(label)}</span>\n");
+        }
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The shared donut legend — the donut half of Subtask 3.1's "sunburst **or** donut" interactive-
+    /// legend emphasis (UXO C3), mirroring <see cref="SunburstLegend"/>'s pattern exactly: one focusable entry
+    /// per status (<c>dn-&lt;status&gt;-item</c>, <c>tabindex="0"</c>) so the pure-CSS
+    /// <c>.donut-and-legend:has(.dn-&lt;status&gt;-item:hover/:focus-visible) …</c> rule in specscribe.css can
+    /// dim the non-matching <c>.donut-seg</c> slices and emphasize the match. The existing <c>swatch
+    /// {CssClass}</c> styling and "Label (Count)" text are unchanged — status stays readable at rest without
+    /// the affordance (never color-only). [Story 3.5 Task 3, UXO C3]</summary>
+    public static string DonutLegend(IEnumerable<(string Label, int Value, string CssClass)> items)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"donut-legend\">\n");
+        foreach (var (label, value, cssClass) in items)
+        {
+            sb.Append($"  <span class=\"dn-legend-item dn-{cssClass}-item\" tabindex=\"0\">" +
+                      $"<span class=\"swatch {cssClass}\"></span>{Html(label)} ({value})</span>\n");
         }
         sb.Append("</div>\n");
         return sb.ToString();
@@ -657,62 +677,90 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The dashboard refinement funnel — an HONEST elaboration pyramid, not a classic narrowing
-    /// funnel: planning counts GROW down the pipeline (few epics fan out into many stories and far more
-    /// tasks), so each stage's band width is proportional to its true count, normalized to the largest stage,
-    /// and is never rescaled to force a narrowing silhouette (that would overstate progress — Story 1.5's
-    /// "no chart overstates progress" rule, AC #2). "How much detail work remains" is carried by the per-stage
-    /// coverage sub-labels (epics broken into stories, stories with a task plan), and every stage shows its
-    /// real count as text (never width/color-only). A zero-count stage keeps its labeled row with a dashed
-    /// placeholder band, and a nonzero stage is floored to a visible width so a count of 1 beside hundreds
-    /// never renders as a hairline. Pure inline SVG + status-token CSS classes, no JS. [Story 3.6]</summary>
+    /// <summary>The dashboard refinement funnel — a SIDEWAYS funnel (stages flow left → right: epics →
+    /// drafted stories → task plans → tasks) whose band HEIGHTS are honest: each stage's band height is
+    /// proportional to its true count, normalized to the largest stage, and is never rescaled to force a
+    /// narrowing silhouette (that would overstate progress — Story 1.5's "no chart overstates progress" rule,
+    /// AC #2). Tapered connector polygons between the bands give the classic funnel read; because planning
+    /// counts GROW down the pipeline (few epics fan out into many tasks), the honest shape flares outward —
+    /// "how much detail work remains" is carried by the per-stage coverage sub-labels (epics broken into
+    /// stories, stories with a task plan), and every stage shows its real count as text (never
+    /// height/color-only). A zero-count stage keeps its labeled column with a dashed placeholder band, and a
+    /// nonzero stage is floored to a visible height so a count of 1 beside hundreds never renders as a
+    /// hairline. Pure inline SVG + status-token CSS classes, no JS. [Story 3.6]</summary>
     public static string RefinementFunnel(ProgressModel p)
     {
         if (p.EpicsTotal == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
 
         // Stage 3's coverage sub-label needs a story denominator; with no stories drafted yet, "0 of 0" would
-        // read as noise, so the sub-label is simply omitted (the 0 count row still renders).
-        var planSub = p.StoriesTotal > 0
-            ? $"{p.StoriesWithArtifact} of {p.StoriesTotal} {Plural(p.StoriesTotal, "story", "stories")} {Plural(p.StoriesWithArtifact, "has", "have")} a task plan"
+        // read as noise, so the sub-label is simply omitted (the 0 count column still renders). Subs are split
+        // into two visible lines so they fit under their column; the pointer <title> keeps the full phrase.
+        var planSubTop = p.StoriesTotal > 0
+            ? $"{p.StoriesWithArtifact} of {p.StoriesTotal} {Plural(p.StoriesTotal, "story", "stories")}"
             : null;
-        var stages = new (string Css, int Count, string Label, string? Sub)[]
+        var planSubBottom = p.StoriesTotal > 0
+            ? $"{Plural(p.StoriesWithArtifact, "has", "have")} a task plan"
+            : null;
+        var stages = new (string Css, int Count, string Label, string? SubTop, string? SubBottom)[]
         {
-            ("funnel-epics", p.EpicsTotal, Plural(p.EpicsTotal, "epic", "epics"), null),
+            ("funnel-epics", p.EpicsTotal, Plural(p.EpicsTotal, "epic", "epics"), null, null),
             ("funnel-stories", p.StoriesTotal, Plural(p.StoriesTotal, "story drafted", "stories drafted"),
-                $"{p.EpicsDrafted} of {p.EpicsTotal} {Plural(p.EpicsTotal, "epic", "epics")} broken into stories"),
+                $"{p.EpicsDrafted} of {p.EpicsTotal} {Plural(p.EpicsTotal, "epic", "epics")}", "broken into stories"),
             ("funnel-planned", p.StoriesWithArtifact,
-                Plural(p.StoriesWithArtifact, "story with a task plan", "stories with a task plan"), planSub),
-            ("funnel-tasks", p.TasksTotal, Plural(p.TasksTotal, "task planned", "tasks planned"), null),
+                Plural(p.StoriesWithArtifact, "story with a task plan", "stories with a task plan"), planSubTop, planSubBottom),
+            ("funnel-tasks", p.TasksTotal, Plural(p.TasksTotal, "task planned", "tasks planned"), null, null),
         };
 
-        // Geometry: bands centered in a 640-wide viewBox with 600 usable; nonzero stages floor at 46 so the
-        // smallest stage stays a visible, hoverable band. maxStage >= EpicsTotal >= 1, so no divide-by-zero.
-        const double usableWidth = 600, minWidth = 46, centerX = 320;
+        // Geometry: four 125-wide columns with 30-wide connector gaps in a 640×240 viewBox, bands centered on
+        // a shared midline. Nonzero stages floor at 12 tall so the smallest stage stays a visible, hoverable
+        // band; a zero stage gets a slightly thinner dashed placeholder. maxStage >= EpicsTotal >= 1, so the
+        // height math never divides by zero.
+        const double bandWidth = 125, gapWidth = 30, xStart = 25, midY = 132, maxHeight = 136, minHeight = 12, zeroHeight = 10;
         var maxStage = stages.Max(s => s.Count);
+        double BandHeight(int count) => count == 0 ? zeroHeight : Math.Max(minHeight, count / (double)maxStage * maxHeight);
+        double BandX(int i) => xStart + i * (bandWidth + gapWidth);
 
         var aria = "Refinement funnel: " + string.Join(", ", stages.Select(s => $"{s.Count} {s.Label}"));
 
         var sb = new StringBuilder();
         sb.Append("<div class=\"refinement-funnel\">\n");
-        sb.Append($"<svg class=\"funnel\" viewBox=\"0 0 640 252\" width=\"640\" height=\"252\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
+        sb.Append($"<svg class=\"funnel\" viewBox=\"0 0 640 240\" width=\"640\" height=\"240\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
 
-        var y = 10.0;
-        foreach (var (css, count, label, sub) in stages)
+        // Connector taper between adjacent bands first, so the colored bands render on top of the joints.
+        for (var i = 0; i < stages.Length - 1; i++)
         {
-            var subTspan = sub is null ? string.Empty : $"<tspan class=\"funnel-stage-sub\"> &middot; {Html(sub)}</tspan>";
-            sb.Append($"  <text x=\"{F(centerX)}\" y=\"{F(y + 11)}\" class=\"funnel-stage-text\" text-anchor=\"middle\">" +
-                      $"<tspan class=\"funnel-stage-count\">{count}</tspan> {Html(label)}{subTspan}</text>\n");
+            var x1 = BandX(i) + bandWidth;
+            var x2 = BandX(i + 1);
+            var hL = BandHeight(stages[i].Count);
+            var hR = BandHeight(stages[i + 1].Count);
+            sb.Append($"  <polygon class=\"funnel-connector\" points=\"{F(x1)},{F(midY - hL / 2)} {F(x2)},{F(midY - hR / 2)} " +
+                      $"{F(x2)},{F(midY + hR / 2)} {F(x1)},{F(midY + hL / 2)}\" />\n");
+        }
 
-            var width = count == 0 ? minWidth : Math.Max(minWidth, count / (double)maxStage * usableWidth);
+        for (var i = 0; i < stages.Length; i++)
+        {
+            var (css, count, label, subTop, subBottom) = stages[i];
+            var x = BandX(i);
+            var cx = x + bandWidth / 2;
+            var h = BandHeight(count);
+
+            sb.Append($"  <text x=\"{F(cx)}\" y=\"20\" class=\"funnel-stage-count\" text-anchor=\"middle\">{count}</text>\n");
+            sb.Append($"  <text x=\"{F(cx)}\" y=\"36\" class=\"funnel-stage-label\" text-anchor=\"middle\">{Html(label)}</text>\n");
+
             var cls = count == 0 ? $"funnel-band {css} funnel-zero" : $"funnel-band {css}";
-            var title = sub is null ? $"{count} {label}" : $"{count} {label} — {sub}";
-            sb.Append($"  <rect class=\"{cls}\" x=\"{F(centerX - width / 2)}\" y=\"{F(y + 20)}\" width=\"{F(width)}\" height=\"26\" rx=\"6\">" +
+            var title = subTop is null ? $"{count} {label}" : $"{count} {label} — {subTop} {subBottom}";
+            sb.Append($"  <rect class=\"{cls}\" x=\"{F(x)}\" y=\"{F(midY - h / 2)}\" width=\"{F(bandWidth)}\" height=\"{F(h)}\" rx=\"3\">" +
                       $"<title>{Html(title)}</title></rect>\n");
-            y += 62;
+
+            if (subTop is not null)
+            {
+                sb.Append($"  <text x=\"{F(cx)}\" y=\"216\" class=\"funnel-stage-sub\" text-anchor=\"middle\">{Html(subTop)}</text>\n");
+                sb.Append($"  <text x=\"{F(cx)}\" y=\"230\" class=\"funnel-stage-sub\" text-anchor=\"middle\">{Html(subBottom!)}</text>\n");
+            }
         }
         sb.Append("</svg>\n");
-        sb.Append("<div class=\"funnel-hint\">Each stage breaks the one above into finer detail &mdash; " +
-                  "band width tracks the real count; the sub-labels show how much refinement remains.</div>\n");
+        sb.Append("<div class=\"funnel-hint\">Left to right: each stage breaks the one before into finer detail &mdash; " +
+                  "band height tracks the real count; the sub-labels show how much refinement remains.</div>\n");
         sb.Append("</div>\n");
         return sb.ToString();
     }
@@ -734,6 +782,7 @@ public static class Charts
         return "<div class=\"coverage-meter-group\">" +
                $"<span class=\"coverage-count\">{count}</span>" +
                $"<span class=\"coverage-meter\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" " +
+               $"aria-valuetext=\"{pct}% ({present} of {total} present)\" " +
                $"aria-label=\"Planning artifact coverage: {present} of {total} present\"><span class=\"coverage-meter-fill\" style=\"width:{pct}%\"></span></span>" +
                $"<span class=\"coverage-pct\">{pct}%</span></div>";
     }
@@ -790,16 +839,21 @@ public static class Charts
                 }
                 else
                 {
-                    sb.Append($"    <div class=\"{cls}\" data-tip=\"{tip}\" tabindex=\"0\">{body}</div>\n");
+                    // No href (e.g. the page failed to generate) and nothing else interactive on the card, so
+                    // it stays non-focusable — a tabindex here would be a dead keyboard stop with no action.
+                    // The tooltip content is already present in the card body for sighted/AT users either way.
+                    sb.Append($"    <div class=\"{cls}\" data-tip=\"{tip}\">{body}</div>\n");
                 }
             }
             else
             {
                 // Missing card: the "what it is" sentence, then a copyable create command (or plain guidance
-                // when the detected module exposes none). Not a link — the action is "create it", not "open it".
+                // when the detected module exposes none). The outer card itself isn't a tab stop — the real
+                // interactive control is whatever BmadCommands.InlineGuidance renders inside it, so a keyboard
+                // user reaches one real action per card, not an inert card stop followed by the actual control.
                 var cta = BmadCommands.InlineGuidance(family.CreateCommand, "Create it with",
                     "Add this artifact through your planning workflow.");
-                sb.Append($"    <div class=\"coverage-card js-tip {stateClass} {accent}\" data-tip=\"{tip}\" tabindex=\"0\">" +
+                sb.Append($"    <div class=\"coverage-card js-tip {stateClass} {accent}\" data-tip=\"{tip}\">" +
                           $"{head}{desc}<div class=\"coverage-cta\">{cta}</div></div>\n");
             }
         }

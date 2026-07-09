@@ -484,15 +484,14 @@ public static class EpicsTemplater
         sb.Append("</div>\n\n");
 
         sb.Append("<div class=\"chart-panel\">\n<h3>Epic Status</h3>\n<div class=\"donut-and-legend\">\n");
-        sb.Append(Charts.Donut(new (string, int, string)[]
+        var epicStatusSegments = new (string Label, int Value, string CssClass)[]
         {
             ("Drafted", progress.EpicsDrafted, "drafted"),
             ("Pending", progress.EpicsPending, "pending"),
-        }, ariaLabel: $"Epic status: {progress.EpicsDrafted} drafted, {progress.EpicsPending} pending"));
-        sb.Append("<div class=\"donut-legend\">\n");
-        sb.Append($"  <span><span class=\"swatch drafted\"></span>Drafted ({progress.EpicsDrafted})</span>\n");
-        sb.Append($"  <span><span class=\"swatch pending\"></span>Pending ({progress.EpicsPending})</span>\n");
-        sb.Append("</div>\n</div>\n</div>\n\n");
+        };
+        sb.Append(Charts.Donut(epicStatusSegments, ariaLabel: $"Epic status: {progress.EpicsDrafted} drafted, {progress.EpicsPending} pending"));
+        sb.Append(Charts.DonutLegend(epicStatusSegments));
+        sb.Append("</div>\n</div>\n\n");
 
         // Full width, not paired with the compact donut above — a 22-card mosaic stretched to match a
         // small donut's height (or vice versa) just leaves one of them mostly empty.

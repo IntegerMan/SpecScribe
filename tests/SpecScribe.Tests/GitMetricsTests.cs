@@ -283,4 +283,46 @@ public class GitMetricsTests
         Assert.Empty(empty.Hotspots);
         Assert.Empty(empty.Coupling);
     }
+
+    [Fact]
+    public void ParseNumstatLog_CollapsesFullPathRenameToTheNewPath()
+    {
+        // git's numstat rename form with no shared prefix/suffix: "old => new" as one tab-delimited field.
+        var log = Sentinel + "hash0\n" + "0\t0\told/Name.cs => new/Renamed.cs\n";
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        Assert.Contains(("new/Renamed.cs", 1), deep.Hotspots);
+        Assert.DoesNotContain(deep.Hotspots, h => h.Path.Contains("=>"));
+    }
+
+    [Fact]
+    public void ParseNumstatLog_CollapsesBraceAbbreviatedRenameToTheNewPath()
+    {
+        // git's common-prefix/suffix abbreviated rename form: "src/{old.css => new.css}".
+        var log = Sentinel + "hash0\n" + "0\t0\tsrc/{old.css => new.css}\n";
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        Assert.Contains(("src/new.css", 1), deep.Hotspots);
+        Assert.DoesNotContain(deep.Hotspots, h => h.Path.Contains("{") || h.Path.Contains("=>"));
+    }
+
+    [Fact]
+    public void ParseNumstatLog_RenamedPathsCoupleCorrectlyWithSiblingChanges()
+    {
+        // A rename alongside a normal edit in the same commit must pair on the *resolved* new path, not the
+        // raw arrow text, so coupling reflects real files.
+        var log = Sentinel + "hash0\n" +
+            "0\t0\told/Name.cs => new/Renamed.cs\n" +
+            "1\t1\tOther.cs\n" +
+            Sentinel + "hash1\n" +
+            "0\t0\tnew/Renamed.cs\n" +
+            "1\t1\tOther.cs\n";
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        // Canonical unordered key is ordinal-sorted; "Other.cs" < "new/Renamed.cs" ordinally ('O' < 'n').
+        Assert.Contains(("Other.cs", "new/Renamed.cs", 2), deep.Coupling);
+    }
 }
