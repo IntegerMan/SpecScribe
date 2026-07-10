@@ -48,6 +48,77 @@ public class HtmlTemplaterTests
         Assert.Contains("Read the project overview.", html);
     }
 
+    private static DocModel Doc(string sourceRel, string title) => new()
+    {
+        SourceRelativePath = sourceRel,
+        OutputRelativePath = Path.ChangeExtension(sourceRel, ".html"),
+        Title = title,
+        Frontmatter = Frontmatter.Empty,
+        BodyHtml = string.Empty,
+        Headings = Array.Empty<Heading>(),
+    };
+
+    [Fact]
+    public void RenderIndex_UnrecognizedTopLevelFoldersGetOwnTitledBands()
+    {
+        // Story 4.2 Task 3: docs under folders outside the well-known set degrade to one coherently-titled
+        // band per folder (humanized name), never a silent "Other" dump and never a BMad title.
+        var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe");
+        var html = HtmlTemplater.RenderIndex(
+            docs: new[]
+            {
+                Doc("design-notes/ideas.md", "Ideas"),
+                Doc("design-notes/palette.md", "Palette"),
+                Doc("research/paper.md", "Paper"),
+                Doc("notes.md", "Root Notes"),
+            },
+            nav: nav,
+            progress: ProgressModel.Empty,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        Assert.Contains("Design Notes</div>", html);
+        Assert.Contains("Research</div>", html);
+        Assert.DoesNotContain(">Other</div>", html);
+
+        // The root doc still flows through Overview, and both folder docs sit in the Design Notes band.
+        Assert.Contains("Overview</div>", html);
+        var designNotes = html.IndexOf("Design Notes</div>", StringComparison.Ordinal);
+        var research = html.IndexOf("Research</div>", StringComparison.Ordinal);
+        Assert.True(designNotes < research, "unknown-folder bands are ordered alphabetically");
+        Assert.Contains("href=\"design-notes/ideas.html\"", html);
+        Assert.Contains("href=\"research/paper.html\"", html);
+    }
+
+    [Fact]
+    public void RenderIndex_WellKnownFoldersKeepFriendlyTitlesAndOrder()
+    {
+        // The known set renders exactly as always: friendly titles in fixed order, no humanized duplicates.
+        var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe");
+        var html = HtmlTemplater.RenderIndex(
+            docs: new[]
+            {
+                Doc("implementation-artifacts/deferred-work-notes.md", "Deferred Notes"),
+                Doc("specs/spec-x/rendering.md", "Rendering Spec"),
+                Doc("planning-artifacts/plan.md", "Plan"),
+            },
+            nav: nav,
+            progress: ProgressModel.Empty,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        var planning = html.IndexOf("Planning Artifacts</div>", StringComparison.Ordinal);
+        var specs = html.IndexOf("Spec Kernel</div>", StringComparison.Ordinal);
+        var impl = html.IndexOf("Implementation Artifacts</div>", StringComparison.Ordinal);
+        Assert.True(planning >= 0 && specs > planning && impl > specs,
+            $"expected Planning < Spec Kernel < Implementation, got {planning}/{specs}/{impl}");
+        Assert.DoesNotContain(">Other</div>", html);
+    }
+
     [Fact]
     public void RenderIndex_EmitsSkipLinkAndSingleMainLandmark()
     {

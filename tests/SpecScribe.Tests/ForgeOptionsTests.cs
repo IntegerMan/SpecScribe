@@ -62,6 +62,65 @@ public class ForgeOptionsTests : IDisposable
     }
 
     [Fact]
+    public void Resolve_AdrProbe_FindsConventionalHomeWhenDefaultAbsent()
+    {
+        // No docs/adrs: the ordered probe resolves the first conventional home with markdown content. [Story 4.2 Task 1]
+        Directory.CreateDirectory(Path.Combine(Repo, "docs", "decisions"));
+        File.WriteAllText(Path.Combine(Repo, "docs", "decisions", "0001-first.md"), "# First\n");
+
+        var options = ForgeOptions.Resolve(startDirectory: Repo);
+        Assert.Equal(Path.Combine(Repo, "docs", "decisions"), options.AdrSourceRoot);
+        Assert.False(options.AdrSourceExplicit);
+    }
+
+    [Fact]
+    public void Resolve_AdrProbe_CanonicalDefaultWinsWhenPresent()
+    {
+        // docs/adrs exists (even alongside another convention): today's default branch, byte-identical resolution.
+        Directory.CreateDirectory(Path.Combine(Repo, "docs", "adrs"));
+        Directory.CreateDirectory(Path.Combine(Repo, "docs", "decisions"));
+        File.WriteAllText(Path.Combine(Repo, "docs", "decisions", "0001-first.md"), "# First\n");
+
+        var options = ForgeOptions.Resolve(startDirectory: Repo);
+        Assert.Equal(Path.Combine(Repo, "docs", "adrs"), options.AdrSourceRoot);
+    }
+
+    [Fact]
+    public void Resolve_AdrProbe_ExplicitAdrsAlwaysWinsAndNeverProbes()
+    {
+        Directory.CreateDirectory(Path.Combine(Repo, "docs", "decisions"));
+        File.WriteAllText(Path.Combine(Repo, "docs", "decisions", "0001-first.md"), "# First\n");
+
+        var explicitDir = Path.Combine(_root, "my-adrs");
+        var options = ForgeOptions.Resolve(source: Path.Combine(Repo, "_bmad-output"), adrs: explicitDir);
+        Assert.Equal(explicitDir, options.AdrSourceRoot);
+        Assert.True(options.AdrSourceExplicit);
+    }
+
+    [Fact]
+    public void Resolve_AdrProbe_SkipsEmptyCandidatesAndSeesNestedRecordsOneLevelDeep()
+    {
+        // docs/adr exists but is empty; docs/decisions holds only a nested (one-level) record — the probe
+        // must skip the empty candidate and count the nested one as content. [Story 4.2 Task 1]
+        Directory.CreateDirectory(Path.Combine(Repo, "docs", "adr"));
+        Directory.CreateDirectory(Path.Combine(Repo, "docs", "decisions", "2024"));
+        File.WriteAllText(Path.Combine(Repo, "docs", "decisions", "2024", "0007-nested.md"), "# Nested\n");
+
+        var options = ForgeOptions.Resolve(startDirectory: Repo);
+        Assert.Equal(Path.Combine(Repo, "docs", "decisions"), options.AdrSourceRoot);
+    }
+
+    [Fact]
+    public void Resolve_AdrProbe_NothingFoundKeepsCanonicalDefaultSilently()
+    {
+        // No conventional home anywhere: the canonical (absent) default is kept — ADRs are optional and a
+        // fruitless probe stays silent, unlike an explicit-but-missing --adrs. [Story 4.2 Task 1]
+        var options = ForgeOptions.Resolve(startDirectory: Repo);
+        Assert.Equal(Path.Combine(Repo, "docs", "adrs"), options.AdrSourceRoot);
+        Assert.False(options.AdrSourceExplicit);
+    }
+
+    [Fact]
     public void Resolve_ReadsProjectNameFromBmadConfig()
     {
         Directory.CreateDirectory(Path.Combine(Repo, "_bmad"));

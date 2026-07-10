@@ -33,8 +33,10 @@ public sealed class WorkInventory
 
         foreach (var doc in docs)
         {
+            // Location-tolerant since Story 4.2: any implementation-artifacts/ ancestor segment classifies
+            // (shared adapter convention), so a project nesting the folder deeper keeps its work inventory.
             var norm = PathUtil.NormalizeSlashes(doc.SourceRelativePath);
-            if (!norm.StartsWith("implementation-artifacts/", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!BmadArtifactAdapter.IsUnderImplementationArtifacts(norm)) continue;
 
             var slash = norm.LastIndexOf('/');
             var fileName = slash >= 0 ? norm[(slash + 1)..] : norm;

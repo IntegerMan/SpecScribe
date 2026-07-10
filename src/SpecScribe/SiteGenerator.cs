@@ -13,8 +13,15 @@ public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativeP
 /// nav, and epics/story pages in sync.</summary>
 public sealed class SiteGenerator
 {
-    private static readonly Regex AdrNumberPattern = new(@"^(?<num>\d+)", RegexOptions.Compiled);
+    // ADR numbers derive from several mainstream filename schemes — 0001-x, ADR-0001-x, adr-1-x, adr_001_x,
+    // 1-x: an optional adr token, separators, then the first integer. A filename with no derivable number
+    // still renders (sorted last) rather than dropping. [Story 4.2 Task 2]
+    private static readonly Regex AdrNumberPattern = new(@"^(?:adr)?[-_\s]*(?<num>\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex AdrStatusPattern = new(@"^\*\*Status:\*\*\s*(?<status>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+
+    // The MADR-style "## Status" (or "### Status") section heading whose next non-blank line carries the
+    // status value — the second of the three tolerated status shapes. [Story 4.2 Task 2]
+    private static readonly Regex AdrStatusHeadingPattern = new(@"^#{2,3}\s+Status\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex MarkdownLinkPattern = new(@"\[(?<text>[^\]]+)\]\([^)]+\)", RegexOptions.Compiled);
 
     private readonly ForgeOptions _options;
@@ -115,6 +122,11 @@ public sealed class SiteGenerator
             // Adapter diagnostics surface on the same event channel per-file failures always used — the typed
             // AdapterDiagnostic is the only report for a failure the adapter caught (never double-reported).
             events.AddRange(MapDiagnostics(bundle.Diagnostics));
+
+            // Unrecognized top-level source folders render coherently (each gets its own home-index band, see
+            // HtmlTemplater.RenderIndex) AND are reported as categorized non-fatal structure notices on the
+            // same diagnostic channel — the input Story 4.8's diagnostics page will render. [Story 4.2 Task 5]
+            events.AddRange(MapDiagnostics(UnrecognizedTopLevelFolders(sourceRelatives)));
 
             // Render the epic/story/requirements pages only when the whole ingest chain produced its models —
             // the exact set of writes the previous single try/catch performed after a successful parse.
@@ -266,19 +278,13 @@ public sealed class SiteGenerator
         _coverage = BuildArtifactCoverage(EnumerateSourceFiles().Select(ToSourceRelative).ToList());
     }
 
-    /// <summary>True for epics.md itself, or any file under implementation-artifacts/ — both feed the
-    /// epics/story pages, so either kind of change should trigger a full <see cref="RegenerateEpics"/>
-    /// rather than the generic single-file path.</summary>
-    public bool IsEpicsRelated(string sourceFullPath)
-    {
-        if (string.Equals(Path.GetFileName(sourceFullPath), "epics.md", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var parentDir = Path.GetFileName(Path.GetDirectoryName(sourceFullPath) ?? string.Empty);
-        return string.Equals(parentDir, "implementation-artifacts", StringComparison.OrdinalIgnoreCase);
-    }
+    /// <summary>True for the epics file itself, or any file under an implementation-artifacts/ ancestor —
+    /// both feed the epics/story pages, so either kind of change should trigger a full
+    /// <see cref="RegenerateEpics"/> rather than the generic single-file path. Classifies via the adapter's
+    /// shared conventions so watch routing can never disagree with what ingestion discovers. [Story 4.2 Task 4]</summary>
+    public bool IsEpicsRelated(string sourceFullPath) =>
+        BmadArtifactAdapter.IsEpicsFile(sourceFullPath)
+        || BmadArtifactAdapter.IsUnderImplementationArtifacts(sourceFullPath);
 
     /// <summary>Re-parses epics.md and rewrites epics.html + every epics/epic-N.html + epics/story-N-M.html.
     /// Also refreshes the nav and the artifact map, so added/removed/renamed story files self-heal without
@@ -304,7 +310,7 @@ public sealed class SiteGenerator
             {
                 RefreshCoverage();
                 WriteIndex(nav);
-                return new GenerationEvent(GenerationOutcome.Skipped, "epics.md", sw.Elapsed, "epics.md not found");
+                return new GenerationEvent(GenerationOutcome.Skipped, BmadArtifactAdapter.EpicsFileName, sw.Elapsed, $"{BmadArtifactAdapter.EpicsFileName} not found");
             }
 
             // Same partial-failure caching rules as GenerateAll: a broken mid-edit save must leave the last
@@ -369,9 +375,13 @@ public sealed class SiteGenerator
         }
     }
 
-    /// <summary>Renders each hand-authored record under <c>docs/adrs</c> into <c>SpecScribeOutput/adrs</c>. README.md
-    /// becomes the landing page (index.html); numbered records also become cards on the home index. The whole
-    /// ADR output directory is rebuilt each pass so a deleted or renamed record can't leave a stale page behind.</summary>
+    /// <summary>Renders each hand-authored record under the resolved ADR root into <c>SpecScribeOutput/adrs</c>.
+    /// The ADR root's own README.md becomes the landing page (index.html); every other record becomes a card
+    /// on the home index — numbered or not (an underivable number sorts the card last rather than dropping it,
+    /// AC #2), with README/template scaffolding files still rendering for cross-links but never carded. Records
+    /// nested one level (e.g. <c>decisions/2024/0007-x.md</c>) keep their subpath in the output so authored
+    /// relative cross-links survive the .md → .html swap. The whole ADR output directory is rebuilt each pass
+    /// so a deleted or renamed record can't leave a stale page behind. [Story 4.2 Tasks 1–2]</summary>
     private List<GenerationEvent> GenerateAdrsInternal(SiteNav nav)
     {
         var events = new List<GenerationEvent>();
@@ -387,13 +397,13 @@ public sealed class SiteGenerator
         {
             var sw = Stopwatch.StartNew();
             var fileName = Path.GetFileName(file);
-            var isReadme = string.Equals(fileName, "README.md", StringComparison.OrdinalIgnoreCase);
+            var relativeToRoot = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.AdrSourceRoot, file));
+            // README-as-landing applies to the ADR root's README only; a nested README renders as a regular page.
+            var isReadme = string.Equals(relativeToRoot, "README.md", StringComparison.OrdinalIgnoreCase);
 
-            // README is the landing page; numbered files are the records; everything else (e.g. TEMPLATE.md)
-            // still renders so its cross-links resolve, but never becomes a card.
-            var outputName = isReadme ? "index.html" : Path.ChangeExtension(fileName, ".html");
+            var outputName = isReadme ? "index.html" : Path.ChangeExtension(relativeToRoot, ".html");
             var outputRelative = PathUtil.NormalizeSlashes($"{ForgeOptions.AdrOutputSubdir}/{outputName}");
-            var sourceRelative = PathUtil.NormalizeSlashes($"{ForgeOptions.AdrOutputSubdir}/{fileName}");
+            var sourceRelative = PathUtil.NormalizeSlashes($"{ForgeOptions.AdrOutputSubdir}/{relativeToRoot}");
 
             try
             {
@@ -405,19 +415,30 @@ public sealed class SiteGenerator
                     OutputRelativePath = parsed.OutputRelativePath,
                     Title = parsed.Title,
                     Frontmatter = parsed.Frontmatter,
-                    BodyHtml = AdrLinkRewriter.Rewrite(parsed.BodyHtml),
+                    BodyHtml = AdrLinkRewriter.Rewrite(parsed.BodyHtml, PathUtil.RelativePrefix(outputRelative)),
                     Headings = parsed.Headings,
                     HasMermaid = parsed.HasMermaid,
                 };
 
-                var outputFullPath = Path.Combine(_options.OutputRoot, ForgeOptions.AdrOutputSubdir, outputName);
+                var outputFullPath = Path.Combine(_options.OutputRoot, ForgeOptions.AdrOutputSubdir, outputName.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(outputFullPath)!);
                 File.WriteAllText(outputFullPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
 
-                var number = ParseAdrNumber(fileName);
-                if (!isReadme && number is not null)
+                if (IsAdrRecordFile(relativeToRoot))
                 {
-                    entries.Add(new AdrEntry(doc.Title, outputRelative, sourceRelative, ExtractAdrStatus(raw), number));
+                    var number = ParseAdrNumber(fileName);
+                    entries.Add(new AdrEntry(doc.Title, outputRelative, sourceRelative, ExtractAdrStatus(raw, parsed.Frontmatter), number));
+                    if (number is null)
+                    {
+                        // The unnumbered shape is tolerated, not silent: one categorized non-fatal notice on
+                        // the same channel adapter diagnostics ride, for Story 4.8's diagnostics page to
+                        // render. The record itself still generated above. [Story 4.2 Task 5]
+                        events.AddRange(MapDiagnostics(new[]
+                        {
+                            new AdapterDiagnostic(AdapterDiagnosticCategory.Unsupported, sourceRelative,
+                                "no ADR number derivable from the filename; record rendered unnumbered and sorted last"),
+                        }));
+                    }
                 }
 
                 events.Add(new GenerationEvent(GenerationOutcome.Generated, sourceRelative, sw.Elapsed));
@@ -428,8 +449,30 @@ public sealed class SiteGenerator
             }
         }
 
-        _adrs = entries.OrderBy(e => e.Number).ToList();
+        // Numbered records keep their numeric order; unnumbered ones sort after them, alphabetically by
+        // title — deterministic without inventing a number. [Story 4.2 Task 2]
+        _adrs = entries
+            .OrderBy(e => e.Number is null)
+            .ThenBy(e => e.Number)
+            .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         return events;
+    }
+
+    /// <summary>True when an ADR-tree file (path relative to the ADR root) is a decision RECORD — i.e. a card
+    /// on the home index and a hit for the <see cref="AdrsExist"/> nav gate. READMEs (landing/index prose at
+    /// any depth) and template scaffolding files still render as pages so cross-links resolve, but are never
+    /// records — the same treatment TEMPLATE.md always had. [Story 4.2 Task 2]</summary>
+    private static bool IsAdrRecordFile(string relativeToRoot)
+    {
+        if (string.Equals(Path.GetFileName(relativeToRoot), "README.md", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var stem = Path.GetFileNameWithoutExtension(relativeToRoot);
+        return !string.Equals(stem, "template", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(stem, "adr-template", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Emits one <c>commits/{yyyy-MM-dd}.html</c> page per linked day (the exact set the heatmap
@@ -685,6 +728,23 @@ public sealed class SiteGenerator
                 : GenerationOutcome.Skipped,
             d.RelativePath, TimeSpan.Zero, d.Message));
 
+    /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per top-level source folder
+    /// outside the well-known home-index set — the "unrecognized structure degrades, visibly" half of the
+    /// grouping contract. Derived from the source tree (not the rendered bands) so a folder whose docs were
+    /// all consumed into dedicated surfaces still reports its unrecognized shape once. [Story 4.2 Task 5]</summary>
+    private static IReadOnlyList<AdapterDiagnostic> UnrecognizedTopLevelFolders(IReadOnlyList<string> sourceRelatives) =>
+        sourceRelatives
+            .Select(PathUtil.NormalizeSlashes)
+            .Where(p => p.Contains('/'))
+            .Select(p => p[..p.IndexOf('/')])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(f => !HtmlTemplater.IsWellKnownTopLevelFolder(f))
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .Select(f => new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Unsupported, f + "/",
+                "unrecognized top-level folder; its documents render in their own home-index section"))
+            .ToList();
+
     /// <summary>Caches the adapter-ingested retros (already ordered by epic, then filename) so
     /// <see cref="EpicRetroMap"/> is available to the epic/story pages and the sprint/home surfaces. The
     /// dedicated pages are written later by <see cref="RenderRetroPages"/>. [Story 2.3 retro pages; ingest
@@ -779,8 +839,7 @@ public sealed class SiteGenerator
         // was actually produced (epics.md parsed into a model).
         if (_epicsModel is not null)
         {
-            var epicsSource = sourceRelatives.FirstOrDefault(p =>
-                string.Equals(Path.GetFileName(p), "epics.md", StringComparison.OrdinalIgnoreCase));
+            var epicsSource = sourceRelatives.FirstOrDefault(BmadArtifactAdapter.IsEpicsFile);
             if (epicsSource is not null)
             {
                 map[PathUtil.NormalizeSlashes(epicsSource)] = SiteNav.EpicsOutputPath;
@@ -945,9 +1004,14 @@ public sealed class SiteGenerator
                 .ToList()
             : new List<string>();
 
+    /// <summary>Markdown files in the resolved ADR root, plus ONE level of subdirectories — enough for nested
+    /// year/topic schemes (<c>decisions/2024/0007-x.md</c>) without walking a whole tree of unrelated prose
+    /// into the ADR section (deliberately bounded — the same window the ForgeOptions probe reads). [Story 4.2 Task 1]</summary>
     private List<string> EnumerateAdrFiles() =>
         Directory.Exists(_options.AdrSourceRoot)
             ? Directory.EnumerateFiles(_options.AdrSourceRoot, "*.md", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.EnumerateDirectories(_options.AdrSourceRoot)
+                    .SelectMany(d => Directory.EnumerateFiles(d, "*.md", SearchOption.TopDirectoryOnly)))
                 .Where(p => !IsIgnored(p))
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .ToList()
@@ -1114,7 +1178,11 @@ public sealed class SiteGenerator
         return result;
     }
 
-    private bool AdrsExist() => EnumerateAdrFiles().Any(f => ParseAdrNumber(Path.GetFileName(f)) is not null);
+    /// <summary>The nav/section gate: any renderable RECORD present (numbered or not), rather than the old
+    /// "any numbered file" — an ADR home holding only non-standard-named records still surfaces its section
+    /// (AC #2), while a README-only (or template-only) directory still gates the section off. [Story 4.2 Task 2]</summary>
+    private bool AdrsExist() => EnumerateAdrFiles()
+        .Any(f => IsAdrRecordFile(PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.AdrSourceRoot, f))));
 
     private static int? ParseAdrNumber(string fileName)
     {
@@ -1122,13 +1190,39 @@ public sealed class SiteGenerator
         return m.Success && int.TryParse(m.Groups["num"].Value, out var n) ? n : null;
     }
 
-    /// <summary>Pulls the "**Status:** …" line out of an ADR body and flattens any markdown link in it to plain
-    /// text (e.g. "Superseded by [0002](0002-x.md)" → "Superseded by 0002"), for the index card.</summary>
-    private static string? ExtractAdrStatus(string raw)
+    /// <summary>Derives an ADR's status tolerantly, first derivable value wins: (a) the "**Status:** …" bold
+    /// line, (b) a MADR-style "## Status" section's first non-blank line, (c) a <c>status:</c> frontmatter
+    /// key. Markdown links flatten to plain text (e.g. "Superseded by [0002](0002-x.md)" → "Superseded by
+    /// 0002") and wrapping bold markers are stripped, for the index card. Not derivable ⇒ null — the record
+    /// still renders, just without a status badge (AC #2). The raw status STRING renders as-is; mapping status
+    /// vocabulary to the canonical model is Story 8.1's domain, not this method's. [Story 4.2 Task 2]</summary>
+    private static string? ExtractAdrStatus(string raw, Frontmatter frontmatter)
     {
-        var m = AdrStatusPattern.Match(raw);
-        if (!m.Success) return null;
-        var status = MarkdownLinkPattern.Replace(m.Groups["status"].Value, "${text}").Trim();
+        var bold = AdrStatusPattern.Match(raw);
+        if (bold.Success && CleanAdrStatus(bold.Groups["status"].Value) is { } fromBoldLine)
+        {
+            return fromBoldLine;
+        }
+
+        var heading = AdrStatusHeadingPattern.Match(raw);
+        if (heading.Success)
+        {
+            foreach (var line in raw[(heading.Index + heading.Length)..].Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.Length == 0) continue;
+                if (trimmed.StartsWith('#')) break; // empty Status section — fall through to frontmatter
+                if (CleanAdrStatus(trimmed) is { } fromHeading) return fromHeading;
+                break;
+            }
+        }
+
+        return frontmatter.Status is { Length: > 0 } fromFrontmatter ? CleanAdrStatus(fromFrontmatter) : null;
+    }
+
+    private static string? CleanAdrStatus(string value)
+    {
+        var status = MarkdownLinkPattern.Replace(value, "${text}").Trim().Trim('*').Trim();
         return status.Length == 0 ? null : status;
     }
 

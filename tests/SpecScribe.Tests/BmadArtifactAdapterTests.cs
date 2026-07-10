@@ -257,6 +257,26 @@ public class BmadArtifactAdapterTests : IDisposable
     }
 
     [Fact]
+    public void IngestEpics_NestedImplementationArtifacts_StillResolvesStoryArtifacts()
+    {
+        // Location tolerance (Story 4.2 Task 4): implementation-artifacts/ nested one level deeper still
+        // classifies its story artifacts — discovery keys on the ancestor segment, not a fixed parent dir.
+        var nestedDir = Path.Combine(Source, "tracking", "implementation-artifacts");
+        Directory.CreateDirectory(nestedDir);
+        File.Move(
+            Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"),
+            Path.Combine(nestedDir, "1-1-foundation.md"));
+
+        var ingest = new BmadArtifactAdapter().IngestEpics(Options(), SourceFiles(), Project);
+
+        Assert.NotNull(ingest.Epics);
+        Assert.True(ingest.StoryArtifactsById.ContainsKey("1.1"));
+        var story = Assert.Single(ingest.Epics!.Epics).Stories.Single(s => s.Id == "1.1");
+        Assert.Equal("epics/story-1-1.html", story.ArtifactOutputPath);
+        Assert.Contains(Path.Combine("tracking", "implementation-artifacts", "1-1-foundation.md"), ingest.ConsumedSourceRelatives);
+    }
+
+    [Fact]
     public void Ingest_IgnoredFiles_AreNeitherIngestedNorDiagnosed()
     {
         // An editor temp matching the retro name pattern, and nonexistent to boot — if the ignore filter

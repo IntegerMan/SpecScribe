@@ -73,7 +73,6 @@ public sealed class ArtifactCoverage
     // (PRD, Brief, Architecture spine, UX design + experience) are keyed off those constants below rather than
     // re-hard-coded, following the project's one-classifier/one-seam discipline.
     private const string SpecKernelFile = "SPEC.md";
-    private const string EpicsFile = "epics.md";
     private const string RequirementsFile = "requirements.md";
     private const string RequirementsCatalogFile = "requirements-catalog.md";
 
@@ -99,7 +98,7 @@ public sealed class ArtifactCoverage
         new FamilySpec("Spec Kernel", "Spec", "The canonical spec contract downstream work is built from.", "spec",
             p => NameMatches(p, SpecKernelFile) && HasSegment(p, "specs")),
         new FamilySpec("Epics", "Epics", "The epic and story breakdown of the work.", "create-epics-and-stories",
-            NameIs(EpicsFile)),
+            NameIs(BmadArtifactAdapter.EpicsFileName)),
         // Stories: at least one epic/story artifact file (implementation-artifacts/<n>-<n>-*.md).
         new FamilySpec("Stories", "Implementation Artifacts", "Per-story implementation plans.", "create-story",
             IsStoryArtifact),
@@ -208,11 +207,9 @@ public sealed class ArtifactCoverage
         if (slash < 0) return false;
         if (!StoryFileName.IsMatch(normalizedPath[(slash + 1)..])) return false;
 
-        // Require the immediate parent folder to be implementation-artifacts/ (same scoping as
-        // SiteGenerator.IsEpicsRelated) so a like-named file elsewhere in the tree isn't miscounted.
-        var parent = normalizedPath[..slash];
-        var parentSlash = parent.LastIndexOf('/');
-        var parentName = parentSlash >= 0 ? parent[(parentSlash + 1)..] : parent;
-        return string.Equals(parentName, "implementation-artifacts", StringComparison.OrdinalIgnoreCase);
+        // Require an implementation-artifacts/ ancestor (any depth — the same shared adapter convention
+        // SiteGenerator.IsEpicsRelated and BuildArtifactMap classify by, so coverage can never claim stories
+        // the epics pages don't render) while a like-named file elsewhere in the tree isn't miscounted.
+        return BmadArtifactAdapter.IsUnderImplementationArtifacts(normalizedPath);
     }
 }

@@ -50,6 +50,21 @@ public sealed class ForgeOptions
 
     /// <summary>Subdirectory of the output root where rendered ADR pages land.</summary>
     public const string AdrOutputSubdir = "adrs";
+
+    /// <summary>The conventional ADR homes probed (in this order, first match with any markdown content wins)
+    /// when <c>--adrs</c> is not given AND the canonical default (<c>docs/adrs</c>) is absent. Detection over
+    /// configuration: a repo using another mainstream convention just works, while the canonical default stays
+    /// the first-checked branch so this repo's own resolution is byte-identical. Probing finds nothing ⇒ the
+    /// default (absent) path is kept and the ADR section simply omits, as today. [Story 4.2 Task 1]</summary>
+    public static readonly IReadOnlyList<string> AdrFallbackProbeSubdirs = new[]
+    {
+        Path.Combine("docs", "adr"),
+        Path.Combine("docs", "decisions"),
+        Path.Combine("docs", "architecture", "decisions"),
+        Path.Combine("docs", "architecture", "adr"),
+        "adr",
+        "adrs",
+    };
     public static readonly TimeSpan DebounceInterval = TimeSpan.FromMilliseconds(400);
 
     /// <summary>Resolves paths for a run. Explicit values win; anything omitted is derived from the repo root,
@@ -97,13 +112,61 @@ public sealed class ForgeOptions
         {
             RepoRoot = repoRoot,
             SourceRoot = sourceRoot,
-            AdrSourceRoot = adrs is { Length: > 0 } ? Path.GetFullPath(adrs) : Path.Combine(repoRoot, "docs", "adrs"),
+            AdrSourceRoot = adrs is { Length: > 0 } ? Path.GetFullPath(adrs) : ResolveAdrSourceRoot(repoRoot),
             AdrSourceExplicit = adrs is { Length: > 0 },
             OutputRoot = output is { Length: > 0 } ? Path.GetFullPath(output) : Path.Combine(repoRoot, OutputDirName),
             SiteTitle = projectName is { Length: > 0 } ? projectName : ReadProjectName(repoRoot) ?? DefaultSiteTitle,
             IncludeReadme = includeReadme,
             DeepGitAnalytics = deepGitAnalytics,
         };
+    }
+
+    /// <summary>Resolves the implicit ADR root: the canonical <c>docs/adrs</c> whenever that directory exists
+    /// (even if empty — today's behavior, untouched), otherwise the first
+    /// <see cref="AdrFallbackProbeSubdirs"/> candidate holding at least one markdown file within one directory
+    /// level. Resolved once here, at option time, so watch routing (<c>SiteGenerator.IsAdr</c> compares
+    /// against this same path) and generation can never disagree about where ADRs live. A probe that finds
+    /// nothing keeps the canonical (absent) default silently — ADRs are optional; only an EXPLICIT missing
+    /// <c>--adrs</c> warns (see <see cref="AdrSourceExplicit"/>). [Story 4.2 Task 1]</summary>
+    private static string ResolveAdrSourceRoot(string repoRoot)
+    {
+        var canonical = Path.Combine(repoRoot, "docs", "adrs");
+        if (Directory.Exists(canonical))
+        {
+            return canonical;
+        }
+
+        foreach (var subdir in AdrFallbackProbeSubdirs)
+        {
+            var candidate = Path.Combine(repoRoot, subdir);
+            if (HasMarkdownWithinOneLevel(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return canonical;
+    }
+
+    /// <summary>True when <paramref name="dir"/> holds at least one non-ignored <c>*.md</c> directly or in a
+    /// direct subdirectory — the same one-level-deep window the ADR enumeration reads, so a probe never
+    /// resolves to a directory generation would then find empty. Bounded on purpose (never a whole-tree walk;
+    /// a <c>docs/</c> full of prose can't be swallowed as ADRs). Never throws: an unreadable candidate is
+    /// treated as empty. [Story 4.2 Task 1]</summary>
+    private static bool HasMarkdownWithinOneLevel(string dir)
+    {
+        try
+        {
+            if (!Directory.Exists(dir)) return false;
+            return Directory.EnumerateFiles(dir, "*.md", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.EnumerateDirectories(dir)
+                    .SelectMany(d => Directory.EnumerateFiles(d, "*.md", SearchOption.TopDirectoryOnly)))
+                .Any(p => !PathUtil.IsIgnoredSourceFile(p));
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private static readonly Regex ProjectNamePattern = new(

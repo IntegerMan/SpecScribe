@@ -88,21 +88,32 @@ public static class HtmlTemplater
         return sb.ToString();
     }
 
+    /// <summary>The ordered WELL-KNOWN home-index groups: friendly titles, fixed order (Overview → Planning →
+    /// Spec Kernel → Implementation), and the PRD-prominent planning treatment. Deliberately an extended list,
+    /// not a re-derivation from whatever folders exist — the known set renders exactly as it always has, and
+    /// only folders OUTSIDE it get the appended structure-derived bands below. [Story 4.2 Task 3]</summary>
+    private static readonly (string Title, string Prefix)[] KnownIndexGroups =
+    {
+        ("Overview", ""),
+        ("Planning Artifacts", "planning-artifacts"),
+        // The spec kernel (SPEC.md + companions under specs/) is its own first-class band — the canonical
+        // contract, so it sits between planning and implementation instead of falling into "Other". Keyed
+        // on the specs/ directory prefix, disjoint from Story 2.1's implementation-artifacts/spec-*.md. The
+        // empty-group guard below omits the section cleanly when no specs/ content exists. [Story 2.2 Task 2]
+        ("Spec Kernel", "specs"),
+        ("Implementation Artifacts", BmadArtifactAdapter.ImplementationArtifactsDirName),
+    };
+
+    /// <summary>Whether a top-level source folder is one of the well-known home-index groups — the signal the
+    /// generator uses to emit an "unrecognized structure" notice for anything else (whose docs degrade to
+    /// their own coherently-titled band rather than a silent dump). [Story 4.2 Task 3/5]</summary>
+    public static bool IsWellKnownTopLevelFolder(string folder) =>
+        KnownIndexGroups.Any(g => g.Prefix.Length > 0 && string.Equals(g.Prefix, folder, StringComparison.OrdinalIgnoreCase));
+
     public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null)
     {
         var inventory = work ?? WorkInventory.Empty;
-
-        var groups = new (string Title, string Prefix)[]
-        {
-            ("Overview", ""),
-            ("Planning Artifacts", "planning-artifacts"),
-            // The spec kernel (SPEC.md + companions under specs/) is its own first-class band — the canonical
-            // contract, so it sits between planning and implementation instead of falling into "Other". Keyed
-            // on the specs/ directory prefix, disjoint from Story 2.1's implementation-artifacts/spec-*.md. The
-            // empty-group guard below omits the section cleanly when no specs/ content exists. [Story 2.2 Task 2]
-            ("Spec Kernel", "specs"),
-            ("Implementation Artifacts", "implementation-artifacts"),
-        };
+        var groups = KnownIndexGroups;
 
         var sb = new StringBuilder();
         // Home page carries a descriptive title (sub-pages are already "Title — Site"); OG/description too. [Story 1.5 G2]
@@ -164,11 +175,18 @@ public static class HtmlTemplater
             sb.Append("</div>\n\n");
         }
 
-        var remaining = docs.Where(d => !used.Contains(d)).OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase).ToList();
-        if (remaining.Count > 0)
+        // Docs still unclaimed sit under UNRECOGNIZED top-level folders (root-level docs were claimed by
+        // Overview above). Each such folder degrades to its own coherently-titled band appended after the
+        // known groups — never a silent "Other" dump, and never mis-grouped under a BMad title it doesn't
+        // belong to (NFR8: absent/coherent, not broken or misleading). [Story 4.2 Task 3]
+        var remaining = docs.Where(d => !used.Contains(d)).ToList();
+        foreach (var folderGroup in remaining
+            .GroupBy(d => TopLevelFolder(d.SourceRelativePath), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
         {
-            sb.Append("<div class=\"index-section-title\">Other</div>\n<div class=\"index-grid\">\n");
-            foreach (var d in remaining)
+            var title = folderGroup.Key.Length == 0 ? "Other" : HumanizeFolderName(folderGroup.Key);
+            sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept(title)}{Html(title)}</div>\n<div class=\"index-grid\">\n");
+            foreach (var d in folderGroup.OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase))
             {
                 AppendIndexCard(sb, d);
             }
@@ -182,6 +200,27 @@ public static class HtmlTemplater
         sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
+    }
+
+    /// <summary>The first path segment of a source-relative path, or "" for a root-level doc. The grouping
+    /// key for the structure-derived bands above. [Story 4.2 Task 3]</summary>
+    private static string TopLevelFolder(string sourceRelativePath)
+    {
+        var norm = PathUtil.NormalizeSlashes(sourceRelativePath);
+        var slash = norm.IndexOf('/');
+        return slash < 0 ? string.Empty : norm[..slash];
+    }
+
+    /// <summary>A human band title for an unrecognized top-level folder (<c>design-notes</c> → "Design
+    /// Notes") — the degradation contract's "coherently-titled band". Plain title-casing on separator-split
+    /// words; deriving richer labels from unknown structure would be guessing. [Story 4.2 Task 3]</summary>
+    private static string HumanizeFolderName(string folder)
+    {
+        var ti = System.Globalization.CultureInfo.InvariantCulture.TextInfo;
+        var words = folder.Split('-', '_', ' ', '.')
+            .Where(w => w.Length > 0)
+            .Select(w => ti.ToTitleCase(w.ToLowerInvariant()));
+        return string.Join(" ", words);
     }
 
     /// <summary>The home "Retrospectives" band: one card per retrospective note (its dedicated page), so the

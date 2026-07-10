@@ -101,7 +101,7 @@ public sealed class SiteNav
             items.Add(("ADRs", AdrsLandingOutputPath));
         }
 
-        var hasEpics = sourceRelativePaths.Any(p => string.Equals(Path.GetFileName(p), "epics.md", StringComparison.OrdinalIgnoreCase));
+        var hasEpics = sourceRelativePaths.Any(BmadArtifactAdapter.IsEpicsFile);
         if (hasEpics)
         {
             items.Add(("Epics", EpicsOutputPath));

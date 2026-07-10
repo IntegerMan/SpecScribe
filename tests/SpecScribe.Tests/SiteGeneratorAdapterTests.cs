@@ -172,6 +172,38 @@ public class SiteGeneratorAdapterTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_UnrecognizedTopLevelFolder_RendersOwnBandAndReportsStructureNotice()
+    {
+        // Story 4.2 Tasks 3/5: an unknown folder degrades to its own coherently-titled home band AND emits
+        // one categorized non-fatal structure notice on the diagnostic channel (input for Story 4.8's page).
+        Directory.CreateDirectory(Path.Combine(Source, "design-notes"));
+        File.WriteAllText(Path.Combine(Source, "design-notes", "ideas.md"), "# Ideas\n\nBody.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+        var notice = Assert.Single(events, e => e.Outcome == GenerationOutcome.Skipped && e.RelativePath == "design-notes/");
+        Assert.Contains("unrecognized top-level folder", notice.Message);
+
+        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        Assert.Contains("Design Notes</div>", index);
+        Assert.DoesNotContain(">Other</div>", index);
+        Assert.Contains("href=\"design-notes/ideas.html\"", index);
+    }
+
+    [Fact]
+    public void IsEpicsRelated_ToleratesNestedLocations()
+    {
+        // Watch routing classifies via the adapter's shared conventions (Story 4.2 Task 4): the epics file by
+        // name anywhere, story artifacts by implementation-artifacts/ ancestor at any depth.
+        var gen = new SiteGenerator(Options());
+
+        Assert.True(gen.IsEpicsRelated(Path.Combine(Source, "nested", "epics.md")));
+        Assert.True(gen.IsEpicsRelated(Path.Combine(Source, "tracking", "implementation-artifacts", "1-4-x.md")));
+        Assert.False(gen.IsEpicsRelated(Path.Combine(Source, "planning-artifacts", "prd.md")));
+    }
+
+    [Fact]
     public void GenerateAll_ThenRegenerateEpics_KeepsWatchParity()
     {
         var gen = new SiteGenerator(Options());

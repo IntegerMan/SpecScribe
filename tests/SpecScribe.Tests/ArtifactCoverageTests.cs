@@ -90,6 +90,19 @@ public class ArtifactCoverageTests
         Assert.False(Family(ArtifactCoverage.Build(malformed, NoDates, NoMemlog, Today), "Stories").Present);
     }
 
+    [Fact]
+    public void Build_StoriesTolerateNestedImplementationArtifacts()
+    {
+        // Location tolerance (Story 4.2 Task 4): the folder may sit deeper in the tree — coverage must agree
+        // with the adapter's story discovery, which classifies by ancestor segment, not fixed parent.
+        var nested = new[] { "tracking/implementation-artifacts/1-2-user-auth.md" };
+        Assert.True(Family(ArtifactCoverage.Build(nested, NoDates, NoMemlog, Today), "Stories").Present);
+
+        // But a like-named file with no implementation-artifacts/ ancestor still isn't a story.
+        var elsewhere = new[] { "tracking/other/1-2-user-auth.md" };
+        Assert.False(Family(ArtifactCoverage.Build(elsewhere, NoDates, NoMemlog, Today), "Stories").Present);
+    }
+
     [Theory]
     [InlineData("planning-artifacts/ux-designs/ux-x/DESIGN.md")]
     [InlineData("planning-artifacts/ux-designs/ux-x/EXPERIENCE.md")]

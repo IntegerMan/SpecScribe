@@ -10,6 +10,36 @@ namespace SpecScribe;
 /// are deliberate: generalizing them is Story 4.2's job; this story only names the seam. [Story 4.1]</summary>
 public sealed class BmadArtifactAdapter : IArtifactAdapter
 {
+    /// <summary>BMad's epic/story breakdown file, matched by filename anywhere in the source tree. The ONE
+    /// home for this literal — <see cref="SiteNav"/>, <see cref="SiteGenerator"/>, and
+    /// <see cref="ArtifactCoverage"/> all classify against this constant rather than re-hard-coding the
+    /// string, so BMad's naming lives in exactly one place (NFR4). [Story 4.2 Task 4]</summary>
+    public const string EpicsFileName = "epics.md";
+
+    /// <summary>BMad's per-story artifact folder. Like <see cref="EpicsFileName"/>, the single source of
+    /// truth for the name; classification is by directory SEGMENT (any depth, via
+    /// <see cref="IsUnderImplementationArtifacts(string)"/>), not a fixed parent, so a project that nests the
+    /// folder deeper doesn't lose its stories (AC #1). [Story 4.2 Task 4]</summary>
+    public const string ImplementationArtifactsDirName = "implementation-artifacts";
+
+    /// <summary>True when <paramref name="path"/> (full or relative) is the epics breakdown file, by
+    /// filename regardless of folder depth — the same location tolerance <see cref="SiteNav"/> has always
+    /// applied. [Story 4.2 Task 4]</summary>
+    public static bool IsEpicsFile(string path) =>
+        string.Equals(Path.GetFileName(path), EpicsFileName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>True when any DIRECTORY segment of <paramref name="path"/> (full or relative, either slash
+    /// style) is the implementation-artifacts folder — location-tolerant, not parent-dir-fixed, so
+    /// <c>tracking/implementation-artifacts/1-1-x.md</c> still classifies as a story artifact while a file
+    /// merely NAMED like the folder does not. [Story 4.2 Task 4]</summary>
+    public static bool IsUnderImplementationArtifacts(string path)
+    {
+        var dir = Path.GetDirectoryName(path.Replace('/', Path.DirectorySeparatorChar));
+        if (string.IsNullOrEmpty(dir)) return false;
+        return dir.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Any(s => string.Equals(s, ImplementationArtifactsDirName, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static readonly Regex ArtifactFilenamePattern = new(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
 
     /// <summary>The epics-scoped slice of an ingest, exposed separately so the watch-mode incremental path
@@ -178,15 +208,15 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
     }
 
     /// <summary>Story id (e.g. "1.2") → full path of its detail artifact, discovered by BMad's
-    /// <c>implementation-artifacts/{epic}-{story}-*.md</c> filename convention (carried verbatim; Story 4.2
-    /// generalizes it).</summary>
+    /// <c>{epic}-{story}-*.md</c> filename convention under an <c>implementation-artifacts/</c> ancestor at
+    /// ANY depth (location-tolerant since Story 4.2; the canonical direct child layout is unchanged as the
+    /// primary shape).</summary>
     private static Dictionary<string, string> BuildArtifactMap(IEnumerable<string> files)
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in files)
         {
-            var parentDir = Path.GetFileName(Path.GetDirectoryName(path) ?? string.Empty);
-            if (!string.Equals(parentDir, "implementation-artifacts", StringComparison.OrdinalIgnoreCase))
+            if (!IsUnderImplementationArtifacts(path))
             {
                 continue;
             }
@@ -202,7 +232,7 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
     }
 
     private static string? FindEpicsSourceFile(IEnumerable<string> files) =>
-        files.FirstOrDefault(f => string.Equals(Path.GetFileName(f), "epics.md", StringComparison.OrdinalIgnoreCase));
+        files.FirstOrDefault(IsEpicsFile);
 
     private static string ToSourceRelative(ForgeOptions options, string fullPath) =>
         Path.GetRelativePath(options.SourceRoot, fullPath);

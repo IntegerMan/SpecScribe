@@ -43,6 +43,25 @@ public class WorkInventoryTests
     }
 
     [Fact]
+    public void Build_ClassifiesNestedImplementationArtifacts()
+    {
+        // Location tolerance (Story 4.2 Task 4): a project nesting implementation-artifacts/ deeper keeps
+        // its quick-dev and deferred-work classification.
+        var docs = new[]
+        {
+            Doc("tracking/implementation-artifacts/spec-foo.md", "Nested quick fix", new Frontmatter { Route = "one-shot" }),
+            Doc("tracking/implementation-artifacts/deferred-work.md", "Deferred Work", Frontmatter.Empty, "<ul><li>a</li></ul>"),
+        };
+
+        var inv = WorkInventory.Build(docs);
+
+        Assert.Single(inv.QuickDev);
+        Assert.Equal("Nested quick fix", inv.QuickDev[0].Title);
+        Assert.NotNull(inv.Deferred);
+        Assert.Equal(1, inv.Deferred!.OpenItemCount);
+    }
+
+    [Fact]
     public void Build_EmptyWhenNoQuickDevOrDeferred()
     {
         var inv = WorkInventory.Build(new[] { Doc("planning-artifacts/prd.md", "PRD", Frontmatter.Empty) });
