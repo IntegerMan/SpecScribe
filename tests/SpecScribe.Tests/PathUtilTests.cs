@@ -31,6 +31,24 @@ public class PathUtilTests
         => Assert.Equal("Epic & <code>", PathUtil.StripHtmlTags("Epic &amp; <code>&lt;code&gt;</code>"));
 
     [Fact]
+    public void RenderFooter_CarriesRepoAndAboutLinks_FromRoot()
+    {
+        var footer = PathUtil.RenderFooter("on 2026-07-10");
+        Assert.Contains(PathUtil.RepositoryUrl, footer);
+        // Root page: the About link is a bare href (no relative prefix).
+        Assert.Contains("href=\"about.html\"", footer);
+        Assert.Contains(">About</a>", footer);
+    }
+
+    [Fact]
+    public void RenderFooter_ResolvesAboutHrefFromNestedDepth()
+    {
+        var prefix = PathUtil.RelativePrefix("adrs/0001-thing.html"); // "../"
+        var footer = PathUtil.RenderFooter("on 2026-07-10", prefix);
+        Assert.Contains("href=\"../about.html\"", footer);
+    }
+
+    [Fact]
     public void RenderHeadOpen_EncodesTitleAndStylesheetHref()
     {
         var html = PathUtil.RenderHeadOpen("Cats & Dogs", "../style.css", "../specscribe.js");

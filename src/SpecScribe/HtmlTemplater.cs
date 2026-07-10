@@ -54,7 +54,7 @@ public static class HtmlTemplater
         sb.Append(Toc.WrapWithSidebar(main.ToString(), tocEntries, BuildCompanionRail(doc)));
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}", PathUtil.RelativePrefix(doc.OutputRelativePath)));
         if (doc.HasMermaid)
         {
             sb.Append(Mermaid.InitScript());

@@ -129,7 +129,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // side effect of adapter work (AC #1: rendering stays framework-agnostic and unchanged).
         var expected = new[]
         {
+            // about.html + diagnostics.html are the Story 4.8 additions to the page set — deliberate output
+            // change (this story adds pages + a site-wide footer link), unlike the byte-parity 4.1/4.2 stories.
+            "about.html",
             "adrs/index.html",
+            "diagnostics.html",
             "epics.html",
             "epics/epic-1.html",
             "epics/story-1-1.html",
@@ -189,6 +193,65 @@ public class SiteGeneratorAdapterTests : IDisposable
         Assert.Contains("Design Notes</div>", index);
         Assert.DoesNotContain(">Other</div>", index);
         Assert.Contains("href=\"design-notes/ideas.html\"", index);
+    }
+
+    [Fact]
+    public void GenerateAll_CleanFixture_ProducesAboutAndAllClearDiagnostics()
+    {
+        // Story 4.8: both pages are written on every full run. This fixture is clean (valid sprint yaml, only
+        // well-known folders), so the diagnostics page renders the all-clear state, not an empty table.
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        Assert.True(File.Exists(Path.Combine(Site, "about.html")));
+        var diag = File.ReadAllText(Path.Combine(Site, "diagnostics.html"));
+        Assert.Contains("No notices", diag);
+        Assert.DoesNotContain("diagnostics-table", diag);
+        // AC #2: the effective-config disclosure still renders in the all-clear case, carrying the run's config.
+        Assert.Contains("Effective configuration", diag);
+        Assert.Contains("<dt>Output directory</dt>", diag);
+        Assert.Contains("<dt>Deep-git analytics</dt>", diag);
+    }
+
+    [Fact]
+    public void GenerateAll_UnusableSprintYaml_DiagnosticsPageListsNoticeExactlyOnce()
+    {
+        // The same unsupported-sprint fixture the diagnostic-channel test uses: it must surface as exactly ONE
+        // row on the diagnostics page (no double-count — each adapter diagnostic is mapped into the events list
+        // once), carrying its fine "Unsupported" category word. [Story 4.8 Task 2/7]
+        File.WriteAllText(SprintYaml, "just: some\nunrelated: keys\n");
+
+        new SiteGenerator(Options()).GenerateAll();
+        var diag = File.ReadAllText(Path.Combine(Site, "diagnostics.html"));
+
+        Assert.Contains("diagnostics-table", diag);
+        // The doc-subtitle pins the notice count — "1 notice" proves the single mapped diagnostic isn't doubled.
+        Assert.Contains("&middot; 1 notice &middot;", diag);
+        Assert.Equal(1, Count(diag, "diagnostics-source"));
+        Assert.Contains(">Unsupported</span>", diag);
+        Assert.Contains("sprint-status.yaml", diag);
+    }
+
+    [Fact]
+    public void GenerateAll_FooterAboutLink_ResolvesFromRootAndNestedPages()
+    {
+        // The site-wide footer gains an About link on EVERY page (the deliberate Story 4.8 output change); its
+        // relative href must resolve from both a root page and a nested one.
+        new SiteGenerator(Options()).GenerateAll();
+
+        // Root page → bare href; depth-1 pages (adrs/, epics/) → "../about.html".
+        Assert.Contains("href=\"about.html\"", File.ReadAllText(Path.Combine(Site, "index.html")));
+        Assert.Contains("href=\"../about.html\"", File.ReadAllText(Path.Combine(Site, "adrs", "index.html")));
+        Assert.Contains("href=\"../about.html\"", File.ReadAllText(Path.Combine(Site, "epics", "story-1-1.html")));
+        // The About page links on to the diagnostics run log (the reachability path's final hop).
+        Assert.Contains("href=\"diagnostics.html\"", File.ReadAllText(Path.Combine(Site, "about.html")));
+    }
+
+    private static int Count(string haystack, string needle)
+    {
+        int n = 0, i = 0;
+        while ((i = haystack.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { n++; i += needle.Length; }
+        return n;
     }
 
     [Fact]

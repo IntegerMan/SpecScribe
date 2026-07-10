@@ -83,8 +83,18 @@ public static class PathUtil
         return sb.ToString();
     }
 
-    public static string RenderFooter(string trailingHtml)
-        => $"<footer class=\"doc-footer\">\n  Generated using <a href=\"https://github.com/IntegerMan/SpecScribe\">SpecScribe</a> {trailingHtml}\n</footer>\n\n";
+    /// <summary>The canonical SpecScribe repository URL — the single source shared by the footer's "SpecScribe"
+    /// credit link and the About page's repository link, so the two can never drift. [Story 4.8 Task 5]</summary>
+    public const string RepositoryUrl = "https://github.com/IntegerMan/SpecScribe";
+
+    /// <summary>The site-wide footer at the bottom of every page: the SpecScribe credit link, an "About" link,
+    /// and a per-page <paramref name="trailingHtml"/> (usually the generation timestamp). The About link is the
+    /// owner-chosen reachability path to the About page — and through it the diagnostics run log — so it appears
+    /// on every page. Its href is resolved from <paramref name="relativePrefix"/> (the same <c>../</c> math the
+    /// nav uses) so it points at the output-root <c>about.html</c> correctly from a nested page (e.g.
+    /// <c>adrs/index.html</c>). Root pages pass the empty default. [Story 4.8 Task 5]</summary>
+    public static string RenderFooter(string trailingHtml, string relativePrefix = "")
+        => $"<footer class=\"doc-footer\">\n  Generated using <a href=\"{Html(RepositoryUrl)}\">SpecScribe</a> &middot; <a href=\"{Html(relativePrefix + SiteNav.AboutOutputPath)}\">About</a> {trailingHtml}\n</footer>\n\n";
 
     // Singleline so a tag whose attributes contain newlines still strips cleanly — e.g. an "(AC: #N)"
     // reference linkified inside a heading carries a multi-line `title` (the criterion's Given/When/Then

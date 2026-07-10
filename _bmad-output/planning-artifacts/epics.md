@@ -138,8 +138,8 @@ UX-DR30: Insight-chart context polish: distinguish process-coupling from code-co
 
 FR1: Epic 4 - Shared adapter contract and projection model for multi-framework ingestion.
 FR2: Epics 1 & 2 - Preserve and complete first-class BMad parsing and rendering behavior.
-FR3: Epic 4 - Spec Kit baseline ingestion and projection coverage.
-FR4: Epic 4 - GSD and GSD-Pi baseline ingestion and projection coverage.
+FR3: Epic 11 - Spec Kit integration spike and baseline ingestion/projection coverage.
+FR4: Epic 12 - GSD and GSD-Pi integration spike and baseline ingestion/projection coverage.
 FR5: Epics 1 & 2 - Coherent navigation/dashboards plus complete artifact-class representation.
 FR6: Epic 1 - Requirements, story, and ADR cross-linking integrity.
 FR7: Epics 1 & 2 - Markdown fidelity including Mermaid, task lists, and comment annotations.
@@ -152,7 +152,7 @@ FR13: Epic 6 - Read-only VS Code webview reusing shared core logic.
 FR14: Epic 7 - Source-code treemap (LOC-sized, git-colorized) as a structural visualization.
 FR15: Epic 7 - In-portal code file browsing and source-citation linking to code pages.
 FR16: Epic 7 - Activity timeline and per-date pages linked from dates.
-FR17: Epic 4 - Additional framework adapters (SpecFlow, Squad, Superpowers) via the shared contract.
+FR17: Epics 13–15 - Additional framework adapters (SpecFlow, Squad, Superpowers) via the shared contract, each with an integration spike.
 FR18: Epic 5 - OSS onboarding and reference documentation.
 FR19: Epic 7 - Advanced code-and-git coverage on code pages.
 FR20: Epic 8 - Canonical status lifecycle per entity type with adapter-layer vocabulary mapping and status legend.
@@ -182,9 +182,9 @@ Surface and truthfully represent every BMad artifact class and work type — def
 Add richer analytical insight — git momentum, planning coverage and freshness, and purposeful dashboard polish — so users can understand project shape, gaps, and momentum quickly.
 **FRs covered:** FR9, FR10, FR11
 
-### Epic 4: Multi-Framework Coverage Expansion
-Expand beyond BMad to additional spec-driven frameworks (Spec Kit, GSD/GSD-Pi, SpecFlow, Squad, Superpowers) through one shared adapter contract, first generalizing the renderer away from any single project's personal structure.
-**FRs covered:** FR1, FR3, FR4, FR17
+### Epic 4: Framework-Agnostic Adapter Foundation
+Establish the framework-neutral seam every other framework builds on: one shared adapter contract into the projection model, rendering decoupled from any single project's personal structure, and generation diagnostics — so per-framework coverage epics (11–15) attach without reworking the core templating pipeline. Per-framework coverage moved to its own spike-led epics on 2026-07-10.
+**FRs covered:** FR1
 
 ### Epic 5: Reliable Operations, Configuration, and OSS Documentation
 Make generation and watch dependable and easy to configure, and provide OSS-ready documentation, so the tool is trustworthy for daily use and ready to share with the broader community.
@@ -210,7 +210,28 @@ Complete the requirement → epic → story chain so a Stakeholder can click fro
 Make every surface navigable and correctly interpretable by first-time visitors, non-BMAD stakeholders, and tech leads: insight pages reachable from the nav, every chart self-explaining (legend, time window, why-it-matters), vocabulary defined in place, and consistent dates, references, and TOC treatment. Serves onboarding (5) and health-insight (6) journeys — the adoption deciders.
 **FRs covered:** FR27, FR28, FR29 · **UX-DRs:** UX-DR25, UX-DR27, UX-DR28, UX-DR29, UX-DR30 · **NFRs:** NFR8
 
+### Epic 11: Spec Kit Coverage
+Interpret core Spec Kit artifacts in the portal via the shared adapter contract (Epic 4), led by an integration spike that maps Spec Kit's artifact set to the projection model and pins down unsupported conventions and framework-specific data before baseline coverage begins.
+**FRs covered:** FR3
+
+### Epic 12: GSD and GSD-Pi Coverage
+Render key GSD and GSD-Pi planning and tracking artifacts coherently alongside other frameworks, led by an integration spike that scopes the GSD family's mapping, coverage tiers, and out-of-model data before baseline coverage lands.
+**FRs covered:** FR4
+
+### Epic 13: SpecFlow Coverage
+Interpret core SpecFlow specification and planning artifacts through the shared adapter contract, led by an integration spike that maps SpecFlow's artifact set to the projection model and records deliberately-unsupported conventions and framework-extra data.
+**FRs covered:** FR17
+
+### Epic 14: Squad Coverage
+Interpret core Squad artifacts through the shared adapter contract, led by an integration spike that maps Squad's artifact set to the projection model and identifies unsupported conventions and framework-extra data.
+**FRs covered:** FR17
+
+### Epic 15: Superpowers Coverage
+Interpret core Superpowers artifacts through the shared adapter contract, led by an integration spike that maps Superpowers' artifact set to the projection model and identifies unsupported conventions and framework-extra data.
+**FRs covered:** FR17
+
 <!-- Epics 8–10 added 2026-07-09 from the site-wide UX review; Epic 8 is foundational for 9–10 (status model + count source) and these are candidates to run ahead of Epic 4, with all framework-specific content structured as adapter-supplied data per NFR8. -->
+<!-- Epics 11–15 added 2026-07-10: per-framework coverage stories 4.3–4.7 extracted into their own spike-led epics (append-only, no renumber). Each epic's Story X.1 is a Framework Integration Spike scoping the mapping to Epic 4's adapter contract; X.2 is the migrated baseline coverage. -->
 
 <!-- Repeat for each epic in epics_list (N = 1, 2, 3...) -->
 
@@ -617,11 +638,15 @@ So that I can explore repository activity in depth without cluttering the dashbo
 **Then** I navigate to the corresponding per-file or per-commit detail page
 **And** when deep insights are disabled the heavier hub and detail-page generation does not run and baseline generation performance is unaffected.
 
-## Epic 4: Multi-Framework Coverage Expansion
+## Epic 4: Framework-Agnostic Adapter Foundation
 
-Expand beyond BMad to additional spec-driven frameworks (Spec Kit, GSD/GSD-Pi, SpecFlow, Squad, Superpowers) through one shared adapter contract, first generalizing the renderer away from any single project's personal structure.
+Establish the framework-neutral foundation that additional spec-driven frameworks build on: one shared adapter contract into the projection model, rendering decoupled from any single project's personal structure, and generation diagnostics for degraded runs. Per-framework coverage (Spec Kit, GSD/GSD-Pi, SpecFlow, Squad, Superpowers) is delivered by the spike-led Epics 11–15, which attach to this contract without reworking the core templating pipeline.
 
-**FRs covered:** FR1, FR3, FR4, FR17
+**FRs covered:** FR1
+
+<!-- 2026-07-10: Stories 4.3–4.7 (per-framework coverage) extracted into spike-led Epics 11–15 (append-only, no renumber). Epic 4 now holds only the framework-agnostic foundation: 4.1 adapter contract, 4.2 de-personalization, 4.8 diagnostics. -->
+
+
 
 ### Story 4.1: Shared Framework Adapter Contract and Projection Path
 
@@ -662,106 +687,6 @@ So that my ADRs, folders, and groupings render correctly without matching one sp
 **When** they are parsed
 **Then** recognized decision records still render with title, status, and links where derivable
 **And** format and organization variance is handled tolerantly (non-fatal), without assuming a single numbering or directory scheme.
-
-### Story 4.3: Spec Kit Baseline Adapter Coverage
-
-As a team using Spec Kit,
-I want core Spec Kit artifacts interpreted in the portal,
-So that I can track planning progress without switching tools.
-
-**Acceptance Criteria:**
-
-1.
-**Given** representative current-version Spec Kit repositories
-**When** generation runs
-**Then** core planning and tracking artifacts render without fatal failures
-**And** each discovered artifact is labeled rendered, summarized, or unsupported.
-
-2.
-**Given** unsupported Spec Kit artifact variants
-**When** they are detected
-**Then** they are surfaced as explicit non-fatal notices
-**And** generation continues for supported content.
-
-### Story 4.4: GSD and GSD-Pi Baseline Adapter Coverage
-
-As a team using GSD workflows,
-I want key GSD and GSD-Pi artifacts rendered coherently,
-So that progress and scope remain understandable in one portal.
-
-**Acceptance Criteria:**
-
-1.
-**Given** representative GSD and GSD-Pi repositories
-**When** generation runs
-**Then** key planning and tracking artifacts render without fatal errors
-**And** output remains coherent with existing BMad and Spec Kit surfaces.
-
-2.
-**Given** partially supported GSD artifacts
-**When** they are discovered
-**Then** coverage tier labeling communicates interpretation boundaries clearly
-**And** unsupported items never block full-site generation.
-
-### Story 4.5: SpecFlow Baseline Adapter Coverage
-
-As a team using SpecFlow,
-I want core SpecFlow artifacts interpreted in the portal,
-So that I can track planning and specification progress without switching tools.
-
-**Acceptance Criteria:**
-
-1.
-**Given** representative SpecFlow repositories
-**When** generation runs
-**Then** core planning and specification artifacts render without fatal failures via the shared adapter contract
-**And** each discovered artifact is labeled rendered, summarized, or unsupported.
-
-2.
-**Given** unsupported SpecFlow artifact variants
-**When** they are detected
-**Then** they are surfaced as explicit non-fatal notices
-**And** generation continues for supported content and remains coherent with other framework surfaces.
-
-### Story 4.6: Squad Baseline Adapter Coverage
-
-As a team using Squad,
-I want core Squad artifacts interpreted in the portal,
-So that I can track planning progress without switching tools.
-
-**Acceptance Criteria:**
-
-1.
-**Given** representative Squad repositories
-**When** generation runs
-**Then** core planning and tracking artifacts render without fatal failures via the shared adapter contract
-**And** each discovered artifact is labeled rendered, summarized, or unsupported.
-
-2.
-**Given** unsupported Squad artifact variants
-**When** they are detected
-**Then** they are surfaced as explicit non-fatal notices
-**And** generation continues for supported content and remains coherent with other framework surfaces.
-
-### Story 4.7: Superpowers Baseline Adapter Coverage
-
-As a team using Superpowers,
-I want core Superpowers artifacts interpreted in the portal,
-So that I can track planning progress without switching tools.
-
-**Acceptance Criteria:**
-
-1.
-**Given** representative Superpowers repositories
-**When** generation runs
-**Then** core planning and tracking artifacts render without fatal failures via the shared adapter contract
-**And** each discovered artifact is labeled rendered, summarized, or unsupported.
-
-2.
-**Given** unsupported Superpowers artifact variants
-**When** they are detected
-**Then** they are surfaced as explicit non-fatal notices
-**And** generation continues for supported content and remains coherent with other framework surfaces.
 
 <!-- Story 4.8 added 2026-07-10: spun out of Story 4.2 so partial/degraded generation is detectable in the
      output itself, not only in console scrollback. Consumes the AdapterDiagnostic channel from Story 4.1. -->
@@ -1494,3 +1419,239 @@ So that I do not draw wrong conclusions from artifacts of the data.
 **When** it renders
 **Then** the dead zone is annotated (for example "First commit Jul 4") or the window is trimmed
 **And** single-contributor files suppress or reword multi-contributor phrasing (for example "People to talk to").
+
+<!-- Epics 11–15 added 2026-07-10: per-framework coverage extracted from Epic 4 (Stories 4.3–4.7) into their own
+     spike-led epics (append-only, no renumber). Each epic's Story X.1 is a Framework Integration Spike that scopes
+     the mapping to Epic 4's shared adapter contract — classifying artifacts as mappable/partial/unsupported and
+     recording framework-extra data and deliberately-unsupported conventions — before the migrated baseline
+     coverage story (X.2) runs. FRs: 11 → FR3, 12 → FR4, 13–15 → FR17. -->
+
+## Epic 11: Spec Kit Coverage
+
+Interpret core Spec Kit artifacts in the portal through Epic 4's shared framework adapter contract, so Spec Kit teams can track planning progress without switching tools. Led by an integration spike that scopes the mapping and its boundaries before baseline coverage.
+
+**FRs covered:** FR3
+
+### Story 11.1: Spec Kit Integration Spike
+
+As a maintainer preparing to support Spec Kit,
+I want the Spec Kit artifact set mapped against the shared adapter contract before coverage work begins,
+So that baseline coverage starts with a defined scope, known gaps, and no surprise conventions.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative current-version Spec Kit repositories
+**When** the Spec Kit artifact set is surveyed against the shared adapter contract's ArtifactBundle and projection model
+**Then** a written coverage map classifies each Spec Kit artifact type as mappable, partially-mappable, or unsupported
+**And** the target shared-model projection is named for each mappable type.
+
+2.
+**Given** Spec Kit conventions that exceed the shared projection model or that SpecScribe will deliberately not support
+**When** the spike documents its findings
+**Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
+**And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
+
+### Story 11.2: Spec Kit Baseline Adapter Coverage
+
+As a team using Spec Kit,
+I want core Spec Kit artifacts interpreted in the portal,
+So that I can track planning progress without switching tools.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative current-version Spec Kit repositories
+**When** generation runs
+**Then** core planning and tracking artifacts render without fatal failures
+**And** each discovered artifact is labeled rendered, summarized, or unsupported.
+
+2.
+**Given** unsupported Spec Kit artifact variants
+**When** they are detected
+**Then** they are surfaced as explicit non-fatal notices
+**And** generation continues for supported content.
+
+## Epic 12: GSD and GSD-Pi Coverage
+
+Render key GSD and GSD-Pi planning and tracking artifacts coherently through Epic 4's shared adapter contract, so GSD teams keep progress and scope understandable in one portal. Led by an integration spike that scopes the GSD family's mapping and coverage tiers before baseline coverage.
+
+**FRs covered:** FR4
+
+### Story 12.1: GSD and GSD-Pi Integration Spike
+
+As a maintainer preparing to support GSD and GSD-Pi,
+I want the GSD family's artifact set mapped against the shared adapter contract before coverage work begins,
+So that baseline coverage starts with a defined scope, declared coverage tiers, and no surprise conventions.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative GSD and GSD-Pi repositories
+**When** the GSD family's artifact set is surveyed against the shared adapter contract's ArtifactBundle and projection model
+**Then** a written coverage map classifies each GSD/GSD-Pi artifact type as mappable, partially-mappable, or unsupported
+**And** the target shared-model projection and declared coverage tier are named for each mappable type.
+
+2.
+**Given** GSD/GSD-Pi conventions that exceed the shared projection model or that SpecScribe will deliberately not support
+**When** the spike documents its findings
+**Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
+**And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
+
+### Story 12.2: GSD and GSD-Pi Baseline Adapter Coverage
+
+As a team using GSD workflows,
+I want key GSD and GSD-Pi artifacts rendered coherently,
+So that progress and scope remain understandable in one portal.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative GSD and GSD-Pi repositories
+**When** generation runs
+**Then** key planning and tracking artifacts render without fatal errors
+**And** output remains coherent with existing BMad and Spec Kit surfaces.
+
+2.
+**Given** partially supported GSD artifacts
+**When** they are discovered
+**Then** coverage tier labeling communicates interpretation boundaries clearly
+**And** unsupported items never block full-site generation.
+
+## Epic 13: SpecFlow Coverage
+
+Interpret core SpecFlow specification and planning artifacts through Epic 4's shared adapter contract, so SpecFlow teams can track progress without switching tools. Led by an integration spike that scopes the mapping and its boundaries before baseline coverage.
+
+**FRs covered:** FR17
+
+### Story 13.1: SpecFlow Integration Spike
+
+As a maintainer preparing to support SpecFlow,
+I want the SpecFlow artifact set mapped against the shared adapter contract before coverage work begins,
+So that baseline coverage starts with a defined scope, known gaps, and no surprise conventions.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative SpecFlow repositories
+**When** the SpecFlow artifact set is surveyed against the shared adapter contract's ArtifactBundle and projection model
+**Then** a written coverage map classifies each SpecFlow artifact type as mappable, partially-mappable, or unsupported
+**And** the target shared-model projection is named for each mappable type.
+
+2.
+**Given** SpecFlow conventions that exceed the shared projection model or that SpecScribe will deliberately not support
+**When** the spike documents its findings
+**Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
+**And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
+
+### Story 13.2: SpecFlow Baseline Adapter Coverage
+
+As a team using SpecFlow,
+I want core SpecFlow artifacts interpreted in the portal,
+So that I can track planning and specification progress without switching tools.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative SpecFlow repositories
+**When** generation runs
+**Then** core planning and specification artifacts render without fatal failures via the shared adapter contract
+**And** each discovered artifact is labeled rendered, summarized, or unsupported.
+
+2.
+**Given** unsupported SpecFlow artifact variants
+**When** they are detected
+**Then** they are surfaced as explicit non-fatal notices
+**And** generation continues for supported content and remains coherent with other framework surfaces.
+
+## Epic 14: Squad Coverage
+
+Interpret core Squad artifacts through Epic 4's shared adapter contract, so Squad teams can track planning progress without switching tools. Led by an integration spike that scopes the mapping and its boundaries before baseline coverage.
+
+**FRs covered:** FR17
+
+### Story 14.1: Squad Integration Spike
+
+As a maintainer preparing to support Squad,
+I want the Squad artifact set mapped against the shared adapter contract before coverage work begins,
+So that baseline coverage starts with a defined scope, known gaps, and no surprise conventions.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative Squad repositories
+**When** the Squad artifact set is surveyed against the shared adapter contract's ArtifactBundle and projection model
+**Then** a written coverage map classifies each Squad artifact type as mappable, partially-mappable, or unsupported
+**And** the target shared-model projection is named for each mappable type.
+
+2.
+**Given** Squad conventions that exceed the shared projection model or that SpecScribe will deliberately not support
+**When** the spike documents its findings
+**Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
+**And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
+
+### Story 14.2: Squad Baseline Adapter Coverage
+
+As a team using Squad,
+I want core Squad artifacts interpreted in the portal,
+So that I can track planning progress without switching tools.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative Squad repositories
+**When** generation runs
+**Then** core planning and tracking artifacts render without fatal failures via the shared adapter contract
+**And** each discovered artifact is labeled rendered, summarized, or unsupported.
+
+2.
+**Given** unsupported Squad artifact variants
+**When** they are detected
+**Then** they are surfaced as explicit non-fatal notices
+**And** generation continues for supported content and remains coherent with other framework surfaces.
+
+## Epic 15: Superpowers Coverage
+
+Interpret core Superpowers artifacts through Epic 4's shared adapter contract, so Superpowers teams can track planning progress without switching tools. Led by an integration spike that scopes the mapping and its boundaries before baseline coverage.
+
+**FRs covered:** FR17
+
+### Story 15.1: Superpowers Integration Spike
+
+As a maintainer preparing to support Superpowers,
+I want the Superpowers artifact set mapped against the shared adapter contract before coverage work begins,
+So that baseline coverage starts with a defined scope, known gaps, and no surprise conventions.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative Superpowers repositories
+**When** the Superpowers artifact set is surveyed against the shared adapter contract's ArtifactBundle and projection model
+**Then** a written coverage map classifies each Superpowers artifact type as mappable, partially-mappable, or unsupported
+**And** the target shared-model projection is named for each mappable type.
+
+2.
+**Given** Superpowers conventions that exceed the shared projection model or that SpecScribe will deliberately not support
+**When** the spike documents its findings
+**Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
+**And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
+
+### Story 15.2: Superpowers Baseline Adapter Coverage
+
+As a team using Superpowers,
+I want core Superpowers artifacts interpreted in the portal,
+So that I can track planning progress without switching tools.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative Superpowers repositories
+**When** generation runs
+**Then** core planning and tracking artifacts render without fatal failures via the shared adapter contract
+**And** each discovered artifact is labeled rendered, summarized, or unsupported.
+
+2.
+**Given** unsupported Superpowers artifact variants
+**When** they are detected
+**Then** they are surfaced as explicit non-fatal notices
+**And** generation continues for supported content and remains coherent with other framework surfaces.

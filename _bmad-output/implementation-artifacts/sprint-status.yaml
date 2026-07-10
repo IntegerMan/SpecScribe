@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-10T12:00:00-04:00
+last_updated: 2026-07-10T14:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -79,13 +79,9 @@ development_status:
   epic-4: in-progress
   4-1-shared-framework-adapter-contract-and-projection-path: review
   4-2-decouple-rendering-from-personal-project-structure-assumptions: review
-  4-3-spec-kit-baseline-adapter-coverage: backlog
-  4-4-gsd-and-gsd-pi-baseline-adapter-coverage: backlog
-  4-5-specflow-baseline-adapter-coverage: backlog
-  4-6-squad-baseline-adapter-coverage: backlog
-  4-7-superpowers-baseline-adapter-coverage: backlog
-  4-8-generation-diagnostics-and-configuration-log-page: ready-for-dev # spun out of 4.2 (2026-07-10)
+  4-8-generation-diagnostics-and-configuration-log-page: review # spun out of 4.2 (2026-07-10)
   epic-4-retrospective: optional
+  # Stories 4.3–4.7 (per-framework coverage) relocated 2026-07-10 to spike-led Epics 11–15 (append-only, no renumber)
 
   epic-5: in-progress
   5-1-cli-generate-and-watch-modes-with-smart-defaults: ready-for-dev
@@ -131,6 +127,34 @@ development_status:
   9-5-distinct-acceptance-criteria-blocks-and-collapsed-dev-notes: backlog
   9-6-follow-up-item-provenance-and-resolution-paths: backlog
   epic-9-retrospective: optional
+
+  # Epics 11–15 added 2026-07-10: per-framework coverage (Stories 4.3–4.7) extracted into spike-led epics
+  # (append-only, no renumber). Each epic's X.1 is a Framework Integration Spike; X.2 is the migrated
+  # baseline coverage. All backlog; run create-story per story when scheduled.
+  epic-11: backlog
+  11-1-spec-kit-integration-spike: backlog
+  11-2-spec-kit-baseline-adapter-coverage: backlog
+  epic-11-retrospective: optional
+
+  epic-12: backlog
+  12-1-gsd-and-gsd-pi-integration-spike: backlog
+  12-2-gsd-and-gsd-pi-baseline-adapter-coverage: backlog
+  epic-12-retrospective: optional
+
+  epic-13: backlog
+  13-1-specflow-integration-spike: backlog
+  13-2-specflow-baseline-adapter-coverage: backlog
+  epic-13-retrospective: optional
+
+  epic-14: backlog
+  14-1-squad-integration-spike: backlog
+  14-2-squad-baseline-adapter-coverage: backlog
+  epic-14-retrospective: optional
+
+  epic-15: backlog
+  15-1-superpowers-integration-spike: backlog
+  15-2-superpowers-baseline-adapter-coverage: backlog
+  epic-15-retrospective: optional
 
 action_items:
   - epic: 1

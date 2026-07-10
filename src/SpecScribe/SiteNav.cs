@@ -33,6 +33,22 @@ public sealed class SiteNav
     /// (link to it) so the two can't disagree. [Story 3.4]</summary>
     public const string StructureOutputPath = "structure.html";
 
+    /// <summary>The generation diagnostics (run-log) page: the run's non-fatal notices (unsupported/malformed/
+    /// skipped artifacts + render-time errors) plus the effective configuration and detection results. Written on
+    /// EVERY full run (the zero-notice case renders an all-clear state), so — unlike the git pages — its link can
+    /// never dangle. Deliberately NOT a top-nav item: it is reached via the footer → About → Diagnostics path, so
+    /// it stays out of <see cref="Build"/>'s <c>Items</c>/<c>QuickLinks</c>. Shared between the generator (writes
+    /// the file) and the About templater (links to it) so the two can't disagree. [Story 4.8]</summary>
+    public const string DiagnosticsOutputPath = "diagnostics.html";
+
+    /// <summary>The About page: SpecScribe's own product metadata (version/description/author/repository) plus the
+    /// prominent link to the <see cref="DiagnosticsOutputPath"/> run log. It is the owner-chosen reachability path
+    /// for the diagnostics page — linked from the site-wide footer, written on every full run. Like
+    /// <see cref="DiagnosticsOutputPath"/> it is deliberately NOT a top-nav item (reached via the footer), so it
+    /// stays out of <see cref="Build"/>'s <c>Items</c>/<c>QuickLinks</c>. Shared between the generator (writes the
+    /// file) and the footer (links to it) so the two can't disagree. [Story 4.8]</summary>
+    public const string AboutOutputPath = "about.html";
+
     public required IReadOnlyList<(string Label, string OutputRelativePath)> Items { get; init; }
 
     /// <summary>Every discoverable key view for the dashboard's quick-link grid. A superset of the nav bar:

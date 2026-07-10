@@ -226,6 +226,15 @@ public sealed class SiteGenerator
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav, workInventory);
             reporter?.EndPhase(GenerationPhase.Index);
+
+            // Diagnostics + About are the whole-run reporting surface (Story 4.8): written LAST, after every
+            // phase has appended its events, so the diagnostics page reflects the COMPLETE non-fatal notice set.
+            // Both are always written on a full run (the diagnostics page's zero-notice case renders an all-clear
+            // state, never a gated-away page), so the site-wide footer "About" link — and the About page's link
+            // on to the run log — can never 404. Each write's own Generated event is appended AFTER the
+            // diagnostics page reads the notice list, so it never self-references. [Story 4.8 Task 6]
+            events.Add(WriteDiagnostics(nav, events));
+            events.Add(WriteAbout(nav));
         }
         return events;
     }
@@ -720,13 +729,18 @@ public sealed class SiteGenerator
     /// <summary>Surfaces adapter diagnostics on the existing event/reporter channel: malformed artifacts and
     /// ingest errors report as <see cref="GenerationOutcome.Error"/> (exactly how per-file parse failures
     /// always reported), unsupported/skipped shapes as <see cref="GenerationOutcome.Skipped"/>. Always
-    /// non-fatal — the run has already continued past whatever these describe (AC #2). [Story 4.1]</summary>
+    /// non-fatal — the run has already continued past whatever these describe (AC #2). [Story 4.1]
+    /// <para>The message is prefixed with the fine <see cref="AdapterDiagnosticCategory"/> word (e.g.
+    /// <c>[Unsupported]</c>) so the coarse <see cref="GenerationOutcome"/> collapse (four categories → two
+    /// outcomes) doesn't lose the distinction the Story 4.8 diagnostics page shows. Additive and harmless on
+    /// the console path (which already prints messages); recovered by
+    /// <see cref="DiagnosticsTemplater"/> without needing a second channel. [Story 4.8 Task 2]</para></summary>
     private static IEnumerable<GenerationEvent> MapDiagnostics(IReadOnlyList<AdapterDiagnostic> diagnostics) =>
         diagnostics.Select(d => new GenerationEvent(
             d.Category is AdapterDiagnosticCategory.Malformed or AdapterDiagnosticCategory.Error
                 ? GenerationOutcome.Error
                 : GenerationOutcome.Skipped,
-            d.RelativePath, TimeSpan.Zero, d.Message));
+            d.RelativePath, TimeSpan.Zero, $"[{d.Category}] {d.Message}"));
 
     /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per top-level source folder
     /// outside the well-known home-index set — the "unrecognized structure degrades, visibly" half of the
@@ -908,6 +922,36 @@ public sealed class SiteGenerator
         // attribute value and corrupt the copyable command. [Story 2.3 polish #5]
         var html = ActionItemsTemplater.RenderPage(open, EpicRetroMap, _module.Commands, nav, deferredHref);
         File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.ActionItemsOutputPath), html);
+    }
+
+    /// <summary>Writes <c>diagnostics.html</c> — the whole-run report of the run's non-fatal notices plus the
+    /// effective configuration + detection results (AC #1/#2). Projects the notice list off the single
+    /// accumulated <paramref name="events"/> list (no double-count) and reads the config from already-resolved
+    /// <see cref="_options"/>/<see cref="_module"/> (local-first — no I/O, no remote calls). Deliberately NOT
+    /// run through <see cref="ApplyReferenceLinks"/>: an exception message can embed "Story N.M"/"FR-9"
+    /// fragments the linkifier would wrap and distort — the same trap <see cref="WriteActionItems"/> avoids.
+    /// Returns its own <see cref="GenerationOutcome.Generated"/> event for the run summary / output inventory.
+    /// [Story 4.8 Task 6]</summary>
+    private GenerationEvent WriteDiagnostics(SiteNav nav, IReadOnlyList<GenerationEvent> events)
+    {
+        var sw = Stopwatch.StartNew();
+        var notices = DiagnosticNotice.FromEvents(events);
+        var config = DiagnosticsConfig.FromRun(_options, _module);
+        var html = DiagnosticsTemplater.RenderPage(notices, config, nav);
+        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.DiagnosticsOutputPath), html);
+        return new GenerationEvent(GenerationOutcome.Generated, SiteNav.DiagnosticsOutputPath, sw.Elapsed);
+    }
+
+    /// <summary>Writes <c>about.html</c> — SpecScribe's own product-metadata page (version/description/author/
+    /// repository, read from the assembly) plus the prominent link to the diagnostics run log. Static (no run
+    /// dependency); written alongside the diagnostics page on every full run so the footer's About link always
+    /// resolves. Returns its own <see cref="GenerationOutcome.Generated"/> event. [Story 4.8 Task 6]</summary>
+    private GenerationEvent WriteAbout(SiteNav nav)
+    {
+        var sw = Stopwatch.StartNew();
+        var html = AboutTemplater.RenderPage(nav);
+        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.AboutOutputPath), html);
+        return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutOutputPath, sw.Elapsed);
     }
 
     /// <summary>Path to the repo-root README that feeds the optional Readme page.</summary>

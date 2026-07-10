@@ -1105,6 +1105,13 @@ code.color-swatch {
    against future base changes. [Story 2.3 Task 2] */
 .status-badge.pending { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
 
+/* Story 4.8 — generation-diagnostics severity badges. Deliberately NOT the --status-* lifecycle stage tokens:
+   a run notice (unsupported/malformed/skipped/error) is not a delivery stage. Error borrows the site's
+   established --rust attention accent; warning stays muted/neutral parchment. The category word is always
+   present as text beside the color (never color-only, UX-DR17 / NFR6). */
+.status-badge.diag-error { background: #f4e2dc; color: var(--rust); border-color: var(--rust); }
+.status-badge.diag-warn { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
+
 .status-badge.task-badge {
   display: inline-flex;
   align-items: center;
@@ -3113,3 +3120,20 @@ a.cmd-menu-toggle:hover { color: var(--rust); border-color: var(--gold-light); }
   border-bottom: 1px solid var(--parchment-dark);
 }
 .sprint-action-text { flex: 1 1 60%; color: var(--ink); }
+
+/* ====================== DIAGNOSTICS & ABOUT (Story 4.8) ======================
+   The diagnostics run-log page (notices table + effective-config disclosure) and the About page. Palette
+   tokens only, single parchment theme — consistent with the rest of the portal. */
+.diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; word-break: break-word; }
+
+/* All-clear state: the done badge beside a short line when a run produced zero notices. */
+.diagnostics-clear { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+.diagnostics-clear p { margin: 0; color: var(--ink-faded); }
+
+/* The effective-configuration disclosure summary reads like a chart-panel heading. */
+.diagnostics-config summary { cursor: pointer; font-weight: bold; color: var(--teal-deep); }
+.diagnostics-config .diag-config { margin-top: 0.8rem; }
+
+/* About page prose spacing inside its panel. */
+.about-panel p { color: var(--ink-faded); line-height: 1.6; }
+.about-diagnostics-link { margin-top: 1rem; }

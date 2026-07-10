@@ -163,7 +163,7 @@ public static class EpicsTemplater
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}", PathUtil.RelativePrefix(outputPath)));
         // A ```mermaid fence authored inside an artifact body (story remainder, dev-agent record, review
         // findings, change log) renders as a <pre class="mermaid"> block via RenderBlock. Inject the
         // client-side init script only when one actually landed on this page, mirroring the HasMermaid gate
@@ -311,7 +311,7 @@ public static class EpicsTemplater
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}", PathUtil.RelativePrefix(outputPath)));
         // A ```mermaid fence authored inside an artifact body (story remainder, dev-agent record, review
         // findings, change log) renders as a <pre class="mermaid"> block via RenderBlock. Inject the
         // client-side init script only when one actually landed on this page, mirroring the HasMermaid gate
@@ -391,7 +391,7 @@ public static class EpicsTemplater
         sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + epicOutputPath)}\">&larr; Back to Epic {epic.Number}</a>\n");
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}", prefix));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
