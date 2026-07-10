@@ -30,7 +30,7 @@ public static class EpicsViewBuilder
     };
 
     private static EpicChip BuildChip(EpicInfo epic) =>
-        new(epic.Number, epic.Title, StatusStyles.ForEpic(epic), $"epics/epic-{epic.Number}.html");
+        new(epic.Number, epic.Title, StatusStyles.ForEpicWithRetrospective(epic), $"epics/epic-{epic.Number}.html");
 
     // ----- Epic page ----------------------------------------------------------------------------------------
 
@@ -38,7 +38,7 @@ public static class EpicsViewBuilder
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var prefix = Prefix(outputPath);
-        var epicClass = StatusStyles.ForEpic(epic);
+        var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
 
         var bars = new List<ProgressBarView>
         {
@@ -187,7 +187,10 @@ public static class EpicsViewBuilder
             return sb.ToString();
         }
 
-        if (epicClass != "done") return string.Empty;
+        // With the retro-gated classifier (BuildEpic passes ForEpicWithRetrospective), an all-stories-done epic
+        // with no retro reads as "review" — that is exactly the state that should be nudged to run a retro. Once
+        // a retro exists the epic is "done" and this whole method returned above via the epicRetroPath link. [spec-sunburst-retro]
+        if (epicClass != "review") return string.Empty;
         var guidance = BmadCommands.InlineGuidance(
             commands.Command("retrospective"),
             $"Epic {epic.Number} is complete — capture the lessons with",

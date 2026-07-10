@@ -117,6 +117,7 @@ public sealed class SiteGenerator
             {
                 _epicsModel = bundle.Epics;
                 _progress = progress;
+                TagEpicRetrospectives();
             }
             if (bundle.Requirements is not null)
             {
@@ -332,6 +333,10 @@ public sealed class SiteGenerator
             {
                 _epicsModel = ingest.Epics;
                 _progress = progress;
+                // Watch-mode re-ingest also re-stamps HasRetrospective from the (preserved) retro map, so a retro'd
+                // all-done epic doesn't flip to "In review" on the sunburst/donut/badge after an unrelated story
+                // edit — the flag must not reset to false when the model is rebuilt. [spec-sunburst-retro]
+                TagEpicRetrospectives();
             }
             if (ingest.Requirements is not null)
             {
@@ -812,6 +817,21 @@ public sealed class SiteGenerator
         // re-grouping all retros on every epic in the epics render loop). [Story 2.3 review]
         _epicRetroMap = _retros.GroupBy(r => r.EpicNumber)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).First().OutputRelativePath);
+    }
+
+    /// <summary>Stamps each epic's <see cref="EpicInfo.HasRetrospective"/> from <see cref="EpicRetroMap"/> — the
+    /// SAME signal the epic/story pages' retro link reads — so the retro-gated "In review" tier
+    /// (<see cref="StatusStyles.ForEpicWithRetrospective"/>) and those links can never disagree. Called after the
+    /// epics model is (re)cached in BOTH <see cref="GenerateAll"/> and the incremental <see cref="RegenerateEpics"/>,
+    /// so a watch-mode rebuild doesn't reset the flag to false and wrongly downgrade a retro'd epic to "In review".
+    /// [spec-sunburst-retro]</summary>
+    private void TagEpicRetrospectives()
+    {
+        if (_epicsModel is null) return;
+        foreach (var epic in _epicsModel.Epics)
+        {
+            epic.HasRetrospective = _epicRetroMap.ContainsKey(epic.Number);
+        }
     }
 
     /// <summary>Writes each parsed retrospective into its dedicated <see cref="RetroTemplater"/> page (at the

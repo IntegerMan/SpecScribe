@@ -870,25 +870,16 @@ So that a future VS Code webview can render those two surfaces from the same typ
 
 <!-- Former AC #2 (webview display) and AC #3 (live host-push) relocated 2026-07-10 to Story 6.4. -->
 
-### Story 6.3: Host-Aware Theming and Explicit Helper Actions
+### Story 6.3: Host-Aware Theming and Explicit Helper Actions — RENUMBERED to Story 6.5
 
-As a maintainer using multiple themes,
-I want webview visuals to align with VS Code chrome while preserving SpecScribe semantics,
-So that the experience feels native without losing product identity.
-
-**Acceptance Criteria:**
-
-1.
-**Given** light, dark, and high-contrast VS Code themes
-**When** the webview renders
-**Then** host theme variables are respected for chrome and container surfaces
-**And** status and insight semantics remain clear and accessible.
-
-2.
-**Given** helper actions are exposed in the webview
-**When** I trigger a helper
-**Then** it generates explicit commands or prompts only
-**And** no source planning artifacts are mutated by the helper path.
+<!-- 2026-07-10: RENUMBERED 6.3 → 6.5 at create-story (owner-directed). This is a SEQUENCING fix, not a
+     scope change. Host theming + helper actions both presuppose a rendering VS Code webview, which does
+     NOT exist until Story 6.4 (the webview runtime) ships — so this story must sort AFTER 6.4, not before
+     it. Rather than carry the "runs after 6.4 despite sorting before it" footnote indefinitely (the note
+     6.4's split already had to add), the story number now matches the dependency order. Append-only /
+     no-renumber-of-6.4 per project convention (like 4.8 out of 4.2, Epics 11-15, and 6.4 out of 6.2): 6.4
+     keeps its number, the theming story moves to the next free slot (6.5), and this 6.3 slot is retired
+     with this breadcrumb. Full ACs + content now live under Story 6.5 below. -->
 
 ### Story 6.4: Read-Only VS Code Webview Runtime for Dashboard and Epics
 
@@ -925,6 +916,31 @@ So that I can inspect project state without context-switching to a browser.
 **When** host updates are pushed
 **Then** visible status refreshes in place without full panel reset
 **And** drill/breadcrumb context remains coherent.
+
+### Story 6.5: Host-Aware Theming and Explicit Helper Actions
+
+<!-- 2026-07-10: RENUMBERED from Story 6.3 (owner-directed sequencing fix — see the retired 6.3 breadcrumb
+     above). ACs verbatim from the former Story 6.3. DEPENDS ON Story 6.4 (the webview runtime this story
+     themes and hangs helper buttons on) and Story 6.2 (the section view models 6.4 renders). Sequences
+     LAST in Epic 6. -->
+
+As a maintainer using multiple themes,
+I want webview visuals to align with VS Code chrome while preserving SpecScribe semantics,
+So that the experience feels native without losing product identity.
+
+**Acceptance Criteria:**
+
+1.
+**Given** light, dark, and high-contrast VS Code themes
+**When** the webview renders
+**Then** host theme variables are respected for chrome and container surfaces
+**And** status and insight semantics remain clear and accessible.
+
+2.
+**Given** helper actions are exposed in the webview
+**When** I trigger a helper
+**Then** it generates explicit commands or prompts only
+**And** no source planning artifacts are mutated by the helper path.
 
 ## Epic 7: Code and Git Exploration
 

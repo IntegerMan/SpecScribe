@@ -28,7 +28,9 @@ public static class BmadCommands
     };
 
     public static string RenderNextSteps(StoryInfo story, CommandCatalog commands) =>
-        RenderPanel(ForStory(story, commands));
+        StatusStyles.ForStory(story) == "done"
+            ? RenderAllDonePanel()
+            : RenderPanel(ForStory(story, commands));
 
     public static string RenderEpicNextSteps(EpicInfo epic, CommandCatalog commands) =>
         RenderPanel(ForEpic(epic, commands));
@@ -40,6 +42,14 @@ public static class BmadCommands
     /// the Next Steps into a shared panel rather than give it a standalone one.</summary>
     public static string RenderEpicNextStepsInner(EpicInfo epic, CommandCatalog commands) =>
         RenderInner(ForEpic(epic, commands));
+
+    /// <summary>The story actions pane for a DONE story: no command list — a finished story needs no next
+    /// action, so it gets a celebratory terminal state (checkmark + success styling) instead of the code-review
+    /// nudge a review/in-progress story shows. Reuses the shared done glyph (<see cref="Icons.ForStatus"/>) so
+    /// the checkmark stays anchored to the one status-icon seam. [spec-sunburst-retro]</summary>
+    private static string RenderAllDonePanel() =>
+        "<div class=\"chart-panel next-steps all-done\">\n<h3>Next Steps</h3>\n" +
+        $"<p class=\"all-done-complete\"><span class=\"all-done-icon\">{Icons.ForStatus("done")}</span>All done — this story is complete.</p>\n</div>\n\n";
 
     private static string RenderPanel(List<Suggestion> suggestions)
     {
@@ -224,10 +234,17 @@ public static class BmadCommands
             return suggestions;
         }
 
-        if (status.Contains("done") || status.Contains("complete") || status.Contains("review"))
+        if (status.Contains("review"))
         {
             Add(suggestions, commands.Command("code-review", story.Id),
                 "Final adversarial pass over the story's changes.");
+            return suggestions;
+        }
+
+        if (status.Contains("done") || status.Contains("complete"))
+        {
+            // A done story is finished — no next action. RenderNextSteps renders a celebratory "All done" panel
+            // instead of this (empty) list, so a completed story is never nagged to re-review. [spec-sunburst-retro]
             return suggestions;
         }
 
@@ -248,7 +265,10 @@ public static class BmadCommands
 
     private static List<Suggestion> ForEpic(EpicInfo epic, CommandCatalog commands)
     {
-        var epicClass = StatusStyles.ForEpic(epic);
+        // Retro-gated: an all-stories-done epic reads as "review" until its retro closes it out (then "done").
+        // Keying the retro suggestion off "review" fires it exactly when it's needed and stops nagging an epic
+        // that already has a retro. [spec-sunburst-retro]
+        var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
         var suggestions = new List<Suggestion>();
 
         if (epicClass == "pending")
@@ -258,10 +278,16 @@ public static class BmadCommands
             return suggestions;
         }
 
-        if (epicClass == "done")
+        if (epicClass == "review")
         {
             Add(suggestions, commands.Command("retrospective", epic.Number.ToString()),
                 "Runs a retrospective now that every story in this epic is done.");
+            return suggestions;
+        }
+
+        if (epicClass == "done")
+        {
+            // Every story done and the retrospective is captured — nothing more to suggest at the epic level.
             return suggestions;
         }
 

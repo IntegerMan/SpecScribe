@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-10T22:00:00-04:00
+last_updated: 2026-07-10T23:30:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -91,12 +91,24 @@ development_status:
   epic-5-retrospective: optional
 
   epic-6: in-progress
-  6-1-shared-view-model-contract-for-html-and-webview-adapters: review
+  6-1-shared-view-model-contract-for-html-and-webview-adapters: done
   6-2-read-only-vs-code-dashboard-and-epics-experience: review # scoped to epics AC #1 (rendering-core body decomposition) at create-story; webview runtime (AC #2/#3) split out, needs correct-course seating
-  6-3-host-aware-theming-and-explicit-helper-actions: backlog
-  # Story 6.4 split out of 6.2 at create-story 2026-07-10 (webview runtime + live push, former 6.2 AC #2/#3);
-  # append-only/no-renumber. Sequences AFTER 6.2 and BEFORE 6.3 (6.3 theming depends on the webview existing).
+  # Epic 6 stories RENUMBERED into dependency order 2026-07-10 (owner-authorized): 6.1 contract → 6.2 section
+  # view models → 6.3 VS Code integration spike → 6.4 webview runtime → 6.5 host theming. Numeric == dependency
+  # order, no inversions. (History: host-theming was briefly renumbered 6.3→6.5 to sort after the webview; the
+  # spike then took the vacated 6.3 slot and the runtime kept 6.4.) epics.md still numbers host-theming as its
+  # 6.3 and has no spike entry — reconcile via correct-course/sprint-planning; this file is the operational truth.
+  # Story 6.3 = VS Code Integration Spike (feasibility proof + ADR 0005 seam decision), redirected here at
+  # create-story 2026-07-10 from the former 6.4 webview-runtime story (owner-confirmed). Story file:
+  # 6-3-vs-code-integration-spike.md. SOFT-depends on 6.2 (stand in if its view models aren't built yet).
+  6-3-vs-code-integration-spike: ready-for-dev
+  # Story 6.4 = the webview RUNTIME (webview UI + live host-push, former 6.2 AC #2/#3 + the epic's 6.4 ACs).
+  # Seated by the 6.3 spike's ADR 0005; run create-story when the spike lands. DEPENDS ON 6.2 (section view
+  # models) + 6.3 (spike decision). Keeps the webview-runtime slug; no story file yet.
   6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: backlog
+  # Story 6.5 = host theming + explicit helper actions (was epics.md Story 6.3). DEPENDS ON 6.4 (webview runtime)
+  # + 6.2; sequences after the 6.3 spike and the 6.4 runtime.
+  6-5-host-aware-theming-and-explicit-helper-actions: ready-for-dev
   epic-6-retrospective: optional
 
   epic-7: in-progress
@@ -112,7 +124,7 @@ development_status:
   # (Story 8.1 created via create-story). Run sprint-planning to seat Epics 9–10 stories when scheduled.
   epic-8: in-progress
   8-1-canonical-status-model-with-portal-wide-legend: ready-for-dev
-  8-2-single-source-of-truth-for-every-count: backlog
+  8-2-single-source-of-truth-for-every-count: ready-for-dev
   8-3-paired-progress-and-readiness-semantics: backlog
   8-4-state-aware-next-step-command-surface: backlog
   8-5-designed-empty-states: backlog

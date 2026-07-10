@@ -38,8 +38,9 @@ public class PathUtilTests
         // Root page: the details link is a bare href (no relative prefix), relabelled from "About".
         Assert.Contains("href=\"about.html\"", footer);
         Assert.Contains(">View generation details</a>", footer);
-        // The generation date is humanized (current month name), not the raw yyyy-MM-dd HH:mm it used to carry.
-        Assert.Contains($" on {DateTime.Now:MMMM} ", footer);
+        // The generation date is humanized ("July 10, 2026 at 5:14 PM"), not the raw yyyy-MM-dd HH:mm it used to
+        // carry. Asserted by shape, not against DateTime.Now, so the test doesn't depend on the moment it runs.
+        Assert.Matches(@" on [A-Z][a-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} (AM|PM) &middot;", footer);
     }
 
     [Fact]

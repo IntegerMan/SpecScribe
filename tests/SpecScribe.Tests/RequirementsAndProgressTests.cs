@@ -218,6 +218,33 @@ public class RequirementsParserTests
     }
 
     [Fact]
+    public void DeriveStatus_AllDoneCoveringEpicIsDone_EvenWithNoRetrospective()
+    {
+        // Guard: requirement roll-up must NOT be retro-gated. A covering epic whose every story is done rolls
+        // its requirement up to Done regardless of whether a retrospective exists — a retro is a closure ritual,
+        // not an implementation signal. Swapping DeriveStatus onto ForEpicWithRetrospective would wrongly drop a
+        // fully-built requirement to Planned. This is exactly the all-done-no-retro state the sunburst renders as
+        // "In review", so the divergence between the two classifiers is intentional and pinned here. [spec-sunburst-retro]
+        var dir = Directory.CreateTempSubdirectory("ss-req-done-").FullName;
+        try
+        {
+            var artifact = Path.Combine(dir, "1-1.md");
+            File.WriteAllText(artifact, "# Story 1.1\nStatus: done\n\n## Tasks / Subtasks\n\n- [x] a\n- [x] b\n");
+            var epics = EpicsParser.Parse(MultiEpicEpicsMd);
+            var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null);
+            // The pipeline never sets HasRetrospective (SiteGenerator does, from the retro map) — so it defaults
+            // false here: the all-done-no-retro state.
+            Assert.All(epics.Epics, e => Assert.False(e.HasRetrospective));
+
+            var reqs = RequirementsParser.Parse(MultiEpicEpicsMd, epics, progress);
+
+            // FR1 is covered solely by Epic 1, now fully done → Done, not Planned.
+            Assert.Equal(RequirementStatus.Done, reqs.ById["FR1"].Status);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void RenderIndex_PopulatedProject_ContainsStatusGridAndFlowPanel()
     {
         var (reqs, epics) = ParseMultiEpic();

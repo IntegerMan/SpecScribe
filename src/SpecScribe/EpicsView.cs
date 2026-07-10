@@ -1,11 +1,11 @@
 namespace SpecScribe;
 
 /// <summary>One epic "chip" (the compact vertical-slice / further-development overview links) as DATA: the epic
-/// number, its title (already-projected inline HTML), its <see cref="StatusStyles.ForEpic"/> status class, and
-/// its drill href. Mirrors the story's <c>EpicChip { Number, Title, Status, Href }</c>. [Story 6.2]</summary>
+/// number, its title (already-projected inline HTML), its <see cref="StatusStyles.ForEpicWithRetrospective"/>
+/// status class, and its drill href. Mirrors the story's <c>EpicChip { Number, Title, Status, Href }</c>. [Story 6.2]</summary>
 /// <param name="Number">The epic number.</param>
 /// <param name="TitleHtml">The epic title as already-projected inline HTML (carried verbatim, as the chip renders it raw).</param>
-/// <param name="StatusClass">The <see cref="StatusStyles.ForEpic"/> css class (done/active/drafted/pending).</param>
+/// <param name="StatusClass">The <see cref="StatusStyles.ForEpicWithRetrospective"/> css class (done/review/active/ready/drafted/pending — a retro-gated visual surface).</param>
 /// <param name="Href">The drill href to the epic page (e.g. <c>epics/epic-1.html</c>).</param>
 public sealed record EpicChip(int Number, string TitleHtml, string StatusClass, string Href);
 
@@ -109,8 +109,9 @@ public sealed record EpicPageView
     /// <summary>The epic title as already-projected HTML (the <c>&lt;h1&gt;</c>).</summary>
     public required string TitleHtml { get; init; }
 
-    /// <summary>The <see cref="StatusStyles.ForEpic"/> status class — the header badge stage AND the page's
-    /// interaction status stage.</summary>
+    /// <summary>The <see cref="StatusStyles.ForEpicWithRetrospective"/> status class — the header badge stage AND
+    /// the page's interaction status stage (a retro-gated visual surface: an all-done epic with no retro reads
+    /// "review").</summary>
     public required string StatusClass { get; init; }
 
     /// <summary>The header status badge label (<see cref="StatusStyles.EpicLabel"/>).</summary>

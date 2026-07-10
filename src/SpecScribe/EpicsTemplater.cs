@@ -46,7 +46,7 @@ public static class EpicsTemplater
     public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
-        var epicClass = StatusStyles.ForEpic(epic);
+        var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
 
         var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
         {

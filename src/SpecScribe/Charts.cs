@@ -150,7 +150,7 @@ public static class Charts
         {
             var weight = Math.Max(1, epic.Stories.Count);
             var sweep = weight * anglePerUnit;
-            var epicClass = StatusStyles.ForEpic(epic);
+            var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
 
             // aria-label carries the same name+status+count as the hover-only <title>, so keyboard and

@@ -39,5 +39,7 @@ public class AboutTemplaterTests
         // Full page shell (skip link + single main landmark), like every other synthesized page.
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
         Assert.Contains("<main id=\"main-content\"", html);
+        // The centered content-column layout shared with the diagnostics page.
+        Assert.Contains("<main id=\"main-content\" class=\"info-page\">", html);
     }
 }

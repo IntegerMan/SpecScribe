@@ -80,6 +80,9 @@ public static class RenderParity
     private static readonly Regex CrumbEntry = new("<a href=\"(?<href>[^\"]*)\">(?<label>.*?)</a>|<span class=\"crumb-current\"[^>]*>(?<current>.*?)</span>", RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex Stylesheet = new("<link rel=\"stylesheet\" href=\"(?<href>[^\"]*)\">", RegexOptions.Compiled);
     private static readonly Regex Script = new("<script src=\"(?<href>[^\"]*)\" defer>", RegexOptions.Compiled);
+    // Any anchor's href, in document order — used to evidence the ACTUAL order children appear in, rather than
+    // trusting the reference's own declared order (a surface that renders children out of order must be caught).
+    private static readonly Regex AnyAnchorHref = new("<a[^>]+href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
 
     /// <summary>The facts a <see cref="PageView"/> DECLARES — the reference every surface is checked against.</summary>
     public static SemanticFacts FromPageView(PageView page) => new()
@@ -122,14 +125,15 @@ public static class RenderParity
             Nav = nav,
             Breadcrumb = breadcrumb,
             ParentDrillTarget = parent,
-            // Only children whose target actually appears in the rendered output survive — a dropped child is
-            // absent here, so it differs from the reference's full set.
-            ChildDrillTargets = reference.Interaction.ChildTargets
-                .Where(c => html.Contains(NormalizeTarget(c), StringComparison.Ordinal))
-                .Select(NormalizeTarget)
-                .ToList(),
-            // The status stage is evidenced only if the page actually renders a badge carrying it.
-            StatusStage = reference.Interaction.StatusStage is { } s && html.Contains($"status-badge {s}", StringComparison.Ordinal) ? s : null,
+            // Evidenced in the DOCUMENT'S OWN order (not the reference's declared order), so a surface that
+            // renders children correctly-present but out of order is caught by the SequenceEqual in
+            // FindDivergences, not masked by re-deriving order from what we're supposed to be checking against.
+            ChildDrillTargets = ExtractChildDrillTargets(html, reference.Interaction.ChildTargets),
+            // The status stage is evidenced only if the page actually renders a badge carrying it. Matches the
+            // <span class="status-badge ..."> element itself (word-bounded, order/extra-class tolerant) rather than
+            // a raw substring, so an unrelated "status-badge {s}" occurring elsewhere can't false-positive and a
+            // reordered/extended class list on the real badge can't false-negative.
+            StatusStage = reference.Interaction.StatusStage is { } s && StatusBadgeMatches(html, s) ? s : null,
             Stylesheet = cssMatch.Success ? NormalizeTarget(cssMatch.Groups["href"].Value) : string.Empty,
             Script = scriptMatch.Success ? NormalizeTarget(scriptMatch.Groups["href"].Value) : string.Empty,
             MermaidPresent = html.Contains("mermaid.initialize", StringComparison.Ordinal),
@@ -208,6 +212,28 @@ public static class RenderParity
         }
         return crumbs;
     }
+
+    /// <summary>Evidences the expected drill children in the order they actually appear in <paramref name="html"/>
+    /// (first occurrence wins), filtered down to the reference's checklist — a dropped child is simply absent, and
+    /// a reordered one now shows up out of sequence instead of silently inheriting the reference's order.</summary>
+    private static IReadOnlyList<string> ExtractChildDrillTargets(string html, IReadOnlyList<string> expectedChildren)
+    {
+        var expected = expectedChildren.Select(NormalizeTarget).ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var ordered = new List<string>();
+        foreach (Match m in AnyAnchorHref.Matches(html))
+        {
+            var target = NormalizeTarget(m.Groups["href"].Value);
+            if (expected.Contains(target) && seen.Add(target)) ordered.Add(target);
+        }
+        return ordered;
+    }
+
+    /// <summary>True when the rendered output carries a <c>&lt;span class="status-badge ..."&gt;</c> whose class
+    /// list includes <paramref name="stage"/> — word-bounded and order/extra-class tolerant, so it evidences the
+    /// canonical <see cref="StatusStyles.RenderBadge"/> output regardless of incidental class-order changes.</summary>
+    private static bool StatusBadgeMatches(string html, string stage) =>
+        Regex.IsMatch(html, $"<span class=\"status-badge\\b(?=[^\"]*\\b{Regex.Escape(stage)}\\b)[^\"]*\"", RegexOptions.Singleline);
 
     /// <summary>Folds a rendered href back to its output-relative target: normalize slashes, drop the
     /// <c>?v=</c> cache-bust token, and strip the leading <c>../</c> prefix segments so a link rendered from a

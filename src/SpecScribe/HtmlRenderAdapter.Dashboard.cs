@@ -136,7 +136,7 @@ public sealed partial class HtmlRenderAdapter
         string? centerText;
         if (epicsModel is not null && epicsModel.Epics.Count > 0)
         {
-            var classes = epicsModel.Epics.Select(StatusStyles.ForEpic).ToList();
+            var classes = epicsModel.Epics.Select(StatusStyles.ForEpicWithRetrospective).ToList();
             int Count(string c) => classes.Count(x => x == c);
             segments = StatusStyles.EpicStages
                 .Select(stage => (StatusStyles.EpicLabel(stage), Count(stage), stage))

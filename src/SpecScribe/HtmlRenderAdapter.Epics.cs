@@ -108,7 +108,7 @@ public sealed partial class HtmlRenderAdapter
 
     private void AppendEpicCard(StringBuilder sb, EpicInfo epic, CommandCatalog commands)
     {
-        var statusCls = StatusStyles.ForEpic(epic);
+        var statusCls = StatusStyles.ForEpicWithRetrospective(epic);
         sb.Append($"<div class=\"epic-card\" id=\"epic-{epic.Number}\">\n");
         sb.Append($"  <h2><span class=\"epic-num\">Epic {epic.Number}</span> {epic.Title} <span class=\"epic-status {statusCls}\">{PathUtil.Html(StatusStyles.EpicLabel(statusCls))}</span></h2>\n");
 

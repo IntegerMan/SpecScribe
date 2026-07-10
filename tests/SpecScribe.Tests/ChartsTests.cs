@@ -58,6 +58,36 @@ public class ChartsTests
     }
 
     [Fact]
+    public void Sunburst_AllDoneEpicReadsAsInReviewUntilRetroExists()
+    {
+        // An epic whose every story is done but has no parsed retrospective is retro-gated to the "review"
+        // (deep-teal) tier in the sunburst's inner ring — delivered, retro pending — rather than green "done".
+        EpicsModel Model(bool hasRetro)
+        {
+            var epic = Epic(Story("1.1", "Do the thing", "done", done: 3, total: 3));
+            epic.HasRetrospective = hasRetro;
+            return new EpicsModel
+            {
+                OverviewHtml = string.Empty,
+                RequirementsInventoryHtml = string.Empty,
+                Epics = new[] { epic },
+            };
+        }
+
+        var noRetro = Charts.Sunburst(Model(hasRetro: false));
+        // The epic (inner-ring) segment carries the review class + label. (The task ring has its own sb-done arc
+        // for the finished tasks, so the epic segment's aria-label is the unambiguous signal to assert on.)
+        Assert.Contains("class=\"sb-seg sb-review\"", noRetro);
+        Assert.Contains("aria-label=\"Epic 1: First Epic — In review, 1 story\"", noRetro);
+
+        var withRetro = Charts.Sunburst(Model(hasRetro: true));
+        // Once a retro exists the epic segment is green "done" again. (Assert on the epic aria-label, not a bare
+        // "In review" — the legend always lists an "In review" swatch regardless of the data.)
+        Assert.Contains("aria-label=\"Epic 1: First Epic — Done, 1 story\"", withRetro);
+        Assert.DoesNotContain("Epic 1: First Epic — In review", withRetro);
+    }
+
+    [Fact]
     public void Sunburst_LegendEntriesAreKeyboardReachableAndStatusKeyedForEmphasis()
     {
         // The interactive-legend emphasis (Story 3.5 Task 3) is pure CSS, but it needs each legend entry to

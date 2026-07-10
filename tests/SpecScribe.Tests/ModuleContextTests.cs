@@ -186,6 +186,59 @@ public class BmadCommandsTests
         Assert.Contains("/bmad-create-story 3.2", html);
     }
 
+    [Fact]
+    public void RenderNextSteps_DoneStory_ShowsCelebratoryAllDonePanelNotCodeReview()
+    {
+        // A finished story is never nudged to re-review — its actions pane becomes a celebratory terminal state
+        // (checkmark + "All done" + success styling) instead of the code-review suggestion. [spec-sunburst-retro]
+        var html = BmadCommands.RenderNextSteps(Story("2.1", "done"), BmmCatalog);
+
+        Assert.Contains("next-steps all-done", html);   // the success-styled panel
+        Assert.Contains("All done", html);               // the message
+        Assert.Contains("ss-icon", html);                // the shared done checkmark glyph
+        Assert.DoesNotContain("/bmad-code-review", html);
+    }
+
+    private static EpicInfo Epic(bool hasRetro, params StoryInfo[] stories) => new()
+    {
+        Number = 1,
+        Title = "First Epic",
+        GoalHtml = string.Empty,
+        Status = EpicStatus.Drafted,
+        Section = EpicSection.VerticalSlice,
+        Stories = stories,
+        HasRetrospective = hasRetro,
+    };
+
+    [Fact]
+    public void RenderEpicNextSteps_AllStoriesDoneNoRetro_SuggestsRetrospective()
+    {
+        // The retro-gated "review" state (every story done, no retro yet) is exactly when to nudge a retro.
+        var catalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["retrospective"] = "/bmad-retrospective",
+        });
+
+        var html = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: false, Story("1.1", "done"), Story("1.2", "done")), catalog);
+
+        Assert.Contains("/bmad-retrospective 1", html);
+    }
+
+    [Fact]
+    public void RenderEpicNextSteps_AllStoriesDoneWithRetro_SuggestsNothing()
+    {
+        // Once the retro exists the epic is "done" — nothing more to suggest, so the panel is omitted entirely
+        // (no re-nagging to run a retrospective it already has). [spec-sunburst-retro]
+        var catalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["retrospective"] = "/bmad-retrospective",
+        });
+
+        var html = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: true, Story("1.1", "done"), Story("1.2", "done")), catalog);
+
+        Assert.Equal(string.Empty, html);
+    }
+
     private static EpicsModel Project(params StoryInfo[] stories) => new()
     {
         OverviewHtml = string.Empty,

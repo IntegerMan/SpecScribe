@@ -846,6 +846,9 @@ code.color-swatch {
 
 /* Status semantics everywhere: parchment = pending · gold = drafted/ready · teal = active dev · green = done ONLY. */
 .epic-chip.done { border-left: 3px solid var(--status-done); }
+/* An all-stories-done epic with no retrospective yet reads as "In review" on the visual epic-status surfaces
+   (retro-gated), matching the sunburst ring's deep-teal review tier. [spec-sunburst-retro] */
+.epic-chip.review { border-left: 3px solid var(--status-review); }
 .epic-chip.active { border-left: 3px solid var(--status-active); }
 /* Epic chips/badges intentionally share one gold for ready + drafted (only the sunburst ring shows the
    brighter ready shade); the label text carries the difference. [spec-sunburst-epic-focus-and-ready-rollup] */
@@ -901,6 +904,8 @@ code.color-swatch {
 }
 
 .epic-status.done { background: #e8f0e4; color: var(--moss); border: 1px solid var(--moss-light); }
+/* Retro-gated "In review" tier — mirrors .status-badge.review's deep-teal. [spec-sunburst-retro] */
+.epic-status.review { background: #d9e6ea; color: var(--teal-deep); border: 1px solid var(--teal-deep); }
 .epic-status.active { background: #e0ecea; color: var(--teal); border: 1px solid var(--teal); }
 .epic-status.ready,
 .epic-status.drafted { background: #f5ecd4; color: var(--gold); border: 1px solid var(--gold-light); }
@@ -1289,6 +1294,14 @@ code.color-swatch {
 /* The command <code> (.cmd-text) carries no pill of its own — the surrounding .cmd-badge is the pill. */
 
 .next-steps-desc { display: block; margin-top: 0.25rem; font-size: 0.78rem; color: var(--ink-light); line-height: 1.5; }
+
+/* Done-story actions pane: a finished story has no next command, so it gets a celebratory terminal state
+   (green success accent + the shared done checkmark) instead of a code-review nudge. Distinct from the muted,
+   italic .all-done-note used on the epic Up Next card. [spec-sunburst-retro] */
+.next-steps.all-done { border-left: 3px solid var(--status-done); }
+.all-done-complete { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--moss); font-weight: 600; }
+.all-done-icon { display: inline-flex; }
+.all-done-icon .ss-icon { width: 1.15rem; height: 1.15rem; }
 
 /* ====================== DEV AGENT RECORD TABLE ====================== */
 /* Collapsed by default — agent bookkeeping, not the first thing a reader wants. The summary is styled to

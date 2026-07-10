@@ -64,15 +64,29 @@ public static class StatusStyles
         return "drafted";
     }
 
+    /// <summary>The retro-gated epic class for the VISUAL epic-status surfaces (sunburst, Epic Status donut,
+    /// epics-index chips, epic page/card badges): an epic whose every story is done but which has no
+    /// retrospective yet reads as "review" (delivered, retro pending) rather than "done" — so those surfaces
+    /// don't call an epic finished until its retro closes it out. Every other tier defers to
+    /// <see cref="ForEpic"/>. Kept SEPARATE from <see cref="ForEpic"/> on purpose: requirements roll-up
+    /// (<c>RequirementsParser.DeriveStatus</c>) maps epic status onto implementation-completeness, where a retro
+    /// (a closure ritual, not an implementation signal) must never downgrade a fully-built epic. [spec-sunburst-retro]</summary>
+    public static string ForEpicWithRetrospective(EpicInfo epic)
+    {
+        var cls = ForEpic(epic);
+        return cls == "done" && !epic.HasRetrospective ? "review" : cls;
+    }
+
     /// <summary>The complete set of css classes <see cref="ForEpic"/> can return, in narrative order
     /// (done → … → pending). Mirrors <see cref="StoryStages"/>: one authored list, iterated by every epic
     /// roll-up consumer (e.g. the Epic Status donut), so a class can never be silently dropped by a consumer
     /// that forgot to bucket it. Unlike <see cref="StoryStages"/>, "pending" is a real reachable tier here.</summary>
-    public static readonly IReadOnlyList<string> EpicStages = new[] { "done", "active", "ready", "drafted", "pending" };
+    public static readonly IReadOnlyList<string> EpicStages = new[] { "done", "review", "active", "ready", "drafted", "pending" };
 
     public static string EpicLabel(string cssClass) => cssClass switch
     {
         "done" => "Done",
+        "review" => "In review",
         "active" => "In development",
         "ready" => "Ready for dev",
         "drafted" => "Stories drafted",

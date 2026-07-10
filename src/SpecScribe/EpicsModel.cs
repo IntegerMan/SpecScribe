@@ -40,6 +40,14 @@ public sealed class EpicInfo
     public required EpicStatus Status { get; init; }
     public required EpicSection Section { get; init; }
     public required IReadOnlyList<StoryInfo> Stories { get; init; }
+
+    /// <summary>True once a retrospective note has been parsed for this epic — set post-construction from the
+    /// same <c>EpicRetroMap</c> the epic/story pages' retro link uses (see SiteGenerator), so it can never
+    /// disagree with that link. Gates the sunburst/donut/chip/badge "In review" tier via
+    /// <see cref="StatusStyles.ForEpicWithRetrospective"/>: an all-done epic isn't called finished until its
+    /// retro closes it out. Default false. Deliberately NOT consumed by requirements roll-up (a retro is a
+    /// closure ritual, not an implementation signal).</summary>
+    public bool HasRetrospective { get; set; }
 }
 
 /// <summary>One numbered acceptance criterion pulled from a story artifact's "## Acceptance Criteria"

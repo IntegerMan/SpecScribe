@@ -172,6 +172,35 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         Assert.Contains("I want the placeholder replaced", html);
     }
 
+    [Fact]
+    public void RegenerateEpics_KeepsRetroGatedEpicDone_DoesNotFlipToReviewInWatchMode()
+    {
+        // Watch-mode regression: an all-stories-done epic WITH a retrospective must keep rendering "Done" after an
+        // incremental RegenerateEpics. The retro flag is re-stamped from the preserved retro map, not reset to
+        // false — which (before the fix) reset HasRetrospective to false on the rebuilt model and wrongly
+        // downgraded the epic to the retro-gated "In review" on the sunburst/donut/badge. [spec-sunburst-retro]
+        var impl = Path.Combine(Source, "implementation-artifacts");
+        const string done = "Status: done\n\n## Tasks / Subtasks\n\n- [x] Task 1\n";
+        File.WriteAllText(Path.Combine(impl, "1-1-drafted-story.md"), "# Story 1.1\n" + done);
+        File.WriteAllText(Path.Combine(impl, "1-2-future-story.md"), "# Story 1.2\n" + done);
+        File.WriteAllText(Path.Combine(impl, "epic-1-retro-2026-07-10.md"),
+            "# Epic 1 Retrospective\n\n**Date:** 2026-07-10\n**Participants:** Team\n\nWent well.\n");
+
+        var gen = GenerateSite();
+        // Sanity: all done + retro present ⇒ the epic header badge is "Done", never the retro-gated "In review".
+        Assert.Contains("status-badge done", File.ReadAllText(EpicPage));
+        Assert.DoesNotContain("status-badge review", File.ReadAllText(EpicPage));
+
+        // A watch edit to a story file triggers an incremental epics regen (retros are NOT re-parsed on this path).
+        File.WriteAllText(Path.Combine(impl, "1-1-drafted-story.md"), "# Story 1.1\n" + done + "- [x] Task 2\n");
+        Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateEpics().Outcome);
+
+        // Still "Done" — before the fix the epic flipped to "In review" on the incremental rebuild.
+        var epicHtml = File.ReadAllText(EpicPage);
+        Assert.Contains("status-badge done", epicHtml);
+        Assert.DoesNotContain("status-badge review", epicHtml);
+    }
+
     // ---- Inline Story/Epic mention links ----
 
     [Fact]

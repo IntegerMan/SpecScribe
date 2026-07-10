@@ -66,16 +66,18 @@ public class StatusStylesTests
     [Fact]
     public void EpicStages_CoversEveryForEpicOutputAndEachHasALabel()
     {
-        // Representative epics exercising each reachable ForEpic branch. EpicStages is the single list the Epic
-        // Status donut iterates, so binding ForEpic's real outputs to it (both directions) guarantees a class
-        // can never silently drop from the donut, nor an EpicStages member be dead. [heatmap-debt-triage]
+        // Representative epics exercising each reachable epic-class branch. EpicStages is the single list the Epic
+        // Status donut iterates (over ForEpicWithRetrospective, which adds a "review" tier for all-done-no-retro
+        // epics), so binding those real outputs to it (both directions) guarantees a class can never silently
+        // drop from the donut, nor an EpicStages member be dead. [heatmap-debt-triage; spec-sunburst-retro]
         var outputs = new[]
         {
-            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("done"))),          // done
-            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("in progress"))),   // active
-            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("ready-for-dev"))), // ready
-            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null))),            // drafted
-            StatusStyles.ForEpic(Epic(EpicStatus.Pending, Story("done"))),          // pending
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("done"))),                          // done
+            StatusStyles.ForEpicWithRetrospective(Epic(EpicStatus.Drafted, Story("done"))),         // review (no retro)
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("in progress"))),                   // active
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("ready-for-dev"))),                 // ready
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null))),                            // drafted
+            StatusStyles.ForEpic(Epic(EpicStatus.Pending, Story("done"))),                          // pending
         };
 
         Assert.All(outputs, o => Assert.Contains(o, StatusStyles.EpicStages));
@@ -90,12 +92,43 @@ public class StatusStylesTests
 
     [Theory]
     [InlineData("done", "Done")]
+    [InlineData("review", "In review")]
     [InlineData("active", "In development")]
     [InlineData("ready", "Ready for dev")]
     [InlineData("drafted", "Stories drafted")]
     [InlineData("pending", "Pending")]
     public void EpicLabel_MapsEachTier(string cssClass, string expected)
         => Assert.Equal(expected, StatusStyles.EpicLabel(cssClass));
+
+    [Fact]
+    public void ForEpicWithRetrospective_DowngradesDoneToReviewOnlyWhenNoRetro()
+    {
+        // All stories done, no retro parsed yet → "review" (delivered, retro pending).
+        var noRetro = Epic(EpicStatus.Drafted, Story("done"), Story("complete"));
+        Assert.False(noRetro.HasRetrospective);
+        Assert.Equal("review", StatusStyles.ForEpicWithRetrospective(noRetro));
+
+        // Same epic once a retrospective exists → back to "done".
+        var withRetro = Epic(EpicStatus.Drafted, Story("done"), Story("complete"));
+        withRetro.HasRetrospective = true;
+        Assert.Equal("done", StatusStyles.ForEpicWithRetrospective(withRetro));
+    }
+
+    [Fact]
+    public void ForEpicWithRetrospective_LeavesNonDoneTiersUntouchedRegardlessOfRetro()
+    {
+        // Only the "done" tier is retro-gated; every other tier is exactly what ForEpic returns, even if a
+        // (spurious) retro flag is set — the downgrade must never invent a "review" from a partial epic.
+        var active = Epic(EpicStatus.Drafted, Story("done"), Story("ready-for-dev"));
+        Assert.Equal("active", StatusStyles.ForEpicWithRetrospective(active));
+
+        var ready = Epic(EpicStatus.Drafted, Story("ready-for-dev"));
+        ready.HasRetrospective = true;
+        Assert.Equal("ready", StatusStyles.ForEpicWithRetrospective(ready));
+
+        var pending = Epic(EpicStatus.Pending, Story("done"));
+        Assert.Equal("pending", StatusStyles.ForEpicWithRetrospective(pending));
+    }
 
     [Theory]
     [InlineData("done", "Done")]

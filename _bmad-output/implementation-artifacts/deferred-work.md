@@ -2,6 +2,13 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of story-6-1 (2026-07-10)
+
+- source_spec: `6-1-shared-view-model-contract-for-html-and-webview-adapters.md`
+- **`SpecScribe.csproj`'s `BuildDate` MSBuild stamp is non-deterministic.** `$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))` is evaluated at every compile, so two builds of the identical commit on different days produce different assembly bytes — a build-determinism tradeoff. Revisit if reproducible builds become a requirement.
+- **`ProductMetadata.IsPrerelease`/`CommitHash` have no format validation.** `Version.Contains('-')` and `sha[..7]` (no hex check) are naive but low-risk since the version string is developer-controlled via csproj. Add validation if the version source ever becomes less trusted.
+- **ADR-extraction rework, `BmadArtifactAdapter.TryParse` hardening, and `ForgeOptions` README exclusion predate Story 6.1's actual diff window** (landed in an earlier "4.x review" commit, not this story's work) — surfaced during 6.1's review only because the review diff spanned more than this story's own commits. Not actionable via 6.1; revisit if that earlier commit's changes are reviewed directly.
+
 ## Deferred from: code review of story-4-8 (2026-07-10)
 
 - source_spec: `4-8-generation-diagnostics-and-configuration-log-page.md`
