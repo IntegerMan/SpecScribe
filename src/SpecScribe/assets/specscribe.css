@@ -1579,7 +1579,6 @@ code.color-swatch {
 /* Every tile fill maps 1:1 to its lifecycle token — the single stage→color source, never hardcoded hex. */
 .req-status-block.done { background: var(--status-done); }
 .req-status-block.active { background: var(--status-active); color: var(--warm-white); }
-.req-status-block.review { background: var(--status-review); color: var(--warm-white); }
 .req-status-block.ready { background: var(--status-ready); }
 .req-status-block.pending { background: var(--status-pending); }
 .req-status-block.deferred { background: var(--status-deferred); color: var(--warm-white); }

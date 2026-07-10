@@ -7,11 +7,13 @@ public enum RequirementKind { Functional, NonFunctional }
 /// covering epic's stories have task plans but none started); Active = "partially implemented" (a covering
 /// epic has a story in dev/review/done, but not every covering epic is fully done); Done (every covering epic
 /// is complete).
-/// <para>Honesty caveat: the FR→Epic map is epic-level, so "Active / Partially implemented" is derived from
-/// the covering <em>epics'</em> story progress (via <see cref="StatusStyles.ForEpic"/>), not per-requirement
-/// story attribution — it is an informed approximation, never a claim beyond what the covering epics support.
-/// This deliberately supersedes the earlier stance (Story 3.7) that refused any mid-development state, now that
-/// the multi-epic FR→story mapping (<see cref="RequirementsParser.StoriesFor"/>) backs it.</para></summary>
+/// <para>Honesty caveat: the FR→Epic map is epic-level, and "Active / Partially implemented" is an
+/// <em>epic-level</em> approximation — <see cref="StatusStyles.ForEpic"/> rolls up over the covering epic's
+/// entire story list, not just the stories <see cref="RequirementsParser.StoriesFor"/> resolves for this
+/// specific requirement. A covering epic can read "active" from a story unrelated to this requirement. This
+/// deliberately supersedes the earlier stance (Story 3.7) that refused any mid-development state, but it is
+/// not the finer-grained, per-requirement claim the name might suggest — it is the same epic-level signal as
+/// every other requirement-status tier, just with a new label for a real epic-level state.</para></summary>
 public enum RequirementStatus { Deferred, Planned, Ready, Active, Done }
 
 /// <summary>One Functional or Non-Functional requirement parsed from epics.md's "## Requirements Inventory".

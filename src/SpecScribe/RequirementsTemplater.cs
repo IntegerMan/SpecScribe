@@ -41,7 +41,7 @@ public static class RequirementsTemplater
         sb.Append("</div>\n</section>\n\n");
 
         // Requirements at a glance: every FR/NFR as a colorized status block (AC #1), then the Sankey-style flow
-        // of functional requirements from definition → epic coverage → implementation state (AC #2). The blocks
+        // of ALL requirements from definition → epic coverage → implementation state (AC #2). The blocks
         // and the requirement cards below are the flow's text equivalent (AC #3, never diagram-only).
         var allReqs = model.Functional.Concat(model.NonFunctional).ToList();
         if (allReqs.Count > 0)
@@ -50,10 +50,9 @@ public static class RequirementsTemplater
             sb.Append("<div class=\"chart-panel\">\n");
             sb.Append(Charts.RequirementStatusGrid(allReqs, prefix: string.Empty));
             sb.Append("</div>\n\n");
-        }
 
-        if (model.Functional.Count > 0)
-        {
+            // Gated on allReqs (FR+NFR), matching RequirementFlow's actual scope — an NFR-only project must
+            // not silently lose the flow panel just because it has zero FRs.
             sb.Append("<div class=\"section-divider\">Requirements flow</div>\n");
             sb.Append("<div class=\"chart-panel\">\n");
             sb.Append(Charts.RequirementFlow(model, epics));

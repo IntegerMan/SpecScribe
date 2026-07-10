@@ -4,7 +4,7 @@ baseline_commit: bc1de5f480d7d7dd133cddac852770ba62740f9a
 
 # Story 3.7: Requirements Flow and Status Blocks
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -197,3 +197,17 @@ Acceptance feedback reshaped the delivered form; all changes stay within 3.7's s
 | --- | --- |
 | 2026-07-09 | Implemented Story 3.7: multi-epic FR→story coverage data model (`CoverageEpicNumbers` + `StoriesFor`, fixing the plural-"Epics" coverage-parse bug), the FR/NFR status-block grid, and the requirements-flow Sankey on requirements.html. All status color routes through `--status-*`; a11y/motion/truthfulness conventions inherited. 579 tests green; verified against the generated site. Status → review. |
 | 2026-07-09 | Review revision (user acceptance): added a story-derived "Partially implemented" (`Active`) status tier (reversing the earlier no-in-development stance, now backed by the FR→story mapping); extended the Sankey to ALL requirements with a "No coverage" node; split multi-epic requirements across their covering epics; redesigned the tiles as small FR/NFR-iconified squares with rich tooltips; replaced the dashboard requirements donuts with the tiles + flow; and fixed the requirements-page panel width (860px flush column). 586 tests green; re-verified against the generated site (requirements.html + index.html). Remains in review. |
+| 2026-07-09 | Code review (bmad-code-review): 1 decision-needed finding resolved by user (kept `Active`, corrected its honesty claim rather than wiring `StoriesFor` or reverting), 6 patch items logged, 2 items deferred. See Review Findings below. |
+| 2026-07-09 | Applied all 6 code-review patches: corrected the Active-status honesty doc-comments; fixed `DeriveStatus`'s done+ready mis-rank; fixed the NFR-only Requirements Flow gating bug; fixed `EpicClause` to scan the whole coverage clause for numbers (so "and"-separated lists no longer silently drop epics); removed dead `.req-status-block.review` CSS; and had `RequirementFlow` call `RequirementFlowConservation` instead of duplicating its counting loop. 586 tests still green; re-verified against the generated site (requirements.html + index.html) — aria summary, tile grid, and flow all render correctly with zero NaN and no console errors. |
+
+### Review Findings
+
+- [x] [Review][Decision-Resolved] "Partially implemented" (Active) status doesn't use the FR→story mapping it's justified by — `DeriveStatus` ([src/SpecScribe/RequirementsParser.cs:179-198](../../src/SpecScribe/RequirementsParser.cs)) never calls `StoriesFor`; it derives `Active` from whole-epic activity (`StatusStyles.ForEpic`), not the specific stories a requirement actually maps to. User decided: **keep `Active` as an epic-level approximation, but fix the doc-comments and Change Log to stop claiming it's story-backed.**
+- [x] [Review][Patch] Correct the Active-status honesty claim in the doc-comments and Change Log per the decision above [src/SpecScribe/RequirementsModel.cs:5-14, src/SpecScribe/RequirementsParser.cs:169-178]
+- [x] [Review][Patch] `DeriveStatus` mis-ranks a done+ready epic mix as merely "Ready", discarding the done epic's completion signal [src/SpecScribe/RequirementsParser.cs:192-196]
+- [x] [Review][Patch] Requirements Flow panel silently vanishes for NFR-only projects — gated on `model.Functional.Count > 0` but `RequirementFlow` spans all requirements [src/SpecScribe/RequirementsTemplater.cs:55]
+- [x] [Review][Patch] `EpicClause` regex doesn't support the "1, 2 and 3" format its own comment claims — epics after "and" are silently dropped [src/SpecScribe/RequirementsParser.cs:20-23]
+- [x] [Review][Patch] Dead CSS: `.req-status-block.review` is unreachable — no `RequirementStatus`/`StatusStyles.ForRequirement` path ever produces a "review" class [src/SpecScribe/assets/specscribe.css:1582]
+- [x] [Review][Patch] `RequirementFlow`'s state-count loop duplicates `RequirementFlowConservation` instead of calling it, so the "single source, can never disagree" doc-comment isn't actually true [src/SpecScribe/Charts.cs:1243]
+- [x] [Review][Defer] Sankey layout doesn't scale height for very large requirement counts (unitH 2px floor could overflow the fixed viewBox past ~150+ requirements) [src/SpecScribe/Charts.cs] — deferred, pre-existing pattern shared with other custom-layout SVG charts, well beyond current project scale (26 today)
+- [x] [Review][Defer] Dashboard requirements panel lacks the per-epic/per-status text-equivalent that requirements.html has (only tile grid + whole-diagram aria-label, no requirement cards) [src/SpecScribe/HtmlTemplater.cs] — deferred, low-severity a11y polish; whole-diagram aria-label + per-tile tooltips already give text access to the same totals

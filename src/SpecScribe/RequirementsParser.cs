@@ -17,10 +17,13 @@ public static class RequirementsParser
 {
     private static readonly Regex DefLine = new(@"^(FR|NFR)(\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex CategoryLine = new(@"^\*\*(.+?)\*\*$", RegexOptions.Compiled);
-    // Matches the leading "Epic 4" / "Epics 1 & 2" / "Epics 1, 2 and 3" coverage clause and its numbers.
-    // Plural "Epics" and multi-number lists are real in epics.md (FR2/FR5/FR7: "Epics 1 & 2"), which the old
-    // singular "Epic\s+(\d+)" first-match pattern silently dropped entirely (no whitespace after "Epic"s).
-    private static readonly Regex EpicClause = new(@"^Epics?\s+([\d,&\s]*\d)", RegexOptions.Compiled);
+    // Matches the leading "Epic 4" / "Epics 1 & 2" / "Epics 1, 2 and 3" coverage clause. Only confirms the
+    // clause names epic(s) at all (plural "Epics" and multi-number lists are real in epics.md — FR2/FR5/FR7:
+    // "Epics 1 & 2" — which the old singular "Epic\s+(\d+)" first-match pattern silently dropped entirely, no
+    // whitespace after "Epic"s). The actual numbers are pulled from the WHOLE clause via NumberRef below, not
+    // from this pattern's capture group, so any separator between numbers ("&", ",", "and", ", and") works —
+    // a narrower digits/comma/ampersand-only capture group would silently drop numbers after the word "and".
+    private static readonly Regex EpicClause = new(@"^Epics?\b", RegexOptions.Compiled);
     private static readonly Regex NumberRef = new(@"\d+", RegexOptions.Compiled);
 
     private sealed record Coverage(IReadOnlyList<int> EpicNumbers, bool Deferred, string? Note);
@@ -82,9 +85,10 @@ public static class RequirementsParser
             // requirements flow (Story 3.7) needs the full set. Ordered by appearance, de-duplicated; empty for
             // a deferred line or a clause that doesn't name epics (unmapped). The singular primary is this
             // list's first element (resolved in ParseDefs). [Story 3.7 Task 1.1]
-            var clauseMatch = deferred ? Match.Empty : EpicClause.Match(clause);
-            var epicNumbers = clauseMatch.Success
-                ? NumberRef.Matches(clauseMatch.Groups[1].Value)
+            // Numbers come from the WHOLE clause (not just EpicClause's match), so "Epics 1, 2 and 3" captures
+            // all three regardless of separator — EpicClause only gates whether the line names epics at all.
+            var epicNumbers = !deferred && EpicClause.IsMatch(clause)
+                ? NumberRef.Matches(clause)
                     .Select(match => int.Parse(match.Value))
                     .Distinct()
                     .ToArray()
@@ -173,9 +177,11 @@ public static class RequirementsParser
     /// <c>Ready</c> (a covering epic has task-planned stories but none started); <c>Active</c> = partially
     /// implemented (a covering epic has a story in flight, but not every covering epic is done); <c>Done</c>
     /// (every covering epic is fully done).
-    /// <para>Because the map is epic-level, "Active" is an informed approximation of the covering epics'
-    /// progress, not a per-requirement story claim (see <see cref="RequirementStatus"/>). This supersedes the
-    /// earlier refusal to surface any mid-development state, now that the multi-epic mapping backs it.</para></summary>
+    /// <para>Because the map is epic-level, "Active" is an epic-level approximation of the covering epics'
+    /// aggregate progress — it does NOT use <see cref="StoriesFor"/> to check whether the specific stories
+    /// this requirement maps to are the ones in flight; any story anywhere in a covering epic being active is
+    /// enough. This supersedes the earlier refusal to surface any mid-development state, but it is the same
+    /// coarse epic-level signal as every other tier here, not a finer per-requirement claim.</para></summary>
     private static RequirementStatus DeriveStatus(
         bool deferred,
         IReadOnlyList<int> epicNumbers,
@@ -190,9 +196,11 @@ public static class RequirementsParser
         if (classes.Count == 0) return RequirementStatus.Planned;
 
         if (classes.All(c => c == "done")) return RequirementStatus.Done;
-        // A covering epic with any story in dev/review/done rolls up to "active" — surfaced as partially
-        // implemented since the whole set of covering epics isn't done yet.
-        if (classes.Any(c => c == "active")) return RequirementStatus.Active;
+        // A covering epic that is itself fully done, or has any story in dev/review/done, rolls up to
+        // "active" — surfaced as partially implemented since the whole set of covering epics isn't done yet.
+        // "done" must count here too: a requirement covered by one finished epic and one merely-ready epic
+        // has real progress and must not be reported as just "Ready for dev".
+        if (classes.Any(c => c is "active" or "done")) return RequirementStatus.Active;
         if (classes.Any(c => c == "ready")) return RequirementStatus.Ready;
         return RequirementStatus.Planned;
     }

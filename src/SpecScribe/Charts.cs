@@ -1238,9 +1238,9 @@ public static class Charts
         double L1Throughput(int key) => all.Sum(r => Weight(r, key));
         int L1ReqCount(int key) => key == Sentinel ? all.Count(NoCoverage) : all.Count(r => r.CoverageEpicNumbers.Contains(key));
 
-        // State nodes: the buckets actually populated (a zero state draws no node/ribbon).
-        var stateCount = FlowStates.ToDictionary(s => s.Css, _ => 0);
-        foreach (var r in all) stateCount[StatusStyles.ForRequirement(r)]++;
+        // State nodes: the buckets actually populated (a zero state draws no node/ribbon). Shares
+        // RequirementFlowConservation's counting so the two can never disagree.
+        var (_, stateCount) = RequirementFlowConservation(all);
         var stateKeys = FlowStates.Where(s => stateCount[s.Css] > 0).Select(s => s.Css).ToList();
 
         // Fractional weight flowing from an L1 node into a terminal state.
