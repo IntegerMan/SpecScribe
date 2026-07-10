@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-09T21:00:00-04:00
+last_updated: 2026-07-09T23:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -76,8 +76,8 @@ development_status:
   3-8-git-insights-hub-page: done
   epic-3-retrospective: done
 
-  epic-4: backlog
-  4-1-shared-framework-adapter-contract-and-projection-path: backlog
+  epic-4: in-progress
+  4-1-shared-framework-adapter-contract-and-projection-path: ready-for-dev
   4-2-decouple-rendering-from-personal-project-structure-assumptions: backlog
   4-3-spec-kit-baseline-adapter-coverage: backlog
   4-4-gsd-and-gsd-pi-baseline-adapter-coverage: backlog
@@ -107,6 +107,29 @@ development_status:
   7-5-per-commit-detail-pages: ready-for-dev
   7-6-source-code-treemap-for-codebase-exploration: ready-for-dev # moved from Story 3.4 (SCP 2026-07-08)
   epic-7-retrospective: optional
+
+  # Epics 8–10 added to epics.md 2026-07-09 from the site-wide UX review; only Epic 8 is seeded here
+  # (Story 8.1 created via create-story). Run sprint-planning to seat Epics 9–10 stories when scheduled.
+  epic-8: in-progress
+  8-1-canonical-status-model-with-portal-wide-legend: ready-for-dev
+  8-2-single-source-of-truth-for-every-count: backlog
+  8-3-paired-progress-and-readiness-semantics: backlog
+  8-4-state-aware-next-step-command-surface: backlog
+  8-5-designed-empty-states: backlog
+  8-6-one-primary-view-per-dashboard-dataset: backlog
+  8-7-generation-time-recency-signals: backlog
+  epic-8-retrospective: optional
+
+  # Epic 9 seeded here as Story 9.1 was created via create-story (2026-07-09). Run sprint-planning to
+  # seat Epic 10 stories when scheduled.
+  epic-9: in-progress
+  9-1-requirement-pages-link-to-their-covering-stories: ready-for-dev
+  9-2-nfr-and-ux-dr-coverage-maps: backlog
+  9-3-deferred-on-purpose-vs-unmapped-coverage-states: backlog
+  9-4-verification-evidence-strip-on-story-pages: backlog
+  9-5-distinct-acceptance-criteria-blocks-and-collapsed-dev-notes: backlog
+  9-6-follow-up-item-provenance-and-resolution-paths: backlog
+  epic-9-retrospective: optional
 
 action_items:
   - epic: 1
