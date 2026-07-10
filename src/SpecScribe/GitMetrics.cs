@@ -70,6 +70,8 @@ public sealed record FileContributor(string Name, int Commits, DateOnly? LastCom
 /// <paramref name="LastChangeDate"/>, for the guarded per-commit link + "latest change" line), and the
 /// per-file <paramref name="Contributors"/> that power the file→people drill-down. <paramref name="LinesAdded"/>/
 /// <paramref name="LinesDeleted"/> sum only text-file rows (binary rows carry no counts). [Story 3.8]</summary>
+/// <paramref name="TotalContributors"/> is the file's full distinct-author count before the top-N take, so
+/// the page can disclose when the shown list is truncated. [Review addition 2026-07-09]</summary>
 public sealed record FileChangeStat(
     string Path,
     int Changes,
@@ -77,18 +79,21 @@ public sealed record FileChangeStat(
     int LinesDeleted,
     string LatestHash,
     DateOnly? LastChangeDate,
-    IReadOnlyList<FileContributor> Contributors);
+    IReadOnlyList<FileContributor> Contributors,
+    int TotalContributors);
 
 /// <summary>The aggregate views behind the Git Insights hub page (FR-10), all derived from the one shared
 /// bounded numstat fetch: per-file change frequency + churn + the file's contributors (the master-detail
 /// "who works on this file" drill-down), and the per-day activity series for the analyzed window
 /// (<paramref name="CommitCount"/> commits, <paramref name="ContributorCount"/> distinct authors — headline
-/// context only, never a ranked people list). [Story 3.8]</summary>
+/// context only, never a ranked people list). <paramref name="TotalFilesTouched"/> is the full distinct-file
+/// count before the top-N take, so the page can disclose when <see cref="Files"/> is truncated. [Story 3.8]</summary>
 public sealed record GitInsightsData(
     IReadOnlyList<FileChangeStat> Files,
     IReadOnlyList<(DateOnly Day, int Count)> Activity,
     int CommitCount,
-    int ContributorCount);
+    int ContributorCount,
+    int TotalFilesTouched);
 
 /// <summary>Shells out to git for a handful of read-only stats. Never throws and never blocks a save —
 /// any failure (git missing, not a repo, slow process) simply yields a null pulse, which callers treat
@@ -490,6 +495,12 @@ public static class GitMetrics
                         accum.LatestHash = commit.Hash;
                         accum.LastChangeDate = day;
                     }
+                    else
+                    {
+                        // The newest commit's own date failed to parse (day is null) — backfill from the next
+                        // (older) commit that does have one, rather than leaving LastChangeDate stuck null.
+                        accum.LastChangeDate ??= day;
+                    }
                     var author = accum.Authors.GetValueOrDefault(commit.Author);
                     author.Commits++;
                     author.LastDate ??= day; // newest-first: the first date seen for this author+file is latest
@@ -514,7 +525,8 @@ public static class GitMetrics
                     .ThenBy(a => a.Key, StringComparer.Ordinal)
                     .Take(topContributorsPerFile)
                     .Select(a => new FileContributor(a.Key, a.Value.Commits, a.Value.LastDate))
-                    .ToList()))
+                    .ToList(),
+                kv.Value.Authors.Count))
             .ToList();
 
         var activity = byDay
@@ -522,7 +534,7 @@ public static class GitMetrics
             .Select(kv => (Day: kv.Key, Count: kv.Value))
             .ToList();
 
-        return new GitInsightsData(files, activity, commits.Count, allAuthors.Count);
+        return new GitInsightsData(files, activity, commits.Count, allAuthors.Count, fileStats.Count);
     }
 
     /// <summary>Resolves a `--numstat` path field to the file's current path, collapsing git's rename/move

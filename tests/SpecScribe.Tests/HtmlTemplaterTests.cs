@@ -408,11 +408,12 @@ public class HtmlTemplaterTests
             Files: new[]
             {
                 new FileChangeStat("src/Charts.cs", 4, 10, 2, "c001", new DateOnly(2026, 1, 5),
-                    new[] { new FileContributor("Alice", 4, new DateOnly(2026, 1, 5)) }),
+                    new[] { new FileContributor("Alice", 4, new DateOnly(2026, 1, 5)) }, TotalContributors: 1),
             },
             Activity: new[] { (new DateOnly(2026, 1, 5), 4) },
             CommitCount: 4,
-            ContributorCount: 1);
+            ContributorCount: 1,
+            TotalFilesTouched: 1);
         var withInsights = HtmlTemplater.RenderIndex(
             docs: Array.Empty<DocModel>(),
             nav: nav,
@@ -1227,5 +1228,36 @@ public class HtmlTemplaterTests
         var html = RenderPlanning(Doc("implementation-artifacts/x.md", "implementation-artifacts/x.html", "X", Frontmatter.Empty));
 
         Assert.DoesNotContain("Planning Artifacts", html);
+    }
+
+    [Fact]
+    public void RenderIndex_RequirementsPanelIsTilesPlusFlow_NotDonuts()
+    {
+        // Story 3.7 follow-up: the dashboard Requirements panel was replaced from a pair of progress donuts to
+        // the requirements-maturation view — the FR/NFR status-tile grid + the requirements-flow Sankey.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var reqs = new RequirementsModel
+        {
+            Functional = new[]
+            {
+                new RequirementInfo { Kind = RequirementKind.Functional, Number = 1, TextHtml = "Do a thing", Status = RequirementStatus.Done, CoverageEpicNumber = 1, CoverageEpicNumbers = new[] { 1 } },
+            },
+            NonFunctional = new[]
+            {
+                new RequirementInfo { Kind = RequirementKind.NonFunctional, Number = 1, TextHtml = "Be fast", Status = RequirementStatus.Planned, CoverageEpicNumbers = Array.Empty<int>() },
+            },
+        };
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
+            epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "done")), requirements: reqs,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty);
+
+        // The tile grid + the Sankey both render, and the old donut breakdown is gone.
+        Assert.Contains("req-status-grid", html);
+        Assert.Contains("req-status-block", html);
+        Assert.Contains("req-flow-svg", html);
+        Assert.Contains("href=\"requirements.html\"", html);
+        Assert.DoesNotContain("req-donut-label", html);
     }
 }

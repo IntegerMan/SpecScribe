@@ -835,28 +835,31 @@ public class ChartsTests
     };
 
     [Fact]
-    public void RequirementStatusGrid_EmitsOneLabeledBlockPerRequirement_NeverColourOnly()
+    public void RequirementStatusGrid_EmitsOneTilePerRequirement_ThreeRedundantChannels()
     {
         var reqs = new[]
         {
             Req(RequirementKind.Functional, 1, RequirementStatus.Done, false, 1),
-            Req(RequirementKind.Functional, 2, RequirementStatus.Ready, false, 1, 2),
+            Req(RequirementKind.Functional, 2, RequirementStatus.Active, false, 1, 2),
             Req(RequirementKind.NonFunctional, 7, RequirementStatus.Deferred, deferred: true),
         };
 
         var html = Charts.RequirementStatusGrid(reqs, prefix: string.Empty);
 
-        // One block per requirement, each linking to its detail page with the correct status class...
-        Assert.Contains("<a class=\"req-status-block done\" href=\"requirements/fr1.html\"", html);
-        Assert.Contains("<a class=\"req-status-block ready\" href=\"requirements/fr2.html\"", html);
-        Assert.Contains("<a class=\"req-status-block deferred\" href=\"requirements/nfr7.html\"", html);
-        // ...its id as visible text (the non-colour reading)...
-        Assert.Contains(">FR1</a>", html);
-        Assert.Contains(">NFR7</a>", html);
-        // ...and a status word in the tooltip (never colour-only, UX-DR17).
+        // One tile per requirement — the rich js-tip class + correct status class + link to the detail page...
+        Assert.Contains("<a class=\"req-status-block js-tip done\" href=\"requirements/fr1.html\"", html);
+        Assert.Contains("<a class=\"req-status-block js-tip active\" href=\"requirements/fr2.html\"", html);
+        Assert.Contains("<a class=\"req-status-block js-tip deferred\" href=\"requirements/nfr7.html\"", html);
+        // ...the id as visible text (the non-colour reading)...
+        Assert.Contains("<span class=\"req-block-id\">FR1</span>", html);
+        Assert.Contains("<span class=\"req-block-id\">NFR7</span>", html);
+        // ...a kind icon (FR vs NFR — the shape channel)...
+        Assert.Contains("<span class=\"req-block-icon\">", html);
+        // ...the status word in the plain-title fallback AND the multi-line rich tooltip (never colour-only).
         Assert.Contains("title=\"FR1 — Done\"", html);
-        Assert.Contains("title=\"FR2 — Ready for dev\"", html);
-        Assert.Contains("title=\"NFR7 — Deferred\"", html);
+        Assert.Contains("title=\"FR2 — Partially implemented\"", html);
+        Assert.Contains("data-tip=\"NFR7", html);
+        Assert.Contains("Deferred\nRequirement 7", html); // rich tip carries status word + definition snippet
     }
 
     [Fact]
@@ -943,28 +946,40 @@ public class ChartsTests
 
         Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"", svg);
-        // The aria summary names the functional-requirement total and the four honest states.
-        Assert.Contains("4 functional requirements", svg);
+        // The aria summary names the FULL requirement total (FR + NFR = 5), not just the functional ones.
+        Assert.Contains("5 requirements", svg);
     }
 
     [Fact]
-    public void RequirementFlow_DeferredAndUnmappedProduceLabeledFlow_NotDropped()
+    public void RequirementFlow_IncludesNfrs()
+    {
+        // The flow spans ALL requirements now — NFR1 (uncovered) must appear, routed to "No coverage".
+        var (reqs, epics) = FlowFixture();
+        var svg = Charts.RequirementFlow(reqs, epics);
+        // The aria total (5) already proves the NFR is counted; the "No coverage" node is where it lands.
+        Assert.Contains("with no coverage", svg);
+    }
+
+    [Fact]
+    public void RequirementFlow_DeferredUnmappedAndNfrsLandInNoCoverageNode_NotDropped()
     {
         var (reqs, epics) = FlowFixture();
         var svg = Charts.RequirementFlow(reqs, epics);
 
-        // The explicit honest node — deferred AND unmapped requirements terminate here, never vanish (AC #2).
-        Assert.Contains("Deferred / Unmapped", svg);
+        // The explicit honest node — deferred FRs, unmapped FRs, and uncovered NFRs terminate here, never vanish.
+        Assert.Contains("No coverage", svg);
     }
 
     [Fact]
-    public void RequirementFlow_NamesSecondaryCoveringEpicsInTooltip_NotDropped()
+    public void RequirementFlow_SplitsMultiEpicRequirementAcrossItsEpics()
     {
-        // FR2 is covered by Epics 1 & 2 but routes to its PRIMARY (Epic 1); the secondary Epic 2 must not
-        // vanish from the flow — it's named in the Epic 1 node's tooltip. [Subtask 1.4]
+        // FR2 is covered by Epics 1 & 2, so BOTH epic nodes must render (the split makes the second visible),
+        // and the shared-count note appears on the node tooltip. [multi-epic split]
         var (reqs, epics) = FlowFixture();
         var svg = Charts.RequirementFlow(reqs, epics);
-        Assert.Contains("some also covered by Epic 2", svg);
+        Assert.Contains(">Epic 1</text>", svg);
+        Assert.Contains(">Epic 2</text>", svg);
+        Assert.Contains("shared with other epics", svg);
     }
 
     [Fact]
@@ -972,10 +987,10 @@ public class ChartsTests
     {
         var (reqs, epics) = FlowFixture();
 
-        // Conservation is asserted through the public conservation helper the builder uses: the count entering
-        // "definition" equals the sum reaching the four implementation-state buckets.
-        var (entering, byState) = Charts.RequirementFlowConservation(reqs.Functional);
-        Assert.Equal(reqs.Functional.Count, entering);
+        // Conservation is asserted through the public conservation helper the builder uses: the count of ALL
+        // requirements entering "definition" equals the sum reaching the terminal implementation-state buckets.
+        var (entering, byState) = Charts.RequirementFlowConservation(reqs.All.ToList());
+        Assert.Equal(reqs.All.Count(), entering);
         Assert.Equal(entering, byState.Values.Sum());
     }
 

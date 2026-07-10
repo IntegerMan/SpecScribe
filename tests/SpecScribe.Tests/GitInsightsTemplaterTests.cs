@@ -20,9 +20,9 @@ public class GitInsightsTemplaterTests
                 {
                     new FileContributor("Alice", 7, new DateOnly(2026, 7, 6)),
                     new FileContributor("Bob", 2, new DateOnly(2026, 7, 2)),
-                }),
+                }, TotalContributors: 2),
             new FileChangeStat("src/SpecScribe/HtmlTemplater.cs", 4, 33, 12, "fff9999aaa", new DateOnly(2026, 7, 3),
-                new[] { new FileContributor("Bob", 4, new DateOnly(2026, 7, 3)) }),
+                new[] { new FileContributor("Bob", 4, new DateOnly(2026, 7, 3)) }, TotalContributors: 1),
         },
         Activity: new[]
         {
@@ -30,7 +30,8 @@ public class GitInsightsTemplaterTests
             (new DateOnly(2026, 7, 6), 6),
         },
         CommitCount: 9,
-        ContributorCount: 2);
+        ContributorCount: 2,
+        TotalFilesTouched: 2);
 
     private static GitPulse SamplePulse()
     {
@@ -60,6 +61,28 @@ public class GitInsightsTemplaterTests
         Assert.Contains(">Files &amp; Contributors</h2>", html);
         Assert.Contains(">Activity Over Time</h2>", html);
         Assert.Contains("crumb-current", html); // breadcrumb trail back home
+    }
+
+    [Fact]
+    public void RenderPage_DisclosesWhenFilesAndContributorsAreTruncated()
+    {
+        // TotalFilesTouched/TotalContributors exceed what's actually shown, so the page must say so rather
+        // than presenting the capped counts as if they were the full totals. [Review fix 2026-07-09]
+        var insights = new GitInsightsData(
+            Files: new[]
+            {
+                new FileChangeStat("src/SpecScribe/Charts.cs", 9, 120, 40, "abc1234def", new DateOnly(2026, 7, 6),
+                    new[] { new FileContributor("Alice", 7, new DateOnly(2026, 7, 6)) }, TotalContributors: 5),
+            },
+            Activity: Array.Empty<(DateOnly, int)>(),
+            CommitCount: 9,
+            ContributorCount: 5,
+            TotalFilesTouched: 60);
+
+        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
+
+        Assert.Contains("top 1 of 60 files", html);
+        Assert.Contains("and 4 more contributors", html);
     }
 
     [Fact]
@@ -124,9 +147,11 @@ public class GitInsightsTemplaterTests
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
 
         // Activity over time = the existing accessible heatmap (whose active days link to per-day pages).
+        // The headline is derived from the SAME pulse data as the heatmap (not insights.Activity), so the
+        // two can never disagree — SamplePulse has 1 commit across 1 active day. [Review fix 2026-07-09]
         Assert.Contains("class=\"heatmap\"", html);
         Assert.Contains("commits/2026-07-06.html", html);
-        Assert.Contains("9 commits across 2 active days", html);
+        Assert.Contains("1 commit across 1 active day", html);
     }
 
     [Fact]
@@ -136,11 +161,12 @@ public class GitInsightsTemplaterTests
             Files: new[]
             {
                 new FileChangeStat("src/<weird> & \"odd\".cs", 1, 1, 0, "beef123", new DateOnly(2026, 7, 1),
-                    new[] { new FileContributor("<b>Eve</b> & Co", 1, new DateOnly(2026, 7, 1)) }),
+                    new[] { new FileContributor("<b>Eve</b> & Co", 1, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
             },
             Activity: Array.Empty<(DateOnly, int)>(),
             CommitCount: 1,
-            ContributorCount: 1);
+            ContributorCount: 1,
+            TotalFilesTouched: 1);
 
         var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
 
@@ -188,7 +214,8 @@ public class GitInsightsTemplaterTests
             Files: Array.Empty<FileChangeStat>(),
             Activity: Array.Empty<(DateOnly, int)>(),
             CommitCount: 0,
-            ContributorCount: 0);
+            ContributorCount: 0,
+            TotalFilesTouched: 0);
 
         var html = GitInsightsTemplater.RenderPage(empty, null, Nav());
 

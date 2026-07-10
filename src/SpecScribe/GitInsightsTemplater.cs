@@ -49,7 +49,10 @@ public static class GitInsightsTemplater
         sb.Append("  <h1>Git Insights</h1>\n");
         sb.Append("  <div class=\"meta-pills\">\n");
         sb.Append($"    <span class=\"pill\">{N(insights.CommitCount)} {Charts.Plural(insights.CommitCount, "commit", "commits")} analyzed</span>\n");
-        sb.Append($"    <span class=\"pill\">{N(insights.Files.Count)} {Charts.Plural(insights.Files.Count, "file", "files")}</span>\n");
+        var filesLabel = insights.TotalFilesTouched > insights.Files.Count
+            ? $"top {N(insights.Files.Count)} of {N(insights.TotalFilesTouched)} files"
+            : $"{N(insights.Files.Count)} {Charts.Plural(insights.Files.Count, "file", "files")}";
+        sb.Append($"    <span class=\"pill\">{filesLabel}</span>\n");
         sb.Append($"    <span class=\"pill\">{N(insights.ContributorCount)} {Charts.Plural(insights.ContributorCount, "contributor", "contributors")}</span>\n");
         sb.Append("  </div>\n</header>\n\n");
 
@@ -190,6 +193,11 @@ public static class GitInsightsTemplater
                 sb.Append($"<span class=\"gi-contributor-meta\">{meta}</span>");
                 sb.Append("</li>\n");
             }
+            if (file.TotalContributors > file.Contributors.Count)
+            {
+                var more = file.TotalContributors - file.Contributors.Count;
+                sb.Append($"          <li class=\"gi-more\">and {N(more)} more {Charts.Plural(more, "contributor", "contributors")}&hellip;</li>\n");
+            }
             sb.Append("        </ul>\n");
         }
 
@@ -206,15 +214,18 @@ public static class GitInsightsTemplater
     /// <summary>Activity over time — the existing accessible commit heatmap, reused rather than a parallel
     /// time chart. Its active-day cells already link to the generated <c>commits/{date}.html</c> pages (and
     /// this page sits at the output root, the same place the heatmap's root-relative hrefs assume), so the
-    /// "select an entry → navigate to detail" contract holds with zero new link plumbing. The headline
-    /// figures come from the deep window's activity series so the text matches the analyzed commits.</summary>
+    /// "select an entry → navigate to detail" contract holds with zero new link plumbing. The headline figures
+    /// are derived from the SAME series the heatmap renders (<paramref name="git"/>'s <c>DailySeries</c>/
+    /// <c>CommitsByDay</c>) — never from <c>insights.Activity</c>'s separately-bounded deep-git window — so the
+    /// sentence can never disagree with the chart directly below it. Falls back to the deep window's activity
+    /// series only when no baseline pulse is available at all. [Review fix 2026-07-09]</summary>
     private static void AppendActivitySection(StringBuilder sb, GitInsightsData insights, GitPulse? git)
     {
         sb.Append("<section class=\"deep-page-section git-insights-section\">\n");
         sb.Append("  <h2>Activity Over Time</h2>\n");
-        var windowDays = insights.Activity.Count;
-        var windowCommits = insights.Activity.Sum(a => a.Count);
-        sb.Append($"  <p class=\"deep-page-lead\">{N(windowCommits)} {Charts.Plural(windowCommits, "commit", "commits")} across {N(windowDays)} active {Charts.Plural(windowDays, "day", "days")} in the analyzed window. Each active day in the heatmap links to that day's commit log.</p>\n");
+        var windowDays = git?.DailySeries.Count ?? insights.Activity.Count;
+        var windowCommits = git is not null ? git.DailySeries.Sum(d => d.Count) : insights.Activity.Sum(a => a.Count);
+        sb.Append($"  <p class=\"deep-page-lead\">{N(windowCommits)} {Charts.Plural(windowCommits, "commit", "commits")} across {N(windowDays)} active {Charts.Plural(windowDays, "day", "days")}. Each active day in the heatmap links to that day's commit log.</p>\n");
         sb.Append("  <div class=\"chart-panel\">\n");
         if (git is not null && git.DailySeries.Count > 0)
         {

@@ -228,12 +228,12 @@ public static class RequirementsTemplater
 
     private static void AppendStatusDonut(StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs)
     {
-        var (done, ready, planned, deferred) = StatusCounts(reqs);
+        var (done, active, ready, planned, deferred) = StatusCounts(reqs);
 
         sb.Append("<div class=\"chart-panel\">\n");
         sb.Append($"<h3>{PathUtil.Html(label)} ({reqs.Count})</h3>\n<div class=\"donut-and-legend\">\n");
         var statusSegments = StatusSegments(reqs);
-        sb.Append(Charts.Donut(statusSegments, ariaLabel: $"{label} requirements: {done} done, {ready} ready for dev, {planned} planned, {deferred} deferred"));
+        sb.Append(Charts.Donut(statusSegments, ariaLabel: $"{label} requirements: {done} done, {active} partially implemented, {ready} ready for dev, {planned} planned, {deferred} deferred"));
         sb.Append(Charts.DonutLegend(statusSegments));
         sb.Append("</div>\n</div>\n\n");
     }
@@ -252,18 +252,20 @@ public static class RequirementsTemplater
         sb.Append("    </div>\n  </a>\n");
     }
 
-    private static (int Done, int Ready, int Planned, int Deferred) StatusCounts(IReadOnlyList<RequirementInfo> reqs) => (
+    private static (int Done, int Active, int Ready, int Planned, int Deferred) StatusCounts(IReadOnlyList<RequirementInfo> reqs) => (
         reqs.Count(r => r.Status == RequirementStatus.Done),
+        reqs.Count(r => r.Status == RequirementStatus.Active),
         reqs.Count(r => r.Status == RequirementStatus.Ready),
         reqs.Count(r => r.Status == RequirementStatus.Planned),
         reqs.Count(r => r.Status == RequirementStatus.Deferred));
 
     private static (string, int, string)[] StatusSegments(IReadOnlyList<RequirementInfo> reqs)
     {
-        var (done, ready, planned, deferred) = StatusCounts(reqs);
+        var (done, active, ready, planned, deferred) = StatusCounts(reqs);
         return new (string, int, string)[]
         {
             ("Done", done, "done"),
+            ("Partially implemented", active, "active"),
             ("Ready for dev", ready, "ready"),
             ("Planned", planned, "pending"),
             ("Deferred", deferred, "deferred"),

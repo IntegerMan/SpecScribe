@@ -59,6 +59,17 @@ public static class Icons
         };
     }
 
+    /// <summary>One glyph per requirement kind — a shape channel distinguishing Functional from Non-Functional
+    /// requirements on the compact status tiles, so the tiles carry kind as shape (not color, which encodes
+    /// status). Functional = a gear/cog (behavior the system <em>does</em>); Non-Functional = a shield (a
+    /// quality/constraint the system must <em>uphold</em>). Decorative like every other icon — the tile's id
+    /// text + rich tooltip carry the meaning. [Story 3.7 follow-up]</summary>
+    public static string ForRequirementKind(RequirementKind kind) => kind switch
+    {
+        RequirementKind.Functional => Svg("<circle cx=\"8\" cy=\"8\" r=\"2.2\"/><path d=\"M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6 5 5M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4\"/>"),
+        _ => Svg("<path d=\"M8 2.2 12.8 4v4.2c0 3-2.1 4.9-4.8 5.8-2.7-.9-4.8-2.8-4.8-5.8V4Z\"/>"),
+    };
+
     /// <summary>Wraps glyph markup in the shared decorative-icon shell: <c>aria-hidden</c>/<c>focusable="false"</c>
     /// (the text label carries the meaning), the <c>ss-icon</c> css hook for sizing, and <c>currentColor</c>
     /// stroke/fill so every icon inherits the surrounding label/badge color — never a hard-coded hex.</summary>

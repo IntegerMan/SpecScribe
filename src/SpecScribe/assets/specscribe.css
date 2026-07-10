@@ -1553,17 +1553,19 @@ code.color-swatch {
    SAME --status-* tokens as every other chart; the structural definition/epic nodes and the definition→epic
    ribbons use neutral base-palette chrome (they are not lifecycle stages), exactly as the funnel connector,
    coupling graph, and tree already do. No raw hex — route new status color through the tokens. */
+/* Small square tiles that wrap: three redundant channels — status color (fill), the id as text, and a kind
+   icon (FR vs NFR) as shape — so status is never color-only (UX-DR17). Rich detail is in the js-tip tooltip. */
 .req-status-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .req-status-block {
   display: inline-flex;
+  flex: 0 0 auto; /* never shrink below the 3rem square in the wrapping flex row */
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 2.9rem;
-  padding: 0.28rem 0.5rem;
-  border-radius: 5px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.72rem;
-  font-weight: 700;
+  gap: 0.12rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 6px;
   color: var(--ink);
   text-decoration: none;
   border: 1px solid var(--border);
@@ -1571,7 +1573,10 @@ code.color-swatch {
 }
 .req-status-block:hover { transform: translateY(-2px); text-decoration: none; }
 .req-status-block:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-/* Every block fill maps 1:1 to its lifecycle token — the single stage→color source, never hardcoded hex. */
+.req-block-icon { display: inline-flex; }
+.req-block-icon .ss-icon { width: 1rem; height: 1rem; }
+.req-block-id { font-family: 'Courier New', monospace; font-size: 0.6rem; font-weight: 700; line-height: 1; }
+/* Every tile fill maps 1:1 to its lifecycle token — the single stage→color source, never hardcoded hex. */
 .req-status-block.done { background: var(--status-done); }
 .req-status-block.active { background: var(--status-active); color: var(--warm-white); }
 .req-status-block.review { background: var(--status-review); color: var(--warm-white); }
@@ -1592,10 +1597,12 @@ code.color-swatch {
 .req-flow-ribbon { fill: var(--parchment-dark); opacity: 0.55; }
 /* State nodes + the epic→state ribbons carry the real lifecycle color via the shared --status-* tokens. */
 .req-flow-state.done { fill: var(--status-done); }
+.req-flow-state.active { fill: var(--status-active); }
 .req-flow-state.ready { fill: var(--status-ready); }
 .req-flow-state.pending { fill: var(--status-pending); }
 .req-flow-state.deferred { fill: var(--status-deferred); }
 .req-flow-ribbon.done { fill: var(--status-done); opacity: 0.5; }
+.req-flow-ribbon.active { fill: var(--status-active); opacity: 0.5; }
 .req-flow-ribbon.ready { fill: var(--status-ready); opacity: 0.5; }
 .req-flow-ribbon.pending { fill: var(--status-pending); opacity: 0.5; }
 .req-flow-ribbon.deferred { fill: var(--status-deferred); opacity: 0.5; }
@@ -2314,11 +2321,15 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    default to the wider 1100px used on the home page). */
 .req-index .dashboard,
 .req-index .section-divider,
+.req-index .chart-panel,
 .req-group-grid {
   max-width: 860px;
   padding-left: 0;
   padding-right: 0;
 }
+/* The status-tile grid + requirements-flow panels are centered chart-panels; keep them in the flush column
+   so the grid and Sankey align with every other section instead of stretching edge-to-edge (round-2 fix). */
+.req-index .chart-panel { margin-left: auto; margin-right: auto; }
 /* Anchored group dividers clear the sticky nav when jumped to. */
 .req-index .section-divider[id] { scroll-margin-top: 4.5rem; }
 

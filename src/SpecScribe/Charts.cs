@@ -1134,12 +1134,15 @@ public static class Charts
         }
     }
 
-    /// <summary>The FR/NFR status-block grid (Story 3.7 AC #1): one small colorized chip per requirement in
-    /// source order, each an <c>&lt;a&gt;</c> to its detail page carrying the shared status class (fill routes
-    /// through <c>var(--status-*)</c> in CSS). Never color-only — the chip shows its id as visible text and a
-    /// <c>title</c>/<c>data-tip</c> carrying id + human status word (UX-DR17). An empty list renders nothing so
-    /// a kind with zero members doesn't draw an empty box. HTML, not SVG — a sibling of <see cref="EpicMosaic"/>
-    /// / <see cref="ArtifactCoveragePanel"/>. [Story 3.7 Task 2]</summary>
+    /// <summary>The FR/NFR status-tile grid (Story 3.7 AC #1): one small square tile per requirement in source
+    /// order that wraps to the next line, each an <c>&lt;a&gt;</c> to its detail page. Three redundant channels
+    /// so status is never color-only (UX-DR17): the fill is the status color (via the shared
+    /// <c>var(--status-*)</c> class from <see cref="StatusStyles.ForRequirement"/>), the id is visible text, and
+    /// a <em>kind</em> icon (<see cref="Icons.ForRequirementKind"/>) distinguishes FR from NFR by shape. The
+    /// rich, never-clipped body-level tooltip (<c>js-tip</c> + multi-line <c>data-tip</c>, served by
+    /// specscribe.js) carries id + the human status word + a text snippet; a plain <c>title</c> is the no-JS
+    /// fallback, and the requirement cards below remain the full text equivalent. Empty list renders nothing.
+    /// HTML, not SVG — a sibling of <see cref="EpicMosaic"/>. [Story 3.7 + follow-up]</summary>
     public static string RequirementStatusGrid(IReadOnlyList<RequirementInfo> reqs, string prefix)
     {
         if (reqs.Count == 0) return string.Empty;
@@ -1149,114 +1152,141 @@ public static class Charts
         foreach (var req in reqs)
         {
             var cls = StatusStyles.ForRequirement(req);
-            var tip = $"{req.Id} — {StatusStyles.RequirementLabel(req.Status)}";
+            var label = StatusStyles.RequirementLabel(req.Status);
+            var snippet = Shorten(PathUtil.StripHtmlTags(req.TextHtml).Trim(), 96);
+            var kind = req.Kind == RequirementKind.Functional ? "Functional" : "Non-functional";
+            // Multi-line rich tooltip (white-space: pre-line): id + kind + status word + a definition snippet.
+            var richTip = $"{req.Id} · {kind}\n{label}\n{snippet}";
+            var titleTip = $"{req.Id} — {label}";
             var href = $"{prefix}requirements/{req.Slug}.html";
-            sb.Append($"  <a class=\"req-status-block {cls}\" href=\"{Html(href)}\" data-tip=\"{Html(tip)}\" title=\"{Html(tip)}\">{Html(req.Id)}</a>\n");
+            sb.Append($"  <a class=\"req-status-block js-tip {cls}\" href=\"{Html(href)}\" data-tip=\"{Html(richTip)}\" title=\"{Html(titleTip)}\">" +
+                      $"<span class=\"req-block-icon\">{Icons.ForRequirementKind(req.Kind)}</span>" +
+                      $"<span class=\"req-block-id\">{Html(req.Id)}</span></a>\n");
         }
         sb.Append("</div>\n");
         return sb.ToString();
     }
 
-    /// <summary>The four honest implementation-state buckets, in narrative order (most → least complete), keyed
-    /// by the css class <see cref="StatusStyles.ForRequirement"/> produces. The single source both the flow's
-    /// state column and <see cref="RequirementFlowConservation"/> iterate, so they can never disagree.</summary>
+    /// <summary>The five implementation-state buckets, in narrative order (most → least complete), keyed by the
+    /// css class <see cref="StatusStyles.ForRequirement"/> produces. The single source both the flow's state
+    /// column and <see cref="RequirementFlowConservation"/> iterate, so they can never disagree. "active" is the
+    /// story-derived "partially implemented" tier (Story 3.7 follow-up).</summary>
     private static readonly (string Css, string Word)[] FlowStates =
-        { ("done", "done"), ("ready", "ready for dev"), ("pending", "planned"), ("deferred", "deferred") };
+    {
+        ("done", "done"), ("active", "partially implemented"), ("ready", "ready for dev"),
+        ("pending", "planned"), ("deferred", "deferred"),
+    };
 
     /// <summary>The conservation contract behind <see cref="RequirementFlow"/>, exposed for testing: the count
-    /// of functional requirements ENTERING the flow at "definition" (= the FR total) and how they partition
-    /// across the four terminal implementation states. Every FR exits at exactly ONE state
+    /// of requirements ENTERING the flow at "definition" (= the requirement total) and how they partition across
+    /// the terminal implementation states. Every requirement exits at exactly ONE state
     /// (<see cref="StatusStyles.ForRequirement"/>), so the state counts sum back to the entering total — nothing
-    /// dropped (AC #2), nothing double-counted (Subtask 1.4), even for multi-epic FRs. [Story 3.7 Task 3]</summary>
+    /// dropped, nothing double-counted, even for a multi-epic requirement (its middle-layer epic split is
+    /// fractional but it still terminates in one state). [Story 3.7 + follow-up]</summary>
     public static (int Entering, IReadOnlyDictionary<string, int> ByState) RequirementFlowConservation(
-        IReadOnlyList<RequirementInfo> functional)
+        IReadOnlyList<RequirementInfo> requirements)
     {
         var byState = FlowStates.ToDictionary(s => s.Css, _ => 0);
-        foreach (var req in functional) byState[StatusStyles.ForRequirement(req)]++;
-        return (functional.Count, byState);
+        foreach (var req in requirements) byState[StatusStyles.ForRequirement(req)]++;
+        return (requirements.Count, byState);
     }
 
-    /// <summary>The requirements flow — a Sankey-style diagram of functional requirements maturing left → right
-    /// through three layers: (1) Definition (all FRs), (2) Epic coverage (one node per covering epic, plus an
-    /// explicit "Deferred / Unmapped" node), (3) Implementation state (the four honest <see cref="RequirementStatus"/>
-    /// buckets). Each FR is routed to its PRIMARY covering epic node (secondary covering epics named in the
-    /// node/ribbon tooltips), and deferred/unmapped FRs terminate in the Deferred/Unmapped node rather than being
-    /// dropped (AC #2). Ribbon thickness and node height are proportional to FR counts, so the count entering at
-    /// definition equals the sum reaching the four states (conservation — see
-    /// <see cref="RequirementFlowConservation"/>). The terminal states are the deliberately-conservative
-    /// epic-rolled-up status already on each FR — never a fabricated finer per-story state (AC #3, Story 1.5).
-    /// State nodes/ribbons color through the shared <c>--status-*</c> tokens; the structural definition/epic nodes
-    /// use neutral base-palette chrome. Layout is computed here at generation time exactly like
-    /// <see cref="CouplingGraph"/> — pure inline SVG + CSS, no JS. The whole diagram carries a summarizing
-    /// <c>role="img"</c> name; per-node/per-ribbon <c>&lt;title&gt;</c>s serve pointer users; the status-block
-    /// grid + requirement cards on the same page are the text equivalent so the flow is never the sole carrier.
-    /// [Story 3.7 Task 3]</summary>
+    /// <summary>The requirements flow — a Sankey-style diagram of ALL requirements (FR + NFR) maturing left →
+    /// right through three layers: (1) Definition (every requirement), (2) Epic coverage (one node per covering
+    /// epic, plus an explicit "No coverage" node), (3) Implementation state (the five
+    /// <see cref="RequirementStatus"/> buckets). A requirement covered by k epics is SPLIT evenly across them
+    /// (each covering epic gets weight 1/k), so a multi-epic requirement is visibly connected to every epic that
+    /// covers it — conservation still holds because its total outgoing weight is 1. A requirement with no covering
+    /// epic (an unmapped FR, a deferred FR, or a — currently uncovered — NFR) routes to the "No coverage" node,
+    /// then on to its own terminal state (so deferred vs planned stays visible), never dropped. Ribbon thickness
+    /// and node height are proportional to the (possibly fractional) requirement weight, so the count entering at
+    /// definition equals the sum reaching the states (see <see cref="RequirementFlowConservation"/>). Terminal
+    /// states are the epic-rolled-up status on each requirement — "partially implemented" is an informed
+    /// epic-level approximation, never a fabricated per-requirement claim (<see cref="RequirementStatus"/>). State
+    /// nodes/ribbons color through the shared <c>--status-*</c> tokens; the structural definition/epic nodes use
+    /// neutral base-palette chrome. Layout is computed at generation time like <see cref="CouplingGraph"/> — pure
+    /// inline SVG + CSS, no JS. Whole-diagram <c>role="img"</c> name; per-node/per-ribbon <c>&lt;title&gt;</c>s
+    /// for pointer users; the status-tile grid + requirement cards are the text equivalent. [Story 3.7 + follow-up]</summary>
     public static string RequirementFlow(RequirementsModel reqs, EpicsModel epics)
     {
-        var frs = reqs.Functional;
-        if (frs.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
+        var all = reqs.All.ToList();
+        if (all.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
 
-        var n = frs.Count;
+        var n = all.Count;
+        const int Sentinel = -1; // the "No coverage" node's key
 
-        // L1 routing key: primary covering epic number, or -1 for a deferred/unmapped FR → the shared node.
-        static int L1Key(RequirementInfo r) => !r.Deferred && r.CoverageEpicNumber is { } e ? e : -1;
+        // A requirement with no covering epic routes to the "No coverage" node (weight 1); otherwise its unit
+        // weight splits evenly across its covering epics (1/k each). Deterministic and conserves to 1 per req.
+        static bool NoCoverage(RequirementInfo r) => r.CoverageEpicNumbers.Count == 0;
+        static double Weight(RequirementInfo r, int key) =>
+            key == Sentinel
+                ? (NoCoverage(r) ? 1.0 : 0.0)
+                : r.CoverageEpicNumbers.Contains(key) ? 1.0 / r.CoverageEpicNumbers.Count : 0.0;
 
-        var epicKeys = frs.Where(r => L1Key(r) >= 1).Select(L1Key).Distinct().OrderBy(k => k).ToList();
-        var hasDeferredUnmapped = frs.Any(r => L1Key(r) == -1);
+        var epicKeys = all.SelectMany(r => r.CoverageEpicNumbers).Distinct().OrderBy(k => k).ToList();
+        var hasNoCoverage = all.Any(NoCoverage);
 
-        // Ordered L1 nodes: the covering epics ascending, then the Deferred / Unmapped node last (if any FR
-        // routes to it). -1 is its sentinel key.
+        // Ordered L1 nodes: covering epics ascending, then the "No coverage" node last (if any req routes there).
         var l1Keys = new List<int>(epicKeys);
-        if (hasDeferredUnmapped) l1Keys.Add(-1);
+        if (hasNoCoverage) l1Keys.Add(Sentinel);
 
         var epicTitleByNumber = epics.Epics.ToDictionary(e => e.Number, e => PathUtil.StripHtmlTags(e.Title));
-        string L1Label(int key) => key == -1 ? "Deferred / Unmapped" : $"Epic {key}";
+        string L1Label(int key) => key == Sentinel ? "No coverage" : $"Epic {key}";
 
-        // State nodes: the four buckets, only those actually populated (a zero state draws no node/ribbon).
+        // L1 throughput = summed fractional weight (drives node height + ribbon thickness); L1 req count = the
+        // number of DISTINCT requirements touching the node (the honest integer shown in the label/tooltip).
+        double L1Throughput(int key) => all.Sum(r => Weight(r, key));
+        int L1ReqCount(int key) => key == Sentinel ? all.Count(NoCoverage) : all.Count(r => r.CoverageEpicNumbers.Contains(key));
+
+        // State nodes: the buckets actually populated (a zero state draws no node/ribbon).
         var stateCount = FlowStates.ToDictionary(s => s.Css, _ => 0);
-        foreach (var r in frs) stateCount[StatusStyles.ForRequirement(r)]++;
+        foreach (var r in all) stateCount[StatusStyles.ForRequirement(r)]++;
         var stateKeys = FlowStates.Where(s => stateCount[s.Css] > 0).Select(s => s.Css).ToList();
 
-        int L1Count(int key) => frs.Count(r => L1Key(r) == key);
-        int PairCount(int l1, string state) => frs.Count(r => L1Key(r) == l1 && StatusStyles.ForRequirement(r) == state);
+        // Fractional weight flowing from an L1 node into a terminal state.
+        double PairWeight(int l1, string state) =>
+            all.Where(r => StatusStyles.ForRequirement(r) == state).Sum(r => Weight(r, l1));
 
-        // Geometry. Three node columns joined by proportional ribbons; a single unit-height (pixels per FR) is
-        // shared across all columns so a ribbon of a given count has the SAME thickness at both ends. The
-        // tallest column (most gaps) fills usableH exactly; the others are centered with slack.
-        const double width = 760, topPad = 46, usableH = 300, gap = 16, nodeW = 15;
-        const double defX = 60, epicX = 372, stateX = 636;
+        // Geometry. Three node columns joined by proportional ribbons; a single unit-height (pixels per
+        // requirement) is shared across all columns so a ribbon of a given weight has the SAME thickness at both
+        // ends. Each column's weights sum to n, so the tallest column (most gaps) fills usableH; others center.
+        const double width = 760, topPad = 46, usableH = 320, gap = 14, nodeW = 15;
+        const double defX = 60, epicX = 372, stateX = 628;
         var height = topPad + usableH + 26;
 
         var maxNodes = Math.Max(1, Math.Max(l1Keys.Count, stateKeys.Count));
         var unitH = Math.Max(2.0, (usableH - gap * (maxNodes - 1)) / n);
 
-        // Lay a column out: ordered node counts → their (top y, height), the whole stack vertically centered.
-        (double Y, double H)[] LayoutColumn(IReadOnlyList<int> counts)
+        // Lay a column out: ordered node weights → their (top y, height), the whole stack vertically centered.
+        (double Y, double H)[] LayoutColumn(IReadOnlyList<double> weights)
         {
-            var totalH = counts.Sum() * unitH + gap * Math.Max(0, counts.Count - 1);
+            var totalH = weights.Sum() * unitH + gap * Math.Max(0, weights.Count - 1);
             var y = topPad + (usableH - totalH) / 2;
-            var result = new (double, double)[counts.Count];
-            for (var i = 0; i < counts.Count; i++)
+            var result = new (double, double)[weights.Count];
+            for (var i = 0; i < weights.Count; i++)
             {
-                var h = counts[i] * unitH;
+                var h = weights[i] * unitH;
                 result[i] = (y, h);
                 y += h + gap;
             }
             return result;
         }
 
-        var defLayout = LayoutColumn(new[] { n });
-        var l1Layout = LayoutColumn(l1Keys.Select(L1Count).ToList());
-        var stateLayout = LayoutColumn(stateKeys.Select(k => stateCount[k]).ToList());
+        var defLayout = LayoutColumn(new double[] { n });
+        var l1Layout = LayoutColumn(l1Keys.Select(L1Throughput).ToList());
+        var stateLayout = LayoutColumn(stateKeys.Select(k => (double)stateCount[k]).ToList());
 
         var sb = new StringBuilder();
 
         var done = stateCount["done"];
+        var active = stateCount["active"];
         var ready = stateCount["ready"];
         var planned = stateCount["pending"];
         var deferred = stateCount["deferred"];
-        var aria = $"Requirements flow: {n} functional {Plural(n, "requirement", "requirements")}: " +
-                   $"{done} done, {ready} ready for dev, {planned} planned, {deferred} deferred, across {epicKeys.Count} {Plural(epicKeys.Count, "epic", "epics")}";
+        var noCov = all.Count(NoCoverage);
+        var aria = $"Requirements flow: {n} {Plural(n, "requirement", "requirements")}: " +
+                   $"{done} done, {active} partially implemented, {ready} ready for dev, {planned} planned, {deferred} deferred; " +
+                   $"{epicKeys.Count} covering {Plural(epicKeys.Count, "epic", "epics")}, {noCov} with no coverage";
 
         sb.Append("<div class=\"req-flow\">\n");
         sb.Append($"<svg class=\"req-flow-svg\" viewBox=\"0 0 {F(width)} {F(height)}\" width=\"{F(width)}\" height=\"{F(height)}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
@@ -1274,8 +1304,9 @@ public static class Charts
         for (var i = 0; i < l1Keys.Count; i++)
         {
             var (ly, lh) = l1Layout[i];
-            var thickness = L1Count(l1Keys[i]) * unitH;
-            var ribbonTitle = $"{L1Count(l1Keys[i])} {Plural(L1Count(l1Keys[i]), "requirement", "requirements")} → {L1Label(l1Keys[i])}";
+            var thickness = L1Throughput(l1Keys[i]) * unitH;
+            var reqCount = L1ReqCount(l1Keys[i]);
+            var ribbonTitle = $"{reqCount} {Plural(reqCount, "requirement", "requirements")} → {L1Label(l1Keys[i])}";
             sb.Append($"  <path class=\"req-flow-ribbon\" d=\"{RibbonPath(defX + nodeW, defCursor, defCursor + thickness, epicX, ly, ly + lh)}\">" +
                       $"<title>{Html(ribbonTitle)}</title></path>\n");
             defCursor += thickness;
@@ -1290,11 +1321,11 @@ public static class Charts
         {
             for (var j = 0; j < stateKeys.Count; j++)
             {
-                var c = PairCount(l1Keys[i], stateKeys[j]);
-                if (c == 0) continue;
-                var thickness = c * unitH;
+                var w = PairWeight(l1Keys[i], stateKeys[j]);
+                if (w <= 1e-9) continue;
+                var thickness = w * unitH;
                 var word = FlowStates.First(s => s.Css == stateKeys[j]).Word;
-                var title = $"{c} {Plural(c, "requirement", "requirements")} from {L1Label(l1Keys[i])} → {word}";
+                var title = $"{L1Label(l1Keys[i])} → {word}";
                 sb.Append($"  <path class=\"req-flow-ribbon {stateKeys[j]}\" d=\"{RibbonPath(epicX + nodeW, l1RightCursor[i], l1RightCursor[i] + thickness, stateX, stateLeftCursor[j], stateLeftCursor[j] + thickness)}\">" +
                           $"<title>{Html(title)}</title></path>\n");
                 l1RightCursor[i] += thickness;
@@ -1306,36 +1337,28 @@ public static class Charts
 
         // Definition node (structural chrome).
         sb.Append($"  <rect class=\"req-flow-node req-flow-def\" x=\"{F(defX)}\" y=\"{F(defY)}\" width=\"{F(nodeW)}\" height=\"{F(defH)}\" rx=\"2\">" +
-                  $"<title>{n} functional {Plural(n, "requirement", "requirements")}</title></rect>\n");
-        sb.Append($"  <text x=\"{F(defX + nodeW / 2)}\" y=\"{F(defY - 6)}\" class=\"req-flow-nodelabel\" text-anchor=\"middle\">{n} {Plural(n, "FR", "FRs")}</text>\n");
+                  $"<title>{n} {Plural(n, "requirement", "requirements")}</title></rect>\n");
+        sb.Append($"  <text x=\"{F(defX + nodeW / 2)}\" y=\"{F(defY - 6)}\" class=\"req-flow-nodelabel\" text-anchor=\"middle\">{n} {Plural(n, "req", "reqs")}</text>\n");
 
-        // Epic-coverage nodes (structural chrome; the Deferred/Unmapped node shares the class but is labeled honestly).
+        // Epic-coverage nodes (structural chrome; the "No coverage" node shares the class but is labeled honestly).
         for (var i = 0; i < l1Keys.Count; i++)
         {
             var (ly, lh) = l1Layout[i];
             var key = l1Keys[i];
-            var count = L1Count(key);
-            var titleExtra = key == -1
-                ? "deferred or unmapped"
+            var count = L1ReqCount(key);
+            var titleExtra = key == Sentinel
+                ? "deferred, unmapped, or non-functional"
                 : epicTitleByNumber.TryGetValue(key, out var t) ? t : $"Epic {key}";
 
-            // Each FR is routed to its PRIMARY covering epic, so a multi-epic FR's secondary epics would
-            // otherwise vanish from the flow. Name them in this node's tooltip so the multi-epic coverage is
-            // preserved, not dropped (Subtask 1.4's recommended routing rule). [Story 3.7]
-            var secondaryEpics = key == -1
-                ? Array.Empty<int>()
-                : frs.Where(r => L1Key(r) == key)
-                    .SelectMany(r => r.CoverageEpicNumbers)
-                    .Where(e => e != key)
-                    .Distinct()
-                    .OrderBy(e => e)
-                    .ToArray();
-            var secondaryNote = secondaryEpics.Length > 0
-                ? $" · some also covered by {string.Join(" & ", secondaryEpics.Select(e => $"Epic {e}"))}"
-                : string.Empty;
+            // A multi-epic requirement is split across all its covering epics, so it appears in each epic node.
+            // Note how many of this node's requirements are shared with another epic, so the split is legible.
+            var shared = key == Sentinel
+                ? 0
+                : all.Count(r => r.CoverageEpicNumbers.Contains(key) && r.CoverageEpicNumbers.Count > 1);
+            var sharedNote = shared > 0 ? $" · {shared} shared with other epics" : string.Empty;
 
             sb.Append($"  <rect class=\"req-flow-node req-flow-epic\" x=\"{F(epicX)}\" y=\"{F(ly)}\" width=\"{F(nodeW)}\" height=\"{F(lh)}\" rx=\"2\">" +
-                      $"<title>{Html(L1Label(key))}: {count} {Plural(count, "requirement", "requirements")} ({Html(titleExtra)}){Html(secondaryNote)}</title></rect>\n");
+                      $"<title>{Html(L1Label(key))}: {count} {Plural(count, "requirement", "requirements")} ({Html(titleExtra)}){Html(sharedNote)}</title></rect>\n");
             sb.Append($"  <text x=\"{F(epicX + nodeW / 2)}\" y=\"{F(ly - 6)}\" class=\"req-flow-nodelabel\" text-anchor=\"middle\">{Html(L1Label(key))}</text>\n");
         }
 
@@ -1352,7 +1375,7 @@ public static class Charts
         }
 
         sb.Append("</svg>\n");
-        sb.Append("<div class=\"req-flow-hint\">Functional requirements flow left to right: from definition, through the epic that covers each one, into its honest implementation state. Deferred and unmapped requirements are shown, not dropped. The status blocks and requirement list below carry the same information as text.</div>\n");
+        sb.Append("<div class=\"req-flow-hint\">Requirements flow left to right: from definition, through the epic(s) that cover each one, into its honest implementation state. A requirement covered by several epics is split across them; deferred, unmapped, and not-yet-covered requirements are shown under &ldquo;No coverage,&rdquo; not dropped. The status tiles and requirement list below carry the same information as text.</div>\n");
         sb.Append("</div>\n");
         return sb.ToString();
     }

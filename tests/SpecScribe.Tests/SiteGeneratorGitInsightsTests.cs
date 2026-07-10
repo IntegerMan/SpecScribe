@@ -87,7 +87,7 @@ public class SiteGeneratorGitInsightsTests : IDisposable
     [Fact]
     public void GenerateAll_FlagOnWithHistory_EmitsHubAndDashboardLink()
     {
-        if (!TryCreateGitHistory()) return; // git CLI unavailable on this host — the pure/unit layers cover the rest
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise gated hub generation; install git rather than silently skipping this test");
 
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
@@ -109,7 +109,7 @@ public class SiteGeneratorGitInsightsTests : IDisposable
     [Fact]
     public void GenerateAll_TwoRunsProduceIdenticalHubMarkup()
     {
-        if (!TryCreateGitHistory()) return; // git CLI unavailable on this host
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise determinism; install git rather than silently skipping this test");
 
         var site2 = Path.Combine(_root, "site2");
         var events1 = new SiteGenerator(Options(deepGit: true)).GenerateAll();

@@ -193,6 +193,31 @@ public class RequirementsParserTests
     }
 
     [Fact]
+    public void DeriveStatus_PartiallyImplemented_WhenACoveringEpicHasAnInProgressStory()
+    {
+        // Story 3.7 follow-up: requirements now surface a story-derived "partially implemented" (Active) tier
+        // when a covering epic has work in flight — the earlier design refused this; now the FR→story mapping
+        // backs it. A covering epic with an in-progress story rolls up to ForEpic == "active".
+        var dir = Directory.CreateTempSubdirectory("ss-req-active-").FullName;
+        try
+        {
+            var artifact = Path.Combine(dir, "1-1.md");
+            File.WriteAllText(artifact, "# Story 1.1\nStatus: in progress\n\n## Tasks / Subtasks\n\n- [x] a\n- [ ] b\n");
+            var epics = EpicsParser.Parse(MultiEpicEpicsMd);
+            var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null);
+            var reqs = RequirementsParser.Parse(MultiEpicEpicsMd, epics, progress);
+
+            // FR1 (Epic 1, in-progress story) and FR2 (Epics 1 & 2 — Epic 1 active) both read "partially implemented".
+            Assert.Equal(RequirementStatus.Active, reqs.ById["FR1"].Status);
+            Assert.Equal(RequirementStatus.Active, reqs.ById["FR2"].Status);
+            // The uncovered/deferred ones are unaffected.
+            Assert.Equal(RequirementStatus.Deferred, reqs.ById["FR3"].Status);
+            Assert.Equal(RequirementStatus.Planned, reqs.ById["FR4"].Status);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void RenderIndex_PopulatedProject_ContainsStatusGridAndFlowPanel()
     {
         var (reqs, epics) = ParseMultiEpic();
@@ -205,10 +230,10 @@ public class RequirementsParserTests
         Assert.Contains("Requirements at a glance", html);
         Assert.Contains("req-status-grid", html);
         Assert.Contains("req-status-block", html);
-        // ...and the requirements flow panel (AC #2), including the honest deferred/unmapped node.
+        // ...and the requirements flow panel (AC #2), including the honest "No coverage" node.
         Assert.Contains("Requirements flow", html);
         Assert.Contains("req-flow-svg", html);
-        Assert.Contains("Deferred / Unmapped", html);
+        Assert.Contains("No coverage", html);
     }
 }
 

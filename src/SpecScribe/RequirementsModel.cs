@@ -2,12 +2,17 @@ namespace SpecScribe;
 
 public enum RequirementKind { Functional, NonFunctional }
 
-/// <summary>Derived roll-up of a requirement's progress, sourced from the epic that covers it. Because the
-/// FR→Epic map is epic-level, we can't attribute a specific in-flight story to one requirement, so we
-/// deliberately don't claim "in development": the honest buckets are Planned (no task plans yet),
-/// Ready (the covering epic's stories have task plans), Done (the entire covering epic is complete), and
-/// Deferred. Ordered least→most complete.</summary>
-public enum RequirementStatus { Deferred, Planned, Ready, Done }
+/// <summary>Derived roll-up of a requirement's progress, sourced from the epic(s) that cover it. The buckets,
+/// least→most complete: Deferred; Planned (covered but no task plans yet, or no coverage at all); Ready (a
+/// covering epic's stories have task plans but none started); Active = "partially implemented" (a covering
+/// epic has a story in dev/review/done, but not every covering epic is fully done); Done (every covering epic
+/// is complete).
+/// <para>Honesty caveat: the FR→Epic map is epic-level, so "Active / Partially implemented" is derived from
+/// the covering <em>epics'</em> story progress (via <see cref="StatusStyles.ForEpic"/>), not per-requirement
+/// story attribution — it is an informed approximation, never a claim beyond what the covering epics support.
+/// This deliberately supersedes the earlier stance (Story 3.7) that refused any mid-development state, now that
+/// the multi-epic FR→story mapping (<see cref="RequirementsParser.StoriesFor"/>) backs it.</para></summary>
+public enum RequirementStatus { Deferred, Planned, Ready, Active, Done }
 
 /// <summary>One Functional or Non-Functional requirement parsed from epics.md's "## Requirements Inventory".
 /// Its <see cref="Status"/> is rolled up from the epic named in the FR Coverage Map.</summary>

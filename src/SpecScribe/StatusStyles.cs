@@ -84,6 +84,7 @@ public static class StatusStyles
     public static string ForRequirement(RequirementInfo req) => req.Status switch
     {
         RequirementStatus.Done => "done",       // green
+        RequirementStatus.Active => "active",   // teal — partially implemented
         RequirementStatus.Ready => "ready",     // gold
         RequirementStatus.Planned => "pending", // tan
         _ => "deferred",                        // grey
@@ -92,6 +93,7 @@ public static class StatusStyles
     public static string RequirementLabel(RequirementStatus status) => status switch
     {
         RequirementStatus.Done => "Done",
+        RequirementStatus.Active => "Partially implemented",
         RequirementStatus.Ready => "Ready for dev",
         RequirementStatus.Planned => "Planned",
         _ => "Deferred",

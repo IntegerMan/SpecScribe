@@ -330,7 +330,7 @@ public static class HtmlTemplater
         // the dashboard — the Git Pulse header above links out to it when --deep-git produced data. This keeps
         // the dashboard focused and gives the graph room to breathe. [Story 3.2]
 
-        AppendRequirementsPanel(sb, requirements);
+        AppendRequirementsPanel(sb, requirements, epicsModel);
 
         if (p.PerEpic.Count > 0)
         {
@@ -539,85 +539,24 @@ public static class HtmlTemplater
         return "family-planning";
     }
 
-    /// <summary>FR/NFR progress at a glance: a status donut for each kind, rolled up from covering-epic
-    /// progress, with a CTA into the full requirements page.</summary>
-    private static void AppendRequirementsPanel(StringBuilder sb, RequirementsModel? requirements)
+    /// <summary>The dashboard requirements panel — the requirements-maturation view (Story 3.7 follow-up,
+    /// replacing the earlier pair of progress donuts): the compact FR/NFR status-tile grid over the
+    /// requirements-flow Sankey, with a CTA into the full page. Full-width, like the Git Pulse / coverage
+    /// panels. The flow needs the epics model to resolve coverage; without it the panel degrades to the tile
+    /// grid alone. Omitted entirely when there are no requirements (graceful omission, Story 1.1).</summary>
+    private static void AppendRequirementsPanel(StringBuilder sb, RequirementsModel? requirements, EpicsModel? epicsModel)
     {
         if (requirements is null || !requirements.All.Any()) return;
 
-        sb.Append("<div class=\"chart-panel\">\n");
-        sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements Progress</h3>");
+        sb.Append("<div class=\"chart-panel req-panel\">\n");
+        sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements</h3>");
         sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
-        sb.Append("<div class=\"chart-row\">\n");
-        AppendRequirementBreakdown(sb, "Functional", requirements.Functional);
-        AppendRequirementBreakdown(sb, "Non-functional", requirements.NonFunctional);
-        sb.Append("</div>\n</div>\n\n");
-    }
-
-    /// <summary>One requirement group's status breakdown. A group with two or more non-zero statuses gets a
-    /// donut (fraction center E3, non-zero-only legend B4); a group where everything sits in a single status
-    /// gets a compact stacked bar instead, since a one-slice donut wastes space (E2).</summary>
-    private static void AppendRequirementBreakdown(StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs)
-    {
-        if (reqs.Count == 0)
+        sb.Append(Charts.RequirementStatusGrid(requirements.All.ToList(), prefix: string.Empty));
+        if (epicsModel is not null)
         {
-            // A kind with no requirements gets an explicit empty state, not a hollow zero-segment stacked bar
-            // (the single-status branch below would otherwise render an empty bar + empty legend). [review E2]
-            sb.Append("<div class=\"chart-col\">\n");
-            sb.Append($"  <div class=\"req-donut-label\">{Html(label)} (0)</div>\n");
-            sb.Append("  <div class=\"chart-empty\">None tracked yet.</div>\n</div>\n");
-            return;
+            sb.Append(Charts.RequirementFlow(requirements, epicsModel));
         }
-
-        int done = reqs.Count(r => r.Status == RequirementStatus.Done);
-        int ready = reqs.Count(r => r.Status == RequirementStatus.Ready);
-        int planned = reqs.Count(r => r.Status == RequirementStatus.Planned);
-        int deferred = reqs.Count(r => r.Status == RequirementStatus.Deferred);
-
-        // "Planned" reads as "Pending" here so the dashboard speaks one six-stage vocabulary across all
-        // panels (the sunburst's Pending→…→Done). [Story 1.5 B1]
-        var segments = new (string Label, int Value, string CssClass)[]
-        {
-            ("Done", done, "done"),
-            ("Ready for dev", ready, "ready"),
-            ("Pending", planned, "pending"),
-            ("Deferred", deferred, "deferred"),
-        };
-        var nonZero = segments.Where(s => s.Value > 0).ToList();
-        var ariaParts = nonZero.Count > 0
-            ? string.Join(", ", nonZero.Select(s => $"{s.Value} {s.Label.ToLowerInvariant()}"))
-            : "none";
-
-        sb.Append("<div class=\"chart-col\">\n");
-        sb.Append($"  <div class=\"req-donut-label\">{Html(label)} ({reqs.Count})</div>\n");
-
-        if (nonZero.Count < 2)
-        {
-            // Single-status group → stacked bar (E2). Denser and directly comparable to its sibling.
-            sb.Append("  <div class=\"req-stacked\">\n");
-            sb.Append($"    <div class=\"req-stacked-bar\" role=\"img\" aria-label=\"{Html($"{label} requirements: {ariaParts}")}\">");
-            foreach (var (_, value, cssClass) in nonZero)
-            {
-                var pct = reqs.Count > 0 ? (double)value / reqs.Count * 100 : 0;
-                sb.Append($"<span class=\"seg {cssClass}\" style=\"width:{pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%\"></span>");
-            }
-            sb.Append("</div>\n");
-            sb.Append("    <div class=\"req-stacked-legend\">\n");
-            foreach (var (segLabel, value, cssClass) in nonZero)
-            {
-                sb.Append($"      <span><span class=\"swatch {cssClass}\"></span>{value} {Html(segLabel)}</span>\n");
-            }
-            sb.Append("    </div>\n  </div>\n</div>\n");
-            return;
-        }
-
-        sb.Append("  <div class=\"donut-and-legend\">\n");
-        sb.Append(Charts.Donut(segments,
-            ariaLabel: $"{label} requirements: {ariaParts}",
-            centerText: $"{done}/{reqs.Count}"));
-        // Only non-zero rows are rendered (B4) — no "Done (0), Ready (0), Deferred (0)" noise.
-        sb.Append(Charts.DonutLegend(nonZero));
-        sb.Append("  </div>\n</div>\n");
+        sb.Append("</div>\n\n");
     }
 
     /// <summary>The first-class "Direct &amp; Quick-Dev Work" band: quick-dev one-shot changes as status-badged

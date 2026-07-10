@@ -37,10 +37,9 @@ public static class RequirementsParser
 
         var coverage = ParseCoverage(mapLines);
         var epicsByNumber = epics.Epics.ToDictionary(e => e.Number);
-        var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
 
-        var functional = ParseDefs(frLines, RequirementKind.Functional, withCategories: true, coverage, epicsByNumber, progressByEpic);
-        var nonFunctional = ParseDefs(nfrLines, RequirementKind.NonFunctional, withCategories: false, coverage, epicsByNumber, progressByEpic);
+        var functional = ParseDefs(frLines, RequirementKind.Functional, withCategories: true, coverage, epicsByNumber);
+        var nonFunctional = ParseDefs(nfrLines, RequirementKind.NonFunctional, withCategories: false, coverage, epicsByNumber);
 
         return new RequirementsModel { Functional = functional, NonFunctional = nonFunctional };
     }
@@ -101,8 +100,7 @@ public static class RequirementsParser
         RequirementKind kind,
         bool withCategories,
         IReadOnlyDictionary<string, Coverage> coverage,
-        IReadOnlyDictionary<int, EpicInfo> epicsByNumber,
-        IReadOnlyDictionary<int, EpicProgress> progressByEpic)
+        IReadOnlyDictionary<int, EpicInfo> epicsByNumber)
     {
         var result = new List<RequirementInfo>();
         string? category = null;
@@ -147,7 +145,7 @@ public static class RequirementsParser
                 CoverageEpicTitleHtml = epicTitle,
                 CoverageNote = cov?.Note,
                 Deferred = deferred,
-                Status = DeriveStatus(deferred, epicNumber, epicsByNumber, progressByEpic),
+                Status = DeriveStatus(deferred, epicNumbers, epicsByNumber),
             });
         }
 
@@ -168,26 +166,34 @@ public static class RequirementsParser
             .ToList();
     }
 
-    /// <summary>Rolls a requirement's status up from its covering epic. Because the FR→Epic map is
-    /// epic-level, one in-flight story can't be pinned to a specific requirement — so we never claim
-    /// "in development". We only assert Done when the <em>entire</em> covering epic is done
-    /// (<see cref="StatusStyles.ForEpic"/> == "done"); otherwise Ready once the epic's stories have task
-    /// plans, else Planned. This stops a lone scaffolding story from painting every requirement its epic
-    /// covers as actively in development.</summary>
+    /// <summary>Rolls a requirement's status up from ALL of its covering epics via
+    /// <see cref="StatusStyles.ForEpic"/> (the single epic→status classifier, which already means "a story has
+    /// entered dev/review/done" for its "active" tier). Least→most complete: <c>Deferred</c>; <c>Planned</c>
+    /// (no covering epic — an unmapped FR or an uncovered NFR — or the covering epics are merely drafted);
+    /// <c>Ready</c> (a covering epic has task-planned stories but none started); <c>Active</c> = partially
+    /// implemented (a covering epic has a story in flight, but not every covering epic is done); <c>Done</c>
+    /// (every covering epic is fully done).
+    /// <para>Because the map is epic-level, "Active" is an informed approximation of the covering epics'
+    /// progress, not a per-requirement story claim (see <see cref="RequirementStatus"/>). This supersedes the
+    /// earlier refusal to surface any mid-development state, now that the multi-epic mapping backs it.</para></summary>
     private static RequirementStatus DeriveStatus(
         bool deferred,
-        int? epicNumber,
-        IReadOnlyDictionary<int, EpicInfo> epicsByNumber,
-        IReadOnlyDictionary<int, EpicProgress> progressByEpic)
+        IReadOnlyList<int> epicNumbers,
+        IReadOnlyDictionary<int, EpicInfo> epicsByNumber)
     {
         if (deferred) return RequirementStatus.Deferred;
-        if (epicNumber is not { } n || !epicsByNumber.TryGetValue(n, out var epic)) return RequirementStatus.Planned;
 
-        if (StatusStyles.ForEpic(epic) == "done") return RequirementStatus.Done;
+        var classes = epicNumbers
+            .Where(epicsByNumber.ContainsKey)
+            .Select(n => StatusStyles.ForEpic(epicsByNumber[n]))
+            .ToList();
+        if (classes.Count == 0) return RequirementStatus.Planned;
 
-        // Not fully done: "Ready for dev" once task plans exist for the covering epic, else still Planned.
-        return progressByEpic.TryGetValue(n, out var ep) && ep.TasksTotal > 0
-            ? RequirementStatus.Ready
-            : RequirementStatus.Planned;
+        if (classes.All(c => c == "done")) return RequirementStatus.Done;
+        // A covering epic with any story in dev/review/done rolls up to "active" — surfaced as partially
+        // implemented since the whole set of covering epics isn't done yet.
+        if (classes.Any(c => c == "active")) return RequirementStatus.Active;
+        if (classes.Any(c => c == "ready")) return RequirementStatus.Ready;
+        return RequirementStatus.Planned;
     }
 }

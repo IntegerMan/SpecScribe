@@ -127,6 +127,7 @@ public class StylesheetTests
         // so the token routing can't silently regress to hardcoded hex. [Story 3.7 Task 4, Story 1.5 B2/B3]
         var css = ReadStylesheet();
         Assert.Contains(".req-status-block.done { background: var(--status-done); }", css);
+        Assert.Contains(".req-status-block.active { background: var(--status-active); color: var(--warm-white); }", css);
         Assert.Contains(".req-status-block.ready { background: var(--status-ready); }", css);
         Assert.Contains(".req-status-block.pending { background: var(--status-pending); }", css);
         Assert.Contains(".req-status-block.deferred { background: var(--status-deferred); color: var(--warm-white); }", css);
@@ -139,11 +140,21 @@ public class StylesheetTests
         // definition/epic chrome uses neutral base-palette tones, never a status token. [Story 3.7 Task 4]
         var css = ReadStylesheet();
         Assert.Contains(".req-flow-state.done { fill: var(--status-done); }", css);
+        Assert.Contains(".req-flow-state.active { fill: var(--status-active); }", css);
         Assert.Contains(".req-flow-state.ready { fill: var(--status-ready); }", css);
         Assert.Contains(".req-flow-state.pending { fill: var(--status-pending); }", css);
         Assert.Contains(".req-flow-state.deferred { fill: var(--status-deferred); }", css);
         // Structural nodes are NOT status tokens — they use the neutral parchment chrome.
         Assert.Contains(".req-flow-epic { fill: var(--parchment-dark)", css);
+    }
+
+    [Fact]
+    public void Stylesheet_RequirementsPanelsShareTheFlushColumn()
+    {
+        // Round-2 width fix: the status-tile + flow chart-panels join the requirements page's flush 860px
+        // column so they align with every other section instead of stretching edge-to-edge.
+        var css = ReadStylesheet();
+        Assert.Contains(".req-index .chart-panel", css);
     }
 
     [Fact]

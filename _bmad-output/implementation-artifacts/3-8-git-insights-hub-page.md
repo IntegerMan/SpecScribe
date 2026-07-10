@@ -4,7 +4,7 @@ baseline_commit: 47ff3ea15365ec928ac5ffdb13a6ea985c2ee516
 
 # Story 3.8: Git Insights Hub Page
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -88,6 +88,28 @@ When `--deep-git` is enabled (Story 3.2's `ForgeOptions.DeepGitAnalytics`), and 
   - [x] Subtask 7.2: `GitInsightsTemplaterTests.cs` (unit): a11y contract, `<caption>`/`<th scope>`, escaping, guarded-link (present→`<a>`, absent→plain text), attribution-not-ranking framing, empty-section note.
   - [x] Subtask 7.3: Generation-level: **gate test** (`DeepGitAnalytics == false` → no `git-insights.html`, no error, unchanged dashboard — the load-bearing AC #2 pin); enabled → page generated + dashboard link present; deep-unavailable-with-flag-on → no hub, no error, rest of site generates; determinism (two runs identical).
   - [x] Subtask 7.4: Full pass: `dotnet test`; then `dotnet run --project src/SpecScribe -- generate --deep-git`, open `SpecScribeOutput/git-insights.html`, **disable JS and reload** (tables still complete/ordered/navigable — the NFR-5 gate), re-enable and confirm sort/filter announce state.
+
+### Review Findings
+
+- [x] [Review][Patch] Activity headline and reused heatmap draw from two different git windows [src/SpecScribe/GitInsightsTemplater.cs:215-221] — The lead sentence ("N commits across M active days in the analyzed window") is computed from `insights.Activity`, sourced from the bounded `-n 300` deep-git numstat fetch, while the heatmap rendered directly below it reuses the baseline `GitPulse`'s unbounded `DailySeries`/`CommitsByDay`. Decision (2026-07-09): derive the headline counts from `git.DailySeries`/`CommitsByDay` (the same data the heatmap renders) instead of `insights.Activity`, so the sentence always matches the chart. **Fixed**: `AppendActivitySection` now sources both figures from `git` when available; regression pin: `GitInsightsTemplaterTests.RenderPage_ReusesTheCommitHeatmapForActivity`.
+
+- [x] [Review][Patch] "N files"/"N contributors" pills and lists silently truncate with no disclosure [src/SpecScribe/GitInsightsTemplater.cs:52, src/SpecScribe/GitMetrics.cs:460] — `BuildInsights` caps at `topFiles = 50` and `topContributorsPerFile = 12`, but the meta-pills print the already-capped counts as if they were totals, and there's no "+N more"/"top 50 of N" indicator anywhere on the page. **Fixed**: added `GitInsightsData.TotalFilesTouched` and `FileChangeStat.TotalContributors`; the files pill now reads "top N of M files" and truncated contributor lists gain an "and N more contributors…" line. Regression pins: `GitMetricsTests.BuildInsights_OrdersFilesByChangeCountThenOrdinalPathAndTruncates`, `BuildInsights_TotalContributorsDiscloseCapWhenAuthorListIsTruncated`, `GitInsightsTemplaterTests.RenderPage_DisclosesWhenFilesAndContributorsAreTruncated`.
+
+- [x] [Review][Patch] sprint-status.yaml still lists this story as `ready-for-dev` [_bmad-output/implementation-artifacts/sprint-status.yaml:76] — despite this story being fully implemented, tested, and in `review` status. Sprint tracking will misreport progress until synced. **Fixed**: entry updated to `review` (superseded by the story-status sync in step 6 of this review).
+
+- [x] [Review][Patch] `FileAccum.LastChangeDate` can be stuck `null` [src/SpecScribe/GitMetrics.cs:487-491] — if a file's newest commit has an unparseable date, the `LatestHash.Length == 0` guard fires once and locks in a null `LastChangeDate`, even though older commits for that file may have valid dates that could backfill it. **Fixed**: added a backfill branch (`accum.LastChangeDate ??= day`) alongside the identity guard. Regression pin: `GitMetricsTests.BuildInsights_BackfillsLastChangeDateWhenNewestCommitDateIsUnparseable`.
+
+- [x] [Review][Patch] Two Git Insights generation tests silently no-op without the git CLI [tests/SpecScribe.Tests/SiteGeneratorGitInsightsTests.cs:90,112] — `GenerateAll_FlagOnWithHistory_EmitsHubAndDashboardLink` and `GenerateAll_TwoRunsProduceIdenticalHubMarkup` both `return` early if `TryCreateGitHistory()` fails, reporting green without exercising the gated-generation/determinism logic they claim to cover. **Fixed**: both now `Assert.True(TryCreateGitHistory(), ...)` so a git-less host fails loudly instead of silently passing.
+
+- [x] [Review][Defer] Commit body containing a literal `0x1F` control char could truncate numstat rows [src/SpecScribe/GitMetrics.cs:386-399] — deferred, pre-existing-shape edge case; extremely unlikely in real commit text and the parser's never-throw contract still holds (silent undercount only, no crash).
+
+- [x] [Review][Defer] Commits with unparseable dates diverge `CommitCount` from summed `Activity` [src/SpecScribe/GitMetrics.cs:469-470] — deferred, pre-existing-shape edge case; same rarity caveat as the control-char finding above, since git always emits a well-formed date in this pipeline.
+
+- [x] [Review][Defer] Churn (`Added`/`Deleted`) sums every numstat row per commit while `Changes` dedups per commit-path [src/SpecScribe/GitMetrics.cs:482-486] — deferred, documented as an intentional tradeoff in the code's own comment; only manifests on rare rename/copy overlaps resolving to the same path within one commit.
+
+- [x] [Review][Defer] `:target`-revealed contributor panel has no explicit focus management for keyboard/AT users [src/SpecScribe/GitInsightsTemplater.cs:154] — deferred, pre-existing gap shared with the commit-heatmap and coupling-graph `:target` drill-downs already in the codebase; not introduced by this story.
+
+- [x] [Review][Defer] No test asserts a stale `git-insights.html` is removed after `--deep-git` is disabled on a prior output dir [tests/SpecScribe.Tests/SiteGeneratorGitInsightsTests.cs] — deferred, coverage gap only; `SiteGenerator` already does a full recursive wipe of the output root every run (`SiteGenerator.cs:55`), so the scenario cannot actually occur.
 
 ---
 

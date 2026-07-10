@@ -162,17 +162,33 @@ claude-opus-4-8 (Amelia — dev-story workflow)
 - **Task 5 (tests, +14).** Parser multi-epic/deferred/unmapped + `StoriesFor`; grid one-block-per-req/tooltip/href/empty/single; flow aria/deferred-unmapped/secondary-epic/conservation/empty/single-FR; stylesheet token-routing for blocks + flow states + the reduced-motion seam join; and a requirements-page render test asserting both sections appear.
 - No new files, folders, or project — extended the monolith in place per the architecture note.
 
+#### Review revision (user acceptance, 2026-07-09) — flow & tiles round 2
+
+Acceptance feedback reshaped the delivered form; all changes stay within 3.7's scope (still `review`). 586 tests green; re-verified against the generated site (`requirements.html` **and** `index.html`) with the preview tools.
+
+- **Finer, story-derived status (reverses the earlier "no in-development" stance).** Added `RequirementStatus.Active` = "Partially implemented". `DeriveStatus` now rolls up over ALL covering epics via `StatusStyles.ForEpic`: all-done → Done; any covering epic in dev/review/done → Active; any ready → Ready; else Planned. This is now defensible because the FR→story mapping backs it; the honesty caveat (epic-level ⇒ "partially implemented" is an approximation) is documented on `RequirementStatus`/`DeriveStatus`. `ForRequirement`/`RequirementLabel` and every requirement-status bucketer (`RequirementsTemplater` donuts) extended with the new tier.
+- **Sankey now spans ALL requirements (FR + NFR)** with an explicit **"No coverage"** node (the old "Deferred / Unmapped" sentinel, renamed) — NFRs have zero coverage in epics.md, so all 7 land there honestly rather than being omitted.
+- **Multi-epic requirements are SPLIT across their covering epics** (fractional 1/k ribbons) instead of primary-only routing, so a `FR2: Epics 1 & 2` requirement is visibly connected to both epic nodes (Epic 2 now gets a node); node height = summed fractional throughput, node label = distinct-requirement integer, tooltip notes how many are shared. Conservation stays requirement-level (each requirement still terminates in one state).
+- **Status tiles redesigned** to small 3rem **squares** (with `flex: 0 0 auto` so they don't shrink in the wrapping row): a **kind icon** (`Icons.ForRequirementKind` — gear = FR, shield = NFR, a shape channel), status color, visible id, and a **rich `js-tip` body-level tooltip** (id · kind / status word / definition snippet) plus the plain-`title` no-JS fallback.
+- **Home dashboard requirements panel REPLACED** — from the two progress donuts to the tile grid + the Sankey (`AppendRequirementsPanel` now takes `EpicsModel?`; the old `AppendRequirementBreakdown` removed). Precedent: Now & Next → sprint board.
+- **Width fix:** the tile-grid and flow `chart-panel`s join the requirements page's flush 860px column (`.req-index .chart-panel`), so they align with every other section instead of stretching edge-to-edge.
+- Live verification: `aria-label="Requirements flow: 26 requirements: 4 done, 3 partially implemented, 7 ready for dev, 12 planned, 0 deferred; 7 covering epics, 7 with no coverage"`; conservation 4+3+7+12+0 = 26; zero `NaN`; tiles render as 48×48 squares with FR/NFR icons; no horizontal overflow; dashboard panel shows tiles + flow; no console errors.
+
 ### File List
 
 - src/SpecScribe/RequirementsModel.cs
 - src/SpecScribe/RequirementsParser.cs
+- src/SpecScribe/StatusStyles.cs (review revision — `Active`/"Partially implemented" requirement tier)
+- src/SpecScribe/Icons.cs (review revision — `ForRequirementKind` FR/NFR glyphs)
 - src/SpecScribe/Charts.cs
 - src/SpecScribe/RequirementsTemplater.cs
+- src/SpecScribe/HtmlTemplater.cs (review revision — dashboard requirements panel replaced with tiles + flow)
 - src/SpecScribe/SiteGenerator.cs
 - src/SpecScribe/assets/specscribe.css
 - tests/SpecScribe.Tests/ChartsTests.cs
 - tests/SpecScribe.Tests/StylesheetTests.cs
 - tests/SpecScribe.Tests/RequirementsAndProgressTests.cs
+- tests/SpecScribe.Tests/HtmlTemplaterTests.cs (review revision — dashboard tiles+flow test)
 - tests/SpecScribe.Tests/LinkifierTests.cs (updated the inline `RequirementInfo` builder for the new required member)
 
 ## Change Log
@@ -180,3 +196,4 @@ claude-opus-4-8 (Amelia — dev-story workflow)
 | Date | Change |
 | --- | --- |
 | 2026-07-09 | Implemented Story 3.7: multi-epic FR→story coverage data model (`CoverageEpicNumbers` + `StoriesFor`, fixing the plural-"Epics" coverage-parse bug), the FR/NFR status-block grid, and the requirements-flow Sankey on requirements.html. All status color routes through `--status-*`; a11y/motion/truthfulness conventions inherited. 579 tests green; verified against the generated site. Status → review. |
+| 2026-07-09 | Review revision (user acceptance): added a story-derived "Partially implemented" (`Active`) status tier (reversing the earlier no-in-development stance, now backed by the FR→story mapping); extended the Sankey to ALL requirements with a "No coverage" node; split multi-epic requirements across their covering epics; redesigned the tiles as small FR/NFR-iconified squares with rich tooltips; replaced the dashboard requirements donuts with the tiles + flow; and fixed the requirements-page panel width (860px flush column). 586 tests green; re-verified against the generated site (requirements.html + index.html). Remains in review. |

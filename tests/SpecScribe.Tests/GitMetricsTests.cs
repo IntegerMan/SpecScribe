@@ -442,6 +442,41 @@ public class GitMetricsTests
         // B and C tie at 1; ordinal path tie-break keeps B (C is truncated by topFiles: 2).
         Assert.Equal("B.cs", insights.Files[1].Path);
         Assert.Equal(3, insights.CommitCount);
+        // TotalFilesTouched (3: A/B/C) exceeds the truncated Files.Count (2) so the page can disclose the cap.
+        Assert.Equal(3, insights.TotalFilesTouched);
+    }
+
+    [Fact]
+    public void BuildInsights_TotalContributorsDiscloseCapWhenAuthorListIsTruncated()
+    {
+        var commits = new[]
+        {
+            Commit("h1", "Alice", "2026-07-03T10:00", ("A.cs", 1, 0)),
+            Commit("h2", "Bob", "2026-07-02T10:00", ("A.cs", 1, 0)),
+        };
+
+        var file = Assert.Single(GitMetrics.BuildInsights(commits, topContributorsPerFile: 1).Files);
+
+        Assert.Single(file.Contributors);
+        // TotalContributors (2: Alice + Bob) exceeds the truncated Contributors.Count (1).
+        Assert.Equal(2, file.TotalContributors);
+    }
+
+    [Fact]
+    public void BuildInsights_BackfillsLastChangeDateWhenNewestCommitDateIsUnparseable()
+    {
+        // The newest commit touching A.cs has no parseable timestamp (Timestamp: null); an older commit does.
+        // LastChangeDate must fall back to that older, valid date rather than staying stuck null.
+        var commits = new[]
+        {
+            new DeepCommit("h2", "Alice", null, "s", "", new[] { new DeepFileChange("A.cs", 1, 0) }),
+            Commit("h1", "Alice", "2026-07-01T10:00", ("A.cs", 1, 0)),
+        };
+
+        var file = Assert.Single(GitMetrics.BuildInsights(commits).Files);
+
+        Assert.Equal("h2", file.LatestHash); // identity still comes from the newest commit
+        Assert.Equal(new DateOnly(2026, 7, 1), file.LastChangeDate); // date backfilled from the older commit
     }
 
     [Fact]
