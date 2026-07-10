@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-09T18:30:00-04:00
+last_updated: 2026-07-09T21:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -74,7 +74,7 @@ development_status:
   3-6-refinement-funnel-on-the-dashboard: done
   3-7-requirements-flow-and-status-blocks: done
   3-8-git-insights-hub-page: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   epic-4: backlog
   4-1-shared-framework-adapter-contract-and-projection-path: backlog
@@ -112,7 +112,7 @@ action_items:
   - epic: 1
     action: "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog for review before Epic 3 planning"
     owner: "Dana (QA Engineer)"
-    status: open
+    status: done
   - epic: 1
     action: "Schedule epic retrospectives promptly on story completion rather than deferring past the epic boundary"
     owner: "Amelia (Developer)"
@@ -120,16 +120,32 @@ action_items:
   - epic: 2
     action: "Triage Epic 1's deferred heatmap tech debt (HeatLevel collapse on sparse history, unmapped ForEpic status classes, non-invariant heatmap date formatting) before starting Epic 3 Story 3.2 or 3.5 - carried unaddressed across two retrospectives now"
     owner: "Dana (QA Engineer)"
-    status: open
+    status: done
   - epic: 2
     action: "When a story's scope grows past a structural threshold mid-implementation (new page type, new information architecture, new interaction model - not visual polish), split it into a new story rather than absorbing it as a numbered polish pass. Story 2.3's 8 polish passes are the cautionary example."
     owner: "Alice (Product Owner)"
-    status: open
+    status: in-progress
   - epic: 2
     action: "Before closing a story, grep other in-flight/recent story files for repeated stale commands or facts already captured in memory (e.g. --output docs/live) - three Epic 2 stories independently repeated this known-wrong command"
     owner: "Amelia (Developer)"
-    status: open
+    status: done
   - epic: 2
     action: "When a story's implementation incidentally touches another story's declared scope (as 2.5's commits did with 2.3's redesign), disclose it in that story's own File List/Completion Notes at review time, not after the fact"
+    owner: "Charlie (Senior Dev)"
+    status: done
+  - epic: 3
+    action: "Elicit visual intent at create-story: when a story introduces any new visual surface (card, chart, layout, insight), present the owner 2-3 named design directions each with a one-line description and capture the pick, rather than deferring the silhouette to the dev or correcting it at review. Direct fix for Epic 3's redesign-after-review rework (3.3 redesigned 4x, 3.6 pivoted 3x, 3.7 round-2 reshape)."
+    owner: "Sally (UX Designer)"
+    status: open
+  - epic: 3
+    action: "Close action/deferred items when the fix ships, in the same change (immediately: the Epic 1 heatmap items, resolved via spec-epic1-heatmap-debt-triage but left open across this epic). A resolved item left open misreports project state."
+    owner: "Dana (QA Engineer)"
+    status: open
+  - epic: 3
+    action: "Apply 'split, don't absorb' at the within-story scale: when a review triggers a structural (not cosmetic) redesign, treat it as a new pass with fresh review, disclosed as such. Learned at epic scale this epic (3.4 to 7.6, 3.6 to 3.7 spin-out); not yet at within-story scale."
+    owner: "Alice (Product Owner)"
+    status: open
+  - epic: 3
+    action: "Add a review-checklist item for the 'parser silently drops a real input shape' class before Epic 4's foreign framework inputs hit the same parsers: 'what real-world input shape does this parser silently drop?' Three instances this epic (renamed-file undercount 3.1/3.2, plural-Epics coverage drop 3.7)."
     owner: "Charlie (Senior Dev)"
     status: open

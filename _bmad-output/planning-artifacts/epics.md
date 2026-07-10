@@ -15,7 +15,11 @@ inputDocuments:
   - src/SpecScribe/SiteGenerator.cs
   - src/SpecScribe/HtmlTemplater.cs
   - src/SpecScribe/BmadCommands.cs
+  - docs/MissingFeatures.md
+  - docs/Epic3UXFeedback.md
+  - docs/UserJourneys.md
 ---
+<!-- 2026-07-09 extension run: FR20–FR31, NFR8, UX-DR21–UX-DR30 extracted from the site-wide UX review; Epics 8–10 with Stories 8.1–8.7, 9.1–9.6, 10.1–10.6 created; final validation in progress. -->
 
 # SpecScribe - Epic Breakdown
 
@@ -51,6 +55,21 @@ FR19: Provide advanced code-and-git coverage on code pages (for example history/
 
 <!-- FR15–FR19 added post-PRD (2026-07-06) to seat the reordered roadmap (Epics 4/5/7); sync back into the PRD for full traceability when convenient. -->
 
+FR20: Publish one canonical status lifecycle per entity type (requirement / epic / story) in the projection model, with each framework's native vocabulary mapped to it at the adapter layer; route every rendered badge through the `--status-*` token system and provide a status-legend affordance reachable from any badge.
+FR21: Derive all entity counts (stories, deferred items, action items, and similar) from a single generator-side source of truth consumed by every widget, so summary counts and detail views can never disagree.
+FR22: Requirement (FR/NFR) detail pages list their covering stories with current status, completing the requirement → epic → story hop using existing coverage-map data.
+FR23: Provide NFR and UX-DR coverage maps parallel to the FR coverage map, with per-item state or a stated verification approach.
+FR24: Coverage reporting distinguishes "deferred on purpose" from "unmapped" as separate states with distinct treatment.
+FR25: Next-step commands are state-aware: each lifecycle state surfaces one primary recommended command plus any applicable alternate/unhappy-path actions (for example correct-course mid-sprint, retro on done), never surfaces commands inapplicable to the current state, and the command surface per state is adapter-supplied rather than hard-coded.
+FR26: Story pages surface a verification-evidence strip (tasks done, tests green, verified date) near the status badge.
+FR27: Insight pages (git insights, deep analytics, action items, deferred work) get stable top-nav entry points; the retired Structure page loses its nav slot.
+FR28: Every chart carries a legend with real values, its analysis time window, and one framing sentence of why the metric matters.
+FR29: Provide a glossary / "how to read this portal" page, first-use acronym expansion, and one-line captions on surfaced commands, with framework-specific vocabulary supplied via the adapter contract.
+FR30: Follow-up items (action items, deferred work) carry provenance, resolution criteria, and a link to the resolving story/spec, with de-duplication across source retros; these surfaces degrade gracefully when a framework lacks the underlying artifact types.
+FR31: Recency signals ("last updated" markers on dashboard widgets and story cards) are derived entirely at generation time from git timestamps and artifact change logs — no per-visitor state, and a from-scratch CI regeneration produces identical output.
+
+<!-- FR20–FR31 added 2026-07-09 from the site-wide UX review (docs/MissingFeatures.md, docs/Epic3UXFeedback.md, docs/UserJourneys.md); sync back into the PRD for full traceability when convenient. -->
+
 ### NonFunctional Requirements
 
 NFR1: Baseline generation performance remains responsive for local OSS repositories, with deeper analytics separated from baseline runs.
@@ -60,6 +79,7 @@ NFR4: Architecture is extensible so new framework adapters can be added without 
 NFR5: Source files are read with shared access and watch mode must not hold write locks on observed files.
 NFR6: Cross-surface accessibility semantics (keyboard drill behavior, labels, status text redundancy) are contractual behavior, not optional styling.
 NFR7: Feature configurability parity is required across interactive menu flows and equivalent CLI parameters, with directory-scoped settings persistence.
+NFR8: Insight surfaces and guidance affordances (status vocabularies, next-step commands, glossary terms, empty-state hints, follow-up/debt artifact types) are framework-agnostic in shared rendering: framework-specific content flows through the adapter contract, and surfaces degrade gracefully — absent, not broken or misleadingly empty — when a methodology lacks the corresponding artifact.
 
 ### Additional Requirements
 
@@ -101,6 +121,18 @@ UX-DR17: Ensure status communication is never color-only; pair color with text l
 UX-DR18: Ensure motion respects prefers-reduced-motion with near-instant transitions and no looping animation.
 UX-DR19: Implement a readable, interactive source-structure visualization — a treemap of the code tree sized by lines of code and colorable by git-derived signals (change frequency, creation/last-modified recency, average change size), with rich hover/focus tooltips, directory drill/zoom with breadcrumb, focusable rectangles carrying descriptive labels, and a non-color text equivalent of every metric.
 UX-DR20: Include high-impact but purposeful visual polish for insight modules (for example animated transitions, visual summaries, and drill paths) without violating performance or accessibility constraints.
+UX-DR21: Each page presents one primary representation per dataset, with alternate views demoted behind a toggle (the sprint page's By Status / By Epic radio-toggle pattern); chart text-twin tables are accessibility contract and are never removed.
+UX-DR22: Empty states are designed, not incidental: per-epic consolidated CLI-hint banners (hint text adapter-supplied), intentional empty-column copy, and one copy-able command affordance per context.
+UX-DR23: Task progress and workflow state are always paired wherever both appear (for example "5/5 tasks · awaiting review"), and dual-count epic badges are restated as sentences.
+UX-DR24: Readiness is self-explanatory: column-level tooltips distinguish backlog from ready-for-dev, and stories lacking task plans are visually separated from actionable ones.
+UX-DR25: One date-format token is used portal-wide; ADR listings gain dates and one-line summaries; events sharing a date get sequence markers.
+UX-DR26: Acceptance criteria render as visually distinct blocks via existing tokens, and dev-record/dev-notes sections collapse by default on long story pages.
+UX-DR27: Wiki-link and file:line reference syntax renders as styled chips or a references appendix, never as raw syntax in prose.
+UX-DR28: Long-artifact "On this page" TOCs group subsections under collapsible parents, and every long page keeps an on-page TOC.
+UX-DR29: Assumption tags ([ASSUMPTION: …]) are styled via the annotation-comment treatment, and retired work renders in a collapsed section that preserves history without cluttering active lists.
+UX-DR30: Insight-chart context polish: distinguish process-coupling from code-coupling in coupling views, annotate or trim pre-project heatmap dead zones, and suppress or reword multi-contributor phrasing when only one contributor exists.
+
+<!-- UX-DR21–UX-DR30 added 2026-07-09 from the site-wide UX review (docs/MissingFeatures.md, docs/Epic3UXFeedback.md, docs/UserJourneys.md). -->
 
 ### FR Coverage Map
 
@@ -123,6 +155,18 @@ FR16: Epic 7 - Activity timeline and per-date pages linked from dates.
 FR17: Epic 4 - Additional framework adapters (SpecFlow, Squad, Superpowers) via the shared contract.
 FR18: Epic 5 - OSS onboarding and reference documentation.
 FR19: Epic 7 - Advanced code-and-git coverage on code pages.
+FR20: Epic 8 - Canonical status lifecycle per entity type with adapter-layer vocabulary mapping and status legend.
+FR21: Epic 8 - Single generator-side count source consumed by every widget.
+FR22: Epic 9 - Requirement detail pages list covering stories with status.
+FR23: Epic 9 - NFR and UX-DR coverage maps parallel to the FR map.
+FR24: Epic 9 - Deferred-on-purpose vs unmapped as distinct coverage states.
+FR25: Epic 8 - State-aware next-step commands (primary + unhappy-path, adapter-supplied).
+FR26: Epic 9 - Verification-evidence strip on story pages.
+FR27: Epic 10 - Insight pages in top nav; Structure nav slot retired.
+FR28: Epic 10 - Chart metadata standard (legend, time window, framing sentence).
+FR29: Epic 10 - Glossary / portal-orientation page with adapter-supplied vocabulary.
+FR30: Epic 9 - Follow-up item provenance, resolution criteria, and de-duplication.
+FR31: Epic 8 - Generation-time recency signals from git/change-log data.
 
 ## Epic List
 
@@ -153,6 +197,20 @@ Expose the same shared projection in a read-only VS Code webview for in-editor v
 ### Epic 7: Code and Git Exploration
 Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth.
 **FRs covered:** FR14, FR15, FR16, FR19
+
+### Epic 8: Dashboard Command Center — Trustworthy Status at a Glance
+Give the Driver an accurate 30-second pulse and a friction-free path to the next unit of work: one canonical status vocabulary everywhere, counts that always agree, progress and workflow state paired, readiness self-explanatory, and state-aware next-step commands (one primary plus applicable unhappy-path actions). Optimizes the home dashboard for the daily journeys (1–2).
+**FRs covered:** FR20, FR21, FR25, FR31 · **UX-DRs:** UX-DR21, UX-DR22, UX-DR23, UX-DR24 · **NFRs:** NFR8
+
+### Epic 9: Traceability and Review Follow-Through
+Complete the requirement → epic → story chain so a Stakeholder can click from any requirement to its delivering stories, a Reviewer can judge a "done" claim in one glance, and follow-up items carry provenance and resolution paths. Serves the review journey (3), the traceability differentiator (4), and debt follow-through (7).
+**FRs covered:** FR22, FR23, FR24, FR26, FR30 · **UX-DRs:** UX-DR26 · **NFRs:** NFR8
+
+### Epic 10: Portal Legibility for Every Audience
+Make every surface navigable and correctly interpretable by first-time visitors, non-BMAD stakeholders, and tech leads: insight pages reachable from the nav, every chart self-explaining (legend, time window, why-it-matters), vocabulary defined in place, and consistent dates, references, and TOC treatment. Serves onboarding (5) and health-insight (6) journeys — the adoption deciders.
+**FRs covered:** FR27, FR28, FR29 · **UX-DRs:** UX-DR25, UX-DR27, UX-DR28, UX-DR29, UX-DR30 · **NFRs:** NFR8
+
+<!-- Epics 8–10 added 2026-07-09 from the site-wide UX review; Epic 8 is foundational for 9–10 (status model + count source) and these are candidates to run ahead of Epic 4, with all framework-specific content structured as adapter-supplied data per NFR8. -->
 
 <!-- Repeat for each epic in epics_list (N = 1, 2, 3...) -->
 
@@ -995,3 +1053,422 @@ So that I can see at a glance where the code mass and the churn live, and drill 
 **Then** rectangles are focusable with descriptive labels announcing name and metric value
 **And** color is never the sole signal (every metric is available as text)
 **And** reduced-motion is respected, preserving the Story 1.4/1.5 conventions and NFR6.
+
+## Epic 8: Dashboard Command Center — Trustworthy Status at a Glance
+
+Give the Driver an accurate 30-second pulse and a friction-free path to the next unit of work: one canonical status vocabulary everywhere, counts that always agree, progress and workflow state paired, readiness self-explanatory, and state-aware next-step commands. Optimizes the home dashboard for the daily journeys (1–2) defined in docs/UserJourneys.md.
+
+**FRs covered:** FR20, FR21, FR25, FR31 · **UX-DRs:** UX-DR21, UX-DR22, UX-DR23, UX-DR24 · **NFRs:** NFR8
+
+### Story 8.1: Canonical Status Model with Portal-Wide Legend
+
+As a maintainer scanning any page,
+I want every status badge to use one canonical vocabulary per entity type,
+So that I never have to mentally map between competing status words.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the projection model defines one canonical lifecycle per entity type (requirement, epic, story)
+**When** any framework's artifacts are projected
+**Then** the framework's native status vocabulary maps to the canonical lifecycle at the adapter layer, with the mapping documented
+**And** no framework-specific status label is hard-coded in shared rendering (NFR8).
+
+2.
+**Given** any badge, chart segment, or legend renders a status
+**When** the page is generated
+**Then** the status routes through the `--status-*` token system so a given state always gets the same word and the same color everywhere
+**And** a status-legend affordance reachable from any badge explains what each stage means.
+
+3.
+**Given** an adapter encounters a native status with no canonical mapping
+**When** projection runs
+**Then** the entity renders in a visible "unrecognized" state rather than being silently mislabeled
+**And** generation completes with a non-fatal notice.
+
+### Story 8.2: Single Source of Truth for Every Count
+
+As a maintainer doing the daily pulse,
+I want all summary counts derived from one generator-side source,
+So that summary widgets and detail views can never disagree.
+
+**Acceptance Criteria:**
+
+1.
+**Given** entity counts (stories, epics, deferred items, action items) appear on multiple surfaces
+**When** the portal is generated
+**Then** every widget consumes the same generator-side count source
+**And** a dashboard total always equals the sum of its own breakdown segments.
+
+2.
+**Given** a dashboard card links to a detail page
+**When** I follow the link
+**Then** the count on the card matches what the detail page shows
+**And** the historical 38-vs-39 story-count class of clash is structurally impossible.
+
+### Story 8.3: Paired Progress and Readiness Semantics
+
+As a maintainer,
+I want task progress and workflow state always shown together,
+So that "5/5 tasks done" while in review reads as one coherent fact, not a contradiction.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a story surface shows task completion and the story has a workflow state
+**When** both are available
+**Then** they render paired (for example "5/5 tasks · awaiting review") everywhere both appear
+**And** epic dual-count badges restate as sentences (for example "6 of 7 done, 1 in review").
+
+2.
+**Given** the sprint board columns Backlog and Ready for dev
+**When** I hover or focus a column header
+**Then** a tooltip distinguishes them (for example "Ready = task plan exists and dependencies met")
+**And** stories lacking task plans are visually separated from actionable ones.
+
+### Story 8.4: State-Aware Next-Step Command Surface
+
+As a maintainer selecting work,
+I want the portal to recommend one primary command per lifecycle state plus applicable unhappy-path actions,
+So that I copy the right command without hunting.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a story in any lifecycle state
+**When** its next-step commands render
+**Then** exactly one primary recommended command shows, plus applicable alternate/unhappy-path actions (for example correct-course mid-sprint, retro on done)
+**And** commands inapplicable to the state never render — a done story no longer surfaces code-review as the next step.
+
+2.
+**Given** the command surface is adapter-supplied data (NFR8)
+**When** a framework lacks a command workflow
+**Then** the next-step section degrades to absent rather than showing wrong or empty commands
+**And** each surfaced command carries a one-line caption explaining what it does.
+
+3.
+**Given** existing next-steps specs (spec-hide-code-review-button-ready-for-dev, spec-story-next-steps-review-command, spec-home-next-steps-label-and-code-review)
+**When** this story is implemented
+**Then** it audits and extends that shipped behavior rather than duplicating it.
+
+### Story 8.5: Designed Empty States
+
+As a stakeholder viewing a shared portal,
+I want empty sections to read as intentional guidance,
+So that zero-counts and repeated CLI hints do not read as errors or clutter.
+
+**Acceptance Criteria:**
+
+1.
+**Given** multiple stories in an epic lack task plans
+**When** the epics page renders
+**Then** per-story CLI hints consolidate into one banner per epic with a single copy-able command affordance
+**And** hint text is adapter-supplied, not hard-coded (NFR8).
+
+2.
+**Given** a sprint board column is empty
+**When** the board renders
+**Then** the column shows intentional guidance copy (for example "Nothing in progress — pick from Ready")
+**And** empty states are visually styled as designed states, not bare zero-counts.
+
+### Story 8.6: One Primary View per Dashboard Dataset
+
+As a maintainer doing a 30-second scan,
+I want each dataset shown one primary way with alternates demoted behind a toggle,
+So that I never reconcile multiple renderings of the same data.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the home dashboard currently renders requirements three ways
+**When** the page is generated
+**Then** the coverage matrix is the single primary representation, with alternates demoted behind a toggle or links
+**And** the sprint page's By Status / By Epic radio-toggle is the reused pattern.
+
+2.
+**Given** any chart with an accessibility text-twin table
+**When** views are consolidated
+**Then** the text-twin table is never removed (accessibility contract per Story 3.7)
+**And** duplicated story-count displays across a page are consolidated to one.
+
+### Story 8.7: Generation-Time Recency Signals
+
+As a maintainer returning to the portal,
+I want "last updated" markers on dashboard widgets and story cards,
+So that I can spot recent movement without diffing pages.
+
+**Acceptance Criteria:**
+
+1.
+**Given** git timestamps and artifact change logs are available at generation time
+**When** the dashboard and story cards render
+**Then** they carry "last updated" recency markers derived solely from that input data
+**And** a from-scratch CI regeneration of the same inputs produces identical output (no per-visitor or cross-build state).
+
+2.
+**Given** a source lacks git data or change-log entries
+**When** generation runs
+**Then** the affected surface shows no recency marker rather than a wrong one
+**And** generation remains non-fatal.
+
+## Epic 9: Traceability and Review Follow-Through
+
+Complete the requirement → epic → story chain so a Stakeholder can click from any requirement to its delivering stories, a Reviewer can judge a "done" claim in one glance, and follow-up items carry provenance and resolution paths. Serves the review journey (3), the traceability differentiator (4), and debt follow-through (7) defined in docs/UserJourneys.md.
+
+**FRs covered:** FR22, FR23, FR24, FR26, FR30 · **UX-DRs:** UX-DR26 · **NFRs:** NFR8
+
+### Story 9.1: Requirement Pages Link to Their Covering Stories
+
+As a stakeholder tracing a requirement,
+I want FR/NFR detail pages to list the stories delivering them with current status,
+So that I can go from a requirement ID to its stories without reading an epics document.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a requirement covered by one or more stories in the coverage map
+**When** its detail page renders
+**Then** the page lists each covering story with its canonical status, linked to the story page
+**And** the listing is built from existing coverage-map data with no new authoring burden.
+
+2.
+**Given** a requirement with no covering stories
+**When** its detail page renders
+**Then** the page states that explicitly rather than omitting the section
+**And** the statement distinguishes deferred from unmapped when Story 9.3's states are available.
+
+### Story 9.2: NFR and UX-DR Coverage Maps
+
+As a maintainer,
+I want NFR and UX design requirements traced with the same rigor as FRs,
+So that non-functional obligations are not second-class.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the epics page shows an FR coverage map
+**When** the page renders
+**Then** parallel (or combined) coverage maps exist for NFRs and UX-DRs
+**And** they use the same canonical status vocabulary as Story 8.1.
+
+2.
+**Given** an NFR with no per-story implementation state
+**When** its coverage renders
+**Then** it shows a stated verification approach instead of an undifferentiated "Planned"
+**And** per-item granularity replaces whole-section uniform status.
+
+### Story 9.3: Deferred-on-Purpose vs Unmapped Coverage States
+
+As a stakeholder reading coverage,
+I want deliberate deferrals distinguished from unmapped gaps,
+So that I do not misread intentional scope decisions as oversights.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a requirement without active coverage
+**When** coverage reporting renders
+**Then** "deferred on purpose" and "unmapped" render as distinct states with distinct visual treatment
+**And** the distinction is never color-only.
+
+2.
+**Given** a deliberately deferred item
+**When** its coverage state renders
+**Then** it links to the deferral source (retro, change proposal, or deferred-work entry) when one exists
+**And** the requirements-flow diagram and its accessibility text twin both carry the split.
+
+### Story 9.4: Verification Evidence Strip on Story Pages
+
+As a reviewer,
+I want tasks, tests, and verification evidence surfaced near the status badge,
+So that I can judge a "done" claim in one glance instead of excavating the dev record.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a story page whose dev record contains task completion, test counts, and verification dates
+**When** the page renders
+**Then** a compact evidence strip (for example "5/5 tasks · 586 tests green · verified 2026-07-09") appears near the status badge
+**And** the strip links to the full dev-record section.
+
+2.
+**Given** a story with missing evidence
+**When** the strip renders
+**Then** missing evidence is visibly absent (for example "no test evidence recorded") rather than the strip being omitted
+**And** the honest-absence signal uses the designed empty-state treatment.
+
+### Story 9.5: Distinct Acceptance-Criteria Blocks and Collapsed Dev Notes
+
+As a reviewer,
+I want acceptance criteria visually distinct from surrounding prose and dev notes collapsed by default on long pages,
+So that I can diff the contract against the claim quickly.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a story page with acceptance criteria
+**When** the page renders
+**Then** ACs render as bordered/tinted blocks using existing design tokens, clearly distinct from body prose
+**And** the treatment audits and extends spec-ac-panel-and-story-card-polish rather than duplicating it.
+
+2.
+**Given** a long story page with dev-notes/dev-record sections
+**When** the page renders
+**Then** those sections collapse by default and expand on demand
+**And** the "On this page" TOC invariant is preserved.
+
+### Story 9.6: Follow-Up Item Provenance and Resolution Paths
+
+As a maintainer at retro time,
+I want every action item and deferred-work entry to show where it came from and what closes it,
+So that promises visibly leave the list when resolved.
+
+**Acceptance Criteria:**
+
+1.
+**Given** an action item or deferred-work entry
+**When** it renders
+**Then** it carries provenance (source retro or story) and resolution criteria
+**And** it links to the resolving story or spec when one exists.
+
+2.
+**Given** multiple items referencing the same underlying obligation across retros
+**When** the follow-ups page renders
+**Then** they are merged or explicitly cross-linked
+**And** items are ordered by age or blocking status rather than flattened by identical affordances.
+
+3.
+**Given** a framework without retro or deferred-work artifact types
+**When** the portal generates
+**Then** these surfaces degrade to absent rather than empty-but-present (NFR8).
+
+## Epic 10: Portal Legibility for Every Audience
+
+Make every surface navigable and correctly interpretable by first-time visitors, non-BMAD stakeholders, and tech leads: insight pages reachable from the nav, every chart self-explaining, vocabulary defined in place, and consistent dates, references, and TOC treatment. Serves the onboarding (5) and health-insight (6) journeys defined in docs/UserJourneys.md — the adoption deciders.
+
+**FRs covered:** FR27, FR28, FR29 · **UX-DRs:** UX-DR25, UX-DR27, UX-DR28, UX-DR29, UX-DR30 · **NFRs:** NFR8
+
+### Story 10.1: Insights Navigation and Structure Page Retirement
+
+As a returning user on any interior page,
+I want insight pages reachable from the top nav,
+So that Git Insights, Deep Analytics, and follow-ups do not require a round-trip through Home.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the portal has git-insights and deep-analytics pages
+**When** navigation renders
+**Then** an "Insights" nav entry groups them
+**And** Action Items and Deferred Work are reachable under Sprint or a "Follow-ups" entry.
+
+2.
+**Given** the Structure page's scope was retired (2026-07-08 correct-course)
+**When** navigation renders
+**Then** Structure no longer holds a top-nav slot (removed or redirected) until the Epic 7 treemap replaces it
+**And** nav entries render only when the corresponding data exists, so shallow repos get no dead links (NFR8).
+
+### Story 10.2: Chart Metadata Standard
+
+As a tech lead reading insight charts,
+I want every chart to carry a legend with real values, its time window, and one framing sentence,
+So that charts deliver insight rather than trivia.
+
+**Acceptance Criteria:**
+
+1.
+**Given** any chart in the portal
+**When** it renders
+**Then** it carries a legend with real value ranges (not only "Less … More"), the analysis time window as a number, and one sentence of why the metric matters
+**And** ranked lists state their ranking metric (for example "top 50 of 781 by commit count").
+
+2.
+**Given** the standard is implemented
+**When** a new chart is added
+**Then** the metadata comes from a shared chart-frame by construction, not per-chart copy
+**And** the work extends spec-commit-heatmap-contrast-and-day-drilldown rather than duplicating it.
+
+### Story 10.3: Glossary and In-Place Vocabulary
+
+As a first-time visitor,
+I want unfamiliar terms defined in place and a suggested reading order,
+So that I can orient without prior methodology knowledge.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a first visit to the portal
+**When** I open Home
+**Then** a linked "How to read this portal" page defines the portal vocabulary and suggests a reading order
+**And** acronyms (FR/NFR, AC, ADR) expand on first use per page via abbr semantics.
+
+2.
+**Given** glossary terms and command captions are framework-specific
+**When** the portal generates for any supported framework
+**Then** that vocabulary is adapter-supplied, never hard-coded in shared rendering (NFR8)
+**And** frameworks without equivalent concepts simply omit those glossary entries.
+
+### Story 10.4: Consistent Dates and Event Sequencing
+
+As a reader correlating events,
+I want one date format everywhere with sequencing for same-day events,
+So that recency and order are never ambiguous.
+
+**Acceptance Criteria:**
+
+1.
+**Given** dates appear across pages (cards, heatmaps, change logs, ADRs)
+**When** the portal generates
+**Then** one date-format token is used portal-wide
+**And** ADR listings gain dates and one-line summaries sourced from the ADR bodies.
+
+2.
+**Given** multiple change-log events share a date
+**When** they render
+**Then** sequence markers order them
+**And** superseded/deprecated ADR states render distinctly from Accepted when they arrive.
+
+### Story 10.5: Document Rendering Legibility
+
+As a reader of long artifacts,
+I want references, annotations, and navigation rendered as designed elements,
+So that raw syntax and flat TOCs do not obstruct reading.
+
+**Acceptance Criteria:**
+
+1.
+**Given** prose containing [[wiki-link]] names or file:line reference syntax
+**When** the page renders
+**Then** references render as styled chips or collect into a references appendix, never as raw syntax
+**And** [ASSUMPTION: …] tags are styled via the Story 2.6 annotation treatment.
+
+2.
+**Given** a long artifact with many sections
+**When** its "On this page" TOC renders
+**Then** subsections group under collapsible parents
+**And** the on-page-TOC invariant for long pages is preserved.
+
+3.
+**Given** retired or superseded work items (for example a retired story)
+**When** their parent page renders
+**Then** they render in a collapsed section that preserves history without cluttering active lists.
+
+### Story 10.6: Insight-Chart Context Polish
+
+As a tech lead interpreting analytics,
+I want misleading chart contexts corrected,
+So that I do not draw wrong conclusions from artifacts of the data.
+
+**Acceptance Criteria:**
+
+1.
+**Given** change-coupling analysis includes generated or status files
+**When** coupling views render
+**Then** process-coupling is distinguished from code-coupling with an explanatory note
+**And** the classification generalizes across repositories rather than naming SpecScribe-specific files (NFR8).
+
+2.
+**Given** an activity heatmap whose window predates the first commit
+**When** it renders
+**Then** the dead zone is annotated (for example "First commit Jul 4") or the window is trimmed
+**And** single-contributor files suppress or reword multi-contributor phrasing (for example "People to talk to").
