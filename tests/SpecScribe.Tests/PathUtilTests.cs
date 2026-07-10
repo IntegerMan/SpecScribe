@@ -31,21 +31,24 @@ public class PathUtilTests
         => Assert.Equal("Epic & <code>", PathUtil.StripHtmlTags("Epic &amp; <code>&lt;code&gt;</code>"));
 
     [Fact]
-    public void RenderFooter_CarriesRepoAndAboutLinks_FromRoot()
+    public void RenderFooter_CarriesRepoAndDetailsLinks_FromRoot()
     {
-        var footer = PathUtil.RenderFooter("on 2026-07-10");
+        var footer = PathUtil.RenderFooter();
         Assert.Contains(PathUtil.RepositoryUrl, footer);
-        // Root page: the About link is a bare href (no relative prefix).
+        // Root page: the details link is a bare href (no relative prefix), relabelled from "About".
         Assert.Contains("href=\"about.html\"", footer);
-        Assert.Contains(">About</a>", footer);
+        Assert.Contains(">View generation details</a>", footer);
+        // The generation date is humanized (current month name), not the raw yyyy-MM-dd HH:mm it used to carry.
+        Assert.Contains($" on {DateTime.Now:MMMM} ", footer);
     }
 
     [Fact]
-    public void RenderFooter_ResolvesAboutHrefFromNestedDepth()
+    public void RenderFooter_ResolvesDetailsHrefFromNestedDepth()
     {
         var prefix = PathUtil.RelativePrefix("adrs/0001-thing.html"); // "../"
-        var footer = PathUtil.RenderFooter("on 2026-07-10", prefix);
+        var footer = PathUtil.RenderFooter(prefix);
         Assert.Contains("href=\"../about.html\"", footer);
+        Assert.Contains(">View generation details</a>", footer);
     }
 
     [Fact]

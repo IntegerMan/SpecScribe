@@ -174,6 +174,13 @@ SpecScribe can expose the Generated Portal information model in a VS Code webvie
 **Out of Scope:**
 - Editing source planning artifacts directly in extension v1. [NON-GOAL for MVP]
 
+#### Release & Distribution (preview)
+
+<!-- Added 2026-07-10 (SCP 2026-07-10, correct-course) to seat Epic 16 release engineering. Sourced from
+     epics.md FR32–FR34 / NFR9; sync detail as needed. -->
+
+SpecScribe ships to the community through published distribution channels rather than source-only. The CLI is packaged and published to a distribution channel chosen during Epic 16's packaging-strategy spike (NuGet `dotnet` global tool and/or self-contained per-OS binaries); the read-only VS Code extension follows via the VS Code Marketplace once the Epic 6 extension surface exists. Releases are produced by a tag-triggered CI pipeline that builds, tests, packages, and publishes, with publishing gated on a passing build+test run (reproducible from a clean checkout). Release-facing documentation includes install/upgrade instructions, a changelog, and a stated versioning/pre-release policy. The initial public release is an explicitly-labeled **preview**; this does not change MVP scope.
+
 ## 5. Non-Goals (Explicit)
 - Building a hosted SaaS with account management and remote data processing in v1.
 - Replacing project management tools, issue trackers, or source control platforms.

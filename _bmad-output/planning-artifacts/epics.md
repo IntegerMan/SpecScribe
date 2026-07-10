@@ -70,6 +70,12 @@ FR31: Recency signals ("last updated" markers on dashboard widgets and story car
 
 <!-- FR20–FR31 added 2026-07-09 from the site-wide UX review (docs/MissingFeatures.md, docs/Epic3UXFeedback.md, docs/UserJourneys.md); sync back into the PRD for full traceability when convenient. -->
 
+FR32: Provide release engineering — reproducible packaging of the CLI to its chosen distribution channel(s), driven by a tag-triggered release pipeline that attaches release artifacts and supports preview/pre-release channels.
+FR33: Package and publish the read-only VS Code extension to the VS Code Marketplace as a preview, dependent on the Epic 6 extension surface existing.
+FR34: Provide release-facing documentation — install/upgrade instructions, a changelog, and a stated versioning/pre-release policy for community consumption.
+
+<!-- FR32–FR34 added 2026-07-10 (SCP 2026-07-10, correct-course) to seat Epic 16 (Release Engineering & Community Preview Launch); sync back into the PRD §4.4 for full traceability when convenient. -->
+
 ### NonFunctional Requirements
 
 NFR1: Baseline generation performance remains responsive for local OSS repositories, with deeper analytics separated from baseline runs.
@@ -80,6 +86,9 @@ NFR5: Source files are read with shared access and watch mode must not hold writ
 NFR6: Cross-surface accessibility semantics (keyboard drill behavior, labels, status text redundancy) are contractual behavior, not optional styling.
 NFR7: Feature configurability parity is required across interactive menu flows and equivalent CLI parameters, with directory-scoped settings persistence.
 NFR8: Insight surfaces and guidance affordances (status vocabularies, next-step commands, glossary terms, empty-state hints, follow-up/debt artifact types) are framework-agnostic in shared rendering: framework-specific content flows through the adapter contract, and surfaces degrade gracefully — absent, not broken or misleadingly empty — when a methodology lacks the corresponding artifact.
+NFR9: Release builds are reproducible and produced by CI from a clean checkout; publishing to any distribution channel is gated on a passing build + test run.
+
+<!-- NFR9 added 2026-07-10 (SCP 2026-07-10, correct-course) for Epic 16. -->
 
 ### Additional Requirements
 
@@ -167,6 +176,9 @@ FR28: Epic 10 - Chart metadata standard (legend, time window, framing sentence).
 FR29: Epic 10 - Glossary / portal-orientation page with adapter-supplied vocabulary.
 FR30: Epic 9 - Follow-up item provenance, resolution criteria, and de-duplication.
 FR31: Epic 8 - Generation-time recency signals from git/change-log data.
+FR32: Epic 16 - Release engineering: reproducible CLI packaging and tag-triggered release pipeline.
+FR33: Epic 16 - VS Code extension packaging and Marketplace publication (depends on Epic 6).
+FR34: Epic 16 - Release-facing documentation, changelog, and versioning policy.
 
 ## Epic List
 
@@ -229,6 +241,10 @@ Interpret core Squad artifacts through the shared adapter contract, led by an in
 ### Epic 15: Superpowers Coverage
 Interpret core Superpowers artifacts through the shared adapter contract, led by an integration spike that maps Superpowers' artifact set to the projection model and identifies unsupported conventions and framework-extra data.
 **FRs covered:** FR17
+
+### Epic 16: Release Engineering & Community Preview Launch
+Everything needed to put a preview build of SpecScribe in the community's hands and keep shipping updates reliably: a reproducible build/test gate, packaged and published CLI distribution, a tag-triggered release pipeline, VS Code Marketplace publication of the read-only extension, release-facing documentation with a changelog and versioning policy, and a preview-launch readiness cut. Led by a packaging-strategy spike (Story 16.1) that fixes the distribution channel(s), versioning/pre-release policy, and publishing prerequisites before the release stories run.
+**FRs covered:** FR32, FR33, FR34 · **NFRs:** NFR9 · **Depends on:** Epic 6 (for Story 16.5).
 
 <!-- Epics 8–10 added 2026-07-09 from the site-wide UX review; Epic 8 is foundational for 9–10 (status model + count source) and these are candidates to run ahead of Epic 4, with all framework-specific content structured as adapter-supplied data per NFR8. -->
 <!-- Epics 11–15 added 2026-07-10: per-framework coverage stories 4.3–4.7 extracted into their own spike-led epics (append-only, no renumber). Each epic's Story X.1 is a Framework Integration Spike scoping the mapping to Epic 4's adapter contract; X.2 is the migrated baseline coverage. -->
@@ -824,9 +840,16 @@ So that feature semantics stay consistent and parser logic is not duplicated.
 
 ### Story 6.2: Read-Only VS Code Dashboard and Epics Experience
 
-As a VS Code user,
-I want an in-editor status surface for dashboard and epics,
-So that I can inspect project state without context-switching to a browser.
+As a maintainer,
+I want the dashboard and epics page bodies decomposed into shared, host-neutral section view models in the rendering core (HTML adapter re-rendering them byte-for-byte identically),
+So that a future VS Code webview can render those two surfaces from the same typed data rather than scraping the HTML surface.
+
+<!-- 2026-07-10: Story 6.2 was SPLIT at create-story (owner-confirmed). It now covers ONLY the
+     rendering-core body decomposition (former AC #1). The webview RUNTIME (former AC #2 + #3 — the
+     in-editor webview UI + live host-push) relocated to the new Story 6.4, because no VS Code
+     extension exists in the repo yet (greenfield surface, new tech stack) and fusing it here would
+     absorb a new structural surface into one un-reviewable story (Epic 2 retro: "split, don't
+     absorb"). The AC #1 authoring note below already anticipated this seam. -->
 
 <!-- 2026-07-10: AC #1 added to name the dashboard/epics page-BODY decomposition as an explicit
      foundational task of this story, not an implicit consequence of AC #2. Story 6.1 delivers the
@@ -845,17 +868,7 @@ So that I can inspect project state without context-switching to a browser.
 **And** the HTML adapter re-renders them byte-for-byte identically (parity harness green)
 **And** no other page body is decomposed (only the surfaces a webview consumer renders).
 
-2.
-**Given** the extension opens the status webview
-**When** project data is loaded
-**Then** dashboard and epics views display with the same core interaction-state semantics as HTML
-**And** in-editor navigation is responsive and readable.
-
-3.
-**Given** source artifacts change while the webview is open
-**When** host updates are pushed
-**Then** visible status refreshes in place without full panel reset
-**And** drill/breadcrumb context remains coherent.
+<!-- Former AC #2 (webview display) and AC #3 (live host-push) relocated 2026-07-10 to Story 6.4. -->
 
 ### Story 6.3: Host-Aware Theming and Explicit Helper Actions
 
@@ -876,6 +889,42 @@ So that the experience feels native without losing product identity.
 **When** I trigger a helper
 **Then** it generates explicit commands or prompts only
 **And** no source planning artifacts are mutated by the helper path.
+
+### Story 6.4: Read-Only VS Code Webview Runtime for Dashboard and Epics
+
+<!-- 2026-07-10: Split out of Story 6.2 at create-story (append-only, no renumber per project
+     convention — like 4.8 out of 4.2 and Epics 11-15). Carries the former Story 6.2 AC #2 + #3 (the
+     actual webview runtime + live host-push). AC #1 here is the JSON view-model export that the
+     webview consumes — the owner-chosen data path (chosen over "run the tool and load the generated
+     HTML" and "a second HTML-ish render adapter"). DEPENDS ON Story 6.2 (the section view models it
+     serializes). SEQUENCING: runs AFTER 6.2 and BEFORE 6.3 (host theming depends on the webview
+     existing), even though its number sorts after 6.3. Context: there is NO VS Code extension in the
+     repo yet — greenfield surface, new tech stack (TypeScript/extension host/webview). Backlog: run
+     create-story to detail it when scheduled. -->
+
+As a VS Code user,
+I want an in-editor status surface for dashboard and epics that stays live as the project changes,
+So that I can inspect project state without context-switching to a browser.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Story 6.2's section view models describe the dashboard and epics surfaces as host-neutral data
+**When** the webview needs that data
+**Then** the rendering core exposes a JSON view-model export of those section view models
+**And** the export carries the section data itself (not scraped HTML) with no dependence on the HTML surface's enhancement scripts.
+
+2.
+**Given** the extension opens the status webview
+**When** project data is loaded
+**Then** dashboard and epics views display with the same core interaction-state semantics as HTML
+**And** in-editor navigation is responsive and readable.
+
+3.
+**Given** source artifacts change while the webview is open
+**When** host updates are pushed
+**Then** visible status refreshes in place without full panel reset
+**And** drill/breadcrumb context remains coherent.
 
 ## Epic 7: Code and Git Exploration
 
@@ -1670,3 +1719,163 @@ So that I can track planning progress without switching tools.
 **When** they are detected
 **Then** they are surfaced as explicit non-fatal notices
 **And** generation continues for supported content and remains coherent with other framework surfaces.
+
+<!-- Epic 16 added 2026-07-10 (SCP 2026-07-10, correct-course): release engineering for the community
+     preview. New, additive scope — no existing epic changed. Spike-led first story (16.1) per the Epics
+     11–15 pattern. Story 16.5 (Marketplace publish) depends on Epic 6's extension existing. FRs: FR32–FR34;
+     NFR9. Run create-story per story when scheduled (16.1 first). -->
+
+## Epic 16: Release Engineering & Community Preview Launch
+
+Everything needed to put a preview build of SpecScribe in the community's hands and keep shipping updates reliably: a reproducible build/test gate, packaged and published CLI distribution, a tag-triggered release pipeline, VS Code Marketplace publication of the read-only extension, release-facing documentation with a changelog and versioning policy, and a preview-launch readiness cut.
+
+**FRs covered:** FR32, FR33, FR34 · **NFRs:** NFR9
+**Depends on:** Epic 6 (for Story 16.5 — the extension must exist to be published).
+
+### Story 16.1: Release & Distribution Packaging Spike
+
+As a maintainer preparing a community preview,
+I want the distribution channels, versioning policy, and publishing prerequisites decided and written down before release stories begin,
+So that packaging work starts with an agreed scope and no surprise blockers.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the CLI can ship via multiple channels
+**When** the spike evaluates them
+**Then** a written decision records the chosen CLI channel(s) — NuGet `dotnet` global tool (already wired in SpecScribe.csproj) and/or self-contained per-OS binaries — with rationale and explicit non-goals.
+
+2.
+**Given** publishing requires accounts and secrets
+**When** the spike documents prerequisites
+**Then** it inventories every required secret/credential (NuGet API key, VS Marketplace publisher + PAT), where each is stored as a repository/environment secret, and any code-signing decision
+**And** no secret value is committed to the repository.
+
+3.
+**Given** a preview release differs from a stable one
+**When** the spike defines policy
+**Then** it records the versioning + pre-release scheme (for example `0.x` / `-preview` tags), the changelog format, and what "preview" promises and does not promise to consumers.
+
+### Story 16.2: Continuous Integration Build & Test Gate
+
+As a maintainer,
+I want every pull request and push to build and run the test suite in CI,
+So that release builds start from a known-green baseline and regressions are caught before merge.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a pull request or push to a release-relevant branch
+**When** CI runs
+**Then** it restores, builds, and executes the `tests/SpecScribe.Tests` suite on a clean checkout, and the job fails on any build or test failure.
+
+2.
+**Given** the gate is green
+**When** a maintainer reviews the pull request
+**Then** the build/test status is visible as a required signal
+**And** the workflow is independent of, and does not disturb, the existing GitHub Pages publish workflow.
+
+### Story 16.3: CLI Packaging and Publication
+
+As a prospective user,
+I want SpecScribe published to its chosen distribution channel,
+So that I can install and run it with a documented one-line command.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Story 16.1's channel decision
+**When** packaging runs
+**Then** the CLI is produced as the chosen artifact(s) — a NuGet global-tool package and/or self-contained per-OS executables — reproducibly from the repository, with the version derived from the release tag rather than a hard-coded csproj value.
+
+2.
+**Given** a produced package
+**When** a user follows the documented install path (for example `dotnet tool install -g SpecScribe`)
+**Then** the `specscribe` command runs and `--version`/`--help` report correctly
+**And** the packaged README/license render on the package listing.
+
+### Story 16.4: Tag-Triggered Release Pipeline
+
+As a maintainer cutting a release,
+I want pushing a release tag to build, verify, package, and publish automatically,
+So that releases are one action and never depend on a local machine's state.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a release or pre-release tag is pushed
+**When** the release pipeline runs
+**Then** it builds and tests on a clean checkout, packages per Story 16.3, publishes to the chosen channel(s), and attaches the release artifacts to the corresponding GitHub Release
+**And** publishing is gated on the build+test step passing (NFR9).
+
+2.
+**Given** a `-preview` / pre-release tag
+**When** the pipeline publishes
+**Then** the release is marked as a pre-release / preview channel per Story 16.1's policy
+**And** a failed publish leaves no partially-released state (the pipeline is safe to re-run).
+
+### Story 16.5: VS Code Extension Packaging and Marketplace Publication
+
+<!-- Depends on Epic 6: the extension surface (esp. Story 6.4 runtime) must exist before it can be
+     packaged/published. Keep blocked/backlog until Epic 6 delivers the extension. -->
+
+As a VS Code user,
+I want the read-only SpecScribe extension available from the Marketplace,
+So that I can install it without building from source.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the Epic 6 extension exists
+**When** the extension is packaged
+**Then** a valid VSIX is produced reproducibly with a Marketplace-ready manifest (publisher, display name, description, icon, categories, repository link) and versioning aligned to Story 16.1's policy.
+
+2.
+**Given** the VSIX and a configured publisher
+**When** a release publishes the extension
+**Then** it appears on the VS Code Marketplace as a read-only preview and installs cleanly
+**And** publication is automatable (extends the Story 16.4 pipeline or a parallel job) rather than a manual one-off.
+
+3.
+**Given** Epic 6 is not yet complete
+**When** this story is scheduled
+**Then** it remains blocked/backlog and is not started until the extension surface exists.
+
+### Story 16.6: Release-Facing Documentation, Changelog, and Versioning Policy
+
+As a community adopter,
+I want install/upgrade instructions, a changelog, and a stated versioning policy,
+So that I can adopt the preview confidently and track what changes between releases.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the chosen distribution channels
+**When** the release docs are produced
+**Then** the README (and Marketplace listing, if applicable) carry accurate install, upgrade, and quick-start instructions using real commands
+**And** a `CHANGELOG.md` following the Story 16.1 format exists and is updated per release.
+
+2.
+**Given** Story 5.4 owns onboarding/reference content
+**When** these release docs are written
+**Then** they cover distribution-facing concerns (install/upgrade, changelog, versioning/pre-release policy, Marketplace listing copy) and cross-link to — rather than duplicate — Story 5.4's material
+**And** `--help`/`--version` output is audited to match the docs.
+
+### Story 16.7: Preview Launch Readiness and Cut
+
+As a maintainer,
+I want a final readiness pass before announcing the preview,
+So that the first public impression is a working install, not a broken link.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the pipeline and docs are in place
+**When** the readiness checklist runs
+**Then** the CLI install path is verified end-to-end from the published artifact on a clean environment (and the extension install if Epic 6 shipped), the LICENSE and contribution/onboarding links resolve, and the preview version/tag is set per Story 16.1's policy.
+
+2.
+**Given** readiness passes
+**When** the preview is cut
+**Then** release notes are published for the tag and the announcement points at working install instructions
+**And** any items intentionally excluded from the preview are recorded as known limitations rather than silent gaps.

@@ -9,11 +9,10 @@ public static class EpicsTemplater
     public static string RenderIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands)
     {
         const string outputPath = SiteNav.EpicsOutputPath;
+        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Epics", null) });
 
+        // Body composed here; the shared chrome is assembled by HtmlRenderAdapter from the PageView below. [Story 6.1]
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Epics & Stories — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName, PathUtil.RelativePrefix(outputPath) + ForgeOptions.ScriptName));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Epics", null) }));
 
         var drafted = model.Epics.Count(e => e.Status == EpicStatus.Drafted);
         // Single <main id="main-content"> landmark / skip-link target for the epics index. [Story 1.4 AC #1]
@@ -67,10 +66,31 @@ public static class EpicsTemplater
         }
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
-        sb.Append(Mermaid.InitScript());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        // The epics index drills down to each epic page; its parent is Home (from the breadcrumb). The roadmap
+        // diagram is always emitted, so MermaidNeeded is always true here (ContainsBlock confirms it). [Story 6.1]
+        var prefix = PathUtil.RelativePrefix(outputPath);
+        var page = new PageView
+        {
+            Kind = PageKind.Epics,
+            OutputRelativePath = outputPath,
+            Title = $"Epics & Stories — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = breadcrumb,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = Mermaid.ContainsBlock(sb.ToString()),
+            },
+            Interaction = new InteractionState
+            {
+                ParentTarget = breadcrumb.ParentTarget,
+                ChildTargets = model.Epics.Select(e => $"epics/epic-{e.Number}.html").ToList(),
+            },
+            BodyHtml = sb.ToString(),
+        };
+        return HtmlRenderAdapter.Shared.Render(page).Content;
     }
 
     public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null)
@@ -78,15 +98,15 @@ public static class EpicsTemplater
         var outputPath = $"epics/epic-{epic.Number}.html";
         var epicClass = StatusStyles.ForEpic(epic);
 
-        var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName, PathUtil.RelativePrefix(outputPath) + ForgeOptions.ScriptName));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
+        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
         {
             ("Home", "index.html"),
             ("Epics", SiteNav.EpicsOutputPath),
             (EpicCrumbLabel(epic), null),
-        }));
+        });
+
+        // Body composed here; the shared chrome is assembled by HtmlRenderAdapter from the PageView below. [Story 6.1]
+        var sb = new StringBuilder();
 
         // Main content is composed into its own builder so it can be wrapped in the two-column page shell
         // beside the TOC sidebar. An epic page is a card list rather than a prose document, so its TOC is a
@@ -163,17 +183,32 @@ public static class EpicsTemplater
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}", PathUtil.RelativePrefix(outputPath)));
-        // A ```mermaid fence authored inside an artifact body (story remainder, dev-agent record, review
-        // findings, change log) renders as a <pre class="mermaid"> block via RenderBlock. Inject the
-        // client-side init script only when one actually landed on this page, mirroring the HasMermaid gate
-        // that guards full pages — detail pages otherwise never carry it.
-        if (Mermaid.ContainsBlock(sb.ToString()))
+        // An epic drills up to the epics index and down to each of its story pages (drafted → the story's
+        // artifact page, undrafted → its placeholder page); its status stage is the epic roll-up. MermaidNeeded
+        // is computed from the body — a ```mermaid fence authored inside an artifact section renders as a
+        // <pre class="mermaid"> block, injecting the client init only when one actually landed (as before). [Story 6.1]
+        var page = new PageView
         {
-            sb.Append(Mermaid.InitScript());
-        }
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+            Kind = PageKind.Epic,
+            OutputRelativePath = outputPath,
+            Title = $"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = breadcrumb,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = Mermaid.ContainsBlock(sb.ToString()),
+            },
+            Interaction = new InteractionState
+            {
+                ParentTarget = breadcrumb.ParentTarget,
+                ChildTargets = epic.Stories.Select(s => s.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(s.Id)).ToList(),
+                StatusStage = epicClass,
+            },
+            BodyHtml = sb.ToString(),
+        };
+        return HtmlRenderAdapter.Shared.Render(page).Content;
     }
 
     public static string RenderStory(
@@ -196,16 +231,16 @@ public static class EpicsTemplater
         var epicOutputPath = $"epics/epic-{epic.Number}.html";
         var storyClass = StatusStyles.ForStory(story);
 
-        var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName, PathUtil.RelativePrefix(outputPath) + ForgeOptions.ScriptName));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
+        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
         {
             ("Home", "index.html"),
             ("Epics", SiteNav.EpicsOutputPath),
             (EpicCrumbLabel(epic), epicOutputPath),
             ($"Story {story.Id}", null),
-        }));
+        });
+
+        // Body composed here; the shared chrome is assembled by HtmlRenderAdapter from the PageView below. [Story 6.1]
+        var sb = new StringBuilder();
 
         // Main content is composed into its own builder (header + panels + article) so it can be wrapped in
         // the two-column page shell beside the TOC sidebar. The detail page emits sections OUT OF source
@@ -311,17 +346,30 @@ public static class EpicsTemplater
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}", PathUtil.RelativePrefix(outputPath)));
-        // A ```mermaid fence authored inside an artifact body (story remainder, dev-agent record, review
-        // findings, change log) renders as a <pre class="mermaid"> block via RenderBlock. Inject the
-        // client-side init script only when one actually landed on this page, mirroring the HasMermaid gate
-        // that guards full pages — detail pages otherwise never carry it.
-        if (Mermaid.ContainsBlock(sb.ToString()))
+        // A story is a drill leaf (no children); it drills up to its epic page. Its status stage is the story
+        // roll-up, but only when the page actually renders a status badge (matching the header's own guard), so
+        // the interaction model never asserts a status the page doesn't show. MermaidNeeded from the body. [Story 6.1]
+        var page = new PageView
         {
-            sb.Append(Mermaid.InitScript());
-        }
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+            Kind = PageKind.Story,
+            OutputRelativePath = outputPath,
+            Title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = breadcrumb,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName,
+                ScriptHref = PathUtil.RelativePrefix(outputPath) + ForgeOptions.ScriptName,
+                MermaidNeeded = Mermaid.ContainsBlock(sb.ToString()),
+            },
+            Interaction = new InteractionState
+            {
+                ParentTarget = breadcrumb.ParentTarget,
+                StatusStage = story.Status is { Length: > 0 } ? storyClass : null,
+            },
+            BodyHtml = sb.ToString(),
+        };
+        return HtmlRenderAdapter.Shared.Render(page).Content;
     }
 
     /// <summary>Renders the placeholder page for a story that exists in epics.md but has no implementation
@@ -335,17 +383,16 @@ public static class EpicsTemplater
         var epicOutputPath = $"epics/epic-{epic.Number}.html";
         var prefix = PathUtil.RelativePrefix(outputPath);
 
-        var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}", prefix + ForgeOptions.StylesheetName, prefix + ForgeOptions.ScriptName));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
+        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
         {
             ("Home", "index.html"),
             ("Epics", SiteNav.EpicsOutputPath),
             (EpicCrumbLabel(epic), epicOutputPath),
             ($"Story {story.Id}", null),
-        }));
+        });
 
+        // Body composed here; the shared chrome is assembled by HtmlRenderAdapter from the PageView below. [Story 6.1]
+        var sb = new StringBuilder();
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <div class=\"kicker-row\">\n");
@@ -391,9 +438,30 @@ public static class EpicsTemplater
         sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + epicOutputPath)}\">&larr; Back to Epic {epic.Number}</a>\n");
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}", prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        // A placeholder story page always renders a "Not yet drafted" status badge, so its stage is the story
+        // roll-up; it drills up to its epic and has no children (no drafted plan to link into). [Story 6.1]
+        var page = new PageView
+        {
+            Kind = PageKind.Story,
+            OutputRelativePath = outputPath,
+            Title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = breadcrumb,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = Mermaid.ContainsBlock(sb.ToString()),
+            },
+            Interaction = new InteractionState
+            {
+                ParentTarget = breadcrumb.ParentTarget,
+                StatusStage = StatusStyles.ForStory(story),
+            },
+            BodyHtml = sb.ToString(),
+        };
+        return HtmlRenderAdapter.Shared.Render(page).Content;
     }
 
     private static void AppendStoryCard(StringBuilder sb, StoryInfo story, string prefix, CommandCatalog commands)

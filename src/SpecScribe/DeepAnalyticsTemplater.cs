@@ -108,7 +108,7 @@ public static class DeepAnalyticsTemplater
             sb.Append("</div>\n\n");
         }
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }

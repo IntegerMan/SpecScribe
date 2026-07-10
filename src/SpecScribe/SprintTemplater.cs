@@ -90,7 +90,7 @@ public static class SprintTemplater
         AppendBoardViews(sb, sprint, epics, prefix);
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }

@@ -77,7 +77,7 @@ public static class ActionItemsTemplater
         }
         sb.Append("</ul>\n</section>\n</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }

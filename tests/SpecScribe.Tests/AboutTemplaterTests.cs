@@ -38,6 +38,6 @@ public class AboutTemplaterTests
         Assert.Contains("href=\"diagnostics.html\"", html);
         // Full page shell (skip link + single main landmark), like every other synthesized page.
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
-        Assert.Contains("<main id=\"main-content\">", html);
+        Assert.Contains("<main id=\"main-content\"", html);
     }
 }

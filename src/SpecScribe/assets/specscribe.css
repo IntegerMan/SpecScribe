@@ -596,6 +596,32 @@ code.color-swatch {
   .cap-row { grid-template-columns: 1fr; gap: 0.1rem; }
 }
 
+/* ============== INFO PAGES (About / Diagnostics) ============== */
+/* The shared centered content column for the otherwise-chromeless synthesized info pages: same max-width as
+   .doc-header so the header and the panels below it line up on one column edge, with comfortable side gutters
+   (these pages have no markdown .doc-body wrapper of their own to supply them). Links route through the site's
+   teal→rust convention instead of falling back to browser-default blue. [About polish] */
+.info-page { max-width: 860px; margin: 0 auto; padding: 0 1.5rem 2.5rem; }
+.info-page a { color: var(--teal); }
+.info-page a:hover { color: var(--rust); }
+
+/* A small pre-release marker beside the About page's title — gold pill on the parchment palette, deliberately
+   outside the lifecycle --status-* vocabulary (a release channel isn't a delivery stage). [About polish] */
+.preview-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+  padding: 0.12rem 0.5rem;
+  font-size: 0.6rem;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--gold-light);
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+}
+
 /* ====================== FOOTER ====================== */
 .doc-footer {
   margin: auto 0 0;

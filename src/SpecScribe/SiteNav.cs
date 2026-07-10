@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace SpecScribe;
 
 /// <summary>The site-wide header nav (Home, module planning docs, ADRs, Epics) plus breadcrumb rendering.
@@ -172,55 +170,29 @@ public sealed class SiteNav
     private static bool IsUnderSpecs(string sourceRelativePath) =>
         PathUtil.NormalizeSlashes(sourceRelativePath).StartsWith("specs/", StringComparison.OrdinalIgnoreCase);
 
-    public string RenderNavBar(string currentOutputRelativePath)
+    /// <summary>Projects this nav's already host-neutral data into the typed <see cref="NavigationView"/> the
+    /// render adapters consume, with <paramref name="activeOutputRelativePath"/> marking the current page. The
+    /// icon concept key is the item's label (the mapping <see cref="RenderNavBar"/> always used); a non-HTML
+    /// surface reads it without re-deriving it. This is the "named typed view of SiteNav's data" the delivery
+    /// contract (AD-2) needs — <see cref="Build"/> stays the producer. [Story 6.1]</summary>
+    public NavigationView ToNavigationView(string activeOutputRelativePath) => new()
     {
-        var prefix = PathUtil.RelativePrefix(currentOutputRelativePath);
-        var current = PathUtil.NormalizeSlashes(currentOutputRelativePath);
+        SiteTitle = SiteTitle,
+        Items = Items.Select(i => new NavItem(i.Label, i.OutputRelativePath, i.Label)).ToList(),
+        QuickLinks = QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description)).ToList(),
+        ActiveOutputRelativePath = activeOutputRelativePath,
+    };
 
-        var sb = new StringBuilder();
-        // The <nav> is the full-bleed sticky bar; an inner wrapper constrains the brand + links to the same
-        // centered content column width as the page body, so the brand and last item line up with the page
-        // gutters instead of floating at the viewport edges. [Deep Analytics polish]
-        sb.Append("<nav class=\"site-nav\" aria-label=\"Document navigation\">\n");
-        sb.Append("  <div class=\"site-nav-inner\">\n");
-        sb.Append($"    <span class=\"site-nav-brand\">{PathUtil.Html(Brand)}</span>\n");
-        sb.Append("    <button class=\"site-nav-toggle\" type=\"button\" aria-label=\"Toggle navigation\" aria-controls=\"site-nav-links\" aria-expanded=\"false\">Menu</button>\n");
-        sb.Append("    <div class=\"site-nav-links\" id=\"site-nav-links\">\n");
-        foreach (var (label, outputPath) in Items)
-        {
-            var href = prefix + outputPath;
-            var isActive = string.Equals(PathUtil.NormalizeSlashes(outputPath), current, StringComparison.OrdinalIgnoreCase);
-            var attrs = isActive ? " class=\"active\" aria-current=\"page\"" : string.Empty;
-            sb.Append($"      <a href=\"{PathUtil.Html(href)}\"{attrs}>{Icons.ForConcept(label)}{PathUtil.Html(label)}</a>\n");
-        }
-        sb.Append("    </div>\n  </div>\n</nav>\n");
-        sb.Append("<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>\n\n");
-        return sb.ToString();
-    }
+    /// <summary>Renders the site nav bar. The string-building was re-homed behind
+    /// <see cref="HtmlRenderAdapter"/> in Story 6.1 (the DELIVERY seam); this now projects to a
+    /// <see cref="NavigationView"/> and delegates, so the bytes are unchanged and un-migrated pages keep calling
+    /// this exactly as before.</summary>
+    public string RenderNavBar(string currentOutputRelativePath) =>
+        HtmlRenderAdapter.Shared.RenderNav(ToNavigationView(currentOutputRelativePath));
 
     /// <summary>Renders a "Home / Epics / Epic 1 / Story 1.1" trail. The last entry (current page) should
-    /// have a null path so it renders as plain text rather than a self-link.</summary>
-    public static string RenderBreadcrumb(string currentOutputRelativePath, IReadOnlyList<(string Label, string? OutputRelativePath)> trail)
-    {
-        if (trail.Count == 0) return string.Empty;
-        var prefix = PathUtil.RelativePrefix(currentOutputRelativePath);
-
-        var sb = new StringBuilder();
-        sb.Append("<div class=\"breadcrumb\" aria-label=\"Breadcrumb\">\n");
-        for (var i = 0; i < trail.Count; i++)
-        {
-            if (i > 0) sb.Append("  <span class=\"crumb-sep\">/</span>\n");
-            var (label, path) = trail[i];
-            if (path is not null)
-            {
-                sb.Append($"  <a href=\"{PathUtil.Html(prefix + path)}\">{PathUtil.Html(label)}</a>\n");
-            }
-            else
-            {
-                sb.Append($"  <span class=\"crumb-current\" aria-current=\"page\">{PathUtil.Html(label)}</span>\n");
-            }
-        }
-        sb.Append("</div>\n\n");
-        return sb.ToString();
-    }
+    /// have a null path so it renders as plain text rather than a self-link. Re-homed behind
+    /// <see cref="HtmlRenderAdapter"/> in Story 6.1; delegates so the bytes are unchanged.</summary>
+    public static string RenderBreadcrumb(string currentOutputRelativePath, IReadOnlyList<(string Label, string? OutputRelativePath)> trail) =>
+        HtmlRenderAdapter.Shared.RenderBreadcrumb(currentOutputRelativePath, BreadcrumbTrail.From(trail));
 }

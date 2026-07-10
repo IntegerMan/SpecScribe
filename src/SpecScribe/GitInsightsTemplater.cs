@@ -60,7 +60,7 @@ public static class GitInsightsTemplater
         AppendActivitySection(sb, insights, git);
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }

@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-10T19:00:00-04:00
+last_updated: 2026-07-10T21:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -91,9 +91,12 @@ development_status:
   epic-5-retrospective: optional
 
   epic-6: in-progress
-  6-1-shared-view-model-contract-for-html-and-webview-adapters: ready-for-dev
-  6-2-read-only-vs-code-dashboard-and-epics-experience: backlog
+  6-1-shared-view-model-contract-for-html-and-webview-adapters: review
+  6-2-read-only-vs-code-dashboard-and-epics-experience: ready-for-dev # scoped to epics AC #1 (rendering-core body decomposition) at create-story; webview runtime (AC #2/#3) split out, needs correct-course seating
   6-3-host-aware-theming-and-explicit-helper-actions: backlog
+  # Story 6.4 split out of 6.2 at create-story 2026-07-10 (webview runtime + live push, former 6.2 AC #2/#3);
+  # append-only/no-renumber. Sequences AFTER 6.2 and BEFORE 6.3 (6.3 theming depends on the webview existing).
+  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: backlog
   epic-6-retrospective: optional
 
   epic-7: in-progress
@@ -155,6 +158,19 @@ development_status:
   15-1-superpowers-integration-spike: backlog
   15-2-superpowers-baseline-adapter-coverage: backlog
   epic-15-retrospective: optional
+
+  # Epic 16 added 2026-07-10 (SCP 2026-07-10, correct-course): release engineering for the community
+  # preview. Additive scope. Spike-led (16.1 first). Story 16.5 (Marketplace publish) is blocked on Epic 6.
+  # All backlog; run create-story per story when scheduled.
+  epic-16: backlog
+  16-1-release-and-distribution-packaging-spike: backlog
+  16-2-continuous-integration-build-and-test-gate: backlog
+  16-3-cli-packaging-and-publication: backlog
+  16-4-tag-triggered-release-pipeline: backlog
+  16-5-vs-code-extension-packaging-and-marketplace-publication: backlog # blocked on Epic 6 (extension must exist)
+  16-6-release-facing-documentation-changelog-and-versioning-policy: backlog
+  16-7-preview-launch-readiness-and-cut: backlog
+  epic-16-retrospective: optional
 
 action_items:
   - epic: 1

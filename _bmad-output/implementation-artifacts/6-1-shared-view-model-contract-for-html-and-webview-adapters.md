@@ -4,7 +4,7 @@ baseline_commit: 3d6ad542f8d7736a6d50c992926875f2897b6c7c
 
 # Story 6.1: Shared View-Model Contract for HTML and Webview Adapters
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -60,37 +60,37 @@ Where **Story 4.1 established the INGESTION seam** (source → normalized `Artif
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Define the view-model contract + record types** (AC: #1)
-  - [ ] Add the host-neutral view-model records as new `.cs` files in `namespace SpecScribe;`: `NavigationView`, `BreadcrumbTrail` (or a `BreadcrumbCrumb` record + `IReadOnlyList`), `AssetManifest`, `PageView`, and `InteractionState`. Every one is a plain data record with **zero HTML strings** and zero `PathUtil.Html`/escaping — escaping is a delivery concern that stays in the adapter.
-  - [ ] `PageView` fields: `PageKind Kind`, `string OutputRelativePath`, `string Title`, `string? MetaDescription`, `NavigationView Nav`, `BreadcrumbTrail Breadcrumb`, `AssetManifest Assets`, `InteractionState Interaction`, and an **opaque body payload** (`string BodyHtml` — the already-rendered inner content from today's templaters; documented as the deferred-decomposition seam). Add a `PageKind` enum covering the current page families.
-  - [ ] `NavigationView` carries: `string SiteTitle`, the ordered nav items (`Label`, `OutputRelativePath`, `ConceptKey` for `Icons.ForConcept`), the quick links (`Label`, `OutputRelativePath`, `Description`), and the current/active output path. This is the **data currently on `SiteNav`** ([SiteNav.cs:52–71](../../src/SpecScribe/SiteNav.cs)) — lift it, don't reinvent it. Keeping `SiteNav.Build` as the producer is fine; the point is a named typed view of its data that a non-HTML surface can consume.
-  - [ ] `InteractionState` carries the drill relationship (parent target + ordered child targets, derived from the breadcrumb trail and the epic/story link hierarchy) and the status-semantics reference (canonical stage from `StatusStyles`). **Do not duplicate `StatusStyles`'s mapping** — reference it.
-  - [ ] XML-doc every public type/member with the *why*, tagged `[Story 6.1]`, matching the heavy-comment style of `IArtifactAdapter.cs`/`ArtifactBundle.cs`. Explicitly name the AD-2 / `IViewModelRenderer` / `IRenderAdapter` lineage so nobody confuses this **delivery** seam with 4.1's **ingestion** seam.
-  - [ ] No new project, no namespace split.
+- [x] **Task 1 — Define the view-model contract + record types** (AC: #1)
+  - [x] Add the host-neutral view-model records as new `.cs` files in `namespace SpecScribe;`: `NavigationView`, `BreadcrumbTrail` (or a `BreadcrumbCrumb` record + `IReadOnlyList`), `AssetManifest`, `PageView`, and `InteractionState`. Every one is a plain data record with **zero HTML strings** and zero `PathUtil.Html`/escaping — escaping is a delivery concern that stays in the adapter.
+  - [x] `PageView` fields: `PageKind Kind`, `string OutputRelativePath`, `string Title`, `string? MetaDescription`, `NavigationView Nav`, `BreadcrumbTrail Breadcrumb`, `AssetManifest Assets`, `InteractionState Interaction`, and an **opaque body payload** (`string BodyHtml` — the already-rendered inner content from today's templaters; documented as the deferred-decomposition seam). Add a `PageKind` enum covering the current page families.
+  - [x] `NavigationView` carries: `string SiteTitle`, the ordered nav items (`Label`, `OutputRelativePath`, `ConceptKey` for `Icons.ForConcept`), the quick links (`Label`, `OutputRelativePath`, `Description`), and the current/active output path. This is the **data currently on `SiteNav`** ([SiteNav.cs:52–71](../../src/SpecScribe/SiteNav.cs)) — lift it, don't reinvent it. Keeping `SiteNav.Build` as the producer is fine; the point is a named typed view of its data that a non-HTML surface can consume.
+  - [x] `InteractionState` carries the drill relationship (parent target + ordered child targets, derived from the breadcrumb trail and the epic/story link hierarchy) and the status-semantics reference (canonical stage from `StatusStyles`). **Do not duplicate `StatusStyles`'s mapping** — reference it.
+  - [x] XML-doc every public type/member with the *why*, tagged `[Story 6.1]`, matching the heavy-comment style of `IArtifactAdapter.cs`/`ArtifactBundle.cs`. Explicitly name the AD-2 / `IViewModelRenderer` / `IRenderAdapter` lineage so nobody confuses this **delivery** seam with 4.1's **ingestion** seam.
+  - [x] No new project, no namespace split.
 
-- [ ] **Task 2 — Define `IRenderAdapter` and implement `HtmlRenderAdapter`** (AC: #1)
-  - [ ] Add `IRenderAdapter` (input = `PageView` (+ collection for a full run) + adapter options; output = host artifacts). Shape it to the sketch at [rendering-architecture.md:47–50](../specs/spec-specscribe/rendering-architecture.md). Keep the naming distinct from 4.1's ingestion `IArtifactAdapter` (delivery vs. ingestion — see Dev Notes).
-  - [ ] Implement `HtmlRenderAdapter` as the first concrete adapter. Move the **page-chrome** string-building into it: the head open (`PathUtil.RenderHeadOpen`), nav bar (`SiteNav.RenderNavBar`), breadcrumb (`SiteNav.RenderBreadcrumb`), and footer (`PathUtil.RenderFooter`) become the adapter's rendering of `NavigationView` / `BreadcrumbTrail` / `AssetManifest`. The page BODY is passed through verbatim from `PageView.BodyHtml`.
-  - [ ] **Byte-identical constraint:** the strings emitted must be exactly today's. The cleanest safe path is to have the adapter *call the existing `SiteNav.RenderNavBar`/`RenderBreadcrumb`/`PathUtil.Render*` helpers* under the hood (re-homing responsibility, not rewriting output) — a full re-implementation of those strings is unnecessary risk. Whatever you choose, the golden test (Task 4) is the gate.
-  - [ ] Decide the migration depth for wiring (see Dev Notes "Wiring strategy"): at minimum the shared chrome for **Home + Epics index + Epic + Story** pages (the surfaces 6.2 renders) flows `template → PageView → HtmlRenderAdapter`. Other page types (docs, sprint, requirements, ADRs, git pages) MAY keep calling the chrome helpers directly this story, but must be noted as deferred wiring, not a contract exception. Do not regress their bytes.
+- [x] **Task 2 — Define `IRenderAdapter` and implement `HtmlRenderAdapter`** (AC: #1)
+  - [x] Add `IRenderAdapter` (input = `PageView` (+ collection for a full run) + adapter options; output = host artifacts). Shape it to the sketch at [rendering-architecture.md:47–50](../specs/spec-specscribe/rendering-architecture.md). Keep the naming distinct from 4.1's ingestion `IArtifactAdapter` (delivery vs. ingestion — see Dev Notes).
+  - [x] Implement `HtmlRenderAdapter` as the first concrete adapter. Move the **page-chrome** string-building into it: the head open (`PathUtil.RenderHeadOpen`), nav bar (`SiteNav.RenderNavBar`), breadcrumb (`SiteNav.RenderBreadcrumb`), and footer (`PathUtil.RenderFooter`) become the adapter's rendering of `NavigationView` / `BreadcrumbTrail` / `AssetManifest`. The page BODY is passed through verbatim from `PageView.BodyHtml`.
+  - [x] **Byte-identical constraint:** the strings emitted must be exactly today's. The cleanest safe path is to have the adapter *call the existing `SiteNav.RenderNavBar`/`RenderBreadcrumb`/`PathUtil.Render*` helpers* under the hood (re-homing responsibility, not rewriting output) — a full re-implementation of those strings is unnecessary risk. Whatever you choose, the golden test (Task 4) is the gate.
+  - [x] Decide the migration depth for wiring (see Dev Notes "Wiring strategy"): at minimum the shared chrome for **Home + Epics index + Epic + Story** pages (the surfaces 6.2 renders) flows `template → PageView → HtmlRenderAdapter`. Other page types (docs, sprint, requirements, ADRs, git pages) MAY keep calling the chrome helpers directly this story, but must be noted as deferred wiring, not a contract exception. Do not regress their bytes.
 
-- [ ] **Task 3 — Parity harness + host-exception registry** (AC: #2)
-  - [ ] Add a `HostRenderException` record (surface id, semantic-fact id, reason) and an in-code registry (empty list this story) that is the single documented home for sanctioned cross-surface divergence. Document that a difference NOT in this list is a bug, not an exception (AC #2 "differences are documented as host-specific exceptions only").
-  - [ ] Add a **semantic-parity extractor**: given `HtmlRenderAdapter` output for a `PageView`, parse back out the semantic facts (ordered nav targets + labels, breadcrumb/drill trail, drill parent/child links, active nav target, asset manifest hrefs, status→stage classes) and assert they equal the source `PageView`'s view models. This proves the HTML adapter neither dropped nor reinterpreted a semantic fact — and is **the exact hook 6.2's webview adapter runs against** to prove parity. Since there is no second surface yet, the source view models ARE the reference; the harness is written so adding a `WebviewRenderAdapter` later means asserting *its* extracted facts against the same reference minus any registered `HostRenderException`.
-  - [ ] Keep the extractor deliberately small and semantic (targets/labels/trail/status), NOT a full HTML differ — the golden test already covers bytes; this test covers *meaning* so a future surface that emits different markup but the same meaning still passes.
+- [x] **Task 3 — Parity harness + host-exception registry** (AC: #2)
+  - [x] Add a `HostRenderException` record (surface id, semantic-fact id, reason) and an in-code registry (empty list this story) that is the single documented home for sanctioned cross-surface divergence. Document that a difference NOT in this list is a bug, not an exception (AC #2 "differences are documented as host-specific exceptions only").
+  - [x] Add a **semantic-parity extractor**: given `HtmlRenderAdapter` output for a `PageView`, parse back out the semantic facts (ordered nav targets + labels, breadcrumb/drill trail, drill parent/child links, active nav target, asset manifest hrefs, status→stage classes) and assert they equal the source `PageView`'s view models. This proves the HTML adapter neither dropped nor reinterpreted a semantic fact — and is **the exact hook 6.2's webview adapter runs against** to prove parity. Since there is no second surface yet, the source view models ARE the reference; the harness is written so adding a `WebviewRenderAdapter` later means asserting *its* extracted facts against the same reference minus any registered `HostRenderException`.
+  - [x] Keep the extractor deliberately small and semantic (targets/labels/trail/status), NOT a full HTML differ — the golden test already covers bytes; this test covers *meaning* so a future surface that emits different markup but the same meaning still passes.
 
-- [ ] **Task 4 — Byte-identical regression + suite green** (AC: #1)
-  - [ ] **Golden-output regression:** assert the full generated site is byte-for-byte unchanged vs. the `baseline_commit` build for a fixture repo — the single most important test (AC #1's "semantics remain equivalent" = no rendered output changed). Reuse the existing `SiteGeneratorAdapterTests` golden pattern / `SiteGenerator*Tests` fixtures. Normalize ONLY the three known-benign diffs (memory: golden-diff-normalization-gotchas): the footer wall-clock (`on yyyy-MM-dd HH:mm`), the `?v=<ModuleVersionId>` asset cache-bust token, and any git-worktree CRLF artifact.
-  - [ ] Run `dotnet test` — whole suite green. **If any existing rendering assertion must change, STOP** — that is a signal you altered rendered output, which fails AC #1 (same rule as 4.1 Task 6).
-  - [ ] Generate this repo's own site to `SpecScribeOutput` and diff against a pre-change build: **zero diffs** expected. Output dir is `SpecScribeOutput` (memory: generate-output-dir-is-specscribeoutput; NOT `docs/live`, NOT `--output docs/live`).
+- [x] **Task 4 — Byte-identical regression + suite green** (AC: #1)
+  - [x] **Golden-output regression:** assert the full generated site is byte-for-byte unchanged vs. the `baseline_commit` build for a fixture repo — the single most important test (AC #1's "semantics remain equivalent" = no rendered output changed). Reuse the existing `SiteGeneratorAdapterTests` golden pattern / `SiteGenerator*Tests` fixtures. Normalize ONLY the three known-benign diffs (memory: golden-diff-normalization-gotchas): the footer wall-clock (`on yyyy-MM-dd HH:mm`), the `?v=<ModuleVersionId>` asset cache-bust token, and any git-worktree CRLF artifact.
+  - [x] Run `dotnet test` — whole suite green. **If any existing rendering assertion must change, STOP** — that is a signal you altered rendered output, which fails AC #1 (same rule as 4.1 Task 6).
+  - [x] Generate this repo's own site to `SpecScribeOutput` and diff against a pre-change build: **zero diffs** expected. Output dir is `SpecScribeOutput` (memory: generate-output-dir-is-specscribeoutput; NOT `docs/live`, NOT `--output docs/live`).
 
-- [ ] **Task 5 — Tests for the contract + adapter** (AC: #1, #2)
-  - [ ] Unit tests: a representative `PageView`/`NavigationView`/`BreadcrumbTrail`/`InteractionState` round-trips through `HtmlRenderAdapter` and the semantic-parity extractor with equal facts; the drill parent/child relationship for a Story page resolves to its Epic and the epics index; status semantics resolve through `StatusStyles` (not a local copy).
-  - [ ] A test asserting the `HostRenderException` registry is empty in 6.1 and that an *injected* fake divergence is caught by the parity harness (so the harness genuinely detects regressions, per AC #2). Add to the existing test project (`net10.0`, xUnit); follow the file-per-unit naming (`RenderViewModelTests.cs`, `HtmlRenderAdapterTests.cs`, `RenderParityTests.cs`).
+- [x] **Task 5 — Tests for the contract + adapter** (AC: #1, #2)
+  - [x] Unit tests: a representative `PageView`/`NavigationView`/`BreadcrumbTrail`/`InteractionState` round-trips through `HtmlRenderAdapter` and the semantic-parity extractor with equal facts; the drill parent/child relationship for a Story page resolves to its Epic and the epics index; status semantics resolve through `StatusStyles` (not a local copy).
+  - [x] A test asserting the `HostRenderException` registry is empty in 6.1 and that an *injected* fake divergence is caught by the parity harness (so the harness genuinely detects regressions, per AC #2). Add to the existing test project (`net10.0`, xUnit); follow the file-per-unit naming (`RenderViewModelTests.cs`, `HtmlRenderAdapterTests.cs`, `RenderParityTests.cs`).
 
-- [ ] **Task 6 — Watch-mode + reporting parity** (AC: #1)
-  - [ ] Confirm the chrome extraction does not regress watch-mode: `RegenerateEpics`/`GenerateOne`/`RemoveFor`/`RegenerateAdrs` must still produce identical pages (they compose the same chrome). Existing watch-path tests (`SiteGeneratorStoryEpicPagesTests`, `SiteGeneratorCoverageTests`) must pass unchanged; call out in Completion Notes how you kept parity (mirror 4.1's approach).
-  - [ ] No change to the `IGenerationReporter`/`GenerationEvent` surface — this story is renderer-internal (AD-2), it does not touch ingestion diagnostics (4.1) or the reporting channel.
+- [x] **Task 6 — Watch-mode + reporting parity** (AC: #1)
+  - [x] Confirm the chrome extraction does not regress watch-mode: `RegenerateEpics`/`GenerateOne`/`RemoveFor`/`RegenerateAdrs` must still produce identical pages (they compose the same chrome). Existing watch-path tests (`SiteGeneratorStoryEpicPagesTests`, `SiteGeneratorCoverageTests`) must pass unchanged; call out in Completion Notes how you kept parity (mirror 4.1's approach).
+  - [x] No change to the `IGenerationReporter`/`GenerationEvent` surface — this story is renderer-internal (AD-2), it does not touch ingestion diagnostics (4.1) or the reporting channel.
 
 ## Dev Notes
 
@@ -147,12 +147,50 @@ Whichever you pick, every page's output bytes stay identical and the golden test
 
 ### Agent Model Used
 
+claude-opus-4-8 (Amelia / dev-story workflow)
+
 ### Debug Log References
+
+- Golden byte-parity gate run three times: after re-homing nav/breadcrumb into the adapter (delegation only), after wiring all five Epics-family templater methods, and against the full suite — the pinned `SiteGeneratorAdapterTests` content fingerprint never changed (no `?v=`/timestamp constant edit needed).
+- End-to-end self-site diff: generated this repo's own site (168 pages, incl. mermaid/ADR/epic/story/requirements/git surfaces) from an **isolated** source copy with both the current working tree and the HEAD (`399b422`) binary, normalized the three benign tokens (footer clock, `?v=` token, CRLF), and `diff -r` reported **zero diffs**. (Diffed against HEAD, not the recorded `baseline_commit` 3d6ad54, because intervening non-6.1 commits — an ADR status pill and a `--diag-error-bg` CSS token — sit between them; isolating *this story's* changes requires the HEAD baseline. Isolated-source generation avoids the `.claude/worktrees/*`-sorts-first stale-`epics.md` gotcha.)
 
 ### Completion Notes List
 
+- **Contract (Task 1).** Added nine host-neutral records/enums, each heavily XML-doc'd with the AD-2 / `IViewModelRenderer` / `IRenderAdapter` lineage and the delivery-vs-ingestion distinction from 4.1: `NavigationView`+`NavItem`+`NavQuickLink`, `BreadcrumbTrail`+`BreadcrumbCrumb`, `AssetManifest`, `InteractionState`, `PageView`+`PageKind`. All are plain data — zero HTML, zero escaping. `InteractionState.StatusStage` **references** `StatusStyles` (the producer calls `StatusStyles.ForStory`/`ForEpic`); it never re-models the mapping (8.1 boundary honored). `BreadcrumbTrail.ParentTarget` derives drill-up from the trail, so the rendered breadcrumb and the interaction model can never disagree.
+- **Adapter + re-homing (Task 2).** `IRenderAdapter` (delivery seam) + `RenderedArtifact`, and `HtmlRenderAdapter` as the first/only concrete adapter. Chose the **re-home, don't rewrite** path: the verbatim nav/breadcrumb string-building moved from `SiteNav` into `HtmlRenderAdapter.RenderNav`/`RenderBreadcrumb`, and `SiteNav.RenderNavBar`/`RenderBreadcrumb` now **delegate** (via `ToNavigationView` / `BreadcrumbTrail.From`) — so every un-migrated page (docs, sprint, requirements, ADR, git, structure, diagnostics, about, commit-day, retro) renders byte-identically for free. `Render(PageView)` composes head + nav + breadcrumb + opaque body + footer + (mermaid) + close.
+- **Wiring depth (Task 2, option (a)+).** Routed the required **Home + Epics index + Epic + Story** chrome through `PageView → HtmlRenderAdapter.Render`, plus the **story placeholder** page (same Epics-family shape, trivially uniform). Each templater now builds only the `<main>…</main>` body, then a `PageView`, then returns `adapter.Render(pv).Content`. All other page types keep calling the (now-delegating) chrome helpers directly — **deferred wiring, not a contract exception**; their bytes are unchanged. `AssetManifest.MermaidNeeded` is computed uniformly as `Mermaid.ContainsBlock(body)` (equivalent to the old head+nav+breadcrumb+body scan since chrome carries no `<pre class="mermaid">`; always true for the epics index which always emits the roadmap).
+- **Parity harness (Task 3).** `HostRenderException(SurfaceId, FactId, Reason)` + `HostRenderExceptions.Registry` (empty this story, documented as the ONLY sanctioned divergence home). `RenderParity` distills a page to `SemanticFacts` two ways — `FromPageView` (declared) vs `Extract` (evidenced by the rendered HTML) — and `FindDivergences` reports one entry per diverging fact (site title, ordered nav targets+labels, active nav, breadcrumb/drill trail, drill parent, drill children, status stage, asset hrefs, mermaid), filtered by any registered exception for the surface. Deliberately **semantic, not a byte differ**: nav/breadcrumb/assets are parsed out of the chrome (prefix + `?v=` folded away, labels via `StripHtmlTags`); child-links and status stage are **presence** checks so a future webview with different markup but equal meaning still passes, and a dropped fact fails.
+- **Status semantics (Task 5).** A Story page's stage is `StatusStyles.ForStory(story)` only when the header actually renders a badge (matching its own `Status is {Length:>0}` guard), so the interaction model never asserts a status the page doesn't show; an Epic page's stage is `StatusStyles.ForEpic(epic)` (always badged); Home/Epics-index carry no stage.
+- **Watch + reporting parity (Task 6).** `RegenerateEpics` calls the same re-homed `EpicsTemplater` methods, so its output is identical — `SiteGeneratorStoryEpicPagesTests`, `SiteGeneratorCoverageTests`, `SiteNavTests`, `HtmlTemplaterTests`, and `GenerateAll_ThenRegenerateEpics_KeepsWatchParity` all pass unchanged. `IGenerationReporter`/`GenerationEvent` and the 4.1 ingestion seam (`IArtifactAdapter`/`ArtifactBundle`/`AdapterDiagnostic`) were not touched.
+- **Verification.** `dotnet test` — 652/652 green (633 pre-existing unchanged + 19 new). Golden fingerprint constant untouched. Zero-diff self-site regression confirmed (above). No new project, no namespace split.
+
 ### File List
+
+**New — src/SpecScribe/**
+- NavigationView.cs
+- BreadcrumbTrail.cs
+- AssetManifest.cs
+- InteractionState.cs
+- PageView.cs
+- IRenderAdapter.cs
+- HtmlRenderAdapter.cs
+- HostRenderException.cs
+- RenderParity.cs
+
+**Modified — src/SpecScribe/**
+- SiteNav.cs (re-homed nav/breadcrumb rendering behind `HtmlRenderAdapter`; added `ToNavigationView`; delegating `RenderNavBar`/`RenderBreadcrumb`; removed now-unused `using System.Text;`)
+- HtmlTemplater.cs (`RenderIndex` home page → `PageView` → adapter)
+- EpicsTemplater.cs (`RenderIndex`, `RenderEpic`, `RenderStory`, `RenderStoryPlaceholder` → `PageView` → adapter)
+
+**New — tests/SpecScribe.Tests/**
+- RenderViewModelTests.cs
+- HtmlRenderAdapterTests.cs
+- RenderParityTests.cs
+
+**Modified — _bmad-output/implementation-artifacts/**
+- sprint-status.yaml (6-1 status tracking)
 
 ## Change Log
 
 - 2026-07-10 — Story 6.1 drafted (create-story): delivery-side (AD-2) view-model contract scoped as the mirror of 4.1's ingestion seam — `PageView`/`NavigationView`/`BreadcrumbTrail`/`AssetManifest`/`InteractionState` + `IRenderAdapter`/`HtmlRenderAdapter` (first consumer, byte-identical chrome) + semantic-parity harness & `HostRenderException` registry. Page-body decomposition, the webview adapter (6.2), host theming (6.3), and any package split explicitly out of scope.
+- 2026-07-10 — Story 6.1 implemented (dev-story): added the nine host-neutral view-model/contract types + `HtmlRenderAdapter` (re-homing nav/breadcrumb string-building out of `SiteNav`, which now delegates), wired Home + Epics-family (index/epic/story/placeholder) chrome through `PageView → HtmlRenderAdapter`, and added the `RenderParity` semantic harness + empty `HostRenderException` registry. Byte-parity proven by the unchanged golden fingerprint and a zero-diff 168-page self-site regression vs HEAD. Suite 652/652 green. Status → review.

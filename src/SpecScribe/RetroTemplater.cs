@@ -43,7 +43,7 @@ public static class RetroTemplater
         sb.Append("</div>\n\n");
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
@@ -116,7 +116,7 @@ public static class RetroTemplater
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}", prefix));
+        sb.Append(PathUtil.RenderFooter(prefix));
         if (retro.HasMermaid)
         {
             sb.Append(Mermaid.InitScript());

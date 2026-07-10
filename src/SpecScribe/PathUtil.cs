@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -87,14 +88,24 @@ public static class PathUtil
     /// credit link and the About page's repository link, so the two can never drift. [Story 4.8 Task 5]</summary>
     public const string RepositoryUrl = "https://github.com/IntegerMan/SpecScribe";
 
-    /// <summary>The site-wide footer at the bottom of every page: the SpecScribe credit link, an "About" link,
-    /// and a per-page <paramref name="trailingHtml"/> (usually the generation timestamp). The About link is the
-    /// owner-chosen reachability path to the About page — and through it the diagnostics run log — so it appears
-    /// on every page. Its href is resolved from <paramref name="relativePrefix"/> (the same <c>../</c> math the
-    /// nav uses) so it points at the output-root <c>about.html</c> correctly from a nested page (e.g.
-    /// <c>adrs/index.html</c>). Root pages pass the empty default. [Story 4.8 Task 5]</summary>
-    public static string RenderFooter(string trailingHtml, string relativePrefix = "")
-        => $"<footer class=\"doc-footer\">\n  Generated using <a href=\"{Html(RepositoryUrl)}\">SpecScribe</a> &middot; <a href=\"{Html(relativePrefix + SiteNav.AboutOutputPath)}\">About</a> {trailingHtml}\n</footer>\n\n";
+    /// <summary>The author's homepage — surfaced as the About page's author link. There is no standard assembly
+    /// attribute for an author URL, so it lives here as a constant, mirroring <see cref="RepositoryUrl"/>.</summary>
+    public const string AuthorUrl = "https://MattEland.dev";
+
+    /// <summary>The site-wide footer at the bottom of every page: the SpecScribe credit link, the generation
+    /// timestamp (human-friendly), and a "View generation details" link on to the About page — the owner-chosen
+    /// reachability path to the About page and, through it, the diagnostics run log, so it appears on every page.
+    /// The generation date is formatted here (single source) rather than by each caller. The details link's href is
+    /// resolved from <paramref name="relativePrefix"/> (the same <c>../</c> math the nav uses) so it points at the
+    /// output-root <c>about.html</c> correctly from a nested page (e.g. <c>adrs/index.html</c>). Root pages pass the
+    /// empty default. [Story 4.8 Task 5; About polish]</summary>
+    public static string RenderFooter(string relativePrefix = "")
+    {
+        // Human-friendly, e.g. "July 10, 2026 at 5:14 PM" — not the raw yyyy-MM-dd HH:mm this used to carry.
+        // InvariantCulture so the generated site reads the same on every machine/locale (deterministic output).
+        var generatedOn = DateTime.Now.ToString("MMMM d, yyyy 'at' h:mm tt", CultureInfo.InvariantCulture);
+        return $"<footer class=\"doc-footer\">\n  Generated using <a href=\"{Html(RepositoryUrl)}\">SpecScribe</a> on {generatedOn} &middot; <a href=\"{Html(relativePrefix + SiteNav.AboutOutputPath)}\">View generation details</a>\n</footer>\n\n";
+    }
 
     // Singleline so a tag whose attributes contain newlines still strips cleanly — e.g. an "(AC: #N)"
     // reference linkified inside a heading carries a multi-line `title` (the criterion's Given/When/Then

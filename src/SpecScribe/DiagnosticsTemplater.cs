@@ -160,12 +160,13 @@ public static class DiagnosticsTemplater
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(config.SiteTitle)} &middot; {notices.Count} {noticeWord} &middot; from the last full generation</div>\n");
         sb.Append("</header>\n\n");
 
-        sb.Append("<main id=\"main-content\">\n");
+        // info-page: the shared centered content column (side gutters + max-width) — same as the About page. [About polish]
+        sb.Append("<main id=\"main-content\" class=\"info-page\">\n");
         sb.Append(RenderNotices(notices));
         sb.Append(RenderConfig(config));
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter($"on {DateTime.Now:yyyy-MM-dd HH:mm}"));
+        sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }

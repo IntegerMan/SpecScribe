@@ -14,12 +14,20 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>specscribe</ToolCommandName>
     <PackageId>SpecScribe</PackageId>
-    <Version>0.1.0</Version>
-    <Authors>Matt Eland</Authors>
-    <Description>Human-readable web pages from spec-driven-development artifacts (BMad/GDS today; SpecKit and GSD planned).</Description>
+    <!-- Pre-release label: makes the package/assembly semver-correctly pre-release, and the About page shows a
+         "Preview" badge. The build identifier (date + commit hash) is added dynamically, not bumped by hand. -->
+    <Version>0.1.0-preview</Version>
+    <Authors>Matthew-Hope Eland</Authors>
+    <Description>A static site generator that builds interactive dashboards from spec-driven development projects and git repositories</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <!-- Stamp the build date into a readable assembly attribute so the About page can show which build produced a
+       site (the commit hash rides along in AssemblyInformationalVersion's "+<sha>" suffix on deterministic builds). -->
+  <ItemGroup>
+    <AssemblyMetadata Include="BuildDate" Value="$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="1.3.2" />

@@ -172,17 +172,20 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         var fingerprint = FingerprintTree(Site);
 
-        const string expected = "157930f456480aecb396ce135ff2ee1d357f588ce713569985f0f71624355f7c";
+        const string expected = "e0ff27d02a21fde846555b84f9bafead8859c67704c9c82936ddad70c76306fb";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
             + $"to:\n  {fingerprint}\nOtherwise this is an unexpected drift from the byte-parity baseline (AC #1).");
     }
 
-    private static readonly Regex FooterClock = new(@"on \d{4}-\d{2}-\d{2} \d{2}:\d{2}", RegexOptions.Compiled);
+    // The footer date is now human-friendly + culture-invariant, e.g. "on July 10, 2026 at 5:14 PM".
+    private static readonly Regex FooterClock = new(@"on [A-Za-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} [AP]M", RegexOptions.Compiled);
     private static readonly Regex AssetCacheBust = new(@"\?v=[0-9a-fA-F]+", RegexOptions.Compiled);
     private static readonly Regex SubtitleVersion = new(@"SpecScribe v[^<]+", RegexOptions.Compiled);
     private static readonly Regex VersionRow = new(@"(<dt>Version</dt><dd>)[^<]*(</dd>)", RegexOptions.Compiled);
+    // The About page's dynamic build identifier (build date · short commit hash) varies per build/commit.
+    private static readonly Regex BuildRow = new(@"(<dt>Build</dt><dd>)[^<]*(</dd>)", RegexOptions.Compiled);
 
     /// <summary>SHA-256 over every output file's normalized content (path-prefixed, ordinal-sorted), so ANY
     /// rendered-byte change flips one hash. Normalizes only per-run/per-build/per-machine noise, never artifact
@@ -210,6 +213,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         content = AssetCacheBust.Replace(content, "?v=<ver>");
         content = SubtitleVersion.Replace(content, "SpecScribe v<ver>");
         content = VersionRow.Replace(content, "$1<ver>$2");
+        content = BuildRow.Replace(content, "$1<build>$2");
         return content;
     }
 
