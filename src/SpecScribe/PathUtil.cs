@@ -21,6 +21,19 @@ public static class PathUtil
 
     public static string ToOutputRelative(string sourceRelativePath) => Path.ChangeExtension(sourceRelativePath, ".html");
 
+    /// <summary>True for working files no pipeline stage should touch — editor temps (<c>~$…</c>,
+    /// <c>*.tmp</c>, <c>*.crswap</c>) and dotfiles (e.g. <c>.memlog.md</c>). One predicate shared by the
+    /// generator's source enumeration and the framework adapters' ingest, so ignored files are neither
+    /// rendered nor reported as unsupported wherever discovery happens. [Story 4.1]</summary>
+    public static bool IsIgnoredSourceFile(string path)
+    {
+        var name = Path.GetFileName(path);
+        return name.StartsWith("~$", StringComparison.Ordinal)
+            || name.StartsWith('.')
+            || name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".crswap", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static string Html(string s) => WebUtility.HtmlEncode(s);
 
     /// <summary>A small inline-SVG favicon (gold quill-spark on a dark parchment-ink tile) emitted as a

@@ -763,6 +763,28 @@ So that I can track planning progress without switching tools.
 **Then** they are surfaced as explicit non-fatal notices
 **And** generation continues for supported content and remains coherent with other framework surfaces.
 
+<!-- Story 4.8 added 2026-07-10: spun out of Story 4.2 so partial/degraded generation is detectable in the
+     output itself, not only in console scrollback. Consumes the AdapterDiagnostic channel from Story 4.1. -->
+### Story 4.8: Generation Diagnostics and Configuration Log Page
+
+As a maintainer running SpecScribe on a project whose structure or framework differs from the defaults,
+I want a generated page that records the run's warnings, skipped or unsupported artifacts, and effective configuration,
+So that silent or partial degradation is detectable in the output itself rather than only in console scrollback.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a generation run that emits non-fatal diagnostics (unsupported, malformed, or skipped artifacts)
+**When** the site is generated
+**Then** a diagnostics page lists each notice with its category, source path, and message
+**And** the page is reachable from the site (nav or dashboard) and degrades to a clean all-clear state when there are no notices.
+
+2.
+**Given** a completed run
+**When** the diagnostics page is generated
+**Then** it records the effective configuration and detection results (source root, resolved ADR location, output directory, deep-git flag, detected framework/module)
+**And** this information is derived entirely at generation time with no remote calls, consistent with local-first operation.
+
 ## Epic 5: Reliable Operations, Configuration, and OSS Documentation
 
 Make generation and watch dependable and easy to configure, and provide OSS-ready documentation, so the tool is trustworthy for daily use and ready to share with the broader community.

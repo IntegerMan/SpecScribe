@@ -13,7 +13,6 @@ public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativeP
 /// nav, and epics/story pages in sync.</summary>
 public sealed class SiteGenerator
 {
-    private static readonly Regex ArtifactFilenamePattern = new(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
     private static readonly Regex AdrNumberPattern = new(@"^(?<num>\d+)", RegexOptions.Compiled);
     private static readonly Regex AdrStatusPattern = new(@"^\*\*Status:\*\*\s*(?<status>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
     private static readonly Regex MarkdownLinkPattern = new(@"\[(?<text>[^\]]+)\]\([^)]+\)", RegexOptions.Compiled);
@@ -21,6 +20,12 @@ public sealed class SiteGenerator
     private readonly ForgeOptions _options;
     private readonly Dictionary<string, DocModel> _docs = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _gate = new();
+
+    // The ingestion seam (AD-1): all framework-specific discovery/parsing lives behind this adapter, so the
+    // generator only ever consumes the normalized ArtifactBundle. Held as the concrete type (not
+    // IArtifactAdapter) because the watch paths also need its scoped epics re-ingest; the adapter registry
+    // that selects among IArtifactAdapter implementations arrives with Stories 4.3+. [Story 4.1]
+    private readonly BmadArtifactAdapter _adapter = new();
 
     private SiteNav? _nav;
     private ModuleContext _module = ModuleContext.None;
@@ -58,12 +63,20 @@ public sealed class SiteGenerator
             EnsureScaffold();
             _docs.Clear();
 
-            // Parse the sprint tracking file once, up front, so its presence drives the nav gate and both the
-            // sprint page and the home widget read the same parsed instance. Missing/malformed → null → the
-            // page, widget, and nav item all omit cleanly. [Story 2.3 Task 1/5]
-            _sprint = SprintStatusParser.ParseFile(SprintSourcePath);
+            // All planning-artifact ingestion (sprint, module detection, retros, epics → requirements) runs
+            // through the framework adapter, which returns one normalized bundle + non-fatal diagnostics.
+            // Progress/git enrichment stays HERE (projection path, AD-4) and is handed in as a callback so the
+            // adapter can keep BMad's epics-before-requirements ordering without owning git. [Story 4.1]
+            ProgressModel? progress = null;
+            var bundle = _adapter.Ingest(_options, files, (model, artifactsById) => progress = ComputeProgress(model, artifactsById));
 
-            var nav = BuildNav(sourceRelatives);
+            // Sprint presence drives the nav gate, and the sprint page + home widget read this same parsed
+            // instance. Missing/malformed → null → the page, widget, and nav item all omit cleanly. [Story 2.3]
+            _sprint = bundle.Sprint;
+            _module = bundle.Module;
+            SetRetros(bundle.Retros);
+
+            var nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasStructure: sourceRelatives.Count > 0);
             _nav = nav;
 
             // Render the README up front so that, if it fails, we can drop the Readme nav entry before any
@@ -79,22 +92,36 @@ public sealed class SiteGenerator
                 }
             }
 
-            var epicsSourceFile = FindEpicsSourceFile(files);
-            var artifactMap = BuildArtifactMap(files);
-            var consumedArtifacts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Files the adapter consumed into dedicated surfaces (story artifacts, retro notes) — the generic
+            // pages loop below must not also render them.
+            var epicsSourceFile = bundle.EpicsSourceFullPath;
+            var consumedArtifacts = new HashSet<string>(bundle.ConsumedSourceRelatives, StringComparer.OrdinalIgnoreCase);
 
-            // Retrospective notes (epic-N-retro-*.md) are a first-class artifact class. Parse them FIRST (parse
-            // needs no epics model), so the epic/story pages below can cross-link to their epic's retro via
-            // EpicRetroMap; consume them so the generic pages loop doesn't also render them. Their dedicated
-            // pages are written after the epics phase (RenderRetroPages needs the epics model). [Story 2.3 retro pages]
-            var retroFiles = files.Where(RetroParser.IsRetroFile).ToList();
-            foreach (var rf in retroFiles) consumedArtifacts.Add(ToSourceRelative(rf));
-            ParseRetros(retroFiles);
+            // Cache the ingested models with the same granularity the inline parse chain had: epics+progress
+            // only once the projection enrichment ran to completion, requirements only when parsed — so a
+            // mid-chain failure leaves the previous (or no) values in place rather than nulling everything.
+            // Deliberately AFTER the README render above: the README has always rendered before the epics
+            // parse, so it is linkified against the PREVIOUS run's models (null on a first run). [Story 4.1]
+            if (progress is not null)
+            {
+                _epicsModel = bundle.Epics;
+                _progress = progress;
+            }
+            if (bundle.Requirements is not null)
+            {
+                _requirements = bundle.Requirements;
+            }
 
-            if (epicsSourceFile is not null)
+            // Adapter diagnostics surface on the same event channel per-file failures always used — the typed
+            // AdapterDiagnostic is the only report for a failure the adapter caught (never double-reported).
+            events.AddRange(MapDiagnostics(bundle.Diagnostics));
+
+            // Render the epic/story/requirements pages only when the whole ingest chain produced its models —
+            // the exact set of writes the previous single try/catch performed after a successful parse.
+            if (epicsSourceFile is not null && bundle is { Epics: { } epicsModel, Requirements: { } requirementsModel } && progress is not null)
             {
                 reporter?.BeginPhase(GenerationPhase.Epics);
-                events.AddRange(GenerateEpicsInternal(epicsSourceFile, files, artifactMap, consumedArtifacts, nav));
+                events.AddRange(RenderEpicsPages(epicsSourceFile, files, bundle.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
                 reporter?.EndPhase(GenerationPhase.Epics);
             }
 
@@ -118,9 +145,9 @@ public sealed class SiteGenerator
             events.AddRange(GenerateAdrsInternal(nav));
             reporter?.EndPhase(GenerationPhase.Adrs);
 
-            // Per-day commit pages the heatmap links to. Git is only computed inside GenerateEpicsInternal,
-            // so a project without an epics.md has no pulse here — which is consistent: no heatmap renders
-            // either, so there's nothing to link to.
+            // Per-day commit pages the heatmap links to. Git is only computed by the epics-phase progress
+            // enrichment, so a project without an epics.md has no pulse here — which is consistent: no
+            // heatmap renders either, so there's nothing to link to.
             if (_progress?.Git is { } gitPulse)
             {
                 reporter?.BeginPhase(GenerationPhase.CommitDays);
@@ -267,17 +294,36 @@ public sealed class SiteGenerator
             var nav = BuildNav(files.Select(ToSourceRelative).ToList());
             _nav = nav;
 
-            var epicsSourceFile = FindEpicsSourceFile(files);
-            if (epicsSourceFile is null)
+            // Scoped re-ingest through the adapter: exactly the epics + story-artifact + requirements re-parse
+            // this path always did, without touching the sprint/retro/module state it never refreshed (AD-5
+            // watch parity). [Story 4.1]
+            ProgressModel? progress = null;
+            var ingest = _adapter.IngestEpics(_options, files, (model, artifactsById) => progress = ComputeProgress(model, artifactsById));
+
+            if (ingest.SourceFullPath is null)
             {
                 RefreshCoverage();
                 WriteIndex(nav);
                 return new GenerationEvent(GenerationOutcome.Skipped, "epics.md", sw.Elapsed, "epics.md not found");
             }
 
-            var artifactMap = BuildArtifactMap(files);
-            var consumed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var epicsEvents = GenerateEpicsInternal(epicsSourceFile, files, artifactMap, consumed, nav);
+            // Same partial-failure caching rules as GenerateAll: a broken mid-edit save must leave the last
+            // good models in place so the rest of the site keeps linkifying against them.
+            if (progress is not null)
+            {
+                _epicsModel = ingest.Epics;
+                _progress = progress;
+            }
+            if (ingest.Requirements is not null)
+            {
+                _requirements = ingest.Requirements;
+            }
+
+            var epicsEvents = new List<GenerationEvent>(MapDiagnostics(ingest.Diagnostics));
+            if (ingest is { Epics: { } epicsModel, Requirements: { } requirementsModel } && progress is not null)
+            {
+                epicsEvents.AddRange(RenderEpicsPages(ingest.SourceFullPath, files, ingest.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
+            }
             RefreshCoverage();
             WriteIndex(nav);
 
@@ -287,7 +333,7 @@ public sealed class SiteGenerator
                 return errored;
             }
 
-            return new GenerationEvent(GenerationOutcome.Updated, ToSourceRelative(epicsSourceFile), sw.Elapsed, $"{consumed.Count} stories");
+            return new GenerationEvent(GenerationOutcome.Updated, ToSourceRelative(ingest.SourceFullPath), sw.Elapsed, $"{ingest.ConsumedSourceRelatives.Count} stories");
         }
     }
 
@@ -465,11 +511,20 @@ public sealed class SiteGenerator
         reporter?.EndPhase(GenerationPhase.GitInsights);
     }
 
-    private List<GenerationEvent> GenerateEpicsInternal(
+    /// <summary>Renders every epics-phase page (epics.html, requirements pages, per-epic and per-story pages)
+    /// from the adapter-ingested models — the render half of what used to be one inline parse+render pass in
+    /// this class. Every templater call and write target is unchanged (AC #1: template and page generators
+    /// remain framework-agnostic); only where the models come from moved. Note the per-story artifact
+    /// FRAGMENT extraction (task list, blurb/remainder split, AC/dev-record sections) deliberately stays in
+    /// this render loop: those calls produce page-shaped HTML fragments on demand, and re-seating them is a
+    /// contract question for Story 4.2/6.1, not this seam. [Story 4.1]</summary>
+    private List<GenerationEvent> RenderEpicsPages(
         string epicsFullPath,
         List<string> files,
         IReadOnlyDictionary<string, string> artifactMap,
-        HashSet<string> consumedArtifacts,
+        EpicsModel model,
+        RequirementsModel requirements,
+        ProgressModel progress,
         SiteNav nav)
     {
         var events = new List<GenerationEvent>();
@@ -478,36 +533,6 @@ public sealed class SiteGenerator
 
         try
         {
-            var raw = MarkdownConverter.ReadAllTextShared(epicsFullPath);
-            var model = EpicsParser.Parse(raw);
-
-            foreach (var epic in model.Epics)
-            {
-                foreach (var story in epic.Stories)
-                {
-                    if (artifactMap.TryGetValue(story.Id, out var artifactFullPath))
-                    {
-                        story.ArtifactOutputPath = $"epics/story-{story.Id.Replace('.', '-')}.html";
-                        story.ArtifactSourcePath = PathUtil.NormalizeSlashes(ToSourceRelative(artifactFullPath));
-                        consumedArtifacts.Add(ToSourceRelative(artifactFullPath));
-                    }
-                }
-            }
-
-            // Computed after artifacts are resolved (above) so task counts land on each StoryInfo before
-            // any page renders. Git is invoked once here, not per-page.
-            var gitPulse = GitMetrics.TryCompute(_options.RepoRoot);
-            // Deep git analytics are strictly opt-in: when the flag is off this ternary short-circuits so
-            // TryComputeDeep — and its extra git process — never runs, and baseline generation timing cannot
-            // regress. That gate IS the FR-10 performance guarantee (AC #1). [Story 3.2]
-            var deepGit = _options.DeepGitAnalytics ? GitMetrics.TryComputeDeep(_options.RepoRoot) : null;
-            var progress = ProgressCalculator.Compute(model, artifactMap, gitPulse, deepGit);
-            _epicsModel = model;
-            _progress = progress;
-            // Requirements come from the same epics.md and roll their progress up from the epics above,
-            // so they're parsed here and cached before any page is linkified against them.
-            var requirements = RequirementsParser.Parse(raw, model, progress);
-            _requirements = requirements;
             var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
             var referenceMap = BuildReferenceMap(files, model, artifactMap, PathUtil.NormalizeSlashes(epicsSourceRelative));
 
@@ -635,21 +660,40 @@ public sealed class SiteGenerator
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
-    /// <summary>Parses the retrospective notes into <see cref="_retros"/> (ordered by epic, then filename) so
-    /// <see cref="EpicRetroMap"/> is available to the epic/story pages and the sprint/home surfaces. Parse only —
-    /// the dedicated pages are written later by <see cref="RenderRetroPages"/>. [Story 2.3 retro pages]</summary>
-    private void ParseRetros(IReadOnlyList<string> retroFiles)
+    /// <summary>The projection-side enrichment handed to the adapter (see <see cref="ProgressProjection"/>):
+    /// task/story roll-ups plus the git pulse, computed on the freshly ingested epics model. Kept in the
+    /// generator — never the adapter — so insight enrichment stays additive and non-blocking (AD-4).
+    /// Git is invoked once per ingest, not per-page. [Story 4.1]</summary>
+    private ProgressModel ComputeProgress(EpicsModel model, IReadOnlyDictionary<string, string> artifactsById)
     {
-        var retros = new List<RetroModel>();
-        foreach (var file in retroFiles)
-        {
-            var sourceRel = ToSourceRelative(file);
-            var outputRel = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(sourceRel));
-            retros.Add(RetroParser.Parse(file, sourceRel, outputRel));
-        }
-        _retros = retros.OrderBy(r => r.EpicNumber).ThenBy(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+        var gitPulse = GitMetrics.TryCompute(_options.RepoRoot);
+        // Deep git analytics are strictly opt-in: when the flag is off this ternary short-circuits so
+        // TryComputeDeep — and its extra git process — never runs, and baseline generation timing cannot
+        // regress. That gate IS the FR-10 performance guarantee (AC #1). [Story 3.2]
+        var deepGit = _options.DeepGitAnalytics ? GitMetrics.TryComputeDeep(_options.RepoRoot) : null;
+        return ProgressCalculator.Compute(model, artifactsById, gitPulse, deepGit);
+    }
+
+    /// <summary>Surfaces adapter diagnostics on the existing event/reporter channel: malformed artifacts and
+    /// ingest errors report as <see cref="GenerationOutcome.Error"/> (exactly how per-file parse failures
+    /// always reported), unsupported/skipped shapes as <see cref="GenerationOutcome.Skipped"/>. Always
+    /// non-fatal — the run has already continued past whatever these describe (AC #2). [Story 4.1]</summary>
+    private static IEnumerable<GenerationEvent> MapDiagnostics(IReadOnlyList<AdapterDiagnostic> diagnostics) =>
+        diagnostics.Select(d => new GenerationEvent(
+            d.Category is AdapterDiagnosticCategory.Malformed or AdapterDiagnosticCategory.Error
+                ? GenerationOutcome.Error
+                : GenerationOutcome.Skipped,
+            d.RelativePath, TimeSpan.Zero, d.Message));
+
+    /// <summary>Caches the adapter-ingested retros (already ordered by epic, then filename) so
+    /// <see cref="EpicRetroMap"/> is available to the epic/story pages and the sprint/home surfaces. The
+    /// dedicated pages are written later by <see cref="RenderRetroPages"/>. [Story 2.3 retro pages; ingest
+    /// moved behind the adapter in Story 4.1]</summary>
+    private void SetRetros(IReadOnlyList<RetroModel> retros)
+    {
+        _retros = retros.ToList();
         // Computed once here rather than on every access (EpicRetroMap used to be a computed property
-        // re-grouping all retros on every epic in the GenerateEpicsInternal loop). [Story 2.3 review]
+        // re-grouping all retros on every epic in the epics render loop). [Story 2.3 review]
         _epicRetroMap = _retros.GroupBy(r => r.EpicNumber)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).First().OutputRelativePath);
     }
@@ -670,20 +714,10 @@ public sealed class SiteGenerator
     }
 
     /// <summary>Maps an epic number to the output path of its (latest, by filename) retrospective page — the
-    /// link target for an open action item tagged with that epic. Computed once in <see cref="ParseRetros"/>.
+    /// link target for an open action item tagged with that epic. Computed once in <see cref="SetRetros"/>.
     /// [Story 2.3 retro pages]</summary>
     private IReadOnlyDictionary<int, string> _epicRetroMap = new Dictionary<int, string>();
     private IReadOnlyDictionary<int, string> EpicRetroMap => _epicRetroMap;
-
-    /// <summary>Path to the sprint tracking file — located by well-known name anywhere under
-    /// <see cref="ForgeOptions.SourceRoot"/> (it is a <c>.yaml</c>, so it is NOT in the <c>*.md</c> source
-    /// enumeration). Null when absent, which drives full graceful omission. [Story 2.3 Task 1]</summary>
-    private string? SprintSourcePath =>
-        Directory.Exists(_options.SourceRoot)
-            ? Directory.EnumerateFiles(_options.SourceRoot, "sprint-status.yaml", SearchOption.AllDirectories)
-                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault()
-            : null;
 
     /// <summary>True once the sprint tracking file parsed into usable data — the single signal the sprint
     /// page, home widget, and nav item all gate on (a present-but-malformed file parses to null and omits
@@ -1023,7 +1057,7 @@ public sealed class SiteGenerator
     }
 
     /// <summary>Discovers <c>.memlog.md</c> journals (dotfiles, so excluded from the <c>*.md</c> source
-    /// enumeration — scanned separately like <see cref="SprintSourcePath"/>), reads each one's
+    /// enumeration — scanned separately, like the adapter's sprint-file discovery), reads each one's
     /// <c>updated:</c> date, and associates it with the family whose canonical file sits in the closest
     /// ancestor directory (longest matching memlog dir wins). Strictly additive: no memlogs → an empty map, so
     /// every family's primary Present/LastModified value is unchanged (AC #2). [Story 3.3 Subtask 2.3]</summary>
@@ -1096,30 +1130,6 @@ public sealed class SiteGenerator
         if (!m.Success) return null;
         var status = MarkdownLinkPattern.Replace(m.Groups["status"].Value, "${text}").Trim();
         return status.Length == 0 ? null : status;
-    }
-
-    private static string? FindEpicsSourceFile(IEnumerable<string> files) =>
-        files.FirstOrDefault(f => string.Equals(Path.GetFileName(f), "epics.md", StringComparison.OrdinalIgnoreCase));
-
-    private static Dictionary<string, string> BuildArtifactMap(IEnumerable<string> files)
-    {
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var path in files)
-        {
-            var parentDir = Path.GetFileName(Path.GetDirectoryName(path) ?? string.Empty);
-            if (!string.Equals(parentDir, "implementation-artifacts", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var name = Path.GetFileNameWithoutExtension(path);
-            var m = ArtifactFilenamePattern.Match(name);
-            if (!m.Success) continue;
-
-            var key = $"{int.Parse(m.Groups["epic"].Value)}.{int.Parse(m.Groups["story"].Value)}";
-            map[key] = path;
-        }
-        return map;
     }
 
     /// <summary>Maps every known source path (normalized, "_bmad-output/"-relative) to the URL its content
@@ -1233,12 +1243,7 @@ public sealed class SiteGenerator
     private string ToSourceRelative(string fullPath) =>
         Path.GetRelativePath(_options.SourceRoot, fullPath);
 
-    private static bool IsIgnored(string path)
-    {
-        var name = Path.GetFileName(path);
-        return name.StartsWith("~$", StringComparison.Ordinal)
-            || name.StartsWith('.')
-            || name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
-            || name.EndsWith(".crswap", StringComparison.OrdinalIgnoreCase);
-    }
+    // The predicate itself moved to PathUtil so the framework adapters share it (ignored files are neither
+    // rendered nor reported as unsupported, wherever discovery happens). [Story 4.1]
+    private static bool IsIgnored(string path) => PathUtil.IsIgnoredSourceFile(path);
 }

@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-09T23:00:00-04:00
+last_updated: 2026-07-10T00:30:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -77,13 +77,14 @@ development_status:
   epic-3-retrospective: done
 
   epic-4: in-progress
-  4-1-shared-framework-adapter-contract-and-projection-path: ready-for-dev
-  4-2-decouple-rendering-from-personal-project-structure-assumptions: backlog
+  4-1-shared-framework-adapter-contract-and-projection-path: review
+  4-2-decouple-rendering-from-personal-project-structure-assumptions: ready-for-dev
   4-3-spec-kit-baseline-adapter-coverage: backlog
   4-4-gsd-and-gsd-pi-baseline-adapter-coverage: backlog
   4-5-specflow-baseline-adapter-coverage: backlog
   4-6-squad-baseline-adapter-coverage: backlog
   4-7-superpowers-baseline-adapter-coverage: backlog
+  4-8-generation-diagnostics-and-configuration-log-page: backlog # spun out of 4.2 (2026-07-10)
   epic-4-retrospective: optional
 
   epic-5: in-progress
