@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: 2026-07-09T00:00:00-04:00
+# last_updated: 2026-07-10T00:00:00-04:00
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-10T14:00:00-04:00
+last_updated: 2026-07-10T18:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -77,9 +77,9 @@ development_status:
   epic-3-retrospective: done
 
   epic-4: in-progress
-  4-1-shared-framework-adapter-contract-and-projection-path: review
-  4-2-decouple-rendering-from-personal-project-structure-assumptions: review
-  4-8-generation-diagnostics-and-configuration-log-page: review # spun out of 4.2 (2026-07-10)
+  4-1-shared-framework-adapter-contract-and-projection-path: done
+  4-2-decouple-rendering-from-personal-project-structure-assumptions: done # code review passed 2026-07-10
+  4-8-generation-diagnostics-and-configuration-log-page: done # spun out of 4.2 (2026-07-10); code review passed 2026-07-10
   epic-4-retrospective: optional
   # Stories 4.3–4.7 (per-framework coverage) relocated 2026-07-10 to spike-led Epics 11–15 (append-only, no renumber)
 
@@ -90,8 +90,8 @@ development_status:
   5-4-oss-onboarding-and-reference-documentation: backlog
   epic-5-retrospective: optional
 
-  epic-6: backlog
-  6-1-shared-view-model-contract-for-html-and-webview-adapters: backlog
+  epic-6: in-progress
+  6-1-shared-view-model-contract-for-html-and-webview-adapters: ready-for-dev
   6-2-read-only-vs-code-dashboard-and-epics-experience: backlog
   6-3-host-aware-theming-and-explicit-helper-actions: backlog
   epic-6-retrospective: optional

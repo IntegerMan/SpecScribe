@@ -225,7 +225,14 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
             var m = ArtifactFilenamePattern.Match(name);
             if (!m.Success) continue;
 
-            var key = $"{int.Parse(m.Groups["epic"].Value)}.{int.Parse(m.Groups["story"].Value)}";
+            // TryParse, not Parse: an absurdly long digit run (still matched by the unbounded \d+ pattern)
+            // would otherwise throw OverflowException and abort the whole ingest, breaking this adapter's
+            // NEVER-throws contract — the same hardening SprintStatusParser already applies to its numeric
+            // keys ([Story 2.3 review]); a non-parseable name simply isn't a story artifact. [Story 4.1 review]
+            if (!int.TryParse(m.Groups["epic"].Value, out var epicNum) ||
+                !int.TryParse(m.Groups["story"].Value, out var storyNum)) continue;
+
+            var key = $"{epicNum}.{storyNum}";
             map[key] = path;
         }
         return map;

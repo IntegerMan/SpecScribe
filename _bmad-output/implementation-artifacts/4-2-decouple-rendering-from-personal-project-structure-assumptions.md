@@ -4,7 +4,7 @@ baseline_commit: 04aba3246b2906b80e06182263944f50cef42e53
 
 # Story 4.2: Decouple Rendering from Personal Project-Structure Assumptions
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -206,6 +206,18 @@ Claude Fable 5 (claude-fable-5) via Claude Code, 2026-07-10
 - `tests/SpecScribe.Tests/BmadArtifactAdapterTests.cs` — modified: 1 new nested implementation-artifacts ingest test
 - `tests/SpecScribe.Tests/WorkInventoryTests.cs` — modified: 1 new nested classification test
 - `tests/SpecScribe.Tests/ArtifactCoverageTests.cs` — modified: 1 new nested Stories-family test
+
+### Review Findings
+
+- [x] [Review][Patch] Non-record markdown files in the ADR directory become home-index cards — `IsAdrRecordFile` ([SiteGenerator.cs:475-485](../../src/SpecScribe/SiteGenerator.cs)) only excludes `README.md` and stems `template`/`adr-template`; any other `.md` file dropped into the ADR folder (notes, glossary, a differently-named template like `0000-template.md`) is now treated as a decision record. **Owner decision (2026-07-10): tighten the exclusion list** — widen template-alias detection (e.g. any stem matching `template` with optional leading/trailing separators, such as `0000-template`, `adr_template`) rather than leaving arbitrary non-record docs to card.
+- [x] [Review][Patch] ADR page's own status pill ignores the bold-line/MADR-heading conventions [HtmlTemplater.cs:36, SiteGenerator.cs:1243] — `RenderPage` calls `AppendStatusPill(main, doc.Frontmatter.Status)` directly, bypassing the tolerant `ExtractAdrStatus` used for index cards. An ADR authored with `**Status:**` or a `## Status` heading shows status on its index card but never on its own page — undercuts AC #2's "recognized decision records still render with title, status, and links where derivable." Fix: compute status once via `ExtractAdrStatus` and thread it into the page render instead of reading frontmatter only.
+- [x] [Review][Patch] Home-index "Implementation Artifacts" band is not location-tolerant like the rest of Task 4 [HtmlTemplater.cs:151-153, BmadArtifactAdapter.cs:35-41] — `RenderIndex` matches `groupPrefix` via an exact top-level `StartsWith`, while `IsUnderImplementationArtifacts` (used by `WorkInventory`/`ArtifactCoverage`/`SiteGenerator`) matches any ancestor segment. A nested `tracking/implementation-artifacts/1-1-x.md` classifies correctly as a story artifact everywhere else but lands in a generic "Tracking" band on the home index instead of "Implementation Artifacts," and trips a spurious "unrecognized top-level folder" diagnostic for a layout the story otherwise explicitly supports. Fix: match this group using the same ancestor-tolerant check.
+- [x] [Review][Patch] ADR fallback probe matches on ANY markdown presence, not decision-record content [ForgeOptions.cs:156-169] — `HasMarkdownWithinOneLevel` only checks "some `.md` file exists," so an unrelated `docs/decisions/` folder (meeting notes, etc.) can win the probe ahead of the real `adr/` folder later in the list; the method's own doc comment ("a docs/ full of prose can't be swallowed as ADRs") isn't actually enforced. Low real-world likelihood given the story's "detect, don't configure" principle, but worth a light content heuristic or comment correction.
+- [x] [Review][Patch] MADR `## Status` heading parser can capture a decorative first line as status text [SiteGenerator.cs:1251-1262] — e.g. a horizontal rule `---` right after the heading becomes the literal status value; no filter for separator-only lines.
+- [x] [Review][Patch] `CleanAdrStatus` doesn't strip underscore-italic markdown [SiteGenerator.cs:1269] — only trims `*`, so a status written as `_Proposed_` renders with literal underscores in the badge.
+- [x] [Review][Patch] `HumanizeFolderName` can produce an empty band title [HtmlTemplater.cs:217-223] — an unrecognized top-level folder made up solely of separator characters (e.g. `___`) collapses to an empty string after word-splitting, contradicting the "never an incoherent/unlabeled band" degradation contract. Needs a fallback to the raw folder name when no words survive.
+- [x] [Review][Defer] `AdrLinkRewriter`'s `rootPrefix`/`climbToAdrRoot` arithmetic only holds for the current one-level-deep ADR recursion bound, with no guard if that bound is ever loosened [AdrLinkRewriter.cs:50-54] — deferred, pre-existing design tradeoff intentional and tested for today's scope; revisit if ADR nesting depth is ever increased.
+- [x] [Review][Defer] Diagnostic-severity bucketing conflates benign "unrecognized top-level folder" notices with genuine anomalies under the same `Skipped` outcome [SiteGenerator.cs UnrecognizedTopLevelFolders] — deferred, pre-existing scope boundary; likely to be revisited when Story 4.8 designs the diagnostics page's presentation/severity, not a 4.2 fix.
 
 ## Change Log
 

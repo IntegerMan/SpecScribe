@@ -46,13 +46,14 @@ public sealed record DiagnosticNotice(string Category, string SourcePath, string
 
     /// <summary>Recovers the fine ingest category from the <c>[Category] …</c> prefix
     /// <see cref="SiteGenerator.MapDiagnostics"/> adds, so the four-category ingest vocabulary survives the
-    /// coarse two-outcome collapse. Only strips the prefix when the bracketed word is EXACTLY a known
-    /// <see cref="AdapterDiagnosticCategory"/> name — so an exception message that merely happens to start with
-    /// <c>[</c> is left intact and simply falls back to its coarse <see cref="GenerationOutcome"/> word. [Story 4.8 Task 2]</summary>
+    /// coarse two-outcome collapse. Only attempted when <see cref="GenerationEvent.FromAdapterDiagnostic"/> is
+    /// set — i.e. the event is known to have come from <c>MapDiagnostics</c> — so a render-time exception
+    /// message that merely happens to start with a matching <c>[Word]</c> shape is never misread as a category
+    /// tag. [Story 4.8 Task 2] [Review][Patch]</summary>
     private static (string Category, string? Message) SplitCategory(GenerationEvent e)
     {
         var msg = e.Message;
-        if (msg is { Length: > 2 } && msg[0] == '[')
+        if (e.FromAdapterDiagnostic && msg is { Length: > 2 } && msg[0] == '[')
         {
             var close = msg.IndexOf(']');
             if (close > 1)
@@ -116,7 +117,11 @@ public sealed record DiagnosticsConfig
         var rel = Path.GetRelativePath(repoRoot, path);
         // GetRelativePath returns the input verbatim (absolute) when there's no shared root, and a "../"-led
         // path when the target sits above/aside the repo — in either case the absolute path reads clearer.
-        if (Path.IsPathRooted(rel) || rel.StartsWith("..", StringComparison.Ordinal))
+        // Checked as a full leading path segment (not a bare string prefix) so a real child folder whose name
+        // happens to start with ".." (e.g. "..cache") isn't mistaken for an escape above the repo root.
+        // [Review][Patch]
+        if (Path.IsPathRooted(rel) || rel == ".." || rel.StartsWith(".." + Path.DirectorySeparatorChar)
+            || rel.StartsWith(".." + Path.AltDirectorySeparatorChar))
         {
             return PathUtil.NormalizeSlashes(path);
         }

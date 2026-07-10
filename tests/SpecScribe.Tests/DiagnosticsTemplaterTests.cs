@@ -100,9 +100,11 @@ public class DiagnosticsTemplaterTests
         var events = new[]
         {
             new GenerationEvent(GenerationOutcome.Generated, "index.html", TimeSpan.Zero),                             // filtered out
-            new GenerationEvent(GenerationOutcome.Skipped, "impl/sprint-status.yaml", TimeSpan.Zero, "[Unsupported] no development_status map"),
-            new GenerationEvent(GenerationOutcome.Error, "adrs/0001.md", TimeSpan.Zero, "[Malformed] boom"),
-            new GenerationEvent(GenerationOutcome.Error, "x.md", TimeSpan.Zero, "raw exception text"),                  // no prefix → coarse "Error"
+            new GenerationEvent(GenerationOutcome.Skipped, "impl/sprint-status.yaml", TimeSpan.Zero, "[Unsupported] no development_status map", FromAdapterDiagnostic: true),
+            new GenerationEvent(GenerationOutcome.Error, "adrs/0001.md", TimeSpan.Zero, "[Malformed] boom", FromAdapterDiagnostic: true),
+            // Same bracket shape as an adapter diagnostic, but NOT flagged as one — a render-time exception
+            // that happens to look like a category tag must never be misread as one. [Review][Patch]
+            new GenerationEvent(GenerationOutcome.Error, "x.md", TimeSpan.Zero, "[Error] raw exception text"),
             new GenerationEvent(GenerationOutcome.Skipped, "y.md", TimeSpan.Zero, null),                               // null msg → coarse "Skipped"
         };
 
@@ -114,9 +116,11 @@ public class DiagnosticsTemplaterTests
         Assert.Equal(DiagnosticSeverity.Warning, notices[0].Severity);
         Assert.Equal("Malformed", notices[1].Category);
         Assert.Equal(DiagnosticSeverity.Error, notices[1].Severity);
-        // A render-time error message that isn't a known-category prefix is left intact under the coarse word.
+        // A render-time error message is never bracket-parsed (not FromAdapterDiagnostic), even when it
+        // coincidentally starts with a matching [Category] shape — the whole message is left intact under
+        // the coarse outcome word. [Review][Patch]
         Assert.Equal("Error", notices[2].Category);
-        Assert.Equal("raw exception text", notices[2].Message);
+        Assert.Equal("[Error] raw exception text", notices[2].Message);
         Assert.Equal("Skipped", notices[3].Category);
         Assert.Null(notices[3].Message);
     }

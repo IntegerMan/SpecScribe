@@ -4,7 +4,7 @@ baseline_commit: f6c58b0722a591353a7ad13ea9d7d8676deef8d7
 
 # Story 4.1: Shared Framework Adapter Contract and Projection Path
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -79,6 +79,19 @@ This is the **foundational contract** for all of Epic 4 (Stories 4.3–4.7 each 
 - [x] **Task 6 — Verify baseline unchanged end-to-end** (AC: #1, #2)
   - [x] Run `dotnet test` (whole suite green — 39 existing test files must still pass unchanged; if any existing assertion must change, that's a signal you altered rendered output — stop and reconsider).
   - [x] Generate this repo's own site and diff the output tree against a pre-change build: **zero diffs** expected. Output dir is `SpecScribeOutput` (NOT `docs/live`; see Project Structure Notes).
+
+### Review Findings
+
+_Adversarial code review 2026-07-10 (Blind Hunter + Edge Case Hunter + Acceptance Auditor, Opus 4.8). Scope: commit `143bb98` (the 8 files in this story's File List). 3 review layers, all completed. AC #1 & AC #2 verified met; scope discipline held; byte-parity of the happy path traced and confirmed._
+
+- [x] [Review][Patch] Golden regression is a filename-inventory check, not the byte-for-byte content guard Task 5 promised — `SiteGeneratorAdapterTests.GenerateAll_GoldenOutputInventory_IsExactlyThePreAdapterPageSet` asserts only the SET of output file paths + absence of Error events. A rendered-page CONTENT drift (risk center #2, "output drift") keeps the same filenames and passes CI. The true byte-for-byte diff was performed manually at implementation (Debug Log: 0 diffs across two configs) but is not pinned in the suite — so this story's own "single most important test" has no automated guard, on the foundational contract five later stories build on. **Resolution (2026-07-10): convert to patch — add a normalized-content assertion, normalizing the 3 known-varying tokens (footer clock, `?v=` cache-bust, CRLF).** [tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:116]
+- [x] [Review][Patch] `BuildArtifactMap` uses `int.Parse`, which throws `OverflowException` on an oversized epic/story number in a story-artifact filename (e.g. `99999999999-1-x.md`), escaping the adapter's newly-declared "NEVER throws for a bad artifact" contract and aborting `GenerateAll`/`RegenerateEpics`. Pre-existing (carried verbatim from the old `SiteGenerator.BuildArtifactMap`), but the sibling `SprintStatusParser` already hardened the identical bug via `TryParse` in Story 2.3. Fix: mirror that pattern (`int.TryParse` + skip). [src/SpecScribe/BmadArtifactAdapter.cs:228]
+
+**Both patches applied 2026-07-10 (review), full suite green (633 tests):**
+- `BmadArtifactAdapter.BuildArtifactMap` → `int.TryParse` + skip; new regression test `IngestEpics_OversizedArtifactNumber_DoesNotThrowAndIsSkipped`.
+- New `SiteGeneratorAdapterTests.GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens` — SHA-256 over the full normalized output tree (neutralizes footer clock, `?v=` cache-bust, CRLF, product version, and the absolute fixture root so it is CI-portable). Verified deterministic across runs and a forced rebuild before pinning; pinned hash `157930f4…`. This is the persistent in-suite byte-content guard Task 5 called for.
+
+**Dismissed as by-design after reading the code (recorded for traceability):** sprint I/O-vs-malformed diagnostic categorization (parser deliberately erases the distinction; message accurate — convergent across all 3 layers but info-asymmetry); `IngestSprint` throw-on-genuine-parser-bug (intended, matches pre-diff); throwing-retro-no-longer-aborts (that IS AC #2); `AppliesTo` unused param / not consulted by generator (documented 4.3+ contract); dead `progress is not null` render clause + `RegenerateEpics` module comment (harmless, no runtime effect); README↔retro ordering latent invariant (inert today).
 
 ## Dev Notes
 

@@ -291,4 +291,20 @@ public class BmadArtifactAdapterTests : IDisposable
         Assert.Single(bundle.Retros);
         Assert.DoesNotContain(bundle.ConsumedSourceRelatives, p => p.Contains("~$") || Path.GetFileName(p).StartsWith('.'));
     }
+
+    [Fact]
+    public void IngestEpics_OversizedArtifactNumber_DoesNotThrowAndIsSkipped()
+    {
+        // A story-artifact filename whose numeric group overflows Int32 (the unbounded \d+ pattern still
+        // matches it). BuildArtifactMap must TryParse-and-skip, honoring the adapter's NEVER-throws contract,
+        // rather than crashing the whole ingest with OverflowException. [Story 4.1 review]
+        File.WriteAllText(
+            Path.Combine(Source, "implementation-artifacts", "99999999999-1-overflow.md"), "# Overflow\n");
+
+        var ingest = new BmadArtifactAdapter().IngestEpics(Options(), SourceFiles(), Project);
+
+        // The valid artifact still resolves; the oversized one is simply absent, no diagnostic, no throw.
+        Assert.True(ingest.StoryArtifactsById.ContainsKey("1.1"));
+        Assert.DoesNotContain(ingest.StoryArtifactsById.Values, v => v.Contains("overflow"));
+    }
 }

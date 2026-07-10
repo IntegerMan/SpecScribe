@@ -7,7 +7,11 @@ namespace SpecScribe;
 
 public enum GenerationOutcome { Generated, Updated, Removed, Skipped, Error }
 
-public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativePath, TimeSpan Elapsed, string? Message = null);
+/// <param name="FromAdapterDiagnostic">True only for events produced by <see cref="SiteGenerator.MapDiagnostics"/>
+/// — the provenance <see cref="DiagnosticNotice.FromEvents"/> checks before trusting a leading
+/// <c>[Category]</c> token in <paramref name="Message"/> as a real category tag, rather than sniffing arbitrary
+/// message text (which could coincidentally start with the same bracket shape). [Review][Patch]</param>
+public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativePath, TimeSpan Elapsed, string? Message = null, bool FromAdapterDiagnostic = false);
 
 /// <summary>Owns the mapping from _bmad-output/*.md to SpecScribeOutput/*.html, and keeps the generated index,
 /// nav, and epics/story pages in sync.</summary>
@@ -418,12 +422,36 @@ public sealed class SiteGenerator
             {
                 var raw = MarkdownConverter.ReadAllTextShared(file);
                 var parsed = MarkdownConverter.Convert(file, sourceRelative, outputRelative);
+                var isRecord = IsAdrRecordFile(relativeToRoot);
+
+                // Computed once, record files only, so the record's own page and its home-index card agree —
+                // both derive status from the same three tolerated shapes (bold line / MADR heading /
+                // frontmatter) rather than the page reading frontmatter alone. Non-record files (README,
+                // template) keep their parsed frontmatter untouched — they were never eligible for a status
+                // badge and a coincidental "**Status:**" line in prose shouldn't grant them one. [Review][Patch]
+                var tolerantStatus = isRecord ? ExtractAdrStatus(raw, parsed.Frontmatter) : parsed.Frontmatter.Status;
+                var frontmatter = tolerantStatus == parsed.Frontmatter.Status
+                    ? parsed.Frontmatter
+                    : new Frontmatter
+                    {
+                        Title = parsed.Frontmatter.Title,
+                        Project = parsed.Frontmatter.Project,
+                        Date = parsed.Frontmatter.Date,
+                        Author = parsed.Frontmatter.Author,
+                        Version = parsed.Frontmatter.Version,
+                        Status = tolerantStatus,
+                        Route = parsed.Frontmatter.Route,
+                        Type = parsed.Frontmatter.Type,
+                        Id = parsed.Frontmatter.Id,
+                        Companions = parsed.Frontmatter.Companions,
+                        Sources = parsed.Frontmatter.Sources,
+                    };
                 var doc = new DocModel
                 {
                     SourceRelativePath = parsed.SourceRelativePath,
                     OutputRelativePath = parsed.OutputRelativePath,
                     Title = parsed.Title,
-                    Frontmatter = parsed.Frontmatter,
+                    Frontmatter = frontmatter,
                     BodyHtml = AdrLinkRewriter.Rewrite(parsed.BodyHtml, PathUtil.RelativePrefix(outputRelative)),
                     Headings = parsed.Headings,
                     HasMermaid = parsed.HasMermaid,
@@ -433,10 +461,10 @@ public sealed class SiteGenerator
                 Directory.CreateDirectory(Path.GetDirectoryName(outputFullPath)!);
                 File.WriteAllText(outputFullPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
 
-                if (IsAdrRecordFile(relativeToRoot))
+                if (isRecord)
                 {
                     var number = ParseAdrNumber(fileName);
-                    entries.Add(new AdrEntry(doc.Title, outputRelative, sourceRelative, ExtractAdrStatus(raw, parsed.Frontmatter), number));
+                    entries.Add(new AdrEntry(doc.Title, outputRelative, sourceRelative, tolerantStatus, number));
                     if (number is null)
                     {
                         // The unnumbered shape is tolerated, not silent: one categorized non-fatal notice on
@@ -468,6 +496,11 @@ public sealed class SiteGenerator
         return events;
     }
 
+    // Matches common ADR template-scaffolding stems: "template", "adr-template"/"adr_template", and a
+    // numbered variant like "0000-template" — an optional leading digits+separator, an optional "adr"
+    // token+separator, then "template". [Review][Patch]
+    private static readonly Regex AdrTemplateStemPattern = new(@"^(?:\d+[-_])?(?:adr[-_])?template$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     /// <summary>True when an ADR-tree file (path relative to the ADR root) is a decision RECORD — i.e. a card
     /// on the home index and a hit for the <see cref="AdrsExist"/> nav gate. READMEs (landing/index prose at
     /// any depth) and template scaffolding files still render as pages so cross-links resolve, but are never
@@ -480,8 +513,7 @@ public sealed class SiteGenerator
         }
 
         var stem = Path.GetFileNameWithoutExtension(relativeToRoot);
-        return !string.Equals(stem, "template", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(stem, "adr-template", StringComparison.OrdinalIgnoreCase);
+        return !AdrTemplateStemPattern.IsMatch(stem);
     }
 
     /// <summary>Emits one <c>commits/{yyyy-MM-dd}.html</c> page per linked day (the exact set the heatmap
@@ -740,24 +772,34 @@ public sealed class SiteGenerator
             d.Category is AdapterDiagnosticCategory.Malformed or AdapterDiagnosticCategory.Error
                 ? GenerationOutcome.Error
                 : GenerationOutcome.Skipped,
-            d.RelativePath, TimeSpan.Zero, $"[{d.Category}] {d.Message}"));
+            d.RelativePath, TimeSpan.Zero, $"[{d.Category}] {d.Message}", FromAdapterDiagnostic: true));
 
     /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per top-level source folder
     /// outside the well-known home-index set — the "unrecognized structure degrades, visibly" half of the
     /// grouping contract. Derived from the source tree (not the rendered bands) so a folder whose docs were
-    /// all consumed into dedicated surfaces still reports its unrecognized shape once. [Story 4.2 Task 5]</summary>
-    private static IReadOnlyList<AdapterDiagnostic> UnrecognizedTopLevelFolders(IReadOnlyList<string> sourceRelatives) =>
-        sourceRelatives
-            .Select(PathUtil.NormalizeSlashes)
+    /// all consumed into dedicated surfaces still reports its unrecognized shape once. A top-level folder
+    /// whose files are ENTIRELY under a nested implementation-artifacts segment (e.g.
+    /// <c>tracking/implementation-artifacts/1-1-x.md</c>) is excluded: those docs land in the known
+    /// Implementation Artifacts band (see <see cref="HtmlTemplater.RenderIndex"/>'s ancestor-tolerant match),
+    /// so flagging the wrapper folder as "unrecognized" would contradict Task 4's location tolerance and the
+    /// notice's own claim that the docs "render in their own home-index section." [Story 4.2 Task 5] [Review][Patch]</summary>
+    private static IReadOnlyList<AdapterDiagnostic> UnrecognizedTopLevelFolders(IReadOnlyList<string> sourceRelatives)
+    {
+        var normalized = sourceRelatives.Select(PathUtil.NormalizeSlashes).ToList();
+        return normalized
             .Where(p => p.Contains('/'))
             .Select(p => p[..p.IndexOf('/')])
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(f => !HtmlTemplater.IsWellKnownTopLevelFolder(f))
+            .Where(f => !normalized
+                .Where(p => p.StartsWith(f + "/", StringComparison.OrdinalIgnoreCase))
+                .All(BmadArtifactAdapter.IsUnderImplementationArtifacts))
             .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .Select(f => new AdapterDiagnostic(
                 AdapterDiagnosticCategory.Unsupported, f + "/",
                 "unrecognized top-level folder; its documents render in their own home-index section"))
             .ToList();
+    }
 
     /// <summary>Caches the adapter-ingested retros (already ordered by epic, then filename) so
     /// <see cref="EpicRetroMap"/> is available to the epic/story pages and the sprint/home surfaces. The
@@ -1256,6 +1298,7 @@ public sealed class SiteGenerator
                 var trimmed = line.Trim();
                 if (trimmed.Length == 0) continue;
                 if (trimmed.StartsWith('#')) break; // empty Status section — fall through to frontmatter
+                if (IsDecorativeLine(trimmed)) continue; // e.g. a "---" rule right under the heading
                 if (CleanAdrStatus(trimmed) is { } fromHeading) return fromHeading;
                 break;
             }
@@ -1264,9 +1307,15 @@ public sealed class SiteGenerator
         return frontmatter.Status is { Length: > 0 } fromFrontmatter ? CleanAdrStatus(fromFrontmatter) : null;
     }
 
+    /// <summary>True for a line made up solely of a single repeated markdown rule/separator character (e.g.
+    /// <c>---</c>, <c>***</c>, <c>___</c>) — never a genuine status value, so the MADR heading scan skips
+    /// past it rather than capturing it verbatim. [Review][Patch]</summary>
+    private static bool IsDecorativeLine(string trimmed) =>
+        trimmed.Length >= 3 && trimmed.Distinct().Count() == 1 && "-=*_".Contains(trimmed[0]);
+
     private static string? CleanAdrStatus(string value)
     {
-        var status = MarkdownLinkPattern.Replace(value, "${text}").Trim().Trim('*').Trim();
+        var status = MarkdownLinkPattern.Replace(value, "${text}").Trim().Trim('*', '_').Trim();
         return status.Length == 0 ? null : status;
     }
 

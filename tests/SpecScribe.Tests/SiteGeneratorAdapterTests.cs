@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -151,6 +154,63 @@ public class SiteGeneratorAdapterTests : IDisposable
         }.OrderBy(p => p, StringComparer.Ordinal).ToList();
 
         Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens()
+    {
+        // AC #1's real guarantee is byte-for-byte-unchanged RENDERED OUTPUT, not merely a matching file set:
+        // GoldenOutputInventory (above) pins the page SET, so a silent CONTENT drift that keeps filenames
+        // stable — risk center #2, the exact failure the manual implementation-time byte-diff guarded once but
+        // the suite did not — would sail through it. This pins the CONTENT: a SHA-256 over every output file,
+        // after neutralizing the only volatile tokens (the wall-clock footer, the ?v=<ModuleVersionId> asset
+        // cache-bust, CRLF, and the build-derived product version) — the same normalizations that diff used
+        // (memory: golden-diff-normalization-gotchas). Regenerate the constant ONLY as a deliberate, reviewed
+        // decision; an unexpected flip is a rendering regression. [Story 4.1 review]
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var fingerprint = FingerprintTree(Site);
+
+        const string expected = "157930f456480aecb396ce135ff2ee1d357f588ce713569985f0f71624355f7c";
+        Assert.True(
+            expected == fingerprint,
+            $"Rendered output content changed. If this was an intentional rendering change, update the constant "
+            + $"to:\n  {fingerprint}\nOtherwise this is an unexpected drift from the byte-parity baseline (AC #1).");
+    }
+
+    private static readonly Regex FooterClock = new(@"on \d{4}-\d{2}-\d{2} \d{2}:\d{2}", RegexOptions.Compiled);
+    private static readonly Regex AssetCacheBust = new(@"\?v=[0-9a-fA-F]+", RegexOptions.Compiled);
+    private static readonly Regex SubtitleVersion = new(@"SpecScribe v[^<]+", RegexOptions.Compiled);
+    private static readonly Regex VersionRow = new(@"(<dt>Version</dt><dd>)[^<]*(</dd>)", RegexOptions.Compiled);
+
+    /// <summary>SHA-256 over every output file's normalized content (path-prefixed, ordinal-sorted), so ANY
+    /// rendered-byte change flips one hash. Normalizes only per-run/per-build/per-machine noise, never artifact
+    /// content — so the constant is portable across machines and CI, not pinned to this box.</summary>
+    private string FingerprintTree(string root)
+    {
+        var sb = new StringBuilder();
+        foreach (var rel in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(root, p)))
+            .OrderBy(p => p, StringComparer.Ordinal))
+        {
+            sb.Append(rel).Append('\n')
+              .Append(NormalizeVolatile(File.ReadAllText(Path.Combine(root, rel)))).Append("\n \n");
+        }
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
+    }
+
+    private string NormalizeVolatile(string content)
+    {
+        content = content.Replace("\r\n", "\n");
+        // The diagnostics page prints the ABSOLUTE repo root (a random per-run temp dir, and machine-specific);
+        // fold every form of the fixture root to a placeholder so the golden pins rendered content, not the box.
+        content = content.Replace(PathUtil.NormalizeSlashes(_root), "<root>").Replace(_root, "<root>");
+        content = FooterClock.Replace(content, "on <ts>");
+        content = AssetCacheBust.Replace(content, "?v=<ver>");
+        content = SubtitleVersion.Replace(content, "SpecScribe v<ver>");
+        content = VersionRow.Replace(content, "$1<ver>$2");
+        return content;
     }
 
     [Fact]

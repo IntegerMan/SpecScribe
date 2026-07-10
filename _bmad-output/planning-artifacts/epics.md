@@ -828,15 +828,30 @@ As a VS Code user,
 I want an in-editor status surface for dashboard and epics,
 So that I can inspect project state without context-switching to a browser.
 
+<!-- 2026-07-10: AC #1 added to name the dashboard/epics page-BODY decomposition as an explicit
+     foundational task of this story, not an implicit consequence of AC #2. Story 6.1 delivers the
+     view-model contract + shared page CHROME (nav/breadcrumb/shell) but deliberately leaves page
+     bodies opaque; the dashboard + epics bodies are the only bodies a webview consumer renders, so
+     their decomposition into shared section view models lands HERE. Per the Epic 2 retro rule
+     ("split, don't absorb a new structural surface"), it is surfaced as its own AC/scope line so the
+     structural work is reviewed on its own terms rather than buried inside the runtime-webview ACs. -->
+
 **Acceptance Criteria:**
 
 1.
+**Given** Story 6.1's view-model contract carries page bodies as opaque payloads
+**When** the dashboard and epics surfaces are prepared for the webview
+**Then** the dashboard and epics page bodies are decomposed into shared, host-neutral section view models in the rendering core
+**And** the HTML adapter re-renders them byte-for-byte identically (parity harness green)
+**And** no other page body is decomposed (only the surfaces a webview consumer renders).
+
+2.
 **Given** the extension opens the status webview
 **When** project data is loaded
 **Then** dashboard and epics views display with the same core interaction-state semantics as HTML
 **And** in-editor navigation is responsive and readable.
 
-2.
+3.
 **Given** source artifacts change while the webview is open
 **When** host updates are pushed
 **Then** visible status refreshes in place without full panel reset

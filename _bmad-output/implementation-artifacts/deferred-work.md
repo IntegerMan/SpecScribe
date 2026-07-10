@@ -2,6 +2,11 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of story-4-8 (2026-07-10)
+
+- source_spec: `4-8-generation-diagnostics-and-configuration-log-page.md`
+- **`UnrecognizedTopLevelFolders`'s well-known-folder set omits `adrs`/`retros`.** `HtmlTemplater.KnownIndexGroups` (`src/SpecScribe/HtmlTemplater.cs:94-102`) lists only `""`/`planning-artifacts`/`specs`/`implementation-artifacts`. On any normally-laid-out BMad repo (ADRs under `docs/adrs`), every generation emits a persistent "unrecognized top-level folder" notice for the ADR directory — which Story 4.8's diagnostics page renders as a standing warning row, meaning the all-clear state Story 4.8's AC #1 promises may never actually be reachable on a real, fully-supported project layout. Root cause is entirely in sibling Story 4.2's code (tagged `[Story 4.2 Task 3/5]`, not part of 4.8's own File List). Add `adrs`/`retros` (and any other first-class, fully-rendered top-level folders) to `KnownIndexGroups`'s recognized set when Story 4.2 is next touched.
+
 ## Deferred from: code review of story-3-6 (2026-07-09)
 
 - source_spec: `3-6-refinement-funnel-on-the-dashboard.md`
@@ -117,3 +122,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-sprint-board-card-tooltip-html-corruption.md`
   summary: `RequirementLinkifier` (`src/SpecScribe/RequirementLinkifier.cs`) has the same attribute-corruption exposure that was just fixed in `StoryEpicLinkifier` — an FR/NFR mention sitting inside a non-anchor tag's attribute value (e.g. a tooltip or aria-label) would get a raw `<a>` injected into it, breaking the tag.
   evidence: `RequirementLinkifier.AnchorSplit` only protects `<a>…</a>` spans (`RequirementLinkifier.cs:13-15`), unlike the fixed `StoryEpicLinkifier.ProtectedSplit`, which now also skips every standalone tag so only real text nodes are scanned. Not caused by this change — pre-existing since the class was written — and not currently known to be triggered by any live template (no site content today puts "FR"/"NFR" text inside a non-anchor attribute), so it's latent rather than reproducible. Apply the same `<[^>]*>` catch-all alternative to `RequirementLinkifier.AnchorSplit` when that seam is next touched.
+
+## Deferred from: code review of story-4-2 (2026-07-10)
+
+- source_spec: `4-2-decouple-rendering-from-personal-project-structure-assumptions.md`
+- **`AdrLinkRewriter`'s `rootPrefix`/`climbToAdrRoot` arithmetic only holds for the current one-level-deep ADR recursion bound.** `src/SpecScribe/AdrLinkRewriter.cs:50-54` — `climbToAdrRoot = rootPrefix[..^"../".Length]` is correct only because `EnumerateAdrFiles` deliberately recurses exactly one level; there's no guard or assertion tying the two together. Intentional and tested for today's one-level scope (Task 1's explicit bound) — revisit if ADR nesting depth is ever increased beyond one level.
+- **Diagnostic-severity bucketing conflates benign "unrecognized top-level folder" notices with genuine anomalies under the same `Skipped` outcome.** `src/SpecScribe/SiteGenerator.cs` `UnrecognizedTopLevelFolders` — every non-well-known top-level folder (even a perfectly benign one like `assets/` or `design-notes/`) emits a `Skipped`-outcome diagnostic identical in bucket to a real anomaly (e.g. "epics.md not found"). Story 4.2's job was only to emit these notices onto the existing channel (Story 4.1's `AdapterDiagnostic`); how they're bucketed/prioritized for a human reader is Story 4.8's diagnostics-page domain. Revisit when 4.8 designs that page's presentation.

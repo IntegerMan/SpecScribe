@@ -39,6 +39,11 @@
   --status-done: var(--moss-light);    /* green — done ONLY */
   --status-deferred: var(--ink-light); /* grey — requirements shelved for later */
 
+  /* Diagnostics severity background (Story 4.8) — a pale rust tint pairing with --rust, deliberately outside
+     the six-stage --status-* vocabulary (a run notice isn't a delivery stage) but still a named token rather
+     than an inline literal, per the project's variable-only palette convention. [Review][Patch] */
+  --diag-error-bg: #f4e2dc;
+
   /* ---- Motion vocabulary (Story 3.5 Task 1) ----
      ONE named set of motion primitives — the same single-source discipline the --status-* tokens enforce for
      color, applied to timing: every insight-surface entrance/hover reads with the same deliberate feel instead
@@ -1109,7 +1114,7 @@ code.color-swatch {
    a run notice (unsupported/malformed/skipped/error) is not a delivery stage. Error borrows the site's
    established --rust attention accent; warning stays muted/neutral parchment. The category word is always
    present as text beside the color (never color-only, UX-DR17 / NFR6). */
-.status-badge.diag-error { background: #f4e2dc; color: var(--rust); border-color: var(--rust); }
+.status-badge.diag-error { background: var(--diag-error-bg); color: var(--rust); border-color: var(--rust); }
 .status-badge.diag-warn { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
 
 .status-badge.task-badge {

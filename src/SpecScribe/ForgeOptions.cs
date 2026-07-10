@@ -148,11 +148,13 @@ public sealed class ForgeOptions
         return canonical;
     }
 
-    /// <summary>True when <paramref name="dir"/> holds at least one non-ignored <c>*.md</c> directly or in a
-    /// direct subdirectory — the same one-level-deep window the ADR enumeration reads, so a probe never
-    /// resolves to a directory generation would then find empty. Bounded on purpose (never a whole-tree walk;
-    /// a <c>docs/</c> full of prose can't be swallowed as ADRs). Never throws: an unreadable candidate is
-    /// treated as empty. [Story 4.2 Task 1]</summary>
+    /// <summary>True when <paramref name="dir"/> holds at least one non-ignored, non-README <c>*.md</c>
+    /// directly or in a direct subdirectory — the same one-level-deep window the ADR enumeration reads, so a
+    /// probe never resolves to a directory generation would then find empty. Bounded on purpose (never a
+    /// whole-tree walk). README is excluded from the content check (though it still renders as the ADR
+    /// landing page if the candidate is chosen) so a folder holding only landing-page prose doesn't win the
+    /// probe ahead of a later candidate that actually holds decision records. Never throws: an unreadable
+    /// candidate is treated as empty. [Story 4.2 Task 1] [Review][Patch]</summary>
     private static bool HasMarkdownWithinOneLevel(string dir)
     {
         try
@@ -161,7 +163,8 @@ public sealed class ForgeOptions
             return Directory.EnumerateFiles(dir, "*.md", SearchOption.TopDirectoryOnly)
                 .Concat(Directory.EnumerateDirectories(dir)
                     .SelectMany(d => Directory.EnumerateFiles(d, "*.md", SearchOption.TopDirectoryOnly)))
-                .Any(p => !PathUtil.IsIgnoredSourceFile(p));
+                .Any(p => !PathUtil.IsIgnoredSourceFile(p)
+                    && !string.Equals(Path.GetFileName(p), "README.md", StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception)
         {

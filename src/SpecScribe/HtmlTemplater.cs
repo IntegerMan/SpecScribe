@@ -146,11 +146,18 @@ public static class HtmlTemplater
 
         foreach (var (groupTitle, groupPrefix) in groups)
         {
+            // The Implementation Artifacts band matches ancestor-tolerantly (any directory segment, any
+            // depth) via the same predicate WorkInventory/ArtifactCoverage classify against, so a project
+            // nesting the folder deeper (e.g. tracking/implementation-artifacts/1-1-x.md) still lands in this
+            // band instead of falling through to a generic unrecognized-folder band. Every other well-known
+            // group keeps the top-level-only match. [Review][Patch]
             var inGroup = docs
                 .Where(d => !used.Contains(d))
                 .Where(d => groupPrefix.Length == 0
                     ? !PathUtil.NormalizeSlashes(d.SourceRelativePath).Contains('/')
-                    : PathUtil.NormalizeSlashes(d.SourceRelativePath).StartsWith(groupPrefix + "/", StringComparison.OrdinalIgnoreCase))
+                    : groupPrefix.Equals(BmadArtifactAdapter.ImplementationArtifactsDirName, StringComparison.OrdinalIgnoreCase)
+                        ? BmadArtifactAdapter.IsUnderImplementationArtifacts(d.SourceRelativePath)
+                        : PathUtil.NormalizeSlashes(d.SourceRelativePath).StartsWith(groupPrefix + "/", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -219,8 +226,11 @@ public static class HtmlTemplater
         var ti = System.Globalization.CultureInfo.InvariantCulture.TextInfo;
         var words = folder.Split('-', '_', ' ', '.')
             .Where(w => w.Length > 0)
-            .Select(w => ti.ToTitleCase(w.ToLowerInvariant()));
-        return string.Join(" ", words);
+            .Select(w => ti.ToTitleCase(w.ToLowerInvariant()))
+            .ToList();
+        // A folder name made up solely of separator characters (e.g. "___") leaves no words to join — fall
+        // back to the raw folder name so the band always has a real, non-empty title. [Review][Patch]
+        return words.Count == 0 ? folder : string.Join(" ", words);
     }
 
     /// <summary>The home "Retrospectives" band: one card per retrospective note (its dedicated page), so the
