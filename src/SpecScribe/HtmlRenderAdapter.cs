@@ -12,7 +12,7 @@ namespace SpecScribe;
 /// <see cref="RenderBreadcrumb"/> hold the verbatim strings, and <see cref="SiteNav.RenderNavBar"/> /
 /// <see cref="SiteNav.RenderBreadcrumb"/> now delegate here so every un-migrated page renders identically. The
 /// golden-output regression (SiteGeneratorAdapterTests) is the gate: any changed byte fails it. [Story 6.1]</para></summary>
-public sealed class HtmlRenderAdapter : IRenderAdapter
+public sealed partial class HtmlRenderAdapter : IRenderAdapter
 {
     /// <summary>The single shared instance — the adapter is stateless, so <see cref="SiteNav"/>'s delegating
     /// chrome helpers and the templaters reuse one instance rather than allocating per page.</summary>

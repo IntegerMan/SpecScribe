@@ -2,7 +2,7 @@
 title: 'About page, footer, and log-page formatting polish'
 type: 'feature'
 created: '2026-07-10'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 context: []
 baseline_commit: '399b422e75052b9764127d8b6df61a78e6f521ec'
@@ -96,3 +96,54 @@ Golden-diff note: the About page's version/build line now varies per build+commi
 
 **Manual checks:**
 - Regenerate the demo site and open `about.html` + `diagnostics.html`: gutters present, links teal (rust on hover), footer reads `… on July 10, 2026 at 5:14 PM · View generation details`, author is a link to MattEland.dev, description is the new sentence, version shows `0.1.0-preview` with a Preview badge and a Build line (date · short hash).
+
+## Suggested Review Order
+
+**Footer restructure (entry point)**
+
+- Single source for the footer markup + culture-invariant friendly date; drops the old `trailingHtml` param.
+  [`PathUtil.cs:102`](../../src/SpecScribe/PathUtil.cs#L102)
+
+- The new author-URL constant, mirroring `RepositoryUrl`.
+  [`PathUtil.cs:93`](../../src/SpecScribe/PathUtil.cs#L93)
+
+**Product metadata & version derivation**
+
+- Splits the informational version — keeps the `-preview` label, extracts the short commit hash.
+  [`AboutTemplater.cs:55`](../../src/SpecScribe/AboutTemplater.cs#L55)
+
+- Record shape: `AuthorUrl`/`CommitHash`/`BuildDate` plus `BuildLabel` + `IsPrerelease` derivations.
+  [`AboutTemplater.cs:21`](../../src/SpecScribe/AboutTemplater.cs#L21)
+
+- Pre-release version label (makes the package semver-correctly pre-release).
+  [`SpecScribe.csproj:19`](../../src/SpecScribe/SpecScribe.csproj#L19)
+
+- Build-date stamped into a readable assembly attribute.
+  [`SpecScribe.csproj:29`](../../src/SpecScribe/SpecScribe.csproj#L29)
+
+**About page rendering**
+
+- Preview badge, shown only when the version is pre-release.
+  [`AboutTemplater.cs:102`](../../src/SpecScribe/AboutTemplater.cs#L102)
+
+- Build row, omitted cleanly when both date and hash are absent.
+  [`AboutTemplater.cs:120`](../../src/SpecScribe/AboutTemplater.cs#L120)
+
+- The shared gutter column applied to `<main>`.
+  [`AboutTemplater.cs:110`](../../src/SpecScribe/AboutTemplater.cs#L110)
+
+**Shared page styling**
+
+- `.info-page` gutter/link column + the `.preview-badge` pill (existing tokens only).
+  [`specscribe.css:604`](../../src/SpecScribe/assets/specscribe.css#L604)
+
+- Diagnostics page adopts the same gutter column.
+  [`DiagnosticsTemplater.cs:164`](../../src/SpecScribe/DiagnosticsTemplater.cs#L164)
+
+**Tests (peripherals)**
+
+- Golden fingerprint: new footer/build normalizers + regenerated constant.
+  [`SiteGeneratorAdapterTests.cs:183`](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs#L183)
+
+- Footer link/label + nested-href assertions.
+  [`PathUtilTests.cs:34`](../../tests/SpecScribe.Tests/PathUtilTests.cs#L34)

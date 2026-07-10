@@ -29,6 +29,39 @@ public sealed record SemanticFacts
     public required bool MermaidPresent { get; init; }
 }
 
+/// <summary>The host-neutral MEANING of a decomposed page BODY, distilled to the SECTION facts a delivery
+/// surface must reproduce: the dashboard's stat-tile values, the epics-index chip rows (number + status stage +
+/// drill href), and an epic page's story rows (id + status stage + drill href). This is the Story 6.2 extension
+/// of <see cref="SemanticFacts"/> from the shared CHROME (6.1) down into the two decomposed bodies: two forms
+/// exist per surface — what the SECTION VIEW MODEL declares (<see cref="RenderParity.FromDashboardView"/> /
+/// <see cref="RenderParity.FromEpicsIndexView"/> / <see cref="RenderParity.FromEpicPageView"/>) and what the
+/// rendered body EVIDENCES (the matching <c>Extract*Section</c>). Parity means the two are equal, scoped to the
+/// body region — a dropped/renamed section fact makes them differ. Deliberately SEMANTIC, not a byte differ (the
+/// golden test covers bytes): a webview emitting different markup but equal section meaning still matches. Each
+/// list is populated only for the surfaces that render it (empty elsewhere), so a per-surface From/Extract pair
+/// never manufactures a false divergence. [Story 6.2]</summary>
+public sealed record SectionFacts
+{
+    /// <summary>The dashboard stat-grid tiles as <c>number|label</c> (HTML-escaped, the rendered form). Empty on
+    /// surfaces with no modeled stat tiles.</summary>
+    public required IReadOnlyList<string> StatTiles { get; init; }
+
+    /// <summary>The epics-index chip rows as <c>number|stage|href</c>. Empty on non-index surfaces.</summary>
+    public required IReadOnlyList<string> EpicChips { get; init; }
+
+    /// <summary>An epic page's story-card rows as <c>anchorId|stage|href</c> (stage empty when the card renders no
+    /// status badge). Empty on non-epic surfaces.</summary>
+    public required IReadOnlyList<string> StoryRows { get; init; }
+
+    /// <summary>The all-empty facts — the shared default the per-surface builders fill selectively.</summary>
+    public static SectionFacts Empty { get; } = new()
+    {
+        StatTiles = Array.Empty<string>(),
+        EpicChips = Array.Empty<string>(),
+        StoryRows = Array.Empty<string>(),
+    };
+}
+
 /// <summary>The AC #2 semantic-parity harness: it extracts the semantic facts back out of a surface's rendered
 /// output and asserts they equal the source <see cref="PageView"/>'s view models — proving the adapter neither
 /// dropped nor reinterpreted a fact. Story 6.1 runs it against the <see cref="HtmlRenderAdapter"/> (the only
@@ -208,4 +241,126 @@ public static class RenderParity
 
     private static string Describe(IReadOnlyList<CrumbFact> crumbs) =>
         string.Join(", ", crumbs.Select(c => $"{c.Label}→{c.Target ?? "(current)"}"));
+
+    // ===== Story 6.2: SECTION-fact parity (dashboard + epics bodies) =========================================
+
+    // Body-region markup the section facts are recovered from. Each is scoped to its own element so a fact from
+    // one section can't leak into another (e.g. a task-badge span is not a story status stage).
+    private static readonly Regex StatCardRegex = new(
+        "<div class=\"stat-card\"[^>]*><div class=\"stat-number\">(?<num>.*?)</div><div class=\"stat-label\">(?<label>.*?)</div>",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex EpicChipRegex = new(
+        "<a class=\"epic-chip (?<stage>[^\"]+)\" href=\"(?<href>[^\"]*)\"><span class=\"num\">(?<num>\\d+)</span>",
+        RegexOptions.Compiled);
+    private static readonly Regex StoryCardRegex = new(
+        "<div class=\"story-card\" id=\"(?<id>[^\"]+)\">(?<body>.*?)</div>\\n\\n",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+    // A story card's OWN status stage is a single-word status-badge class; the task badge (status-badge
+    // task-badge …) has a hyphenated class and is deliberately excluded by the trailing quote.
+    private static readonly Regex StoryStageRegex = new(
+        "<span class=\"status-badge (?<stage>[a-z]+)\"", RegexOptions.Compiled);
+    private static readonly Regex StoryTitleHrefRegex = new(
+        "<a class=\"story-title story-title-link\" href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
+
+    /// <summary>The dashboard's SECTION facts as its view model DECLARES them — the stat-tile row (the parity
+    /// reference for the HTML surface, and the checklist a webview is held to). [Story 6.2]</summary>
+    public static SectionFacts FromDashboardView(DashboardView view) => SectionFacts.Empty with
+    {
+        StatTiles = view.StatTiles.Select(t => $"{PathUtil.Html(t.Number)}|{PathUtil.Html(t.Label)}").ToList(),
+    };
+
+    /// <summary>The dashboard's SECTION facts as the rendered body EVIDENCES them. [Story 6.2]</summary>
+    public static SectionFacts ExtractDashboardSection(string html) => SectionFacts.Empty with
+    {
+        StatTiles = ExtractStatTiles(html),
+    };
+
+    /// <summary>The epics-index SECTION facts (the chip rows) as its view model DECLARES them. [Story 6.2]</summary>
+    public static SectionFacts FromEpicsIndexView(EpicsIndexView view) => SectionFacts.Empty with
+    {
+        EpicChips = view.VerticalSliceChips.Concat(view.FurtherDevelopmentChips)
+            .Select(c => $"{c.Number}|{c.StatusClass}|{NormalizeTarget(c.Href)}").ToList(),
+    };
+
+    /// <summary>The epics-index SECTION facts as the rendered body EVIDENCES them. [Story 6.2]</summary>
+    public static SectionFacts ExtractEpicsIndexSection(string html) => SectionFacts.Empty with
+    {
+        EpicChips = ExtractEpicChips(html),
+    };
+
+    /// <summary>An epic page's SECTION facts (the story rows) as its view model DECLARES them. [Story 6.2]</summary>
+    public static SectionFacts FromEpicPageView(EpicPageView view) => SectionFacts.Empty with
+    {
+        StoryRows = view.StoryCards
+            .Select(c => $"{c.AnchorId}|{(c.Status is not null ? c.StatusStage : string.Empty)}|{NormalizeTarget(c.TitleHref)}")
+            .ToList(),
+    };
+
+    /// <summary>An epic page's SECTION facts as the rendered body EVIDENCES them. [Story 6.2]</summary>
+    public static SectionFacts ExtractEpicPageSection(string html) => SectionFacts.Empty with
+    {
+        StoryRows = ExtractStoryRows(html),
+    };
+
+    /// <summary>Compares a section view model's DECLARED facts to the rendered body's EVIDENCED facts and returns
+    /// one entry per diverging section fact (empty = full section parity). A divergence whose fact id is a
+    /// registered <see cref="HostRenderException"/> for <paramref name="surfaceId"/> is filtered out. The fact
+    /// ids are <c>section.statTiles</c> / <c>section.epicChips</c> / <c>section.storyRows</c>. [Story 6.2]</summary>
+    public static IReadOnlyList<string> FindSectionDivergences(
+        SectionFacts expected, SectionFacts actual, string surfaceId, IReadOnlyList<HostRenderException>? exceptions = null)
+    {
+        var excepted = (exceptions ?? HostRenderExceptions.Registry)
+            .Where(e => e.SurfaceId == surfaceId)
+            .Select(e => e.FactId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var divergences = new List<string>();
+        void Check(string factId, IReadOnlyList<string> exp, IReadOnlyList<string> act)
+        {
+            if (exp.SequenceEqual(act) || excepted.Contains(factId)) return;
+            divergences.Add($"{factId}: expected [{string.Join(", ", exp)}] got [{string.Join(", ", act)}]");
+        }
+
+        Check("section.statTiles", expected.StatTiles, actual.StatTiles);
+        Check("section.epicChips", expected.EpicChips, actual.EpicChips);
+        Check("section.storyRows", expected.StoryRows, actual.StoryRows);
+        return divergences;
+    }
+
+    private static IReadOnlyList<string> ExtractStatTiles(string html)
+    {
+        var tiles = new List<string>();
+        foreach (Match m in StatCardRegex.Matches(html))
+        {
+            tiles.Add($"{m.Groups["num"].Value}|{m.Groups["label"].Value}");
+        }
+        return tiles;
+    }
+
+    private static IReadOnlyList<string> ExtractEpicChips(string html)
+    {
+        var chips = new List<string>();
+        foreach (Match m in EpicChipRegex.Matches(html))
+        {
+            var num = int.Parse(m.Groups["num"].Value);
+            chips.Add($"{num}|{m.Groups["stage"].Value}|{NormalizeTarget(m.Groups["href"].Value)}");
+        }
+        return chips;
+    }
+
+    private static IReadOnlyList<string> ExtractStoryRows(string html)
+    {
+        var rows = new List<string>();
+        foreach (Match m in StoryCardRegex.Matches(html))
+        {
+            var id = m.Groups["id"].Value;
+            var body = m.Groups["body"].Value;
+            var stageMatch = StoryStageRegex.Match(body);
+            var stage = stageMatch.Success ? stageMatch.Groups["stage"].Value : string.Empty;
+            var hrefMatch = StoryTitleHrefRegex.Match(body);
+            var href = hrefMatch.Success ? NormalizeTarget(hrefMatch.Groups["href"].Value) : string.Empty;
+            rows.Add($"{id}|{stage}|{href}");
+        }
+        return rows;
+    }
 }

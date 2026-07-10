@@ -1,0 +1,400 @@
+using System.Text;
+
+namespace SpecScribe;
+
+/// <summary>The epics-family page BODY rendering (epics index / epic page / story page / story placeholder),
+/// re-homed from <c>EpicsTemplater</c> into the delivery adapter and driven by the host-neutral section view
+/// models (Story 6.2). A mechanical RE-HOMING, not a rewrite: data-shaped sections render from records, chart
+/// panels call the same <c>Charts.*</c>/<c>Mermaid.*</c> helpers with the views' domain inputs, opaque prose
+/// fragments are emitted verbatim, and every conditional maps to an optional section — bytes unchanged. [Story 6.2]</summary>
+public sealed partial class HtmlRenderAdapter
+{
+    // ----- Epics index --------------------------------------------------------------------------------------
+
+    /// <summary>Renders the epics-index <c>&lt;main&gt;…&lt;/main&gt;</c> body from its section view model. [Story 6.2]</summary>
+    public string RenderEpicsIndexBody(EpicsIndexView view)
+    {
+        var model = view.Epics;
+        var sb = new StringBuilder();
+
+        sb.Append("<main id=\"main-content\">\n");
+        sb.Append("<header class=\"doc-header\">\n");
+        sb.Append("  <h1>Epics &amp; Stories</h1>\n");
+        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(view.SiteTitle)} &middot; {view.EpicCount} epics &middot; {view.DraftedCount} with stories drafted</div>\n");
+        sb.Append("</header>\n\n");
+
+        sb.Append("<section class=\"dashboard\">\n");
+        AppendEpicsProgressPanel(sb, view.Progress);
+        sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
+        sb.Append(Charts.Sunburst(model, commands: view.Commands));
+        sb.Append("</div>\n");
+        sb.Append("</section>\n\n");
+
+        if (model.OverviewHtml.Length > 0)
+        {
+            sb.Append($"<div class=\"banner\">{model.OverviewHtml}</div>\n\n");
+        }
+
+        if (model.Epics.Count == 0)
+        {
+            AppendEmptyEpicsGuidance(sb, view.Commands);
+        }
+
+        AppendChipSection(sb, "Vertical Slice", view.VerticalSliceChips);
+        AppendChipSection(sb, "Further Development", view.FurtherDevelopmentChips);
+
+        if (model.Epics.Count > 0)
+        {
+            sb.Append("<div class=\"section-divider\">All Epics</div>\n\n");
+            foreach (var epic in model.Epics)
+            {
+                AppendEpicCard(sb, epic, view.Commands);
+            }
+        }
+
+        sb.Append("<div class=\"section-divider\">Suggested Build Order</div>\n\n");
+        sb.Append(Mermaid.Block(Mermaid.RoadmapDiagram(model)));
+
+        if (model.RequirementsInventoryHtml.Length > 0)
+        {
+            sb.Append("<details class=\"epic-card requirements-inventory\">\n");
+            sb.Append("  <summary>Requirements Inventory</summary>\n");
+            sb.Append($"  <div class=\"story-body\">{model.RequirementsInventoryHtml}</div>\n");
+            sb.Append("</details>\n\n");
+        }
+
+        sb.Append("</main>\n\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The epics-index progress panel (stat-grid + Epic Status donut + mosaic). Re-homed from
+    /// <c>EpicsTemplater.AppendProgressPanel</c>.</summary>
+    private void AppendEpicsProgressPanel(StringBuilder sb, ProgressModel progress)
+    {
+        sb.Append("<div class=\"stat-grid\">\n");
+        sb.Append(Charts.StatCard($"{progress.EpicsDrafted}/{progress.EpicsTotal}", "Epics drafted"));
+        sb.Append(Charts.StatCard(progress.StoriesTotal.ToString(), "Stories defined", $"{progress.StoriesWithArtifact} with a task plan"));
+        sb.Append(progress.TasksTotal > 0
+            ? Charts.StatCard($"{progress.TasksDone}/{progress.TasksTotal}", "Tasks done", $"across {progress.StoriesWithArtifact} planned stor{(progress.StoriesWithArtifact == 1 ? "y" : "ies")}")
+            : Charts.StatCard("—", "Tasks done", "none tracked yet"));
+        sb.Append("</div>\n\n");
+
+        sb.Append("<div class=\"chart-panel\">\n<h3>Epic Status</h3>\n<div class=\"donut-and-legend\">\n");
+        var epicStatusSegments = new (string Label, int Value, string CssClass)[]
+        {
+            ("Drafted", progress.EpicsDrafted, "drafted"),
+            ("Pending", progress.EpicsPending, "pending"),
+        };
+        sb.Append(Charts.Donut(epicStatusSegments, ariaLabel: $"Epic status: {progress.EpicsDrafted} drafted, {progress.EpicsPending} pending"));
+        sb.Append(Charts.DonutLegend(epicStatusSegments));
+        sb.Append("</div>\n</div>\n\n");
+
+        sb.Append("<div class=\"chart-panel\">\n<h3>Progress by Epic</h3>\n");
+        sb.Append(Charts.EpicMosaic(progress.PerEpic, e => $"epics/epic-{e.Number}.html"));
+        sb.Append("</div>\n\n");
+    }
+
+    private void AppendChipSection(StringBuilder sb, string title, IReadOnlyList<EpicChip> chips)
+    {
+        if (chips.Count == 0) return;
+
+        sb.Append($"<div class=\"section-divider\">{PathUtil.Html(title)}</div>\n<div class=\"epic-overview\">\n");
+        foreach (var chip in chips)
+        {
+            sb.Append($"  <a class=\"epic-chip {chip.StatusClass}\" href=\"{chip.Href}\"><span class=\"num\">{chip.Number:00}</span>{chip.TitleHtml}</a>\n");
+        }
+        sb.Append("</div>\n\n");
+    }
+
+    private void AppendEpicCard(StringBuilder sb, EpicInfo epic, CommandCatalog commands)
+    {
+        var statusCls = StatusStyles.ForEpic(epic);
+        sb.Append($"<div class=\"epic-card\" id=\"epic-{epic.Number}\">\n");
+        sb.Append($"  <h2><span class=\"epic-num\">Epic {epic.Number}</span> {epic.Title} <span class=\"epic-status {statusCls}\">{PathUtil.Html(StatusStyles.EpicLabel(statusCls))}</span></h2>\n");
+
+        if (epic.GoalHtml.Length > 0)
+        {
+            sb.Append($"  <p class=\"epic-goal\">{epic.GoalHtml}</p>\n");
+        }
+        if (epic.FrMetaHtml is { Length: > 0 })
+        {
+            sb.Append($"  <div class=\"epic-meta\">{epic.FrMetaHtml}</div>\n");
+        }
+        if (epic.Status == EpicStatus.Pending)
+        {
+            var note = BmadCommands.InlineGuidance(
+                commands.Command("create-epics-and-stories"),
+                "Stories not yet drafted — draft them with",
+                "Stories not yet drafted.");
+            sb.Append($"  <div class=\"pending-note\">{note}</div>\n");
+        }
+        sb.Append($"  <a class=\"view-epic-link\" href=\"epics/epic-{epic.Number}.html\">View Epic {epic.Number} stories &rarr;</a>\n");
+        sb.Append("</div>\n\n");
+    }
+
+    private void AppendEmptyEpicsGuidance(StringBuilder sb, CommandCatalog commands)
+    {
+        var note = BmadCommands.InlineGuidance(
+            commands.Command("create-epics-and-stories"),
+            "No epics yet. Break your plan into epics and stories with",
+            "No epics yet — add them to your plan to see them here.");
+        sb.Append($"<div class=\"epic-card empty-state\">\n  <div class=\"pending-note\">{note}</div>\n</div>\n\n");
+    }
+
+    // ----- Epic page ----------------------------------------------------------------------------------------
+
+    /// <summary>Renders a single epic page's <c>&lt;main&gt;…&lt;/main&gt;</c> body from its section view model. [Story 6.2]</summary>
+    public string RenderEpicBody(EpicPageView view)
+    {
+        var main = new StringBuilder();
+        var toc = new List<Toc.Entry>();
+
+        main.Append("<header class=\"doc-header\">\n");
+        main.Append("  <div class=\"kicker-row\">\n");
+        main.Append($"    <span class=\"story-kicker\">Epic {view.Number}</span>\n");
+        main.Append($"    {StatusStyles.Badge(view.StatusClass, view.StatusLabel)}\n");
+        main.Append("  </div>\n");
+        main.Append($"  <h1>{view.TitleHtml}</h1>\n");
+        main.Append("</header>\n\n");
+
+        if (view.GoalHtml.Length > 0 || view.FrMetaHtml is { Length: > 0 })
+        {
+            main.Append("<div class=\"epic-card epic-intro\" id=\"sec-overview\">\n");
+            if (view.GoalHtml.Length > 0) main.Append($"  <p class=\"epic-goal\">{view.GoalHtml}</p>\n");
+            if (view.FrMetaHtml is { Length: > 0 }) main.Append($"  <div class=\"epic-meta\">{view.FrMetaHtml}</div>\n");
+            main.Append("</div>\n\n");
+            toc.Add(new Toc.Entry(2, "Overview", "sec-overview"));
+        }
+
+        if (view.HasStories)
+        {
+            main.Append("<section class=\"dashboard-narrow\">\n<div class=\"chart-row\">\n");
+            main.Append("<div class=\"chart-col\">\n");
+            main.Append("<div class=\"chart-panel\">\n<h3>Epic Progress</h3>\n");
+            foreach (var bar in view.ProgressBars)
+            {
+                main.Append(Charts.ProgressBar(bar.Label, bar.Value, bar.Max, bar.RightLabel));
+            }
+            main.Append("</div>\n\n");
+            main.Append(view.NextActionsPanelHtml);
+            main.Append("</div>\n\n");
+
+            main.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Story Breakdown</h3>\n");
+            main.Append(Charts.EpicSunburst(view.Epic, story => story.ArtifactOutputPath is { } ap
+                ? view.Prefix + ap
+                : $"#{StoryAnchorId(story.Id)}", commands: view.Commands));
+            main.Append("</div>\n");
+            main.Append("</div>\n</section>\n\n");
+        }
+        else if (view.NextStepsHtml.Length > 0)
+        {
+            main.Append("<section class=\"dashboard-narrow\">\n");
+            main.Append(view.NextStepsHtml);
+            main.Append("</section>\n\n");
+        }
+
+        main.Append(view.RetroAffordanceHtml);
+
+        foreach (var card in view.StoryCards)
+        {
+            AppendStoryCard(main, card);
+            toc.Add(new Toc.Entry(2, $"Story {card.Id}", card.AnchorId));
+        }
+
+        var sb = new StringBuilder();
+        sb.Append("<main id=\"main-content\">\n");
+        sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
+        sb.Append("</main>\n\n");
+        return sb.ToString();
+    }
+
+    private void AppendStoryCard(StringBuilder sb, StoryCardView card)
+    {
+        sb.Append($"<div class=\"story-card\" id=\"{card.AnchorId}\">\n");
+        sb.Append("  <div class=\"story-card-header\">\n");
+        sb.Append($"    <span class=\"story-id\">{PathUtil.Html(card.Id)}</span>\n");
+        sb.Append($"    <a class=\"story-title story-title-link\" href=\"{PathUtil.Html(card.TitleHref)}\">{card.TitleHtml}</a>\n");
+
+        if (card.Status is { Length: > 0 } status)
+        {
+            sb.Append($"    {StatusStyles.Badge(card.StatusStage, status)}\n");
+        }
+        if (card.TasksTotal > 0)
+        {
+            sb.Append($"    {TaskBadge(card.TasksDone, card.TasksTotal)}\n");
+        }
+        sb.Append("  </div>\n");
+
+        sb.Append($"  <div class=\"user-story\">{card.UserStoryHtml}</div>\n");
+
+        if (card.AcBlocksHtml.Count > 0)
+        {
+            sb.Append("  <div class=\"ac-label\">Acceptance Criteria</div>\n  <div class=\"ac-list\">\n");
+            foreach (var block in card.AcBlocksHtml)
+            {
+                sb.Append($"    <div class=\"ac-block\">{block}</div>\n");
+            }
+            sb.Append("  </div>\n");
+        }
+
+        if (card.ViewPlanHref is { } viewHref)
+        {
+            sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(viewHref)}\">View full story plan &rarr;</a>\n");
+        }
+        else
+        {
+            sb.Append($"  <div class=\"not-detailed-note\">{card.NoteHtml}</div>\n");
+        }
+
+        sb.Append("</div>\n\n");
+    }
+
+    /// <summary>The story card's task indicator. Re-homed from <c>EpicsTemplater.TaskBadge</c>, keyed on the tally.</summary>
+    private static string TaskBadge(int tasksDone, int tasksTotal)
+    {
+        if (tasksDone >= tasksTotal)
+        {
+            return $"<span class=\"status-badge task-badge complete\">&#10003; {tasksTotal} tasks</span>";
+        }
+        if (tasksDone == 0)
+        {
+            return $"<span class=\"status-badge task-badge none-done\">0/{tasksTotal} tasks</span>";
+        }
+        return $"<span class=\"status-badge task-badge\">{Charts.MiniDonut(tasksDone, tasksTotal)} {tasksDone}/{tasksTotal} tasks</span>";
+    }
+
+    // ----- Story page ---------------------------------------------------------------------------------------
+
+    /// <summary>Renders a drafted story page's <c>&lt;main&gt;…&lt;/main&gt;</c> body from its section view model. [Story 6.2]</summary>
+    public string RenderStoryBody(StoryPageView view)
+    {
+        var main = new StringBuilder();
+        var toc = new List<Toc.Entry>();
+
+        main.Append("<header class=\"doc-header\">\n");
+        main.Append("  <div class=\"kicker-row\">\n");
+        main.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(view.Id)}</span>\n");
+        if (view.Status is { Length: > 0 } status)
+        {
+            main.Append($"    {StatusStyles.Badge(view.StatusStage, status)}\n");
+        }
+        main.Append(view.RetroLinkHtml);
+        main.Append("  </div>\n");
+        main.Append($"  <h1>{view.TitleHtml}</h1>\n");
+        main.Append("</header>\n\n");
+
+        if (view.BlurbHtml.Length > 0)
+        {
+            main.Append($"<div class=\"story-lead user-story\" id=\"sec-user-story\">{view.BlurbHtml}</div>\n\n");
+            toc.Add(new Toc.Entry(2, "User Story", "sec-user-story"));
+        }
+
+        main.Append("<section class=\"dashboard-narrow\">\n<div class=\"chart-row\">\n");
+        if (view.Tasks.Count > 0)
+        {
+            main.Append("<div class=\"chart-panel sunburst-panel\" id=\"sec-task-breakdown\">\n<h3>Task Breakdown</h3>\n");
+            main.Append(Charts.TaskSunburst(view.Tasks));
+            main.Append("</div>\n");
+            toc.Add(new Toc.Entry(2, "Task Breakdown", "sec-task-breakdown"));
+        }
+        main.Append(view.NextStepsHtml);
+        main.Append("</div>\n");
+
+        if (view.AcceptanceCriteria.Count > 0)
+        {
+            main.Append("<div class=\"chart-panel ac-panel\" id=\"sec-acceptance-criteria\">\n<h3>Acceptance Criteria</h3>\n<div class=\"ac-criteria\">\n");
+            foreach (var ac in view.AcceptanceCriteria)
+            {
+                main.Append($"  <div class=\"ac-criterion\" id=\"ac-{ac.Number}\">\n");
+                main.Append($"    <a class=\"ac-anchor\" href=\"#ac-{ac.Number}\">AC #{ac.Number}</a>\n");
+                main.Append($"    <div class=\"ac-criterion-body\">{ac.Html}</div>\n");
+                main.Append("  </div>\n");
+            }
+            main.Append("</div>\n</div>\n");
+            toc.Add(new Toc.Entry(2, "Acceptance Criteria", "sec-acceptance-criteria"));
+        }
+
+        if (view.DevAgentRecord.Count > 0)
+        {
+            main.Append("<details class=\"chart-panel dev-agent-details\" id=\"sec-dev-agent-record\">\n<summary>Dev Agent Record</summary>\n<table class=\"dev-agent-table\">\n");
+            foreach (var entry in view.DevAgentRecord)
+            {
+                main.Append($"  <tr><th>{PathUtil.Html(entry.Label)}</th><td>{entry.ContentHtml}</td></tr>\n");
+            }
+            main.Append("</table>\n</details>\n");
+            toc.Add(new Toc.Entry(2, "Dev Agent Record", "sec-dev-agent-record"));
+        }
+        main.Append("</section>\n\n");
+
+        if (view.ReviewFindingsHtml.Length > 0)
+        {
+            main.Append("<section class=\"chart-panel review-findings\" id=\"sec-review-findings\">\n<h3>Review Findings</h3>\n");
+            main.Append($"<div class=\"doc-body\">{view.ReviewFindingsHtml}</div>\n</section>\n\n");
+            toc.Add(new Toc.Entry(2, "Review Findings", "sec-review-findings"));
+        }
+
+        main.Append("<article class=\"doc-body epic-card\">\n");
+        main.Append(view.RemainderHtml);
+        main.Append("\n</article>\n\n");
+        toc.AddRange(Toc.ExtractHeadings(view.RemainderHtml));
+
+        if (view.ChangeLogHtml.Length > 0)
+        {
+            main.Append("<section class=\"chart-panel change-log\" id=\"sec-change-log\">\n<h3>Change Log</h3>\n");
+            main.Append($"<div class=\"doc-body\">{view.ChangeLogHtml}</div>\n</section>\n\n");
+            toc.Add(new Toc.Entry(2, "Change Log", "sec-change-log"));
+        }
+
+        var sb = new StringBuilder();
+        sb.Append("<main id=\"main-content\">\n");
+        sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
+        sb.Append("</main>\n\n");
+        return sb.ToString();
+    }
+
+    // ----- Story placeholder --------------------------------------------------------------------------------
+
+    /// <summary>Renders a story placeholder page's <c>&lt;main&gt;…&lt;/main&gt;</c> body from its section view
+    /// model. [Story 6.2]</summary>
+    public string RenderStoryPlaceholderBody(StoryPlaceholderView view)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<main id=\"main-content\">\n");
+        sb.Append("<header class=\"doc-header\">\n");
+        sb.Append("  <div class=\"kicker-row\">\n");
+        sb.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(view.Id)}</span>\n");
+        sb.Append($"    {StatusStyles.Badge(view.StatusStage, "Not yet drafted")}\n");
+        sb.Append(view.RetroLinkHtml);
+        sb.Append("  </div>\n");
+        sb.Append($"  <h1>{view.TitleHtml}</h1>\n");
+        sb.Append("</header>\n\n");
+
+        if (view.UserStoryHtml.Length > 0)
+        {
+            sb.Append($"<div class=\"story-lead user-story\">{view.UserStoryHtml}</div>\n\n");
+        }
+
+        if (view.AcBlocksHtml.Count > 0)
+        {
+            sb.Append("<section class=\"dashboard-narrow\">\n");
+            sb.Append("<div class=\"chart-panel ac-panel\">\n<h3>Acceptance Criteria</h3>\n<div class=\"ac-list\">\n");
+            foreach (var block in view.AcBlocksHtml)
+            {
+                sb.Append($"  <div class=\"ac-block\">{block}</div>\n");
+            }
+            sb.Append("</div>\n</div>\n</section>\n\n");
+        }
+
+        sb.Append($"<div class=\"epic-card\">\n  <div class=\"pending-note\">{view.NoteHtml}</div>\n</div>\n\n");
+
+        sb.Append("<section class=\"dashboard-narrow\">\n");
+        sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(view.BackHref)}\">&larr; Back to Epic {view.EpicNumber}</a>\n");
+        sb.Append("</section>\n");
+        sb.Append("</main>\n\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The in-page anchor id for a story card (epic-sunburst jump target). Mirrors
+    /// <c>EpicsViewBuilder.StoryAnchorId</c>.</summary>
+    private static string StoryAnchorId(string storyId) => $"story-{storyId.Replace('.', '-')}";
+}
