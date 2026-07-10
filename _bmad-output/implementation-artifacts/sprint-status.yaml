@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-10T18:00:00-04:00
+last_updated: 2026-07-10T19:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -80,7 +80,7 @@ development_status:
   4-1-shared-framework-adapter-contract-and-projection-path: done
   4-2-decouple-rendering-from-personal-project-structure-assumptions: done # code review passed 2026-07-10
   4-8-generation-diagnostics-and-configuration-log-page: done # spun out of 4.2 (2026-07-10); code review passed 2026-07-10
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
   # Stories 4.3–4.7 (per-framework coverage) relocated 2026-07-10 to spike-led Epics 11–15 (append-only, no renumber)
 
   epic-5: in-progress
@@ -196,4 +196,12 @@ action_items:
   - epic: 3
     action: "Add a review-checklist item for the 'parser silently drops a real input shape' class before Epic 4's foreign framework inputs hit the same parsers: 'what real-world input shape does this parser silently drop?' Three instances this epic (renamed-file undercount 3.1/3.2, plural-Epics coverage drop 3.7)."
     owner: "Charlie (Senior Dev)"
+    status: open
+  - epic: 4
+    action: "Schedule a story/spec to fix HtmlTemplater.KnownIndexGroups omitting 'adrs'/'retros' from the well-known folder set, so a normally-laid-out BMad repo doesn't permanently trip an 'unrecognized top-level folder' notice for its own ADR directory (blocks Story 4.8's all-clear diagnostics state from ever being reachable on real projects)."
+    owner: "Alice (Product Owner)"
+    status: open
+  - epic: 4
+    action: "Before Epic 6 Story 6.1 (view-model contract) starts, read Story 4.1's ingestion-vs-delivery-adapter distinction (AD-1 vs AD-2) directly, so 6.1's contract naming doesn't collide with IArtifactAdapter."
+    owner: "create-story runner for 6.1"
     status: open
