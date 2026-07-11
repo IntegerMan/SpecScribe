@@ -4,20 +4,18 @@ baseline_commit: 8ebca9ed3455e48b40438c86496d4d3ced7d9a80
 
 # Story 6.4: Read-Only VS Code Webview Runtime for Dashboard and Epics
 
-Status: backlog
+Status: ready-for-dev
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
-> ## 🧊 FROZEN 2026-07-10 — do not dev-start
-> This story's entire premise (a C# `WebviewRenderAdapter` rendering webview HTML, per ADR 0005) is **under
-> reconsideration**. Immediately after ADR 0005 was Accepted, the owner reopened its foundation and directed a
-> **delivery-architecture spike, [Story 6.6](6-6-delivery-architecture-and-distribution-spike.md)**, to measure a
-> possible pivot to a **JSON data layer + client-side SPA distributed via npx** (see
-> [sprint-change-proposal-2026-07-10-delivery-architecture.md](../planning-artifacts/sprint-change-proposal-2026-07-10-delivery-architecture.md)).
-> **Do NOT begin 6.4 until ADR 0006 supersedes or re-affirms ADR 0005.** If ADR 0006 **re-affirms** 0005, this
-> story resumes largely as written (re-set status to `ready-for-dev`). If ADR 0006 **pivots**, this story is
-> reshaped or replaced by the follow-on Epics 6/16 re-plan — do not implement it against ADR 0005. Demoted to
-> `backlog` so an unattended dev-loop won't pick it up; the content below is complete and preserved.
+> ## ✅ UNFROZEN 2026-07-10 — cleared to dev
+> This story was briefly frozen while the delivery architecture was reconsidered. **[ADR 0006](../../docs/adrs/0006-delivery-architecture-and-distribution.md)
+> (Accepted) re-affirmed ADR 0005** — C# renders the webview HTML via a `WebviewRenderAdapter`, shipped as a
+> self-contained binary, exactly the premise this story was written against. The pure-TS/SPA pivot was **deferred**,
+> so **this story proceeds as written**, governed by ADR 0005 (as amended by ADR 0006). ADR 0006 also adds two
+> *additive* delivery options — an npx wrapper channel and an optional JSON+SPA output adapter — that do **not**
+> change this story's scope; they are seated as their own stories. The original gate below still applies: dev-start
+> requires Story 6.2 `done`.
 
 ## Story
 

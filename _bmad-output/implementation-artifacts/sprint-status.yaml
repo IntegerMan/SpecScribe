@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-10T00:00:00-04:00
+last_updated: 2026-07-11T01:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -103,21 +103,24 @@ development_status:
   # 6-3-vs-code-integration-spike.md. SOFT-depends on 6.2 (stand in if its view models aren't built yet).
   6-3-vs-code-integration-spike: review # spike complete; ADR 0005 landed (docs/adrs/0005-*.md), spike code quarantined under spike/, core untouched
   # Story 6.4 = the webview RUNTIME (webview UI + live host-push, former 6.2 AC #2/#3 + the epic's 6.4 ACs).
-  # FROZEN 2026-07-10 (SCP 2026-07-10 delivery-architecture): ADR 0005's premise (C#-render + bundled 73 MB
-  # binary) is reopened by Story 6.6's delivery-architecture spike. Do NOT dev-start until ADR 0006 supersedes
-  # or re-affirms ADR 0005. Demoted ready-for-dev → backlog to keep an unattended dev-loop from picking it up;
-  # the story file itself is complete. DEPENDS ON 6.2 + 6.3 + now ADR 0006.
-  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: backlog # FROZEN pending Story 6.6 / ADR 0006
-  # Story 6.5 = host theming + explicit helper actions (was epics.md Story 6.3). DEPENDS ON 6.4 (webview runtime)
-  # + 6.2. FROZEN 2026-07-10 (same SCP): presupposes the 6.4 webview, which is itself frozen pending ADR 0006.
-  6-5-host-aware-theming-and-explicit-helper-actions: backlog # FROZEN pending Story 6.6 / ADR 0006
-  # Story 6.6 = Delivery Architecture & Distribution Spike (owner-directed 2026-07-10). Measures JSON+SPA+npx vs
-  # ADR 0005's C#-static-site + bundled-binary path (output-file bloat, extension bloat, npx/CI friction);
-  # enumerates the C#-core-port cost + coupling-breakers (WASM / pre-generated JSON); produces ADR 0006
-  # (supersedes-or-reaffirms ADR 0005) + a ruling on the NFR6/progressive-enhancement posture for JS surfaces.
-  # GATES 6.4/6.5 + Epic 16 packaging. Throwaway/quarantined; nothing pivots on main. Story file:
-  # 6-6-delivery-architecture-and-distribution-spike.md.
-  6-6-delivery-architecture-and-distribution-spike: review # spike complete; ADR 0006 (Proposed) re-affirms ADR 0005 + adds npx channel + optional JSON+SPA delivery adapter, defers the pure-TS pivot; reverses owner's lean → awaits ratification. src untouched, 676 tests green. spike code quarantined under spike/delivery/
+  # UNFROZEN 2026-07-10: ADR 0006 (Accepted, owner-ratified) re-affirmed ADR 0005's C#-render + self-contained
+  # binary path — exactly this story's premise — and deferred the pure-TS pivot. Proceeds as written under ADR
+  # 0005/0006. Original gate stands: dev-start requires Story 6.2 done. DEPENDS ON 6.2 + 6.3 (both review).
+  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: ready-for-dev
+  # Story 6.5 = host theming + explicit helper actions (was epics.md Story 6.3). UNFROZEN 2026-07-10 (ADR 0006
+  # re-affirmed the C#-rendered webview it themes). Original gate stands: blocked on 6.4 (webview must exist) + 6.2.
+  6-5-host-aware-theming-and-explicit-helper-actions: ready-for-dev
+  # Story 6.6 = Delivery Architecture & Distribution Spike (owner-directed 2026-07-10). Measured JSON+SPA+npx vs
+  # ADR 0005's path; produced ADR 0006 (now Accepted/ratified): re-affirm C# core + self-contained binary, ADD an
+  # npx wrapper channel (Story 16.8) + an optional JSON+SPA delivery adapter (Story 6.7), DEFER the pure-TS pivot.
+  # NFR6 ruling: JSON+SPA is additive over the static-HTML baseline (static/noscript fallback required). Spike code
+  # throwaway under spike/delivery/; src untouched, 676 tests green. Still needs close-out code-review → done.
+  6-6-delivery-architecture-and-distribution-spike: review # ADR 0006 Accepted (ratified 2026-07-10); awaiting close-out code-review
+  # Story 6.7 = JSON + client-renderer (SPA) delivery adapter — seated by ADR 0006 (additive). A second C#
+  # IRenderAdapter that consolidates the many-files output into a JSON data layer + a small client renderer, with
+  # the static-HTML/noscript fallback (NFR6). Rendering stays in C#; no core port. Addresses the file-count concern
+  # (Epic-7 scale). Run create-story to detail when scheduled. DEPENDS ON 6.1 (IRenderAdapter seam) + 6.2 (views).
+  6-7-json-and-spa-delivery-adapter: backlog
   epic-6-retrospective: optional
 
   epic-7: in-progress
@@ -183,18 +186,22 @@ development_status:
   # Epic 16 added 2026-07-10 (SCP 2026-07-10, correct-course): release engineering for the community
   # preview. Additive scope. Spike-led (16.1 first). Story 16.5 (Marketplace publish) is blocked on Epic 6.
   # All backlog; run create-story per story when scheduled.
-  # PACKAGING GATED 2026-07-10 (SCP 2026-07-10 delivery-architecture): 16.1/16.3/16.4/16.5 wait on ADR 0006
-  # (Story 6.6) — the delivery-architecture decision (rendering language, output form, npx-vs-dotnet) is
-  # UPSTREAM of packaging mechanics; deciding a CLI channel now risks a pivot mooting it. 16.2 (CI gate) is
-  # NOT gated — release-readiness hygiene independent of the delivery form.
+  # PACKAGING UNGATED 2026-07-10: ADR 0006 (Accepted) settled the delivery-architecture decision upstream of
+  # packaging — re-affirm the self-contained binary + ADD npx (npm-wrapper-around-native-binary, proven in the
+  # 6.6 spike, now seated as Story 16.8) as a first-class channel alongside dotnet-tool. 16.1's channel decision
+  # is now largely pre-answered by ADR 0006; 16.1 executes the packaging mechanics on that basis.
   epic-16: backlog
-  16-1-release-and-distribution-packaging-spike: backlog # gated on ADR 0006 (delivery-architecture upstream of packaging)
+  16-1-release-and-distribution-packaging-spike: backlog # channel decision now informed by ADR 0006 (binary + npx)
   16-2-continuous-integration-build-and-test-gate: backlog
-  16-3-cli-packaging-and-publication: backlog # gated on ADR 0006 (delivery-architecture upstream of packaging)
-  16-4-tag-triggered-release-pipeline: backlog # gated on ADR 0006 (delivery-architecture upstream of packaging)
-  16-5-vs-code-extension-packaging-and-marketplace-publication: backlog # blocked on Epic 6; also gated on ADR 0006
+  16-3-cli-packaging-and-publication: backlog
+  16-4-tag-triggered-release-pipeline: backlog
+  16-5-vs-code-extension-packaging-and-marketplace-publication: backlog # blocked on Epic 6 (extension must exist)
   16-6-release-facing-documentation-changelog-and-versioning-policy: backlog
   16-7-preview-launch-readiness-and-cut: backlog
+  # Story 16.8 = npx distribution via npm-wrapped native binary — seated by ADR 0006 (additive). Promotes the 6.6
+  # spike's proven ~1.5 KB wrapper (spike/delivery/npm-wrapper) into a real channel: `npx specscribe` runs the
+  # self-contained binary with no .NET SDK. Aligns with / feeds Story 16.3 (CLI packaging). Run create-story to detail.
+  16-8-npx-distribution-via-npm-wrapped-binary: backlog
   epic-16-retrospective: optional
 
 action_items:

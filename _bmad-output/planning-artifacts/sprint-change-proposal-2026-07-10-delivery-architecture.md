@@ -117,3 +117,17 @@
 - `sprint-status.yaml` — `6-6` seated `ready-for-dev`; `6-4`/`6-5` demoted to `backlog` + FROZEN; Epic 16 packaging annotated gated on ADR 0006.
 - `epics.md` — Story 6.6 appended to Epic 6.
 - `6-4-…` / `6-5-…` story files — FROZEN banner added atop each.
+
+---
+
+## Ratification & Re-plan (applied 2026-07-10, follow-up)
+
+Story 6.6's spike ran and produced **[ADR 0006](../../docs/adrs/0006-delivery-architecture-and-distribution.md)** — which, on measured evidence (charts are ~69 % of body bytes, so a JSON layer cuts file-count not bytes; npx-via-npm-wrapper proven port-free; WASM blocked by WASI's inability to spawn `git`; the C#→TS port surface is ~14,200 LOC + 667 tests), **re-affirmed ADR 0005** (C# render + self-contained binary), **added two additive port-free changes** (an npx wrapper channel; an optional JSON+SPA delivery adapter for file-count-heavy contexts), and **deferred the full pure-TS pivot**. This **reverses the owner's original lean**, so the ADR issued as **Proposed**.
+
+**The owner ratified ADR 0006 on 2026-07-10** (and requested the architectures-considered documentation now embedded in the ADR: five flow diagrams + a comparison table + metrics). ADR 0006 → **Accepted**. Applied:
+
+- **ADR 0006** — Status `Proposed` → `Accepted`; added an "Architectures Considered" section (mermaid flow diagrams A–E + comparison table + measured metrics); Decider's note records ratification. `docs/adrs/README.md` updated (0006 → Accepted).
+- **Unfroze** Stories 6.4 and 6.5 (`backlog` → `ready-for-dev`; FROZEN banners replaced with UNFROZEN notes — their *original* prerequisite gates still stand: 6.4 on 6.2 `done`; 6.5 on 6.4). Epic 16 packaging (16.1/16.3/16.4/16.5) un-gated.
+- **Seated two additive stories** (`backlog`, detail via `create-story` when scheduled): **Story 6.7** — *JSON + client-renderer (SPA) delivery adapter* (a second C# `IRenderAdapter` with the static/`noscript` fallback; no core port); **Story 16.8** — *npx distribution via npm-wrapped native binary* (promotes the spike's proven wrapper; aligns with 16.3). Appended to `epics.md` + `sprint-status.yaml`.
+- **Did NOT** seat a C#→TS core-port epic (the pivot is deferred, not adopted).
+- **Still open:** Story 6.6 is `review` and needs its close-out code-review to reach `done`.

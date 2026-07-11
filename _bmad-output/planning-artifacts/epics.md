@@ -992,6 +992,37 @@ So that we either commit to the pivot with evidence (and re-plan Epics 6/16) or 
 **When** it lands
 **Then** no production pivot merges to `main` as product (quarantined under `spike/` or branch-only), the generated site stays byte-identical, and read-only (AD-6) is honored.
 
+### Story 6.7: JSON + Client-Renderer (SPA) Delivery Adapter
+
+<!-- 2026-07-10: Seated by ADR 0006 (Accepted) as an ADDITIVE delivery option — see docs/adrs/0006. The 6.6
+     spike proved the file-count concern (Epic-7 scale reaches thousands of files) is real, and that a JSON +
+     client-renderer output form addresses it WITHOUT porting the C# core: it is a second C# IRenderAdapter over
+     the shared view models. Rendering stays in C#; the static-HTML surface remains the accessible baseline. Full
+     ACs via create-story when scheduled. Depends on Story 6.1 (IRenderAdapter seam) + Story 6.2 (section view
+     models). Note: this does NOT reduce bytes (chart SVGs still ship) — only file count; a true byte reduction
+     would require the deferred TS port (ADR 0006 option D). -->
+
+As a maintainer generating a portal for a large repository,
+I want an optional delivery form that emits a JSON data layer plus a small client-side renderer instead of thousands of static HTML files,
+So that file-count-heavy projects (Epic-7 scale) stay manageable while rendering remains in the C# core and the accessible static-HTML fallback is preserved.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the shared section view models (Story 6.2) and the `IRenderAdapter` seam (Story 6.1)
+**When** the JSON+SPA delivery adapter runs
+**Then** it emits a JSON data layer (with charts as pre-rendered inline SVG) plus a small client renderer that renders the surfaces from it, as a second concrete `IRenderAdapter` — with rendering staying in C# and no core port.
+
+2.
+**Given** NFR6 and the progressive-enhancement policy (JS never the sole carrier of information)
+**When** the JSON+SPA form is produced
+**Then** a static/`noscript` fallback is shipped (the C# core already emits the pre-rendered HTML), so core content and navigation work with JavaScript disabled.
+
+3.
+**Given** this is an additive output form
+**When** it is selected
+**Then** the existing static-HTML surface and the golden byte-parity gate are unaffected (opt-in; no change to default generation).
+
 ## Epic 7: Code and Git Exploration
 
 Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth — so the portal explains not just what is planned, but what exists and what happened when.
@@ -1945,3 +1976,27 @@ So that the first public impression is a working install, not a broken link.
 **When** the preview is cut
 **Then** release notes are published for the tag and the announcement points at working install instructions
 **And** any items intentionally excluded from the preview are recorded as known limitations rather than silent gaps.
+
+### Story 16.8: npx Distribution via npm-Wrapped Native Binary
+
+<!-- 2026-07-10: Seated by ADR 0006 (Accepted) as an ADDITIVE distribution channel — see docs/adrs/0006. The 6.6
+     spike PROVED this end-to-end: a ~1.5 KB npm wrapper (esbuild/Biome pattern, via optionalDependencies) resolves
+     and spawns the self-contained native binary, so `npx specscribe` generated all 196 files with NO .NET SDK
+     present. Promotes that proven wrapper into a real channel. Aligns with / feeds Story 16.3 (CLI packaging) — the
+     native binary it wraps is the same self-contained publish 16.3 produces. Full ACs via create-story when scheduled. -->
+
+As a prospective user in the JS/spec-driven-dev ecosystem,
+I want to run SpecScribe via `npx` with no .NET SDK installed,
+So that trying and using the tool (locally or in CI) is as low-friction as any Node CLI.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the self-contained native binary produced by Story 16.3
+**When** the npm-wrapper package is published
+**Then** `npx <package>` resolves and runs the correct per-OS binary (via `optionalDependencies`/platform packages) and generates the site with no .NET SDK or runtime installed.
+
+2.
+**Given** npx is an additive channel
+**When** it ships
+**Then** the `dotnet tool` channel remains available for .NET users, versioning stays aligned with Story 16.1's policy, and the wrapper's per-RID binary matrix is documented (size/latency trade-offs per ADR 0006).

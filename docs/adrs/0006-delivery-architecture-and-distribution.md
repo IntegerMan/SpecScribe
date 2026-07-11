@@ -1,6 +1,6 @@
 # ADR 0006: Delivery Architecture & Distribution — JSON + SPA + npx vs. the C# Static-Site + Bundled-Binary Path
 
-**Status:** Proposed (spike recommendation — awaiting owner ratification; see "Decider's note")
+**Status:** Accepted (ratified by owner 2026-07-10; see "Decider's note")
 **Date:** 2026-07-10
 **Deciders:** Matt Eland
 **Amends:** [ADR 0005 — VS Code Webview Runtime and Packaging](0005-vs-code-webview-runtime-and-packaging.md) (re-affirmed, not superseded — see Decision)
@@ -91,6 +91,97 @@ parsing**; the rest is large-but-mechanical.
   form. **Tradeoff:** live in-editor regeneration still needs the binary present (bundled or npx'd) to re-emit the
   JSON — a view-only consumer cannot regenerate without it.
 
+## Architectures Considered
+
+Five delivery architectures were weighed. Each flow diagram reads left-to-right: source → processing → delivery. The
+distinction that decides the outcome is **where the process-boundary and the language-boundary fall** — because only
+moving *analysis* across the language boundary (C) forces the expensive rewrite.
+
+### A. Current — ADR 0005 (C# static site + C# webview + bundled binary) — *re-affirmed baseline*
+
+C# parses, projects, and renders finished HTML: one file per artifact for the static site, and webview-ready HTML
+for the VS Code panel (rendered by a C# `WebviewRenderAdapter`, driven by a thin TS shim). "Just works on install"
+is met by bundling a self-contained binary.
+
+```mermaid
+flowchart LR
+  SRC[Source artifacts + git] --> CORE[C# core: parse, project, render]
+  CORE --> HTML[196+ static HTML files]
+  CORE --> WV[C# WebviewRenderAdapter]
+  WV --> SHIM[Thin TS shim] --> PANEL[VS Code webview]
+  BIN[Self-contained binary 73 MB/RID] -. bundled with .-> SHIM
+```
+
+### B. JSON + SPA delivery adapter (C# still renders) — *adopted, additive*
+
+A second `IRenderAdapter` (the Story 6.1 seam) consolidates the many-files output into a JSON data layer + a small
+client renderer. Rendering **stays in C#**; the static HTML remains as the accessible `noscript` fallback (free,
+because the core already emits it). Addresses the file-count concern **without any TS port**.
+
+```mermaid
+flowchart LR
+  SRC[Source artifacts + git] --> CORE[C# core: parse, project]
+  CORE --> ADP[C# JSON+SPA render adapter]
+  ADP --> JSON[JSON data layer + pre-rendered SVG]
+  ADP --> FB[Static HTML / noscript fallback]
+  JSON --> SPA[Small client renderer] --> FEW[Few files, client-rendered]
+```
+
+### C. npx via npm-wrapped native binary — *adopted, additive*
+
+A ~1.5 KB npm wrapper (the esbuild/Biome pattern) resolves and spawns the self-contained binary through
+`optionalDependencies`. Proven end-to-end: `npx` generated all 196 files with **no .NET SDK present**. No port.
+
+```mermaid
+flowchart LR
+  NPX[npx specscribe] --> WRAP[npm wrapper 1.5 KB]
+  WRAP --> BIN[Native self-contained binary]
+  BIN --> GEN[Generates site, no .NET SDK]
+```
+
+### D. Full pure-TS SPA + ported core — *deferred*
+
+The owner's original lean: analysis and rendering both move to TypeScript/Node, distributed via npx natively with no
+binary. This is the only option that fully eliminates the native binary **and** keeps live in-editor regeneration —
+but it requires porting ~14,200 LOC + 667 tests, with Markdig-fidelity and deep-git parsing as the flagged risks.
+
+```mermaid
+flowchart LR
+  SRC[Source artifacts] --> TSCORE[Ported TS/Node core ~14,200 LOC]
+  GIT[git subprocess] --> TSCORE
+  TSCORE --> JSON[JSON] --> SPA[SPA framework] --> APP[Client-rendered app]
+  NPX[npx native, no binary] -. runs .-> TSCORE
+```
+
+### E. WASM core called from Node — *rejected*
+
+Compiling the C# core to a Node-callable `wasi` artifact would give one cross-platform binary and avoid the port.
+Blocked on paper: WASI preview-1 cannot spawn `git`, and the git-pulse + deep-git analytics depend on the `git`
+subprocess. It would require re-architecting the git seam so the JS host runs `git` — not a drop-in.
+
+```mermaid
+flowchart LR
+  SRC[Source artifacts] --> WASM[C# core compiled to WASM/wasi]
+  WASM --> JSON[JSON] --> SPA[SPA]
+  WASM -. WASI cannot spawn .-> GIT[git subprocess: BLOCKED]
+```
+
+### Comparison (measured against *this* repo, 2026-07-10)
+
+| Architecture | Files (this repo → Epic-7 scale) | Body bytes | Distribution | Live in-editor regen | Port cost | NFR6 fallback | Verdict |
+|---|---|---|---|---|---|---|---|
+| **A. Current (ADR 0005)** | 198 → ~1,060 (thousands on big repos) | full (SVG-heavy) | `dotnet tool` / bundled 73 MB/RID | binary present | none | native static HTML | **Re-affirmed** |
+| **B. JSON + SPA adapter (C#)** | few → few | ~same (pre-rendered SVG ships) | via binary / npx | binary present | none (additive `IRenderAdapter`) | static / `noscript` (free) | **Adopted (additive)** |
+| **C. npx npm-wrapper** | n/a (distribution) | n/a | **npx, no .NET SDK (proven)** | binary present | none | n/a | **Adopted (additive)** |
+| **D. Full pure-TS SPA + port** | few → few | ~13.5 KB data floor (charts re-rendered in TS) | npx native, no binary | in Node (native) | **~14,200 LOC + 667 tests**; Markdig + deep-git risk | needs SSR/build for fallback | **Deferred** |
+| **E. WASM core from Node** | few → few | data floor | one `.wasm`, all platforms | **blocked** | git-seam re-architecture | — | **Rejected** (WASI can't spawn `git`) |
+
+**Key measured figures** (full detail in the Evidence base below): inline SVG is **69.3 %** of the dashboard body /
+**58.9 %** of epics — so a JSON layer shipping pre-rendered SVG cuts *file count* but not *bytes* (the structured
+data floor is 13.5 KB, reachable only by porting chart generation). npx wrapper: **1,558-byte** tarball, generated
+**196 files in 3.7 s** with no .NET SDK. Self-contained binary: **73 MiB / 34 MB gzipped** per RID. Client render:
+fetch 35 ms + render ~7–8 ms.
+
 ## Decision
 
 **Re-affirm ADR 0005's core — C# remains SpecScribe's rendering and analysis engine, shipped as a self-contained
@@ -143,10 +234,14 @@ fallback at zero extra cost. The webview's "reach the same information without e
 
 ### Decider's note
 
-This ADR is marked **Proposed** rather than Accepted because its recommendation **reverses the owner's stated lean**
-(toward a pure-TS SPA + ported core). The spike's job was to decide by numbers; the numbers say the three concerns are
-each addressable without the port, and the port is expensive and risky. The owner ratifies (→ Accepted) or overrides
-(→ records the counter-decision and seats the port epic). Either way the frozen stories unblock per the re-plan below.
+The spike's recommendation **reverses the owner's original lean** (toward a pure-TS SPA + ported core): the numbers
+show the three concerns are each addressable without the port, and the port is expensive (~14,200 LOC + 667 tests)
+and risky (Markdig fidelity, deep-git parsing). It was therefore issued as **Proposed** for an explicit decision.
+
+**Ratified by the owner (Matthew-Hope Eland) on 2026-07-10** — Status is now **Accepted**. The full-TS pivot (option D)
+is **deferred, not rejected**: if "no native binary in the extension, with live in-editor regen" later becomes a hard
+requirement, it is seated as its own epic gated on a WASM-git-bridge feasibility proof. The frozen stories unblock per
+the re-plan below.
 
 ## Consequences
 
