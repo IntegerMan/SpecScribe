@@ -2,6 +2,18 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 6-3-vs-code-integration-spike (2026-07-11)
+
+- source_spec: `6-3-vs-code-integration-spike.md` — three throwaway-spike-code defects carried to the Story 6.4 runtime build. **All three are now RESOLVED in Story 6.4** (verified 2026-07-11, 701 tests green); kept here for the audit trail.
+- **[RESOLVED in 6.4]** ~~Live-push watcher glob anchored to the workspace folder while the renderer walks up to the repo root~~ — 6.4's `webview` command now returns `repoRoot` in its payload and the extension anchors its `FileSystemWatcher`s to that resolved root (`RelativePattern(vscode.Uri.file(cache.repoRoot), …)`), so live-push fires even when VS Code is opened on a subdirectory. Wiring pinned by `SiteGeneratorWebviewTests.RenderWebviewSurfaces_CoversAllFiveSurfaceFamilies`.
+- **[RESOLVED in 6.4]** ~~Overlapping debounced re-renders race~~ — the runtime shim coalesces concurrent spawns via an in-flight guard (`loading ??= runRenderer(...).finally(() => loading = undefined)`), so rapid saves + nav-during-load share one render and no stale result overwrites a fresher one.
+- **[RESOLVED in 6.4]** ~~Re-invoking the command leaks watchers/handlers and resets the panel~~ — the runtime early-returns and reveals the existing panel (`if (panel) { panel.reveal(); return; }`); watchers/handlers register once per panel.
+
+## Deferred from: code review of 6-4-...-webview-runtime (2026-07-11)
+
+- source_spec: `6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics.md` — surfaced during the 6.4 review; not a correctness defect, left for a follow-up.
+- **Scoped re-render not implemented — every live-push does a full site regeneration.** `WebviewCommand` runs `generator.GenerateAll()` into a temp scratch dir on **every** debounced source change, then `RenderWebviewSurfaces()`; ADR 0005 §3 explicitly said *"Story 6.4 **must** add scoped re-render to feel live on large repos"* (~1.8–2.0 s warm full pass; coalesced by the shim's in-flight guard so never concurrent, but still full each time). Correctness is fine and small/medium repos feel fine; on large repos live refresh lags. Follow-up: scope the re-render to the changed artifact family (mirror `SiteGenerator.RegenerateEpics`) so refresh trends sub-second. Track as a 6.4 polish item or a dedicated story.
+
 ## Deferred from: code review of story-6-6 (2026-07-10)
 
 - source_spec: `6-6-delivery-architecture-and-distribution-spike.md`
