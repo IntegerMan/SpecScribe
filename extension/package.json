@@ -1,0 +1,48 @@
+{
+  "name": "specscribe-status",
+  "displayName": "SpecScribe Status",
+  "description": "Read-only, live-updating in-editor view of a SpecScribe project's dashboard and epics surfaces. All rendering happens in the SpecScribe C# core; this extension is a thin host shim (ADR 0005).",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "specscribe",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "specscribe.openStatus",
+        "category": "SpecScribe",
+        "title": "Open Status"
+      }
+    ],
+    "configuration": {
+      "title": "SpecScribe",
+      "properties": {
+        "specscribe.toolPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the SpecScribe tool the extension spawns for rendering — an executable, or a `SpecScribe.dll` to run via `dotnet`. Leave empty to use the binary bundled with the extension (when packaged) or `specscribe` on PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "node esbuild.js --production && npx --yes @vscode/vsce@latest package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.6.0"
+  }
+}

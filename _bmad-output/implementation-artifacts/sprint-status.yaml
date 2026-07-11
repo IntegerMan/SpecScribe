@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-11T02:00:00-04:00
+last_updated: 2026-07-11T12:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -106,7 +106,7 @@ development_status:
   # UNFROZEN 2026-07-10: ADR 0006 (Accepted, owner-ratified) re-affirmed ADR 0005's C#-render + self-contained
   # binary path — exactly this story's premise — and deferred the pure-TS pivot. Proceeds as written under ADR
   # 0005/0006. Original gate stands: dev-start requires Story 6.2 done. DEPENDS ON 6.2 + 6.3 (both review).
-  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: ready-for-dev
+  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: review # implemented 2026-07-11 (branch worktree-bmad-dev-story-6-4): WebviewRenderAdapter + `specscribe webview` CLI + extension/ thin shim; 701 tests green, golden byte-identity vs fa1d79c held; one F5 smoke in real VS Code remains (extension/README.md checklist)
   # Story 6.5 = host theming + explicit helper actions (was epics.md Story 6.3). UNFROZEN 2026-07-10 (ADR 0006
   # re-affirmed the C#-rendered webview it themes). Original gate stands: blocked on 6.4 (webview must exist) + 6.2.
   6-5-host-aware-theming-and-explicit-helper-actions: ready-for-dev

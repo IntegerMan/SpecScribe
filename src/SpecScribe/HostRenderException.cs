@@ -12,11 +12,27 @@ namespace SpecScribe;
 public sealed record HostRenderException(string SurfaceId, string FactId, string Reason);
 
 /// <summary>The single documented home for sanctioned cross-surface divergence — the registry AC #2's parity
-/// checks consult. EMPTY in Story 6.1 (the HTML adapter is the only surface and drops/reinterprets nothing), so
-/// the harness treats every divergence as a regression. A future surface adds its host-specific exceptions here
-/// so they are visible and reviewed, never silent drift. [Story 6.1]</summary>
+/// checks consult. Empty through Stories 6.1/6.2 (the HTML adapter drops/reinterprets nothing); Story 6.4's
+/// webview surface registers its three host-specific exceptions here — all CHROME/ASSET facts forced by the
+/// webview platform's Content-Security-Policy, never a section/content fact (the body facts hold full parity).
+/// [Story 6.1; entries Story 6.4]</summary>
 public static class HostRenderExceptions
 {
-    /// <summary>The sanctioned divergences. Empty this story.</summary>
-    public static readonly IReadOnlyList<HostRenderException> Registry = Array.Empty<HostRenderException>();
+    /// <summary>The sanctioned divergences. Exactly the three ADR 0005 measured for the webview surface; every
+    /// entry names its surface and carries a reviewable reason. An unregistered divergence is a bug.</summary>
+    public static readonly IReadOnlyList<HostRenderException> Registry = new[]
+    {
+        new HostRenderException("webview", "asset.css",
+            "The webview inlines the production stylesheet into its <style> block (no <link rel=\"stylesheet\"> "
+            + "is emitted): under the webview CSP local resources only load via asWebviewUri, and ADR 0005 "
+            + "ratified inlining so the shim ships no loose asset files. Same bytes of CSS, different carrier."),
+        new HostRenderException("webview", "asset.js",
+            "The specscribe.js enhancement script is deliberately absent: it is convenience-only by the "
+            + "progressive-enhancement policy (rendering-architecture.md), and ADR 0005 measured that the body "
+            + "reaches the same information without it. The webview's only script is its own nonce'd bridge."),
+        new HostRenderException("webview", "mermaid",
+            "No Mermaid script can load under the webview CSP (script-src is nonce-locked, remote loads are "
+            + "blocked), so the epics roadmap's <pre class=\"mermaid\"> degrades to readable preformatted text — "
+            + "ADR 0005's accepted fallback. Bundling Mermaid with a nonce remains a 6.5+ option if ever wanted."),
+    };
 }

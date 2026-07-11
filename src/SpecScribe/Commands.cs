@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -26,6 +29,67 @@ public sealed class GenerateCommand : Command<SiteSettings>
         ConsoleUi.PrintInitialSummary(events, sw.Elapsed);
         ConsoleUi.PrintOutputLink(options);
         return generator;
+    }
+}
+
+/// <summary>`specscribe webview` — render the VS Code webview surface bundle (dashboard + epics family) as one
+/// JSON payload on stdout, then exit. This is the extension↔core data path ADR 0005 ratified: the thin TS shim
+/// spawns this command and reads finished, CSP-safe HTML — all rendering stays in C#. A machine channel, not a
+/// human one: stdout carries ONLY the JSON (no logo, no progress — Spectre output would corrupt the payload);
+/// diagnostics go to stderr. [Story 6.4]
+/// <para><b>Read-only by construction (AC #6):</b> the generation pass this command runs to populate the shared
+/// models writes its scratch site into a per-project temp directory — never the project's configured output, and
+/// never any source artifact — so opening the status panel leaves the project untouched. Pass <c>--output</c> to
+/// direct the scratch site somewhere specific. Additive to the CLI: <c>generate</c>/<c>watch</c>/interactive
+/// behavior is unchanged, and the pending Story 5.x CLI scope is untouched.</para></summary>
+public sealed class WebviewCommand : Command<SiteSettings>
+{
+    protected override int Execute(CommandContext context, SiteSettings settings, CancellationToken cancellationToken)
+    {
+        var resolved = settings.Resolve();
+        var options = settings.Output is { Length: > 0 }
+            ? resolved
+            : RedirectOutputToScratch(resolved);
+
+        var generator = new SiteGenerator(options);
+        var events = generator.GenerateAll();
+        foreach (var error in events.Where(e => e.Outcome == GenerationOutcome.Error))
+        {
+            // Non-fatal per the generator's own contract (sibling pages still rendered); surfaced for the shim's
+            // stderr capture so a broken artifact is diagnosable from the extension host log.
+            Console.Error.WriteLine($"[specscribe webview] {error.RelativePath}: {error.Message}");
+        }
+
+        var bundle = generator.RenderWebviewSurfaces();
+        var payload = new
+        {
+            siteTitle = bundle.SiteTitle,
+            entry = bundle.EntryPath,
+            document = bundle.EntryDocument,
+            surfaces = bundle.Surfaces.ToDictionary(s => s.OutputRelativePath, s => new { title = s.Title, content = s.ContentHtml }),
+        };
+        Console.Out.Write(JsonSerializer.Serialize(payload));
+        return 0;
+    }
+
+    /// <summary>Clones the resolved options with the output root moved to a stable per-project temp scratch
+    /// directory (keyed by a hash of the repo root so concurrent projects never collide, stable so successive
+    /// spawns overwrite rather than accumulate).</summary>
+    private static ForgeOptions RedirectOutputToScratch(ForgeOptions options)
+    {
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            options.RepoRoot.ToUpperInvariant())))[..16].ToLowerInvariant();
+        return new ForgeOptions
+        {
+            RepoRoot = options.RepoRoot,
+            SourceRoot = options.SourceRoot,
+            AdrSourceRoot = options.AdrSourceRoot,
+            AdrSourceExplicit = options.AdrSourceExplicit,
+            OutputRoot = Path.Combine(Path.GetTempPath(), "specscribe-webview", key),
+            SiteTitle = options.SiteTitle,
+            IncludeReadme = options.IncludeReadme,
+            DeepGitAnalytics = options.DeepGitAnalytics,
+        };
     }
 }
 
