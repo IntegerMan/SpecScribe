@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: 2026-07-10T00:00:00-04:00
+# last_updated: 2026-07-11T00:00:00-04:00
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-11T01:00:00-04:00
+last_updated: 2026-07-11T02:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -92,7 +92,7 @@ development_status:
 
   epic-6: in-progress
   6-1-shared-view-model-contract-for-html-and-webview-adapters: done
-  6-2-read-only-vs-code-dashboard-and-epics-experience: review # scoped to epics AC #1 (rendering-core body decomposition) at create-story; webview runtime (AC #2/#3) split out, needs correct-course seating
+  6-2-read-only-vs-code-dashboard-and-epics-experience: done # scoped to epics AC #1 (rendering-core body decomposition) at create-story; webview runtime (AC #2/#3) split out, needs correct-course seating. Code-review 2026-07-11: 4 patches applied (status harmonization owned + golden regen, parity harness broadened to full AC#3, regex + cref fixes), suite green
   # Epic 6 stories RENUMBERED into dependency order 2026-07-10 (owner-authorized): 6.1 contract → 6.2 section
   # view models → 6.3 VS Code integration spike → 6.4 webview runtime → 6.5 host theming. Numeric == dependency
   # order, no inversions. (History: host-theming was briefly renumbered 6.3→6.5 to sort after the webview; the
@@ -115,7 +115,7 @@ development_status:
   # npx wrapper channel (Story 16.8) + an optional JSON+SPA delivery adapter (Story 6.7), DEFER the pure-TS pivot.
   # NFR6 ruling: JSON+SPA is additive over the static-HTML baseline (static/noscript fallback required). Spike code
   # throwaway under spike/delivery/; src untouched, 676 tests green. Still needs close-out code-review → done.
-  6-6-delivery-architecture-and-distribution-spike: review # ADR 0006 Accepted (ratified 2026-07-10); awaiting close-out code-review
+  6-6-delivery-architecture-and-distribution-spike: done # ADR 0006 Accepted (ratified 2026-07-10); close-out code-review passed 2026-07-10
   # Story 6.7 = JSON + client-renderer (SPA) delivery adapter — seated by ADR 0006 (additive). A second C#
   # IRenderAdapter that consolidates the many-files output into a JSON data layer + a small client renderer, with
   # the static-HTML/noscript fallback (NFR6). Rendering stays in C#; no core port. Addresses the file-count concern
@@ -139,7 +139,7 @@ development_status:
   8-2-single-source-of-truth-for-every-count: ready-for-dev
   8-3-paired-progress-and-readiness-semantics: ready-for-dev
   8-4-state-aware-next-step-command-surface: ready-for-dev
-  8-5-designed-empty-states: backlog
+  8-5-designed-empty-states: ready-for-dev
   8-6-one-primary-view-per-dashboard-dataset: backlog
   8-7-generation-time-recency-signals: backlog
   epic-8-retrospective: optional

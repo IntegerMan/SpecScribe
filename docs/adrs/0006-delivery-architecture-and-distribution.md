@@ -64,7 +64,7 @@ matching ADR 0005's ~73 MB. An **npm-wrapper-around-native-binary** package (the
 achievable now, with no port.**
 
 **Axis C — the port surface (enumerated, not performed).** "Pure TypeScript for the application" ⇒ porting
-**~14,200 production LOC across 87 `.cs` files + the ~667-case / 55-file test suite**:
+**~14,200 production LOC across 87 `.cs` files + the ~676-case / 55-file test suite**:
 
 | Subsystem | LOC | Port risk |
 |---|---:|---|
@@ -76,7 +76,7 @@ achievable now, with no port.**
 | Git (`GitMetrics`, incl. deep-git numstat parsing) | 604 | **Medium** — `git` subprocess ports to Node, but the deep-git numstat/log parsing is fiddly and already bug-prone (memory: deep-git-single-numstat-path) |
 | CLI / IO / watch / settings | 2,532 | **Medium** — Spectre.Console→commander/yargs, FileSystemWatcher→chokidar |
 
-Plus re-porting ~667 tests. Two clusters carry genuine fidelity risk — **Markdig extensions** and **deep-git
+Plus re-porting ~676 tests. Two clusters carry genuine fidelity risk — **Markdig extensions** and **deep-git
 parsing**; the rest is large-but-mechanical.
 
 **Coupling-breakers (axis C):**
@@ -130,7 +130,7 @@ flowchart LR
 ### C. npx via npm-wrapped native binary — *adopted, additive*
 
 A ~1.5 KB npm wrapper (the esbuild/Biome pattern) resolves and spawns the self-contained binary through
-`optionalDependencies`. Proven end-to-end: `npx` generated all 196 files with **no .NET SDK present**. No port.
+`optionalDependencies`. Proven end-to-end: `npx` generated all 198 files (196 HTML) with **no .NET SDK present**. No port.
 
 ```mermaid
 flowchart LR
@@ -143,7 +143,7 @@ flowchart LR
 
 The owner's original lean: analysis and rendering both move to TypeScript/Node, distributed via npx natively with no
 binary. This is the only option that fully eliminates the native binary **and** keeps live in-editor regeneration —
-but it requires porting ~14,200 LOC + 667 tests, with Markdig-fidelity and deep-git parsing as the flagged risks.
+but it requires porting ~14,200 LOC + 676 tests, with Markdig-fidelity and deep-git parsing as the flagged risks.
 
 ```mermaid
 flowchart LR
@@ -173,13 +173,13 @@ flowchart LR
 | **A. Current (ADR 0005)** | 198 → ~1,060 (thousands on big repos) | full (SVG-heavy) | `dotnet tool` / bundled 73 MB/RID | binary present | none | native static HTML | **Re-affirmed** |
 | **B. JSON + SPA adapter (C#)** | few → few | ~same (pre-rendered SVG ships) | via binary / npx | binary present | none (additive `IRenderAdapter`) | static / `noscript` (free) | **Adopted (additive)** |
 | **C. npx npm-wrapper** | n/a (distribution) | n/a | **npx, no .NET SDK (proven)** | binary present | none | n/a | **Adopted (additive)** |
-| **D. Full pure-TS SPA + port** | few → few | ~13.5 KB data floor (charts re-rendered in TS) | npx native, no binary | in Node (native) | **~14,200 LOC + 667 tests**; Markdig + deep-git risk | needs SSR/build for fallback | **Deferred** |
+| **D. Full pure-TS SPA + port** | few → few | ~13.5 KB data floor (charts re-rendered in TS) | npx native, no binary | in Node (native) | **~14,200 LOC + 676 tests**; Markdig + deep-git risk | needs SSR/build for fallback | **Deferred** |
 | **E. WASM core from Node** | few → few | data floor | one `.wasm`, all platforms | **blocked** | git-seam re-architecture | — | **Rejected** (WASI can't spawn `git`) |
 
 **Key measured figures** (full detail in the Evidence base below): inline SVG is **69.3 %** of the dashboard body /
 **58.9 %** of epics — so a JSON layer shipping pre-rendered SVG cuts *file count* but not *bytes* (the structured
 data floor is 13.5 KB, reachable only by porting chart generation). npx wrapper: **1,558-byte** tarball, generated
-**196 files in 3.7 s** with no .NET SDK. Self-contained binary: **73 MiB / 34 MB gzipped** per RID. Client render:
+**198 files (196 HTML) in 3.7 s** with no .NET SDK. Self-contained binary: **73 MiB / 34 MB gzipped** per RID. Client render:
 fetch 35 ms + render ~7–8 ms.
 
 ## Decision
@@ -207,7 +207,7 @@ the full simultaneous set.** "Thin extension + live in-editor regen + npx + *no 
    **pre-generated-JSON breaker**: a thin *consumer* webview/SPA loads committed JSON + a small JS bundle (no 73 MB
    binary in the view path), with regeneration delegated to the binary (bundled once, or run via npx/CI on change).
    Full elimination of the native binary *and* live in-editor regeneration is the one outcome that forces the port
-   (or a WASM-with-git-host-bridge re-architecture). The evidence does not justify paying ~14,200 LOC + 667 tests of
+   (or a WASM-with-git-host-bridge re-architecture). The evidence does not justify paying ~14,200 LOC + 676 tests of
    port — with Markdig-fidelity and deep-git risk — to reach it now.
 
 **Therefore ADR 0005 is re-affirmed (not superseded).** Its data path (C# renders webview/HTML), its self-contained
@@ -235,7 +235,7 @@ fallback at zero extra cost. The webview's "reach the same information without e
 ### Decider's note
 
 The spike's recommendation **reverses the owner's original lean** (toward a pure-TS SPA + ported core): the numbers
-show the three concerns are each addressable without the port, and the port is expensive (~14,200 LOC + 667 tests)
+show the three concerns are each addressable without the port, and the port is expensive (~14,200 LOC + 676 tests)
 and risky (Markdig fidelity, deep-git parsing). It was therefore issued as **Proposed** for an explicit decision.
 
 **Ratified by the owner (Matthew-Hope Eland) on 2026-07-10** — Status is now **Accepted**. The full-TS pivot (option D)
@@ -246,7 +246,7 @@ the re-plan below.
 ## Consequences
 
 **Positive**
-- No ~14,200 LOC / 667-test rewrite; Epics 1–4 + 3 are preserved. Markdig-fidelity and deep-git risk are not re-incurred.
+- No ~14,200 LOC / 676-test rewrite; Epics 1–4 + 3 are preserved. Markdig-fidelity and deep-git risk are not re-incurred.
 - npx ships to the JS audience **now**, port-free (proven). CI needs no .NET SDK.
 - The file-count concern gets a real answer (JSON+SPA adapter) that stays within the shared-core contract (AD-1/AD-2,
   NFR4) as an additive `IRenderAdapter` — no seed-level namespace split.

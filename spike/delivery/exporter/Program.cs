@@ -28,8 +28,8 @@ using SpecScribe;
 
 try
 {
-    var startDir = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
     var outDir = GetOption(args, "--out") ?? "delivery-out";
+    var startDir = GetStartDir(args); // first positional, skipping option flags AND their space-separated values
 
     var options = ForgeOptions.Resolve(startDirectory: startDir ?? Directory.GetCurrentDirectory());
 
@@ -167,8 +167,31 @@ static (int count, int bytes) SvgMass(string html)
 
 static string? GetOption(string[] args, string name)
 {
+    // `--name VALUE` form (value must not itself be a flag)…
     var i = Array.IndexOf(args, name);
-    return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+    if (i >= 0 && i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
+        return args[i + 1];
+    // …or `--name=VALUE` form.
+    var prefix = name + "=";
+    return args.FirstOrDefault(a => a.StartsWith(prefix, StringComparison.Ordinal))?[prefix.Length..];
+}
+
+// First positional argument: not an option flag and not the space-separated value of one.
+// Without this, `-- --out DIR` (no leading positional) would pick DIR as BOTH the ingest root and the out dir.
+static string? GetStartDir(string[] args)
+{
+    for (var i = 0; i < args.Length; i++)
+    {
+        var a = args[i];
+        if (a.StartsWith("--", StringComparison.Ordinal))
+        {
+            if (!a.Contains('=') && i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                i++; // skip this flag's value
+            continue;
+        }
+        return a;
+    }
+    return null;
 }
 
 // Best-effort standalone docs for the dashboard's home-index bands — mirrors the 6.3 spike's BuildDocs.

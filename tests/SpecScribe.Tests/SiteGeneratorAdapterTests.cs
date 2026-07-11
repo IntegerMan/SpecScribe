@@ -46,6 +46,10 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         Stand up the portal.
 
+        ### Epic 2: Delivery
+
+        Ship the portal.
+
         ## Epic 1: Foundation
 
         ### Story 1.1: Foundation Story
@@ -55,6 +59,34 @@ public class SiteGeneratorAdapterTests : IDisposable
         ### Story 1.2: Undrafted Story
 
         As a maintainer, I want the follow-up (no artifact yet).
+
+        ## Epic 2: Delivery
+
+        ### Story 2.1: Delivery Story
+
+        As a maintainer, I want delivery.
+        """;
+
+    // Epic 2 is all-done but has NO retrospective — the ForEpic vs ForEpicWithRetrospective divergence (an
+    // all-done-without-retro epic reads as "In review" on the visual status surfaces). Keeping this in the golden
+    // fixture is what makes the byte gate actually EXERCISE that retro-gated branch, which it previously did not.
+    // [Story 6.2 review]
+    private const string Story21Md = """
+        # Story 2.1: Delivery Story
+
+        Status: done
+
+        ## Story
+
+        As a maintainer, I want delivery.
+
+        ## Acceptance Criteria
+
+        1. It ships.
+
+        ## Tasks / Subtasks
+
+        - [x] Task 1: Ship it (AC: #1)
         """;
 
     private const string Story11Md = """
@@ -90,6 +122,8 @@ public class SiteGeneratorAdapterTests : IDisposable
           epic-1: in-progress
           1-1-foundation: in-progress
           1-2-undrafted: backlog
+          epic-2: done
+          2-1-delivery: done
         """;
 
     public SiteGeneratorAdapterTests()
@@ -100,6 +134,7 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), EpicsMd);
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"), Story11Md);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "2-1-delivery.md"), Story21Md);
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "epic-1-retro-2026-07-06.md"), RetroMd);
         File.WriteAllText(SprintYaml, SprintYamlContent);
         File.WriteAllText(Path.Combine(Adrs, "README.md"), "# ADR Index\n\nRecords.\n");
@@ -139,8 +174,10 @@ public class SiteGeneratorAdapterTests : IDisposable
             "diagnostics.html",
             "epics.html",
             "epics/epic-1.html",
+            "epics/epic-2.html",
             "epics/story-1-1.html",
             "epics/story-1-2.html",
+            "epics/story-2-1.html",
             "implementation-artifacts/epic-1-retro-2026-07-06.html",
             "index.html",
             "requirements.html",
@@ -172,7 +209,7 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         var fingerprint = FingerprintTree(Site);
 
-        const string expected = "3dd28244bbe9724537f6a28eea2b174542ee40660e2d3e99604b28feb018d589";
+        const string expected = "d68a2fc9a55b2e7a32fa2c1e7362e4e59972e056cf98d400e90b4a5481fac950";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -328,6 +365,27 @@ public class SiteGeneratorAdapterTests : IDisposable
         Assert.True(gen.IsEpicsRelated(Path.Combine(Source, "nested", "epics.md")));
         Assert.True(gen.IsEpicsRelated(Path.Combine(Source, "tracking", "implementation-artifacts", "1-4-x.md")));
         Assert.False(gen.IsEpicsRelated(Path.Combine(Source, "planning-artifacts", "prd.md")));
+    }
+
+    [Fact]
+    public void GenerateAll_AllDoneEpicWithoutRetrospective_RendersAsInReview()
+    {
+        // Story 6.2 harmonized the epic-status VISUAL surfaces onto StatusStyles.ForEpicWithRetrospective: an epic
+        // whose every story is done but which has NO retrospective reads as "In review" (delivered, retro pending)
+        // rather than "Done". Epic 2 in this fixture is exactly that case (Story 2.1 done, no epic-2 retro). This
+        // pins the branch the golden fingerprint now exercises — it was previously invisible because the only
+        // fixture epic had an in-progress story. [Story 6.2 review]
+        new SiteGenerator(Options()).GenerateAll();
+
+        // The epic HEADER badge reads "In review". No story here is in review (Story 2.1 is done), so a
+        // review-class status badge on this page can only be the epic's own header badge.
+        var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
+        Assert.Contains("<span class=\"status-badge review\">", epic2);
+
+        // …and the epics-index chip for Epic 2 agrees (the same retro-gated classifier), so the surfaces are
+        // consistent rather than one reading "Done" and another "In review".
+        var epicsIndex = File.ReadAllText(Path.Combine(Site, "epics.html"));
+        Assert.Contains("epic-chip review", epicsIndex);
     }
 
     [Fact]

@@ -126,8 +126,10 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</section>\n\n");
     }
 
-    /// <summary>The Epic Status donut. Re-homed from <c>HtmlTemplater.AppendEpicStatusPanel</c> — the donut still
-    /// derives its segments from the same <see cref="StatusStyles.ForEpic"/> roll-up, so nothing is re-modelled.</summary>
+    /// <summary>The Epic Status donut. Re-homed from <c>HtmlTemplater.AppendEpicStatusPanel</c> — the donut derives
+    /// its segments from the retro-gated <see cref="StatusStyles.ForEpicWithRetrospective"/> roll-up (an all-done
+    /// epic with no retrospective reads as "In review", harmonizing with the sunburst/chips/badge surfaces that
+    /// already used it), so nothing is re-modelled. [Story 6.2 review: harmonized the epic-status surfaces.]</summary>
     private void AppendEpicStatusPanel(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel)
     {
         sb.Append("<div class=\"chart-panel\">\n<h3>Epic Status</h3>\n<div class=\"donut-and-legend\">\n");

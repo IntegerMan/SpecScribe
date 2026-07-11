@@ -45,8 +45,8 @@ SPECSCRIBE_BIN=<pubdir>/specscribe(.exe) node bin/specscribe.js generate --outpu
 | Client render | fetch 35 ms, render 7.9 ms (dashboard) / 6.9 ms (epics) |
 | Epic-7 file-count extrapolation (this small repo) | +863 pages → ~1,060 files; large repos → thousands |
 | Self-contained binary | 73.0 MiB raw / 34.2 MB gzipped per RID |
-| npx wrapper | 1.5 KB; `npx`→wrapper→native exe generated 196 files in 3.7 s, no .NET SDK |
-| Port surface (axis C, not performed) | ~14,200 LOC / 87 files + ~667 tests; Markdig + deep-git are the risk clusters |
+| npx wrapper | 1.5 KB; `npx`→wrapper→native exe generated 198 files (196 HTML) in 3.7 s, no .NET SDK |
+| Port surface (axis C, not performed) | ~14,200 LOC / 87 files + ~676 tests; Markdig + deep-git are the risk clusters |
 
 **Verdict:** each concern (file bloat, npx, thin extension) is addressable **without** the C#→TS port; the coupling
 that would force the port holds only for the full simultaneous set. See ADR 0006 for the decision.

@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Story 6.6 DELIVERY-ARCHITECTURE SPIKE — THROWAWAY. Quarantined under spike/, referenced by no solution and
-       excluded from the shipped `specscribe` tool's build/pack (there is no .sln; `dotnet build src/SpecScribe`
-       never sees this). Emits a JSON DATA LAYER (structured section records) + the pre-rendered section bodies
+  <!-- Story 6.6 DELIVERY-ARCHITECTURE SPIKE — THROWAWAY. Quarantined under spike/ and excluded from the shipped
+       `specscribe` tool's build/pack: the repo's solution (SpecScribe.slnx) lists ONLY src/SpecScribe +
+       tests/SpecScribe.Tests and never references this project, and `dotnet build src/SpecScribe` never sees it.
+       Emits a JSON DATA LAYER (structured section records) + the pre-rendered section bodies
        for the dashboard + epics surfaces, from the SAME host-neutral view models the HTML surface uses
        (DashboardViewBuilder / EpicsViewBuilder + HtmlRenderAdapter) — no scraping of generated .html, no
        re-parsing of .md (AD-1/AD-2). Its ONLY purpose is to MEASURE axis-A bloat (output form). Delete with the

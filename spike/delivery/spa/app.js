@@ -12,11 +12,22 @@
   const strip = document.getElementById('strip');
   const surface = document.getElementById('surface');
 
+  async function fetchJson(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(url + ' → HTTP ' + r.status);
+    return r.json();
+  }
+
   const t0 = performance.now();
-  const [data, bodies] = await Promise.all([
-    fetch('data.json').then(r => r.json()),
-    fetch('bodies.json').then(r => r.json()),
-  ]);
+  let data, bodies;
+  try {
+    [data, bodies] = await Promise.all([fetchJson('data.json'), fetchJson('bodies.json')]);
+  } catch (e) {
+    perf.textContent = 'load failed: ' + e.message +
+      ' — serve this dir over HTTP with data.json + bodies.json alongside index.html (see spike/delivery/README.md)';
+    console.error('[spike] load failed', e);
+    return;
+  }
   const tFetched = performance.now();
 
   const renders = {};      // measured client render time per surface
@@ -31,7 +42,7 @@
       JSON.stringify(data).length.toLocaleString() + ' B) — charts below are injected pre-rendered from bodies.json';
     strip.appendChild(label);
     const tiles = surfaceKey === 'dashboard'
-      ? (data.dashboard.StatTiles || [])
+      ? (data.dashboard?.StatTiles || [])
       : [
           { Number: String(data.epics?.EpicCount ?? '—'), Label: 'Epics' },
           { Number: String(data.epics?.DraftedCount ?? '—'), Label: 'Drafted' },

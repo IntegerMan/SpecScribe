@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of story-6-6 (2026-07-10)
+
+- source_spec: `6-6-delivery-architecture-and-distribution-spike.md`
+- **Client render/interaction perf at scale unmeasured (AC #1) → carry into Story 6.7.** The 6.6 spike measured client render only on this small repo (fetch 35 ms / render ~7–8 ms) and extrapolated the Epic-7 blow-up for file count alone (+863 → ~1,060 files). Owner decision 2026-07-10: not load-bearing for the re-affirm-C# outcome, so the large-dataset render/interaction measurement belongs on **Story 6.7 (JSON+SPA delivery adapter)** where the adapter is built — make it an explicit AC/task there.
+- **Out-of-scope planning edits rode along in the spike's commit range.** AC #6 constrains what lands on `main` to the decision's own artifacts (ADR 0006, README index, 0005 amend-note, story record, sprint-status update for 6.6). The `1c9270b`..`HEAD` range also carries an `8-4-state-aware-next-step-command-surface` flip (backlog→ready-for-dev in `sprint-status.yaml`), `epics.md` edits, the 6-4/6-5 story-file edits, and a dependabot `spike/vscode` esbuild bump (0.24.2→0.28.1). These are already committed on `main` and are most likely intentional planning bundling, not spike leakage — none touches `src/**` or `tests/**`. Left as-is; if a future review wants a clean per-story boundary, split planning-status edits from spike close-out commits.
+
 ## Deferred from: code review of story-6-1 (2026-07-10)
 
 - source_spec: `6-1-shared-view-model-contract-for-html-and-webview-adapters.md`

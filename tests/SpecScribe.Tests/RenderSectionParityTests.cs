@@ -67,6 +67,134 @@ public class RenderSectionParityTests
         Assert.Contains(divergences, d => d.StartsWith("section.statTiles", StringComparison.Ordinal));
     }
 
+    // ----- Dashboard cards / panels / drill targets (AC #3 broadening) --------------------------------------
+
+    /// <summary>A dashboard carrying every broadened section fact: derived Now &amp; Next cards, Overall-Progress
+    /// bars, quick-link drill targets, a planning band (primary PRD + UX + other) and an ADR band, and a quick-dev
+    /// work card.</summary>
+    private static DashboardView RichDashboard() => new()
+    {
+        SiteTitle = "SpecScribe",
+        StatTiles = new[] { new StatTile("3/5", "Epics drafted") },
+        Commands = CommandCatalog.Empty,
+        Progress = ProgressModel.Empty,
+        NowNext = new DashboardNowNext(SprintBoard: null, Cards: new[]
+        {
+            new NowNextCard("active", "In dev", "Story 1.1", "epics/story-1-1.html"),
+            new NowNextCard("ready", "Up next", "Story 1.2", "epics/story-1-2.html"),
+        }),
+        ProgressBars = new[]
+        {
+            new ProgressBarView("Planning", 3, 5, "3 / 5 epics"),
+            new ProgressBarView("Implementation", 1, 2),
+        },
+        QuickLinks = new[]
+        {
+            new NavQuickLink("Epics", "epics.html", "All epics & stories"),
+            new NavQuickLink("Requirements", "requirements.html", "Requirement coverage"),
+        },
+        Work = new WorkInventory
+        {
+            QuickDev = new[] { new QuickDevEntry("Fix the footer", "quick/fix-footer.html", "done", "bugfix") },
+            Deferred = null,
+        },
+        OpenRetroActionItems = 0,
+        IndexBands = new[]
+        {
+            new IndexBand
+            {
+                Title = "Planning Artifacts", ConceptKey = "Planning", Cards = Array.Empty<IndexCardView>(),
+                Planning = new PlanningLayout(
+                    Prd: new IndexCardView { Style = IndexCardStyle.PrimaryPrd, Title = "PRD", Href = "planning/prd.html", SourcePath = "prd.md", Kicker = "Primary document" },
+                    UxCards: new[] { new IndexCardView { Style = IndexCardStyle.Doc, Title = "UX Design", Href = "planning/ux.html", SourcePath = "ux.md" } },
+                    OtherCards: new[] { new IndexCardView { Style = IndexCardStyle.Doc, Title = "Product Brief", Href = "planning/brief.html", SourcePath = "brief.md" } }),
+            },
+            new IndexBand
+            {
+                Title = "Architecture Decisions", ConceptKey = "ADR", Cards = new[]
+                {
+                    new IndexCardView { Style = IndexCardStyle.Adr, Title = "ADR 0001", Href = "adrs/0001.html", SourcePath = "0001.md", Status = "Accepted" },
+                },
+                TitleRow = true, MoreLinkHref = "adrs/index.html", MoreLinkLabel = "All ADRs",
+            },
+        },
+    };
+
+    [Fact]
+    public void Dashboard_BroadenedSectionFacts_HaveFullParity()
+    {
+        var view = RichDashboard();
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        var expected = RenderParity.FromDashboardView(view);
+        var actual = RenderParity.ExtractDashboardSection(body);
+
+        Assert.Empty(RenderParity.FindSectionDivergences(expected, actual, "html"));
+
+        // Each broadened fact is genuinely recovered from the rendered body — not merely both-empty.
+        Assert.Equal(new[] { "active|In dev|Story 1.1|epics/story-1-1.html", "ready|Up next|Story 1.2|epics/story-1-2.html" }, actual.NowNextCards);
+        Assert.Equal(new[] { "Planning|3 / 5 epics", "Implementation|1 / 2" }, actual.ProgressBars);
+        Assert.Equal(new[] { "epics.html", "requirements.html" }, actual.QuickLinks);
+        // Document order across the two card shapes: primary PRD, then UX, then Product Brief, then the ADR card.
+        Assert.Equal(new[] { "PRD|planning/prd.html", "UX Design|planning/ux.html", "Product Brief|planning/brief.html", "ADR 0001|adrs/0001.html" }, actual.IndexCards);
+        Assert.Equal(new[] { "Fix the footer|quick/fix-footer.html" }, actual.WorkCards);
+    }
+
+    [Fact]
+    public void Dashboard_FindSectionDivergences_CatchesADroppedNowNextCard()
+    {
+        var view = RichDashboard();
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        var lying = view with { NowNext = new DashboardNowNext(null, view.NowNext!.Cards.Take(1).ToList()) };
+        var divergences = RenderParity.FindSectionDivergences(
+            RenderParity.FromDashboardView(lying), RenderParity.ExtractDashboardSection(body), "html");
+        Assert.Contains(divergences, d => d.StartsWith("section.nowNextCards", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Dashboard_FindSectionDivergences_CatchesAMisreportedIndexCardDrillTarget()
+    {
+        var view = RichDashboard();
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        // A reference claiming the ADR card drills somewhere the body never linked → an index-card divergence.
+        var adrBand = view.IndexBands[1];
+        var lyingBand = adrBand with { Cards = new[] { adrBand.Cards[0] with { Href = "adrs/9999.html" } } };
+        var lying = view with { IndexBands = new[] { view.IndexBands[0], lyingBand } };
+        var divergences = RenderParity.FindSectionDivergences(
+            RenderParity.FromDashboardView(lying), RenderParity.ExtractDashboardSection(body), "html");
+        Assert.Contains(divergences, d => d.StartsWith("section.indexCards", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Dashboard_FindSectionDivergences_CatchesADroppedQuickLinkAndWorkCard()
+    {
+        var view = RichDashboard();
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        var lying = view with
+        {
+            QuickLinks = view.QuickLinks.Take(1).ToList(),
+            Work = new WorkInventory { QuickDev = Array.Empty<QuickDevEntry>(), Deferred = null },
+        };
+        var divergences = RenderParity.FindSectionDivergences(
+            RenderParity.FromDashboardView(lying), RenderParity.ExtractDashboardSection(body), "html");
+        Assert.Contains(divergences, d => d.StartsWith("section.quickLinks", StringComparison.Ordinal));
+        Assert.Contains(divergences, d => d.StartsWith("section.workCards", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Dashboard_NoDerivedCards_EmitsNoNowNextCardFacts()
+    {
+        // When the derived Now & Next panel has no cards (the sprint-board mode renders no now-next-card either),
+        // both the declared and evidenced now-next facts are empty — no manufactured divergence.
+        var view = RichDashboard() with { NowNext = new DashboardNowNext(SprintBoard: null, Cards: Array.Empty<NowNextCard>()) };
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+        var actual = RenderParity.ExtractDashboardSection(body);
+        Assert.Empty(actual.NowNextCards);
+    }
+
     // ----- Epics-index chips --------------------------------------------------------------------------------
 
     private static SiteNav Nav() =>

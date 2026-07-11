@@ -53,12 +53,39 @@ public sealed record SectionFacts
     /// status badge). Empty on non-epic surfaces.</summary>
     public required IReadOnlyList<string> StoryRows { get; init; }
 
+    /// <summary>The dashboard "Now &amp; Next" DERIVED drill cards as <c>css|kicker|title|href</c>, in render
+    /// order (empty in sprint-board mode, where the panel carries no <c>now-next-card</c>). Empty on non-dashboard
+    /// surfaces. [Story 6.2 review: AC #3 card/drill-target broadening.]</summary>
+    public required IReadOnlyList<string> NowNextCards { get; init; }
+
+    /// <summary>The dashboard "Overall Progress" bars as <c>label|value-text</c> (the visible fraction —
+    /// <c>rightLabel ?? "value / max"</c>), in render order. Empty on non-dashboard surfaces. [Story 6.2 review.]</summary>
+    public required IReadOnlyList<string> ProgressBars { get; init; }
+
+    /// <summary>The dashboard "Explore Key Views" quick-link DRILL targets (normalized href), in render order.
+    /// Empty on non-dashboard surfaces. [Story 6.2 review: AC #3 drill-target broadening.]</summary>
+    public required IReadOnlyList<string> QuickLinks { get; init; }
+
+    /// <summary>The dashboard home index-grid CARDS as <c>title|href</c>, in render order, across every band
+    /// (planning PRD/UX/other, spec, implementation, ADR, retro). Excludes the quick-dev work cards
+    /// (<see cref="WorkCards"/>). Empty on non-dashboard surfaces. [Story 6.2 review: AC #3 card broadening.]</summary>
+    public required IReadOnlyList<string> IndexCards { get; init; }
+
+    /// <summary>The dashboard "Direct &amp; Quick-Dev Work" cards as <c>title|href</c>, in render order. Empty on
+    /// non-dashboard surfaces. [Story 6.2 review: AC #3 card broadening.]</summary>
+    public required IReadOnlyList<string> WorkCards { get; init; }
+
     /// <summary>The all-empty facts — the shared default the per-surface builders fill selectively.</summary>
     public static SectionFacts Empty { get; } = new()
     {
         StatTiles = Array.Empty<string>(),
         EpicChips = Array.Empty<string>(),
         StoryRows = Array.Empty<string>(),
+        NowNextCards = Array.Empty<string>(),
+        ProgressBars = Array.Empty<string>(),
+        QuickLinks = Array.Empty<string>(),
+        IndexCards = Array.Empty<string>(),
+        WorkCards = Array.Empty<string>(),
     };
 }
 
@@ -230,10 +257,16 @@ public static class RenderParity
     }
 
     /// <summary>True when the rendered output carries a <c>&lt;span class="status-badge ..."&gt;</c> whose class
-    /// list includes <paramref name="stage"/> — word-bounded and order/extra-class tolerant, so it evidences the
-    /// canonical <see cref="StatusStyles.RenderBadge"/> output regardless of incidental class-order changes.</summary>
+    /// list includes <paramref name="stage"/> as a WHOLE space-delimited class token — order/extra-class tolerant,
+    /// so it evidences the canonical <see cref="StatusStyles.Badge"/> output regardless of incidental class-order
+    /// changes, while a hyphenated compound class does NOT satisfy it. The <c>(?&lt;![-\w])…(?![-\w])</c> guards are
+    /// what keep <c>done</c> from matching inside the <c>none-done</c> task badge — a plain <c>\b</c> treats the
+    /// hyphen as a word boundary and false-positives on that compound. [Story 6.2 review]</summary>
     private static bool StatusBadgeMatches(string html, string stage) =>
-        Regex.IsMatch(html, $"<span class=\"status-badge\\b(?=[^\"]*\\b{Regex.Escape(stage)}\\b)[^\"]*\"", RegexOptions.Singleline);
+        Regex.IsMatch(
+            html,
+            $"<span class=\"status-badge\\b(?=[^\"]*(?<![-\\w]){Regex.Escape(stage)}(?![-\\w]))[^\"]*\"",
+            RegexOptions.Singleline);
 
     /// <summary>Folds a rendered href back to its output-relative target: normalize slashes, drop the
     /// <c>?v=</c> cache-bust token, and strip the leading <c>../</c> prefix segments so a link rendered from a
@@ -287,19 +320,74 @@ public static class RenderParity
         "<span class=\"status-badge (?<stage>[a-z]+)\"", RegexOptions.Compiled);
     private static readonly Regex StoryTitleHrefRegex = new(
         "<a class=\"story-title story-title-link\" href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
+    // Dashboard body facts (Story 6.2 review — AC #3 card/panel/drill broadening). Each class is unique WITHIN the
+    // dashboard body, so extraction never crosses into another section.
+    private static readonly Regex NowNextCardRegex = new(
+        "<a class=\"now-next-card (?<css>[^\"]*)\" href=\"(?<href>[^\"]*)\">\\s*"
+        + "<span class=\"now-next-kicker\">(?<kicker>[^<]*)</span>\\s*"
+        + "<span class=\"now-next-title\">(?<title>[^<]*)</span>",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+    // The progress row pairs its label with the NEXT progress-value (non-greedy), the row structure guaranteeing
+    // one value follows each label before the next row.
+    private static readonly Regex ProgressBarRegex = new(
+        "<div class=\"progress-label\">(?<label>[^<]*)</div>.*?<div class=\"progress-value\">(?<val>[^<]*)</div>",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex QuickLinkRegex = new(
+        "<a class=\"quick-link-pill [^\"]*\" href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
+    // An ordinary index card is an anchor whose class is EXACTLY "index-card" (the trailing quote excludes both the
+    // "index-card index-card--primary" div and the "index-card quick-dev-card" work card).
+    private static readonly Regex IndexCardRegex = new(
+        "<a class=\"index-card\" href=\"(?<href>[^\"]*)\">\\s*<h2>(?<title>[^<]*)</h2>",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+    // The prominent primary-PRD card carries its drill href inside the <h2> anchor, not on the card element.
+    private static readonly Regex PrimaryCardRegex = new(
+        "<div class=\"index-card index-card--primary\">\\s*<span class=\"index-card-kicker\">[^<]*</span>\\s*"
+        + "<h2><a href=\"(?<href>[^\"]*)\">(?<title>[^<]*)</a></h2>",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex WorkCardRegex = new(
+        "<a class=\"index-card quick-dev-card\" href=\"(?<href>[^\"]*)\">\\s*<h2>(?<title>[^<]*)</h2>",
+        RegexOptions.Compiled | RegexOptions.Singleline);
 
     /// <summary>The dashboard's SECTION facts as its view model DECLARES them — the stat-tile row (the parity
     /// reference for the HTML surface, and the checklist a webview is held to). [Story 6.2]</summary>
     public static SectionFacts FromDashboardView(DashboardView view) => SectionFacts.Empty with
     {
         StatTiles = view.StatTiles.Select(t => $"{PathUtil.Html(t.Number)}|{PathUtil.Html(t.Label)}").ToList(),
+        NowNextCards = (view.NowNext?.Cards ?? Array.Empty<NowNextCard>())
+            .Select(c => $"{c.CssClass}|{PathUtil.Html(c.Kicker)}|{PathUtil.Html(c.Title)}|{NormalizeTarget(c.Href)}").ToList(),
+        ProgressBars = view.ProgressBars
+            .Select(b => $"{PathUtil.Html(b.Label)}|{PathUtil.Html(b.RightLabel ?? $"{b.Value} / {b.Max}")}").ToList(),
+        QuickLinks = view.QuickLinks.Select(q => NormalizeTarget(q.OutputRelativePath)).ToList(),
+        IndexCards = view.IndexBands.SelectMany(FlattenBandCards)
+            .Select(c => $"{PathUtil.Html(c.Title)}|{NormalizeTarget(c.Href)}").ToList(),
+        WorkCards = view.Work.QuickDev
+            .Select(e => $"{PathUtil.Html(e.Title)}|{NormalizeTarget(e.OutputPath)}").ToList(),
     };
 
     /// <summary>The dashboard's SECTION facts as the rendered body EVIDENCES them. [Story 6.2]</summary>
     public static SectionFacts ExtractDashboardSection(string html) => SectionFacts.Empty with
     {
         StatTiles = ExtractStatTiles(html),
+        NowNextCards = ExtractNowNextCards(html),
+        ProgressBars = ExtractProgressBars(html),
+        QuickLinks = ExtractQuickLinks(html),
+        IndexCards = ExtractIndexCards(html),
+        WorkCards = ExtractWorkCards(html),
     };
+
+    /// <summary>Flattens a home-index band's cards into render order — the special planning band emits its PRD, then
+    /// the UX subgroup, then the remaining cards; every other band is a flat card list. [Story 6.2 review]</summary>
+    private static IEnumerable<IndexCardView> FlattenBandCards(IndexBand band)
+    {
+        if (band.Planning is { } planning)
+        {
+            if (planning.Prd is { } prd) yield return prd;
+            foreach (var c in planning.UxCards) yield return c;
+            foreach (var c in planning.OtherCards) yield return c;
+            yield break;
+        }
+        foreach (var c in band.Cards) yield return c;
+    }
 
     /// <summary>The epics-index SECTION facts (the chip rows) as its view model DECLARES them. [Story 6.2]</summary>
     public static SectionFacts FromEpicsIndexView(EpicsIndexView view) => SectionFacts.Empty with
@@ -350,6 +438,11 @@ public static class RenderParity
         Check("section.statTiles", expected.StatTiles, actual.StatTiles);
         Check("section.epicChips", expected.EpicChips, actual.EpicChips);
         Check("section.storyRows", expected.StoryRows, actual.StoryRows);
+        Check("section.nowNextCards", expected.NowNextCards, actual.NowNextCards);
+        Check("section.progressBars", expected.ProgressBars, actual.ProgressBars);
+        Check("section.quickLinks", expected.QuickLinks, actual.QuickLinks);
+        Check("section.indexCards", expected.IndexCards, actual.IndexCards);
+        Check("section.workCards", expected.WorkCards, actual.WorkCards);
         return divergences;
     }
 
@@ -388,5 +481,63 @@ public static class RenderParity
             rows.Add($"{id}|{stage}|{href}");
         }
         return rows;
+    }
+
+    private static IReadOnlyList<string> ExtractNowNextCards(string html)
+    {
+        var cards = new List<string>();
+        foreach (Match m in NowNextCardRegex.Matches(html))
+        {
+            cards.Add($"{m.Groups["css"].Value}|{m.Groups["kicker"].Value}|{m.Groups["title"].Value}|{NormalizeTarget(m.Groups["href"].Value)}");
+        }
+        return cards;
+    }
+
+    private static IReadOnlyList<string> ExtractProgressBars(string html)
+    {
+        var bars = new List<string>();
+        foreach (Match m in ProgressBarRegex.Matches(html))
+        {
+            bars.Add($"{m.Groups["label"].Value}|{m.Groups["val"].Value}");
+        }
+        return bars;
+    }
+
+    private static IReadOnlyList<string> ExtractQuickLinks(string html)
+    {
+        var links = new List<string>();
+        foreach (Match m in QuickLinkRegex.Matches(html))
+        {
+            links.Add(NormalizeTarget(m.Groups["href"].Value));
+        }
+        return links;
+    }
+
+    /// <summary>Recovers the home-index cards in DOCUMENT order across the two card shapes (ordinary anchor card +
+    /// the primary-PRD div whose href lives in its <c>&lt;h2&gt;</c> anchor), sorting the combined matches by
+    /// position so a webview emitting them in the wrong order is caught. Quick-dev work cards are excluded by the
+    /// exact-class match and recovered separately by <see cref="ExtractWorkCards"/>. [Story 6.2 review]</summary>
+    private static IReadOnlyList<string> ExtractIndexCards(string html)
+    {
+        var cards = new List<(int Index, string Fact)>();
+        foreach (Match m in IndexCardRegex.Matches(html))
+        {
+            cards.Add((m.Index, $"{m.Groups["title"].Value}|{NormalizeTarget(m.Groups["href"].Value)}"));
+        }
+        foreach (Match m in PrimaryCardRegex.Matches(html))
+        {
+            cards.Add((m.Index, $"{m.Groups["title"].Value}|{NormalizeTarget(m.Groups["href"].Value)}"));
+        }
+        return cards.OrderBy(c => c.Index).Select(c => c.Fact).ToList();
+    }
+
+    private static IReadOnlyList<string> ExtractWorkCards(string html)
+    {
+        var cards = new List<string>();
+        foreach (Match m in WorkCardRegex.Matches(html))
+        {
+            cards.Add($"{m.Groups["title"].Value}|{NormalizeTarget(m.Groups["href"].Value)}");
+        }
+        return cards;
     }
 }
