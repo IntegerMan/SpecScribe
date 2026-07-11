@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<!-- Story 6.6 DELIVERY-ARCHITECTURE SPIKE — throwaway minimal SPA. Renders the dashboard + epics surfaces from
+     the C#-emitted JSON data layer (data.json + bodies.json), with in-view navigation and no page reload. Its
+     only purpose is to answer axis-A's "does a JSON+client-renderer output form work, and what does it cost?"
+     It is NOT a product; the durable output of this story is ADR 0006. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SpecScribe — Delivery Spike SPA</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0e0f16; color: #e6e7ee; font: 15px/1.5 system-ui, sans-serif; }
+  .spa-bar { position: sticky; top: 0; z-index: 50; display: flex; gap: .5rem; align-items: center;
+    padding: .5rem 1rem; background: #12131a; border-bottom: 1px solid #2a2c38; }
+  .spa-bar button { cursor: pointer; padding: .3rem .9rem; border-radius: 6px; border: 1px solid #2a2c38;
+    background: transparent; color: inherit; font: inherit; }
+  .spa-bar button[aria-current="true"] { background: #6c8cff; color: #fff; border-color: transparent; }
+  .spa-note { margin-left: auto; opacity: .6; font-size: 13px; }
+  #perf { padding: .4rem 1rem; font: 12px monospace; background: #171922; border-bottom: 1px solid #2a2c38; color: #9fb2ff; }
+  /* The data-driven strip the SPA renders ITSELF from data.json (proves the structured data path is consumable). */
+  .data-strip { display: flex; flex-wrap: wrap; gap: .6rem; padding: 1rem; border-bottom: 1px dashed #2a2c38; }
+  .data-tile { border: 1px solid #2a2c38; border-radius: 8px; padding: .6rem .9rem; min-width: 120px; }
+  .data-tile .n { font-size: 1.4rem; font-weight: 700; }
+  .data-tile .l { opacity: .7; font-size: 13px; }
+  .strip-label { width: 100%; opacity: .5; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  /* The pre-rendered body (charts + rich panels) the SPA INJECTS from bodies.json (the part a thin client can't
+     cheaply re-render — that's the chart-gen port cost axis B/C measures). Site CSS is not loaded here; the
+     charts are inline SVG so they still paint. */
+  #surface { padding: 1rem; }
+  #surface svg { max-width: 100%; }
+</style>
+</head>
+<body>
+<div class="spa-bar" role="tablist" aria-label="Delivery spike surfaces">
+  <button type="button" data-surface="dashboard" role="tab" aria-current="true">Dashboard</button>
+  <button type="button" data-surface="epics" role="tab" aria-current="false">Epics</button>
+  <span class="spa-note">SpecScribe Story 6.6 spike · JSON data layer + client renderer · read-only</span>
+</div>
+<div id="perf">loading…</div>
+<div id="strip" class="data-strip"></div>
+<div id="surface" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

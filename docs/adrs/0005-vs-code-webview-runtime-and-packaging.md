@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-07-10
 **Deciders:** Matt Eland
+**Amended by:** [ADR 0006 — Delivery Architecture & Distribution](0006-delivery-architecture-and-distribution.md) (re-affirms this ADR's C#-render + self-contained-binary core; adds npx distribution + an optional JSON+SPA delivery form)
 
 ## Context
 

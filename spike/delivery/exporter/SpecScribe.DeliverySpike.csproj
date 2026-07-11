@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Story 6.6 DELIVERY-ARCHITECTURE SPIKE — THROWAWAY. Quarantined under spike/, referenced by no solution and
+       excluded from the shipped `specscribe` tool's build/pack (there is no .sln; `dotnet build src/SpecScribe`
+       never sees this). Emits a JSON DATA LAYER (structured section records) + the pre-rendered section bodies
+       for the dashboard + epics surfaces, from the SAME host-neutral view models the HTML surface uses
+       (DashboardViewBuilder / EpicsViewBuilder + HtmlRenderAdapter) — no scraping of generated .html, no
+       re-parsing of .md (AD-1/AD-2). Its ONLY purpose is to MEASURE axis-A bloat (output form). Delete with the
+       branch; the durable output is ADR 0006. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>specscribe-delivery-spike</AssemblyName>
+    <RootNamespace>SpecScribe.DeliverySpike</RootNamespace>
+    <!-- The referenced SpecScribe project is PackAsTool; suppress the transitive pack-tool warning for the spike. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\SpecScribe\SpecScribe.csproj" />
+  </ItemGroup>
+
+</Project>

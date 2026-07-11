@@ -1,11 +1,11 @@
 ---
-baseline_commit: 8ebca9ed3455e48b40438c86496d4d3ced7d9a80
+baseline_commit: 1c9270b069a7fbd22d210b880b8372b6223ef987
 supersedes_decision: docs/adrs/0005-vs-code-webview-runtime-and-packaging.md
 ---
 
 # Story 6.6: Delivery Architecture & Distribution Spike — JSON + SPA + npx vs. the C# Static-Site + Bundled-Binary Path
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -56,31 +56,31 @@ The owner's "pure TypeScript SPA via npx" bundles four axes that are individuall
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Branch + baseline** (AC: #6)
-  - [ ] Work on an isolated spike branch (e.g. `spike/delivery-arch-6-6`); do **not** develop on `main` (background auto-committer — memory: [[worktree-edits-must-target-worktree-path]]). Re-capture `baseline_commit` (frontmatter) from the HEAD you branch off.
-  - [ ] Reuse the 6.3 spike's quarantine discipline ([spike/README.md](../../spike/README.md)): nothing here joins the `.sln`, `dotnet pack`, or the site build.
+- [x] **Task 1 — Branch + baseline** (AC: #6)
+  - [x] Work on an isolated spike branch (e.g. `spike/delivery-arch-6-6`); do **not** develop on `main` (background auto-committer — memory: [[worktree-edits-must-target-worktree-path]]). Re-capture `baseline_commit` (frontmatter) from the HEAD you branch off. → branched off `1c9270b`; frontmatter re-captured.
+  - [x] Reuse the 6.3 spike's quarantine discipline ([spike/README.md](../../spike/README.md)): nothing here joins the `.sln`, `dotnet pack`, or the site build. → all spike code under `spike/delivery/`; no `.sln` in repo; `dotnet build src/SpecScribe` never sees it.
 
-- [ ] **Task 2 — Axis A: JSON data layer + SPA slice, measure bloat** (AC: #1)
-  - [ ] Emit a **JSON data layer** for the dashboard + epics from Story 6.2's section view models. **Heed the 6.2 serialization gotcha** (memory: [[story-6-2-section-view-models-live]]): the section DATA records round-trip cleanly, but domain-model carrier fields (e.g. `CommandCatalog`, no parameterless ctor) do not — serialize section data on its own terms and pre-render chart panels to inline SVG strings (charts are pure SVG + links — memory: [[charting-is-pure-svg-no-js]]).
-  - [ ] Build a **minimal client renderer** (a small SPA — pick the lightest thing that answers the question; vanilla or a micro-framework is fine, a heavy framework only if evaluating framework fit is explicitly wanted) that renders the two surfaces from the JSON, with working in-view navigation between them.
-  - [ ] **Measure and record** (numbers, not vibes): output-file count vs. the current 113-file static site; extrapolate to Epic-7 scale (per-source-file + per-commit + per-date pages); total bytes; JSON size + whether chunking/lazy-load is needed; client render + interaction latency at the largest realistic dataset (synthesize a large-repo fixture if needed).
+- [x] **Task 2 — Axis A: JSON data layer + SPA slice, measure bloat** (AC: #1)
+  - [x] Emit a **JSON data layer** for the dashboard + epics from Story 6.2's section view models. Heeded the 6.2 serialization gotcha: serialized only the clean DATA records; chart/domain-carrier panels excluded from the data layer and carried as pre-rendered inline-SVG strings in `bodies.json`. → `spike/delivery/exporter`.
+  - [x] Build a **minimal client renderer** — a ~90-line vanilla-JS SPA (`spike/delivery/spa`) renders both surfaces from the JSON with in-view navigation; verified in the browser (fetch 35 ms, render 7.9 ms dashboard / 6.9 ms epics; 107 chart SVGs paint; 5 tiles rendered from `data.json`).
+  - [x] **Measured and recorded** (see Completion Notes + [ADR 0006](../../docs/adrs/0006-delivery-architecture-and-distribution.md)): static site 198 files / 5.88 MB; chart mass 69.3% (dashboard) / 58.9% (epics); structured data layer 13.5 KB; Epic-7 extrapolation +863 pages → ~1,060 files (thousands on large repos). The 113-file figure in this task was stale — the repo is at 196 HTML files today.
 
-- [ ] **Task 3 — Axis D: npx distribution** (AC: #2)
-  - [ ] Prototype the **npm-wrapper-around-native-binary** path: an npm package whose `bin` resolves/executes the self-contained `specscribe` (`dotnet publish -r <rid> --self-contained -p:PublishSingleFile=true`); confirm `npx <pkg>` runs it with **no .NET SDK installed**. Measure package size (per-RID / optional-deps strategy), cold-run latency, and the cross-platform matrix.
-  - [ ] Compare on paper against `dnx`/`dotnet tool` (needs .NET or is per-RID) and a hypothetical **full-TS CLI** (npm install footprint, zero runtime dep) so the ADR can weigh distribution honestly.
+- [x] **Task 3 — Axis D: npx distribution** (AC: #2)
+  - [x] Prototyped the **npm-wrapper-around-native-binary** path (`spike/delivery/npm-wrapper`): 1.5 KB wrapper whose `bin` resolves/spawns the self-contained `specscribe`. `npm install`+run of the wrapper generated all 196 files in 3.7 s with **no .NET SDK/runtime used**. Self-contained binary = 73.0 MiB raw / 34.2 MB gzipped per RID; per-RID optional-deps strategy documented.
+  - [x] Compared on paper against `dnx`/`dotnet tool` (needs .NET or per-RID) and a hypothetical full-TS CLI (small install, zero runtime dep, but needs the axis-C port) — in ADR 0006.
 
-- [ ] **Task 4 — Axis C: rewrite surface + coupling-breakers** (AC: #3)
-  - [ ] Enumerate the C# analysis/rendering surface a TS port would replace (walk `src/SpecScribe/`: parsers, `Frontmatter`, `MarkdownConverter`/Markdig, `EpicsParser`/`RequirementsParser`/`SprintStatusParser`, `ProgressCalculator`, `ArtifactCoverage`, `GitMetrics` incl. deep-git, `Charts`, the templaters, the 667-test suite). Estimate effort/risk; flag anything with no clean JS equivalent (Markdig fidelity, deep-git parsing).
-  - [ ] Evaluate the **coupling-breakers** so the pivot need not imply a full port: (a) **WASM** — can the C# core compile to a Node-callable WASM/wasi artifact (time-boxed; desk-research acceptable if a build is infeasible in the window)? (b) **pre-generated JSON** — CI runs the C# tool once to emit JSON; the SPA + VS Code webview only *consume* it (no in-editor live regen without the binary — state that tradeoff against AC "live updates").
+- [x] **Task 4 — Axis C: rewrite surface + coupling-breakers** (AC: #3)
+  - [x] Enumerated the port surface: ~14,200 production LOC / 87 `.cs` files + ~667 tests, by subsystem, with Markdig-extension fidelity and deep-git parsing flagged as the genuine-risk clusters (table in ADR 0006). No production port written.
+  - [x] Evaluated coupling-breakers: (a) **WASM** — desk-research verdict: WASI can't spawn `git`, a hard blocker for the git analytics; removes the per-RID matrix but needs a git-host bridge, not a drop-in. (b) **pre-generated JSON** — cheapest breaker, zero port, but live in-editor regen still needs the binary. Both recorded in ADR 0006.
 
-- [ ] **Task 5 — Write ADR 0006 + seat the re-plan** (AC: #4, #5)
-  - [ ] Author **`docs/adrs/0006-delivery-architecture-and-distribution.md`** (hand-authored, rendered by SpecScribe; format per [ADR 0005](../../docs/adrs/0005-vs-code-webview-runtime-and-packaging.md)). Decide across axes A–D with the measured numbers; **explicitly supersede or re-affirm ADR 0005**; rule on the **accessibility posture** of JS-rendered surfaces (NFR6 + the progressive-enhancement policy). Record the coupling verdict (does the pivot force a C# port, or is there a break).
-  - [ ] Update [docs/adrs/README.md](../../docs/adrs/README.md); if superseding, add `**Superseded by:** ADR 0006` to [ADR 0005](../../docs/adrs/0005-vs-code-webview-runtime-and-packaging.md)'s header.
-  - [ ] Name the follow-on precisely: pivot → the Epics 6/16 re-plan correct-course (and whether the C#-port is its own epic); re-affirm → unfreeze 6.4/6.5 + 16.1. Do not execute the re-plan here; make its scope unambiguous.
+- [x] **Task 5 — Write ADR 0006 + seat the re-plan** (AC: #4, #5)
+  - [x] Authored **`docs/adrs/0006-delivery-architecture-and-distribution.md`** (renders cleanly through SpecScribe). Decides axes A–D with the measured numbers; **re-affirms ADR 0005** (C#-render + self-contained binary) with two additive amendments (npx channel + optional JSON+SPA delivery adapter); rules the NFR6/progressive-enhancement posture (static fallback required; JS never sole carrier). Coupling verdict recorded: the pivot does **not** force a port for any single concern.
+  - [x] Updated [docs/adrs/README.md](../../docs/adrs/README.md); added an `**Amended by:** ADR 0006` note to [ADR 0005](../../docs/adrs/0005-vs-code-webview-runtime-and-packaging.md)'s header (re-affirmed, so "Amended", not "Superseded").
+  - [x] Named the follow-on: re-affirm path → unfreeze 6.4/6.5 + 16.1 and seat two additive stories (JSON+SPA delivery adapter; npx wrapper channel); if the owner overrides toward the pivot → seat a C#-port epic gated on a WASM-git-bridge spike. Re-plan seated in ADR 0006, not executed here.
 
-- [ ] **Task 6 — Quarantine & land only the decision** (AC: #6)
-  - [ ] Keep the spike branch unmerged or land only quarantined `spike/` artifacts + ADR 0006 + README index + the 0005 supersede note + this story's record. The shipped `specscribe` tool gains **no** pivot code.
-  - [ ] If any `src/SpecScribe/*.cs` was touched for the prototype, revert on `main` or keep it branch-only. **Verify the generated site is byte-identical** vs. `baseline_commit` if the core was touched (memory: [[golden-diff-normalization-gotchas]], [[generate-output-dir-is-specscribeoutput]]).
+- [x] **Task 6 — Quarantine & land only the decision** (AC: #6)
+  - [x] Spike branch `spike/delivery-arch-6-6`; only quarantined `spike/delivery/` + ADR 0006 + README index + the 0005 amend note + this story's record + the sprint-status update land. Shipped `specscribe` gains **no** pivot code.
+  - [x] **No `src/SpecScribe/*.cs` touched** (git-confirmed). Full suite green — **676 tests pass incl. the `GoldenContentFingerprint` byte-parity gate** → generated site byte-identical. Read-only honored (exporter writes only to its `--out`).
 
 ## Dev Notes
 
@@ -123,12 +123,50 @@ The deliverable is **ADR 0006 + a seated re-plan**, not a shippable SPA or a por
 
 ### Agent Model Used
 
+claude-opus-4-8 (Dev Story workflow)
+
 ### Debug Log References
+
+- Axis-A bloat report: `dotnet run --project spike/delivery/exporter -c Release -- "." --out <dir>` (prints the 3-way byte split to stderr).
+- SPA client-render timings captured in-browser (`window.__spikeTiming`): fetch 35 ms, render dashboard 7.9 ms / epics 6.9 ms.
+- Self-contained publish: `dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true` → 76,526,642 B exe (34.2 MB gz).
+- npx chain: `npm install <wrapper.tgz>` + run installed bin (`SPECSCRIBE_BIN` → native exe) generated 196 files in 3.7 s.
+- Regression + byte-parity: `dotnet test tests/SpecScribe.Tests` → **676 passed, 0 failed** (incl. `GoldenContentFingerprint`).
 
 ### Completion Notes List
 
+**This is a SPIKE — decision-first, throwaway code, ADR 0006 is the durable deliverable.** No production pivot on `main`; `src/SpecScribe` untouched (git-confirmed); 676 tests green including the golden byte-parity gate.
+
+**Measured (this repo, 2026-07-10) — four axes:**
+- **Axis A (output form):** Static site = 198 files (196 HTML) / 5.88 MB; cold+warm generate ~3.2 s. Inline SVG is **69.3%** of the dashboard body and **58.9%** of epics (2,469 SVGs / 1.37 MB site-wide). Structured non-chart data layer for both surfaces = **13.5 KB**. Epic-7 file-count extrapolation: **+863 pages → ~1,060 files** on this small repo; thousands–tens of thousands on a large repo. **Crux:** a JSON layer shipping pre-rendered SVG does not shrink bytes (payload ≈ 170 KB dashboard); only porting chart-gen to TS reaches the ~13.5 KB floor. The *file-count* win, however, needs only a JSON+SPA output form — deliverable as a C# adapter, no port.
+- **Axis D (distribution):** npx proven end-to-end via npm-wrapper-around-native-binary (1.5 KB wrapper + 73 MiB/34 MB-gz per-RID binary), no .NET SDK. `dnx`/`dotnet tool` compared on paper (needs .NET / per-RID); full-TS CLI compared (tiny install, but needs the port).
+- **Axis C (analysis language):** Port surface enumerated (~14,200 LOC / 87 files + ~667 tests) with Markdig-extensions and deep-git parsing as the risk clusters. Coupling-breakers: WASM blocked by WASI-can't-spawn-`git`; pre-generated-JSON is zero-port but keeps the binary for regen.
+- **Axis B (rendering language):** ruled by the accessibility posture — keeping C# rendering preserves the NFR6 JS-optional baseline for free.
+
+**Decision (ADR 0006, Proposed):** Re-affirm ADR 0005's C#-render + self-contained-binary core; **amend** with (1) npx-via-npm-wrapper as the primary CLI channel and (2) an optional JSON+SPA delivery adapter (a C# `IRenderAdapter`) for file-count-sensitive contexts. **Defer** the full pure-TS-SPA + core-port pivot — the evidence shows none of the three owner concerns requires it, and it discards ~14,200 LOC + 667 tests at real Markdig/deep-git risk. **Accessibility ruling:** JSON+SPA is additive over the static-HTML baseline; a static/`noscript` fallback is required and is free because C# already emits the pre-rendered HTML.
+
+**⚠ Reverses the owner's stated lean** (toward pure-TS + npx). ADR 0006 is therefore marked **Proposed**, awaiting owner ratification — accept → Accepted + unfreeze per the re-plan; override → record the counter-decision and seat the port epic (gated on a WASM-git-bridge spike). Either way, 6.4/6.5 + 16.1 unblock.
+
+**Re-plan seated (not executed):** unfreeze 6.4/6.5/16.1; seat two additive stories (JSON+SPA delivery adapter; npx wrapper channel); do **not** seat a core-port epic unless the ADR is overridden.
+
 ### File List
+
+**Durable (land on the decision):**
+- `docs/adrs/0006-delivery-architecture-and-distribution.md` (new — the deliverable)
+- `docs/adrs/README.md` (modified — index entry for ADR 0006)
+- `docs/adrs/0005-vs-code-webview-runtime-and-packaging.md` (modified — `Amended by: ADR 0006` header note)
+- `_bmad-output/implementation-artifacts/6-6-delivery-architecture-and-distribution-spike.md` (this story record; frontmatter `baseline_commit`, tasks, Dev Agent Record, Change Log, Status)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — 6.6 → in-progress → review)
+
+**Throwaway (quarantined under `spike/delivery/`, no `.sln`/pack/site-build reference; deletable with the branch):**
+- `spike/delivery/README.md`
+- `spike/delivery/exporter/SpecScribe.DeliverySpike.csproj`, `spike/delivery/exporter/Program.cs`
+- `spike/delivery/spa/index.html`, `spike/delivery/spa/app.js`
+- `spike/delivery/npm-wrapper/package.json`, `spike/delivery/npm-wrapper/bin/specscribe.js` (launcher — force-added past the global `bin/` gitignore)
+
+**No changes to `src/SpecScribe/**` or `tests/**`.**
 
 ## Change Log
 
+- 2026-07-10 — Spike executed (dev-story). Measured all four axes against this repo; built throwaway evidence under `spike/delivery/` (C# JSON-layer exporter + bloat meter, vanilla-JS SPA, npm-wrapper npx proof). Produced **ADR 0006** (Proposed) re-affirming ADR 0005's C#-render + self-contained-binary core with two additive amendments (npx channel + optional JSON+SPA delivery adapter) and deferring the full pure-TS pivot; ruled the NFR6 accessibility posture (static fallback required). ADR reverses the owner's stated lean → left **Proposed** for ratification. `src/SpecScribe` untouched; 676 tests pass incl. the golden byte-parity gate. Status → review.
 - 2026-07-10 — Story 6.6 drafted (create-story → correct-course). Seated by the owner's decision to de-risk a possible delivery pivot (JSON + SPA + npx) via a spike rather than commit on a lean, immediately after ADR 0005 was Accepted on the "rendering stays in C#, bundle a 73 MB binary" premise. The spike measures four separable axes (output form, rendering language, analysis language, distribution), enumerates the C#-core-port cost and the coupling-breakers (WASM / pre-generated JSON), and produces **ADR 0006** superseding-or-reaffirming ADR 0005 — plus a ruling on the NFR6/progressive-enhancement accessibility posture for JS-rendered surfaces. Stories 6.4 + 6.5 and Epic 16 packaging are frozen pending ADR 0006. No production pivot lands on `main`; the code is throwaway evidence, the ADR is the durable output.
