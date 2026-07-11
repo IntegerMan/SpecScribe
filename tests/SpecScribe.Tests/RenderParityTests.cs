@@ -137,10 +137,11 @@ public class RenderParityTests
     }
 
     [Fact]
-    public void HostRenderExceptionRegistry_IsEmptyInStory61()
+    public void HostRenderExceptionRegistry_CarriesNoHtmlSurfaceEntry()
     {
-        // The HTML adapter reproduces every fact, so there is nothing to except this story. A future surface
-        // adds its host-specific exceptions here rather than drifting silently.
-        Assert.Empty(HostRenderExceptions.Registry);
+        // The HTML adapter reproduces every fact, so nothing is excepted for it — the registry's entries (added
+        // by Story 6.4's webview surface, exactly as this test anticipated in 6.1) are all scoped to "webview"
+        // and never soften the HTML surface's zero-divergence bar.
+        Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.SurfaceId == "html");
     }
 }

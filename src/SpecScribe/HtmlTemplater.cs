@@ -101,7 +101,14 @@ public static class HtmlTemplater
     /// footer) is assembled by the same adapter from the <see cref="PageView"/> — the DELIVERY-seam contract
     /// (AD-2). This is 6.1's opaque <see cref="PageView.BodyHtml"/> seam now carrying an adapter-rendered-from-data
     /// body instead of a templater-hand-built one; bytes unchanged. [Story 6.1; Story 6.2]</summary>
-    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null)
+    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildIndexPage(docs, nav, progress, epicsModel, requirements, adrs, commands, work, sprint, retros, coverage)).Content;
+
+    /// <summary>Builds the dashboard's <see cref="PageView"/> without committing to a surface — the mechanical
+    /// split of <see cref="RenderIndex"/> (which now just feeds this through the HTML adapter, bytes unchanged)
+    /// that lets the webview surface render the SAME page model through its own <see cref="IRenderAdapter"/>
+    /// instead of duplicating the view/PageView assembly. [Story 6.4]</summary>
+    public static PageView BuildIndexPage(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null)
     {
         var inventory = work ?? WorkInventory.Empty;
 
@@ -130,7 +137,7 @@ public static class HtmlTemplater
             },
             BodyHtml = body,
         };
-        return HtmlRenderAdapter.Shared.Render(page).Content;
+        return page;
     }
 
     private static void AppendPill(StringBuilder sb, string? value, string _)

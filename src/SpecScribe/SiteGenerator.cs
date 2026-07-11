@@ -625,6 +625,13 @@ public sealed class SiteGenerator
             var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
             var referenceMap = BuildReferenceMap(files, model, artifactMap, PathUtil.NormalizeSlashes(epicsSourceRelative));
 
+            // Cached for the webview delivery path (Story 6.4): RenderWebviewSurfaces re-renders these same
+            // epics/story pages through the WebviewRenderAdapter from the generator's cached models, and needs
+            // the artifact + reference maps this render loop already resolved. Both full and watch-mode passes
+            // come through here, so the cache can never lag the rendered site.
+            _storyArtifactsById = artifactMap;
+            _referenceMap = referenceMap;
+
             File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands), "epics.html"));
 
             // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
@@ -656,35 +663,9 @@ public sealed class SiteGenerator
                         continue;
                     }
 
-                    var artifactFullPath = artifactMap[story.Id];
-                    var artifactRelative = ToSourceRelative(artifactFullPath);
-                    var artifactRaw = MarkdownConverter.ReadAllTextShared(artifactFullPath);
-                    var tasks = TaskListParser.Parse(artifactRaw);
-                    var (blurbHtml, remainderHtml) = EpicsParser.SplitStoryArtifact(artifactRaw);
-                    var acceptanceCriteria = EpicsParser.ExtractAcceptanceCriteria(artifactRaw);
-                    var devAgentRecord = EpicsParser.ExtractDevAgentRecord(artifactRaw);
-                    var reviewFindingsHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Review Findings");
-                    var changeLogHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Change Log");
-
-                    // Turn "[Source: _bmad-output/path.md]" citations into real links to the generated page.
-                    var storyPrefix = PathUtil.RelativePrefix(story.ArtifactOutputPath);
-                    blurbHtml = SourceLinkifier.Linkify(blurbHtml, referenceMap, storyPrefix);
-                    remainderHtml = SourceLinkifier.Linkify(remainderHtml, referenceMap, storyPrefix);
-                    reviewFindingsHtml = SourceLinkifier.Linkify(reviewFindingsHtml, referenceMap, storyPrefix);
-                    changeLogHtml = SourceLinkifier.Linkify(changeLogHtml, referenceMap, storyPrefix);
-                    acceptanceCriteria = acceptanceCriteria
-                        .Select(ac => ac with { Html = SourceLinkifier.Linkify(ac.Html, referenceMap, storyPrefix) })
-                        .ToList();
-                    devAgentRecord = devAgentRecord
-                        .Select(e => (e.Label, ContentHtml: SourceLinkifier.Linkify(e.ContentHtml, referenceMap, storyPrefix)))
-                        .ToList();
-
-                    // Deep-link every "(AC: #N)" reference in the plan to its criterion panel above.
-                    var criteriaByNumber = acceptanceCriteria.ToDictionary(ac => ac.Number, ac => ac.PlainText);
-                    remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
-
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks, reviewFindingsHtml, changeLogHtml, nav, _module.Commands, epicRetroPath);
+                    var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav, _module.Commands, epicRetroPath);
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
@@ -697,6 +678,144 @@ public sealed class SiteGenerator
         }
 
         return events;
+    }
+
+    /// <summary>The per-story artifact fragments a drafted story page renders — the extraction + linkify pipeline
+    /// that lived inline in <see cref="RenderEpicsPages"/>, re-homed so the webview delivery path
+    /// (<see cref="RenderWebviewSurfaces"/>) composes the story page from the IDENTICAL fragments rather than a
+    /// drift-prone copy. [Story 6.4]</summary>
+    private sealed record StoryPageFragments(
+        string ArtifactRelative,
+        string BlurbHtml,
+        string RemainderHtml,
+        IReadOnlyList<AcceptanceCriterion> AcceptanceCriteria,
+        IReadOnlyList<(string Label, string ContentHtml)> DevAgentRecord,
+        IReadOnlyList<TaskItem> Tasks,
+        string ReviewFindingsHtml,
+        string ChangeLogHtml);
+
+    /// <summary>Reads one drafted story's artifact and produces its page fragments (task list, blurb/remainder
+    /// split, AC / dev-record / review / change-log sections), source-citation-linkified against
+    /// <paramref name="referenceMap"/> and with "(AC: #N)" plan references deep-linked. A verbatim re-homing of
+    /// the fragment block from <see cref="RenderEpicsPages"/> — bytes unchanged (the golden regression is the
+    /// gate). [Story 4.1 fragments; re-homed Story 6.4]</summary>
+    private StoryPageFragments BuildStoryPageFragments(StoryInfo story, string artifactFullPath, Dictionary<string, string> referenceMap)
+    {
+        var artifactRelative = ToSourceRelative(artifactFullPath);
+        var artifactRaw = MarkdownConverter.ReadAllTextShared(artifactFullPath);
+        var tasks = TaskListParser.Parse(artifactRaw);
+        var (blurbHtml, remainderHtml) = EpicsParser.SplitStoryArtifact(artifactRaw);
+        var acceptanceCriteria = EpicsParser.ExtractAcceptanceCriteria(artifactRaw);
+        var devAgentRecord = EpicsParser.ExtractDevAgentRecord(artifactRaw);
+        var reviewFindingsHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Review Findings");
+        var changeLogHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Change Log");
+
+        // Turn "[Source: _bmad-output/path.md]" citations into real links to the generated page. Only drafted
+        // stories reach here (both callers guard on ArtifactOutputPath before resolving the artifact path).
+        var storyPrefix = PathUtil.RelativePrefix(story.ArtifactOutputPath!);
+        blurbHtml = SourceLinkifier.Linkify(blurbHtml, referenceMap, storyPrefix);
+        remainderHtml = SourceLinkifier.Linkify(remainderHtml, referenceMap, storyPrefix);
+        reviewFindingsHtml = SourceLinkifier.Linkify(reviewFindingsHtml, referenceMap, storyPrefix);
+        changeLogHtml = SourceLinkifier.Linkify(changeLogHtml, referenceMap, storyPrefix);
+        acceptanceCriteria = acceptanceCriteria
+            .Select(ac => ac with { Html = SourceLinkifier.Linkify(ac.Html, referenceMap, storyPrefix) })
+            .ToList();
+        devAgentRecord = devAgentRecord
+            .Select(e => (e.Label, ContentHtml: SourceLinkifier.Linkify(e.ContentHtml, referenceMap, storyPrefix)))
+            .ToList();
+
+        // Deep-link every "(AC: #N)" reference in the plan to its criterion panel above.
+        var criteriaByNumber = acceptanceCriteria.ToDictionary(ac => ac.Number, ac => ac.PlainText);
+        remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
+
+        return new StoryPageFragments(
+            artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
+            reviewFindingsHtml, changeLogHtml);
+    }
+
+    /// <summary>The artifact + reference maps the last epics render pass resolved, cached for
+    /// <see cref="RenderWebviewSurfaces"/> (both <see cref="GenerateAll"/> and <see cref="RegenerateEpics"/>
+    /// route through <see cref="RenderEpicsPages"/>, which refreshes them). [Story 6.4]</summary>
+    private IReadOnlyDictionary<string, string> _storyArtifactsById = new Dictionary<string, string>();
+    private Dictionary<string, string> _referenceMap = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Renders the webview's navigable surface set — dashboard, epics index, every epic page, and every
+    /// story page/placeholder (the five Story 6.2 surface families) — through the
+    /// <see cref="WebviewRenderAdapter"/>, from the SAME cached models, builders, and fragment pipeline the HTML
+    /// site was generated from. This is the Story 6.4 delivery seam ADR 0005 ratified: the extension gets
+    /// finished, CSP-safe HTML produced entirely in C#; it re-parses no markdown and scrapes no generated site
+    /// (AD-1/AD-2). Requires a completed <see cref="GenerateAll"/> pass on this instance (the webview CLI command
+    /// runs one first); a pure READ of cached state plus source story artifacts — it writes nothing (AC #6).
+    /// [Story 6.4]</summary>
+    public WebviewBundle RenderWebviewSurfaces()
+    {
+        lock (_gate)
+        {
+            var nav = _nav ?? throw new InvalidOperationException(
+                "RenderWebviewSurfaces requires a completed GenerateAll() pass on this generator.");
+
+            var surfaces = new List<WebviewSurface>();
+
+            // Dashboard — the same inputs WriteIndex hands the templater, so the webview dashboard can never
+            // disagree with the generated index.html.
+            var docs = _docs.Values.ToList();
+            var dashboardPage = HtmlTemplater.BuildIndexPage(
+                docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
+                WorkInventory.Build(docs), _sprint, _retros, _coverage);
+            surfaces.Add(WebviewSurfaceFor(dashboardPage));
+
+            // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
+            // progress, same placeholder rule, same fragment pipeline), rendered to webview content instead of
+            // written to disk.
+            if (_epicsModel is { } model && _progress is { } progress)
+            {
+                var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
+                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands)));
+
+                foreach (var epic in model.Epics)
+                {
+                    var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
+                    surfaces.Add(WebviewSurfaceFor(
+                        EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath),
+                        skipEpicNumber: epic.Number));
+
+                    foreach (var story in epic.Stories)
+                    {
+                        if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
+                        {
+                            surfaces.Add(WebviewSurfaceFor(
+                                EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath),
+                                skipStoryId: story.Id));
+                            continue;
+                        }
+
+                        var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
+                        surfaces.Add(WebviewSurfaceFor(
+                            EpicsTemplater.BuildStoryPage(
+                                epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
+                                f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav,
+                                _module.Commands, epicRetroPath),
+                            skipStoryId: story.Id));
+                    }
+                }
+            }
+
+            // The entry document embeds the dashboard's ALREADY-linkified content, so wrapping happens after
+            // linkification and the linkifier never walks the shell's CSS/bridge-script text.
+            var entry = surfaces[0];
+            var entryDocument = WebviewRenderAdapter.Shared.WrapDocument(dashboardPage, entry.ContentHtml);
+            return new WebviewBundle(_options.SiteTitle, entry.OutputRelativePath, entryDocument, surfaces);
+        }
+    }
+
+    /// <summary>Renders one page's webview content region and reference-linkifies it with the same skip rules
+    /// the HTML surface uses (a page never self-links its own story/epic mentions). [Story 6.4]</summary>
+    private WebviewSurface WebviewSurfaceFor(PageView page, string? skipStoryId = null, int? skipEpicNumber = null)
+    {
+        var content = ApplyReferenceLinks(
+            WebviewRenderAdapter.Shared.RenderContent(page), page.OutputRelativePath,
+            skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
+        return new WebviewSurface(PathUtil.NormalizeSlashes(page.OutputRelativePath), page.Title, content);
     }
 
     private GenerationEvent GenerateOneInternal(string sourceFullPath, SiteNav nav)

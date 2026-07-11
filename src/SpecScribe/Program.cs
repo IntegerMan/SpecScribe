@@ -21,6 +21,8 @@ app.Configure(config =>
         .WithDescription("Generate the documentation site once and exit.");
     config.AddCommand<WatchCommand>("watch")
         .WithDescription("Generate the site, then regenerate whenever a source file changes.");
+    config.AddCommand<WebviewCommand>("webview")
+        .WithDescription("Render the VS Code webview surface bundle as JSON on stdout (used by the SpecScribe extension).");
     config.PropagateExceptions();
 });
 

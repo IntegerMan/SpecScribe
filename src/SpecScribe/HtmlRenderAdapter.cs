@@ -43,7 +43,14 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     /// <summary>Renders the site nav bar from a <see cref="NavigationView"/>. The verbatim string-building that
     /// used to live on <see cref="SiteNav.RenderNavBar"/>, re-homed here behind the render adapter — the icon key
     /// now comes from <see cref="NavItem.ConceptKey"/> rather than reusing the label. Output is unchanged. [Story 6.1]</summary>
-    public string RenderNav(NavigationView nav)
+    public string RenderNav(NavigationView nav) => RenderNavMarkup(nav) + NavToggleScript;
+
+    /// <summary>The nav bar's MARKUP alone — <see cref="RenderNav"/> minus the trailing inline toggle script.
+    /// Split out (a pure mechanical extraction; <see cref="RenderNav"/>'s concatenation is byte-identical) so the
+    /// <see cref="WebviewRenderAdapter"/> can reuse the exact nav element under the webview's strict
+    /// Content-Security-Policy, where a non-nonce'd inline script would simply be blocked: the webview's own
+    /// nonce'd bridge script owns the toggle behavior there instead. [Story 6.4]</summary>
+    public string RenderNavMarkup(NavigationView nav)
     {
         var prefix = PathUtil.RelativePrefix(nav.ActiveOutputRelativePath);
         var current = PathUtil.NormalizeSlashes(nav.ActiveOutputRelativePath);
@@ -65,9 +72,13 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
             sb.Append($"      <a href=\"{PathUtil.Html(href)}\"{attrs}>{Icons.ForConcept(item.ConceptKey)}{PathUtil.Html(item.Label)}</a>\n");
         }
         sb.Append("    </div>\n  </div>\n</nav>\n");
-        sb.Append("<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>\n\n");
         return sb.ToString();
     }
+
+    /// <summary>The HTML surface's inline nav-toggle script, verbatim (self-locating via
+    /// <c>document.currentScript</c>, so it must directly follow the nav element). Deliberately NOT emitted by the
+    /// webview surface — its CSP blocks non-nonce'd inline scripts. [Story 6.1; split out Story 6.4]</summary>
+    private const string NavToggleScript = "<script>(function(){var script=document.currentScript;if(!script)return;var nav=script.previousElementSibling;if(!nav||!nav.classList.contains('site-nav'))return;var toggle=nav.querySelector('.site-nav-toggle');var links=nav.querySelector('.site-nav-links');if(!toggle||!links)return;var mq=window.matchMedia('(max-width: 640px)');function closeNav(){nav.classList.remove('site-nav-open');toggle.setAttribute('aria-expanded','false');}function openNav(){nav.classList.add('site-nav-open');toggle.setAttribute('aria-expanded','true');var first=links.querySelector('a');if(first)first.focus();}toggle.addEventListener('click',function(){if(nav.classList.contains('site-nav-open')){closeNav();}else{openNav();}});links.querySelectorAll('a').forEach(function(link){link.addEventListener('click',function(){if(mq.matches){closeNav();}});});nav.addEventListener('keydown',function(evt){if(evt.key==='Escape'&&nav.classList.contains('site-nav-open')){evt.preventDefault();closeNav();toggle.focus();}});window.addEventListener('resize',function(){if(!mq.matches){closeNav();}});})();</script>\n\n";
 
     /// <summary>Renders a "Home / Epics / Epic 1 / Story 1.1" trail from a <see cref="BreadcrumbTrail"/>. The last
     /// crumb (current page) has a null path so it renders as plain text rather than a self-link. Verbatim

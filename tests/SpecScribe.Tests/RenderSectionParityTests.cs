@@ -353,10 +353,11 @@ public class RenderSectionParityTests
     }
 
     [Fact]
-    public void HostRenderExceptionRegistry_IsStillEmptyInStory62()
+    public void HostRenderExceptionRegistry_CarriesNoSectionFactEntry()
     {
-        // The HTML adapter reproduces every section fact, so there is nothing to except this story either. A
-        // future surface (6.4's webview) adds its host-specific exceptions here rather than drifting silently.
-        Assert.Empty(HostRenderExceptions.Registry);
+        // Every surface — the webview included (its entries arrived with Story 6.4, exactly as this test
+        // anticipated in 6.2) — renders the decomposed section facts to full parity: the registry may only carry
+        // chrome/asset exceptions, never a section.* fact. A section divergence is always a bug.
+        Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.FactId.StartsWith("section.", StringComparison.Ordinal));
     }
 }
