@@ -5,10 +5,19 @@ renumbered_from: 6.3
 
 # Story 6.5: Host-Aware Theming and Explicit Helper Actions
 
-Status: ready-for-dev
+Status: backlog
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 <!-- Renumbered from Story 6.3 → 6.5 on 2026-07-10 (owner-directed sequencing fix). See "Renumber note" below. -->
+
+> ## 🧊 FROZEN 2026-07-10 — do not dev-start
+> This story themes the VS Code webview built by [Story 6.4](6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics.md),
+> which is itself **frozen**: ADR 0005's C#-render + bundled-binary premise is being reconsidered by the
+> delivery-architecture spike, [Story 6.6](6-6-delivery-architecture-and-distribution-spike.md) (see
+> [sprint-change-proposal-2026-07-10-delivery-architecture.md](../planning-artifacts/sprint-change-proposal-2026-07-10-delivery-architecture.md)).
+> If ADR 0006 pivots to a JSON+SPA delivery, the theming surface this story maps (`.vscode-*` host variables over
+> a C#-rendered webview) changes shape entirely. **Do NOT begin until ADR 0006 lands and Story 6.4 is unfrozen.**
+> Demoted to `backlog`; content below preserved. (This is in addition to the story's own existing gate on 6.4/6.2.)
 
 ## Story
 

@@ -1,0 +1,9 @@
+# Spike VSIX would ship only the bundle + manifest + the published renderer payload (Story 16.5 decides the real
+# packaging). Everything else is dev-only.
+src/**
+esbuild.js
+tsconfig.json
+node_modules/**
+**/*.map
+**/*.ts
+!dist/extension.js

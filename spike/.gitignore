@@ -1,0 +1,7 @@
+# Spike build outputs — never committed (the spike's durable output is ADR 0005, not binaries).
+**/bin/
+**/obj/
+**/pub/
+**/dist/
+**/node_modules/
+**/*.vsix

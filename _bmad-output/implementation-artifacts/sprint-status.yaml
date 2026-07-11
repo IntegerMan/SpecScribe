@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-10T23:30:00-04:00
+last_updated: 2026-07-11T00:15:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -101,14 +101,23 @@ development_status:
   # Story 6.3 = VS Code Integration Spike (feasibility proof + ADR 0005 seam decision), redirected here at
   # create-story 2026-07-10 from the former 6.4 webview-runtime story (owner-confirmed). Story file:
   # 6-3-vs-code-integration-spike.md. SOFT-depends on 6.2 (stand in if its view models aren't built yet).
-  6-3-vs-code-integration-spike: ready-for-dev
+  6-3-vs-code-integration-spike: review # spike complete; ADR 0005 landed (docs/adrs/0005-*.md), spike code quarantined under spike/, core untouched
   # Story 6.4 = the webview RUNTIME (webview UI + live host-push, former 6.2 AC #2/#3 + the epic's 6.4 ACs).
-  # Seated by the 6.3 spike's ADR 0005; run create-story when the spike lands. DEPENDS ON 6.2 (section view
-  # models) + 6.3 (spike decision). Keeps the webview-runtime slug; no story file yet.
-  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: backlog
+  # FROZEN 2026-07-10 (SCP 2026-07-10 delivery-architecture): ADR 0005's premise (C#-render + bundled 73 MB
+  # binary) is reopened by Story 6.6's delivery-architecture spike. Do NOT dev-start until ADR 0006 supersedes
+  # or re-affirms ADR 0005. Demoted ready-for-dev → backlog to keep an unattended dev-loop from picking it up;
+  # the story file itself is complete. DEPENDS ON 6.2 + 6.3 + now ADR 0006.
+  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: backlog # FROZEN pending Story 6.6 / ADR 0006
   # Story 6.5 = host theming + explicit helper actions (was epics.md Story 6.3). DEPENDS ON 6.4 (webview runtime)
-  # + 6.2; sequences after the 6.3 spike and the 6.4 runtime.
-  6-5-host-aware-theming-and-explicit-helper-actions: ready-for-dev
+  # + 6.2. FROZEN 2026-07-10 (same SCP): presupposes the 6.4 webview, which is itself frozen pending ADR 0006.
+  6-5-host-aware-theming-and-explicit-helper-actions: backlog # FROZEN pending Story 6.6 / ADR 0006
+  # Story 6.6 = Delivery Architecture & Distribution Spike (owner-directed 2026-07-10). Measures JSON+SPA+npx vs
+  # ADR 0005's C#-static-site + bundled-binary path (output-file bloat, extension bloat, npx/CI friction);
+  # enumerates the C#-core-port cost + coupling-breakers (WASM / pre-generated JSON); produces ADR 0006
+  # (supersedes-or-reaffirms ADR 0005) + a ruling on the NFR6/progressive-enhancement posture for JS surfaces.
+  # GATES 6.4/6.5 + Epic 16 packaging. Throwaway/quarantined; nothing pivots on main. Story file:
+  # 6-6-delivery-architecture-and-distribution-spike.md.
+  6-6-delivery-architecture-and-distribution-spike: ready-for-dev
   epic-6-retrospective: optional
 
   epic-7: in-progress
@@ -125,7 +134,7 @@ development_status:
   epic-8: in-progress
   8-1-canonical-status-model-with-portal-wide-legend: ready-for-dev
   8-2-single-source-of-truth-for-every-count: ready-for-dev
-  8-3-paired-progress-and-readiness-semantics: backlog
+  8-3-paired-progress-and-readiness-semantics: ready-for-dev
   8-4-state-aware-next-step-command-surface: backlog
   8-5-designed-empty-states: backlog
   8-6-one-primary-view-per-dashboard-dataset: backlog
@@ -174,12 +183,16 @@ development_status:
   # Epic 16 added 2026-07-10 (SCP 2026-07-10, correct-course): release engineering for the community
   # preview. Additive scope. Spike-led (16.1 first). Story 16.5 (Marketplace publish) is blocked on Epic 6.
   # All backlog; run create-story per story when scheduled.
+  # PACKAGING GATED 2026-07-10 (SCP 2026-07-10 delivery-architecture): 16.1/16.3/16.4/16.5 wait on ADR 0006
+  # (Story 6.6) — the delivery-architecture decision (rendering language, output form, npx-vs-dotnet) is
+  # UPSTREAM of packaging mechanics; deciding a CLI channel now risks a pivot mooting it. 16.2 (CI gate) is
+  # NOT gated — release-readiness hygiene independent of the delivery form.
   epic-16: backlog
-  16-1-release-and-distribution-packaging-spike: backlog
+  16-1-release-and-distribution-packaging-spike: backlog # gated on ADR 0006 (delivery-architecture upstream of packaging)
   16-2-continuous-integration-build-and-test-gate: backlog
-  16-3-cli-packaging-and-publication: backlog
-  16-4-tag-triggered-release-pipeline: backlog
-  16-5-vs-code-extension-packaging-and-marketplace-publication: backlog # blocked on Epic 6 (extension must exist)
+  16-3-cli-packaging-and-publication: backlog # gated on ADR 0006 (delivery-architecture upstream of packaging)
+  16-4-tag-triggered-release-pipeline: backlog # gated on ADR 0006 (delivery-architecture upstream of packaging)
+  16-5-vs-code-extension-packaging-and-marketplace-publication: backlog # blocked on Epic 6; also gated on ADR 0006
   16-6-release-facing-documentation-changelog-and-versioning-policy: backlog
   16-7-preview-launch-readiness-and-cut: backlog
   epic-16-retrospective: optional
