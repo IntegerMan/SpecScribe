@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-11T06:00:00-04:00
+last_updated: 2026-07-11T12:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -109,7 +109,7 @@ development_status:
   6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: done # implemented 2026-07-11 (branch worktree-bmad-dev-story-6-4): WebviewRenderAdapter + `specscribe webview` CLI + extension/ thin shim. Code review PASSED 2026-07-11 (parallel adversarial): 8 patches applied (toolPath scope RCE fix, UTF-8 stdout, disposed-panel guards, CSP base-uri/form-action, content-safe nonce substitution) + 2 test-coverage patches; 704 tests green, golden byte-identity vs fa1d79c held; a11y nav-toggle fidelity deferred to 6.5; one F5 smoke in real VS Code remains (extension/README.md checklist)
   # Story 6.5 = host theming + explicit helper actions (was epics.md Story 6.3). UNFROZEN 2026-07-10 (ADR 0006
   # re-affirmed the C#-rendered webview it themes). Original gate stands: blocked on 6.4 (webview must exist) + 6.2.
-  6-5-host-aware-theming-and-explicit-helper-actions: ready-for-dev
+  6-5-host-aware-theming-and-explicit-helper-actions: review
   # Story 6.6 = Delivery Architecture & Distribution Spike (owner-directed 2026-07-10). Measured JSON+SPA+npx vs
   # ADR 0005's path; produced ADR 0006 (now Accepted/ratified): re-affirm C# core + self-contained binary, ADD an
   # npx wrapper channel (Story 16.8) + an optional JSON+SPA delivery adapter (Story 6.7), DEFER the pure-TS pivot.
@@ -120,7 +120,7 @@ development_status:
   # IRenderAdapter that consolidates the many-files output into a JSON data layer + a small client renderer, with
   # the static-HTML/noscript fallback (NFR6). Rendering stays in C#; no core port. Addresses the file-count concern
   # (Epic-7 scale). Run create-story to detail when scheduled. DEPENDS ON 6.1 (IRenderAdapter seam) + 6.2 (views).
-  6-7-json-and-spa-delivery-adapter: backlog
+  6-7-json-and-spa-delivery-adapter: ready-for-dev # create-story 2026-07-11: ADR-0006 Architecture B (additive third IRenderAdapter, Id "spa"); whole-site consolidation via the universal <main id="main-content"> landmark seam (no all-pages PageView rewrite); ships pre-rendered content regions (NOT the ~13.5 KB data floor — that's deferred option D); opt-in --spa flag, static site byte-identical + noscript fallback
   epic-6-retrospective: optional
 
   epic-7: in-progress

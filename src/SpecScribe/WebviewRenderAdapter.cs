@@ -24,16 +24,25 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
     public string Id => "webview";
 
     /// <summary>The production stylesheet, inlined once from the same embedded resource
-    /// <see cref="SiteGenerator"/> copies to the site root — the webview ships the EXACT site CSS (host-aware
-    /// theming is Story 6.5's job, not this one's). Loaded lazily so merely referencing the adapter never does
-    /// resource I/O.</summary>
-    private static readonly Lazy<string> Stylesheet = new(() =>
+    /// <see cref="SiteGenerator"/> copies to the site root — the webview ships the EXACT site CSS, then layers the
+    /// Story 6.5 <see cref="ThemeBridge"/> on top (a second inline sheet) to map host chrome variables. Loaded
+    /// lazily so merely referencing the adapter never does resource I/O.</summary>
+    private static readonly Lazy<string> Stylesheet = new(() => ReadEmbedded("SpecScribe.assets.specscribe.css"));
+
+    /// <summary>The Story 6.5 host-theme bridge, inlined into a SECOND <c>&lt;style&gt;</c> block right after the
+    /// production stylesheet so its <c>.vscode-*</c>-scoped rules win the cascade. It maps VS Code host variables
+    /// onto SpecScribe's chrome/container tokens and contrast-tunes the status/insight accents per theme (AD-7).
+    /// It is inert outside a webview (those body classes never match in a browser), which is exactly why the
+    /// generated HTML surface — which never loads this — stays byte-identical.</summary>
+    private static readonly Lazy<string> ThemeBridge = new(() => ReadEmbedded("SpecScribe.assets.specscribe-webview-theme.css"));
+
+    private static string ReadEmbedded(string resourceName)
     {
-        using var stream = typeof(WebviewRenderAdapter).Assembly.GetManifestResourceStream("SpecScribe.assets.specscribe.css")
-            ?? throw new InvalidOperationException("Embedded specscribe.css not found on the SpecScribe assembly.");
+        using var stream = typeof(WebviewRenderAdapter).Assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded {resourceName} not found on the SpecScribe assembly.");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
-    });
+    }
 
     /// <summary>Renders one page as a full standalone webview document — the artifact the shim assigns to
     /// <c>webview.html</c> (after placeholder substitution). Equivalent to
@@ -68,6 +77,13 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         .Replace("__TITLE__", PathUtil.Html(page.Title))
         .Replace("__PATH__", PathUtil.Html(PathUtil.NormalizeSlashes(page.OutputRelativePath)))
         .Replace("__CSS__", Stylesheet.Value)
+        // The theme bridge is inlined AS-IS into its own <style> after __CSS__; a second replace (not string
+        // concatenation into __CSS__) keeps the two sheets separable and the base CSS untouched.
+        .Replace("__THEME_CSS__", ThemeBridge.Value)
+        // The read-only helper prompt rides in a data attribute the bridge script reads on click (AC #2). Attribute-
+        // escaped so a project title with quotes can't break out of the attribute; the value is only ever copied to
+        // the clipboard by the host, never executed or written anywhere.
+        .Replace("__HELPER_PROMPT__", PathUtil.Html(WebviewHelpers.CodeReviewPrompt(page.Nav.SiteTitle)))
         .Replace("__CONTENT__", contentHtml);
 
     // The shell around the swappable region. Kept as one template so the CSP policy, container id, and bridge
@@ -82,8 +98,13 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>__TITLE__</title>
         <style>__CSS__</style>
+        <style>__THEME_CSS__</style>
         </head>
         <body>
+        <div class="ss-webview-toolbar">
+        <span class="ss-webview-toolbar-label">SpecScribe</span>
+        <button type="button" class="ss-helper-btn" data-ss-label="a code-review prompt" data-ss-prompt="__HELPER_PROMPT__">Copy code-review prompt</button>
+        </div>
         <div id="specscribe-surface" data-path="__PATH__">
         __CONTENT__
         </div>
@@ -110,6 +131,19 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
           document.addEventListener('click', function (e) {
             var t = e.target;
             if (!t || !t.closest) return;
+
+            // Read-only helper (AC #2): hand the pre-generated prompt to the host, which copies it to the
+            // clipboard. This branch NEVER writes an artifact or mutates state — it posts text and stops. Any use
+            // of the copied prompt is a separate, explicit user action outside the webview.
+            var helper = t.closest('.ss-helper-btn');
+            if (helper) {
+              if (vscode) vscode.postMessage({
+                type: 'copyHelperText',
+                text: helper.getAttribute('data-ss-prompt') || '',
+                label: helper.getAttribute('data-ss-label') || 'text'
+              });
+              return;
+            }
 
             // Nav toggle: the HTML surface's inline toggle script is CSP-blocked here, so the same collapse
             // behavior is delegated (narrow editor panels are the norm, so this matters more, not less).

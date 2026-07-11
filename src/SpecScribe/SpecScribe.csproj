@@ -41,6 +41,9 @@
     <!-- Embedded rather than copied content so the stylesheet + script survive global-tool packaging intact. -->
     <EmbeddedResource Include="assets\specscribe.css" />
     <EmbeddedResource Include="assets\specscribe.js" />
+    <!-- Webview-only host-theme bridge (Story 6.5): inlined by WebviewRenderAdapter AFTER specscribe.css. NOT on
+         the generated HTML surface — it is scoped under .vscode-* body classes that only exist in the webview. -->
+    <EmbeddedResource Include="assets\specscribe-webview-theme.css" />
   </ItemGroup>
 
 </Project>

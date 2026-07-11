@@ -1,0 +1,297 @@
+/* SpecScribe VS Code webview host-theme bridge — [Story 6.5]
+   ============================================================================================================
+   A WEBVIEW-ONLY, ADDITIVE layer. It is inlined by the WebviewRenderAdapter INTO A SECOND <style> block
+   immediately AFTER the production specscribe.css, so every selector here has the same or higher specificity
+   than the base and wins the cascade. It is NEVER served to the generated HTML surface.
+
+   Why it is inert everywhere except the webview: every rule is scoped under one of the four body classes VS Code
+   stamps on <body> automatically — .vscode-light / .vscode-dark / .vscode-high-contrast /
+   .vscode-high-contrast-light — plus the --vscode-* theme variables VS Code injects. In a browser those classes
+   never match and those variables never resolve, so the whole sheet is dead weight and the generated .html bytes
+   are untouched (the golden regression stays green). In the webview host the classes match and the tokens
+   re-value live as the user switches themes — no JS, no flash.
+
+   The AD-7 contract this file realizes: the webview MAPS host variables for chrome/container surfaces (there is no
+   SpecScribe semantic to protect there — native chrome is what makes it feel in-editor), while the SpecScribe
+   status + insight ACCENTS stay SpecScribe-owned (the hues carry the six-stage meaning) and are only CONTRAST-
+   TUNED per theme so they stay accessible. Accents are NOT bridged onto VS Code's ~3 severity colors — that would
+   collapse the six-stage vocabulary the whole insight system depends on (owner decision; memory:
+   specscribe-status-token-system). This layer re-values TOKENS the charts/badges already consume; it forks no
+   chart markup and adds no status vocabulary. */
+
+/* ============================================================================================================
+   1. CHROME / CONTAINER TOKENS → HOST VARIABLES  (all four themes; the host vars are themselves theme-specific,
+      so one mapping serves light, dark, and both high-contrast families)  [Story 6.5 Task 1, AC #1]
+   ============================================================================================================ */
+.vscode-light,
+.vscode-dark,
+.vscode-high-contrast,
+.vscode-high-contrast-light {
+  /* Page + raised container backgrounds adopt the editor + widget surfaces. */
+  --cream: var(--vscode-editor-background);
+  --warm-white: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --parchment: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --parchment-dark: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --parchment-deep: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+
+  /* Body / secondary / tertiary text adopt the host foreground family. */
+  --ink: var(--vscode-foreground);
+  --ink-faded: var(--vscode-descriptionForeground, var(--vscode-foreground));
+  --ink-light: var(--vscode-descriptionForeground, var(--vscode-foreground));
+
+  /* Borders + shadow follow the host so cards/panels separate the way native widgets do. */
+  --border: var(--vscode-panel-border, var(--vscode-widget-border, var(--vscode-editorWidget-border)));
+  --shadow: var(--vscode-widget-shadow, transparent);
+}
+
+/* The nav bar is authored with LITERAL colors (a near-black bar, gold brand/links) rather than tokens, so it
+   cannot follow the chrome tokens above — map its surfaces to the host title-bar/panel palette directly. */
+.vscode-light .site-nav,
+.vscode-dark .site-nav,
+.vscode-high-contrast .site-nav,
+.vscode-high-contrast-light .site-nav {
+  background: var(--vscode-titleBar-activeBackground, var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+  border-bottom-color: var(--vscode-panel-border, var(--vscode-widget-border));
+  backdrop-filter: none;
+}
+
+.vscode-light .site-nav-brand,
+.vscode-dark .site-nav-brand,
+.vscode-high-contrast .site-nav-brand,
+.vscode-high-contrast-light .site-nav-brand {
+  color: var(--vscode-titleBar-activeForeground, var(--vscode-foreground));
+}
+
+.vscode-light .site-nav a,
+.vscode-dark .site-nav a,
+.vscode-high-contrast .site-nav a,
+.vscode-high-contrast-light .site-nav a {
+  color: var(--vscode-foreground);
+}
+
+.vscode-light .site-nav a:hover,
+.vscode-light .site-nav a.active,
+.vscode-dark .site-nav a:hover,
+.vscode-dark .site-nav a.active,
+.vscode-high-contrast .site-nav a:hover,
+.vscode-high-contrast .site-nav a.active,
+.vscode-high-contrast-light .site-nav a:hover,
+.vscode-high-contrast-light .site-nav a.active {
+  color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground, var(--vscode-foreground)));
+}
+
+.vscode-light .site-nav-toggle,
+.vscode-dark .site-nav-toggle,
+.vscode-high-contrast .site-nav-toggle,
+.vscode-high-contrast-light .site-nav-toggle {
+  color: var(--vscode-foreground);
+  border-color: var(--vscode-panel-border, var(--vscode-widget-border));
+}
+
+/* Fenced code blocks carry their own near-black surface; adopt the host code-block palette instead. */
+.vscode-light .doc-body pre,
+.vscode-dark .doc-body pre,
+.vscode-high-contrast .doc-body pre,
+.vscode-high-contrast-light .doc-body pre {
+  background: var(--vscode-textCodeBlock-background, var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+  color: var(--vscode-editor-foreground, var(--vscode-foreground));
+}
+
+/* ============================================================================================================
+   2. STATUS + INSIGHT ACCENTS — CONTRAST-TUNED PER THEME  [Story 6.5 Task 2, AC #1]
+      Same hue = same meaning (teal=active, deep-teal=review, green=done, golds=ready/drafted, tan-grey=pending,
+      grey=deferred). Only lightness/saturation moves so each stays legible against the host background and the
+      six stages stay mutually distinguishable. The status tokens that reference chart accents in the base sheet
+      (e.g. --status-active: var(--teal)) are ALSO re-valued to literals here so the mapping is explicit and
+      reviewable rather than relying on lazy var() substitution.
+   ============================================================================================================ */
+
+/* ---- Regular DARK theme (editor bg ≈ #1e1e1e): lift the darker teals/greens/rusts off the background ---- */
+.vscode-dark {
+  --status-pending: #cbc4b6;
+  --status-drafted: #e8d9a8;
+  --status-ready: #e6b52e;
+  --status-active: #5fb3c6;
+  --status-review: #4d9ab5;
+  --status-done: #8fbb82;
+  --status-deferred: #a89887;
+
+  --teal: #5fb3c6;
+  --teal-deep: #4d9ab5;
+  --gold: #d9a520;
+  --gold-light: #e6b52e;
+  --moss: #78a86a;
+  --moss-light: #8fbb82;
+  --rust: #cf6a41;
+  --rust-light: #dd8a5f;
+}
+
+/* ---- HIGH-CONTRAST DARK (bg #000): push to bright, saturated variants for the WCAG-AAA-ish HC floor ---- */
+.vscode-high-contrast {
+  --status-pending: #d8d8d8;
+  --status-drafted: #f0dfa8;
+  --status-ready: #ffcc33;
+  --status-active: #56d0ff;
+  --status-review: #4aa8ff;
+  --status-done: #7fe08a;
+  --status-deferred: #cfc0aa;
+
+  --teal: #56d0ff;
+  --teal-deep: #4aa8ff;
+  --gold: #ffcc33;
+  --gold-light: #ffd84d;
+  --moss: #6fd07a;
+  --moss-light: #7fe08a;
+  --rust: #ff8a5c;
+  --rust-light: #ff9e73;
+}
+
+/* ---- HIGH-CONTRAST LIGHT (bg #fff): the pale golds/tans that read on warm-light VANISH on pure white, so go
+        DARKER + more saturated so every accent clears the HC floor against white ---- */
+.vscode-high-contrast-light {
+  --status-pending: #6b6459;
+  --status-drafted: #8a6d0a;
+  --status-ready: #7a5600;
+  --status-active: #14606f;
+  --status-review: #0e3947;
+  --status-done: #2f5a2a;
+  --status-deferred: #5a4535;
+
+  --teal: #14606f;
+  --teal-deep: #0e3947;
+  --gold: #7a5600;
+  --gold-light: #8a6d0a;
+  --moss: #2f5a2a;
+  --moss-light: #3f6a38;
+  --rust: #7a2f14;
+  --rust-light: #9a4a24;
+}
+
+/* ============================================================================================================
+   3. STATUS CHIPS — neutralize the LITERAL pale-pastel backgrounds on the dark themes  [Story 6.5 Task 2]
+      The per-stage badge/pill rules paint a light pastel FILL with token-driven text+border. On a dark host that
+      pastel fill is a jarring light block. Drop the fill to transparent (an outlined chip) so the tuned token
+      text + border carry the stage — the six-stage distinction survives, now legible on dark. The light and
+      HC-light themes keep the pastel fills (they read fine on a light background). [AC #1]
+   ============================================================================================================ */
+.vscode-dark .status-badge.done,
+.vscode-dark .status-badge.active,
+.vscode-dark .status-badge.review,
+.vscode-dark .status-badge.ready,
+.vscode-dark .status-badge.drafted,
+.vscode-dark .epic-status.done,
+.vscode-dark .epic-status.review,
+.vscode-dark .epic-status.active,
+.vscode-dark .epic-status.ready,
+.vscode-dark .epic-status.drafted,
+.vscode-dark .gherkin-kw.kw-given,
+.vscode-dark .gherkin-kw.kw-when,
+.vscode-dark .gherkin-kw.kw-then,
+.vscode-dark .sprint-flag,
+.vscode-high-contrast .status-badge.done,
+.vscode-high-contrast .status-badge.active,
+.vscode-high-contrast .status-badge.review,
+.vscode-high-contrast .status-badge.ready,
+.vscode-high-contrast .status-badge.drafted,
+.vscode-high-contrast .epic-status.done,
+.vscode-high-contrast .epic-status.review,
+.vscode-high-contrast .epic-status.active,
+.vscode-high-contrast .epic-status.ready,
+.vscode-high-contrast .epic-status.drafted,
+.vscode-high-contrast .gherkin-kw.kw-given,
+.vscode-high-contrast .gherkin-kw.kw-when,
+.vscode-high-contrast .gherkin-kw.kw-then,
+.vscode-high-contrast .sprint-flag {
+  background: transparent;
+}
+
+/* kw-when's text is a LITERAL dark gold (#7a5600) that disappears on dark — retint it to the tuned gold token
+   (given/then already use --teal / --rust tokens, which are re-valued above). */
+.vscode-dark .gherkin-kw.kw-when,
+.vscode-high-contrast .gherkin-kw.kw-when {
+  color: var(--gold-light);
+}
+
+/* The "In development" now-next card washes in a literal pale teal (#e4efec) gradient; flatten it to the host
+   surface so it doesn't glow light on a dark editor (its teal left-accent border still marks it). */
+.vscode-dark .now-next-card.active,
+.vscode-high-contrast .now-next-card.active {
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+}
+
+/* The :target AC-highlight paints a literal pale gold; use a translucent tuned-gold wash on dark instead. */
+.vscode-dark .ac-criterion:target,
+.vscode-high-contrast .ac-criterion:target {
+  background: color-mix(in srgb, var(--gold-light) 22%, transparent);
+}
+
+/* ============================================================================================================
+   4. FOCUS RINGS — keep a visible indicator on every theme  [Story 6.5 Task 3, AC #1]
+      The content focus rings use --teal / --gold-light, which are re-valued above, so they stay visible on the
+      regular dark/light webview. High-contrast themes demand an unmistakable indicator, so route the shared
+      rings through --vscode-focusBorder there.
+   ============================================================================================================ */
+.vscode-high-contrast .index-card:focus-visible,
+.vscode-high-contrast .index-card--primary h2 a:focus-visible,
+.vscode-high-contrast .index-card-branch:focus-visible,
+.vscode-high-contrast .now-next-card:focus-visible,
+.vscode-high-contrast .quick-link-card:focus-visible,
+.vscode-high-contrast .epic-mosaic-card:focus-visible,
+.vscode-high-contrast .epic-chip:focus-visible,
+.vscode-high-contrast .story-title-link:focus-visible,
+.vscode-high-contrast .req-id-link:focus-visible,
+.vscode-high-contrast .req-epic:focus-visible,
+.vscode-high-contrast .toc-sidebar a:focus-visible,
+.vscode-high-contrast .breadcrumb a:focus-visible,
+.vscode-high-contrast .ac-anchor:focus-visible,
+.vscode-high-contrast .ac-ref:focus-visible,
+.vscode-high-contrast .view-epic-link:focus-visible,
+.vscode-high-contrast .site-nav a:focus-visible,
+.vscode-high-contrast .site-nav-toggle:focus-visible,
+.vscode-high-contrast-light .site-nav a:focus-visible,
+.vscode-high-contrast-light .site-nav-toggle:focus-visible {
+  outline-color: var(--vscode-focusBorder);
+}
+
+/* ============================================================================================================
+   5. READ-ONLY HELPER TOOLBAR  [Story 6.5 Task 4, AC #2]
+      Chrome for the webview-shell helper bar (it lives OUTSIDE #specscribe-surface, so it survives every in-place
+      content swap). The buttons only GENERATE text and hand it off explicitly (clipboard) via the bridge script —
+      they never write a source artifact (AD-6 / FR-17 / NFR-5).
+   ============================================================================================================ */
+.ss-webview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 1.5rem;
+  background: var(--vscode-editorWidget-background, transparent);
+  border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+
+.ss-webview-toolbar-label {
+  font: 0.72rem/1.4 var(--vscode-font-family, Georgia, serif);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+  margin-right: auto;
+}
+
+.ss-helper-btn {
+  font: 0.8rem var(--vscode-font-family, Georgia, serif);
+  cursor: pointer;
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, #0e639c);
+  border: 1px solid var(--vscode-button-border, transparent);
+}
+
+.ss-helper-btn:hover {
+  background: var(--vscode-button-hoverBackground, var(--vscode-button-background, #1177bb));
+}
+
+.ss-helper-btn:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}

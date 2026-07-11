@@ -5,7 +5,8 @@ namespace SpecScribe;
 /// caller's <c>../</c> prefix, WITHOUT the build cache-bust token — <see cref="PathUtil.RenderHeadOpen"/> still
 /// owns appending <c>?v=</c>) and flags whether the page carries a mermaid diagram (so the client init module is
 /// injected only when one landed). It deliberately models WHICH assets, not HOW a host themes them — host-aware
-/// theming / VS Code chrome variables are Story 6.3 (AD-7), out of scope here. [Story 6.1]</summary>
+/// theming / VS Code chrome variables are Story 6.5 (AD-7), delivered webview-side as a separate inline theme
+/// layer (see <see cref="WebviewRenderAdapter"/>), not through this manifest. [Story 6.1]</summary>
 public sealed record AssetManifest
 {
     /// <summary>The output-relative stylesheet href (prefix applied, no <c>?v=</c>).</summary>

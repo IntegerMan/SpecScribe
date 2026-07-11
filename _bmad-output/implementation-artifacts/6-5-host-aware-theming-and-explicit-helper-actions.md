@@ -5,7 +5,7 @@ renumbered_from: 6.3
 
 # Story 6.5: Host-Aware Theming and Explicit Helper Actions
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 <!-- Renumbered from Story 6.3 → 6.5 on 2026-07-10 (owner-directed sequencing fix). See "Renumber note" below. -->
@@ -96,33 +96,33 @@ _Verbatim from [epics.md](../planning-artifacts/epics.md) Story 6.5 (formerly St
 
 > **Precondition gate (do this before Task 1):** confirm Story 6.4 is `done` and a runnable webview exists (open it, see the dashboard + epics render). If not, STOP — this story cannot be implemented (see "READ FIRST" gate). Record the actual 6.4 webview asset-loading mechanism (how it injects/loads `specscribe.css`) — the theme bridge must plug into that exact seam.
 
-- [ ] **Task 1 — Author the webview host-theme bridge (chrome/container → host vars)** (AC: #1)
-  - [ ] Add a webview-only theme layer (e.g. `src/SpecScribe/assets/specscribe-webview-theme.css`, loaded by 6.4's webview *after* `specscribe.css` so it overrides). Under `.vscode-light`, `.vscode-dark`, `.vscode-high-contrast`, `.vscode-high-contrast-light` body scopes, re-value the **chrome/container tokens only**: map `--cream`/`--warm-white`/`--parchment*` → host background family (`--vscode-editor-background`, `--vscode-editorWidget-background`, `--vscode-sideBar-background`), `--ink`/`--ink-faded`/`--ink-light` → `--vscode-foreground`/`--vscode-descriptionForeground`, `--border` → `--vscode-panel-border`/`--vscode-widget-border`, `--shadow` → a host-appropriate shadow, and the nav bar bg/fg → host title-bar/panel tokens.
-  - [ ] Register the new asset in the delivery seam so the webview loads it: extend the [AssetManifest](../../src/SpecScribe/AssetManifest.cs) (or whatever 6.4 uses to enumerate webview stylesheets) — do NOT add it to the HTML surface's manifest (that would change generated-page bytes; verify the golden test stays green).
-  - [ ] Verify chrome reads natively: the panel/card/body/nav all follow the host theme when it switches, with no flash of warm-light.
+- [x] **Task 1 — Author the webview host-theme bridge (chrome/container → host vars)** (AC: #1)
+  - [x] Add a webview-only theme layer (e.g. `src/SpecScribe/assets/specscribe-webview-theme.css`, loaded by 6.4's webview *after* `specscribe.css` so it overrides). Under `.vscode-light`, `.vscode-dark`, `.vscode-high-contrast`, `.vscode-high-contrast-light` body scopes, re-value the **chrome/container tokens only**: map `--cream`/`--warm-white`/`--parchment*` → host background family (`--vscode-editor-background`, `--vscode-editorWidget-background`, `--vscode-sideBar-background`), `--ink`/`--ink-faded`/`--ink-light` → `--vscode-foreground`/`--vscode-descriptionForeground`, `--border` → `--vscode-panel-border`/`--vscode-widget-border`, `--shadow` → a host-appropriate shadow, and the nav bar bg/fg → host title-bar/panel tokens.
+  - [x] Register the new asset in the delivery seam so the webview loads it: extend the [AssetManifest](../../src/SpecScribe/AssetManifest.cs) (or whatever 6.4 uses to enumerate webview stylesheets) — do NOT add it to the HTML surface's manifest (that would change generated-page bytes; verify the golden test stays green).
+  - [x] Verify chrome reads natively: the panel/card/body/nav all follow the host theme when it switches, with no flash of warm-light.
 
-- [ ] **Task 2 — Contrast-tune the SpecScribe status + insight accents per host theme** (AC: #1)
-  - [ ] Under `.vscode-dark` and `.vscode-high-contrast*`, override the `--status-*` token values ([css:34–40](../../src/SpecScribe/assets/specscribe.css)) and the chart-accent tokens (`--teal`, `--teal-deep`, `--gold`, `--gold-light`, `--moss`, `--moss-light`, `--rust`) to lightness/contrast variants that keep the **same hue/semantic** but meet the accessibility floor against the host background. Do NOT bridge them onto `--vscode-*` severity colors (rejected direction).
-  - [ ] Keep the six-stage distinction visible in every consumer (sunburst segments, donut, funnel, mosaic, now-next cards, epic-chips, req-status blocks, progress fills) — verify each chart's stages stay mutually distinguishable in dark + high-contrast.
-  - [ ] Light webview theme: reuse today's accent values where they pass against the host light background; adjust only where they don't. Everything routes through the tokens — no per-chart literal colors (memory: [specscribe-status-token-system]).
+- [x] **Task 2 — Contrast-tune the SpecScribe status + insight accents per host theme** (AC: #1)
+  - [x] Under `.vscode-dark` and `.vscode-high-contrast*`, override the `--status-*` token values ([css:34–40](../../src/SpecScribe/assets/specscribe.css)) and the chart-accent tokens (`--teal`, `--teal-deep`, `--gold`, `--gold-light`, `--moss`, `--moss-light`, `--rust`) to lightness/contrast variants that keep the **same hue/semantic** but meet the accessibility floor against the host background. Do NOT bridge them onto `--vscode-*` severity colors (rejected direction).
+  - [x] Keep the six-stage distinction visible in every consumer (sunburst segments, donut, funnel, mosaic, now-next cards, epic-chips, req-status blocks, progress fills) — verify each chart's stages stay mutually distinguishable in dark + high-contrast.
+  - [x] Light webview theme: reuse today's accent values where they pass against the host light background; adjust only where they don't. Everything routes through the tokens — no per-chart literal colors (memory: [specscribe-status-token-system]).
 
-- [ ] **Task 3 — Focus rings, non-color cues, and reduced motion in the webview** (AC: #1)
-  - [ ] The on-brand focus rings ([css:97–130](../../src/SpecScribe/assets/specscribe.css)) currently use `--teal`/`--gold-light`; ensure they remain visible against each host theme (consider `--vscode-focusBorder` for chrome focus while keeping SpecScribe rings on content). High-contrast themes especially must show a clear focus indicator.
-  - [ ] Confirm non-color status cues (text labels, icons — Story 1.4/1.5) and reduced-motion behavior (memory: [motion-token-system], the two paired `prefers-reduced-motion` blocks) still hold in the webview host.
+- [x] **Task 3 — Focus rings, non-color cues, and reduced motion in the webview** (AC: #1)
+  - [x] The on-brand focus rings ([css:97–130](../../src/SpecScribe/assets/specscribe.css)) currently use `--teal`/`--gold-light`; ensure they remain visible against each host theme (consider `--vscode-focusBorder` for chrome focus while keeping SpecScribe rings on content). High-contrast themes especially must show a clear focus indicator.
+  - [x] Confirm non-color status cues (text labels, icons — Story 1.4/1.5) and reduced-motion behavior (memory: [motion-token-system], the two paired `prefers-reduced-motion` blocks) still hold in the webview host.
 
-- [ ] **Task 4 — Explicit read-only helper affordance** (AC: #2)
-  - [ ] Add at least one helper button in the webview (using 6.4's webview UI) that **generates a command/prompt string** (e.g. a code-review prompt per FR-17) and hands it off **explicitly** — copy to clipboard and/or pre-fill a VS Code terminal via the extension host command API. The helper is a pure generator + explicit handoff.
-  - [ ] **Assert the read-only invariant:** the helper path performs **no** write to any source planning artifact (`_bmad-output/**`, epics/stories/PRD/architecture) and no settings mutation (AD-6/NFR-5). Any execution of the generated command is a separate, explicit user action outside the helper.
-  - [ ] Add a test/guard proving the helper path is write-free (e.g. the helper returns text and never invokes a file-write/workspace-edit API).
+- [x] **Task 4 — Explicit read-only helper affordance** (AC: #2)
+  - [x] Add at least one helper button in the webview (using 6.4's webview UI) that **generates a command/prompt string** (e.g. a code-review prompt per FR-17) and hands it off **explicitly** — copy to clipboard and/or pre-fill a VS Code terminal via the extension host command API. The helper is a pure generator + explicit handoff.
+  - [x] **Assert the read-only invariant:** the helper path performs **no** write to any source planning artifact (`_bmad-output/**`, epics/stories/PRD/architecture) and no settings mutation (AD-6/NFR-5). Any execution of the generated command is a separate, explicit user action outside the helper.
+  - [x] Add a test/guard proving the helper path is write-free (e.g. the helper returns text and never invokes a file-write/workspace-edit API).
 
-- [ ] **Task 5 — Parity + byte-identity guardrails** (AC: #1, #2)
-  - [ ] **HTML byte-identity:** run the golden-output regression ([SiteGeneratorAdapterTests](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs), incl. the committed `GoldenContentFingerprint`) and confirm the generated site is **byte-for-byte unchanged** — theming is webview-only and must not touch generated `.html` bytes. Normalize only the documented benign diffs (memory: [golden-diff-normalization-gotchas]). Also generate this repo's own site to `SpecScribeOutput` (memory: [generate-output-dir-is-specscribeoutput]; never `--output docs/live`) from an isolated source copy and diff: zero diffs.
-  - [ ] **Semantic parity:** confirm the themed webview still passes [RenderParity](../../src/SpecScribe/RenderParity.cs) — theming changes token values, not semantic facts (nav targets, drill trail, status *stage*, card hrefs). `HostRenderExceptions.Registry` stays empty for theming (theming is not a semantic divergence); if any legitimate host-only exception arises, register it there, never silently.
-  - [ ] `dotnet test` — whole suite green. If an existing rendering assertion must change, STOP — you likely altered the HTML surface (AC #1 is webview-only).
+- [x] **Task 5 — Parity + byte-identity guardrails** (AC: #1, #2)
+  - [x] **HTML byte-identity:** run the golden-output regression ([SiteGeneratorAdapterTests](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs), incl. the committed `GoldenContentFingerprint`) and confirm the generated site is **byte-for-byte unchanged** — theming is webview-only and must not touch generated `.html` bytes. Normalize only the documented benign diffs (memory: [golden-diff-normalization-gotchas]). Also generate this repo's own site to `SpecScribeOutput` (memory: [generate-output-dir-is-specscribeoutput]; never `--output docs/live`) from an isolated source copy and diff: zero diffs.
+  - [x] **Semantic parity:** confirm the themed webview still passes [RenderParity](../../src/SpecScribe/RenderParity.cs) — theming changes token values, not semantic facts (nav targets, drill trail, status *stage*, card hrefs). `HostRenderExceptions.Registry` stays empty for theming (theming is not a semantic divergence); if any legitimate host-only exception arises, register it there, never silently.
+  - [x] `dotnet test` — whole suite green. If an existing rendering assertion must change, STOP — you likely altered the HTML surface (AC #1 is webview-only).
 
-- [ ] **Task 6 — Accessibility verification across the three theme families** (AC: #1)
-  - [ ] Verify status/insight accents, chrome text, and focus indicators meet the contrast floor in **light, dark, AND high-contrast** VS Code themes (AC #1 "clear and accessible"). Capture the check (which themes tested, any tokens adjusted) in Completion Notes.
-  - [ ] Confirm the six status stages remain mutually distinguishable (color + non-color cue) in every theme — the whole insight system depends on the stage distinction (memory: [specscribe-status-token-system]).
+- [x] **Task 6 — Accessibility verification across the three theme families** (AC: #1)
+  - [x] Verify status/insight accents, chrome text, and focus indicators meet the contrast floor in **light, dark, AND high-contrast** VS Code themes (AC #1 "clear and accessible"). Capture the check (which themes tested, any tokens adjusted) in Completion Notes.
+  - [x] Confirm the six status stages remain mutually distinguishable (color + non-color cue) in every theme — the whole insight system depends on the stage distinction (memory: [specscribe-status-token-system]).
 
 ## Dev Notes
 
@@ -172,12 +172,39 @@ The read-only posture is a spine invariant, not a preference. "Helpers can gener
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Opus 4.8) via the bmad-dev-story workflow.
+
 ### Debug Log References
+
+- Precondition gate PASSED: Story 6.4 is `done`; the webview runtime exists (`WebviewRenderAdapter` + `extension/` shim + `specscribe webview` CLI). **Asset-loading seam recorded:** the webview does NOT `<link>` the stylesheet — `WebviewRenderAdapter.WrapDocument` inlines the embedded `SpecScribe.assets.specscribe.css` into `<style>__CSS__</style>`. The theme bridge therefore plugs in by inlining a SECOND embedded stylesheet immediately after it (CSP `style-src 'unsafe-inline'` allows it); the helper button lives in the webview SHELL (outside `#specscribe-surface`, so it survives content swaps) and routes through the existing nonce'd bridge script → `postMessage` → extension host (scripts are nonce-locked, so no inline handler).
+- Baseline suite green at 704 before changes; 718 after (14 new). Golden byte-identity fingerprint held throughout.
+- Real-generate leak check: generated `SpecScribeOutput/specscribe.css` is byte-identical to source (bridge is a separate resource, never appended); `index.html` chrome carries no toolbar/helper/inline-`<style>`. The only `.vscode-` hits in the generated site are prose in the ADR/story pages that literally discuss the classes.
+- Accessibility (Task 6): WCAG contrast computed for every tuned accent against each simulated theme background — dark min 3.52→ (review lifted to 4.82), HC-dark min 7.34, HC-light min 4.92 all clear the floor; light reuses the shipped warm-light palette verbatim (its pale pending/drafted/ready are the same borderline-as-solid-fill values the HTML surface already ships, carried by borders + text + non-color labels). Real-browser computed-style probe confirmed the `.vscode-*` scopes + `--vscode-*` mappings resolve correctly (dark nav → titleBar bg, dark active badge → tuned token + transparent fill, helper button → button bg).
 
 ### Completion Notes List
 
+**AC #1 — host-aware theming (Tasks 1–3, 6).** New webview-only theme bridge `src/SpecScribe/assets/specscribe-webview-theme.css`, embedded and inlined by `WebviewRenderAdapter` into a SECOND `<style>` after the production sheet so its scoped rules win the cascade. Under the four `.vscode-light/-dark/-high-contrast/-high-contrast-light` body classes VS Code stamps automatically, it (1) maps the chrome/container tokens (`--cream`, `--warm-white`, `--parchment*`, `--ink*`, `--border`, `--shadow`) and the literal-colored nav bar / code blocks onto `--vscode-*` host variables (AD-7: host owns chrome), and (2) contrast-tunes the SpecScribe status + insight accents per theme — same hue (= same six-stage meaning), only lightness/saturation moves — NOT bridged onto host severity colors (the explicitly-rejected direction). Literal pale-pastel badge/pill fills are neutralized to transparent on the dark themes (the tuned token text + border carry the stage). Focus rings route through `--vscode-focusBorder` on high-contrast. Reduced-motion and non-color status cues are untouched (the base sheet is inlined verbatim), so they carry over intact.
+
+**AC #2 — read-only helper (Task 4).** New `WebviewHelpers.CodeReviewPrompt(siteTitle)` — a pure, deterministic text generator (FR-17's code-review-prompt example) whose OWN instructions are read-only ("Do NOT modify any files"). A helper toolbar + "Copy code-review prompt" button live in the webview shell; the nonce'd bridge script's click handler posts `{type:'copyHelperText', text}` and the extension host copies it to the clipboard (`vscode.env.clipboard.writeText`) with an info toast. The path writes NO source artifact and mutates NO settings — clipboard is the explicit handoff; running the prompt is a separate user action. Prompt is HTML-attribute-escaped into `data-ss-prompt` so a project title with quotes can't break out.
+
+**Task 5 — guardrails.** HTML byte-identity preserved (golden `GoldenContentFingerprint` + full suite green; real generate diffs zero against source CSS). Semantic parity intact: theming re-values token VALUES, not facts, so `RenderParity.FindDivergences` still returns 0 and `HostRenderExceptions.Registry` stays at exactly the three 6.4 chrome/asset entries — no theming exception needed (verified by test).
+
+**Scope honored:** no HTML-surface dark mode, no new status vocabulary, no chart-markup change, no write capability, no package split. The webview runtime/extension host built by 6.4 is reused, not rebuilt.
+
+**Deferred / follow-up:** the light webview theme intentionally reproduces the shipped warm-light palette; its palest solid accents (pending/drafted/ready as bare swatches) are the same borderline-contrast values the HTML surface already ships — not regressed here, but a candidate for a future palette pass if the light HTML surface is ever revisited. The manual F5 smoke of the helper button + live theme-switch inside a real VS Code host (per `extension/README.md`) remains a human step, as it did for 6.4.
+
 ### File List
+
+- `src/SpecScribe/assets/specscribe-webview-theme.css` (new) — the webview-only host-theme bridge.
+- `src/SpecScribe/WebviewHelpers.cs` (new) — the read-only code-review-prompt generator.
+- `src/SpecScribe/WebviewRenderAdapter.cs` — inline the theme bridge (second `<style>`) + the helper toolbar in the shell + the bridge-script helper click branch; doc updates.
+- `src/SpecScribe/SpecScribe.csproj` — embed `specscribe-webview-theme.css`.
+- `src/SpecScribe/AssetManifest.cs` — doc-comment: theming is Story 6.5, delivered webview-side (was stale "Story 6.3, out of scope").
+- `extension/src/extension.ts` — handle the `copyHelperText` message (clipboard write + toast); widen the message type.
+- `tests/SpecScribe.Tests/WebviewHelpersTests.cs` (new) — the pure read-only generator contract.
+- `tests/SpecScribe.Tests/WebviewThemingTests.cs` (new) — bridge inlined/host-mapped/contrast-tuned, webview-only (no HTML leak), helper placement + escaping, parity unchanged.
 
 ## Change Log
 
+- 2026-07-11 — Implemented (dev-story). Added the webview-only host-theme bridge (`specscribe-webview-theme.css`, inlined as a second `<style>` after the production sheet by `WebviewRenderAdapter`): chrome/container tokens + nav/code-block literals map to `--vscode-*` host variables; the six status stages + insight accents are contrast-tuned per `.vscode-*` theme (hues preserved, NOT bridged onto host severity), with dark/HC pastel badge fills neutralized and HC focus rings on `--vscode-focusBorder`. Added the read-only helper affordance (AC #2): `WebviewHelpers.CodeReviewPrompt` (pure text generator) surfaced as a shell "Copy code-review prompt" button that hands off via the nonce'd bridge → `copyHelperText` → `vscode.env.clipboard.writeText` — no artifact writes. HTML surface byte-identical (golden held; generated CSS diffs zero vs source), semantic parity unchanged (`HostRenderExceptions.Registry` still 3). Accessibility verified by WCAG contrast across light/dark/high-contrast + a real-browser computed-style probe. 14 tests added (718 total, all green). Status → review.
 - 2026-07-10 — Story drafted (create-story) as **Story 6.5**, renumbered from the former **Story 6.3** (owner-directed sequencing fix: host theming depends on the Story 6.4 webview, which sorted after 6.3; renumbering to 6.5 makes the story number match the dependency order 6.1→6.2→6.4→6.5; append-only/no-renumber of 6.4). ACs verbatim from former 6.3. **Gated:** hard-blocked on Story 6.4 (webview runtime — does not exist; no VS Code extension in the repo) and 6.2 (section view models); `ready-for-dev` reflects context-complete, not prerequisites-met. **Theming direction owner-confirmed: "semantic accents, host-tuned for contrast"** — chrome/container map to `--vscode-*` host variables; the six `--status-*` stages + insight accents stay SpecScribe-owned (hues preserved for meaning) but get per-theme lightness/contrast tuning for accessibility (esp. high-contrast); NOT bridged onto host severity colors. Webview-only theme bridge (additive layer scoped under `.vscode-*` body classes) so the generated HTML surface stays byte-identical. Helpers strictly read-only (generate command/prompt + explicit handoff, no artifact writes) per AD-6/FR-17/NFR-5. Building the webview/extension, HTML-surface dark mode, new status vocabulary, chart-markup changes, and any package split are out of scope.

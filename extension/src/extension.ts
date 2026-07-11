@@ -74,7 +74,15 @@ async function openStatus(context: vscode.ExtensionContext) {
     p.webview.postMessage({ type: 'update', html: surface.content, path: current, reason, fragment });
   }
 
-  p.webview.onDidReceiveMessage(async (msg: { type?: string; target?: string; fragment?: string; href?: string }) => {
+  p.webview.onDidReceiveMessage(async (msg: { type?: string; target?: string; fragment?: string; href?: string; text?: string; label?: string }) => {
+    if (msg?.type === 'copyHelperText' && typeof msg.text === 'string') {
+      // Read-only helper handoff (AC #2, AD-6/NFR-5): the webview generated a prompt; the only thing the host does
+      // is put it on the clipboard. NOTHING here writes a project artifact, edits a file, or mutates settings —
+      // clipboard is the explicit handoff, and any use of the copied text is a separate user action.
+      await vscode.env.clipboard.writeText(msg.text);
+      void vscode.window.showInformationMessage(`SpecScribe: copied ${msg.label ?? 'text'} to the clipboard.`);
+      return;
+    }
     if (msg?.type === 'navigate' && typeof msg.target === 'string') {
       if (!cache) return;
       if (!cache.surfaces[msg.target]) {
