@@ -54,6 +54,8 @@ async function openStatus(context: vscode.ExtensionContext) {
 
   const cwd = folder.uri.fsPath;
   const p = (panel = createPanel());
+  let disposed = false;
+  p.onDidDispose(() => { disposed = true; });
 
   let current = ''; // the surface the user is looking at — refreshes re-push THIS path
   let cache: WebviewPayload | undefined;
@@ -95,15 +97,19 @@ async function openStatus(context: vscode.ExtensionContext) {
   try {
     cache = await load();
   } catch (err) {
-    p.webview.html = errorHtml(String(err));
+    // Show the error, but drop the singleton so a later "Open Status" re-renders instead of just revealing this
+    // dead panel — the user may have fixed the tool path in the meantime.
+    if (!disposed) p.webview.html = errorHtml(String(err));
+    panel = undefined;
     return;
   }
+  if (disposed) return; // panel closed during the (possibly ~3.5s cold) spawn — never touch a disposed webview
 
   // First paint: set the full document ONCE (the only place a nonce is minted). Every navigation and every
   // live-push thereafter is an in-place postMessage swap, so the panel never resets (AC #3).
   current = cache.entry;
   p.title = `SpecScribe: ${cache.siteTitle}`;
-  p.webview.html = withRuntime(p.webview, cache.document);
+  p.webview.html = composeEntryHtml(p.webview, cache);
 
   // Live host-push (AD-8, ADR 0005 §3): extension-host watchers over the planning sources — the same roots the
   // C# FileWatcherService covers (_bmad-output/**/*.md + hand-authored ADRs) — debounced, then one re-render
@@ -111,11 +117,13 @@ async function openStatus(context: vscode.ExtensionContext) {
   // (NFR5 — the renderer reads with shared access).
   const refresh = debounce(async () => {
     try {
-      cache = await load();
+      const next = await load();
+      if (disposed) return; // panel closed while the re-render was in flight — nothing to patch
+      cache = next;
       p.title = `SpecScribe: ${cache.siteTitle}`;
       push(current, 'refresh');
     } catch (err) {
-      void vscode.window.showWarningMessage(`SpecScribe refresh failed: ${String(err)}`);
+      if (!disposed) void vscode.window.showWarningMessage(`SpecScribe refresh failed: ${String(err)}`);
     }
   }, 400);
   for (const pattern of ['_bmad-output/**/*.md', 'docs/adrs/**/*.md']) {
@@ -143,10 +151,21 @@ function createPanel(): vscode.WebviewPanel {
   return p;
 }
 
-/** Substitute the two — and only two — host-runtime values the C# shell left as placeholders. */
-function withRuntime(webview: vscode.Webview, html: string): string {
+/** Build the first-paint document: substitute the two host-runtime placeholders (cspSource + a freshly minted
+ * nonce) into the C# shell ONLY, never the rendered content region. The content is lifted out before substitution
+ * and spliced back verbatim after, so page content that literally contains the (publicly documented)
+ * `__NONCE__`/`__CSP_SOURCE__` tokens can neither be corrupted nor forge a valid script nonce to defeat the CSP. */
+function composeEntryHtml(webview: vscode.Webview, payload: WebviewPayload): string {
   const nonce = crypto.randomBytes(16).toString('base64');
-  return html.split('__CSP_SOURCE__').join(webview.cspSource).split('__NONCE__').join(nonce);
+  const content = payload.surfaces[payload.entry]?.content ?? '';
+  const sentinel = ' __specscribe_content__ ';
+  // The entry content is inlined exactly once (WrapDocument put it at __CONTENT__); pull it out so the token
+  // replace below can only ever touch the shell the C# renderer controls.
+  const shell = content && payload.document.includes(content)
+    ? payload.document.split(content).join(sentinel)
+    : payload.document;
+  const runtimeShell = shell.split('__CSP_SOURCE__').join(webview.cspSource).split('__NONCE__').join(nonce);
+  return runtimeShell.split(sentinel).join(content);
 }
 
 /** Spawn the SpecScribe tool's `webview` command and parse its stdout JSON — the extension↔core data path
@@ -172,8 +191,12 @@ function runRenderer(context: vscode.ExtensionContext, cwd: string): Promise<Web
 
     let out = '';
     let errText = '';
-    proc.stdout.on('data', (d) => (out += d.toString()));
-    proc.stderr.on('data', (d) => (errText += d.toString()));
+    // Decode as a UTF-8 stream, not per Buffer chunk: a multibyte char (em-dashes are pervasive in the payload)
+    // split across a chunk boundary would otherwise decode to replacement chars and corrupt the content.
+    proc.stdout.setEncoding('utf8');
+    proc.stderr.setEncoding('utf8');
+    proc.stdout.on('data', (d) => (out += d));
+    proc.stderr.on('data', (d) => (errText += d));
     proc.on('error', (e) => { clearTimeout(timer); reject(e); });
     proc.on('close', (code) => {
       clearTimeout(timer);

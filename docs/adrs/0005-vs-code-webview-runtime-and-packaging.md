@@ -41,7 +41,10 @@ confirm that shim can stay thin and dumb.
 - A ~180-line TS shim (`spike/vscode/src/extension.ts`): register command → open `WebviewPanel` → `spawn` the
   renderer → parse stdout JSON → inject two host-runtime values → live-push on file change.
 - Run against this repo (16 epics, 79 markdown files) the renderer produced a **306 KB** dashboard document and a
-  **237 KB** epics document, containing **107** and **18** inline `<svg>` charts respectively.
+  **237 KB** epics document, containing **107** and **18** inline `<svg>` charts respectively. (These figures are
+  from a deliberately **reduced** input set — ADRs and coverage were omitted to keep the spike small — so the
+  runtime's full-fidelity output will be somewhat larger; the CSP-survival conclusions below are unaffected, since
+  SVG/style behaviour is identical regardless of input completeness.)
 
 Toolchain confirmed live during the spike (this repo had no prior VS Code work): `esbuild` 0.24.2 (bundler),
 TypeScript 5.9.3, `@types/vscode` 1.125.0 (`engines.vscode ^1.90.0`), `@vscode/vsce` for VSIX packaging, .NET SDK
@@ -68,9 +71,11 @@ runtime.)
 ### 2. Invocation / packaging — spawn the .NET tool as a child process; ship self-contained
 
 The extension obtains content by **spawning the SpecScribe .NET tool as a child process and reading HTML/JSON from
-stdout**. The spike proved this path end-to-end (spawn → stdout → `webview.html`). Measured spawn-plus-full-render
-latency against this repo: **~1.8–2.0 s warm, ~3.5 s cold** — dominated by ingest + the `git` subprocess calls,
-not .NET startup.
+stdout**. The **C# side** of this path — ingest → render → JSON on stdout — is proven headlessly (`dotnet run`);
+the **extension-host side** (`spawn`, `JSON.parse`, injecting the two placeholders into a live `webview.html`) is
+exercised only in the same manual `F5` run as the pixel paint (see "Not yet proven"), not in the headless
+environment. Measured spawn-plus-full-render latency against this repo (C# side): **~1.8–2.0 s warm, ~3.5 s cold**
+— dominated by ingest + the `git` subprocess calls, not .NET startup.
 
 To honor "just works on install", the VSIX **bundles a self-contained single-file publish** of the tool
 (`dotnet publish -r <rid> --self-contained -p:PublishSingleFile=true`), so no separately-installed .NET runtime is
@@ -97,7 +102,11 @@ Measured against the spike's real output:
 
 - **Inline SVG charts survive unchanged** — 107 (dashboard) + 18 (epics) `<svg>` elements inject directly, no
   external `src`, no external references of any kind (no `<img>`, `<link>`, `src=`, or `http(s)://` in the body).
-  `default-src 'none'` with tight `img-src`/`font-src` is viable. This vindicates the pure-SVG charting decision.
+  Because the body needs no remote origins, `default-src 'none'` with a **tight** `img-src`/`font-src` (`data:`
+  only, no remote hosts) is viable — and the runtime (Story 6.4) seals exactly that. Note the spike's throwaway
+  shell shipped a **looser** `img-src __CSP_SOURCE__ data: https:` (any-HTTPS) that the runtime tightened; the
+  point proven here is that the *content* permits the tight policy, not that the spike artifact already ran it.
+  This vindicates the pure-SVG charting decision.
 - **The body carries no scripts of its own** — the only `<script>` in each document is the shim's own nonce'd
   bridge. The tooltip/copy enhancement JS (`assets/specscribe.js`) and the nav-toggle inline script live in the
   page *chrome/head*, which the webview shell replaces — so the progressive-enhancement policy holds: the body
@@ -132,7 +141,9 @@ same information without enhancement scripts. The `RenderParity` harness remains
 - Rendering stays entirely in C# (the owner's north star); the TS shim is ~180 lines, **3.4 KB minified** — a
   probe, not a product. No core-language rewrite is implied.
 - The webview plugs into the Story 6.1 `IRenderAdapter` seam as designed — additive, not a rewrite (NFR4).
-- Pure-SVG charts and the "no information in enhancement JS" policy pay off directly: the CSP story is clean.
+- Pure-SVG charts and the "no information in enhancement JS" policy pay off directly: the body needs no script and
+  no remote origins, so the runtime can seal a strict CSP (Story 6.4 does — nonce-locked `script-src`, `data:`-only
+  `img-src`).
 - Zero-prerequisite install is achievable via a bundled self-contained tool; the same artifact serves Epic 16.3.
 
 **Negative / trade-offs**
@@ -149,11 +160,15 @@ same information without enhancement scripts. The `RenderParity` harness remains
 
 **Not yet proven (single manual-verification gap)**
 
-- The spike validated everything up to and including `webview.html = <string>` (the C# renderer output, the CSP
-  policy, the shim compile/bundle, spawn + JSON, packaging sizes/latency). The one thing a headless environment
-  cannot exercise is the **actual pixel paint inside VS Code's Electron webview and the live in-editor refresh**.
+- Headlessly validated: the **C# renderer output** (JSON via `dotnet run`), the **CSP policy string**, the
+  **shim compile/bundle** (`tsc --noEmit` + `esbuild`), and **packaging sizes/latency**. What a headless
+  environment cannot exercise is the **extension-host runtime path**: the shim actually `spawn`-ing the child,
+  `JSON.parse`-ing its stdout, injecting `webview.cspSource`/nonce, and the **pixel paint + live in-editor refresh**
+  inside VS Code's Electron webview — these need the VS Code host and share one manual `F5` verification. (The
+  spike's default spawn path also isn't wired for that run — the built renderer isn't copied under
+  `<extensionPath>/renderer/`, so the `F5` must set `SPECSCRIBE_SPIKE_RENDERER`; Story 6.4 owns the real wiring.)
   Story 6.4 must open the panel in a real VS Code once (`F5` on the spike, or the first runtime build) to confirm
-  paint + in-place update before closing the loop. Everything upstream of the paint is evidence-backed.
+  spawn+consume + paint + in-place update before closing the loop.
 
 ## References
 

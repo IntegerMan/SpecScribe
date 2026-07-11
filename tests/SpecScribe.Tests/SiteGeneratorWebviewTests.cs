@@ -242,4 +242,28 @@ public class SiteGeneratorWebviewTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.Throws<InvalidOperationException>(() => gen.RenderWebviewSurfaces());
     }
+
+    [Fact]
+    public void FullGenerateThenWebviewPass_LeavesSourceArtifactsUntouched()
+    {
+        // AC #6 at the seam that actually writes: the `specscribe webview` command runs a full GenerateAll()
+        // (which DOES write the site) before RenderWebviewSurfaces(). Pin that this write pass never creates,
+        // deletes, or modifies any source planning artifact (_bmad-output/**, docs/**) — the read-only guarantee
+        // the panel makes about the user's project. (The generated site output is separate — the real command
+        // redirects it to a temp scratch dir, so it never lands in the project.)
+        var docsRoot = Path.Combine(_root, "docs");
+        string[] SourceFiles() =>
+            Directory.EnumerateFiles(Source, "*", SearchOption.AllDirectories)
+                .Concat(Directory.EnumerateFiles(docsRoot, "*", SearchOption.AllDirectories))
+                .OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        var before = SourceFiles().ToDictionary(p => p, File.GetLastWriteTimeUtc);
+
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        gen.RenderWebviewSurfaces();
+
+        var after = SourceFiles().ToDictionary(p => p, File.GetLastWriteTimeUtc);
+        Assert.Equal(before.Keys.OrderBy(k => k), after.Keys.OrderBy(k => k));
+        Assert.All(before, kv => Assert.Equal(kv.Value, after[kv.Key]));
+    }
 }

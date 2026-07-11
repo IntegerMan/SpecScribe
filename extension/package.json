@@ -28,6 +28,7 @@
         "specscribe.toolPath": {
           "type": "string",
           "default": "",
+          "scope": "machine-overridable",
           "markdownDescription": "Path to the SpecScribe tool the extension spawns for rendering — an executable, or a `SpecScribe.dll` to run via `dotnet`. Leave empty to use the binary bundled with the extension (when packaged) or `specscribe` on PATH."
         }
       }

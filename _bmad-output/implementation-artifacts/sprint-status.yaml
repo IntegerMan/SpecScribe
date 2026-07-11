@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-11T03:00:00-04:00
+last_updated: 2026-07-11T06:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -101,12 +101,12 @@ development_status:
   # Story 6.3 = VS Code Integration Spike (feasibility proof + ADR 0005 seam decision), redirected here at
   # create-story 2026-07-10 from the former 6.4 webview-runtime story (owner-confirmed). Story file:
   # 6-3-vs-code-integration-spike.md. SOFT-depends on 6.2 (stand in if its view models aren't built yet).
-  6-3-vs-code-integration-spike: review # spike complete; ADR 0005 landed (docs/adrs/0005-*.md), spike code quarantined under spike/, core untouched
+  6-3-vs-code-integration-spike: done # code-review 2026-07-11 (parallel adversarial): ADR 0005 decision sound, all 5 ACs met; 3 ADR-accuracy patches applied (CSP tight/clean wording, headless-proof scope, reduced-render caveat), 8 spike-code defects deferred to 6.4, 1 false positive (UTF-8) rejected. Spike code quarantined under spike/, core untouched
   # Story 6.4 = the webview RUNTIME (webview UI + live host-push, former 6.2 AC #2/#3 + the epic's 6.4 ACs).
   # UNFROZEN 2026-07-10: ADR 0006 (Accepted, owner-ratified) re-affirmed ADR 0005's C#-render + self-contained
   # binary path — exactly this story's premise — and deferred the pure-TS pivot. Proceeds as written under ADR
   # 0005/0006. Original gate stands: dev-start requires Story 6.2 done. DEPENDS ON 6.2 + 6.3 (both review).
-  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: review # implemented 2026-07-11 (branch worktree-bmad-dev-story-6-4): WebviewRenderAdapter + `specscribe webview` CLI + extension/ thin shim; 701 tests green, golden byte-identity vs fa1d79c held; one F5 smoke in real VS Code remains (extension/README.md checklist)
+  6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics: done # implemented 2026-07-11 (branch worktree-bmad-dev-story-6-4): WebviewRenderAdapter + `specscribe webview` CLI + extension/ thin shim. Code review PASSED 2026-07-11 (parallel adversarial): 8 patches applied (toolPath scope RCE fix, UTF-8 stdout, disposed-panel guards, CSP base-uri/form-action, content-safe nonce substitution) + 2 test-coverage patches; 704 tests green, golden byte-identity vs fa1d79c held; a11y nav-toggle fidelity deferred to 6.5; one F5 smoke in real VS Code remains (extension/README.md checklist)
   # Story 6.5 = host theming + explicit helper actions (was epics.md Story 6.3). UNFROZEN 2026-07-10 (ADR 0006
   # re-affirmed the C#-rendered webview it themes). Original gate stands: blocked on 6.4 (webview must exist) + 6.2.
   6-5-host-aware-theming-and-explicit-helper-actions: ready-for-dev
@@ -141,7 +141,7 @@ development_status:
   8-4-state-aware-next-step-command-surface: ready-for-dev
   8-5-designed-empty-states: ready-for-dev
   8-6-one-primary-view-per-dashboard-dataset: ready-for-dev
-  8-7-generation-time-recency-signals: backlog
+  8-7-generation-time-recency-signals: ready-for-dev
   epic-8-retrospective: optional
 
   # Epic 9 seeded here as Story 9.1 was created via create-story (2026-07-09). Run sprint-planning to

@@ -4,7 +4,7 @@ baseline_commit: b58d78740621a64f27ec7fc27d47e6d218ff7c06
 
 # Story 6.3: VS Code Integration Spike — Webview Feasibility & Core↔Extension Seam Decision
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -96,6 +96,30 @@ _Code review 2026-07-11 (adversarial + edge-case + acceptance layers). All five 
 - [x] [Review][Defer] Live-push watcher glob is anchored to the workspace folder while the renderer resolves the repo root by walking **up** [spike/vscode/src/extension.ts:71] — deferred to Story 6.4. When the opened folder is a subdirectory of the repo, first paint works (renderer walks up to find `_bmad-output`) but `RelativePattern(folder, '_bmad-output/**/*.md')` never matches, so the watcher never fires and live-push is silently dead — invalidating the AD-8 evidence for that layout.
 - [x] [Review][Defer] Overlapping debounced re-renders race [spike/vscode/src/extension.ts:74-77] — deferred to Story 6.4. The 400 ms debounce only coalesces sub-400 ms bursts; two saves within one ~1.8 s render window spawn concurrent renders with no in-flight/generation guard, so a stale render can overwrite fresher content. (ADR §3 already flags scoped re-render as 6.4 work — add a generation token there.)
 - [x] [Review][Defer] Re-invoking `specscribe.openStatus` while the panel is open leaks watchers/handlers and resets the panel [spike/vscode/src/extension.ts:48-86] — deferred to Story 6.4. `panel ??= createPanel` reuses the panel but the rest of `openStatus` re-runs: another `onDidReceiveMessage`, another `createFileSystemWatcher`, and a fresh `webview.html =` (no `reveal()`, no dedupe). N invocations ⇒ N watchers, N-fold live-push, and a panel reset (contra ADR §3 "never resets"). Register watcher/handler once (in `createPanel`) and early-return+`reveal()` on reuse.
+
+### Review Findings — Parallel Adversarial Review (2026-07-11, bmad-code-review)
+
+_Second review pass: three parallel layers (Blind Hunter adversarial + Edge Case Hunter + Acceptance Auditor, all Opus), diff scoped to the merged spike (`1c9270b`). **The core decision in ADR 0005 is SOUND and safe to keep** — all 5 spike ACs substantively met (AC#1 partial only on the honestly-disclosed manual-`F5` pixel-paint gap; quarantine/read-only/byte-identity all clean). One cross-layer false positive was caught and rejected in triage. The surviving items are (a) durable-ADR accuracy overstatements worth softening on `main`, and (b) throwaway spike-code defects that carry to the Story 6.4 runtime (several re-confirm the prior pass's deferrals)._
+
+**Patch — durable ADR 0005 accuracy (on `main`; decision unaffected):**
+- [x] [Review][Patch] ADR §4 overstates CSP as "tight"/"clean" while the spike shell ships a permissive `img-src __CSP_SOURCE__ data: https:` [docs/adrs/0005-vs-code-webview-runtime-and-packaging.md:100,113,135] — **APPLIED 2026-07-11:** §4 now states the spike ran the looser any-HTTPS `img-src` and that the *content* (no remote origins) permits the tight policy the runtime seals; Consequences reworded from "the CSP story is clean" to the strict-policy-the-runtime-seals framing.
+- [x] [Review][Patch] ADR §2 + "Not yet proven" overstate "spawn → stdout → `webview.html` … proven end-to-end" [docs/adrs/0005-vs-code-webview-runtime-and-packaging.md:71,150-156] — **APPLIED 2026-07-11:** §2 now scopes the headless proof to the C# side and marks the extension-host spawn/parse/inject path as sharing the manual-`F5` gap; "Not yet proven" rewritten accordingly (and now notes the unwired default spawn path / `SPECSCRIBE_SPIKE_RENDERER` requirement).
+- [x] [Review][Patch] ADR "evidence base" figures (306/237 KB, 107/18 `<svg>`) come from a deliberately reduced render (`adrs: Array.Empty`, `coverage: null`, `hasAdrs:false`) [docs/adrs/0005-…:43-49; spike/vscode/renderer/Program.cs:61-62] — **APPLIED 2026-07-11:** added a "reduced input set" caveat to the evidence-base bullet noting the runtime output will be larger and the CSP conclusions are unaffected.
+
+**Defer — throwaway spike code, carry to Story 6.4 runtime:**
+- [x] [Review][Defer] Default renderer spawn path is never populated + dead `exe` fallback [spike/vscode/src/extension.ts:120-125] — deferred to 6.4. Default spawns `dotnet <extensionPath>/renderer/specscribe-webview-spike.dll`, but no build step places a dll there (`npm run build` bundles only `dist/extension.js`; the README builds the renderer to `spike-out/`). The computed `exe` path (line 120) is never referenced in command selection. **Consequence: the one remaining manual `F5` verification needs `SPECSCRIBE_SPIKE_RENDERER` set** — the "just works" default resolves nothing. Whoever closes the paint gap must know this.
+- [x] [Review][Defer] Surface-switch `await load()` has no error handling, asymmetric with `refresh`'s try/catch [spike/vscode/src/extension.ts:52-58] — deferred to 6.4. A renderer failure on toggle produces an unhandled rejection and no user feedback.
+- [x] [Review][Defer] `withRuntime` does a whole-document `split/join` of `__NONCE__`/`__CSP_SOURCE__` [spike/vscode/src/extension.ts:110-113] — deferred to 6.4. Rendered content containing the literal placeholders would be silently rewritten; undercuts the "exactly two opaque strings" framing (negligible probability today).
+- [x] [Review][Defer] Live-push watcher scoped to `*.md` only [spike/vscode/src/extension.ts:73] — deferred to 6.4. Edits to `sprint-status.yaml` and other non-`.md` inputs that feed the dashboard never trigger a live refresh (AC#2 literally names `.md`, so the spike AC still passes).
+- [x] [Review][Defer] No spawn timeout / kill [spike/vscode/src/extension.ts:127-142] — deferred to 6.4. A hung renderer or `git` subprocess leaves the webview blank indefinitely; debounced refreshes can pile up.
+- [x] [Review][Defer] Multi-root workspace uses `workspaceFolders[0]` unconditionally [spike/vscode/src/extension.ts:39] — deferred to 6.4. If the SpecScribe project isn't the first root, it renders/watches the wrong folder. (Same root cause as the pre-logged watcher-glob finding.)
+- [x] [Review][Defer] Renderer arg/enumeration edges [spike/vscode/renderer/Program.cs:27,33-38] — deferred to 6.4. `--out <dir>`'s value is also matched by `FirstOrDefault(a => !a.StartsWith("--"))`, so `renderer --out X` (no project dir) mis-reads `X` as the project dir (dead via the shim, which always passes `[dll, cwd]`); a missing `_bmad-output` silently renders an empty dashboard rather than signalling not-a-SpecScribe folder; an unreadable subdir aborts the whole enumerate.
+- [x] [Review][Defer] Re-confirms prior pass: watcher-glob anchored to workspace folder while renderer walks up, overlapping-debounce race (no generation token), and re-invoke leaks/panel-reset all reproduced in the current code — see the four items above in the prior Review Findings block. Fix all together in 6.4 (register watcher/handler once; add a generation/in-flight guard; derive the watched path from the resolved source root).
+
+**Dismissed (noise / false positive):**
+- UTF-8 stdout corruption (raised by BOTH hunters — chunk-boundary and Windows-codepage variants): **FALSE POSITIVE.** `Program.cs:87` serializes via `System.Text.Json` with default options, whose `JavaScriptEncoder.Default` escapes every non-ASCII codepoint to `\uXXXX`, so the stdout payload is pure ASCII — no multibyte sequences exist to split or mis-decode; `JSON.parse` reconstructs the characters faithfully.
+- Shim "~180 line" / "3.4 KB minified" figures slightly off (158 lines incl. header; minified size unverifiable without committed `dist/`) — nitpick.
+- AC#1 "in-webview paint measured statically, not demonstrated" — not a defect; it is the accepted, disclosed manual-`F5` gap already recorded in ADR 0005, `spike/README.md`, and the prior review findings.
 
 ## Dev Notes
 

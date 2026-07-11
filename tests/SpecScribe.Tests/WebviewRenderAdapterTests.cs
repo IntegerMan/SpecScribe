@@ -110,6 +110,103 @@ public class WebviewRenderAdapterTests
         Assert.Contains(divergences, d => d.StartsWith("drill.child", StringComparison.Ordinal));
     }
 
+    /// <summary>A drafted story page (surface family #4): breadcrumb up to its epic + a status badge, no drill
+    /// children — the webview must reproduce this chrome exactly like the HTML surface.</summary>
+    private static PageView StoryPage(SiteNav nav)
+    {
+        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+        {
+            ("Home", "index.html"),
+            ("Epics", SiteNav.EpicsOutputPath),
+            ("1 · Foundation", "epics/epic-1.html"),
+            ("Story 1.1", null),
+        });
+        var body =
+            "<main id=\"main-content\">\n" +
+            StatusStyles.Badge("done", "Done") + "\n" +
+            "</main>\n\n";
+
+        return new PageView
+        {
+            Kind = PageKind.Story,
+            OutputRelativePath = "epics/story-1-1.html",
+            Title = "Story 1.1: Foundation — SpecScribe",
+            Nav = nav.ToNavigationView("epics/story-1-1.html"),
+            Breadcrumb = breadcrumb,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = "../" + ForgeOptions.StylesheetName,
+                ScriptHref = "../" + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = new InteractionState
+            {
+                ParentTarget = breadcrumb.ParentTarget,
+                ChildTargets = Array.Empty<string>(),
+                StatusStage = "done",
+            },
+            BodyHtml = body,
+        };
+    }
+
+    /// <summary>An undrafted story's placeholder page (surface family #5): same chrome, but no status stage and no
+    /// drill children — it must still reach FULL parity (the body facts are trivially satisfied).</summary>
+    private static PageView StoryPlaceholderPage(SiteNav nav)
+    {
+        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+        {
+            ("Home", "index.html"),
+            ("Epics", SiteNav.EpicsOutputPath),
+            ("1 · Foundation", "epics/epic-1.html"),
+            ("Story 1.2", null),
+        });
+
+        return new PageView
+        {
+            Kind = PageKind.Story,
+            OutputRelativePath = "epics/story-1-2.html",
+            Title = "Story 1.2: Undrafted — SpecScribe",
+            Nav = nav.ToNavigationView("epics/story-1-2.html"),
+            Breadcrumb = breadcrumb,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = "../" + ForgeOptions.StylesheetName,
+                ScriptHref = "../" + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = new InteractionState
+            {
+                ParentTarget = breadcrumb.ParentTarget,
+                ChildTargets = Array.Empty<string>(),
+                StatusStage = null,
+            },
+            BodyHtml = "<main id=\"main-content\">\n<p>Not yet drafted.</p>\n</main>\n\n",
+        };
+    }
+
+    [Fact]
+    public void Render_StoryPage_HasFullChromeParity_UnderTheRegisteredExceptions()
+    {
+        // Closes the AC #4 gap the review flagged: story pages (surface family #4) now run through FindDivergences,
+        // not just the dashboard/epics-index/epic-page trio.
+        var page = StoryPage(Nav());
+        var doc = WebviewRenderAdapter.Shared.Render(page).Content;
+
+        var divergences = RenderParity.FindDivergences(page, doc, WebviewRenderAdapter.Shared.Id);
+        Assert.True(divergences.Count == 0, "expected story-page parity, got: " + string.Join(" | ", divergences));
+    }
+
+    [Fact]
+    public void Render_StoryPlaceholder_HasFullChromeParity_UnderTheRegisteredExceptions()
+    {
+        // …and the placeholder page (surface family #5): a no-status, no-children page must still reach parity.
+        var page = StoryPlaceholderPage(Nav());
+        var doc = WebviewRenderAdapter.Shared.Render(page).Content;
+
+        var divergences = RenderParity.FindDivergences(page, doc, WebviewRenderAdapter.Shared.Id);
+        Assert.True(divergences.Count == 0, "expected placeholder parity, got: " + string.Join(" | ", divergences));
+    }
+
     // ----- Section parity (AC #4, 6.2 facts) ------------------------------------------------------------------
 
     [Fact]

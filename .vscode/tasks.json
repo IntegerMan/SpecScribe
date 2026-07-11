@@ -70,6 +70,61 @@
       "runOptions": {
         "instanceLimit": 1
       }
+    },
+    {
+      "label": "SpecScribe: Publish Extension Binary",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "publish",
+        "src/SpecScribe",
+        "-c",
+        "Debug",
+        "-o",
+        "extension/bin"
+      ],
+      "problemMatcher": [
+        "$msCompile"
+      ]
+    },
+    {
+      "label": "SpecScribe: Install Extension Deps",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "install"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/extension"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "SpecScribe: Build Extension",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/extension"
+      },
+      "problemMatcher": [
+        "$esbuild"
+      ],
+      "dependsOn": [
+        "SpecScribe: Install Extension Deps"
+      ]
+    },
+    {
+      "label": "SpecScribe: Build Extension Host",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "SpecScribe: Publish Extension Binary",
+        "SpecScribe: Build Extension"
+      ],
+      "problemMatcher": []
     }
   ]
 }

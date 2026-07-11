@@ -78,7 +78,7 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         <html lang="en">
         <head>
         <meta charset="UTF-8" />
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src __CSP_SOURCE__ data: https:; style-src 'unsafe-inline' __CSP_SOURCE__; script-src 'nonce-__NONCE__'; font-src __CSP_SOURCE__ data:;" />
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; img-src __CSP_SOURCE__ data: https:; style-src 'unsafe-inline' __CSP_SOURCE__; script-src 'nonce-__NONCE__'; font-src __CSP_SOURCE__ data:;" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>__TITLE__</title>
         <style>__CSS__</style>
