@@ -1,0 +1,37 @@
+{
+  "name": "specscribe-status-spike",
+  "displayName": "SpecScribe Status (SPIKE)",
+  "description": "THROWAWAY VS Code integration spike for SpecScribe Story 6.3 — feasibility proof only, NOT for publication.",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "specscribe-spike",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "specscribe.openStatus",
+        "title": "SpecScribe: Open Status (Spike)"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "node esbuild.js --production && npx --yes @vscode/vsce@latest package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -942,6 +942,56 @@ So that the experience feels native without losing product identity.
 **Then** it generates explicit commands or prompts only
 **And** no source planning artifacts are mutated by the helper path.
 
+### Story 6.6: Delivery Architecture & Distribution Spike
+
+<!-- 2026-07-10: Appended via correct-course (SCP 2026-07-10 delivery-architecture, owner-directed). Seated in
+     Epic 6 because it reopens ADR 0005 (an Epic 6 artifact) and gates 6.4/6.5, though its scope is
+     APPLICATION-WIDE (not webview-only). Immediately after ADR 0005 was Accepted on the "rendering stays in
+     C#, bundle a 73 MB self-contained binary" premise, the owner leaned toward a JSON data layer + a
+     client-side SPA distributed via npx. This spike MEASURES that direction rather than committing to it
+     (mirrors the Story 6.3 spike pattern). Its deliverable is ADR 0006, which supersedes-or-reaffirms ADR
+     0005. Stories 6.4 + 6.5 and Epic 16 packaging (16.1/16.3/16.4/16.5) are frozen pending ADR 0006. Full ACs
+     + tasks live in the story file 6-6-delivery-architecture-and-distribution-spike.md. Note: epics.md's
+     Epic 6 numbering reconciliation (host-theming still headed "Story 6.3" above; no spike entries) remains
+     the pre-existing deferred follow-up — sprint-status.yaml is the operational truth. -->
+
+As the SpecScribe maintainer,
+I want a hands-on spike that measures whether SpecScribe's delivery architecture should pivot toward a JSON data layer + a small client-side renderer (SPA) distributed via npx — versus the current C# static-site generator + (per ADR 0005) a bundled self-contained binary — decided by real numbers and recorded as ADR 0006,
+So that we either commit to the pivot with evidence (and re-plan Epics 6/16) or re-affirm the C# path knowing exactly what we're trading away, before any code is rewritten and before Story 6.4 is built on a premise that may not hold.
+
+**Acceptance Criteria (spike — decision-first, throwaway):**
+
+1.
+**Given** a thinnest end-to-end slice (C# core emits a JSON data layer for the dashboard + epics section view models; a minimal client renderer renders them)
+**When** it runs against this repo
+**Then** the spike measures output-file count vs. today's static site (extrapolated to Epic-7 scale), total + JSON byte size (and whether chunking is needed), and client render/interaction performance at the largest realistic dataset.
+
+2.
+**Given** the owner wants npx-executable distribution
+**When** the spike prototypes it
+**Then** it proves at least the npm-wrapper-around-native-binary path (`npx` runs the self-contained tool with no .NET SDK), measuring package size, cold-run latency, and the cross-platform story, compared against `dnx`/`dotnet tool` and a hypothetical full-TS CLI.
+
+3.
+**Given** "pure TypeScript for the application" implies porting the analysis core
+**When** the spike assesses it
+**Then** it enumerates the C# surface a port would replace (parsers, projection, GitMetrics/deep-git, coverage, charts, the 667-test suite) with an effort/risk estimate, and evaluates coupling-breakers (WASM-compiled core callable from Node; or a pre-generated-JSON model) — without performing a production port.
+
+4.
+**Given** the measured evidence
+**When** the spike concludes
+**Then** a new `docs/adrs/0006-*.md` records the decision across all four axes (output form, rendering language, analysis language, distribution), explicitly supersedes-or-reaffirms ADR 0005, and rules on the accessibility posture (NFR6 / progressive-enhancement) for any JS-rendered surfaces
+**And** docs/adrs/README.md is updated (and ADR 0005 gets a supersede note if superseded).
+
+5.
+**Given** ADR 0006's decision
+**When** the spike concludes
+**Then** it names the concrete follow-on: pivot → a correct-course re-planning Epics 6 (6.4/6.5) and 16 (packaging → npm/npx) and whether the C#-core-port is its own epic; re-affirm → unfreeze 6.4/6.5 and 16.1.
+
+6.
+**Given** a spike produces throwaway code
+**When** it lands
+**Then** no production pivot merges to `main` as product (quarantined under `spike/` or branch-only), the generated site stays byte-identical, and read-only (AD-6) is honored.
+
 ## Epic 7: Code and Git Exploration
 
 Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth — so the portal explains not just what is planned, but what exists and what happened when.

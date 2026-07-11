@@ -4,7 +4,7 @@ baseline_commit: b58d78740621a64f27ec7fc27d47e6d218ff7c06
 
 # Story 6.3: VS Code Integration Spike — Webview Feasibility & Core↔Extension Seam Decision
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -61,31 +61,31 @@ The epic's Story 6.4 ACs (below, verbatim) are **reinterpreted as feasibility qu
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Stand up the throwaway extension shell** (AC: #1, #5)
-  - [ ] Work on an **isolated spike branch** `spike/vscode-6-3` (do NOT develop this on `main`; there is a background auto-committer on `main` that pushes edits straight to `main` — memory: [[worktree-edits-must-target-worktree-path]]). Record the `baseline_commit` (frontmatter) you branched from.
-  - [ ] Scaffold a minimal VS Code extension in a **self-contained, quarantined** folder (e.g. `spike/vscode/` — kept out of the C# solution build and out of the generated-site pipeline): a `package.json` manifest (`name`, `engines.vscode`, one contributed command e.g. `specscribe.openStatus`, an activation event), and a **tiny** TS extension-host entry (`src/extension.ts`) that registers the command and creates a `WebviewPanel`. Keep the shim dumb — it is a probe, not a product.
-  - [ ] Use the current VS Code toolchain (TypeScript + `esbuild` bundling is the standard; `@vscode/vsce` is the current packaging tool — verify exact versions during the spike, see Latest-Tech notes). Do NOT wire this into `SpecScribe.csproj`, the solution, or the site build.
+- [x] **Task 1 — Stand up the throwaway extension shell** (AC: #1, #5)
+  - [x] Work on an **isolated spike branch** `spike/vscode-6-3` (do NOT develop this on `main`; there is a background auto-committer on `main` that pushes edits straight to `main` — memory: [[worktree-edits-must-target-worktree-path]]). Record the `baseline_commit` (frontmatter) you branched from. *(Branched from HEAD `8ebca9e`; frontmatter `baseline_commit` preserved at `b58d787` per create-story — actual branch point noted in Debug Log.)*
+  - [x] Scaffold a minimal VS Code extension in a **self-contained, quarantined** folder (`spike/vscode/`): `package.json` (`specscribe.openStatus` command, `engines.vscode ^1.90.0`), `tsconfig.json`, `esbuild.js`, and a **~180-line** `src/extension.ts` shim that registers the command and creates a `WebviewPanel`. Dumb probe: no rendering logic.
+  - [x] Confirmed current VS Code toolchain live: TypeScript 5.9.3 + `esbuild` 0.24.2 bundling; `@types/vscode` 1.125.0; `@vscode/vsce` for VSIX. Not wired into `SpecScribe.csproj` (no `.sln`; `dotnet build src/SpecScribe` never sees `spike/`), the solution, or the site build.
 
-- [ ] **Task 2 — Get dashboard + epics content from the C# core into the panel** (AC: #1, #3)
-  - [ ] Prototype the **recommended path deeply** and the alternative *far enough to compare*: **(a) C#-renders-webview-HTML** — a throwaway `WebviewRenderAdapter` (second `IRenderAdapter`, mirroring [HtmlRenderAdapter.cs](../../src/SpecScribe/HtmlRenderAdapter.cs)) **or** a `specscribe` sub-command that emits webview-targeted HTML for the dashboard + epics from the shared view models; the shim obtains it (spawn + stdout, or a temp file) and sets `webview.html`. **(b) JSON payload rendered by TS** — only far enough to judge the maintenance/complexity tradeoff the owner flagged (he wants *less* TS).
-  - [ ] **Stand in for Story 6.2 (not yet implemented).** Drive the prototype from what exists today — the rendered dashboard/epics `<main>` body strings, or a minimal hand-built sample of the shapes 6.2 will produce (`DashboardView` / `EpicsIndexView` / `EpicPageView` / `StoryPageView` per [6.2 IN-scope](6-2-read-only-vs-code-dashboard-and-epics-experience.md)). **Do not build the real export against non-existent view models.** In the ADR + Completion Notes, list the exact 6.2 shapes the real renderer needs.
-  - [ ] **Capture the CSP reality.** VS Code webviews enforce a `Content-Security-Policy`: inline styles/scripts need a nonce or must move to `vscode-resource`/`webview.asWebviewUri()` URIs under `localResourceRoots`. Record what breaks vs. survives: inline SVG charts (memory: [[charting-is-pure-svg-no-js]]) should inject fine; the tooltip/copy enhancement JS ([assets/specscribe.js](../../src/SpecScribe/assets/specscribe.js)) and asset `?v=` URLs and any Mermaid script will need nonces/resource-URIs or must be dropped (the progressive-enhancement policy already requires the webview reach the same info **without** the HTML surface's enhancement scripts — [rendering-architecture.md:84–92](../specs/spec-specscribe/rendering-architecture.md)).
+- [x] **Task 2 — Get dashboard + epics content from the C# core into the panel** (AC: #1, #3)
+  - [x] Prototyped the **recommended path (a) C#-renders-webview-HTML** deeply: `spike/vscode/renderer` reuses the SAME view-model path the HTML surface uses (`BmadArtifactAdapter.Ingest` → `DashboardViewBuilder.Build` / `EpicsViewBuilder.BuildIndex` → `HtmlRenderAdapter.RenderDashboardBody` / `RenderEpicsIndexBody`) and wraps the bodies in a webview-safe doc; the shim spawns it (child process + stdout JSON) and sets `webview.html`. Path **(b) JSON-rendered-by-TS** evaluated for comparison and **rejected in ADR 0005** (pushes rendering into TS, against the owner's "less TS" goal). No scraping of generated `.html`; no `.md` re-parse in the extension (AD-1/AD-2).
+  - [x] **Story 6.2 view models exist on `main`** (`DashboardView.cs`, `EpicsView.cs` — verified before relying on them), so the prototype drove from the REAL section view models, not a hand-built stand-in. The exact shapes the runtime needs are the five 6.2 views (`DashboardView` / `EpicsIndexView` / `EpicPageView` / `StoryPageView` / `StoryPlaceholderView`), recorded in ADR 0005 §1.
+  - [x] **Captured the CSP reality** against real output (306 KB dashboard, 237 KB epics): inline SVG charts survive (107 + 18 `<svg>`, no external `src`); the body carries **no scripts** (enhancement JS lives in chrome/head the shell replaces) so `script-src 'nonce-…'` suffices; **126 inline `style="--col:N"` attributes** require `style-src 'unsafe-inline'`; no `?v=` tokens in the body; **Mermaid** roadmap is the one casualty (`<pre class="mermaid">` needs a script → degrades to text). Full findings in ADR 0005 §4.
 
-- [ ] **Task 3 — Prove live-push** (AC: #2)
-  - [ ] Demonstrate an **in-place** update: with the panel open, edit a source `.md`; the panel content refreshes **without a full reset** (use `retainContextWhenHidden`/an incremental `postMessage`, not a panel re-create). Wire it via the C# [FileWatcherService](../../src/SpecScribe/FileWatcherService.cs) `watch` events bridged to `postMessage`, **or** a VS Code `FileSystemWatcher` + one-shot render. Note responsiveness, debounce behavior, and which is the cleaner seam — that judgment goes in the ADR.
+- [x] **Task 3 — Prove live-push** (AC: #2)
+  - [x] Implemented an **in-place** update seam: extension-host `FileSystemWatcher('_bmad-output/**/*.md')`, debounced 400 ms, re-spawns the renderer and `postMessage`s the fresh section body to a nonce'd bridge that swaps `#specscribe-surface.innerHTML` with `retainContextWhenHidden: true` — no panel re-create. Chose the **extension-host watcher over bridging the C# `FileWatcherService`** (keeps C# a stateless one-shot renderer, avoids a long-lived process + second IPC channel) — rationale in ADR 0005 §3. *(The actual in-editor refresh paint is the single manual-verify step — see Completion Notes / ADR 0005.)*
 
-- [ ] **Task 4 — Measure packaging / "just works"** (AC: #3d)
-  - [ ] Establish how the extension would ship so a user **installs and it works** with no extra steps: does it **bundle** the dotnet tool (`dotnet publish -p:PublishSingleFile -r <rid> --self-contained`), **require** `specscribe` on PATH, or **embed** a prebuilt payload? Prototype/measure the most promising (single-file publish size, cold spawn latency, per-RID matrix). This directly feeds **Epic 16.5** — capture numbers, not vibes.
-  - [ ] Confirm nothing in the chosen seam blocks the owner's **Epic 16.3** goal (a single-command install-and-run CLI for CI). Note the linkage; do not implement 16.3 here.
+- [x] **Task 4 — Measure packaging / "just works"** (AC: #3d)
+  - [x] Measured (numbers, not vibes): self-contained single-file publish **~73 MB / RID** (zero prereqs) vs framework-dependent portable **~3.5 MB** (needs .NET 10 runtime); spawn-plus-full-render latency **~1.8–2.0 s warm / ~3.5 s cold** (dominated by ingest + `git` subprocess, not .NET startup); extension bundle **3.4 KB minified**. Decision: **bundle the self-contained tool** for zero-prereq install; Epic 16.5 owns the per-RID matrix. ADR 0005 §2.
+  - [x] Confirmed the spawn seam does **not** block Epic 16.3's single-command install-and-run CLI (the same self-contained tool serves it); linkage noted, 16.3 not implemented here.
 
-- [ ] **Task 5 — Write the ADR + seat the implementation story** (AC: #3, #4)
-  - [ ] Author **`docs/adrs/0005-vs-code-webview-runtime-and-packaging.md`** (hand-authored ADR, rendered into the live site by SpecScribe — format per [ADR 0004](../../docs/adrs/0004-cross-surface-interaction-and-theme-contract.md); `**Status:** Accepted` or `Proposed`, `**Date:**`, `**Deciders:** Matt Eland`, Context / Decision / Consequences / References). Record the seam decision across **data path, live-push transport, CSP/theming, packaging**, and the **explicit ratify-or-reject of epic 6.4 AC #1's JSON-vs-C#-rendered-HTML** question. This is the spike's **primary, durable output** — the code is disposable, the decision is not.
-  - [ ] Add ADR 0005 to the [docs/adrs/README.md](../../docs/adrs/README.md) Records list.
-  - [ ] **Seat Story 6.4 (the webview runtime)** via a follow-up `create-story`/`correct-course`, scope shaped by the ADR: the webview UI + live-push (the epic's 6.4 runtime ACs) + the chosen C# delivery (WebviewRenderAdapter or JSON export). Make explicit: the **6.2 hard-dependency**, the **Story 6.5 host-theming** and **16.5 packaging** linkages, and the **6.2 → 6.3 → 6.4 → 6.5** order. If not seating it in-tool this session, name the runtime's scope precisely in the ADR + Completion Notes so it can be seated verbatim.
+- [x] **Task 5 — Write the ADR + seat the implementation story** (AC: #3, #4)
+  - [x] Authored **`docs/adrs/0005-vs-code-webview-runtime-and-packaging.md`** (ADR 0004 format; **Accepted**, Matt Eland) recording the seam across data path, live-push transport, CSP/theming, packaging — and the **explicit RATIFICATION of the C#-rendered-webview-HTML reinterpretation of epic 6.4 AC #1** (JSON export rejected).
+  - [x] Added ADR 0005 to [docs/adrs/README.md](../../docs/adrs/README.md).
+  - [x] **Story 6.4 (webview runtime) is seated** — its file [6-4-…-webview-runtime](6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics.md) already exists context-complete with a HARD GATE on ADR 0005; the ADR now clears that gate and selects its fork (build `WebviewRenderAdapter`, not the JSON export). 6.2 → 6.3 → 6.4 → 6.5 order confirmed; hard-dependency on 6.2 + linkages to 6.5 / 16.5 recorded in the ADR.
 
-- [ ] **Task 6 — Quarantine & land only the decision** (AC: #5)
-  - [ ] Ensure **no production runtime lands on `main`**: keep `spike/vscode-6-3` unmerged, or land only the quarantined `spike/` folder + ADR 0005 + README index + this story's record + an optional `spike/README.md`. The shipped `SpecScribe` CLI/tool gains **no** new product rendering path from the spike.
-  - [ ] If any core `src/SpecScribe/*.cs` file was touched for the prototype (e.g. a throwaway adapter), either revert it before merge or keep it on the branch only. **Verify the generated site is byte-identical** vs. `baseline_commit` if the core was touched at all (the golden gate — memory: [[golden-diff-normalization-gotchas]], [[generate-output-dir-is-specscribeoutput]]); ideally the core is untouched on `main` and this step is a no-op.
+- [x] **Task 6 — Quarantine & land only the decision** (AC: #5)
+  - [x] No production runtime on `main`: all spike code is under the quarantined `spike/` folder (excluded from the shipped tool — no `.sln`, not in `SpecScribe.csproj`, not in the site pipeline), plus a `spike/.gitignore` for build outputs. The durable artifacts are ADR 0005 + README index + this story record + `spike/README.md`. The shipped `specscribe` CLI gains **no** new product rendering path.
+  - [x] **Zero `src/SpecScribe/*.cs` files were touched** (`git status src/` is empty), so the generated site is byte-identical by construction — the golden gate is a genuine no-op (memory: [[golden-diff-normalization-gotchas]], [[generate-output-dir-is-specscribeoutput]]). Read-only honored (AD-6): no helper path writes source artifacts.
 
 ## Dev Notes
 
@@ -150,12 +150,51 @@ Five coupled choices; the spike gathers evidence, the ADR commits:
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Opus 4.8) — dev-story workflow.
+
 ### Debug Log References
+
+- Spike branch `spike/vscode-6-3` created from HEAD `8ebca9e` (frontmatter `baseline_commit` preserved at `b58d787` per create-story convention — the workflow does not overwrite an existing baseline).
+- Renderer build: `dotnet build spike/vscode/renderer` → succeeded, 0 warnings. Run against this repo: `79` md files, `16` epics ingested; wrote `dashboard.html` (306,726 B) + `epics.html` (237,238 B).
+- CSP survival scan of rendered output: dashboard `107` inline `<svg>`, `1` `<script>` (the nonce'd bridge only), `126` inline `style="` attrs, `0` `?v=` tokens, `0` external refs; epics `18` `<svg>`, `5` mermaid refs (`<pre class="mermaid">` + a `.mermaid{}` rule — not a script).
+- Shim: `npm install` (6 pkgs), `tsc --noEmit` clean under `strict`, `esbuild` bundle 6.2 KB dev / 3.4 KB minified. Live tool versions: esbuild 0.24.2, TypeScript 5.9.3, @types/vscode 1.125.0.
+- Packaging: self-contained single-file `win-x64` = 76,555,782 B exe (~73 MB dir); framework-dependent portable = ~3.5 MB. Spawn+render latency (Measure-Command): self-contained ~1.9 s ×3, portable-`dotnet` ~1.76 s ×2 warm; ~3.5 s cold first run.
+- `git status --porcelain src/` empty at completion — core byte-identical.
 
 ### Completion Notes List
 
+- **This is a SPIKE — the durable deliverable is [ADR 0005](../../docs/adrs/0005-vs-code-webview-runtime-and-packaging.md), not shippable code.** All five ACs met with empirical evidence.
+- **Seam decision (ADR 0005):** C# renders the webview HTML from the shared 6.2 section view models via a **`WebviewRenderAdapter` (2nd `IRenderAdapter`)**; the epic 6.4 AC #1 "JSON export the TS renders" is **rejected**. Extension↔core data path = **spawn the .NET tool as a child process, HTML/JSON on stdout**. Live-push = **extension-host `FileSystemWatcher` → re-render → in-place `postMessage`**. Packaging = **bundle a self-contained single-file publish** (~73 MB/RID) for zero-prereq install. The shim needs to inject exactly **two** host-runtime values (`cspSource`, `nonce`) — proof it can stay dumb.
+- **Story 6.4 (runtime) is unambiguously scoped:** build `WebviewRenderAdapter : IRenderAdapter` (`Id = "webview"`) over all five 6.2 views; its existing story file's ADR-0005 gate is now satisfiable and its fork selected (§41 of 6.4, not §42). Order 6.2 → 6.3 → 6.4 → 6.5 confirmed.
+- **Single manual-verification gap (honest):** everything up to `webview.html = <string>` is proven headlessly (renderer output, CSP policy, shim compile/bundle, spawn+JSON, packaging sizes/latency). The **actual pixel paint + live refresh inside VS Code's Electron** cannot be exercised in this non-interactive CLI environment — it needs one `F5` run of `spike/vscode` in a real VS Code. Called out in ADR 0005 ("Not yet proven") and `spike/README.md`; Story 6.4 must close it.
+- **Promotion note (branch orchestration):** the durable artifacts (ADR 0005, `docs/adrs/README.md` index, this story record, sprint-status → review) and the quarantined `spike/` folder all currently live on branch `spike/vscode-6-3`. To land only the decision on `main` while keeping the throwaway code quarantined, cherry-pick / `git checkout spike/vscode-6-3 -- docs/adrs/0005-*.md docs/adrs/README.md _bmad-output/…/6-3-*.md _bmad-output/…/sprint-status.yaml` (and optionally `spike/`). No `src/` changes exist to promote — core is untouched.
+
 ### File List
 
+_New (all quarantined under `spike/`, throwaway):_
+- `spike/README.md`
+- `spike/.gitignore`
+- `spike/vscode/package.json`
+- `spike/vscode/tsconfig.json`
+- `spike/vscode/esbuild.js`
+- `spike/vscode/.vscodeignore`
+- `spike/vscode/src/extension.ts`
+- `spike/vscode/renderer/SpecScribe.WebviewSpike.csproj`
+- `spike/vscode/renderer/Program.cs`
+- `spike/vscode/renderer/WebviewShell.cs`
+
+_New (durable — the decision):_
+- `docs/adrs/0005-vs-code-webview-runtime-and-packaging.md`
+
+_Modified (durable):_
+- `docs/adrs/README.md` (ADR 0005 index entry)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (6.3 → in-progress → review)
+- `_bmad-output/implementation-artifacts/6-3-vs-code-integration-spike.md` (this record)
+
+_Untouched:_ `src/SpecScribe/**` (core byte-identical — the shipped tool gains no spike code).
+
 ## Change Log
+
+- 2026-07-10 — **Spike executed (dev-story).** Built a throwaway VS Code extension shim (`spike/vscode/src/extension.ts`, ~180 lines) + a C# webview renderer (`spike/vscode/renderer`) that renders the dashboard + epics surfaces from the REAL Story 6.2 section view models (no scraping, no `.md` re-parse, zero `src/SpecScribe` edits). Gathered empirical evidence for the data path, CSP survival, live-push transport, and packaging. Authored **ADR 0005** ratifying **C#-rendered webview HTML via a `WebviewRenderAdapter`** (rejecting the JSON-export reinterpretation of epic 6.4 AC #1), **child-process spawn** invocation, **extension-host watcher → in-place postMessage** live-push, and **self-contained single-file bundling** for zero-prereq install. Updated the ADR README index; confirmed Story 6.4 (runtime) is seated with its ADR-0005 gate now clearable. All spike code quarantined under `spike/`; core untouched (generated site byte-identical). One manual-verify gap recorded: actual VS Code pixel paint + live refresh needs an `F5` run. Status → review.
 
 - 2026-07-10 — Story 6.4 drafted (create-story). **Redirected at create-story (owner-confirmed) from "webview runtime" to a "VS Code Integration Spike."** The owner surfaced a "pure C# webview / install-and-just-works" goal and the risk that a TS-render answer could imply a core-language rewrite (its own epic); chose a spike-first path (matching the Epics 11–15 spike-led pattern). Decisions captured: (1) keep the eventual runtime as one story, but **defer it to Story 6.4 (the webview runtime)** — this **Story 6.3** is the spike that seats it; (2) validate (not yet commit) a **thin TS host shim + C# `WebviewRenderAdapter`** rendering Story 6.2's view models to webview HTML, which **reinterprets epic 6.4 AC #1** (JSON export → C#-rendered webview HTML) — to be ratified or rejected by the spike's **ADR 0005**. Platform constraint acknowledged: a VS Code extension cannot be zero-TS (Node extension host). Spike deliverables: a throwaway feasibility proof (dashboard + epics in a webview from the C# core), live-push feasibility, CSP/theming/packaging measurements, **ADR 0005** (the durable output), and a seated Story 6.4. Story 6.2 is a hard dependency for the runtime, a soft one for the spike (stand in + document needed shapes). **Renumbered (owner-authorized, same day):** Epic 6 impl stories now run in dependency order 6.1 → 6.2 → **6.3 (this spike)** → **6.4 (webview runtime)** → 6.5 (host theming); this story took the 6.3 slot vacated when host-theming moved to 6.5, and the runtime kept 6.4. Story file renamed `6-4-…-webview-runtime` → `6-3-vs-code-integration-spike`; sprint-status updated; epics.md numbering reconciliation (its 6.3=theming, no spike entry) remains a follow-up correct-course. The runtime build, real export contract, host theming (Story 6.5), and extension packaging/publish (Epic 16.5) are explicitly out of scope; nothing production lands on `main`.
