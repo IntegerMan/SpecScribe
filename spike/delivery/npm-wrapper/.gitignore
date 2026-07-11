@@ -1,0 +1,4 @@
+# The repo-wide `bin/` ignore (for .NET build output) would otherwise swallow this npm package's launcher
+# SOURCE, which lives in bin/ by npm convention. Re-include it. (Throwaway Story 6.6 spike.)
+!bin/
+!bin/specscribe.js

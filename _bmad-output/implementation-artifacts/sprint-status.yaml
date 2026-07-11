@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-11T00:15:00-04:00
+last_updated: 2026-07-10T00:00:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -117,7 +117,7 @@ development_status:
   # (supersedes-or-reaffirms ADR 0005) + a ruling on the NFR6/progressive-enhancement posture for JS surfaces.
   # GATES 6.4/6.5 + Epic 16 packaging. Throwaway/quarantined; nothing pivots on main. Story file:
   # 6-6-delivery-architecture-and-distribution-spike.md.
-  6-6-delivery-architecture-and-distribution-spike: ready-for-dev
+  6-6-delivery-architecture-and-distribution-spike: review # spike complete; ADR 0006 (Proposed) re-affirms ADR 0005 + adds npx channel + optional JSON+SPA delivery adapter, defers the pure-TS pivot; reverses owner's lean → awaits ratification. src untouched, 676 tests green. spike code quarantined under spike/delivery/
   epic-6-retrospective: optional
 
   epic-7: in-progress
@@ -135,7 +135,7 @@ development_status:
   8-1-canonical-status-model-with-portal-wide-legend: ready-for-dev
   8-2-single-source-of-truth-for-every-count: ready-for-dev
   8-3-paired-progress-and-readiness-semantics: ready-for-dev
-  8-4-state-aware-next-step-command-surface: backlog
+  8-4-state-aware-next-step-command-surface: ready-for-dev
   8-5-designed-empty-states: backlog
   8-6-one-primary-view-per-dashboard-dataset: backlog
   8-7-generation-time-recency-signals: backlog

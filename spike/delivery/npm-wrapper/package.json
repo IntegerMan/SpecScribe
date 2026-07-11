@@ -1,0 +1,13 @@
+{
+  "name": "specscribe-delivery-spike",
+  "version": "0.0.0-spike",
+  "private": true,
+  "description": "Story 6.6 THROWAWAY spike — npm-wrapper-around-native-binary proof (npx runs the self-contained .NET tool with no .NET SDK). Not published; the durable output is ADR 0006.",
+  "bin": {
+    "specscribe-spike": "bin/specscribe.js"
+  },
+  "files": [
+    "bin/specscribe.js"
+  ],
+  "//": "Real distribution would list per-RID native packages under optionalDependencies (the esbuild/Biome pattern), e.g. @specscribe/win-x64, @specscribe/linux-x64, @specscribe/darwin-arm64 — each carrying ONE ~34 MB gzipped binary so a user downloads only their platform. The wrapper itself stays a few KB."
+}
