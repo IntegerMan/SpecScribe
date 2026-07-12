@@ -113,15 +113,20 @@ public sealed class FileWatcherService : IDisposable
             // a save can emit Changed/Created/Deleted in any order before the debounce settles.
             // IsDataSource is checked FIRST: sprint-status.yaml is under implementation-artifacts/, so
             // IsEpicsRelated would otherwise claim it and route to RegenerateEpics (which skips sprint state). [Story 6.11]
+            // The generic GenerateOne/RemoveFor fallback assumes a markdown artifact; the widened Filters/WatchedExtensions
+            // admit yaml/toml across the whole source root (not just the two named data sources), so a stray non-data-source
+            // yaml/toml file must be skipped here rather than mis-handled as markdown. [Story 6.11 review]
             var ev = _generator.IsDataSource(fullPath)
                 ? _generator.RegenerateFromDataSource(fullPath)
                 : _generator.IsAdr(fullPath)
                     ? _generator.RegenerateAdrs()
                     : _generator.IsEpicsRelated(fullPath)
                         ? _generator.RegenerateEpics()
-                        : File.Exists(fullPath)
-                            ? _generator.GenerateOne(fullPath)
-                            : _generator.RemoveFor(fullPath);
+                        : !fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+                            ? new GenerationEvent(GenerationOutcome.Skipped, Path.GetRelativePath(_options.RepoRoot, fullPath).Replace('\\', '/'), TimeSpan.Zero, "non-markdown, not a recognized data source")
+                            : File.Exists(fullPath)
+                                ? _generator.GenerateOne(fullPath)
+                                : _generator.RemoveFor(fullPath);
             _onEvent(ev);
         }, null, ForgeOptions.DebounceInterval, Timeout.InfiniteTimeSpan);
         return timer;

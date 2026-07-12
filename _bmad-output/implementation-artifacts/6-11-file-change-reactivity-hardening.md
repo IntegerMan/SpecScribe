@@ -5,7 +5,7 @@ seated_by: SCP 2026-07-11 (correct-course) — FR35, VS Code Native-Integration 
 
 # Story 6.11: File-Change Reactivity Hardening
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -174,6 +174,22 @@ Add to the `webview` payload — mirroring `configuredOutputRoot` exactly ([Comm
   - [x] `dotnet test` — **779/779 green excluding `GoldenContentFingerprint`.** The golden's 1 failure is **pre-existing uncommitted Story 6.12 work** (its `DiagnosticsTemplater.cs` diagnostics-page change), **proven not mine**: reverting my four core files to HEAD left the golden failing at the *identical* hash `977cb973…`. My changes touch no HTML-render path (memory: [golden-diff-normalization-gotchas]). Added C# tests: sprint-status.yaml change re-parses `_sprint` + refreshes the sprint surface (+ the RegenerateEpics mis-route contrast); `IsDataSource` positives/negatives; the sprint-file dual-classification (data-source AND epics-related → ordering matters); the three root resolvers (default, custom, subdir `../..`); payload carries `sourceRoot`/`adrRoot`/`repoRoot` (camelCase); FileWatcherService constructs with a config dir present.
   - [x] Read-only + no write locks (NFR5) confirmed: grepped the diff — **no** `writeFile`/`fs.write*`/`applyEdit`/settings `.update(`/`SettingsStore` in the extension diff (the lone `clipboard.writeText` is the pre-existing 6.5 helper), and **no** `File.Write`/`File.Open`/`FileStream`/`.Lock`/`FileShare.None` in the core diff. Widened watchers read the new yaml/toml through the existing shared-read paths (`ReadAllTextShared`); no `_bmad` dir is created.
   - [x] Extended [extension/README.md](../../extension/README.md) F5 checklist (Story 6.11 section: sprint-status.yaml → Now & Next; config.toml → title; subdir-open still live; hidden panel+tree defers spawn, one render on reveal). Updated [deferred-work.md](deferred-work.md): marked the stale `repoRoot`-in-payload note **resolved in 6.11** (it falsely claimed 6.4); recorded the core-`watch` project-name-restart asymmetry + R6.4 scoped-render deferral. Coverage boundary + config.toml asymmetry called out in Completion Notes.
+
+### Review Findings
+
+_Code review (2026-07-12), diff `30da813..875eb0f` scoped to this story's 12 owned files (parallel adversarial + edge-case + acceptance-audit)._
+
+- [x] [Review][Patch] Non-data-source `.yaml`/`.yml`/`.toml` files under the source root fall through to `GenerateOne`/`RemoveFor` (markdown-oriented), likely erroring — the widened `Filters`/`Debounce` admit the whole source root, not just `sprint-status.yaml`; no test exercises the dispatch outcome for a stray yaml file (only `IsDataSource` classification is tested) [src/SpecScribe/FileWatcherService.cs:30, 116-124] — fixed: non-`.md` files that pass `IsDataSource`/`IsAdr`/`IsEpicsRelated` now return a `Skipped` event instead of hitting `GenerateOne`/`RemoveFor`
+- [x] [Review][Patch] `RegenerateFromDataSource` only special-cases an `Error` outcome from the full `GenerateAll()`; a `Skipped` outcome for the actual data source (e.g. malformed sprint-status.yaml) is swallowed and misreported as `Updated` [src/SpecScribe/SiteGenerator.cs:427-441] — fixed: now also checks for a `Skipped` event matching the data source's filename and returns it instead of a false `Updated`
+- [x] [Review][Defer] `_bmad` config-dir watcher is registered only if the directory exists at `FileWatcherService` construction time; created-later `_bmad/` never gets watched for that watch session [src/SpecScribe/FileWatcherService.cs:40-44] — deferred, narrow edge case (real projects have `_bmad/config.toml` before `specscribe watch` starts)
+- [x] [Review][Defer] `IsProjectConfigFile`'s doc comment claims "any depth" `_bmad`-segment matching, but only the repo-root `_bmad` dir is ever watched — a nested `_bmad`-named dir elsewhere is classified as a data source but never fires [src/SpecScribe/SiteGenerator.cs:328-343 vs FileWatcherService.cs:40] — deferred, theoretical (one `_bmad` dir per project in practice)
+- [x] [Review][Defer] `publishDiagnostics` (Story 6.12) anchors Problems-panel paths via `folder.uri.fsPath` instead of the `lastRepoRoot` convention this story established for reveal-source/tree-open — wrong path on a subdir-open [extension/src/extension.ts:1034-1056] — deferred, out of scope: Story 6.12's own code, flag for its review
+- [x] [Review][Defer] `SerializeDiagnostics` (Story 6.12) unconditionally resolves every source-anchored notice against `resolved.SourceRoot`, mis-resolving an ADR-anchored notice [src/SpecScribe/Commands.cs SerializeDiagnostics] — deferred, out of scope: Story 6.12's own code
+- [x] [Review][Defer] `parseDiagnostics`/severity mapping (Story 6.12) silently coerces any non-`"error"` severity to `Warning` with no `message`-type validation [extension/src/extension.ts parseDiagnostics/publishDiagnostics] — deferred, out of scope: Story 6.12's own code
+
+_Dismissed as noise (7): "resolveWorkspacePath re-architected" (actually Story 6.10's own code-review patch, tagged as such, not new 6.11 work); "FileSystemWatcher default Filter='*.*' not cleared before `Filters.Add`" (false positive — .NET's `Filters` collection replaces the "*.*" default once non-empty); "config.toml `SiteTitle` staying stale" (already documented/accepted in deferred-work.md:219); "dirty flag is a boolean, not a queue" (matches intended full-`GenerateAll`-on-reveal design); "full `GenerateAll` per debounced event, no batching" (explicitly deferred by the story itself as R6.4); "`RegenerateEpics_LeavesSprintStateStale` test pins broken behavior" (mischaracterized — it pins the intentional AD-5 invariant); "zero extension TS test coverage" (pre-existing, honestly documented project-wide, not a new gap)._
+
+_Note: `875eb0f` bundles this story's files together with Story 6.12's Problems-panel diagnostics work in the same commit — `Commands.cs` and `extension.ts` carry both stories' changes interleaved. The golden-neutrality proof (Task 5) isolated the four core files this story owns outright but did not isolate `Commands.cs`. Not a defect in this story's own work; noted for the record._
 
 ## Dev Notes
 

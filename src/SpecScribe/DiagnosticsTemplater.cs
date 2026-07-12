@@ -9,6 +9,15 @@ namespace SpecScribe;
 /// UX-DR17 / NFR6). [Story 4.8]</summary>
 public enum DiagnosticSeverity { Error, Warning }
 
+/// <summary>Which real root (if any) <see cref="DiagnosticNotice.SourcePath"/> is relative to — the "which
+/// directory do I combine this with" bit the <c>webview</c> command's Problems-panel channel needs. A single
+/// <c>bool</c> ("is this anchored") isn't enough: an ingest notice can be anchored to <em>either</em> the
+/// source root (<c>SiteGenerator.MapDiagnostics</c> for source artifacts) <em>or</em> the ADR root (the
+/// unnumbered-ADR notice, whose path is relative to <c>AdrSourceRoot</c>/the ADR output subdir, not
+/// <c>SourceRoot</c>) — combining an ADR-relative path with <c>SourceRoot</c> silently resolves to a
+/// nonexistent file. [Story 6.12] [Review][Patch]</summary>
+public enum DiagnosticAnchorRoot { None, Source, Adr }
+
 /// <summary>One row on the Story 4.8 diagnostics page: a single non-fatal notice from the run, projected off
 /// the unified <see cref="GenerationEvent"/> channel. <see cref="Category"/> is the fine
 /// <see cref="AdapterDiagnosticCategory"/> word for ingest notices (recovered from the message prefix
@@ -19,15 +28,18 @@ public enum DiagnosticSeverity { Error, Warning }
 /// <param name="SourcePath">The source- or output-relative path the run reported for this notice.</param>
 /// <param name="Message">Human-readable detail; may be null for a bare skip (rendered as an em-dash).</param>
 /// <param name="Severity">Error vs. warning — the badge color only.</param>
-/// <param name="SourceAnchored">True when <see cref="SourcePath"/> is a real source artifact relative to the
-/// source root (an ingest notice from <see cref="SiteGenerator.MapDiagnostics"/>, provenance
-/// <see cref="GenerationEvent.FromAdapterDiagnostic"/>) rather than an output-relative render-time <c>.html</c>.
+/// <param name="AnchorRoot">Which root (if any) <see cref="SourcePath"/> is relative to — <see cref="DiagnosticAnchorRoot.None"/>
+/// for an output-relative render-time <c>.html</c> notice, <see cref="DiagnosticAnchorRoot.Source"/> for a
+/// source-root ingest notice, <see cref="DiagnosticAnchorRoot.Adr"/> for the ADR-root unnumbered-ADR notice
+/// (provenance <see cref="GenerationEvent.FromAdapterDiagnostic"/>/<see cref="GenerationEvent.FromAdrDiagnostic"/>).
 /// The diagnostics page (Story 4.8) ignores this field — it is render-invisible — but the <c>webview</c>
 /// command's JSON-lines stderr channel uses it to decide which notices can anchor to a file in the VS Code
-/// Problems panel. Surfacing it here (rather than re-deriving) keeps the page and the Problems channel reading
-/// ONE shared notice set so they can never disagree. [Story 6.12]</param>
+/// Problems panel, and which real root to resolve the path against. Surfacing it here (rather than re-deriving)
+/// keeps the page and the Problems channel reading ONE shared notice set so they can never disagree.
+/// [Story 6.12] [Review][Patch]</param>
 public sealed record DiagnosticNotice(
-    string Category, string SourcePath, string? Message, DiagnosticSeverity Severity, bool SourceAnchored = false)
+    string Category, string SourcePath, string? Message, DiagnosticSeverity Severity,
+    DiagnosticAnchorRoot AnchorRoot = DiagnosticAnchorRoot.None)
 {
     /// <summary>Projects the run's non-fatal notices off the single accumulated <see cref="GenerationEvent"/>
     /// list — the "whole run's non-fatal notices" surface with ZERO double-counting (each adapter diagnostic is
@@ -46,10 +58,13 @@ public sealed record DiagnosticNotice(
 
             var (category, message) = SplitCategory(e);
             var severity = e.Outcome == GenerationOutcome.Error ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning;
-            // FromAdapterDiagnostic is the exact "this path is a real source artifact" bit MapDiagnostics already
-            // set (source-relative ingest notices) vs. render-time output-relative notices — carry it verbatim so
-            // the Problems channel (Story 6.12) and this page derive from one type. [Story 6.12]
-            notices.Add(new DiagnosticNotice(category, e.RelativePath, message, severity, e.FromAdapterDiagnostic));
+            // FromAdapterDiagnostic/FromAdrDiagnostic are the exact "is this a real source artifact, and which
+            // root" bits MapDiagnostics already set — carry them verbatim (rather than re-deriving from the path
+            // string) so the Problems channel (Story 6.12) and this page derive from one type. [Story 6.12] [Review][Patch]
+            var anchorRoot = e.FromAdrDiagnostic ? DiagnosticAnchorRoot.Adr
+                : e.FromAdapterDiagnostic ? DiagnosticAnchorRoot.Source
+                : DiagnosticAnchorRoot.None;
+            notices.Add(new DiagnosticNotice(category, e.RelativePath, message, severity, anchorRoot));
         }
 
         return notices;

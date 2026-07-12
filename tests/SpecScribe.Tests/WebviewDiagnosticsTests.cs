@@ -41,7 +41,7 @@ public class WebviewDiagnosticsTests
         {
             new DiagnosticNotice(
                 "Unsupported", "implementation-artifacts/sprint-status.yaml",
-                "no development_status map", DiagnosticSeverity.Warning, SourceAnchored: true),
+                "no development_status map", DiagnosticSeverity.Warning, DiagnosticAnchorRoot.Source),
         };
 
         var line = Assert.Single(Lines(WebviewCommand.SerializeDiagnostics(notices, Options())));
@@ -62,7 +62,7 @@ public class WebviewDiagnosticsTests
         var notices = new[]
         {
             new DiagnosticNotice(
-                "Error", "deep-analytics.html", "template blew up", DiagnosticSeverity.Error, SourceAnchored: false),
+                "Error", "deep-analytics.html", "template blew up", DiagnosticSeverity.Error, DiagnosticAnchorRoot.None),
         };
 
         var line = Assert.Single(Lines(WebviewCommand.SerializeDiagnostics(notices, Options())));
@@ -74,12 +74,34 @@ public class WebviewDiagnosticsTests
     }
 
     [Fact]
+    public void SerializeDiagnostics_AdrAnchoredNotice_ResolvesAgainstAdrSourceRoot_NotSourceRoot()
+    {
+        // The unnumbered-ADR notice (SiteGenerator.GenerateAdrsInternal) carries a SourcePath prefixed with the
+        // ADR OUTPUT subdir ("adrs/…"), relative to AdrSourceRoot — NOT SourceRoot. Combining it with SourceRoot
+        // (the pre-patch bug) resolves to a nonexistent file; this pins the correct AdrSourceRoot-relative join.
+        var notices = new[]
+        {
+            new DiagnosticNotice(
+                "Unsupported", "adrs/0007-foo.md",
+                "no ADR number derivable from the filename; record rendered unnumbered and sorted last",
+                DiagnosticSeverity.Warning, DiagnosticAnchorRoot.Adr),
+        };
+
+        var line = Assert.Single(Lines(WebviewCommand.SerializeDiagnostics(notices, Options())));
+
+        // AdrSourceRoot in Options() is "<repoRoot>/docs/adrs" — the resolved path must land there, not under
+        // "_bmad-output/adrs/…" (which is what combining with SourceRoot would produce).
+        Assert.Equal("docs/adrs/0007-foo.md", line.GetProperty("path").GetString());
+        Assert.True(line.GetProperty("fileAnchored").GetBoolean());
+    }
+
+    [Fact]
     public void SerializeDiagnostics_MapsSeverity_ErrorAndWarning()
     {
         var notices = new[]
         {
-            new DiagnosticNotice("Malformed", "a.md", "bad", DiagnosticSeverity.Error, SourceAnchored: true),
-            new DiagnosticNotice("Skipped", "b.md", "later", DiagnosticSeverity.Warning, SourceAnchored: true),
+            new DiagnosticNotice("Malformed", "a.md", "bad", DiagnosticSeverity.Error, DiagnosticAnchorRoot.Source),
+            new DiagnosticNotice("Skipped", "b.md", "later", DiagnosticSeverity.Warning, DiagnosticAnchorRoot.Source),
         };
 
         var lines = Lines(WebviewCommand.SerializeDiagnostics(notices, Options()));
@@ -103,7 +125,7 @@ public class WebviewDiagnosticsTests
         // JSON never contains a literal null message.
         var notices = new[]
         {
-            new DiagnosticNotice("Skipped", "c.md", null, DiagnosticSeverity.Warning, SourceAnchored: true),
+            new DiagnosticNotice("Skipped", "c.md", null, DiagnosticSeverity.Warning, DiagnosticAnchorRoot.Source),
         };
 
         var line = Assert.Single(Lines(WebviewCommand.SerializeDiagnostics(notices, Options())));

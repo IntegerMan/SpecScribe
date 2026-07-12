@@ -4,7 +4,7 @@ baseline_commit: 39f79da
 
 # Story 6.12: Native Diagnostics — Problems Panel Integration
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -168,6 +168,11 @@ Notices have no line/column. Anchor to `new vscode.Range(0,0,0,0)` (file top). D
 - [extension/src/extension.ts:756–791](../../extension/src/extension.ts) — `runRenderer` (stderr capture + close handler to extend); [:369–427](../../extension/src/extension.ts) — `SpecScribeStore.load()` (the on-settle seam to publish from); [:133–174, :806–810](../../extension/src/extension.ts) — `activate`/`deactivate` (where to create/dispose the collection).
 - [tests/SpecScribe.Tests/WebviewCommandTests.cs](../../tests/SpecScribe.Tests/WebviewCommandTests.cs) — the pure-projection test shape to extend.
 - Memory: golden-diff-normalization-gotchas (fingerprint stays fixed), specscribe-status-token-system (status tokens are NOT the Problems severity domain), story-6-4-webview-runtime-live / story-6-9-native-outline-tree-live (the shim spawn/store patterns this rides on).
+
+### Review Findings
+
+- [x] [Review][Patch] `SerializeDiagnostics` computes a wrong file path for unnumbered-ADR notices — the notice's `SourcePath` (`"adrs/{name}.md"`, relative to `AdrSourceRoot`) is unconditionally combined with `resolved.SourceRoot`, producing a nonexistent path for every unnumbered-ADR record. Fixed: added `DiagnosticAnchorRoot` (None|Source|Adr) to `DiagnosticNotice` (replacing the `SourceAnchored` bool), a new `GenerationEvent.FromAdrDiagnostic` bit set at the unnumbered-ADR `MapDiagnostics` call site, and a branch in `SerializeDiagnostics` (`StripAdrOutputPrefix` + `AdrSourceRoot` join for the Adr case). New regression test `SerializeDiagnostics_AdrAnchoredNotice_ResolvesAgainstAdrSourceRoot_NotSourceRoot`; full suite green (785 tests, only the pre-existing unrelated golden-fingerprint drift fails). [src/SpecScribe/SiteGenerator.cs, src/SpecScribe/Commands.cs, src/SpecScribe/DiagnosticsTemplater.cs]
+- [x] [Review][Patch] `publishDiagnostics` anchors file-anchored notices to `folder.uri.fsPath` instead of the resolved `lastRepoRoot`, inconsistent with the sibling `revealSource`/`openSource` paths in the same diff — breaks Problems-panel anchoring on a subdir-open workspace (repo root ≠ workspace folder). Fixed: routed through `resolveWorkspacePath(lastRepoRoot ?? folder.uri.fsPath, record.path)`, same containment guard as the sibling paths; a missing/escaping path is now silently dropped rather than anchoring to the wrong/nonexistent file. `tsc --noEmit` clean. [extension/src/extension.ts]
 
 ## Dev Agent Record
 

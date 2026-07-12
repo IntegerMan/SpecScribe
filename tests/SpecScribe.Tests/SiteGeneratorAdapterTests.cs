@@ -350,7 +350,7 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         // Exactly the page's set: one non-fatal, source-anchored sprint-status.yaml skip.
         var notice = Assert.Single(notices);
-        Assert.True(notice.SourceAnchored);
+        Assert.Equal(DiagnosticAnchorRoot.Source, notice.AnchorRoot);
         Assert.EndsWith("sprint-status.yaml", notice.SourcePath, StringComparison.OrdinalIgnoreCase);
 
         // …and the wire is a faithful mirror of that same set: one anchored, repo-relative, forward-slashed line.

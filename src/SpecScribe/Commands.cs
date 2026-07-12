@@ -132,13 +132,17 @@ public sealed class WebviewCommand : Command<SiteSettings>
     /// spawn-free, mirroring <see cref="SerializePayload"/>/<see cref="ResolveConfiguredOutputRoot"/> so the wire
     /// contract is unit-testable without launching the command. Each line carries exactly <c>path</c>,
     /// <c>severity</c> (<c>"error"</c>|<c>"warning"</c>), <c>message</c>, and <c>fileAnchored</c>.
-    /// <para>Path resolution: a source-anchored notice (<see cref="DiagnosticNotice.SourceAnchored"/>) becomes a
-    /// repo-relative, forward-slashed path (the shim joins it to the workspace folder to build a real file
-    /// <c>Uri</c>) — the same convention as <see cref="ResolveConfiguredOutputRoot"/>; a render-time notice keeps
-    /// its output-relative <c>.html</c> path verbatim and rides the wire for page-coherence but is not
-    /// file-anchored (the shim leaves it on the diagnostics page). Roots come from the PRE-redirect
-    /// <paramref name="resolved"/> so anchored paths point at the project's real source, never the scratch
-    /// output. [Story 6.12]</para></summary>
+    /// <para>Path resolution: a source-anchored notice (<see cref="DiagnosticNotice.AnchorRoot"/> ==
+    /// <see cref="DiagnosticAnchorRoot.Source"/>) becomes a repo-relative, forward-slashed path combined with
+    /// <see cref="ForgeOptions.SourceRoot"/> (the shim joins it to the workspace folder to build a real file
+    /// <c>Uri</c>) — the same convention as <see cref="ResolveConfiguredOutputRoot"/>. An ADR-anchored notice
+    /// (<see cref="DiagnosticAnchorRoot.Adr"/>) combines with <see cref="ForgeOptions.AdrSourceRoot"/> instead —
+    /// its <see cref="DiagnosticNotice.SourcePath"/> is relative to the ADR OUTPUT subdir, not the source root, so
+    /// combining it with <see cref="ForgeOptions.SourceRoot"/> would resolve to a nonexistent file. [Review][Patch]
+    /// A render-time notice (<see cref="DiagnosticAnchorRoot.None"/>) keeps its output-relative <c>.html</c> path
+    /// verbatim and rides the wire for page-coherence but is not file-anchored (the shim leaves it on the
+    /// diagnostics page). Roots come from the PRE-redirect <paramref name="resolved"/> so anchored paths point at
+    /// the project's real source, never the scratch output. [Story 6.12]</para></summary>
     public static string SerializeDiagnostics(IReadOnlyList<DiagnosticNotice> notices, ForgeOptions resolved)
     {
         if (notices.Count == 0)
@@ -149,9 +153,14 @@ public sealed class WebviewCommand : Command<SiteSettings>
         var sb = new StringBuilder();
         foreach (var notice in notices)
         {
-            var path = notice.SourceAnchored
-                ? Path.GetRelativePath(resolved.RepoRoot, Path.Combine(resolved.SourceRoot, notice.SourcePath)).Replace('\\', '/')
-                : notice.SourcePath.Replace('\\', '/');
+            var path = notice.AnchorRoot switch
+            {
+                DiagnosticAnchorRoot.Source =>
+                    Path.GetRelativePath(resolved.RepoRoot, Path.Combine(resolved.SourceRoot, notice.SourcePath)).Replace('\\', '/'),
+                DiagnosticAnchorRoot.Adr =>
+                    Path.GetRelativePath(resolved.RepoRoot, Path.Combine(resolved.AdrSourceRoot, StripAdrOutputPrefix(notice.SourcePath))).Replace('\\', '/'),
+                _ => notice.SourcePath.Replace('\\', '/'),
+            };
             // Self-describing single-line Problems entry: prefix the category so a bare skip (null Message) still
             // reads, and the fine ingest category is visible. Raw text — never linkified (Problems shows one line).
             var message = notice.Message is null ? notice.Category : $"{notice.Category}: {notice.Message}";
@@ -160,7 +169,7 @@ public sealed class WebviewCommand : Command<SiteSettings>
                 path,
                 severity = notice.Severity == DiagnosticSeverity.Error ? "error" : "warning",
                 message,
-                fileAnchored = notice.SourceAnchored,
+                fileAnchored = notice.AnchorRoot != DiagnosticAnchorRoot.None,
             };
             // Same camelCase policy as the stdout payload so the TS RawDiagnostic interface reads one convention.
             sb.Append(JsonSerializer.Serialize(line, CamelCase));
@@ -168,6 +177,20 @@ public sealed class WebviewCommand : Command<SiteSettings>
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>An ADR-anchored notice's <see cref="DiagnosticNotice.SourcePath"/> carries the ADR OUTPUT subdir
+    /// prefix (<see cref="ForgeOptions.AdrOutputSubdir"/>, e.g. <c>"adrs/0007-foo.md"</c> — the shape
+    /// <c>GenerateAdrsInternal</c> uses for the diagnostics page's source-column display), not a path relative to
+    /// <see cref="ForgeOptions.AdrSourceRoot"/> directly. Strip it before combining with
+    /// <see cref="ForgeOptions.AdrSourceRoot"/>, so the real on-disk ADR file resolves instead of a nonexistent
+    /// <c>AdrSourceRoot/adrs/…</c> path. [Story 6.12] [Review][Patch]</summary>
+    private static string StripAdrOutputPrefix(string sourceRelative)
+    {
+        var prefix = ForgeOptions.AdrOutputSubdir + "/";
+        return sourceRelative.StartsWith(prefix, StringComparison.Ordinal)
+            ? sourceRelative[prefix.Length..]
+            : sourceRelative;
     }
 
     /// <summary>The configured output root expressed relative to the repo root, with forward slashes so the
