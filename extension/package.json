@@ -141,12 +141,12 @@
       {
         "id": "specscribe.status.drafted",
         "description": "SpecScribe status accent — Drafted (pale gold).",
-        "defaults": { "light": "#8a6d0a", "dark": "#e8d9a8", "highContrast": "#f0dfa8", "highContrastLight": "#8a6d0a" }
+        "defaults": { "light": "#8a6d0a", "dark": "#e8d9a8", "highContrast": "#f0dfa8", "highContrastLight": "#5c4807" }
       },
       {
         "id": "specscribe.status.pending",
         "description": "SpecScribe status accent — Pending (tan-grey).",
-        "defaults": { "light": "#6b6459", "dark": "#cbc4b6", "highContrast": "#d8d8d8", "highContrastLight": "#6b6459" }
+        "defaults": { "light": "#6b6459", "dark": "#cbc4b6", "highContrast": "#d8d8d8", "highContrastLight": "#46413a" }
       }
     ],
     "menus": {

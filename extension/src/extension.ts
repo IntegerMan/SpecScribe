@@ -266,12 +266,15 @@ function createController(
   let current = '';                                   // the surface the user is looking at — refreshes re-push THIS
   let pendingReveal: Reveal = initialReveal;          // applied once the first payload lands
 
-  const shared = store ?? (store = new SpecScribeStore(context, folder));
+  // Read `store` fresh on every use rather than capturing it once: a workspace-folder change (bindWorkspace)
+  // disposes the old store and rebinds the module-level `store` to a new one, and this panel must follow that
+  // rebind rather than keep reading a disposed, dead store (whose watchers no longer fire).
+  const currentStore = () => store ?? (store = new SpecScribeStore(context, folder));
 
   p.onDidDispose(() => { disposed = true; panel = undefined; active = undefined; });
 
   function push(target: string, reason: 'navigate' | 'refresh', fragment = '') {
-    const cache = shared.payload;
+    const cache = currentStore().payload;
     if (!cache) return;
     const surface = cache.surfaces[target] ?? cache.surfaces[cache.entry];
     if (!surface) return;
@@ -302,7 +305,7 @@ function createController(
       return;
     }
     if (msg?.type === 'navigate' && typeof msg.target === 'string') {
-      const cache = shared.payload;
+      const cache = currentStore().payload;
       if (!cache) return;
       if (!cache.surfaces[msg.target]) {
         // Not one of the webview's navigable surfaces (e.g. a requirements or doc page): the in-editor set is
@@ -327,7 +330,7 @@ function createController(
   // (fired as the initial load settles) never posts into a webview whose bridge script isn't installed yet.
   const sub = dataChanged.event(() => {
     if (disposed || !painted) return;
-    if (shared.payload) push(current, 'refresh');
+    if (currentStore().payload) push(current, 'refresh');
   });
   p.onDidDispose(() => sub.dispose());
 
@@ -338,9 +341,9 @@ function createController(
     try {
       // Reuse the shared cache if the tree (or a prior open) already loaded it — opening the panel then costs no
       // second spawn (Story 6.9). Only a cold store pays the ~3.5 s render, wrapped in the progress heartbeat.
-      cache = shared.payload ?? await vscode.window.withProgress(
+      cache = currentStore().payload ?? await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'SpecScribe: rendering…' },
-        () => shared.load(),
+        () => currentStore().load(),
       );
     } catch (err) {
       // Show the error page, but drop the singleton so a later "Open Status" re-renders instead of just revealing
@@ -368,7 +371,7 @@ function createController(
   return {
     reveal(reveal: Reveal) {
       p.reveal();
-      const cache = shared.payload;
+      const cache = currentStore().payload;
       if (cache && painted) {
         const key = resolveReveal(cache, reveal);
         if (key !== current) push(key, 'navigate');
@@ -471,9 +474,12 @@ const STAGE_ICON: Record<string, string> = {
 
 function stageIcon(stage: string): vscode.ThemeIcon {
   const glyph = STAGE_ICON[stage];
+  // An unrecognized stage means the core emitted a stage string this map's six-stage vocabulary doesn't cover
+  // (drift, or a future 7th stage) — flag it visibly (warning color/shape) rather than blending silently into
+  // one of the six known looks.
   return glyph
     ? new vscode.ThemeIcon(glyph, new vscode.ThemeColor(`specscribe.status.${stage}`))
-    : new vscode.ThemeIcon('circle-outline');
+    : new vscode.ThemeIcon('question', new vscode.ThemeColor('problemsWarningIcon.foreground'));
 }
 
 class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
@@ -491,7 +497,10 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
     }
     if (node.kind === 'epic') {
       const e = node.epic;
-      const item = new vscode.TreeItem(`Epic ${e.number}: ${e.title}`, vscode.TreeItemCollapsibleState.Expanded);
+      const collapsible = e.stories.length > 0
+        ? vscode.TreeItemCollapsibleState.Expanded
+        : vscode.TreeItemCollapsibleState.None;
+      const item = new vscode.TreeItem(`Epic ${e.number}: ${e.title}`, collapsible);
       item.description = `${e.storiesDone}/${e.storiesTotal}`;
       item.iconPath = stageIcon(e.stage);
       item.tooltip = `Epic ${e.number}: ${e.title} — ${e.stageLabel} (${e.storiesDone}/${e.storiesTotal} stories done)`;
@@ -528,6 +537,12 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
 
     const outline = store.outline;
     if (!outline) {
+      if (store.isLoaded) {
+        // A payload DID load successfully, but it carries no `outline` field — an older (pre-6.9) core binary,
+        // not a load failure. Re-spawning would never fix this (the same stale tool would keep answering the
+        // same way), so show a static message instead of looping `store.load()` on every tree refresh.
+        return [messageNode('⚠ SpecScribe tool is out of date — update it to see the project outline', 'warning')];
+      }
       // Detected but nothing loaded yet: lazily trigger the FIRST spawn (this is the natural lazy activation cost —
       // a spawn on first reveal, not on activation), and show a graceful loading node meanwhile. On the failure of
       // that first load, show an error node instead of re-spawning in a loop.
@@ -562,9 +577,12 @@ function renderStatusBar(): void {
   if (!projectDetected || !store) { item.hide(); return; }
 
   if (store.lastError) {
-    // A failed refresh must not leave the last-good count looking current (AC #2).
+    // A failed refresh must not leave the last-good count looking current (AC #2). Word this differently on a
+    // first-ever failure (isLoaded false, no cache exists yet) than on a refresh failure with a last-good cache.
     item.text = '$(warning) SpecScribe: data stale';
-    item.tooltip = `SpecScribe: last refresh failed — showing cached data.\n${String(store.lastError)}`;
+    item.tooltip = store.isLoaded
+      ? `SpecScribe: last refresh failed — showing cached data.\n${String(store.lastError)}`
+      : `SpecScribe: could not load data.\n${String(store.lastError)}`;
     item.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     item.show();
     return;

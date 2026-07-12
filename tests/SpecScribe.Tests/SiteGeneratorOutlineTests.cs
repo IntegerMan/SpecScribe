@@ -296,6 +296,49 @@ public class SiteGeneratorOutlineTests : IDisposable
     }
 
     [Fact]
+    public void HelperCommand_ReadyStage_ResolvesToDevStory()
+    {
+        // Isolated from the shared fixture (which has no "ready" story) so it doesn't disturb the epic/story
+        // indices every other test in this file asserts against. Mirrors BmadCommands.PrimaryStoryCommand's own
+        // doc comment ("dev-story when ready/active") — the "ready" branch was previously untested here.
+        var story = new StoryInfo
+        {
+            Id = "9.9",
+            EpicNumber = 9,
+            Title = "Ready Story",
+            UserStoryHtml = "",
+            AcBlocksHtml = Array.Empty<string>(),
+            Status = "ready-for-dev",
+        };
+        var commands = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/bmad-dev-story",
+        });
+
+        Assert.Equal("ready", StatusStyles.ForStory(story));
+        Assert.Equal("/bmad-dev-story 9.9", BmadCommands.PrimaryStoryCommand(story, commands));
+    }
+
+    [Fact]
+    public void EpicStage_Pending_WhenEpicHasNoStories()
+    {
+        // Isolated for the same reason as HelperCommand_ReadyStage_ResolvesToDevStory above — the shared fixture's
+        // three epics never hit "pending" (StatusStyles.EpicStages' 6th, epic-only tier), which ForEpicWithRetrospective
+        // and the tree's stage icon/color map both need to handle.
+        var epic = new EpicInfo
+        {
+            Number = 9,
+            Title = "Empty Epic",
+            GoalHtml = "",
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.FurtherDevelopment,
+            Stories = Array.Empty<StoryInfo>(),
+        };
+
+        Assert.Equal("pending", StatusStyles.ForEpicWithRetrospective(epic));
+    }
+
+    [Fact]
     public void SerializePayload_EmitsOutline_AllCamelCase()
     {
         var gen = new SiteGenerator(Options());
