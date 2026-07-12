@@ -79,8 +79,12 @@ async function openStatus(context: vscode.ExtensionContext) {
       // Read-only helper handoff (AC #2, AD-6/NFR-5): the webview generated a prompt; the only thing the host does
       // is put it on the clipboard. NOTHING here writes a project artifact, edits a file, or mutates settings —
       // clipboard is the explicit handoff, and any use of the copied text is a separate user action.
-      await vscode.env.clipboard.writeText(msg.text);
-      void vscode.window.showInformationMessage(`SpecScribe: copied ${msg.label ?? 'text'} to the clipboard.`);
+      try {
+        await vscode.env.clipboard.writeText(msg.text);
+        void vscode.window.showInformationMessage(`SpecScribe: copied ${msg.label ?? 'text'} to the clipboard.`);
+      } catch (err) {
+        void vscode.window.showErrorMessage(`SpecScribe: couldn't copy to the clipboard: ${String(err)}`);
+      }
       return;
     }
     if (msg?.type === 'navigate' && typeof msg.target === 'string') {
@@ -166,7 +170,9 @@ function createPanel(): vscode.WebviewPanel {
 function composeEntryHtml(webview: vscode.Webview, payload: WebviewPayload): string {
   const nonce = crypto.randomBytes(16).toString('base64');
   const content = payload.surfaces[payload.entry]?.content ?? '';
-  const sentinel = ' __specscribe_content__ ';
+  // Random per-call sentinel (same pattern as the nonce): a fixed literal could collide with pre-existing text in
+  // the C# shell (CSS/script) and corrupt it on the final swap-back, defeating the whole point of this technique.
+  const sentinel = ` __specscribe_content_${crypto.randomBytes(8).toString('hex')}__ `;
   // The entry content is inlined exactly once (WrapDocument put it at __CONTENT__); pull it out so the token
   // replace below can only ever touch the shell the C# renderer controls.
   const shell = content && payload.document.includes(content)

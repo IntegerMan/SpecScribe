@@ -222,6 +222,7 @@
 /* The :target AC-highlight paints a literal pale gold; use a translucent tuned-gold wash on dark instead. */
 .vscode-dark .ac-criterion:target,
 .vscode-high-contrast .ac-criterion:target {
+  background: rgba(230, 181, 46, 0.22); /* plain fallback for hosts without color-mix() support */
   background: color-mix(in srgb, var(--gold-light) 22%, transparent);
 }
 
@@ -248,6 +249,21 @@
 .vscode-high-contrast .view-epic-link:focus-visible,
 .vscode-high-contrast .site-nav a:focus-visible,
 .vscode-high-contrast .site-nav-toggle:focus-visible,
+.vscode-high-contrast-light .index-card:focus-visible,
+.vscode-high-contrast-light .index-card--primary h2 a:focus-visible,
+.vscode-high-contrast-light .index-card-branch:focus-visible,
+.vscode-high-contrast-light .now-next-card:focus-visible,
+.vscode-high-contrast-light .quick-link-card:focus-visible,
+.vscode-high-contrast-light .epic-mosaic-card:focus-visible,
+.vscode-high-contrast-light .epic-chip:focus-visible,
+.vscode-high-contrast-light .story-title-link:focus-visible,
+.vscode-high-contrast-light .req-id-link:focus-visible,
+.vscode-high-contrast-light .req-epic:focus-visible,
+.vscode-high-contrast-light .toc-sidebar a:focus-visible,
+.vscode-high-contrast-light .breadcrumb a:focus-visible,
+.vscode-high-contrast-light .ac-anchor:focus-visible,
+.vscode-high-contrast-light .ac-ref:focus-visible,
+.vscode-high-contrast-light .view-epic-link:focus-visible,
 .vscode-high-contrast-light .site-nav a:focus-visible,
 .vscode-high-contrast-light .site-nav-toggle:focus-visible {
   outline-color: var(--vscode-focusBorder);
@@ -270,7 +286,7 @@
 }
 
 .ss-webview-toolbar-label {
-  font: 0.72rem/1.4 var(--vscode-font-family, Georgia, serif);
+  font: 0.72rem/1.4 var(--vscode-font-family, -apple-system, "Segoe UI", sans-serif);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
@@ -278,7 +294,7 @@
 }
 
 .ss-helper-btn {
-  font: 0.8rem var(--vscode-font-family, Georgia, serif);
+  font: 0.8rem var(--vscode-font-family, -apple-system, "Segoe UI", sans-serif);
   cursor: pointer;
   padding: 0.3rem 0.7rem;
   border-radius: 4px;
