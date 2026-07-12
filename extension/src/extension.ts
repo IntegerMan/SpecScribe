@@ -729,14 +729,12 @@ function messageNode(label: string, icon?: string): OutlineNode {
  * data is interpreted here, so AD-1/AD-2 hold. [spec-vscode-sidebar-shortcuts-…-quickpick] */
 interface Shortcut { label: string; icon: string; command: string; tooltip: string }
 
+// Deliberately just the view-opening entries (owner decision, 2026-07-12 F5 review): Refresh already lives on
+// the outline's title bar, and Generated Site / Generate / Watch / Project Settings are occasional operations
+// that belong in the Command Palette, not permanent sidebar real estate.
 const SHORTCUTS: readonly Shortcut[] = [
   { label: 'Open Dashboard', icon: 'dashboard', command: 'specscribe.openDashboard', tooltip: 'Open the SpecScribe status panel on the dashboard' },
   { label: 'Open Epics', icon: 'list-tree', command: 'specscribe.openEpics', tooltip: 'Open the SpecScribe status panel on the epics index' },
-  { label: 'Refresh Status', icon: 'refresh', command: 'specscribe.refresh', tooltip: 'Re-render the panel, outline tree, and status bar' },
-  { label: 'Open Generated Site', icon: 'globe', command: 'specscribe.openGeneratedSite', tooltip: 'Open the generated static site in your browser' },
-  { label: 'Generate Full Site', icon: 'rocket', command: 'specscribe.generateSite', tooltip: 'Stage the generate command in a terminal — you press Enter' },
-  { label: 'Watch', icon: 'sync', command: 'specscribe.watch', tooltip: 'Stage the watch command in a terminal — you press Enter' },
-  { label: 'Open Project Settings', icon: 'settings-gear', command: 'specscribe.openProjectSettings', tooltip: 'Open the directory-scoped .specscribe settings file' },
 ];
 
 /** The static Shortcuts section pinned above the Project Outline: one-click nodes for the existing SpecScribe

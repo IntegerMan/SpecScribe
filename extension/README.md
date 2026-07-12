@@ -155,10 +155,10 @@ list: status gating, page↔tree parity, and the camelCase wire shape in `SiteGe
 hand in the F5 dev host:
 
 - **Shortcuts section:** in a SpecScribe repo the SpecScribe container shows a **Shortcuts** view **above**
-  Project Outline with seven codicon nodes — Open Dashboard, Open Epics, Refresh Status, Open Generated Site,
-  Generate Full Site, Watch, Open Project Settings. Clicking a node runs its command (Generate/Watch stage a
-  terminal command **without executing** — you press Enter). Open a non-SpecScribe folder → the Shortcuts view
-  is hidden (its manifest `when` gates on detection).
+  Project Outline with two codicon nodes — Open Dashboard and Open Epics (trimmed to the view-openers by owner
+  decision; Refresh lives on the outline title bar, and the operational commands stay Palette-only). Clicking a
+  node opens/reveals the panel on that surface. Open a non-SpecScribe folder → the Shortcuts view is hidden
+  (its manifest `when` gates on detection).
 - **Quick Pick options match the page:** right-click an **in-progress** story → **Copy BMad Command…** lists
   dev-story + code-review with the story page's own descriptions; an **in-review** story lists only code-review;
   a **ready-for-dev** story only dev-story (no code-review — nothing to review yet); a **done** story shows NO

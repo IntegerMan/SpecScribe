@@ -223,6 +223,12 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
   summary: Stronger SpecScribe branding/iconography — a distinctive brand mark in the sidebar (activity bar/tree) and inside the rendered application (site + webview header), beyond the current two `extension/media` SVGs.
   evidence: Split from the 2026-07-12 extension-polish intent (owner chose sidebar/command polish first). Touches the C# renderer's chrome (nav/header), so it carries golden-fingerprint churn (see golden-diff normalization gotchas) and per the create-story-elicit-visual-intent lesson the owner should be offered 2-3 named design directions before any silhouette is built — deserves its own focused spec.
 
+## Deferred from: owner F5 review of the VS Code experience (2026-07-12)
+
+- source_spec: `spec-vscode-sidebar-shortcuts-and-story-command-quickpick.md`
+  summary: Owner feedback after F5: "color use and contrast feels a little off in the VS experience" — run the deferred Story 6.5 webview-theme contrast/light-palette verification pass and tune the `.vscode-*` bridge (and the six `specscribe.status.*` tree accents, which must be re-tuned TOGETHER with the webview accents per Story 6.9's constraint) against real host themes.
+  evidence: Story 6.5 shipped the theme bridge but its own spec deferred the light-palette check and contrast verification ("no dedicated `.vscode-light` contrast-tuning block", see the 6.5 deferred section above); the owner has now visually confirmed the debt matters in daily use. Seat alongside (or inside) the deferred branding/iconography goal so accents and brand marks land as one visual pass.
+
 ## Deferred from: code review of spec-vscode-sidebar-shortcuts-and-story-command-quickpick (2026-07-12)
 
 - source_spec: `spec-vscode-sidebar-shortcuts-and-story-command-quickpick.md`
