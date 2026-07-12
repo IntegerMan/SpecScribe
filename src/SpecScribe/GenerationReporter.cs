@@ -2,7 +2,7 @@ using Spectre.Console;
 
 namespace SpecScribe;
 
-public enum GenerationPhase { Scan, Epics, Pages, Adrs, CommitDays, GitInsights, Index }
+public enum GenerationPhase { Scan, Epics, Pages, Adrs, CodePages, CommitDays, GitInsights, Index }
 
 /// <summary>Receives phase-by-phase progress from <see cref="SiteGenerator.GenerateAll"/> so the
 /// console layer can show a live breakdown without the generator knowing about Spectre.</summary>
@@ -23,6 +23,7 @@ public sealed class SpectreGenerationReporter : IGenerationReporter
         [GenerationPhase.Epics] = "Parsing epics & stories",
         [GenerationPhase.Pages] = "Rendering pages",
         [GenerationPhase.Adrs] = "Rendering ADRs",
+        [GenerationPhase.CodePages] = "Rendering code pages",
         [GenerationPhase.CommitDays] = "Rendering commit-day pages",
         [GenerationPhase.GitInsights] = "Rendering git insights hub",
         [GenerationPhase.Index] = "Writing dashboard & index",

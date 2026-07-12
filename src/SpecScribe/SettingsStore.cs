@@ -17,9 +17,13 @@ public sealed class SavedSettings
     /// <c>true</c> is ever written — the flag defaults off, so there is nothing to persist for the off case. [Story 3.2]</summary>
     public bool? DeepGit { get; set; }
 
+    /// <summary>Persisted code-link base URL (<c>--code-url</c>). Null means "never configured" — citations render
+    /// as in-portal code pages. A non-null value switches to external links against this base. [Story 7.1]</summary>
+    public string? CodeUrl { get; set; }
+
     /// <summary>True when nothing was configured — an all-null file is not worth writing or logging.</summary>
     [JsonIgnore]
-    public bool IsEmpty => Source is null && Adrs is null && Output is null && ProjectName is null && DeepGit is null;
+    public bool IsEmpty => Source is null && Adrs is null && Output is null && ProjectName is null && DeepGit is null && CodeUrl is null;
 }
 
 /// <summary>Reads and writes the optional <c>.specscribe</c> settings file in the current directory. Persistence
@@ -69,6 +73,7 @@ public static class SettingsStore
             // Persist the opt-in only when it is on; false is the default, so leave it null (nothing to save)
             // and keep an otherwise-empty config from being written just because the flag is off. [Story 3.2]
             DeepGit = settings.DeepGit ? true : null,
+            CodeUrl = settings.CodeUrl,
         };
 
         if (saved.IsEmpty) return null;
@@ -96,5 +101,7 @@ public static class SettingsStore
         // The CLI bool defaults false and there is no --no-deep-git, so settings.DeepGit == false unambiguously
         // means "not requested on this run" — safe to restore a persisted true; an explicit --deep-git stays on.
         if (!settings.DeepGit && saved.DeepGit == true) settings.DeepGit = true;
+        // CLI wins over saved: only fill from the persisted value when no --code-url was passed this run.
+        settings.CodeUrl ??= saved.CodeUrl;
     }
 }

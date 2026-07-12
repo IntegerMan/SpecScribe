@@ -64,6 +64,19 @@ public class StylesheetTests
         => Assert.Contains(".cmd-copy", ReadStylesheet());
 
     [Fact]
+    public void Stylesheet_HasCodeFilePageStyles()
+    {
+        // Story 7.1 in-portal code pages: the code surface, the anchored line rows/gutter, and the :target
+        // line highlight the "#L{n}" deep-links rely on must survive later refactors.
+        var css = ReadStylesheet();
+        Assert.Contains(".code-file", css);
+        Assert.Contains(".code-line", css);
+        Assert.Contains(".code-ln", css);
+        Assert.Contains(".code-src", css);
+        Assert.Contains(".code-line:target", css);
+    }
+
+    [Fact]
     public void Stylesheet_HasSendMenuStyles()
     {
         // The unified command badge and its send menu (native <details>) with shared menu rows.

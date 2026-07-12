@@ -34,7 +34,11 @@ public class SiteSettings : CommandSettings
     [Description("Also emit a JSON + client-renderer (SPA) delivery form alongside the static site: one entry shell, a manifest, and a few content chunks that navigate the whole site client-side (fewer files for large repos). Default: off; the static site is unchanged and is the no-JS fallback.")]
     public bool Spa { get; set; }
 
+    [CommandOption("--code-url <BASE>")]
+    [Description("Base URL for source-file links (e.g. https://github.com/owner/repo/blob/main). When set, in-portal code pages are NOT generated and citations link to {BASE}/<path>#L<line> instead. Default: unset, so referenced source files render as in-portal pages.")]
+    public string? CodeUrl { get; set; }
+
     /// <summary>Resolves these settings into absolute paths. Throws <see cref="DirectoryNotFoundException"/>
     /// with an actionable message when auto-discovery fails.</summary>
-    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa);
+    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl);
 }

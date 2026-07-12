@@ -465,6 +465,67 @@ code.color-swatch {
   padding: 0;
 }
 
+/* Story 7.1 — in-portal code file pages (code/<path>.html). A dark, legible-as-code surface (monospace, line
+   numbers, preserved whitespace, horizontal scroll for long lines — the block scrolls, never the page body) with a
+   non-selectable gutter and a :target line highlight so `code/<path>.html#L42` scrolls to and flags the addressed
+   line (same no-JS mechanism as the AC-anchor highlight). Neutral ink/parchment/gold tokens only — the --status-*
+   lifecycle tokens are off-limits here. */
+pre.code-file {
+  margin: 1.5rem 0;
+  padding: 1rem 0;
+  background: #241a0d;
+  color: #f0e4c8;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+pre.code-file code {
+  background: none;
+  color: inherit;
+  padding: 0;
+  display: block;
+}
+
+.code-line {
+  display: block;
+  white-space: pre;
+  /* Keep a jumped-to line clear of the sticky nav when reached via a "#L{n}" link. */
+  scroll-margin-top: 5rem;
+}
+
+.code-line:target {
+  background: rgba(184, 134, 11, 0.22);
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+
+.code-ln {
+  display: inline-block;
+  width: 3.5rem;
+  padding: 0 1rem 0 0.75rem;
+  text-align: right;
+  color: #b09c7a;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.code-src {
+  white-space: pre;
+}
+
+/* Placeholder note shown when a referenced file exists but can't be rendered inline (binary/oversized/unreadable). */
+.code-placeholder {
+  margin: 1.5rem 0;
+  padding: 1rem 1.2rem;
+  border-left: 3px solid var(--border);
+  background: var(--parchment-dark);
+  color: var(--ink-light);
+  font-style: italic;
+}
+
 /* Every markdown-generated table carries .md-table (see MarkdownConverter.TagTables), so this styles
    pipe tables consistently everywhere — inside .doc-body and in stand-alone panels like Change Log. */
 .md-table {

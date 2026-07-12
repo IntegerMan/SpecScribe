@@ -1,6 +1,10 @@
+---
+baseline_commit: 37ec9802d53358c0ace6800de12da160c807283b
+---
+
 # Story 7.1: In-Portal Code File Browsing
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -230,33 +234,33 @@ No external libraries or APIs are introduced, so there is no version/security re
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Discover the referenced code-file set (AC: #1)**
-  - [ ] Add `CodeReferenceScanner` (pure helper): given each source artifact's raw markdown + its source-relative directory + `RepoRoot`, extract citation targets and resolve them to repo-relative paths.
-  - [ ] Handle both citation shapes seen in real artifacts: markdown-link form `[Source: [X.cs:76-99](../../src/SpecScribe/X.cs)]` (resolve href relative to the artifact dir) and inline/code-span form `` [Source: `src/SpecScribe/X.cs:15-17`] `` / `[Source: src/SpecScribe/X.cs:15]` (repo-relative). [Source: `_bmad-output/implementation-artifacts/3-3-agent-and-workflow-structure-coverage-insights.md:77-84`, `1-3-markdown-fidelity-for-core-artifact-patterns.md:88-90`]
-  - [ ] Keep only candidates that (a) resolve inside `RepoRoot`, (b) are **not** under `SourceRoot` (`_bmad-output`) — those are already rendered as doc pages — and (c) exist on disk and aren't `IsIgnored`. Strip any `:line`/`#fragment` suffix when resolving the path.
-  - [ ] Dedupe (ordinal-ignore-case) and return a deterministic, sorted set.
-- [ ] **Task 2 — `CodeFileTemplater.RenderPage` (AC: #1, #2)**
-  - [ ] Build the page shell via `PathUtil.RenderHeadOpen` + `SiteNav.RenderNavBar` + `SiteNav.RenderBreadcrumb` + single `<main id="main-content">`, mirroring `CommitDayTemplater`.
-  - [ ] Render the line table: one `.code-line` per source line with `id="L{n}"`, a `.code-ln` gutter number, and an HTML-escaped `.code-src`. Normalize newlines; empty lines still emit an anchored row.
-  - [ ] Header: file path as `<h1>`, a kicker ("Source File"), and a meta pill with line count (invariant formatting).
-- [ ] **Task 3 — Generation wiring (AC: #1)**
-  - [ ] Add `_codePages` map field + `GenerationPhase.CodePages` (enum + label).
-  - [ ] Add `GenerateCodePagesInternal(...)`: wipe+recreate `code/`, iterate the referenced set, render each, write to `code/<path>.html`, collect `GenerationEvent`s, and populate `_codePages` (repo-relative → output-relative). Invoke it from `GenerateAll` with `BeginPhase/EndPhase` (near the commit-days phase).
-- [ ] **Task 3b — Code link strategy configuration (AC: #1)**
-  - [ ] Add optional `CodeSourceBaseUrl` to `ForgeOptions` (nullable, non-`required`) + `Resolve(...)` param.
-  - [ ] Add the `--code-url` CLI option to `SiteSettings` and pass it through `Resolve()`; add it to `SavedSettings`/`SettingsStore.TrySave`/`ApplyTo` (CLI wins over saved).
-  - [ ] Gate generation: when `CodeSourceBaseUrl` is set, **skip** `GenerateCodePagesInternal` entirely (external mode). Still leave the anchor scheme unchanged (`#L{n}` is GitHub-compatible for 7.2's external links).
-- [ ] **Task 4 — Safety & graceful degradation (AC: #1, #2)**
-  - [ ] Path-traversal guard: reject candidates resolving outside `RepoRoot`; confirm the output path stays inside `OutputRoot`.
-  - [ ] Binary detection (NUL byte / non-UTF-8) and size cap → omit or emit a clearly-marked placeholder page; never throw.
-  - [ ] Wrap per-file rendering in try/catch → `GenerationEvent(Error, …)`; the phase always completes.
-- [ ] **Task 5 — Styling (AC: #2)**
-  - [ ] Add `.code-file`/`.code-line`/`.code-ln`/`.code-src` + `:target` line highlight to `specscribe.css` using neutral tokens (not `--status-*`); horizontal scroll on the `<pre>`, never the body. Update `StylesheetTests` if it asserts on class presence.
-- [ ] **Task 6 — Tests (AC: #1, #2)**
-  - [ ] `CodeFileTemplaterTests`: anchors, numbering, escaping, a11y shell, blank-line handling.
-  - [ ] `SiteGeneratorCodePagesTests`: referenced→page, non-referenced→omitted, binary/oversized→non-fatal, path-traversal→no page/no leak, stale-output rebuild, determinism.
-- [ ] **Task 7 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green; run a real generation against this repo (default `SpecScribeOutput/`), open a `code/…html` page, confirm anchors/escaping/line-up/scroll and that non-referenced files produced no pages.
+- [x] **Task 1 — Discover the referenced code-file set (AC: #1)**
+  - [x] Add `CodeReferenceScanner` (pure helper): given each source artifact's raw markdown + its source-relative directory + `RepoRoot`, extract citation targets and resolve them to repo-relative paths.
+  - [x] Handle both citation shapes seen in real artifacts: markdown-link form `[Source: [X.cs:76-99](../../src/SpecScribe/X.cs)]` (resolve href relative to the artifact dir) and inline/code-span form `` [Source: `src/SpecScribe/X.cs:15-17`] `` / `[Source: src/SpecScribe/X.cs:15]` (repo-relative). [Source: `_bmad-output/implementation-artifacts/3-3-agent-and-workflow-structure-coverage-insights.md:77-84`, `1-3-markdown-fidelity-for-core-artifact-patterns.md:88-90`]
+  - [x] Keep only candidates that (a) resolve inside `RepoRoot`, (b) are **not** under `SourceRoot` (`_bmad-output`) — those are already rendered as doc pages — and (c) exist on disk and aren't `IsIgnored`. Strip any `:line`/`#fragment` suffix when resolving the path.
+  - [x] Dedupe (ordinal-ignore-case) and return a deterministic, sorted set.
+- [x] **Task 2 — `CodeFileTemplater.RenderPage` (AC: #1, #2)**
+  - [x] Build the page shell via `PathUtil.RenderHeadOpen` + `SiteNav.RenderNavBar` + `SiteNav.RenderBreadcrumb` + single `<main id="main-content">`, mirroring `CommitDayTemplater`.
+  - [x] Render the line table: one `.code-line` per source line with `id="L{n}"`, a `.code-ln` gutter number, and an HTML-escaped `.code-src`. Normalize newlines; empty lines still emit an anchored row.
+  - [x] Header: file path as `<h1>`, a kicker ("Source File"), and a meta pill with line count (invariant formatting).
+- [x] **Task 3 — Generation wiring (AC: #1)**
+  - [x] Add `_codePages` map field + `GenerationPhase.CodePages` (enum + label).
+  - [x] Add `GenerateCodePagesInternal(...)`: wipe+recreate `code/`, iterate the referenced set, render each, write to `code/<path>.html`, collect `GenerationEvent`s, and populate `_codePages` (repo-relative → output-relative). Invoke it from `GenerateAll` with `BeginPhase/EndPhase` (near the commit-days phase).
+- [x] **Task 3b — Code link strategy configuration (AC: #1)**
+  - [x] Add optional `CodeSourceBaseUrl` to `ForgeOptions` (nullable, non-`required`) + `Resolve(...)` param.
+  - [x] Add the `--code-url` CLI option to `SiteSettings` and pass it through `Resolve()`; add it to `SavedSettings`/`SettingsStore.TrySave`/`ApplyTo` (CLI wins over saved).
+  - [x] Gate generation: when `CodeSourceBaseUrl` is set, **skip** `GenerateCodePagesInternal` entirely (external mode). Still leave the anchor scheme unchanged (`#L{n}` is GitHub-compatible for 7.2's external links).
+- [x] **Task 4 — Safety & graceful degradation (AC: #1, #2)**
+  - [x] Path-traversal guard: reject candidates resolving outside `RepoRoot`; confirm the output path stays inside `OutputRoot`.
+  - [x] Binary detection (NUL byte / non-UTF-8) and size cap → omit or emit a clearly-marked placeholder page; never throw.
+  - [x] Wrap per-file rendering in try/catch → `GenerationEvent(Error, …)`; the phase always completes.
+- [x] **Task 5 — Styling (AC: #2)**
+  - [x] Add `.code-file`/`.code-line`/`.code-ln`/`.code-src` + `:target` line highlight to `specscribe.css` using neutral tokens (not `--status-*`); horizontal scroll on the `<pre>`, never the body. Update `StylesheetTests` if it asserts on class presence.
+- [x] **Task 6 — Tests (AC: #1, #2)**
+  - [x] `CodeFileTemplaterTests`: anchors, numbering, escaping, a11y shell, blank-line handling.
+  - [x] `SiteGeneratorCodePagesTests`: referenced→page, non-referenced→omitted, binary/oversized→non-fatal, path-traversal→no page/no leak, stale-output rebuild, determinism.
+- [x] **Task 7 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green; run a real generation against this repo (default `SpecScribeOutput/`), open a `code/…html` page, confirm anchors/escaping/line-up/scroll and that non-referenced files produced no pages.
 
 ## Dev Notes
 
@@ -297,8 +301,44 @@ No external libraries or APIs are introduced, so there is no version/security re
 
 ### Agent Model Used
 
+Claude Opus 4.8 (GitHub Copilot)
+
 ### Debug Log References
+
+- Full generation pass against this repo (`generate --source _bmad-output --adrs docs/adrs --output SpecScribeOutput`): 142 generated, 1 skipped. The single skip is `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — it genuinely contains embedded NUL bytes (a deliberate test sentinel, confirmed at line 239), so binary detection correctly degraded it to a clearly-marked placeholder page rather than rendering garbage or throwing. 82 code pages rendered; non-referenced repo files produced none.
+- Manual verify on `code/src/SpecScribe/ForgeOptions.cs.html`: 225 `.code-line` rows with anchors `L1`…`L225` (1:1), 57 escaped HTML metacharacters, `../../../specscribe.css` relative prefix (correct depth), skip-link → single `<main id="main-content">`, "Source File" kicker, `<h1>` file path.
 
 ### Completion Notes List
 
+- **New artifact class: in-portal code pages.** Referenced source files (discovered from `[Source: …]` citations, never a filesystem walk) render at `code/<repo-relative-path>.html` as line-numbered, HTML-escaped, monospace pages. The `.html` suffix is appended to the full path (extension included) so `X.cs`/`X.ts` never collide.
+- **Locked cross-story convention:** per-line anchor id = `L{n}` (1-based), GitHub-compatible, covered by `CodeFileTemplaterTests` so Story 7.2's `code/<path>.html#L42` links can't silently break.
+- **Code link strategy (`CodeSourceBaseUrl` / `--code-url`):** default (unset) → in-portal pages; set → the in-portal phase is skipped entirely (external mode). Plumbed through `ForgeOptions.Resolve`, `SiteSettings`, and `SavedSettings`/`SettingsStore` (CLI wins over saved). This story owns the setting + the generation gate; citation resolution (in-portal page vs. `{base}/<path>#L{n}`) is deliberately left to Story 7.2. The `_codePages` map (repo-relative → output-relative) is cached for 7.2 but not wired into any linkifier here.
+- **Safety / graceful degradation:** path-traversal guard (candidate must resolve inside `RepoRoot`, output must stay inside `OutputRoot`); binary detection (NUL byte / strict-UTF-8 failure, git's heuristic) and a ~1 MB size cap degrade to a placeholder page; every per-file render is wrapped in try/catch → `GenerationEvent`, so one bad file never throws out of the phase. `code/` is wiped+recreated each full pass (atomic rebuild).
+- **Deliberate golden-fingerprint update:** `SiteGeneratorAdapterTests.GenerateAll_GoldenContentFingerprint…` was rebaselined because `specscribe.css` gained the new `.code-file`/`.code-line`/`.code-ln`/`.code-src`/`:target`/`.code-placeholder` rules. The page-*inventory* golden was unaffected (the fixture cites no real repo files), confirming the drift is purely the intended CSS addition.
+- **Known limitation (per Dev Notes):** a source *code* file edit doesn't flow through the `_bmad-output` watch handlers, so code pages refresh only on a full generate — deliberate for 7.1; no code-file watch wiring was added.
+
 ### File List
+
+**New:**
+- `src/SpecScribe/CodeReferenceScanner.cs`
+- `src/SpecScribe/CodeFileTemplater.cs`
+- `tests/SpecScribe.Tests/CodeReferenceScannerTests.cs`
+- `tests/SpecScribe.Tests/CodeFileTemplaterTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorCodePagesTests.cs`
+
+**Modified:**
+- `src/SpecScribe/SiteGenerator.cs` — `_codePages` field, `GenerateCodePagesInternal(...)` phase + `TryReadCodeText`/`SplitCodeLines` helpers + size/sniff constants, invoked from `GenerateAll` after the ADRs phase.
+- `src/SpecScribe/GenerationReporter.cs` — `GenerationPhase.CodePages` enum value + label.
+- `src/SpecScribe/ForgeOptions.cs` — optional `CodeSourceBaseUrl` property + `Resolve(...)` param.
+- `src/SpecScribe/SiteSettings.cs` — `--code-url` CLI option + passed through `Resolve()`.
+- `src/SpecScribe/SettingsStore.cs` — `CodeUrl` on `SavedSettings` (+ `IsEmpty`), `TrySave`, and `ApplyTo` (CLI wins).
+- `src/SpecScribe/assets/specscribe.css` — `.code-file`/`.code-line`/`.code-ln`/`.code-src`/`.code-line:target`/`.code-placeholder` rules.
+- `tests/SpecScribe.Tests/StylesheetTests.cs` — assertion for the new code-page classes.
+- `tests/SpecScribe.Tests/SettingsStoreTests.cs` — `CodeUrl` round-trip, CLI-wins, and `IsEmpty` coverage.
+- `tests/SpecScribe.Tests/ForgeOptionsTests.cs` — `CodeSourceBaseUrl` default + `--code-url` flow-through coverage.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden content fingerprint rebaselined for the new CSS.
+
+### Change Log
+
+- 2026-07-12: Implemented Story 7.1 (In-Portal Code File Browsing, FR15). Added referenced-source-file discovery, `code/<path>.html` page rendering with stable `L{n}` line anchors, the `--code-url` external-link strategy gate, and full safety/degradation handling. Full suite green (815 tests).
+

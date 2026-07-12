@@ -50,6 +50,12 @@ public sealed class SiteGenerator
     private RequirementsModel? _requirements;
     private List<AdrEntry> _adrs = new();
     private List<CommitDayEntry> _commitDays = new();
+
+    // Story 7.1: repo-relative source path (forward slashes) -> code-page output-relative path (code/<path>.html).
+    // Populated by GenerateCodePagesInternal, cached the same way _adrs/_commitDays are so Story 7.2 can reuse it
+    // to linkify source citations without re-running discovery. Empty in external mode (--code-url) and when no
+    // referenced source files exist.
+    private Dictionary<string, string> _codePages = new(StringComparer.OrdinalIgnoreCase);
     private SprintStatus? _sprint;
     private List<RetroModel> _retros = new();
     private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
@@ -176,6 +182,11 @@ public sealed class SiteGenerator
             reporter?.BeginPhase(GenerationPhase.Adrs);
             events.AddRange(GenerateAdrsInternal(nav));
             reporter?.EndPhase(GenerationPhase.Adrs);
+
+            // In-portal code file pages for source files referenced by planning/implementation artifacts (Story 7.1,
+            // FR15). Additive: a new page class under code/, discovered from citations, that Stories 7.2–7.4 build on.
+            // Skipped entirely in external-link mode (--code-url).
+            events.AddRange(GenerateCodePagesInternal(files, nav, reporter));
 
             // Per-day commit pages the heatmap links to. Git is only computed by the epics-phase progress
             // enrichment, so a project without an epics.md has no pulse here — which is consistent: no
@@ -664,7 +675,174 @@ public sealed class SiteGenerator
         return events;
     }
 
-    /// <summary>Writes the aggregate <c>git-insights.html</c> hub when — and only when — the opt-in deep-git
+    // Above this size a referenced source file is treated as too large to render inline and degraded to a
+    // placeholder page (never read into memory in full). A seed value, not a contract — a future settings toggle
+    // (Epic 5 / AD-3) could surface it; there is deliberately no knob for it yet. [Story 7.1]
+    private const long MaxCodeFileBytes = 1_048_576; // ~1 MB
+
+    // Leading bytes sniffed when classifying a file as binary. A file under the size cap is read in full anyway, so
+    // the actual NUL / invalid-UTF-8 check runs over the whole content; this window only bounds the FileInfo path.
+    private const int BinarySniffBytes = 8192;
+
+    /// <summary>Renders each referenced, readable repository source file into <c>code/&lt;repo-relative-path&gt;.html</c>
+    /// — a line-numbered, escaped, monospace page with a stable <c>id="L{n}"</c> anchor per line (Story 7.1, FR15).
+    /// The referenced set is derived from source-artifact citations (<see cref="CodeReferenceScanner"/>), NOT a
+    /// filesystem walk, so only the small purposeful set renders (NFR1) and non-referenced files are omitted with no
+    /// broken navigation (AC #1). Mirrors <see cref="GenerateCommitDaysInternal"/>/<see cref="GenerateAdrsInternal"/>:
+    /// wipe+recreate the output dir each pass (atomic rebuild, AD-5), per-file try/catch → <see cref="GenerationEvent"/>
+    /// so one bad file never throws out of the phase (NFR2), and cache the path map (<see cref="_codePages"/>) for
+    /// Story 7.2's citation linkification. Skipped entirely in external-link mode (<c>--code-url</c>): no page is
+    /// generated for links that will point at an external base URL instead.</summary>
+    private List<GenerationEvent> GenerateCodePagesInternal(List<string> sourceFiles, SiteNav nav, IGenerationReporter? reporter)
+    {
+        var events = new List<GenerationEvent>();
+        _codePages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var codeDir = Path.Combine(_options.OutputRoot, "code");
+        if (Directory.Exists(codeDir))
+        {
+            Directory.Delete(codeDir, recursive: true);
+        }
+
+        // External mode: citations will resolve to {CodeSourceBaseUrl}/<path>#L{n} (Story 7.2), so there are no
+        // in-portal pages to generate. Nothing to render — the dir stays absent.
+        if (_options.CodeSourceBaseUrl is { Length: > 0 })
+        {
+            return events;
+        }
+
+        // Discover the referenced code-file set from the source-artifact corpus. Reading each artifact's raw text
+        // again (shared access) is bounded to the small *.md set; a per-file read failure just skips that artifact.
+        var artifacts = new List<CitedArtifact>(sourceFiles.Count);
+        foreach (var file in sourceFiles)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(Path.GetFullPath(file)) ?? _options.SourceRoot;
+                artifacts.Add(new CitedArtifact(MarkdownConverter.ReadAllTextShared(file), dir));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Non-fatal: an artifact we can't read simply contributes no citations.
+            }
+        }
+
+        var referenced = CodeReferenceScanner.Discover(artifacts, _options.RepoRoot, _options.SourceRoot);
+        if (referenced.Count == 0)
+        {
+            return events;
+        }
+
+        var outputRootFull = Path.GetFullPath(_options.OutputRoot);
+
+        reporter?.BeginPhase(GenerationPhase.CodePages, referenced.Count);
+        foreach (var repoRelative in referenced)
+        {
+            var sw = Stopwatch.StartNew();
+            // Append ".html" to the FULL path (extension included) so X.cs and X.ts in one dir never collide.
+            var outputRelative = PathUtil.NormalizeSlashes($"code/{repoRelative}.html");
+            try
+            {
+                var full = Path.GetFullPath(Path.Combine(_options.RepoRoot, repoRelative.Replace('/', Path.DirectorySeparatorChar)));
+
+                // Defense in depth: the output path must stay inside the output root (the repo-relative path was
+                // already traversal-checked in discovery, but never trust it twice).
+                var outputFull = Path.GetFullPath(Path.Combine(_options.OutputRoot, outputRelative.Replace('/', Path.DirectorySeparatorChar)));
+                if (!outputFull.StartsWith(outputRootFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    events.Add(new GenerationEvent(GenerationOutcome.Skipped, outputRelative, sw.Elapsed, "output path escapes the output root"));
+                    reporter?.Tick(GenerationPhase.CodePages);
+                    continue;
+                }
+
+                string html;
+                GenerationOutcome outcome;
+                if (new FileInfo(full).Length > MaxCodeFileBytes)
+                {
+                    html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
+                        "This file is too large to render inline.", nav);
+                    outcome = GenerationOutcome.Skipped;
+                }
+                else if (TryReadCodeText(full, out var text))
+                {
+                    var lines = SplitCodeLines(text);
+                    html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav);
+                    outcome = GenerationOutcome.Generated;
+                }
+                else
+                {
+                    html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
+                        "This file is not a readable text file and can't be shown inline.", nav);
+                    outcome = GenerationOutcome.Skipped;
+                }
+
+                WriteOutput(outputRelative, html);
+                _codePages[PathUtil.NormalizeSlashes(repoRelative)] = outputRelative;
+                events.Add(new GenerationEvent(outcome, outputRelative, sw.Elapsed));
+            }
+            catch (Exception ex)
+            {
+                events.Add(new GenerationEvent(GenerationOutcome.Error, outputRelative, sw.Elapsed, ex.Message));
+            }
+            reporter?.Tick(GenerationPhase.CodePages);
+        }
+        reporter?.EndPhase(GenerationPhase.CodePages);
+
+        return events;
+    }
+
+    /// <summary>Reads a source file as UTF-8 text with shared access, returning false when it is binary — a NUL byte
+    /// anywhere or a strict-UTF-8 decode failure, the same dependency-free heuristic git uses. A leading UTF-8 BOM is
+    /// stripped so it never lands as a stray character on line 1. [Story 7.1]</summary>
+    private static bool TryReadCodeText(string fullPath, out string text)
+    {
+        text = string.Empty;
+        byte[] bytes;
+        try
+        {
+            using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var ms = new MemoryStream();
+            stream.CopyTo(ms);
+            bytes = ms.ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        if (Array.IndexOf(bytes, (byte)0) >= 0)
+        {
+            return false;
+        }
+
+        var offset = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? 3 : 0;
+        try
+        {
+            text = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+                .GetString(bytes, offset, bytes.Length - offset);
+            return true;
+        }
+        catch (DecoderFallbackException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Normalizes <c>\r\n</c>/<c>\r</c> to <c>\n</c> so line numbers match editors, then splits into lines.
+    /// A single trailing empty entry from a terminating newline is dropped (editors/GitHub don't number a phantom
+    /// final line); a genuine blank line in the body is preserved so anchors stay 1:1 with source lines. [Story 7.1]</summary>
+    private static IReadOnlyList<string> SplitCodeLines(string text)
+    {
+        var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
+        var lines = normalized.Split('\n');
+        if (lines.Length > 1 && lines[^1].Length == 0)
+        {
+            return lines[..^1];
+        }
+        return lines;
+    }
+
+
     /// pass produced its hub aggregates (<see cref="DeepGitPulse.Insights"/>). A no-op otherwise: with
     /// <c>--deep-git</c> off the deep pass never ran, <c>DeepGit</c> is null, and no hub work (or page)
     /// happens at all — that gate IS the AC #2 performance guarantee. Mirrors the deep-analytics page's

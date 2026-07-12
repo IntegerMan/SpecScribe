@@ -39,6 +39,15 @@ public sealed class ForgeOptions
     /// <c>required</c> precisely so every existing <see cref="ForgeOptions"/> construction defaults to off. [Story 6.7]</summary>
     public bool EmitSpa { get; init; }
 
+    /// <summary>The code-link strategy (Story 7.1). When null/empty (the default), source citations resolve to
+    /// in-portal code pages generated under <c>code/</c>. When set (via <c>--code-url</c>), the in-portal code-page
+    /// phase is skipped entirely and citations resolve to <c>{CodeSourceBaseUrl}/&lt;repo-relative-path&gt;#L{n}</c>
+    /// instead — the natural fit for a project whose docs are on GitHub Pages but whose code is on GitHub proper
+    /// (which also supplies syntax highlighting for free). The <c>#L{n}</c> line anchor is identical in both modes,
+    /// so 7.2's citation resolution differs only in the base. Not <c>required</c> so every existing
+    /// <see cref="ForgeOptions"/> construction defaults to in-portal mode. [Story 7.1]</summary>
+    public string? CodeSourceBaseUrl { get; init; }
+
     public const string StylesheetName = "specscribe.css";
 
     /// <summary>The one sanctioned progressive-enhancement script (on-brand chart tooltips + Next Steps copy
@@ -94,7 +103,8 @@ public sealed class ForgeOptions
         string? startDirectory = null,
         bool includeReadme = true,
         bool deepGitAnalytics = false,
-        bool emitSpa = false)
+        bool emitSpa = false,
+        string? codeSourceBaseUrl = null)
     {
         string repoRoot;
         string sourceRoot;
@@ -135,6 +145,7 @@ public sealed class ForgeOptions
             IncludeReadme = includeReadme,
             DeepGitAnalytics = deepGitAnalytics,
             EmitSpa = emitSpa,
+            CodeSourceBaseUrl = codeSourceBaseUrl is { Length: > 0 } ? codeSourceBaseUrl : null,
         };
     }
 

@@ -69,4 +69,55 @@ public class SettingsStoreTests
         SettingsStore.ApplyTo(new SavedSettings(), settings);
         Assert.False(settings.DeepGit);
     }
+
+    [Fact]
+    public void IsEmpty_IsFalseWhenOnlyCodeUrlSet()
+    {
+        // A config that persists just the code-link base URL is still worth writing. [Story 7.1]
+        Assert.False(new SavedSettings { CodeUrl = "https://example.com" }.IsEmpty);
+    }
+
+    [Fact]
+    public void ApplyTo_FillsCodeUrlFromSavedWhenCliDidNotProvideIt()
+    {
+        var saved = new SavedSettings { CodeUrl = "https://github.com/owner/repo/blob/main" };
+        var settings = new SiteSettings();
+
+        SettingsStore.ApplyTo(saved, settings);
+
+        Assert.Equal("https://github.com/owner/repo/blob/main", settings.CodeUrl);
+    }
+
+    [Fact]
+    public void ApplyTo_DoesNotOverrideExplicitCliCodeUrl()
+    {
+        var saved = new SavedSettings { CodeUrl = "https://saved.example/blob/main" };
+        var settings = new SiteSettings { CodeUrl = "https://cli.example/blob/main" };
+
+        SettingsStore.ApplyTo(saved, settings);
+
+        Assert.Equal("https://cli.example/blob/main", settings.CodeUrl); // CLI wins over saved
+    }
+
+    [Fact]
+    public void TrySaveThenTryLoad_RoundTripsCodeUrl()
+    {
+        var original = Directory.GetCurrentDirectory();
+        var temp = Directory.CreateTempSubdirectory("specscribe-settings-").FullName;
+        try
+        {
+            Directory.SetCurrentDirectory(temp);
+            SettingsStore.TrySave(new SiteSettings { CodeUrl = "https://github.com/owner/repo/blob/main" });
+
+            var loaded = SettingsStore.TryLoad();
+
+            Assert.NotNull(loaded);
+            Assert.Equal("https://github.com/owner/repo/blob/main", loaded!.CodeUrl);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(original);
+            try { Directory.Delete(temp, recursive: true); } catch (IOException) { }
+        }
+    }
 }

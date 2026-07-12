@@ -154,4 +154,25 @@ public class ForgeOptionsTests : IDisposable
 
         Assert.True(settings.Resolve().DeepGitAnalytics);
     }
+
+    [Fact]
+    public void CodeSourceBaseUrl_DefaultsToNull()
+    {
+        // In-portal code pages are the default: an unset --code-url resolves to a null base URL. [Story 7.1]
+        Assert.Null(ForgeOptions.Resolve(startDirectory: Repo).CodeSourceBaseUrl);
+    }
+
+    [Fact]
+    public void SiteSettings_CodeUrlFlowsIntoResolvedOptions()
+    {
+        // The --code-url option must reach ForgeOptions.CodeSourceBaseUrl. Source is explicit so resolution
+        // doesn't depend on the cwd. [Story 7.1]
+        var settings = new SiteSettings
+        {
+            Source = Path.Combine(Repo, "_bmad-output"),
+            CodeUrl = "https://github.com/owner/repo/blob/main",
+        };
+
+        Assert.Equal("https://github.com/owner/repo/blob/main", settings.Resolve().CodeSourceBaseUrl);
+    }
 }

@@ -210,7 +210,7 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         var fingerprint = FingerprintTree(Site);
 
-        const string expected = "d68a2fc9a55b2e7a32fa2c1e7362e4e59972e056cf98d400e90b4a5481fac950";
+        const string expected = "77b038a0dacf62415eda35c65a8994b62815783e42eb7374a4300c9c11dcde70";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
