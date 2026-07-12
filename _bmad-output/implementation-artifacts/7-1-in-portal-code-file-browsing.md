@@ -28,6 +28,12 @@ so that I can inspect referenced code without leaving the portal.
 **Then** I can navigate to specific lines via stable anchors
 **And** the page degrades safely for very large, binary, or unreadable files. [Source: epics.md#Story 7.1; FR15]
 
+3.
+**Given** a rendered code file page for a file cited by one or more artifacts
+**When** I open it
+**Then** the page leads with a relationship view — a node-link graph of the artifacts that reference the file, each node linking to that artifact — and treats the source itself as secondary supporting detail
+**And** the reference relationships are also available as a plain text list (never colour- or image-only), and the per-line anchors stay reachable so Story 7.2's citation deep links continue to land. [Source: epics.md#Story 7.1; reopened 2026-07-12]
+
 ---
 
 ## Developer Context
@@ -341,4 +347,5 @@ Claude Opus 4.8 (GitHub Copilot)
 ### Change Log
 
 - 2026-07-12: Implemented Story 7.1 (In-Portal Code File Browsing, FR15). Added referenced-source-file discovery, `code/<path>.html` page rendering with stable `L{n}` line anchors, the `--code-url` external-link strategy gate, and full safety/degradation handling. Full suite green (815 tests).
+- 2026-07-12: Reopened + reworked (owner feedback — the giant referenced-by list + un-highlighted code dump inverted the tool's intent). Added AC #3: the code page is now **relationship-first**. New `Charts.ReferenceGraph` renders a pure-SVG node-link "Referenced by" graph (this file at the center, one link per citing artifact) as the hero via `CodeFileTemplater.AppendRelationships`; raw source moved into a secondary `code-source-section` (kept **visible**, never collapsed, so `#L{n}` deep-links still land) with a `data-code-path` re-targeting hook; the full-title accessible list is retained. `.code-referenced-by` CSS replaced by `.code-relationships`/`.ref-graph`/`.code-source-section`. Golden fingerprint rebaselined (CSS-only for the citation-free fixture). Suite green.
 
