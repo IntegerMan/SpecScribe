@@ -34,5 +34,20 @@ public static class HostRenderExceptions
             "No Mermaid script can load under the webview CSP (script-src is nonce-locked, remote loads are "
             + "blocked), so the epics roadmap's <pre class=\"mermaid\"> degrades to readable preformatted text — "
             + "ADR 0005's accepted fallback. Bundling Mermaid with a nonce remains a 6.5+ option if ever wanted."),
+        // The SPA surface (Story 6.7) is a REAL browser, so — unlike the webview — it keeps the production
+        // specscribe.css and specscribe.js: those chrome/asset facts MATCH the html surface (the shared entry shell
+        // loads them), which is why the SPA registers NO asset.css / asset.js exception. Its ONE sanctioned
+        // divergence is Mermaid: the epics roadmap's <pre class="mermaid"> is initialized by an inline
+        // `mermaid.initialize` the static page carries after its footer, but the SPA swaps content regions via
+        // innerHTML (an injected <script> never executes) and does not re-run a Mermaid pass across swaps, so the
+        // served page string carries no `mermaid.initialize` and the roadmap degrades to readable preformatted text
+        // — the same accepted fallback as the webview. Full Mermaid-in-SPA (re-init across swaps) is a deferred
+        // enhancement; the diagram source is present and readable meanwhile (progressive enhancement / NFR6).
+        new HostRenderException("spa", "mermaid",
+            "The SPA swaps content regions via innerHTML, where an injected Mermaid init script never executes and "
+            + "is not re-run across swaps, so the epics roadmap's <pre class=\"mermaid\"> degrades to readable "
+            + "preformatted text — the same accepted fallback as the webview. Unlike the webview, the SPA keeps "
+            + "specscribe.css/specscribe.js (real browser), so it registers no asset.css/asset.js exception. Full "
+            + "Mermaid-in-SPA re-init is a deferred enhancement (Story 6.7 Completion Notes)."),
     };
 }

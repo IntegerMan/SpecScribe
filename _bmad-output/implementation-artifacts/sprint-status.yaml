@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-11T15:30:00-04:00
+last_updated: 2026-07-11T17:30:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -121,13 +121,13 @@ development_status:
   # IRenderAdapter that consolidates the many-files output into a JSON data layer + a small client renderer, with
   # the static-HTML/noscript fallback (NFR6). Rendering stays in C#; no core port. Addresses the file-count concern
   # (Epic-7 scale). Run create-story to detail when scheduled. DEPENDS ON 6.1 (IRenderAdapter seam) + 6.2 (views).
-  6-7-json-and-spa-delivery-adapter: ready-for-dev # create-story 2026-07-11: ADR-0006 Architecture B (additive third IRenderAdapter, Id "spa"); whole-site consolidation via the universal <main id="main-content"> landmark seam (no all-pages PageView rewrite); ships pre-rendered content regions (NOT the ~13.5 KB data floor — that's deferred option D); opt-in --spa flag, static site byte-identical + noscript fallback
+  6-7-json-and-spa-delivery-adapter: review # dev-story 2026-07-11: implemented — third IRenderAdapter (spa) + opt-in --spa; whole-site 219→12 files; static byte-identical (golden Debug+Release + real-repo OFF/ON diff clean); parity zero-section + 1 justified mermaid exception; client verified E2E; 733 tests green. create-story 2026-07-11: ADR-0006 Architecture B (additive third IRenderAdapter, Id "spa"); whole-site consolidation via the universal <main id="main-content"> landmark seam (no all-pages PageView rewrite); ships pre-rendered content regions (NOT the ~13.5 KB data floor — that's deferred option D); opt-in --spa flag, static site byte-identical + noscript fallback
   # Stories 6.8–6.12 added 2026-07-11 (SCP 2026-07-11, correct-course): seat the VS Code Native-Integration
   # Recommendations (docs/VSCodeIntegrationRecommendations.md, FR35). Read-only, rendering stays in C#. Complete
   # before the Epic 17 hardening pass. 6.8 = the "Now" quick-dev wave (incl. Workspace-Trust R5.4, a Marketplace
   # prerequisite for 16.5); 6.9–6.11 = the "Next" story-sized wave; 6.12 = diagnostics, rides Story 4.8.
   # Run create-story per story when scheduled.
-  6-8-extension-discoverability-workspace-trust-and-command-surface: backlog
+  6-8-extension-discoverability-workspace-trust-and-command-surface: ready-for-dev # create-story 2026-07-11: "Now" quick-dev wave — R5.4 Workspace Trust (16.5 prereq) + R1.1–R1.3 activation/menus + R2.1–R2.4 commands + R3.3 open-beside + R5.2 open-project-settings + R7.1–R7.3 UX polish. Manifest/routing only (extension/package.json + extension.ts), reuses spawn/panel machinery, read-only, HTML byte-identical. Not gated (6.4/6.5 done, extension exists).
   6-9-native-project-outline-tree-view-and-status-bar: backlog
   6-10-editor-artifact-bridges-reveal-source: backlog
   6-11-file-change-reactivity-hardening: backlog
@@ -159,7 +159,7 @@ development_status:
   # seat Epic 10 stories when scheduled.
   epic-9: in-progress
   9-1-requirement-pages-link-to-their-covering-stories: ready-for-dev
-  9-2-nfr-and-ux-dr-coverage-maps: backlog
+  9-2-nfr-and-ux-dr-coverage-maps: ready-for-dev
   9-3-deferred-on-purpose-vs-unmapped-coverage-states: backlog
   9-4-verification-evidence-strip-on-story-pages: backlog
   9-5-distinct-acceptance-criteria-blocks-and-collapsed-dev-notes: backlog

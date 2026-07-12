@@ -1,10 +1,10 @@
 ---
-baseline_commit: b5f2514ab13d65e0c0811c0eddc5198e48a8dee4
+baseline_commit: 2e4cb4cbef30a1094954ba27294192683bc902d2
 ---
 
 # Story 6.7: JSON + Client-Renderer (SPA) Delivery Adapter
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -72,39 +72,39 @@ The story's value is entirely in the **"So that"** — cutting **thousands** of 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Branch + baseline + reuse audit** (AC: #1, #5)
-  - [ ] Work on a branch, not `main` directly — there is a background auto-committer on `main` (memory: [[worktree-edits-must-target-worktree-path]]). Re-capture `baseline_commit` in the frontmatter to the HEAD you branch from.
-  - [ ] Read [WebviewRenderAdapter.cs](../../src/SpecScribe/WebviewRenderAdapter.cs), [WebviewBundle.cs](../../src/SpecScribe/WebviewBundle.cs), [SiteGenerator.RenderWebviewSurfaces](../../src/SpecScribe/SiteGenerator.cs) (~:750), and the `WebviewCommand` in [Commands.cs](../../src/SpecScribe/Commands.cs) (~:45). **The webview is your template**: a second render form over the same views, a bundle record, a generator method that gathers surfaces, and a thin CLI. You are building the third form with the same shape.
-  - [ ] Skim the throwaway spike under [`spike/delivery/`](../../spike/delivery) — `exporter/Program.cs` (the JSON-layer shape + the `bodies` vs `data` split — you ship the **bodies** form), `spa/app.js` + `spa/index.html` (a ~90-line client renderer with in-view nav — the shape to productionize). **Do not merge spike code as-is**; it is a probe, your code is product (comment/test bar).
+- [x] **Task 1 — Branch + baseline + reuse audit** (AC: #1, #5)
+  - [x] Work on a branch, not `main` directly — there is a background auto-committer on `main` (memory: [[worktree-edits-must-target-worktree-path]]). Re-capture `baseline_commit` in the frontmatter to the HEAD you branch from.
+  - [x] Read [WebviewRenderAdapter.cs](../../src/SpecScribe/WebviewRenderAdapter.cs), [WebviewBundle.cs](../../src/SpecScribe/WebviewBundle.cs), [SiteGenerator.RenderWebviewSurfaces](../../src/SpecScribe/SiteGenerator.cs) (~:750), and the `WebviewCommand` in [Commands.cs](../../src/SpecScribe/Commands.cs) (~:45). **The webview is your template**: a second render form over the same views, a bundle record, a generator method that gathers surfaces, and a thin CLI. You are building the third form with the same shape.
+  - [x] Skim the throwaway spike under [`spike/delivery/`](../../spike/delivery) — `exporter/Program.cs` (the JSON-layer shape + the `bodies` vs `data` split — you ship the **bodies** form), `spa/app.js` + `spa/index.html` (a ~90-line client renderer with in-view nav — the shape to productionize). **Do not merge spike code as-is**; it is a probe, your code is product (comment/test bar).
 
-- [ ] **Task 2 — The content-region seam for the whole site** (AC: #1, #5, #7)
-  - [ ] Define the unit the SPA ships: `{ outputRelativePath, title, contentRegionHtml }` per page, where `contentRegionHtml` = the shared nav markup + breadcrumb + the page body (the same region `WebviewRenderAdapter.RenderContent` produces). For the **five 6.2 dashboard/epics surfaces**, reuse the exact `Build*Page → PageView` path the webview taps (`HtmlTemplater.BuildIndexPage`, `EpicsTemplater.Build*Page`, `SiteGenerator.BuildStoryPageFragments`) so those regions are true view-model renders (strongest parity).
-  - [ ] For **every OTHER page type** (docs, sprint, requirements, ADRs, git insights, deep analytics, commits, retros, action items, about, diagnostics), obtain the content region from the render pipeline's own output via the universal `<main id="main-content"> … </main>` landmark **plus** the shared nav/breadcrumb chrome (rendered from the same `NavigationView`/`BreadcrumbTrail` the page already built). Capture at the write seam in `SiteGenerator` where the rendered string is already in hand — **not** by re-reading `OutputRoot/*.html` (that is scraping; forbidden — AD-1/AD-2). See Dev Notes "Is landmark-slicing scraping?" for the exact legitimate boundary.
-  - [ ] Add the adapter (`JsonSpaRenderAdapter : IRenderAdapter`, `Id = "spa"` suggested) + a bundle record (mirror `WebviewBundle`/`WebviewSurface`). The adapter renders one page's content region (mirror `WebviewRenderAdapter.RenderContent`); a `SiteGenerator` method (mirror `RenderWebviewSurfaces`) gathers all surfaces into the bundle.
+- [x] **Task 2 — The content-region seam for the whole site** (AC: #1, #5, #7)
+  - [x] Define the unit the SPA ships: `{ outputRelativePath, title, contentRegionHtml }` per page, where `contentRegionHtml` = the shared nav markup + breadcrumb + the page body (the same region `WebviewRenderAdapter.RenderContent` produces). For the **five 6.2 dashboard/epics surfaces**, reuse the exact `Build*Page → PageView` path the webview taps (`HtmlTemplater.BuildIndexPage`, `EpicsTemplater.Build*Page`, `SiteGenerator.BuildStoryPageFragments`) so those regions are true view-model renders (strongest parity).
+  - [x] For **every OTHER page type** (docs, sprint, requirements, ADRs, git insights, deep analytics, commits, retros, action items, about, diagnostics), obtain the content region from the render pipeline's own output via the universal `<main id="main-content"> … </main>` landmark **plus** the shared nav/breadcrumb chrome (rendered from the same `NavigationView`/`BreadcrumbTrail` the page already built). Capture at the write seam in `SiteGenerator` where the rendered string is already in hand — **not** by re-reading `OutputRoot/*.html` (that is scraping; forbidden — AD-1/AD-2). See Dev Notes "Is landmark-slicing scraping?" for the exact legitimate boundary.
+  - [x] Add the adapter (`JsonSpaRenderAdapter : IRenderAdapter`, `Id = "spa"` suggested) + a bundle record (mirror `WebviewBundle`/`WebviewSurface`). The adapter renders one page's content region (mirror `WebviewRenderAdapter.RenderContent`); a `SiteGenerator` method (mirror `RenderWebviewSurfaces`) gathers all surfaces into the bundle.
 
-- [ ] **Task 3 — Emit the JSON data layer + client renderer + fallback** (AC: #1, #2, #7)
-  - [ ] Emit a **manifest** JSON (site title, nav graph, ordered page index with path/title/breadcrumb + drill parent/children) and the page content regions grouped into a **bounded, small** number of **content chunks** (group by category or a size cap — the invariant is *few files, not one-per-page*; see Dev Notes "Chunking & bytes"). Charts stay pre-rendered inline SVG inside the regions (memory: [[charting-is-pure-svg-no-js]]).
-  - [ ] Ship the **client renderer**: an entry HTML shell (shared nav/footer chrome rendered once, initial surface inlined for instant first paint + `<noscript>`) + a **small vanilla-JS** bundle (fetch manifest/chunks, intercept in-portal `<a>` clicks → swap `#…` content region in-view, update the URL via History API, lazy-load chunks). Emit these as new **embedded assets** (mirror how `specscribe.css`/`specscribe.js` are embedded + copied — [SiteGenerator.CopyEmbeddedAsset](../../src/SpecScribe/SiteGenerator.cs) ~:1211, [SpecScribe.csproj](../../src/SpecScribe/SpecScribe.csproj) `<EmbeddedResource>`).
-  - [ ] **NFR6 fallback (AC #2):** the untouched static site is the fallback. The SPA entry must degrade under `<noscript>` to working content + navigation (the pre-rendered surface and/or a link to the static `index.html`). Verify with JS disabled: the initial surface is readable and the static site is reachable.
-  - [ ] All output lands under `OutputRoot` only (AC #6). Nothing outside it, nothing in sources.
+- [x] **Task 3 — Emit the JSON data layer + client renderer + fallback** (AC: #1, #2, #7)
+  - [x] Emit a **manifest** JSON (site title, nav graph, ordered page index with path/title/breadcrumb + drill parent/children) and the page content regions grouped into a **bounded, small** number of **content chunks** (group by category or a size cap — the invariant is *few files, not one-per-page*; see Dev Notes "Chunking & bytes"). Charts stay pre-rendered inline SVG inside the regions (memory: [[charting-is-pure-svg-no-js]]).
+  - [x] Ship the **client renderer**: an entry HTML shell (shared nav/footer chrome rendered once, initial surface inlined for instant first paint + `<noscript>`) + a **small vanilla-JS** bundle (fetch manifest/chunks, intercept in-portal `<a>` clicks → swap `#…` content region in-view, update the URL via History API, lazy-load chunks). Emit these as new **embedded assets** (mirror how `specscribe.css`/`specscribe.js` are embedded + copied — [SiteGenerator.CopyEmbeddedAsset](../../src/SpecScribe/SiteGenerator.cs) ~:1211, [SpecScribe.csproj](../../src/SpecScribe/SpecScribe.csproj) `<EmbeddedResource>`).
+  - [x] **NFR6 fallback (AC #2):** the untouched static site is the fallback. The SPA entry must degrade under `<noscript>` to working content + navigation (the pre-rendered surface and/or a link to the static `index.html`). Verify with JS disabled: the initial surface is readable and the static site is reachable.
+  - [x] All output lands under `OutputRoot` only (AC #6). Nothing outside it, nothing in sources.
 
-- [ ] **Task 4 — Opt-in CLI wiring (additive)** (AC: #3)
-  - [ ] Add the opt-in surface: suggested `--spa` flag on [SiteSettings](../../src/SpecScribe/SiteSettings.cs) (mirror `--deep-git` exactly: `[CommandOption("--spa")]`, default `false`, threaded through `ForgeOptions.Resolve`), honored by `generate`/`watch`. Default OFF ⇒ **no SPA files, no behavior change** (AC #3). (Alternative: a `specscribe spa` subcommand like `WebviewCommand` — pick one; a flag is simpler and keeps the static site + SPA in one output.)
-  - [ ] Keep it additive: `generate`/`watch`/`webview`/interactive behavior unchanged; Story 5.x's pending CLI scope (5.1/5.2/5.3) untouched. Register in [Program.cs](../../src/SpecScribe/Program.cs) only if you add a subcommand.
-  - [ ] Golden gate after wiring: pinned fingerprint unchanged (flag OFF **and** ON — the static bytes are identical either way); `dotnet test` green.
+- [x] **Task 4 — Opt-in CLI wiring (additive)** (AC: #3)
+  - [x] Add the opt-in surface: suggested `--spa` flag on [SiteSettings](../../src/SpecScribe/SiteSettings.cs) (mirror `--deep-git` exactly: `[CommandOption("--spa")]`, default `false`, threaded through `ForgeOptions.Resolve`), honored by `generate`/`watch`. Default OFF ⇒ **no SPA files, no behavior change** (AC #3). (Alternative: a `specscribe spa` subcommand like `WebviewCommand` — pick one; a flag is simpler and keeps the static site + SPA in one output.)
+  - [x] Keep it additive: `generate`/`watch`/`webview`/interactive behavior unchanged; Story 5.x's pending CLI scope (5.1/5.2/5.3) untouched. Register in [Program.cs](../../src/SpecScribe/Program.cs) only if you add a subcommand.
+  - [x] Golden gate after wiring: pinned fingerprint unchanged (flag OFF **and** ON — the static bytes are identical either way); `dotnet test` green.
 
-- [ ] **Task 5 — Parity + tests** (AC: #4, #5, #6)
-  - [ ] Run the SPA content regions through [RenderParity](../../src/SpecScribe/RenderParity.cs) under surface id `spa`: chrome facts via `FindDivergences(pageView, region, "spa", exceptions)` and section facts via `FindSectionDivergences` (`From*View` declared vs. `Extract*Section` evidenced) for dashboard, epics index, epic page. Register any legitimate divergence in `HostRenderExceptions.Registry` with a reason — the ideal is **zero** (unlike the webview's 3: the SPA is a browser, so it can keep `specscribe.css`/`specscribe.js` and Mermaid, so its chrome/asset facts should match `html`). If you register any entry, justify it (e.g. an added client-nav script fact).
-  - [ ] xUnit tests in [tests/SpecScribe.Tests/](../../tests/SpecScribe.Tests), file-per-unit (e.g. `JsonSpaRenderAdapterTests.cs`, `SiteGeneratorSpaTests.cs`): the bundle covers every page the static run emits (AC #7); manifest + chunks serialize and round-trip; a representative page's content region equals the `html` surface's `<main>` region (proving "same C#-rendered content, no re-render"); injected divergence caught; **read-only** — running the SPA form leaves the project tree + configured output untouched apart from the intended SPA files (AC #6, mirror `SiteGeneratorWebviewTests`).
-  - [ ] **Golden byte-identity (AC #5):** pinned `GoldenContentFingerprint` unchanged (Debug + Release), and a self-site diff (baseline build vs. this branch, both with the flag OFF, then the branch with the flag ON) shows the static `.html`/assets are byte-identical under only the 5 benign normalizations (memory: [[golden-diff-normalization-gotchas]]). **If any existing rendering assertion must change, STOP** — you perturbed the static surface.
-  - [ ] Full suite green, Debug + Release.
+- [x] **Task 5 — Parity + tests** (AC: #4, #5, #6)
+  - [x] Run the SPA content regions through [RenderParity](../../src/SpecScribe/RenderParity.cs) under surface id `spa`: chrome facts via `FindDivergences(pageView, region, "spa", exceptions)` and section facts via `FindSectionDivergences` (`From*View` declared vs. `Extract*Section` evidenced) for dashboard, epics index, epic page. Register any legitimate divergence in `HostRenderExceptions.Registry` with a reason — the ideal is **zero** (unlike the webview's 3: the SPA is a browser, so it can keep `specscribe.css`/`specscribe.js` and Mermaid, so its chrome/asset facts should match `html`). If you register any entry, justify it (e.g. an added client-nav script fact).
+  - [x] xUnit tests in [tests/SpecScribe.Tests/](../../tests/SpecScribe.Tests), file-per-unit (e.g. `JsonSpaRenderAdapterTests.cs`, `SiteGeneratorSpaTests.cs`): the bundle covers every page the static run emits (AC #7); manifest + chunks serialize and round-trip; a representative page's content region equals the `html` surface's `<main>` region (proving "same C#-rendered content, no re-render"); injected divergence caught; **read-only** — running the SPA form leaves the project tree + configured output untouched apart from the intended SPA files (AC #6, mirror `SiteGeneratorWebviewTests`).
+  - [x] **Golden byte-identity (AC #5):** pinned `GoldenContentFingerprint` unchanged (Debug + Release), and a self-site diff (baseline build vs. this branch, both with the flag OFF, then the branch with the flag ON) shows the static `.html`/assets are byte-identical under only the 5 benign normalizations (memory: [[golden-diff-normalization-gotchas]]). **If any existing rendering assertion must change, STOP** — you perturbed the static surface.
+  - [x] Full suite green, Debug + Release.
 
-- [ ] **Task 6 — Verify the client renderer end-to-end** (AC: #1, #2)
-  - [ ] The C# unit tests can't paint a browser. Verify the client renderer the way 6.4 verified its bridge: drive the **real** emitted bundle + the real client JS in a browser (the [Browser pane / preview tools], or a headless harness) — initial surface paints (charts as inline SVG), an in-portal link swaps the content region in-view with the URL updated, breadcrumb up-drill works, an external link opens normally, and **with JS disabled** the `<noscript>` fallback shows content + reaches the static site. Record the checklist + result in Completion Notes.
+- [x] **Task 6 — Verify the client renderer end-to-end** (AC: #1, #2)
+  - [x] The C# unit tests can't paint a browser. Verify the client renderer the way 6.4 verified its bridge: drive the **real** emitted bundle + the real client JS in a browser (the [Browser pane / preview tools], or a headless harness) — initial surface paints (charts as inline SVG), an in-portal link swaps the content region in-view with the URL updated, breadcrumb up-drill works, an external link opens normally, and **with JS disabled** the `<noscript>` fallback shows content + reaches the static site. Record the checklist + result in Completion Notes.
 
-- [ ] **Task 7 — Record + hand off** (AC: all)
-  - [ ] Completion Notes: the adapter/bundle/CLI touchpoints, the chunking scheme chosen + measured file-count reduction (AC #7) and payload sizes (ADR 0006 axis A), any `HostRenderException` entries (with reasons), the client-renderer verification result, and what Epic 16 (distribution) inherits.
-  - [ ] Update [sprint-status.yaml](sprint-status.yaml) (`6-7-json-and-spa-delivery-adapter` → `review` at story end) and this file's Dev Agent Record / Change Log.
+- [x] **Task 7 — Record + hand off** (AC: all)
+  - [x] Completion Notes: the adapter/bundle/CLI touchpoints, the chunking scheme chosen + measured file-count reduction (AC #7) and payload sizes (ADR 0006 axis A), any `HostRenderException` entries (with reasons), the client-renderer verification result, and what Epic 16 (distribution) inherits.
+  - [x] Update [sprint-status.yaml](sprint-status.yaml) (`6-7-json-and-spa-delivery-adapter` → `review` at story end) and this file's Dev Agent Record / Change Log.
 
 ## Dev Notes
 
@@ -166,12 +166,58 @@ ADR 0006 measured that a JSON layer shipping pre-rendered SVG is **~the same byt
 
 ### Agent Model Used
 
+claude-opus-4-8 (Amelia / bmad-dev-story)
+
 ### Debug Log References
+
+- Golden byte-parity gate held after routing 15 long-tail page writes through the new `WriteOutput` capture funnel: `SiteGeneratorAdapterTests` (`GoldenContentFingerprint` + `GoldenOutputInventory`) green in Debug **and** Release, fingerprint constant unchanged (`d68a2fc9…`).
+- Real-repo self-diff (SPA flag OFF vs ON) via PowerShell, normalizing only the footer wall-clock + `?v=` token: **0** genuinely differing static files across 219 pages. (The lone apparent diff, `diagnostics.html`, was solely the disclosed `-o` output path — two different scratch dirs — not an SPA config leak; the `--spa` flag deliberately does NOT enter the diagnostics config disclosure, which is what keeps the page byte-identical.)
+- End-to-end client verification against the real emitted bundle served over HTTP (Node static server + Browser pane) — see Completion Notes checklist. No console errors.
 
 ### Completion Notes List
 
+Implemented ADR 0006 Architecture B: a third concrete `IRenderAdapter` (`JsonSpaRenderAdapter`, `Id = "spa"`) that emits an opt-in JSON + client-renderer delivery form **alongside** the untouched static site.
+
+**Adapter / bundle / seam touchpoints**
+- `JsonSpaRenderAdapter.RenderContent` = nav markup (no inline toggle script — the client owns nav-toggle via delegation) + breadcrumb + body — byte-identical to the webview's region shape.
+- `SpaBundle`/`SpaPage` records; `SpaDelivery` (pure helpers: `<main id="main-content">` landmark slice, `<title>` extraction, chunk grouping, manifest/chunk JSON, entry-shell builder).
+- `SiteGenerator`: new `_spaCapture` buffer (null unless `--spa`); a single `WriteOutput(path, html)` funnel that writes **and** (only under `--spa`) captures each long-tail page's finished HTML at the write seam — consuming the render pipeline's OWN output one step before `File.WriteAllText`, never re-reading a generated `.html` or re-parsing `.md` (AD-1/AD-2; the reviewer-sensitive boundary). 15 long-tail write sites routed through it; the 5 dashboard/epics families deliberately stay direct and are re-rendered via their view models in `BuildSpaBundle` (strongest parity). `RenderSpaBundle()` (public, mirrors `RenderWebviewSurfaces`) + `EmitSpaSite()` write the SPA files under `OutputRoot` only (AC #6). Re-emitted on every incremental watch path too (`GenerateOne`/`RegenerateEpics`/`RegenerateAdrs`/`RemoveFor`), so `watch --spa` stays in sync.
+- CLI: additive `--spa` flag on `SiteSettings` (mirrors `--deep-git`), threaded through `ForgeOptions.EmitSpa` (non-`required`, defaults false → zero churn on other `ForgeOptions` constructions). `generate`/`watch` honor it; `webview`/interactive/Story 5.x scope untouched.
+- Client: `assets/specscribe-spa.js` (embedded, ~7 KB) — fetches manifest + lazy-loads chunks, intercepts in-portal `<a>` clicks (resolves against tracked `data-path`, History API `pushState`), delegates nav-toggle, and degrades to native navigation for external/fragment/unknown links or a missing data layer.
+
+**Chunking + measured file-count win (AC #7, ADR 0006 axis A)**
+- Grouped by top-level output segment, split at a 75-page cap per chunk (scale-safe: never one-per-page, never a monolith).
+- This repo: **219 static pages → static site + 12 additive SPA files** (`app.html` + `specscribe-spa.js` + `spa/manifest.json` + 9 content chunks). The `epics` group exceeded 75 pages and correctly split into `pages-epics.json` (~3.7 MB) + `pages-epics-2.json` (~2.3 MB). As ADR 0006 predicted, this cuts **file count, not bytes** (regions ship pre-rendered inline SVG — the ~13.5 KB structured-data floor needs the deferred TS chart port, option D, explicitly out of scope). First-paint payload is just `app.html` (dashboard inlined) — no chunk fetch needed until you navigate.
+
+**Parity (AC #4)** — Section facts (dashboard/epics/epic) hold with **zero** exceptions (same C#-rendered bodies). Chrome facts are checked on the SPA's effective served page (entry shell + region); `asset.css`/`asset.js` **match** `html` (the SPA is a real browser and keeps the real stylesheet + enhancement script — its advantage over the webview's 3 exceptions). One honest `spa`-scoped `mermaid` exception registered: the epics roadmap's init can't survive an `innerHTML` swap, so it degrades to readable preformatted text (same accepted fallback as the webview; source is present — NFR6). **Deferred enhancement:** full Mermaid-in-SPA (re-init across swaps) and the one-time sortable-table upgrade (git-insights) rebinding after a swap — both are convenience-only; delegated enhancements (tooltips/copy/menus in `specscribe.js`) already survive swaps automatically.
+
+**End-to-end client verification (real bundle over HTTP, Browser pane)** — all passed, no console errors:
+- ✅ First paint: dashboard inlined, 5 stat cards, **134 inline SVG charts**, nav rendered (non-zero layout boxes).
+- ✅ In-portal nav (dashboard → Epics): content region swapped in-place, URL → `epics.html` via History API, **no full reload**, active-nav highlight + title updated.
+- ✅ Drill-down to `epics/epic-1.html` (nested URL, breadcrumb `../` links resolved against the tracked path).
+- ✅ Breadcrumb up-drill (back to `epics.html`) and browser Back (`popstate`) both restore the correct surface.
+- ✅ External (`https:`) and same-page (`#`) links left to native handling (not hijacked).
+- ✅ `<noscript>` fallback in the raw served HTML: inlined dashboard readable with JS off, link to the static `index.html`, nav links point to real static pages (which load directly, HTTP 200).
+
+**What Epic 16 (distribution) inherits** — the `--spa` form is output-only; how the bundle is hosted/packaged is unchanged (any static host works; `spa/*.json` must be served with normal static semantics). No new runtime dependency (the client is dependency-free vanilla JS; the only CDN reference remains Mermaid, unchanged and shared with the static site).
+
 ### File List
+
+- `src/SpecScribe/JsonSpaRenderAdapter.cs` (new) — third `IRenderAdapter` (`Id = "spa"`), content-region render.
+- `src/SpecScribe/SpaBundle.cs` (new) — `SpaPage` / `SpaBundle` records.
+- `src/SpecScribe/SpaDelivery.cs` (new) — landmark slice, chunking, manifest/chunk JSON, entry-shell builder.
+- `src/SpecScribe/assets/specscribe-spa.js` (new) — client renderer (embedded asset).
+- `src/SpecScribe/SiteGenerator.cs` — `_spaCapture` + `WriteOutput` capture funnel (15 long-tail writes routed through it), `RenderSpaBundle`/`BuildSpaBundle`/`AddSpaSurface`/`EmitSpaSite`/`WriteSpaFile`, `--spa` init in `GenerateAll` + re-emit in the incremental watch paths.
+- `src/SpecScribe/SiteSettings.cs` — `--spa` flag.
+- `src/SpecScribe/ForgeOptions.cs` — `EmitSpa` option + `Resolve` param.
+- `src/SpecScribe/HostRenderException.cs` — one `spa`/`mermaid` exception (justified).
+- `src/SpecScribe/SpecScribe.csproj` — embed `specscribe-spa.js`.
+- `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` (new) — whole-site coverage, manifest/chunk round-trip, region == static `<main>`, read-only, flag-off, few-files, noscript.
+- `tests/SpecScribe.Tests/RenderSpaParityTests.cs` (new) — chrome + section parity under `spa`, the one mermaid exception, injected-divergence catch, registry hygiene.
+- `tests/SpecScribe.Tests/WebviewRenderAdapterTests.cs` — registry hygiene test scoped to webview-only entries (spa entry added).
+- `tests/SpecScribe.Tests/WebviewThemingTests.cs` — registry-count assertion scoped to webview entries.
 
 ## Change Log
 
+- 2026-07-11 — Story 6.7 implemented (dev-story). Third `IRenderAdapter` (`spa`) + opt-in `--spa` JSON+SPA delivery form: whole-site consolidation (219 static pages → 12 additive SPA files on this repo) via the `<main id="main-content">` landmark captured at the render write seam (no all-pages `PageView` rewrite, no scraping). Static site byte-identical (golden gate green Debug+Release; real-repo OFF-vs-ON self-diff clean). Parity under surface id `spa`: zero section exceptions, `asset.css`/`asset.js` match `html`, one justified `mermaid` exception. Client renderer verified end-to-end in a browser (in-place nav, History API, breadcrumb/popstate, noscript fallback). 733 tests green (Debug + Release), +2 net new test files. Status → review.
 - 2026-07-11 — Story 6.7 drafted (create-story). Scoped from [ADR 0006](../../docs/adrs/0006-delivery-architecture-and-distribution.md) Architecture B (additive JSON+SPA delivery adapter) as the **third** concrete `IRenderAdapter` after `html`/`webview`. Defining scope decision recorded (READ FIRST / veto-before-dev, per the Epic 3 retro house rule): **whole-site consolidation** (the real Epic-7-scale file-count win), made affordable by capturing each page's content region at the render write seam via the universal `<main id="main-content">` landmark — no deferred all-pages `PageView` rewrite required — with the 5 dashboard/epics surfaces reusing the webview's true view-model render path. Ships **pre-rendered content regions** (charts as inline SVG), **not** the structured ~13.5 KB data floor (that needs the deferred TS chart port — ADR 0006 option D, explicitly out). Opt-in via a `--spa` flag (mirrors `--deep-git`); static site stays byte-identical (golden gate OFF and ON) and is the `<noscript>` fallback. Derived ACs added (mirroring 6.4): parity under surface id `spa` (#4), static byte-identity (#5), end-to-end read-only (#6), whole-site-few-files (#7). Byte reduction, host theming (6.5), the webview, packaging (Epic 16), and any C#→TS port explicitly out of scope. Status → ready-for-dev.

@@ -364,21 +364,21 @@ public class WebviewRenderAdapterTests
     // ----- Registry hygiene (AC #4: every entry justified, none blanket) --------------------------------------
 
     [Fact]
-    public void Registry_CarriesOnlyTheThreeJustifiedWebviewChromeExceptions()
+    public void Registry_CarriesExactlyTheThreeJustifiedWebviewChromeExceptions()
     {
         // Exactly the three ADR 0005 measured — all webview-scoped, all chrome/asset facts, each with a real
         // reason. No html-surface entry (the HTML adapter still diverges on nothing) and no section.* entry
-        // (the body facts hold FULL parity — the content is byte-identical by construction).
-        Assert.Equal(3, HostRenderExceptions.Registry.Count);
-        Assert.All(HostRenderExceptions.Registry, e =>
-        {
-            Assert.Equal("webview", e.SurfaceId);
-            Assert.False(string.IsNullOrWhiteSpace(e.Reason));
-            Assert.DoesNotContain("section.", e.FactId);
-        });
+        // (the body facts hold FULL parity — the content is byte-identical by construction). Story 6.7's SPA
+        // surface adds its own single (mermaid) entry, asserted separately in RenderSpaParityTests.
+        var webview = HostRenderExceptions.Registry.Where(e => e.SurfaceId == "webview").ToList();
+        Assert.Equal(3, webview.Count);
+        Assert.All(webview, e => Assert.False(string.IsNullOrWhiteSpace(e.Reason)));
         Assert.Equal(
             new[] { "asset.css", "asset.js", "mermaid" },
-            HostRenderExceptions.Registry.Select(e => e.FactId).OrderBy(f => f, StringComparer.Ordinal).ToList());
+            webview.Select(e => e.FactId).OrderBy(f => f, StringComparer.Ordinal).ToList());
+        // Global hygiene across every surface: a section.* fact may never be excepted (a body divergence is
+        // always a bug).
+        Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.FactId.StartsWith("section.", StringComparison.Ordinal));
     }
 
     private static int Count(string haystack, string needle)

@@ -32,6 +32,13 @@ public sealed class ForgeOptions
     /// flag is the FR-10 performance guarantee — the gate, not a timing test. [Story 3.2]</summary>
     public required bool DeepGitAnalytics { get; init; }
 
+    /// <summary>When true (opt-in via <c>--spa</c>), generation additionally emits the JSON + client-renderer (SPA)
+    /// delivery form — a manifest, grouped content chunks, an entry shell, and the client script — ALONGSIDE the
+    /// untouched static site (ADR 0006 Architecture B, Story 6.7). Off by default: with the flag off NO SPA files
+    /// are written and the static output is byte-identical, so the golden gate is unaffected (AC #3/#5). Not
+    /// <c>required</c> precisely so every existing <see cref="ForgeOptions"/> construction defaults to off. [Story 6.7]</summary>
+    public bool EmitSpa { get; init; }
+
     public const string StylesheetName = "specscribe.css";
 
     /// <summary>The one sanctioned progressive-enhancement script (on-brand chart tooltips + Next Steps copy
@@ -78,7 +85,8 @@ public sealed class ForgeOptions
         string? projectName = null,
         string? startDirectory = null,
         bool includeReadme = true,
-        bool deepGitAnalytics = false)
+        bool deepGitAnalytics = false,
+        bool emitSpa = false)
     {
         string repoRoot;
         string sourceRoot;
@@ -118,6 +126,7 @@ public sealed class ForgeOptions
             SiteTitle = projectName is { Length: > 0 } ? projectName : ReadProjectName(repoRoot) ?? DefaultSiteTitle,
             IncludeReadme = includeReadme,
             DeepGitAnalytics = deepGitAnalytics,
+            EmitSpa = emitSpa,
         };
     }
 

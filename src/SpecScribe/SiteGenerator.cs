@@ -49,6 +49,13 @@ public sealed class SiteGenerator
     private List<RetroModel> _retros = new();
     private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
 
+    // When --spa is active, every long-tail page's finished HTML is captured here as it is written (output path →
+    // full page string) so the SPA bundle can slice its content region from the render pipeline's OWN output rather
+    // than re-reading the generated site off disk (AD-1/AD-2). Null on a normal run — no capture, no overhead, and
+    // the static output stays byte-identical (AC #3/#5). The dashboard/epics families are NOT captured here; the
+    // SPA re-renders them from their view models (RenderSpaBundle) for strongest parity. [Story 6.7]
+    private Dictionary<string, string>? _spaCapture;
+
     public SiteGenerator(ForgeOptions options)
     {
         _options = options;
@@ -73,6 +80,9 @@ public sealed class SiteGenerator
 
             EnsureScaffold();
             _docs.Clear();
+
+            // Fresh capture buffer for this full build when the opt-in SPA form is on (null otherwise → no capture).
+            _spaCapture = _options.EmitSpa ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) : null;
 
             // All planning-artifact ingestion (sprint, module detection, retros, epics → requirements) runs
             // through the framework adapter, which returns one normalized bundle + non-fatal diagnostics.
@@ -181,9 +191,7 @@ public sealed class SiteGenerator
                 try
                 {
                     var html = DeepAnalyticsTemplater.RenderPage(deepPulse, nav);
-                    File.WriteAllText(
-                        Path.Combine(_options.OutputRoot, SiteNav.DeepAnalyticsOutputPath),
-                        ApplyReferenceLinks(html, SiteNav.DeepAnalyticsOutputPath));
+                    WriteOutput(SiteNav.DeepAnalyticsOutputPath, ApplyReferenceLinks(html, SiteNav.DeepAnalyticsOutputPath));
                     events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.DeepAnalyticsOutputPath, sw.Elapsed));
                 }
                 catch (Exception ex)
@@ -240,6 +248,13 @@ public sealed class SiteGenerator
             // diagnostics page reads the notice list, so it never self-references. [Story 4.8 Task 6]
             events.Add(WriteDiagnostics(nav, events));
             events.Add(WriteAbout(nav));
+
+            // Opt-in JSON+SPA delivery form, emitted LAST so every captured page is present. Strictly additive:
+            // writes only its own files under OutputRoot, leaving every static page byte-identical (AC #3/#5/#6).
+            if (_options.EmitSpa)
+            {
+                EmitSpaSite(nav);
+            }
         }
         return events;
     }
@@ -253,6 +268,9 @@ public sealed class SiteGenerator
             var ev = GenerateOneInternal(sourceFullPath, nav);
             RefreshCoverage();
             WriteIndex(nav);
+            // Keep the opt-in SPA form in sync in watch mode: _spaCapture already holds the fresh page (captured by
+            // GenerateOneInternal's WriteOutput), so re-emitting rebuilds the manifest/chunks from current state.
+            if (_options.EmitSpa) EmitSpaSite(nav);
             return ev;
         }
     }
@@ -273,8 +291,12 @@ public sealed class SiteGenerator
                 }
 
                 _docs.Remove(relative);
+                // Drop the removed page from the SPA capture so a stale region can't linger in the next bundle.
+                if (_spaCapture is not null) _spaCapture.Remove(PathUtil.NormalizeSlashes(doc.OutputRelativePath));
                 RefreshCoverage();
-                WriteIndex(_nav ?? BuildNav(Array.Empty<string>()));
+                var nav = _nav ?? BuildNav(Array.Empty<string>());
+                WriteIndex(nav);
+                if (_options.EmitSpa) EmitSpaSite(nav);
                 return new GenerationEvent(GenerationOutcome.Removed, relative, sw.Elapsed);
             }
 
@@ -350,6 +372,7 @@ public sealed class SiteGenerator
             }
             RefreshCoverage();
             WriteIndex(nav);
+            if (_options.EmitSpa) EmitSpaSite(nav);
 
             var errored = epicsEvents.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
             if (errored is not null)
@@ -382,6 +405,7 @@ public sealed class SiteGenerator
             var events = GenerateAdrsInternal(nav);
             RefreshCoverage();
             WriteIndex(nav);
+            if (_options.EmitSpa) EmitSpaSite(nav);
 
             var errored = events.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
             if (errored is not null)
@@ -462,9 +486,7 @@ public sealed class SiteGenerator
                     HasMermaid = parsed.HasMermaid,
                 };
 
-                var outputFullPath = Path.Combine(_options.OutputRoot, ForgeOptions.AdrOutputSubdir, outputName.Replace('/', Path.DirectorySeparatorChar));
-                Directory.CreateDirectory(Path.GetDirectoryName(outputFullPath)!);
-                File.WriteAllText(outputFullPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+                WriteOutput(outputRelative, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
 
                 if (isRecord)
                 {
@@ -552,9 +574,7 @@ public sealed class SiteGenerator
                 var nextDay = i < days.Count - 1 ? days[i + 1] : (DateOnly?)null;
                 var html = CommitDayTemplater.RenderPage(day, git.CommitsByDay[day], prevDay, nextDay, nav);
 
-                File.WriteAllText(
-                    Path.Combine(commitsDir, $"{Charts.D(day)}.html"),
-                    ApplyReferenceLinks(html, outputRelative));
+                WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
                 entries.Add(new CommitDayEntry(day, outputRelative));
                 events.Add(new GenerationEvent(GenerationOutcome.Generated, outputRelative, sw.Elapsed));
@@ -585,9 +605,7 @@ public sealed class SiteGenerator
         try
         {
             var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav);
-            File.WriteAllText(
-                Path.Combine(_options.OutputRoot, SiteNav.GitInsightsOutputPath),
-                ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
+            WriteOutput(SiteNav.GitInsightsOutputPath, ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
         }
         catch (Exception ex)
@@ -818,6 +836,157 @@ public sealed class SiteGenerator
         return new WebviewSurface(PathUtil.NormalizeSlashes(page.OutputRelativePath), page.Title, content);
     }
 
+    // ===== Story 6.7: JSON + client-renderer (SPA) delivery form =============================================
+
+    /// <summary>The page write seam for pages the SPA form consolidates: writes <paramref name="html"/> to
+    /// <paramref name="outputRelativePath"/> under the output root (creating parent dirs), and — ONLY when
+    /// <c>--spa</c> is active — captures the finished page string in memory (<see cref="_spaCapture"/>) for the SPA
+    /// bundle. The capture consumes the render pipeline's OWN output at the instant it is produced, one step before
+    /// it becomes a file: it never reads a generated <c>.html</c> back off disk and never re-parses a source
+    /// <c>.md</c>, so AD-1/AD-2 hold (Story 6.7 Dev Notes "Is landmark-slicing scraping?"). The dashboard/epics
+    /// families deliberately do NOT route through here — the SPA re-renders them from their view models (strongest
+    /// parity, see <see cref="BuildSpaBundle"/>). Bytes written are identical to the prior direct
+    /// <c>File.WriteAllText</c>, so the golden gate is unaffected (AC #5). [Story 6.7]</summary>
+    private void WriteOutput(string outputRelativePath, string html)
+    {
+        var full = Path.Combine(_options.OutputRoot, outputRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        var dir = Path.GetDirectoryName(full);
+        if (dir is { Length: > 0 }) Directory.CreateDirectory(dir);
+        File.WriteAllText(full, html);
+        if (_spaCapture is not null)
+        {
+            _spaCapture[PathUtil.NormalizeSlashes(outputRelativePath)] = html;
+        }
+    }
+
+    /// <summary>Builds the whole-site SPA bundle: the five dashboard/epics families rendered through their view
+    /// models (the same strongest-parity path the webview uses), plus EVERY other page's content region sliced from
+    /// the render output captured at the write seam (<see cref="_spaCapture"/>) via the universal
+    /// <c>&lt;main id="main-content"&gt;</c> landmark. Requires a completed capture pass (only populated under
+    /// <c>--spa</c>). A pure read of cached state + captured strings — it writes nothing (AC #6). [Story 6.7]</summary>
+    public SpaBundle RenderSpaBundle()
+    {
+        lock (_gate)
+        {
+            var nav = _nav ?? throw new InvalidOperationException(
+                "RenderSpaBundle requires a completed GenerateAll() pass with --spa on this generator.");
+            return BuildSpaBundle(nav);
+        }
+    }
+
+    private SpaBundle BuildSpaBundle(SiteNav nav)
+    {
+        var pages = new List<SpaPage>();
+        var familyPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // 1) Dashboard + epics families via their view models — true view-model renders, so section-fact parity is
+        // airtight (AC #4). Mirrors RenderWebviewSurfaces' iteration exactly (same models, retro map, placeholder
+        // rule, fragment pipeline).
+        var docs = _docs.Values.ToList();
+        var dashboardPage = HtmlTemplater.BuildIndexPage(
+            docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
+            WorkInventory.Build(docs), _sprint, _retros, _coverage);
+        AddSpaSurface(pages, familyPaths, dashboardPage);
+
+        if (_epicsModel is { } model && _progress is { } progress)
+        {
+            var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
+            AddSpaSurface(pages, familyPaths, EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands));
+
+            foreach (var epic in model.Epics)
+            {
+                var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
+                AddSpaSurface(pages, familyPaths,
+                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath),
+                    skipEpicNumber: epic.Number);
+
+                foreach (var story in epic.Stories)
+                {
+                    if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
+                    {
+                        AddSpaSurface(pages, familyPaths,
+                            EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath),
+                            skipStoryId: story.Id);
+                        continue;
+                    }
+
+                    var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
+                    AddSpaSurface(pages, familyPaths,
+                        EpicsTemplater.BuildStoryPage(
+                            epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
+                            f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav,
+                            _module.Commands, epicRetroPath),
+                        skipStoryId: story.Id);
+                }
+            }
+        }
+
+        // 2) Every OTHER captured page: slice its content region via the landmark. Families are already covered
+        // above (skipped here). The nav is re-rendered fresh (byte-identical to the page's own, minus the inline
+        // toggle script the client owns); the breadcrumb + <main> come from the page's own captured output.
+        if (_spaCapture is { } capture)
+        {
+            foreach (var (path, fullHtml) in capture)
+            {
+                var normalized = PathUtil.NormalizeSlashes(path);
+                if (familyPaths.Contains(normalized)) continue;
+                var navMarkup = HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView(normalized));
+                var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
+                pages.Add(new SpaPage(normalized, SpaDelivery.ExtractTitle(fullHtml), region));
+            }
+        }
+
+        return new SpaBundle(_options.SiteTitle, "index.html", pages);
+    }
+
+    /// <summary>Renders one dashboard/epics family page's SPA content region (nav + breadcrumb + body) through
+    /// <see cref="JsonSpaRenderAdapter"/>, reference-linkified with the SAME skip rules the static page uses (a page
+    /// never self-links its own story/epic mentions), records the path as a family (so the landmark-slice pass skips
+    /// it), and appends it to the bundle. [Story 6.7]</summary>
+    private void AddSpaSurface(List<SpaPage> pages, HashSet<string> familyPaths, PageView page,
+        string? skipStoryId = null, int? skipEpicNumber = null)
+    {
+        var region = ApplyReferenceLinks(
+            JsonSpaRenderAdapter.Shared.RenderContent(page), page.OutputRelativePath,
+            skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
+        var path = PathUtil.NormalizeSlashes(page.OutputRelativePath);
+        familyPaths.Add(path);
+        pages.Add(new SpaPage(path, page.Title, region));
+    }
+
+    /// <summary>Writes the opt-in SPA delivery files — the client script, the manifest + content chunks, and the
+    /// entry shell — ALL under <see cref="ForgeOptions.OutputRoot"/>, strictly alongside the untouched static site
+    /// (AC #3/#5/#6). Called at the end of a full generate and after each incremental watch update when <c>--spa</c>
+    /// is on. Never touches a source artifact or an existing static page. [Story 6.7]</summary>
+    private void EmitSpaSite(SiteNav nav)
+    {
+        var bundle = BuildSpaBundle(nav);
+
+        // The client renderer, embedded and copied exactly like specscribe.css/js.
+        CopyEmbeddedAsset("SpecScribe.assets.specscribe-spa.js", SpaDelivery.ScriptName);
+
+        // Manifest + bounded content chunks.
+        foreach (var file in SpaDelivery.BuildDataFiles(bundle))
+        {
+            WriteSpaFile(file.OutputRelativePath, file.Content);
+        }
+
+        // The entry shell inlines the dashboard region for instant first paint AND the no-JS fallback (AC #2).
+        var entryRegion = bundle.Pages.First(p => p.OutputRelativePath == bundle.EntryPath).ContentHtml;
+        WriteSpaFile(SpaDelivery.EntryFileName, SpaDelivery.BuildEntryShell(bundle.SiteTitle, entryRegion));
+    }
+
+    /// <summary>Writes one SPA output file under the output root (creating parent dirs). Unlike
+    /// <see cref="WriteOutput"/> this never captures — SPA files are the delivery output, not site pages to
+    /// consolidate. [Story 6.7]</summary>
+    private void WriteSpaFile(string outputRelativePath, string content)
+    {
+        var full = Path.Combine(_options.OutputRoot, outputRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        var dir = Path.GetDirectoryName(full);
+        if (dir is { Length: > 0 }) Directory.CreateDirectory(dir);
+        File.WriteAllText(full, content);
+    }
+
     private GenerationEvent GenerateOneInternal(string sourceFullPath, SiteNav nav)
     {
         var sw = Stopwatch.StartNew();
@@ -840,9 +1009,7 @@ public sealed class SiteGenerator
             var doc = MarkdownConverter.Convert(sourceFullPath, relative, outputRelative);
             doc.Companions = ResolveSpecCompanions(doc);
 
-            var outputFullPath = Path.Combine(_options.OutputRoot, outputRelative);
-            Directory.CreateDirectory(Path.GetDirectoryName(outputFullPath)!);
-            File.WriteAllText(outputFullPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+            WriteOutput(outputRelative, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
 
             _docs[relative] = doc;
             var outcome = alreadyExisted ? GenerationOutcome.Updated : GenerationOutcome.Generated;
@@ -962,9 +1129,7 @@ public sealed class SiteGenerator
         foreach (var retro in _retros)
         {
             var outputRel = retro.OutputRelativePath;
-            var outputFull = Path.Combine(_options.OutputRoot, outputRel.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(Path.GetDirectoryName(outputFull)!);
-            File.WriteAllText(outputFull, ApplyReferenceLinks(RetroTemplater.RenderPage(retro, _epicsModel, nav), outputRel));
+            WriteOutput(outputRel, ApplyReferenceLinks(RetroTemplater.RenderPage(retro, _epicsModel, nav), outputRel));
         }
     }
 
@@ -986,7 +1151,7 @@ public sealed class SiteGenerator
     {
         if (_sprint is null) return;
         var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros);
-        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.SprintOutputPath), ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
+        WriteOutput(SiteNav.SprintOutputPath, ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
 
     /// <summary>Writes <c>structure.html</c> — the interactive project/artifact structure tree. Gated on the
@@ -1013,9 +1178,7 @@ public sealed class SiteGenerator
         if (tree.IsEmpty) return;
 
         var html = RenderStructurePage(tree, nav);
-        File.WriteAllText(
-            Path.Combine(_options.OutputRoot, SiteNav.StructureOutputPath),
-            ApplyReferenceLinks(html, SiteNav.StructureOutputPath));
+        WriteOutput(SiteNav.StructureOutputPath, ApplyReferenceLinks(html, SiteNav.StructureOutputPath));
     }
 
     /// <summary>Maps each source-artifact path that has a generated page to its output-relative URL, from the
@@ -1085,7 +1248,7 @@ public sealed class SiteGenerator
     {
         if (_retros.Count == 0) return;
         var html = RetroTemplater.RenderIndex(_retros, nav);
-        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.RetrosOutputPath), ApplyReferenceLinks(html, SiteNav.RetrosOutputPath));
+        WriteOutput(SiteNav.RetrosOutputPath, ApplyReferenceLinks(html, SiteNav.RetrosOutputPath));
     }
 
     /// <summary>Writes the open-action-items page (<c>action-items.html</c>) when the sprint tracks open items —
@@ -1102,7 +1265,7 @@ public sealed class SiteGenerator
         // contain "Epic N"/"Story N.M" mentions); the linkifier would wrap those in <a> tags INSIDE the
         // attribute value and corrupt the copyable command. [Story 2.3 polish #5]
         var html = ActionItemsTemplater.RenderPage(open, EpicRetroMap, _module.Commands, nav, deferredHref);
-        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.ActionItemsOutputPath), html);
+        WriteOutput(SiteNav.ActionItemsOutputPath, html);
     }
 
     /// <summary>Writes <c>diagnostics.html</c> — the whole-run report of the run's non-fatal notices plus the
@@ -1119,7 +1282,7 @@ public sealed class SiteGenerator
         var notices = DiagnosticNotice.FromEvents(events);
         var config = DiagnosticsConfig.FromRun(_options, _module);
         var html = DiagnosticsTemplater.RenderPage(notices, config, nav);
-        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.DiagnosticsOutputPath), html);
+        WriteOutput(SiteNav.DiagnosticsOutputPath, html);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.DiagnosticsOutputPath, sw.Elapsed);
     }
 
@@ -1131,7 +1294,7 @@ public sealed class SiteGenerator
     {
         var sw = Stopwatch.StartNew();
         var html = AboutTemplater.RenderPage(nav);
-        File.WriteAllText(Path.Combine(_options.OutputRoot, SiteNav.AboutOutputPath), html);
+        WriteOutput(SiteNav.AboutOutputPath, html);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutOutputPath, sw.Elapsed);
     }
 
@@ -1153,8 +1316,7 @@ public sealed class SiteGenerator
         try
         {
             var doc = MarkdownConverter.Convert(ReadmeSourcePath, "README.md", SiteNav.ReadmeOutputPath);
-            var outputFullPath = Path.Combine(_options.OutputRoot, SiteNav.ReadmeOutputPath);
-            File.WriteAllText(outputFullPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), SiteNav.ReadmeOutputPath));
+            WriteOutput(SiteNav.ReadmeOutputPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), SiteNav.ReadmeOutputPath));
             return new GenerationEvent(GenerationOutcome.Generated, "README.md", sw.Elapsed);
         }
         catch (Exception ex)
@@ -1167,8 +1329,7 @@ public sealed class SiteGenerator
     /// requirement set (the detail page skips its own id so it never self-links).</summary>
     private void WriteRequirements(RequirementsModel requirements, EpicsModel model, ProgressModel progress, SiteNav nav)
     {
-        File.WriteAllText(
-            Path.Combine(_options.OutputRoot, "requirements.html"),
+        WriteOutput("requirements.html",
             ApplyReferenceLinks(RequirementsTemplater.RenderIndex(requirements, model, progress, nav), "requirements.html"));
 
         var requirementsDir = Path.Combine(_options.OutputRoot, "requirements");
@@ -1181,7 +1342,7 @@ public sealed class SiteGenerator
                 : null;
             var outputRelative = $"requirements/{req.Slug}.html";
             var html = RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav);
-            File.WriteAllText(Path.Combine(requirementsDir, $"{req.Slug}.html"), ApplyReferenceLinks(html, outputRelative, skipRequirementId: req.Id));
+            WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative, skipRequirementId: req.Id));
         }
     }
 

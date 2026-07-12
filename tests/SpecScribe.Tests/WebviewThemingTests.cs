@@ -185,8 +185,9 @@ public class WebviewThemingTests
         var divergences = RenderParity.FindDivergences(page, doc, WebviewRenderAdapter.Shared.Id);
         Assert.True(divergences.Count == 0, "expected parity, got: " + string.Join(" | ", divergences));
 
-        // No section.* or theming exception was added: the registry stays at exactly the three 6.4 chrome/asset
-        // entries (theming is not a semantic divergence).
-        Assert.Equal(3, HostRenderExceptions.Registry.Count);
+        // No section.* or theming exception was added: the WEBVIEW surface stays at exactly its three 6.4
+        // chrome/asset entries (theming is not a semantic divergence). Other surfaces' entries — e.g. Story 6.7's
+        // single spa mermaid exception — are out of scope here.
+        Assert.Equal(3, HostRenderExceptions.Registry.Count(e => e.SurfaceId == "webview"));
     }
 }
