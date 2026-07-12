@@ -22,6 +22,18 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
     /// folder deeper doesn't lose its stories (AC #1). [Story 4.2 Task 4]</summary>
     public const string ImplementationArtifactsDirName = "implementation-artifacts";
 
+    /// <summary>BMad's sprint tracking file (the sprint board / Now &amp; Next data source), matched by filename
+    /// anywhere under the source root. The ONE home for this literal — <see cref="IngestSprint"/> discovers it and
+    /// <see cref="SiteGenerator.IsDataSource"/> classifies watch-mode events against this same constant rather than
+    /// re-hard-coding the string (NFR4). It is a <c>.yaml</c>, so it is deliberately outside the <c>*.md</c> source
+    /// enumeration and needs the widened watch route. [Story 6.11]</summary>
+    public const string SprintStatusFileName = "sprint-status.yaml";
+
+    /// <summary>True when <paramref name="path"/> (full or relative) is the sprint tracking file, by filename
+    /// regardless of folder depth — the same location tolerance the ingest discovery applies. [Story 6.11]</summary>
+    public static bool IsSprintStatusFile(string path) =>
+        string.Equals(Path.GetFileName(path), SprintStatusFileName, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>True when <paramref name="path"/> (full or relative) is the epics breakdown file, by
     /// filename regardless of folder depth — the same location tolerance <see cref="SiteNav"/> has always
     /// applied. [Story 4.2 Task 4]</summary>
@@ -160,7 +172,7 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
     private static SprintStatus? IngestSprint(ForgeOptions options, List<AdapterDiagnostic> diagnostics)
     {
         var sprintPath = Directory.Exists(options.SourceRoot)
-            ? Directory.EnumerateFiles(options.SourceRoot, "sprint-status.yaml", SearchOption.AllDirectories)
+            ? Directory.EnumerateFiles(options.SourceRoot, SprintStatusFileName, SearchOption.AllDirectories)
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .FirstOrDefault()
             : null;

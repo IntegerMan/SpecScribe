@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using SpecScribe;
 
@@ -331,6 +332,35 @@ public class SiteGeneratorAdapterTests : IDisposable
         Assert.Equal(1, Count(diag, "diagnostics-source"));
         Assert.Contains(">Unsupported</span>", diag);
         Assert.Contains("sprint-status.yaml", diag);
+    }
+
+    [Fact]
+    public void GenerateAll_UnusableSprintYaml_DiagnosticsWireMirrorsThePagesNoticeSet()
+    {
+        // AC #2 coherence (Story 6.12): the `webview` command's JSON-lines stderr channel and the Story 4.8
+        // diagnostics page derive from the SAME DiagnosticNotice.FromEvents(events) projection, so the two
+        // surfaces can never disagree. DiagnosticsPageListsNoticeExactlyOnce (above) pins "1 notice" on this exact
+        // malformed-sprint fixture for the PAGE; here the same fixture feeds the WIRE — same count, same anchored
+        // source path, no double-count.
+        File.WriteAllText(SprintYaml, "just: some\nunrelated: keys\n");
+
+        var options = Options();
+        var events = new SiteGenerator(options).GenerateAll();
+        var notices = DiagnosticNotice.FromEvents(events);
+
+        // Exactly the page's set: one non-fatal, source-anchored sprint-status.yaml skip.
+        var notice = Assert.Single(notices);
+        Assert.True(notice.SourceAnchored);
+        Assert.EndsWith("sprint-status.yaml", notice.SourcePath, StringComparison.OrdinalIgnoreCase);
+
+        // …and the wire is a faithful mirror of that same set: one anchored, repo-relative, forward-slashed line.
+        var line = Assert.Single(WebviewCommand.SerializeDiagnostics(notices, options)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => JsonDocument.Parse(l).RootElement)
+            .ToList());
+        Assert.True(line.GetProperty("fileAnchored").GetBoolean());
+        Assert.EndsWith("sprint-status.yaml", line.GetProperty("path").GetString()!, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain('\\', line.GetProperty("path").GetString()!);
     }
 
     [Fact]

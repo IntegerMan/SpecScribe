@@ -50,6 +50,14 @@ public sealed class ForgeOptions
     public const string DefaultSiteTitle = "BMad Live Docs";
     public const string SourceDirName = "_bmad-output";
 
+    /// <summary>BMad's config directory (repo-root <c>_bmad</c>) and the project-config file inside it whose
+    /// <c>project_name</c> brands the site (<see cref="ReadProjectName"/>). Named constants because this file lives
+    /// under NEITHER source root — the watch layer (<see cref="FileWatcherService"/>) and the data-source
+    /// classifier (<see cref="SiteGenerator.IsDataSource"/>) both need it, and it must be the ONE literal (NFR4).
+    /// [Story 6.11]</summary>
+    public const string ConfigDirName = "_bmad";
+    public const string ConfigFileName = "config.toml";
+
     /// <summary>Default output directory (a single top-level folder under the repo root, not nested under
     /// <c>docs/</c> where the hand-authored ADR source lives). Matches the <c>--output SpecScribeOutput</c>
     /// convention used by the README and the GitHub Pages workflow.</summary>
@@ -191,7 +199,7 @@ public sealed class ForgeOptions
     {
         try
         {
-            var configPath = Path.Combine(repoRoot, "_bmad", "config.toml");
+            var configPath = Path.Combine(repoRoot, ConfigDirName, ConfigFileName);
             if (!File.Exists(configPath)) return null;
 
             var text = MarkdownConverter.ReadAllTextShared(configPath);

@@ -314,6 +314,34 @@ public sealed class SiteGenerator
         _coverage = BuildArtifactCoverage(EnumerateSourceFiles().Select(ToSourceRelative).ToList());
     }
 
+    /// <summary>True for a non-markdown DATA SOURCE the site reads but the <c>.md</c> dispatch routes don't refresh:
+    /// the sprint tracking file (<c>sprint-status.yaml</c> — the sprint board / Now &amp; Next data) and the project
+    /// config (<c>_bmad/config.toml</c> — the site branding). The watch dispatch checks this FIRST (before
+    /// <see cref="IsAdr"/>/<see cref="IsEpicsRelated"/>) because <c>sprint-status.yaml</c> lives under
+    /// <c>implementation-artifacts/</c>, so <see cref="IsEpicsRelated"/> would otherwise claim it and route to
+    /// <see cref="RegenerateEpics"/>, which by design never re-parses sprint state (AD-5). Classifies via the shared
+    /// <see cref="BmadArtifactAdapter.SprintStatusFileName"/> / <see cref="ForgeOptions.ConfigFileName"/> conventions,
+    /// never a second literal. [Story 6.11]</summary>
+    public bool IsDataSource(string sourceFullPath) =>
+        BmadArtifactAdapter.IsSprintStatusFile(sourceFullPath) || IsProjectConfigFile(sourceFullPath);
+
+    /// <summary>True when <paramref name="path"/> is <c>_bmad/config.toml</c>: the config file NAME under a
+    /// <c>_bmad</c> directory SEGMENT (any depth, either slash style) — the same location-tolerant, segment-based
+    /// discipline <see cref="BmadArtifactAdapter.IsUnderImplementationArtifacts"/> uses, so a stray <c>config.toml</c>
+    /// elsewhere isn't mistaken for the project config. [Story 6.11]</summary>
+    private static bool IsProjectConfigFile(string path)
+    {
+        if (!string.Equals(Path.GetFileName(path), ForgeOptions.ConfigFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var dir = Path.GetDirectoryName(path.Replace('/', Path.DirectorySeparatorChar));
+        if (string.IsNullOrEmpty(dir)) return false;
+        return dir.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Any(s => string.Equals(s, ForgeOptions.ConfigDirName, StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>True for the epics file itself, or any file under an implementation-artifacts/ ancestor —
     /// both feed the epics/story pages, so either kind of change should trigger a full
     /// <see cref="RegenerateEpics"/> rather than the generic single-file path. Classifies via the adapter's
@@ -383,6 +411,33 @@ public sealed class SiteGenerator
 
             return new GenerationEvent(GenerationOutcome.Updated, ToSourceRelative(ingest.SourceFullPath), sw.Elapsed, $"{ingest.ConsumedSourceRelatives.Count} stories");
         }
+    }
+
+    /// <summary>Watch-mode route for a non-markdown DATA SOURCE change (<c>sprint-status.yaml</c>,
+    /// <c>_bmad/config.toml</c> — see <see cref="IsDataSource"/>). The surfaces these feed (the dashboard's
+    /// Now &amp; Next / sprint board, the sprint page, the project branding) are NOT markdown artifacts, so none of
+    /// the <c>.md</c> routes refresh them — worse, <c>sprint-status.yaml</c> mis-routes to
+    /// <see cref="RegenerateEpics"/>, which deliberately skips sprint state (AD-5). A full <see cref="GenerateAll"/>
+    /// is the simplest correct refresh: it re-parses <c>_sprint</c> (and everything else) and rewrites the surfaces,
+    /// matching what the VS Code extension already does on every spawn. Scoping the re-render to just the changed
+    /// family is the deferred R6.4 perf follow-up, not correctness.
+    /// <para><b>config.toml caveat:</b> a full pass re-renders, but <see cref="ForgeOptions.SiteTitle"/> is fixed at
+    /// <see cref="ForgeOptions.Resolve"/> time, so a project-NAME change needs a core <c>watch</c> restart to
+    /// re-brand (the extension re-resolves options on each fresh spawn and has no such limit). [Story 6.11]</para></summary>
+    public GenerationEvent RegenerateFromDataSource(string sourceFullPath)
+    {
+        var sw = Stopwatch.StartNew();
+        // GenerateAll takes _gate itself, so no outer lock here — a full rebuild is the whole point of this route.
+        var events = GenerateAll();
+        var relative = Path.GetRelativePath(_options.RepoRoot, sourceFullPath).Replace('\\', '/');
+
+        var errored = events.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
+        if (errored is not null)
+        {
+            return errored;
+        }
+
+        return new GenerationEvent(GenerationOutcome.Updated, relative, sw.Elapsed, "data source");
     }
 
     /// <summary>True for any file under the ADR source root — routes watch-mode events to

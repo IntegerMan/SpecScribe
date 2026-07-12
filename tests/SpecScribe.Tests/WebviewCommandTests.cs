@@ -48,4 +48,62 @@ public class WebviewCommandTests
         // Never emit a backslash even on Windows: the shim treats the value as a POSIX-joinable relative path.
         Assert.Equal("build/site", WebviewCommand.ResolveConfiguredOutputRoot(options));
     }
+
+    // ===== Story 6.11: the resolved watch roots the shim builds its file watchers from ============================
+
+    private static ForgeOptions RootedOptions(string repoRoot, string? source = null, string? adrs = null) =>
+        new()
+        {
+            RepoRoot = repoRoot,
+            SourceRoot = source ?? Path.Combine(repoRoot, ForgeOptions.SourceDirName),
+            AdrSourceRoot = adrs ?? Path.Combine(repoRoot, "docs", "adrs"),
+            AdrSourceExplicit = adrs is not null,
+            OutputRoot = Path.Combine(repoRoot, ForgeOptions.OutputDirName),
+            SiteTitle = "SpecScribe",
+            IncludeReadme = false,
+            DeepGitAnalytics = false,
+        };
+
+    [Fact]
+    public void ResolveSourceRoot_And_AdrRoot_DefaultLayout_RepoRelative_ForwardSlashed()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "specscribe-roots-default");
+        var options = RootedOptions(repoRoot);
+
+        Assert.Equal("_bmad-output", WebviewCommand.ResolveSourceRoot(options));
+        Assert.Equal("docs/adrs", WebviewCommand.ResolveAdrRoot(options));
+    }
+
+    [Fact]
+    public void ResolveSourceRoot_And_AdrRoot_CustomRoots_AreProjected()
+    {
+        // A repo with non-default --source/--adrs (Story 5.1/5.2) must watch the CUSTOM trees, not the literals.
+        var repoRoot = Path.Combine(Path.GetTempPath(), "specscribe-roots-custom");
+        var options = RootedOptions(
+            repoRoot,
+            source: Path.Combine(repoRoot, "spec", "artifacts"),
+            adrs: Path.Combine(repoRoot, "decisions"));
+
+        Assert.Equal("spec/artifacts", WebviewCommand.ResolveSourceRoot(options));
+        Assert.Equal("decisions", WebviewCommand.ResolveAdrRoot(options));
+    }
+
+    [Fact]
+    public void ResolveRepoRootOffset_AtRepoRoot_IsDot()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "specscribe-offset-root");
+        // The shim spawns `webview` with cwd == the workspace folder; opened at the repo root they coincide → ".".
+        Assert.Equal(".", WebviewCommand.ResolveRepoRootOffset(RootedOptions(repoRoot), workingDirectory: repoRoot));
+    }
+
+    [Fact]
+    public void ResolveRepoRootOffset_OpenedOnSubdir_IsTheUpwardOffset()
+    {
+        // Opened two levels deep, the workspace folder is a descendant and the repo root is two up → "../..", so the
+        // shim resolves the real repo root and anchors both watchers and reveal-source to it (the subdir-open fix).
+        var repoRoot = Path.Combine(Path.GetTempPath(), "specscribe-offset-subdir");
+        var workingDirectory = Path.Combine(repoRoot, "packages", "app");
+
+        Assert.Equal("../..", WebviewCommand.ResolveRepoRootOffset(RootedOptions(repoRoot), workingDirectory));
+    }
 }

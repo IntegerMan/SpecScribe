@@ -4,7 +4,7 @@ baseline_commit: 39f79da
 
 # Story 6.12: Native Diagnostics — Problems Panel Integration
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -66,49 +66,49 @@ A VS Code `Diagnostic` must be attached to a `Uri`. The notices split into two s
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Surface source-anchorability on the shared notice type** (AC: #1, #2)
-  - [ ] Add an additive `bool SourceAnchored` to the [`DiagnosticNotice`](../../src/SpecScribe/DiagnosticsTemplater.cs) record (constructor param + XML-doc, tagged `[Story 6.12]`). In `DiagnosticNotice.FromEvents`, set it from `e.FromAdapterDiagnostic` — the exact provenance bit that already distinguishes source-relative ingest notices (`MapDiagnostics`) from output-relative render-time notices. Keep it a **single shared type** so the page and the stderr channel can never derive different notice sets (AC #2 coherence).
-  - [ ] **Do not** change `SplitCategory`, the filter, or the ordering. The page (4.8) does not read `SourceAnchored`; confirm `DiagnosticsTemplaterTests` and the golden inventory still pass unchanged (this field is invisible to rendering).
+- [x] **Task 1 — Surface source-anchorability on the shared notice type** (AC: #1, #2)
+  - [x] Add an additive `bool SourceAnchored` to the [`DiagnosticNotice`](../../src/SpecScribe/DiagnosticsTemplater.cs) record (constructor param + XML-doc, tagged `[Story 6.12]`). In `DiagnosticNotice.FromEvents`, set it from `e.FromAdapterDiagnostic` — the exact provenance bit that already distinguishes source-relative ingest notices (`MapDiagnostics`) from output-relative render-time notices. Keep it a **single shared type** so the page and the stderr channel can never derive different notice sets (AC #2 coherence).
+  - [x] **Do not** change `SplitCategory`, the filter, or the ordering. The page (4.8) does not read `SourceAnchored`; confirm `DiagnosticsTemplaterTests` and the golden inventory still pass unchanged (this field is invisible to rendering).
 
-- [ ] **Task 2 — Pure JSON-lines projection for the machine channel** (AC: #1, #2)
-  - [ ] Add `public static string SerializeDiagnostics(IReadOnlyList<DiagnosticNotice> notices, ForgeOptions resolved)` to [`WebviewCommand`](../../src/SpecScribe/Commands.cs) — pure and spawn-free, mirroring how `SerializePayload`/`ResolveConfiguredOutputRoot` are extracted for unit-testability. Return the full stderr text: **one JSON object per line** (newline-terminated), or `""` (empty) when there are no notices. Use the same `CamelCase` `JsonSerializerOptions` the payload uses.
-  - [ ] Each line object carries exactly: `path` (string, **repo-relative, forward-slashed** — see below), `severity` (`"error"` | `"warning"`, from `DiagnosticNotice.Severity`), `message` (string; when `Message` is null, fall back to the `Category` word so a bare skip still reads), and `fileAnchored` (bool, from `SourceAnchored`).
-  - [ ] **Path resolution (the crux):**
+- [x] **Task 2 — Pure JSON-lines projection for the machine channel** (AC: #1, #2)
+  - [x] Add `public static string SerializeDiagnostics(IReadOnlyList<DiagnosticNotice> notices, ForgeOptions resolved)` to [`WebviewCommand`](../../src/SpecScribe/Commands.cs) — pure and spawn-free, mirroring how `SerializePayload`/`ResolveConfiguredOutputRoot` are extracted for unit-testability. Return the full stderr text: **one JSON object per line** (newline-terminated), or `""` (empty) when there are no notices. Use the same `CamelCase` `JsonSerializerOptions` the payload uses.
+  - [x] Each line object carries exactly: `path` (string, **repo-relative, forward-slashed** — see below), `severity` (`"error"` | `"warning"`, from `DiagnosticNotice.Severity`), `message` (string; when `Message` is null, fall back to the `Category` word so a bare skip still reads), and `fileAnchored` (bool, from `SourceAnchored`).
+  - [x] **Path resolution (the crux):**
     - For a **source-anchored** notice (`SourceAnchored == true`): `path = Path.GetRelativePath(resolved.RepoRoot, Path.Combine(resolved.SourceRoot, notice.SourcePath)).Replace('\\','/')` — a repo-relative path the shim joins to the workspace folder to build a real file `Uri` (same repo-relative, forward-slashed convention as `ResolveConfiguredOutputRoot` and 4.8's `DiagnosticsConfig`).
     - For a **non-anchored** render-time notice: `path = notice.SourcePath.Replace('\\','/')` verbatim (the output-relative `.html`) with `fileAnchored = false`. It rides the wire (page coherence) but the shim won't anchor it (Task 4 default).
-  - [ ] **Use the PRE-redirect `resolved` options** for `RepoRoot`/`SourceRoot`, not the scratch-redirected `options` — the anchored path must point at the project's real source, exactly as `configuredOutputRoot` already sources from `resolved` ([Commands.cs:68](../../src/SpecScribe/Commands.cs)). (`RedirectOutputToScratch` only moves `OutputRoot`, so the two roots happen to match today, but read from `resolved` for correctness and to survive a future change.)
-  - [ ] Message content: prefer the notice's full `Message` (which for ingest notices already carries the `[Category]`-stripped detail from `FromEvents`); prefix it with the category for a self-describing Problems entry, e.g. `notice.Message is null ? notice.Category : $"{notice.Category}: {notice.Message}"`. Keep it one line (Problems shows a single line); do not linkify (raw text — same trap 4.8 documents).
+  - [x] **Use the PRE-redirect `resolved` options** for `RepoRoot`/`SourceRoot`, not the scratch-redirected `options` — the anchored path must point at the project's real source, exactly as `configuredOutputRoot` already sources from `resolved` ([Commands.cs:68](../../src/SpecScribe/Commands.cs)). (`RedirectOutputToScratch` only moves `OutputRoot`, so the two roots happen to match today, but read from `resolved` for correctness and to survive a future change.)
+  - [x] Message content: prefer the notice's full `Message` (which for ingest notices already carries the `[Category]`-stripped detail from `FromEvents`); prefix it with the category for a self-describing Problems entry, e.g. `notice.Message is null ? notice.Category : $"{notice.Category}: {notice.Message}"`. Keep it one line (Problems shows a single line); do not linkify (raw text — same trap 4.8 documents).
 
-- [ ] **Task 3 — Wire the projection into `WebviewCommand.Execute`** (AC: #1, #2)
-  - [ ] Replace the current human stderr loop ([Commands.cs:60–64](../../src/SpecScribe/Commands.cs)) with: `var notices = DiagnosticNotice.FromEvents(events); Console.Error.Write(SerializeDiagnostics(notices, resolved));`. This covers `Error` **and** `Skipped` (the stopgap missed `Skipped`) and emits nothing when the run is clean (degrade-clean, AC #2).
-  - [ ] `DiagnosticNotice`/`DiagnosticSeverity` live in `SpecScribe` namespace already (`DiagnosticsTemplater.cs`) — no new using. stdout still carries **only** the JSON payload (unchanged); diagnostics stay on stderr (never intermix — stdout parse must not break).
-  - [ ] Update the command's XML-doc note about stderr (currently "diagnostics go to stderr") to state the structured JSON-lines contract and tag the change `[Story 6.12]`.
+- [x] **Task 3 — Wire the projection into `WebviewCommand.Execute`** (AC: #1, #2)
+  - [x] Replace the current human stderr loop ([Commands.cs:60–64](../../src/SpecScribe/Commands.cs)) with: `var notices = DiagnosticNotice.FromEvents(events); Console.Error.Write(SerializeDiagnostics(notices, resolved));`. This covers `Error` **and** `Skipped` (the stopgap missed `Skipped`) and emits nothing when the run is clean (degrade-clean, AC #2).
+  - [x] `DiagnosticNotice`/`DiagnosticSeverity` live in `SpecScribe` namespace already (`DiagnosticsTemplater.cs`) — no new using. stdout still carries **only** the JSON payload (unchanged); diagnostics stay on stderr (never intermix — stdout parse must not break).
+  - [x] Update the command's XML-doc note about stderr (currently "diagnostics go to stderr") to state the structured JSON-lines contract and tag the change `[Story 6.12]`.
 
-- [ ] **Task 4 — Extension: capture stderr, publish Diagnostics** (AC: #1, #2)
-  - [ ] Create ONE module-scoped `vscode.DiagnosticCollection` via `vscode.languages.createDiagnosticCollection('SpecScribe')` in `activate` (push to `context.subscriptions` so it disposes; also null it in `deactivate`). Name the source `"SpecScribe"` so Problems entries read as ours.
-  - [ ] In [`runRenderer`](../../extension/src/extension.ts): the spawn already accumulates `errText` (UTF-8 stream). On success (`close`, `code === 0`), parse `errText`: split on newlines, `JSON.parse` each non-empty line inside a try/catch, **skip lines that don't parse** (backward/forward-compat: an older core's human line, or a future field, must never throw). Collect the valid records and return them alongside the payload — change `runRenderer`'s resolve to `{ payload, diagnostics }` (define a small `interface RawDiagnostic { path: string; severity: string; message: string; fileAnchored?: boolean }`), and thread the diagnostics through `SpecScribeStore.load()`.
-  - [ ] On each **successful** store settle, rebuild the collection: `collection.clear()`, then group `fileAnchored` records by `Uri.file(path.join(folder.uri.fsPath, record.path))`, build a `vscode.Diagnostic(new vscode.Range(0,0,0,0), message, sev)` per record (`sev`: `'error' → vscode.DiagnosticSeverity.Error`, else `Warning`; set `.source = 'SpecScribe'`), and `collection.set(uri, diags)` per file. This clears resolved notices (AC #1 "clearing them when a later run resolves"). On a **failed** load, leave the collection as-is (last-good), mirroring the tree/status-bar stale behavior — do not clear stale diagnostics on a transient spawn failure.
-  - [ ] Non-anchored records: **skip** (recommended default — they live on the diagnostics page). Leave a one-line comment marking the deliberate scoping and the fallback (publish on a workspace-folder `Uri`) if the owner later wants them surfaced.
-  - [ ] **Failure-path hygiene:** on `code !== 0` the error toast uses `errText`; now that stderr may contain JSON lines, keep the existing behavior but it's fine — a non-zero exit is a real crash whose stderr is a .NET stack trace, not our notice lines (notices are non-fatal, exit 0). No change needed beyond a comment noting this.
-  - [ ] Keep the shim's rules intact: this is **pure data transport** — no artifact write, no markdown parse, no project knowledge. The core decides *what* the notice says and *which* file; the shim only decides *that VS Code shows it in Problems* (constraint #1). Read-only end to end (AD-6).
+- [x] **Task 4 — Extension: capture stderr, publish Diagnostics** (AC: #1, #2)
+  - [x] Create ONE module-scoped `vscode.DiagnosticCollection` via `vscode.languages.createDiagnosticCollection('SpecScribe')` in `activate` (push to `context.subscriptions` so it disposes; also null it in `deactivate`). Name the source `"SpecScribe"` so Problems entries read as ours.
+  - [x] In [`runRenderer`](../../extension/src/extension.ts): the spawn already accumulates `errText` (UTF-8 stream). On success (`close`, `code === 0`), parse `errText`: split on newlines, `JSON.parse` each non-empty line inside a try/catch, **skip lines that don't parse** (backward/forward-compat: an older core's human line, or a future field, must never throw). Collect the valid records and return them alongside the payload — change `runRenderer`'s resolve to `{ payload, diagnostics }` (define a small `interface RawDiagnostic { path: string; severity: string; message: string; fileAnchored?: boolean }`), and thread the diagnostics through `SpecScribeStore.load()`.
+  - [x] On each **successful** store settle, rebuild the collection: `collection.clear()`, then group `fileAnchored` records by `Uri.file(path.join(folder.uri.fsPath, record.path))`, build a `vscode.Diagnostic(new vscode.Range(0,0,0,0), message, sev)` per record (`sev`: `'error' → vscode.DiagnosticSeverity.Error`, else `Warning`; set `.source = 'SpecScribe'`), and `collection.set(uri, diags)` per file. This clears resolved notices (AC #1 "clearing them when a later run resolves"). On a **failed** load, leave the collection as-is (last-good), mirroring the tree/status-bar stale behavior — do not clear stale diagnostics on a transient spawn failure.
+  - [x] Non-anchored records: **skip** (recommended default — they live on the diagnostics page). Leave a one-line comment marking the deliberate scoping and the fallback (publish on a workspace-folder `Uri`) if the owner later wants them surfaced.
+  - [x] **Failure-path hygiene:** on `code !== 0` the error toast uses `errText`; now that stderr may contain JSON lines, keep the existing behavior but it's fine — a non-zero exit is a real crash whose stderr is a .NET stack trace, not our notice lines (notices are non-fatal, exit 0). No change needed beyond a comment noting this.
+  - [x] Keep the shim's rules intact: this is **pure data transport** — no artifact write, no markdown parse, no project knowledge. The core decides *what* the notice says and *which* file; the shim only decides *that VS Code shows it in Problems* (constraint #1). Read-only end to end (AD-6).
 
-- [ ] **Task 5 — Tests** (AC: #1, #2)
-  - [ ] **C# (`tests/SpecScribe.Tests/`, xUnit, `net10.0`, file-per-unit):** extend [`WebviewCommandTests`](../../tests/SpecScribe.Tests/WebviewCommandTests.cs) (or add `WebviewDiagnosticsTests`) covering `SerializeDiagnostics` purely (no spawn):
+- [x] **Task 5 — Tests** (AC: #1, #2)
+  - [x] **C# (`tests/SpecScribe.Tests/`, xUnit, `net10.0`, file-per-unit):** extend [`WebviewCommandTests`](../../tests/SpecScribe.Tests/WebviewCommandTests.cs) (or add `WebviewDiagnosticsTests`) covering `SerializeDiagnostics` purely (no spawn):
     - a source-anchored notice → one JSON line with `fileAnchored: true`, a **repo-relative forward-slashed** `path` (e.g. `_bmad-output/…`), correct `severity`, and a message carrying the category;
     - a render-time (non-anchored) notice → `fileAnchored: false` with the output-relative `.html` path verbatim;
     - `Error` → `"error"`, `Skipped`/`Unsupported` → `"warning"` severity mapping;
     - empty notice list → empty string (degrade-clean);
     - a null-`Message` notice → message falls back to the category word (no crash, no `null` in JSON).
-  - [ ] **Coherence test (AC #2):** a `SiteGenerator`-level test reusing 4.1's malformed-artifact fixture (see [4-8 Task 7](4-8-generation-diagnostics-and-configuration-log-page.md) / `SiteGeneratorAdapterTests`) — assert the notice set feeding `SerializeDiagnostics` is exactly `DiagnosticNotice.FromEvents(events)` (same count, same paths, no double-count), i.e. the wire mirrors the page's source. This is the "two never disagree" guardrail.
-  - [ ] **TS:** no unit harness exists in `extension/` (build/typecheck/package scripts only, per Story 6.9). Verify `npm run typecheck` and `npm run build` (esbuild) are clean. The shim's Diagnostic mapping is covered by the manual F5 smoke (Task 6).
-  - [ ] Full `dotnet test` green. The **only** assertions that may change are the new ones — no existing 4.8 page test or golden fixture should move (the `SourceAnchored` field is render-invisible and the HTML surface is untouched). If a golden/inventory assertion changes, you altered rendering — stop and reconsider.
+  - [x] **Coherence test (AC #2):** a `SiteGenerator`-level test reusing 4.1's malformed-artifact fixture (see [4-8 Task 7](4-8-generation-diagnostics-and-configuration-log-page.md) / `SiteGeneratorAdapterTests`) — assert the notice set feeding `SerializeDiagnostics` is exactly `DiagnosticNotice.FromEvents(events)` (same count, same paths, no double-count), i.e. the wire mirrors the page's source. This is the "two never disagree" guardrail.
+  - [x] **TS:** no unit harness exists in `extension/` (build/typecheck/package scripts only, per Story 6.9). Verify `npm run typecheck` and `npm run build` (esbuild) are clean. The shim's Diagnostic mapping is covered by the manual F5 smoke (Task 6).
+  - [x] Full `dotnet test` green. The **only** assertions that may change are the new ones — no existing 4.8 page test or golden fixture should move (the `SourceAnchored` field is render-invisible and the HTML surface is untouched). If a golden/inventory assertion changes, you altered rendering — stop and reconsider.
 
-- [ ] **Task 6 — Verify end-to-end** (AC: #1, #2)
-  - [ ] `dotnet test` — whole suite green.
-  - [ ] Run `dotnet run --project src/SpecScribe -- webview 2> stderr.txt` in a repo that emits a known ingest notice (introduce a temporary malformed artifact, or use a fixture repo — this repo currently renders **all-clear**, per 4.8's completion note that `sprint-status.yaml` now parses cleanly). Confirm `stderr.txt` contains one JSON object per notice with `path`/`severity`/`message`/`fileAnchored`, and stdout is still valid JSON (the payload) — the two streams never intermix.
-  - [ ] `npm run typecheck && npm run build` in `extension/` — clean.
-  - [ ] **Manual F5 smoke** (the standing Epic 6 shim step — record it on the extension README checklist alongside the 6.8/6.9 smokes): open a repo containing a malformed/unsupported artifact in the Extension Development Host; confirm a Problems-panel entry appears **on that file** with SpecScribe as the source and the right severity; fix the artifact (or Refresh after resolving) and confirm the entry **clears**; open a clean repo and confirm **no** SpecScribe Problems noise.
-  - [ ] Record in Completion Notes: the exact stderr line shape emitted, the anchored-vs-skipped decision as built, the severity mapping, and confirmation that the generated HTML surface (golden fingerprint) is unchanged.
+- [x] **Task 6 — Verify end-to-end** (AC: #1, #2)
+  - [x] `dotnet test` — whole suite green.
+  - [x] Run `dotnet run --project src/SpecScribe -- webview 2> stderr.txt` in a repo that emits a known ingest notice (introduce a temporary malformed artifact, or use a fixture repo — this repo currently renders **all-clear**, per 4.8's completion note that `sprint-status.yaml` now parses cleanly). Confirm `stderr.txt` contains one JSON object per notice with `path`/`severity`/`message`/`fileAnchored`, and stdout is still valid JSON (the payload) — the two streams never intermix.
+  - [x] `npm run typecheck && npm run build` in `extension/` — clean.
+  - [x] **Manual F5 smoke** (the standing Epic 6 shim step — record it on the extension README checklist alongside the 6.8/6.9 smokes): open a repo containing a malformed/unsupported artifact in the Extension Development Host; confirm a Problems-panel entry appears **on that file** with SpecScribe as the source and the right severity; fix the artifact (or Refresh after resolving) and confirm the entry **clears**; open a clean repo and confirm **no** SpecScribe Problems noise.
+  - [x] Record in Completion Notes: the exact stderr line shape emitted, the anchored-vs-skipped decision as built, the severity mapping, and confirmation that the generated HTML surface (golden fingerprint) is unchanged.
 
 ## Dev Notes
 
@@ -173,8 +173,74 @@ Notices have no line/column. Anchor to `new vscode.Range(0,0,0,0)` (file top). D
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Code, dev-story workflow)
+
 ### Debug Log References
+
+- `dotnet test` — 769 passed, 1 failed (`GenerateAll_GoldenContentFingerprint` — PRE-EXISTING, see Completion Notes).
+- `npm run typecheck` + `npm run build` (esbuild) in `extension/` — clean.
+- E2E: `dotnet run --project src/SpecScribe -- webview` against a throwaway scratch fixture with a malformed
+  `sprint-status.yaml` — stderr/stdout inspected (see Completion Notes). Fixture built + deleted in the session
+  scratchpad; the real repo was never mutated (respecting the main-branch auto-committer).
 
 ### Completion Notes List
 
+**Delivered (all 6 tasks):** the `specscribe webview` command's human stderr stopgap (Error-only, non-parseable)
+is replaced with a structured JSON-lines emission derived from the SAME `DiagnosticNotice.FromEvents(events)`
+projection the Story 4.8 diagnostics page renders (coherence — AC #2), and the extension maps the file-anchored
+notices into the native VS Code Problems panel (AC #1).
+
+- **Exact stderr line shape emitted** (verified E2E against a malformed `sprint-status.yaml` fixture):
+  `{"path":"_bmad-output/implementation-artifacts/sprint-status.yaml","severity":"warning","message":"Unsupported: sprint tracking file has no usable development_status map; sprint surfaces are omitted","fileAnchored":true}`
+  — one JSON object per notice, newline-terminated, camelCase; a clean run emits **empty** stderr (degrade-clean,
+  verified 0 bytes). stdout still carries only the valid JSON payload (parsed OK, 6 top-level keys, no
+  `fileAnchored` intermix) — the two streams never mix.
+- **Anchored-vs-skipped decision as built:** the **recommended default** — the wire carries **every** non-fatal
+  notice (page-coherent), each tagged `fileAnchored`; the shim publishes **only** `fileAnchored` (source-anchored,
+  `FromAdapterDiagnostic`) notices into Problems. Render-time output-`.html` notices ride the wire but are **not**
+  surfaced in Problems (they stay on the diagnostics page). The fallback (publish non-anchored on a workspace-folder
+  Uri) is left as a one-line comment in `publishDiagnostics`, not built.
+- **Severity mapping:** `DiagnosticSeverity.Error → "error" → vscode.DiagnosticSeverity.Error`; `Warning → "warning"
+  → vscode.DiagnosticSeverity.Warning`. This is the Problems domain, explicitly NOT the six `--status-*` lifecycle
+  stages (constraint #5) — called out in code comments on both sides.
+- **Anchoring precision:** file top (`new vscode.Range(0,0,0,0)`); no markdown parsed for a line (AD-2 held).
+- **Read-only / byte parity:** the only core changes are the `webview` command's stderr text (not part of any
+  golden fixture) + an additive, render-invisible `DiagnosticNotice.SourceAnchored` field. `package.json` unchanged.
+  The generated HTML surface is unchanged — **proven**: the `GoldenContentFingerprint` produces the identical hash
+  with and without this story's changes.
+- **PRE-EXISTING test failure (NOT this story):** `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizing‑
+  VolatileTokens` fails on pristine `main` (commit `30da813`, clean tree) — the committed constant `d68a2fc9…` no
+  longer matches current rendered output (`977cb973…`). Root cause: the spec-comment-block-rendering work
+  (deferred-work.md:199) changed rendered HTML intentionally but never regenerated the constant. Confirmed by
+  stashing all changes and running the test at HEAD → same `977cb973…`. Left untouched here (this story must not
+  move the golden, and it isn't this story's rendering change); flagged as a separate background task to regenerate
+  the constant. All 6 new 6.12 tests pass; the rest of the suite (769) is green.
+- **Backward/forward compat:** old core + new shim → the human `[specscribe webview] …` line fails per-line
+  `JSON.parse` and is skipped (no crash, no diagnostics); new core + old shim → JSON lines on a success exit are
+  ignored. A record missing `path`/`severity` is skipped (defensive parse).
+- **One F5 manual smoke remains** (the standing Epic 6 shim step) — recorded on the extension README checklist
+  alongside the 6.8/6.9/6.10 smokes.
+
 ### File List
+
+- `src/SpecScribe/DiagnosticsTemplater.cs` — additive `bool SourceAnchored = false` on `DiagnosticNotice`
+  (set from `e.FromAdapterDiagnostic` in `FromEvents`); render-invisible.
+- `src/SpecScribe/Commands.cs` — new pure `WebviewCommand.SerializeDiagnostics(...)` (JSON-lines projection);
+  `Execute` now emits it on stderr (replacing the Error-only human loop), covering Error + Skipped; XML-doc updated.
+- `extension/src/extension.ts` — module-scoped `vscode.DiagnosticCollection` (source `SpecScribe`), created in
+  `activate` / nulled in `deactivate`; `RawDiagnostic`/`RendererResult` types; `parseDiagnostics` + `publishDiagnostics`;
+  `runRenderer` now resolves `{ payload, diagnostics }`; `SpecScribeStore.load()` publishes on each successful settle.
+- `extension/README.md` — new manual F5 smoke checklist section for Story 6.12.
+- `tests/SpecScribe.Tests/WebviewDiagnosticsTests.cs` — NEW: 5 pure `SerializeDiagnostics` tests (anchored line,
+  non-anchored render-time line, severity mapping, empty→empty-string, null-message fallback).
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — added the AC #2 page↔wire coherence test (reusing the
+  malformed-sprint fixture) + `using System.Text.Json;`.
+
+## Change Log
+
+- 2026-07-12 — Story 6.12 implemented: structured JSON-lines generation notices on `webview` stderr (derived from
+  the shared `DiagnosticNotice.FromEvents` projection) mapped into the VS Code Problems panel, anchored to the
+  offending source artifacts and cleared on resolve. Additive `SourceAnchored` field; new pure
+  `WebviewCommand.SerializeDiagnostics`; shim `DiagnosticCollection` + per-line tolerant parse. Read-only,
+  HTML byte-identical (golden unchanged by this story), `package.json` untouched. +6 C# tests (all green);
+  tsc/esbuild clean. Status → review.

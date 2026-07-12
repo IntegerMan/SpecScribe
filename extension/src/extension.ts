@@ -86,9 +86,37 @@ interface WebviewPayload {
    * rendering (ADR 0005 §1) — the "Open Generated Site" command joins it to the folder. Optional so an older
    * core still parses. [Story 6.8] */
   configuredOutputRoot?: string;
+  /** Resolved watch roots (Story 6.11), all repo/workspace-relative + forward-slashed. `sourceRoot`/`adrRoot` are the
+   * source and ADR trees the file watchers are built from; `repoRoot` is the workspace-relative offset from the
+   * folder to the real repo root (`.` at the root), so the shim resolves the absolute repo root once and anchors BOTH
+   * the watchers AND the reveal-source join to it (correct even when opened on a subdirectory). All optional so an
+   * older core still parses — the store falls back to the literal `_bmad-output`/`docs/adrs` globs when absent. */
+  sourceRoot?: string;
+  adrRoot?: string;
+  repoRoot?: string;
   surfaces: Record<string, SurfaceContent>;
   /** The activity-bar tree + status-bar data. Optional so an older core (pre-6.9) still parses. [Story 6.9] */
   outline?: ProjectOutline;
+}
+
+/** One core-emitted generation notice, parsed from a JSON line on the `webview` command's stderr. The core owns
+ * WHAT the notice says and WHICH file; the shim only decides that VS Code shows the file-anchored ones in the
+ * Problems panel (constraint #1). Unknown fields are ignored and a record missing `path`/`severity` is skipped, so
+ * a future core field never breaks an older shim. [Story 6.12] */
+interface RawDiagnostic {
+  path: string;
+  severity: string;
+  /** `'error'` and `'warning'` map to VS Code's Problems severities — this is the Problems domain, NOT the six
+   * `--status-*` lifecycle stages (constraint #5), which never collapse onto host severities. */
+  message: string;
+  fileAnchored?: boolean;
+}
+
+/** One `webview` spawn's outcome: the stdout payload plus the notices parsed off its stderr JSON lines. Threaded
+ * together so the store can refresh the cache and republish the Problems collection on the same settle. */
+interface RendererResult {
+  payload: WebviewPayload;
+  diagnostics: RawDiagnostic[];
 }
 
 /** The direct-open target an entry point asks for. Resolved against the loaded payload's surface keys — never a
@@ -120,6 +148,12 @@ let active: PanelController | undefined;
 /** Last payload's configured output root, so "Open Generated Site" needn't re-spawn just to learn the path. */
 let lastConfiguredOutputRoot: string | undefined;
 
+/** Last payload's resolved ABSOLUTE repo root (the workspace folder joined to the core-emitted `repoRoot` offset).
+ * The ONE anchor shared by the store's watchers and the reveal-source join, so a subdir-open (repo root ≠ workspace
+ * folder) watches and reveals the right paths. Undefined until the first payload lands → callers fall back to the
+ * workspace folder (today's behavior, correct at the common repo-root open). [Story 6.11] */
+let lastRepoRoot: string | undefined;
+
 /** Whether folder[0] is a SpecScribe repo — gates the status bar's visibility and the tree's lazy load (mirrors
  * the `specscribe.projectDetected` context key the manifest `when` clauses use). [Story 6.9] */
 let projectDetected = false;
@@ -135,6 +169,15 @@ const dataChanged = new vscode.EventEmitter<void>();
 
 let statusBar: vscode.StatusBarItem | undefined;
 let treeProvider: OutlineTreeProvider | undefined;
+/** The outline TreeView handle — kept at module scope (not just pushed to subscriptions) so the visibility-aware
+ * refresh can read `treeView.visible` and subscribe to `onDidChangeVisibility` (Story 6.11 R6.3). */
+let treeView: vscode.TreeView<OutlineNode> | undefined;
+
+/** The one collection the core's per-artifact generation notices publish into — VS Code renders it in the native
+ * Problems panel with `SpecScribe` as the source. Rebuilt on every successful store settle (clearing notices a
+ * later run resolves); left untouched on a failed load so a transient spawn error doesn't drop last-good
+ * diagnostics. Pure host-UI transport — nothing here writes a project artifact (read-only, AD-6). [Story 6.12] */
+let diagnosticCollection: vscode.DiagnosticCollection | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   const register = (id: string, handler: (...args: unknown[]) => unknown) =>
@@ -165,10 +208,18 @@ export function activate(context: vscode.ExtensionContext) {
   statusBar.command = 'specscribe.openStatus';
   context.subscriptions.push(statusBar);
 
+  // Problems: one DiagnosticCollection the core's generation notices publish into (source `SpecScribe`). Disposed
+  // with the extension; rebuilt on every successful store load. [Story 6.12]
+  diagnosticCollection = vscode.languages.createDiagnosticCollection('SpecScribe');
+  context.subscriptions.push(diagnosticCollection);
+
   // Tree: a TreeDataProvider mapping the core outline 1:1. getChildren lazily triggers the first spawn on reveal.
   treeProvider = new OutlineTreeProvider();
-  context.subscriptions.push(
-    vscode.window.createTreeView('specscribe.outline', { treeDataProvider: treeProvider }));
+  treeView = vscode.window.createTreeView('specscribe.outline', { treeDataProvider: treeProvider });
+  context.subscriptions.push(treeView);
+  // Visibility-aware refresh (R6.3): when the tree becomes visible, flush a watcher-driven reload deferred while it
+  // was hidden. The tree's own lazy FIRST load stays in getChildren (visibility-appropriate already). [Story 6.11]
+  context.subscriptions.push(treeView.onDidChangeVisibility((e) => { if (e.visible) store?.flushIfDirty(); }));
 
   // All three consumers subscribe ONCE to the fan-out; the store fires it on every (re)load.
   context.subscriptions.push(dataChanged.event(() => { renderStatusBar(); treeProvider?.refresh(); }));
@@ -294,14 +345,24 @@ function createController(
     if (msg?.type === 'revealSource' && typeof msg.path === 'string') {
       // Reveal source (AC #1) — open the surface's core-emitted `.md` read-only, optionally at a line (AC #2's
       // line-capable seam, ridden by Story 7.2's code citations). `showTextDocument` OPENS an editor; it never
-      // writes (AD-6/ADR 0003/FR-17/NFR-5). The path is core-resolved repo-relative; join it to the workspace
-      // folder through the containment guard so a stale/hostile payload can't turn this into "open any file".
-      const target = resolveWorkspacePath(folder.uri.fsPath, msg.path);
-      if (!target) return;
+      // writes (AD-6/ADR 0003/FR-17/NFR-5). The path is core-resolved repo-relative; join it to the resolved REPO
+      // ROOT (Story 6.11 — correct on a subdir-open, not just the workspace folder) through the containment guard so
+      // a stale/hostile payload can't turn this into "open any file".
+      const target = resolveWorkspacePath(lastRepoRoot ?? folder.uri.fsPath, msg.path);
+      if (!target) {
+        // Mirror openSource's feedback (Story 6.9/6.10 share one convention): a rejected/missing path is never
+        // silent, whether triggered from the tree or the webview.
+        void vscode.window.showErrorMessage(`SpecScribe: couldn't open ${msg.path} — not found in this workspace.`);
+        return;
+      }
       const options = typeof msg.line === 'number' && msg.line > 0
         ? { selection: new vscode.Range(msg.line - 1, 0, msg.line - 1, 0) } // data-line is 1-based; Range is 0-based
         : undefined;
-      void vscode.window.showTextDocument(vscode.Uri.file(target), options);
+      try {
+        await vscode.window.showTextDocument(vscode.Uri.file(target), options);
+      } catch (err) {
+        void vscode.window.showErrorMessage(`SpecScribe: couldn't open ${msg.path}: ${String(err)}`);
+      }
       return;
     }
     if (msg?.type === 'navigate' && typeof msg.target === 'string') {
@@ -333,6 +394,11 @@ function createController(
     if (currentStore().payload) push(current, 'refresh');
   });
   p.onDidDispose(() => sub.dispose());
+
+  // Visibility-aware refresh (R6.3): when this panel becomes visible, flush a watcher-driven reload the store
+  // deferred while every consumer was hidden. Harmless when nothing is dirty. [Story 6.11]
+  const visSub = p.onDidChangeViewState((e) => { if (e.webviewPanel.visible) currentStore().flushIfDirty(); });
+  p.onDidDispose(() => visSub.dispose());
 
   // Cold-start heartbeat (R7.1): the first spawn is cold (~3.5 s), so wrap it in a Notification progress so first
   // paint always has a visible affordance rather than an inert blank panel.
@@ -387,14 +453,18 @@ function createController(
 
 /** The one owner of the cached `specscribe webview` payload: a single spawn (coalesced), a single cache, and a
  * single change signal the panel + tree + status bar all react to. Promoting acquisition out of the panel closure
- * (6.4/6.8) is what lets the tree stay live with no panel open. The watchers relocate here too (the tree needs
- * them without a panel) — same globs, same 400 ms debounce, same `workspaceFolders[0]` scope as 6.4 (watch-root
- * hardening is Story 6.11). Read-only: watching takes no locks and writes nothing. [Story 6.9] */
+ * (6.4/6.8) is what lets the tree stay live with no panel open. The watchers live here too (the tree needs them
+ * without a panel). Story 6.11 hardened them: the globs admit the yaml/toml data sources, they rebuild from the
+ * core-resolved roots (correct on a subdir-open / non-default roots), and the reload is visibility-gated. Debounce
+ * stays 400 ms, scope stays `workspaceFolders[0]` (multi-root is out of scope). Read-only: watching takes no locks
+ * and writes nothing. [Story 6.9, Story 6.11] */
 class SpecScribeStore {
   private cache: WebviewPayload | undefined;
   private loading: Promise<WebviewPayload> | undefined; // coalesces concurrent spawns (rapid saves, nav during load)
   private error: unknown | undefined;
   private readonly watchers: vscode.Disposable[] = [];
+  private dirty = false;                 // a watcher fired while no consumer was visible — reload on next reveal (R6.3)
+  private rootsKey: string | undefined;  // the resolved-roots signature the current watchers were built from (R6.2)
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -412,10 +482,17 @@ class SpecScribeStore {
    * so a manual Refresh can surface a toast — auto (watcher) callers swallow it and rely on the stale UI. */
   load(): Promise<WebviewPayload> {
     this.loading ??= runRenderer(this.context, this.folder.uri.fsPath)
-      .then((payload) => {
+      .then(({ payload, diagnostics }) => {
         this.cache = payload;
         this.error = undefined;
         lastConfiguredOutputRoot = payload.configuredOutputRoot ?? lastConfiguredOutputRoot;
+        // Resolve the absolute repo root ONCE (workspace folder + core-emitted offset) and share it for the watchers
+        // AND the reveal-source join, then (re)build the watchers from the payload's resolved roots. [Story 6.11]
+        lastRepoRoot = path.resolve(this.folder.uri.fsPath, payload.repoRoot ?? '.');
+        this.rebuildWatchersFromRoots(payload);
+        // Rebuild the Problems panel from this run's notices (clearing any a later run resolved). Only on success —
+        // a failed load leaves the collection as last-good, mirroring the tree/status-bar stale behavior. [Story 6.12]
+        publishDiagnostics(this.folder, diagnostics);
         return payload;
       })
       .catch((err) => {
@@ -429,14 +506,40 @@ class SpecScribeStore {
     return this.loading;
   }
 
-  /** Relocated watchers (from 6.4's panel closure): a source edit debounces into one re-render + a fan-out. Only
-   * reloads once something has already loaded — before first use there is nothing to refresh, and the first tree
-   * reveal / panel open will lazy-load fresh, so we avoid a cold spawn on every save in an unopened repo. Globs,
-   * debounce, and folder scope are frozen until Story 6.11. */
+  /** Bootstrap the watchers on the literal fallback globs (anchored to the workspace folder) so an edit BEFORE the
+   * first load still triggers a lazy reload. Once a payload lands, {@link load} rebuilds these from the core-resolved
+   * roots (bootstrap-then-rebuild — see {@link rebuildWatchersFromRoots}). Story 6.11 un-froze 6.9's watchers: the
+   * globs now admit the yaml/toml data sources (sprint-status.yaml, _bmad/config.toml) past *.md, the folder anchor
+   * becomes the resolved repo root on rebuild, and the reload is visibility-gated. Debounce stays 400 ms. Watching
+   * takes no locks and writes nothing (NFR5). [Story 6.11] */
   startWatching(): void {
-    const debounced = debounce(() => { if (this.cache) void this.load().catch(() => { /* stale UI covers it */ }); }, 400);
-    for (const pattern of ['_bmad-output/**/*.md', 'docs/adrs/**/*.md']) {
-      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(this.folder, pattern));
+    this.installWatchers(this.folder.uri, ['_bmad-output/**/*.{md,yaml,yml}', 'docs/adrs/**/*.md', '_bmad/config.toml']);
+  }
+
+  /** Rebuild the watchers from the payload's resolved roots (repo-relative source/ADR globs, anchored to the ABSOLUTE
+   * repo root), so a non-default `--source`/`--adrs` or a subdir-open watches the right tree — no path literal in TS
+   * beyond the fallback. No-op when the core omitted the roots (older core → keep the bootstrap literals) or when the
+   * resolved roots are unchanged (avoid churning watchers on every refresh). [Story 6.11] */
+  private rebuildWatchersFromRoots(payload: WebviewPayload): void {
+    if (payload.sourceRoot === undefined && payload.adrRoot === undefined && payload.repoRoot === undefined) {
+      return; // older core: the bootstrap literal-glob watchers stay
+    }
+    const repoAbs = path.resolve(this.folder.uri.fsPath, payload.repoRoot ?? '.');
+    const source = payload.sourceRoot ?? '_bmad-output';
+    const adr = payload.adrRoot ?? 'docs/adrs';
+    const key = `${repoAbs}|${source}|${adr}`;
+    if (key === this.rootsKey) return; // already watching these exact roots
+    this.rootsKey = key;
+    this.disposeWatchers();
+    this.installWatchers(vscode.Uri.file(repoAbs), [`${source}/**/*.{md,yaml,yml}`, `${adr}/**/*.md`, '_bmad/config.toml']);
+  }
+
+  /** Create the file-system watchers for a base + globs, all funneling into ONE debounced, visibility-gated reload
+   * ({@link onWatchEvent}). Read-only: createFileSystemWatcher observes; it takes no locks. */
+  private installWatchers(base: vscode.Uri, globs: string[]): void {
+    const debounced = debounce(() => this.onWatchEvent(), 400);
+    for (const glob of globs) {
+      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(base, glob));
       watcher.onDidChange(debounced);
       watcher.onDidCreate(debounced);
       watcher.onDidDelete(debounced);
@@ -444,10 +547,42 @@ class SpecScribeStore {
     }
   }
 
-  dispose(): void {
+  private disposeWatchers(): void {
     for (const w of this.watchers) w.dispose();
     this.watchers.length = 0;
   }
+
+  /** A debounced watcher event: reload if a consumer (panel or tree) is visible, else mark dirty and defer the spawn
+   * until one reveals (R6.3 — no ~2 s render burst while nothing is visible). Only ever reloads once something has
+   * loaded (before first use the lazy first-load on reveal covers it — unchanged from 6.9). [Story 6.11] */
+  private onWatchEvent(): void {
+    if (!this.cache) return;
+    if (anyConsumerVisible()) {
+      void this.load().catch(() => { /* stale UI covers it */ });
+    } else {
+      this.dirty = true;
+    }
+  }
+
+  /** Flush a deferred (dirty) watcher-driven reload once, when a consumer becomes visible. The manual Refresh and the
+   * tree's lazy first-load are visibility-independent by nature and never touch this flag. [Story 6.11] */
+  flushIfDirty(): void {
+    if (this.dirty && this.cache) {
+      this.dirty = false;
+      void this.load().catch(() => { /* stale UI covers it */ });
+    }
+  }
+
+  dispose(): void {
+    this.disposeWatchers();
+  }
+}
+
+/** True when the panel OR the outline tree is currently visible — the gate for the store's watcher-driven reload
+ * (R6.3). `RelativePattern`/`createFileSystemWatcher` keep firing while hidden; this lets the store defer the spawn
+ * until something is on screen to see the result. [Story 6.11] */
+function anyConsumerVisible(): boolean {
+  return (panel?.visible ?? false) || (treeView?.visible ?? false);
 }
 
 // ===== Story 6.9: the activity-bar tree ======================================================================
@@ -608,7 +743,9 @@ async function openSource(node: unknown): Promise<void> {
   const source = storyNode(node)?.story.sourcePath;
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!source || !folder) return;
-  const target = resolveWorkspacePath(folder.uri.fsPath, source);
+  // Anchor on the resolved repo root (Story 6.11) so a subdir-open reveals correctly — same convention as the
+  // webview reveal; falls back to the workspace folder before the first payload lands.
+  const target = resolveWorkspacePath(lastRepoRoot ?? folder.uri.fsPath, source);
   if (!target) {
     void vscode.window.showErrorMessage(`SpecScribe: couldn't open ${source} — not found in this workspace.`);
     return;
@@ -621,18 +758,34 @@ async function openSource(node: unknown): Promise<void> {
 }
 
 /** Resolve a core-emitted repo-relative path against the workspace folder, returning it ONLY if it stays inside
- * the folder AND exists on disk. Defense-in-depth (Story 17.2 posture): the path is trusted core output, but the
- * shim must never become an "open any file on disk" primitive on a stale or hostile payload — reject a `..`-escape,
- * an absolute override, or a vanished target. Read-only-within-workspace is the entire contract; this joins the ONE
- * repo-relative convention (shared by the tree "Open Source" and the webview reveal) to the folder. The subdir-open
- * case (repo root ≠ workspace folder) is the same limitation the watchers carry today — Story 6.11, not solved
- * here. [Story 6.10] */
+ * the folder, exists on disk, AND is a file. Defense-in-depth (Story 17.2 posture): the path is trusted core
+ * output, but the shim must never become an "open any file on disk" primitive on a stale or hostile payload —
+ * reject a `..`-escape, an absolute override, a vanished target, a directory, or a symlink that resolves outside
+ * the workspace. Containment is checked against the REAL (symlink-resolved) paths, since a lexical prefix check
+ * alone can't see a workspace-local symlink pointing elsewhere; on Windows the comparison is case-insensitive to
+ * match the filesystem. Read-only-within-`root` is the entire contract; this joins the ONE repo-relative convention
+ * (shared by the tree "Open Source" and the webview reveal) to `root`. Callers pass the resolved absolute REPO ROOT
+ * (`lastRepoRoot`), so the subdir-open case (repo root ≠ workspace folder) resolves correctly — the watchers anchor
+ * to the same root, one convention. [Story 6.10, Story 6.11 anchored on the resolved repo root] */
 function resolveWorkspacePath(root: string, rel: string): string | undefined {
   if (!rel || path.isAbsolute(rel)) return undefined;
   const rootResolved = path.resolve(root);
   const target = path.resolve(rootResolved, rel);
-  const within = target === rootResolved || target.startsWith(rootResolved + path.sep);
-  return within && fs.existsSync(target) ? target : undefined;
+  if (!fs.existsSync(target)) return undefined;
+  let stat: fs.Stats;
+  let realRoot: string;
+  let realTarget: string;
+  try {
+    stat = fs.statSync(target);
+    realRoot = fs.realpathSync(rootResolved);
+    realTarget = fs.realpathSync(target);
+  } catch {
+    return undefined;
+  }
+  if (!stat.isFile()) return undefined;
+  const norm = process.platform === 'win32' ? (s: string) => s.toLowerCase() : (s: string) => s;
+  const within = norm(realTarget) === norm(realRoot) || norm(realTarget).startsWith(norm(realRoot) + path.sep);
+  return within ? realTarget : undefined;
 }
 
 /** "Copy Helper Prompt" (tree context action): copy the story's core-composed helper command to the clipboard for
@@ -814,12 +967,12 @@ function toolCommandLine(tool: ResolvedTool, sub?: string): string {
 
 /** Spawn the SpecScribe tool's `webview` command and parse its stdout JSON — the extension↔core data path
  * ADR 0005 ratified. Tool resolution is shared with the terminal handoff via {@link resolveTool}. */
-function runRenderer(context: vscode.ExtensionContext, cwd: string): Promise<WebviewPayload> {
+function runRenderer(context: vscode.ExtensionContext, cwd: string): Promise<RendererResult> {
   const tool = resolveTool(context);
   const command = tool.command;
   const args = [...tool.prefixArgs, 'webview'];
 
-  return new Promise<WebviewPayload>((resolve, reject) => {
+  return new Promise<RendererResult>((resolve, reject) => {
     const proc = spawn(command, args, { cwd });
     // A renderer that never returns must not hang forever (cold spawns measured ~3.5 s; 60 s is a generous
     // ceiling for very large repos).
@@ -839,14 +992,67 @@ function runRenderer(context: vscode.ExtensionContext, cwd: string): Promise<Web
     proc.on('error', (e) => { clearTimeout(timer); reject(e); });
     proc.on('close', (code) => {
       clearTimeout(timer);
+      // A non-zero exit is a real crash whose stderr is a .NET stack trace, not our notice lines (notices are
+      // non-fatal, exit 0), so the error toast keeps using errText verbatim — no diagnostics parsed here.
       if (code !== 0) return reject(new Error(`SpecScribe renderer exited ${code}: ${errText || '(no stderr)'}`));
+      let payload: WebviewPayload;
       try {
-        resolve(JSON.parse(out) as WebviewPayload);
+        payload = JSON.parse(out) as WebviewPayload;
       } catch (e) {
-        reject(new Error(`SpecScribe renderer produced invalid JSON: ${String(e)}`));
+        return reject(new Error(`SpecScribe renderer produced invalid JSON: ${String(e)}`));
       }
+      // stderr carries the structured notice lines (Story 6.12); parse them independently of the stdout payload.
+      resolve({ payload, diagnostics: parseDiagnostics(errText) });
     });
   });
+}
+
+/** Parse the `webview` command's stderr into notice records: split on newlines and `JSON.parse` each non-empty
+ * line, skipping any that don't parse or lack `path`/`severity`. Tolerant by design — an older core's human
+ * `[specscribe webview] …` line, a future field, or a stray .NET log line must never throw or produce a partial
+ * record. [Story 6.12] */
+function parseDiagnostics(errText: string): RawDiagnostic[] {
+  const records: RawDiagnostic[] = [];
+  for (const line of errText.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    try {
+      const rec = JSON.parse(trimmed) as RawDiagnostic;
+      if (typeof rec.path === 'string' && typeof rec.severity === 'string') records.push(rec);
+    } catch {
+      // Not one of our JSON notice lines — ignore it (backward/forward compatibility).
+    }
+  }
+  return records;
+}
+
+/** Publish the file-anchored notices into the Problems panel, grouped by file. Clears first so notices a later
+ * run resolved disappear (AC #1). Non-anchored render-time (`.html`) notices are deliberately skipped — they live
+ * on the diagnostics page, their home (the recommended scoping; the fallback, if the owner ever wants them in
+ * Problems, is to publish them on a single workspace-folder `Uri`). Read-only: this only tells VS Code what to
+ * show. [Story 6.12] */
+function publishDiagnostics(folder: vscode.WorkspaceFolder, records: RawDiagnostic[]): void {
+  if (!diagnosticCollection) return;
+  diagnosticCollection.clear();
+
+  const byPath = new Map<string, vscode.Diagnostic[]>();
+  for (const record of records) {
+    if (!record.fileAnchored) continue;
+    const fsPath = path.join(folder.uri.fsPath, record.path);
+    const severity = record.severity === 'error'
+      ? vscode.DiagnosticSeverity.Error
+      : vscode.DiagnosticSeverity.Warning;
+    // No source position on a notice — anchor to the file top honestly rather than parse markdown for a line (AD-2).
+    const diag = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), record.message, severity);
+    diag.source = 'SpecScribe';
+    const diags = byPath.get(fsPath) ?? [];
+    diags.push(diag);
+    byPath.set(fsPath, diags);
+  }
+
+  for (const [fsPath, diags] of byPath) {
+    diagnosticCollection.set(vscode.Uri.file(fsPath), diags);
+  }
 }
 
 function errorHtml(message: string): string {
@@ -866,4 +1072,6 @@ export function deactivate() {
   store?.dispose();
   store = undefined;
   dataChanged.dispose();
+  // The collection is also disposed via context.subscriptions; null it so a re-activate rebinds a fresh one.
+  diagnosticCollection = undefined;
 }

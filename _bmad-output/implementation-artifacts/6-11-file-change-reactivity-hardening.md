@@ -5,7 +5,7 @@ seated_by: SCP 2026-07-11 (correct-course) — FR35, VS Code Native-Integration 
 
 # Story 6.11: File-Change Reactivity Hardening
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -146,34 +146,34 @@ Add to the `webview` payload — mirroring `configuredOutputRoot` exactly ([Comm
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Gate & baseline reconnaissance** (prereq for all ACs)
-  - [ ] Confirm Stories [6.9](6-9-native-project-outline-tree-view-and-status-bar.md) **and** [6.10](6-10-editor-artifact-bridges-reveal-source.md) are `done` in [sprint-status.yaml](sprint-status.yaml); if either is not, **HALT and flag** (this story un-freezes 6.9's relocated watchers and adds the resolved-roots datum 6.10 punted here — see the GATED notice).
-  - [ ] Re-capture current `HEAD` for the byte-parity diff (the `main` auto-committer may sit ahead of `baseline_commit` `39f79da` — memory: [worktree-edits-must-target-worktree-path]).
-  - [ ] `dotnet build src/SpecScribe`, run `specscribe webview` from the repo root, **capture the JSON**. Confirm the real payload shape post-6.9/6.10 (does it carry `sourcePath` per surface from 6.10? it must **not** yet carry `sourceRoot`/`adrRoot`/`repoRoot` — you're adding those). Note the real `sprint-status.yaml` path (`_bmad-output/implementation-artifacts/sprint-status.yaml`) and `_bmad/config.toml` path so the watcher + `IsDataSource` classifier can be asserted against them.
+- [x] **Task 0 — Gate & baseline reconnaissance** (prereq for all ACs)
+  - [x] Confirm Stories [6.9](6-9-native-project-outline-tree-view-and-status-bar.md) **and** [6.10](6-10-editor-artifact-bridges-reveal-source.md) are `done` in [sprint-status.yaml](sprint-status.yaml); if either is not, **HALT and flag** (this story un-freezes 6.9's relocated watchers and adds the resolved-roots datum 6.10 punted here — see the GATED notice). **Gate initially HALTED (6.10 was `review`); owner completed 6.10's code review → `done`, then resumed. Both now `done`.**
+  - [x] Re-capture current `HEAD` for the byte-parity diff (the `main` auto-committer may sit ahead of `baseline_commit` `39f79da` — memory: [worktree-edits-must-target-worktree-path]). **HEAD at dev time = `30da813` (carries 6.9 + 6.10). Byte-parity compared against the working tree, not the stale baseline.**
+  - [x] `dotnet build src/SpecScribe`, run `specscribe webview` from the repo root, **capture the JSON**. Confirmed the real payload carries `sourcePath` per surface (6.10) and did **not** yet carry `sourceRoot`/`adrRoot`/`repoRoot`. Real paths confirmed: `_bmad-output/implementation-artifacts/sprint-status.yaml`, `_bmad/config.toml`.
 
-- [ ] **Task 1 — Core: non-`.md` watch + the data-source route** (AC: #1)
-  - [ ] [FileWatcherService.cs](../../src/SpecScribe/FileWatcherService.cs): admit `.yaml`/`.yml`/`.toml` alongside `.md` (widen `Filter`→`Filters`, or drop the filter and gate in `Debounce`); widen the `Debounce` re-guard (65) to the same extension set; add a watch root covering `_bmad/config.toml` (fact #6 — it's under neither current root). Keep `NotifyFilter`/buffer/400 ms unchanged; reads stay shared (NFR5).
-  - [ ] [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs): add `IsDataSource(fullPath)` (sprint-status.yaml via the adapter convention + `_bmad/config.toml`) and `RegenerateFromDataSource(fullPath)` (re-parse `_sprint` via a full `GenerateAll()`; return an `Updated` `GenerationEvent`).
-  - [ ] [FileWatcherService.cs `CreateTimer`](../../src/SpecScribe/FileWatcherService.cs): route `IsDataSource` **before** `IsAdr`/`IsEpicsRelated` so sprint-status.yaml doesn't mis-route to `RegenerateEpics` (fact #3).
+- [x] **Task 1 — Core: non-`.md` watch + the data-source route** (AC: #1)
+  - [x] [FileWatcherService.cs](../../src/SpecScribe/FileWatcherService.cs): admit `.yaml`/`.yml`/`.toml` alongside `.md` via the `Filters` collection (source root gets the full set; ADR root stays `*.md`); widened the `Debounce` re-guard to the same `WatchedExtensions` set; added a watch root covering `_bmad/config.toml` (its `_bmad` dir, watched only when present — never created). `NotifyFilter`/buffer/400 ms unchanged; reads stay shared (NFR5).
+  - [x] [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs): added `IsDataSource(fullPath)` (sprint-status.yaml via `BmadArtifactAdapter.SprintStatusFileName` + `_bmad/config.toml` via `ForgeOptions.ConfigDirName`/`ConfigFileName`, segment-based) and `RegenerateFromDataSource(fullPath)` (re-parse `_sprint` via a full `GenerateAll()`; returns an `Updated` `GenerationEvent`).
+  - [x] [FileWatcherService.cs `CreateTimer`](../../src/SpecScribe/FileWatcherService.cs): routed `IsDataSource` **before** `IsAdr`/`IsEpicsRelated` so sprint-status.yaml doesn't mis-route to `RegenerateEpics` (fact #3).
 
-- [ ] **Task 2 — Core: resolved roots on the payload** (AC: #2a)
-  - [ ] [Commands.cs](../../src/SpecScribe/Commands.cs): add pure resolvers `ResolveSourceRoot`/`ResolveAdrRoot`/`ResolveRepoRootOffset(resolved, folder?)` mirroring `ResolveConfiguredOutputRoot`; serialize `sourceRoot`/`adrRoot`/`repoRoot` on the payload from the **pre-redirect** `resolved` options (not the scratch-redirected `options`).
-  - [ ] Decide `repoRoot`'s meaning: a workspace-relative offset the shim `path.resolve`s against `folder`. Since the C# process's `cwd` is the workspace folder and it walks up to `RepoRoot`, `repoRoot = Path.GetRelativePath(cwd, RepoRoot).Replace('\\','/')` (`.` at root). Document it on the interface.
+- [x] **Task 2 — Core: resolved roots on the payload** (AC: #2a)
+  - [x] [Commands.cs](../../src/SpecScribe/Commands.cs): added pure resolvers `ResolveSourceRoot`/`ResolveAdrRoot`/`ResolveRepoRootOffset(resolved, workingDirectory?)` mirroring `ResolveConfiguredOutputRoot`; serialized `sourceRoot`/`adrRoot`/`repoRoot` on the payload from the **pre-redirect** `resolved` options.
+  - [x] `repoRoot` = `Path.GetRelativePath(cwd, RepoRoot)` forward-slashed (`.` at root; `../..` two levels deep); `workingDirectory` injected for testability (defaults to the real cwd). Documented on the `WebviewPayload` interface.
 
-- [ ] **Task 3 — Shim: derive watchers from resolved roots + harmonize reveal** (AC: #2a)
-  - [ ] `WebviewPayload.sourceRoot?`/`adrRoot?`/`repoRoot?` ([extension.ts:75–86](../../extension/src/extension.ts)).
-  - [ ] `SpecScribeStore`: resolve `repoAbs = path.resolve(folder, payload.repoRoot ?? '.')`; build watchers as `RelativePattern(Uri.file(repoAbs), '<sourceRoot>/**/*.{md,yaml,yml}')`, one for `<adrRoot>/**/*.md`, one for `_bmad/config.toml`. **Bootstrap-then-rebuild:** literal-glob watchers at bind time, rebuilt from the payload roots on first `load()`. Fallback to today's literals when roots are absent. Keep the `if (this.cache)` reload guard.
-  - [ ] Harmonize 6.10 reveal-source (and 6.9 tree "Open Source" if still `_bmad-output`-literal): join source paths against `repoAbs`, not `folder`. One convention; remove the remaining path literal.
+- [x] **Task 3 — Shim: derive watchers from resolved roots + harmonize reveal** (AC: #2a)
+  - [x] `WebviewPayload.sourceRoot?`/`adrRoot?`/`repoRoot?` added (all optional so an older core still parses).
+  - [x] `SpecScribeStore`: resolves `repoAbs = path.resolve(folder, payload.repoRoot ?? '.')`; builds watchers as `RelativePattern(Uri.file(repoAbs), '<sourceRoot>/**/*.{md,yaml,yml}')` + `<adrRoot>/**/*.md` + `_bmad/config.toml`. **Bootstrap-then-rebuild:** literal-glob watchers at bind time, rebuilt from the payload roots on the first `load()` (guarded by a `rootsKey` so it rebuilds only when the roots change). Falls back to today's literals when roots are absent. Keeps the `if (this.cache)` reload guard.
+  - [x] Harmonized 6.10 reveal-source **and** 6.9's tree "Open Source" onto the resolved repo root: both join against `lastRepoRoot ?? folder.uri.fsPath` (the module-level resolved absolute repo root). One convention; the `resolveWorkspacePath` doc comment updated (subdir-open now solved).
 
-- [ ] **Task 4 — Shim: visibility-aware refresh** (AC: #2b)
-  - [ ] Track `anyConsumerVisible` from `panel.visible`/`onDidChangeViewState` + `treeView.visible`/`onDidChangeVisibility`. Gate the store's **watcher-driven** reload: visible → `load()`; hidden → set `dirty`, skip spawn; on hidden→visible with `dirty` → `load()` once, clear `dirty`.
-  - [ ] Leave the tree's lazy first-load and the manual Refresh untouched (both visibility-independent by nature). Preserve the in-flight coalescer.
+- [x] **Task 4 — Shim: visibility-aware refresh** (AC: #2b)
+  - [x] `anyConsumerVisible()` reads `panel.visible` + `treeView.visible`; the panel's `onDidChangeViewState` and the tree's `onDidChangeVisibility` both call `store.flushIfDirty()`. The store's **watcher-driven** reload (`onWatchEvent`) reloads when visible, else sets `dirty` and skips the spawn; on reveal `flushIfDirty` reloads once and clears `dirty`.
+  - [x] The tree's lazy first-load (`getChildren` → `store.load()`) and the manual Refresh command are untouched (visibility-independent by nature). The in-flight `loading ??=` coalescer is preserved.
 
-- [ ] **Task 5 — Verify, guard, document** (AC: all)
-  - [ ] `cd extension && npm install && npm run typecheck && npm run build` — TS compiles, esbuild bundles clean, `package.json` valid.
-  - [ ] `dotnet test` whole suite green **including `GoldenContentFingerprint`** ([SiteGeneratorAdapterTests.cs](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs)) — no HTML changed, golden stays green (memory: [golden-diff-normalization-gotchas]). Add C# tests: sprint-status.yaml change re-parses `_sprint` + refreshes the dashboard; widened watcher admits yaml/toml and still routes `.md`; `IsDataSource` positives/negatives; the three root resolvers (default, custom root, subdir offset); payload carries `sourceRoot`/`adrRoot`/`repoRoot` (camelCase).
-  - [ ] Confirm read-only + no write locks (NFR5): grep the diff for any write API (`writeFile`, `fs.write*`, `applyEdit`, settings `.update(`, `SettingsStore`) — **none**; the widened watchers still open the new yaml/toml with shared reads and take no locks.
-  - [ ] Extend [extension/README.md](../../extension/README.md) F5 checklist (sprint-status.yaml edit → Now & Next refreshes; config.toml project-name edit → title refreshes; subdir-open still live; hidden panel+tree defers spawn, one render on reveal). Update [deferred-work.md](deferred-work.md): mark line 8's `repoRoot`-in-payload note **resolved** (real now); record the core-`watch` project-name-restart + R6.4 scoped-render deferrals. Be explicit in Completion Notes about the automated-coverage boundary (no TS harness) and the config.toml core-`watch` asymmetry.
+- [x] **Task 5 — Verify, guard, document** (AC: all)
+  - [x] `cd extension && npm run typecheck && npm run build` — TS compiles, esbuild bundles clean, `package.json` unchanged/valid.
+  - [x] `dotnet test` — **779/779 green excluding `GoldenContentFingerprint`.** The golden's 1 failure is **pre-existing uncommitted Story 6.12 work** (its `DiagnosticsTemplater.cs` diagnostics-page change), **proven not mine**: reverting my four core files to HEAD left the golden failing at the *identical* hash `977cb973…`. My changes touch no HTML-render path (memory: [golden-diff-normalization-gotchas]). Added C# tests: sprint-status.yaml change re-parses `_sprint` + refreshes the sprint surface (+ the RegenerateEpics mis-route contrast); `IsDataSource` positives/negatives; the sprint-file dual-classification (data-source AND epics-related → ordering matters); the three root resolvers (default, custom, subdir `../..`); payload carries `sourceRoot`/`adrRoot`/`repoRoot` (camelCase); FileWatcherService constructs with a config dir present.
+  - [x] Read-only + no write locks (NFR5) confirmed: grepped the diff — **no** `writeFile`/`fs.write*`/`applyEdit`/settings `.update(`/`SettingsStore` in the extension diff (the lone `clipboard.writeText` is the pre-existing 6.5 helper), and **no** `File.Write`/`File.Open`/`FileStream`/`.Lock`/`FileShare.None` in the core diff. Widened watchers read the new yaml/toml through the existing shared-read paths (`ReadAllTextShared`); no `_bmad` dir is created.
+  - [x] Extended [extension/README.md](../../extension/README.md) F5 checklist (Story 6.11 section: sprint-status.yaml → Now & Next; config.toml → title; subdir-open still live; hidden panel+tree defers spawn, one render on reveal). Updated [deferred-work.md](deferred-work.md): marked the stale `repoRoot`-in-payload note **resolved in 6.11** (it falsely claimed 6.4); recorded the core-`watch` project-name-restart asymmetry + R6.4 scoped-render deferral. Coverage boundary + config.toml asymmetry called out in Completion Notes.
 
 ## Dev Notes
 
@@ -241,12 +241,45 @@ The core change is watch-mode behavior + additive payload data; it emits no HTML
 
 ### Agent Model Used
 
+claude-opus-4-8 (dev-story workflow, 2026-07-12).
+
 ### Debug Log References
+
+- Gate (Task 0): first scan found 6.10 = `review`, not `done` → **HALTED and flagged** per Task 0. Owner completed 6.10's code review to `done`; resumed. Both 6.9/6.10 `done` at resume.
+- Golden fingerprint isolation: `GoldenContentFingerprint` was red on entry (wanted `977cb973…`). Backed up + reverted my four core files (`SiteGenerator`/`BmadArtifactAdapter`/`ForgeOptions`/`FileWatcherService`) to HEAD and re-ran the golden — **still failed at the identical hash**, proving the drift is uncommitted Story 6.12 work (`DiagnosticsTemplater.cs` holds both the diagnostics-page render change and `DiagnosticNotice`), not this story. Files restored.
 
 ### Completion Notes List
 
+- **AC #1 (both layers).** Core: `FileWatcherService` now admits `.md`/`.yaml`/`.yml`/`.toml` (source root via the `Filters` collection; new `_bmad` config-dir watcher when present), widened the `Debounce` re-guard to the same set, and — the substantive fix — routes `IsDataSource` **before** `IsAdr`/`IsEpicsRelated` to the new `SiteGenerator.RegenerateFromDataSource` (a full `GenerateAll()` that re-parses `_sprint`). Without the new route, sprint-status.yaml mis-routes to `RegenerateEpics`, which by design never re-parses sprint state (proven by the `RegenerateEpics_LeavesSprintStateStale…` contrast test). Extension: watch globs widened to the yaml/toml set + a `_bmad/config.toml` watcher.
+- **AC #2a (resolved watch roots + subdir-open uniform fix).** New pure resolvers on `WebviewCommand` emit `sourceRoot`/`adrRoot`/`repoRoot` on the payload (mirroring `configuredOutputRoot`, from the pre-redirect `resolved`). The shim resolves the absolute repo root once (`path.resolve(folder, repoRoot)` → module-level `lastRepoRoot`), builds its watchers from it (bootstrap-then-rebuild), and **both** the webview reveal-source join and 6.9's tree "Open Source" now anchor to the same root — no `_bmad-output`/`docs/adrs` literal in TS path logic (fallback literals only when an older core omits the roots).
+- **AC #2b (visibility-aware refresh).** The store's watcher-driven reload is gated on `anyConsumerVisible()` (panel OR tree); hidden → mark `dirty` + skip the spawn; on reveal (`onDidChangeViewState`/`onDidChangeVisibility`) → flush once. The tree's lazy first-load, the manual Refresh, and the in-flight coalescer are untouched.
+- **Read-only (NFR5):** no write/lock APIs added in either layer (diff-grepped); the `_bmad` dir is watched only when it already exists (never created).
+- **Byte-identical HTML:** the change is watch behavior + additive payload data; nothing touches the render path. Golden neutrality proven empirically (see Debug Log). The lone golden red is pre-existing uncommitted Story 6.12 drift.
+- **Automated-coverage boundary (honest):** the extension has **no TS test harness** — the shim's glob-widening, watcher-rebuild, reveal harmonization, and visibility gating ride the **F5 manual smoke** (extended in `extension/README.md`). Automated gates: `tsc --noEmit` + esbuild + the C# suite (data-source route, classifier, resolvers, payload roots).
+- **config.toml asymmetry (documented, not faked):** the extension fully picks up a project-name change (fresh spawn re-runs `ForgeOptions.Resolve()`); core `watch` mode re-renders on a config.toml change but keeps the old `SiteTitle` until restart (deferred — see deferred-work.md).
+
 ### File List
+
+**Core (`src/SpecScribe/`):**
+- `BmadArtifactAdapter.cs` — added `SprintStatusFileName` const + `IsSprintStatusFile`; the sprint-discovery literal now uses the const.
+- `ForgeOptions.cs` — added `ConfigDirName`/`ConfigFileName` consts; `ReadProjectName` uses them.
+- `SiteGenerator.cs` — added `IsDataSource`, `IsProjectConfigFile`, `RegenerateFromDataSource`.
+- `FileWatcherService.cs` — `Filters`-based widened watch set, `_bmad/config.toml` watch root, widened `Debounce` re-guard, `IsDataSource`-first dispatch.
+- `Commands.cs` — added `ResolveSourceRoot`/`ResolveAdrRoot`/`ResolveRepoRootOffset` + `SourceDirDefault`/`AdrDirDefault`; `SerializePayload` carries `sourceRoot`/`adrRoot`/`repoRoot` (optional params); `Execute` passes them.
+
+**Extension (`extension/`):**
+- `src/extension.ts` — `WebviewPayload.sourceRoot?`/`adrRoot?`/`repoRoot?`; `lastRepoRoot` + captured `treeView` module state; `SpecScribeStore` bootstrap-then-rebuild watchers, widened globs, visibility-gated `onWatchEvent`/`flushIfDirty`; panel `onDidChangeViewState` + tree `onDidChangeVisibility` flush; reveal-source (webview + tree) anchored on the resolved repo root.
+- `README.md` — Story 6.11 F5 smoke checklist.
+
+**Tests (`tests/SpecScribe.Tests/`):**
+- `SiteGeneratorDataSourceTests.cs` (new) — `IsDataSource` classification, sprint dual-classification, `RegenerateFromDataSource` re-parses sprint + rewrites the surface, RegenerateEpics mis-route contrast, FileWatcherService config-dir smoke.
+- `WebviewCommandTests.cs` — the three root resolvers (default, custom, subdir offset).
+- `SiteGeneratorWebviewTests.cs` — payload carries the resolved roots (camelCase).
+
+**Docs (`_bmad-output/implementation-artifacts/`):**
+- `deferred-work.md` — resolved the stale `repoRoot`-in-payload note; recorded the two 6.11 deferrals.
 
 ## Change Log
 
+- 2026-07-12 — Story implemented (dev-story). **AC #1** (both layers): widened `FileWatcherService` to the yaml/toml data sources (`Filters` + re-guard + a `_bmad/config.toml` watch root) and added the `SiteGenerator.IsDataSource` classifier + `RegenerateFromDataSource` route (checked **before** `IsEpicsRelated`, so sprint-status.yaml re-parses `_sprint` instead of mis-routing to the sprint-skipping `RegenerateEpics`); extension watch globs widened to match. **AC #2a**: new pure `WebviewCommand.ResolveSourceRoot`/`ResolveAdrRoot`/`ResolveRepoRootOffset` emit `sourceRoot`/`adrRoot`/`repoRoot` on the `webview` payload; the shim resolves the absolute repo root once and anchors **both** watchers (bootstrap-then-rebuild) and reveal-source (webview + 6.9 tree) to it — the uniform subdir-open fix 6.10 punted here; no path literal in TS. **AC #2b**: visibility-aware refresh gates the store's watcher-driven reload on any consumer being visible, deferring the spawn (dirty flag) until reveal. Read-only end to end (NFR5, diff-grepped); HTML byte-identical (additive payload + watch behavior only — golden neutrality proven by reverting my core files and reproducing the identical pre-existing Story-6.12 drift hash). +12 C# tests (779 green excluding the pre-existing 6.12 golden drift); tsc + esbuild clean. No new command/setting/manifest change. Extended the extension README F5 checklist; resolved the stale `repoRoot`-in-payload deferred-work note and recorded the config.toml-restart + R6.4 scoped-render deferrals. One F5 manual smoke in real VS Code remains. Status → review.
 - 2026-07-11 — Story drafted (create-story) from the VS Code Native-Integration Recommendations (FR35, [docs/VSCodeIntegrationRecommendations.md](../../docs/VSCodeIntegrationRecommendations.md)) "Next" wave — the **last** native-integration story before Epic 17. Seats **R6.1** (the shipped live-data DEFECT: `sprint-status.yaml` / `_bmad/config.toml` never trigger refresh — fixed in BOTH layers: extension watch globs **and** the core `FileWatcherService` `Filter` + `Debounce` re-guard + a **new data-source dispatch route** that re-parses `_sprint`, since sprint-status.yaml otherwise mis-routes to `RegenerateEpics` which by design skips sprint state), **R6.2** (watch roots derived from **resolved** source/ADR roots carried on the `webview` payload — adding the `sourceRoot`/`adrRoot`/`repoRoot` datum that [deferred-work.md:8](deferred-work.md) has falsely claimed existed since 6.4, and which Story 6.10 explicitly **punted here** to fix the subdir-open caveat **uniformly** for watchers and reveal-source), and **R6.3** (visibility-aware refresh: a hidden panel/tree marks itself dirty and re-renders once on reveal — adapted to 6.9's shared-store lifetime, gating the watcher-driven reload on any consumer's visibility). **Hard-gated on Stories 6.9 AND 6.10 `done`** (un-freezes 6.9's relocated `SpecScribeStore` watchers; adds the resolved-roots datum 6.10 deferred + harmonizes 6.10's reveal-source join onto it); 6.4/6.5/6.8 done. Read-only end to end (watchers take no write locks on the newly-watched yaml/toml — NFR5); HTML surface byte-identical (watch-behavior + additive payload data only — golden unaffected, no `HostRenderException`). Honest asymmetry recorded: the extension (fresh spawn per refresh) fully picks up a config.toml project-name change; core `watch` mode re-renders but needs a restart to re-brand (deferred). Explicitly OUT: multi-root R3.4 (not in the epic's 6.11 ACs), scoped/warm re-render R6.4 (stays deferred), git-state refresh R6.5, new VS Code settings, HTML/rendering changes. Status → ready-for-dev.

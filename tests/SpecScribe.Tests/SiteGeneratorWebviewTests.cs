@@ -284,6 +284,23 @@ public class SiteGeneratorWebviewTests : IDisposable
     }
 
     [Fact]
+    public void SerializePayload_EmitsResolvedWatchRoots_CamelCase()
+    {
+        // Story 6.11: the payload carries the resolved watch roots the shim builds its file watchers from — all
+        // camelCase, forward-slashed, additive (no HTML change). The values here are the pure resolvers' output.
+        var bundle = GeneratedSite().RenderWebviewSurfaces();
+        var json = WebviewCommand.SerializePayload(
+            bundle, "SpecScribeOutput", "_bmad-output", "docs/adrs", "../..");
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        Assert.Equal("_bmad-output", root.GetProperty("sourceRoot").GetString());
+        Assert.Equal("docs/adrs", root.GetProperty("adrRoot").GetString());
+        // The repo-root offset rides verbatim so the shim resolves the absolute repo root on a subdir-open.
+        Assert.Equal("../..", root.GetProperty("repoRoot").GetString());
+    }
+
+    [Fact]
     public void EntryDocument_CarriesTheHiddenRevealButton_AndEmptyDataSource()
     {
         // The entry is the dashboard (no source): the "Open source" control is present as webview-only toolbar
@@ -292,6 +309,9 @@ public class SiteGeneratorWebviewTests : IDisposable
         var bundle = GeneratedSite().RenderWebviewSurfaces();
 
         Assert.Contains("ss-reveal-src-btn", bundle.EntryDocument);
+        // The actual "paints hidden" claim in the test name — a class-name substring match alone would not catch
+        // a regression that drops the `hidden` attribute from the button markup.
+        Assert.Contains("class=\"ss-reveal-src-btn\" title=\"Open the markdown file this view was rendered from (read-only)\" hidden>", bundle.EntryDocument);
         Assert.Contains("data-source=\"\"", bundle.EntryDocument);
         Assert.Contains("revealSource", bundle.EntryDocument);          // the bridge posts it
         Assert.Contains("data-code-path", bundle.EntryDocument);        // the AC #2 seam is present (inert)

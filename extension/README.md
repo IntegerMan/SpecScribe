@@ -108,6 +108,45 @@ host-delivery by hand in the F5 dev host:
 - **Guard (read-only-within-workspace):** a `data-code-path` pointing outside the workspace (`../…` or an absolute
   path) or at a non-existent file is **rejected** — no editor opens, no error spew.
 
+## F5 smoke checklist (manual — Story 6.11: file-change reactivity hardening)
+
+Same coverage boundary — the watch/visibility behavior has **no TS test harness**; the automated gates are `tsc
+--noEmit` + esbuild + valid `package.json` + the C# suite (which pins the data-source route re-parsing `_sprint` and
+rewriting the sprint surface, the `IsDataSource` classification, and the payload's resolved `sourceRoot`/`adrRoot`/
+`repoRoot`). Verify the reactivity by hand in the F5 dev host:
+
+- **Non-`.md` data source refreshes the view (AC #1):** open the panel, then edit and save `sprint-status.yaml`
+  (e.g. move a story to `in-progress`) → the dashboard's **Now & Next** / sprint board refreshes in place. Before
+  6.11 this went stale silently.
+- **Project name refreshes (AC #1):** edit `_bmad/config.toml`'s `project_name` and save → the panel title +
+  branding update on the next refresh (the extension re-spawns per change, so it picks up the new name for free).
+- **Non-default / subdir roots watch the right tree (AC #2a):** open the workspace on a **subdirectory** of the
+  repo (repo root ≠ workspace folder), open the panel, then edit a source under the real `_bmad-output` → it still
+  live-updates, and **Open source** still opens the correct file (both anchored to the resolved repo root).
+- **Visibility-aware refresh (AC #2b):** hide **both** the panel (switch editor tab) and the outline tree (collapse
+  the view), edit a source a few times → **no** renderer spawns while hidden; reveal either surface → exactly
+  **one** render runs and the view is current. The manual **Refresh** command still reloads regardless of
+  visibility.
+
+## F5 smoke checklist (manual — Story 6.12: native diagnostics → Problems panel)
+
+Same coverage boundary — the Problems mapping has **no TS test harness**; the automated gates are `tsc --noEmit` +
+esbuild + valid `package.json` + the C# suite (which pins the `webview` command's JSON-lines stderr contract in
+`WebviewDiagnosticsTests` and the page↔wire coherence in `SiteGeneratorAdapterTests`). Verify the host-delivery by
+hand in the F5 dev host:
+
+- **A broken artifact surfaces on the file (AC #1):** open a repo whose `sprint-status.yaml` has no usable
+  `development_status` map (or any malformed/unsupported source artifact). Open the panel (spawns the renderer) →
+  a **Problems** entry appears **on that file**, source **SpecScribe**, severity **Warning** (Unsupported/Skipped)
+  or **Error** (Malformed), anchored at the top of the file.
+- **Resolving clears it (AC #1):** fix the artifact (or Refresh after resolving) → the Problems entry **clears** on
+  the next successful load. A transient spawn failure leaves the last-good entries in place (not cleared).
+- **Clean repo is quiet (AC #2 degrade-clean):** open a repo that renders all-clear → **no** SpecScribe Problems
+  entries appear.
+- **Render-time notices stay on the page (scoping):** a notice for an output-relative `.html` (a render-time
+  failure) does **not** appear in Problems — it remains on the generated diagnostics page, its home. Only
+  file-anchored source-artifact notices reach Problems.
+
 ## What this folder is (and isn't)
 
 - Self-contained: not part of the .NET solution, not part of the generated-site pipeline, no CI wiring.

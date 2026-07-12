@@ -19,7 +19,15 @@ public enum DiagnosticSeverity { Error, Warning }
 /// <param name="SourcePath">The source- or output-relative path the run reported for this notice.</param>
 /// <param name="Message">Human-readable detail; may be null for a bare skip (rendered as an em-dash).</param>
 /// <param name="Severity">Error vs. warning — the badge color only.</param>
-public sealed record DiagnosticNotice(string Category, string SourcePath, string? Message, DiagnosticSeverity Severity)
+/// <param name="SourceAnchored">True when <see cref="SourcePath"/> is a real source artifact relative to the
+/// source root (an ingest notice from <see cref="SiteGenerator.MapDiagnostics"/>, provenance
+/// <see cref="GenerationEvent.FromAdapterDiagnostic"/>) rather than an output-relative render-time <c>.html</c>.
+/// The diagnostics page (Story 4.8) ignores this field — it is render-invisible — but the <c>webview</c>
+/// command's JSON-lines stderr channel uses it to decide which notices can anchor to a file in the VS Code
+/// Problems panel. Surfacing it here (rather than re-deriving) keeps the page and the Problems channel reading
+/// ONE shared notice set so they can never disagree. [Story 6.12]</param>
+public sealed record DiagnosticNotice(
+    string Category, string SourcePath, string? Message, DiagnosticSeverity Severity, bool SourceAnchored = false)
 {
     /// <summary>Projects the run's non-fatal notices off the single accumulated <see cref="GenerationEvent"/>
     /// list — the "whole run's non-fatal notices" surface with ZERO double-counting (each adapter diagnostic is
@@ -38,7 +46,10 @@ public sealed record DiagnosticNotice(string Category, string SourcePath, string
 
             var (category, message) = SplitCategory(e);
             var severity = e.Outcome == GenerationOutcome.Error ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning;
-            notices.Add(new DiagnosticNotice(category, e.RelativePath, message, severity));
+            // FromAdapterDiagnostic is the exact "this path is a real source artifact" bit MapDiagnostics already
+            // set (source-relative ingest notices) vs. render-time output-relative notices — carry it verbatim so
+            // the Problems channel (Story 6.12) and this page derive from one type. [Story 6.12]
+            notices.Add(new DiagnosticNotice(category, e.RelativePath, message, severity, e.FromAdapterDiagnostic));
         }
 
         return notices;
