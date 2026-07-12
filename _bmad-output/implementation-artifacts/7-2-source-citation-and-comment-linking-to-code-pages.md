@@ -1,6 +1,9 @@
+---
+baseline_commit: 179e041d03c95cb3d890756c1fbbd29736f9d4de
+---
 # Story 7.2: Source-Citation and Comment Linking to Code Pages
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -217,26 +220,26 @@ No external libraries or APIs are introduced — nothing to version-check. Two p
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Confirm 7.1 has landed (blocking gate)**
-  - [ ] Verify `SiteGenerator._codePages`, `ForgeOptions.CodeSourceBaseUrl`, `CodeReferenceScanner`, `CodeFileTemplater`, and the `code/…html#L{n}` output all exist on the base branch. If not, implement/merge 7.1 first — do not re-create its seams here.
-- [ ] **Task 1 — `CodeReferenceLinkifier` (AC: #1)**
-  - [ ] New pure static class. Href rewriter (model on `AdrLinkRewriter`): match `href="(…/)?<repo code path>.<ext>(:N(-M)?)?"`, take first `N` as the line, strip the suffix, resolve the path via the shared resolver.
-  - [ ] Anchor-aware plain-text matcher (model on `RequirementLinkifier`'s `<a>`-split): match inert `[Source: …code path…]` / code-span citations in non-anchor segments only — this is what reaches inside `md-comment` asides.
-  - [ ] Shared emit: in-portal → `{prefix}code/<repo-rel>.html#L{n}` gated on `_codePages` membership; external → `{baseUrl.TrimEnd('/')}/<repo-rel>#L{n}` gated on file-exists-in-repo. `PathUtil.Html` every href.
-  - [ ] Unresolved: href form → drop anchor, keep inner text; plain-text form → leave as-is. Never throw.
-- [ ] **Task 2 — Wire into the whole-page pass (AC: #1)**
-  - [ ] Call `CodeReferenceLinkifier.Linkify(...)` from `ApplyReferenceLinks`, after the existing FR/Story linkifiers, using the already-computed `prefix`. Guard: no-op when `_codePages` is empty and `CodeSourceBaseUrl` is null.
-  - [ ] Share `CodeReferenceScanner`'s resolution (expose a pure static resolver if it's private).
-- [ ] **Task 3 — Back-navigation "Referenced by" (AC: #2, in-portal)**
-  - [ ] Build a file→citing-artifacts reverse map during 7.1's discovery (capture citing artifact output URL + title per resolved code path); dedupe; deterministic order.
-  - [ ] Extend `CodeFileTemplater.RenderPage` to render a "Referenced by" list inside `<main>` (omit when empty). Pass the reverse map from `GenerateCodePagesInternal`.
-- [ ] **Task 4 — Styling (AC: #2)**
-  - [ ] Add/`reuse` a neutral-token style for "Referenced by" (not `--status-*`). Update `StylesheetTests` if it asserts class presence.
-- [ ] **Task 5 — Tests (AC: #1, #2)**
-  - [ ] `CodeReferenceLinkifierTests`: href-with-line, href-no-line, range→first-line, code-span, comment-aside, unresolved→plain-text, idempotence/anchor-awareness, escaping; external-mode base-URL + non-repo-path degrade.
-  - [ ] Generation-level: citation on story *and* doc page resolves; code page shows "Referenced by"; `.md` citation regression intact; determinism.
-- [ ] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green. Real generate (default `SpecScribeOutput/`): citations click through to `code/…html#L{n}`, code pages list "Referenced by", unresolved refs are plain text. Re-run with `--code-url …` and confirm external links + no `code/` pages.
+- [x] **Task 0 — Confirm 7.1 has landed (blocking gate)**
+  - [x] Verify `SiteGenerator._codePages`, `ForgeOptions.CodeSourceBaseUrl`, `CodeReferenceScanner`, `CodeFileTemplater`, and the `code/…html#L{n}` output all exist on the base branch. If not, implement/merge 7.1 first — do not re-create its seams here.
+- [x] **Task 1 — `CodeReferenceLinkifier` (AC: #1)**
+  - [x] New pure static class. Href rewriter (model on `AdrLinkRewriter`): match `href="(…/)?<repo code path>.<ext>(:N(-M)?)?"`, take first `N` as the line, strip the suffix, resolve the path via the shared resolver.
+  - [x] Anchor-aware plain-text matcher (model on `RequirementLinkifier`'s `<a>`-split): match inert `[Source: …code path…]` / code-span citations in non-anchor segments only — this is what reaches inside `md-comment` asides.
+  - [x] Shared emit: in-portal → `{prefix}code/<repo-rel>.html#L{n}` gated on `_codePages` membership; external → `{baseUrl.TrimEnd('/')}/<repo-rel>#L{n}` gated on file-exists-in-repo. `PathUtil.Html` every href.
+  - [x] Unresolved: href form → drop anchor, keep inner text; plain-text form → leave as-is. Never throw.
+- [x] **Task 2 — Wire into the whole-page pass (AC: #1)**
+  - [x] Call `CodeReferenceLinkifier.Linkify(...)` from `ApplyReferenceLinks`, after the existing FR/Story linkifiers, using the already-computed `prefix`. Guard: no-op when `_codePages` is empty and `CodeSourceBaseUrl` is null.
+  - [x] Share `CodeReferenceScanner`'s resolution (expose a pure static resolver if it's private).
+- [x] **Task 3 — Back-navigation "Referenced by" (AC: #2, in-portal)**
+  - [x] Build a file→citing-artifacts reverse map during 7.1's discovery (capture citing artifact output URL + title per resolved code path); dedupe; deterministic order.
+  - [x] Extend `CodeFileTemplater.RenderPage` to render a "Referenced by" list inside `<main>` (omit when empty). Pass the reverse map from `GenerateCodePagesInternal`.
+- [x] **Task 4 — Styling (AC: #2)**
+  - [x] Add/`reuse` a neutral-token style for "Referenced by" (not `--status-*`). Update `StylesheetTests` if it asserts class presence.
+- [x] **Task 5 — Tests (AC: #1, #2)**
+  - [x] `CodeReferenceLinkifierTests`: href-with-line, href-no-line, range→first-line, code-span, comment-aside, unresolved→plain-text, idempotence/anchor-awareness, escaping; external-mode base-URL + non-repo-path degrade.
+  - [x] Generation-level: citation on story *and* doc page resolves; code page shows "Referenced by"; `.md` citation regression intact; determinism.
+- [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green. Real generate (default `SpecScribeOutput/`): citations click through to `code/…html#L{n}`, code pages list "Referenced by", unresolved refs are plain text. Re-run with `--code-url …` and confirm external links + no `code/` pages.
 
 ## Dev Notes
 
@@ -273,8 +276,38 @@ No external libraries or APIs are introduced — nothing to version-check. Two p
 
 ### Agent Model Used
 
+GitHub Copilot (Claude Opus 4.8)
+
 ### Debug Log References
+
+- `dotnet build SpecScribe.slnx` — clean (0 warnings, 0 errors).
+- `dotnet test SpecScribe.slnx` — 837 passed / 0 failed (was 816 pre-story; +21 new). One transient failure of the pre-existing real-git flake `SiteGeneratorGitInsightsTests.GenerateAll_TwoRunsProduceIdenticalHubMarkup` cleared on re-run (passes in isolation; unrelated to this diff).
+- Golden fingerprint `SiteGeneratorAdapterTests.GenerateAll_GoldenContentFingerprint_…` deliberately rebaselined (`77b038a0…` → `31ef6fdd…`) — the fixture cites no real repo files, so the linkifier is a no-op there and the ONLY output delta is the new `.code-referenced-by` CSS rules (same class of deliberate CSS-driven rebaseline 7.1 did).
+- Real generate (default `SpecScribeOutput/`): 142 pages; 1196 resolved `code/…html#L{n}` links across the site; zero dead file-level `../../src/…ext` links; "Referenced by" blocks present on code pages and resolving to real story/artifact pages. External run (`--code-url https://github.com/IntegerMan/SpecScribe/blob/main`): citations became GitHub `…/src/…#L{n}` links and no `code/` directory was generated.
 
 ### Completion Notes List
 
+- **AC #1 (resolve + degrade):** New pure `CodeReferenceLinkifier` (modeled on `AdrLinkRewriter` for the href form and `RequirementLinkifier` for the anchor-aware plain-text form) wired into `SiteGenerator.ApplyReferenceLinks` AFTER the FR/Story linkifiers, so every generated page (story, doc, ADR, retro, sprint, index) resolves code citations — including citations inside `<aside class="md-comment">` asides (the "comment linking" half). In-portal mode gates strictly on `_codePages` membership; external mode (`--code-url`) gates on `CodeReferenceScanner.TryResolveRepoFile` existence. Unresolved view-source anchors drop to plain text (no broken links, never throws); inert citations stay plain. `#L{n}` is identical across both modes (7.1's locked anchor).
+- **AC #2 (back-navigation):** A file→citing-artifacts reverse map is built up front in the new `DiscoverCodeReferences` pass and rendered as a semantic "Referenced by" list inside the code page's `<main>` (link text = the citing artifact's H1 title; neutral tokens only). Absent/empty → the block is omitted.
+- **Ordering fix (load-bearing):** 7.1 generated code pages AFTER the story/doc/ADR pages, so citations on those pages would have linkified against an empty `_codePages`. Split into two phases — `DiscoverCodeReferences(files)` runs BEFORE the epics/story/doc/ADR render to populate `_codePages` + the reverse map (pure, no output written); `GenerateCodePagesInternal` still renders the code pages later, where `_referenceMap` exists to route the "Referenced by" back-links.
+- **No-drift:** `CodeReferenceScanner` now exposes shared `TryResolveCitation` / `TryResolveRepoFile` (both routing through one private `TryResolvePath` validation core that `Discover` also uses), so the set of citations that link can never drift from the set of pages 7.1 generated.
+- **Scope honored:** `SourceLinkifier`'s `.md` behavior is untouched (a parallel resolver was added, not a rewrite); no top-nav "Code" entry; no writes back to source. Plain markdown directory links in prose (e.g. `[src/SpecScribe/](../../src/SpecScribe)`) are deliberately left as authored — they are not `[Source: …]` file citations and have no code page.
+
 ### File List
+
+**New:**
+- `src/SpecScribe/CodeReferenceLinkifier.cs`
+- `tests/SpecScribe.Tests/CodeReferenceLinkifierTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorCodeCitationTests.cs`
+
+**Modified:**
+- `src/SpecScribe/SiteGenerator.cs` (DiscoverCodeReferences phase + reverse map + BuildReferencedBy + CodeReferenceLinkifier call in ApplyReferenceLinks; GenerateCodePagesInternal consumes the pre-discovered set)
+- `src/SpecScribe/CodeReferenceScanner.cs` (shared `TryResolveCitation`/`TryResolveRepoFile`/`TryResolvePath` resolver; `StripLocator(out int? line)` overload)
+- `src/SpecScribe/CodeFileTemplater.cs` (`RenderPage` "Referenced by" block)
+- `src/SpecScribe/assets/specscribe.css` (`.code-referenced-by` neutral-token styling)
+- `tests/SpecScribe.Tests/StylesheetTests.cs` (`.code-referenced-by` presence assertion)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` (golden fingerprint rebaselined for the new CSS)
+
+## Change Log
+
+- 2026-07-12 — Story 7.2 implemented: source-citation + view-source + comment-embedded code citations resolve to in-portal code pages (`code/<path>.html#L{n}`) or external GitHub links (`--code-url`), with graceful plain-text degradation for unresolved refs and a "Referenced by" back-link block on each code page. 837 tests green (+21). (baseline_commit: 179e041d)

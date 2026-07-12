@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace SpecScribe;
@@ -60,13 +61,33 @@ public static class CodeReferenceScanner
     /// <summary>Strips a trailing <c>#fragment</c> then a trailing <c>:line</c>/<c>:line-line</c> locator, leaving a
     /// bare path. Both are common in citations (<c>X.cs:15-17</c>, <c>architecture.md#Overview</c>) and neither is
     /// part of the file path.</summary>
-    public static string StripLocator(string target)
+    public static string StripLocator(string target) => StripLocator(target, out _);
+
+    /// <summary>Overload that also reports the FIRST line of a <c>:line</c>/<c>:line-line</c> locator when present
+    /// (<c>X.cs:42-60</c> → line 42), so Story 7.2's citation linkifier can emit the matching <c>#L{n}</c> fragment.
+    /// A path with no clean numeric locator yields <c>null</c>. The <c>#fragment</c> is dropped first (it is not a
+    /// line locator), then the <c>:line</c> suffix.</summary>
+    public static string StripLocator(string target, out int? line)
     {
+        line = null;
         if (string.IsNullOrEmpty(target)) return string.Empty;
         var path = target;
         var hash = path.IndexOf('#');
         if (hash >= 0) path = path[..hash];
-        path = LineSuffix.Replace(path, string.Empty);
+
+        var locator = LineSuffix.Match(path);
+        if (locator.Success)
+        {
+            // The match is ":N" or ":N-M" at the end; parse the first run of digits after the colon.
+            var digits = locator.Value.AsSpan(1);
+            var dash = digits.IndexOf('-');
+            if (dash >= 0) digits = digits[..dash];
+            if (int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n > 0)
+            {
+                line = n;
+            }
+            path = path[..locator.Index];
+        }
         return path.Trim();
     }
 
@@ -89,32 +110,76 @@ public static class CodeReferenceScanner
         {
             foreach (var citation in ExtractTargets(artifact.RawMarkdown))
             {
-                var cleaned = StripLocator(citation.Target);
-                if (cleaned.Length == 0) continue;
-
-                var baseDir = citation.RelativeToArtifact ? artifact.ArtifactDirFullPath : repoFull;
-                string full;
-                try
+                if (TryResolveCitation(citation, artifact.ArtifactDirFullPath, repoFull, sourceFull, out var repoRel))
                 {
-                    full = Path.GetFullPath(Path.Combine(baseDir, cleaned.Replace('/', Path.DirectorySeparatorChar)));
+                    results.Add(repoRel);
                 }
-                catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
-                {
-                    continue;
-                }
-
-                // (a) inside the repo, (b) not the _bmad-output source root the doc pipeline already renders.
-                if (!IsInside(full, repoFull)) continue;
-                if (IsInside(full, sourceFull)) continue;
-                // (c) a real file, (d) not an ignored working file.
-                if (!File.Exists(full)) continue;
-                if (PathUtil.IsIgnoredSourceFile(full)) continue;
-
-                results.Add(PathUtil.NormalizeSlashes(Path.GetRelativePath(repoFull, full)));
             }
         }
 
         return results.ToList();
+    }
+
+    /// <summary>Resolves a single extracted citation to a repo-relative code path, applying the exact same rules the
+    /// full <see cref="Discover"/> pass uses so the set of citations Story 7.2 turns into links can never drift from
+    /// the set of pages Story 7.1 generated. A markdown-link citation resolves relative to the citing artifact's
+    /// directory; an inline/bare citation resolves repo-relative. The candidate survives only when it (a) resolves
+    /// INSIDE <paramref name="repoRoot"/>, (b) is NOT under <paramref name="sourceRoot"/>, (c) exists as a file, and
+    /// (d) is not an ignored working file. Accepts already-full <paramref name="repoRoot"/>/<paramref name="sourceRoot"/>
+    /// or raw paths (normalized here).</summary>
+    public static bool TryResolveCitation(
+        CodeCitation citation, string artifactDirFullPath, string repoRoot, string sourceRoot, out string repoRelPath)
+    {
+        repoRelPath = string.Empty;
+        var cleaned = StripLocator(citation.Target);
+        if (cleaned.Length == 0) return false;
+
+        var repoFull = Path.GetFullPath(repoRoot);
+        var sourceFull = Path.GetFullPath(sourceRoot);
+        var baseDir = citation.RelativeToArtifact ? artifactDirFullPath : repoFull;
+        return TryResolvePath(cleaned, baseDir, repoFull, sourceFull, out repoRelPath);
+    }
+
+    /// <summary>Resolves an already repo-relative candidate path (e.g. the <c>src/…</c> tail Story 7.2 recovers from a
+    /// rendered view-source href) to its canonical repo-relative form, honoring the identical inside-repo / not-under-
+    /// source / exists / not-ignored gate <see cref="Discover"/> uses. Used by the external-link mode of Story 7.2's
+    /// citation linkifier, where there is no in-portal page map to gate on. Returns false (degrade to plain text) for
+    /// anything that escapes the repo, is a source doc, is missing, or is ignored.</summary>
+    public static bool TryResolveRepoFile(string repoRelativeCandidate, string repoRoot, string sourceRoot, out string repoRelPath)
+    {
+        repoRelPath = string.Empty;
+        if (string.IsNullOrEmpty(repoRelativeCandidate)) return false;
+        var repoFull = Path.GetFullPath(repoRoot);
+        var sourceFull = Path.GetFullPath(sourceRoot);
+        return TryResolvePath(repoRelativeCandidate, repoFull, repoFull, sourceFull, out repoRelPath);
+    }
+
+    /// <summary>The shared resolution + validation core: combine <paramref name="candidate"/> against
+    /// <paramref name="baseDir"/>, then enforce the inside-repo / not-under-source / exists / not-ignored gate and
+    /// return the normalized repo-relative path. The single implementation both discovery and Story 7.2's linkifier
+    /// route through so their notions of "a real, linkable code file" cannot drift.</summary>
+    private static bool TryResolvePath(string candidate, string baseDir, string repoFull, string sourceFull, out string repoRelPath)
+    {
+        repoRelPath = string.Empty;
+        string full;
+        try
+        {
+            full = Path.GetFullPath(Path.Combine(baseDir, candidate.Replace('/', Path.DirectorySeparatorChar)));
+        }
+        catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
+        {
+            return false;
+        }
+
+        // (a) inside the repo, (b) not the _bmad-output source root the doc pipeline already renders.
+        if (!IsInside(full, repoFull)) return false;
+        if (IsInside(full, sourceFull)) return false;
+        // (c) a real file, (d) not an ignored working file.
+        if (!File.Exists(full)) return false;
+        if (PathUtil.IsIgnoredSourceFile(full)) return false;
+
+        repoRelPath = PathUtil.NormalizeSlashes(Path.GetRelativePath(repoFull, full));
+        return true;
     }
 
     /// <summary>True when <paramref name="fullPath"/> sits strictly inside <paramref name="rootFull"/> (a proper

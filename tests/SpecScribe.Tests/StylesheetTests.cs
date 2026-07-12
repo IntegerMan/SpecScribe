@@ -77,6 +77,13 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_HasReferencedByStyles()
+    {
+        // Story 7.2 "Referenced by" back-navigation block on code pages — neutral tokens only, no --status-*.
+        Assert.Contains(".code-referenced-by", ReadStylesheet());
+    }
+
+    [Fact]
     public void Stylesheet_HasSendMenuStyles()
     {
         // The unified command badge and its send menu (native <details>) with shared menu rows.

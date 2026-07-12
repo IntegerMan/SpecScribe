@@ -56,6 +56,16 @@ public sealed class SiteGenerator
     // to linkify source citations without re-running discovery. Empty in external mode (--code-url) and when no
     // referenced source files exist.
     private Dictionary<string, string> _codePages = new(StringComparer.OrdinalIgnoreCase);
+
+    // Story 7.2: discovered ONCE up front (DiscoverCodeReferences), before any citing page is linkified, so
+    // ApplyReferenceLinks can resolve citations against a populated _codePages on every page — including the
+    // story/doc/ADR pages that render BEFORE the code pages themselves. _codeReferenced is the deterministic set
+    // of repo-relative files that get an in-portal page (empty in external mode); _codeReverseMap is the
+    // file -> citing artifacts back-map that drives each code page's "Referenced by" block (AC #2). Keyed on the
+    // citing artifact's SOURCE-relative path (resolved to its output URL at render time, once _referenceMap exists).
+    private List<string> _codeReferenced = new();
+    private Dictionary<string, List<(string CitingSourceRelative, string Title)>> _codeReverseMap = new(StringComparer.OrdinalIgnoreCase);
+
     private SprintStatus? _sprint;
     private List<RetroModel> _retros = new();
     private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
@@ -153,6 +163,13 @@ public sealed class SiteGenerator
             // HtmlTemplater.RenderIndex) AND are reported as categorized non-fatal structure notices on the
             // same diagnostic channel — the input Story 4.8's diagnostics page will render. [Story 4.2 Task 5]
             events.AddRange(MapDiagnostics(UnrecognizedTopLevelFolders(sourceRelatives)));
+
+            // Story 7.2: discover the referenced code-file set up front — BEFORE the epic/story/doc/ADR pages are
+            // rendered — so ApplyReferenceLinks resolves every source citation against a populated _codePages on
+            // each of those pages. The code pages themselves are still rendered later (GenerateCodePagesInternal),
+            // once _referenceMap exists to route each page's "Referenced by" back-links. Pure/disk-read only; no
+            // output written here. A no-op in external mode (--code-url leaves _codePages empty by design).
+            DiscoverCodeReferences(files);
 
             // Render the epic/story/requirements pages only when the whole ingest chain produced its models —
             // the exact set of writes the previous single try/catch performed after a successful parse.
@@ -684,19 +701,101 @@ public sealed class SiteGenerator
     // the actual NUL / invalid-UTF-8 check runs over the whole content; this window only bounds the FileInfo path.
     private const int BinarySniffBytes = 8192;
 
+    /// <summary>Story 7.2 Phase A — discovers the referenced code-file set from the source-artifact corpus and
+    /// populates <see cref="_codePages"/> (forward map) + <see cref="_codeReverseMap"/> (file → citing artifacts,
+    /// for each code page's "Referenced by" block) UP FRONT, before any citing page is rendered. This is what lets
+    /// <see cref="ApplyReferenceLinks"/> resolve citations on the story/doc/ADR pages that render before the code
+    /// pages themselves. Pure discovery: reads the small <c>*.md</c> set (shared access) and touches no output.
+    /// A no-op in external-link mode (<c>--code-url</c>) — citations resolve to the external base with no page map,
+    /// so <see cref="_codePages"/> stays empty by design.</summary>
+    private void DiscoverCodeReferences(List<string> sourceFiles)
+    {
+        _codePages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _codeReferenced = new List<string>();
+        _codeReverseMap = new Dictionary<string, List<(string, string)>>(StringComparer.OrdinalIgnoreCase);
+
+        // External mode: no in-portal pages, so nothing to discover — the linkifier resolves against the repo
+        // directly ({CodeSourceBaseUrl}/<path>#L{n}).
+        if (_options.CodeSourceBaseUrl is { Length: > 0 })
+        {
+            return;
+        }
+
+        var repoFull = Path.GetFullPath(_options.RepoRoot);
+        var sourceFull = Path.GetFullPath(_options.SourceRoot);
+        var referenced = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in sourceFiles)
+        {
+            string raw;
+            string dir;
+            try
+            {
+                dir = Path.GetDirectoryName(Path.GetFullPath(file)) ?? _options.SourceRoot;
+                raw = MarkdownConverter.ReadAllTextShared(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Non-fatal: an artifact we can't read simply contributes no citations.
+                continue;
+            }
+
+            var citingRelative = PathUtil.NormalizeSlashes(ToSourceRelative(file));
+            var citingTitle = ExtractArtifactTitle(raw, citingRelative);
+
+            foreach (var citation in CodeReferenceScanner.ExtractTargets(raw))
+            {
+                if (!CodeReferenceScanner.TryResolveCitation(citation, dir, repoFull, sourceFull, out var repoRel))
+                {
+                    continue;
+                }
+                referenced.Add(repoRel);
+
+                // Reverse map: one entry per citing artifact per referenced file, deduped so an artifact that cites
+                // the same file twice lists once. Order is deterministic (source-file iteration is sorted upstream).
+                var list = _codeReverseMap.TryGetValue(repoRel, out var existing)
+                    ? existing
+                    : _codeReverseMap[repoRel] = new List<(string, string)>();
+                if (!list.Any(e => string.Equals(e.CitingSourceRelative, citingRelative, StringComparison.OrdinalIgnoreCase)))
+                {
+                    list.Add((citingRelative, citingTitle));
+                }
+            }
+        }
+
+        _codeReferenced = referenced.ToList();
+        foreach (var repoRel in _codeReferenced)
+        {
+            // The page exists for every discovered (real, non-ignored) file — rendered as a full page or a
+            // placeholder, both written to this path — so citations can resolve now, before the pages render.
+            _codePages[PathUtil.NormalizeSlashes(repoRel)] = PathUtil.NormalizeSlashes($"code/{repoRel}.html");
+        }
+    }
+
+    // First Markdown H1 ("# Title") as an artifact's display title for the "Referenced by" back-links; falls back
+    // to the source-relative path when a doc has no heading. A cheap single-line read (like the project_name /
+    // memlog-date reads), not a full parse.
+    private static readonly Regex ArtifactTitlePattern = new(
+        @"^\s{0,3}#\s+(?<title>.+?)\s*#*\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
+
+    private static string ExtractArtifactTitle(string markdown, string fallbackRelative)
+    {
+        var m = ArtifactTitlePattern.Match(markdown);
+        return m.Success ? m.Groups["title"].Value.Trim() : fallbackRelative;
+    }
+
     /// <summary>Renders each referenced, readable repository source file into <c>code/&lt;repo-relative-path&gt;.html</c>
-    /// — a line-numbered, escaped, monospace page with a stable <c>id="L{n}"</c> anchor per line (Story 7.1, FR15).
-    /// The referenced set is derived from source-artifact citations (<see cref="CodeReferenceScanner"/>), NOT a
-    /// filesystem walk, so only the small purposeful set renders (NFR1) and non-referenced files are omitted with no
-    /// broken navigation (AC #1). Mirrors <see cref="GenerateCommitDaysInternal"/>/<see cref="GenerateAdrsInternal"/>:
-    /// wipe+recreate the output dir each pass (atomic rebuild, AD-5), per-file try/catch → <see cref="GenerationEvent"/>
-    /// so one bad file never throws out of the phase (NFR2), and cache the path map (<see cref="_codePages"/>) for
-    /// Story 7.2's citation linkification. Skipped entirely in external-link mode (<c>--code-url</c>): no page is
+    /// — a line-numbered, escaped, monospace page with a stable <c>id="L{n}"</c> anchor per line (Story 7.1, FR15) and
+    /// a "Referenced by" back-link block to the artifacts that cite it (Story 7.2, AC #2). The referenced set is
+    /// discovered up front by <see cref="DiscoverCodeReferences"/> (NOT a filesystem walk), so only the small
+    /// purposeful set renders (NFR1) and non-referenced files are omitted with no broken navigation (AC #1). Mirrors
+    /// <see cref="GenerateCommitDaysInternal"/>/<see cref="GenerateAdrsInternal"/>: wipe+recreate the output dir each
+    /// pass (atomic rebuild, AD-5) and per-file try/catch → <see cref="GenerationEvent"/> so one bad file never
+    /// throws out of the phase (NFR2). Skipped entirely in external-link mode (<c>--code-url</c>): no page is
     /// generated for links that will point at an external base URL instead.</summary>
     private List<GenerationEvent> GenerateCodePagesInternal(List<string> sourceFiles, SiteNav nav, IGenerationReporter? reporter)
     {
         var events = new List<GenerationEvent>();
-        _codePages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         var codeDir = Path.Combine(_options.OutputRoot, "code");
         if (Directory.Exists(codeDir))
@@ -704,35 +803,13 @@ public sealed class SiteGenerator
             Directory.Delete(codeDir, recursive: true);
         }
 
-        // External mode: citations will resolve to {CodeSourceBaseUrl}/<path>#L{n} (Story 7.2), so there are no
-        // in-portal pages to generate. Nothing to render — the dir stays absent.
-        if (_options.CodeSourceBaseUrl is { Length: > 0 })
+        // External mode (no pages) or no referenced files — nothing to render. The set was discovered up front.
+        if (_codeReferenced.Count == 0)
         {
             return events;
         }
 
-        // Discover the referenced code-file set from the source-artifact corpus. Reading each artifact's raw text
-        // again (shared access) is bounded to the small *.md set; a per-file read failure just skips that artifact.
-        var artifacts = new List<CitedArtifact>(sourceFiles.Count);
-        foreach (var file in sourceFiles)
-        {
-            try
-            {
-                var dir = Path.GetDirectoryName(Path.GetFullPath(file)) ?? _options.SourceRoot;
-                artifacts.Add(new CitedArtifact(MarkdownConverter.ReadAllTextShared(file), dir));
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // Non-fatal: an artifact we can't read simply contributes no citations.
-            }
-        }
-
-        var referenced = CodeReferenceScanner.Discover(artifacts, _options.RepoRoot, _options.SourceRoot);
-        if (referenced.Count == 0)
-        {
-            return events;
-        }
-
+        var referenced = _codeReferenced;
         var outputRootFull = Path.GetFullPath(_options.OutputRoot);
 
         reporter?.BeginPhase(GenerationPhase.CodePages, referenced.Count);
@@ -741,6 +818,7 @@ public sealed class SiteGenerator
             var sw = Stopwatch.StartNew();
             // Append ".html" to the FULL path (extension included) so X.cs and X.ts in one dir never collide.
             var outputRelative = PathUtil.NormalizeSlashes($"code/{repoRelative}.html");
+
             try
             {
                 var full = Path.GetFullPath(Path.Combine(_options.RepoRoot, repoRelative.Replace('/', Path.DirectorySeparatorChar)));
@@ -750,10 +828,16 @@ public sealed class SiteGenerator
                 var outputFull = Path.GetFullPath(Path.Combine(_options.OutputRoot, outputRelative.Replace('/', Path.DirectorySeparatorChar)));
                 if (!outputFull.StartsWith(outputRootFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 {
+                    // No page will be written — drop the forward-map entry Phase A optimistically added so no
+                    // citation resolves to a page that does not exist.
+                    _codePages.Remove(PathUtil.NormalizeSlashes(repoRelative));
                     events.Add(new GenerationEvent(GenerationOutcome.Skipped, outputRelative, sw.Elapsed, "output path escapes the output root"));
                     reporter?.Tick(GenerationPhase.CodePages);
                     continue;
                 }
+
+                // Story 7.2 (AC #2): the artifacts that cite this file, resolved to their generated pages.
+                var referencedBy = BuildReferencedBy(repoRelative);
 
                 string html;
                 GenerationOutcome outcome;
@@ -766,7 +850,7 @@ public sealed class SiteGenerator
                 else if (TryReadCodeText(full, out var text))
                 {
                     var lines = SplitCodeLines(text);
-                    html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav);
+                    html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy);
                     outcome = GenerationOutcome.Generated;
                 }
                 else
@@ -777,11 +861,12 @@ public sealed class SiteGenerator
                 }
 
                 WriteOutput(outputRelative, html);
-                _codePages[PathUtil.NormalizeSlashes(repoRelative)] = outputRelative;
                 events.Add(new GenerationEvent(outcome, outputRelative, sw.Elapsed));
             }
             catch (Exception ex)
             {
+                // The page was not written — drop Phase A's forward-map entry so no citation links to a 404.
+                _codePages.Remove(PathUtil.NormalizeSlashes(repoRelative));
                 events.Add(new GenerationEvent(GenerationOutcome.Error, outputRelative, sw.Elapsed, ex.Message));
             }
             reporter?.Tick(GenerationPhase.CodePages);
@@ -789,6 +874,30 @@ public sealed class SiteGenerator
         reporter?.EndPhase(GenerationPhase.CodePages);
 
         return events;
+    }
+
+    /// <summary>Resolves a code file's citing artifacts (captured by <see cref="DiscoverCodeReferences"/>) to the
+    /// output-relative URLs of their generated pages + a display title — the "Referenced by" back-navigation on the
+    /// code page (Story 7.2, AC #2). Routing reuses the epics render pass's <see cref="_referenceMap"/> (which maps
+    /// every source file, story artifacts included, to its page), falling back to a plain extension swap for the rare
+    /// citer that predates an epics render. Order is deterministic (reverse-map insertion follows the sorted source
+    /// walk).</summary>
+    private IReadOnlyList<(string OutputUrl, string Title)> BuildReferencedBy(string repoRelative)
+    {
+        if (!_codeReverseMap.TryGetValue(repoRelative, out var citers) || citers.Count == 0)
+        {
+            return Array.Empty<(string, string)>();
+        }
+
+        var result = new List<(string OutputUrl, string Title)>(citers.Count);
+        foreach (var (citingSourceRelative, title) in citers)
+        {
+            var url = _referenceMap.TryGetValue(citingSourceRelative, out var mapped)
+                ? mapped
+                : PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(citingSourceRelative));
+            result.Add((url, title));
+        }
+        return result;
     }
 
     /// <summary>Reads a source file as UTF-8 text with shared access, returning false when it is binary — a NUL byte
@@ -1707,6 +1816,11 @@ public sealed class SiteGenerator
         {
             html = StoryEpicLinkifier.Linkify(html, _epicsModel, prefix, skipStoryId, skipEpicNumber);
         }
+        // Story 7.2: resolve source-code citations + view-source links to Story 7.1's code pages (or, in external
+        // mode, to {CodeSourceBaseUrl}/<path>#L{n}). Runs AFTER the FR/Story linkifiers and is anchor-aware, so it
+        // never touches the links they emitted. A no-op when there are no code pages and no external base URL.
+        html = CodeReferenceLinkifier.Linkify(
+            html, _codePages, _options.CodeSourceBaseUrl, prefix, _options.RepoRoot, _options.SourceRoot);
         return html;
     }
 

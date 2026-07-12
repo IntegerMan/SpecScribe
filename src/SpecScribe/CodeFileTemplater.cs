@@ -16,12 +16,15 @@ public static class CodeFileTemplater
 {
     /// <summary>Renders the full code page. <paramref name="lines"/> is rendered verbatim — one anchored
     /// <c>.code-line</c> per element, numbered from 1, including blank lines — so line numbers stay 1:1 with the
-    /// source. The caller owns newline normalization and escaping is applied here.</summary>
+    /// source. The caller owns newline normalization and escaping is applied here. <paramref name="referencedBy"/>
+    /// (Story 7.2, AC #2) is the set of artifacts that cite this file, each an output-relative URL + display title;
+    /// an empty list omits the "Referenced by" block entirely (no empty heading).</summary>
     public static string RenderPage(
         string repoRelativePath,
         string outputRelativePath,
         IReadOnlyList<string> lines,
-        SiteNav nav)
+        SiteNav nav,
+        IReadOnlyList<(string OutputUrl, string Title)>? referencedBy = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
         var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav);
@@ -29,6 +32,8 @@ public static class CodeFileTemplater
         var count = lines.Count;
         sb.Append($"  <div class=\"meta-pills\"><span class=\"pill\">{count.ToString(CultureInfo.InvariantCulture)} {(count == 1 ? "line" : "lines")}</span></div>\n");
         sb.Append("</header>\n\n");
+
+        AppendReferencedBy(sb, prefix, referencedBy);
 
         sb.Append("<pre class=\"code-file\"><code>");
         for (var i = 0; i < count; i++)
@@ -42,6 +47,27 @@ public static class CodeFileTemplater
 
         return EndShell(sb, prefix);
     }
+
+    /// <summary>Emits the "Referenced by" back-navigation block (Story 7.2, AC #2): a semantic list of the artifacts
+    /// that cite this file, inside the existing <c>&lt;main&gt;</c> landmark with meaningful link text (the citing
+    /// artifact's title, never "click here" — NFR6/UX-DR16). Neutral <c>--ink</c>/<c>--border</c>/<c>--parchment</c>
+    /// tokens only. An empty list writes nothing (no bare heading).</summary>
+    private static void AppendReferencedBy(StringBuilder sb, string prefix, IReadOnlyList<(string OutputUrl, string Title)>? referencedBy)
+    {
+        if (referencedBy is null || referencedBy.Count == 0) return;
+
+        sb.Append("<aside class=\"code-referenced-by\">\n");
+        sb.Append("  <h2>Referenced by</h2>\n");
+        sb.Append("  <ul>\n");
+        foreach (var (outputUrl, title) in referencedBy)
+        {
+            var href = PathUtil.Html(prefix + PathUtil.NormalizeSlashes(outputUrl));
+            sb.Append($"    <li><a href=\"{href}\">{PathUtil.Html(title)}</a></li>\n");
+        }
+        sb.Append("  </ul>\n");
+        sb.Append("</aside>\n\n");
+    }
+
 
     /// <summary>Renders a clearly-marked placeholder page for a referenced file that exists but can't be shown
     /// inline (binary, oversized, or unreadable). The page still carries the full nav/breadcrumb/a11y shell and a

@@ -526,6 +526,35 @@ pre.code-file code {
   font-style: italic;
 }
 
+/* Story 7.2 "Referenced by" back-navigation on a code page: the artifacts that cite this file. Neutral
+   ink/border/parchment tokens only — the --status-* lifecycle tokens are off-limits here (same rule as .code-file). */
+.code-referenced-by {
+  margin: 1.5rem 0;
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
+  border-radius: 6px;
+  background: var(--parchment);
+}
+
+.code-referenced-by h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--ink-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.code-referenced-by ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.code-referenced-by li {
+  margin: 0.2rem 0;
+  color: var(--ink);
+}
+
 /* Every markdown-generated table carries .md-table (see MarkdownConverter.TagTables), so this styles
    pipe tables consistently everywhere — inside .doc-body and in stand-alone panels like Change Log. */
 .md-table {

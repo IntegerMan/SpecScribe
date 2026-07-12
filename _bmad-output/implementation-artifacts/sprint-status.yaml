@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-12T18:30:00-04:00
+last_updated: 2026-07-12T19:15:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -136,7 +136,7 @@ development_status:
 
   epic-7: in-progress
   7-1-in-portal-code-file-browsing: review
-  7-2-source-citation-and-comment-linking-to-code-pages: ready-for-dev
+  7-2-source-citation-and-comment-linking-to-code-pages: review # dev-story 2026-07-12: CodeReferenceLinkifier in ApplyReferenceLinks (href + inline/comment matchers, anchor-aware), two-phase code discovery (DiscoverCodeReferences before epics/doc/ADR render so _codePages is populated), "Referenced by" back-nav via _codeReverseMap, external --code-url mode; shared CodeReferenceScanner resolver (no drift); .md/SourceLinkifier untouched. 837 tests green (+21); golden rebaselined for .code-referenced-by CSS only (fixture cites no real files → linkifier no-ops)
   7-3-activity-timeline-and-date-pages: ready-for-dev
   7-4-advanced-code-and-git-coverage: ready-for-dev
   7-5-per-commit-detail-pages: ready-for-dev
