@@ -27,7 +27,13 @@ inputDocuments:
 
 This document provides the complete epic and story breakdown for SpecScribe, decomposing the requirements from the PRD, UX Design if it exists, and Architecture requirements into implementable stories.
 
-The epics are ordered by delivery phase: (1) a polished, richly-functional BMad-only portal, (2) deeper insight surfaces and UX, (3) expansion to additional frameworks, (4) reliable operations/configuration and OSS-ready documentation, and (5) the editor surface plus code-and-git exploration.
+The epics are ordered by delivery phase: (1) a polished, richly-functional BMad-only portal, (2) deeper insight surfaces and UX, (3) the editor surface (VS Code companion) plus code-and-git exploration, (4) the framework-agnostic foundation and per-framework/module expansion, and finally the release run-up: (5) reliable CLI operations and configuration, (6) a pre-publication code-hardening and release-readiness review, and (7) release engineering and the community preview launch.
+
+**Delivery sequencing (numbers are stable IDs, not run order).** Per the project's append-only / no-renumber convention, epic numbers are permanent identifiers and do not imply execution order. The end-of-roadmap run order is: **Epic 5 (Reliable CLI Operations & Configuration) → Epic 17 (Code Hardening & Release-Readiness Review) → Epic 16 (Release Engineering & Community Preview Launch)** — finalize the operational surface, harden it for public and private codebases, then publish. Epic 18 (BMad Module & Expansion Coverage) is exploratory and sequences alongside the framework-coverage Epics 11–15, not on the release-blocking path. Epic 6's native-integration additions (Stories 6.8–6.12) complete before the hardening pass.
+
+<!-- Delivery-sequence note + phase reorder added 2026-07-11 (SCP 2026-07-11, correct-course): owner-directed end-of-roadmap order (CLI → hardening → publication). Numbers unchanged per append-only convention; run order carried in this note + sprint-status.yaml (the operational truth). -->
+
+_(Requirements FR35–FR36, NFR10 and Epics 17–18 were appended 2026-07-11 — see the correct-course provenance comments below.)_
 
 ## Requirements Inventory
 
@@ -76,6 +82,11 @@ FR34: Provide release-facing documentation — install/upgrade instructions, a c
 
 <!-- FR32–FR34 added 2026-07-10 (SCP 2026-07-10, correct-course) to seat Epic 16 (Release Engineering & Community Preview Launch); sync back into the PRD §4.4 for full traceability when convenient. -->
 
+FR35: Provide native VS Code host-integration surfaces beyond the read-only webview panel — extension discoverability/activation, an expanded command surface, native surfaces (a project-outline tree view and status-bar summary), editor↔artifact bridges, and file-change reactivity hardening — all read-only and rendered from core-emitted data (per ADR 0005's JSON-export clause), so the extension feels native without moving rendering out of the C# core or introducing authoring side effects.
+FR36: Explore and provide baseline coverage for BMad's own module and expansion ecosystem beyond the BMM core already supported (for example BMad Builder, Creative Intelligence, and game-dev / GDS-style expansions), mapping each module's distinctive artifacts to the shared adapter contract (Epic 4) so BMad users on non-BMM modules see their planning artifacts represented.
+
+<!-- FR35–FR36 added 2026-07-11 (SCP 2026-07-11, correct-course): FR35 seats the VS Code Native-Integration Recommendations (docs/VSCodeIntegrationRecommendations.md, R1–R8) as Epic 6 host-integration surface growth; FR36 seats Epic 18 (BMad module/expansion exploration), distinct from the third-party-framework Epics 11–15. Sync back into the PRD when convenient. -->
+
 ### NonFunctional Requirements
 
 NFR1: Baseline generation performance remains responsive for local OSS repositories, with deeper analytics separated from baseline runs.
@@ -89,6 +100,10 @@ NFR8: Insight surfaces and guidance affordances (status vocabularies, next-step 
 NFR9: Release builds are reproducible and produced by CI from a clean checkout; publishing to any distribution channel is gated on a passing build + test run.
 
 <!-- NFR9 added 2026-07-10 (SCP 2026-07-10, correct-course) for Epic 16. -->
+
+NFR10: SpecScribe is hardened to run safely and correctly against both public and private codebases before community publication: generated output leaks no secrets or unintended private content, rendered surfaces are injection-safe, untrusted-workspace / tool-resolution attack surfaces are closed, dependencies are audited, and no personal-structure assumptions remain — verified by a dedicated pre-publication hardening review.
+
+<!-- NFR10 added 2026-07-11 (SCP 2026-07-11, correct-course) for Epic 17 (Code Hardening & Release-Readiness Review), which runs after feature completion and before Epic 16's publication/cut stories. -->
 
 ### Additional Requirements
 
@@ -162,7 +177,7 @@ FR14: Epic 7 - Source-code treemap (LOC-sized, git-colorized) as a structural vi
 FR15: Epic 7 - In-portal code file browsing and source-citation linking to code pages.
 FR16: Epic 7 - Activity timeline and per-date pages linked from dates.
 FR17: Epics 13–15 - Additional framework adapters (SpecFlow, Squad, Superpowers) via the shared contract, each with an integration spike.
-FR18: Epic 5 - OSS onboarding and reference documentation.
+FR18: Epic 16 - OSS onboarding and reference documentation (moved from Epic 5 on 2026-07-11; Story 5.4 removed, folded into Story 16.6).
 FR19: Epic 7 - Advanced code-and-git coverage on code pages.
 FR20: Epic 8 - Canonical status lifecycle per entity type with adapter-layer vocabulary mapping and status legend.
 FR21: Epic 8 - Single generator-side count source consumed by every widget.
@@ -179,6 +194,9 @@ FR31: Epic 8 - Generation-time recency signals from git/change-log data.
 FR32: Epic 16 - Release engineering: reproducible CLI packaging and tag-triggered release pipeline.
 FR33: Epic 16 - VS Code extension packaging and Marketplace publication (depends on Epic 6).
 FR34: Epic 16 - Release-facing documentation, changelog, and versioning policy.
+FR35: Epic 6 - Native VS Code host-integration surfaces (discoverability, commands, tree view/status bar, editor bridges, reactivity), seated from the VS Code Native-Integration Recommendations (docs/VSCodeIntegrationRecommendations.md).
+FR36: Epic 18 - BMad module/expansion coverage exploration and baseline via the shared adapter contract.
+NFR10: Epic 17 - Pre-publication code hardening and security/privacy review for public + private codebase readiness.
 
 ## Epic List
 
@@ -198,9 +216,9 @@ Add richer analytical insight — git momentum, planning coverage and freshness,
 Establish the framework-neutral seam every other framework builds on: one shared adapter contract into the projection model, rendering decoupled from any single project's personal structure, and generation diagnostics — so per-framework coverage epics (11–15) attach without reworking the core templating pipeline. Per-framework coverage moved to its own spike-led epics on 2026-07-10.
 **FRs covered:** FR1
 
-### Epic 5: Reliable Operations, Configuration, and OSS Documentation
-Make generation and watch dependable and easy to configure, and provide OSS-ready documentation, so the tool is trustworthy for daily use and ready to share with the broader community.
-**FRs covered:** FR8, FR12, FR18
+### Epic 5: Reliable CLI Operations and Configuration
+Make generation and watch dependable and easy to configure, so the tool is trustworthy for daily use. Sequences late in the roadmap (immediately before the Epic 17 hardening pass) so the operational surface is finalized just before hardening and release. OSS onboarding/reference documentation moved to Epic 16 (2026-07-11).
+**FRs covered:** FR8, FR12
 
 ### Epic 6: VS Code Read-Only Companion Surface
 Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects.
@@ -243,8 +261,24 @@ Interpret core Superpowers artifacts through the shared adapter contract, led by
 **FRs covered:** FR17
 
 ### Epic 16: Release Engineering & Community Preview Launch
-Everything needed to put a preview build of SpecScribe in the community's hands and keep shipping updates reliably: a reproducible build/test gate, packaged and published CLI distribution, a tag-triggered release pipeline, VS Code Marketplace publication of the read-only extension, release-facing documentation with a changelog and versioning policy, and a preview-launch readiness cut. Led by a packaging-strategy spike (Story 16.1) that fixes the distribution channel(s), versioning/pre-release policy, and publishing prerequisites before the release stories run.
-**FRs covered:** FR32, FR33, FR34 · **NFRs:** NFR9 · **Depends on:** Epic 6 (for Story 16.5).
+Everything needed to put a preview build of SpecScribe in the community's hands and keep shipping updates reliably: a reproducible build/test gate, packaged and published CLI distribution, a tag-triggered release pipeline, VS Code Marketplace publication of the read-only extension, OSS onboarding plus release-facing documentation with a changelog and versioning policy, and a preview-launch readiness cut. Led by a packaging-strategy spike (Story 16.1) that fixes the distribution channel(s), versioning/pre-release policy, and publishing prerequisites before the release stories run. Runs last in delivery order, after the Epic 17 hardening sign-off.
+**FRs covered:** FR32, FR33, FR34, FR18 · **NFRs:** NFR9 · **Depends on:** Epic 6 (for Story 16.5), Epic 17 (hardening sign-off gates the cut).
+
+### Epic 17: Code Hardening & Release-Readiness Review
+A dedicated pre-publication pass to remediate structural weaknesses, inconsistencies, and inefficiencies; close security and privacy gaps so the tool is safe on both public and private codebases; and burn down or explicitly accept the deferred-work and retro-action backlog — producing a release-readiness sign-off that gates Epic 16's publication and cut. Sequences after feature completion (Epics 1–15, 18) and Epic 5, and before Epic 16's publish stories.
+**NFRs covered:** NFR10 (also touches NFR1 performance, NFR4 extensibility).
+
+### Epic 18: BMad Module & Expansion Coverage Exploration
+Extend first-class BMad support beyond the BMM core to BMad's own module and expansion ecosystem (for example BMad Builder, Creative Intelligence, and game-dev / GDS-style expansions), led by a landscape-and-coverage spike that maps each module's distinctive artifacts to Epic 4's shared adapter contract before baseline coverage. Distinct from the third-party-framework Epics 11–15; exploratory, not release-blocking.
+**FRs covered:** FR36
+
+<!-- Epics 17–18 added 2026-07-11 (SCP 2026-07-11, correct-course): Epic 17 = pre-publication hardening (NFR10), gates Epic 16's cut; Epic 18 = BMad-native module exploration (FR36), distinct from framework Epics 11–15. Append-only, no renumber. Run create-story per story when scheduled (17.1 / 18.1 spike first). -->
+
+<!-- 2026-07-11: Story 5.4 (OSS onboarding/reference docs) removed from Epic 5 and folded into Epic 16 Story 16.6; FR18 coverage moved Epic 5 → Epic 16. -->
+
+<!-- 2026-07-11: Epic 6 native-integration Stories 6.8–6.12 seated from docs/VSCodeIntegrationRecommendations.md (FR35); existing Stories 5.2/7.1/7.2/8.4/16.5/6.7 annotated with the recommendation IDs they own. -->
+
+<!-- 2026-07-11: Delivery run order (numbers are stable IDs, not execution order) — feature work (Epics 1–4, 6–15) and exploratory Epic 18 → Epic 5 (CLI) → Epic 17 (hardening) → Epic 16 (publication). See the Overview delivery-sequence note; sprint-status.yaml is the operational truth. -->
 
 <!-- Epics 8–10 added 2026-07-09 from the site-wide UX review; Epic 8 is foundational for 9–10 (status model + count source) and these are candidates to run ahead of Epic 4, with all framework-specific content structured as adapter-supplied data per NFR8. -->
 <!-- Epics 11–15 added 2026-07-10: per-framework coverage stories 4.3–4.7 extracted into their own spike-led epics (append-only, no renumber). Each epic's Story X.1 is a Framework Integration Spike scoping the mapping to Epic 4's adapter contract; X.2 is the migrated baseline coverage. -->
@@ -726,11 +760,13 @@ So that silent or partial degradation is detectable in the output itself rather 
 **Then** it records the effective configuration and detection results (source root, resolved ADR location, output directory, deep-git flag, detected framework/module)
 **And** this information is derived entirely at generation time with no remote calls, consistent with local-first operation.
 
-## Epic 5: Reliable Operations, Configuration, and OSS Documentation
+## Epic 5: Reliable CLI Operations and Configuration
 
-Make generation and watch dependable and easy to configure, and provide OSS-ready documentation, so the tool is trustworthy for daily use and ready to share with the broader community.
+Make generation and watch dependable and easy to configure, so the tool is trustworthy for daily use. Sequences late in delivery order (immediately before the Epic 17 hardening pass) so the operational surface is finalized just before hardening and release.
 
-**FRs covered:** FR8, FR12, FR18
+**FRs covered:** FR8, FR12
+
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course): Epic 5 retitled (OSS docs removed). Story 5.4 (OSS Onboarding and Reference Documentation) removed and folded into Epic 16 Story 16.6; FR18 coverage moved Epic 5 → Epic 16. The Story 5.4 slot is intentionally vacant (append-only, no renumber). -->
 
 ### Story 5.1: CLI Generate and Watch Modes with Smart Defaults
 
@@ -753,6 +789,12 @@ So that I can produce and refresh docs quickly in real projects.
 **And** help output documents available command options clearly.
 
 ### Story 5.2: Directory-Scoped Settings with Interactive and CLI Parity
+
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course) — owns VS Code recommendation R5.3: the `webview` spawn
+     (like `generate`/`watch`) calls `SiteSettings.Resolve()` directly and never consults `SettingsStore`, so a
+     repo with saved custom source/ADR/deep-git settings renders with DEFAULTS in the webview today. This story's
+     AC #1 parity promise ("configured defaults reused from directory-scoped settings; behavior matches CLI") must
+     route `Resolve()` through the settings store for ALL commands, and add a webview-parity test. -->
 
 As a repeat user,
 I want settings persisted per repository and overridable per run,
@@ -792,31 +834,23 @@ So that output stays coherent without blocking file edits.
 **Then** stale pages are removed or refreshed appropriately
 **And** rebuild scope escalates when required for coherence.
 
-### Story 5.4: OSS Onboarding and Reference Documentation
-
-As a prospective adopter from the OSS community,
-I want clear getting-started, configuration, and contribution documentation,
-So that I can install, run, configure, and contribute to SpecScribe without insider knowledge.
-
-**Acceptance Criteria:**
-
-1.
-**Given** a new user arrives at the repository
-**When** they follow the documentation
-**Then** getting-started steps, a configuration/CLI reference, and contribution guidance are complete, accurate, and current
-**And** examples reflect real, working commands.
-
-2.
-**Given** the documentation coexists with the tool and generated portal
-**When** it is produced
-**Then** docs stay consistent with actual behavior (options, defaults, commands) and are easy to keep in sync
-**And** missing or partial docs are surfaced rather than silently absent.
+<!-- Story 5.4 (OSS Onboarding and Reference Documentation) removed 2026-07-11 (SCP 2026-07-11, correct-course)
+     and folded into Epic 16 Story 16.6 (Release-Facing Documentation, which now OWNS onboarding/reference
+     content rather than deferring to 5.4). FR18 coverage moved Epic 5 → Epic 16. Story number 5.4 is
+     intentionally vacant per the append-only / no-renumber convention. Original ACs preserved in the
+     Sprint Change Proposal (sprint-change-proposal-2026-07-11.md) and now carried by Story 16.6 AC #1/#3. -->
 
 ## Epic 6: VS Code Read-Only Companion Surface
 
-Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects.
+Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects, and grow the extension's native host-integration surface (discoverability, commands, tree view/status bar, editor bridges, reactivity) so it feels native — all read-only and rendered from core-emitted data.
 
-**FRs covered:** FR13
+**FRs covered:** FR13, FR35
+
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course): FR35 + Stories 6.8–6.12 added to seat the VS Code
+     Native-Integration Recommendations (docs/VSCodeIntegrationRecommendations.md, R1–R8). Stories 6.1–6.7
+     unchanged. The two Epic 6 invariants hold throughout: rendering stays in C#, the extension stays
+     read-only (ADR 0005 AD-1/AD-2, ADR 0003 AD-6). Several recommendations seat in OTHER stories they
+     belong to (annotated in place): R5.3→5.2, R4.2→7.1/7.2, R4.3→8.4, R1.4/R1.6/R8.1→16.5, R8.2→6.7. -->
 
 ### Story 6.1: Shared View-Model Contract for HTML and Webview Adapters
 
@@ -994,6 +1028,11 @@ So that we either commit to the pivot with evidence (and re-plan Epics 6/16) or 
 
 ### Story 6.7: JSON + Client-Renderer (SPA) Delivery Adapter
 
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course) — carries VS Code recommendation R8.2: keep the WebviewBundle
+     payload shape compatible with this story's JSON data-layer schema, so the webview can OPTIONALLY consume
+     committed/CI-generated JSON for instant first paint (with the live spawn refreshing behind it). Design note
+     only — a JSON-only consumer cannot regenerate, so the binary remains the live path (the ADR 0006 trade-off). -->
+
 <!-- 2026-07-10: Seated by ADR 0006 (Accepted) as an ADDITIVE delivery option — see docs/adrs/0006. The 6.6
      spike proved the file-count concern (Epic-7 scale reaches thousands of files) is real, and that a JSON +
      client-renderer output form addresses it WITHOUT porting the C# core: it is a second C# IRenderAdapter over
@@ -1023,6 +1062,158 @@ So that file-count-heavy projects (Epic-7 scale) stay manageable while rendering
 **When** it is selected
 **Then** the existing static-HTML surface and the golden byte-parity gate are unaffected (opt-in; no change to default generation).
 
+<!-- Stories 6.8–6.12 added 2026-07-11 (SCP 2026-07-11, correct-course) to seat the VS Code Native-Integration
+     Recommendations (docs/VSCodeIntegrationRecommendations.md). Each story names the R-items it delivers.
+     Constraints (per §2 of that doc): rendering stays in C#; the extension stays read-only; VS Code settings
+     carry HOST concerns only (project behavior stays in directory-scoped settings, ADR 0003); the generated
+     HTML surface stays byte-identical (golden fingerprint unaffected); status surfaces derive from the six
+     core-emitted --status-* stages, never re-mapped onto VS Code's 3-severity palette. Delivery order per the
+     doc's §4 waves: 6.8 (the "Now" quick-dev wave, incl. the Workspace-Trust hole that MUST close before the
+     16.5 Marketplace publish) → 6.9–6.11 (the "Next" story-sized wave) → 6.12 (diagnostics, rides Story 4.8).
+     All complete before the Epic 17 hardening pass. Run create-story per story when scheduled. -->
+
+### Story 6.8: Extension Discoverability, Workspace Trust, and Command Surface
+
+<!-- Seats recommendations R5.4 (Workspace Trust — must land before Story 16.5 Marketplace publish),
+     R1.1–R1.3 (activation events, context keys, explorer/editor menus), R2.1–R2.4 (direct-open / refresh /
+     generate-watch terminal-handoff / open-generated-site commands), R3.3 (open-beside + specscribe.openLocation),
+     R5.2 (open project settings), R7.1–R7.3 (cold-start progress, actionable error notification, panel icon).
+     All manifest/routing changes reusing the existing spawn/panel machinery — no new rendering. -->
+
+As a VS Code user with a spec-driven repository,
+I want the extension to announce itself and offer more than one way in — activating on project detection, contributing menus and direct-open/refresh commands, and declaring a safe workspace-trust posture,
+So that I can discover and drive SpecScribe natively instead of having to already know a single command exists.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a workspace that contains SpecScribe artifacts (detected by path existence only, no content parsing)
+**When** the folder is opened
+**Then** the extension activates, sets a `specscribe.projectDetected` context key, and its menu/command contributions appear only in such repos (gated by `when` clauses)
+**And** repos without spec artifacts see no SpecScribe noise.
+
+2.
+**Given** the extension spawns a workspace-adjacent binary and honors a `toolPath` setting
+**When** the manifest declares workspace-trust capabilities
+**Then** untrusted workspaces cannot override `toolPath` (declared via `capabilities.untrustedWorkspaces` with `restrictedConfigurations`), closing the tool-resolution attack surface, while user/machine-level values still apply
+**And** this posture is in place before the Story 16.5 Marketplace publish.
+
+3.
+**Given** the user wants to reach SpecScribe from the editor
+**When** command and menu contributions are used
+**Then** direct-open (Dashboard/Epics), refresh, open-generated-site, and explorer/editor-title "Open in SpecScribe Status" entries all route through the existing read-only spawn/panel path, the panel can open beside the active editor per a `specscribe.openLocation` host setting, and "Open Project Settings" reveals the directory-scoped settings file without SpecScribe writing it
+**And** generate/watch commands are staged into an integrated terminal for the user to run (SpecScribe never executes a write to the project's output).
+
+4.
+**Given** cold start and error paths
+**When** the panel is opening or a spawn fails
+**Then** first paint shows a progress/heartbeat affordance and failures surface an actionable notification (set `toolPath` / retry), and the panel tab carries a SpecScribe icon
+**And** no recommendation in this story mutates a project artifact.
+
+### Story 6.9: Native Project Outline — Tree View and Status Bar
+
+<!-- Seats R3.1 (activity-bar TreeView: epics → stories with status, via a new core JSON outline export —
+     the ADR 0005 §1 "JSON export for a non-webview consumer" clause), R3.2 (status-bar summary item), and
+     R1.5 (viewsWelcome empty state). Requires contributing six specscribe.status.* theme colors (light/dark/
+     highContrast, mirroring the Story 6.5 accent tuning) so ThemeIcon-based status icons stay on the semantic
+     --status-* stages rather than host severities. New structural surface — its own story per "split, don't
+     absorb". -->
+
+As a VS Code user,
+I want a persistent SpecScribe outline in the sidebar and a status summary in the status bar,
+So that I can glance at epic/story status and jump to any surface without opening the webview panel.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the rendering core exposes a host-neutral outline export (epic/story id, title, status stage, counts, surface path, source artifact path) — added as a new `outline` payload or `specscribe outline` command, not scraped HTML
+**When** the extension renders its activity-bar tree view
+**Then** epics and their stories appear as tree nodes mapped 1:1 from the export, with status conveyed by icons derived from the six core-emitted `--status-*` stages (via contributed `specscribe.status.*` theme colors, not VS Code's 3-severity palette)
+**And** an empty/undetected workspace shows a `viewsWelcome` guidance state rather than a dead view.
+
+2.
+**Given** the tree view and a status-bar item
+**When** the user interacts with them (all read-only)
+**Then** clicking a node reveals that surface in the webview panel, context actions open the source markdown or copy the story's helper prompt, and the status-bar item shows a summary count (e.g. active/review) that opens the status panel
+**And** a failed refresh is shown as a stale/error indicator rather than silently wrong data.
+
+### Story 6.10: Editor ↔ Artifact Bridges (Reveal-Source)
+
+<!-- Seats R4.1 (reveal-source from the webview → showTextDocument). Also establishes the structured-link
+     seam that R4.2 (Epic 7 code citations → showTextDocument at a line) and R4.3 (Story 8.4 next-step
+     command → terminal handoff) plug into — those two implement in their owning stories (7.1/7.2, 8.4),
+     annotated there. Read-only: opens editors, changes nothing. -->
+
+As a VS Code user,
+I want to jump from a surface in the webview straight to the artifact that produced it,
+So that the portal and my files feel like one thing rather than two disconnected views.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the webview payload carries source-artifact paths on its surface/section metadata
+**When** I trigger "reveal source" on a surface or section in the webview
+**Then** a `revealSource` host message opens that markdown file via `showTextDocument` (read-only navigation, no mutation)
+**And** the path resolution reuses the core-resolved roots (no duplicated path assumptions).
+
+2.
+**Given** future code-citation (Epic 7) and next-step-command (Story 8.4) surfaces
+**When** those surfaces emit links
+**Then** the core emits them with structured data attributes (e.g. `data-code-path`/`data-line`, or command text) so the VS Code host can re-target them natively (editor at a line; command staged in a terminal), while the HTML surface keeps its portal/GitHub links
+**And** the re-targeting behavior itself is implemented in the owning stories (7.1/7.2, 8.4), this story only guarantees the seam exists.
+
+### Story 6.11: File-Change Reactivity Hardening
+
+<!-- Seats R6.1 (the shipped live-data DEFECT: non-.md sources — sprint-status.yaml, _bmad/config.toml —
+     never trigger refresh, in BOTH the extension globs and the core FileWatcherService Filter="*.md" plus its
+     three .md-enforcing sites; already recorded in deferred-work.md), R6.2 (derive watch roots from the core's
+     resolved source/ADR roots instead of hardcoded globs), R6.3 (visibility-aware refresh: mark dirty while
+     hidden, render on reveal). R6.4 scoped-re-render is the ADR 0005 §3 follow-up already tracked in
+     deferred-work; fold it here or leave as its noted 6.4 polish item. -->
+
+As a VS Code user with the status panel open,
+I want edits to every data source the portal reads to refresh the view — not just markdown,
+So that the panel never silently shows stale sprint or config data.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the "stays live" promise (Story 6.4 AC #3) and that `sprint-status.yaml` / `_bmad/config.toml` feed the dashboard
+**When** those non-`.md` sources change while the panel is open
+**Then** the view refreshes for them — fixed in both layers: the extension watch globs and the core `FileWatcherService` (its `Filter`, its debounce re-guard, and its fire-time dispatch, which needs a "regenerate the surfaces this feeds" route for yaml/toml rather than the `.md`-only artifact routes)
+**And** the fix is a reviewed change, not a drive-by glob edit (per the deferred-work note).
+
+2.
+**Given** a repository configured with non-default source/ADR roots (Story 5.1/5.2)
+**When** the extension sets up its file watchers
+**Then** the watched paths are derived from the core-resolved roots carried in the webview payload (workspace-relative), not the hardcoded `_bmad-output/`/`docs/adrs/` globs
+**And** a hidden panel marks itself dirty and re-renders once on reveal rather than re-spawning per change while hidden.
+
+### Story 6.12: Native Diagnostics — Problems Panel Integration
+
+<!-- Seats R8.3 (map the per-artifact generation errors the `specscribe webview` command already streams on
+     stderr into VS Code Diagnostics on the offending files). Depends on Story 4.8's diagnostics work for the
+     core-owned structured (JSON-lines: path/message/severity) format; rides with or after 4.8. Pure data
+     transport — arguably the most "native" integration in the recommendations. -->
+
+As a VS Code user,
+I want SpecScribe's per-artifact generation warnings to appear in the Problems panel on the offending files,
+So that broken or unsupported artifacts surface where every other tool's errors live.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the core emits per-artifact generation notices in a structured, core-owned format (JSON lines: path, message, severity — the same channel Story 4.8's diagnostics page consumes)
+**When** the extension receives them
+**Then** it maps each to a VS Code `Diagnostic` anchored to the offending artifact file, clearing them when a later run resolves the notice
+**And** this remains pure read-only data transport (no artifact is modified).
+
+2.
+**Given** Story 4.8 owns the diagnostics format and page
+**When** this story is scheduled
+**Then** it consumes that format rather than defining a parallel one, and degrades cleanly (no diagnostics surfaced) when the core emits none
+**And** it stays coherent with the diagnostics page so the two never disagree.
+
 ## Epic 7: Code and Git Exploration
 
 Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth — so the portal explains not just what is planned, but what exists and what happened when.
@@ -1030,6 +1221,12 @@ Let users browse the project's code and history in-portal — turning source cit
 **FRs covered:** FR14, FR15, FR16, FR19
 
 ### Story 7.1: In-Portal Code File Browsing
+
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course) — carries VS Code recommendation R4.2 (with 7.2): design the
+     code-citation links so a host can re-target them. Emit code links with structured data attributes
+     (data-code-path, data-line) so the VS Code webview can map a click to showTextDocument(file, {selection:line})
+     instead of an in-portal code page, while the HTML surface keeps its portal/GitHub links. Design the seam in
+     here, don't retrofit; the webview re-targeting itself rides Story 6.10's link seam. -->
 
 As a reviewer,
 I want project source files rendered as readable pages,
@@ -1050,6 +1247,11 @@ So that I can inspect referenced code without leaving the portal.
 **And** the page degrades safely for very large, binary, or unreadable files.
 
 ### Story 7.2: Source-Citation and Comment Linking to Code Pages
+
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course) — owns VS Code recommendation R4.2 (link resolution): when this
+     story defines how source citations resolve to code pages, emit the structured data attributes (data-code-path,
+     data-line) that let the VS Code host re-target citations to native editor navigation. Pairs with Story 7.1
+     and plugs into Story 6.10's reveal seam. -->
 
 As a contributor,
 I want source citations and "View source" links to resolve to in-portal code pages,
@@ -1235,6 +1437,12 @@ So that "5/5 tasks done" while in review reads as one coherent fact, not a contr
 **And** stories lacking task plans are visually separated from actionable ones.
 
 ### Story 8.4: State-Aware Next-Step Command Surface
+
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course) — carries VS Code recommendation R4.3: in the webview, pair the
+     existing copy-command helper with "Open in Terminal" (createTerminal + sendText(command, execute:false) — the
+     command is STAGED at a prompt and the user presses Enter). Preserves the AD-6/ADR 0003 read-only ruling
+     (SpecScribe never executes; the explicit choice stays with the user) while feeling native. Worth an explicit
+     AC here so the read-only ruling is recorded; the webview wiring rides Story 6.10's link seam. -->
 
 As a maintainer selecting work,
 I want the portal to recommend one primary command per lifecycle state plus applicable unhappy-path actions,
@@ -1916,6 +2124,14 @@ So that releases are one action and never depend on a local machine's state.
 <!-- Depends on Epic 6: the extension surface (esp. Story 6.4 runtime) must exist before it can be
      packaged/published. Keep blocked/backlog until Epic 6 delivers the extension. -->
 
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course) — owns VS Code recommendations R1.4 (contributes.walkthroughs
+     first-run onboarding — the single best Marketplace-launch onboarding lever), R1.6 (Marketplace metadata
+     polish: real categories, keywords, icon, repository, README with screenshots — already implied by AC #1),
+     and R8.1 (platform-specific VSIX targets: `vsce package --target win32-x64` etc. so the Marketplace serves
+     each user only their platform's build, turning ADR 0005's ~73 MB-per-RID from a multiplied download into a
+     single-RID one). PREREQUISITE: the Workspace-Trust posture (R5.4) in Story 6.8 must be in place before this
+     publish — it is a Marketplace review-bar item. -->
+
 As a VS Code user,
 I want the read-only SpecScribe extension available from the Marketplace,
 So that I can install it without building from source.
@@ -1938,11 +2154,15 @@ So that I can install it without building from source.
 **When** this story is scheduled
 **Then** it remains blocked/backlog and is not started until the extension surface exists.
 
-### Story 16.6: Release-Facing Documentation, Changelog, and Versioning Policy
+### Story 16.6: OSS Onboarding, Release-Facing Documentation, Changelog, and Versioning Policy
+
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course): absorbed the removed Story 5.4 (OSS onboarding/reference
+     docs). This story now OWNS both onboarding/reference content (FR18) and release-facing docs (FR34);
+     AC #2/#3 below carry the former 5.4 ACs. -->
 
 As a community adopter,
-I want install/upgrade instructions, a changelog, and a stated versioning policy,
-So that I can adopt the preview confidently and track what changes between releases.
+I want getting-started and configuration/CLI reference documentation alongside install/upgrade instructions, a changelog, and a stated versioning policy,
+So that I can install, run, configure, and contribute to SpecScribe without insider knowledge, and adopt the preview confidently while tracking what changes between releases.
 
 **Acceptance Criteria:**
 
@@ -1950,13 +2170,20 @@ So that I can adopt the preview confidently and track what changes between relea
 **Given** the chosen distribution channels
 **When** the release docs are produced
 **Then** the README (and Marketplace listing, if applicable) carry accurate install, upgrade, and quick-start instructions using real commands
-**And** a `CHANGELOG.md` following the Story 16.1 format exists and is updated per release.
+**And** a `CHANGELOG.md` following the Story 16.1 format exists and is updated per release
+**And** `--help`/`--version` output is audited to match the docs.
 
 2.
-**Given** Story 5.4 owns onboarding/reference content
-**When** these release docs are written
-**Then** they cover distribution-facing concerns (install/upgrade, changelog, versioning/pre-release policy, Marketplace listing copy) and cross-link to — rather than duplicate — Story 5.4's material
-**And** `--help`/`--version` output is audited to match the docs.
+**Given** a new user or contributor arrives at the repository (former Story 5.4 scope, FR18)
+**When** they follow the documentation
+**Then** getting-started steps, a configuration/CLI reference, and contribution guidance are complete, accurate, and current
+**And** examples reflect real, working commands.
+
+3.
+**Given** the documentation coexists with the tool and generated portal (former Story 5.4 scope, FR18)
+**When** it is produced
+**Then** docs stay consistent with actual behavior (options, defaults, commands) and are easy to keep in sync, with distribution-facing concerns (install/upgrade, changelog, versioning/pre-release policy, Marketplace listing copy) integrated rather than duplicated
+**And** missing or partial docs are surfaced rather than silently absent.
 
 ### Story 16.7: Preview Launch Readiness and Cut
 
@@ -2000,3 +2227,144 @@ So that trying and using the tool (locally or in CI) is as low-friction as any N
 **Given** npx is an additive channel
 **When** it ships
 **Then** the `dotnet tool` channel remains available for .NET users, versioning stays aligned with Story 16.1's policy, and the wrapper's per-RID binary matrix is documented (size/latency trade-offs per ADR 0006).
+
+<!-- Epic 17 added 2026-07-11 (SCP 2026-07-11, correct-course): pre-publication hardening. Runs after feature
+     completion (Epics 1–15, 18) and Epic 5, and BEFORE Epic 16's publish/cut stories — its sign-off (Story 17.4)
+     gates the community preview. NFR10. Append-only, no renumber. Run create-story per story when scheduled. -->
+
+## Epic 17: Code Hardening & Release-Readiness Review
+
+A dedicated pre-publication pass to get SpecScribe ready to work reliably and safely with both public and private codebases: remediate structural weaknesses, inconsistencies, and inefficiencies accumulated across the feature epics; close security and privacy gaps; and burn down or explicitly accept the deferred-work and retro-action backlog — ending in a release-readiness sign-off that gates Epic 16's publication and cut. This epic reviews and remediates existing code; it does not add product features.
+
+**NFRs covered:** NFR10 (also touches NFR1 performance, NFR4 extensibility).
+**Sequencing:** after Epics 1–15 and 18 (features) and Epic 5 (CLI); before Epic 16 Stories 16.3+ (publish) and 16.7 (cut).
+
+### Story 17.1: Structural and Consistency Remediation Sweep
+
+As the SpecScribe maintainer preparing for public release,
+I want a deliberate sweep for structural weaknesses, inconsistencies, and duplication across the C# core, the extension shim, and the stylesheet,
+So that the codebase is coherent and maintainable before outside contributors and users depend on it.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the code accumulated across the feature epics
+**When** the structural review runs
+**Then** it identifies and remediates structural weaknesses and inconsistencies — duplicated single-source-of-truth violations (for example the twin sunburst legend tuples, the divergent `scroll-margin-top` clearance values, the icon key/label dual-representation), dead or unreachable code, and naming/token drift — with each fix pinned by a test or an explicit rationale for deferral
+**And** the golden byte-parity gate and full test suite stay green (remediation must not change rendered output unless a change is intentional and re-baselined).
+
+2.
+**Given** items already recorded in `deferred-work.md` as maintainability/consistency debt
+**When** this sweep triages them
+**Then** each is either fixed here or carried forward with a recorded decision, and no fix silently regresses another surface
+**And** the review covers the extension TypeScript shim and the CSS, not only the C# core.
+
+### Story 17.2: Security and Privacy Hardening for Public and Private Repos
+
+As the SpecScribe maintainer,
+I want the tool audited and hardened so it is safe to run on both public and private codebases,
+So that neither a hostile public repo nor a sensitive private one can produce an unsafe or leaky result.
+
+**Acceptance Criteria:**
+
+1.
+**Given** SpecScribe renders untrusted repository content into HTML and a VS Code webview
+**When** the security review runs
+**Then** output-injection surfaces are closed — HTML-escaping is complete and consistent (for example the unescaped detail-page `<h1>` titles, `StatusStyles.Badge`'s un-escaped `cssClass`, and the `RequirementLinkifier` attribute-injection exposure recorded in deferred-work), the webview CSP/nonce posture is verified, and the untrusted-workspace / `toolPath` tool-resolution attack surface is closed (Story 6.8's Workspace-Trust posture is present and effective)
+**And** each closed hole is pinned by a regression test.
+
+2.
+**Given** SpecScribe may run on a private codebase
+**When** the privacy review runs
+**Then** generated output is confirmed to leak no secrets or unintended private content beyond what the source artifacts already expose, no personal-structure assumptions remain that would misrender or drop a differently-organized repo (Epic 4 de-personalization verified end to end), and third-party dependencies (C# and the extension's npm tree) are audited for known vulnerabilities
+**And** local-first / no-remote-telemetry operation (NFR3) is re-confirmed for every code path added since it was last verified.
+
+### Story 17.3: Performance and Efficiency Pass
+
+As a user running SpecScribe on a real, sometimes-large repository,
+I want the known performance and efficiency debts addressed before release,
+So that generation and the live webview stay responsive at realistic scale.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the performance debts recorded across the feature epics
+**When** the efficiency pass runs
+**Then** the highest-impact items are addressed or explicitly accepted with rationale — the webview's full-site re-render per change (ADR 0005 §3 scoped re-render / warm-renderer follow-up), unbounded git-log/heatmap payloads on mature repos, redundant per-fragment renderer-swap scans, and missing recursion-depth guards on the tree/treemap renderers
+**And** baseline generation performance (NFR1) is measured before and after, with deep analytics still separated from baseline runs.
+
+2.
+**Given** changes intended purely to improve efficiency
+**When** they land
+**Then** rendered output stays byte-identical (or intentional changes are re-baselined) and the test suite stays green
+**And** any item left unaddressed is recorded as an accepted known limitation rather than dropped silently.
+
+### Story 17.4: Deferred-Work Burndown and Release-Readiness Sign-off
+
+As the SpecScribe maintainer,
+I want every open deferred-work item and retrospective action triaged to a decision, and a release-readiness sign-off produced,
+So that the community preview ships from a known, deliberate state rather than an unreviewed backlog.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the `deferred-work.md` backlog and the open `sprint-status.yaml` retrospective action items
+**When** the burndown runs
+**Then** each open item is resolved, scheduled into a specific story, or explicitly accepted as a documented known limitation — with none left in an ambiguous open state
+**And** items resolved by Stories 17.1–17.3 are closed in the same pass (per the Epic 3 retro rule: close items when the fix ships).
+
+2.
+**Given** the hardening work of this epic is complete
+**When** the sign-off is produced
+**Then** a release-readiness record states that structural, security/privacy, and performance reviews passed (or lists accepted limitations), and that the tool is cleared to run against public and private codebases
+**And** this sign-off is the gate Epic 16's publish/cut stories (16.3+, 16.7) depend on.
+
+<!-- Epic 18 added 2026-07-11 (SCP 2026-07-11, correct-course): BMad-native module/expansion exploration
+     (FR36), distinct from the third-party-framework Epics 11–15. Spike-led (18.1) per the Epics 11–15 pattern.
+     Exploratory — sequences alongside 11–15, not on the release-blocking path. Run create-story when scheduled. -->
+
+## Epic 18: BMad Module & Expansion Coverage Exploration
+
+Extend first-class BMad support beyond the BMM core (already supported) to BMad's own module and expansion ecosystem — for example BMad Builder, Creative Intelligence, and game-dev / GDS-style expansions — so BMad users working in non-BMM modules see their planning and tracking artifacts represented in the portal. Delivered through Epic 4's shared adapter contract and led by a landscape-and-coverage spike, mirroring the spike-led Epics 11–15. Distinct from those third-party-framework epics: this is the BMad-native module surface. Exploratory, not release-blocking.
+
+**FRs covered:** FR36
+
+### Story 18.1: BMad Module Landscape and Coverage Spike
+
+As a maintainer preparing to support BMad modules beyond BMM,
+I want the BMad module/expansion ecosystem inventoried and each module's distinctive artifacts mapped against the shared adapter contract before any coverage work begins,
+So that baseline coverage starts with a defined scope, a prioritized target module, and no surprise conventions.
+
+**Acceptance Criteria:**
+
+1.
+**Given** BMad's module and expansion ecosystem beyond the BMM core (for example BMad Builder, Creative Intelligence, and game-dev / GDS-style expansions)
+**When** the spike inventories it and surveys each module's artifact set against the shared adapter contract's ArtifactBundle and projection model
+**Then** a written coverage map classifies each module's distinctive artifact types as mappable, partially-mappable, or unsupported (noting which are already covered by the existing BMM parsing), names the target shared-model projection for each mappable type, and recommends a priority module (or modules) to cover first
+**And** the survey distinguishes BMad-native modules from the third-party frameworks already scoped by Epics 11–15.
+
+2.
+**Given** module conventions that exceed the shared projection model or that SpecScribe will deliberately not support
+**When** the spike documents its findings
+**Then** framework/module-extra data is recorded as candidate projection extensions or explicit non-goals, and deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit
+**And** the current BMM-specific next-step-command mapping is assessed for generalization to other modules (per the "strongly GDS-oriented … requires generalization" note in Additional Requirements), giving the coverage story an agreed scope boundary.
+
+### Story 18.2: Priority BMad Module Baseline Coverage
+
+As a team using a BMad module beyond BMM,
+I want my module's core planning and tracking artifacts interpreted in the portal,
+So that I can track progress without switching tools or losing module-specific work.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the priority module(s) chosen by Story 18.1's coverage map
+**When** generation runs against a representative repository for that module
+**Then** the module's core planning and tracking artifacts render without fatal failures via the shared adapter contract, each discovered artifact labeled rendered, summarized, or unsupported
+**And** output stays coherent alongside the existing BMM and framework surfaces, with BMM support fully intact.
+
+2.
+**Given** module-specific artifacts the projection does not model
+**When** they are discovered
+**Then** they surface as explicit non-fatal notices (coverage-tier labeling where partial) and never block full-site generation
+**And** any module-specific next-step-command vocabulary flows through the adapter contract rather than being hard-coded (NFR8).

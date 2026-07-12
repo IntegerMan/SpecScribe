@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: 2026-07-11T00:00:00-04:00
+# last_updated: 2026-07-11T15:30:00-04:00
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-11T13:00:00-04:00
+last_updated: 2026-07-11T15:30:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -87,7 +87,8 @@ development_status:
   5-1-cli-generate-and-watch-modes-with-smart-defaults: ready-for-dev
   5-2-directory-scoped-settings-with-interactive-and-cli-parity: ready-for-dev
   5-3-watch-regeneration-safety-and-scope-aware-rebuilds: ready-for-dev
-  5-4-oss-onboarding-and-reference-documentation: backlog
+  # 5-4-oss-onboarding-and-reference-documentation: REMOVED 2026-07-11 (SCP 2026-07-11, correct-course) —
+  # folded into Epic 16 Story 16.6; FR18 coverage moved Epic 5 → Epic 16. Slot intentionally vacant (append-only).
   epic-5-retrospective: optional
 
   epic-6: in-progress
@@ -121,6 +122,16 @@ development_status:
   # the static-HTML/noscript fallback (NFR6). Rendering stays in C#; no core port. Addresses the file-count concern
   # (Epic-7 scale). Run create-story to detail when scheduled. DEPENDS ON 6.1 (IRenderAdapter seam) + 6.2 (views).
   6-7-json-and-spa-delivery-adapter: ready-for-dev # create-story 2026-07-11: ADR-0006 Architecture B (additive third IRenderAdapter, Id "spa"); whole-site consolidation via the universal <main id="main-content"> landmark seam (no all-pages PageView rewrite); ships pre-rendered content regions (NOT the ~13.5 KB data floor — that's deferred option D); opt-in --spa flag, static site byte-identical + noscript fallback
+  # Stories 6.8–6.12 added 2026-07-11 (SCP 2026-07-11, correct-course): seat the VS Code Native-Integration
+  # Recommendations (docs/VSCodeIntegrationRecommendations.md, FR35). Read-only, rendering stays in C#. Complete
+  # before the Epic 17 hardening pass. 6.8 = the "Now" quick-dev wave (incl. Workspace-Trust R5.4, a Marketplace
+  # prerequisite for 16.5); 6.9–6.11 = the "Next" story-sized wave; 6.12 = diagnostics, rides Story 4.8.
+  # Run create-story per story when scheduled.
+  6-8-extension-discoverability-workspace-trust-and-command-surface: backlog
+  6-9-native-project-outline-tree-view-and-status-bar: backlog
+  6-10-editor-artifact-bridges-reveal-source: backlog
+  6-11-file-change-reactivity-hardening: backlog
+  6-12-native-diagnostics-problems-panel-integration: backlog
   epic-6-retrospective: optional
 
   epic-7: in-progress
@@ -203,6 +214,25 @@ development_status:
   # self-contained binary with no .NET SDK. Aligns with / feeds Story 16.3 (CLI packaging). Run create-story to detail.
   16-8-npx-distribution-via-npm-wrapped-binary: backlog
   epic-16-retrospective: optional
+
+  # Epic 17 added 2026-07-11 (SCP 2026-07-11, correct-course): pre-publication code hardening (NFR10). Runs after
+  # feature completion (Epics 1–15, 18) and Epic 5, and BEFORE Epic 16's publish/cut stories — Story 17.4's
+  # release-readiness sign-off gates the community preview. Reviews/remediates existing code; adds no features.
+  # All backlog; run create-story per story when scheduled.
+  epic-17: backlog
+  17-1-structural-and-consistency-remediation-sweep: backlog
+  17-2-security-and-privacy-hardening-for-public-and-private-repos: backlog
+  17-3-performance-and-efficiency-pass: backlog
+  17-4-deferred-work-burndown-and-release-readiness-sign-off: backlog # gates Epic 16 publish/cut (16.3+, 16.7)
+  epic-17-retrospective: optional
+
+  # Epic 18 added 2026-07-11 (SCP 2026-07-11, correct-course): BMad-native module/expansion exploration (FR36),
+  # distinct from third-party-framework Epics 11–15. Spike-led (18.1). Exploratory — sequences alongside 11–15,
+  # not release-blocking. All backlog; run create-story per story when scheduled.
+  epic-18: backlog
+  18-1-bmad-module-landscape-and-coverage-spike: backlog
+  18-2-priority-bmad-module-baseline-coverage: backlog
+  epic-18-retrospective: optional
 
 action_items:
   - epic: 1
