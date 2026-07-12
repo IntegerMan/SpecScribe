@@ -86,7 +86,10 @@ public sealed class WebviewCommand : Command<SiteSettings>
             // into. The extension's "Open Generated Site" command joins this to the workspace folder to find
             // an already-generated index.html. [Story 6.8 AC #3, R2.4]
             configuredOutputRoot,
-            surfaces = bundle.Surfaces.ToDictionary(s => s.OutputRelativePath, s => new { title = s.Title, content = s.ContentHtml }),
+            // `sourcePath` (Story 6.10): the repo-relative artifact each surface was rendered from, so the webview's
+            // "Open source" control can post `revealSource` and the shim opens it read-only. Null (dashboard) omits
+            // the button host-side. A per-surface datum, not rendering — the generated site is unaffected.
+            surfaces = bundle.Surfaces.ToDictionary(s => s.OutputRelativePath, s => new { title = s.Title, content = s.ContentHtml, sourcePath = s.SourcePath }),
             // Host-neutral epic/story outline + status-bar summary for the VS Code native surfaces (activity-bar
             // tree, status bar). Data, not rendering (ADR 0005 §1); its SurfacePaths are exactly the surface keys
             // above, so a tree click reveals the right surface. Emits no HTML — the generated site is unaffected.

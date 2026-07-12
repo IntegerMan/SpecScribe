@@ -6,7 +6,8 @@
 //   2. open a WebviewPanel, AND drive the native activity-bar tree + status bar (Story 6.9),
 //   3. obtain C#-rendered HTML + the host-neutral `outline` from the `specscribe webview` child process,
 //   4. inject the two host-runtime values (cspSource + nonce) the C# shell left as placeholders,
-//   5. relay messages: in-webview navigation, open-external, and file-change live-push (postMessage, in place).
+//   5. relay messages: in-webview navigation, open-external, reveal-source (open a `.md` read-only), and
+//      file-change live-push (postMessage, in place).
 //
 // It parses NO markdown, renders NO view, and holds NO project knowledge (AD-1/AD-2). Project *detection* is by
 // path existence only (`fs.existsSync`) — not parsing, so AD-2 holds. Every byte of visible content — including
@@ -27,6 +28,10 @@ import * as path from 'node:path';
 interface SurfaceContent {
   title: string;
   content: string; // nav + breadcrumb + body — what an in-place swap installs into #specscribe-surface
+  /** The repo-relative markdown this surface was rendered from, for the read-only "Open source" reveal (Story
+   * 6.10). Forward-slashed, host-joined to the workspace folder (the ONE convention — no `_bmad-output` literal
+   * here). Absent/empty for a source-less surface (the dashboard) → the reveal button stays hidden. [Story 6.10] */
+  sourcePath?: string;
 }
 
 /** One story in the host-neutral outline (mirrors the C# `OutlineStory`). Every field is core-decided; the shim
@@ -37,7 +42,8 @@ interface OutlineStory {
   stage: string;        // done|review|active|ready|drafted — keys the status color + icon map
   stageLabel: string;   // human name for the tooltip (core-emitted, never composed here)
   surfacePath?: string; // a surfaces[...] key to push() to (present for placeholder stories too)
-  sourcePath?: string;  // artifact path relative to _bmad-output/ for read-only "Open Source"; absent → no action
+  sourcePath?: string;  // repo-relative artifact path for read-only "Open Source" (host-joined to the folder, one
+                        // convention shared with the webview reveal — no _bmad-output literal); absent → no action
   tasksDone: number;
   tasksTotal: number;
   helperCommand?: string; // the most-actionable BMad command, composed core-side; absent → no copy action
@@ -270,14 +276,29 @@ function createController(
     const surface = cache.surfaces[target] ?? cache.surfaces[cache.entry];
     if (!surface) return;
     current = cache.surfaces[target] ? target : cache.entry;
-    p.webview.postMessage({ type: 'update', html: surface.content, path: current, reason, fragment });
+    // `source` carries the swapped-in surface's repo-relative artifact (Story 6.10) so the bridge can refresh
+    // #specscribe-surface's data-source and show/hide the "Open source" button; '' when the surface has none.
+    p.webview.postMessage({ type: 'update', html: surface.content, path: current, source: surface.sourcePath ?? '', reason, fragment });
   }
 
-  p.webview.onDidReceiveMessage(async (msg: { type?: string; target?: string; fragment?: string; href?: string; text?: string; label?: string }) => {
+  p.webview.onDidReceiveMessage(async (msg: { type?: string; target?: string; fragment?: string; href?: string; text?: string; label?: string; path?: string; line?: number }) => {
     if (msg?.type === 'copyHelperText' && typeof msg.text === 'string') {
       // Read-only helper handoff (AD-6/NFR-5): the webview generated a prompt; the only thing the host does is put
       // it on the clipboard. NOTHING here writes a project artifact, edits a file, or mutates settings. [Story 6.5]
       await copyToClipboard(msg.text, msg.label ?? 'text');
+      return;
+    }
+    if (msg?.type === 'revealSource' && typeof msg.path === 'string') {
+      // Reveal source (AC #1) — open the surface's core-emitted `.md` read-only, optionally at a line (AC #2's
+      // line-capable seam, ridden by Story 7.2's code citations). `showTextDocument` OPENS an editor; it never
+      // writes (AD-6/ADR 0003/FR-17/NFR-5). The path is core-resolved repo-relative; join it to the workspace
+      // folder through the containment guard so a stale/hostile payload can't turn this into "open any file".
+      const target = resolveWorkspacePath(folder.uri.fsPath, msg.path);
+      if (!target) return;
+      const options = typeof msg.line === 'number' && msg.line > 0
+        ? { selection: new vscode.Range(msg.line - 1, 0, msg.line - 1, 0) } // data-line is 1-based; Range is 0-based
+        : undefined;
+      void vscode.window.showTextDocument(vscode.Uri.file(target), options);
       return;
     }
     if (msg?.type === 'navigate' && typeof msg.target === 'string') {
@@ -562,18 +583,38 @@ function renderStatusBar(): void {
 // ===== Story 6.9: tree context actions (all read-only) =======================================================
 
 /** "Open Source" (tree context action): open the story's source `.md` in a read-only editor. Resolves the
- * core-emitted relative path against the workspace root + `_bmad-output/` (fact #6). No mutation — `showTextDocument`
- * only opens. Absent `sourcePath` nodes never expose this (contextValue gate), so `node` always carries one here. */
+ * core-emitted REPO-relative path against the workspace folder through the SAME containment guard the webview
+ * reveal uses — one convention, no `_bmad-output` literal (Story 6.10 AC #1 harmonization). No mutation —
+ * `showTextDocument` only opens. Absent `sourcePath` nodes never expose this (contextValue gate). */
 async function openSource(node: unknown): Promise<void> {
   const source = storyNode(node)?.story.sourcePath;
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!source || !folder) return;
-  const uri = vscode.Uri.file(path.join(folder.uri.fsPath, '_bmad-output', source));
+  const target = resolveWorkspacePath(folder.uri.fsPath, source);
+  if (!target) {
+    void vscode.window.showErrorMessage(`SpecScribe: couldn't open ${source} — not found in this workspace.`);
+    return;
+  }
   try {
-    await vscode.window.showTextDocument(uri);
+    await vscode.window.showTextDocument(vscode.Uri.file(target));
   } catch (err) {
     void vscode.window.showErrorMessage(`SpecScribe: couldn't open ${source}: ${String(err)}`);
   }
+}
+
+/** Resolve a core-emitted repo-relative path against the workspace folder, returning it ONLY if it stays inside
+ * the folder AND exists on disk. Defense-in-depth (Story 17.2 posture): the path is trusted core output, but the
+ * shim must never become an "open any file on disk" primitive on a stale or hostile payload — reject a `..`-escape,
+ * an absolute override, or a vanished target. Read-only-within-workspace is the entire contract; this joins the ONE
+ * repo-relative convention (shared by the tree "Open Source" and the webview reveal) to the folder. The subdir-open
+ * case (repo root ≠ workspace folder) is the same limitation the watchers carry today — Story 6.11, not solved
+ * here. [Story 6.10] */
+function resolveWorkspacePath(root: string, rel: string): string | undefined {
+  if (!rel || path.isAbsolute(rel)) return undefined;
+  const rootResolved = path.resolve(root);
+  const target = path.resolve(rootResolved, rel);
+  const within = target === rootResolved || target.startsWith(rootResolved + path.sep);
+  return within && fs.existsSync(target) ? target : undefined;
 }
 
 /** "Copy Helper Prompt" (tree context action): copy the story's core-composed helper command to the clipboard for

@@ -19,9 +19,12 @@ namespace SpecScribe;
 /// <param name="SurfacePath">The story page's output-relative path — one of the <c>surfaces[...]</c> keys the
 /// webview bundle emits — so a tree click can <c>push()</c> straight to it. Populated for placeholder stories
 /// too (the placeholder page IS a surface), so every story node is clickable; only null defensively.</param>
-/// <param name="SourcePath">The story artifact's path relative to <c>_bmad-output/</c> (e.g.
-/// <c>implementation-artifacts/6-9-….md</c>) for the tree's read-only "Open Source" action; null when the story
-/// has no drafted artifact yet (the action is then omitted host-side).</param>
+/// <param name="SourcePath">The story artifact's REPO-relative path (forward-slashed, e.g.
+/// <c>_bmad-output/implementation-artifacts/6-9-….md</c>) for the tree's read-only "Open Source" action; null when
+/// the story has no drafted artifact yet (the action is then omitted host-side). Repo-relative — not
+/// source-root-relative — so the host joins it to the workspace folder with the SAME one convention the webview
+/// reveal-source and <c>configuredOutputRoot</c> use, with no <c>_bmad-output</c> literal duplicated in TypeScript
+/// (Story 6.10 AC #1 "no duplicated path assumptions").</param>
 /// <param name="TasksDone">Checked task/subtask count from the artifact; 0 when there is no artifact.</param>
 /// <param name="TasksTotal">Total task/subtask count from the artifact; 0 when there is no artifact.</param>
 /// <param name="HelperCommand">The single most-actionable BMad command for this story's status (dev-story when

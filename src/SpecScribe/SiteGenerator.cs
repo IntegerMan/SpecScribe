@@ -650,6 +650,11 @@ public sealed class SiteGenerator
             // come through here, so the cache can never lag the rendered site.
             _storyArtifactsById = artifactMap;
             _referenceMap = referenceMap;
+            // The epics file's REPO-relative source path (Story 6.10 reveal-source): epic/index/placeholder
+            // surfaces resolve their "Open source" target to it. Repo-relative (not source-root-relative like
+            // ToSourceRelative) so the host joins it to the workspace folder with the same one convention the
+            // story `.md` and `configuredOutputRoot` use — no `_bmad-output` literal anywhere host-side.
+            _epicsSourcePath = RepoRelative(epicsFullPath);
 
             File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands), "epics.html"));
 
@@ -758,6 +763,17 @@ public sealed class SiteGenerator
     private IReadOnlyDictionary<string, string> _storyArtifactsById = new Dictionary<string, string>();
     private Dictionary<string, string> _referenceMap = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The epics file's repo-relative source path (forward-slashed), captured in
+    /// <see cref="RenderEpicsPages"/> so <see cref="RenderWebviewSurfaces"/> can point epic/index/placeholder
+    /// surfaces at it for the Story 6.10 reveal-source affordance. Empty until the first epics render pass. [Story 6.10]</summary>
+    private string? _epicsSourcePath;
+
+    /// <summary>Expresses an absolute path relative to the repo root with forward slashes — the ONE source-path
+    /// convention the VS Code host joins to the workspace folder (matching <c>configuredOutputRoot</c>), so no
+    /// <c>_bmad-output</c> or other path-structure literal is ever duplicated host-side (Story 6.10 AC #1). [Story 6.10]</summary>
+    private string RepoRelative(string absolutePath) =>
+        PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.RepoRoot, absolutePath));
+
     /// <summary>Renders the webview's navigable surface set — dashboard, epics index, every epic page, and every
     /// story page/placeholder (the five Story 6.2 surface families) — through the
     /// <see cref="WebviewRenderAdapter"/>, from the SAME cached models, builders, and fragment pipeline the HTML
@@ -793,37 +809,43 @@ public sealed class SiteGenerator
             if (_epicsModel is { } model && _progress is { } progress)
             {
                 var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands)));
+                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands), _epicsSourcePath));
 
                 foreach (var epic in model.Epics)
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
                     var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath);
-                    surfaces.Add(WebviewSurfaceFor(epicPage, skipEpicNumber: epic.Number));
+                    surfaces.Add(WebviewSurfaceFor(epicPage, _epicsSourcePath, skipEpicNumber: epic.Number));
 
                     var outlineStories = new List<OutlineStory>();
                     foreach (var story in epic.Stories)
                     {
                         PageView storyPage;
+                        // A drafted story's REPO-relative `.md` — the reveal-source target (Story 6.10) AND the
+                        // harmonized 6.9 tree "Open Source" path (one convention, host-joined to the workspace
+                        // folder). Null for a placeholder (no artifact yet); its surface still reveals the epics
+                        // file (the placeholder's source IS the epic), but the outline node omits "Open Source".
+                        string? storySourcePath = null;
                         if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
                         {
                             storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath);
                         }
                         else
                         {
+                            storySourcePath = RepoRelative(artifactFullPath);
                             var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
                             storyPage = EpicsTemplater.BuildStoryPage(
                                 epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                                 f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav,
                                 _module.Commands, epicRetroPath);
                         }
-                        surfaces.Add(WebviewSurfaceFor(storyPage, skipStoryId: story.Id));
+                        surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
 
                         var storyStage = StatusStyles.ForStory(story);
                         outlineStories.Add(new OutlineStory(
                             story.Id, story.Title, storyStage, StatusStyles.StoryLabel(storyStage),
                             PathUtil.NormalizeSlashes(storyPage.OutputRelativePath),
-                            story.ArtifactSourcePath,
+                            storySourcePath,
                             story.TasksDone, story.TasksTotal,
                             BmadCommands.PrimaryStoryCommand(story, _module.Commands)));
                     }
@@ -841,9 +863,11 @@ public sealed class SiteGenerator
             var outline = new ProjectOutline(outlineEpics, BuildOutlineSummary(outlineEpics));
 
             // The entry document embeds the dashboard's ALREADY-linkified content, so wrapping happens after
-            // linkification and the linkifier never walks the shell's CSS/bridge-script text.
+            // linkification and the linkifier never walks the shell's CSS/bridge-script text. The dashboard's
+            // SourcePath is null (it aggregates many artifacts), so the reveal button paints hidden — the bridge
+            // shows it only once an update swaps in a surface that carries a source (Story 6.10).
             var entry = surfaces[0];
-            var entryDocument = WebviewRenderAdapter.Shared.WrapDocument(dashboardPage, entry.ContentHtml);
+            var entryDocument = WebviewRenderAdapter.Shared.WrapDocument(dashboardPage, entry.ContentHtml, entry.SourcePath);
             return new WebviewBundle(_options.SiteTitle, entry.OutputRelativePath, entryDocument, surfaces, outline);
         }
     }
@@ -863,13 +887,15 @@ public sealed class SiteGenerator
     }
 
     /// <summary>Renders one page's webview content region and reference-linkifies it with the same skip rules
-    /// the HTML surface uses (a page never self-links its own story/epic mentions). [Story 6.4]</summary>
-    private WebviewSurface WebviewSurfaceFor(PageView page, string? skipStoryId = null, int? skipEpicNumber = null)
+    /// the HTML surface uses (a page never self-links its own story/epic mentions). <paramref name="sourcePath"/>
+    /// is the repo-relative artifact the surface was rendered from (the Story 6.10 reveal-source target), or null
+    /// for a source-less surface (the dashboard). [Story 6.4]</summary>
+    private WebviewSurface WebviewSurfaceFor(PageView page, string? sourcePath = null, string? skipStoryId = null, int? skipEpicNumber = null)
     {
         var content = ApplyReferenceLinks(
             WebviewRenderAdapter.Shared.RenderContent(page), page.OutputRelativePath,
             skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
-        return new WebviewSurface(PathUtil.NormalizeSlashes(page.OutputRelativePath), page.Title, content);
+        return new WebviewSurface(PathUtil.NormalizeSlashes(page.OutputRelativePath), page.Title, content, sourcePath);
     }
 
     // ===== Story 6.7: JSON + client-renderer (SPA) delivery form =============================================

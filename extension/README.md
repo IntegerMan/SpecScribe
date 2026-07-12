@@ -84,6 +84,30 @@ export). Verify the native surfaces by hand in the F5 dev host:
 - **Refresh & live push:** the outline's title-bar **Refresh** button re-renders; editing an `_bmad-output/**/*.md`
   file live-updates the tree, status bar, and open panel together (one coalesced spawn).
 
+## F5 smoke checklist (manual — Story 6.10: reveal-source editor↔artifact bridge)
+
+Same coverage boundary — reveal-source has **no TS test harness**; the automated gates are `tsc --noEmit` +
+esbuild + valid `package.json` + the C# suite (which asserts the payload's per-surface `sourcePath`: a story → its
+`.md` repo-relative, an epic/index/placeholder → `epics.md`, the dashboard → null, forward-slashed). Verify the
+host-delivery by hand in the F5 dev host:
+
+- **"Open source" button visibility (AC #1):** open the panel — on the **dashboard** the toolbar's **Open source**
+  button is **hidden** (the dashboard aggregates many artifacts). Navigate to any **epic** or **story** surface
+  (click a nav/drill link, or a tree node) → the button **appears**; navigate back to the dashboard → it hides
+  again.
+- **Reveal opens the right file, read-only (AC #1):** on a **story** surface, click **Open source** → its
+  `_bmad-output/…/<n-m-…>.md` opens in an editor. On an **epic** or **epics-index** surface → `epics.md` opens.
+  Nothing is written; it is a plain editor open.
+- **One path convention (AC #1):** the tree's **Open Source File** context action (Story 6.9) opens the **same**
+  file as the webview button for a given story — both join the core's repo-relative `sourcePath` to the workspace
+  folder (no `_bmad-output` literal remains in the shim).
+- **Line-capable code seam (AC #2, inert until Story 7.2):** temporarily hand-insert an anchor into a story's
+  rendered body, e.g. `<a href="#" data-code-path="_bmad-output/planning-artifacts/epics.md" data-line="10">x</a>`
+  (or set the attributes via the dev-host DOM), and click it → the file opens **at line 10** (the selection lands
+  on that line). Confirms the `data-code-path`/`data-line` recognition Story 7.2 will ride. Remove the probe after.
+- **Guard (read-only-within-workspace):** a `data-code-path` pointing outside the workspace (`../…` or an absolute
+  path) or at a non-existent file is **rejected** — no editor opens, no error spew.
+
 ## What this folder is (and isn't)
 
 - Self-contained: not part of the .NET solution, not part of the generated-site pipeline, no CI wiring.
@@ -95,5 +119,9 @@ export). Verify the native surfaces by hand in the F5 dev host:
   Workspace Trust, and open-beside shipped in **Story 6.8**.
 - The native activity-bar **tree view + status bar** shipped in **Story 6.9** (a new core `outline` export drives
   them; the shim maps it 1:1 with a pure stage→icon lookup and holds the shared payload for panel + tree + bar).
-- Still out of this extension's scope: editor↔artifact reveal bridges from the webview (Story 6.10), and
-  file-watch/multi-root hardening — the yaml/toml watch gap, core-derived watch roots, multi-root (Story 6.11).
+- The webview **reveal-source bridge** ("Open source" → open the surface's `.md` read-only) shipped in **Story
+  6.10**, which also established the line-capable `revealSource` seam that Story 7.2's code citations and Story
+  8.4's next-step command will ride (the `data-code-path`/`data-line` recognition is present but inert; the
+  `stageCommand` terminal-handoff point is documented in `WebviewRenderAdapter.cs`, built in 8.4).
+- Still out of this extension's scope: file-watch/multi-root hardening — the yaml/toml watch gap, core-derived
+  watch roots, the subdir-open path caveat (repo root ≠ workspace folder), multi-root (Story 6.11).

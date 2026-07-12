@@ -259,7 +259,9 @@ public class SiteGeneratorOutlineTests : IDisposable
 
         Assert.Equal(2, s11.TasksTotal);
         Assert.Equal(1, s11.TasksDone);
-        Assert.Equal("implementation-artifacts/1-1-foundation.md", s11.SourcePath);
+        // Repo-relative (Story 6.10 harmonization): the tree "Open Source" joins this to the workspace folder with
+        // the SAME one convention the webview reveal + configuredOutputRoot use — no `_bmad-output` literal host-side.
+        Assert.Equal("_bmad-output/implementation-artifacts/1-1-foundation.md", s11.SourcePath);
     }
 
     [Fact]

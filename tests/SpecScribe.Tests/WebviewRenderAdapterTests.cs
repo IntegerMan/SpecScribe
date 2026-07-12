@@ -357,8 +357,9 @@ public class WebviewRenderAdapterTests
     public void Render_StampsTheSurfacePathTheBridgeResolvesLinksAgainst()
     {
         var doc = WebviewRenderAdapter.Shared.Render(EpicPage(Nav())).Content;
-        // The bridge resolves relative hrefs (e.g. "story-1-1.html" from an epics/ page) against this path.
-        Assert.Contains("<div id=\"specscribe-surface\" data-path=\"epics/epic-1.html\">", doc);
+        // The bridge resolves relative hrefs (e.g. "story-1-1.html" from an epics/ page) against data-path;
+        // data-source is empty here (Render wraps with no source — the Story 6.10 reveal button stays hidden).
+        Assert.Contains("<div id=\"specscribe-surface\" data-path=\"epics/epic-1.html\" data-source=\"\">", doc);
     }
 
     // ----- Registry hygiene (AC #4: every entry justified, none blanket) --------------------------------------

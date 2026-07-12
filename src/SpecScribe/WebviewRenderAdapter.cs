@@ -73,7 +73,7 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
     /// accepted posture), inlined stylesheet, the surface container stamped with the page's output-relative path
     /// (the bridge resolves relative links against it), and the nonce'd bridge script. <c>__CSP_SOURCE__</c> /
     /// <c>__NONCE__</c> are deliberately left for the shim — the two-value seam that keeps the shim dumb.</summary>
-    public string WrapDocument(PageView page, string contentHtml) => DocumentTemplate
+    public string WrapDocument(PageView page, string contentHtml, string? sourcePath = null) => DocumentTemplate
         .Replace("__TITLE__", PathUtil.Html(page.Title))
         .Replace("__PATH__", PathUtil.Html(PathUtil.NormalizeSlashes(page.OutputRelativePath)))
         .Replace("__CSS__", Stylesheet.Value)
@@ -84,6 +84,11 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         // escaped so a project title with quotes can't break out of the attribute; the value is only ever copied to
         // the clipboard by the host, never executed or written anywhere.
         .Replace("__HELPER_PROMPT__", PathUtil.Html(WebviewHelpers.CodeReviewPrompt(page.Nav.SiteTitle)))
+        // The repo-relative source artifact this surface was rendered from (Story 6.10 reveal-source). Rides in the
+        // surface container's data-source; the bridge posts it as `revealSource` on the toolbar button and toggles
+        // that button's visibility on it (empty → hidden, e.g. the dashboard). Attribute-escaped like __PATH__; the
+        // host only ever OPENS it read-only, never writes it.
+        .Replace("__SOURCE__", PathUtil.Html(PathUtil.NormalizeSlashes(sourcePath ?? "")))
         .Replace("__CONTENT__", contentHtml);
 
     // The shell around the swappable region. Kept as one template so the CSP policy, container id, and bridge
@@ -103,15 +108,25 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         <body>
         <div class="ss-webview-toolbar">
         <span class="ss-webview-toolbar-label">SpecScribe</span>
+        <button type="button" class="ss-reveal-src-btn" title="Open the markdown file this view was rendered from (read-only)" hidden>Open source</button>
         <button type="button" class="ss-helper-btn" data-ss-label="a code-review prompt" data-ss-prompt="__HELPER_PROMPT__">Copy code-review prompt</button>
         </div>
-        <div id="specscribe-surface" data-path="__PATH__">
+        <div id="specscribe-surface" data-path="__PATH__" data-source="__SOURCE__">
         __CONTENT__
         </div>
         <script nonce="__NONCE__">
         (function () {
           var vscode = (typeof acquireVsCodeApi === 'function') ? acquireVsCodeApi() : null;
           var surface = document.getElementById('specscribe-surface');
+          var revealBtn = document.querySelector('.ss-reveal-src-btn');
+
+          // The current surface's repo-relative source artifact (Story 6.10). Read off #specscribe-surface's
+          // data-source, which the entry document stamps and every in-place `update` swap refreshes.
+          function currentSource() { return surface ? (surface.getAttribute('data-source') || '') : ''; }
+          // Show the "Open source" toolbar button only when the current surface HAS a source (the dashboard has
+          // none). Called on first paint and after every content swap so the button always reflects the view.
+          function syncRevealBtn() { if (revealBtn) revealBtn.hidden = !currentSource(); }
+          syncRevealBtn();
 
           // Resolves a rendered relative href (e.g. "story-1-1.html", "../index.html", "epics.html#epic-2")
           // against the CURRENT surface's output-relative path — a webview is not a browser tab, so anchor
@@ -145,6 +160,16 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
               return;
             }
 
+            // Reveal source (AC #1): open the markdown this surface was rendered from, read-only. Posts the
+            // surface's repo-relative data-source; the shim joins it to the workspace folder and calls
+            // showTextDocument. NEVER writes — it hands over a path and stops.
+            var reveal = t.closest('.ss-reveal-src-btn');
+            if (reveal) {
+              var src = currentSource();
+              if (vscode && src) vscode.postMessage({ type: 'revealSource', path: src });
+              return;
+            }
+
             // Nav toggle: the HTML surface's inline toggle script is CSP-blocked here, so the same collapse
             // behavior is delegated (narrow editor panels are the norm, so this matters more, not less).
             var toggle = t.closest('.site-nav-toggle');
@@ -156,6 +181,31 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
 
             var a = t.closest('a[href]');
             if (!a || !vscode) return;
+
+            // AC #2 structured-link seam — INERT until Story 7.2 emits these attributes. A code citation that
+            // carries data-code-path (+ optional 1-based data-line) is re-targeted to the editor via the SAME
+            // line-capable revealSource message this story delivers; the HTML surface keeps its portal/GitHub href
+            // (data-* are additive, webview-intercepted, never alter the static site). This branch is what
+            // "rides Story 6.10's link seam" means — recognition here, emission in 7.1/7.2.
+            var codePath = a.getAttribute('data-code-path');
+            if (codePath) {
+              e.preventDefault();
+              var lineAttr = a.getAttribute('data-line');
+              var lineNum = lineAttr ? parseInt(lineAttr, 10) : 0;
+              var msg = { type: 'revealSource', path: codePath };
+              if (lineNum > 0) msg.line = lineNum;
+              vscode.postMessage(msg);
+              return;
+            }
+
+            // AC #2 command-staging extension point — DOCUMENTED here, BUILT in Story 8.4 (R4.3). A future
+            // next-step-command surface emits an element carrying its command text; a branch like the one above
+            // would post `{ type: 'stageCommand', command: <text> }`, and the shim's handler would reuse the
+            // existing `stageTerminalCommand` primitive (createTerminal + sendText(command, /* execute: */ false))
+            // to STAGE it at a prompt — the user presses Enter, SpecScribe never does (AD-6/ADR 0003). This story
+            // deliberately does NOT build that handler or emit the control; 8.4 owns the command surface and
+            // designs against this known shape rather than retrofitting it.
+
             var href = a.getAttribute('href') || '';
             if (href.charAt(0) === '#') return; // same-page anchor: native fragment scroll still works
 
@@ -179,6 +229,11 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
             if (m.type !== 'update' || typeof m.html !== 'string' || !surface) return;
             surface.innerHTML = m.html;
             if (m.path) surface.setAttribute('data-path', m.path);
+            // Reflect the swapped-in surface's source and show/hide the reveal button (Story 6.10). Set
+            // unconditionally from m.source so navigating to a source-less surface (the dashboard) clears a stale
+            // value and hides the button.
+            surface.setAttribute('data-source', m.source || '');
+            syncRevealBtn();
             if (m.reason === 'navigate') {
               var el = m.fragment ? document.getElementById(m.fragment) : null;
               if (el) { el.scrollIntoView(); } else { window.scrollTo(0, 0); }

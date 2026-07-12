@@ -244,6 +244,60 @@ public class SiteGeneratorWebviewTests : IDisposable
     }
 
     [Fact]
+    public void EverySurface_CarriesRepoRelativeSourcePath_PerFamily()
+    {
+        // Story 6.10 AC #1: each surface knows the repo-relative artifact it was rendered from. A story → its own
+        // `.md`; an epic/index/placeholder → the epics file; the dashboard → null (it aggregates many).
+        var bundle = GeneratedSite().RenderWebviewSurfaces();
+        WebviewSurface S(string key) => bundle.Surfaces.Single(s => s.OutputRelativePath == key);
+
+        Assert.Equal("_bmad-output/implementation-artifacts/1-1-foundation.md", S("epics/story-1-1.html").SourcePath);
+        Assert.Equal("_bmad-output/implementation-artifacts/2-1-delivery.md", S("epics/story-2-1.html").SourcePath);
+        // The undrafted story's placeholder reveals the epic that declares it (its source IS the epics file).
+        Assert.Equal("_bmad-output/planning-artifacts/epics.md", S("epics/story-1-2.html").SourcePath);
+        Assert.Equal("_bmad-output/planning-artifacts/epics.md", S("epics/epic-1.html").SourcePath);
+        Assert.Equal("_bmad-output/planning-artifacts/epics.md", S("epics.html").SourcePath);
+        // The dashboard has no single source artifact → null, so the reveal button hides on it.
+        Assert.Null(S("index.html").SourcePath);
+
+        // Forward-slashed on every platform (the host joins it to the workspace folder, like configuredOutputRoot).
+        Assert.All(bundle.Surfaces.Where(s => s.SourcePath is not null), s => Assert.DoesNotContain('\\', s.SourcePath!));
+    }
+
+    [Fact]
+    public void SerializePayload_EmitsSourcePathPerSurface_CamelCase_NullForDashboard()
+    {
+        var bundle = GeneratedSite().RenderWebviewSurfaces();
+        var json = WebviewCommand.SerializePayload(bundle, "SpecScribeOutput");
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var surfaces = doc.RootElement.GetProperty("surfaces");
+
+        var story = surfaces.GetProperty("epics/story-1-1.html");
+        Assert.True(story.TryGetProperty("sourcePath", out var src), "surface object carries camelCase `sourcePath`");
+        Assert.Equal("_bmad-output/implementation-artifacts/1-1-foundation.md", src.GetString());
+
+        // The dashboard's null source serializes as JSON null so the shim distinguishes "no source" from a value
+        // (both hide the button) — the property is present and null, not absent-as-a-computed-value.
+        var dashboard = surfaces.GetProperty("index.html");
+        Assert.True(dashboard.TryGetProperty("sourcePath", out var dashSrc));
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, dashSrc.ValueKind);
+    }
+
+    [Fact]
+    public void EntryDocument_CarriesTheHiddenRevealButton_AndEmptyDataSource()
+    {
+        // The entry is the dashboard (no source): the "Open source" control is present as webview-only toolbar
+        // chrome but paints hidden, and #specscribe-surface's data-source is empty until an update swaps in a
+        // sourced surface. Toolbar chrome, never in the shared body (parity/golden unaffected — fact #6).
+        var bundle = GeneratedSite().RenderWebviewSurfaces();
+
+        Assert.Contains("ss-reveal-src-btn", bundle.EntryDocument);
+        Assert.Contains("data-source=\"\"", bundle.EntryDocument);
+        Assert.Contains("revealSource", bundle.EntryDocument);          // the bridge posts it
+        Assert.Contains("data-code-path", bundle.EntryDocument);        // the AC #2 seam is present (inert)
+    }
+
+    [Fact]
     public void FullGenerateThenWebviewPass_LeavesSourceArtifactsUntouched()
     {
         // AC #6 at the seam that actually writes: the `specscribe webview` command runs a full GenerateAll()

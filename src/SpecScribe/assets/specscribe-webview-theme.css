@@ -293,7 +293,11 @@
   margin-right: auto;
 }
 
-.ss-helper-btn {
+/* The read-only toolbar buttons share one look (Story 6.5's Copy prompt + Story 6.10's Open source). The reveal
+   button is a distinct class — NOT also .ss-helper-btn — so the bridge's helper `closest('.ss-helper-btn')` branch
+   can't misfire on it; the shared appearance comes from listing both selectors here. */
+.ss-helper-btn,
+.ss-reveal-src-btn {
   font: 0.8rem var(--vscode-font-family, -apple-system, "Segoe UI", sans-serif);
   cursor: pointer;
   padding: 0.3rem 0.7rem;
@@ -303,11 +307,24 @@
   border: 1px solid var(--vscode-button-border, transparent);
 }
 
-.ss-helper-btn:hover {
+.ss-helper-btn:hover,
+.ss-reveal-src-btn:hover {
   background: var(--vscode-button-hoverBackground, var(--vscode-button-background, #1177bb));
 }
 
-.ss-helper-btn:focus-visible {
+.ss-helper-btn:focus-visible,
+.ss-reveal-src-btn:focus-visible {
   outline: 2px solid var(--vscode-focusBorder);
   outline-offset: 2px;
+}
+
+/* The reveal button is secondary chrome; when the host exposes a secondary-button palette, prefer it so "Open
+   source" reads as lighter-weight than the primary Copy-prompt action. Falls back to the shared primary look. */
+.ss-reveal-src-btn {
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground, #fff));
+  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background, #0e639c));
+}
+
+.ss-reveal-src-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground, var(--vscode-button-background, #1177bb)));
 }

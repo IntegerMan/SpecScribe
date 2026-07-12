@@ -5,7 +5,7 @@ seated_by: SCP 2026-07-11 (correct-course) — FR35, VS Code Native-Integration 
 
 # Story 6.10: Editor ↔ Artifact Bridges (Reveal-Source)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -158,38 +158,38 @@ The AC is explicit: the re-targeting **behavior** (core-side link emission + its
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Baseline & payload reconnaissance** (prereq for AC #1)
-  - [ ] Confirm Story [6.8](6-8-extension-discoverability-workspace-trust-and-command-surface.md) is `done` in [sprint-status.yaml](sprint-status.yaml); if not, **halt and flag** (this story extends 6.8's shim). Note whether [6.9](6-9-native-project-outline-tree-view-and-status-bar.md) has merged (it adds `outline` to the same payload/interface and a tree "Open Source" whose convention this story harmonizes — Design decision "One source-path convention").
-  - [ ] Re-capture `HEAD` for the byte-parity diff (the `main` auto-committer may sit ahead of `baseline_commit` `b8d2a5e` — memory: [worktree-edits-must-target-worktree-path]).
-  - [ ] `dotnet build src/SpecScribe`, run `specscribe webview` from the repo root, **capture the JSON**. Record the real payload shape (the `surfaces` map's `{title, content}` today, plus 6.9's `outline` if merged) and the exact **source `.md` path** a story surface should resolve to (e.g. `_bmad-output/implementation-artifacts/6-4-…md`), so the emitted `sourcePath` can be asserted against it.
+- [x] **Task 0 — Baseline & payload reconnaissance** (prereq for AC #1)
+  - [x] Confirm Story [6.8](6-8-extension-discoverability-workspace-trust-and-command-surface.md) is `done` in [sprint-status.yaml](sprint-status.yaml); if not, **halt and flag** (this story extends 6.8's shim). Note whether [6.9](6-9-native-project-outline-tree-view-and-status-bar.md) has merged (it adds `outline` to the same payload/interface and a tree "Open Source" whose convention this story harmonizes — Design decision "One source-path convention").
+  - [x] Re-capture `HEAD` for the byte-parity diff (the `main` auto-committer may sit ahead of `baseline_commit` `b8d2a5e` — memory: [worktree-edits-must-target-worktree-path]).
+  - [x] `dotnet build src/SpecScribe`, run `specscribe webview` from the repo root, **capture the JSON**. Record the real payload shape (the `surfaces` map's `{title, content}` today, plus 6.9's `outline` if merged) and the exact **source `.md` path** a story surface should resolve to (e.g. `_bmad-output/implementation-artifacts/6-4-…md`), so the emitted `sourcePath` can be asserted against it.
 
-- [ ] **Task 1 — Core source-path plumbing** (AC: #1)
-  - [ ] Add `string? SourcePath` to `WebviewSurface` ([WebviewBundle.cs:7](../../src/SpecScribe/WebviewBundle.cs)), `[Story 6.10]`.
-  - [ ] Cache `_epicsSourcePath` (repo-relative epics.md via `Path.GetRelativePath(_options.RepoRoot, epicsFullPath)`) in `RenderEpicsPages` beside `_storyArtifactsById` ([SiteGenerator.cs:647–652](../../src/SpecScribe/SiteGenerator.cs)); add the field near [SiteGenerator.cs:758](../../src/SpecScribe/SiteGenerator.cs).
-  - [ ] Add a `RepoRelative(string absolutePath)` helper; compute each surface's `SourcePath` in `RenderWebviewSurfaces`/`WebviewSurfaceFor` per the Design-decision table (story `.md` / epics.md / null).
-  - [ ] Serialize `sourcePath` on the payload's surface objects ([Commands.cs:75](../../src/SpecScribe/Commands.cs)).
+- [x] **Task 1 — Core source-path plumbing** (AC: #1)
+  - [x] Add `string? SourcePath` to `WebviewSurface` ([WebviewBundle.cs:7](../../src/SpecScribe/WebviewBundle.cs)), `[Story 6.10]`.
+  - [x] Cache `_epicsSourcePath` (repo-relative epics.md via `Path.GetRelativePath(_options.RepoRoot, epicsFullPath)`) in `RenderEpicsPages` beside `_storyArtifactsById` ([SiteGenerator.cs:647–652](../../src/SpecScribe/SiteGenerator.cs)); add the field near [SiteGenerator.cs:758](../../src/SpecScribe/SiteGenerator.cs).
+  - [x] Add a `RepoRelative(string absolutePath)` helper; compute each surface's `SourcePath` in `RenderWebviewSurfaces`/`WebviewSurfaceFor` per the Design-decision table (story `.md` / epics.md / null).
+  - [x] Serialize `sourcePath` on the payload's surface objects ([Commands.cs:75](../../src/SpecScribe/Commands.cs)).
 
-- [ ] **Task 2 — Webview control + bridge** (AC: #1, seam for #2)
-  - [ ] `WrapDocument`: add `string? sourcePath = null` param, `__SOURCE__` replace (`PathUtil.Html(sourcePath ?? "")`), `data-source="__SOURCE__"` on `#specscribe-surface`, and the `<button class="ss-reveal-src-btn">Open source</button>` in `.ss-webview-toolbar`. `RenderWebviewSurfaces` passes the entry surface's `SourcePath` when building `entryDocument` ([SiteGenerator.cs:825](../../src/SpecScribe/SiteGenerator.cs)).
-  - [ ] Bridge: reveal button click → `postMessage({type:'revealSource', path: surface.getAttribute('data-source')})` (only when non-empty); `update` handler sets `data-source` from `m.source` and toggles the button (`hidden = !src`); anchor branch recognizes `data-code-path`(+`data-line`) → `revealSource{path, line}` **before** navigate/openExternal.
-  - [ ] Style the button to match `.ss-helper-btn` (reuse the existing toolbar button CSS; no new stylesheet — the theme bridge already themes the toolbar).
+- [x] **Task 2 — Webview control + bridge** (AC: #1, seam for #2)
+  - [x] `WrapDocument`: add `string? sourcePath = null` param, `__SOURCE__` replace (`PathUtil.Html(sourcePath ?? "")`), `data-source="__SOURCE__"` on `#specscribe-surface`, and the `<button class="ss-reveal-src-btn">Open source</button>` in `.ss-webview-toolbar`. `RenderWebviewSurfaces` passes the entry surface's `SourcePath` when building `entryDocument` ([SiteGenerator.cs:825](../../src/SpecScribe/SiteGenerator.cs)).
+  - [x] Bridge: reveal button click → `postMessage({type:'revealSource', path: surface.getAttribute('data-source')})` (only when non-empty); `update` handler sets `data-source` from `m.source` and toggles the button (`hidden = !src`); anchor branch recognizes `data-code-path`(+`data-line`) → `revealSource{path, line}` **before** navigate/openExternal.
+  - [x] Style the button to match `.ss-helper-btn` (reuse the existing toolbar button CSS; no new stylesheet — the theme bridge already themes the toolbar).
 
-- [ ] **Task 3 — Shim message handler** (AC: #1, line-capable for #2)
-  - [ ] `SurfaceContent.sourcePath?: string` ([extension.ts:24–27](../../extension/src/extension.ts)); include `source: surface.sourcePath ?? ''` in `push`'s `update` message ([extension.ts:157](../../extension/src/extension.ts)).
-  - [ ] Add the `revealSource` branch to `onDidReceiveMessage` ([extension.ts:175–205](../../extension/src/extension.ts)): guarded `resolveWorkspacePath(cwd, msg.path)` (reject `..`-escape/absolute; prefer `fs.existsSync`), then `showTextDocument(Uri.file(target), line? {selection})`. Read-only; no other effect.
-  - [ ] Convert a 1-based `data-line` to a 0-based `vscode.Range` for the selection.
+- [x] **Task 3 — Shim message handler** (AC: #1, line-capable for #2)
+  - [x] `SurfaceContent.sourcePath?: string` ([extension.ts:24–27](../../extension/src/extension.ts)); include `source: surface.sourcePath ?? ''` in `push`'s `update` message ([extension.ts:157](../../extension/src/extension.ts)).
+  - [x] Add the `revealSource` branch to `onDidReceiveMessage` ([extension.ts:175–205](../../extension/src/extension.ts)): guarded `resolveWorkspacePath(cwd, msg.path)` (reject `..`-escape/absolute; prefer `fs.existsSync`), then `showTextDocument(Uri.file(target), line? {selection})`. Read-only; no other effect.
+  - [x] Convert a 1-based `data-line` to a 0-based `vscode.Range` for the selection.
 
-- [ ] **Task 4 — Harmonize the source-path convention** (AC: #1 "no duplicated path assumptions")
-  - [ ] If 6.9 merged: point its tree "Open Source" at the repo-relative `SourcePath` via the shared `RepoRelative` helper and remove the `_bmad-output` literal from its `path.join`. If not merged: add a Dev Note directing 6.9 to this convention. Never ship two conventions.
+- [x] **Task 4 — Harmonize the source-path convention** (AC: #1 "no duplicated path assumptions")
+  - [x] If 6.9 merged: point its tree "Open Source" at the repo-relative `SourcePath` via the shared `RepoRelative` helper and remove the `_bmad-output` literal from its `path.join`. If not merged: add a Dev Note directing 6.9 to this convention. Never ship two conventions.
 
-- [ ] **Task 5 — Document the command-staging seam** (AC: #2)
-  - [ ] In Dev Notes / a code comment at the bridge dispatch, record the `stageCommand` extension point (message shape + reuse of `stageTerminalCommand`'s `createTerminal`+`sendText(cmd,false)` primitive) so Story 8.4 emits its control against a known seam. Do **not** build the handler.
+- [x] **Task 5 — Document the command-staging seam** (AC: #2)
+  - [x] In Dev Notes / a code comment at the bridge dispatch, record the `stageCommand` extension point (message shape + reuse of `stageTerminalCommand`'s `createTerminal`+`sendText(cmd,false)` primitive) so Story 8.4 emits its control against a known seam. Do **not** build the handler.
 
-- [ ] **Task 6 — Verify, guard, document** (AC: all)
-  - [ ] `cd extension && npm install && npm run typecheck && npm run build` — TS compiles, esbuild bundles clean, `package.json` valid.
-  - [ ] `dotnet test` whole suite green **including `GoldenContentFingerprint`** ([SiteGeneratorAdapterTests.cs](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs)) — `sourcePath` is a payload field, not part of the generated site, so golden stays green (memory: [golden-diff-normalization-gotchas]). Confirm `RenderParity`/`RenderSectionParity` tests pass with **no** new `HostRenderException` (the button is unscanned toolbar chrome — fact #6). Add C# assertions: payload surface carries `sourcePath`; a story surface's `sourcePath` equals its `.md` repo-relative; epic/index/placeholder → epics.md repo-relative; dashboard → null; forward-slashed on Windows.
-  - [ ] Confirm read-only end to end: grep the diff for any write API (`writeFile`, `fs.write*`, `applyEdit`, settings `.update(`, `SettingsStore`) — **none**. `showTextDocument` (open) + the existing clipboard are the only host effects.
-  - [ ] Extend [extension/README.md](../../extension/README.md) F5 checklist (button appears on story/epic surfaces, hidden on dashboard; opens the correct `.md` read-only; a hand-inserted `data-code-path`/`data-line` anchor opens the file at the line). Be explicit in Completion Notes about the automated-coverage boundary (no TS harness).
+- [x] **Task 6 — Verify, guard, document** (AC: all)
+  - [x] `cd extension && npm install && npm run typecheck && npm run build` — TS compiles, esbuild bundles clean, `package.json` valid.
+  - [x] `dotnet test` whole suite green **including `GoldenContentFingerprint`** ([SiteGeneratorAdapterTests.cs](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs)) — `sourcePath` is a payload field, not part of the generated site, so golden stays green (memory: [golden-diff-normalization-gotchas]). Confirm `RenderParity`/`RenderSectionParity` tests pass with **no** new `HostRenderException` (the button is unscanned toolbar chrome — fact #6). Add C# assertions: payload surface carries `sourcePath`; a story surface's `sourcePath` equals its `.md` repo-relative; epic/index/placeholder → epics.md repo-relative; dashboard → null; forward-slashed on Windows.
+  - [x] Confirm read-only end to end: grep the diff for any write API (`writeFile`, `fs.write*`, `applyEdit`, settings `.update(`, `SettingsStore`) — **none**. `showTextDocument` (open) + the existing clipboard are the only host effects.
+  - [x] Extend [extension/README.md](../../extension/README.md) F5 checklist (button appears on story/epic surfaces, hidden on dashboard; opens the correct `.md` read-only; a hand-inserted `data-code-path`/`data-line` anchor opens the file at the line). Be explicit in Completion Notes about the automated-coverage boundary (no TS harness).
 
 ## Dev Notes
 
@@ -253,12 +253,43 @@ The temptation is to "finish" code citations or terminal commands here. Don't. T
 
 ### Agent Model Used
 
+claude-opus-4-8 (Amelia / bmad-dev-story workflow), 2026-07-11.
+
 ### Debug Log References
+
+- `dotnet build src/SpecScribe` → clean (0 warnings/errors).
+- `dotnet run --project src/SpecScribe -- webview` reconnaissance (Task 0) BEFORE and AFTER: confirmed the payload's `surfaces` grew a `sourcePath` per surface (story → `_bmad-output/implementation-artifacts/<n-m-…>.md`; epic/index/placeholder → `_bmad-output/planning-artifacts/epics.md`; dashboard → `null`), the outline story `sourcePath` harmonized to repo-relative, and the entry document carries the hidden `ss-reveal-src-btn` + `data-source=""`.
+- `dotnet test` → **762 passed, 0 failed** (was 761 pre-change; +4 new webview/serialization tests, −1 obsolete via the updated 6.9 outline assertion). Includes `GoldenContentFingerprint` (byte-identity held — `sourcePath` is a payload datum, not site HTML) and `RenderParity`/`Registry_CarriesExactlyTheThreeJustifiedWebviewChromeExceptions` (no new `HostRenderException`).
+- One pre-existing adapter test (`WebviewRenderAdapterTests.Render_StampsTheSurfacePathTheBridgeResolvesLinksAgainst`) pinned the exact `#specscribe-surface` markup and was updated for the added `data-source=""` attribute (expected — the surface container gained one attribute).
+- `cd extension && npm run typecheck && npm run build` → `tsc --noEmit` clean, esbuild bundles clean.
+- Write-freedom scan of the working diff (`writeFile|fs.write|applyEdit|WorkspaceEdit|.update(|File.Write|SettingsStore`) → **NONE**. Only new host effect is `showTextDocument` (open, read-only).
 
 ### Completion Notes List
 
+- **AC #1 — reveal-source (fully built):** `WebviewSurface.SourcePath` (repo-relative, nullable) computed per surface family in `RenderWebviewSurfaces` via a new `RepoRelative` helper (`Path.GetRelativePath(RepoRoot, …)` + forward slashes — the exact `configuredOutputRoot` convention, **no duplicated path assumption**); serialized as `sourcePath` on each payload surface object. `WrapDocument` gained a `string? sourcePath` param → `__SOURCE__` → `data-source` on `#specscribe-surface` + an **"Open source"** `<button class="ss-reveal-src-btn">` in the webview-only `.ss-webview-toolbar` (beside 6.5's copy-prompt button). The bridge posts `revealSource{path}`; the shim joins it to `workspaceFolders[0]` through a containment guard and calls `showTextDocument` **read-only**. The button hides when the surface has no source (the dashboard); the bridge toggles it on first paint and every in-place swap.
+- **AC #2 — the seam (guaranteed, not populated):** `revealSource` is line-capable (`{path, line}`, 1-based → 0-based `vscode.Range`). The bridge's anchor branch recognizes `data-code-path`(+`data-line`) → `revealSource{path,line}` **before** navigate/openExternal — **inert until Story 7.2 emits those attributes**. The `stageCommand` terminal-handoff extension point (reuse of `stageTerminalCommand`'s `createTerminal` + `sendText(cmd, false)`) is **documented** at the bridge dispatch for **Story 8.4** to build; no handler or emission here.
+- **Harmonized the source-path convention (Task 4):** 6.9's tree "Open Source" previously joined `path.join(root, '_bmad-output', sourcePath)` with a source-root-relative `OutlineStory.SourcePath`. Aligned onto the repo-relative convention: `OutlineStory.SourcePath` is now repo-relative (same `RepoRelative` helper), and the shim's `openSource` drops the `_bmad-output` literal, routing through the shared `resolveWorkspacePath` guard. **One convention, one helper, zero `_bmad-output` literal in TypeScript.**
+- **Read-only end to end (AD-6/ADR 0003/FR-17/NFR-5):** `showTextDocument` opens; the documented command seam stages (`sendText(cmd, false)`) — SpecScribe never writes and never presses Enter.
+- **Byte-identity + parity safe by placement:** the control is a `<button>` in the webview-only shell toolbar (`WrapDocument`), never in the shared body/nav/breadcrumb. Golden fingerprint unchanged; parity green; **no new `HostRenderException`** (registry still 3 webview + 1 spa).
+- **Path guard (defense-in-depth, 17.2 posture):** `resolveWorkspacePath` rejects `..`-escapes, absolute overrides, and non-existent targets — the shim can't become an "open any file on disk" primitive on a stale/hostile payload.
+- **Automated-coverage boundary (honest):** the extension has **no TS test harness** — automated gates are `tsc --noEmit` + esbuild + JSON validity + the C# suite (which covers the payload `sourcePath` + its per-family computation + serialization). Functional reveal-source verification is the **F5 manual smoke** (extended in `extension/README.md`); **one F5 smoke in real VS Code remains** (button visibility on story/epic vs hidden on dashboard; opens the correct `.md` read-only; the hand-inserted `data-code-path`/`data-line` anchor opens at the line; guard rejects out-of-workspace).
+- **Subdir-open caveat (NOT solved; NOT regressed):** the host joins `sourcePath` under `workspaceFolders[0]`; when VS Code opens a subdirectory (repo root ≠ workspace folder) the join is wrong — the **same** limitation the watchers carry today (**Story 6.11**). No `repoRoot`-in-payload field added; the common repo-root-open case is correct.
+
 ### File List
+
+- `src/SpecScribe/WebviewBundle.cs` — `WebviewSurface.SourcePath` (repo-relative, nullable) added to the record.
+- `src/SpecScribe/SiteGenerator.cs` — `RepoRelative` helper; `_epicsSourcePath` cache set in `RenderEpicsPages`; per-surface source computation in `RenderWebviewSurfaces` (story `.md` / epics.md / null); harmonized outline `OutlineStory.SourcePath` to repo-relative; `WebviewSurfaceFor` gains `string? sourcePath`; entry-document wrap passes the dashboard's (null) source.
+- `src/SpecScribe/WebviewRenderAdapter.cs` — `WrapDocument` `string? sourcePath` param + `__SOURCE__`; `data-source` on `#specscribe-surface`; the "Open source" toolbar button; bridge additions (reveal-button click, `data-code-path`/`data-line` recognition, documented `stageCommand` seam, `data-source` refresh + button toggle on swap).
+- `src/SpecScribe/Commands.cs` — serialize `sourcePath` on each payload surface object.
+- `src/SpecScribe/ProjectOutline.cs` — `OutlineStory.SourcePath` doc updated (now repo-relative).
+- `src/SpecScribe/assets/specscribe-webview-theme.css` — `.ss-reveal-src-btn` shares the toolbar-button look (secondary-button palette with primary fallback); distinct class so the helper branch can't misfire.
+- `extension/src/extension.ts` — `SurfaceContent.sourcePath?`; `source` on the push `update` message; `revealSource` handler (guarded, line-capable, read-only); `resolveWorkspacePath` containment guard; `openSource` harmonized off the `_bmad-output` literal; header/interface doc updates.
+- `extension/README.md` — Story 6.10 F5 smoke checklist + scope note.
+- `tests/SpecScribe.Tests/SiteGeneratorWebviewTests.cs` — 3 new tests (per-family `sourcePath`, camelCase serialization + dashboard null, entry-doc hidden reveal button + `data-source=""` + seam present).
+- `tests/SpecScribe.Tests/SiteGeneratorOutlineTests.cs` — 6.9 outline `SourcePath` assertion updated to repo-relative (harmonization).
+- `tests/SpecScribe.Tests/WebviewRenderAdapterTests.cs` — `#specscribe-surface` assertion updated for the added `data-source=""`.
 
 ## Change Log
 
+- 2026-07-11 — **Implemented (dev-story).** AC #1 reveal-source fully built: per-surface repo-relative `SourcePath` on the `webview` payload (computed in `RenderWebviewSurfaces` via a `RepoRelative` helper mirroring `configuredOutputRoot`), a webview-only "Open source" toolbar `<button>` posting a `revealSource` host message, the shim opening the `.md` read-only via `showTextDocument` (workspace-folder join through a containment guard — no duplicated path assumption). AC #2 seam established: line-capable `revealSource{path,line}` + inert `data-code-path`/`data-line` recognition (Story 7.2 rides it), `stageCommand` terminal-handoff point documented for Story 8.4. Harmonized 6.9's tree "Open Source" onto the one repo-relative convention (dropped the `_bmad-output` literal from TypeScript). Read-only end to end (write-API scan clean; only `showTextDocument`). HTML surface byte-identical — control is webview-only toolbar chrome, no new `HostRenderException`, golden + parity green. 762 C# tests pass (+3 new, 1 pre-existing markup assertion + the 6.9 outline `SourcePath` assertion updated); `tsc --noEmit` + esbuild clean. One F5 manual smoke in real VS Code remains (README checklist). Status → review.
 - 2026-07-11 — Story drafted (create-story) from the VS Code Native-Integration Recommendations (FR35, [docs/VSCodeIntegrationRecommendations.md](../../docs/VSCodeIntegrationRecommendations.md)) "Next" wave. Seats **R4.1** (reveal-source: the `webview` payload carries a core-resolved **repo-relative** source-artifact path per surface — mirroring `configuredOutputRoot`; a webview-only "Open source" `<button>` in the `.ss-webview-toolbar` posts a `revealSource` host message; the shim opens the `.md` read-only via `showTextDocument`, joining the workspace folder — **no duplicated path assumption**), and establishes the **R4.2/R4.3 structured-link seam** (a line-capable `revealSource{path,line}` + the bridge recognizing `data-code-path`/`data-line`, inert until Story 7.2 emits; the terminal-command `stageCommand` extension point documented for Story 8.4 to build). **Hard-gated on Story 6.8** (`done` required — same shim message loop / `resolveTool` / `projectDetected`); **build after Story 6.9** (shared `WebviewSurface`/payload/interface edits + harmonize the source-path convention off 6.9's `_bmad-output`-join tree action onto the repo-relative form); 6.4/6.5 done. Read-only end to end (`showTextDocument` opens, never writes; staged commands never execute); HTML surface byte-identical (control is webview-only toolbar chrome — no `RenderParity` impact, no new `HostRenderException`). Explicitly OUT: code-link/command **emission** (7.1/7.2, 8.4), tree/status-bar/shared-provider (6.9), watch-hardening / subdir-root resolution (6.11), per-section reveal anchors, new settings/commands/manifest. Status → ready-for-dev.
