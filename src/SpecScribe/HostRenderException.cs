@@ -32,8 +32,11 @@ public static class HostRenderExceptions
             + "reaches the same information without it. The webview's only script is its own nonce'd bridge."),
         new HostRenderException("webview", "mermaid",
             "No Mermaid script can load under the webview CSP (script-src is nonce-locked, remote loads are "
-            + "blocked), so the epics roadmap's <pre class=\"mermaid\"> degrades to readable preformatted text — "
-            + "ADR 0005's accepted fallback. Bundling Mermaid with a nonce remains a 6.5+ option if ever wanted."),
+            + "blocked), so any <pre class=\"mermaid\"> — the epics roadmap AND, since the whole-site captured "
+            + "surfaces (spec-webview-doc-page-surfaces), any doc/ADR page carrying a diagram — degrades to "
+            + "readable preformatted text — ADR 0005's accepted fallback. The captured surfaces also drop any "
+            + "in-page script the same way (innerHTML swaps never execute scripts; the sliced region is "
+            + "script-free by the same policy as asset.js). Bundling Mermaid with a nonce remains an option."),
         // The SPA surface (Story 6.7) is a REAL browser, so — unlike the webview — it keeps the production
         // specscribe.css and specscribe.js: those chrome/asset facts MATCH the html surface (the shared entry shell
         // loads them), which is why the SPA registers NO asset.css / asset.js exception. Its ONE sanctioned

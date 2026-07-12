@@ -2,6 +2,20 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: spec-webview-doc-page-surfaces implementation (2026-07-12)
+
+- source_spec: `spec-webview-doc-page-surfaces.md`
+  ~~summary: When ADR records exist but the ADR root has no `README.md`, the nav links `adrs/index.html` which is never generated — a 404 in the static site and a dead surface key in the webview.~~ **RESOLVED same day (owner decision at the review checkpoint):** `GenerateAdrsInternal` now synthesizes a minimal landing from the ordered `_adrs` records when no root README exists, so the nav link always resolves; repos WITH a README are byte-identical (golden unaffected). Pinned by `SiteGeneratorWebviewTests.AdrLandingIsSynthesized_WhenTheAdrRootHasNoReadme`.
+- source_spec: `spec-webview-doc-page-surfaces.md`
+  summary: The shared 6.7 landmark extraction truncates a captured page whose `<main>` body contains a literal `</main>` (e.g. a raw-HTML code sample) — the region ends at the first closer, shipping unbalanced markup to the SPA and webview.
+  evidence: `SpaDelivery.ExtractContentRegion` takes the FIRST `</main>` at-or-after the opener (the 6.7 review only fixed close-before-open). Inherent to string slicing; affects SPA and captured webview surfaces equally; no live page hits it today. Revisit if a doc legitimately embeds that literal — a depth-counting scan or a sentinel comment emitted by the templaters would fix both consumers at once.
+- source_spec: `spec-webview-doc-page-surfaces.md`
+  summary: Watch-mode incremental passes can leave stale entries in the page capture (`_spaCapture`) — e.g. `RegenerateAdrs` wipes the adrs/ output dir but doesn't prune capture keys for deleted ADRs — so a long-lived generator's SPA/webview bundle can ship a page that no longer exists.
+  evidence: Extends the existing 6.7 deferral ("watch-mode `_spaCapture`/bundle can drift on doc rename or delete") to the ADR/epics wipe-and-rebuild routes. The VS Code panel is UNAFFECTED (each refresh is a fresh `specscribe webview` spawn → fresh GenerateAll → fresh capture); only core `watch`-mode with `--spa` (or a future long-lived webview server) can hit it. Prune per wiped subdir when the rename/removal path is next touched.
+- source_spec: `spec-webview-doc-page-surfaces.md`
+  summary: Every watcher-driven panel refresh now re-renders and re-parses the whole-site payload (~7.8 MB on this repo after exclusions + relaxed escaping) — the per-save cost grew with the surface breadth and there is no incremental path.
+  evidence: Extends the existing 6.4 deferral ("Scoped re-render not implemented") and 6.11's full-`GenerateAll` note: the shim spawns per refresh and `JSON.parse`s the full bundle. Fine at current sizes; the R6.4 scoped re-render / `--serve` warm-process idea remains the perf follow-up, now with a bigger payoff.
+
 ## Deferred from: code review of 6-3-vs-code-integration-spike (2026-07-11)
 
 - source_spec: `6-3-vs-code-integration-spike.md` — three throwaway-spike-code defects carried to the Story 6.4 runtime build. **All three are now RESOLVED in Story 6.4** (verified 2026-07-11, 701 tests green); kept here for the audit trail.

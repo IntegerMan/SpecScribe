@@ -101,6 +101,75 @@ public class CodeFileTemplaterTests
         Assert.Contains("<span class=\"pill\">Not rendered</span>", html);
     }
 
+    private static readonly (string OutputUrl, string Title)[] Refs =
+    {
+        ("epics/story-7-1.html", "Story 7.1: In-Portal Code File Browsing"),
+        ("epics/epic-8.html", "Epic 8: Dashboard Command Center"),
+    };
+
+    [Fact]
+    public void RenderPage_WithReferences_LeadsWithRelationshipGraphThenSecondarySource()
+    {
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+
+        // The relationships block (graph + accessible list) is present and is the hero — it precedes the source.
+        Assert.Contains("<section class=\"code-relationships\">", html);
+        Assert.Contains("class=\"ref-graph\"", html);
+        Assert.Contains("<section class=\"code-source-section\"", html);
+        var relIndex = html.IndexOf("code-relationships", StringComparison.Ordinal);
+        var srcIndex = html.IndexOf("code-source-section", StringComparison.Ordinal);
+        Assert.True(relIndex >= 0 && relIndex < srcIndex, "relationships must lead the page, source is secondary");
+
+        // Each citing artifact is a real graph node link carrying its full title, with a compact ring label.
+        Assert.Contains("class=\"ref-node\" href=\"", html);
+        Assert.Contains("epics/story-7-1.html", html);
+        Assert.Contains("<title>Story 7.1: In-Portal Code File Browsing</title>", html);
+        Assert.Contains(">Story 7.1</text>", html);   // compact ring label (identifier before the colon)
+
+        // The always-present accessible list carries the FULL titles and meaningful link text.
+        Assert.Contains("class=\"ref-list\"", html);
+        Assert.Contains(">Story 7.1: In-Portal Code File Browsing</a>", html);
+        Assert.Contains(">Epic 8: Dashboard Command Center</a>", html);
+
+        // The locked line anchors survive the redesign (source is de-emphasized, never removed).
+        Assert.Contains("id=\"L1\"", html);
+        Assert.Contains("data-code-path=\"src/SpecScribe/Sample.cs\"", html);
+    }
+
+    [Fact]
+    public void RenderPage_NoReferences_OmitsRelationshipsBlockButKeepsSource()
+    {
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav());
+
+        Assert.DoesNotContain("code-relationships", html);
+        Assert.DoesNotContain("ref-graph", html);
+        // Source still renders with its anchors.
+        Assert.Contains("<section class=\"code-source-section\"", html);
+        Assert.Contains("id=\"L1\"", html);
+    }
+
+    [Fact]
+    public void RenderPage_WithExternalUrl_AddsAdditiveViewSourceLink()
+    {
+        const string external = "https://github.com/owner/repo/blob/main/src/SpecScribe/Sample.cs";
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, external);
+
+        Assert.Contains("class=\"code-external-link\"", html);
+        Assert.Contains($"href=\"{external}\"", html);
+        Assert.Contains("View on GitHub", html);
+        // The in-portal source is still fully rendered — the external link is additive, not a replacement.
+        Assert.Contains("class=\"code-file\"", html);
+        Assert.Contains("<span class=\"code-src\">using System;</span>", html);
+    }
+
+    [Fact]
+    public void RenderPage_NoExternalUrl_OmitsViewSourceLink()
+    {
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+
+        Assert.DoesNotContain("code-external-link", html);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;

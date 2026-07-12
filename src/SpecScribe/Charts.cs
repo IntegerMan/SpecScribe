@@ -1047,6 +1047,71 @@ public static class Charts
         return sb.ToString();
     }
 
+    /// <summary>Story 7.1 — the relationship-first hero of a code page: a pure-SVG hub-and-spoke graph with the
+    /// source file at the center and one linked node per citing artifact (story/epic/ADR/doc) around a ring. The
+    /// edges ARE the "referenced by" citations — this graph is artifact&#8594;file only (there is no file&#8594;file
+    /// citation edge), so it reads honestly as "what refers to this file", never as a code call/dependency graph.
+    /// Each ring node is a real link to the citing artifact's page: the full title rides its <c>&lt;title&gt;</c>/
+    /// <c>aria-label</c> while a compact label (e.g. "Story 7.1") stays legible on the ring. No JS. Neutral
+    /// ink/gold/border tokens only — the <c>--status-*</c> lifecycle tokens are off-limits on code surfaces (same
+    /// rule as <c>.code-file</c>). An empty reference set returns nothing (the caller omits the whole block).</summary>
+    public static string ReferenceGraph(
+        string centerLabel,
+        IReadOnlyList<(string Href, string Title, string Short)> refs,
+        int size = 0)
+    {
+        var count = refs.Count;
+        if (count == 0) return string.Empty;
+
+        // Grow the canvas with the node count so the ring never crowds; bounded so a heavily-cited file stays sane.
+        if (size <= 0) size = Math.Clamp(360 + count * 16, 380, 760);
+        var c = size / 2.0;
+        var ringR = size * 0.26;
+
+        (double X, double Y) Pos(int i)
+        {
+            var ang = -Math.PI / 2 + 2 * Math.PI * i / count;
+            return (c + ringR * Math.Cos(ang), c + ringR * Math.Sin(ang));
+        }
+
+        var sb = new StringBuilder();
+        var aria = $"Reference graph: {centerLabel} is referenced by {count} {Plural(count, "artifact", "artifacts")}";
+        sb.Append($"<svg class=\"ref-graph\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
+
+        // Edges first so the nodes sit on top of them. Every spoke runs from the center file to one citing artifact.
+        for (var i = 0; i < count; i++)
+        {
+            var (x, y) = Pos(i);
+            sb.Append($"  <line class=\"ref-edge\" x1=\"{F(c)}\" y1=\"{F(c)}\" x2=\"{F(x)}\" y2=\"{F(y)}\" />\n");
+        }
+
+        // Center node: the file itself (a chip, not a link — you are already on its page).
+        var cw = Math.Max(90.0, Shorten(centerLabel, 24).Length * 7 + 20);
+        sb.Append("  <g class=\"ref-center\">\n");
+        sb.Append($"    <rect class=\"ref-center-box\" x=\"{F(c - cw / 2)}\" y=\"{F(c - 16)}\" width=\"{F(cw)}\" height=\"32\" rx=\"6\" />\n");
+        sb.Append($"    <text class=\"ref-center-label\" x=\"{F(c)}\" y=\"{F(c)}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"13\">{Html(Shorten(centerLabel, 24))}</text>\n");
+        sb.Append("  </g>\n");
+
+        // Ring nodes: one link per citing artifact, label anchored away from center so text clears the ring.
+        for (var i = 0; i < count; i++)
+        {
+            var (x, y) = Pos(i);
+            var (href, title, shortLabel) = refs[i];
+            var ang = -Math.PI / 2 + 2 * Math.PI * i / count;
+            var lx = c + (ringR + 14) * Math.Cos(ang);
+            var ly = c + (ringR + 14) * Math.Sin(ang);
+            var anchor = Math.Cos(ang) >= 0 ? "start" : "end";
+            sb.Append($"  <a class=\"ref-node\" href=\"{Html(href)}\" aria-label=\"{Html(title)}\">")
+              .Append($"<title>{Html(title)}</title>")
+              .Append($"<circle class=\"ref-dot\" cx=\"{F(x)}\" cy=\"{F(y)}\" r=\"7\" />")
+              .Append($"<text class=\"ref-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"12\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(shortLabel, 20))}</text>")
+              .Append("</a>\n");
+        }
+
+        sb.Append("</svg>\n");
+        return sb.ToString();
+    }
+
     /// <summary>The last path segment (filename) of a forward-slash path — compact graph labels while the full
     /// path stays in the node's tooltip.</summary>
     private static string Basename(string path)

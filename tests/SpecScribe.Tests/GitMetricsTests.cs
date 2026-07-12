@@ -574,6 +574,46 @@ public class GitMetricsTests
         Assert.Equal("Alice", Assert.Single(file.Contributors).Name);
     }
 
+    [Fact]
+    public void ParseNumstatLog_ExposesTheParsedCommitsForPerCommitPages()
+    {
+        // Story 7.5: the pulse carries the per-commit records (subject/body/author/timestamp/files) so the
+        // per-commit detail pages ride the same one parse — newest-first (git log order), a binary row kept
+        // with null churn. Same records BuildInsights consumes, exposed rather than re-parsed.
+        var log = Rec("full1234abcd", "Alice", "2026-07-02T11:00", "Newer subject", "Body text.",
+                      "3\t1\tsrc/A.cs")
+                + Rec("full5678wxyz", "Bob", "2026-07-01T09:15", "Older subject", "",
+                      "-\t-\tassets/logo.png");
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        Assert.Equal(2, deep.Commits.Count);
+        // Newest-first: git log order is preserved through the parse.
+        Assert.Equal("full1234abcd", deep.Commits[0].Hash);
+        Assert.Equal("Alice", deep.Commits[0].Author);
+        Assert.Equal(new DateTime(2026, 7, 2, 11, 0, 0), deep.Commits[0].Timestamp);
+        Assert.Equal("Newer subject", deep.Commits[0].Subject);
+        Assert.Equal("Body text.", deep.Commits[0].Body);
+        Assert.Equal(new DeepFileChange("src/A.cs", 3, 1), Assert.Single(deep.Commits[0].Files));
+        // Binary row on the older commit keeps its path with null counts.
+        var binary = Assert.Single(deep.Commits[1].Files);
+        Assert.Equal("assets/logo.png", binary.Path);
+        Assert.Null(binary.Added);
+        Assert.Null(binary.Deleted);
+        // Back-compat: the hotspot/coupling/insights views still populate from the same parse.
+        Assert.NotNull(deep.Insights);
+        Assert.Equal(2, deep.Insights!.CommitCount);
+        Assert.Equal(2, deep.Hotspots.Count);
+    }
+
+    [Fact]
+    public void ParseNumstatLog_EmptyLog_ExposesEmptyCommitsNeverNull()
+    {
+        var deep = GitMetrics.ParseNumstatLog(string.Empty);
+        Assert.NotNull(deep.Commits);
+        Assert.Empty(deep.Commits);
+    }
+
     private static DeepCommit Commit(string hash, string author, string date, params (string Path, int Added, int Deleted)[] files)
         => new(hash, author,
             DateTime.ParseExact(date, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),

@@ -107,6 +107,14 @@ public class SiteGeneratorWebviewTests : IDisposable
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"), Story11Md);
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "2-1-delivery.md"), Story21Md);
         File.WriteAllText(Path.Combine(Adrs, "0001-a-decision.md"), "# ADR 0001: A Decision\n\n**Status:** Accepted\n\nBody.\n");
+        // The ADR root's README becomes the adrs/index.html landing the nav links to. Without it the landing is
+        // never generated (a pre-existing gap — the nav still links it), so the capture fixture mirrors the
+        // real-world layout every documented repo uses. [spec-webview-doc-page-surfaces]
+        File.WriteAllText(Path.Combine(Adrs, "README.md"),
+            "# Decisions\n\n- [ADR 0001: A Decision](0001-a-decision.md)\n");
+        // A generic planning doc (story artifacts render only as epics-family pages, not doc pages) — the
+        // captured-surface tests need one real long-tail doc page. [spec-webview-doc-page-surfaces]
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", "prd.md"), "# PRD\n\nA requirement.\n");
     }
 
     public void Dispose()
@@ -339,5 +347,166 @@ public class SiteGeneratorWebviewTests : IDisposable
         var after = SourceFiles().ToDictionary(p => p, File.GetLastWriteTimeUtc);
         Assert.Equal(before.Keys.OrderBy(k => k), after.Keys.OrderBy(k => k));
         Assert.All(before, kv => Assert.Equal(kv.Value, after[kv.Key]));
+    }
+
+    // ===== spec-webview-doc-page-surfaces: long-tail captured surfaces =======================================
+
+    private SiteGenerator GeneratedSiteWithCapture()
+    {
+        var gen = new SiteGenerator(Options()) { CapturePages = true };
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        return gen;
+    }
+
+    [Fact]
+    public void CapturePages_AddsLongTailPages_AsNavigableSurfaces()
+    {
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+        // ORDINAL (case-sensitive) deliberately: the shim's lookup is a case-sensitive JS object keyed by the
+        // serialized surface paths, so an assertion with a looser comparer would pass cases the runtime rejects.
+        var keys = bundle.Surfaces.Select(s => s.OutputRelativePath).ToHashSet(StringComparer.Ordinal);
+
+        // The owner's dead-end set becomes live in-panel targets: the ADR landing AND an ADR detail page,
+        // requirements, about, and the story artifact's generic doc rendering. Family surfaces still present.
+        Assert.Contains(SiteNav.AdrsLandingOutputPath, keys);
+        Assert.Contains(keys, k => k.StartsWith("adrs/", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(k, SiteNav.AdrsLandingOutputPath, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(SiteNav.RequirementsOutputPath, keys);
+        Assert.Contains(SiteNav.AboutOutputPath, keys);
+        Assert.Contains("planning-artifacts/prd.html", keys);
+        Assert.Contains("index.html", keys);
+        Assert.Contains("epics.html", keys);
+    }
+
+    [Fact]
+    public void CapturePages_EveryEntryNavLink_ResolvesToABundledSurface()
+    {
+        // The user-facing acceptance: no header nav link may dead-end. Every .html href in the ENTRY surface's
+        // nav region (output-relative from index.html, so no prefix resolution needed) must be a bundled key.
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+        var keys = bundle.Surfaces.Select(s => s.OutputRelativePath).ToHashSet(StringComparer.Ordinal);
+        var entry = bundle.Surfaces.Single(s => s.OutputRelativePath == "index.html");
+        var navEnd = entry.ContentHtml.IndexOf("</nav>", StringComparison.Ordinal);
+        Assert.True(navEnd > 0, "entry surface carries the nav region");
+        var nav = entry.ContentHtml[..navEnd];
+
+        var hrefs = System.Text.RegularExpressions.Regex.Matches(nav, "href=\"(?<h>[^\"#]+\\.html)")
+            .Select(m => m.Groups["h"].Value).Distinct().ToList();
+        Assert.NotEmpty(hrefs);
+        Assert.All(hrefs, h => Assert.Contains(h, keys));
+    }
+
+    [Fact]
+    public void CapturePages_SubdirectorySurfaceLinks_ResolveToBundledKeys()
+    {
+        // The drill scenario that motivated the feature: a SUBDIRECTORY surface (adrs/index.html) emits
+        // ../-prefixed nav hrefs and bare record hrefs; resolved against its own base — the same dot-segment
+        // collapse the bridge script performs — every one must land on a bundled key (case-SENSITIVE, like the
+        // shim's JS-object lookup).
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+        var keys = bundle.Surfaces.Select(s => s.OutputRelativePath).ToHashSet(StringComparer.Ordinal);
+        var adrIndex = bundle.Surfaces.Single(s => s.OutputRelativePath == SiteNav.AdrsLandingOutputPath);
+
+        var hrefs = System.Text.RegularExpressions.Regex.Matches(adrIndex.ContentHtml, "href=\"(?<h>[^\"#]+\\.html)")
+            .Select(m => m.Groups["h"].Value).Distinct().ToList();
+        Assert.NotEmpty(hrefs);
+        Assert.All(hrefs, h => Assert.Contains(ResolveLikeBridge(h, SiteNav.AdrsLandingOutputPath), keys));
+        // And at least one resolved href is the ADR record itself — the drill the owner clicked for.
+        Assert.Contains(hrefs, h =>
+            ResolveLikeBridge(h, SiteNav.AdrsLandingOutputPath).StartsWith("adrs/", StringComparison.Ordinal)
+            && ResolveLikeBridge(h, SiteNav.AdrsLandingOutputPath) != SiteNav.AdrsLandingOutputPath);
+    }
+
+    /// <summary>The bridge script's relative-href resolution, mirrored: join to the base surface's directory and
+    /// collapse <c>.</c>/<c>..</c> segments (see the <c>resolve()</c> function in WebviewRenderAdapter's
+    /// DocumentTemplate).</summary>
+    private static string ResolveLikeBridge(string href, string basePath)
+    {
+        var baseDir = basePath.Contains('/') ? basePath[..(basePath.LastIndexOf('/') + 1)] : string.Empty;
+        var parts = new List<string>();
+        foreach (var segment in (baseDir + href).Split('/'))
+        {
+            if (segment == "." || segment.Length == 0) continue;
+            if (segment == "..") { if (parts.Count > 0) parts.RemoveAt(parts.Count - 1); continue; }
+            parts.Add(segment);
+        }
+        return string.Join('/', parts);
+    }
+
+    [Fact]
+    public void AdrLandingIsSynthesized_WhenTheAdrRootHasNoReadme()
+    {
+        // Owner decision (2026-07-12): nav links adrs/index.html whenever records exist, so a README-less ADR
+        // root must synthesize a landing (previously a 404 in the static site AND a webview dead-end). The
+        // landing lists each record as a drill link. Repos WITH a README are byte-identical (golden unaffected).
+        File.Delete(Path.Combine(Adrs, "README.md"));
+
+        var gen = GeneratedSiteWithCapture();
+        var bundle = gen.RenderWebviewSurfaces();
+
+        Assert.True(File.Exists(Path.Combine(Site, "adrs", "index.html")), "synthesized landing written to the site");
+        var landing = bundle.Surfaces.Single(s => s.OutputRelativePath == SiteNav.AdrsLandingOutputPath);
+        Assert.Contains("0001-a-decision.html", landing.ContentHtml);
+        Assert.Contains("ADR 0001: A Decision", landing.ContentHtml);
+    }
+
+    [Fact]
+    public void RepoReadmeSurface_CarriesItsSourcePath()
+    {
+        // readme.html renders straight from the repo README (never via _docs) — the spec's first-named page
+        // must still carry its reveal-source mapping.
+        File.WriteAllText(Path.Combine(_root, "README.md"), "# The Repo\n\nHello.\n");
+        var options = ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: true);
+        var gen = new SiteGenerator(options) { CapturePages = true };
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        var bundle = gen.RenderWebviewSurfaces();
+
+        var readme = bundle.Surfaces.Single(s => s.OutputRelativePath == SiteNav.ReadmeOutputPath);
+        Assert.Equal("README.md", readme.SourcePath);
+    }
+
+    [Fact]
+    public void CapturePages_ExcludesCodePages_FromTheBundle()
+    {
+        // A cited real source file produces a code page in the SITE, but the webview bundle deliberately omits
+        // code/** — the tree scales with the TARGET repo (unbounded payload), and in-editor the 7.2 citations
+        // open the real file via revealSource instead. The shim's toast stays the honest fallback.
+        Directory.CreateDirectory(Path.Combine(_root, "src"));
+        File.WriteAllText(Path.Combine(_root, "src", "Widget.cs"), "public class Widget { }\n");
+        File.AppendAllText(Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"),
+            "\n[Source: `src/Widget.cs`]\n");
+
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+
+        Assert.True(File.Exists(Path.Combine(Site, "code", "src", "Widget.cs.html")),
+            "the code page itself is still generated into the site");
+        Assert.DoesNotContain(bundle.Surfaces,
+            s => s.OutputRelativePath.StartsWith("code/", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CapturedSurface_CarriesChromeRegion_AndRepoRelativeSourcePath()
+    {
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+
+        // Region shape = the family shape: fresh per-page nav leads, the page's own <main> follows — so a swap
+        // refreshes active-nav/breadcrumb exactly like a family surface (the 6.7 extraction guarantees this).
+        var adrIndex = bundle.Surfaces.Single(s => s.OutputRelativePath == SiteNav.AdrsLandingOutputPath);
+        Assert.StartsWith("<nav class=\"site-nav\"", adrIndex.ContentHtml);
+        Assert.Contains("<main id=\"main-content\"", adrIndex.ContentHtml);
+        Assert.False(string.IsNullOrWhiteSpace(adrIndex.Title));
+
+        // Reveal-source: an ADR detail page maps to its repo-relative .md (docs/adrs/...); a generic doc page
+        // maps to its _bmad-output source — same one convention as story surfaces (Story 6.10). Aggregates
+        // (requirements/about) carry none → button hidden, like the dashboard.
+        var adrDetail = bundle.Surfaces.Single(s =>
+            s.OutputRelativePath.StartsWith("adrs/", StringComparison.OrdinalIgnoreCase)
+            && s.OutputRelativePath != SiteNav.AdrsLandingOutputPath);
+        Assert.Equal("docs/adrs/0001-a-decision.md", adrDetail.SourcePath);
+        var docPage = bundle.Surfaces.Single(s => s.OutputRelativePath == "planning-artifacts/prd.html");
+        Assert.Equal("_bmad-output/planning-artifacts/prd.md", docPage.SourcePath);
+        var about = bundle.Surfaces.Single(s => s.OutputRelativePath == SiteNav.AboutOutputPath);
+        Assert.Null(about.SourcePath);
     }
 }

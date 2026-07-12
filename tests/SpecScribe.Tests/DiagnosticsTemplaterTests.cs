@@ -20,6 +20,7 @@ public class DiagnosticsTemplaterTests
         OutputRootDisplay = "SpecScribeOutput",
         DeepGitAnalytics = deepGit,
         IncludeReadme = true,
+        CodeSourceDisplay = "in-portal only",
         ModuleDisplay = "BMad Method",
     };
 

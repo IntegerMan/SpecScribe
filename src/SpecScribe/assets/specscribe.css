@@ -526,33 +526,153 @@ pre.code-file code {
   font-style: italic;
 }
 
-/* Story 7.2 "Referenced by" back-navigation on a code page: the artifacts that cite this file. Neutral
-   ink/border/parchment tokens only — the --status-* lifecycle tokens are off-limits here (same rule as .code-file). */
-.code-referenced-by {
-  margin: 1.5rem 0;
-  padding: 1rem 1.2rem;
+/* Story 7.1 (rework) — the relationships block is the hero of a code page: a hub-and-spoke reference graph plus a
+   full-title list of the artifacts that cite this file. Neutral ink/border/parchment/gold tokens only — the
+   --status-* lifecycle tokens are off-limits on code surfaces (same rule as .code-file). */
+.code-relationships {
+  margin: 1.5rem 0 2rem;
+  padding: 1.25rem 1.4rem;
   border: 1px solid var(--border);
   border-left: 3px solid var(--gold);
   border-radius: 6px;
   background: var(--parchment);
 }
 
-.code-referenced-by h2 {
-  margin: 0 0 0.5rem;
+.code-relationships > h2 {
+  margin: 0 0 0.3rem;
   font-size: 0.95rem;
   color: var(--ink-light);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.code-referenced-by ul {
-  margin: 0;
-  padding-left: 1.2rem;
+.code-relationships-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--ink-light);
 }
 
-.code-referenced-by li {
+/* The graph can be wider than the column on a heavily-cited file — scroll it inside its own box, never the page. */
+.ref-graph-wrap {
+  overflow-x: auto;
+  text-align: center;
+}
+
+.ref-graph {
+  max-width: 100%;
+  height: auto;
+}
+
+.ref-edge {
+  stroke: var(--border);
+  stroke-width: 1.5;
+  stroke-opacity: 0.85;
+}
+
+.ref-center-box {
+  fill: var(--ink);
+  stroke: var(--gold);
+  stroke-width: 1.5;
+}
+
+.ref-center-label {
+  fill: var(--parchment);
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+}
+
+.ref-node {
+  cursor: pointer;
+}
+
+.ref-dot {
+  fill: var(--gold);
+  stroke: var(--parchment);
+  stroke-width: 1.5;
+  transition: r 0.12s ease, fill 0.12s ease;
+}
+
+.ref-label {
+  fill: var(--ink);
+  font-family: system-ui, sans-serif;
+}
+
+.ref-node:hover .ref-dot,
+.ref-node:focus-visible .ref-dot {
+  fill: var(--ink);
+  r: 9;
+}
+
+.ref-node:hover .ref-label,
+.ref-node:focus-visible .ref-label {
+  fill: var(--gold-dark, var(--gold));
+  text-decoration: underline;
+}
+
+.ref-node:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Full-title equivalent of the graph (graph labels are compact): always present for screen readers and no-image
+   contexts, and where the complete artifact titles live. Two columns when there's room. */
+.ref-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.2rem;
+  columns: 2 16rem;
+  column-gap: 2rem;
+}
+
+.ref-list li {
   margin: 0.2rem 0;
   color: var(--ink);
+  break-inside: avoid;
+}
+
+/* Source is secondary supporting detail on a code page — a muted section label under the relationships graph. */
+.code-source-section {
+  margin-top: 1.5rem;
+}
+
+.code-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.code-source-head h2 {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-light);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Story 7.7 — additive "view online" link to the same file on its hosting platform (never replaces the page). */
+.code-external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--parchment);
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.code-external-link:hover,
+.code-external-link:focus-visible {
+  border-color: var(--gold);
+  color: var(--gold-dark, var(--gold));
+}
+
+.code-external-standalone {
+  margin: 1rem 0;
 }
 
 /* Every markdown-generated table carries .md-table (see MarkdownConverter.TagTables), so this styles
@@ -2251,6 +2371,76 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .commit-day-nav a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
 /* When only "next" exists (earliest active day), keep it on the right edge. */
 .commit-day-nav .commit-day-next { margin-left: auto; }
+
+/* The day-page hash becomes a link into its per-commit detail page (Story 7.5) when one exists; the inner
+   <code class="commit-hash"> keeps the gold monospace look, the wrapper only adds the affordance. */
+.commit-hash-link { text-decoration: none; }
+.commit-hash-link:hover .commit-hash { text-decoration: underline; }
+.commit-hash-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
+/* ============ PER-COMMIT DETAIL PAGE (Story 7.5) ============
+   Neutral tokens only (ink / border / parchment family) — never --status-* lifecycle colors: a commit page is
+   attribution + churn, not a workflow state. */
+.commit-detail .commit-hash-pill code { font-family: 'Courier New', monospace; color: var(--gold); }
+.commit-detail .commit-attribution { color: var(--ink-light); }
+
+/* Commit message body: readable measure and generous line-height; paragraph breaks preserved by the templater. */
+.commit-message {
+  margin: 0 0 1.6rem;
+  max-width: 70ch;
+  color: var(--ink);
+  line-height: 1.6;
+}
+.commit-message p { margin: 0 0 0.85rem; }
+.commit-message p:last-child { margin-bottom: 0; }
+
+.commit-files { margin-top: 1.4rem; }
+.commit-files > h2 { font-size: 1.05rem; margin: 0 0 0.6rem; color: var(--ink); }
+.commit-files-empty { color: var(--ink-light); font-style: italic; }
+
+.commit-files-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.commit-files-table caption {
+  caption-side: top;
+  text-align: left;
+  color: var(--ink-light);
+  font-size: 0.82rem;
+  font-style: italic;
+  padding-bottom: 0.5rem;
+}
+.commit-files-table th,
+.commit-files-table td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: baseline;
+}
+.commit-files-table thead th {
+  border-bottom: 2px solid var(--parchment-deep);
+  color: var(--ink-faded);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.commit-files-table th.commit-num,
+.commit-files-table td.commit-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.commit-files-table td code { font-size: 0.85rem; word-break: break-all; }
+.commit-files-table tbody tr:hover { background: var(--parchment); }
+.commit-files-table .commit-added { color: var(--teal-deep); }
+.commit-files-table .commit-deleted { color: var(--rust); }
+
+/* Binary-file marker: the sign columns carry an em dash, this badge names why (never color-only). */
+.commit-file-binary {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faded);
+}
 
 /* ====================== MERMAID ====================== */
 .mermaid {

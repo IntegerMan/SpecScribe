@@ -1246,6 +1246,12 @@ So that I can inspect referenced code without leaving the portal.
 **Then** I can navigate to specific lines via stable anchors
 **And** the page degrades safely for very large, binary, or unreadable files.
 
+3.
+**Given** a rendered code file page for a file cited by one or more artifacts
+**When** I open it
+**Then** the page leads with a relationship view — a node-link graph of the artifacts that reference the file, each node linking to that artifact — and treats the source itself as secondary supporting detail
+**And** the reference relationships are also available as a plain text list (never colour- or image-only), and the per-line anchors stay reachable so citation deep links continue to land.
+
 ### Story 7.2: Source-Citation and Comment Linking to Code Pages
 
 <!-- 2026-07-11 (SCP 2026-07-11, correct-course) — owns VS Code recommendation R4.2 (link resolution): when this
@@ -1363,6 +1369,26 @@ So that I can see at a glance where the code mass and the churn live, and drill 
 **Then** rectangles are focusable with descriptive labels announcing name and metric value
 **And** color is never the sole signal (every metric is available as text)
 **And** reduced-motion is respected, preserving the Story 1.4/1.5 conventions and NFR6.
+
+### Story 7.7: External Source Linking and Auto-Detection
+
+As a maintainer whose repository is hosted on a platform like GitHub or GitLab,
+I want each in-portal code page to link out to the same file's hosted source, with the base URL detected automatically,
+So that readers can reach the canonical, syntax-highlighted source without my having to hand-configure a URL.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a repository with a recognizable hosting remote, or a GitHub Pages / CI deployment context
+**When** the site is generated without an explicit source-URL override
+**Then** the external source base is derived automatically from the git remote or the deployment environment
+**And** an explicit override always takes precedence, and an unrecognizable or absent remote degrades to in-portal-only with no error.
+
+2.
+**Given** an external source base is configured or detected
+**When** code pages are generated
+**Then** in-portal code pages are still generated and each gains an additive "view source online" link to the hosted file
+**And** source citations continue to resolve to the in-portal pages — the external base is additive, never a replacement — and the setting is reachable from both the CLI and the interactive menu (NFR7).
 
 ## Epic 8: Dashboard Command Center — Trustworthy Status at a Glance
 

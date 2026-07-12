@@ -387,11 +387,13 @@ function createController(
       const cache = currentStore().payload;
       if (!cache) return;
       if (!cache.surfaces[msg.target]) {
-        // Not one of the webview's navigable surfaces (e.g. a requirements or doc page): the in-editor set is
-        // deliberately dashboard + epics only this story. Say so instead of a dead click.
+        // Not one of the webview's navigable surfaces. Since spec-webview-doc-page-surfaces the bundle carries
+        // the whole site EXCEPT code/commit-drill pages (owner-excluded — they scale with the target repo), so
+        // this is the honest fallback for those hrefs and for stale/unknown targets. No promise about what a
+        // click "does instead": only 7.2 citation anchors (data-code-path) open real files, not plain hrefs.
         void vscode.window.showInformationMessage(
-          `SpecScribe: "${msg.target}" isn't part of the in-editor status view (dashboard + epics). ` +
-          'Run `specscribe generate` to browse the full site.');
+          `SpecScribe: "${msg.target}" isn't available in the in-editor view. ` +
+          'Run "specscribe generate" to browse the full site in a browser.');
         return;
       }
       push(msg.target, 'navigate', msg.fragment ?? '');

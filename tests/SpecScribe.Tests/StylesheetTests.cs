@@ -79,8 +79,10 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasReferencedByStyles()
     {
-        // Story 7.2 "Referenced by" back-navigation block on code pages — neutral tokens only, no --status-*.
-        Assert.Contains(".code-referenced-by", ReadStylesheet());
+        // Story 7.1 (rework) relationships block + reference graph on code pages — neutral tokens only, no --status-*.
+        var css = ReadStylesheet();
+        Assert.Contains(".code-relationships", css);
+        Assert.Contains(".ref-graph", css);
     }
 
     [Fact]

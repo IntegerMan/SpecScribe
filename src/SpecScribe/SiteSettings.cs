@@ -35,10 +35,12 @@ public class SiteSettings : CommandSettings
     public bool Spa { get; set; }
 
     [CommandOption("--code-url <BASE>")]
-    [Description("Base URL for source-file links (e.g. https://github.com/owner/repo/blob/main). When set, in-portal code pages are NOT generated and citations link to {BASE}/<path>#L<line> instead. Default: unset, so referenced source files render as in-portal pages.")]
+    [Description("Base URL for source-file links (e.g. https://github.com/owner/repo/blob/main). Adds a 'view source online' link to each in-portal code page (the pages are always generated). Default: unset, and auto-detected from the git remote or GitHub Pages context when available.")]
     public string? CodeUrl { get; set; }
 
     /// <summary>Resolves these settings into absolute paths. Throws <see cref="DirectoryNotFoundException"/>
-    /// with an actionable message when auto-discovery fails.</summary>
-    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl);
+    /// with an actionable message when auto-discovery fails. This is the CLI entry path, so it opts into git-remote /
+    /// CI auto-detection of the external source base when <c>--code-url</c> is not given (library/test callers use
+    /// <see cref="ForgeOptions.Resolve"/> directly, which leaves detection off for deterministic output).</summary>
+    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl, autoDetectCodeUrl: true);
 }

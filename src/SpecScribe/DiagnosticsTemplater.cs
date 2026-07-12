@@ -113,6 +113,11 @@ public sealed record DiagnosticsConfig
     public required bool DeepGitAnalytics { get; init; }
     public required bool IncludeReadme { get; init; }
 
+    /// <summary>The effective external source base for "view source online" links — the explicit or auto-detected
+    /// <c>CodeSourceBaseUrl</c>, or "in-portal only" when none resolved. A field read of an already-resolved value
+    /// (detection ran at option-resolution time), so this surface stays I/O-free. [Story 7.7]</summary>
+    public required string CodeSourceDisplay { get; init; }
+
     /// <summary>The detected framework/module label (e.g. "BMad Method"), or "Unknown (not detected)" when no
     /// methodology module resolved — the AC #2 "detected framework/module" line.</summary>
     public required string ModuleDisplay { get; init; }
@@ -130,6 +135,7 @@ public sealed record DiagnosticsConfig
         OutputRootDisplay = RelToRepo(options.RepoRoot, options.OutputRoot),
         DeepGitAnalytics = options.DeepGitAnalytics,
         IncludeReadme = options.IncludeReadme,
+        CodeSourceDisplay = options.CodeSourceBaseUrl is { Length: > 0 } url ? url : "in-portal only",
         ModuleDisplay = module.Module == BmadModule.Unknown
             ? "Unknown (not detected)"
             : module.Commands.ModuleLabel,
@@ -254,6 +260,7 @@ public static class DiagnosticsTemplater
         AppendRow(sb, "Output directory", config.OutputRootDisplay);
         AppendRow(sb, "Deep-git analytics", config.DeepGitAnalytics ? "on (--deep-git)" : "off");
         AppendRow(sb, "README included", config.IncludeReadme ? "yes" : "no");
+        AppendRow(sb, "External source base", config.CodeSourceDisplay);
         sb.Append("  </dl>\n");
         sb.Append("</details>\n\n");
         return sb.ToString();

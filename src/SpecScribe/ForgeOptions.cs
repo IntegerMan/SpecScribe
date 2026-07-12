@@ -39,13 +39,13 @@ public sealed class ForgeOptions
     /// <c>required</c> precisely so every existing <see cref="ForgeOptions"/> construction defaults to off. [Story 6.7]</summary>
     public bool EmitSpa { get; init; }
 
-    /// <summary>The code-link strategy (Story 7.1). When null/empty (the default), source citations resolve to
-    /// in-portal code pages generated under <c>code/</c>. When set (via <c>--code-url</c>), the in-portal code-page
-    /// phase is skipped entirely and citations resolve to <c>{CodeSourceBaseUrl}/&lt;repo-relative-path&gt;#L{n}</c>
-    /// instead — the natural fit for a project whose docs are on GitHub Pages but whose code is on GitHub proper
-    /// (which also supplies syntax highlighting for free). The <c>#L{n}</c> line anchor is identical in both modes,
-    /// so 7.2's citation resolution differs only in the base. Not <c>required</c> so every existing
-    /// <see cref="ForgeOptions"/> construction defaults to in-portal mode. [Story 7.1]</summary>
+    /// <summary>The base URL of the file's source on its hosting platform, e.g.
+    /// <c>https://github.com/owner/repo/blob/main</c> (Story 7.7). When set — explicitly via <c>--code-url</c> or
+    /// auto-detected from the git remote / GitHub Pages CI context — in-portal code pages still generate as always and
+    /// each one gains an <em>additive</em> "view source online" link to <c>{CodeSourceBaseUrl}/&lt;repo-relative-path&gt;</c>.
+    /// This never diverts citations away from the in-portal pages; it only adds a way out to the hosted original
+    /// (which also supplies syntax highlighting for free). Not <c>required</c> so every existing
+    /// <see cref="ForgeOptions"/> construction defaults to no external link. [Story 7.7, was 7.1]</summary>
     public string? CodeSourceBaseUrl { get; init; }
 
     public const string StylesheetName = "specscribe.css";
@@ -104,7 +104,8 @@ public sealed class ForgeOptions
         bool includeReadme = true,
         bool deepGitAnalytics = false,
         bool emitSpa = false,
-        string? codeSourceBaseUrl = null)
+        string? codeSourceBaseUrl = null,
+        bool autoDetectCodeUrl = false)
     {
         string repoRoot;
         string sourceRoot;
@@ -145,7 +146,11 @@ public sealed class ForgeOptions
             IncludeReadme = includeReadme,
             DeepGitAnalytics = deepGitAnalytics,
             EmitSpa = emitSpa,
-            CodeSourceBaseUrl = codeSourceBaseUrl is { Length: > 0 } ? codeSourceBaseUrl : null,
+            // Explicit --code-url always wins; otherwise (CLI only — never in test/library paths, which pass
+            // autoDetectCodeUrl=false so generation stays deterministic) fall back to git-remote / CI detection.
+            CodeSourceBaseUrl = codeSourceBaseUrl is { Length: > 0 } url
+                ? url
+                : autoDetectCodeUrl ? CodeSourceUrlResolver.TryDetect(repoRoot) : null,
         };
     }
 

@@ -186,13 +186,17 @@ public class SiteGeneratorCodePagesTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_ExternalMode_SkipsCodePagesButStillGeneratesSite()
+    public void GenerateAll_ExternalBase_StillGeneratesPages_AndAddsViewSourceLink()
     {
         Generate(codeSourceBaseUrl: "https://github.com/owner/repo/blob/main");
 
-        // External-link mode: no in-portal code pages at all.
-        Assert.False(File.Exists(ReferencedPage));
-        Assert.False(File.Exists(LinkedPage));
+        // The external base is additive (Story 7.7): in-portal code pages are still generated…
+        Assert.True(File.Exists(ReferencedPage));
+        Assert.True(File.Exists(LinkedPage));
+        // …and each carries an additive "view source online" link to the hosted file (whole-file, no #L anchor).
+        var html = File.ReadAllText(ReferencedPage);
+        Assert.Contains("code-external-link", html);
+        Assert.Contains("https://github.com/owner/repo/blob/main/src/Lib/Referenced.cs", html);
         // The rest of the site still generates.
         Assert.True(File.Exists(Path.Combine(Site, "index.html")));
     }

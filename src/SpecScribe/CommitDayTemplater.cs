@@ -14,7 +14,8 @@ public static class CommitDayTemplater
         IReadOnlyList<CommitInfo> commits,
         DateOnly? prevDay,
         DateOnly? nextDay,
-        SiteNav nav)
+        SiteNav nav,
+        Func<string, string?>? commitHref = null)
     {
         var readable = Charts.DReadable(day);
         var outputPath = $"commits/{Charts.D(day)}.html";
@@ -47,7 +48,15 @@ public static class CommitDayTemplater
         foreach (var commit in commits)
         {
             sb.Append("  <li class=\"commit-day-item\">\n");
-            sb.Append($"    <code class=\"commit-hash\">{PathUtil.Html(commit.ShortHash)}</code>\n");
+            // The hash links to its per-commit detail page (Story 7.5) when the resolver has one, plain otherwise
+            // (guard-all-links-on-target-availability). The resolver returns a path relative to the output root,
+            // so this nested page prepends its own "../" prefix. The <code class="commit-hash"> stays intact for
+            // styling either way.
+            var hashHtml = PathUtil.Html(commit.ShortHash);
+            var commitTarget = commitHref?.Invoke(commit.ShortHash);
+            sb.Append(commitTarget is { Length: > 0 }
+                ? $"    <a class=\"commit-hash-link\" href=\"{PathUtil.Html(prefix + commitTarget)}\"><code class=\"commit-hash\">{hashHtml}</code></a>\n"
+                : $"    <code class=\"commit-hash\">{hashHtml}</code>\n");
             sb.Append($"    <span class=\"commit-time\">{PathUtil.Html(commit.Time)}</span>\n");
             sb.Append($"    <span class=\"commit-author\">{PathUtil.Html(commit.Author)}</span>\n");
             sb.Append($"    <span class=\"commit-subject\">{PathUtil.Html(commit.Subject)}</span>\n");

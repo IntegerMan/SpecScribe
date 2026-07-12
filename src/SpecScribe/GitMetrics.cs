@@ -41,6 +41,13 @@ public sealed record DeepGitPulse(
     /// clears it if writing <c>git-insights.html</c> fails, so the dashboard's "View all git insights" link is
     /// never left pointing at a page that doesn't exist. [Story 3.8]</summary>
     public GitInsightsData? Insights { get; set; }
+
+    /// <summary>The per-commit records parsed from the SAME shared numstat fetch (one fetch, one parse, several
+    /// views), surfaced so Story 7.5 can render a per-commit detail page (<c>commit/{shortHash}.html</c>) without
+    /// re-fetching. Newest-first (git log order, as <see cref="GitMetrics.ParseNumstatRecords"/> emits). Empty
+    /// (never null) when the log was empty or predates the enriched fetch — the per-commit phase then generates
+    /// no pages and the hub/day-page hash links stay plain (guarded). [Story 7.5]</summary>
+    public IReadOnlyList<DeepCommit> Commits { get; init; } = Array.Empty<DeepCommit>();
 }
 
 /// <summary>One file's numstat row within a commit. <paramref name="Added"/>/<paramref name="Deleted"/> are
@@ -351,7 +358,7 @@ public static class GitMetrics
             .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
             .ToList();
 
-        return new DeepGitPulse(hotspots, coupling) { Insights = BuildInsights(commits) };
+        return new DeepGitPulse(hotspots, coupling) { Insights = BuildInsights(commits), Commits = commits };
     }
 
     /// <summary>Commit-record boundary sentinel in the shared deep-git fetch (<c>%x01</c>): marks where each
@@ -562,6 +569,25 @@ public static class GitMetrics
 
         var arrow = rawPath.IndexOf(" => ", StringComparison.Ordinal);
         return arrow >= 0 ? rawPath[(arrow + 4)..] : rawPath;
+    }
+
+    /// <summary>The <c>origin</c> remote URL, or null when there is no remote / no git (Story 7.7). Uses the same
+    /// timeout-guarded, failure-tolerant <see cref="RunGit"/> seam as history reads — a repo without a remote simply
+    /// yields no external-source base.</summary>
+    public static string? TryGetRemoteUrl(string repoRoot)
+    {
+        var url = RunGit(repoRoot, "remote get-url origin");
+        return string.IsNullOrWhiteSpace(url) ? null : url.Trim();
+    }
+
+    /// <summary>The current branch name, or null in detached-HEAD state (or no git) so the caller can fall back to a
+    /// default branch for the external-source base (Story 7.7).</summary>
+    public static string? TryGetCurrentBranch(string repoRoot)
+    {
+        var branch = RunGit(repoRoot, "rev-parse --abbrev-ref HEAD");
+        if (string.IsNullOrWhiteSpace(branch)) return null;
+        branch = branch.Trim();
+        return branch is "HEAD" or "" ? null : branch;
     }
 
     private static string? RunGit(string workingDirectory, string arguments)

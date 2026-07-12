@@ -1,6 +1,10 @@
+---
+baseline_commit: 279d27e230ff391ce9f73bb1e438ca24775ceaa4
+---
+
 # Story 7.3: Activity Timeline and Date Pages
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

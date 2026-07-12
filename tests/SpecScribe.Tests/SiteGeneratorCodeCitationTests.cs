@@ -4,9 +4,10 @@ namespace SpecScribe.Tests;
 
 /// <summary>Generation-level coverage for Story 7.2: source citations on rendered pages resolve to Story 7.1's
 /// in-portal code pages with the correct <c>#L{n}</c> anchor (no residual dead <c>../../src/…</c> link), the cited
-/// code page carries a "Referenced by" block back to every citing artifact (AC #2), the resolution runs on doc pages
-/// (proving it lives in the whole-page pass, not the story-only path), and output is deterministic. External-link
-/// mode turns the same citations into <c>{base}/&lt;path&gt;#L{n}</c> GitHub links with no <c>code/</c> pages.</summary>
+/// code page carries a relationships block back to every citing artifact (AC #2), the resolution runs on doc pages
+/// (proving it lives in the whole-page pass, not the story-only path), and output is deterministic. With an external
+/// source base set (Story 7.7) the in-portal pages and citations are UNCHANGED; each page merely gains an additive
+/// "view source online" link — the base is additive, never a replacement.</summary>
 public class SiteGeneratorCodeCitationTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("specscribe-cite-").FullName;
@@ -86,7 +87,9 @@ public class SiteGeneratorCodeCitationTests : IDisposable
         Generate();
 
         var html = File.ReadAllText(CodePage);
-        Assert.Contains("code-referenced-by", html);
+        // The relationships block (graph + accessible list) is the hero of the code page.
+        Assert.Contains("code-relationships", html);
+        Assert.Contains("class=\"ref-graph\"", html);
         // Both citing docs are listed with meaningful (title) link text back to their pages.
         Assert.Contains("Engineering Notes", html);
         Assert.Contains("Other Doc", html);
@@ -116,15 +119,21 @@ public class SiteGeneratorCodeCitationTests : IDisposable
     }
 
     [Fact]
-    public void ExternalMode_CitationsBecomeGitHubLinks_AndNoCodePages()
+    public void ExternalBase_IsAdditive_KeepsInPortalCitationsAndAddsViewSourceLink()
     {
         Generate(codeSourceBaseUrl: "https://github.com/IntegerMan/SpecScribe/blob/main");
 
-        var html = File.ReadAllText(NotesPage);
-        Assert.Contains("https://github.com/IntegerMan/SpecScribe/blob/main/src/Lib/Foo.cs#L42", html);
-        Assert.Contains("https://github.com/IntegerMan/SpecScribe/blob/main/src/Lib/Foo.cs#L15", html);
-        // No in-portal code page is generated in external mode.
-        Assert.False(File.Exists(CodePage));
-        Assert.False(Directory.Exists(Path.Combine(Site, "code")));
+        // Citations still resolve to the in-portal code pages — the external base never diverts them.
+        var notes = File.ReadAllText(NotesPage);
+        Assert.Contains("code/src/Lib/Foo.cs.html#L42", notes);
+        Assert.Contains("code/src/Lib/Foo.cs.html#L15", notes);
+        Assert.DoesNotContain("github.com/IntegerMan/SpecScribe/blob/main/src/Lib/Foo.cs#L42", notes);
+
+        // The in-portal page IS generated and carries an additive "view source online" link to the hosted file.
+        Assert.True(File.Exists(CodePage));
+        var code = File.ReadAllText(CodePage);
+        Assert.Contains("code-external-link", code);
+        Assert.Contains("https://github.com/IntegerMan/SpecScribe/blob/main/src/Lib/Foo.cs", code);
+        Assert.Contains("View on GitHub", code);
     }
 }

@@ -47,8 +47,16 @@ public sealed class GenerateCommand : Command<SiteSettings>
 public sealed class WebviewCommand : Command<SiteSettings>
 {
     /// <summary>Serializer options for the stdout payload: camelCase property names so the C# records read the
-    /// same as the hand-named camelCase fields on the TS side. [Story 6.9]</summary>
-    private static readonly JsonSerializerOptions CamelCase = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    /// same as the hand-named camelCase fields on the TS side. [Story 6.9]
+    /// <para>Relaxed escaping: the payload is now dominated by surface HTML (whole-site surfaces —
+    /// spec-webview-doc-page-surfaces), and the default encoder turns every <c>&lt;</c>/<c>&gt;</c>/<c>&amp;</c>/quote
+    /// into a 6-byte <c>\uXXXX</c> sequence — a material fraction of the bundle. Safe here because the payload is
+    /// only ever <c>JSON.parse</c>d by the shim, never embedded into markup.</para></summary>
+    private static readonly JsonSerializerOptions CamelCase = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     protected override int Execute(CommandContext context, SiteSettings settings, CancellationToken cancellationToken)
     {
@@ -58,6 +66,10 @@ public sealed class WebviewCommand : Command<SiteSettings>
             : RedirectOutputToScratch(resolved);
 
         var generator = new SiteGenerator(options);
+        // Capture every long-tail page at the write seam so RenderWebviewSurfaces can turn docs/ADRs/requirements
+        // pages into navigable surfaces — the panel's header nav works in-editor. Memory-only: the scratch output's
+        // written bytes are unchanged. [spec-webview-doc-page-surfaces]
+        generator.CapturePages = true;
         var events = generator.GenerateAll();
         // The run's non-fatal notices as structured JSON lines on stderr — the SAME DiagnosticNotice.FromEvents
         // projection the Story 4.8 diagnostics page renders (coherence: the two surfaces can never disagree). This
@@ -376,6 +388,16 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         // Configure paths doesn't silently flip it. [Story 3.2 Subtask 4.1]
         settings.DeepGit = AnsiConsole.Confirm(
             "Enable deep git analytics (change coupling and hotspots)?", defaultValue: settings.DeepGit);
+
+        // External source base for "view source online" links — a configurable setting, so NFR7 (menu/CLI parity)
+        // requires it in the menu too, not just --code-url. The default surfaces the current or auto-detected value
+        // (defaults.CodeSourceBaseUrl already reflects git-remote / CI detection) so the user can confirm or override;
+        // clearing it falls back to in-portal-only + fresh auto-detection on the next run. [Story 7.7]
+        var codePrompt = new TextPrompt<string>("Source hosting base URL (blank = in-portal only / auto-detect):").AllowEmpty();
+        var codeDefault = settings.CodeUrl ?? defaults?.CodeSourceBaseUrl;
+        if (!string.IsNullOrWhiteSpace(codeDefault)) codePrompt = codePrompt.DefaultValue(codeDefault);
+        var codeUrl = AnsiConsole.Prompt(codePrompt);
+        settings.CodeUrl = string.IsNullOrWhiteSpace(codeUrl) ? null : codeUrl.Trim();
 
         // Persist the choices so they're restored on the next run.
         if (SettingsStore.TrySave(settings) is { } savedPath)

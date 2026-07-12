@@ -51,6 +51,14 @@ public sealed class SiteGenerator
     private List<AdrEntry> _adrs = new();
     private List<CommitDayEntry> _commitDays = new();
 
+    // Story 7.5: full %H commit hash -> per-commit detail page output-relative path (commit/{shortHash}.html).
+    // Populated by GenerateCommitDetailsInternal (only under --deep-git); the CommitHref resolver matches keys
+    // exactly, then by prefix, so both the hub's full-%H link and the day page's abbreviated-%h link resolve.
+    // Empty (never null) when the flag is off / git is absent → the day-page + hub hashes stay plain (guarded).
+    // The shared seam Stories 7.3 (date pages) / 7.4 (change history) consume once landed.
+    private List<CommitDetailEntry> _commitDetails = new();
+    private Dictionary<string, string> _commitPages = new(StringComparer.Ordinal);
+
     // Story 7.1: repo-relative source path (forward slashes) -> code-page output-relative path (code/<path>.html).
     // Populated by GenerateCodePagesInternal, cached the same way _adrs/_commitDays are so Story 7.2 can reuse it
     // to linkify source citations without re-running discovery. Empty in external mode (--code-url) and when no
@@ -70,12 +78,20 @@ public sealed class SiteGenerator
     private List<RetroModel> _retros = new();
     private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
 
-    // When --spa is active, every long-tail page's finished HTML is captured here as it is written (output path →
-    // full page string) so the SPA bundle can slice its content region from the render pipeline's OWN output rather
-    // than re-reading the generated site off disk (AD-1/AD-2). Null on a normal run — no capture, no overhead, and
-    // the static output stays byte-identical (AC #3/#5). The dashboard/epics families are NOT captured here; the
-    // SPA re-renders them from their view models (RenderSpaBundle) for strongest parity. [Story 6.7]
+    // When --spa is active OR CapturePages is set, every long-tail page's finished HTML is captured here as it is
+    // written (output path → full page string) so the SPA bundle / webview bundle can slice its content region from
+    // the render pipeline's OWN output rather than re-reading the generated site off disk (AD-1/AD-2). Null on a
+    // normal run — no capture, no overhead, and the static output stays byte-identical (AC #3/#5). The
+    // dashboard/epics families are NOT captured here; the SPA and webview re-render them from their view models
+    // (RenderSpaBundle / RenderWebviewSurfaces) for strongest parity. [Story 6.7; spec-webview-doc-page-surfaces]
     private Dictionary<string, string>? _spaCapture;
+
+    /// <summary>Opt-in page capture WITHOUT the SPA delivery outputs: when true, <see cref="GenerateAll"/> fills the
+    /// same write-seam capture <c>--spa</c> uses, and <see cref="RenderWebviewSurfaces"/> turns every captured
+    /// long-tail page (docs, ADRs, requirements, sprint, retros…) into a navigable webview surface so the panel's
+    /// header nav links work in-editor. Set BEFORE <see cref="GenerateAll"/> (the webview command does). Memory-only:
+    /// written bytes are identical either way (the golden gate). [spec-webview-doc-page-surfaces]</summary>
+    public bool CapturePages { get; set; }
 
     public SiteGenerator(ForgeOptions options)
     {
@@ -102,8 +118,11 @@ public sealed class SiteGenerator
             EnsureScaffold();
             _docs.Clear();
 
-            // Fresh capture buffer for this full build when the opt-in SPA form is on (null otherwise → no capture).
-            _spaCapture = _options.EmitSpa ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) : null;
+            // Fresh capture buffer for this full build when the opt-in SPA form is on OR the webview asked for
+            // page capture (null otherwise → no capture). Capture is memory-only either way.
+            _spaCapture = _options.EmitSpa || CapturePages
+                ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                : null;
 
             // All planning-artifact ingestion (sprint, module detection, retros, epics → requirements) runs
             // through the framework adapter, which returns one normalized bundle + non-fatal diagnostics.
@@ -205,13 +224,23 @@ public sealed class SiteGenerator
             // Skipped entirely in external-link mode (--code-url).
             events.AddRange(GenerateCodePagesInternal(files, nav, reporter));
 
+            // Per-commit detail pages (Story 7.5, FR-10). Runs BEFORE the per-day pages and the Git Insights hub so
+            // _commitPages is populated when those two render their guarded hash links. Gated on the same opt-in
+            // deep-git data (Commits ride the --deep-git-bounded fetch): flag off / git absent → DeepGit null →
+            // Commits empty → no commit/ dir, no pages, and the day-page + hub hashes stay plain (AC #2).
+            if (_progress?.DeepGit is { Commits.Count: > 0 } deepCommits)
+            {
+                events.AddRange(GenerateCommitDetailsInternal(deepCommits.Commits, nav));
+            }
+
             // Per-day commit pages the heatmap links to. Git is only computed by the epics-phase progress
             // enrichment, so a project without an epics.md has no pulse here — which is consistent: no
-            // heatmap renders either, so there's nothing to link to.
+            // heatmap renders either, so there's nothing to link to. The commit-detail resolver lights up each
+            // day's hash as a link into commit/ when a per-commit page exists (plain otherwise). [Story 7.5]
             if (_progress?.Git is { } gitPulse)
             {
                 reporter?.BeginPhase(GenerationPhase.CommitDays);
-                events.AddRange(GenerateCommitDaysInternal(gitPulse, nav));
+                events.AddRange(GenerateCommitDaysInternal(gitPulse, nav, CommitHref));
                 reporter?.EndPhase(GenerationPhase.CommitDays);
             }
 
@@ -538,6 +567,7 @@ public sealed class SiteGenerator
         }
 
         var entries = new List<AdrEntry>();
+        var hasRootReadme = false;
         foreach (var file in EnumerateAdrFiles())
         {
             var sw = Stopwatch.StartNew();
@@ -545,6 +575,7 @@ public sealed class SiteGenerator
             var relativeToRoot = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.AdrSourceRoot, file));
             // README-as-landing applies to the ADR root's README only; a nested README renders as a regular page.
             var isReadme = string.Equals(relativeToRoot, "README.md", StringComparison.OrdinalIgnoreCase);
+            if (isReadme) hasRootReadme = true;
 
             var outputName = isReadme ? "index.html" : Path.ChangeExtension(relativeToRoot, ".html");
             var outputRelative = PathUtil.NormalizeSlashes($"{ForgeOptions.AdrOutputSubdir}/{outputName}");
@@ -623,6 +654,56 @@ public sealed class SiteGenerator
             .ThenBy(e => e.Number)
             .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        // The nav (and the dashboard quick link) point at adrs/index.html whenever records exist, but only a
+        // root README ever produced that landing — README-less repos shipped a 404 in the static site and a
+        // dead surface in the webview. Synthesize a minimal landing from the already-ordered records so the
+        // link always resolves (owner decision 2026-07-12, spec-webview-doc-page-surfaces review). An
+        // intentional render ADDITION on README-less repos only: repos WITH a root README (including the
+        // golden fixture) are byte-identical, so the golden gate is unaffected.
+        if (!hasRootReadme && _adrs.Count > 0)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var body = new StringBuilder();
+                body.Append("<p>Architecture decision records for this project.</p>\n<ul class=\"adr-landing-list\">\n");
+                foreach (var adr in _adrs)
+                {
+                    // Records live under the adrs/ output subdir alongside this landing — the href is the
+                    // record's output path with that shared prefix stripped (nested records keep their subpath).
+                    var prefix = ForgeOptions.AdrOutputSubdir + "/";
+                    var href = adr.OutputRelativePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                        ? adr.OutputRelativePath[prefix.Length..]
+                        : adr.OutputRelativePath;
+                    body.Append($"<li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(adr.Title)}</a>");
+                    if (!string.IsNullOrWhiteSpace(adr.Status))
+                    {
+                        body.Append($" — {PathUtil.Html(adr.Status)}");
+                    }
+                    body.Append("</li>\n");
+                }
+                body.Append("</ul>\n");
+
+                var landing = new DocModel
+                {
+                    SourceRelativePath = ForgeOptions.AdrOutputSubdir,
+                    OutputRelativePath = SiteNav.AdrsLandingOutputPath,
+                    Title = "Architecture Decisions",
+                    Frontmatter = new Frontmatter { Title = "Architecture Decisions" },
+                    BodyHtml = body.ToString(),
+                    Headings = Array.Empty<Heading>(),
+                };
+                WriteOutput(SiteNav.AdrsLandingOutputPath,
+                    ApplyReferenceLinks(HtmlTemplater.RenderPage(landing, nav), SiteNav.AdrsLandingOutputPath));
+                events.Add(new GenerationEvent(GenerationOutcome.Generated,
+                    $"{ForgeOptions.AdrOutputSubdir}/index.html (synthesized landing)", sw.Elapsed));
+            }
+            catch (Exception ex)
+            {
+                events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.AdrsLandingOutputPath, sw.Elapsed, ex.Message));
+            }
+        }
         return events;
     }
 
@@ -651,7 +732,7 @@ public sealed class SiteGenerator
     /// links to the adjacent active days. Mirrors <see cref="GenerateAdrsInternal"/>: wipe+recreate the dir,
     /// render a bespoke page, run reference-linkification so "Story N.M"/"FR25" mentions in subjects become
     /// links, and write.</summary>
-    private List<GenerationEvent> GenerateCommitDaysInternal(GitPulse git, SiteNav nav)
+    private List<GenerationEvent> GenerateCommitDaysInternal(GitPulse git, SiteNav nav, Func<string, string?>? commitHref = null)
     {
         var events = new List<GenerationEvent>();
 
@@ -675,7 +756,7 @@ public sealed class SiteGenerator
             {
                 var prevDay = i > 0 ? days[i - 1] : (DateOnly?)null;
                 var nextDay = i < days.Count - 1 ? days[i + 1] : (DateOnly?)null;
-                var html = CommitDayTemplater.RenderPage(day, git.CommitsByDay[day], prevDay, nextDay, nav);
+                var html = CommitDayTemplater.RenderPage(day, git.CommitsByDay[day], prevDay, nextDay, nav, commitHref);
 
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
@@ -692,6 +773,107 @@ public sealed class SiteGenerator
         return events;
     }
 
+    /// <summary>Emits one <c>commit/{shortHash}.html</c> detail page per commit in the bounded (<c>-n 300</c>),
+    /// <c>--deep-git</c>-gated <see cref="DeepGitPulse.Commits"/> window (Story 7.5, FR-10) and populates
+    /// <see cref="_commitPages"/> (full <c>%H</c> hash → output-relative path) so the per-day pages and the Git
+    /// Insights hub can light up their guarded hash links. Mirrors <see cref="GenerateCommitDaysInternal"/>/
+    /// <see cref="GenerateAdrsInternal"/>: wipe+recreate the <c>commit/</c> dir (atomic rebuild, AD-5), per-commit
+    /// try/catch → <see cref="GenerationEvent"/> so one malformed commit never throws out of the phase (NFR-2), and
+    /// <see cref="ApplyReferenceLinks"/> so "Story N.M"/"FR-9" mentions in the subject and body become links (AC #1).
+    /// File-path cells resolve to Story 7.1's <c>code/…html</c> pages via the guarded <see cref="CodePageHref"/>
+    /// resolver (plain when a file has no in-portal page). Bounding is contractual: the phase runs only under
+    /// <c>--deep-git</c> and only over the capped fetch window, so ≤300 pages are ever generated (AC #2).</summary>
+    private List<GenerationEvent> GenerateCommitDetailsInternal(IReadOnlyList<DeepCommit> commits, SiteNav nav)
+    {
+        var events = new List<GenerationEvent>();
+
+        var commitDir = Path.Combine(_options.OutputRoot, "commit");
+        if (Directory.Exists(commitDir))
+        {
+            Directory.Delete(commitDir, recursive: true);
+        }
+
+        var entries = new List<CommitDetailEntry>();
+        var pages = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Track the short-hash filenames used this pass so a (astronomically unlikely) 7-char collision between two
+        // full hashes in the ≤300 window widens the abbreviation instead of overwriting the earlier page.
+        var usedFileHashes = new HashSet<string>(StringComparer.Ordinal);
+
+        Directory.CreateDirectory(commitDir);
+        foreach (var commit in commits)
+        {
+            var sw = Stopwatch.StartNew();
+            var shortHash = UniqueShortHash(commit.Hash, usedFileHashes);
+            var outputRelative = PathUtil.NormalizeSlashes($"commit/{shortHash}.html");
+            try
+            {
+                var html = CommitDetailTemplater.RenderPage(commit, nav, CodePageHref);
+                WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
+
+                entries.Add(new CommitDetailEntry(commit.Hash, outputRelative));
+                // Key on the full %H so the resolver can match the hub's full hash exactly and the day page's
+                // abbreviated %h by prefix. A duplicate full hash in one window (impossible in practice) keeps the
+                // first page's path rather than throwing.
+                pages.TryAdd(commit.Hash, outputRelative);
+                events.Add(new GenerationEvent(GenerationOutcome.Generated, outputRelative, sw.Elapsed));
+            }
+            catch (Exception ex)
+            {
+                events.Add(new GenerationEvent(GenerationOutcome.Error, outputRelative, sw.Elapsed, ex.Message));
+            }
+        }
+
+        _commitDetails = entries;
+        _commitPages = pages;
+        return events;
+    }
+
+    /// <summary>The per-commit page filename stem: <see cref="CommitDetailTemplater.ShortHash"/> normally, widened
+    /// one char at a time only when two full hashes share the same abbreviation in this window (belt-and-suspenders
+    /// against a 7-char collision the display hash would otherwise mask). Records the chosen stem in
+    /// <paramref name="used"/>.</summary>
+    private static string UniqueShortHash(string fullHash, HashSet<string> used)
+    {
+        var length = CommitDetailTemplater.ShortHashLength;
+        var candidate = CommitDetailTemplater.ShortHash(fullHash);
+        while (!used.Add(candidate))
+        {
+            length++;
+            if (length >= fullHash.Length)
+            {
+                // Exhausted the full hash (identical hashes) — fall back to a suffix so the write never clobbers.
+                candidate = $"{fullHash}-{used.Count}";
+                used.Add(candidate);
+                break;
+            }
+            candidate = fullHash[..length];
+        }
+        return candidate;
+    }
+
+    /// <summary>The guarded per-commit-detail resolver (Story 7.5): a commit hash → its <c>commit/…html</c> page,
+    /// output-relative. Matches <see cref="_commitPages"/> keys (full <c>%H</c>) exactly first, then by prefix so an
+    /// abbreviated <c>%h</c> from the baseline day-page fetch still resolves (git can widen <c>%h</c> past 7 chars on
+    /// collision, so prefix — not equality — is the safe rule). Returns null (→ plain hash) when no page exists.
+    /// ≤300 entries, so the linear prefix scan is trivial.</summary>
+    private string? CommitHref(string hash)
+    {
+        if (hash.Length == 0 || _commitPages.Count == 0) return null;
+        if (_commitPages.TryGetValue(hash, out var exact)) return exact;
+        foreach (var kv in _commitPages)
+        {
+            if (kv.Key.StartsWith(hash, StringComparison.Ordinal)) return kv.Value;
+        }
+        return null;
+    }
+
+    /// <summary>The guarded code-page resolver for a commit's changed-file path (Story 7.1/7.5): a repo-relative
+    /// source path → its <c>code/…html</c> page, output-relative, when that file has an in-portal page (i.e. it is
+    /// cited by an artifact — <see cref="_codePages"/>). Returns null (→ plain <c>&lt;code&gt;</c> path) otherwise,
+    /// including in external <c>--code-url</c> mode where <see cref="_codePages"/> is empty by design.</summary>
+    private string? CodePageHref(string repoRelativePath) =>
+        _codePages.TryGetValue(PathUtil.NormalizeSlashes(repoRelativePath), out var path) ? path : null;
+
     // Above this size a referenced source file is treated as too large to render inline and degraded to a
     // placeholder page (never read into memory in full). A seed value, not a contract — a future settings toggle
     // (Epic 5 / AD-3) could surface it; there is deliberately no knob for it yet. [Story 7.1]
@@ -706,20 +888,13 @@ public sealed class SiteGenerator
     /// for each code page's "Referenced by" block) UP FRONT, before any citing page is rendered. This is what lets
     /// <see cref="ApplyReferenceLinks"/> resolve citations on the story/doc/ADR pages that render before the code
     /// pages themselves. Pure discovery: reads the small <c>*.md</c> set (shared access) and touches no output.
-    /// A no-op in external-link mode (<c>--code-url</c>) — citations resolve to the external base with no page map,
-    /// so <see cref="_codePages"/> stays empty by design.</summary>
+    /// In-portal pages are ALWAYS discovered — the external source base (<c>--code-url</c>, Story 7.7) is additive
+    /// (a link out from each page), so it no longer suppresses this pass.</summary>
     private void DiscoverCodeReferences(List<string> sourceFiles)
     {
         _codePages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _codeReferenced = new List<string>();
         _codeReverseMap = new Dictionary<string, List<(string, string)>>(StringComparer.OrdinalIgnoreCase);
-
-        // External mode: no in-portal pages, so nothing to discover — the linkifier resolves against the repo
-        // directly ({CodeSourceBaseUrl}/<path>#L{n}).
-        if (_options.CodeSourceBaseUrl is { Length: > 0 })
-        {
-            return;
-        }
 
         var repoFull = Path.GetFullPath(_options.RepoRoot);
         var sourceFull = Path.GetFullPath(_options.SourceRoot);
@@ -791,8 +966,8 @@ public sealed class SiteGenerator
     /// purposeful set renders (NFR1) and non-referenced files are omitted with no broken navigation (AC #1). Mirrors
     /// <see cref="GenerateCommitDaysInternal"/>/<see cref="GenerateAdrsInternal"/>: wipe+recreate the output dir each
     /// pass (atomic rebuild, AD-5) and per-file try/catch → <see cref="GenerationEvent"/> so one bad file never
-    /// throws out of the phase (NFR2). Skipped entirely in external-link mode (<c>--code-url</c>): no page is
-    /// generated for links that will point at an external base URL instead.</summary>
+    /// throws out of the phase (NFR2). When an external source base is configured/detected (<c>--code-url</c>,
+    /// Story 7.7) each page additionally carries an additive "view source online" link — the pages still generate.</summary>
     private List<GenerationEvent> GenerateCodePagesInternal(List<string> sourceFiles, SiteNav nav, IGenerationReporter? reporter)
     {
         var events = new List<GenerationEvent>();
@@ -838,25 +1013,27 @@ public sealed class SiteGenerator
 
                 // Story 7.2 (AC #2): the artifacts that cite this file, resolved to their generated pages.
                 var referencedBy = BuildReferencedBy(repoRelative);
+                // Story 7.7: additive link to the same file on its hosting platform (null unless a base is set/detected).
+                var externalUrl = BuildExternalSourceUrl(repoRelative);
 
                 string html;
                 GenerationOutcome outcome;
                 if (new FileInfo(full).Length > MaxCodeFileBytes)
                 {
                     html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
-                        "This file is too large to render inline.", nav);
+                        "This file is too large to render inline.", nav, referencedBy, externalUrl);
                     outcome = GenerationOutcome.Skipped;
                 }
                 else if (TryReadCodeText(full, out var text))
                 {
                     var lines = SplitCodeLines(text);
-                    html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy);
+                    html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl);
                     outcome = GenerationOutcome.Generated;
                 }
                 else
                 {
                     html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
-                        "This file is not a readable text file and can't be shown inline.", nav);
+                        "This file is not a readable text file and can't be shown inline.", nav, referencedBy, externalUrl);
                     outcome = GenerationOutcome.Skipped;
                 }
 
@@ -899,6 +1076,14 @@ public sealed class SiteGenerator
         }
         return result;
     }
+
+    /// <summary>The additive "view source online" URL for a code page (Story 7.7): the configured/detected external
+    /// base joined with the repo-relative path, or null when no base is set (in-portal only). No <c>#L{n}</c> here —
+    /// this is a whole-file link; per-line deep links stay in-portal via <see cref="CodeReferenceLinkifier"/>.</summary>
+    private string? BuildExternalSourceUrl(string repoRelative) =>
+        _options.CodeSourceBaseUrl is { Length: > 0 } baseUrl
+            ? baseUrl.TrimEnd('/') + "/" + PathUtil.NormalizeSlashes(repoRelative)
+            : null;
 
     /// <summary>Reads a source file as UTF-8 text with shared access, returning false when it is binary — a NUL byte
     /// anywhere or a strict-UTF-8 decode failure, the same dependency-free heuristic git uses. A leading UTF-8 BOM is
@@ -966,7 +1151,10 @@ public sealed class SiteGenerator
         var sw = Stopwatch.StartNew();
         try
         {
-            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav);
+            // Wire the guarded commit-detail resolver (Story 7.5): the hub's "latest {hash}" links light up as
+            // links into commit/ when a per-commit page exists, plain otherwise. The hub sits at the output root,
+            // so the resolver's root-relative path is used as-is (the templater applies no prefix there).
+            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, commitHref: CommitHref);
             WriteOutput(SiteNav.GitInsightsOutputPath, ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
         }
@@ -1229,6 +1417,60 @@ public sealed class SiteGenerator
 
             var outline = new ProjectOutline(outlineEpics, BuildOutlineSummary(outlineEpics));
 
+            // Long-tail pages (docs, ADRs, requirements, sprint, retros, about, diagnostics…) captured at the
+            // WriteOutput seam during this run's GenerateAll (CapturePages — the webview command turns it on):
+            // every header nav link and index drill gets a live in-panel target instead of the shim's
+            // "isn't part of the in-editor view" toast. Regions are sliced from the render pipeline's OWN
+            // output via the Story 6.7 landmark extraction (never a disk read-back — AD-1/AD-2), with fresh
+            // per-page nav markup so active-state travels with the surface exactly like the family surfaces.
+            // The dashboard/epics families above keep their view-model render path (strongest parity) and are
+            // never shadowed.
+            // Deliberate EXCLUSIONS (owner decision 2026-07-12) — the page classes that scale with the TARGET
+            // repo rather than its planning artifacts: code pages (Story 7.1 — matched as the exact _codePages
+            // set, not a path prefix, so a source folder literally named code/ still surfaces), commit-day
+            // pages (Story 7.3 — one per active day, unbounded on old repos), and Story 7.5's commit/ detail
+            // pages (prefix — that story's cache is concurrent in-flight work). In-editor those clicks toast
+            // honestly; 7.2 citations already open the real file via revealSource. [spec-webview-doc-page-surfaces]
+            if (CapturePages && _spaCapture is null)
+            {
+                throw new InvalidOperationException(
+                    "CapturePages was set after GenerateAll(); set it before generating so the write seam captures pages.");
+            }
+            if (_spaCapture is { } capture)
+            {
+                var familyPaths = new HashSet<string>(
+                    surfaces.Select(s => PathUtil.NormalizeSlashes(s.OutputRelativePath)),
+                    StringComparer.OrdinalIgnoreCase);
+                var excluded = new HashSet<string>(_codePages.Values, StringComparer.OrdinalIgnoreCase);
+                foreach (var day in _commitDays)
+                {
+                    excluded.Add(PathUtil.NormalizeSlashes(day.OutputRelativePath));
+                }
+                var sourceByOutput = BuildCapturedSourceMap();
+                foreach (var (path, fullHtml) in capture)
+                {
+                    var normalized = PathUtil.NormalizeSlashes(path);
+                    if (familyPaths.Contains(normalized)) continue;
+                    if (excluded.Contains(normalized)) continue;
+                    if (normalized.StartsWith("commit/", StringComparison.OrdinalIgnoreCase)) continue;
+                    var navMarkup = HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView(normalized));
+                    var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
+                    if (ReferenceEquals(region, navMarkup))
+                    {
+                        // No <main> landmark → the slice degraded to nav-only. A silently BLANK surface is
+                        // worse than the shim's honest toast, so skip it (the SPA keeps its nav-only degrade:
+                        // a browser tab is escapable; a status panel claiming "links work" is not).
+                        continue;
+                    }
+                    sourceByOutput.TryGetValue(normalized, out var capturedSource);
+                    surfaces.Add(new WebviewSurface(
+                        normalized,
+                        SpaDelivery.ExtractTitle(fullHtml),
+                        region,
+                        capturedSource));
+                }
+            }
+
             // The entry document embeds the dashboard's ALREADY-linkified content, so wrapping happens after
             // linkification and the linkifier never walks the shell's CSS/bridge-script text. The dashboard's
             // SourcePath is null (it aggregates many artifacts), so the reveal button paints hidden — the bridge
@@ -1237,6 +1479,49 @@ public sealed class SiteGenerator
             var entryDocument = WebviewRenderAdapter.Shared.WrapDocument(dashboardPage, entry.ContentHtml, entry.SourcePath);
             return new WebviewBundle(_options.SiteTitle, entry.OutputRelativePath, entryDocument, surfaces, outline);
         }
+    }
+
+    /// <summary>Repo-relative source <c>.md</c> for each captured long-tail page that has ONE obvious source —
+    /// generic docs (<see cref="DocModel"/>, keyed by output path) and ADR pages (<see cref="AdrEntry"/>) — for
+    /// the webview reveal-source affordance, joined host-side with the SAME one repo-relative convention the
+    /// story surfaces use (Story 6.10). Aggregate pages (sprint, requirements index, about, diagnostics…) are
+    /// simply absent → null <c>SourcePath</c> → the reveal button stays hidden, exactly like the dashboard.
+    /// [spec-webview-doc-page-surfaces]</summary>
+    private Dictionary<string, string> BuildCapturedSourceMap()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // Never ship a sourcePath that escapes the repo root: RepoRelative degrades to an absolute path when
+        // the source lives outside RepoRoot (known deferred quirk), and the host containment guard would
+        // reject it anyway — omitting the entry (button hidden) is the honest degrade.
+        void Add(string outputRelative, string sourceFullPath)
+        {
+            var rel = RepoRelative(sourceFullPath);
+            if (Path.IsPathRooted(rel) || rel.StartsWith("..", StringComparison.Ordinal)) return;
+            map[PathUtil.NormalizeSlashes(outputRelative)] = PathUtil.NormalizeSlashes(rel);
+        }
+
+        foreach (var doc in _docs.Values)
+        {
+            Add(doc.OutputRelativePath, Path.Combine(_options.SourceRoot, doc.SourceRelativePath));
+        }
+        var adrDisplayPrefix = ForgeOptions.AdrOutputSubdir + "/";
+        foreach (var adr in _adrs)
+        {
+            // AdrEntry.SourceRelativePath is DISPLAY-prefixed with the output subdir ("adrs/<file>.md" — see
+            // GenerateAdrsInternal); the real file lives at AdrSourceRoot + the un-prefixed remainder.
+            var rel = adr.SourceRelativePath.StartsWith(adrDisplayPrefix, StringComparison.OrdinalIgnoreCase)
+                ? adr.SourceRelativePath[adrDisplayPrefix.Length..]
+                : adr.SourceRelativePath;
+            Add(adr.OutputRelativePath, Path.Combine(_options.AdrSourceRoot, rel));
+        }
+        // The repo README renders straight from ReadmeSourcePath (never via _docs) — the spec's first-named
+        // page shouldn't be the one surface missing its reveal affordance.
+        if (ReadmeAvailable)
+        {
+            Add(SiteNav.ReadmeOutputPath, ReadmeSourcePath);
+        }
+        return map;
     }
 
     /// <summary>Tallies the status-bar summary from the assembled outline — stories by stage across all epics,
@@ -1816,11 +2101,13 @@ public sealed class SiteGenerator
         {
             html = StoryEpicLinkifier.Linkify(html, _epicsModel, prefix, skipStoryId, skipEpicNumber);
         }
-        // Story 7.2: resolve source-code citations + view-source links to Story 7.1's code pages (or, in external
-        // mode, to {CodeSourceBaseUrl}/<path>#L{n}). Runs AFTER the FR/Story linkifiers and is anchor-aware, so it
-        // never touches the links they emitted. A no-op when there are no code pages and no external base URL.
+        // Story 7.2: resolve source-code citations + view-source links to Story 7.1's code pages. Runs AFTER the
+        // FR/Story linkifiers and is anchor-aware, so it never touches the links they emitted; a no-op when there are
+        // no code pages. Citations always resolve to the in-portal pages now (Story 7.7 made the external base
+        // additive, not a replacement) — the code page itself carries the "view source online" link — so pass no
+        // external base here: a configured/detected --code-url never diverts a citation from its in-portal page.
         html = CodeReferenceLinkifier.Linkify(
-            html, _codePages, _options.CodeSourceBaseUrl, prefix, _options.RepoRoot, _options.SourceRoot);
+            html, _codePages, codeSourceBaseUrl: null, prefix, _options.RepoRoot, _options.SourceRoot);
         return html;
     }
 

@@ -210,7 +210,10 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         var fingerprint = FingerprintTree(Site);
 
-        const string expected = "31ef6fddf272491d07d13d2bba6821e1bd139affd2c49618c1dc7ebfd91b4a27";
+        // Regenerated for Story 7.1 (rework): adds the relationships-graph + secondary-source + external-link
+        // styling to specscribe.css. The output FILE SET is unchanged for this fixture (it has no [Source:]
+        // citations, so no code/ pages), so only the stylesheet bytes moved. [golden-diff-normalization-gotchas]
+        const string expected = "ff6dee84fda9fd5fbab4275115900aaf887688ee14138553622771ee06d42cdc";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

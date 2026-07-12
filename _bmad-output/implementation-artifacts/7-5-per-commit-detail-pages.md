@@ -1,6 +1,10 @@
+---
+baseline_commit: 279d27e230ff391ce9f73bb1e438ca24775ceaa4
+---
+
 # Story 7.5: Per-Commit Detail Pages
 
-Status: ready-for-dev
+Status: review
 
 <!-- Context-engineered 2026-07-09 (create-story). Supersedes the 2026-07-08 owner draft, whose Task 1 ("extend the shared fetch to add %b + --numstat, produce a CommitDetail record") is now STALE: Story 3.8 already landed the enriched fetch AND the per-commit DeepCommit record. This story now exposes that existing data and renders/wires the pages. Validation optional: run validate-create-story before dev-story. -->
 
@@ -226,24 +230,24 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Expose the existing per-commit records on the deep pulse (AC: #1)**
-  - [ ] Add `IReadOnlyList<DeepCommit> Commits` (empty default, never null) to `DeepGitPulse`; populate it in `ParseNumstatLog` from the `commits` records it already parses via `ParseNumstatRecords`. No fetch change, no new record type. Preserve `Hotspots`/`Coupling`/`Insights` + all existing tests. [Source: [GitMetrics.cs:34-44,294-350](../../src/SpecScribe/GitMetrics.cs)]
-- [ ] **Task 2 — `CommitDetailTemplater` → `commit/{shortHash}.html` (AC: #1, #2)**
-  - [ ] New `CommitDetailTemplater` mirroring `CommitDayTemplater`'s synthesized shell (skip-link, single `<main>`, breadcrumb, `doc-header`/`doc-body`, footer). Render subject `<h1>`, author+date attribution pill (guard null timestamp), full body as escaped paragraph-preserving prose (omit when empty), and a scrollable files-changed table (path, +added, −deleted; binary marker for null churn). Path is a guarded `fileHref` link (plain until 7.1). Escape everything; invariant dates; neutral tokens.
-  - [ ] New `CommitDetailEntry(Hash, OutputRelativePath)` record.
-- [ ] **Task 3 — Generation phase + `_commitPages` seam (AC: #1, #2)**
-  - [ ] Add `_commitPages` (hash→path) and `_commitDetails` fields. Add `GenerateCommitDetailsInternal` mirroring `GenerateCommitDaysInternal`: gate on `_progress?.DeepGit?.Commits`, wipe+recreate `commit/`, per-commit try/catch, `File.WriteAllText(..., ApplyReferenceLinks(html, rel))`, record entries, populate `_commitPages`. Call it in `GenerateAll` **before** the commit-days and git-insights phases. Filename short hash = `Hash[..7]` (document the collision fallback).
-- [ ] **Task 4 — Wire the guarded `commitHref` resolver into both consumers (AC: #1, #2)**
-  - [ ] Add optional `commitHref` param to `CommitDayTemplater.RenderPage`; render the `commit-hash` as a guarded link; pass the resolver from `GenerateCommitDaysInternal`.
-  - [ ] Pass the resolver as `commitHref:` into the existing `GitInsightsTemplater.RenderPage(...)` call. Resolver matches full hash then `StartsWith` prefix (handles `%h` vs `%H`).
-- [ ] **Task 5 — Styling (AC: #1)**
-  - [ ] Add `.commit-detail` (+ files table, body prose, meta pill) styles in `src/SpecScribe/assets/specscribe.css` using neutral tokens (not `--status-*`); table scrolls in its own container. **No JavaScript.** Optional companion `StylesheetTests` assertion.
-- [ ] **Task 6 — Tests (AC: #1, #2)**
-  - [ ] `GitMetricsTests`: `Commits` exposed (shape, newest-first, binary rows, empty→empty); `Hotspots`/`Coupling`/`Insights` back-compat.
-  - [ ] `CommitDetailTemplaterTests`: four signals render; a11y shell; escaping; binary/empty-body/null-date partials; guarded file link (present/absent).
-  - [ ] `SiteGeneratorCommitDetailsTests`: opt-in on → pages exist + day/hub hashes link in; opt-out off → no `commit/` + plain hashes + baseline identical + `TryComputeDeep` not called; graceful degradation (no git → no pages, no error); reference linkification present; determinism.
-- [ ] **Task 7 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green. Baseline generate (no `--deep-git`) → no `commit/` dir, day-page hashes plain. Deep generate (`--deep-git`) → `commit/{hash}.html` shows subject/author+date/body/files+churn with linkified references, no JS, invariant dates, escaped content; day + hub hashes link in. Non-git run degrades cleanly. (Default `SpecScribeOutput/`; never `--output docs/live`.)
+- [x] **Task 1 — Expose the existing per-commit records on the deep pulse (AC: #1)**
+  - [x] Add `IReadOnlyList<DeepCommit> Commits` (empty default, never null) to `DeepGitPulse`; populate it in `ParseNumstatLog` from the `commits` records it already parses via `ParseNumstatRecords`. No fetch change, no new record type. Preserve `Hotspots`/`Coupling`/`Insights` + all existing tests. [Source: [GitMetrics.cs:34-44,294-350](../../src/SpecScribe/GitMetrics.cs)]
+- [x] **Task 2 — `CommitDetailTemplater` → `commit/{shortHash}.html` (AC: #1, #2)**
+  - [x] New `CommitDetailTemplater` mirroring `CommitDayTemplater`'s synthesized shell (skip-link, single `<main>`, breadcrumb, `doc-header`/`doc-body`, footer). Render subject `<h1>`, author+date attribution pill (guard null timestamp), full body as escaped paragraph-preserving prose (omit when empty), and a scrollable files-changed table (path, +added, −deleted; binary marker for null churn). Path is a guarded `fileHref` link (plain until 7.1). Escape everything; invariant dates; neutral tokens.
+  - [x] New `CommitDetailEntry(Hash, OutputRelativePath)` record.
+- [x] **Task 3 — Generation phase + `_commitPages` seam (AC: #1, #2)**
+  - [x] Add `_commitPages` (hash→path) and `_commitDetails` fields. Add `GenerateCommitDetailsInternal` mirroring `GenerateCommitDaysInternal`: gate on `_progress?.DeepGit?.Commits`, wipe+recreate `commit/`, per-commit try/catch, `File.WriteAllText(..., ApplyReferenceLinks(html, rel))`, record entries, populate `_commitPages`. Call it in `GenerateAll` **before** the commit-days and git-insights phases. Filename short hash = `Hash[..7]` (document the collision fallback).
+- [x] **Task 4 — Wire the guarded `commitHref` resolver into both consumers (AC: #1, #2)**
+  - [x] Add optional `commitHref` param to `CommitDayTemplater.RenderPage`; render the `commit-hash` as a guarded link; pass the resolver from `GenerateCommitDaysInternal`.
+  - [x] Pass the resolver as `commitHref:` into the existing `GitInsightsTemplater.RenderPage(...)` call. Resolver matches full hash then `StartsWith` prefix (handles `%h` vs `%H`).
+- [x] **Task 5 — Styling (AC: #1)**
+  - [x] Add `.commit-detail` (+ files table, body prose, meta pill) styles in `src/SpecScribe/assets/specscribe.css` using neutral tokens (not `--status-*`); table scrolls in its own container. **No JavaScript.** Optional companion `StylesheetTests` assertion.
+- [x] **Task 6 — Tests (AC: #1, #2)**
+  - [x] `GitMetricsTests`: `Commits` exposed (shape, newest-first, binary rows, empty→empty); `Hotspots`/`Coupling`/`Insights` back-compat.
+  - [x] `CommitDetailTemplaterTests`: four signals render; a11y shell; escaping; binary/empty-body/null-date partials; guarded file link (present/absent).
+  - [x] `SiteGeneratorCommitDetailsTests`: opt-in on → pages exist + day/hub hashes link in; opt-out off → no `commit/` + plain hashes + baseline identical; graceful degradation (no git → no pages, no error); reference linkification present; determinism.
+- [x] **Task 7 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green (859 tests). Baseline generate (no `--deep-git`) → no `commit/` dir, day-page hashes plain. Deep generate (`--deep-git`) → `commit/{hash}.html` (143 pages, bounded) shows subject/author+date/body/files+churn with linkified references, no new JS, invariant dates, escaped content; day + hub hashes link in. Non-git run degrades cleanly. (Default `SpecScribeOutput/`; never `--output docs/live`.)
 
 ## Dev Notes
 
@@ -275,8 +279,43 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Opus 4.8) — bmad-dev-story workflow, 2026-07-12.
+
 ### Debug Log References
+
+- `dotnet build src/SpecScribe` → clean (0 warnings, 0 errors) throughout.
+- `dotnet test` → **859 passed, 0 failed** (18 new Story-7.5 tests; real git available on host so the gated generation tests ran, not no-op'd).
+- Golden `GenerateAll_GoldenContentFingerprint` flipped once (expected): adding `.commit-detail` styles changed `specscribe.css` bytes. Regenerated the constant `31ef6fdd… → 1cd24db9…`; the output FILE SET is unchanged for the non-deep-git golden fixture (commit pages are `--deep-git`-gated), so only the stylesheet moved. [[golden-diff-normalization-gotchas]]
+- Manual verify against this repo: baseline `generate` → no `SpecScribeOutput/commit/`, day-page hashes plain (`0` `commit-hash-link`, `2` plain `commit-hash`). `generate --deep-git` → 143 `commit/*.html` pages (bounded ≤ 300); a page shows `<h1>` subject, `by Matt Eland · Thu, Jul 9, 2026 at 15:10` attribution, files-changed caption, `+N`/`&minus;N` churn; day pages link `../commit/{hash}.html`; the Git Insights hub's "latest" links `commit/{hash}.html`; no new `<script>` (the two script tags are the pre-existing shared shell — a day page carries the identical pair).
+- **⚠️ Concurrent-tree note for the reviewer:** the full suite reached **859 passed / 0 failed** on completion of Story 7.5. A subsequent, *concurrent and unrelated* effort (**Story 7.1 rework** — a "relationships block / hub-and-spoke reference graph" replacing the `.code-referenced-by` back-nav) began editing shared files on `main` mid-session (`Charts.cs` +65, `CodeFileTemplater.cs` +124, `Commands.cs`, `specscribe.css` +210 with `.code-referenced-by` removed). That work introduced **3 failures OUTSIDE Story 7.5's scope** — `StylesheetTests.Stylesheet_HasReferencedByStyles`, `SiteGeneratorCodeCitationTests.CodePage_HasReferencedByBackToCitingArtifacts` (both assert the now-removed 7.1 `.code-referenced-by` surface), and `GenerateAll_GoldenContentFingerprint` (moved again by those 7.1-rework rendered-byte changes). None are caused by 7.5's diff (verified: the css diff removes `.code-referenced-by` under a `Story 7.1 (rework)` comment; the templater diff restructures that aside). The golden constant here (`1cd24db9…`) is regenerated for **7.5's `.commit-detail` CSS only**; it was deliberately NOT re-bumped to absorb the concurrent 7.1-rework output — that story owns its own golden regen.
 
 ### Completion Notes List
 
+- **Data layer was already present (as the context predicted).** Task 1 was one property: `DeepGitPulse.Commits` (`init`, empty-list default), populated in `ParseNumstatLog` from the `commits` records it already parsed via `ParseNumstatRecords`. No git-command change, no new record type; `Hotspots`/`Coupling`/`Insights` and all existing tests preserved (verified back-compat assertions in the same test).
+- **`CommitDetailTemplater`** mirrors `CommitDayTemplater`'s synthesized shell exactly (skip-link → single `<main id="main-content">`, breadcrumb, `doc-header`/`doc-body`, footer). Renders the four AC-#1 signals: subject `<h1>` (`(no subject)` fallback), author+date attribution pill (guards null timestamp → author only, never a rank), full body as escaped paragraph-preserving prose (blank line → `<p>`, single newline → `<br>`; omitted entirely when empty), and a scrollable files-changed table (path, `+N`/`&minus;N`, binary rows show a `binary` marker + em dashes, never `+0`/`&minus;0`). Every git free-text field escaped via `PathUtil.Html`.
+- **`_commitPages` seam owned here** (full `%H` → `commit/{shortHash}.html`). `GenerateCommitDetailsInternal` runs BEFORE the commit-days and git-insights phases, gated on `_progress?.DeepGit is { Commits.Count: > 0 }`, wipe+recreates `commit/`, per-item try/catch, `ApplyReferenceLinks` (so "Story N.M"/"FR-9" in the subject **and** body linkify), records `CommitDetailEntry`. Filename stem = `Hash[..7]` with a `UniqueShortHash` collision-widening fallback (belt-and-suspenders).
+- **`%h` vs `%H` reconciliation:** the `CommitHref` resolver matches full-hash keys exactly, then by `StartsWith` prefix — so the hub's full-`%H` `LatestHash` and the day page's abbreviated-`%h` `ShortHash` both resolve. Verified live on this repo.
+- **Deviation from the (pre-7.1-merge) context, deliberately:** the story context (written 2026-07-09) said file links stay plain until 7.1 lands and to "pass null." Stories 7.1/7.2 have since landed on `main` (`_codePages` exists and is populated), so I wired the guarded `CodePageHref` resolver into the file-path cells — strictly better for AC #2 ("file entries lead to the corresponding file page"), still no dead links (plain `<code>` when a file has no in-portal page, e.g. external `--code-url` mode). The templater stays resolver-agnostic; this is a SiteGenerator wiring choice.
+- **Deviation on one test assertion:** the Task-6 opt-out subtask suggested asserting "`TryComputeDeep` not called." There is no seam to observe that; I assert the observable outcome instead (no `commit/` dir + plain day-page hashes), exactly as the sibling `SiteGeneratorGitInsightsTests` does for its own gate. Task text updated to match what was implemented.
+- **Graceful degradation** holds at every branch: flag off / git absent → `DeepGit` null → `Commits` empty → no `commit/` dir, no pages, day/hub hashes plain, baseline site intact (proven by `GenerateAll_FlagOff…` and `…WithoutGitHistory…` tests). Neutral tokens only (no `--status-*`); no JavaScript added.
+
+### Change Log
+
+- 2026-07-12 — Implemented Story 7.5 (per-commit detail pages). Added `DeepGitPulse.Commits`; new `CommitDetailTemplater` + `CommitDetailEntry` rendering `commit/{shortHash}.html`; new `GenerateCommitDetailsInternal` phase + `_commitPages`/`_commitDetails` seam; wired the guarded `commitHref` resolver into `CommitDayTemplater` (new optional param) and the Git Insights hub, and a guarded `CodePageHref` file-link resolver; `.commit-detail` styling. +18 tests (859 total, green); golden fingerprint regenerated for the CSS change. Status → review.
+
 ### File List
+
+**New:**
+- `src/SpecScribe/CommitDetailTemplater.cs`
+- `src/SpecScribe/CommitDetailEntry.cs`
+- `tests/SpecScribe.Tests/CommitDetailTemplaterTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs`
+
+**Modified:**
+- `src/SpecScribe/GitMetrics.cs` — `DeepGitPulse.Commits` property + population in `ParseNumstatLog`.
+- `src/SpecScribe/CommitDayTemplater.cs` — optional `commitHref` param; guarded hash link.
+- `src/SpecScribe/SiteGenerator.cs` — `_commitPages`/`_commitDetails` fields; `GenerateCommitDetailsInternal`; `UniqueShortHash`, `CommitHref`, `CodePageHref` resolvers; phase call before commit-days/hub; resolver hand-offs into `GenerateCommitDaysInternal` and `GitInsightsTemplater.RenderPage`.
+- `src/SpecScribe/assets/specscribe.css` — `.commit-detail` (+ files table, body prose, meta pill, `.commit-hash-link`) styles, neutral tokens.
+- `tests/SpecScribe.Tests/GitMetricsTests.cs` — `Commits`-exposure + empty-log tests.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden fingerprint constant regenerated for the CSS change.
+- `_bmad-output/implementation-artifacts/7-5-per-commit-detail-pages.md` — this story (frontmatter `baseline_commit`, tasks, Dev Agent Record, status).
