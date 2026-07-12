@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="#c5c5c5">
+  <!-- Activity-bar container icon (Story 6.9). VS Code masks by ALPHA and tints with the theme foreground, so
+       only the shape matters — a bulleted outline that reads as "Project Outline". Distinct from the colored
+       panel-tab icon (media/specscribe.svg), which is NOT mask-tinted. -->
+  <circle cx="5" cy="6" r="1.7"/>
+  <rect x="9" y="4.9" width="11" height="2.2" rx="1.1"/>
+  <circle cx="5" cy="12" r="1.7"/>
+  <rect x="9" y="10.9" width="11" height="2.2" rx="1.1"/>
+  <circle cx="5" cy="18" r="1.7"/>
+  <rect x="9" y="16.9" width="8" height="2.2" rx="1.1"/>
+</svg>

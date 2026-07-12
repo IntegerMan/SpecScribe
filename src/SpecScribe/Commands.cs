@@ -44,6 +44,10 @@ public sealed class GenerateCommand : Command<SiteSettings>
 /// behavior is unchanged, and the pending Story 5.x CLI scope is untouched.</para></summary>
 public sealed class WebviewCommand : Command<SiteSettings>
 {
+    /// <summary>Serializer options for the stdout payload: camelCase property names so the C# records read the
+    /// same as the hand-named camelCase fields on the TS side. [Story 6.9]</summary>
+    private static readonly JsonSerializerOptions CamelCase = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
     protected override int Execute(CommandContext context, SiteSettings settings, CancellationToken cancellationToken)
     {
         var resolved = settings.Resolve();
@@ -61,6 +65,16 @@ public sealed class WebviewCommand : Command<SiteSettings>
         }
 
         var bundle = generator.RenderWebviewSurfaces();
+        Console.Out.Write(SerializePayload(bundle, ResolveConfiguredOutputRoot(resolved)));
+        return 0;
+    }
+
+    /// <summary>Serializes the stdout payload the TS shim parses: the entry document + every navigable surface,
+    /// the configured output root, and the host-neutral <c>outline</c> (tree + status-bar summary). Extracted from
+    /// <see cref="Execute"/> so the JSON contract the extension depends on — camelCase throughout, <c>surfaces</c>
+    /// keyed by output-relative path, <c>outline</c> present — is unit-testable without a spawn. [Story 6.9]</summary>
+    public static string SerializePayload(WebviewBundle bundle, string configuredOutputRoot)
+    {
         var payload = new
         {
             siteTitle = bundle.SiteTitle,
@@ -71,11 +85,19 @@ public sealed class WebviewCommand : Command<SiteSettings>
             // the project's real configured output, never the temp scratch dir this command actually renders
             // into. The extension's "Open Generated Site" command joins this to the workspace folder to find
             // an already-generated index.html. [Story 6.8 AC #3, R2.4]
-            configuredOutputRoot = ResolveConfiguredOutputRoot(resolved),
+            configuredOutputRoot,
             surfaces = bundle.Surfaces.ToDictionary(s => s.OutputRelativePath, s => new { title = s.Title, content = s.ContentHtml }),
+            // Host-neutral epic/story outline + status-bar summary for the VS Code native surfaces (activity-bar
+            // tree, status bar). Data, not rendering (ADR 0005 §1); its SurfacePaths are exactly the surface keys
+            // above, so a tree click reveals the right surface. Emits no HTML — the generated site is unaffected.
+            // [Story 6.9]
+            outline = bundle.Outline,
         };
-        Console.Out.Write(JsonSerializer.Serialize(payload));
-        return 0;
+        // CamelCase so the nested `outline` record (PascalCase properties) serializes to the same convention as
+        // the hand-named camelCase fields above — one consistent shape for the TS interface. The naming policy
+        // touches property NAMES only, never string values or the `surfaces` dictionary KEYS (those are
+        // output-relative paths, governed by DictionaryKeyPolicy, which stays default/none). [Story 6.9]
+        return JsonSerializer.Serialize(payload, CamelCase);
     }
 
     /// <summary>The configured output root expressed relative to the repo root, with forward slashes so the

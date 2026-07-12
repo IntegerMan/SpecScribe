@@ -52,6 +52,38 @@ dev host — this is the human step Stories 6.4/6.5 also flagged:
   `specscribe.toolPath` yields an actionable notification (**Set specscribe.toolPath** / **Retry**) alongside the
   error page; the panel tab carries the SpecScribe icon.
 
+## F5 smoke checklist (manual — Story 6.9: native tree + status bar)
+
+Same coverage boundary as above — the tree/status-bar/welcome surfaces have **no TS test harness**; the automated
+gates are `tsc --noEmit` + esbuild + valid `package.json` + the C# suite (which covers the new core `outline`
+export). Verify the native surfaces by hand in the F5 dev host:
+
+- **Tree appears only in a SpecScribe repo (AC #1):** the **SpecScribe** icon shows in the activity bar; its
+  **Project Outline** view lists epics, each expandable to its stories. Open a **non-SpecScribe** folder → the
+  view shows the `viewsWelcome` guidance ("No SpecScribe project detected…"), not a dead/empty tree.
+- **Stage icons carry the six-stage vocabulary (AC #1, constraint #5):** each node's icon color reflects its
+  stage (done/review/active/ready/drafted/pending) via the contributed `specscribe.status.*` colors — **not** VS
+  Code's pass/fail/warning severity palette. Toggle light / dark / high-contrast themes: the accents stay legible
+  and mutually distinguishable, and the shape (filled/hollow circle, check, eye, slash) reinforces the color.
+- **Labels/counts are core-decided:** epic rows read `Epic N: Title` with a `done/total` story count; story rows
+  read `N.M Title` with a `done/total` task count (only when it has tasks). Nothing is computed in the extension.
+- **Click reveals in the panel (AC #2):** clicking any epic/story node opens (or reveals) the **single** status
+  panel and navigates it to that surface in place — no second panel, and it reuses the tree's already-loaded data
+  (no extra render spawn).
+- **Context actions are read-only (AC #2):** right-click a story with a drafted artifact → **Open Source File**
+  opens its `_bmad-output/…md` in a read-only editor; a story with a helper command → **Copy Helper Prompt**
+  copies the `/bmad-…` command to the clipboard (a toast confirms). Undrafted / done stories omit the respective
+  action. Nothing writes a file or runs the command.
+- **Status bar (AC #2):** a `$(checklist) SpecScribe: N active · M review` item shows once data has loaded;
+  clicking it opens the status panel; its tooltip carries the fuller `done/total` counts. It is hidden in a
+  non-SpecScribe repo.
+- **Stale/error on BOTH surfaces (AC #2):** force a failure (e.g. set `specscribe.toolPath` to a bad path and
+  Refresh) → the status bar switches to `$(warning) SpecScribe: data stale` with a warning background, and the
+  tree shows a "⚠ Last refresh failed — showing cached data" node above the (still-visible) cached epics. Fix the
+  path and Refresh → both clear.
+- **Refresh & live push:** the outline's title-bar **Refresh** button re-renders; editing an `_bmad-output/**/*.md`
+  file live-updates the tree, status bar, and open panel together (one coalesced spawn).
+
 ## What this folder is (and isn't)
 
 - Self-contained: not part of the .NET solution, not part of the generated-site pipeline, no CI wiring.
@@ -61,5 +93,7 @@ dev host — this is the human step Stories 6.4/6.5 also flagged:
   the panel-tab icon under `media/` (Story 6.8) is a different, in-scope asset.
 - Host-aware theming and helper actions shipped in **Story 6.5**; discoverability, the command/menu surface,
   Workspace Trust, and open-beside shipped in **Story 6.8**.
-- Still out of this extension's scope: the native tree view / status bar (Story 6.9), editor↔artifact reveal
-  bridges (Story 6.10), and file-watch/multi-root hardening (Story 6.11).
+- The native activity-bar **tree view + status bar** shipped in **Story 6.9** (a new core `outline` export drives
+  them; the shim maps it 1:1 with a pure stage→icon lookup and holds the shared payload for panel + tree + bar).
+- Still out of this extension's scope: editor↔artifact reveal bridges from the webview (Story 6.10), and
+  file-watch/multi-root hardening — the yaml/toml watch gap, core-derived watch roots, multi-root (Story 6.11).

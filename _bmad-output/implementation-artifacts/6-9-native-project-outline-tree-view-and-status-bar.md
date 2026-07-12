@@ -5,7 +5,7 @@ seated_by: SCP 2026-07-11 (correct-course) — FR35, VS Code Native-Integration 
 
 # Story 6.9: Native Project Outline — Tree View and Status Bar
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -180,42 +180,42 @@ The tree, the status bar, and the panel must all read **one** cached payload fro
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Baseline & payload reconnaissance** (prereq for AC #1)
-  - [ ] Confirm Story [6.8](6-8-extension-discoverability-workspace-trust-and-command-surface.md) is `done` in [sprint-status.yaml](sprint-status.yaml); if not, **halt and flag** (this story extends 6.8's shim — see the GATED notice).
-  - [ ] Re-capture current `HEAD` for the byte-parity diff (the `main` auto-committer may sit between recorded `baseline_commit` `0a0d0f7` and HEAD — memory: [worktree-edits-must-target-worktree-path]).
-  - [ ] Build (`dotnet build src/SpecScribe`) and run `specscribe webview` from the repo root; **capture the JSON**. Record the real payload shape (confirm it has **no** `repoRoot` and **no** `outline` yet — fact #10), and the exact **surface keys** (`OutputRelativePath`s) for the dashboard, epics index, an epic page, and a story page + a placeholder — the outline `SurfacePath`s must match these.
+- [x] **Task 0 — Baseline & payload reconnaissance** (prereq for AC #1)
+  - [x] Confirm Story [6.8](6-8-extension-discoverability-workspace-trust-and-command-surface.md) is `done` in [sprint-status.yaml](sprint-status.yaml); if not, **halt and flag** (this story extends 6.8's shim — see the GATED notice). — **First scheduled while 6.8 was `review` → HALTED and flagged; resumed once the owner confirmed 6.8 `done` (code-review passed).**
+  - [x] Re-capture current `HEAD` for the byte-parity diff — HEAD was `b8d2a5e` (ahead of recorded `baseline_commit` `0a0d0f7`; baseline preserved, memory: [worktree-edits-must-target-worktree-path]).
+  - [x] Build (`dotnet build src/SpecScribe`) and run `specscribe webview`; captured the JSON. Confirmed the real payload has **no** `repoRoot` and **no** `outline` (fact #10 — the deferred-work note was stale), 105 surfaces, keys `index.html` / `epics.html` / `epics/epic-{N}.html` / `epics/story-{N}-{M}.html` (placeholders share the story-page pattern) — every outline `SurfacePath` matches one of these.
 
-- [ ] **Task 1 — Core `outline` export** (AC: #1)
-  - [ ] Add `ProjectOutline`/`OutlineEpic`/`OutlineStory`/`OutlineSummary` records (`src/SpecScribe/`, `[Story 6.9]`).
-  - [ ] Build the outline in/beside `RenderWebviewSurfaces()` from `_epicsModel` + `_progress` + `EpicRetroMap`: per-epic stage via `StatusStyles.ForEpicWithRetrospective`, per-story stage via `StatusStyles.ForStory`; `SurfacePath` = each node's `OutputRelativePath` (resolved in the same loop, not re-derived); `SourcePath` = `story.ArtifactSourcePath`; counts from `TasksDone`/`TasksTotal` and story-stage tallies; `HelperCommand` via the `BmadCommands` per-story command selection ([BmadCommands.cs:214–245](../../src/SpecScribe/BmadCommands.cs)).
-  - [ ] Compute `OutlineSummary` (active/review/done/total) core-side.
-  - [ ] Add `Outline` to `WebviewBundle` ([WebviewBundle.cs](../../src/SpecScribe/WebviewBundle.cs)); serialize `outline` on the payload ([Commands.cs:64–70](../../src/SpecScribe/Commands.cs)).
+- [x] **Task 1 — Core `outline` export** (AC: #1)
+  - [x] Added `ProjectOutline`/`OutlineEpic`/`OutlineStory`/`OutlineSummary` records ([ProjectOutline.cs](../../src/SpecScribe/ProjectOutline.cs), `[Story 6.9]`) — plus a core-emitted `StageLabel` per node so the tree tooltip needs no TS-authored label (AD-2).
+  - [x] Built the outline in `RenderWebviewSurfaces()` in lock-step with the surfaces: per-epic stage `ForEpicWithRetrospective`, per-story stage `ForStory`; `SurfacePath` captured from the SAME `PageView` each surface renders from (never re-derived); `SourcePath` = `story.ArtifactSourcePath`; counts from `TasksDone`/`TasksTotal` + a done rollup; `HelperCommand` via new `BmadCommands.PrimaryStoryCommand`.
+  - [x] Computed `OutlineSummary` (active/review/done/total) core-side via `BuildOutlineSummary` (tallies the same stage strings each node carries).
+  - [x] Added `Outline` to `WebviewBundle`; serialized `outline` on the payload (extracted `WebviewCommand.SerializePayload`, camelCase policy so the record reads the same convention as the hand-named fields; dictionary keys untouched).
 
-- [ ] **Task 2 — Shared payload provider refactor** (AC: #1, #2)
-  - [ ] Hoist the payload cache, the in-flight `loading` coalescer, and a `vscode.EventEmitter` to a module-level provider (extend 6.8's `activeController`, don't fork). Expose `getOutline()` + `onDidChange`.
-  - [ ] Relocate the `_bmad-output/**/*.md` + `docs/adrs/**/*.md` watchers (400 ms debounce) from `openStatus` to the provider's lifetime so the tree stays live with no panel. **Keep globs/debounce/`workspaceFolders[0]` unchanged** (watch hardening is 6.11).
-  - [ ] Point `openStatus`/the panel at the shared cache; verify the in-flight guard and all disposed/UTF-8/sentinel/clipboard guards from 6.4/6.5 still hold.
-  - [ ] Add `outline` to the `WebviewPayload` TS interface.
+- [x] **Task 2 — Shared payload provider refactor** (AC: #1, #2)
+  - [x] 6.8's shim kept the payload **panel-scoped** (no hoisted `activeController` cache existed — adapted to 6.8's actual shape). Introduced a module-level `SpecScribeStore` owning the cache, the in-flight `loading` coalescer, and a shared `dataChanged` fan-out; exposes `payload`/`outline`/`lastError`/`load()`.
+  - [x] Relocated the `_bmad-output/**/*.md` + `docs/adrs/**/*.md` watchers (400 ms debounce, `workspaceFolders[0]`) from the panel closure to the store's lifetime (created on activation, disposed on folder-rebind/`deactivate`). **Globs/debounce/scope unchanged** (watch hardening is 6.11); added only a "don't spawn before first load" guard.
+  - [x] Pointed the panel at the shared cache (reuses it with no second spawn); preserved the in-flight coalescer and every disposed/UTF-8/random-sentinel/clipboard guard from 6.4/6.5.
+  - [x] Added `outline` (+ its `OutlineEpic`/`OutlineStory`/`OutlineSummary`/`ProjectOutline` interfaces) to `WebviewPayload`.
 
-- [ ] **Task 3 — Tree view** (AC: #1)
-  - [ ] Manifest: `viewsContainers.activitybar` (+ bundled monochrome activity-bar SVG), `views` (`specscribe.outline`), `contributes.colors` (six `specscribe.status.*` with light/dark/HC/HC-light defaults mirroring [6.5](../../src/SpecScribe/assets/specscribe-webview-theme.css)), `viewsWelcome` (`when: !specscribe.projectDetected` + a loading/empty clause).
-  - [ ] `TreeDataProvider`: epics → stories, 1:1 from `getOutline()`; labels/descriptions from records only; `ThemeIcon(glyph, ThemeColor('specscribe.status.'+stage))` via a pure `stage→{icon,colorId}` lookup. Subscribe `onDidChangeTreeData` to the provider event. Register via `window.createTreeView`/`registerTreeDataProvider`.
-  - [ ] Verify a non-SpecScribe folder shows the welcome state (or no container), and a detected repo mid-spawn shows a graceful loading state — never a dead view.
+- [x] **Task 3 — Tree view** (AC: #1)
+  - [x] Manifest: `viewsContainers.activitybar` (+ new mask-tinted monochrome [specscribe-outline.svg](../../extension/media/specscribe-outline.svg)), `views` (`specscribe.outline`), `contributes.colors` (six `specscribe.status.*` with light/dark/HC/HC-light defaults mirroring the [6.5 tuning](../../src/SpecScribe/assets/specscribe-webview-theme.css)), `viewsWelcome` (`when: !specscribe.projectDetected`).
+  - [x] `OutlineTreeProvider`: epics → stories 1:1 from `store.outline`; labels/descriptions/tooltips from records only; icon via a pure `STAGE_ICON` lookup + `ThemeColor('specscribe.status.'+stage)`. Subscribes to the `dataChanged` fan-out; registered via `window.createTreeView`.
+  - [x] Non-SpecScribe folder → `viewsWelcome` (getChildren short-circuits, never spawns); detected-but-loading → a "Loading…" node; detected-but-empty → a "No epics found" node — never a dead view.
 
-- [ ] **Task 4 — Interactions + status bar** (AC: #2)
-  - [ ] Node `command` → internal `specscribe.revealSurface` → **6.8's** parametrized open path (reveal + `push(surfacePath)`).
-  - [ ] `view/item/context`: "Open Source" (`showTextDocument` on the resolved `_bmad-output/<SourcePath>`, read-only) and "Copy Helper Prompt" (clipboard), each `when`-gated on `contextValue`. Undrafted/no-helper nodes omit the respective action.
-  - [ ] Status-bar item from `outline.summary` (core-computed), `command: specscribe.openStatus`, tooltip with fuller counts; hidden when `!projectDetected`/no data.
-  - [ ] Optional `view/title` "Refresh" button → the provider's reload (shares the in-flight guard).
+- [x] **Task 4 — Interactions + status bar** (AC: #2)
+  - [x] Node `command` → `specscribe.revealSurface` → the ONE parametrized open path (extended `openStatus` to accept an exact surface key alongside 6.8's dashboard/epics targets; reveal + `push`).
+  - [x] `view/item/context`: "Open Source File" (`showTextDocument` on `_bmad-output/<SourcePath>`, read-only) and "Copy Helper Prompt" (clipboard), each `when`-gated on `contextValue` (`story-source` / `story-helper`); undrafted/done nodes omit the respective action.
+  - [x] Status-bar item from `outline.summary` (core-counted), `command: specscribe.openStatus`, tooltip with `done/total`; hidden when `!projectDetected`/no data.
+  - [x] `view/title` "Refresh Outline" button → `store.load()` (shares the in-flight guard).
 
-- [ ] **Task 5 — Stale/error state** (AC: #2)
-  - [ ] On a load/refresh **throw**: switch the status-bar item to a warning presentation (`$(warning)` + `statusBarItem.warningBackground` + error tooltip) AND surface a tree stale affordance (top node or welcome marker). Clear both on the next success. Verify by forcing a bad `toolPath`.
+- [x] **Task 5 — Stale/error state** (AC: #2)
+  - [x] On a load/refresh **throw** the store keeps the last-good cache and records the error: the status bar switches to `$(warning) SpecScribe: data stale` + `statusBarItem.warningBackground` + an error tooltip, AND the tree shows a "⚠ Last refresh failed — showing cached data" node above the cached epics. Both clear on the next success. (Verifiable by forcing a bad `toolPath` — F5 checklist item.)
 
-- [ ] **Task 6 — Verify, guard, document** (AC: all)
-  - [ ] `cd extension && npm install && npm run typecheck && npm run build` — TS compiles, esbuild bundles clean, `package.json` is valid JSON and the manifest loads without activation errors.
-  - [ ] `dotnet test` whole suite green **including `GoldenContentFingerprint`** ([SiteGeneratorAdapterTests.cs](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs)) — the `outline` payload field is not part of the generated site, so golden stays green (memory: [golden-diff-normalization-gotchas]). Add C# assertions: outline present on the payload, stages match `StatusStyles`, every `SurfacePath` matches a real surface key, summary counts correct, a placeholder story maps correctly, a retro-pending all-done epic reads `review`.
-  - [ ] Confirm read-only end to end: grep the diff for any write API (`writeFile`, `fs.write*`, `workspace.applyEdit`, settings `.update(`, `SettingsStore` writes) — **none** in any code path. Clipboard + `showTextDocument` are the only host effects and both are read-only.
-  - [ ] Extend [extension/README.md](../../extension/README.md) F5 checklist (list above). Note (as 6.4/6.5/6.8 did) the F5 smoke is a human step; be explicit in Completion Notes about the automated-coverage boundary (no TS test harness).
+- [x] **Task 6 — Verify, guard, document** (AC: all)
+  - [x] `npm run typecheck` + `npm run build` clean; `package.json` validated as JSON.
+  - [x] `dotnet test` whole suite green (759) **including `GoldenContentFingerprint`** — the `outline` field is not part of the generated site, so golden byte-identity held. Added 10 C# assertions ([SiteGeneratorOutlineTests.cs](../../tests/SpecScribe.Tests/SiteGeneratorOutlineTests.cs)): outline present + all-camelCase on the serialized payload, stages match `StatusStyles`, every `SurfacePath` matches a real surface key, summary counts, epic done-rollup, placeholder story maps (clickable, no source/counts), helper-command selection, retro-gated epic stage (done-with-retro vs review-without).
+  - [x] Read-only confirmed: grepped the shim — the only write-shaped API is `createFileSystemWatcher` (a read-only watcher); host effects are `setContext`, `postMessage`, `openExternal`, `showTextDocument`, `clipboard.writeText`, and staged `sendText(cmd, false)` — no `writeFile`/`applyEdit`/settings-`.update`/`SettingsStore`. C# side is a pure projection (`RenderWebviewSurfaces_WritesNothing` still green).
+  - [x] Extended [extension/README.md](../../extension/README.md) with a Story 6.9 F5 checklist; the F5 smoke remains a manual human step (no TS test harness) — see Completion Notes on the coverage boundary.
 
 ## Dev Notes
 
@@ -280,12 +280,41 @@ The only C# change is an additive payload field + its model; it emits no HTML, s
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Opus 4.8) via the dev-story workflow.
+
 ### Debug Log References
+
+- Task 0 gate: first invocation found [sprint-status.yaml](sprint-status.yaml) `6-8-…: review` → **HALTED and flagged** per the GATED notice rather than reimplementing 6.8's seams. Resumed after the owner confirmed 6.8 `done`.
+- `specscribe webview` payload recon (real repo): top-level keys `siteTitle/entry/document/configuredOutputRoot/surfaces` — **no** `repoRoot`, **no** `outline` (fact #10 confirmed stale). 105 surfaces; keys `index.html`, `epics.html`, `epics/epic-{N}.html`, `epics/story-{N}-{M}.html`.
+- Post-export payload check: `outline.summary` `{active:0,review:0,done:29,total:85}`; **every** epic/story `SurfacePath` matched a real `surfaces[...]` key (0 misses); `stageLabel` present + camelCase.
 
 ### Completion Notes List
 
+- **Constraint #5 (stages, not severities) — the review magnet — is honored end to end.** Node icon colors come only from the six contributed `specscribe.status.*` theme colors (`package.json → contributes.colors`), keyed on the core-emitted stage string; the shim's ONLY logic is the pure `STAGE_ICON` shape lookup (filled/hollow circle, check, eye, slash — a shape channel reinforcing color per UX-DR17). **No built-in severity `ThemeIcon`** (`iconPassed`/`problemsError`) anywhere.
+- **Two co-defining accent sources now exist** (inherent to the platform — `ThemeColor` only accepts *contributed* colors, unreachable from the webview `<style>` bridge): the [6.5 webview theme CSS](../../src/SpecScribe/assets/specscribe-webview-theme.css) (dark/HC/HC-light) and the new `contributes.colors` block. **A future accent re-tune must update BOTH.** The webview CSS never authored a regular-**light** webview palette (deferred at 6.5), so the `light` defaults here are hue-faithful, white-legible values I derived; light-theme visual verification rides along with the deferred 6.5 light work (F5 checklist covers it).
+- **The load-bearing refactor** promoted payload acquisition from panel-scoped (6.4/6.8) to a module-level `SpecScribeStore` driving panel + tree + status bar off one coalesced spawn. 6.8 had **not** hoisted a shared cache (the story's fact #1 assumed it did) — adapted to 6.8's real shape. Watchers moved to the store's lifetime (so the tree stays live with no panel) with globs/debounce/`workspaceFolders[0]` **frozen** (6.11 owns watch hardening); added only a "don't spawn before first load" guard so an unopened repo pays no cold spawn on saves. All 6.4/6.5 guards preserved (disposed checks, UTF-8 stream decode, random per-call `composeEntryHtml` sentinel, clipboard try/catch, in-flight coalescing).
+- **Lazy activation:** first data acquisition is a spawn on first tree reveal / panel open (not an eager activation cost). Consequence: the **status bar is hidden until the tree or panel loads data once** (per the story's "hide when no data" rule) — it populates and stays live thereafter. Opening the panel after the tree loaded **reuses the cache** (no second spawn).
+- **Welcome-vs-gating decision:** I did **not** hard-gate the tree view's `when` on `specscribe.projectDetected`. AC #1 ("an *undetected* workspace shows a `viewsWelcome`") and the story's own F5 item ("welcome view in a non-SpecScribe folder") both require the view to be *present* when undetected — a `when`-gated view can't host a welcome. So the SpecScribe activity-bar icon is visible generally; in a non-SpecScribe folder it shows the guidance welcome, and `getChildren` short-circuits so it **never spawns** there.
+- **Read-only end to end (AD-6):** reveal a surface / open a `.md` read-only (`showTextDocument`) / copy a prompt (`clipboard.writeText`). The helper command is copied for the user to run; the extension never executes it. C# side is a pure projection (byte-identical HTML; golden green).
+- **Coverage boundary (honest):** the extension has **no TS test harness** — automated gates are `tsc --noEmit` + esbuild + valid `package.json` + the C# suite (which covers the new `outline` export with 10 assertions). The tree/status-bar/welcome/stale surfaces are verified by the **manual F5 smoke** (extended in [extension/README.md](../../extension/README.md)) — the same human step 6.4/6.5/6.8 carry. One F5 pass in a real VS Code host remains.
+- **Scope held:** no webview reveal-source message (6.10), no watch-gap/multi-root/core-derived-roots change (6.11), no diagnostics (6.12), no Marketplace metadata/walkthrough (16.5), no new VS Code settings, no scoped re-render. The activity-bar icon (a functional contribution) is in scope.
+
 ### File List
 
+- `src/SpecScribe/ProjectOutline.cs` — **new**: `ProjectOutline`/`OutlineEpic`/`OutlineStory`/`OutlineSummary` records.
+- `src/SpecScribe/SiteGenerator.cs` — build the outline (with per-node `SurfacePath` captured in the surface loop) + `BuildOutlineSummary`; return it on `WebviewBundle`.
+- `src/SpecScribe/WebviewBundle.cs` — added `Outline` to the bundle record.
+- `src/SpecScribe/BmadCommands.cs` — added `PrimaryStoryCommand` (most-actionable per-story command, null when done/unavailable).
+- `src/SpecScribe/Commands.cs` — extracted testable `WebviewCommand.SerializePayload`; serialize `outline`; camelCase policy.
+- `tests/SpecScribe.Tests/SiteGeneratorOutlineTests.cs` — **new**: 10 assertions over the export + serialized payload.
+- `extension/src/extension.ts` — shared `SpecScribeStore`, `OutlineTreeProvider`, status bar, reveal/open-source/copy-helper handlers, stale/error state; watchers relocated; panel points at the shared cache.
+- `extension/package.json` — `viewsContainers`/`views`/`viewsWelcome`/`colors` (six `specscribe.status.*`), new commands + `view/title`/`view/item/context` menus, palette gating.
+- `extension/media/specscribe-outline.svg` — **new**: mask-tinted monochrome activity-bar icon.
+- `extension/README.md` — Story 6.9 F5 smoke checklist; scope notes updated.
+
 ## Change Log
+
+- 2026-07-11 — **dev-story (implemented).** Added a host-neutral core `outline` export (epic/story records + status-bar summary) on the `specscribe webview` payload — the ADR 0005 §1 non-webview-consumer clause, built from the already-ingested `EpicsModel`/`StatusStyles`/`BmadCommands`, emitting no HTML (golden byte-identity held). Refactored the extension shim to a shared `SpecScribeStore` (panel-scoped → panel + activity-bar tree + status bar off one coalesced spawn, watchers relocated) and added the native surfaces: a `TreeDataProvider` (epics→stories, stage icons via six contributed `specscribe.status.*` theme colors — constraint #5's first exercise), a status-bar summary with a stale/error presentation, `viewsWelcome`, and read-only reveal / open-source / copy-helper interactions. 759 C# tests green (incl. `GoldenContentFingerprint`; +10 outline assertions); `tsc`/esbuild clean; read-only verified. F5 manual smoke remains. Status → review.
+- 2026-07-11 — Story drafted (create-story) from the VS Code Native-Integration Recommendations (FR35, [docs/VSCodeIntegrationRecommendations.md](../../docs/VSCodeIntegrationRecommendations.md)) "Next" wave. Seats R3.1 (activity-bar TreeView: epics→stories with stage status, via a new core `outline` export — the ADR 0005 §1 non-webview-consumer clause), R3.2 (status-bar summary item + stale indicator), R1.5 (`viewsWelcome` empty state). **GATED on Story 6.8** (`done` required): consumes 6.8's `specscribe.projectDetected` context key, parametrized direct-open path, and shared tool-resolution helper; 6.4/6.5 already done. First Epic 6 surface to exercise constraint #5 — status icons derive from the six core-emitted `--status-*` stages via contributed `specscribe.status.*` theme colors (mirroring the 6.5 accent tuning), never VS Code's 3-severity palette. Core change is an additive `outline` field on the `webview` payload (Option A, over a separate `specscribe outline` command); the load-bearing shim change is promoting payload acquisition from panel-scoped to a shared provider driving tree + status bar + panel. Read-only end to end (reveal / open-source `showTextDocument` / copy-prompt clipboard); HTML surface byte-identical. Explicitly OUT: webview reveal-source (6.10), watch-gap/multi-root/core-derived roots (6.11), diagnostics (6.12), Marketplace metadata/walkthrough (16.5), new settings, scoped re-render. Status → ready-for-dev.
 
 - 2026-07-11 — Story drafted (create-story) from the VS Code Native-Integration Recommendations (FR35, [docs/VSCodeIntegrationRecommendations.md](../../docs/VSCodeIntegrationRecommendations.md)) "Next" wave. Seats R3.1 (activity-bar TreeView: epics→stories with stage status, via a new core `outline` export — the ADR 0005 §1 non-webview-consumer clause), R3.2 (status-bar summary item + stale indicator), R1.5 (`viewsWelcome` empty state). **GATED on Story 6.8** (`done` required): consumes 6.8's `specscribe.projectDetected` context key, parametrized direct-open path, and shared tool-resolution helper; 6.4/6.5 already done. First Epic 6 surface to exercise constraint #5 — status icons derive from the six core-emitted `--status-*` stages via contributed `specscribe.status.*` theme colors (mirroring the 6.5 accent tuning), never VS Code's 3-severity palette. Core change is an additive `outline` field on the `webview` payload (Option A, over a separate `specscribe outline` command); the load-bearing shim change is promoting payload acquisition from panel-scoped to a shared provider driving tree + status bar + panel. Read-only end to end (reveal / open-source `showTextDocument` / copy-prompt clipboard); HTML surface byte-identical. Explicitly OUT: webview reveal-source (6.10), watch-gap/multi-root/core-derived roots (6.11), diagnostics (6.12), Marketplace metadata/walkthrough (16.5), new settings, scoped re-render. Status → ready-for-dev.

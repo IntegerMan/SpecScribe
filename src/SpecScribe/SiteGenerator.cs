@@ -774,6 +774,10 @@ public sealed class SiteGenerator
                 "RenderWebviewSurfaces requires a completed GenerateAll() pass on this generator.");
 
             var surfaces = new List<WebviewSurface>();
+            // Built in lock-step with the surfaces below so every outline SurfacePath is captured from the SAME
+            // PageView the surface is rendered from — never re-derived — guaranteeing it matches a surfaces[...]
+            // key a tree click can push() to (Story 6.9 fact #5). Data only; no HTML, no re-parse.
+            var outlineEpics = new List<OutlineEpic>();
 
             // Dashboard — the same inputs WriteIndex hands the templater, so the webview dashboard can never
             // disagree with the generated index.html.
@@ -794,37 +798,68 @@ public sealed class SiteGenerator
                 foreach (var epic in model.Epics)
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                    surfaces.Add(WebviewSurfaceFor(
-                        EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath),
-                        skipEpicNumber: epic.Number));
+                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath);
+                    surfaces.Add(WebviewSurfaceFor(epicPage, skipEpicNumber: epic.Number));
 
+                    var outlineStories = new List<OutlineStory>();
                     foreach (var story in epic.Stories)
                     {
+                        PageView storyPage;
                         if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
                         {
-                            surfaces.Add(WebviewSurfaceFor(
-                                EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath),
-                                skipStoryId: story.Id));
-                            continue;
+                            storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath);
                         }
-
-                        var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
-                        surfaces.Add(WebviewSurfaceFor(
-                            EpicsTemplater.BuildStoryPage(
+                        else
+                        {
+                            var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
+                            storyPage = EpicsTemplater.BuildStoryPage(
                                 epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                                 f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav,
-                                _module.Commands, epicRetroPath),
-                            skipStoryId: story.Id));
+                                _module.Commands, epicRetroPath);
+                        }
+                        surfaces.Add(WebviewSurfaceFor(storyPage, skipStoryId: story.Id));
+
+                        var storyStage = StatusStyles.ForStory(story);
+                        outlineStories.Add(new OutlineStory(
+                            story.Id, story.Title, storyStage, StatusStyles.StoryLabel(storyStage),
+                            PathUtil.NormalizeSlashes(storyPage.OutputRelativePath),
+                            story.ArtifactSourcePath,
+                            story.TasksDone, story.TasksTotal,
+                            BmadCommands.PrimaryStoryCommand(story, _module.Commands)));
                     }
+
+                    var epicStage = StatusStyles.ForEpicWithRetrospective(epic);
+                    outlineEpics.Add(new OutlineEpic(
+                        epic.Number, epic.Title, epicStage, StatusStyles.EpicLabel(epicStage),
+                        PathUtil.NormalizeSlashes(epicPage.OutputRelativePath),
+                        StoriesTotal: epic.Stories.Count,
+                        StoriesDone: epic.Stories.Count(s => StatusStyles.ForStory(s) == "done"),
+                        outlineStories));
                 }
             }
+
+            var outline = new ProjectOutline(outlineEpics, BuildOutlineSummary(outlineEpics));
 
             // The entry document embeds the dashboard's ALREADY-linkified content, so wrapping happens after
             // linkification and the linkifier never walks the shell's CSS/bridge-script text.
             var entry = surfaces[0];
             var entryDocument = WebviewRenderAdapter.Shared.WrapDocument(dashboardPage, entry.ContentHtml);
-            return new WebviewBundle(_options.SiteTitle, entry.OutputRelativePath, entryDocument, surfaces);
+            return new WebviewBundle(_options.SiteTitle, entry.OutputRelativePath, entryDocument, surfaces, outline);
         }
+    }
+
+    /// <summary>Tallies the status-bar summary from the assembled outline — stories by stage across all epics,
+    /// computed core-side so the shim does no counting (Story 6.9, R3.2). Routes every count through the stage
+    /// strings <see cref="StatusStyles.ForStory"/> already produced (carried on each <see cref="OutlineStory"/>),
+    /// so it can never disagree with the tree's per-node icons.</summary>
+    private static OutlineSummary BuildOutlineSummary(IReadOnlyList<OutlineEpic> epics)
+    {
+        var stages = epics.SelectMany(e => e.Stories).Select(s => s.Stage).ToList();
+        return new OutlineSummary(
+            Active: stages.Count(s => s == "active"),
+            Review: stages.Count(s => s == "review"),
+            Done: stages.Count(s => s == "done"),
+            Total: stages.Count);
     }
 
     /// <summary>Renders one page's webview content region and reference-linkifies it with the same skip rules

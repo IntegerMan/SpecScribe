@@ -66,6 +66,87 @@
         "command": "specscribe.openProjectSettings",
         "category": "SpecScribe",
         "title": "Open Project Settings"
+      },
+      {
+        "command": "specscribe.refreshOutline",
+        "category": "SpecScribe",
+        "title": "Refresh Outline",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "specscribe.revealSurface",
+        "category": "SpecScribe",
+        "title": "Reveal in Panel"
+      },
+      {
+        "command": "specscribe.openSource",
+        "category": "SpecScribe",
+        "title": "Open Source File",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "specscribe.copyHelperPrompt",
+        "category": "SpecScribe",
+        "title": "Copy Helper Prompt",
+        "icon": "$(clippy)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "specscribe",
+          "title": "SpecScribe",
+          "icon": "media/specscribe-outline.svg"
+        }
+      ]
+    },
+    "views": {
+      "specscribe": [
+        {
+          "id": "specscribe.outline",
+          "name": "Project Outline",
+          "icon": "media/specscribe-outline.svg",
+          "contextualTitle": "SpecScribe"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "specscribe.outline",
+        "when": "!specscribe.projectDetected",
+        "contents": "No SpecScribe project detected in this folder.\nOpen a folder that contains a `_bmad-output` directory (or a `_bmad/config.toml`) to see its epics and stories here.\n[Open Folder](command:vscode.openFolder)"
+      }
+    ],
+    "colors": [
+      {
+        "id": "specscribe.status.done",
+        "description": "SpecScribe status accent — Done (green). Mirrors the Story 6.5 webview theme tuning.",
+        "defaults": { "light": "#3f7a35", "dark": "#8fbb82", "highContrast": "#7fe08a", "highContrastLight": "#2f5a2a" }
+      },
+      {
+        "id": "specscribe.status.review",
+        "description": "SpecScribe status accent — In review (deep teal).",
+        "defaults": { "light": "#1e4a5a", "dark": "#4d9ab5", "highContrast": "#4aa8ff", "highContrastLight": "#0e3947" }
+      },
+      {
+        "id": "specscribe.status.active",
+        "description": "SpecScribe status accent — In development (teal).",
+        "defaults": { "light": "#2e6b7a", "dark": "#5fb3c6", "highContrast": "#56d0ff", "highContrastLight": "#14606f" }
+      },
+      {
+        "id": "specscribe.status.ready",
+        "description": "SpecScribe status accent — Ready for dev (gold).",
+        "defaults": { "light": "#b8860b", "dark": "#e6b52e", "highContrast": "#ffcc33", "highContrastLight": "#7a5600" }
+      },
+      {
+        "id": "specscribe.status.drafted",
+        "description": "SpecScribe status accent — Drafted (pale gold).",
+        "defaults": { "light": "#8a6d0a", "dark": "#e8d9a8", "highContrast": "#f0dfa8", "highContrastLight": "#8a6d0a" }
+      },
+      {
+        "id": "specscribe.status.pending",
+        "description": "SpecScribe status accent — Pending (tan-grey).",
+        "defaults": { "light": "#6b6459", "dark": "#cbc4b6", "highContrast": "#d8d8d8", "highContrastLight": "#6b6459" }
       }
     ],
     "menus": {
@@ -101,20 +182,65 @@
         {
           "command": "specscribe.openProjectSettings",
           "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.refreshOutline",
+          "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.revealSurface",
+          "when": "false"
+        },
+        {
+          "command": "specscribe.openSource",
+          "when": "false"
+        },
+        {
+          "command": "specscribe.copyHelperPrompt",
+          "when": "false"
         }
       ],
       "explorer/context": [
         {
           "command": "specscribe.openStatus",
-          "when": "specscribe.projectDetected && resourcePath =~ /_bmad-output/",
+          "when": "specscribe.projectDetected && resourcePath =~ /(^|\\/)_bmad-output(\\/|$)/",
           "group": "navigation@99"
         }
       ],
       "editor/title": [
         {
           "command": "specscribe.openStatus",
-          "when": "specscribe.projectDetected && resourceExtname == .md && resourceDirname =~ /_bmad-output/",
+          "when": "specscribe.projectDetected && resourceExtname == .md && resourceDirname =~ /(^|\\/)_bmad-output(\\/|$)/",
           "group": "navigation@99"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "specscribe.refreshOutline",
+          "when": "view == specscribe.outline",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "specscribe.openSource",
+          "when": "view == specscribe.outline && viewItem =~ /-source/",
+          "group": "inline@1"
+        },
+        {
+          "command": "specscribe.openSource",
+          "when": "view == specscribe.outline && viewItem =~ /-source/",
+          "group": "navigation@1"
+        },
+        {
+          "command": "specscribe.copyHelperPrompt",
+          "when": "view == specscribe.outline && viewItem =~ /-helper/",
+          "group": "inline@2"
+        },
+        {
+          "command": "specscribe.copyHelperPrompt",
+          "when": "view == specscribe.outline && viewItem =~ /-helper/",
+          "group": "navigation@2"
         }
       ]
     },

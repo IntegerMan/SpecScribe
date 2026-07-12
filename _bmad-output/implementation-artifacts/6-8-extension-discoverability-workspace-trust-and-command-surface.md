@@ -5,7 +5,7 @@ seated_by: SCP 2026-07-11 (correct-course) — FR35, VS Code Native-Integration 
 
 # Story 6.8: Extension Discoverability, Workspace Trust, and Command Surface
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -198,6 +198,13 @@ Add these commands (all `category: "SpecScribe"`), each routing through the exis
   - [x] Option A taken: `dotnet test` whole suite green — **735 passed / 0 failed** (was 733; +2 `WebviewCommandTests`), including the golden `GoldenContentFingerprint` (site byte-identical; payload is not part of the site). Added `WebviewCommand.ResolveConfiguredOutputRoot` + 2 assertions.
   - [x] Read-only confirmed: grep for `writeFile|fs.write|applyEdit|WorkspaceEdit|.update(|SettingsStore` over the shim → **none** in a command path. Only host-side effects are the 6.5 clipboard (unchanged) and staged `sendText(cmd, false)` (not executed).
   - [x] Extended [extension/README.md](../../extension/README.md) with an F5 smoke checklist (noted as a human step, as 6.4/6.5 did).
+
+### Review Findings
+
+- [x] [Review][Patch] `openGeneratedSite` mishandles a cross-drive/absolute `configuredOutputRoot` [extension/src/extension.ts:300] — fixed via `path.isAbsolute(root)` branch
+- [x] [Review][Patch] Terminal proliferation — Generate/Watch/Setup never reuse an existing "SpecScribe" terminal [extension/src/extension.ts:320] — fixed via `getOrCreateTerminal()` helper
+- [x] [Review][Patch] `updateDetection()` scans all workspace folders while every handler only acts on `workspaceFolders?.[0]` [extension/src/extension.ts:90] — fixed, detection now scoped to folder[0]
+- [x] [Review][Patch] Unanchored substring `when` regex on `_bmad-output` menu gating [extension/package.json] — fixed, anchored to path-segment boundary
 
 ## Dev Notes
 

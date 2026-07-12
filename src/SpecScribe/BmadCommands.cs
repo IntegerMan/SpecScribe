@@ -32,6 +32,16 @@ public static class BmadCommands
             ? RenderAllDonePanel()
             : RenderPanel(ForStory(story, commands));
 
+    /// <summary>The single most-actionable slash command for a story given its status — the same status→step
+    /// selection <see cref="ForStory"/> ranks first (dev-story when ready/active, code-review when in review,
+    /// create-story when undrafted), exposed as one string for a host that surfaces a per-story action outside the
+    /// HTML "Next Steps" panel (the VS Code native outline's "Copy Helper Prompt"). Returns null when the story is
+    /// done (no next action) or the detected module exposes no matching command — the caller then omits the
+    /// action, never printing a command that isn't installed. Composed here in C# so the shim authors no command
+    /// (AD-2). [Story 6.9]</summary>
+    public static string? PrimaryStoryCommand(StoryInfo story, CommandCatalog commands) =>
+        StatusStyles.ForStory(story) == "done" ? null : ForStory(story, commands).FirstOrDefault()?.Command;
+
     public static string RenderEpicNextSteps(EpicInfo epic, CommandCatalog commands) =>
         RenderPanel(ForEpic(epic, commands));
 
