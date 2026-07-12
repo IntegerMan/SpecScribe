@@ -58,6 +58,11 @@ public static class PathUtil
     private static readonly string AssetVersion =
         typeof(PathUtil).Assembly.ManifestModule.ModuleVersionId.ToString("N").Substring(0, 8);
 
+    /// <summary>The same cache-busting token used on <c>specscribe.css</c>/<c>specscribe.js</c>, exposed for other
+    /// emitted assets (e.g. the SPA delivery form's script + JSON data layer) that need the identical
+    /// redeploy-invalidation guarantee. [Story 6.7 review]</summary>
+    public static string CurrentAssetVersion => AssetVersion;
+
     public static string RenderHeadOpen(string title, string cssHref, string scriptHref, string? description = null)
     {
         var sb = new StringBuilder();

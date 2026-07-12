@@ -50,6 +50,11 @@ public sealed record StoryCardView
     /// <summary>The story narrative as already-projected HTML (named opaque fragment).</summary>
     public required string UserStoryHtml { get; init; }
 
+    /// <summary>The epics.md comment above the narrative, pre-rendered as a block-level <c>.md-comment</c>
+    /// annotation; "" when absent. Rendered as its own block above the user-story blurb (named opaque
+    /// fragment).</summary>
+    public string UserStoryNoteHtml { get; init; } = string.Empty;
+
     /// <summary>The acceptance-criteria blocks as already-projected HTML (named opaque fragments).</summary>
     public required IReadOnlyList<string> AcBlocksHtml { get; init; }
 
@@ -221,6 +226,10 @@ public sealed record StoryPlaceholderView
 
     /// <summary>The narrative HTML (named opaque fragment; empty when absent).</summary>
     public required string UserStoryHtml { get; init; }
+
+    /// <summary>The epics.md comment above the narrative, pre-rendered as a block-level <c>.md-comment</c>
+    /// annotation; "" when absent. Rendered as its own block above the narrative (named opaque fragment).</summary>
+    public string UserStoryNoteHtml { get; init; } = string.Empty;
 
     /// <summary>The epics.md acceptance-criteria blocks as HTML (named opaque fragments; empty → panel omitted).</summary>
     public required IReadOnlyList<string> AcBlocksHtml { get; init; }

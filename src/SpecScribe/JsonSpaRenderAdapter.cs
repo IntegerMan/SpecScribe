@@ -11,10 +11,13 @@ namespace SpecScribe;
 /// as pre-rendered inline SVG exactly as on the HTML surface (this cuts FILE COUNT, not bytes — ADR 0006 axis A;
 /// the byte-shrinking TS chart port is option D, deferred).
 /// <para><b>Unlike the webview</b> (<see cref="WebviewRenderAdapter"/>), the SPA runs in a real browser, so it
-/// keeps the production <c>specscribe.css</c>/<c>specscribe.js</c> and Mermaid — its chrome/asset semantic facts
-/// therefore MATCH the <c>html</c> surface and it registers ZERO <see cref="HostRenderException"/>s (AC #4). The
-/// region shape is identical to the webview's <see cref="WebviewRenderAdapter.RenderContent"/> (nav markup, no
-/// inline toggle script — the client owns nav-toggle via delegation across swaps). [Story 6.7]</para></summary>
+/// keeps the production <c>specscribe.css</c>/<c>specscribe.js</c> — its chrome/asset semantic facts therefore MATCH
+/// the <c>html</c> surface and it registers no asset.css/asset.js <see cref="HostRenderException"/> (AC #4). It DOES
+/// register one Mermaid exception (<see cref="HostRenderExceptions.Registry"/>: <c>("spa", "mermaid", …)</c>): the
+/// client swaps regions via innerHTML, where an injected Mermaid init script never executes, so the roadmap's
+/// <c>&lt;pre class="mermaid"&gt;</c> degrades to readable preformatted text — the same accepted fallback as the
+/// webview. The region shape is identical to the webview's <see cref="WebviewRenderAdapter.RenderContent"/> (nav
+/// markup, no inline toggle script — the client owns nav-toggle via delegation across swaps). [Story 6.7]</para></summary>
 public sealed class JsonSpaRenderAdapter : IRenderAdapter
 {
     /// <summary>The single shared instance — stateless, like <see cref="HtmlRenderAdapter.Shared"/> and

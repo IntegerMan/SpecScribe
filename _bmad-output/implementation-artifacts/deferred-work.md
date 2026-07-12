@@ -23,6 +23,13 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - **Renderer timeout SIGTERM + unbounded stdout.** `extension.ts` `runRenderer` uses `proc.kill()` (default SIGTERM, may not reliably terminate the `dotnet` host on Windows → orphaned process) and accumulates stdout with no size cap. Not fatal; harden the kill (SIGKILL escalation) and cap the buffer when the shim is next touched.
 - **Scratch key case-folds the repo root.** `RedirectOutputToScratch` hashes `RepoRoot.ToUpperInvariant()`, so two distinct repos differing only in path case map to the same scratch dir on a case-sensitive filesystem (Linux). Negligible in practice; drop the case-fold (or use the OS path comparer) when this is next touched.
 
+## Deferred from: code review of story-6-7 (2026-07-11)
+
+- source_spec: `6-7-json-and-spa-delivery-adapter.md`
+- **Watch-mode `_spaCapture`/bundle can drift from the real static file set on doc rename or delete.** `_spaCapture` entries are only explicitly removed on doc deletion (`SiteGenerator.cs:295`); a rename that changes a doc's output-relative path mid-watch has no guaranteed purge of the stale old-path entry, so a rebuilt SPA bundle could include an orphaned page no longer part of the static site. Pre-existing watch/doc-lifecycle behavior, not introduced fresh by this diff; revisit when the rename/removal path is next touched.
+- **`MaxPagesPerChunk` (75) batch-splitting boundary has zero test coverage.** `SiteGeneratorSpaTests.GenerateWithSpa_EmitsABoundedFewFiles_FarFewerThanPages` only exercises a small fixture; the "split oversized groups into numbered `-2.json` files" branch in `SpaDelivery.BuildDataFiles` is never exercised at the 75-page boundary. Add a boundary test when next touching chunking.
+- **Chunk-batch assignment depends on unstated stable enumeration order.** `SpaDelivery.BuildDataFiles`/`SiteGenerator.BuildSpaBundle` assign pages to batch files in `_docs.Values` iteration order; a future change to upstream enumeration could shuffle which numbered chunk a page lands in between otherwise-identical generations, which matters for teams diffing committed generated output. Cosmetic; note if generated output is ever committed to git.
+
 ## Deferred from: code review of story-6-6 (2026-07-10)
 
 - source_spec: `6-6-delivery-architecture-and-distribution-spike.md`
@@ -185,3 +192,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - **Live-refresh debounce spawns the renderer even after the panel is disposed.** `extension/src/extension.ts` — the `disposed` guard in the debounced refresh callback is checked only after `await load()` resolves, not before calling `load()`, so a refresh timer firing post-disposal still spawns a wasted `specscribe webview` child process (discarded result, no user-visible effect).
 - **Test assertions in `WebviewHelpersTests`/`WebviewThemingTests` pin exact prompt wording with ordinal string matching** (e.g. `"Do NOT modify any files"`), coupling test stability to copy-editing rather than to the read-only behavioral contract they're meant to protect.
 - **No test exercises `<`/`>` in `siteTitle` reaching the `data-ss-prompt` attribute** — only a double-quote case is covered, even though the same `PathUtil.Html` path is relied on to prevent markup injection there.
+
+## Deferred from: spec-comment-block-rendering review (2026-07-11)
+
+- source_spec: `spec-comment-block-rendering.md`
+  summary: A block comment whose body quotes another `<!--` renders the inner marker as a literal escaped `&lt;!--` inside the `.md-comment` aside.
+  evidence: Pre-existing (present at baseline `0a0d0f7`, ~59 site-wide occurrences, unchanged by the user-story-region fix): `CommentAnnotationRenderer.StripCommentMarkers` only strips the outer `<!--`/`-->` pair, so a nested opener in comments like `epics.md:1065`/`1077` survives escaping. Standalone/AC-region comment path, orthogonal to the user-story split. Fix belongs in the shared renderer (strip/normalize inner markers), not this spec.

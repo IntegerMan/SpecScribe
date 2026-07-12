@@ -95,6 +95,7 @@ public static class EpicsViewBuilder
             TitleHref = prefix + titleTarget,
             ViewPlanHref = story.ArtifactOutputPath is { } ap ? prefix + ap : null,
             UserStoryHtml = story.UserStoryHtml,
+            UserStoryNoteHtml = story.UserStoryNoteHtml,
             AcBlocksHtml = story.AcBlocksHtml,
             NoteHtml = noteHtml,
         };
@@ -157,6 +158,7 @@ public static class EpicsViewBuilder
             StatusStage = StatusStyles.ForStory(story),
             RetroLinkHtml = RenderStoryRetroLink(epic.Number, prefix, epicRetroPath),
             UserStoryHtml = story.UserStoryHtml,
+            UserStoryNoteHtml = story.UserStoryNoteHtml,
             AcBlocksHtml = story.AcBlocksHtml,
             NoteHtml = note,
             EpicNumber = epic.Number,

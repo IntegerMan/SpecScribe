@@ -346,6 +346,7 @@ public sealed class SiteGenerator
             {
                 RefreshCoverage();
                 WriteIndex(nav);
+                if (_options.EmitSpa) EmitSpaSite(nav);
                 return new GenerationEvent(GenerationOutcome.Skipped, BmadArtifactAdapter.EpicsFileName, sw.Elapsed, $"{BmadArtifactAdapter.EpicsFileName} not found");
             }
 
@@ -923,7 +924,9 @@ public sealed class SiteGenerator
 
         // 2) Every OTHER captured page: slice its content region via the landmark. Families are already covered
         // above (skipped here). The nav is re-rendered fresh (byte-identical to the page's own, minus the inline
-        // toggle script the client owns); the breadcrumb + <main> come from the page's own captured output.
+        // toggle script the client owns); the breadcrumb + <main> come from the page's own captured output. The
+        // breadcrumb is ALSO recovered structurally (from that same captured string — never re-read from disk)
+        // so the manifest's drill parent/child data covers the whole site, not just the 5 view-model families.
         if (_spaCapture is { } capture)
         {
             foreach (var (path, fullHtml) in capture)
@@ -932,11 +935,12 @@ public sealed class SiteGenerator
                 if (familyPaths.Contains(normalized)) continue;
                 var navMarkup = HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView(normalized));
                 var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
-                pages.Add(new SpaPage(normalized, SpaDelivery.ExtractTitle(fullHtml), region));
+                var breadcrumb = SpaDelivery.ExtractBreadcrumb(fullHtml, normalized);
+                pages.Add(new SpaPage(normalized, SpaDelivery.ExtractTitle(fullHtml), region, breadcrumb));
             }
         }
 
-        return new SpaBundle(_options.SiteTitle, "index.html", pages);
+        return new SpaBundle(_options.SiteTitle, "index.html", nav.Items, pages);
     }
 
     /// <summary>Renders one dashboard/epics family page's SPA content region (nav + breadcrumb + body) through
@@ -951,7 +955,7 @@ public sealed class SiteGenerator
             skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
         var path = PathUtil.NormalizeSlashes(page.OutputRelativePath);
         familyPaths.Add(path);
-        pages.Add(new SpaPage(path, page.Title, region));
+        pages.Add(new SpaPage(path, page.Title, region, page.Breadcrumb.Crumbs));
     }
 
     /// <summary>Writes the opt-in SPA delivery files — the client script, the manifest + content chunks, and the
@@ -961,12 +965,30 @@ public sealed class SiteGenerator
     private void EmitSpaSite(SiteNav nav)
     {
         var bundle = BuildSpaBundle(nav);
+        var dataFiles = SpaDelivery.BuildDataFiles(bundle);
+
+        // Guard against a real doc's output path colliding with one of the SPA form's own reserved paths (e.g. a
+        // doc slug that happens to render to "app.html" or "spa/pages-root.json"): writing anyway would silently
+        // overwrite either the legitimate static page or the SPA's own delivery file with no diagnostic. Loud and
+        // early beats a corrupted output tree. [Story 6.7 review]
+        var reservedPaths = dataFiles.Select(f => f.OutputRelativePath)
+            .Append(SpaDelivery.ScriptName)
+            .Append(SpaDelivery.EntryFileName);
+        var bundlePaths = new HashSet<string>(bundle.Pages.Select(p => p.OutputRelativePath), StringComparer.OrdinalIgnoreCase);
+        var collision = reservedPaths.FirstOrDefault(bundlePaths.Contains);
+        if (collision is not null)
+        {
+            throw new InvalidOperationException(
+                $"--spa cannot be emitted: a generated page already claims the reserved SPA output path "
+                + $"'{collision}'. Rename the conflicting source artifact so its output path no longer collides "
+                + "with the SPA delivery form's own files (app.html, specscribe-spa.js, spa/*.json).");
+        }
 
         // The client renderer, embedded and copied exactly like specscribe.css/js.
         CopyEmbeddedAsset("SpecScribe.assets.specscribe-spa.js", SpaDelivery.ScriptName);
 
         // Manifest + bounded content chunks.
-        foreach (var file in SpaDelivery.BuildDataFiles(bundle))
+        foreach (var file in dataFiles)
         {
             WriteSpaFile(file.OutputRelativePath, file.Content);
         }

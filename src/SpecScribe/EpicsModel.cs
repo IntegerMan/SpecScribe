@@ -11,6 +11,14 @@ public sealed class StoryInfo
     public required int EpicNumber { get; init; }
     public required string Title { get; init; }
     public required string UserStoryHtml { get; init; }
+
+    /// <summary>Any HTML comment authored above the As-a/I-want narrative in epics.md, pre-rendered as a
+    /// block-level <c>.md-comment</c> annotation (markers stripped); "" when the story has no such comment.
+    /// Kept separate from <see cref="UserStoryHtml"/> so it renders as its own block, not folded into the
+    /// italic blurb (where a block comment collapses to inline text and leaks its <c>&lt;!--</c>/<c>--&gt;</c>
+    /// markers). Named opaque fragment.</summary>
+    public string UserStoryNoteHtml { get; init; } = string.Empty;
+
     public required IReadOnlyList<string> AcBlocksHtml { get; init; }
 
     /// <summary>Set once a matching implementation-artifacts/*.md file is resolved; null if this story

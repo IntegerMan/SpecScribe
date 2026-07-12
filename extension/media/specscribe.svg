@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" role="img" aria-label="SpecScribe">
+  <!-- Panel-tab icon (Story 6.8 R7.3). Self-contained and NOT theme-recolored by VS Code, so the teal badge
+       gives contrast on both light and dark editor tabs; the gold nib echoes the SpecScribe brand palette. -->
+  <rect x="1" y="1" width="14" height="14" rx="3.2" fill="#2e6b7a"/>
+  <path d="M5.1 4.6h5.8" stroke="#f5f0e8" stroke-width="1.15" stroke-linecap="round"/>
+  <path d="M5.1 8h5.8" stroke="#f5f0e8" stroke-width="1.15" stroke-linecap="round"/>
+  <path d="M5.1 11.4h3.6" stroke="#f5f0e8" stroke-width="1.15" stroke-linecap="round"/>
+  <circle cx="11.3" cy="11.4" r="1.35" fill="#d4a017"/>
+</svg>

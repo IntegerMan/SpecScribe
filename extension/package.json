@@ -12,7 +12,18 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:_bmad/config.toml",
+    "workspaceContains:_bmad-output"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "restrictedConfigurations": [
+        "specscribe.toolPath"
+      ]
+    }
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -20,8 +31,93 @@
         "command": "specscribe.openStatus",
         "category": "SpecScribe",
         "title": "Open Status"
+      },
+      {
+        "command": "specscribe.openDashboard",
+        "category": "SpecScribe",
+        "title": "Open Dashboard"
+      },
+      {
+        "command": "specscribe.openEpics",
+        "category": "SpecScribe",
+        "title": "Open Epics"
+      },
+      {
+        "command": "specscribe.refresh",
+        "category": "SpecScribe",
+        "title": "Refresh Status"
+      },
+      {
+        "command": "specscribe.openGeneratedSite",
+        "category": "SpecScribe",
+        "title": "Open Generated Site"
+      },
+      {
+        "command": "specscribe.generateSite",
+        "category": "SpecScribe",
+        "title": "Generate Full Site"
+      },
+      {
+        "command": "specscribe.watch",
+        "category": "SpecScribe",
+        "title": "Watch"
+      },
+      {
+        "command": "specscribe.openProjectSettings",
+        "category": "SpecScribe",
+        "title": "Open Project Settings"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "specscribe.openStatus",
+          "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.openDashboard",
+          "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.openEpics",
+          "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.refresh",
+          "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.openGeneratedSite",
+          "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.generateSite",
+          "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.watch",
+          "when": "specscribe.projectDetected"
+        },
+        {
+          "command": "specscribe.openProjectSettings",
+          "when": "specscribe.projectDetected"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "specscribe.openStatus",
+          "when": "specscribe.projectDetected && resourcePath =~ /_bmad-output/",
+          "group": "navigation@99"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "specscribe.openStatus",
+          "when": "specscribe.projectDetected && resourceExtname == .md && resourceDirname =~ /_bmad-output/",
+          "group": "navigation@99"
+        }
+      ]
+    },
     "configuration": {
       "title": "SpecScribe",
       "properties": {
@@ -30,6 +126,20 @@
           "default": "",
           "scope": "machine-overridable",
           "markdownDescription": "Path to the SpecScribe tool the extension spawns for rendering — an executable, or a `SpecScribe.dll` to run via `dotnet`. Leave empty to use the binary bundled with the extension (when packaged) or `specscribe` on PATH."
+        },
+        "specscribe.openLocation": {
+          "type": "string",
+          "enum": [
+            "beside",
+            "active"
+          ],
+          "enumDescriptions": [
+            "Open the SpecScribe Status panel beside the active editor.",
+            "Open the SpecScribe Status panel in the active editor column."
+          ],
+          "default": "beside",
+          "scope": "window",
+          "markdownDescription": "Where the SpecScribe Status panel opens relative to your editor. A host/window concern — project behavior (source/ADR roots, output, deep-git) lives in the directory-scoped `.specscribe` file, not here."
         }
       }
     }

@@ -207,6 +207,49 @@ public class SiteGeneratorSpaTests : IDisposable
     }
 
     [Fact]
+    public void Manifest_CarriesTheNavGraphAndPerPageBreadcrumbDrillData()
+    {
+        // Story 6.7 review: the manifest previously carried only path->title/chunk. It must ALSO carry the top nav
+        // graph plus, per page, the breadcrumb trail and drill parent/children — for BOTH the view-model-rendered
+        // families (dashboard/epics/stories) and every long-tail page whose breadcrumb is recovered from its own
+        // captured HTML (never re-read from disk).
+        GeneratedSite();
+        using var manifestDoc = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(Site, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar))));
+        var root = manifestDoc.RootElement;
+
+        var nav = root.GetProperty("nav").EnumerateArray().ToList();
+        Assert.NotEmpty(nav);
+        Assert.Contains(nav, n => n.GetProperty("label").GetString() == "Home" && n.GetProperty("outputRelativePath").GetString() == "index.html");
+        Assert.Contains(nav, n => n.GetProperty("label").GetString() == "Epics");
+
+        var pages = root.GetProperty("pages");
+
+        // The dashboard (family-rendered) has no parent — its own breadcrumb trail is empty, just like the static page.
+        var home = pages.GetProperty("index.html");
+        Assert.Empty(home.GetProperty("breadcrumb").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, home.GetProperty("parent").ValueKind);
+        Assert.Contains("epics.html", home.GetProperty("children").EnumerateArray().Select(c => c.GetString()));
+
+        // "About" is a long-tail (non-family) page: its breadcrumb/parent must be recovered from its OWN captured
+        // HTML, not just available on the family pages.
+        var about = pages.GetProperty("about.html");
+        var aboutCrumbs = about.GetProperty("breadcrumb").EnumerateArray().ToList();
+        Assert.Equal(2, aboutCrumbs.Count);
+        Assert.Equal("Home", aboutCrumbs[0].GetProperty("label").GetString());
+        Assert.Equal("index.html", aboutCrumbs[0].GetProperty("outputRelativePath").GetString());
+        Assert.Equal("About", aboutCrumbs[1].GetProperty("label").GetString());
+        Assert.Equal(JsonValueKind.Null, aboutCrumbs[1].GetProperty("outputRelativePath").ValueKind);
+        Assert.Equal("index.html", about.GetProperty("parent").GetString());
+
+        // Epic 1 (family-rendered) drills down to its own stories, recovered structurally from the model.
+        var epic1 = pages.GetProperty("epics/epic-1.html");
+        Assert.Equal("epics.html", epic1.GetProperty("parent").GetString());
+        var epic1Children = epic1.GetProperty("children").EnumerateArray().Select(c => c.GetString()).ToList();
+        Assert.Contains("epics/story-1-1.html", epic1Children);
+    }
+
+    [Fact]
     public void LongTailRegion_IsTheSameCSharpRenderedContent_AsTheStaticPageMainBlock()
     {
         // AC #1: no re-render. A long-tail page's SPA content region carries the EXACT <main> block the static page
@@ -221,6 +264,46 @@ public class SiteGeneratorSpaTests : IDisposable
             Assert.Contains(staticMain, region);
             // …and the region also carries the page's own nav + breadcrumb chrome (the swappable region shape).
             Assert.Contains("<nav class=\"site-nav\"", region);
+        }
+    }
+
+    [Fact]
+    public void EmitSpaSite_ThrowsALoudDiagnostic_WhenADocsOutputPathCollidesWithAReservedSpaPath()
+    {
+        // Story 6.7 review: EmitSpaSite writes app.html/specscribe-spa.js/spa/*.json LAST, with no guard against a
+        // real doc's own output path claiming one of those reserved names — which would otherwise silently
+        // overwrite either the legitimate static page or the SPA's own delivery file. A doc source file named
+        // "app.md" at the source root maps straight to the output root's "app.html" (Path.ChangeExtension), landing
+        // squarely on SpaDelivery.EntryFileName.
+        File.WriteAllText(Path.Combine(Source, "app.md"), "# App\n\nSome doc that happens to be named app.\n");
+
+        var gen = new SiteGenerator(Options(spa: true));
+        var ex = Assert.Throws<InvalidOperationException>(() => gen.GenerateAll());
+        Assert.Contains("app.html", ex.Message);
+    }
+
+    [Fact]
+    public void RegenerateEpics_ReEmitsTheSpaSite_EvenWhenEpicsSourceIsMissing()
+    {
+        // Story 6.7 review: RegenerateEpics' early-return path (epics.md not found) rewrote the nav via WriteIndex
+        // but skipped EmitSpaSite — unlike every other watch call site — so the SPA form could go stale relative
+        // to the freshly-rewritten index.html. Deleting epics.md flips the top nav graph (the "Epics" item drops);
+        // the SPA manifest must reflect that on the very next incremental pass, not lag behind.
+        var gen = GeneratedSite();
+        Assert.Contains(NavLabels(), l => l == "Epics");
+
+        File.Delete(Path.Combine(Source, "planning-artifacts", "epics.md"));
+        var ev = gen.RegenerateEpics();
+
+        Assert.Equal(GenerationOutcome.Skipped, ev.Outcome);
+        Assert.DoesNotContain(NavLabels(), l => l == "Epics");
+
+        List<string> NavLabels()
+        {
+            using var doc = JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(Site, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar))));
+            return doc.RootElement.GetProperty("nav").EnumerateArray()
+                .Select(n => n.GetProperty("label").GetString()!).ToList();
         }
     }
 
@@ -244,10 +327,10 @@ public class SiteGeneratorSpaTests : IDisposable
         // AC #2 / NFR6: the dashboard region is inlined (readable with JS off), a noscript link reaches the static
         // site, and the client script is loaded. The inlined nav links are ordinary relative links to static pages.
         Assert.Contains("stat-card", app);                                   // the real dashboard body, inlined
-        Assert.Contains("<div id=\"spa-content\" data-path=\"index.html\">", app);
+        Assert.Contains("<div id=\"spa-content\" data-path=\"index.html\" data-asset-version=\"", app);
         Assert.Contains("<noscript>", app);
         Assert.Contains("<a href=\"index.html\">open the full static site</a>", app);
-        Assert.Contains("<script src=\"" + SpaDelivery.ScriptName + "\"", app);
+        Assert.Contains("<script src=\"" + SpaDelivery.ScriptName + "?v=", app); // cache-busted like specscribe.js
         Assert.Contains("href=\"epics.html\"", app);                         // nav link works with JS disabled
     }
 

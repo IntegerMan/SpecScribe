@@ -19,12 +19,19 @@
   // nested) URL. On reload of a pushed nested URL the browser simply loads that static page (graceful).
   var basePrefix = location.pathname.slice(0, location.pathname.lastIndexOf("/") + 1);
 
-  var manifest = null;          // { siteTitle, entry, pages: { path: { title, chunk } } }
+  var manifest = null;          // { siteTitle, entry, nav, pages: { path: { title, chunk, breadcrumb, parent, children } } }
   var chunkCache = {};          // chunkFile -> { path: regionHtml }
   var currentPath = content.getAttribute("data-path") || "index.html";
+  // The build's cache-busting token (identical to specscribe.css/.js's own ?v=) — appended to every manifest/chunk
+  // fetch so a redeployed data layer is never masked by a browser/CDN cache of the previous build. [Story 6.7 review]
+  var assetVersion = content.getAttribute("data-asset-version") || "";
+
+  function versioned(url) {
+    return assetVersion ? url + (url.indexOf("?") >= 0 ? "&" : "?") + "v=" + assetVersion : url;
+  }
 
   function fetchJson(url) {
-    return fetch(url).then(function (r) {
+    return fetch(versioned(url)).then(function (r) {
       if (!r.ok) throw new Error(url + " -> HTTP " + r.status);
       return r.json();
     });
@@ -132,7 +139,14 @@
   window.addEventListener("popstate", function (e) {
     var state = e.state;
     if (state && state.path) { navigate(state.path, state.fragment || "", false); return; }
-    navigate(manifest ? manifest.entry : currentPath, "", false);
+    // No (or a foreign) history state — e.g. the user navigated in from outside this SPA's own history entries,
+    // or went back past the initial replaceState. Derive the target from the actual address bar rather than
+    // blindly resetting to the dashboard, so the visible content never disagrees with the URL. [Story 6.7 review]
+    var fromUrl = location.pathname.indexOf(basePrefix) === 0
+      ? location.pathname.slice(basePrefix.length)
+      : "";
+    var target = fromUrl && pageInfo(fromUrl) ? fromUrl : (manifest ? manifest.entry : currentPath);
+    navigate(target, location.hash ? location.hash.slice(1) : "", false);
   });
 
   // Load the data layer. Until it resolves the inlined dashboard is fully readable and its links navigate to the

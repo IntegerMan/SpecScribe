@@ -57,13 +57,19 @@ public static class SpaDelivery
     public static string ExtractContentRegion(string fullPageHtml, string navMarkup)
     {
         const string mainMarker = "<main id=\"main-content\"";
+        const string mainCloser = "</main>";
         var mainOpen = fullPageHtml.IndexOf(mainMarker, StringComparison.Ordinal);
-        var mainClose = fullPageHtml.IndexOf("</main>", StringComparison.Ordinal);
+        // Search for the closer starting AT the opener, not from index 0 — a page whose body legitimately
+        // contains an earlier literal "</main>" (e.g. a doc's raw-HTML code sample) must never be allowed to
+        // put mainClose before mainOpen, which would make the slice below throw. [Story 6.7 review]
+        var mainClose = mainOpen >= 0
+            ? fullPageHtml.IndexOf(mainCloser, mainOpen, StringComparison.Ordinal)
+            : -1;
         if (mainOpen < 0 || mainClose < 0)
         {
             return navMarkup;
         }
-        mainClose += "</main>".Length;
+        mainClose += mainCloser.Length;
 
         // The breadcrumb (when present) immediately precedes <main> and carries no script, so nav + [breadcrumb +
         // main] is contiguous and script-free — exactly the RenderContent shape (nav markup + breadcrumb + body).
@@ -79,6 +85,54 @@ public static class SpaDelivery
     {
         var m = TitleRegex.Match(fullPageHtml);
         return m.Success ? WebUtility.HtmlDecode(m.Groups["t"].Value) : string.Empty;
+    }
+
+    // Matches the breadcrumb markup HtmlRenderAdapter.RenderBreadcrumb produces, in document order: either a
+    // linked crumb (<a href="...">Label</a>) or the current, unlinked crumb (<span class="crumb-current" ...>Label</span>).
+    private static readonly Regex CrumbRegex = new(
+        "<a href=\"(?<href>[^\"]*)\">(?<alabel>[^<]*)</a>|<span class=\"crumb-current\"[^>]*>(?<clabel>[^<]*)</span>",
+        RegexOptions.Compiled);
+
+    /// <summary>Recovers the page's breadcrumb trail as structured <see cref="BreadcrumbCrumb"/> data from the
+    /// render pipeline's OWN captured output — the same string <see cref="ExtractContentRegion"/> slices, never a
+    /// re-read of a generated file. Every dashboard/epics family page already carries this structurally via its
+    /// <see cref="PageView.Breadcrumb"/> (<see cref="SiteGenerator.AddSpaSurface"/> uses that directly); this
+    /// extraction exists so every OTHER captured page — docs, ADRs, sprint, requirements, commits, etc. — gets the
+    /// SAME structured parent/drill data the manifest ships (Story 6.7 review: the manifest previously carried none
+    /// of this for non-family pages). A linked crumb's href always equals <c>RelativePrefix(currentOutputRelativePath)
+    /// + targetPath</c> (see <see cref="PathUtil.RenderHeadOpen"/>'s sibling <c>RenderBreadcrumb</c>), so stripping
+    /// that exact, independently-computed prefix recovers the output-relative target with no dot-segment parsing.
+    /// [Story 6.7 review]</summary>
+    public static IReadOnlyList<BreadcrumbCrumb> ExtractBreadcrumb(string fullPageHtml, string currentOutputRelativePath)
+    {
+        var crumbStart = fullPageHtml.IndexOf("<div class=\"breadcrumb\"", StringComparison.Ordinal);
+        if (crumbStart < 0)
+        {
+            return Array.Empty<BreadcrumbCrumb>();
+        }
+        var crumbEnd = fullPageHtml.IndexOf("</div>", crumbStart, StringComparison.Ordinal);
+        if (crumbEnd < 0)
+        {
+            return Array.Empty<BreadcrumbCrumb>();
+        }
+
+        var prefix = PathUtil.RelativePrefix(currentOutputRelativePath);
+        var crumbSection = fullPageHtml.Substring(crumbStart, crumbEnd - crumbStart);
+        var crumbs = new List<BreadcrumbCrumb>();
+        foreach (Match m in CrumbRegex.Matches(crumbSection))
+        {
+            if (m.Groups["href"].Success)
+            {
+                var href = WebUtility.HtmlDecode(m.Groups["href"].Value);
+                var target = href.StartsWith(prefix, StringComparison.Ordinal) ? href[prefix.Length..] : href;
+                crumbs.Add(new BreadcrumbCrumb(WebUtility.HtmlDecode(m.Groups["alabel"].Value), target));
+            }
+            else
+            {
+                crumbs.Add(new BreadcrumbCrumb(WebUtility.HtmlDecode(m.Groups["clabel"].Value), null));
+            }
+        }
+        return crumbs;
     }
 
     /// <summary>One serialized SPA output file: its output-relative path and its content bytes (UTF-8 text).</summary>
@@ -123,13 +177,33 @@ public static class SpaDelivery
 
         var files = new List<OutputFile>();
 
-        // Manifest: site title, entry, and the ordered page index (path → title + chunk).
+        // Each page's drill-UP parent is the same "last crumb carrying a real path" rule
+        // BreadcrumbTrail.ParentTarget already defines, so the manifest's structured parent/child graph can never
+        // disagree with what the embedded breadcrumb HTML shows. [Story 6.7 review]
+        var parentByPath = ordered.ToDictionary(
+            p => p.OutputRelativePath,
+            p => new BreadcrumbTrail { Crumbs = p.Breadcrumb }.ParentTarget,
+            StringComparer.Ordinal);
+        var childrenByParent = ordered
+            .Where(p => parentByPath[p.OutputRelativePath] is not null)
+            .GroupBy(p => parentByPath[p.OutputRelativePath]!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(p => p.OutputRelativePath).ToList());
+
+        // Manifest: site title, entry, the top nav graph, and the ordered page index (path → title + chunk +
+        // breadcrumb + drill parent/children — AC #1's InteractionState semantics, structured rather than only
+        // embedded in HTML).
         var pages = new Dictionary<string, ManifestEntry>(StringComparer.Ordinal);
         foreach (var page in ordered)
         {
-            pages[page.OutputRelativePath] = new ManifestEntry(page.Title, pathToChunk[page.OutputRelativePath]);
+            var crumbs = page.Breadcrumb.Select(c => new ManifestCrumb(c.Label, c.OutputRelativePath)).ToList();
+            var children = childrenByParent.TryGetValue(page.OutputRelativePath, out var kids)
+                ? kids
+                : Array.Empty<string>();
+            pages[page.OutputRelativePath] = new ManifestEntry(
+                page.Title, pathToChunk[page.OutputRelativePath], crumbs, parentByPath[page.OutputRelativePath], children);
         }
-        var manifest = new Manifest(bundle.SiteTitle, bundle.EntryPath, pages);
+        var navGraph = bundle.Nav.Select(n => new ManifestNavItem(n.Label, n.OutputRelativePath)).ToList();
+        var manifest = new Manifest(bundle.SiteTitle, bundle.EntryPath, navGraph, pages);
         files.Add(new OutputFile(ManifestPath, JsonSerializer.Serialize(manifest, JsonOptions)));
 
         // Content chunks, ordinal by file name so the emitted set is deterministic.
@@ -172,15 +246,34 @@ public static class SpaDelivery
         sb.Append("</noscript>\n");
         // The client swaps THIS element's innerHTML on navigation; data-path is the current page's key the client
         // resolves relative links against (it never trusts the URL, which may be push-state'd to a nested path).
-        sb.Append("<div id=\"spa-content\" data-path=\"index.html\">\n");
+        // data-asset-version is the same build token used above, read by the client so its manifest/chunk fetches
+        // carry it too (a stale cached JSON layer would otherwise survive a redeploy indefinitely). [Story 6.7 review]
+        sb.Append($"<div id=\"spa-content\" data-path=\"index.html\" data-asset-version=\"{PathUtil.CurrentAssetVersion}\">\n");
         sb.Append(dashboardRegion);
         sb.Append("\n</div>\n");
-        sb.Append($"<script src=\"{ScriptName}\" defer></script>\n");
+        // Versioned exactly like specscribe.css/specscribe.js (PathUtil.RenderHeadOpen above): a redeployed script
+        // must never be masked by a browser/CDN cache of the previous build. The SAME token is appended to the
+        // client's own manifest/chunk fetches (see the data-asset-version attribute below) so the whole SPA data
+        // layer invalidates together on every redeploy — not just the script. [Story 6.7 review — cache-busting]
+        sb.Append($"<script src=\"{ScriptName}?v={PathUtil.CurrentAssetVersion}\" defer></script>\n");
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
 
-    private sealed record ManifestEntry(string Title, string Chunk);
+    private sealed record ManifestCrumb(string Label, string? OutputRelativePath);
 
-    private sealed record Manifest(string SiteTitle, string Entry, IReadOnlyDictionary<string, ManifestEntry> Pages);
+    private sealed record ManifestNavItem(string Label, string OutputRelativePath);
+
+    private sealed record ManifestEntry(
+        string Title,
+        string Chunk,
+        IReadOnlyList<ManifestCrumb> Breadcrumb,
+        string? Parent,
+        IReadOnlyList<string> Children);
+
+    private sealed record Manifest(
+        string SiteTitle,
+        string Entry,
+        IReadOnlyList<ManifestNavItem> Nav,
+        IReadOnlyDictionary<string, ManifestEntry> Pages);
 }

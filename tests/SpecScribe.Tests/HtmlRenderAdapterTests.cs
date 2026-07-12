@@ -115,4 +115,51 @@ public class HtmlRenderAdapterTests
     {
         Assert.Equal("html", HtmlRenderAdapter.Shared.Id);
     }
+
+    [Fact]
+    public void StoryPlaceholder_RendersUserStoryNoteAsOwnBlockAboveTheBlurb()
+    {
+        var view = new StoryPlaceholderView
+        {
+            Id = "1.1",
+            TitleHtml = "Edge story",
+            StatusStage = "drafted",
+            RetroLinkHtml = string.Empty,
+            UserStoryNoteHtml = "<aside class=\"md-comment\">seat note</aside>\n",
+            UserStoryHtml = "<p>As a user…</p>",
+            AcBlocksHtml = System.Array.Empty<string>(),
+            NoteHtml = "<span>draft it</span>",
+            EpicNumber = 1,
+            BackHref = "../epics/epic-1.html",
+        };
+
+        var html = HtmlRenderAdapter.Shared.RenderStoryPlaceholderBody(view);
+
+        // The note is its own block, ahead of the user-story blurb — not folded inside it.
+        var noteIdx = html.IndexOf("md-comment", System.StringComparison.Ordinal);
+        var blurbIdx = html.IndexOf("user-story", System.StringComparison.Ordinal);
+        Assert.True(noteIdx >= 0 && blurbIdx >= 0 && noteIdx < blurbIdx);
+        Assert.DoesNotContain("user-story\"><aside class=\"md-comment\"", html);
+    }
+
+    [Fact]
+    public void StoryPlaceholder_OmitsNoteBlockWhenNoteIsEmpty()
+    {
+        var view = new StoryPlaceholderView
+        {
+            Id = "1.1",
+            TitleHtml = "No-note story",
+            StatusStage = "drafted",
+            RetroLinkHtml = string.Empty,
+            UserStoryHtml = "<p>As a user…</p>",
+            AcBlocksHtml = System.Array.Empty<string>(),
+            NoteHtml = "<span>draft it</span>",
+            EpicNumber = 1,
+            BackHref = "../epics/epic-1.html",
+        };
+
+        var html = HtmlRenderAdapter.Shared.RenderStoryPlaceholderBody(view);
+
+        Assert.DoesNotContain("md-comment", html);
+    }
 }

@@ -5,7 +5,7 @@ seated_by: SCP 2026-07-11 (correct-course) — FR35, VS Code Native-Integration 
 
 # Story 6.8: Extension Discoverability, Workspace Trust, and Command Surface
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -161,43 +161,43 @@ Add these commands (all `category: "SpecScribe"`), each routing through the exis
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Baseline & payload reconnaissance** (prereq for AC #3)
-  - [ ] Re-capture current `HEAD` for the byte-parity diff (intervening auto-committer commits may sit between the recorded `baseline_commit` `2e4cb4c` and HEAD — memory: [worktree-edits-must-target-worktree-path]).
-  - [ ] Build the tool (`dotnet build src/SpecScribe`) and run `specscribe webview` from the repo root; **capture the JSON** and record the exact **surface keys** (dashboard `entry` + the **epics-index** `OutputRelativePath`) the shim must target. Confirm whether the payload already carries `repoRoot` (it does — deferred-work.md:8) and does **not** carry a configured output root (fact #11).
+- [x] **Task 0 — Baseline & payload reconnaissance** (prereq for AC #3)
+  - [x] Re-capture current `HEAD` for the byte-parity diff (intervening auto-committer commits may sit between the recorded `baseline_commit` `2e4cb4c` and HEAD — memory: [worktree-edits-must-target-worktree-path]). HEAD at dev-start = `0a0d0f7`.
+  - [x] Build the tool (`dotnet build src/SpecScribe`) and run `specscribe webview` from the repo root; **capture the JSON** and record the exact **surface keys**. Confirmed: dashboard `entry` = `index.html`; epics-index key = `epics.html`. Payload top-level keys were `siteTitle, entry, document, surfaces` — it did **NOT** carry `repoRoot` (the story's deferred-work.md:8 note is stale) and did **NOT** carry a configured output root (fact #11 confirmed). Resolved epics key at runtime with `/(^|\/)epics\.html$/`, not a hard-code.
 
-- [ ] **Task 1 — Activation, context key, and `when`-gated contributions** (AC: #1)
-  - [ ] `package.json`: add `activationEvents` `["workspaceContains:_bmad/config.toml", "workspaceContains:_bmad-output"]`.
-  - [ ] `extension.ts` `activate()`: detect SpecScribe artifacts across `workspace.workspaceFolders` by `fs.existsSync` on `_bmad/config.toml` OR `_bmad-output` (path existence only — no reads); `executeCommand('setContext', 'specscribe.projectDetected', <bool>)`. Subscribe to `onDidChangeWorkspaceFolders` to re-evaluate.
-  - [ ] Gate all new `commandPalette` entries and both context menus with `when: specscribe.projectDetected` (+ resource filters for the menus). Verify a non-SpecScribe folder shows zero SpecScribe entries.
+- [x] **Task 1 — Activation, context key, and `when`-gated contributions** (AC: #1)
+  - [x] `package.json`: added `activationEvents` `["workspaceContains:_bmad/config.toml", "workspaceContains:_bmad-output"]`.
+  - [x] `extension.ts` `activate()`: `updateDetection()` checks each `workspace.workspaceFolders` via `fs.existsSync` on `_bmad/config.toml` OR `_bmad-output` (path existence only) → `setContext('specscribe.projectDetected', <bool>)`; subscribed to `onDidChangeWorkspaceFolders`.
+  - [x] All 8 `commandPalette` entries and both context menus gated with `when: specscribe.projectDetected` (+ `_bmad-output`/`.md` resource clauses on the menus).
 
-- [ ] **Task 2 — Workspace Trust posture** (AC: #2)
-  - [ ] `package.json`: add `capabilities.untrustedWorkspaces` = `{ "supported": "limited", "restrictedConfigurations": ["specscribe.toolPath"] }` (exact shape above).
-  - [ ] Record in Completion Notes that this is the Story 16.5 Marketplace prerequisite and the Story 17.2 verification target (epics.md:2273).
+- [x] **Task 2 — Workspace Trust posture** (AC: #2)
+  - [x] `package.json`: added `capabilities.untrustedWorkspaces` = `{ "supported": "limited", "restrictedConfigurations": ["specscribe.toolPath"] }` (exact shape).
+  - [x] Recorded in Completion Notes: this is the Story 16.5 Marketplace prerequisite and the Story 17.2 verification target.
 
-- [ ] **Task 3 — Command surface: direct-open, refresh, open-generated-site** (AC: #3)
-  - [ ] Extract a **shared tool-resolution helper** from `runRenderer` (fact #5) returning `{command, baseArgs}` for reuse by spawn AND terminal handoff.
-  - [ ] Parametrize the open path with an optional `initialSurface`; register `specscribe.openDashboard` (entry) and `specscribe.openEpics` (resolved epics key, Task 0). Respect the singleton: reveal + `push` when already open.
-  - [ ] Register `specscribe.refresh` → hoisted reload trigger (module-level controller ref set on open, cleared on dispose), sharing the in-flight `load()` guard.
-  - [ ] Register `specscribe.openGeneratedSite`: resolve output root (**option A recommended** — add `configuredOutputRoot` to the payload; else option B default `SpecScribeOutput`), `env.openExternal(<root>/index.html)` if it exists, else the existing toast.
+- [x] **Task 3 — Command surface: direct-open, refresh, open-generated-site** (AC: #3)
+  - [x] Extracted `resolveTool()` (returns `{command, prefixArgs}`) shared by `runRenderer` spawn AND terminal handoff.
+  - [x] Parametrized the open path with a `SurfaceTarget` (`'dashboard' | 'epics'`); registered `specscribe.openDashboard` (entry) and `specscribe.openEpics` (runtime-resolved epics key). Singleton respected: `reveal()` + `push` when already open (via `PanelController.reveal`).
+  - [x] Registered `specscribe.refresh` → `PanelController.reload()` (module-level `active` controller ref, cleared on dispose), sharing the in-flight `load()` guard; opens the panel if none.
+  - [x] Registered `specscribe.openGeneratedSite`: **option A** — added `configuredOutputRoot` to the payload; shim caches it in `lastConfiguredOutputRoot` (falls back to `SpecScribeOutput`), `env.openExternal(<root>/index.html)` if it exists, else a toast.
 
-- [ ] **Task 4 — Command surface: terminal handoff & project settings** (AC: #3)
-  - [ ] Register `specscribe.generateSite` / `specscribe.watch`: `createTerminal({name:'SpecScribe', cwd})` + `sendText(cmd, false)` (staged, user presses Enter), `cmd` built from the shared resolver. Terminal reveal, no auto-execute.
-  - [ ] Register `specscribe.openProjectSettings`: `showTextDocument('.specscribe')` if present; else an info message offering to stage the CLI interactive "Configure paths" flow in a terminal. **No extension-side write to `.specscribe`.**
+- [x] **Task 4 — Command surface: terminal handoff & project settings** (AC: #3)
+  - [x] Registered `specscribe.generateSite` / `specscribe.watch`: `createTerminal({name:'SpecScribe', cwd})` + `sendText(cmd, false)` (staged), `cmd` from `toolCommandLine(resolveTool(...))`.
+  - [x] Registered `specscribe.openProjectSettings`: `showTextDocument('.specscribe')` if present; else an info message offering to stage the CLI interactive flow. **No extension-side write to `.specscribe`.**
 
-- [ ] **Task 5 — Menus & open-beside** (AC: #1, #3)
-  - [ ] `contributes.menus`: `explorer/context` + `editor/title` "Open in SpecScribe Status" (gated by `projectDetected` + `_bmad-output`/`.md` resource clauses), reusing `openStatus`.
-  - [ ] Add `specscribe.openLocation` config (`enum active|beside`, default `beside`, `scope: window`). `createPanel()` maps it to `ViewColumn.Active`/`ViewColumn.Beside` (replace hard-coded `ViewColumn.One`).
+- [x] **Task 5 — Menus & open-beside** (AC: #1, #3)
+  - [x] `contributes.menus`: `explorer/context` + `editor/title` reuse `specscribe.openStatus` (gated by `projectDetected` + `_bmad-output`/`.md` clauses). Note: VS Code menu items show the *command's* title, so the label is "Open Status" (no per-menu title override exists); handler reuses `openStatus`.
+  - [x] Added `specscribe.openLocation` config (`enum beside|active`, default `beside`, `scope: window`). `createPanel()` maps it to `ViewColumn.Beside`/`ViewColumn.Active` (replaced hard-coded `ViewColumn.One`).
 
-- [ ] **Task 6 — UX polish: progress, error, icon** (AC: #4)
-  - [ ] Wrap the cold-start `load()` in `withProgress` (Notification) so first paint has a heartbeat.
-  - [ ] Add the actionable `showErrorMessage` (buttons: "Set specscribe.toolPath" → `workbench.action.openSettings`; "Retry" → re-open) in the catch, alongside the existing `errorHtml`.
-  - [ ] Bundle a panel-tab SVG under `extension/` and set `panel.iconPath` in `createPanel()`.
+- [x] **Task 6 — UX polish: progress, error, icon** (AC: #4)
+  - [x] Wrapped the cold-start `load()` in `withProgress` (Notification, "SpecScribe: rendering…").
+  - [x] Added actionable `showActionableError` ("Set specscribe.toolPath" → `workbench.action.openSettings`; "Retry" → re-open) alongside the existing script-free `errorHtml`.
+  - [x] Bundled `extension/media/specscribe.svg` and set `panel.iconPath` in `createPanel()`.
 
-- [ ] **Task 7 — Verify, guard, and document** (AC: all)
-  - [ ] `cd extension && npm install && npm run typecheck && npm run build` — TS compiles and esbuild bundles clean. Validate `package.json` is well-formed JSON and the manifest loads (no VS Code activation errors).
-  - [ ] If option A (payload field) was taken: `dotnet test` whole suite green **including the golden `GoldenContentFingerprint`** ([SiteGeneratorAdapterTests.cs](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs)) — the generated site must be byte-identical (payload is not part of the site). Add a C# assertion for the new `configuredOutputRoot` field.
-  - [ ] Confirm read-only end to end: grep the diff for any write API (`writeFile`, `fs.write*`, `workspace.applyEdit`, `.update(` on settings, `SettingsStore` writes) — there must be **none** in a command path. Clipboard (6.5) is the only host-side effect and is unchanged.
-  - [ ] Extend [extension/README.md](../../extension/README.md) F5 checklist: new commands appear only in a SpecScribe repo; Dashboard/Epics/Refresh/Open Generated Site work; explorer + editor-title menus fire; Generate/Watch land staged (un-executed) in a terminal; Open Project Settings reveals `.specscribe`; panel opens beside; cold-start shows progress; a bad `toolPath` yields the actionable notification; the tab shows the icon. Note (as 6.4/6.5 did) that the F5 smoke is a human step.
+- [x] **Task 7 — Verify, guard, and document** (AC: all)
+  - [x] `npm run typecheck` (clean) + `npm run build` (esbuild → `dist/extension.js`, 14.2 KB). `package.json` validated as well-formed JSON.
+  - [x] Option A taken: `dotnet test` whole suite green — **735 passed / 0 failed** (was 733; +2 `WebviewCommandTests`), including the golden `GoldenContentFingerprint` (site byte-identical; payload is not part of the site). Added `WebviewCommand.ResolveConfiguredOutputRoot` + 2 assertions.
+  - [x] Read-only confirmed: grep for `writeFile|fs.write|applyEdit|WorkspaceEdit|.update(|SettingsStore` over the shim → **none** in a command path. Only host-side effects are the 6.5 clipboard (unchanged) and staged `sendText(cmd, false)` (not executed).
+  - [x] Extended [extension/README.md](../../extension/README.md) with an F5 smoke checklist (noted as a human step, as 6.4/6.5 did).
 
 ## Dev Notes
 
@@ -263,12 +263,36 @@ This story emits no HTML, so the golden fingerprint (memory: [golden-diff-normal
 
 ### Agent Model Used
 
+claude-opus-4-8 (Dev Story workflow, 2026-07-11)
+
 ### Debug Log References
+
+- Task 0 payload capture: `dotnet SpecScribe.dll webview` → top keys `siteTitle, entry, document, surfaces`; `entry = index.html`, epics-index key = `epics.html`; no `repoRoot`, no output-root field pre-change.
+- Post-change payload: `configuredOutputRoot = "SpecScribeOutput"` (default; the shim spawns `webview` without `--output`, so option A and B coincide for this story — as the story anticipated).
+- `npm run typecheck` clean; `npm run build` → `dist/extension.js` (14.2 KB). `dotnet test` → 735 passed / 0 failed / 0 skipped.
 
 ### Completion Notes List
 
+- **Manifest/routing only, read-only end to end.** Every AC is delivered by `extension/package.json` + `extension/src/extension.ts`, reusing the existing spawn/panel/`push` machinery; plus one host-delivered core datum (`configuredOutputRoot`). No new rendering, view model, or markdown parsing. Grep confirmed no write API in any command path — only the unchanged 6.5 clipboard helper and staged (`sendText(cmd, false)`, un-executed) terminal commands.
+- **HTML byte-identical (constraint #4).** The optional `configuredOutputRoot` is payload-only data, not part of the generated site; the golden `GoldenContentFingerprint` stayed green. No C# rendering was touched.
+- **Workspace Trust (AC #2) — the security-critical item.** `capabilities.untrustedWorkspaces = { supported: "limited", restrictedConfigurations: ["specscribe.toolPath"] }` makes VS Code ignore a *workspace-level* `toolPath` override in Restricted Mode (closing the spawn-redirect RCE surface) while user/machine values still apply. **This is the Story 16.5 Marketplace publish prerequisite and the Story 17.2 hardening verification target (epics.md:2273).** Manifest presence is verified; the *behavioral* untrusted-workspace check is a human F5 step (README checklist) — the extension has no TS test harness.
+- **One shared tool resolver.** `resolveTool()` (extracted from `runRenderer`) feeds both the panel spawn and the terminal-handoff command string via `toolCommandLine()`, so spawn and terminal can never drift (`dotnet <dll>` vs `<exe>` vs `specscribe` on PATH resolved once).
+- **Epics key resolved, not hard-coded.** `resolveTarget()` matches `/(^|\/)epics\.html$/` against the live payload surface keys, falling back to `entry` (mirroring `push`'s fallback). Confirmed against a real payload in Task 0 (`epics.html`).
+- **Singleton preserved + a `PanelController` seam.** Direct-open/refresh steer the one panel through `active.reveal(target)` / `active.reload()`; the in-flight `load()` coalescing guard is intact, so a manual Refresh during an auto re-render won't double-spawn. 6.4/6.5 guards preserved: disposed checks, UTF-8 `setEncoding`, per-call random sentinel in `composeEntryHtml`, clipboard try/catch.
+- **Menu label nuance.** VS Code menu items render the *command's* title (there is no per-menu title override), so the explorer/editor "Open in SpecScribe Status" intent surfaces as **Open Status** by reusing `specscribe.openStatus`. Faithful to "handler reuses openStatus"; a distinct label would need a duplicate command id (not worth the extra surface).
+- **Scope discipline.** No tree view / status bar (6.9), no reveal-source (6.10), no watch-gap/multi-root fix (6.11), no Marketplace metadata/walkthrough (16.5), no `.specscribe`-through-webview (5.2), nav-toggle a11y (R7.4) left deferred. The panel-tab icon (`media/specscribe.svg`) is the in-scope R7.3 asset, distinct from the Marketplace icon.
+- **Automated coverage honesty.** The C# side is unit-tested (`WebviewCommandTests`, +2). The TS manifest/menu/trust/open-beside/progress/error behaviors have **no automated gate** (no TS test runner exists); they are verified via the extended README F5 checklist as a manual human step, exactly as Stories 6.4/6.5 documented.
+
 ### File List
+
+- `extension/package.json` — modified (activationEvents, capabilities.untrustedWorkspaces, 7 new commands, contributes.menus, `specscribe.openLocation` config)
+- `extension/src/extension.ts` — modified (detection + setContext + folder-change re-eval; 8 command handlers; `PanelController` seam; `resolveTool`/`toolCommandLine`; `createPanel` open-location + iconPath; cold-start `withProgress`; actionable error notification; `configuredOutputRoot` in payload interface)
+- `extension/media/specscribe.svg` — new (panel-tab icon)
+- `extension/README.md` — modified (F5 smoke checklist; scope/story notes updated)
+- `src/SpecScribe/Commands.cs` — modified (`configuredOutputRoot` payload field + `WebviewCommand.ResolveConfiguredOutputRoot` helper)
+- `tests/SpecScribe.Tests/WebviewCommandTests.cs` — new (2 tests for `ResolveConfiguredOutputRoot`)
 
 ## Change Log
 
+- 2026-07-11 — Implemented (dev-story). `extension/package.json` + `extension/src/extension.ts` deliver all four ACs: activation on `_bmad/config.toml`/`_bmad-output` detection + `specscribe.projectDetected` context key + `when`-gated commands/menus (AC #1); `capabilities.untrustedWorkspaces` locking `specscribe.toolPath` in Restricted Mode — the 16.5 Marketplace prerequisite / 17.2 verification target (AC #2); direct-open Dashboard/Epics, Refresh, Open Generated Site (payload `configuredOutputRoot`, option A), staged Generate/Watch terminal handoff, Open Project Settings (reveal-only), open-beside via `specscribe.openLocation` (AC #3); cold-start `withProgress`, actionable error notification, panel-tab icon (AC #4). One shared `resolveTool()` for spawn+terminal; epics key runtime-resolved; singleton + 6.4/6.5 guards preserved. Read-only end to end; HTML byte-identical (golden green). Tests 733→735 (+2 `WebviewCommandTests`). Status → review.
 - 2026-07-11 — Story drafted (create-story) from the VS Code Native-Integration Recommendations (FR35, [docs/VSCodeIntegrationRecommendations.md](../../docs/VSCodeIntegrationRecommendations.md)) "Now" quick-dev wave. Scope: R5.4 (Workspace Trust — the 16.5 Marketplace prerequisite), R1.1–R1.3 (activation + context key + explorer/editor menus), R2.1–R2.4 (direct-open / refresh / generate-watch terminal handoff / open-generated-site), R3.3 (open-beside + `specscribe.openLocation`), R5.2 (open project settings), R7.1–R7.3 (cold-start progress, actionable error notification, panel icon). **Not gated** — 6.4/6.5 are done and the extension exists; this story edits `extension/package.json` + `extension/src/extension.ts` (+ optional one-field `WebviewCommand` payload addition for open-generated-site). Manifest/routing only, reusing the existing spawn/panel machinery — no new rendering, read-only end to end, HTML surface byte-identical. Workspace-Trust manifest shape confirmed against current VS Code docs. Explicitly OUT: tree view/status bar (6.9), reveal-source (6.10), watch-gap/multi-root (6.11), Marketplace metadata/walkthrough (16.5), `.specscribe`-through-webview (5.2/R5.3), nav-toggle a11y (R7.4 — deferred unless owner folds in). Status → ready-for-dev.

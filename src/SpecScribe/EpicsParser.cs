@@ -21,6 +21,13 @@ public static class EpicsParser
     private static readonly Regex MetaLine = new(@"^\*\*(FRs|NFRs) covered:\*\*\s*(.*)$", RegexOptions.Compiled);
     private static readonly Regex StatusLine = new(@"^Status:\s*(.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
 
+    /// <summary>Matches one or more HTML comments (each lazily closed at its first <c>--&gt;</c>) at the very
+    /// start of a story's user-story region, plus any trailing blank space, so they can be peeled off and
+    /// rendered as their own block. Singleline so a comment spans lines; anchored at start so only *leading*
+    /// comments are lifted — narrative after the close marker, and an unterminated <c>&lt;!--</c>, are left
+    /// alone.</summary>
+    private static readonly Regex LeadingHtmlComments = new(@"\A\s*(?:<!--.*?-->\s*)+", RegexOptions.Singleline | RegexOptions.Compiled);
+
     public static EpicsModel Parse(string raw)
     {
         var body = MarkdownConverter.StripFrontmatter(raw);
@@ -426,13 +433,28 @@ public static class EpicsParser
         }
 
         var userStoryEnd = acIdx >= 0 ? acIdx : endIdx;
-        var userStoryLines = new List<string>();
-        for (var i = startIdx + 1; i < userStoryEnd; i++)
-        {
-            var line = lines[i].Trim();
-            if (line.Length > 0) userStoryLines.Add(line);
-        }
-        var userStoryHtml = MarkdownConverter.RenderInline(JoinUserStoryLines(userStoryLines));
+
+        // Peel any leading HTML comment(s) off the front of the user-story region and render them as their own
+        // block (RenderBlock → the block-comment renderer's marker-free .md-comment aside), leaving the
+        // As-a/I-want narrative to keep its single-line join. Folding both together would collapse the block
+        // comment to inline text — and inline HTML comments forbid the "--" these seat-mapping notes carry, so
+        // Markdig would emit the literal <!-- --> markers into the italic blurb. Peeling only the *leading*
+        // run (lazy match to the first "-->") means narrative that follows the close marker — even on the same
+        // line — stays in the narrative, an unterminated "<!--" leaves the region untouched rather than eating
+        // the story, and a comment authored below the narrative is left in place rather than hoisted up.
+        var regionText = string.Join("\n", lines[(startIdx + 1)..userStoryEnd]);
+        var leading = LeadingHtmlComments.Match(regionText);
+        var commentMd = leading.Success ? leading.Value.Trim() : string.Empty;
+        var narrativeText = leading.Success ? regionText[leading.Length..] : regionText;
+
+        var userStoryNoteHtml = HasCommentText(commentMd)
+            ? MarkdownConverter.RenderBlock(commentMd)
+            : string.Empty;
+        var narrativeLines = narrativeText.Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => l.Length > 0)
+            .ToList();
+        var userStoryHtml = MarkdownConverter.RenderInline(JoinUserStoryLines(narrativeLines));
 
         var acBlocks = new List<string>();
         if (acIdx >= 0)
@@ -484,6 +506,7 @@ public static class EpicsParser
             EpicNumber = epicNum,
             Title = MarkdownConverter.RenderInline(title),
             UserStoryHtml = userStoryHtml,
+            UserStoryNoteHtml = userStoryNoteHtml,
             AcBlocksHtml = acBlocks,
         };
     }
@@ -501,6 +524,11 @@ public static class EpicsParser
         }
         return MarkdownConverter.RenderInline(line);
     }
+
+    /// <summary>True when a peeled leading-comment run has visible text between its markers, so an empty
+    /// <c>&lt;!-- --&gt;</c> doesn't produce a hollow <c>.md-comment</c> aside above the story.</summary>
+    private static bool HasCommentText(string commentMd)
+        => commentMd.Length > 0 && commentMd.Replace("<!--", string.Empty).Replace("-->", string.Empty).Trim().Length > 0;
 
     /// <summary>Joins "As a X," / "I want Y," / "So that Z." lines into one sentence, lowercasing the
     /// leading word of continuation lines (except "I") to read naturally mid-sentence.</summary>

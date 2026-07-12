@@ -104,6 +104,118 @@ public class EpicsParserTests
         Assert.Contains("class=\"gherkin-line\"", block);
     }
 
+    private const string CommentedStoryEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: Commented story
+
+        <!-- Seats R3.1 (tree view) via the new outline export, keeping icons on the
+             semantic --status-* stages rather than host severities. Split, don't absorb. -->
+
+        As a VS Code user,
+        I want an outline in the sidebar,
+        So that I can glance at status.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_LeadingCommentRendersAsOwnBlock_NotFoldedIntoUserStory()
+    {
+        var story = EpicsParser.Parse(CommentedStoryEpicsMd).Epics[0].Stories[0];
+
+        // The comment becomes its own marker-free .md-comment block (the block-comment renderer permits the
+        // "--" in "--status-*" that would break an inline HTML comment and leak the literal markers).
+        Assert.Contains("class=\"md-comment\"", story.UserStoryNoteHtml);
+        Assert.Contains("Seats R3.1", story.UserStoryNoteHtml);
+        Assert.DoesNotContain("<!--", story.UserStoryNoteHtml);
+        Assert.DoesNotContain("-->", story.UserStoryNoteHtml);
+        Assert.DoesNotContain("&lt;!--", story.UserStoryNoteHtml);
+
+        // The narrative blurb carries only the story, with no comment content or leaked markers.
+        Assert.Contains("As a VS Code user", story.UserStoryHtml);
+        Assert.DoesNotContain("Seats R3.1", story.UserStoryHtml);
+        Assert.DoesNotContain("<!--", story.UserStoryHtml);
+        Assert.DoesNotContain("&lt;!--", story.UserStoryHtml);
+    }
+
+    [Fact]
+    public void Parse_StoryWithoutComment_HasEmptyNote()
+    {
+        var story = EpicsParser.Parse(SampleEpicsMd).Epics[0].Stories[0];
+        Assert.Equal(string.Empty, story.UserStoryNoteHtml);
+    }
+
+    /// <summary>Wraps a raw user-story-region body into a minimal epics.md and returns the parsed first story,
+    /// so the leading-comment edge cases can be exercised without repeating the epics scaffold each time.</summary>
+    private static StoryInfo ParseStoryWithBody(string body) => EpicsParser.Parse($"""
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: Edge story
+
+        {body}
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """).Epics[0].Stories[0];
+
+    [Fact]
+    public void Parse_UnterminatedComment_DoesNotSwallowNarrative()
+    {
+        // A "<!--" with no closing "-->" is malformed and never occurs in real epics.md, but it must not eat
+        // the story: nothing is lifted into a note block, and the narrative text still renders (no data loss)
+        // rather than being blanked. Formatting degrades — the stray "<!--" has no clean boundary — but the
+        // content survives, which is the honest contract for malformed input.
+        var story = ParseStoryWithBody("<!-- dangling note with no close\n\nAs a user, I want the thing.");
+
+        Assert.Equal(string.Empty, story.UserStoryNoteHtml);
+        Assert.Contains("the thing", story.UserStoryHtml);
+    }
+
+    [Fact]
+    public void Parse_NarrativeAfterCloseMarker_StaysInNarrative()
+    {
+        // The closing "-->" sharing its line with narrative text must keep that text in the blurb, not drop it.
+        var story = ParseStoryWithBody("<!-- brief note --> As a user, I want the thing.");
+
+        Assert.Contains("class=\"md-comment\"", story.UserStoryNoteHtml);
+        Assert.Contains("brief note", story.UserStoryNoteHtml);
+        Assert.Contains("As a user", story.UserStoryHtml);
+        Assert.DoesNotContain("brief note", story.UserStoryHtml);
+    }
+
+    [Fact]
+    public void Parse_EmptyComment_YieldsNoNoteBlock()
+    {
+        var story = ParseStoryWithBody("<!-- -->\n\nAs a user, I want the thing.");
+
+        Assert.Equal(string.Empty, story.UserStoryNoteHtml);
+        Assert.Contains("As a user", story.UserStoryHtml);
+    }
+
     private const string NumberedAcEpicsMd = """
         # Epics
 

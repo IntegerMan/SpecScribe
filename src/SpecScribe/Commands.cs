@@ -66,11 +66,24 @@ public sealed class WebviewCommand : Command<SiteSettings>
             siteTitle = bundle.SiteTitle,
             entry = bundle.EntryPath,
             document = bundle.EntryDocument,
+            // Host-delivery of a core-resolved DATUM (not rendering — ADR 0005 §1): the workspace-relative
+            // root a plain `generate` would write to. Sourced from the PRE-redirect resolved options so it is
+            // the project's real configured output, never the temp scratch dir this command actually renders
+            // into. The extension's "Open Generated Site" command joins this to the workspace folder to find
+            // an already-generated index.html. [Story 6.8 AC #3, R2.4]
+            configuredOutputRoot = ResolveConfiguredOutputRoot(resolved),
             surfaces = bundle.Surfaces.ToDictionary(s => s.OutputRelativePath, s => new { title = s.Title, content = s.ContentHtml }),
         };
         Console.Out.Write(JsonSerializer.Serialize(payload));
         return 0;
     }
+
+    /// <summary>The configured output root expressed relative to the repo root, with forward slashes so the
+    /// value is stable across platforms (the VS Code shim joins it to the workspace folder). Falls back to the
+    /// absolute path when the output root lives outside the repo (an explicit <c>--output</c> elsewhere) — the
+    /// shim then opens it directly. Pure and side-effect-free so it is unit-testable without a spawn. [Story 6.8]</summary>
+    public static string ResolveConfiguredOutputRoot(ForgeOptions resolved)
+        => Path.GetRelativePath(resolved.RepoRoot, resolved.OutputRoot).Replace('\\', '/');
 
     /// <summary>Clones the resolved options with the output root moved to a stable per-project temp scratch
     /// directory (keyed by a hash of the repo root so concurrent projects never collide, stable so successive

@@ -225,6 +225,10 @@ public sealed partial class HtmlRenderAdapter
         }
         sb.Append("  </div>\n");
 
+        if (card.UserStoryNoteHtml.Length > 0)
+        {
+            sb.Append($"  {card.UserStoryNoteHtml}");
+        }
         sb.Append($"  <div class=\"user-story\">{card.UserStoryHtml}</div>\n");
 
         if (card.AcBlocksHtml.Count > 0)
@@ -368,6 +372,11 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("  </div>\n");
         sb.Append($"  <h1>{view.TitleHtml}</h1>\n");
         sb.Append("</header>\n\n");
+
+        if (view.UserStoryNoteHtml.Length > 0)
+        {
+            sb.Append($"<div class=\"story-lead\">{view.UserStoryNoteHtml}</div>\n\n");
+        }
 
         if (view.UserStoryHtml.Length > 0)
         {
