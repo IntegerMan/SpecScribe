@@ -32,15 +32,32 @@ public static class BmadCommands
             ? RenderAllDonePanel()
             : RenderPanel(ForStory(story, commands));
 
-    /// <summary>The single most-actionable slash command for a story given its status — the same status→step
-    /// selection <see cref="ForStory"/> ranks first (dev-story when ready/active, code-review when in review,
-    /// create-story when undrafted), exposed as one string for a host that surfaces a per-story action outside the
-    /// HTML "Next Steps" panel (the VS Code native outline's "Copy Helper Prompt"). Returns null when the story is
-    /// done (no next action) or the detected module exposes no matching command — the caller then omits the
-    /// action, never printing a command that isn't installed. Composed here in C# so the shim authors no command
-    /// (AD-2). [Story 6.9]</summary>
+    /// <summary>The FULL status-gated next-step command list for a story — the exact set the story page's
+    /// "Next Steps" panel renders (<see cref="RenderNextSteps"/> routes the same <see cref="ForStory"/> list),
+    /// projected as data for a non-HTML host (the VS Code outline's "Copy BMad Command…" Quick Pick shows the
+    /// LITERAL command each entry copies), in the page's order — dev-story leads when ready/active, code-review
+    /// when in review, and an undrafted first-of-epic (X.1) story may lead with check-implementation-readiness
+    /// ahead of its create-story. Empty for a done story (no next action — the page shows the "All done" panel
+    /// instead) and when the detected module exposes none — the host then omits the action entirely, so the
+    /// gating (e.g. no code-review before work is reviewable) lives here, never in TypeScript (AD-2).
+    /// Whitespace-only catalog values are dropped so the emitted list never carries a blank command.
+    /// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick]</summary>
+    public static IReadOnlyList<OutlineStoryCommand> StoryCommands(StoryInfo story, CommandCatalog commands) =>
+        StatusStyles.ForStory(story) == "done"
+            ? Array.Empty<OutlineStoryCommand>()
+            : ForStory(story, commands)
+                .Where(s => !string.IsNullOrWhiteSpace(s.Command))
+                .Select(s => new OutlineStoryCommand(s.Command, s.Description))
+                .ToList();
+
+    /// <summary>The single most-actionable slash command for a story — always the FIRST entry of
+    /// <see cref="StoryCommands"/>, kept as one string for payload back-compat (an older shim reads only this)
+    /// and as the single-command convenience for tests/hosts. Delegates so it can never drift from the list.
+    /// Returns null when the story is done (no next action) or the detected module exposes no matching command —
+    /// the caller then omits the action, never printing a command that isn't installed. Composed here in C# so
+    /// the shim authors no command (AD-2). [Story 6.9]</summary>
     public static string? PrimaryStoryCommand(StoryInfo story, CommandCatalog commands) =>
-        StatusStyles.ForStory(story) == "done" ? null : ForStory(story, commands).FirstOrDefault()?.Command;
+        StoryCommands(story, commands).FirstOrDefault()?.Command;
 
     public static string RenderEpicNextSteps(EpicInfo epic, CommandCatalog commands) =>
         RenderPanel(ForEpic(epic, commands));

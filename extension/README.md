@@ -71,9 +71,9 @@ export). Verify the native surfaces by hand in the F5 dev host:
   panel and navigates it to that surface in place — no second panel, and it reuses the tree's already-loaded data
   (no extra render spawn).
 - **Context actions are read-only (AC #2):** right-click a story with a drafted artifact → **Open Source File**
-  opens its `_bmad-output/…md` in a read-only editor; a story with a helper command → **Copy Helper Prompt**
-  copies the `/bmad-…` command to the clipboard (a toast confirms). Undrafted / done stories omit the respective
-  action. Nothing writes a file or runs the command.
+  opens its `_bmad-output/…md` in a read-only editor; a story with next-step commands → **Copy BMad Command…**
+  opens a Quick Pick of the literal `/bmad-…` strings (see the sidebar-shortcuts checklist below). Undrafted /
+  done stories omit the respective action. Nothing writes a file or runs the command.
 - **Status bar (AC #2):** a `$(checklist) SpecScribe: N active · M review` item shows once data has loaded;
   clicking it opens the status panel; its tooltip carries the fuller `done/total` counts. It is hidden in a
   non-SpecScribe repo.
@@ -147,6 +147,28 @@ hand in the F5 dev host:
   failure) does **not** appear in Problems — it remains on the generated diagnostics page, its home. Only
   file-anchored source-artifact notices reach Problems.
 
+## F5 smoke checklist (manual — sidebar shortcuts + story command Quick Pick)
+
+Same coverage boundary — the Shortcuts view and Quick Pick have **no TS test harness**; the automated gates are
+`tsc --noEmit` + esbuild + valid `package.json` + the C# suite (which pins the outline's per-story `commands`
+list: status gating, page↔tree parity, and the camelCase wire shape in `SiteGeneratorOutlineTests`). Verify by
+hand in the F5 dev host:
+
+- **Shortcuts section:** in a SpecScribe repo the SpecScribe container shows a **Shortcuts** view **above**
+  Project Outline with seven codicon nodes — Open Dashboard, Open Epics, Refresh Status, Open Generated Site,
+  Generate Full Site, Watch, Open Project Settings. Clicking a node runs its command (Generate/Watch stage a
+  terminal command **without executing** — you press Enter). Open a non-SpecScribe folder → the Shortcuts view
+  is hidden (its manifest `when` gates on detection).
+- **Quick Pick options match the page:** right-click an **in-progress** story → **Copy BMad Command…** lists
+  dev-story + code-review with the story page's own descriptions; an **in-review** story lists only code-review;
+  a **ready-for-dev** story only dev-story (no code-review — nothing to review yet); a **done** story shows NO
+  copy action in its context menu at all. Compare against the same story's page "Next Steps" panel — the sets
+  must match exactly.
+- **Exact copy + toast:** pick an entry → the clipboard holds that literal command string and the toast names it
+  verbatim. Esc/cancel → nothing is copied and no toast shows.
+- **Older-core fallback:** against an older tool build (payload without `commands`) the action still appears,
+  backed by the single `helperCommand`, and copies it.
+
 ## What this folder is (and isn't)
 
 - Self-contained: not part of the .NET solution, not part of the generated-site pipeline, no CI wiring.
@@ -158,6 +180,9 @@ hand in the F5 dev host:
   Workspace Trust, and open-beside shipped in **Story 6.8**.
 - The native activity-bar **tree view + status bar** shipped in **Story 6.9** (a new core `outline` export drives
   them; the shim maps it 1:1 with a pure stage→icon lookup and holds the shared payload for panel + tree + bar).
+- The sidebar **Shortcuts** view and the status-gated **Copy BMad Command…** Quick Pick (a core-emitted
+  per-story `commands` list mirroring the story page's Next Steps set) shipped via
+  `spec-vscode-sidebar-shortcuts-and-story-command-quickpick`.
 - The webview **reveal-source bridge** ("Open source" → open the surface's `.md` read-only) shipped in **Story
   6.10**, which also established the line-capable `revealSource` seam that Story 7.2's code citations and Story
   8.4's next-step command will ride (the `data-code-path`/`data-line` recognition is present but inert; the

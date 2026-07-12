@@ -85,9 +85,9 @@
         "icon": "$(go-to-file)"
       },
       {
-        "command": "specscribe.copyHelperPrompt",
+        "command": "specscribe.copyStoryCommand",
         "category": "SpecScribe",
-        "title": "Copy Helper Prompt",
+        "title": "Copy BMad Command…",
         "icon": "$(clippy)"
       }
     ],
@@ -102,6 +102,13 @@
     },
     "views": {
       "specscribe": [
+        {
+          "id": "specscribe.shortcuts",
+          "name": "Shortcuts",
+          "icon": "media/specscribe-outline.svg",
+          "contextualTitle": "SpecScribe",
+          "when": "specscribe.projectDetected"
+        },
         {
           "id": "specscribe.outline",
           "name": "Project Outline",
@@ -196,7 +203,7 @@
           "when": "false"
         },
         {
-          "command": "specscribe.copyHelperPrompt",
+          "command": "specscribe.copyStoryCommand",
           "when": "false"
         }
       ],
@@ -233,12 +240,12 @@
           "group": "navigation@1"
         },
         {
-          "command": "specscribe.copyHelperPrompt",
+          "command": "specscribe.copyStoryCommand",
           "when": "view == specscribe.outline && viewItem =~ /-helper/",
           "group": "inline@2"
         },
         {
-          "command": "specscribe.copyHelperPrompt",
+          "command": "specscribe.copyStoryCommand",
           "when": "view == specscribe.outline && viewItem =~ /-helper/",
           "group": "navigation@2"
         }

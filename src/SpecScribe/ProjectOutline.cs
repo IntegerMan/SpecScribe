@@ -1,5 +1,13 @@
 namespace SpecScribe;
 
+/// <summary>One next-step command for a story — a (command, description) pair mirroring exactly one entry of the
+/// story page's "Next Steps" panel, projected as data so the VS Code tree's "Copy BMad Command…" Quick Pick can
+/// show the LITERAL command it will copy beside the same description the page shows. Composed core-side by
+/// <see cref="BmadCommands.StoryCommands"/> from the SAME status-gated list the page renders, so the tree's
+/// option set can never disagree with the page (AD-2: no command text authored in TypeScript).
+/// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick]</summary>
+public sealed record OutlineStoryCommand(string Command, string Description);
+
 /// <summary>One story as the VS Code native outline (activity-bar tree + status bar) needs it: a flat,
 /// host-neutral record derived entirely from the already-ingested <see cref="StoryInfo"/> and classified by the
 /// existing <see cref="StatusStyles"/> — NOT a new render, no markdown re-parse, no HTML. This is the
@@ -27,10 +35,16 @@ namespace SpecScribe;
 /// (Story 6.10 AC #1 "no duplicated path assumptions").</param>
 /// <param name="TasksDone">Checked task/subtask count from the artifact; 0 when there is no artifact.</param>
 /// <param name="TasksTotal">Total task/subtask count from the artifact; 0 when there is no artifact.</param>
-/// <param name="HelperCommand">The single most-actionable BMad command for this story's status (dev-story when
-/// ready/active, code-review when in review, create-story when undrafted), composed core-side via
-/// <see cref="BmadCommands.PrimaryStoryCommand"/>; null when the detected module exposes none (the "Copy Helper
-/// Prompt" action is then omitted). Composed in C#, never authored in TypeScript (AD-2).</param>
+/// <param name="HelperCommand">The single most-actionable BMad command for this story's status — always the
+/// FIRST entry of <paramref name="Commands"/> (null when that list is empty). Kept for payload back-compat: an
+/// older shim reads only this. Note the first entry is usually the story's own step command but not always
+/// (an undrafted X.1 story may lead with check-implementation-readiness — see
+/// <see cref="BmadCommands.StoryCommands"/>). Composed in C#, never authored in TypeScript (AD-2).</param>
+/// <param name="Commands">The FULL status-gated next-step command list — the exact set the story page's
+/// "Next Steps" panel renders (<see cref="BmadCommands.StoryCommands"/>), in the page's order. Empty for a done
+/// story or when the module exposes none; the host then omits its "Copy BMad Command…" action, so all gating
+/// (e.g. no code-review before work is reviewable) is decided here, never in the shim (AD-2).
+/// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick]</param>
 public sealed record OutlineStory(
     string Id,
     string Title,
@@ -40,7 +54,8 @@ public sealed record OutlineStory(
     string? SourcePath,
     int TasksDone,
     int TasksTotal,
-    string? HelperCommand);
+    string? HelperCommand,
+    IReadOnlyList<OutlineStoryCommand> Commands);
 
 /// <summary>One epic as the native outline needs it: a collapsible parent node over its stories. Its
 /// <paramref name="Stage"/> uses the retro-gated classifier (<see cref="StatusStyles.ForEpicWithRetrospective"/>)

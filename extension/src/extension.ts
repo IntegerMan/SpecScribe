@@ -34,6 +34,14 @@ interface SurfaceContent {
   sourcePath?: string;
 }
 
+/** One next-step command for a story (mirrors the C# `OutlineStoryCommand`): the literal command string the
+ * Quick Pick shows and copies, plus the same description the story page's Next Steps panel renders beside it.
+ * Both core-composed — the shim authors neither (AD-2). [spec-vscode-sidebar-shortcuts-…-quickpick] */
+interface OutlineStoryCommand {
+  command: string;
+  description: string;
+}
+
 /** One story in the host-neutral outline (mirrors the C# `OutlineStory`). Every field is core-decided; the shim
  * computes none of it (AD-1/AD-2). [Story 6.9] */
 interface OutlineStory {
@@ -47,6 +55,10 @@ interface OutlineStory {
   tasksDone: number;
   tasksTotal: number;
   helperCommand?: string; // the most-actionable BMad command, composed core-side; absent → no copy action
+  /** The FULL status-gated command list — the exact set the story page's Next Steps panel shows, in its order
+   * (empty = no copy action, e.g. a done story). Optional so an older core still parses; the shim then falls
+   * back to a one-item list from `helperCommand`. [spec-vscode-sidebar-shortcuts-…-quickpick] */
+  commands?: OutlineStoryCommand[];
 }
 
 /** One epic in the outline (mirrors the C# `OutlineEpic`); its stage is the retro-gated classifier. [Story 6.9] */
@@ -201,7 +213,13 @@ export function activate(context: vscode.ExtensionContext) {
     if (typeof surfacePath === 'string') openStatus(context, { kind: 'surface', key: surfacePath });
   });
   register('specscribe.openSource', (node: unknown) => void openSource(node));
-  register('specscribe.copyHelperPrompt', (node: unknown) => void copyHelperPrompt(node));
+  register('specscribe.copyStoryCommand', (node: unknown) => void copyStoryCommand(node));
+
+  // Shortcuts: a static host-chrome section pinned above the outline (labels/icons are the same class of host
+  // chrome as the manifest command titles; no project content is authored here). The view itself is gated on
+  // `specscribe.projectDetected` via its manifest `when`.
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('specscribe.shortcuts', new ShortcutsTreeProvider()));
 
   // Status bar: a summary count that opens the panel; hidden until a detected repo has data (Story 6.9 R3.2).
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -651,8 +669,10 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
     item.iconPath = stageIcon(s.stage);
     item.tooltip = `${s.id} ${s.title} — ${s.stageLabel}` +
       (s.tasksTotal > 0 ? ` (${s.tasksDone}/${s.tasksTotal} tasks)` : '');
-    // contextValue gates which read-only context actions appear (Open Source / Copy Helper Prompt).
-    item.contextValue = 'story' + (s.sourcePath ? '-source' : '') + (s.helperCommand ? '-helper' : '');
+    // contextValue gates which read-only context actions appear (Open Source / Copy BMad Command…). The
+    // `-helper` gate is simply "the core-decided command list is non-empty" — a done story's list is empty, so
+    // it exposes no copy action at all. No status logic here (AD-2): the core decides, the gate relays.
+    item.contextValue = 'story' + (s.sourcePath ? '-source' : '') + (availableStoryCommands(s).length > 0 ? '-helper' : '');
     if (s.surfacePath) {
       item.command = { command: 'specscribe.revealSurface', title: 'Reveal in panel', arguments: [s.surfacePath] };
     }
@@ -700,6 +720,41 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
 
 function messageNode(label: string, icon?: string): OutlineNode {
   return { kind: 'message', label, icon };
+}
+
+// ===== Sidebar shortcuts (host chrome) =======================================================================
+
+/** One shortcut node: an already-registered host command with a codicon. Pure host chrome — the labels mirror
+ * the manifest command titles (the one sanctioned class of shim-authored text); no project content and no core
+ * data is interpreted here, so AD-1/AD-2 hold. [spec-vscode-sidebar-shortcuts-…-quickpick] */
+interface Shortcut { label: string; icon: string; command: string; tooltip: string }
+
+const SHORTCUTS: readonly Shortcut[] = [
+  { label: 'Open Dashboard', icon: 'dashboard', command: 'specscribe.openDashboard', tooltip: 'Open the SpecScribe status panel on the dashboard' },
+  { label: 'Open Epics', icon: 'list-tree', command: 'specscribe.openEpics', tooltip: 'Open the SpecScribe status panel on the epics index' },
+  { label: 'Refresh Status', icon: 'refresh', command: 'specscribe.refresh', tooltip: 'Re-render the panel, outline tree, and status bar' },
+  { label: 'Open Generated Site', icon: 'globe', command: 'specscribe.openGeneratedSite', tooltip: 'Open the generated static site in your browser' },
+  { label: 'Generate Full Site', icon: 'rocket', command: 'specscribe.generateSite', tooltip: 'Stage the generate command in a terminal — you press Enter' },
+  { label: 'Watch', icon: 'sync', command: 'specscribe.watch', tooltip: 'Stage the watch command in a terminal — you press Enter' },
+  { label: 'Open Project Settings', icon: 'settings-gear', command: 'specscribe.openProjectSettings', tooltip: 'Open the directory-scoped .specscribe settings file' },
+];
+
+/** The static Shortcuts section pinned above the Project Outline: one-click nodes for the existing SpecScribe
+ * commands, so every surface is reachable from the sidebar without command-palette digging. Read-only by
+ * construction — each node only invokes an already-registered command (Generate/Watch stay staged-terminal
+ * handoffs; nothing executes on the user's behalf, AD-6). [spec-vscode-sidebar-shortcuts-…-quickpick] */
+class ShortcutsTreeProvider implements vscode.TreeDataProvider<Shortcut> {
+  getTreeItem(s: Shortcut): vscode.TreeItem {
+    const item = new vscode.TreeItem(s.label, vscode.TreeItemCollapsibleState.None);
+    item.iconPath = new vscode.ThemeIcon(s.icon);
+    item.tooltip = s.tooltip;
+    item.command = { command: s.command, title: s.label };
+    return item;
+  }
+
+  getChildren(element?: Shortcut): Shortcut[] {
+    return element ? [] : [...SHORTCUTS];
+  }
 }
 
 // ===== Story 6.9: status bar =================================================================================
@@ -788,12 +843,43 @@ function resolveWorkspacePath(root: string, rel: string): string | undefined {
   return within ? realTarget : undefined;
 }
 
-/** "Copy Helper Prompt" (tree context action): copy the story's core-composed helper command to the clipboard for
- * the user to run themselves. The extension NEVER runs it (AD-6). Absent `helperCommand` nodes never expose this. */
-async function copyHelperPrompt(node: unknown): Promise<void> {
-  const command = storyNode(node)?.story.helperCommand;
-  if (!command) return;
-  await copyToClipboard(command, 'helper command');
+/** The story's status-gated command list, exactly as the core emitted it (the story page's Next Steps set, in
+ * the page's order). Falls back to a one-item list from the legacy `helperCommand` when an older core omits
+ * `commands`. The shim never filters by status, reorders, or composes — an empty result means "show no copy
+ * action" (AD-2). [spec-vscode-sidebar-shortcuts-…-quickpick] */
+function availableStoryCommands(story: OutlineStory): OutlineStoryCommand[] {
+  // Shape-defensive like the rest of the payload handling (this runs inside getTreeItem, where a thrown
+  // TypeError would break tree rendering): a non-array `commands`, a null entry, a non-string/blank command,
+  // or a non-string description from a stale/hostile payload must degrade to "fewer options", never a crash.
+  if (Array.isArray(story.commands)) {
+    return story.commands
+      .filter((c): c is OutlineStoryCommand =>
+        !!c && typeof c.command === 'string' && c.command.trim().length > 0)
+      .map((c) => ({ command: c.command, description: typeof c.description === 'string' ? c.description : '' }));
+  }
+  return story.helperCommand ? [{ command: story.helperCommand, description: '' }] : [];
+}
+
+/** "Copy BMad Command…" (tree context action): a Quick Pick whose labels are the LITERAL command strings the
+ * core composed for this story's status — the same set, order, and descriptions as the story page's Next Steps
+ * panel, so the user always sees exactly what will be copied. Picking one copies that string verbatim and the
+ * toast names it; Esc copies nothing. The extension NEVER runs the command (AD-6). Empty-list nodes never
+ * expose this (contextValue gate). [spec-vscode-sidebar-shortcuts-…-quickpick] */
+async function copyStoryCommand(node: unknown): Promise<void> {
+  const story = storyNode(node)?.story;
+  if (!story) return;
+  const options = availableStoryCommands(story);
+  if (options.length === 0) return;
+  const picked = await vscode.window.showQuickPick(
+    options.map((c) => ({ label: c.command, detail: c.description || undefined })),
+    {
+      placeHolder: `Copy a BMad command for story ${story.id} — the picked text goes to the clipboard`,
+      matchOnDetail: true, // typing filters on the description too, not just the command text
+    },
+  );
+  if (!picked) return; // cancelled — nothing copied, no toast
+  // The toast names the copied command verbatim (plain text — notifications don't render markdown).
+  await copyToClipboard(picked.label, picked.label);
 }
 
 /** The one clipboard-write path (Story 6.5's pattern): write, then a confirmation toast; the try/catch is the 6.5
@@ -1030,7 +1116,12 @@ function parseDiagnostics(errText: string): RawDiagnostic[] {
  * run resolved disappear (AC #1). Non-anchored render-time (`.html`) notices are deliberately skipped — they live
  * on the diagnostics page, their home (the recommended scoping; the fallback, if the owner ever wants them in
  * Problems, is to publish them on a single workspace-folder `Uri`). Read-only: this only tells VS Code what to
- * show. [Story 6.12] */
+ * show.
+ * <p>Anchors on the resolved REPO ROOT (`lastRepoRoot`, falling back to the workspace folder before the first
+ * payload lands) through the SAME `resolveWorkspacePath` containment guard `revealSource`/`openSource` use — one
+ * convention, correct on a subdir-open (repo root ≠ workspace folder), and a stale/hostile `record.path` that
+ * escapes the workspace or doesn't exist on disk is silently dropped rather than anchoring a Diagnostic to the
+ * wrong (or a nonexistent) file. [Story 6.12] [Review][Patch]</p> */
 function publishDiagnostics(folder: vscode.WorkspaceFolder, records: RawDiagnostic[]): void {
   if (!diagnosticCollection) return;
   diagnosticCollection.clear();
@@ -1038,16 +1129,17 @@ function publishDiagnostics(folder: vscode.WorkspaceFolder, records: RawDiagnost
   const byPath = new Map<string, vscode.Diagnostic[]>();
   for (const record of records) {
     if (!record.fileAnchored) continue;
-    const fsPath = path.join(folder.uri.fsPath, record.path);
+    const target = resolveWorkspacePath(lastRepoRoot ?? folder.uri.fsPath, record.path);
+    if (!target) continue; // missing / escapes the workspace / not a file — never anchor to it
     const severity = record.severity === 'error'
       ? vscode.DiagnosticSeverity.Error
       : vscode.DiagnosticSeverity.Warning;
     // No source position on a notice — anchor to the file top honestly rather than parse markdown for a line (AD-2).
     const diag = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), record.message, severity);
     diag.source = 'SpecScribe';
-    const diags = byPath.get(fsPath) ?? [];
+    const diags = byPath.get(target) ?? [];
     diags.push(diag);
-    byPath.set(fsPath, diags);
+    byPath.set(target, diags);
   }
 
   for (const [fsPath, diags] of byPath) {

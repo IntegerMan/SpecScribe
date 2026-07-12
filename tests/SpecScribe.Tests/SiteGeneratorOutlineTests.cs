@@ -364,4 +364,121 @@ public class SiteGeneratorOutlineTests : IDisposable
         // The surfaces dictionary keys stay verbatim output-relative paths (NOT camelCased by the naming policy).
         Assert.True(root.GetProperty("surfaces").TryGetProperty("index.html", out _), "surface keys are untouched paths");
     }
+
+    // ===== spec-vscode-sidebar-shortcuts-and-story-command-quickpick: the full status-gated command list =====
+
+    [Fact]
+    public void StoryCommands_MirrorThePageNextStepsSet_StatusGated()
+    {
+        // ONE generation for all four assertions (Story(id) would re-run GenerateAll per call). The tree's
+        // Quick Pick option set IS the story page's Next Steps set (one BmadCommands source): in-progress →
+        // dev-story + code-review; review → code-review only; done → EMPTY (no copy action shown host-side);
+        // undrafted → create-story for the story being viewed.
+        var stories = Outline().Epics.SelectMany(e => e.Stories).ToDictionary(s => s.Id);
+
+        Assert.Equal(new[] { "/bmad-dev-story 1.1", "/bmad-code-review 1.1" },
+            stories["1.1"].Commands.Select(c => c.Command).ToArray());
+        Assert.Equal(new[] { "/bmad-code-review 1.3" },
+            stories["1.3"].Commands.Select(c => c.Command).ToArray());
+        Assert.Empty(stories["2.1"].Commands);
+        Assert.Equal(new[] { "/bmad-create-story 1.2" },
+            stories["1.2"].Commands.Select(c => c.Command).ToArray());
+
+        // Every entry carries the page's description (the Quick Pick's detail line), and the legacy single
+        // helperCommand is exactly the first entry — one source, no drift.
+        var s11 = stories["1.1"];
+        Assert.All(s11.Commands, c => Assert.False(string.IsNullOrWhiteSpace(c.Description)));
+        Assert.Equal(s11.Commands[0].Command, s11.HelperCommand);
+    }
+
+    [Fact]
+    public void StoryCommands_ParityWithRenderedNextStepsPanel_AcrossStatuses()
+    {
+        // The load-bearing "mirrors the page" claim, asserted against the ACTUAL RenderNextSteps output rather
+        // than by construction: for every status the panel offers exactly the commands StoryCommands emits
+        // (badge count == list count, each command present), and a done story renders the all-done panel with
+        // an empty list. Includes the undrafted X.1 case, where check-implementation-readiness LEADS the list
+        // (a two-entry list whose first entry is not create-story) — and PrimaryStoryCommand must track it.
+        var commands = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/bmad-dev-story",
+            ["code-review"] = "/bmad-code-review",
+            ["create-story"] = "/bmad-create-story",
+            ["check-implementation-readiness"] = "/bmad-check-implementation-readiness",
+        });
+
+        foreach (var status in new[] { "ready-for-dev", "in-progress", "in-review", "done", "" })
+        {
+            var story = new StoryInfo
+            {
+                Id = "9.1", // X.1 so the blank-status branch exercises readiness-leads-create-story
+                EpicNumber = 9,
+                Title = "Parity Story",
+                UserStoryHtml = "",
+                AcBlocksHtml = Array.Empty<string>(),
+                Status = status,
+            };
+            var list = BmadCommands.StoryCommands(story, commands);
+            var html = BmadCommands.RenderNextSteps(story, commands);
+
+            Assert.Equal(list.FirstOrDefault()?.Command, BmadCommands.PrimaryStoryCommand(story, commands));
+
+            if (StatusStyles.ForStory(story) == "done")
+            {
+                Assert.Empty(list);
+                Assert.Contains("all-done", html);
+                continue;
+            }
+
+            Assert.NotEmpty(list);
+            Assert.Equal(list.Count, html.Split("cmd-copy").Length - 1); // one copy badge per emitted command
+            foreach (var c in list)
+            {
+                Assert.Contains(PathUtil.Html(c.Command), html);
+            }
+        }
+    }
+
+    [Fact]
+    public void StoryCommands_ReadyStage_GetsNoCodeReview_EvenWhenTheModuleExposesIt()
+    {
+        // A ready story has no changes yet — the page never offers code-review, so neither may the tree.
+        // The catalog deliberately exposes code-review to prove the gate is status-driven, not catalog-driven.
+        var story = new StoryInfo
+        {
+            Id = "9.9",
+            EpicNumber = 9,
+            Title = "Ready Story",
+            UserStoryHtml = "",
+            AcBlocksHtml = Array.Empty<string>(),
+            Status = "ready-for-dev",
+        };
+        var commands = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/bmad-dev-story",
+            ["code-review"] = "/bmad-code-review",
+        });
+
+        Assert.Equal(new[] { "/bmad-dev-story 9.9" },
+            BmadCommands.StoryCommands(story, commands).Select(c => c.Command).ToArray());
+    }
+
+    [Fact]
+    public void SerializePayload_EmitsStoryCommands_CamelCase()
+    {
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        var json = WebviewCommand.SerializePayload(gen.RenderWebviewSurfaces(), "SpecScribeOutput");
+        using var doc = JsonDocument.Parse(json);
+
+        // Story 1.1 (in-progress) — the wire shape the TS OutlineStoryCommand interface depends on:
+        // `commands` is an array of { command, description } and its first command IS helperCommand.
+        var story = doc.RootElement.GetProperty("outline").GetProperty("epics")[0].GetProperty("stories")[0];
+        Assert.True(story.TryGetProperty("commands", out var cmds), "story node carries camelCase `commands`");
+        Assert.Equal(JsonValueKind.Array, cmds.ValueKind);
+        Assert.True(cmds.GetArrayLength() >= 1, "an in-progress story has at least one command");
+        Assert.True(cmds[0].TryGetProperty("command", out var first), "entry carries camelCase `command`");
+        Assert.True(cmds[0].TryGetProperty("description", out _), "entry carries camelCase `description`");
+        Assert.Equal(story.GetProperty("helperCommand").GetString(), first.GetString());
+    }
 }

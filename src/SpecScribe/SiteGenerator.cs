@@ -11,7 +11,12 @@ public enum GenerationOutcome { Generated, Updated, Removed, Skipped, Error }
 /// — the provenance <see cref="DiagnosticNotice.FromEvents"/> checks before trusting a leading
 /// <c>[Category]</c> token in <paramref name="Message"/> as a real category tag, rather than sniffing arbitrary
 /// message text (which could coincidentally start with the same bracket shape). [Review][Patch]</param>
-public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativePath, TimeSpan Elapsed, string? Message = null, bool FromAdapterDiagnostic = false);
+/// <param name="FromAdrDiagnostic">True only for the subset of <paramref name="FromAdapterDiagnostic"/> events
+/// whose <see cref="RelativePath"/> is relative to the ADR output subdir / <c>AdrSourceRoot</c> (the
+/// unnumbered-ADR notice), rather than the source root — the "which root do I anchor to" bit
+/// <see cref="DiagnosticNotice"/> needs so the <c>webview</c> command's Problems-panel channel resolves the real
+/// file instead of combining an ADR-relative path with <c>SourceRoot</c>. [Story 6.12] [Review][Patch]</param>
+public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativePath, TimeSpan Elapsed, string? Message = null, bool FromAdapterDiagnostic = false, bool FromAdrDiagnostic = false);
 
 /// <summary>Owns the mapping from _bmad-output/*.md to SpecScribeOutput/*.html, and keeps the generated index,
 /// nav, and epics/story pages in sync.</summary>
@@ -437,6 +442,20 @@ public sealed class SiteGenerator
             return errored;
         }
 
+        // A Skipped notice means the data source itself didn't actually parse (e.g. malformed sprint-status.yaml) —
+        // report that rather than claiming Updated, so the watch-mode log/event stream never misrepresents a
+        // silently-unapplied edit as a success. Match by filename, not the full relative path: ingest diagnostics
+        // report source-root-relative paths (BmadArtifactAdapter.ToSourceRelative) while `relative` here is
+        // repo-root-relative — the two conventions differ, but IsDataSource already narrows this method to exactly
+        // sprint-status.yaml / config.toml, so filename equality is unambiguous. [Story 6.11 review]
+        var fileName = Path.GetFileName(sourceFullPath);
+        var skipped = events.FirstOrDefault(e =>
+            e.Outcome == GenerationOutcome.Skipped && string.Equals(Path.GetFileName(e.RelativePath), fileName, StringComparison.OrdinalIgnoreCase));
+        if (skipped is not null)
+        {
+            return skipped;
+        }
+
         return new GenerationEvent(GenerationOutcome.Updated, relative, sw.Elapsed, "data source");
     }
 
@@ -557,7 +576,7 @@ public sealed class SiteGenerator
                         {
                             new AdapterDiagnostic(AdapterDiagnosticCategory.Unsupported, sourceRelative,
                                 "no ADR number derivable from the filename; record rendered unnumbered and sorted last"),
-                        }));
+                        }, fromAdr: true));
                     }
                 }
 
@@ -897,12 +916,18 @@ public sealed class SiteGenerator
                         surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
 
                         var storyStage = StatusStyles.ForStory(story);
+                        // ONE StoryCommands call feeds both fields: `commands` (the full status-gated list the
+                        // story page's Next Steps panel renders — the Quick Pick's option set) and the legacy
+                        // single `helperCommand` (its first entry, kept for older-shim back-compat), so the tree
+                        // can never disagree with the page. [spec-vscode-sidebar-shortcuts-…-quickpick]
+                        var storyCommands = BmadCommands.StoryCommands(story, _module.Commands);
                         outlineStories.Add(new OutlineStory(
                             story.Id, story.Title, storyStage, StatusStyles.StoryLabel(storyStage),
                             PathUtil.NormalizeSlashes(storyPage.OutputRelativePath),
                             storySourcePath,
                             story.TasksDone, story.TasksTotal,
-                            BmadCommands.PrimaryStoryCommand(story, _module.Commands)));
+                            storyCommands.Count > 0 ? storyCommands[0].Command : null,
+                            storyCommands));
                     }
 
                     var epicStage = StatusStyles.ForEpicWithRetrospective(epic);
@@ -1196,12 +1221,16 @@ public sealed class SiteGenerator
     /// outcomes) doesn't lose the distinction the Story 4.8 diagnostics page shows. Additive and harmless on
     /// the console path (which already prints messages); recovered by
     /// <see cref="DiagnosticsTemplater"/> without needing a second channel. [Story 4.8 Task 2]</para></summary>
-    private static IEnumerable<GenerationEvent> MapDiagnostics(IReadOnlyList<AdapterDiagnostic> diagnostics) =>
+    /// <param name="fromAdr">True when <paramref name="diagnostics"/>' <see cref="AdapterDiagnostic.RelativePath"/>
+    /// is relative to the ADR output subdir / <c>AdrSourceRoot</c> rather than the source root (the
+    /// unnumbered-ADR notice) — carried onto the resulting <see cref="GenerationEvent.FromAdrDiagnostic"/> so
+    /// <see cref="DiagnosticNotice.FromEvents"/> anchors it to the right root. [Story 6.12] [Review][Patch]</param>
+    private static IEnumerable<GenerationEvent> MapDiagnostics(IReadOnlyList<AdapterDiagnostic> diagnostics, bool fromAdr = false) =>
         diagnostics.Select(d => new GenerationEvent(
             d.Category is AdapterDiagnosticCategory.Malformed or AdapterDiagnosticCategory.Error
                 ? GenerationOutcome.Error
                 : GenerationOutcome.Skipped,
-            d.RelativePath, TimeSpan.Zero, $"[{d.Category}] {d.Message}", FromAdapterDiagnostic: true));
+            d.RelativePath, TimeSpan.Zero, $"[{d.Category}] {d.Message}", FromAdapterDiagnostic: true, FromAdrDiagnostic: fromAdr));
 
     /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per top-level source folder
     /// outside the well-known home-index set — the "unrecognized structure degrades, visibly" half of the
