@@ -50,7 +50,7 @@ context:
 | No git at all | non-git dir, `Git`/`DeepGit` null | **No** `timeline.html`, no date pages, no dashboard link (was previously a fabricated mtime timeline) | Non-fatal; rest of site generates |
 | Non-artifact file changed | git commit touched `src/Foo.cs` (not in `_referenceMap`) | Not counted as an "artifact updated" (only reference-map artifacts count) | Skipped silently |
 | Date on an active day | "last commit" headline / Git-Pulse date whose day has a date page | Rendered via `PortalDates` **and** linked to `commits/{iso}.html` | N/A |
-| Date on an inactive day | freshness "Updated {day}" whose day has no date page | Rendered via `PortalDates`, **plain text** (no link) | N/A |
+| Freshness date (mtime, not git-verified) | coverage card "Updated {day}" (`ArtifactCoverage.LastModified`) | Rendered via `PortalDates`, **always plain text** (no link, any day) — mtime isn't the git-verified day a `commits/{iso}.html` page describes | N/A |
 | ADR with date+context | body has `**Date:** 2026-07-10` + `## Context` para | Card shows formatted date + one-line summary | N/A |
 | ADR missing both | body has neither date nor context | Card shows title (+status) only; no empty line | Degrade to absent |
 | Same-day change-log run | two `- 2026-07-06:` entries, one `- 2026-07-08:` | Jul-6 entries get "(1 of 2)"/"(2 of 2)" markers, dates reformatted; Jul-8 gets none; order preserved | N/A |
@@ -65,7 +65,7 @@ context:
 - `src/SpecScribe/PortalDates.cs` -- **NEW.** The single date/time formatter: `Day(DateOnly)`, `Day(DateTime)`, `DayWithWeekday(DateOnly)`, `IsoDay(DateOnly)`, `Timestamp(DateOnly, hhmm, zoneLabel?)`, one `DayFormat` const. Pure, `InvariantCulture`, IO-free.
 - `src/SpecScribe/SiteGenerator.cs` -- `BuildArtifactsByDay` (rewrite: mtime → git-derived from `_progress.DeepGit.Commits`); `ArtifactLabel` (reuse); the union-day computation in `GenerateDatePagesInternal`/`GenerateTimelineInternal`; a new guarded `DateHref(DateOnly)` resolver over the generated date-page day set; `ExtractAdrDate`/`ExtractAdrSummary` (beside `ExtractAdrStatus` ~2108) wired into `new AdrEntry(...)` (~608).
 - `src/SpecScribe/GitMetrics.cs` -- `DeepCommit.Timestamp`+`Files` are the artifact-day source; per-commit `HH:mm` display routes through `PortalDates`; **do not** touch the `--date=format:` parse contract.
-- `src/SpecScribe/Charts.cs` -- `D`→`PortalDates.IsoDay` (byte-identical); `DReadable`/month-label→`PortalDates`; heatmap "last commit" headline (541), Git-Pulse last-commit (627), freshness lines (846/909/912) route through `PortalDates` **and** wrap the date in the guarded `DateHref` link.
+- `src/SpecScribe/Charts.cs` -- `D`→`PortalDates.IsoDay` (byte-identical); `DReadable`/month-label→`PortalDates`; heatmap "last commit" headline (541) and Git-Pulse last-commit (627) route through `PortalDates` **and** wrap the date in a guarded date link. Freshness lines (846/909/912) route through `PortalDates` but deliberately **stay plain text** (no link, corrected post-review 2026-07-13): that date is filesystem mtime (`ArtifactCoverage.LastModified`, pre-existing Story 3.3 signal), not the git-verified day the date-page set is built from, so linking it to `commits/{iso}.html` would overstate what the linked day actually explains.
 - `src/SpecScribe/PathUtil.cs` -- `RenderFooter` clock (111): 12h → `PortalDates` 24h + `TimeZoneInfo.Local` label; preserve "formatted once here" + `relativePrefix` math.
 - `src/SpecScribe/CommitDayTemplater.cs` -- commit times + the day heading via `PortalDates`; prev/next date labels link via `DateHref`.
 - `src/SpecScribe/AdrModel.cs` -- `AdrEntry` gains `DateOnly? Date`, `string? Summary`.
@@ -97,6 +97,19 @@ context:
 - Given the ADR index, when it generates, then cards carry dates and one-line summaries sourced from the ADR bodies (absent when the body has neither), and superseded/deprecated statuses render distinctly from Accepted on both the ADR page and the card.
 - Given a change-log run sharing a date, when rendered, then ordinal sequence markers order the run (unique dates unmarked; unrecognized shapes unchanged and never reordered).
 - Given two generation runs over identical input, when compared, then output is byte-identical (determinism), and the golden fingerprint was regenerated deliberately after widening the `FooterClock` normalization.
+
+### Review Findings
+
+- [x] [Review][Patch] (resolved decision — drop the ambiguous format) Removed `M/d/yyyy` from `PortalDates.AuthoredDayFormats` — ISO + named-month formats already cover legitimate authored dates unambiguously; a day-first slash date now degrades to verbatim instead of silently misparsing. [src/SpecScribe/PortalDates.cs:67]
+- [x] [Review][Patch] (resolved decision — leave unlinked, fix the spec) Corrected the Code Map bullet: freshness lines (846/909/912) deliberately stay plain text (filesystem mtime, not the git-verified date-page day); updated the I/O & Edge-Case Matrix row to match. [Code Map + matrix sections of this spec]
+- [x] [Review][Patch] `GitPulsePanel`'s date-link guard now checks actual `LinkedCommitDays` membership (the same set the heatmap uses) instead of a bare `day <= today` comparison. [src/SpecScribe/Charts.cs:643]
+- [x] [Review][Patch] `SequenceChangeLog`'s `HasInterveningBullet` now only counts a bullet as intervening when its indentation is ≤ the item bullets' own indentation, so a nested sub-bullet no longer breaks a legitimate same-day run. [src/SpecScribe/EpicsParser.cs:352,357]
+- [x] [Review][Patch] `BuildArtifactsByDay`'s `repoRelToArtifact` now uses `TryAdd` (first-write-wins, explicit) instead of an overwriting indexer on repo-relative path collisions. [src/SpecScribe/SiteGenerator.cs:860]
+- [x] [Review][Patch] `ExtractAdrDate`'s `## Date` heading fallback now keeps scanning lines within the section (stopping only at the next heading) instead of breaking unconditionally after the first line. [src/SpecScribe/SiteGenerator.cs:2649-2660]
+- [x] [Review][Patch] `ExtractAdrSummary`'s H1-tail fallback now splits on the LAST dash occurrence (both em/en-dash and spaced-hyphen variants) instead of the first, so an earlier unrelated dash (e.g. a numeric range) no longer garbles the summary. [src/SpecScribe/SiteGenerator.cs:2710,2723]
+- [x] [Review][Patch] (no code change — reviewed and accepted as a documented trade-off) `CollapseSummary`'s numbered-prefix stripper has no reliable heuristic to distinguish a real list marker from a sentence that happens to start with "N. " without full markdown context; any fix would trade one false positive for another, so left as-is. [src/SpecScribe/SiteGenerator.cs:2731]
+
+**Verification:** `dotnet build` clean; `dotnet test` 997/997 green (golden `GoldenContentFingerprint` regenerated deliberately — see `SiteGeneratorAdapterTests.cs:252-259` — and eyeballed via a real `--deep-git` generate: freshness dates confirmed plain text, GitPulse last-commit link confirmed working, ADR 0006's dash-in-title summary confirmed correctly resolved via the last-dash fix).
 
 ## Spec Change Log
 

@@ -637,10 +637,11 @@ public static class Charts
         // "captioned git" treatment). Kept in the commit's authored offset, never converted.
         var last = PortalDates.Timestamp(git.LastCommitTimestamp);
         // The last-commit date is a date in the context of a change → link it to that day's date page, guarded on
-        // it being on-or-before today (a future-skewed commit gets no page, so no dead link). Root-relative href
-        // like the heatmap cells (this panel renders on the root index page).
+        // actual membership in the generated date-page set (the SAME LinkedCommitDays the heatmap uses) rather than
+        // a bare date comparison, so this guard can never drift from what pages actually exist — never a dead link.
         var lastDay = DateOnly.FromDateTime(git.LastCommitTimestamp);
-        var lastLinked = lastDay <= DateOnly.FromDateTime(DateTime.Now)
+        var linkedDays = LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now));
+        var lastLinked = linkedDays.Contains(lastDay)
             ? $"<a class=\"date-link\" href=\"commits/{D(lastDay)}.html\">{Html(last)}</a>"
             : Html(last);
 

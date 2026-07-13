@@ -62,9 +62,13 @@ public static class PortalDates
         Timestamp(DateOnly.FromDateTime(dt), TimeOfDay(dt), zoneLabel);
 
     /// <summary>The authored-date shapes tolerated when normalizing a hand-typed frontmatter/card date to the one
-    /// portal token. ISO first (what the artifacts use), then a couple of common spellings.</summary>
+    /// portal token. ISO first (what the artifacts use), then a couple of common spellings — all unambiguous
+    /// (month-name formats only). Deliberately excludes numeric slash formats like "M/d/yyyy": a day-first date
+    /// ("10/7/2026") would silently misparse as US month-first with no way to detect the intent, which is worse
+    /// than degrading to verbatim (NFR8) — an unrecognized shape just falls through to the caller's as-authored
+    /// display instead of showing a plausible-but-wrong date.</summary>
     private static readonly string[] AuthoredDayFormats =
-        { "yyyy-MM-dd", "yyyy/MM/dd", "MMMM d, yyyy", "MMM d, yyyy", "d MMMM yyyy", "M/d/yyyy" };
+        { "yyyy-MM-dd", "yyyy/MM/dd", "MMMM d, yyyy", "MMM d, yyyy", "d MMMM yyyy" };
 
     /// <summary>The single tolerant authored-date parser shared by every surface that accepts a hand-typed date
     /// (ADR "**Date:**" lines, retro/doc card meta) so they can't disagree on what parses (Story 10.4). Invariant

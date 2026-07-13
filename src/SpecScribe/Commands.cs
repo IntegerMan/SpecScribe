@@ -395,12 +395,17 @@ public sealed class InteractiveCommand : Command<SiteSettings>
             "Enable deep git analytics (change coupling and hotspots)?", defaultValue: settings.DeepGit);
 
         // External source base for "view source online" links — a configurable setting, so NFR7 (menu/CLI parity)
-        // requires it in the menu too, not just --code-url. The default surfaces the current or auto-detected value
-        // (defaults.CodeSourceBaseUrl already reflects git-remote / CI detection) so the user can confirm or override;
-        // clearing it falls back to in-portal-only + fresh auto-detection on the next run. [Story 7.7]
+        // requires it in the menu too, not just --code-url. Only an already-EXPLICIT settings.CodeUrl pre-fills the
+        // prompt's default; a merely auto-detected value (defaults.CodeSourceBaseUrl) is surfaced as an informational
+        // line instead, never as the prompt default — otherwise accepting the default on Enter would persist a
+        // branch-specific detected URL to disk as if it were an explicit override, freezing future runs onto today's
+        // branch instead of re-detecting fresh each time. [Story 7.7]
+        if (string.IsNullOrWhiteSpace(settings.CodeUrl) && !string.IsNullOrWhiteSpace(defaults?.CodeSourceBaseUrl))
+        {
+            AnsiConsole.MarkupLine($"[grey]Auto-detected source base: {Markup.Escape(defaults.CodeSourceBaseUrl)} (leave blank to keep auto-detecting)[/]");
+        }
         var codePrompt = new TextPrompt<string>("Source hosting base URL (blank = in-portal only / auto-detect):").AllowEmpty();
-        var codeDefault = settings.CodeUrl ?? defaults?.CodeSourceBaseUrl;
-        if (!string.IsNullOrWhiteSpace(codeDefault)) codePrompt = codePrompt.DefaultValue(codeDefault);
+        if (!string.IsNullOrWhiteSpace(settings.CodeUrl)) codePrompt = codePrompt.DefaultValue(settings.CodeUrl);
         var codeUrl = AnsiConsole.Prompt(codePrompt);
         settings.CodeUrl = string.IsNullOrWhiteSpace(codeUrl) ? null : codeUrl.Trim();
 

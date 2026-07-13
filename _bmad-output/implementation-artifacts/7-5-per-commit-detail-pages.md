@@ -4,7 +4,7 @@ baseline_commit: 279d27e230ff391ce9f73bb1e438ca24775ceaa4
 
 # Story 7.5: Per-Commit Detail Pages
 
-Status: review
+Status: done
 
 <!-- Context-engineered 2026-07-09 (create-story). Supersedes the 2026-07-08 owner draft, whose Task 1 ("extend the shared fetch to add %b + --numstat, produce a CommitDetail record") is now STALE: Story 3.8 already landed the enriched fetch AND the per-commit DeepCommit record. This story now exposes that existing data and renders/wires the pages. Validation optional: run validate-create-story before dev-story. -->
 
@@ -248,6 +248,17 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
   - [x] `SiteGeneratorCommitDetailsTests`: opt-in on → pages exist + day/hub hashes link in; opt-out off → no `commit/` + plain hashes + baseline identical; graceful degradation (no git → no pages, no error); reference linkification present; determinism.
 - [x] **Task 7 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green (859 tests). Baseline generate (no `--deep-git`) → no `commit/` dir, day-page hashes plain. Deep generate (`--deep-git`) → `commit/{hash}.html` (143 pages, bounded) shows subject/author+date/body/files+churn with linkified references, no new JS, invariant dates, escaped content; day + hub hashes link in. Non-git run degrades cleanly. (Default `SpecScribeOutput/`; never `--output docs/live`.)
+
+### Review Findings
+
+Reviewed 2026-07-13 against baseline `279d27e`, diff scoped to `CommitDetailEntry.cs`, `CommitDetailTemplater.cs`, `GitMetrics.cs`, `SiteGenerator.cs`, `CommitDayTemplater.cs`, and their tests. Three parallel layers (adversarial, edge-case, acceptance-auditor) ran; the Acceptance Auditor found **no AC or guardrail violations**. Note: this story's changes are bundled into commit `5691d24` alongside concurrent Stories 7.3/7.4/7.6/10.4 in the same files — findings below are filtered to what's actually 7.5's own code.
+
+- [x] [Review][Patch] `UniqueShortHash`/output-path computed outside the per-commit try/catch, so a throw there would abort the whole phase instead of degrading one commit [SiteGenerator.cs:1000-1002] — fixed, both moved inside the try
+- [x] [Review][Patch] Subject/author fallback checks `Length == 0`, not whitespace — a whitespace-only subject or author renders blank instead of the "(no subject)"/"Unknown" fallback [CommitDetailTemplater.cs:36,95] — fixed, switched to `IsNullOrWhiteSpace`
+- [x] [Review][Defer] Determinism/no-fatal git tests hard-fail via `Assert.True(TryCreateGitHistory(), ...)` instead of skipping when git is unavailable [SiteGeneratorCommitDetailsTests.cs] — deferred, pre-existing repo-wide test convention (mirrored from `SiteGeneratorGitInsightsTests`/`SiteGeneratorTimelineTests`/`SiteGeneratorCodeInsightsTests`), not introduced by this story
+- [x] [Review][Defer] Determinism test's footer-stripping regex hardcodes a signed `UTC[+-]\d{2}:\d{2}` offset shape [SiteGeneratorCommitDetailsTests.cs:167] — deferred, pre-existing repo-wide test convention (same regex duplicated in 3 sibling test files), not introduced by this story
+
+Dismissed as noise/accepted-risk/out-of-scope (13): `CommitHref` prefix-match ambiguity on hash collision (same astronomically-low risk the story itself already accepts for filename collisions); `_commitDetails` field set but not yet read (deliberate precedent-mirroring for 7.3/7.4 consumption per Dev Notes); files-changed table has no row cap (not an AC requirement, per-commit not per-window); binary-detection edge case for a single-null churn value (unreachable — numstat always pairs both dashes); commit body renders git trailers as prose (spec explicitly calls for the full body verbatim); test comment "AC #2's performance guarantee" (accurate — flag-off is a true zero-cost gate); stale `_codePages` comment (pre-existing context line from Story 7.1, not part of this diff); plus FileInsight contributor casing, `BuildCodeMapMetrics` ordering, `BuildArtifactsByDay` undercounting, and four ADR date/summary extraction edge cases — all belong to concurrently-bundled Stories 7.4/7.6/10.4, not 7.5.
 
 ## Dev Notes
 

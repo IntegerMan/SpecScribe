@@ -4,7 +4,7 @@ baseline_commit: 5691d24b30be909f6690504525516c61329d0924
 
 # Story 7.7: External Source Linking and Auto-Detection
 
-Status: review
+Status: done
 
 ## Story
 
@@ -96,3 +96,50 @@ Implemented 2026-07-12 alongside the Story 7.1 rework.
 
 - 2026-07-12: Created and implemented. `--code-url` is now additive (in-portal pages always generate; each gains a
   hosted-source link) with git-remote + GitHub-Pages/CI auto-detection, menu/CLI parity, and a diagnostics row.
+
+### Review Findings
+
+Code review 2026-07-13 (diff scoped to this story's File Structure Requirements files, extracted from bundled
+commit `5691d24`). Triggered in part by owner-reported live-site 404s on `.md` files referenced in stories — note
+that this diff only touches the *external* "view source online" links, not in-portal `.md`/doc-page resolution
+(that's the separately-bundled webview-doc-page-surfaces work in the same commit); if the `.md` 404s persist, they
+likely need a separate review pass scoped to that work.
+
+- [x] [Review][Patch] Add a host allowlist: only emit an external "view source online" link for github.com,
+  gitlab.*-style hosts (existing `-/blob/` handling), and Bitbucket (fixed to its real `/src/{branch}/<path>` scheme
+  instead of the wrong `/blob/`); any other/unrecognized host degrades to `null` (in-portal only), matching AC1's
+  "unrecognizable remote degrades to in-portal-only with no error." Owner-resolved and fixed 2026-07-13.
+  [CodeSourceUrlResolver.cs](../../src/SpecScribe/CodeSourceUrlResolver.cs)
+- [x] [Review][Dismiss] `CodeItemHref` (deep-analytics hotspots table, git-insights file table, code map) preferring
+  the external hosted link over the in-portal code page is intentional per owner (2026-07-13) — these aggregate
+  views are meant to jump straight to the hosted, syntax-highlighted source. No change needed.
+- [x] [Review][Patch] Hardcoded `"main"` branch fallback breaks links on `master`/`trunk`-default repos whenever the
+  branch can't be determined (detached HEAD, or CI env missing both `GITHUB_SHA`/`GITHUB_REF_NAME`) — no test covers
+  a non-`main` default branch. Fixed 2026-07-13: new `GitMetrics.TryGetDefaultBranch` (reads the local
+  `refs/remotes/origin/HEAD` symref) is now tried before the `"main"` literal fallback.
+  [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs), [CodeSourceUrlResolver.cs](../../src/SpecScribe/CodeSourceUrlResolver.cs)
+- [x] [Review][Patch] The interactive menu (`ConfigurePaths`) pre-fills the URL prompt with the auto-detected,
+  branch-specific value; accepting the default (or just pressing Enter) persists it to `SettingsStore` as an
+  explicit `CodeUrl`, which then always wins over future auto-detection on every later run — violates the story's
+  own guardrail: "Don't persist a detected (branch-specific) URL as if it were an explicit setting."
+  Fixed 2026-07-13: only an already-explicit `settings.CodeUrl` pre-fills the prompt default now; a merely
+  auto-detected value is shown as an informational line instead. [Commands.cs](../../src/SpecScribe/Commands.cs)
+- [x] [Review][Patch] Branch names and repo-relative paths are embedded into the constructed URL with plain string
+  concatenation and no percent-encoding — a path or branch containing a space, `#`, or `?` truncates or corrupts the
+  resulting link (matches the class of bug behind the reported 404s, just on the new external links rather than
+  `.md` pages). Fixed 2026-07-13: new `CodeSourceUrlResolver.EscapeUrlSegments` percent-encodes each `/`-delimited
+  segment, applied to branch names and to the repo-relative path in `BuildExternalSourceUrl`.
+  [CodeSourceUrlResolver.cs](../../src/SpecScribe/CodeSourceUrlResolver.cs), [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+- [x] [Review][Patch] IPv6 remote hosts are mangled: the trailing-port strip uses `host.IndexOf(':')` (first colon)
+  instead of the last, truncating `[::1]` down to `"["` — the corrupted host still passes the length/segment checks,
+  so `ParseRemote` returns a bogus URL instead of degrading to `null`. Fixed 2026-07-13: bracketed IPv6 literals are
+  now detected and only a port trailing the closing `]` is stripped. [CodeSourceUrlResolver.cs](../../src/SpecScribe/CodeSourceUrlResolver.cs)
+- [x] [Review][Defer] A query string or fragment on the git remote URL itself (e.g. `repo.git?ref=x`) leaks into the
+  generated repo name, since only a literal trailing `.git` is stripped — deferred, rare remote shape.
+  [CodeSourceUrlResolver.cs](../../src/SpecScribe/CodeSourceUrlResolver.cs)
+- [x] [Review][Defer] An explicit `--code-url` value that already contains its own `#...` fragment isn't sanitized
+  before the repo-relative path is appended, corrupting the link — deferred, requires a deliberately unusual
+  `--code-url`. [SiteGenerator.cs:1307-1310](../../src/SpecScribe/SiteGenerator.cs)
+- [x] [Review][Defer] `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` on the webview JSON payload and the
+  unconditional `generator.CapturePages = true` in `WebviewCommand` — real considerations, but out of this story's
+  scope (bundled webview-doc-page-surfaces work riding the same commit/files). [Commands.cs](../../src/SpecScribe/Commands.cs)

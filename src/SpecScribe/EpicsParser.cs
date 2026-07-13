@@ -349,16 +349,23 @@ public static class EpicsParser
     }
 
     // Any markdown list-item bullet (dated or not), used to detect a distinct entry sitting between two dated items.
-    private static readonly Regex ChangeLogBullet = new(@"^\s*[-*]\s", RegexOptions.Compiled);
+    // Captures its own leading indentation so a nested sub-bullet (more indented than the item bullets themselves)
+    // can be told apart from a sibling top-level entry.
+    private static readonly Regex ChangeLogBullet = new(@"^(?<indent>\s*)[-*]\s", RegexOptions.Compiled);
 
     /// <summary>True when a list-item bullet line sits strictly between <paramref name="fromLine"/> and
-    /// <paramref name="toLine"/> — i.e. a distinct change-log entry (with a different or unparseable date) separates
-    /// two same-date items, so they must not be grouped into one "(k of N)" run.</summary>
+    /// <paramref name="toLine"/> AT THE SAME (OR SHALLOWER) INDENTATION as the item bullets themselves — i.e. a
+    /// distinct change-log entry (with a different or unparseable date) separates two same-date items, so they must
+    /// not be grouped into one "(k of N)" run. A more-indented bullet is a nested sub-point of the preceding entry,
+    /// not a separate entry, and does not break adjacency.</summary>
     private static bool HasInterveningBullet(string[] lines, int fromLine, int toLine)
     {
+        var itemMatch = ChangeLogBullet.Match(lines[fromLine]);
+        var itemIndent = itemMatch.Success ? itemMatch.Groups["indent"].Length : 0;
         for (var i = fromLine + 1; i < toLine; i++)
         {
-            if (ChangeLogBullet.IsMatch(lines[i])) return true;
+            var m = ChangeLogBullet.Match(lines[i]);
+            if (m.Success && m.Groups["indent"].Length <= itemIndent) return true;
         }
         return false;
     }

@@ -173,10 +173,27 @@ public sealed class ForgeOptions
             EmitSpa = emitSpa,
             // Explicit --code-url always wins; otherwise (CLI only — never in test/library paths, which pass
             // autoDetectCodeUrl=false so generation stays deterministic) fall back to git-remote / CI detection.
-            CodeSourceBaseUrl = codeSourceBaseUrl is { Length: > 0 } url
-                ? url
+            // A malformed value (no scheme, whitespace-only) is rejected rather than accepted verbatim, since it
+            // would otherwise silently flow into a broken "view source online" link on every code page.
+            CodeSourceBaseUrl = TryValidateCodeUrl(codeSourceBaseUrl, out var validatedCodeUrl)
+                ? validatedCodeUrl
                 : autoDetectCodeUrl ? CodeSourceUrlResolver.TryDetect(repoRoot) : null,
         };
+    }
+
+    /// <summary>Validates a candidate <c>--code-url</c> value: must be non-blank and an absolute http(s) URL.
+    /// Rejects whitespace-only input and schemeless values (e.g. <c>example.com/repo</c>) that would otherwise
+    /// silently produce a broken external link. [Story 7.1, code-review patch]</summary>
+    private static bool TryValidateCodeUrl(string? candidate, out string validated)
+    {
+        validated = string.Empty;
+        if (candidate is not { Length: > 0 }) return false;
+        var trimmed = candidate.Trim();
+        if (trimmed.Length == 0) return false;
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)) return false;
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return false;
+        validated = trimmed;
+        return true;
     }
 
     /// <summary>Resolves the implicit ADR root: the canonical <c>docs/adrs</c> whenever that directory exists

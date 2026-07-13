@@ -2,6 +2,41 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of story-7-7 (2026-07-13)
+
+- source_spec: `7-7-external-source-linking-and-auto-detection.md`
+  summary: A query string or fragment on the git remote URL itself (e.g. `repo.git?ref=x`) leaks into the generated
+  repo name, since `ParseRemote` only strips a literal trailing `.git`.
+  evidence: Edge Case Hunter. Rare remote shape in practice. [CodeSourceUrlResolver.cs](../../src/SpecScribe/CodeSourceUrlResolver.cs)
+- source_spec: `7-7-external-source-linking-and-auto-detection.md`
+  summary: An explicit `--code-url` value that already contains its own `#...` fragment isn't sanitized before the
+  repo-relative path is appended, corrupting the resulting link.
+  evidence: Edge Case Hunter. Requires a deliberately unusual `--code-url`. [SiteGenerator.cs:1307-1310](../../src/SpecScribe/SiteGenerator.cs)
+- source_spec: `7-7-external-source-linking-and-auto-detection.md`
+  summary: `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` on the webview JSON payload and the unconditional
+  `generator.CapturePages = true` in `WebviewCommand.Execute` are real considerations (JSON-escaping relaxation on a
+  payload that embeds arbitrary HTML; forced whole-site page capture on every webview run) but belong to the
+  bundled webview-doc-page-surfaces work riding the same commit/files, not Story 7.7 itself.
+  evidence: Blind Hunter. [Commands.cs](../../src/SpecScribe/Commands.cs)
+
+## Deferred from: code review of story-7-1 (2026-07-13)
+
+- source_spec: `7-1-in-portal-code-file-browsing.md`
+  summary: `StringComparer.OrdinalIgnoreCase` on repo-relative path dictionaries (`_codePages`, `_codeReverseMap`, discovery's `SortedSet`) risks silently colliding two case-differing files on a case-sensitive (Linux) checkout.
+  evidence: Blind Hunter + Edge Case Hunter (independently flagged). Mirrors the codebase-wide convention already used for `_docs` and the markdown reference map since before this story; deferred as pre-existing, not novel to 7.1. [SiteGenerator.cs:78,87,1109](../../src/SpecScribe/SiteGenerator.cs)
+- source_spec: `7-1-in-portal-code-file-browsing.md`
+  summary: `CommitHref`'s abbreviated-hash fallback does a linear `Dictionary` scan with no ambiguity check, so two same-prefix short hashes resolve non-deterministically.
+  evidence: Blind Hunter + Edge Case Hunter (independently flagged). `CommitHref`/`_commitPages` are Story 7.5's seam, reused here for the code page's History tab; not introduced by 7.1. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+- source_spec: `7-1-in-portal-code-file-browsing.md`
+  summary: `EnumerateCodeFiles`/`MaxCodeFileBytes` reuse for the code-map's per-file line count (Story 7.6) reads every tracked file fully into memory just to count lines, and silently omits >1MB files from the size visualization.
+  evidence: Blind Hunter. Out of 7.1's scope (Story 7.6 code, bundled into this diff only because it shares `SiteGenerator.cs`). [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+- source_spec: `7-1-in-portal-code-file-browsing.md`
+  summary: Placeholder pages (binary/oversized/unreadable files) never receive `FileInsight`/History-tab data even when `--deep-git` has it, because `RenderPlaceholder` doesn't accept those parameters.
+  evidence: Edge Case Hunter. Out of 7.1's scope — the Insights/History tabs are Story 7.4/7.8/10.x work bundled into `CodeFileTemplater.cs`. [CodeFileTemplater.cs](../../src/SpecScribe/CodeFileTemplater.cs)
+- source_spec: `7-1-in-portal-code-file-browsing.md`
+  summary: `TabGroupName` can theoretically collide across two paths that differ only in `/` vs. a literal `-` in a directory name, cross-wiring radio-group tab state.
+  evidence: Blind Hunter. Low likelihood; only affects the SPA/webview whole-document capture mode. [CodeFileTemplater.cs](../../src/SpecScribe/CodeFileTemplater.cs)
+
 ## Deferred from: code review of story-7-6 (2026-07-13)
 
 - source_spec: `7-6-source-code-treemap-for-codebase-exploration.md`
@@ -318,3 +353,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-7-3-10-4-honest-navigable-portal-dates.md`
   summary: Git-derived artifact-change days do not follow renames — a commit that touched an artifact under its pre-rename path is not attributed to the current reference-map key, so that artifact's change days are silently incomplete.
   evidence: Edge Case Hunter finding (low). This under-reports (shows fewer change days) but never mis-attributes, so it is an honest degradation consistent with the story's stance. Following renames needs git rename-detection (a --follow-style map) that is out of scope for this pass.
+
+## Deferred from: code review of 7-5-per-commit-detail-pages (2026-07-13)
+
+- source_spec: `7-5-per-commit-detail-pages.md`
+- **Git-dependent generation tests hard-fail instead of skipping when git is unavailable on the host.** `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs` (`Assert.True(TryCreateGitHistory(), ...)`) — pre-existing repo-wide test convention mirrored from `SiteGeneratorGitInsightsTests`/`SiteGeneratorTimelineTests`/`SiteGeneratorCodeInsightsTests`, not introduced by this story. A CI runner or dev machine without git on PATH gets outright failures rather than skips.
+- **Determinism test's footer-stripping regex hardcodes a signed UTC offset shape (`UTC[+-]\d{2}:\d{2}`).** `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs:167` — same regex duplicated verbatim in 3 sibling test files; if the actual offset is ever rendered without a sign (e.g. `+00:00` shown as `00:00`) or `PortalDates`' footer format shifts slightly, the "determinism" test degrades into comparing two un-normalized strings. Pre-existing convention, not introduced by this story.

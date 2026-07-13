@@ -178,6 +178,12 @@ public static class CodeReferenceScanner
         if (!File.Exists(full)) return false;
         if (PathUtil.IsIgnoredSourceFile(full)) return false;
 
+        // (e) if the candidate is itself a symlink/junction, resolve its final target and re-check containment —
+        // a symlink lexically inside RepoRoot can still point outside it, and the checks above only ever compared
+        // lexical paths.
+        var resolvedTarget = new FileInfo(full).ResolveLinkTarget(returnFinalTarget: true)?.FullName;
+        if (resolvedTarget is not null && !IsInside(resolvedTarget, repoFull)) return false;
+
         repoRelPath = PathUtil.NormalizeSlashes(Path.GetRelativePath(repoFull, full));
         return true;
     }

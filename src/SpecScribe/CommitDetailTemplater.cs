@@ -33,7 +33,7 @@ public static class CommitDetailTemplater
         var shortHash = ShortHash(commit.Hash);
         var outputPath = $"commit/{shortHash}.html";
         var prefix = PathUtil.RelativePrefix(outputPath); // "../" — commit/ is one level below the output root.
-        var subject = commit.Subject.Length == 0 ? "(no subject)" : commit.Subject;
+        var subject = string.IsNullOrWhiteSpace(commit.Subject) ? "(no subject)" : commit.Subject;
 
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
@@ -92,7 +92,7 @@ public static class CommitDetailTemplater
     /// formatting so the attribution reads identically on every host. Escaped (author is free text).</summary>
     private static string Attribution(DeepCommit commit)
     {
-        var author = commit.Author.Length == 0 ? "Unknown" : commit.Author;
+        var author = string.IsNullOrWhiteSpace(commit.Author) ? "Unknown" : commit.Author;
         var sb = new StringBuilder($"by {PathUtil.Html(author)}");
         if (commit.Timestamp is { } ts)
         {

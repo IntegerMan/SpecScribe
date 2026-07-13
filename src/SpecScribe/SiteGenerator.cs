@@ -857,7 +857,10 @@ public sealed class SiteGenerator
                     var full = Path.GetFullPath(Path.Combine(_options.SourceRoot, sourceRel.Replace('/', Path.DirectorySeparatorChar)));
                     var repoRel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.RepoRoot, full));
                     if (repoRel.StartsWith("..", StringComparison.Ordinal)) continue; // outside the repo — git never reports it
-                    repoRelToArtifact[repoRel] = (sourceRel, PathUtil.NormalizeSlashes(href));
+                    // TryAdd (not an overwriting indexer): if two artifacts normalize to the same repo-relative path
+                    // (e.g. case-only variants under the OrdinalIgnoreCase comparer), the first one found keeps the
+                    // git-day attribution rather than silently losing it to whichever entry happened to iterate last.
+                    repoRelToArtifact.TryAdd(repoRel, (sourceRel, PathUtil.NormalizeSlashes(href)));
                 }
                 catch
                 {
@@ -998,10 +1001,13 @@ public sealed class SiteGenerator
         foreach (var commit in commits)
         {
             var sw = Stopwatch.StartNew();
-            var shortHash = UniqueShortHash(commit.Hash, usedFileHashes);
-            var outputRelative = PathUtil.NormalizeSlashes($"commit/{shortHash}.html");
+            // shortHash/outputRelative are computed inside the try so a malformed commit degrades to a single
+            // Error event instead of aborting the whole phase (NFR-2, AC #2's per-commit isolation contract).
+            var outputRelative = string.Empty;
             try
             {
+                var shortHash = UniqueShortHash(commit.Hash, usedFileHashes);
+                outputRelative = PathUtil.NormalizeSlashes($"commit/{shortHash}.html");
                 var html = CommitDetailTemplater.RenderPage(commit, nav, CodePageHref);
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
@@ -1086,10 +1092,6 @@ public sealed class SiteGenerator
     // placeholder page (never read into memory in full). A seed value, not a contract — a future settings toggle
     // (Epic 5 / AD-3) could surface it; there is deliberately no knob for it yet. [Story 7.1]
     private const long MaxCodeFileBytes = 1_048_576; // ~1 MB
-
-    // Leading bytes sniffed when classifying a file as binary. A file under the size cap is read in full anyway, so
-    // the actual NUL / invalid-UTF-8 check runs over the whole content; this window only bounds the FileInfo path.
-    private const int BinarySniffBytes = 8192;
 
     /// <summary>Story 7.2 Phase A — discovers the referenced code-file set from the source-artifact corpus and
     /// populates <see cref="_codePages"/> (forward map) + <see cref="_codeReverseMap"/> (file → citing artifacts,
@@ -1194,9 +1196,18 @@ public sealed class SiteGenerator
 
         // The syntax highlighter ships only where it is used: copy the vendored Prism bundle + theme to the output
         // root exactly when in-portal code pages are generated, so a site with no code pages stays byte-identical
-        // (and the golden fixtures, which cite no real repo files, never gain these assets).
-        CopyEmbeddedAsset("SpecScribe.assets.prism.js", ForgeOptions.CodeHighlightScriptName);
-        CopyEmbeddedAsset("SpecScribe.assets.prism.css", ForgeOptions.CodeHighlightStyleName);
+        // (and the golden fixtures, which cite no real repo files, never gain these assets). Guarded like every
+        // per-file write below — a missing/misconfigured embedded resource degrades to a reported error instead of
+        // throwing out of the whole phase (NFR2).
+        try
+        {
+            CopyEmbeddedAsset("SpecScribe.assets.prism.js", ForgeOptions.CodeHighlightScriptName);
+            CopyEmbeddedAsset("SpecScribe.assets.prism.css", ForgeOptions.CodeHighlightStyleName);
+        }
+        catch (Exception ex)
+        {
+            events.Add(new GenerationEvent(GenerationOutcome.Error, ForgeOptions.CodeHighlightScriptName, TimeSpan.Zero, ex.Message));
+        }
 
         var referenced = _codeReferenced;
         var outputRootFull = Path.GetFullPath(_options.OutputRoot);
@@ -1300,7 +1311,7 @@ public sealed class SiteGenerator
     /// this is a whole-file link; per-line deep links stay in-portal via <see cref="CodeReferenceLinkifier"/>.</summary>
     private string? BuildExternalSourceUrl(string repoRelative) =>
         _options.CodeSourceBaseUrl is { Length: > 0 } baseUrl
-            ? baseUrl.TrimEnd('/') + "/" + PathUtil.NormalizeSlashes(repoRelative)
+            ? baseUrl.TrimEnd('/') + "/" + CodeSourceUrlResolver.EscapeUrlSegments(PathUtil.NormalizeSlashes(repoRelative))
             : null;
 
     /// <summary>Reads a source file as UTF-8 text with shared access, returning false when it is binary — a NUL byte
@@ -1345,6 +1356,10 @@ public sealed class SiteGenerator
     /// final line); a genuine blank line in the body is preserved so anchors stay 1:1 with source lines. [Story 7.1]</summary>
     private static IReadOnlyList<string> SplitCodeLines(string text)
     {
+        if (text.Length == 0)
+        {
+            return Array.Empty<string>();
+        }
         var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
         var lines = normalized.Split('\n');
         if (lines.Length > 1 && lines[^1].Length == 0)
@@ -2649,6 +2664,9 @@ public sealed class SiteGenerator
         var heading = AdrDateHeadingPattern.Match(raw);
         if (heading.Success)
         {
+            // Scan every line within the section (stop only at the next heading) rather than giving up after the
+            // first substantive line — a "## Date" section that opens with intro prose before the actual date
+            // would otherwise be missed.
             foreach (var line in raw[(heading.Index + heading.Length)..].Split('\n'))
             {
                 var trimmed = line.Trim();
@@ -2656,7 +2674,6 @@ public sealed class SiteGenerator
                 if (trimmed.StartsWith('#')) break;
                 if (IsDecorativeLine(trimmed)) continue;
                 if (TryParseAdrDate(trimmed) is { } fromHeading) return fromHeading;
-                break;
             }
         }
 
@@ -2706,11 +2723,13 @@ public sealed class SiteGenerator
         }
 
         // Fallback: the descriptive tail some ADR titles carry after a dash ("ADR 0006: … — JSON + SPA + npx …").
-        // Accept an em-dash, an en-dash, or a spaced ASCII hyphen so hyphenated titles get a summary too.
-        var dashIndex = title.IndexOfAny(new[] { '—', '–' });
+        // Accept an em-dash, an en-dash, or a spaced ASCII hyphen so hyphenated titles get a summary too. Uses the
+        // LAST dash occurrence, not the first — a title can carry an earlier dash that isn't the title/description
+        // separator (e.g. a numeric range like "2020–2025"), and the intended separator is always the final one.
+        var dashIndex = title.LastIndexOfAny(new[] { '—', '–' });
         if (dashIndex < 0)
         {
-            var spaced = title.IndexOf(" - ", StringComparison.Ordinal);
+            var spaced = title.LastIndexOf(" - ", StringComparison.Ordinal);
             if (spaced >= 0) dashIndex = spaced + 1; // point at the hyphen so the +1 below skips it
         }
         if (dashIndex >= 0 && CollapseSummary(title[(dashIndex + 1)..]) is { Length: > 0 } fromTitle) return fromTitle;

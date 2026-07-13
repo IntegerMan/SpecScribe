@@ -42,6 +42,57 @@ public class CodeSourceUrlResolverTests
     }
 
     [Fact]
+    public void FromRemoteUrl_Bitbucket_UsesSrcNotBlob()
+    {
+        // Bitbucket Cloud's real file-view path is /src/{branch}/{path}, not GitHub's /blob/.
+        Assert.Equal("https://bitbucket.org/owner/repo/src/main",
+            CodeSourceUrlResolver.FromRemoteUrl("https://bitbucket.org/owner/repo.git", "main"));
+    }
+
+    [Theory]
+    // Self-hosted / unrecognized hosts degrade to null (AC1: unrecognizable remote -> in-portal-only, no error)
+    // rather than a fabricated, likely-broken GitHub-shaped link.
+    [InlineData("https://git.example-internal.com/owner/repo.git")]
+    [InlineData("https://dev.azure.com/org/project/_git/repo")]
+    [InlineData("git@codeberg.internal:owner/repo.git")]
+    public void FromRemoteUrl_UnrecognizedHost_DegradesToNull(string remote)
+    {
+        Assert.Null(CodeSourceUrlResolver.FromRemoteUrl(remote, "main"));
+    }
+
+    [Fact]
+    public void FromRemoteUrl_BranchWithSpecialCharacters_IsPercentEncoded()
+    {
+        Assert.Equal("https://github.com/owner/repo/blob/feature/weird%20name%23tag",
+            CodeSourceUrlResolver.FromRemoteUrl("https://github.com/owner/repo.git", "feature/weird name#tag"));
+    }
+
+    [Theory]
+    // IPv6 literal hosts are bracketed; a bare first-colon split would truncate the host to garbage.
+    [InlineData("git@[::1]:owner/repo.git")]
+    [InlineData("https://[::1]/owner/repo.git")]
+    public void FromRemoteUrl_Ipv6Host_DegradesToNullRatherThanGarbage(string remote)
+    {
+        // Neither github/gitlab/bitbucket recognizes an IPv6-literal host, so this degrades to null either way —
+        // the point of this test is that it does NOT produce a URL built from a mangled host like "[".
+        Assert.Null(CodeSourceUrlResolver.FromRemoteUrl(remote, "main"));
+    }
+
+    [Fact]
+    public void ParseRemote_Ipv6HostWithPort_StripsOnlyThePort()
+    {
+        var parsed = CodeSourceUrlResolver.ParseRemote("ssh://git@[::1]:2222/owner/repo.git");
+        Assert.NotNull(parsed);
+        Assert.Equal("[::1]", parsed!.Value.Host);
+    }
+
+    [Fact]
+    public void EscapeUrlSegments_PreservesSlashesButEncodesEachSegment()
+    {
+        Assert.Equal("src/My%20File%23One.cs", CodeSourceUrlResolver.EscapeUrlSegments("src/My File#One.cs"));
+    }
+
+    [Fact]
     public void FromCiEnvironment_GitHubActions_PinsToImmutableSha()
     {
         var env = new Dictionary<string, string?>

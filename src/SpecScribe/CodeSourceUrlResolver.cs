@@ -28,7 +28,10 @@ public static class CodeSourceUrlResolver
 
         var remote = GitMetrics.TryGetRemoteUrl(repoRoot);
         if (remote is null) return null;
-        return FromRemoteUrl(remote, GitMetrics.TryGetCurrentBranch(repoRoot));
+        // Prefer the actually-checked-out branch; fall back to the remote's default branch (its origin/HEAD
+        // symref) on detached HEAD, rather than guessing "main" for repos that still default to "master"/"trunk".
+        var branch = GitMetrics.TryGetCurrentBranch(repoRoot) ?? GitMetrics.TryGetDefaultBranch(repoRoot);
+        return FromRemoteUrl(remote, branch);
     }
 
     /// <summary>Builds a blob base from the variables GitHub Actions sets (<c>GITHUB_ACTIONS</c>,
@@ -50,23 +53,40 @@ public static class CodeSourceUrlResolver
         if (string.IsNullOrWhiteSpace(reff)) reff = Get(env, "GITHUB_REF_NAME");
         if (string.IsNullOrWhiteSpace(reff)) reff = "main";
 
-        return $"{server.TrimEnd('/')}/{repo.Trim('/')}/blob/{reff}";
+        return $"{server.TrimEnd('/')}/{repo.Trim('/')}/blob/{EscapeUrlSegments(reff)}";
     }
 
-    /// <summary>Turns a git remote URL into a blob base. Handles HTTPS (<c>https://github.com/owner/repo(.git)</c>,
-    /// including embedded credentials), SSH (<c>git@github.com:owner/repo.git</c>), and <c>ssh://</c>/<c>git://</c>
-    /// URIs. GitLab's blob path is <c>/-/blob/</c>; GitHub and other hosts use <c>/blob/</c>. Unparseable input
-    /// returns null.</summary>
+    /// <summary>Turns a git remote URL into a blob base — but ONLY for a recognized hosting platform (AC1: "an
+    /// unrecognizable or absent remote degrades to in-portal-only with no error"). Handles HTTPS
+    /// (<c>https://github.com/owner/repo(.git)</c>, including embedded credentials), SSH
+    /// (<c>git@github.com:owner/repo.git</c>), and <c>ssh://</c>/<c>git://</c> URIs. GitHub(-Enterprise)'s and
+    /// Bitbucket's blob paths differ (<c>/blob/</c> vs <c>/src/</c>); GitLab's is <c>/-/blob/</c>. A host that
+    /// matches none of the three returns null rather than guessing a URL scheme that would 404.</summary>
     public static string? FromRemoteUrl(string remoteUrl, string? branch)
     {
         var parsed = ParseRemote(remoteUrl);
         if (parsed is null) return null;
 
         var (host, owner, repo) = parsed.Value;
-        var b = string.IsNullOrWhiteSpace(branch) ? "main" : branch.Trim();
-        var segment = host.Contains("gitlab", StringComparison.OrdinalIgnoreCase) ? "-/blob" : "blob";
-        return $"https://{host}/{owner}/{repo}/{segment}/{b}";
+        var b = EscapeUrlSegments(string.IsNullOrWhiteSpace(branch) ? "main" : branch.Trim());
+
+        if (host.Contains("gitlab", StringComparison.OrdinalIgnoreCase))
+            return $"https://{host}/{owner}/{repo}/-/blob/{b}";
+        if (host.Contains("bitbucket", StringComparison.OrdinalIgnoreCase))
+            return $"https://{host}/{owner}/{repo}/src/{b}";
+        if (host.Contains("github", StringComparison.OrdinalIgnoreCase))
+            return $"https://{host}/{owner}/{repo}/blob/{b}";
+
+        // Unrecognized host (self-hosted Gitea/Gogs/sourcehut/Azure DevOps/etc.) — no URL scheme we can trust,
+        // so degrade to in-portal-only rather than fabricate a link that would 404.
+        return null;
     }
+
+    /// <summary>Percent-encodes each <c>/</c>-delimited segment of a URL path/branch component (never the
+    /// separators themselves), so a branch or repo-relative path containing a space, <c>#</c>, <c>?</c>, or
+    /// non-ASCII character produces a link that actually resolves instead of silently truncating at the browser.</summary>
+    public static string EscapeUrlSegments(string value) =>
+        string.Join('/', value.Split('/').Select(Uri.EscapeDataString));
 
     /// <summary>Extracts <c>(host, owner, repo)</c> from any supported remote form. <c>owner</c> keeps intermediate
     /// path segments so GitLab subgroups (<c>group/subgroup/repo</c>) survive; <c>repo</c> is the final segment with
@@ -102,8 +122,19 @@ public static class CodeSourceUrlResolver
 
         host = host.Trim();
         // Strip a trailing :port so the blob host stays clean (rare for public hosts, but ssh:// URIs carry it).
-        var colon = host.IndexOf(':');
-        if (colon >= 0) host = host[..colon];
+        // An IPv6 literal host is bracketed ("[::1]:22") — its internal colons are not a port separator, so only
+        // look for a port after the closing bracket; a missing bracket close is malformed, not a stray port.
+        if (host.StartsWith('['))
+        {
+            var closeBracket = host.IndexOf(']');
+            if (closeBracket < 0) return null;
+            host = host[..(closeBracket + 1)];
+        }
+        else
+        {
+            var colon = host.IndexOf(':');
+            if (colon >= 0) host = host[..colon];
+        }
 
         var segments = path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length < 2 || host.Length == 0) return null;

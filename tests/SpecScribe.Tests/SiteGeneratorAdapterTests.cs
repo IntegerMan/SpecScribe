@@ -256,7 +256,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // lost both); (3) ADR cards gained date + one-line summary lines; (4) doc/retro card dates + change-log
         // dates now route through PortalDates. Every change is a deliberate, reviewed rendering change (AC #1).
         // [golden-diff-normalization-gotchas]
-        const string expected = "17f693b88d5266bee1e41c5528c1fd2382420899aba6a23bbd44ed4d7aaef892";
+        // Regenerated for the spec-7-3-10-4 code-review patch pass: GitPulsePanel's date-link guard now checks
+        // actual LinkedCommitDays membership instead of a bare day<=today comparison; ExtractAdrSummary's H1-tail
+        // dash split now uses the LAST dash occurrence, not the first; PortalDates dropped the ambiguous
+        // "M/d/yyyy" authored-date format. CSS/content-only for this fixture where those paths are exercised.
+        const string expected = "eebbfbf25be18505868de26c0ef05e44a0ffc5be336d425df6f75da95e22bf56";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
