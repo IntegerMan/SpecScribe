@@ -1,3 +1,4 @@
+using System;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -66,5 +67,27 @@ public class PathUtilTests
         Assert.Contains("<meta name=\"description\"", html);
         Assert.Contains("property=\"og:title\"", html);
         Assert.StartsWith("<!DOCTYPE html>", html);
+    }
+
+    [Fact]
+    public void RenderHeadOpen_FaviconIsTheNibMarkOnATealTile()
+    {
+        var html = PathUtil.RenderHeadOpen("Home", "specscribe.css", "specscribe.js");
+
+        // Pull the favicon href and decode the percent-encoded data URI back to the raw SVG.
+        const string marker = "href=\"data:image/svg+xml,";
+        var start = html.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, "head is missing the data-URI favicon");
+        start += marker.Length;
+        var end = html.IndexOf('"', start);
+        var svg = Uri.UnescapeDataString(html[start..end]);
+
+        // The favicon reuses the ONE shared nib geometry — no fourth hand-copied rendition to drift.
+        Assert.Contains(HtmlRenderAdapter.NibPathData, svg);
+        // Rendered as the VS Code panel icon's self-contained palette: teal tile + gold vent.
+        Assert.Contains("#2e6b7a", svg);
+        Assert.Contains("#d4a017", svg);
+        // And NOT the retired gold-quill-spark star (a distinctive point of its old path).
+        Assert.DoesNotContain("18.4 13.6", svg);
     }
 }

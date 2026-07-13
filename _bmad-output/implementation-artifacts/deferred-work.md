@@ -2,7 +2,26 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
-## Deferred from: code review of spec-scribes-nib-branding (2026-07-12)
+## Deferred from: code review of story-7-6 (2026-07-13)
+
+- source_spec: `7-6-source-code-treemap-for-codebase-exploration.md`
+  summary: Per-file exception guard in `SiteGenerator.EnumerateCodeFiles` only catches `IOException`/`UnauthorizedAccessException`; any other exception type from the shared `TryReadCodeText`/`SplitCodeLines` helpers bubbles to the outer catch and empties the whole code-map result instead of skipping just that one file.
+  evidence: Blind Hunter + Edge Case Hunter (independently flagged). `TryReadCodeText`/`SplitCodeLines` pre-date this diff (shared with Story 7.1 code pages) — this story only enlarges the blast radius by also gating the "Code Map" nav item on the result. [SiteGenerator.cs:2307](../../src/SpecScribe/SiteGenerator.cs)
+- source_spec: `7-6-source-code-treemap-for-codebase-exploration.md`
+  summary: `GitMetrics.TryListFiles` splits `git ls-files` output on `\n` and `.Trim()`s each line rather than using `-z`/NUL-delimited output, so a tracked filename containing a literal newline or significant leading/trailing whitespace would corrupt the parsed path.
+  evidence: Edge Case Hunter. Extremely rare in practice; matches the line-based parsing discipline already used elsewhere in `GitMetrics`. [GitMetrics.cs:850](../../src/SpecScribe/GitMetrics.cs)
+
+## Deferred from: quick-dev scope decision — website nib favicon (2026-07-13)
+
+- source_spec: `spec-website-nib-favicon.md`
+  summary: Nib-branded social-preview card (`og:image`/`twitter:card`) for the generated site, so shared links render the brand mark rather than a bare title.
+  evidence: Owner chose (2026-07-13) to ship the favicon now and defer the card. A *functional* preview needs infrastructure SpecScribe lacks: (1) an absolute canonical site URL — the generator only knows the source repo / `CodeSourceBaseUrl` (Story 7.7) and the footer `RepositoryUrl`, not its own deployed URL — so social crawlers (which don't resolve relative `og:image`/`og:url`) need a new `--site-url`/base-url config; and (2) a raster card — X/Facebook/LinkedIn/Slack don't render SVG `og:image`, and the project ships self-contained with no image dependency/pipeline (ADR 0005/0006), so it needs a committed PNG asset (new manual-sync debt, adjacent to Story 16.5's asset-pipeline scope). Independently shippable as its own story once site-URL config + an asset path exist.
+
+## Deferred from: inline review of spec-website-nib-favicon (2026-07-13)
+
+- source_spec: `spec-website-nib-favicon.md`
+  summary: The new favicon is a 4th rendition of the Scribe's Nib mark; its geometry is single-sourced from `HtmlRenderAdapter.NibPathData`, but its three brand hex values (`#2e6b7a` tile, `#f5f0e8` nib, `#d4a017` vent) are hand-copied from `extension/media/specscribe.svg` with no sync guard.
+  evidence: Extends the existing 3-rendition geometry sync-debt (see the spec-scribes-nib-branding deferral below → Story 16.5's asset pipeline). Lower risk than that item — the risky part (geometry) IS single-sourced here, and only the stable brand palette is duplicated — but a future palette change to `specscribe.svg` would silently leave the favicon behind. Fold the favicon into 16.5's asset/token pipeline (or a shared brand-palette constant) when that work lands.
 
 - source_spec: `spec-scribes-nib-branding-and-vs-contrast-pass.md`
   summary: The Scribe's Nib geometry exists in three hand-kept renditions (`HtmlRenderAdapter.NibPathData`, `extension/media/specscribe-outline.svg`, and a 16-box scaled variant in `extension/media/specscribe.svg`) with no sync guard — a future mark tweak can silently drift them.

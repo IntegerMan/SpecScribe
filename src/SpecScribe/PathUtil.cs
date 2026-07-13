@@ -37,13 +37,21 @@ public static class PathUtil
 
     public static string Html(string s) => WebUtility.HtmlEncode(s);
 
-    /// <summary>A small inline-SVG favicon (gold quill-spark on a dark parchment-ink tile) emitted as a
-    /// data URI so every page carries a real tab icon and <c>/favicon.ico</c> stops 404-ing — no extra asset
-    /// file to ship. [Story 1.5 G1]</summary>
+    /// <summary>A small inline-SVG favicon — the Scribe's Nib brand mark on a teal tile — emitted as a data URI
+    /// so every page carries a real tab icon and <c>/favicon.ico</c> stops 404-ing, with no extra asset file to
+    /// ship. This is the browser-tab rendition of the same mark as the extension's panel icon
+    /// (<c>extension/media/specscribe.svg</c>): a teal rounded tile, the parchment nib silhouette, and a gold
+    /// vent. The nib geometry is REUSED verbatim from <see cref="HtmlRenderAdapter.NibPathData"/> (the 24-box path
+    /// with the vent + tip slit as <c>evenodd</c> cutouts) rather than re-drawn, so there is no fourth divergent
+    /// copy of the mark to keep in sync; the gold <c>circle</c> fills the evenodd vent hole. The hardcoded hex is
+    /// intentional — a data-URI favicon is an isolated asset outside the CSS token system (as is
+    /// <c>specscribe.svg</c>), so the "no hex in markup" rule (which governs CSS-driven chrome) does not apply.
+    /// [spec-website-nib-favicon]</summary>
     private const string FaviconSvg =
-        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>" +
-        "<rect width='32' height='32' rx='6' fill='#1a1208'/>" +
-        "<path d='M16 4 L18.4 13.6 L28 16 L18.4 18.4 L16 28 L13.6 18.4 L4 16 L13.6 13.6 Z' fill='#d4a017'/>" +
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>" +
+        "<rect x='1' y='1' width='22' height='22' rx='5' fill='#2e6b7a'/>" +
+        "<path fill-rule='evenodd' fill='#f5f0e8' d='" + HtmlRenderAdapter.NibPathData + "'/>" +
+        "<circle cx='12' cy='9.2' r='2.1' fill='#d4a017'/>" +
         "</svg>";
 
     // Percent-encode the whole SVG so the data URI is valid per RFC 3986 — raw spaces and '<'/'>' inside the

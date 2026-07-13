@@ -235,8 +235,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated once more for spec-scribes-nib-branding's review patches: the funnel connector dropped
         // its opacity (the token now ships raw), --status-deferred froze at its pre-pass literal (decoupled
         // from --ink-light), and the brand-mark SVG gained fallback width/height + the widened nib cutouts.
+        // Regenerated for spec-website-nib-favicon: the every-page favicon in RenderHeadOpen changed from the
+        // retired gold-quill-spark star to the Scribe's Nib mark on a teal tile (reusing HtmlRenderAdapter.NibPathData),
+        // so every page's <head> data-URI icon shifted. No file-set change; content-only.
         // [golden-diff-normalization-gotchas]
-        const string expected = "96ae1efd1fdf4de3cdc3de9230367f35bbe37776900698db3ff4c98cf5c38d3a";
+        const string expected = "4c2ce594b3c8db103fab66e0484df193298c8d5567c9a776f4154c5af8533dd8";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
