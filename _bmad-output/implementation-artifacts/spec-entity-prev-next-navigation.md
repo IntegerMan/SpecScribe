@@ -2,7 +2,7 @@
 title: 'Prev/next sibling navigation in entity page headers'
 type: 'feature'
 created: '2026-07-13'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '19553fe8404e152b3adc7d11f243f63fcfcb3eb2'
 context: []
@@ -64,16 +64,16 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/SpecScribe/EntityPager.cs` -- Create `EntityPager` (record with `Prev`/`Next` nullable `PagerLink(Href, Label)`), a `FromSequence<T>(IReadOnlyList<T> canonicalOrder, int index, Func<T,string> href, Func<T,string> label)` factory (null at ends), and a `Render()` helper emitting `<nav class="entity-pager" aria-label="Sibling navigation">` with a link or `aria-disabled` `<span>` per side; returns empty string when both sides are null.
-- [ ] `src/SpecScribe/assets/specscribe.css` -- Add `position: relative` to `.doc-header`; add `.entity-pager` (absolute top-right within header padding, flex, small, focus-visible + hover mirroring old `.commit-day-nav`) and `.entity-pager-link.is-disabled { opacity:.4; pointer-events:none }`; delete the `.commit-day-nav` rules.
-- [ ] `src/SpecScribe/HtmlTemplater.cs` -- Add optional `EntityPager? pager = null` to `RenderPage`; render `pager?.Render()` inside `doc-header` (top of header). Null callers unchanged.
-- [ ] `src/SpecScribe/CommitDetailTemplater.cs` -- Add `EntityPager? pager` param; emit in `doc-header`.
-- [ ] `src/SpecScribe/CommitDayTemplater.cs` -- Add `EntityPager? pager` param, emit in `doc-header`; remove `prevDay`/`nextDay` params and the bottom `commit-day-nav` block.
-- [ ] `src/SpecScribe/RetroTemplater.cs` -- Add `EntityPager? pager` param; emit in `retro-header`.
-- [ ] `src/SpecScribe/CodeFileTemplater.cs` -- Add `EntityPager? pager` param; emit in its `doc-header`.
-- [ ] `src/SpecScribe/EpicsViewBuilder.cs`, `HtmlRenderAdapter.Epics.cs`, `EpicsView.cs` -- Add a pager field to `EpicPageView`/`StoryPageView`; `EpicsViewBuilder.BuildEpic/BuildStory/BuildStoryPlaceholder` accept the page's neighbors; adapter renders it in the epic/story `doc-header`.
-- [ ] `src/SpecScribe/SiteGenerator.cs` -- In each family's render loop, build the canonical ordered sibling list (commits newest-first as logged; days newest-first; `_adrs` record subset; retros by epic; a flat global story list across epics; code files grouped+sorted per directory) and pass each page its `EntityPager` (hrefs relative to that page). Flip the day loop to newest-first ordering.
-- [ ] `tests/SpecScribe.Tests/EntityPagerTests.cs` (new) + family/generator test updates -- Cover the I/O matrix (ends disabled, lone-member omission, chronological direction, escaping); update templater signatures; regenerate `GenerateAll_GoldenContentFingerprint`.
+- [x] `src/SpecScribe/EntityPager.cs` -- Create `EntityPager` (record with `Prev`/`Next` nullable `PagerLink(Href, Label)`), a `FromSequence<T>(IReadOnlyList<T> canonicalOrder, int index, Func<T,string> href, Func<T,string> label)` factory (null at ends), and a `Render()` helper emitting `<nav class="entity-pager" aria-label="Sibling navigation">` with a link or `aria-disabled` `<span>` per side; returns empty string when both sides are null.
+- [x] `src/SpecScribe/assets/specscribe.css` -- Add `position: relative` to `.doc-header`; add `.entity-pager` (absolute top-right within header padding, flex, small, focus-visible + hover) and `.entity-pager-link.is-disabled { opacity:.4; pointer-events:none }`; delete the `.commit-day-nav` rules.
+- [x] `src/SpecScribe/HtmlTemplater.cs` -- Add optional `EntityPager? pager = null` to `RenderPage`; render `pager?.Render()` inside `doc-header` (top of header). Null callers unchanged.
+- [x] `src/SpecScribe/CommitDetailTemplater.cs` -- Add `EntityPager? pager` param; emit in `doc-header`.
+- [x] `src/SpecScribe/CommitDayTemplater.cs` -- Add `EntityPager? pager` param, emit in `doc-header`; remove `prevDay`/`nextDay` params and the bottom `commit-day-nav` block.
+- [x] `src/SpecScribe/RetroTemplater.cs` -- Add `EntityPager? pager` param; emit in `retro-header`.
+- [x] `src/SpecScribe/CodeFileTemplater.cs` -- Add `EntityPager? pager` param (threaded via `BeginShell` into both `RenderPage` and `RenderPlaceholder`); emit in its `doc-header`.
+- [x] `src/SpecScribe/EpicsViewBuilder.cs`, `HtmlRenderAdapter.Epics.cs`, `EpicsView.cs` -- Add a `Pager` field to `EpicPageView`/`StoryPageView`/`StoryPlaceholderView`; `EpicsViewBuilder.BuildEpic/BuildStory/BuildStoryPlaceholder` accept the page's pager; adapter renders it in each epic/story/placeholder `doc-header`.
+- [x] `src/SpecScribe/SiteGenerator.cs` -- Per-family pagers: commits (newest-first, precomputed hash slots), days (newest-first), ADRs (deferred record write over the ordered `_adrs` set), retros (by epic), global story list across epics, code files (grouped+sorted per directory). `EpicPager`/`StoryPager`/`CommitPagerLabel` helpers added; all three epic/story call sites (HTML + 2 webview) wired for parity.
+- [x] `tests/SpecScribe.Tests/EntityPagerTests.cs` (new) + `CommitDayTemplaterTests.cs` rewrite -- Cover the I/O matrix (ends disabled, lone-member omission, chronological direction, escaping); update the day-page signature; regenerated `GenerateAll_GoldenContentFingerprint`. Suite green (1033).
 
 **Acceptance Criteria:**
 - Given a portal generated with git history and epics, when I open any commit/date/epic/story/ADR/retro/code-file page that has a sibling, then its title header shows an inline `‹ Prev` / `Next ›` control linking to the correct adjacent entity, with the sibling's name in a tooltip.
@@ -107,3 +107,46 @@ Sibling hrefs are same-directory filenames for every family (`commit/`, `commits
 
 **Manual checks:**
 - Generate against this repo (has deep git + epics + ADRs + retros): open a mid-sequence commit page and a date page — confirm `‹ Prev` goes to the **newer** sibling; open Epic 1 and the last epic — confirm the correct end is disabled; open a lone-sibling page — confirm no pager; shrink to mobile width — confirm the control sits in the header with no `<h1>` overlap and no added height.
+
+## Suggested Review Order
+
+**The shared pager (design intent)**
+
+- One record + one rule: `Prev`/`Next` = predecessor/successor in the family's display order; null at the ends.
+  [`EntityPager.cs:28`](../../src/SpecScribe/EntityPager.cs#L28)
+- The only markup: a link, or a disabled `<span aria-disabled>`; empty string when there are no siblings.
+  [`EntityPager.cs:50`](../../src/SpecScribe/EntityPager.cs#L50)
+
+**Per-family sibling computation (highest-risk — the generator)**
+
+- Days are newest-first, so index `i` maps to `daysNewestFirst[Count-1-i]` — Prev = newer, Next = older.
+  [`SiteGenerator.cs:860`](../../src/SpecScribe/SiteGenerator.cs#L860)
+- Commits: a hash-precompute pass builds page paths up front so a neighbor's href is known before it renders.
+  [`SiteGenerator.cs:1062`](../../src/SpecScribe/SiteGenerator.cs#L1062)
+- ADRs: records are written in a second pass over the ordered `_adrs` set (the pager needs the full order).
+  [`SiteGenerator.cs:719`](../../src/SpecScribe/SiteGenerator.cs#L719)
+- Code files: siblings are same-directory, alphabetical — grouped once before the render loop.
+  [`SiteGenerator.cs:1382`](../../src/SpecScribe/SiteGenerator.cs#L1382)
+- Epic/story/retro pagers via identity-matched helpers (dup-number/id safe) — global story order across epics.
+  [`SiteGenerator.cs:1123`](../../src/SpecScribe/SiteGenerator.cs#L1123)
+
+**Where the pager renders (three header paths)**
+
+- Adapter body path — epics/stories render `view.Pager` so HTML + webview stay parity-identical.
+  [`HtmlRenderAdapter.Epics.cs:153`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs#L153)
+- Shared markdown path — ADRs pass a pager; every other doc passes null → byte-identical.
+  [`HtmlTemplater.cs:29`](../../src/SpecScribe/HtmlTemplater.cs#L29)
+- Synthesized date page — inline header pager replaces the retired bottom `commit-day-nav`.
+  [`CommitDayTemplater.cs:50`](../../src/SpecScribe/CommitDayTemplater.cs#L50)
+
+**Placement (CSS)**
+
+- Absolute in the header's top padding → zero added height, no collision with the centered title.
+  [`specscribe.css:238`](../../src/SpecScribe/assets/specscribe.css#L238)
+
+**Tests**
+
+- Ends/lone-member/escaping on the shared component.
+  [`EntityPagerTests.cs:56`](../../tests/SpecScribe.Tests/EntityPagerTests.cs#L56)
+- Generator-level guard that the date pager is newest-first (Prev = newer day).
+  [`SiteGeneratorTimelineTests.cs:192`](../../tests/SpecScribe.Tests/SiteGeneratorTimelineTests.cs#L192)

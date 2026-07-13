@@ -34,7 +34,7 @@ public static class EpicsViewBuilder
 
     // ----- Epic page ----------------------------------------------------------------------------------------
 
-    public static EpicPageView BuildEpic(EpicInfo epic, EpicProgress progress, CommandCatalog commands, string? epicRetroPath)
+    public static EpicPageView BuildEpic(EpicInfo epic, EpicProgress progress, CommandCatalog commands, string? epicRetroPath, EntityPager? pager = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var prefix = Prefix(outputPath);
@@ -66,6 +66,7 @@ public static class EpicsViewBuilder
             Commands = commands,
             Prefix = prefix,
             StoryCards = epic.Stories.Select(s => BuildStoryCard(s, prefix, commands)).ToList(),
+            Pager = pager ?? EntityPager.None,
         };
     }
 
@@ -114,7 +115,8 @@ public static class EpicsViewBuilder
         string reviewFindingsHtml,
         string changeLogHtml,
         CommandCatalog commands,
-        string? epicRetroPath)
+        string? epicRetroPath,
+        EntityPager? pager = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"BuildStory called for story {story.Id} with no resolved artifact.");
@@ -135,12 +137,13 @@ public static class EpicsViewBuilder
             ReviewFindingsHtml = reviewFindingsHtml,
             RemainderHtml = remainderHtml,
             ChangeLogHtml = changeLogHtml,
+            Pager = pager ?? EntityPager.None,
         };
     }
 
     // ----- Story placeholder --------------------------------------------------------------------------------
 
-    public static StoryPlaceholderView BuildStoryPlaceholder(EpicInfo epic, StoryInfo story, CommandCatalog commands, string? epicRetroPath)
+    public static StoryPlaceholderView BuildStoryPlaceholder(EpicInfo epic, StoryInfo story, CommandCatalog commands, string? epicRetroPath, EntityPager? pager = null)
     {
         var outputPath = StoryEpicLinkifier.StoryPagePath(story.Id);
         var prefix = Prefix(outputPath);
@@ -163,6 +166,7 @@ public static class EpicsViewBuilder
             NoteHtml = note,
             EpicNumber = epic.Number,
             BackHref = prefix + epicOutputPath,
+            Pager = pager ?? EntityPager.None,
         };
     }
 

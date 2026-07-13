@@ -601,6 +601,9 @@ public sealed class SiteGenerator
         }
 
         var entries = new List<AdrEntry>();
+        // Record pages are written AFTER the whole set is ordered (pass 2 below) so each can carry a prev/next pager
+        // across all records by number; their DocModels are stashed here by output path meanwhile. [Prev/next navigation]
+        var recordDocsByOutput = new Dictionary<string, DocModel>(StringComparer.Ordinal);
         // True once a real (non-synthesized) page has actually been WRITTEN to the landing's output slot — the
         // ADR root's README normally, but ANY ADR file that happens to land at the same output path (e.g. a
         // stray "index.md") counts too, since either way the synthesized landing below must not clobber it. Set
@@ -658,10 +661,18 @@ public sealed class SiteGenerator
                     HasMermaid = parsed.HasMermaid,
                 };
 
-                WriteOutput(outputRelative, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
-                if (string.Equals(outputRelative, SiteNav.AdrsLandingOutputPath, StringComparison.OrdinalIgnoreCase))
+                if (isRecord)
                 {
-                    landingPathAlreadyWritten = true;
+                    // Defer the record page write to pass 2 (below) so its pager can span the fully-ordered record set.
+                    recordDocsByOutput[outputRelative] = doc;
+                }
+                else
+                {
+                    WriteOutput(outputRelative, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+                    if (string.Equals(outputRelative, SiteNav.AdrsLandingOutputPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        landingPathAlreadyWritten = true;
+                    }
                 }
 
                 if (isRecord)
@@ -685,7 +696,11 @@ public sealed class SiteGenerator
                     }
                 }
 
-                events.Add(new GenerationEvent(GenerationOutcome.Generated, sourceRelative, sw.Elapsed));
+                // Records emit their Generated event in pass 2, once actually written; non-records write above.
+                if (!isRecord)
+                {
+                    events.Add(new GenerationEvent(GenerationOutcome.Generated, sourceRelative, sw.Elapsed));
+                }
             }
             catch (Exception ex)
             {
@@ -700,6 +715,35 @@ public sealed class SiteGenerator
             .ThenBy(e => e.Number)
             .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        // Pass 2: write each record page now that sibling order is known, giving it a prev/next pager across records
+        // (Prev = lower number, Next = higher; unnumbered sort last), disabled at the ends. [Prev/next navigation]
+        for (var i = 0; i < _adrs.Count; i++)
+        {
+            var entry = _adrs[i];
+            if (!recordDocsByOutput.TryGetValue(entry.OutputRelativePath, out var recordDoc)) continue;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var prefix = PathUtil.RelativePrefix(entry.OutputRelativePath);
+                var pager = EntityPager.FromSequence(_adrs, i,
+                    e => prefix + e.OutputRelativePath,
+                    e => e.Title);
+                WriteOutput(entry.OutputRelativePath, ApplyReferenceLinks(HtmlTemplater.RenderPage(recordDoc, nav, pager), entry.OutputRelativePath));
+                // A record occupying the landing slot (e.g. an `index.md`) must, on successful write, suppress the
+                // synthesized landing below so it isn't clobbered — same "only on a successful write" rule the
+                // non-record branch above follows. [Prev/next navigation]
+                if (string.Equals(entry.OutputRelativePath, SiteNav.AdrsLandingOutputPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    landingPathAlreadyWritten = true;
+                }
+                events.Add(new GenerationEvent(GenerationOutcome.Generated, entry.SourceRelativePath, sw.Elapsed));
+            }
+            catch (Exception ex)
+            {
+                events.Add(new GenerationEvent(GenerationOutcome.Error, entry.SourceRelativePath, sw.Elapsed, ex.Message));
+            }
+        }
 
         // The nav (and the dashboard quick link) point at adrs/index.html whenever records exist, but only a
         // successfully-rendered root README (or a same-slot page) ever produced that landing — README-less repos,
@@ -812,6 +856,8 @@ public sealed class SiteGenerator
 
         Directory.CreateDirectory(commitsDir);
         var entries = new List<CommitDayEntry>();
+        // Days come ascending (oldest→newest); the pager reads newest-first, so Prev = newer day and Next = older. [Prev/next navigation]
+        var daysNewestFirst = days.Reverse().ToList();
         for (var i = 0; i < days.Count; i++)
         {
             var day = days[i];
@@ -821,10 +867,11 @@ public sealed class SiteGenerator
             {
                 var dayCommits = commitsByDay.TryGetValue(day, out var c) ? c : Array.Empty<CommitInfo>();
                 var dayArtifacts = artifactsByDay.TryGetValue(day, out var a) ? a : Array.Empty<(string, string)>();
-                // NOTE (concurrent work): the entity prev/next feature changed CommitDayTemplater.RenderPage to take
-                // an EntityPager instead of prev/next dates but left this caller unbuilt. Passing EntityPager.None
-                // here is a TEMPORARY unblock so the tree compiles — that story owns wiring the real day-sequence pager.
-                var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, EntityPager.None, nav, commitHref);
+                var prefix = PathUtil.RelativePrefix(outputRelative);
+                var pager = EntityPager.FromSequence(daysNewestFirst, days.Count - 1 - i,
+                    d => prefix + PathUtil.NormalizeSlashes($"commits/{Charts.D(d)}.html"),
+                    Charts.DReadable);
+                var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, pager, nav, commitHref);
 
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
@@ -1011,17 +1058,39 @@ public sealed class SiteGenerator
         var usedFileHashes = new HashSet<string>(StringComparer.Ordinal);
 
         Directory.CreateDirectory(commitDir);
+
+        // Pass 1: assign each commit its (collision-safe) short-hash page path up front, so a page's prev/next pager
+        // can point at a neighbor's page before that neighbor is rendered. Hashing is deterministic slicing; a
+        // malformed commit is isolated to its own Error and excluded from the sequence (no page → never a pager
+        // target), preserving the per-commit isolation contract (NFR-2, AC #2). [Prev/next navigation]
+        var slots = new List<(DeepCommit Commit, string OutputRelative)>();
         foreach (var commit in commits)
         {
             var sw = Stopwatch.StartNew();
-            // shortHash/outputRelative are computed inside the try so a malformed commit degrades to a single
-            // Error event instead of aborting the whole phase (NFR-2, AC #2's per-commit isolation contract).
-            var outputRelative = string.Empty;
             try
             {
                 var shortHash = UniqueShortHash(commit.Hash, usedFileHashes);
-                outputRelative = PathUtil.NormalizeSlashes($"commit/{shortHash}.html");
-                var html = CommitDetailTemplater.RenderPage(commit, nav, CodePageHref);
+                slots.Add((commit, PathUtil.NormalizeSlashes($"commit/{shortHash}.html")));
+            }
+            catch (Exception ex)
+            {
+                events.Add(new GenerationEvent(GenerationOutcome.Error, string.Empty, sw.Elapsed, ex.Message));
+            }
+        }
+
+        // Pass 2: render each page with its pager. Commits arrive newest-first (git-log order), so Prev = newer and
+        // Next = older; the tooltip names the sibling by subject (short hash when the subject is empty).
+        for (var i = 0; i < slots.Count; i++)
+        {
+            var (commit, outputRelative) = slots[i];
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var prefix = PathUtil.RelativePrefix(outputRelative);
+                var pager = EntityPager.FromSequence(slots, i,
+                    s => prefix + s.OutputRelative,
+                    s => CommitPagerLabel(s.Commit));
+                var html = CommitDetailTemplater.RenderPage(commit, nav, CodePageHref, pager);
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
                 entries.Add(new CommitDetailEntry(commit.Hash, outputRelative));
@@ -1040,6 +1109,43 @@ public sealed class SiteGenerator
         _commitDetails = entries;
         _commitPages = pages;
         return events;
+    }
+
+    /// <summary>The sibling-pager tooltip for a commit: its subject, or its short hash when the subject is empty
+    /// (so the tooltip always names something). [Prev/next navigation]</summary>
+    private static string CommitPagerLabel(DeepCommit commit) =>
+        string.IsNullOrWhiteSpace(commit.Subject)
+            ? CommitDetailTemplater.ShortHash(commit.Hash)
+            : commit.Subject;
+
+    /// <summary>The prev/next pager for an epic page — adjacent epics by ascending number (Prev = lower, Next =
+    /// higher), disabled at the ends. Hrefs are relative to the current epic page. [Prev/next navigation]</summary>
+    private static EntityPager EpicPager(EpicsModel model, EpicInfo epic)
+    {
+        var ordered = model.Epics.OrderBy(e => e.Number).ToList();
+        // Identity match (not e.Number ==): a malformed model with a duplicate epic number must not mis-locate the
+        // neighbors onto the first occurrence — the ordered list holds the same EpicInfo instances. [review-patch]
+        var index = ordered.FindIndex(e => ReferenceEquals(e, epic));
+        var prefix = PathUtil.RelativePrefix($"epics/epic-{epic.Number}.html");
+        return EntityPager.FromSequence(ordered, index,
+            e => prefix + $"epics/epic-{e.Number}.html",
+            e => $"Epic {e.Number}: {PathUtil.StripHtmlTags(e.Title)}");
+    }
+
+    /// <summary>The prev/next pager for a story page — adjacent stories in global epic→story order (Prev = earlier,
+    /// Next = later), disabled at the ends. Placeholder and drafted stories share one sequence (both are real pages);
+    /// hrefs are relative to the current story page. [Prev/next navigation]</summary>
+    private static EntityPager StoryPager(EpicsModel model, StoryInfo story)
+    {
+        // Order epics ascending before flattening so the global story sequence is deterministic even if model.Epics
+        // is ever unsorted (mirrors EpicPager); identity match avoids mis-locating on a duplicate story id. [review-patch]
+        var all = model.Epics.OrderBy(e => e.Number).SelectMany(e => e.Stories).ToList();
+        var index = all.FindIndex(s => ReferenceEquals(s, story));
+        var currentPath = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
+        var prefix = PathUtil.RelativePrefix(currentPath);
+        return EntityPager.FromSequence(all, index,
+            s => prefix + (s.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(s.Id)),
+            s => $"Story {s.Id}: {PathUtil.StripHtmlTags(s.Title)}");
     }
 
     /// <summary>The per-commit page filename stem: <see cref="CommitDetailTemplater.ShortHash"/> normally, widened
@@ -1271,6 +1377,13 @@ public sealed class SiteGenerator
         var referenced = _codeReferenced;
         var outputRootFull = Path.GetFullPath(_options.OutputRoot);
 
+        // Sibling pager for code pages: files in the SAME directory, ordered alphabetically (Prev = previous file,
+        // Next = next). Grouped once so each page's neighbors are known regardless of write order. [Prev/next navigation]
+        var codeSiblingsByDir = referenced
+            .Select(PathUtil.NormalizeSlashes)
+            .GroupBy(p => { var i = p.LastIndexOf('/'); return i < 0 ? string.Empty : p[..i]; })
+            .ToDictionary(g => g.Key, g => g.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList());
+
         reporter?.BeginPhase(GenerationPhase.CodePages, referenced.Count);
         foreach (var repoRelative in referenced)
         {
@@ -1303,25 +1416,35 @@ public sealed class SiteGenerator
                 // Keyed by the same forward-slash repo path the numstat rows carry, so this joins cleanly.
                 var insight = _progress?.DeepGit?.FileInsights.GetValueOrDefault(PathUtil.NormalizeSlashes(repoRelative));
 
+                // Prev/next across sibling files in this file's directory (tooltip = filename).
+                var rel = PathUtil.NormalizeSlashes(repoRelative);
+                var slash = rel.LastIndexOf('/');
+                var siblings = codeSiblingsByDir[slash < 0 ? string.Empty : rel[..slash]];
+                var codePrefix = PathUtil.RelativePrefix(outputRelative);
+                var pager = EntityPager.FromSequence(siblings,
+                    siblings.FindIndex(p => string.Equals(p, rel, StringComparison.OrdinalIgnoreCase)),
+                    p => codePrefix + PathUtil.NormalizeSlashes($"code/{p}.html"),
+                    Path.GetFileName);
+
                 string html;
                 GenerationOutcome outcome;
                 if (new FileInfo(full).Length > MaxCodeFileBytes)
                 {
                     html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
-                        "This file is too large to render inline.", nav, referencedBy, externalUrl);
+                        "This file is too large to render inline.", nav, referencedBy, externalUrl, pager);
                     outcome = GenerationOutcome.Skipped;
                 }
                 else if (TryReadCodeText(full, out var text))
                 {
                     var lines = SplitCodeLines(text);
                     html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl,
-                        insight, CodePageHref, CommitHref);
+                        insight, CodePageHref, CommitHref, pager);
                     outcome = GenerationOutcome.Generated;
                 }
                 else
                 {
                     html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
-                        "This file is not a readable text file and can't be shown inline.", nav, referencedBy, externalUrl);
+                        "This file is not a readable text file and can't be shown inline.", nav, referencedBy, externalUrl, pager);
                     outcome = GenerationOutcome.Skipped;
                 }
 
@@ -1512,7 +1635,7 @@ public sealed class SiteGenerator
             foreach (var epic in model.Epics)
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
+                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic)), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
 
                 foreach (var story in epic.Stories)
                 {
@@ -1523,14 +1646,14 @@ public sealed class SiteGenerator
                         // artifact overwrites it in place. ArtifactOutputPath stays null — placeholders
                         // must never count as detailed stories anywhere progress is computed.
                         var placeholderPath = StoryEpicLinkifier.StoryPagePath(story.Id);
-                        var placeholderHtml = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, _module.Commands, epicRetroPath);
+                        var placeholderHtml = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
                         File.WriteAllText(Path.Combine(_options.OutputRoot, placeholderPath.Replace('/', Path.DirectorySeparatorChar)), ApplyReferenceLinks(placeholderHtml, placeholderPath, skipStoryId: story.Id));
                         continue;
                     }
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                     var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav, _module.Commands, epicRetroPath);
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
@@ -1655,7 +1778,7 @@ public sealed class SiteGenerator
                 foreach (var epic in model.Epics)
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath);
+                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic));
                     surfaces.Add(WebviewSurfaceFor(epicPage, _epicsSourcePath, skipEpicNumber: epic.Number));
 
                     var outlineStories = new List<OutlineStory>();
@@ -1669,7 +1792,7 @@ public sealed class SiteGenerator
                         string? storySourcePath = null;
                         if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
                         {
-                            storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath);
+                            storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
                         }
                         else
                         {
@@ -1678,7 +1801,7 @@ public sealed class SiteGenerator
                             storyPage = EpicsTemplater.BuildStoryPage(
                                 epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                                 f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav,
-                                _module.Commands, epicRetroPath);
+                                _module.Commands, epicRetroPath, StoryPager(model, story));
                         }
                         surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
 
@@ -1903,7 +2026,7 @@ public sealed class SiteGenerator
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
                 AddSpaSurface(pages, familyPaths,
-                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath),
+                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic)),
                     skipEpicNumber: epic.Number);
 
                 foreach (var story in epic.Stories)
@@ -1911,7 +2034,7 @@ public sealed class SiteGenerator
                     if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
                     {
                         AddSpaSurface(pages, familyPaths,
-                            EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath),
+                            EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story)),
                             skipStoryId: story.Id);
                         continue;
                     }
@@ -1921,7 +2044,7 @@ public sealed class SiteGenerator
                         EpicsTemplater.BuildStoryPage(
                             epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                             f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav,
-                            _module.Commands, epicRetroPath),
+                            _module.Commands, epicRetroPath, StoryPager(model, story)),
                         skipStoryId: story.Id);
                 }
             }
@@ -2157,10 +2280,16 @@ public sealed class SiteGenerator
     /// model for its epic link and "Stories in this Epic" section. [Story 2.3 retro pages]</summary>
     private void RenderRetroPages(SiteNav nav)
     {
+        // Retros navigate in ascending epic order (Prev = lower epic, Next = higher); write order is unchanged. [Prev/next navigation]
+        var ordered = _retros.OrderBy(r => r.EpicNumber).ToList();
         foreach (var retro in _retros)
         {
             var outputRel = retro.OutputRelativePath;
-            WriteOutput(outputRel, ApplyReferenceLinks(RetroTemplater.RenderPage(retro, _epicsModel, nav), outputRel));
+            var prefix = PathUtil.RelativePrefix(outputRel);
+            var pager = EntityPager.FromSequence(ordered, ordered.FindIndex(r => ReferenceEquals(r, retro)),
+                r => prefix + r.OutputRelativePath,
+                r => r.Title);
+            WriteOutput(outputRel, ApplyReferenceLinks(RetroTemplater.RenderPage(retro, _epicsModel, nav, pager), outputRel));
         }
     }
 

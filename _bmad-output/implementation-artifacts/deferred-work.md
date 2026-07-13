@@ -368,3 +368,16 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `7-5-per-commit-detail-pages.md`
 - **Git-dependent generation tests hard-fail instead of skipping when git is unavailable on the host.** `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs` (`Assert.True(TryCreateGitHistory(), ...)`) — pre-existing repo-wide test convention mirrored from `SiteGeneratorGitInsightsTests`/`SiteGeneratorTimelineTests`/`SiteGeneratorCodeInsightsTests`, not introduced by this story. A CI runner or dev machine without git on PATH gets outright failures rather than skips.
 - **Determinism test's footer-stripping regex hardcodes a signed UTC offset shape (`UTC[+-]\d{2}:\d{2}`).** `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs:167` — same regex duplicated verbatim in 3 sibling test files; if the actual offset is ever rendered without a sign (e.g. `+00:00` shown as `00:00`) or `PortalDates`' footer format shifts slightly, the "determinism" test degrades into comparing two un-normalized strings. Pre-existing convention, not introduced by this story.
+
+## Deferred from: code review of spec-entity-prev-next-navigation (2026-07-13)
+
+- source_spec: `spec-entity-prev-next-navigation.md`
+  summary: The sibling pager sequences each family from its full ordered list, so a Prev/Next link can point to a
+  sibling whose page was Skipped/Errored and never written (a code file that fails the output-root escape check or
+  throws mid-render; likewise a day/commit whose render throws) → a 404. In a normal run every sibling has a page
+  (too-large/unreadable code files still get placeholder pages), so this only fires under an exceptional
+  mid-generation race (file deleted/renamed) or a traversal attempt — conditions that already break citations and
+  heatmap links too. A proportionate fix (guard each pager href against the set of actually-written pages, or a
+  post-write second pass) was out of scope for the feature; it bypasses the codebase's otherwise-strict
+  "never a dead link" discipline.
+  evidence: Blind Hunter + Edge Case Hunter agreed. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)

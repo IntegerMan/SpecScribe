@@ -265,7 +265,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // coupled-list styles (.code-insight-coupled). The fixture is not a git repo and cites no real files, so
         // no code page or per-file coupling renders here — again only the stylesheet content shifted the hash.
         // [golden-diff-normalization-gotchas]
-        const string expected = "7696b7285d3c797b81585fc5fef719cfbe9a23fb039670bf2f8d38ef8c5571e0";
+        // Regenerated for spec-entity-prev-next-navigation: leaf entity pages gained an inline "‹ Prev / Next ›"
+        // sibling pager in their .doc-header — epic + story + ADR + retro pages render here (the fixture is not a
+        // git repo, so no commit/date/code pages exist to gain one). specscribe.css gained the .entity-pager* rules
+        // + .doc-header position:relative and dropped the retired bottom-of-page .commit-day-nav styles. Every
+        // change is a deliberate, reviewed rendering change (AC #1).
+        const string expected = "d8e61996f42b9ebffb92f7cb2252f2bd79f87034a0b52ed50cc0d50f7529a5d0";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

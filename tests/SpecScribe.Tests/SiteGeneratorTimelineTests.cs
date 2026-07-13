@@ -188,6 +188,71 @@ public class SiteGeneratorTimelineTests : IDisposable
         }
     }
 
+    [Fact]
+    public void GenerateAll_DatePagePager_IsNewestFirst_PrevIsNewerDay_NextIsOlder()
+    {
+        // Three commits on three distinct days so the MIDDLE date page has a sibling on each side. [Prev/next navigation]
+        Assert.True(TryCreateBackdatedHistory(), "git CLI unavailable on this host — cannot exercise the date pager; install git rather than silently skipping this test");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        AssertNoErrors(events);
+
+        var middle = Path.Combine(CommitsDayDir, "2026-03-02.html");
+        Assert.True(File.Exists(middle), "expected a date page for the middle backdated day");
+        var html = File.ReadAllText(middle);
+
+        // Newest-first: Prev links to the NEWER adjacent day, Next to the OLDER — the user-chosen direction.
+        var prev = Regex.Match(html, "entity-pager-prev\"[^>]*href=\"([^\"]+)\"").Groups[1].Value;
+        var next = Regex.Match(html, "entity-pager-next\"[^>]*href=\"([^\"]+)\"").Groups[1].Value;
+        Assert.Contains("2026-03-03.html", prev);
+        Assert.Contains("2026-03-01.html", next);
+        // The pager rides the header (before the article); the retired bottom nav is gone.
+        Assert.Contains("<nav class=\"entity-pager\"", html);
+        Assert.DoesNotContain("commit-day-nav", html);
+    }
+
+    /// <summary>Initializes a git repo and commits on three distinct, backdated days (author AND committer date
+    /// pinned so day-grouping is deterministic regardless of which git date drives it). Returns false (test no-ops)
+    /// when the git CLI is unavailable.</summary>
+    private bool TryCreateBackdatedHistory()
+    {
+        if (!RunGit("init")) return false;
+        return CommitOn("2026-03-01") && CommitOn("2026-03-02") && CommitOn("2026-03-03");
+    }
+
+    private bool CommitOn(string day)
+    {
+        File.WriteAllText(Path.Combine(_root, $"file-{day}.txt"), day);
+        if (!RunGit("add .")) return false;
+        var stamp = $"{day}T12:00:00";
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = $"-c user.name=\"Timeline Tester\" -c user.email=timeline@example.com -c commit.gpgsign=false commit --date=\"{stamp}\" -m \"commit on {day}\"",
+                WorkingDirectory = _root,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.Environment["GIT_COMMITTER_DATE"] = stamp;
+            using var process = Process.Start(psi);
+            if (process is null) return false;
+            if (!process.WaitForExit(15000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+                return false;
+            }
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>Initializes a real git repo in the fixture root with two commits by a known author. Returns false
     /// (tests no-op) when the git CLI is unavailable or refuses; identity and signing are forced via -c overrides
     /// so a host's global config can't break the fixture.</summary>

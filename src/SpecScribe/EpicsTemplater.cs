@@ -50,12 +50,12 @@ public static class EpicsTemplater
         return page;
     }
 
-    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildEpicPage(epic, progress, nav, commands, epicRetroPath)).Content;
+    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildEpicPage(epic, progress, nav, commands, epicRetroPath, pager)).Content;
 
     /// <summary>Builds an epic page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why the
     /// build/render split exists. [Story 6.4]</summary>
-    public static PageView BuildEpicPage(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null)
+    public static PageView BuildEpicPage(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
@@ -67,7 +67,7 @@ public static class EpicsTemplater
             (EpicCrumbLabel(epic), null),
         });
 
-        var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath);
+        var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath, pager);
         var body = HtmlRenderAdapter.Shared.RenderEpicBody(view);
 
         // An epic drills up to the epics index and down to each of its story pages (drafted → the story's
@@ -112,10 +112,11 @@ public static class EpicsTemplater
         string changeLogHtml,
         SiteNav nav,
         CommandCatalog commands,
-        string? epicRetroPath = null) =>
+        string? epicRetroPath = null,
+        EntityPager? pager = null) =>
         HtmlRenderAdapter.Shared.Render(BuildStoryPage(
             epic, story, artifactSourceRelativePath, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord,
-            tasks, reviewFindingsHtml, changeLogHtml, nav, commands, epicRetroPath)).Content;
+            tasks, reviewFindingsHtml, changeLogHtml, nav, commands, epicRetroPath, pager)).Content;
 
     /// <summary>Builds a drafted story page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why
     /// the build/render split exists. [Story 6.4]</summary>
@@ -132,7 +133,8 @@ public static class EpicsTemplater
         string changeLogHtml,
         SiteNav nav,
         CommandCatalog commands,
-        string? epicRetroPath = null)
+        string? epicRetroPath = null,
+        EntityPager? pager = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"RenderStory called for story {story.Id} with no resolved artifact.");
@@ -149,7 +151,7 @@ public static class EpicsTemplater
 
         var view = EpicsViewBuilder.BuildStory(
             epic, story, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml, commands, epicRetroPath);
+            reviewFindingsHtml, changeLogHtml, commands, epicRetroPath, pager);
         var body = HtmlRenderAdapter.Shared.RenderStoryBody(view);
 
         // A story is a drill leaf (no children); it drills up to its epic page. Its status stage is the story
@@ -183,12 +185,12 @@ public static class EpicsTemplater
     /// <see cref="StoryEpicLinkifier.StoryPagePath"/>), so inline "Story N.M" mentions always resolve and a
     /// later-drafted artifact overwrites it in place. Shows what the plan already knows (narrative + epics.md
     /// acceptance criteria) and signposts the create-story command instead of dead-ending.</summary>
-    public static string RenderStoryPlaceholder(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildStoryPlaceholderPage(epic, story, nav, commands, epicRetroPath)).Content;
+    public static string RenderStoryPlaceholder(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildStoryPlaceholderPage(epic, story, nav, commands, epicRetroPath, pager)).Content;
 
     /// <summary>Builds an undrafted story's placeholder <see cref="PageView"/> — see <see cref="BuildIndexPage"/>
     /// for why the build/render split exists. [Story 6.4]</summary>
-    public static PageView BuildStoryPlaceholderPage(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null)
+    public static PageView BuildStoryPlaceholderPage(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null)
     {
         var outputPath = StoryEpicLinkifier.StoryPagePath(story.Id);
         var epicOutputPath = $"epics/epic-{epic.Number}.html";
@@ -202,7 +204,7 @@ public static class EpicsTemplater
             ($"Story {story.Id}", null),
         });
 
-        var view = EpicsViewBuilder.BuildStoryPlaceholder(epic, story, commands, epicRetroPath);
+        var view = EpicsViewBuilder.BuildStoryPlaceholder(epic, story, commands, epicRetroPath, pager);
         var body = HtmlRenderAdapter.Shared.RenderStoryPlaceholderBody(view);
 
         // A placeholder story page always renders a "Not yet drafted" status badge, so its stage is the story

@@ -3,8 +3,8 @@ using SpecScribe;
 namespace SpecScribe.Tests;
 
 /// <summary>Coverage for the generated date page: readable heading, per-commit rows (hash/time/author/subject,
-/// escaped), the guarded per-commit hash link, the "Artifacts updated" section, artifact-only days, prev/next
-/// active-day links, and the site a11y contract.</summary>
+/// escaped), the guarded per-commit hash link, the "Artifacts updated" section, artifact-only days, the inline
+/// sibling pager, and the site a11y contract.</summary>
 public class CommitDayTemplaterTests
 {
     private static readonly IReadOnlyList<(string Label, string Href)> NoArtifacts = Array.Empty<(string, string)>();
@@ -25,7 +25,7 @@ public class CommitDayTemplaterTests
             C("def5678", "Add the other thing"),
         };
 
-        var html = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, null, null, Nav());
+        var html = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, EntityPager.None, Nav());
 
         Assert.Contains($"<title>Commits on {Charts.DReadable(day)} — SpecScribe</title>", html);
         Assert.Contains($"<h1>Commits on {Charts.DReadable(day)}</h1>", html);
@@ -44,7 +44,7 @@ public class CommitDayTemplaterTests
         var day = new DateOnly(2026, 7, 6);
         var commits = new[] { C("abc1234", "fix <div> & \"q\"", author: "<b>Bob</b>") };
 
-        var html = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, null, null, Nav());
+        var html = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, EntityPager.None, Nav());
 
         Assert.Contains("fix &lt;div&gt; &amp; &quot;q&quot;", html);
         Assert.Contains("&lt;b&gt;Bob&lt;/b&gt;", html);
@@ -52,33 +52,36 @@ public class CommitDayTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_PrevNextLinkAdjacentDaysWithIsoHrefAndReadableText()
+    public void RenderPage_RendersSuppliedPagerInHeader_NotAtFoot()
     {
         var day = new DateOnly(2026, 7, 6);
-        var prev = new DateOnly(2026, 7, 4);
-        var next = new DateOnly(2026, 7, 9);
+        // The generator supplies a newest-first pager (Prev = newer day, Next = older); the templater just renders it.
+        var pager = new EntityPager(
+            new PagerLink("2026-07-09.html", Charts.DReadable(new DateOnly(2026, 7, 9))),
+            new PagerLink("2026-07-04.html", Charts.DReadable(new DateOnly(2026, 7, 4))));
 
-        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, prev, next, Nav());
+        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, pager, Nav());
 
-        // Sibling hrefs stay ISO (bare filename in the same commits/ dir); link text is readable.
-        Assert.Contains("class=\"commit-day-prev\" href=\"2026-07-04.html\"", html);
-        Assert.Contains(Charts.DReadable(prev), html);
-        Assert.Contains("class=\"commit-day-next\" href=\"2026-07-09.html\"", html);
-        Assert.Contains(Charts.DReadable(next), html);
+        // Inline header pager, with sibling names as tooltips; the retired bottom nav is gone.
+        Assert.Contains("<nav class=\"entity-pager\" aria-label=\"Sibling navigation\">", html);
+        Assert.Contains("href=\"2026-07-09.html\"", html);
+        Assert.Contains("&lsaquo; Prev", html);
+        Assert.Contains("href=\"2026-07-04.html\"", html);
+        Assert.Contains("Next &rsaquo;", html);
+        Assert.DoesNotContain("commit-day-nav", html);
+        // The pager sits inside the header (before the kicker), not after the article.
+        Assert.True(html.IndexOf("entity-pager", StringComparison.Ordinal) < html.IndexOf("story-kicker", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void RenderPage_OmitsPrevAtEarliestAndNextAtLatest()
+    public void RenderPage_NoPager_OmitsPagerEntirely()
     {
         var day = new DateOnly(2026, 7, 6);
 
-        var earliest = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, null, new DateOnly(2026, 7, 9), Nav());
-        Assert.DoesNotContain("commit-day-prev", earliest);
-        Assert.Contains("commit-day-next", earliest);
+        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, EntityPager.None, Nav());
 
-        var latest = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, new DateOnly(2026, 7, 4), null, Nav());
-        Assert.Contains("commit-day-prev", latest);
-        Assert.DoesNotContain("commit-day-next", latest);
+        Assert.DoesNotContain("entity-pager", html);
+        Assert.DoesNotContain("commit-day-nav", html);
     }
 
     [Fact]
@@ -88,11 +91,11 @@ public class CommitDayTemplaterTests
         var commits = new[] { C("abc1234", "x") };
 
         var linked = CommitDayTemplater.RenderPage(
-            day, commits, NoArtifacts, null, null, Nav(), commitHref: _ => "commit/abc1234def.html");
+            day, commits, NoArtifacts, EntityPager.None, Nav(), commitHref: _ => "commit/abc1234def.html");
         // Nested page prepends its own ../ prefix; the <code> stays for styling.
         Assert.Contains("<a class=\"commit-hash-link\" href=\"../commit/abc1234def.html\"><code class=\"commit-hash\">abc1234</code></a>", linked);
 
-        var plain = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, null, null, Nav(), commitHref: _ => null);
+        var plain = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, EntityPager.None, Nav(), commitHref: _ => null);
         Assert.Contains("<code class=\"commit-hash\">abc1234</code>", plain);
         Assert.DoesNotContain("commit-hash-link", plain);
     }
@@ -107,7 +110,7 @@ public class CommitDayTemplaterTests
             ("PRD", "planning-artifacts/PRD.html"),
         };
 
-        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, artifacts, null, null, Nav());
+        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, artifacts, EntityPager.None, Nav());
 
         Assert.Contains("<section class=\"artifacts-updated\">", html);
         Assert.Contains("<h2>Artifacts updated</h2>", html);
@@ -124,7 +127,7 @@ public class CommitDayTemplaterTests
     {
         var day = new DateOnly(2026, 7, 6);
 
-        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, null, null, Nav());
+        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, EntityPager.None, Nav());
 
         Assert.DoesNotContain("artifacts-updated", html);
         Assert.DoesNotContain("Artifacts updated", html);
@@ -136,7 +139,7 @@ public class CommitDayTemplaterTests
         var day = new DateOnly(2026, 7, 6);
         var artifacts = new (string Label, string Href)[] { ("Architecture", "planning-artifacts/ARCHITECTURE.html") };
 
-        var html = CommitDayTemplater.RenderPage(day, Array.Empty<CommitInfo>(), artifacts, null, null, Nav());
+        var html = CommitDayTemplater.RenderPage(day, Array.Empty<CommitInfo>(), artifacts, EntityPager.None, Nav());
 
         // Neutral "Activity on …" heading — never claims commits it doesn't have.
         Assert.Contains($"<h1>Activity on {Charts.DReadable(day)}</h1>", html);
