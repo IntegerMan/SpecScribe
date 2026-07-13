@@ -339,4 +339,166 @@
   Array.prototype.forEach.call(document.querySelectorAll("table.js-sortable"), function (table) {
     try { enhanceSortableTable(table); } catch (err) { /* degrade silently — the server-sorted table stands */ }
   });
+
+  // ---- Source-code treemap: dimension switch + directory zoom [Story 7.6] ------------------
+  // Progressive enhancement ONLY. The server ships a correct, sized-by-LOC treemap with the default
+  // (change-frequency) colorize baked in, a legend, and a full text-equivalent table; with JS off this block
+  // never runs and all of that stands. When it runs it (1) reveals the hidden colorize controls + drill
+  // breadcrumb, (2) re-fills the rects when the dimension changes (reading the same data-* the server wrote,
+  // re-bucketing with the SAME thresholds Charts.Bucket uses so the default matches byte-for-byte), and
+  // (3) zooms the SVG viewBox into a directory — deep-linkable via the URL hash — respecting reduced motion
+  // (the reduce branch snaps instead of tweening).
+  (function initCodeMap() {
+    var svg = document.getElementById("codemap-svg");
+    if (!svg) return;
+
+    var cells = Array.prototype.slice.call(svg.querySelectorAll(".codemap-cell"));
+    var baseViewBox = svg.getAttribute("viewBox");
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Mirror Charts.Bucket exactly (<=0.25/0.5/0.75) so the client re-fill agrees with the server-baked default.
+    function bucket(value, max) {
+      if (max <= 0 || value <= 0) return 0;
+      var r = value / max;
+      return r <= 0.25 ? 1 : r <= 0.5 ? 2 : r <= 0.75 ? 3 : 4;
+    }
+
+    function num(cell, name) { var v = cell.getAttribute(name); return v === null ? null : parseFloat(v); }
+
+    function metricFor(cell, dim) {
+      if (dim === "changes") return num(cell, "data-changes");
+      if (dim === "last") return num(cell, "data-last");
+      if (dim === "created") return num(cell, "data-first");
+      if (dim === "avgchange") {
+        var churn = num(cell, "data-churn"), ch = num(cell, "data-changes");
+        return (churn === null || !ch) ? null : churn / ch;
+      }
+      return null;
+    }
+
+    function recolor(dim) {
+      // Dates are huge absolute day numbers, so they must be scaled against the file set's own [min,max]
+      // window; counts/averages scale against max (min 0), matching the server's default (change-frequency) fill.
+      var isDate = dim === "last" || dim === "created";
+      var min = Infinity, max = 0;
+      cells.forEach(function (c) {
+        var v = metricFor(c, dim);
+        if (v === null) return;
+        if (v > max) max = v;
+        if (v < min) min = v;
+      });
+      var range = isDate ? (max - min) : max;
+      cells.forEach(function (c) {
+        for (var l = 0; l <= 4; l++) c.classList.remove("level-" + l);
+        c.classList.remove("level-none");
+        var v = metricFor(c, dim);
+        if (v === null) { c.classList.add("level-none"); return; }
+        c.classList.add("level-" + bucket(isDate ? (v - min) : v, range));
+      });
+    }
+
+    // Reveal the colorize controls (hidden in the server HTML so no inert control ships in the no-JS page).
+    var controls = document.getElementById("codemap-controls");
+    if (controls) {
+      controls.hidden = false;
+      controls.addEventListener("change", function (e) {
+        if (e.target && e.target.name === "codemap-dim") recolor(e.target.value);
+      });
+    }
+
+    var drill = document.querySelector(".codemap-drill");
+    var crumbs = document.getElementById("codemap-breadcrumb");
+    var dirs = Array.prototype.slice.call(svg.querySelectorAll(".codemap-dir"));
+
+    function cssEscape(s) {
+      return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/["\\]/g, "\\$&");
+    }
+
+    function viewBoxFor(path) {
+      if (!path) return baseViewBox;
+      var rect = svg.querySelector('.codemap-dir[data-path="' + cssEscape(path) + '"]');
+      if (!rect) return baseViewBox;
+      return rect.getAttribute("x") + " " + rect.getAttribute("y") + " " +
+        rect.getAttribute("width") + " " + rect.getAttribute("height");
+    }
+
+    function labelFor(path) {
+      if (!path) return "All files";
+      var i = path.lastIndexOf("/");
+      return i >= 0 ? path.slice(i + 1) : path;
+    }
+
+    // Tween the viewBox with requestAnimationFrame when motion is allowed; snap instantly under reduced motion.
+    function setViewBox(target, animate) {
+      if (!animate || !window.requestAnimationFrame) { svg.setAttribute("viewBox", target); return; }
+      var from = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+      var to = target.split(/\s+/).map(Number);
+      if (from.length !== 4 || to.length !== 4) { svg.setAttribute("viewBox", target); return; }
+      var start = null, dur = 240;
+      function step(ts) {
+        if (start === null) start = ts;
+        var t = Math.min(1, (ts - start) / dur);
+        var e = t * (2 - t); // easeOutQuad
+        svg.setAttribute("viewBox", from.map(function (v, i) { return v + (to[i] - v) * e; }).join(" "));
+        if (t < 1) window.requestAnimationFrame(step);
+      }
+      window.requestAnimationFrame(step);
+    }
+
+    function renderCrumbs(path) {
+      if (!crumbs) return;
+      crumbs.innerHTML = "";
+      var trail = [{ p: "", l: "All files" }];
+      if (path) {
+        var acc = "";
+        path.split("/").forEach(function (s) { acc = acc ? acc + "/" + s : s; trail.push({ p: acc, l: s }); });
+      }
+      trail.forEach(function (t, idx) {
+        var li = document.createElement("li");
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "codemap-crumb";
+        btn.textContent = t.l;
+        btn.setAttribute("data-path", t.p);
+        if (idx === trail.length - 1) btn.setAttribute("aria-current", "true");
+        btn.addEventListener("click", function () { zoomTo(t.p, true); });
+        li.appendChild(btn);
+        crumbs.appendChild(li);
+      });
+    }
+
+    function zoomTo(path, pushHash) {
+      setViewBox(viewBoxFor(path), !reduceMotion);
+      renderCrumbs(path);
+      if (pushHash && window.history && history.pushState) {
+        if (path) history.pushState({ dir: path }, "", "#dir=" + encodeURIComponent(path));
+        else history.pushState({ dir: "" }, "", location.pathname + location.search);
+      }
+    }
+
+    if (drill) drill.hidden = false;
+
+    // A directory rect becomes an activatable zoom target (click + keyboard). Made focusable/labelled at runtime
+    // so the no-JS page never ships inert tab stops; aria-hidden is dropped since it's now interactive.
+    dirs.forEach(function (rect) {
+      var path = rect.getAttribute("data-path");
+      rect.removeAttribute("aria-hidden");
+      rect.setAttribute("tabindex", "0");
+      rect.setAttribute("role", "button");
+      rect.setAttribute("aria-label", "Zoom into " + labelFor(path));
+      rect.addEventListener("click", function () { zoomTo(path, true); });
+      rect.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoomTo(path, true); }
+      });
+    });
+
+    function applyHash() {
+      var m = /#dir=([^&]+)/.exec(location.hash);
+      var path = m ? decodeURIComponent(m[1]) : "";
+      svg.setAttribute("viewBox", viewBoxFor(path)); // snap on load/back-forward (no entrance animation)
+      renderCrumbs(path);
+    }
+    window.addEventListener("popstate", applyHash);
+    applyHash();
+  })();
 })();

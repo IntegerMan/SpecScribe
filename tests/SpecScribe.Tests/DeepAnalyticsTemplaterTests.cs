@@ -93,4 +93,69 @@ public class DeepAnalyticsTemplaterTests
         Assert.Contains("chart-empty", bars);
         Assert.DoesNotContain("git-pulse-bar-fill", bars);
     }
+
+    // A resolver that lights up exactly one of the sample's files, so each surface can be checked for
+    // per-item guarding (resolved → link, unresolved → plain) rather than all-or-nothing behavior.
+    private static Func<string, string?> ChartsOnlyResolver() =>
+        path => path == "src/SpecScribe/Charts.cs" ? "code/src/SpecScribe/Charts.cs.html" : null;
+
+    [Fact]
+    public void RenderPage_WithFileHref_LinksResolvedFilesAndLeavesOthersPlain()
+    {
+        var html = DeepAnalyticsTemplater.RenderPage(SampleDeep(), Nav(), fileHref: ChartsOnlyResolver());
+
+        // Coupling table cell, hotspot list item, and graph node for the resolvable file all become links.
+        Assert.Contains("<a href=\"code/src/SpecScribe/Charts.cs.html\">src/SpecScribe/Charts.cs</a>", html); // table + hotspot
+        Assert.Contains("<a class=\"coupling-node-link\" href=\"code/src/SpecScribe/Charts.cs.html\">", html);  // graph node
+        // The unresolved file stays plain text everywhere — per-item guarding, no dead link.
+        Assert.DoesNotContain("<a href=\"code/src/SpecScribe/HtmlTemplater.cs.html\"", html);
+        Assert.DoesNotContain("<a class=\"coupling-node-link\" href=\"code/src/SpecScribe/HtmlTemplater.cs.html\"", html);
+    }
+
+    [Fact]
+    public void RenderPage_WithoutFileHref_RendersNoCodeLinks()
+    {
+        // The default (no resolver) path — the live behavior before this change — emits plain file text only.
+        var html = DeepAnalyticsTemplater.RenderPage(SampleDeep(), Nav());
+        Assert.DoesNotContain("href=\"code/", html);
+        Assert.DoesNotContain("coupling-node-link", html);
+    }
+
+    [Fact]
+    public void CouplingGraph_FileHref_WrapsResolvedNodeInSvgAnchorOnly()
+    {
+        var coupling = new (string, string, int)[] { ("src/A.cs", "src/B.cs", 5) };
+        var svg = Charts.CouplingGraph(coupling, fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
+
+        // Resolved node wrapped in an SVG <a>; the circle/label/title survive inside it.
+        Assert.Contains("<a class=\"coupling-node-link\" href=\"code/src/A.cs.html\">", svg);
+        Assert.Contains("role=\"img\"", svg);
+        Assert.Equal(2, Count(svg, "class=\"coupling-node\""));       // both nodes still render
+        Assert.Equal(1, Count(svg, "class=\"coupling-node-link\"")); // only the resolvable one is linked
+    }
+
+    [Fact]
+    public void HotspotBars_FileHref_LinksResolvedPathsOnly()
+    {
+        var bars = Charts.HotspotBars(
+            new (string, int)[] { ("src/A.cs", 9), ("src/B.cs", 4) },
+            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
+
+        Assert.Contains("<a href=\"code/src/A.cs.html\">src/A.cs</a>", bars);
+        Assert.DoesNotContain("href=\"code/src/B.cs.html\"", bars);
+        Assert.Contains(">src/B.cs<", bars); // still present, just plain
+    }
+
+    [Fact]
+    public void CodeItemLink_EscapesHrefAndLabel()
+    {
+        // A path with markup-significant characters must be escaped in both the href and the visible text.
+        var bars = Charts.HotspotBars(
+            new (string, int)[] { ("src/a<b>.cs", 3) },
+            fileHref: _ => "code/a&b.html");
+
+        Assert.Contains("href=\"code/a&amp;b.html\"", bars);
+        Assert.Contains(">src/a&lt;b&gt;.cs<", bars);
+        Assert.DoesNotContain("<b>", bars);
+    }
 }

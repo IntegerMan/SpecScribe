@@ -914,11 +914,23 @@ public static class Charts
         return sb.ToString();
     }
 
+    /// <summary>Wraps an escaped file path in a guarded code-item link (Story 7.2's dual-mode resolution,
+    /// reused): a resolver returning a non-empty href renders a real link to the file's in-portal
+    /// <c>code/…html</c> page (or, in external <c>--code-url</c> mode, the hosted source); no resolver or no
+    /// target renders the same path plain — never a dead link. Shared by the deep-analytics hotspot list and
+    /// coupling table so a file item is clickable wherever a code target exists. [[epic-7-code-link-strategy]]</summary>
+    private static string CodeItemLink(string path, Func<string, string?>? fileHref)
+    {
+        var escaped = Html(path);
+        var href = fileHref?.Invoke(path);
+        return href is { Length: > 0 } ? $"<a href=\"{Html(href)}\">{escaped}</a>" : escaped;
+    }
+
     /// <summary>The opt-in "Git Hotspots" list (FR-10): most-frequently-changed files as proportional bars
     /// (reusing the Git Pulse bar language), width relative to the busiest file. The exact count stays in text
     /// so the bar is decorative, never the sole information carrier (not size/color-only). Degrades to a
     /// friendly note when there is no change history. [Story 3.2]</summary>
-    public static string HotspotBars(IReadOnlyList<(string Path, int Changes)> hotspots)
+    public static string HotspotBars(IReadOnlyList<(string Path, int Changes)> hotspots, Func<string, string?>? fileHref = null)
     {
         if (hotspots.Count == 0) return "<div class=\"chart-empty\">No file-change history to rank yet.</div>\n";
 
@@ -930,7 +942,7 @@ public static class Charts
             // Floor the fill so the least-changed file still shows a visible sliver.
             var pct = maxChanges <= 0 ? 0 : Math.Clamp((int)Math.Round((double)changes / maxChanges * 100), 6, 100);
             sb.Append(
-                $"  <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{Html(path)}</span>" +
+                $"  <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{CodeItemLink(path, fileHref)}</span>" +
                 $"<span class=\"git-pulse-bar-track\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
                 $"<span class=\"git-pulse-bar-count\">{changes} {Plural(changes, "change", "changes")}</span></li>\n");
         }
@@ -943,7 +955,7 @@ public static class Charts
     /// so the counts scan as a column. Full paths shown as real text (ellipsis-truncated via CSS, full value in
     /// the cell <c>title</c>) so the visual graph is never the sole information carrier. Not statuses, so no
     /// <c>--status-*</c> tokens. Degrades to a friendly note when nothing crosses the coupling threshold. [Story 3.2]</summary>
-    public static string CouplingTable(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling)
+    public static string CouplingTable(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling, Func<string, string?>? fileHref = null)
     {
         if (coupling.Count == 0) return "<div class=\"chart-empty\">No significant change coupling detected.</div>\n";
 
@@ -959,8 +971,8 @@ public static class Charts
         {
             sb.Append(
                 "    <tr>" +
-                $"<td class=\"coupling-file\" title=\"{Html(fileA)}\">{Html(fileA)}</td>" +
-                $"<td class=\"coupling-file\" title=\"{Html(fileB)}\">{Html(fileB)}</td>" +
+                $"<td class=\"coupling-file\" title=\"{Html(fileA)}\">{CodeItemLink(fileA, fileHref)}</td>" +
+                $"<td class=\"coupling-file\" title=\"{Html(fileB)}\">{CodeItemLink(fileB, fileHref)}</td>" +
                 $"<td class=\"coupling-num\">{coChanges}&times;</td></tr>\n");
         }
         sb.Append("  </tbody>\n</table>\n");
@@ -975,7 +987,7 @@ public static class Charts
     /// tokens via CSS classes. Pointer users get per-edge/per-node <c>&lt;title&gt;</c> tooltips; the whole
     /// graph carries a summarizing <c>role="img"</c> name, and the sibling <see cref="CouplingTable"/> is the
     /// exact text equivalent so the graph is never the sole carrier. [Story 3.2]</summary>
-    public static string CouplingGraph(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling, int size = 460)
+    public static string CouplingGraph(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling, int size = 460, Func<string, string?>? fileHref = null)
     {
         if (coupling.Count == 0) return "<div class=\"chart-empty\">No significant change coupling detected.</div>\n";
 
@@ -1031,6 +1043,15 @@ public static class Charts
         {
             var (x, y) = Pos(i);
             var d = degree[nodes[i]];
+
+            // Guarded code-item link (Story 7.2 dual-mode resolver): when the file has an in-portal code page
+            // (or an external source base), the whole node — circle + label — is wrapped in an SVG <a> so a
+            // click navigates to it; no target → the node renders exactly as before (never a dead link). The
+            // <title> tooltip and role="img" stay put either way.
+            var nodeHref = fileHref?.Invoke(nodes[i]);
+            var linked = nodeHref is { Length: > 0 };
+            if (linked) sb.Append($"  <a class=\"coupling-node-link\" href=\"{Html(nodeHref!)}\">\n");
+
             sb.Append($"  <circle class=\"coupling-node\" cx=\"{F(x)}\" cy=\"{F(y)}\" r=\"{F(NodeR(d))}\">" +
                       $"<title>{Html(nodes[i])} — {d} coupled {Plural(d, "change", "changes")}</title></circle>\n");
 
@@ -1041,6 +1062,8 @@ public static class Charts
             // font-size is in SVG user units (not a CSS rem) so the labels scale up with the graph when it is
             // enlarged in the page's expand/zoom lightbox — a fixed rem would stay tiny at any display size.
             sb.Append($"  <text class=\"coupling-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"13\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(Basename(nodes[i]), 22))}</text>\n");
+
+            if (linked) sb.Append("  </a>\n");
         }
 
         sb.Append("</svg>\n");
@@ -1149,55 +1172,158 @@ public static class Charts
                 .OrderBy(d => d)
                 .ToList();
 
-    /// <summary>Renders the project/artifact structure tree as native, zero-JS disclosure widgets: every
-    /// directory branch is a <c>&lt;details&gt;</c>/<c>&lt;summary&gt;</c> (focusable, Enter/Space toggles it, and
-    /// the browser natively announces its expanded/collapsed state — AC #1's expand/collapse and AC #2's
-    /// "announced state" with NO JavaScript, exactly like the <c>.dev-agent-details</c> and <c>.story</c>
-    /// disclosures already do), and leaves are <c>&lt;li&gt;</c> rows. A leaf that maps to a generated page is an
-    /// <c>&lt;a href&gt;</c> (route to the page — AC #2); a leaf without one is plain text — routing is
-    /// best-effort, never a broken link. Top-level branches render <c>open</c> (a reviewer landing on the surface
-    /// sees the shape, not a closed root); deeper branches render closed. Static — no motion (Story 3.5 owns
-    /// insight animation), so reduced-motion is trivially satisfied. Every label/href is HTML-escaped. [Story 3.4]</summary>
-    public static string ProjectStructureTree(ProjectTree tree)
+    /// <summary>Renders the source-code treemap as pure, server-computed SVG (Story 7.6). One <c>&lt;rect&gt;</c>
+    /// per node from the precomputed squarified <paramref name="layout"/>: directory rects draw group boundaries +
+    /// a clipped label, file rects are the leaves — sized by lines of code, filled by the default colorize
+    /// dimension (change frequency when git metrics exist, else a neutral fill). Every file rect is focusable
+    /// (<c>tabindex="0"</c>) with a descriptive <c>aria-label</c> (name + active metric) and carries every metric as
+    /// <c>data-*</c> attributes so the scoped JS enhancement re-fills it without a round-trip and the tooltip (the
+    /// body-level <c>js-tip</c>/<c>data-tip</c> node) reads it. A file routes to its in-portal code page ONLY when
+    /// the guarded <paramref name="fileHref"/> returns non-null (dormant until Story 7.1) — otherwise a plain,
+    /// focusable rect, never a broken link. No <c>&lt;script&gt;</c> is required for this baseline to be correct.
+    /// Every label/path is HTML-escaped. [Story 7.6]</summary>
+    public static string CodeTreemap(
+        IReadOnlyList<TreemapRect> layout,
+        double width,
+        double height,
+        bool hasMetrics,
+        Func<string, string?>? fileHref)
     {
-        // structure.html sits at the output root (prefix ""), but derive the prefix rather than hardcode "no
-        // prefix" so the renderer stays correct if the surface ever moves. [Subtask 2.3]
-        var prefix = PathUtil.RelativePrefix(SiteNav.StructureOutputPath);
+        if (layout.Count == 0) return "<div class=\"chart-empty\">No source files to map.</div>";
+
+        // The DEFAULT server-baked dimension is change frequency; compute its max once so the level buckets match
+        // the JS re-bucketing (which derives the same max from the DOM). A metric-less file → neutral (level-none).
+        double maxChanges = 0;
+        foreach (var r in layout)
+        {
+            if (!r.Node.IsDirectory && r.Node.Metrics is { } m && m.Changes > maxChanges) maxChanges = m.Changes;
+        }
 
         var sb = new StringBuilder();
-        sb.Append("<div class=\"structure-tree\">\n");
-        sb.Append("<ul class=\"tree-list\">\n");
-        foreach (var node in tree.Roots)
+        sb.Append($"<svg id=\"codemap-svg\" class=\"codemap\" viewBox=\"0 0 {F(width)} {F(height)}\" ")
+          .Append($"width=\"{F(width)}\" height=\"{F(height)}\" role=\"img\" ")
+          .Append("aria-label=\"Source-code treemap: each rectangle is a file sized by its line count, nested by directory. The text table below lists every file and its metrics.\" preserveAspectRatio=\"xMidYMid meet\">\n");
+
+        // Directories first (drawn as the containing boundaries), then files on top — the layout already emits them
+        // in that depth order, so a single pass preserves stacking.
+        foreach (var rect in layout)
         {
-            AppendTreeNode(sb, node, prefix, depth: 0);
+            if (rect.Node.IsDirectory)
+            {
+                AppendTreemapDir(sb, rect);
+            }
+            else
+            {
+                AppendTreemapFile(sb, rect, maxChanges, hasMetrics, fileHref);
+            }
         }
-        sb.Append("</ul>\n</div>\n");
+
+        sb.Append("</svg>\n");
         return sb.ToString();
     }
 
-    private static void AppendTreeNode(StringBuilder sb, TreeNode node, string prefix, int depth)
+    private static void AppendTreemapDir(StringBuilder sb, TreemapRect rect)
     {
-        if (node.IsDirectory)
+        if (rect.W <= 0 || rect.H <= 0) return;
+        var path = Html(rect.Node.RepoRelativePath);
+        sb.Append($"  <rect class=\"codemap-dir\" data-path=\"{path}\" data-depth=\"{rect.Depth}\" ")
+          .Append($"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" aria-hidden=\"true\"></rect>\n");
+
+        // Only label a directory whose header strip is wide enough to read; truncate to what fits (~6px/char) so a
+        // long collapsed-chain label never spills past its rect.
+        if (rect.W < 34) return;
+        var maxChars = Math.Max(4, (int)(rect.W / 6.2));
+        var label = rect.Node.Label;
+        if (label.Length > maxChars) label = label[..Math.Max(1, maxChars - 1)] + "\u2026";
+        var tx = F(rect.X + 4);
+        var ty = F(rect.Y + 11);
+        sb.Append($"  <text class=\"codemap-dir-label\" x=\"{tx}\" y=\"{ty}\" aria-hidden=\"true\">{Html(label)}</text>\n");
+    }
+
+    private static void AppendTreemapFile(StringBuilder sb, TreemapRect rect, double maxChanges, bool hasMetrics, Func<string, string?>? fileHref)
+    {
+        if (rect.W <= 0 || rect.H <= 0) return;
+        var node = rect.Node;
+        var metrics = node.Metrics;
+
+        // Level for the default (change-frequency) dimension; a file with no git record is neutral (level-none).
+        var levelClass = metrics is { } m0 ? $"level-{Bucket(m0.Changes, maxChanges)}" : "level-none";
+
+        // Machine-readable data-* for the JS re-fill + text derivation (always path + lines; git metrics only when
+        // present so the enhancement treats a metric-less file as neutral).
+        var data = new StringBuilder();
+        data.Append($" data-path=\"{Html(node.RepoRelativePath)}\" data-lines=\"{node.Lines.ToString(CultureInfo.InvariantCulture)}\"");
+        if (metrics is { } m)
         {
-            // Top-level branches default open so the shape is visible on landing; deeper branches start closed.
-            var open = depth == 0 ? " open" : string.Empty;
-            sb.Append("<li class=\"tree-branch\">");
-            sb.Append($"<details{open}><summary>{Icons.ForConcept("Structure")}<span class=\"tree-label\">{Html(node.Label)}</span></summary>");
-            sb.Append("<ul class=\"tree-list\">");
-            foreach (var child in node.Children)
-            {
-                AppendTreeNode(sb, child, prefix, depth + 1);
-            }
-            sb.Append("</ul></details></li>\n");
+            data.Append($" data-changes=\"{m.Changes.ToString(CultureInfo.InvariantCulture)}\"");
+            data.Append($" data-churn=\"{m.TotalChurn.ToString(CultureInfo.InvariantCulture)}\"");
+            if (m.FirstDate is { } fd) data.Append($" data-first=\"{fd.DayNumber.ToString(CultureInfo.InvariantCulture)}\"");
+            if (m.LastDate is { } ld) data.Append($" data-last=\"{ld.DayNumber.ToString(CultureInfo.InvariantCulture)}\"");
         }
-        else if (node.OutputHref is { Length: > 0 } href)
+
+        // Accessible name (name + the active metric value) — color is never the sole signal (AC #4).
+        var ariaLabel = metrics is { } ma
+            ? $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, {ma.Changes} {Plural(ma.Changes, "change", "changes")}"
+            : $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}";
+
+        // Rich multi-line tooltip via the shared body-level js-tip node (never a clipped ::after on the rect).
+        var tip = BuildTreemapTip(node);
+
+        var href = fileHref?.Invoke(node.RepoRelativePath);
+        var rectMarkup =
+            $"<rect class=\"codemap-cell {levelClass} js-tip\" tabindex=\"0\"{data} " +
+            $"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" " +
+            $"role=\"{(href is { Length: > 0 } ? "link" : "img")}\" aria-label=\"{Html(ariaLabel)}\" data-tip=\"{Html(tip)}\"></rect>";
+
+        if (href is { Length: > 0 } target)
         {
-            sb.Append($"<li class=\"tree-leaf\"><a class=\"tree-file\" href=\"{Html(prefix + href)}\">{Html(node.Label)}</a></li>\n");
+            sb.Append($"  <a href=\"{Html(target)}\">{rectMarkup}</a>\n");
         }
         else
         {
-            sb.Append($"<li class=\"tree-leaf\"><span class=\"tree-file\">{Html(node.Label)}</span></li>\n");
+            sb.Append("  ").Append(rectMarkup).Append('\n');
         }
+    }
+
+    /// <summary>The multi-line tooltip text (rendered via <c>white-space: pre-line</c> in the shared tip node) for a
+    /// treemap file rect: path, line count, and — when present — the git metrics as text. [Story 7.6]</summary>
+    private static string BuildTreemapTip(CodeMapNode node)
+    {
+        var sb = new StringBuilder();
+        sb.Append(node.RepoRelativePath).Append('\n');
+        sb.Append(node.Lines.ToString("N0", CultureInfo.InvariantCulture)).Append(' ').Append(Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines"));
+        if (node.Metrics is { } m)
+        {
+            sb.Append('\n');
+            sb.Append(m.Changes.ToString("N0", CultureInfo.InvariantCulture)).Append(' ').Append(Plural(m.Changes, "change", "changes"));
+            sb.Append(" \u00b7 ").Append(m.TotalChurn.ToString("N0", CultureInfo.InvariantCulture)).Append(" churn");
+            if (m.Changes > 0)
+            {
+                var avg = (double)m.TotalChurn / m.Changes;
+                sb.Append(" \u00b7 avg ").Append(avg.ToString("N0", CultureInfo.InvariantCulture));
+            }
+            if (m.FirstDate is { } fd && m.LastDate is { } ld)
+            {
+                sb.Append('\n').Append("first ").Append(D(fd)).Append(" \u00b7 last ").Append(D(ld)).Append(" (within recent history)");
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Quantizes a value onto the shared sequential ramp's 0..4 levels (the SAME discipline
+    /// <see cref="HeatLevel"/> uses for the commit heatmap — a non-<c>--status-*</c> scale, since code mass/churn is
+    /// not a lifecycle stage). Mirrored byte-for-byte by the treemap's JS re-bucketing. [Story 7.6]</summary>
+    private static int Bucket(double value, double max)
+    {
+        if (max <= 0 || value <= 0) return 0;
+        var ratio = value / max;
+        return ratio switch
+        {
+            <= 0.25 => 1,
+            <= 0.5 => 2,
+            <= 0.75 => 3,
+            _ => 4,
+        };
     }
 
     /// <summary>The FR/NFR status-tile grid (Story 3.7 AC #1): one small square tile per requirement in source

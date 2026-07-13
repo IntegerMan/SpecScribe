@@ -14,6 +14,12 @@
       "port": 8097
     },
     {
+      "name": "nib-preview",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8096", "--directory", "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/cb469376-9b78-4b47-a655-84bc140bdd65/scratchpad/site-preview"],
+      "port": 8096
+    },
+    {
       "name": "verify-site",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8098", "--directory", "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/87c0719e-0306-427a-84f0-695619c89683/scratchpad/verify-site"],

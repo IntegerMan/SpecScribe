@@ -1,0 +1,400 @@
+namespace SpecScribe;
+
+/// <summary>One node in the source-code treemap — a directory container or a source file. <see cref="Label"/> is
+/// the segment name shown on the rectangle (a directory name or a file name — never the full path); a collapsed
+/// single-child directory chain joins its segments with <c>" / "</c> into one label (exactly as the retired
+/// <c>ProjectTree.BuildDir</c> did). <see cref="RepoRelativePath"/> is the FULL repo-relative path
+/// (forward-slash) — for a file it is the treemap-cell identity + the key the guarded code-page resolver and the
+/// git-metric join use; for a directory it is the deepest directory path after chain collapse.
+/// <see cref="Lines"/> is the treemap SIZE key: a file's own line count, a directory's rolled-up Σ of descendant
+/// file lines. <see cref="Metrics"/> carries the per-file git-derived colorize dimensions — <c>null</c> for every
+/// directory and for any file with no git record (outside the analyzed window, or <c>--deep-git</c> off), which the
+/// renderer draws with a neutral fill (per-file graceful degradation, AC #2). [Story 7.6]</summary>
+public sealed record CodeMapNode(
+    string Label,
+    string RepoRelativePath,
+    bool IsDirectory,
+    long Lines,
+    CodeFileMetrics? Metrics,
+    IReadOnlyList<CodeMapNode> Children);
+
+/// <summary>One positioned rectangle in the squarified treemap layout: the <see cref="Node"/> it draws, its
+/// position/size within the fixed viewBox (<see cref="X"/>/<see cref="Y"/>/<see cref="W"/>/<see cref="H"/>), and
+/// its nesting <see cref="Depth"/> (0 = a root-level node). Directory rects contain their children's rects (drawn
+/// as group boundaries + a label header); file rects are the leaves. Positions are pure functions of the (already
+/// deterministic) node order, so the layout is byte-stable for snapshot tests. [Story 7.6]</summary>
+public sealed record TreemapRect(CodeMapNode Node, double X, double Y, double W, double H, int Depth);
+
+/// <summary>A pure, source-code-derived treemap model of a repository's files sized by lines of code and nested by
+/// directory. Mirrors the shape every pure model in this repo uses (<see cref="WorkInventory"/>,
+/// <see cref="ArtifactCoverage"/>, the retired <c>ProjectTree</c> it replaces): a pure <see cref="Build"/> over
+/// already-gathered inputs (NO disk access — every nesting/roll-up/collapse rule is unit-testable without a repo),
+/// an <see cref="Empty"/> singleton, and an <see cref="IsEmpty"/> flag callers use to omit the whole surface. Never
+/// throws — the generator degrades any failure to <see cref="Empty"/> so the code-map omits and generation still
+/// succeeds (AD-4 / NFR2).
+/// <para>The node set is a <b>source-code walk</b> (repo-relative paths like <c>src/SpecScribe/Foo.cs</c>) — a
+/// DIFFERENT path space from the retired artifact tree's <c>_bmad-output</c>-relative <c>*.md</c> set. Git's
+/// <c>--numstat</c> emits the same repo-relative paths, so line counts and git metrics join cleanly. The
+/// <c>_docs</c> output-href map is NOT the link source here (that was the artifact tree); in-portal code-page links
+/// come from a guarded resolver supplied by the caller (dormant until Story 7.1 lands). [Story 7.6]</para></summary>
+public sealed class CodeMap
+{
+    public required IReadOnlyList<CodeMapNode> Roots { get; init; }
+
+    /// <summary>Number of file leaves in the map — the "N files" in the surface headline.</summary>
+    public int FileCount { get; init; }
+
+    /// <summary>Number of real directories represented (collapsed chains still count each directory), for the
+    /// "across M directories" half of the headline.</summary>
+    public int DirectoryCount { get; init; }
+
+    /// <summary>Total lines of code across every file — the treemap's whole-area denominator.</summary>
+    public long TotalLines { get; init; }
+
+    /// <summary>True when there is no source code to show, so the caller omits the whole surface (graceful
+    /// omission) rather than render an empty treemap.</summary>
+    public bool IsEmpty => Roots.Count == 0;
+
+    public static readonly CodeMap Empty = new()
+    {
+        Roots = Array.Empty<CodeMapNode>(),
+        FileCount = 0,
+        DirectoryCount = 0,
+        TotalLines = 0,
+    };
+
+    /// <summary>A mutable directory node used only while assembling the trie; converted to immutable
+    /// <see cref="CodeMapNode"/>s at the end.</summary>
+    private sealed class Dir
+    {
+        public required string Name { get; init; }
+        // Keyed Ordinal (exact) so two segments differing only in case stay distinct trie slots; ordering and the
+        // git-metric lookup handle case-insensitivity separately, matching the project's path discipline.
+        public Dictionary<string, Dir> Dirs { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, FileLeaf> Files { get; } = new(StringComparer.Ordinal);
+    }
+
+    /// <summary>A file leaf captured during the trie build: its full repo-relative path, line count, and the
+    /// optional per-file git metrics (null when the file has no git record).</summary>
+    private sealed record FileLeaf(string RepoRelativePath, long Lines, CodeFileMetrics? Metrics);
+
+    /// <summary>Builds the treemap model over already-resolved inputs — NO disk access. Each source file's
+    /// repo-relative path is normalized through <see cref="PathUtil.NormalizeSlashes"/> and split on <c>/</c> into
+    /// a nested directory→children trie (the final segment is a file leaf, every prior segment a directory
+    /// branch). A file's git metrics are looked up in <paramref name="gitMetrics"/> (both sides normalized +
+    /// compared <see cref="StringComparer.OrdinalIgnoreCase"/> for Windows/Git-Bash path-case parity); a file with
+    /// no entry gets <c>Metrics = null</c> → neutral fill, never a broken join. Directory <see cref="CodeMapNode.Lines"/>
+    /// roll up as Σ of descendant file lines. Ordering is deterministic (directories before files, then
+    /// <see cref="StringComparer.OrdinalIgnoreCase"/> within each group) so the output — and therefore the
+    /// squarified layout — is byte-stable for the snapshot tests. Never throws (NFR2).</summary>
+    /// <param name="sourceFiles">Every source file the generator walked, as (repo-relative path, line count).</param>
+    /// <param name="gitMetrics">Per-file git-derived metrics keyed by repo-relative path (empty when unavailable).</param>
+    public static CodeMap Build(
+        IReadOnlyList<(string RepoRelativePath, long Lines)> sourceFiles,
+        IReadOnlyDictionary<string, CodeFileMetrics> gitMetrics)
+    {
+        // Normalize the git-metric keys once so lookups are slash- and case-insensitive regardless of how git or
+        // the caller keyed them.
+        var metricLookup = new Dictionary<string, CodeFileMetrics>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in gitMetrics)
+        {
+            metricLookup[PathUtil.NormalizeSlashes(key)] = value;
+        }
+
+        var root = new Dir { Name = string.Empty };
+        foreach (var (rawPath, lines) in sourceFiles)
+        {
+            if (string.IsNullOrWhiteSpace(rawPath)) continue;
+            var norm = PathUtil.NormalizeSlashes(rawPath);
+            var segments = norm.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0) continue;
+
+            var cur = root;
+            for (var i = 0; i < segments.Length - 1; i++)
+            {
+                var seg = segments[i];
+                if (!cur.Dirs.TryGetValue(seg, out var next))
+                {
+                    next = new Dir { Name = seg };
+                    cur.Dirs[seg] = next;
+                }
+                cur = next;
+            }
+
+            var fileName = segments[^1];
+            // Defensive: a real filesystem can't have a directory and a file with the same name at one level; if
+            // the inputs somehow imply it, keep the directory and drop the file rather than throw (NFR2).
+            if (cur.Dirs.ContainsKey(fileName)) continue;
+            var metric = metricLookup.TryGetValue(norm, out var m) ? m : null;
+            cur.Files[fileName] = new FileLeaf(norm, Math.Max(lines, 0), metric);
+        }
+
+        var fileCount = 0;
+        var dirCount = 0;
+        Count(root, ref fileCount, ref dirCount);
+
+        var roots = BuildChildren(root, string.Empty);
+        if (roots.Count == 0) return Empty;
+
+        var totalLines = roots.Sum(r => r.Lines);
+        return new CodeMap
+        {
+            Roots = roots,
+            FileCount = fileCount,
+            DirectoryCount = dirCount,
+            TotalLines = totalLines,
+        };
+    }
+
+    /// <summary>Tallies real files and directories over the raw trie (the virtual root is not itself a directory),
+    /// so the headline counts reflect true structure even where the renderer collapses chains.</summary>
+    private static void Count(Dir dir, ref int files, ref int dirs)
+    {
+        files += dir.Files.Count;
+        foreach (var sub in dir.Dirs.Values)
+        {
+            dirs++;
+            Count(sub, ref files, ref dirs);
+        }
+    }
+
+    /// <summary>Converts a directory's children to ordered immutable nodes: directories first, then files, each
+    /// group alphabetical by <see cref="StringComparer.OrdinalIgnoreCase"/> (culture-independent, byte-stable).
+    /// <paramref name="parentPath"/> is the repo-relative path of the enclosing directory (empty at the root).</summary>
+    private static IReadOnlyList<CodeMapNode> BuildChildren(Dir parent, string parentPath)
+    {
+        var nodes = new List<CodeMapNode>(parent.Dirs.Count + parent.Files.Count);
+        foreach (var dir in parent.Dirs.Values.OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            nodes.Add(BuildDir(dir, parentPath));
+        }
+        foreach (var file in parent.Files.OrderBy(f => f.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var leaf = file.Value;
+            nodes.Add(new CodeMapNode(file.Key, leaf.RepoRelativePath, IsDirectory: false, leaf.Lines, leaf.Metrics, Array.Empty<CodeMapNode>()));
+        }
+        return nodes;
+    }
+
+    /// <summary>Builds one directory branch, collapsing a single-child directory chain into one joined label so
+    /// depth reads as real structure, not filesystem noise (UX-DR19) — a directory is collapsed into its child
+    /// ONLY when it has exactly one child and that child is itself a directory. The directory's
+    /// <see cref="CodeMapNode.RepoRelativePath"/> is the deepest collapsed segment's path; its
+    /// <see cref="CodeMapNode.Lines"/> is Σ of its (immutable) children's lines. Never navigable, never carries
+    /// git metrics (those are per-file). Bounded loop guard caps pathological depth without throwing (NFR2).</summary>
+    private static CodeMapNode BuildDir(Dir dir, string parentPath)
+    {
+        var label = dir.Name;
+        var cur = dir;
+        var path = Join(parentPath, dir.Name);
+
+        var guard = 0;
+        while (cur.Files.Count == 0 && cur.Dirs.Count == 1 && guard++ < 4096)
+        {
+            var child = cur.Dirs.Values.First();
+            label = $"{label} / {child.Name}";
+            path = Join(path, child.Name);
+            cur = child;
+        }
+
+        var children = BuildChildren(cur, path);
+        var lines = children.Sum(c => c.Lines);
+        return new CodeMapNode(label, path, IsDirectory: true, lines, Metrics: null, children);
+    }
+
+    private static string Join(string parentPath, string segment) =>
+        parentPath.Length == 0 ? segment : $"{parentPath}/{segment}";
+
+    /// <summary>Flattens the tree to just the file leaves, in deterministic tree order (directories before files,
+    /// depth-first). The text-equivalent metrics table and the default-dimension ordering derive from this.</summary>
+    public IReadOnlyList<CodeMapNode> Files()
+    {
+        var files = new List<CodeMapNode>(FileCount);
+        void Walk(IReadOnlyList<CodeMapNode> nodes)
+        {
+            foreach (var n in nodes)
+            {
+                if (n.IsDirectory) Walk(n.Children);
+                else files.Add(n);
+            }
+        }
+        Walk(Roots);
+        return files;
+    }
+
+    // ---- Squarified treemap layout (Bruls, Huizing & van Wijk 2000) ----
+
+    /// <summary>The default treemap viewBox width the layout tiles (a fixed coordinate space; the SVG scales to
+    /// fit its container). Height is <see cref="DefaultHeight"/>.</summary>
+    public const double DefaultWidth = 1000;
+
+    /// <summary>The default treemap viewBox height the layout tiles.</summary>
+    public const double DefaultHeight = 640;
+
+    /// <summary>Vertical space reserved at the top of a directory rectangle for its label header, so children tile
+    /// the region below it and the boundary reads clearly (AC #1).</summary>
+    private const double DirHeader = 16;
+
+    /// <summary>Inset applied inside a directory rectangle before its children tile, giving a visible boundary
+    /// gutter between nested levels.</summary>
+    private const double Pad = 2;
+
+    /// <summary>Recursion cap: a pathological directory depth stops nesting rather than risking a deep stack; the
+    /// deepest levels simply render as a filled directory rect with no drawn children (NFR2 never-throw).</summary>
+    private const int MaxDepth = 32;
+
+    /// <summary>Minimum inner width/height for a directory to bother tiling its children — below this the header
+    /// and gutter would swamp the region, so the directory renders as a solid rect.</summary>
+    private const double MinTileable = 6;
+
+    /// <summary>Computes the pure, deterministic squarified layout of this map within a fixed viewBox. Emits one
+    /// <see cref="TreemapRect"/> per node (directories first, containing their children's rects). Aspect ratios
+    /// stay near-1 via the standard squarified algorithm; ordering is a pure function of the (already deterministic)
+    /// node order, so the output is byte-stable. Guards zero/negative sizes and caps recursion depth — never throws
+    /// (NFR2).</summary>
+    public IReadOnlyList<TreemapRect> Layout(double width = DefaultWidth, double height = DefaultHeight)
+    {
+        var output = new List<TreemapRect>();
+        if (IsEmpty || width <= 0 || height <= 0) return output;
+        LayoutNodes(Roots, 0, 0, width, height, 0, output);
+        return output;
+    }
+
+    private static void LayoutNodes(IReadOnlyList<CodeMapNode> nodes, double x, double y, double w, double h, int depth, List<TreemapRect> output)
+    {
+        if (nodes.Count == 0 || w <= 0 || h <= 0) return;
+        // Size by lines; a zero-line file/dir still gets a minimal slice so it stays visible and focusable.
+        var items = new List<(CodeMapNode Node, double Size)>(nodes.Count);
+        foreach (var n in nodes)
+        {
+            items.Add((n, Math.Max(n.Lines, 1)));
+        }
+        Squarify(items, x, y, w, h, depth, output);
+    }
+
+    private static void Squarify(List<(CodeMapNode Node, double Size)> items, double x, double y, double w, double h, int depth, List<TreemapRect> output)
+    {
+        double totalSize = items.Sum(i => i.Size);
+        if (totalSize <= 0 || w <= 0 || h <= 0) return;
+
+        var scale = (w * h) / totalSize;
+        var scaled = new List<(CodeMapNode Node, double Area)>(items.Count);
+        foreach (var (node, size) in items)
+        {
+            scaled.Add((node, size * scale));
+        }
+
+        double rx = x, ry = y, rw = w, rh = h;
+        var row = new List<(CodeMapNode Node, double Area)>();
+        var index = 0;
+        while (index < scaled.Count)
+        {
+            var shortSide = Math.Min(rw, rh);
+            var candidate = scaled[index];
+            if (row.Count == 0)
+            {
+                row.Add(candidate);
+                index++;
+                continue;
+            }
+
+            var currentWorst = Worst(row, shortSide);
+            row.Add(candidate);
+            var newWorst = Worst(row, shortSide);
+            if (newWorst <= currentWorst)
+            {
+                // Adding the candidate did not worsen the aspect ratio — keep it in the row.
+                index++;
+            }
+            else
+            {
+                // The candidate worsened the row — remove it, lay the row out, and start a fresh row.
+                row.RemoveAt(row.Count - 1);
+                LayoutRow(row, ref rx, ref ry, ref rw, ref rh, depth, output);
+                row.Clear();
+            }
+        }
+
+        if (row.Count > 0)
+        {
+            LayoutRow(row, ref rx, ref ry, ref rw, ref rh, depth, output);
+        }
+    }
+
+    /// <summary>The worst (largest) aspect ratio in a row laid along the given <paramref name="side"/> length —
+    /// the squarified algorithm's cost function (Bruls et al. 2000).</summary>
+    private static double Worst(List<(CodeMapNode Node, double Area)> row, double side)
+    {
+        if (row.Count == 0 || side <= 0) return double.MaxValue;
+        double sum = 0, max = 0, min = double.MaxValue;
+        foreach (var (_, area) in row)
+        {
+            sum += area;
+            if (area > max) max = area;
+            if (area < min) min = area;
+        }
+        if (sum <= 0 || min <= 0) return double.MaxValue;
+        var s2 = sum * sum;
+        var side2 = side * side;
+        return Math.Max((side2 * max) / s2, s2 / (side2 * min));
+    }
+
+    private static void LayoutRow(List<(CodeMapNode Node, double Area)> row, ref double rx, ref double ry, ref double rw, ref double rh, int depth, List<TreemapRect> output)
+    {
+        double sum = 0;
+        foreach (var (_, area) in row) sum += area;
+        if (sum <= 0) return;
+
+        var landscape = rw >= rh;            // fill a column on the left when wider than tall, else a row on top
+        var shortSide = Math.Min(rw, rh);
+        if (shortSide <= 0) return;
+        var thickness = sum / shortSide;
+
+        double offset = 0;
+        foreach (var (node, area) in row)
+        {
+            var length = area / thickness;   // extent along the short side
+            double cx, cy, cw, ch;
+            if (landscape)
+            {
+                cx = rx;
+                cy = ry + offset;
+                cw = thickness;
+                ch = length;
+            }
+            else
+            {
+                cx = rx + offset;
+                cy = ry;
+                cw = length;
+                ch = thickness;
+            }
+            EmitRect(node, cx, cy, cw, ch, depth, output);
+            offset += length;
+        }
+
+        if (landscape)
+        {
+            rx += thickness;
+            rw -= thickness;
+        }
+        else
+        {
+            ry += thickness;
+            rh -= thickness;
+        }
+    }
+
+    private static void EmitRect(CodeMapNode node, double x, double y, double w, double h, int depth, List<TreemapRect> output)
+    {
+        output.Add(new TreemapRect(node, x, y, w, h, depth));
+        if (!node.IsDirectory || node.Children.Count == 0 || depth >= MaxDepth) return;
+
+        var innerX = x + Pad;
+        var innerY = y + DirHeader;
+        var innerW = w - (2 * Pad);
+        var innerH = h - DirHeader - Pad;
+        if (innerW < MinTileable || innerH < MinTileable) return;
+        LayoutNodes(node.Children, innerX, innerY, innerW, innerH, depth + 1, output);
+    }
+}

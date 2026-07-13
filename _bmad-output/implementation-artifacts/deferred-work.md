@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-scribes-nib-branding (2026-07-12)
+
+- source_spec: `spec-scribes-nib-branding-and-vs-contrast-pass.md`
+  summary: The Scribe's Nib geometry exists in three hand-kept renditions (`HtmlRenderAdapter.NibPathData`, `extension/media/specscribe-outline.svg`, and a 16-box scaled variant in `extension/media/specscribe.svg`) with no sync guard — a future mark tweak can silently drift them.
+  evidence: Review finding (Blind Hunter #9). The in-app path is now single-sourced as a C# const and both SVG comments point at it, but nothing mechanical pins the extension assets to the const (tests run against the compiled assembly, not repo-relative asset files, and no build step spans C#/SVG). Add a repo-relative asset test or a generation step for the SVGs when extension packaging (Story 16.5) builds its asset pipeline.
+
 ## Deferred from: spec-webview-doc-page-surfaces implementation (2026-07-12)
 
 - source_spec: `spec-webview-doc-page-surfaces.md`

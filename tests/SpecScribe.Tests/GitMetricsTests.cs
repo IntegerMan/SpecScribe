@@ -614,6 +614,103 @@ public class GitMetricsTests
         Assert.Empty(deep.Commits);
     }
 
+    // ---- BuildCodeMapMetrics (untruncated per-file treemap metrics) [Story 7.6] ----
+
+    [Fact]
+    public void BuildCodeMapMetrics_CountsChangesOncePerCommitPerFileAndSumsChurn()
+    {
+        // A.cs is listed TWICE in one commit (still one change, both rows' churn summed) and once more in an
+        // older commit. B.cs appears once. Binary rows contribute 0 churn but still count as a change.
+        var commits = new[]
+        {
+            new DeepCommit("h2", "Alice", new DateTime(2026, 7, 2, 10, 0, 0), "s", "", new[]
+            {
+                new DeepFileChange("A.cs", 3, 1),
+                new DeepFileChange("A.cs", 10, 0), // same file twice in one commit -> one change, churn still summed
+                new DeepFileChange("bin/Logo.png", null, null), // binary -> 0 churn, still a change
+            }),
+            Commit("h1", "Alice", "2026-07-01T10:00", ("A.cs", 2, 2), ("B.cs", 5, 0)),
+        };
+
+        var map = GitMetrics.BuildCodeMapMetrics(commits);
+
+        var a = map["A.cs"];
+        Assert.Equal(2, a.Changes);                 // once per commit despite the duplicate row
+        Assert.Equal(3 + 1 + 10 + 0 + 2 + 2, a.TotalChurn); // every row summed across both commits
+        var bin = map["bin/Logo.png"];
+        Assert.Equal(1, bin.Changes);
+        Assert.Equal(0, bin.TotalChurn);            // binary rows never throw, add no churn
+        Assert.Equal(5, map["B.cs"].TotalChurn);
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_ResolvesFirstAndLastDateFromNewestFirstStream()
+    {
+        // Records arrive newest-first. LastDate = newest day, FirstDate = oldest day in the window.
+        var commits = new[]
+        {
+            Commit("h3", "Alice", "2026-07-10T10:00", ("A.cs", 1, 0)),
+            Commit("h2", "Alice", "2026-07-05T10:00", ("A.cs", 1, 0)),
+            Commit("h1", "Alice", "2026-07-01T10:00", ("A.cs", 1, 0)),
+        };
+
+        var a = GitMetrics.BuildCodeMapMetrics(commits)["A.cs"];
+
+        Assert.Equal(new DateOnly(2026, 7, 10), a.LastDate);
+        Assert.Equal(new DateOnly(2026, 7, 1), a.FirstDate);
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_BackfillsDatesWhenNewestCommitHasNoTimestamp()
+    {
+        // The newest commit touching A.cs has an unparseable timestamp (null); an older one carries the date.
+        // Both FirstDate and LastDate must fall back to that older valid date rather than staying stuck null.
+        var commits = new[]
+        {
+            new DeepCommit("h2", "Alice", null, "s", "", new[] { new DeepFileChange("A.cs", 1, 0) }),
+            Commit("h1", "Alice", "2026-07-05T10:00", ("A.cs", 1, 0)),
+        };
+
+        var a = GitMetrics.BuildCodeMapMetrics(commits)["A.cs"];
+
+        Assert.Equal(new DateOnly(2026, 7, 5), a.LastDate);
+        Assert.Equal(new DateOnly(2026, 7, 5), a.FirstDate);
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_IsUntruncatedUnlikeBuildInsights()
+    {
+        // A 60-file window: BuildInsights caps at top-50, but the treemap needs EVERY file, so this map holds 60.
+        var files = Enumerable.Range(0, 60).Select(i => ($"src/File{i:00}.cs", 1, 0)).ToArray();
+        var commit = Commit("h1", "Alice", "2026-07-01T10:00", files);
+
+        var map = GitMetrics.BuildCodeMapMetrics(new[] { commit });
+
+        Assert.Equal(60, map.Count);
+        Assert.True(GitMetrics.BuildInsights(new[] { commit }).Files.Count <= 50);
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_EmptyInputYieldsEmptyMap()
+    {
+        Assert.Empty(GitMetrics.BuildCodeMapMetrics(Array.Empty<DeepCommit>()));
+    }
+
+    [Fact]
+    public void ParseNumstatLog_CarriesTheCodeMapMetricsFromTheSameParse()
+    {
+        // One parse, several views: the pulse also carries the untruncated treemap metric map.
+        var log = Rec("abc123", "Alice", "2026-07-01T09:15", "Subject", "", "3\t1\tsrc/A.cs");
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        Assert.NotNull(deep.CodeMapMetrics);
+        var a = deep.CodeMapMetrics["src/A.cs"];
+        Assert.Equal(1, a.Changes);
+        Assert.Equal(4, a.TotalChurn);
+        Assert.Equal(new DateOnly(2026, 7, 1), a.LastDate);
+    }
+
     private static DeepCommit Commit(string hash, string author, string date, params (string Path, int Added, int Deleted)[] files)
         => new(hash, author,
             DateTime.ParseExact(date, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),

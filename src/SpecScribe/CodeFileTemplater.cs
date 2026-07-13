@@ -53,17 +53,47 @@ public static class CodeFileTemplater
         sb.Append($"  <div class=\"meta-pills\"><span class=\"pill\">{count.ToString(CultureInfo.InvariantCulture)} {(count == 1 ? "line" : "lines")}</span></div>\n");
         sb.Append("</header>\n\n");
 
-        // Source is deliberately secondary — but it sits BESIDE the relationships (two columns), so a tall file no
-        // longer pushes the graph out of view. The block still carries the locked per-line id="L{n}" anchors (kept
-        // visible, never collapsed, so a "#L42" deep link lands on every browser) and a data-code-path hook for host
-        // re-targeting (VS Code recommendation R4.2).
+        // The "view online" jump-off rides ALONGSIDE the source (next to the "Source" heading) since it points at the
+        // code, not at the insights — so it survives even when there is no insights tab.
+        var source = BuildSource(repoRelativePath, lines, externalSourceUrl);
+
+        // The insights view collects everything ABOUT the file — its relationship graph and (Story 7.4) the opt-in
+        // git-signal panels — and the code view holds the source. A null insight => empty coverage => the page is
+        // byte-identical to a run without --deep-git for that half.
+        var coverage = insight is null ? "" : BuildCoverageSection(prefix, insight, coupledFileHref, commitHref);
+        var insights = BuildInsightsPanel(prefix, repoRelativePath, referencedBy, coverage);
+
+        if (insights.Length == 0)
+        {
+            // Nothing to say about the file (uncited, no external link, no deep-git insight) — no point in tabs; the
+            // source spans the full width exactly as the pre-tab layout did for an uncited file.
+            sb.Append(source).Append('\n');
+            return EndShell(sb, prefix);
+        }
+
+        // Two pure-CSS tabbed views: insights lead (the reader asked to be led by what the code MEANS, not the code),
+        // code second. A deep link to code/<path>.html#L42 still lands: a :target on a source line forces the code
+        // view forward in CSS (see .code-tabs :target rules), so the locked #L{n} convention survives the tabs.
+        AppendTabs(sb, outputRelativePath, insights, source);
+        return EndShell(sb, prefix);
+    }
+
+    /// <summary>Builds the secondary "Source" panel: the file's contents as one contiguous
+    /// <c>&lt;code class="language-*"&gt;</c> block so Prism can tokenize multi-line constructs (block comments,
+    /// verbatim strings) correctly; the language class routes it to the right grammar (absent =&gt; Prism leaves it
+    /// plain, the graceful path for unknown file types). Every line — including blanks — is one anchored
+    /// <c>.code-line</c> span carrying the locked <c>id="L{n}"</c> anchor and a <c>data-ln</c> for the CSS gutter
+    /// counter (deliberately NOT a text child, so the tokenized <c>textContent</c> stays pure source). The
+    /// <c>data-code-path</c> hook lets a host re-target the file (VS Code recommendation R4.2).</summary>
+    private static string BuildSource(string repoRelativePath, IReadOnlyList<string> lines, string? externalSourceUrl)
+    {
+        var count = lines.Count;
         var source = new StringBuilder();
         source.Append($"<section class=\"code-source-section\" data-code-path=\"{PathUtil.Html(PathUtil.NormalizeSlashes(repoRelativePath))}\">\n");
-        source.Append("  <div class=\"code-source-head\">\n    <h2>Source</h2>\n  </div>\n");
-        // One contiguous <code> so Prism can tokenize multi-line constructs (block comments, verbatim strings)
-        // correctly; the language class routes it to the right grammar (absent => Prism leaves it plain, the
-        // graceful path for unknown file types). Per-line spans carry the locked id="L{n}" anchor and a data-ln for
-        // the CSS gutter counter — deliberately NOT a text child, so the tokenized textContent stays pure source.
+        // The additive "view online" link (Story 7.7) sits to the right of the heading — an inline jump-off with its
+        // host mark, never a replacement for the in-portal source.
+        var external = externalSourceUrl is { Length: > 0 } u ? "\n    " + ExternalSourceAnchor(u) : "";
+        source.Append($"  <div class=\"code-source-head\">\n    <h2>Source</h2>{external}\n  </div>\n");
         var langClass = LanguageClass(repoRelativePath);
         source.Append(langClass is null ? "<pre class=\"code-file\"><code>" : $"<pre class=\"code-file\"><code class=\"{langClass}\">");
         for (var i = 0; i < count; i++)
@@ -73,17 +103,52 @@ public static class CodeFileTemplater
             source.Append($"<span class=\"code-line\" id=\"L{ns}\" data-ln=\"{ns}\">{PathUtil.Html(lines[i])}</span>\n");
         }
         source.Append("</code></pre>\n</section>\n");
+        return source.ToString();
+    }
 
-        AppendBody(sb, BuildAside(prefix, repoRelativePath, referencedBy, externalSourceUrl), source.ToString());
+    /// <summary>Wraps the two views in a pure-CSS, no-JS tab shell ([[charting-is-pure-svg-no-js]]): a
+    /// <c>&lt;fieldset&gt;</c> of two radio "tabs" (a visually-hidden legend names the choice for assistive tech) plus
+    /// two sibling panels. The insights tab is <c>checked</c> so the page LEADS with what the file means; CSS
+    /// <c>:has(:checked)</c> toggles the panels and <c>:target</c> forces the code panel forward for <c>#L{n}</c> deep
+    /// links. The radio group name is per-page unique so several code pages consolidated into one document
+    /// (SPA/webview capture) don't cross-wire their tabs.</summary>
+    private static void AppendTabs(StringBuilder sb, string outputRelativePath, string insightsPanel, string sourcePanel)
+    {
+        var group = PathUtil.Html(TabGroupName(outputRelativePath));
+        sb.Append("<div class=\"code-tabs\">\n");
+        sb.Append("  <fieldset class=\"code-tablist\">\n");
+        sb.Append("    <legend class=\"sr-only\">Choose a view for this file</legend>\n");
+        sb.Append($"    <label class=\"code-tab code-tab--insights\"><input type=\"radio\" class=\"code-tab-input\" name=\"{group}\" checked><span>Insights</span></label>\n");
+        sb.Append($"    <label class=\"code-tab code-tab--source\"><input type=\"radio\" class=\"code-tab-input\" name=\"{group}\"><span>Code</span></label>\n");
+        sb.Append("  </fieldset>\n");
+        sb.Append("  <div class=\"code-tabpanel code-tabpanel--insights\">\n");
+        sb.Append(insightsPanel);
+        sb.Append("  </div>\n");
+        sb.Append("  <div class=\"code-tabpanel code-tabpanel--source\">\n");
+        sb.Append(sourcePanel);
+        sb.Append("  </div>\n");
+        sb.Append("</div>\n\n");
+    }
 
-        // Story 7.4: opt-in per-file "Advanced coverage" section, full-width under the source/relationships. Null
-        // insight => nothing appended => baseline-identical page (a run without --deep-git).
-        if (insight is not null)
+    /// <summary>Assembles the insights view: the "Referenced by" relationship graph as a card, followed by the opt-in
+    /// advanced-coverage panels (<paramref name="coverage"/>). Returns empty when there is nothing to show (uncited
+    /// and no insight) so the caller drops the tabs entirely and renders the source full-width.</summary>
+    private static string BuildInsightsPanel(
+        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)>? referencedBy,
+        string coverage)
+    {
+        var hasRefs = referencedBy is { Count: > 0 };
+        if (!hasRefs && coverage.Length == 0) return "";
+
+        var sb = new StringBuilder();
+        if (hasRefs)
         {
-            sb.Append(BuildCoverageSection(prefix, insight, coupledFileHref, commitHref));
+            sb.Append("<div class=\"insight-panels\">\n");
+            sb.Append(BuildRelationshipsCard(prefix, repoRelativePath, referencedBy!));
+            sb.Append("</div>\n");
         }
-
-        return EndShell(sb, prefix);
+        sb.Append(coverage);
+        return sb.ToString();
     }
 
     /// <summary>Renders the opt-in "Advanced coverage" section (Story 7.4): the file's change frequency, file-scoped
@@ -107,19 +172,20 @@ public static class CodeFileTemplater
         var sb = new StringBuilder();
         sb.Append("<section class=\"code-insights\" aria-labelledby=\"advanced-coverage\">\n");
         sb.Append("  <h2 id=\"advanced-coverage\">Advanced coverage</h2>\n");
-        sb.Append("  <p class=\"code-insights-note\">Opt-in git signals for this file: how often it changes, who changes it, what changes alongside it, and its recent history.</p>\n");
 
-        sb.Append("  <div class=\"code-insights-grid\">\n");
+        // Each git signal is its own bordered child panel, laid out in a responsive grid — no wrapper card, no
+        // explanatory preamble; the panel headings carry the meaning.
+        sb.Append("  <div class=\"insight-panels\">\n");
 
         // Change frequency — always shown when the section renders (the anchoring "how often" signal).
-        sb.Append("    <div class=\"code-insight-block\">\n");
+        sb.Append("    <section class=\"insight-panel code-insight-block\">\n");
         sb.Append("      <h3>Change frequency</h3>\n");
         sb.Append($"      <p class=\"code-insight-frequency\">Changed in <strong>{insight.ChangeCount.ToString(CultureInfo.InvariantCulture)}</strong> {Charts.Plural(insight.ChangeCount, "commit", "commits")} in the analyzed history.</p>\n");
-        sb.Append("    </div>\n");
+        sb.Append("    </section>\n");
 
         if (hasContributors)
         {
-            sb.Append("    <div class=\"code-insight-block\">\n");
+            sb.Append("    <section class=\"insight-panel code-insight-block\">\n");
             sb.Append("      <h3>Contributors to this file</h3>\n");
             sb.Append("      <ul class=\"code-insight-contributors\">\n");
             foreach (var (author, commits) in insight.Contributors)
@@ -129,12 +195,12 @@ public static class CodeFileTemplater
                     $"<span class=\"contributor-count\">{commits.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(commits, "commit", "commits")}</span></li>\n");
             }
             sb.Append("      </ul>\n");
-            sb.Append("    </div>\n");
+            sb.Append("    </section>\n");
         }
 
         if (hasCoupled)
         {
-            sb.Append("    <div class=\"code-insight-block\">\n");
+            sb.Append("    <section class=\"insight-panel code-insight-block\">\n");
             sb.Append("      <h3>Often changed with</h3>\n");
             sb.Append("      <ul class=\"code-insight-coupled\">\n");
             foreach (var (path, coChanges) in insight.CoupledFiles)
@@ -148,14 +214,14 @@ public static class CodeFileTemplater
                     $"        <li>{nameCell} <span class=\"coupled-count\">{coChanges.ToString(CultureInfo.InvariantCulture)}&times;</span></li>\n");
             }
             sb.Append("      </ul>\n");
-            sb.Append("    </div>\n");
+            sb.Append("    </section>\n");
         }
 
         sb.Append("  </div>\n");
 
         if (hasHistory)
         {
-            sb.Append("  <div class=\"code-insight-history\">\n");
+            sb.Append("  <section class=\"insight-panel code-insight-history\">\n");
             sb.Append("    <h3>Change history</h3>\n");
             sb.Append("    <div class=\"table-scroll\">\n");
             sb.Append("    <table class=\"code-history-table\">\n");
@@ -184,7 +250,7 @@ public static class CodeFileTemplater
             }
             sb.Append("      </tbody>\n    </table>\n");
             sb.Append("    </div>\n");
-            sb.Append("  </div>\n");
+            sb.Append("  </section>\n");
         }
 
         sb.Append("</section>\n");
@@ -250,6 +316,62 @@ public static class CodeFileTemplater
         }
 
         sb.Append("</aside>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Builds the "Referenced by" relationship card for the insights tab: the pure-SVG node-link graph of the
+    /// artifacts that cite this file (Story 7.1 rework), plus a visually-hidden but present <c>&lt;ul&gt;</c> that
+    /// mirrors the graph's links for assistive tech (the <c>&lt;svg role="img"&gt;</c> exposes only its summary label,
+    /// so this is the accessible, keyboard-reachable equivalent — meaningful link text, never "click here",
+    /// NFR6/UX-DR16). Same markup the sidebar used, now a card among the insight panels.</summary>
+    private static string BuildRelationshipsCard(
+        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)> referencedBy)
+    {
+        // Resolve each citing artifact once to (href, full title, compact label) — shared by the graph and list.
+        var nodes = new List<(string Href, string Title, string Short)>(referencedBy.Count);
+        foreach (var (outputUrl, title) in referencedBy)
+        {
+            nodes.Add((prefix + PathUtil.NormalizeSlashes(outputUrl), title, ShortLabel(title)));
+        }
+
+        var sb = new StringBuilder();
+        sb.Append("<section class=\"code-relationships\">\n");
+        sb.Append("  <h2>Referenced by</h2>\n");
+        sb.Append("  <p class=\"code-relationships-note\">The artifacts that cite this file. References run artifact&#8594;file, so this shows what refers to the file — not code dependencies.</p>\n");
+        sb.Append("  <div class=\"ref-graph-wrap\">\n");
+        sb.Append(Charts.ReferenceGraph(BaseName(repoRelativePath), nodes));
+        sb.Append("  </div>\n");
+        sb.Append("  <ul class=\"ref-list sr-only\">\n");
+        foreach (var (href, title, _) in nodes)
+        {
+            sb.Append($"    <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(title)}</a></li>\n");
+        }
+        sb.Append("  </ul>\n");
+        sb.Append("</section>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>A per-page-unique radio-group name for the view tabs, derived from the page's output-relative path
+    /// (non-alphanumeric runs collapse to a single hyphen). Uniqueness matters when several code pages are captured
+    /// into one document (SPA/webview consolidation): a shared name would make their radio groups mutually exclusive
+    /// and cross-wire the tabs.</summary>
+    private static string TabGroupName(string outputRelativePath)
+    {
+        var sb = new StringBuilder("code-view-");
+        var prevHyphen = false;
+        foreach (var c in outputRelativePath)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                sb.Append(char.ToLowerInvariant(c));
+                prevHyphen = false;
+            }
+            else if (!prevHyphen)
+            {
+                sb.Append('-');
+                prevHyphen = true;
+            }
+        }
         return sb.ToString();
     }
 

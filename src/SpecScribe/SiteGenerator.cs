@@ -79,6 +79,12 @@ public sealed class SiteGenerator
     private List<string> _codeReferenced = new();
     private Dictionary<string, List<(string CitingSourceRelative, string Title)>> _codeReverseMap = new(StringComparer.OrdinalIgnoreCase);
 
+    // Story 7.6: the source-code walk (repo-relative path + line count), enumerated ONCE per full generation
+    // (EnumerateCodeFiles — git ls-files with a bounded fallback) and cached so both the nav gate (built early)
+    // and WriteCodeMap (written after the pages phase) read the same set. Empty when no readable source files were
+    // found → the "Code Map" nav item, quick link, and page all omit together (one signal, never a broken link).
+    private IReadOnlyList<(string RepoRelativePath, long Lines)> _codeFiles = Array.Empty<(string, long)>();
+
     private SprintStatus? _sprint;
     private List<RetroModel> _retros = new();
     private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
@@ -108,6 +114,9 @@ public sealed class SiteGenerator
         reporter?.BeginPhase(GenerationPhase.Scan);
         var files = EnumerateSourceFiles();
         var sourceRelatives = files.Select(ToSourceRelative).ToList();
+        // Story 7.6: the source-code walk gates the Code Map nav item/page. Enumerated once here (before the nav is
+        // built) and cached so WriteCodeMap reuses the exact same set — never a broken "Code Map" link.
+        _codeFiles = EnumerateCodeFiles();
         reporter?.EndPhase(GenerationPhase.Scan);
 
         var events = new List<GenerationEvent>();
@@ -142,7 +151,7 @@ public sealed class SiteGenerator
             _module = bundle.Module;
             SetRetros(bundle.Retros);
 
-            var nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasStructure: sourceRelatives.Count > 0);
+            var nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasCodeMap: _codeFiles.Count > 0);
             _nav = nav;
 
             // Render the README up front so that, if it fails, we can drop the Readme nav entry before any
@@ -153,7 +162,7 @@ public sealed class SiteGenerator
                 readmeEvent = GenerateReadmeInternal(nav);
                 if (readmeEvent is { Outcome: GenerationOutcome.Error })
                 {
-                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false, hasSprint: SprintAvailable, hasStructure: sourceRelatives.Count > 0);
+                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false, hasSprint: SprintAvailable, hasCodeMap: _codeFiles.Count > 0);
                     _nav = nav;
                 }
             }
@@ -267,7 +276,7 @@ public sealed class SiteGenerator
                 var sw = Stopwatch.StartNew();
                 try
                 {
-                    var html = DeepAnalyticsTemplater.RenderPage(deepPulse, nav);
+                    var html = DeepAnalyticsTemplater.RenderPage(deepPulse, nav, fileHref: CodeItemHref);
                     WriteOutput(SiteNav.DeepAnalyticsOutputPath, ApplyReferenceLinks(html, SiteNav.DeepAnalyticsOutputPath));
                     events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.DeepAnalyticsOutputPath, sw.Elapsed));
                 }
@@ -305,9 +314,10 @@ public sealed class SiteGenerator
             // The sprint page reads the epics model (for real story/epic titles + links), so it's written
             // after the epics phase. Gated on parsed sprint data; a no-op when there is none. [Story 2.3 Task 3/5]
             WriteSprint(nav);
-            // The structure tree reads the fully-populated _docs (source→output hrefs), so it's written after the
-            // pages phase — like WriteSprint, gated on the same source-artifact signal as its nav item. [Story 3.4]
-            WriteStructure(nav, sourceRelatives);
+            // The source-code treemap reads the cached source-code walk + the (now-populated) deep-git per-file
+            // metrics, so it's written after the pages/git phases — like WriteSprint, gated on the same source-code
+            // signal as its nav item. Replaced the retired Story 3.4 structure tree. [Story 7.6]
+            WriteCodeMap(nav);
             WriteRetroIndex(nav);
             // Built once and shared with WriteIndex below — both used to rebuild it independently. [Story 2.3 review]
             var workInventory = WorkInventory.Build(_docs.Values.ToList());
@@ -1010,6 +1020,19 @@ public sealed class SiteGenerator
     private string? CodePageHref(string repoRelativePath) =>
         _codePages.TryGetValue(PathUtil.NormalizeSlashes(repoRelativePath), out var path) ? path : null;
 
+    /// <summary>The guarded file→code-item resolver for the git-analytics surfaces (deep-analytics coupling
+    /// graph/table + hotspots, and the git-insights file table). It selects the same link mode Story 7.2's
+    /// citation linkifier uses (<see cref="CodeReferenceLinkifier"/>), so file items and source citations on a
+    /// page resolve consistently: when a <c>--code-url</c> base is configured, the external hosted source
+    /// (<see cref="BuildExternalSourceUrl"/>); otherwise the in-portal <c>code/…html</c> page, guarded on it
+    /// existing in <see cref="_codePages"/> (<see cref="CodePageHref"/>). Null (→ plain text) when nothing
+    /// resolves — never a dead link. Whole-file link (no <c>#L{n}</c>), matching BuildExternalSourceUrl. Both
+    /// pages sit at the output root, so the href is used as-is (no page prefix to apply).</summary>
+    private string? CodeItemHref(string repoRelativePath) =>
+        _options.CodeSourceBaseUrl is { Length: > 0 }
+            ? BuildExternalSourceUrl(repoRelativePath)
+            : CodePageHref(repoRelativePath);
+
     // Above this size a referenced source file is treated as too large to render inline and degraded to a
     // placeholder page (never read into memory in full). A seed value, not a contract — a future settings toggle
     // (Epic 5 / AD-3) could surface it; there is deliberately no knob for it yet. [Story 7.1]
@@ -1300,7 +1323,7 @@ public sealed class SiteGenerator
             // Wire the guarded commit-detail resolver (Story 7.5): the hub's "latest {hash}" links light up as
             // links into commit/ when a per-commit page exists, plain otherwise. The hub sits at the output root,
             // so the resolver's root-relative path is used as-is (the templater applies no prefix there).
-            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, commitHref: CommitHref);
+            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, fileHref: CodeItemHref, commitHref: CommitHref);
             WriteOutput(SiteNav.GitInsightsOutputPath, ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
         }
@@ -2046,85 +2069,38 @@ public sealed class SiteGenerator
     /// mapping) so navigable leaves route to real pages and non-navigable ones render as plain text — never a
     /// broken link. The whole gather+build is wrapped never-throw → <see cref="ProjectTree.Empty"/> so any failure
     /// degrades to omission and generation still succeeds (AD-4 / NFR2). [Story 3.4 Task 3]</summary>
-    private void WriteStructure(SiteNav nav, IReadOnlyList<string> sourceRelatives)
+    /// <summary>Writes <c>code-map.html</c> — the source-code treemap (Story 7.6). Builds the pure
+    /// <see cref="CodeMap"/> over the cached source-code walk (<see cref="_codeFiles"/>) joined to the deep-git
+    /// per-file metrics (<see cref="DeepGitPulse.CodeMapMetrics"/>, empty when <c>--deep-git</c> is off → sized-by-LOC
+    /// with a neutral fill + the "git data unavailable" notice), computes the squarified layout, and renders. Gated
+    /// on the same source-code signal as its nav item, so a Code Map link is never emitted to a page that wasn't
+    /// produced. Wrapped never-throw → any failure degrades to "surface omitted, generation still succeeds"
+    /// (AD-4 / NFR2), matching the old <c>WriteStructure</c> and every insight provider. The <c>fileHref</c> code-page
+    /// resolver is left <c>null</c> per the story: the seam is wired but dormant until an owner decision wires an
+    /// existing guarded resolver (Story 7.1/7.2 code pages now exist on this branch). [Story 7.6]</summary>
+    private void WriteCodeMap(SiteNav nav)
     {
-        if (sourceRelatives.Count == 0) return;
+        if (_codeFiles.Count == 0) return;
 
-        ProjectTree tree;
+        CodeMap map;
+        IReadOnlyList<TreemapRect> layout;
         try
         {
-            tree = ProjectTree.Build(sourceRelatives, BuildStructureHrefMap(sourceRelatives));
+            var metrics = _progress?.DeepGit?.CodeMapMetrics
+                ?? (IReadOnlyDictionary<string, CodeFileMetrics>)new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal);
+            map = CodeMap.Build(_codeFiles, metrics);
+            layout = map.Layout();
         }
         catch (Exception)
         {
-            tree = ProjectTree.Empty;
+            map = CodeMap.Empty;
+            layout = Array.Empty<TreemapRect>();
         }
 
-        if (tree.IsEmpty) return;
+        if (map.IsEmpty) return;
 
-        var html = RenderStructurePage(tree, nav);
-        WriteOutput(SiteNav.StructureOutputPath, ApplyReferenceLinks(html, SiteNav.StructureOutputPath));
-    }
-
-    /// <summary>Maps each source-artifact path that has a generated page to its output-relative URL, from the
-    /// already-populated <see cref="_docs"/> (source→output) plus <c>epics.md → epics.html</c> (which renders
-    /// specially and is never a generic <see cref="_docs"/> entry). Consumed story artifacts and any file with no
-    /// generated page are simply absent, so <see cref="ProjectTree"/> renders them as plain text. [Story 3.4]</summary>
-    private IReadOnlyDictionary<string, string> BuildStructureHrefMap(IReadOnlyList<string> sourceRelatives)
-    {
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var doc in _docs.Values)
-        {
-            map[PathUtil.NormalizeSlashes(doc.SourceRelativePath)] = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
-        }
-
-        // epics.md is consumed into epics.html, so it never appears in _docs — add it only when the epics page
-        // was actually produced (epics.md parsed into a model).
-        if (_epicsModel is not null)
-        {
-            var epicsSource = sourceRelatives.FirstOrDefault(BmadArtifactAdapter.IsEpicsFile);
-            if (epicsSource is not null)
-            {
-                map[PathUtil.NormalizeSlashes(epicsSource)] = SiteNav.EpicsOutputPath;
-            }
-        }
-
-        return map;
-    }
-
-    /// <summary>Assembles the standalone <c>structure.html</c> shell — the same <see cref="PathUtil.RenderHeadOpen"/>
-    /// + nav + breadcrumb + <c>&lt;main id="main-content"&gt;</c> + footer every other <c>Write*</c> page uses —
-    /// with the tree living in a <c>chart-panel</c>. The tree markup itself comes from the pure, no-JS
-    /// <see cref="Charts.ProjectStructureTree"/>. [Story 3.4 Subtask 3.3]</summary>
-    private string RenderStructurePage(ProjectTree tree, SiteNav nav)
-    {
-        var outputPath = SiteNav.StructureOutputPath;
-        var prefix = PathUtil.RelativePrefix(outputPath); // "" — structure.html is at the output root.
-
-        var fileWord = Charts.Plural(tree.FileCount, "file", "files");
-        var dirWord = Charts.Plural(tree.DirectoryCount, "directory", "directories");
-        var headline = $"{tree.FileCount} {fileWord} across {tree.DirectoryCount} {dirWord}";
-
-        var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Project Structure — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Interactive tree of the project and artifact structure for {nav.SiteTitle} — expand and collapse directories and jump to the generated pages."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Structure", null) }));
-
-        sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
-        sb.Append("<h1>Project Structure</h1>\n");
-        sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {PathUtil.Html(headline)}</p>\n\n");
-        sb.Append("<section class=\"chart-panel\">\n");
-        sb.Append("  <h3>Project &amp; Artifact Structure</h3>\n");
-        sb.Append(Charts.ProjectStructureTree(tree));
-        sb.Append("</section>\n\n");
-        sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+        var html = CodeMapTemplater.RenderPage(map, layout, nav, fileHref: null);
+        WriteOutput(SiteNav.CodeMapOutputPath, ApplyReferenceLinks(html, SiteNav.CodeMapOutputPath));
     }
 
     /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the
@@ -2282,6 +2258,109 @@ public sealed class SiteGenerator
                 .ToList()
             : new List<string>();
 
+    // Story 7.6: defensive upper bound on the source files the code-map walk sizes, so a pathological tree can't
+    // turn the treemap into an unbounded job (NFR1). Far above any real repo's tracked-file count.
+    private const int MaxCodeMapFiles = 25_000;
+
+    /// <summary>The source-code walk for the treemap (Story 7.6): git-tracked files + their line counts,
+    /// repo-relative + forward-slash. Prefers <c>git ls-files</c> (tracked files only → excludes <c>bin/</c>,
+    /// <c>obj/</c>, <c>.git/</c>, <c>node_modules/</c>, and everything <c>.gitignore</c> covers, defining "the
+    /// codebase" the way git does); falls back to a bounded directory walk with an explicit exclude list when git is
+    /// unavailable / not a repo. Each file's line count is read with the SAME size cap + binary/UTF-8 guard the code
+    /// pages use (<see cref="TryReadCodeText"/>) — binary/oversized/unreadable files have no meaningful LOC and are
+    /// skipped. Bounded (<see cref="MaxCodeMapFiles"/>) and wrapped never-throw (NFR1/NFR2): any failure yields an
+    /// empty list, so the whole surface omits and generation still succeeds. Runs once per full generation.</summary>
+    private IReadOnlyList<(string RepoRelativePath, long Lines)> EnumerateCodeFiles()
+    {
+        try
+        {
+            var repoRoot = Path.GetFullPath(_options.RepoRoot);
+            var relatives = GitMetrics.TryListFiles(repoRoot) ?? FallbackCodeWalk(repoRoot);
+
+            var result = new List<(string, long)>();
+            foreach (var rel in relatives)
+            {
+                if (result.Count >= MaxCodeMapFiles) break;
+                if (string.IsNullOrWhiteSpace(rel)) continue;
+
+                var normalized = PathUtil.NormalizeSlashes(rel);
+                string full;
+                try
+                {
+                    full = Path.GetFullPath(Path.Combine(repoRoot, normalized.Replace('/', Path.DirectorySeparatorChar)));
+                }
+                catch
+                {
+                    continue;
+                }
+
+                // Defense in depth: a stray "../" in the list must never escape the repo root.
+                if (!full.StartsWith(repoRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+
+                try
+                {
+                    if (!File.Exists(full)) continue;
+                    if (new FileInfo(full).Length > MaxCodeFileBytes) continue;   // oversized → no meaningful LOC
+                    if (!TryReadCodeText(full, out var text)) continue;           // binary / unreadable → skip
+                    result.Add((normalized, SplitCodeLines(text).Count));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // A file that vanished mid-walk or is locked — skip it, never fail the whole walk.
+                }
+            }
+            return result;
+        }
+        catch
+        {
+            return Array.Empty<(string, long)>();
+        }
+    }
+
+    /// <summary>A bounded, git-free fallback source walk for the code-map when the repo isn't a git checkout: a
+    /// depth-first enumeration under the repo root, skipping dot-directories (<c>.git</c>, <c>.vs</c>,
+    /// <c>.claude</c>…) and the usual build/dependency dirs (<c>bin</c>, <c>obj</c>, <c>node_modules</c>), and the
+    /// shared editor-temp/dotfile ignore set. Capped at <see cref="MaxCodeMapFiles"/> so it can't run away on a huge
+    /// tree. Returns repo-relative, forward-slash paths. [Story 7.6]</summary>
+    private static IReadOnlyList<string> FallbackCodeWalk(string repoRoot)
+    {
+        if (!Directory.Exists(repoRoot)) return Array.Empty<string>();
+
+        var results = new List<string>();
+        var stack = new Stack<string>();
+        stack.Push(repoRoot);
+        while (stack.Count > 0 && results.Count < MaxCodeMapFiles)
+        {
+            var dir = stack.Pop();
+            string[] entries;
+            try
+            {
+                entries = Directory.GetFileSystemEntries(dir);
+            }
+            catch
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (results.Count >= MaxCodeMapFiles) break;
+                var name = Path.GetFileName(entry);
+                if (Directory.Exists(entry))
+                {
+                    if (name.StartsWith('.') || name is "bin" or "obj" or "node_modules") continue;
+                    stack.Push(entry);
+                }
+                else if (!PathUtil.IsIgnoredSourceFile(entry))
+                {
+                    results.Add(PathUtil.NormalizeSlashes(Path.GetRelativePath(repoRoot, entry)));
+                }
+            }
+        }
+
+        return results;
+    }
+
     /// <summary>Markdown files in the resolved ADR root, plus ONE level of subdirectories — enough for nested
     /// year/topic schemes (<c>decisions/2024/0007-x.md</c>) without walking a whole tree of unrelated prose
     /// into the ADR section (deliberately bounded — the same window the ForgeOptions probe reads). [Story 4.2 Task 1]</summary>
@@ -2301,10 +2380,11 @@ public sealed class SiteGenerator
     private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives)
     {
         _module = ModuleContext.Detect(_options.RepoRoot, sourceRelatives);
-        // StructureAvailable = the source-artifact file set is non-empty — the SINGLE signal that gates both the
-        // nav item/quick link here and the WriteStructure page write, so a Structure link is never emitted to a
-        // page that wasn't produced. [Story 3.4 Subtask 3.4]
-        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasStructure: sourceRelatives.Count > 0);
+        // CodeMapAvailable = the cached source-code walk is non-empty — the SINGLE signal that gates both the nav
+        // item/quick link here and the WriteCodeMap page write, so a Code Map link is never emitted to a page that
+        // wasn't produced. The incremental watch paths that call BuildNav reuse the last full run's _codeFiles (the
+        // treemap only regenerates on a full rebuild). [Story 7.6 Subtask 3.4]
+        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasCodeMap: _codeFiles.Count > 0);
     }
 
     private static readonly IReadOnlyDictionary<string, DateOnly> EmptyDates = new Dictionary<string, DateOnly>();

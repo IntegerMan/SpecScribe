@@ -32,11 +32,12 @@ public sealed class SiteNav
     /// between the generator (writes the file) and the templaters (link to it) so the two can't disagree. [Story 7.3]</summary>
     public const string TimelineOutputPath = "timeline.html";
 
-    /// <summary>The interactive project/artifact structure tree page. Written only when the source-artifact file
-    /// set is non-empty; the nav item and dashboard quick link gate on the same signal so a link is never emitted
-    /// to a page that wasn't produced. Shared between the generator (writes the file) and the templater/nav
-    /// (link to it) so the two can't disagree. [Story 3.4]</summary>
-    public const string StructureOutputPath = "structure.html";
+    /// <summary>The source-code treemap page (files sized by lines of code, colorable by git-derived change
+    /// signals). Written only when the source-code walk found readable files; the nav item and dashboard quick link
+    /// gate on the same signal so a link is never emitted to a page that wasn't produced. Shared between the
+    /// generator (writes the file) and the templater/nav (link to it) so the two can't disagree. Replaced the
+    /// retired Story 3.4 artifact structure tree. [Story 7.6]</summary>
+    public const string CodeMapOutputPath = "code-map.html";
 
     /// <summary>The generation diagnostics (run-log) page: the run's non-fatal notices (unsupported/malformed/
     /// skipped artifacts + render-time errors) plus the effective configuration and detection results. Written on
@@ -73,7 +74,7 @@ public sealed class SiteNav
 
     public bool HasSprint => Items.Any(i => i.Label == "Sprint");
 
-    public bool HasStructure => Items.Any(i => i.Label == "Structure");
+    public bool HasCodeMap => Items.Any(i => i.Label == "Code Map");
 
     public static SiteNav Build(
         IReadOnlyList<string> sourceRelativePaths,
@@ -82,7 +83,7 @@ public sealed class SiteNav
         bool hasAdrs = false,
         bool hasReadme = false,
         bool hasSprint = false,
-        bool hasStructure = false)
+        bool hasCodeMap = false)
     {
         var items = new List<(string, string)> { ("Home", HomeOutputPath) };
         var quickLinks = new List<(string, string, string)>();
@@ -141,13 +142,13 @@ public sealed class SiteNav
             quickLinks.Add(("Sprint", SprintOutputPath, "See where every epic and story sits."));
         }
 
-        // The interactive structure tree is its own first-class insight surface, gated on the source-artifact
-        // file set the same way Sprint gates on the yaml. Sits in the Epics/Sprint insight-tracking
-        // neighborhood. Its nav label routes through Icons.ForConcept("Structure"). [Story 3.4 Task 3.2]
-        if (hasStructure)
+        // The source-code treemap is its own first-class insight surface, gated on the source-code walk the same
+        // way Sprint gates on the yaml. Sits in the Epics/Sprint insight-tracking neighborhood. Its nav label
+        // routes through Icons.ForConcept("Code Map"). [Story 7.6 Subtask 3.3]
+        if (hasCodeMap)
         {
-            items.Add(("Structure", StructureOutputPath));
-            quickLinks.Add(("Structure", StructureOutputPath, "Explore the project and artifact structure."));
+            items.Add(("Code Map", CodeMapOutputPath));
+            quickLinks.Add(("Code Map", CodeMapOutputPath, "Explore the codebase by size and change activity."));
         }
 
         if (hasAdrs)

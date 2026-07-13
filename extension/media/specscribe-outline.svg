@@ -1,11 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="#c5c5c5">
-  <!-- Activity-bar container icon (Story 6.9). VS Code masks by ALPHA and tints with the theme foreground, so
-       only the shape matters — a bulleted outline that reads as "Project Outline". Distinct from the colored
-       panel-tab icon (media/specscribe.svg), which is NOT mask-tinted. -->
-  <circle cx="5" cy="6" r="1.7"/>
-  <rect x="9" y="4.9" width="11" height="2.2" rx="1.1"/>
-  <circle cx="5" cy="12" r="1.7"/>
-  <rect x="9" y="10.9" width="11" height="2.2" rx="1.1"/>
-  <circle cx="5" cy="18" r="1.7"/>
-  <rect x="9" y="16.9" width="8" height="2.2" rx="1.1"/>
+  <!-- Activity-bar container icon — the Scribe's Nib brand mark (spec-scribes-nib-branding). VS Code masks by
+       ALPHA and tints with the theme foreground, so only the silhouette matters: a filled fountain-pen nib with
+       the vent hole and tip slit cut out via fill-rule="evenodd". Same geometry as the in-app header mark
+       (HtmlRenderAdapter) — one mark, three renditions. -->
+  <path fill-rule="evenodd" d="M12 1.6 C7.6 1.6 4.6 4.9 4.6 9.3 C4.6 14.8 8.6 19.3 12 22.6 C15.4 19.3 19.4 14.8 19.4 9.3 C19.4 4.9 16.4 1.6 12 1.6 Z M12 7.1 a2.1 2.1 0 1 0 0 4.2 a2.1 2.1 0 1 0 0 -4.2 Z M10.9 12.5 L13.1 12.5 L12.5 18.6 L12 19.9 L11.5 18.6 Z"/>
 </svg>

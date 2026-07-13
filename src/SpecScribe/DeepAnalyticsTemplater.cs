@@ -10,7 +10,7 @@ namespace SpecScribe;
 /// Git Pulse panel links here. Pure HTML/CSS + inline SVG — no JS, matching the chart convention. [Story 3.2]</summary>
 public static class DeepAnalyticsTemplater
 {
-    public static string RenderPage(DeepGitPulse deep, SiteNav nav)
+    public static string RenderPage(DeepGitPulse deep, SiteNav nav, Func<string, string?>? fileHref = null)
     {
         var outputPath = SiteNav.DeepAnalyticsOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -51,7 +51,7 @@ public static class DeepAnalyticsTemplater
         {
             sb.Append("    <a class=\"coupling-expand\" href=\"#coupling-zoom\" aria-label=\"Expand the change-coupling graph\">&#10530; Expand</a>\n");
         }
-        sb.Append(Charts.CouplingGraph(deep.Coupling));
+        sb.Append(Charts.CouplingGraph(deep.Coupling, fileHref: fileHref));
         if (hasCoupling)
         {
             sb.Append("    <p class=\"coupling-legend\">Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together.</p>\n");
@@ -73,7 +73,7 @@ public static class DeepAnalyticsTemplater
         }
         sb.Append("      </div>\n");
         sb.Append("      <p class=\"deep-page-note\">Files that changed together most often, with the number of shared commits.</p>\n");
-        sb.Append(Charts.CouplingTable(deep.Coupling));
+        sb.Append(Charts.CouplingTable(deep.Coupling, fileHref));
         sb.Append("    </div>\n");
 
         sb.Append("    <div class=\"chart-panel deep-page-list-panel\">\n");
@@ -85,7 +85,7 @@ public static class DeepAnalyticsTemplater
         }
         sb.Append("      </div>\n");
         sb.Append("      <p class=\"deep-page-note\">The files changed most often across recent history — the parts of the codebase carrying the most churn.</p>\n");
-        sb.Append(Charts.HotspotBars(deep.Hotspots));
+        sb.Append(Charts.HotspotBars(deep.Hotspots, fileHref));
         sb.Append("    </div>\n");
 
         sb.Append("  </div>\n");
@@ -103,7 +103,7 @@ public static class DeepAnalyticsTemplater
             sb.Append("  <a class=\"coupling-lightbox-backdrop\" href=\"#\" aria-label=\"Close enlarged graph\"></a>\n");
             sb.Append("  <div class=\"coupling-lightbox-panel\">\n");
             sb.Append("    <a class=\"coupling-lightbox-close\" href=\"#\" aria-label=\"Close enlarged graph\">&times;</a>\n");
-            sb.Append(Charts.CouplingGraph(deep.Coupling));
+            sb.Append(Charts.CouplingGraph(deep.Coupling, fileHref: fileHref));
             sb.Append("  </div>\n");
             sb.Append("</div>\n\n");
         }

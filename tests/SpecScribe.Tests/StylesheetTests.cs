@@ -133,12 +133,12 @@ public class StylesheetTests
     }
 
     [Fact]
-    public void Stylesheet_HasStructureTreeStyles()
+    public void Stylesheet_HasCodeMapStyles()
     {
-        // Cheap guard so the Story 3.4 structure-tree seam can't be silently deleted in a later refactor.
+        // Cheap guard so the Story 7.6 code-map treemap seam can't be silently deleted in a later refactor.
         var css = ReadStylesheet();
-        Assert.Contains(".structure-tree", css);
-        Assert.Contains(".tree-branch", css);
+        Assert.Contains(".codemap-cell", css);
+        Assert.Contains(".codemap-legend", css);
     }
 
     [Fact]
@@ -243,7 +243,7 @@ public class StylesheetTests
         // Keyed to already-present sibling roots so an unbuilt surface (the funnel until 3.6) is a no-op.
         Assert.Contains(".git-pulse", block);
         Assert.Contains(".coverage", block);
-        Assert.Contains(".structure-tree", block);
+        Assert.Contains(".codemap", block);
         Assert.Contains(".refinement-funnel", block);
     }
 
@@ -379,5 +379,111 @@ public class StylesheetTests
         Assert.Contains("ss-tooltip", js);
         // The send menu's click-away / Escape dismissal ships in the same sanctioned script.
         Assert.Contains("send-menu", js);
+    }
+
+    // ---- spec-scribes-nib-branding: brand mark + contrast pass ---------------------------------------------
+
+    private static string ReadThemeBridge()
+    {
+        var asm = typeof(Charts).Assembly;
+        using var stream = asm.GetManifestResourceStream("SpecScribe.assets.specscribe-webview-theme.css")
+            ?? throw new InvalidOperationException("Embedded 'SpecScribe.assets.specscribe-webview-theme.css' is missing.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    /// <summary>WCAG 2.x relative-luminance contrast ratio for two <c>#rrggbb</c> values — computed, not
+    /// eyeballed, so a future palette tweak that regresses the contrast pass goes red here rather than in a
+    /// review screenshot.</summary>
+    private static double ContrastRatio(string hexA, string hexB)
+    {
+        static double Channel(string hex, int index)
+        {
+            var c = Convert.ToInt32(hex.Substring(index, 2), 16) / 255.0;
+            return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+        }
+        static double Lum(string hex)
+        {
+            var h = hex.TrimStart('#');
+            return 0.2126 * Channel(h, 0) + 0.7152 * Channel(h, 2) + 0.0722 * Channel(h, 4);
+        }
+        var (l1, l2) = (Lum(hexA), Lum(hexB));
+        if (l1 < l2) (l1, l2) = (l2, l1);
+        return (l1 + 0.05) / (l2 + 0.05);
+    }
+
+    private static string TokenValue(string css, string token)
+    {
+        // Comments are stripped first: this stylesheet's prose routinely quotes token/value pairs (including
+        // this pass's own before/after notes), and Regex.Match would happily validate a dead value quoted in a
+        // comment while the live definition regressed.
+        var code = System.Text.RegularExpressions.Regex.Replace(
+            css, @"/\*.*?\*/", string.Empty, System.Text.RegularExpressions.RegexOptions.Singleline);
+        var m = System.Text.RegularExpressions.Regex.Match(
+            code, $@"{System.Text.RegularExpressions.Regex.Escape(token)}\s*:\s*(#[0-9a-fA-F]{{6}})\s*;");
+        Assert.True(m.Success, $"{token} must be defined as a 6-digit hex literal");
+        return m.Groups[1].Value;
+    }
+
+    [Fact]
+    public void MutedInk_ClearsWcagAA_OnBothParchmentSurfaces()
+    {
+        // The owner's F5 finding ("light text on light backgrounds"): --ink-light measured 3.95:1 on
+        // --parchment-dark. The deepened value must clear 4.5:1 (AA, normal text) on BOTH parchment surfaces.
+        var css = ReadStylesheet();
+        var inkLight = TokenValue(css, "--ink-light");
+        Assert.True(ContrastRatio(inkLight, TokenValue(css, "--parchment")) >= 4.5,
+            $"--ink-light {inkLight} vs --parchment must be >= 4.5:1");
+        Assert.True(ContrastRatio(inkLight, TokenValue(css, "--parchment-dark")) >= 4.5,
+            $"--ink-light {inkLight} vs --parchment-dark must be >= 4.5:1");
+    }
+
+    [Fact]
+    public void FunnelConnector_IsItsOwnVisibleToken_OnSiteAndInTheBridge()
+    {
+        // The owner's F5 finding: the funnel's stage-linking band filled with --parchment-dark, which the
+        // webview bridge remaps to the widget BACKGROUND — literally invisible on dark hosts. It must be its
+        // own token, visibly distinct from the page background on the site (the old pairing was ~1.1:1), and
+        // re-valued in the shared .vscode-* bridge block riding the host separator palette.
+        var css = ReadStylesheet();
+        // The RAW token is what ships: the rule must not reintroduce an opacity that re-blends the band toward
+        // the surface below the floor asserted here.
+        Assert.Contains(".funnel-connector { fill: var(--funnel-connector); }", css);
+        var connector = TokenValue(css, "--funnel-connector");
+        // Asserted against the surfaces the funnel ACTUALLY sits on: the chart panel (--warm-white) and the
+        // page body (--cream) — not the parchment tokens, which host no funnel.
+        Assert.True(ContrastRatio(connector, TokenValue(css, "--warm-white")) >= 1.8,
+            $"--funnel-connector {connector} must be distinguishable (>=1.8:1) from the chart panel surface");
+        Assert.True(ContrastRatio(connector, TokenValue(css, "--cream")) >= 1.8,
+            $"--funnel-connector {connector} must be distinguishable (>=1.8:1) from the page body surface");
+
+        // The bridge derives the band from the host FOREGROUND (never the ~1.5:1 border hairlines, which some
+        // themes even define as transparent) so it is visible and hue-neutral in every theme family.
+        var bridge = ReadThemeBridge();
+        Assert.Contains("--funnel-connector: color-mix(in srgb, var(--vscode-foreground)", bridge);
+    }
+
+    [Fact]
+    public void SiteNavMark_HasSizingRule_AndInheritsCurrentColor()
+    {
+        // The Scribe's Nib header mark: sized relative to the wordmark and colored ONLY via currentColor
+        // (token-system rule; the brand span's color drives it on every surface, including whatever the
+        // webview bridge re-values that color to). Anchored on the exact rule opener — MediaBlock is for
+        // unique @media headers and would mis-anchor on a comment mention of the selector.
+        var css = ReadStylesheet();
+        var ruleStart = css.IndexOf(".site-nav-mark {", StringComparison.Ordinal);
+        Assert.True(ruleStart >= 0, "stylesheet carries the .site-nav-mark rule");
+        var rule = css[ruleStart..css.IndexOf('}', ruleStart)];
+        Assert.Contains("fill: currentColor", rule);
+        Assert.DoesNotContain("#", rule);
+    }
+
+    [Fact]
+    public void StatusDeferred_IsFrozenLiteral_DecoupledFromMutedInk()
+    {
+        // Review finding: --status-deferred used to ALIAS --ink-light, so deepening the muted-text token would
+        // silently re-tune the deferred ACCENT — exactly the owner's no-accent-retune constraint. It must stay
+        // a frozen literal at the pre-pass value.
+        Assert.Equal("#7a6250", TokenValue(ReadStylesheet(), "--status-deferred"));
     }
 }

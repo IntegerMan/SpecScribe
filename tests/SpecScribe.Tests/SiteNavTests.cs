@@ -75,27 +75,27 @@ public class SiteNavTests
     }
 
     [Fact]
-    public void Build_AddsStructureItemAndQuickLinkWhenAvailable()
+    public void Build_AddsCodeMapItemAndQuickLinkWhenAvailable()
     {
-        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasStructure: true);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasCodeMap: true);
 
-        // Structure sits in the insight/tracking neighborhood after Epics/Requirements. [Story 3.4 Task 3.2]
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Structure" }, nav.Items.Select(i => i.Label).ToArray());
-        Assert.Equal(SiteNav.StructureOutputPath, nav.Items.First(i => i.Label == "Structure").OutputRelativePath);
-        Assert.True(nav.HasStructure);
+        // Code Map sits in the insight/tracking neighborhood after Epics/Requirements. [Story 7.6 Subtask 3.3]
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Code Map" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(SiteNav.CodeMapOutputPath, nav.Items.First(i => i.Label == "Code Map").OutputRelativePath);
+        Assert.True(nav.HasCodeMap);
 
-        var quick = Assert.Single(nav.QuickLinks, q => q.Label == "Structure");
-        Assert.Equal(SiteNav.StructureOutputPath, quick.OutputRelativePath);
+        var quick = Assert.Single(nav.QuickLinks, q => q.Label == "Code Map");
+        Assert.Equal(SiteNav.CodeMapOutputPath, quick.OutputRelativePath);
     }
 
     [Fact]
-    public void Build_OmitsStructureWhenNotAvailable()
+    public void Build_OmitsCodeMapWhenNotAvailable()
     {
-        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasStructure: false);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasCodeMap: false);
 
-        Assert.DoesNotContain("Structure", nav.Items.Select(i => i.Label));
-        Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Structure");
-        Assert.False(nav.HasStructure);
+        Assert.DoesNotContain("Code Map", nav.Items.Select(i => i.Label));
+        Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Code Map");
+        Assert.False(nav.HasCodeMap);
     }
 
     [Fact]
@@ -195,5 +195,27 @@ public class SiteNavTests
         Assert.Contains("href=\"../../index.html\"", html);
         Assert.Contains("href=\"../../epics.html\"", html);
         Assert.Contains("class=\"crumb-current\" aria-current=\"page\">Story 1.1</span>", html);
+    }
+
+    [Fact]
+    public void RenderNavMarkup_CarriesTheBrandMark_TokenColoredAndDecorative()
+    {
+        // The Scribe's Nib header mark (spec-scribes-nib-branding): present on every surface via the ONE nav
+        // seam, decorative (aria-hidden — the brand's accessible name stays the wordmark text), with fallback
+        // width/height so a stylesheet miss can't paint the 300×150 replaced-element default, and colored ONLY
+        // via CSS currentColor — the SVG markup must carry no hex, or the webview brand recolor would silently
+        // stop driving the mark. Guards the MARKUP (the stylesheet-side twin lives in StylesheetTests).
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var markup = HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView("index.html"));
+
+        var svgStart = markup.IndexOf("<svg class=\"site-nav-mark\"", StringComparison.Ordinal);
+        Assert.True(svgStart >= 0, "the brand span carries the site-nav-mark SVG");
+        var svg = markup[svgStart..(markup.IndexOf("</svg>", svgStart, StringComparison.Ordinal) + "</svg>".Length)];
+        Assert.Contains("aria-hidden=\"true\"", svg);
+        Assert.Contains("width=\"16\"", svg);
+        Assert.Contains(HtmlRenderAdapter.NibPathData, svg);
+        Assert.DoesNotContain("#", svg);
+        // The wordmark still renders as the brand span's own text, right after the mark.
+        Assert.Contains("</svg>SpecScribe</span>", markup);
     }
 }

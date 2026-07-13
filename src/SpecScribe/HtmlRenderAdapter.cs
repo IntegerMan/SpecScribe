@@ -50,6 +50,17 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     /// <see cref="WebviewRenderAdapter"/> can reuse the exact nav element under the webview's strict
     /// Content-Security-Policy, where a non-nonce'd inline script would simply be blocked: the webview's own
     /// nonce'd bridge script owns the toggle behavior there instead. [Story 6.4]</summary>
+    /// <remarks>The Scribe's Nib path data (24×24 viewBox): a filled nib silhouette with the vent hole and tip
+    /// slit as <c>evenodd</c> cutouts, sized so the cutouts survive ~14px header rendering (slit 2.2 units wide,
+    /// vent r 2.1). The extension's <c>media/specscribe-outline.svg</c> carries THIS SAME geometry and
+    /// <c>media/specscribe.svg</c> a 16-box scaled variant — keep the three in step when the mark changes
+    /// (no build-step sync exists yet; see deferred-work). [spec-scribes-nib-branding]</remarks>
+    public const string NibPathData =
+        "M12 1.6 C7.6 1.6 4.6 4.9 4.6 9.3 C4.6 14.8 8.6 19.3 12 22.6 "
+        + "C15.4 19.3 19.4 14.8 19.4 9.3 C19.4 4.9 16.4 1.6 12 1.6 Z "
+        + "M12 7.1 a2.1 2.1 0 1 0 0 4.2 a2.1 2.1 0 1 0 0 -4.2 Z "
+        + "M10.9 12.5 L13.1 12.5 L12.5 18.6 L12 19.9 L11.5 18.6 Z";
+
     public string RenderNavMarkup(NavigationView nav)
     {
         var prefix = PathUtil.RelativePrefix(nav.ActiveOutputRelativePath);
@@ -61,7 +72,16 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         // gutters instead of floating at the viewport edges. [Deep Analytics polish]
         sb.Append("<nav class=\"site-nav\" aria-label=\"Document navigation\">\n");
         sb.Append("  <div class=\"site-nav-inner\">\n");
-        sb.Append($"    <span class=\"site-nav-brand\">{PathUtil.Html(nav.SiteTitle)}</span>\n");
+        // The Scribe's Nib brand mark (spec-scribes-nib-branding): the SAME nib geometry as the extension's
+        // activity-bar/panel icons (see NibPathData), inlined once at this ONE nav seam so all three surfaces
+        // (site, webview, SPA) carry it. Decorative (aria-hidden) beside the wordmark; colored purely via
+        // currentColor from the brand span (token-system rule — no hex in markup), with the vent and slit as
+        // evenodd cutouts so it reads on any bar background. width/height are the unstyled fallback size — a
+        // stylesheet miss must degrade to a small icon, never the 300×150 replaced-element default.
+        sb.Append("    <span class=\"site-nav-brand\">"
+            + "<svg class=\"site-nav-mark\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\">"
+            + $"<path fill-rule=\"evenodd\" d=\"{NibPathData}\"/></svg>"
+            + $"{PathUtil.Html(nav.SiteTitle)}</span>\n");
         sb.Append("    <button class=\"site-nav-toggle\" type=\"button\" aria-label=\"Toggle navigation\" aria-controls=\"site-nav-links\" aria-expanded=\"false\">Menu</button>\n");
         sb.Append("    <div class=\"site-nav-links\" id=\"site-nav-links\">\n");
         foreach (var item in nav.Items)

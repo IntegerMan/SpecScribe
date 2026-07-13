@@ -11,7 +11,15 @@
   --warm-white: #faf7f2;
   --ink: #2a1f0e;
   --ink-faded: #5a4535;
-  --ink-light: #7a6250;
+  /* Deepened from #7a6250 (measured 3.95:1 on --parchment-dark — below AA) to clear 4.5:1 on BOTH parchment
+     surfaces (4.90 on parchment-dark, 5.91 on parchment) while keeping the warm hue. Pinned by the computed
+     WCAG test in StylesheetTests. [spec-scribes-nib-branding contrast pass] */
+  --ink-light: #6b5442;
+  /* The refinement funnel's stage-linking band. Deliberately its OWN token (not --parchment-dark, whose webview
+     remap made the connector invisible on dark hosts): visibly distinct from both page and panel surfaces here
+     (1.95:1 / 1.61:1 vs the old ~1.1:1), and re-valued per theme in the webview bridge.
+     [spec-scribes-nib-branding contrast pass] */
+  --funnel-connector: #c7a56d;
   --rust: #8b3a1a;
   --rust-light: #c4622d;
   --moss: #4a6741;
@@ -37,7 +45,10 @@
   --status-active: var(--teal);        /* teal — in development */
   --status-review: var(--teal-deep);   /* deep teal — in review */
   --status-done: var(--moss-light);    /* green — done ONLY */
-  --status-deferred: var(--ink-light); /* grey — requirements shelved for later */
+  /* Frozen at the value --ink-light held before the spec-scribes-nib-branding contrast pass deepened that
+     TEXT token — the deferred ACCENT must not drift when muted-text contrast is tuned (they only ever shared
+     a value by coincidence, and the owner's no-accent-retune constraint covers this stage too). */
+  --status-deferred: #7a6250; /* grey-brown — requirements shelved for later */
 
   /* Diagnostics severity background (Story 4.8) — a pale rust tint pairing with --rust, deliberately outside
      the six-stage --status-* vocabulary (a run notice isn't a delivery stage) but still a named token rather
@@ -166,6 +177,17 @@ body {
   margin-right: auto;
   white-space: nowrap;
   color: var(--gold-light);
+}
+
+/* The Scribe's Nib mark beside the wordmark (one geometry with the extension icons — spec-scribes-nib-branding).
+   currentColor inherits the brand gold above — and whatever the webview bridge re-values the brand color to —
+   so the mark itself declares no color. */
+.site-nav-mark {
+  width: 1.15em;
+  height: 1.15em;
+  fill: currentColor;
+  vertical-align: -0.2em;
+  margin-right: 0.4em;
 }
 
 .site-nav-toggle {
@@ -569,6 +591,126 @@ pre.code-file code[class*="language-"] {
   padding: 0 1.5rem 2.5rem;
 }
 
+/* Story 7.1 (tabbed) — a code page splits into two pure-CSS, no-JS views: "Insights & relationships" (the reader
+   asked to be led by what the code MEANS) and "Code". Radio inputs drive it; :has(:checked) toggles the panels so no
+   script is needed, honoring the pure-SVG/HTML charting rule. Neutral ink/border/parchment/gold tokens only. */
+.code-tabs {
+  margin-top: 1.5rem;
+}
+
+/* The tablist is a real <fieldset> of radios (a visually-hidden legend names the choice for assistive tech); the
+   fieldset's default chrome is stripped so it reads as a segmented control. */
+.code-tablist {
+  border: 0;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: inline-flex;
+  gap: 0.25rem;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.25rem;
+}
+
+.code-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-light);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+/* The radio itself is removed from view but stays in the a11y tree and keyboard-focusable (native arrow-key group
+   navigation). Focus and checked state are reflected onto the label via :has(). */
+.code-tab-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.code-tab:hover {
+  color: var(--ink);
+}
+
+/* The checked tab reads as active — UNLESS a deep-link target has forced the code view (see the :target rules below),
+   in which case the :not(:has()) gate switches this off so the source tab wins instead. Gating is deterministic and
+   avoids a specificity tie with the target override. */
+.code-tabs:not(:has(.code-tabpanel--source .code-line:target)) .code-tab:has(.code-tab-input:checked) {
+  background: var(--ink);
+  color: var(--parchment);
+}
+
+.code-tab:has(.code-tab-input:focus-visible) {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Exactly one panel shows at a time. Default hidden; the checked tab reveals its panel. */
+.code-tabpanel {
+  display: none;
+}
+
+.code-tabs:has(.code-tab--insights .code-tab-input:checked) .code-tabpanel--insights,
+.code-tabs:has(.code-tab--source .code-tab-input:checked) .code-tabpanel--source {
+  display: block;
+}
+
+/* Deep-link survival: a #L{n} anchor lands on a source line inside the (initially hidden) code panel. When a line is
+   :target, force the code view forward and mark its tab active — so code/<path>.html#L42 still works with the insights
+   tab defaulted, no JavaScript. The :has() argument is spelled with `.code-line:target` so these rules match the
+   specificity of the :has(:checked) rules above AND follow them in source order — the tie-breaker that lets a live
+   deep link override the default checked tab. */
+.code-tabs:has(.code-tabpanel--source .code-line:target) .code-tabpanel--insights {
+  display: none;
+}
+
+.code-tabs:has(.code-tabpanel--source .code-line:target) .code-tabpanel--source {
+  display: block;
+}
+
+.code-tabs:has(.code-tabpanel--source .code-line:target) .code-tab--source {
+  background: var(--ink);
+  color: var(--parchment);
+}
+
+/* Insight panels — a responsive grid of bordered child cards (relationships graph, "view online", and each git
+   signal). A wide card (the change-history table) opts into full width. */
+.insight-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.2rem;
+  align-items: start;
+}
+
+.insight-panel {
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
+  border-radius: 6px;
+  background: var(--parchment);
+}
+
+.insight-panel > h2,
+.insight-panel > h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* The history card is a full table — let it span the whole grid row rather than squeeze into one column. */
+.code-insight-history {
+  grid-column: 1 / -1;
+}
+
 /* Graph beside code. The aside is a sticky sidebar so a tall file scrolls past a still-visible graph; min-width:0 on
    the source column lets its <pre> shrink and scroll internally instead of blowing out the grid. */
 .code-layout {
@@ -689,12 +831,28 @@ pre.code-file code[class*="language-"] {
   min-width: 0;
 }
 
+/* "Source" heading with the additive "view online" link pushed to its right. */
+.code-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
 .code-source-head h2 {
-  margin: 0 0 0.4rem;
+  margin: 0;
   font-size: 0.85rem;
   color: var(--ink-light);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* Next to the heading the link is a compact inline pill (a bit smaller than the sidebar action it replaced). */
+.code-source-head .code-external-link {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
 }
 
 /* Story 7.7 — additive "view online" action in the sidebar, below the graph. A full-width pill button with the host
@@ -740,41 +898,18 @@ pre.code-file code[class*="language-"] {
   }
 }
 
-/* Story 7.4 — opt-in "Advanced coverage" section: per-file git signals under the source. Neutral chart tokens
-   only (never --status-* lifecycle colors); pure HTML/CSS, no JS. Omitted entirely when --deep-git is off. */
+/* Story 7.4 — opt-in "Advanced coverage" section: per-file git signals, now a group of child .insight-panel cards
+   (change frequency, contributors, coupling, history) rather than one boxed surface. The section itself is a bare
+   grouping — no border/background of its own; the cards carry the chrome. Neutral chart tokens only (never
+   --status-* lifecycle colors); pure HTML/CSS, no JS. Omitted entirely when --deep-git is off. */
 .code-insights {
-  margin-top: 2rem;
-  padding: 1.3rem 1.4rem;
-  border: 1px solid var(--border);
-  border-top: 3px solid var(--gold);
-  border-radius: 6px;
-  background: var(--parchment);
+  margin-top: 1.5rem;
 }
 
 .code-insights > h2 {
-  margin: 0 0 0.3rem;
+  margin: 0 0 0.9rem;
   font-size: 0.9rem;
   color: var(--ink-light);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.code-insights-note {
-  margin: 0 0 1.1rem;
-  font-size: 0.85rem;
-  color: var(--ink-light);
-}
-
-.code-insights-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.2rem 1.6rem;
-}
-
-.code-insight-block h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.8rem;
-  color: var(--ink-faded);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -2002,7 +2137,9 @@ pre.code-file code[class*="language-"] {
    there yet" rather than a colored bar that could read as data (AC #2 early-stage honesty). */
 .funnel-band.funnel-zero { fill: none; stroke: var(--ink-light); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.6; }
 /* Data-free flow joints between the stage bands — neutral, muted, and behind the bands. */
-.funnel-connector { fill: var(--parchment-dark); opacity: 0.8; }
+/* No opacity here on purpose: a translucent fill re-blends toward the surface and quietly undercuts the
+   distinguishability the token guarantees (the contrast test pins the RAW value — what ships must match it). */
+.funnel-connector { fill: var(--funnel-connector); }
 .funnel-stage-count { font-size: 16px; font-weight: 700; fill: var(--ink); }
 .funnel-stage-label { font-size: 11px; fill: var(--ink-faded); }
 .funnel-stage-sub { font-size: 10px; fill: var(--ink-light); }
@@ -2263,49 +2400,105 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .coverage-card.missing { background: var(--parchment); border-style: dashed; }
 .coverage-card.stale { border-left-color: var(--rust-light); }
 
-/* ============ STRUCTURE TREE (interactive project/artifact tree, structure.html) ============ */
-/* Native <details>/<summary> disclosure — zero JS. Structure/hierarchy is NOT a lifecycle stage, so nothing
-   here routes through the --status-* tokens (those stay the single stage→color source); depth/branch/leaf are
-   styled with neutral base-palette tones + guide-rule borders only. Static, no motion (Story 3.5 owns insight
-   animation), so reduced-motion is trivially satisfied. Family glyphs inherit currentColor via .ss-icon. [Story 3.4] */
-.structure-tree { font-size: 0.9rem; line-height: 1.6; }
-.structure-tree .tree-list { list-style: none; margin: 0; padding: 0; }
+/* ============ CODE MAP (source-code treemap, code-map.html) ============ */
+/* Server-rendered squarified SVG treemap — files sized by lines of code, colored on a SEQUENTIAL ramp (change
+   activity), zoomable via a small progressive-enhancement script. Code mass/churn is NOT a lifecycle stage, so
+   nothing here routes through the --status-* tokens (those stay the single stage→color source); the ramp reuses
+   the commit-heatmap sequential levels. Everything is correct with JS off (baked default fill + legend + the text
+   table below); the drill breadcrumb + colorize controls are revealed by script. [Story 7.6] */
+.codemap-panel .chart-lead { margin-top: 0; }
 
-/* Every nested list gets a left indent + a hairline guide rule so depth reads at a glance (UX-DR19). The
-   top-level list has no rule (nothing to the left of a root). */
-.structure-tree .tree-list .tree-list {
-  margin-left: 0.55rem;
-  padding-left: 0.9rem;
-  border-left: 1px solid var(--border);
+/* The SVG scales to the panel width; on a very narrow screen the viewport scrolls internally (a last resort per
+   the overflow discipline) rather than forcing a horizontal PAGE scroll. */
+.codemap-viewport { overflow-x: auto; margin-top: 0.6rem; }
+.codemap { display: block; width: 100%; min-width: 320px; height: auto; }
+
+/* File cells: the sequential ramp fill (levels), a hairline boundary, and the shared focus ring. Levels reuse the
+   SAME values as the commit heatmap so the two sequential ramps can never desync. level-none = a file with no git
+   record (neutral, clearly "no data" — never the sole signal; the tooltip + text table carry the truth). */
+.codemap-cell { stroke: var(--parchment); stroke-width: 0.5; transition: stroke 0.12s ease; }
+.codemap-cell.level-0 { fill: var(--parchment-dark); fill-opacity: 0.35; }
+.codemap-cell.level-1 { fill: #ecd18f; }
+.codemap-cell.level-2 { fill: #dfb455; }
+.codemap-cell.level-3 { fill: var(--gold-light); }
+.codemap-cell.level-4 { fill: var(--gold); }
+.codemap-cell.level-none { fill: var(--parchment-dark); fill-opacity: 0.55; }
+.codemap-cell:hover { stroke: var(--rust); stroke-width: 1.5; }
+/* SVG focus: default outlines render unreliably around SVG rects, so express focus on the rect itself (teal, the
+   shared ring) — never outline:none without a visible replacement. Matches the heatmap/sunburst convention. */
+.codemap-cell:focus-visible { outline: none; stroke: var(--teal); stroke-width: 2; }
+.codemap a { cursor: pointer; }
+
+/* Directory boundaries + labels: neutral guide-rule tone, transparent fill so the child cells read through. When
+   the script makes a directory an activatable zoom target it gains the same hover/focus affordance as a cell. */
+.codemap-dir { fill: none; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
+.codemap-dir[role="button"] { cursor: pointer; }
+.codemap-dir[role="button"]:hover { stroke: var(--rust); stroke-opacity: 1; }
+.codemap-dir:focus-visible { outline: none; stroke: var(--teal); stroke-width: 2; stroke-opacity: 1; }
+.codemap-dir-label {
+  font-size: 10px;
+  fill: var(--ink-faded);
+  font-family: 'Courier New', monospace;
+  pointer-events: none;
 }
 
-.structure-tree .tree-branch > details > summary {
-  cursor: pointer;
-  list-style: none;
+/* Colorize controls (revealed by script; hidden in the no-JS page so no inert control ships). */
+.codemap-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+  margin: 0.6rem 0 0.3rem;
+  padding: 0;
+  border: 0;
+  font-size: 0.85rem;
+}
+.codemap-controls-label { color: var(--ink-light); font-weight: 600; }
+.codemap-radio { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+
+/* Legend — always visible (it explains the baked-in default colors). Same ramp tokens as the cells + heatmap. */
+.codemap-legend {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.15rem 0.3rem;
-  border-radius: 4px;
-  color: var(--ink);
-  font-weight: 600;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  margin-top: 0.4rem;
 }
-/* Reuse the shared caret pattern (.dev-agent-details): hide the native marker, prepend a ▸ that flips to ▾. */
-.structure-tree summary::-webkit-details-marker { display: none; }
-.structure-tree summary::before { content: "\25B8"; color: var(--gold); font-size: 0.8em; width: 0.8em; flex: 0 0 auto; }
-.structure-tree details[open] > summary::before { content: "\25BE"; }
-.structure-tree summary:hover { background: var(--parchment); }
+.codemap-legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.codemap-legend-swatch.level-0 { background: var(--parchment-dark); opacity: 0.35; }
+.codemap-legend-swatch.level-1 { background: #ecd18f; }
+.codemap-legend-swatch.level-2 { background: #dfb455; }
+.codemap-legend-swatch.level-3 { background: var(--gold-light); }
+.codemap-legend-swatch.level-4 { background: var(--gold); }
 
-/* Leaf file rows are lighter than the folder branches above them (directory = weight, file = quiet). */
-.structure-tree .tree-leaf { padding: 0.12rem 0.3rem 0.12rem 1.5rem; }
-.structure-tree .tree-leaf .tree-file { color: var(--ink-light); }
-.structure-tree .tree-leaf a.tree-file { color: var(--rust); text-decoration: none; }
-.structure-tree .tree-leaf a.tree-file:hover { text-decoration: underline; }
+/* Drill breadcrumb (revealed by script). Reuses the button/crumb vocabulary; separators via ::before. */
+.codemap-drill { margin: 0.5rem 0 0.2rem; }
+.codemap-breadcrumb { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; margin: 0; padding: 0; font-size: 0.8rem; }
+.codemap-breadcrumb li { display: flex; align-items: center; }
+.codemap-breadcrumb li + li::before { content: "\203A"; color: var(--ink-faded); margin-right: 0.25rem; }
+.codemap-crumb {
+  background: none;
+  border: 0;
+  color: var(--rust);
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+  font: inherit;
+  border-radius: 3px;
+}
+.codemap-crumb:hover { text-decoration: underline; }
+.codemap-crumb[aria-current="true"] { color: var(--ink); cursor: default; text-decoration: none; }
 
-/* Long paths wrap rather than force horizontal page scroll on mobile (.chart-panel scrolls internally as a
-   last resort per the overflow discipline). [Subtask 4.3] */
-.structure-tree .tree-label,
-.structure-tree .tree-file { overflow-wrap: anywhere; }
+.codemap-notice { color: var(--ink-light); font-size: 0.85rem; margin: 0.6rem 0; }
+
+/* The text-equivalent table: the no-JS truth of the visualization. Numeric columns right-align. */
+.codemap-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.codemap-table th, .codemap-table td { text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid var(--border); }
+.codemap-table th[scope="row"] { font-weight: 400; overflow-wrap: anywhere; }
+.codemap-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.codemap-table thead th { color: var(--ink-light); font-weight: 600; }
+.codemap-table a { color: var(--rust); text-decoration: none; }
+.codemap-table a:hover { text-decoration: underline; }
 
 /* ============ DEEP ANALYTICS (opt-in --deep-git: hotspots + change coupling) ============ */
 /* Change-coupling node-link graph (deep-analytics page). Layout is computed at generation time; this only
@@ -3364,7 +3557,7 @@ a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2
      longer a no-op for it; a future staged per-stage narrowing reveal can still hang off the same class. */
   .git-pulse,
   .coverage,
-  .structure-tree,
+  .codemap,
   .refinement-funnel,
   .req-flow { animation: panel-reveal var(--motion-entrance) var(--motion-ease) both; }
   @keyframes panel-reveal {
@@ -3405,7 +3598,7 @@ a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2
   .heatmap .heatmap-cell,
   .git-pulse,
   .coverage,
-  .structure-tree,
+  .codemap,
   .refinement-funnel,
   .req-flow {
     animation: none;

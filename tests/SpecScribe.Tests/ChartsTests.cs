@@ -800,54 +800,84 @@ public class ChartsTests
         Assert.Contains("<title>1 of 1 story is done</title>", svg);
     }
 
-    // ---- Project structure tree (Story 3.4) ------------------------------------------------
+    // ---- Source-code treemap SVG (Story 7.6) -----------------------------------------------
+
+    private static CodeMap TreemapWithMetrics() => CodeMap.Build(
+        new[] { ("src/A.cs", 100L), ("src/B.cs", 40L) },
+        new Dictionary<string, CodeFileMetrics>
+        {
+            ["src/A.cs"] = new CodeFileMetrics(5, 120, new DateOnly(2026, 6, 1), new DateOnly(2026, 7, 1)),
+        });
 
     [Fact]
-    public void ProjectStructureTree_RendersDirectoriesAsNativeDetailsWithGlyphAndLabel()
+    public void CodeTreemap_RendersOneFocusableRectPerFileWithMetricDataAttributes()
     {
-        var tree = ProjectTree.Build(new[] { "planning-artifacts/epics.md" }, new Dictionary<string, string>());
+        var map = TreemapWithMetrics();
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
 
-        var html = Charts.ProjectStructureTree(tree);
-
-        // A directory branch is a native <details>/<summary> disclosure (zero-JS expand/collapse + announced
-        // state), the top-level one open, carrying the decorative Structure glyph beside its label.
-        Assert.Contains("<details open>", html);
-        Assert.Contains("<summary>", html);
-        Assert.Contains("aria-hidden=\"true\"", html); // the Structure glyph is decorative
-        Assert.Contains("<span class=\"tree-label\">planning-artifacts</span>", html);
-        // The whole surface is JS-free — lock the no-script contract.
-        Assert.DoesNotContain("<script", html);
+        // Server-rendered SVG (no client layout math), one file rect carrying every metric as data-*.
+        Assert.Contains("<svg id=\"codemap-svg\"", svg);
+        Assert.Contains("class=\"codemap-cell", svg);
+        Assert.Contains("data-path=\"src/A.cs\"", svg);
+        Assert.Contains("data-lines=\"100\"", svg);
+        Assert.Contains("data-changes=\"5\"", svg);
+        Assert.Contains("data-churn=\"120\"", svg);
+        // Focusable, with a rich body-level tooltip + accessible name (color never the sole signal, AC #4).
+        Assert.Contains("tabindex=\"0\"", svg);
+        Assert.Contains("js-tip", svg);
+        Assert.Contains("data-tip=", svg);
+        Assert.Contains("aria-label=", svg);
+        // The default (change-frequency) fill is baked in server-side — A.cs is the busiest, so level-4.
+        Assert.Contains("codemap-cell level-4 js-tip", svg);
     }
 
     [Fact]
-    public void ProjectStructureTree_LinksMappedLeavesAndLeavesOthersAsPlainText()
+    public void CodeTreemap_LinksFileOnlyWhenResolverReturnsATarget()
     {
-        var tree = ProjectTree.Build(
-            new[] { "planning-artifacts/epics.md", "planning-artifacts/orphan.md" },
-            new Dictionary<string, string> { ["planning-artifacts/epics.md"] = "epics.html" });
+        var map = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
+        var layout = map.Layout();
 
-        var html = Charts.ProjectStructureTree(tree);
+        // A resolver that yields a page → the rect is wrapped in an <a> and marked role="link".
+        var linked = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false,
+            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/A.cs.html\">", linked);
+        Assert.Contains("role=\"link\"", linked);
 
-        // Mapped file → an <a> to its generated page (AC #2 routing). structure.html is at the root, so the
-        // output-relative href passes through unprefixed.
-        Assert.Contains("<a class=\"tree-file\" href=\"epics.html\">epics.md</a>", html);
-        // Unmapped file → plain, non-link text — never a broken link.
-        Assert.Contains("<span class=\"tree-file\">orphan.md</span>", html);
+        // No resolver → a plain, focusable rect, never a broken link (the 7.1-dormant seam).
+        var plain = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+        Assert.DoesNotContain("<a href", plain);
+        Assert.Contains("role=\"img\"", plain);
     }
 
     [Fact]
-    public void ProjectStructureTree_EscapesLabelsAndHrefs()
+    public void CodeTreemap_MetriclessFilesAreNeutralWithNoGitDataAttributes()
     {
-        var tree = ProjectTree.Build(
-            new[] { "a&b/c<d>.md" },
-            new Dictionary<string, string> { ["a&b/c<d>.md"] = "pages/a&b.html" });
+        // Git data unavailable (empty metric dict) → every file is sized-by-LOC with a neutral fill and no
+        // per-file git data-* (per-file graceful degradation, AC #2).
+        var map = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
 
-        var html = Charts.ProjectStructureTree(tree);
+        Assert.Contains("level-none", svg);
+        Assert.DoesNotContain("data-changes", svg);
+        Assert.DoesNotContain("data-churn", svg);
+    }
 
-        Assert.Contains("a&amp;b</span>", html);        // directory label escaped
-        Assert.Contains(">c&lt;d&gt;.md</a>", html);     // file label escaped
-        Assert.Contains("href=\"pages/a&amp;b.html\"", html); // href escaped
-        Assert.DoesNotContain("<d>", html);              // no raw unescaped angle brackets leak through
+    [Fact]
+    public void CodeTreemap_EscapesLabelsAndPaths()
+    {
+        var map = CodeMap.Build(new[] { ("a&b/c<d>.cs", 5L) }, new Dictionary<string, CodeFileMetrics>());
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+
+        Assert.Contains("a&amp;b", svg);          // directory label + data-path escaped
+        Assert.Contains("c&lt;d&gt;.cs", svg);    // file label/path escaped
+        Assert.DoesNotContain("<d>", svg);        // no raw unescaped angle brackets leak through
+    }
+
+    [Fact]
+    public void CodeTreemap_EmptyLayoutRendersAnEmptyChartNotice()
+    {
+        var svg = Charts.CodeTreemap(Array.Empty<TreemapRect>(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+        Assert.Contains("chart-empty", svg);
     }
 
     // ==================== Story 3.7: requirement status-block grid + requirements flow ====================

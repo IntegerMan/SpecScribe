@@ -42,6 +42,16 @@
   /* Borders + shadow follow the host so cards/panels separate the way native widgets do. */
   --border: var(--vscode-panel-border, var(--vscode-widget-border, var(--vscode-editorWidget-border)));
   --shadow: var(--vscode-widget-shadow, transparent);
+
+  /* The refinement funnel's stage-linking band (spec-scribes-nib-branding contrast pass). Before this token
+     existed the connector filled with --parchment-dark, which the surface remap above turns INTO the widget
+     background — the band was literally invisible on dark hosts (owner F5 finding). Derive it from the host
+     FOREGROUND, not the border palette: review found stock themes' border tokens are ~1.5:1 hairline colors
+     (and some themes define them fully transparent, which a var() fallback never catches), while a 30% mix
+     toward the foreground is clearly visible, hue-neutral (no collision with the six status accents, even in
+     high contrast), and correct in every theme family by construction. A webview too old for color-mix keeps
+     the base #c7a56d, which is itself ~6:1 on a dark editor background. */
+  --funnel-connector: color-mix(in srgb, var(--vscode-foreground) 30%, var(--vscode-editor-background));
 }
 
 /* The nav bar is authored with LITERAL colors (a near-black bar, gold brand/links) rather than tokens, so it

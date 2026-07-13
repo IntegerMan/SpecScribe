@@ -57,7 +57,28 @@ public sealed record DeepGitPulse(
     /// untouched. [Story 7.4]</summary>
     public IReadOnlyDictionary<string, FileInsight> FileInsights { get; init; }
         = new Dictionary<string, FileInsight>(StringComparer.Ordinal);
+
+    /// <summary>The untruncated per-file metric view for the source-code treemap (Story 7.6): ONE entry per file
+    /// that appears anywhere in the analyzed window — deliberately NOT top-N truncated like <see cref="Insights"/>,
+    /// so a whole-codebase treemap can colorize every file that has git history. Keyed by repo-relative path (git's
+    /// own forward-slash paths, the same strings the numstat rows carry — so it joins cleanly to the treemap's
+    /// source-file walk). Computed from the SAME shared numstat parse (one fetch, one parse, several views) — no
+    /// extra git call. Settable (mirroring <see cref="Insights"/>) so <see cref="SiteGenerator"/> can clear/ignore
+    /// it. Empty (never null) when the log was empty or predates the enriched fetch; a file with no entry simply
+    /// gets a neutral fill (per-file graceful degradation, AC #2). [Story 7.6]</summary>
+    public IReadOnlyDictionary<string, CodeFileMetrics> CodeMapMetrics { get; set; }
+        = new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal);
 }
+
+/// <summary>The per-file git-derived signals a source-code treemap colorizes by (Story 7.6). <paramref name="Changes"/>
+/// = commits touching this file (once per commit, mirroring <see cref="GitMetrics.BuildInsights"/>'s
+/// once-per-commit-per-file counting); <paramref name="TotalChurn"/> = Σ (added + deleted) across every numstat row
+/// (binary rows contribute 0); average change size is <c>TotalChurn / Changes</c> (computed at render, divide-by-zero
+/// guarded). <paramref name="FirstDate"/>/<paramref name="LastDate"/> are the oldest/newest commit day within the
+/// <b>analyzed window</b> touching this file — NOT true repository creation/modification: the shared fetch is bounded
+/// (<c>-n 300</c>), so these are "recency within recent history", matching the AC's deliberate "<b>relative</b>
+/// creation date" wording. Either date is null when no parsed record for the file carried a timestamp. [Story 7.6]</summary>
+public sealed record CodeFileMetrics(int Changes, int TotalChurn, DateOnly? FirstDate, DateOnly? LastDate);
 
 /// <summary>One file's numstat row within a commit. <paramref name="Added"/>/<paramref name="Deleted"/> are
 /// null for binary files (git prints <c>-</c> for both counts) — the path still counts as a change. [Story 3.8]</summary>
@@ -386,7 +407,13 @@ public static class GitMetrics
             .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
             .ToList();
 
-        return new DeepGitPulse(hotspots, coupling) { Insights = BuildInsights(commits), Commits = commits, FileInsights = BuildFileInsights(commits) };
+        return new DeepGitPulse(hotspots, coupling)
+        {
+            Insights = BuildInsights(commits),
+            Commits = commits,
+            FileInsights = BuildFileInsights(commits),
+            CodeMapMetrics = BuildCodeMapMetrics(commits),
+        };
     }
 
     /// <summary>Commit-record boundary sentinel in the shared deep-git fetch (<c>%x01</c>): marks where each
@@ -698,6 +725,70 @@ public static class GitMetrics
         return result;
     }
 
+    /// <summary>Per-file accumulator for <see cref="BuildCodeMapMetrics"/>: change frequency, total churn, and the
+    /// oldest/newest commit day seen for the file. Mirrors <see cref="FileAccum"/>'s small-mutable-class shape for a
+    /// readable hot loop. [Story 7.6]</summary>
+    private sealed class CodeMapAccum
+    {
+        public int Changes;
+        public int TotalChurn;
+        public DateOnly? FirstDate; // oldest day seen (records are newest-first, so the LAST assignment wins — keep overwriting)
+        public DateOnly? LastDate;  // newest day seen (records are newest-first, so the FIRST non-null day is latest)
+    }
+
+    /// <summary>Builds the untruncated per-file treemap metric map (Story 7.6) from the SAME parsed records the
+    /// hotspot/coupling/hub/per-file views consume — one fetch, one parse, several views; no extra git call. Unlike
+    /// <see cref="BuildInsights"/> this is NOT top-N truncated: EVERY file appearing anywhere in the window gets an
+    /// entry, so a whole-codebase treemap can colorize each file with history. Per file: <b>Changes</b> (commits
+    /// touching it, once per commit — a file listed twice in one commit is one change, mirroring
+    /// <see cref="BuildInsights"/>'s <c>seenInCommit</c> guard), <b>TotalChurn</b> (Σ added + deleted across every
+    /// numstat row; binary rows contribute 0), and the <b>oldest/newest</b> commit day within the window. Records
+    /// arrive newest-first, so <c>LastDate</c> is the first non-null day seen and <c>FirstDate</c> is the last
+    /// (oldest) day seen (kept overwriting). Pure and repo-free (mirrors <see cref="BuildInsights"/>): empty input
+    /// yields an empty map and it never throws. [Story 7.6]</summary>
+    public static IReadOnlyDictionary<string, CodeFileMetrics> BuildCodeMapMetrics(IReadOnlyList<DeepCommit> commits)
+    {
+        var accum = new Dictionary<string, CodeMapAccum>(StringComparer.Ordinal);
+
+        foreach (var commit in commits)
+        {
+            var day = commit.Timestamp is { } ts ? DateOnly.FromDateTime(ts) : (DateOnly?)null;
+            // Once-per-commit-per-file change counting: a file listed twice in one commit is still one change.
+            var seenInCommit = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var file in commit.Files)
+            {
+                if (!accum.TryGetValue(file.Path, out var a))
+                {
+                    accum[file.Path] = a = new CodeMapAccum();
+                }
+
+                // Churn sums every numstat row (binary rows contribute 0); change frequency counts once per commit.
+                a.TotalChurn += (file.Added ?? 0) + (file.Deleted ?? 0);
+                if (seenInCommit.Add(file.Path))
+                {
+                    a.Changes++;
+                }
+
+                // Dates: records are newest-first. The first non-null day seen is the file's latest; keep
+                // overwriting FirstDate with each newer-to-older day so it settles on the oldest day in the window.
+                if (day is { } d)
+                {
+                    a.LastDate ??= d;
+                    a.FirstDate = d;
+                }
+            }
+        }
+
+        var result = new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal);
+        foreach (var (path, a) in accum)
+        {
+            result[path] = new CodeFileMetrics(a.Changes, a.TotalChurn, a.FirstDate, a.LastDate);
+        }
+
+        return result;
+    }
+
     /// <summary>Resolves a `--numstat` path field to the file's current path, collapsing git's rename/move
     /// display syntax rather than treating it as one literal path. Git renders a rename either as a full
     /// <c>old/path.cs =&gt; new/path.cs</c> swap, or — when old and new share a prefix/suffix — abbreviated as
@@ -742,6 +833,27 @@ public static class GitMetrics
         if (string.IsNullOrWhiteSpace(branch)) return null;
         branch = branch.Trim();
         return branch is "HEAD" or "" ? null : branch;
+    }
+
+    /// <summary>Lists the repo's git-TRACKED files (repo-relative, forward-slash), or null when the directory is not
+    /// a git repo / git is unavailable — the source-file set the code-map treemap walks (Story 7.6). Reuses the same
+    /// timeout-guarded, failure-tolerant <see cref="RunGit"/> seam as the history reads; <c>ls-files</c> already
+    /// excludes <c>bin/</c>, <c>obj/</c>, <c>.git/</c>, <c>node_modules/</c>, and everything <c>.gitignore</c> covers
+    /// — defining "the codebase" exactly the way git does. <c>core.quotepath=off</c> keeps non-ASCII paths literal
+    /// (never octal-escaped). Never throws (RunGit swallows failures → null). [Story 7.6]</summary>
+    public static IReadOnlyList<string>? TryListFiles(string repoRoot)
+    {
+        var output = RunGit(repoRoot, "-c core.quotepath=off ls-files");
+        if (output is null) return null;
+
+        var files = new List<string>();
+        foreach (var line in output.Split('\n'))
+        {
+            var path = line.Trim();
+            if (path.Length == 0) continue;
+            files.Add(PathUtil.NormalizeSlashes(path));
+        }
+        return files;
     }
 
     private static string? RunGit(string workingDirectory, string arguments)

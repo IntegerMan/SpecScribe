@@ -3,18 +3,20 @@ using SpecScribe;
 
 namespace SpecScribe.Tests;
 
-/// <summary>Generation-level coverage for Story 3.4: with source *.md artifacts present, a structure.html tree
-/// page is produced (nested native &lt;details&gt; disclosure, linking to at least one generated page) and the
-/// Structure nav item + quick link appear; with no source files, none of those exist and no broken links are
-/// emitted. Follows the temp-dir fixture style of <see cref="SiteGeneratorSprintTests"/>. [Story 3.4]</summary>
-public class SiteGeneratorStructureTests : IDisposable
+/// <summary>Generation-level coverage for Story 7.6: with source code present under the repo root, a
+/// <c>code-map.html</c> treemap page is produced (server-rendered SVG + a text-equivalent table, inside the
+/// standard page shell) and the "Code Map" nav item + dashboard quick link appear; with no readable source files,
+/// none of those exist and no broken links are emitted. In a non-git temp repo the deep-git metrics are absent, so
+/// the page renders sized-by-LOC with the "git data unavailable" notice. Follows the temp-dir fixture style of the
+/// sprint/structure generation tests. Replaced the retired Story 3.4 SiteGeneratorStructureTests. [Story 7.6]</summary>
+public class SiteGeneratorCodeMapTests : IDisposable
 {
-    private readonly string _root = Directory.CreateTempSubdirectory("specscribe-structure-").FullName;
+    private readonly string _root = Directory.CreateTempSubdirectory("specscribe-codemap-").FullName;
 
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string StructurePage => Path.Combine(Site, "structure.html");
+    private string CodeMapPage => Path.Combine(Site, "code-map.html");
     private string IndexPage => Path.Combine(Site, "index.html");
 
     private const string EpicsMd = """
@@ -33,21 +35,24 @@ public class SiteGeneratorStructureTests : IDisposable
         As a maintainer, I want the foundation.
         """;
 
-    private const string BriefMd = """
-        # Product Brief
+    private const string WidgetCs = """
+        namespace Sample;
 
-        A short brief so the tree has a linkable planning artifact under a nested folder.
+        public sealed class Widget
+        {
+            public int Value { get; set; }
+            public string Render() => $"<b>{Value}</b>";
+        }
         """;
 
-    public SiteGeneratorStructureTests()
+    public SiteGeneratorCodeMapTests()
     {
         Directory.CreateDirectory(Path.Combine(Source, "planning-artifacts"));
-        Directory.CreateDirectory(Path.Combine(Source, "planning-artifacts", "briefs", "brief-x"));
-        Directory.CreateDirectory(Path.Combine(Source, "implementation-artifacts"));
+        Directory.CreateDirectory(Path.Combine(_root, "src", "Sample"));
         Directory.CreateDirectory(Adrs);
 
         File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), EpicsMd);
-        File.WriteAllText(Path.Combine(Source, "planning-artifacts", "briefs", "brief-x", "brief.md"), BriefMd);
+        File.WriteAllText(Path.Combine(_root, "src", "Sample", "Widget.cs"), WidgetCs);
         File.WriteAllText(Path.Combine(Adrs, "README.md"), "# ADR Index\n\nRecords.\n");
     }
 
@@ -68,55 +73,55 @@ public class SiteGeneratorStructureTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_WithSourceArtifacts_ProducesStructurePageWithTreeNavAndQuickLink()
+    public void GenerateAll_WithSourceCode_ProducesCodeMapPageWithTreemapNavAndQuickLink()
     {
         GenerateSite();
 
-        Assert.True(File.Exists(StructurePage), "structure.html should be generated when source *.md files exist");
-        var html = File.ReadAllText(StructurePage);
+        Assert.True(File.Exists(CodeMapPage), "code-map.html should be generated when readable source files exist");
+        var html = File.ReadAllText(CodeMapPage);
 
         // The standard standalone-page shell: single main landmark, nav, breadcrumb.
         Assert.Contains("<main id=\"main-content\"", html);
         Assert.Contains("class=\"site-nav\"", html);
         Assert.Contains("class=\"breadcrumb\"", html);
-        // The nested native <details> tree, and a link to at least one known generated page (epics.html).
-        Assert.Contains("class=\"structure-tree\"", html);
-        Assert.Contains("<details", html);
-        Assert.Contains("href=\"epics.html\"", html);
-        // The collapsed single-child chain reads as one branch label: briefs → brief-x is a pure single-child
-        // chain, so it renders as one "briefs / brief-x" branch (planning-artifacts itself has two children —
-        // epics.md and briefs — so it is not collapsed).
-        Assert.Contains("briefs / brief-x", html);
 
-        // The Structure nav item + dashboard quick link appear and point at the page.
+        // The server-rendered SVG treemap + the no-JS text-equivalent table listing the walked source file.
+        Assert.Contains("id=\"codemap-svg\"", html);
+        Assert.Contains("codemap-cell", html);
+        Assert.Contains("codemap-table", html);
+        Assert.Contains("src/Sample/Widget.cs", html);
+        // Non-git temp repo → no deep-git metrics → sized-by-LOC with the graceful-degradation notice.
+        Assert.Contains("codemap-notice", html);
+
+        // The Code Map nav item + dashboard quick link appear and point at the page.
         var index = File.ReadAllText(IndexPage);
-        Assert.Contains("href=\"structure.html\"", index);
-        Assert.Contains("Explore the project and artifact structure.", index);
+        Assert.Contains("href=\"code-map.html\"", index);
+        Assert.Contains("Explore the codebase by size and change activity.", index);
 
-        AssertNoBrokenLocalLinks(StructurePage);
+        AssertNoBrokenLocalLinks(CodeMapPage);
         AssertNoBrokenLocalLinks(IndexPage);
     }
 
     [Fact]
-    public void GenerateAll_WithNoSourceArtifacts_OmitsStructurePageAndNav()
+    public void GenerateAll_WithNoReadableSourceFiles_OmitsCodeMapPageAndNav()
     {
-        // Remove every source *.md so the source-artifact file set is empty.
-        foreach (var md in Directory.EnumerateFiles(Source, "*.md", SearchOption.AllDirectories))
+        // Remove every file under the repo root so the source-code walk finds nothing.
+        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
         {
-            File.Delete(md);
+            File.Delete(file);
         }
 
         GenerateSite();
 
-        Assert.False(File.Exists(StructurePage), "no structure.html without any source *.md files");
+        Assert.False(File.Exists(CodeMapPage), "no code-map.html without any readable source files");
         var index = File.ReadAllText(IndexPage);
-        Assert.DoesNotContain("href=\"structure.html\"", index);
+        Assert.DoesNotContain("href=\"code-map.html\"", index);
 
         AssertNoBrokenLocalLinks(IndexPage);
     }
 
     /// <summary>Every local (non-anchor, non-scheme) href on the page resolves to a file that was actually
-    /// generated — the "never a broken link" guarantee (AC #2, NFR2).</summary>
+    /// generated — the "never a broken link" guarantee (AC #3, NFR2).</summary>
     private void AssertNoBrokenLocalLinks(string pagePath)
     {
         var html = File.ReadAllText(pagePath);

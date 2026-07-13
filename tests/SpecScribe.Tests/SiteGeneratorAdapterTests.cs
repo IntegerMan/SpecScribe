@@ -176,6 +176,9 @@ public class SiteGeneratorAdapterTests : IDisposable
             // change (this story adds pages + a site-wide footer link), unlike the byte-parity 4.1/4.2 stories.
             "about.html",
             "adrs/index.html",
+            // Story 7.6: code-map.html replaced the retired Story 3.4 structure.html (source-code treemap; the
+            // fixture's repo-root walk finds its markdown files, so the surface generates).
+            "code-map.html",
             // Story 7.3: artifact-mtime-driven date page (today, folded) + the activity timeline surface.
             "commits/<date>.html",
             "diagnostics.html",
@@ -194,7 +197,6 @@ public class SiteGeneratorAdapterTests : IDisposable
             "specscribe.css",
             "specscribe.js",
             "sprint.html",
-            "structure.html",
             "timeline.html",
         }.OrderBy(p => p, StringComparer.Ordinal).ToList();
 
@@ -223,8 +225,18 @@ public class SiteGeneratorAdapterTests : IDisposable
         // stylesheet content shifted the fingerprint. Regenerated again for Story 7.4: specscribe.css gained the
         // opt-in ".code-insights" advanced-coverage styles (CSS-only; the fixture is not a git repo and cites no
         // real files, so no per-file insight section renders — again only the stylesheet content shifted).
+        // Regenerated for spec-scribes-nib-branding: the nav brand span gained the inline Scribe's Nib mark
+        // (every page — the ONE RenderNavMarkup seam), and specscribe.css gained .site-nav-mark, the
+        // --funnel-connector token, and the AA-deepened --ink-light (#7a6250 → #6b5442).
+        // Regenerated for Story 7.6: the retired structure.html became the source-code treemap code-map.html
+        // (new page content), the nav item/quick link "Structure" → "Code Map" on every page (the shared nav
+        // seam), and specscribe.css/.js gained the .codemap-* treemap styles + the scoped zoom/dimension-switch
+        // enhancement (structure-tree CSS removed).
+        // Regenerated once more for spec-scribes-nib-branding's review patches: the funnel connector dropped
+        // its opacity (the token now ships raw), --status-deferred froze at its pre-pass literal (decoupled
+        // from --ink-light), and the brand-mark SVG gained fallback width/height + the widened nib cutouts.
         // [golden-diff-normalization-gotchas]
-        const string expected = "e2654cd7822e039b0d93c295ade4f2812df3091c8dcf1e8fe4c48536766fc4b1";
+        const string expected = "96ae1efd1fdf4de3cdc3de9230367f35bbe37776900698db3ff4c98cf5c38d3a";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
