@@ -2,7 +2,8 @@
 // SpecScribe Status — the production thin extension-host shim (Story 6.4, governed by ADR 0005).
 //
 // This file is deliberately the WHOLE TypeScript surface. Its only responsibilities (the "irreducible shim"):
-//   1. register commands + menus and set the `specscribe.projectDetected` context key (discoverability, Story 6.8),
+//   1. register commands + menus and set the `specscribe.available` context key (a folder is open — the extension
+//      renders in ANY workspace, not only bmad projects; spec-vscode-any-workspace-and-processing-indicators),
 //   2. open a WebviewPanel, AND drive the native activity-bar tree + status bar (Story 6.9),
 //   3. obtain C#-rendered HTML + the host-neutral `outline` from the `specscribe webview` child process,
 //   4. inject the two host-runtime values (cspSource + nonce) the C# shell left as placeholders,
@@ -148,9 +149,6 @@ interface PanelController {
   reload(): void;
 }
 
-/** Detection markers (path existence only — no reads, no parsing; AD-2). Either present ⇒ a SpecScribe repo. */
-const DETECTION_MARKERS = [path.join('_bmad', 'config.toml'), '_bmad-output'];
-
 /** Default output root when no payload has been loaded yet to supply `configuredOutputRoot` (memory: the output
  * dir is `SpecScribeOutput`, never `docs/live`). */
 const DEFAULT_OUTPUT_ROOT = 'SpecScribeOutput';
@@ -166,9 +164,12 @@ let lastConfiguredOutputRoot: string | undefined;
  * workspace folder (today's behavior, correct at the common repo-root open). [Story 6.11] */
 let lastRepoRoot: string | undefined;
 
-/** Whether folder[0] is a SpecScribe repo — gates the status bar's visibility and the tree's lazy load (mirrors
- * the `specscribe.projectDetected` context key the manifest `when` clauses use). [Story 6.9] */
-let projectDetected = false;
+/** Whether a workspace folder is open — the ONLY gate on the status bar, the tree's lazy load, and the manifest
+ * `when` clauses (via the `specscribe.available` context key). Deliberately NOT a bmad/git detection: the extension
+ * renders value in ANY workspace (README + code map + git-if-present), so the presence of a folder — not of a
+ * `_bmad-output` marker — is what enables the surfaces. A non-bmad folder simply shows a "no epics" outline.
+ * [spec-vscode-any-workspace-and-processing-indicators] */
+let folderOpen = false;
 
 /** The single shared payload provider: one spawn, one cache, driving the panel + tree + status bar, refreshed
  * together (Story 6.9's central refactor). Rebound to folder[0] on activation and whenever the folder set changes.
@@ -217,7 +218,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Shortcuts: a static host-chrome section pinned above the outline (labels/icons are the same class of host
   // chrome as the manifest command titles; no project content is authored here). The view itself is gated on
-  // `specscribe.projectDetected` via its manifest `when`.
+  // `specscribe.available` (a folder is open) via its manifest `when`.
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('specscribe.shortcuts', new ShortcutsTreeProvider()));
 
@@ -248,11 +249,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => bindWorkspace(context)));
 }
 
-function isSpecScribeFolder(folderPath: string): boolean {
-  return DETECTION_MARKERS.some((marker) => fs.existsSync(path.join(folderPath, marker)));
-}
-
-/** (Re)bind the shared store + watchers to the current folder[0], refresh the detection context key, and update
+/** (Re)bind the shared store + watchers to the current folder[0], refresh the availability context key, and update
  * the native surfaces. Disposes any prior store so a folder change never leaks watchers. [Story 6.9] */
 function bindWorkspace(context: vscode.ExtensionContext) {
   store?.dispose();
@@ -260,11 +257,11 @@ function bindWorkspace(context: vscode.ExtensionContext) {
 
   const folder = vscode.workspace.workspaceFolders?.[0];
   // Scoped to the first folder only, matching every command handler (they all act on workspaceFolders[0]).
-  // Scanning every folder here would flip the context key true from a SpecScribe folder the commands never
-  // touch, enabling commands that then silently act on the wrong folder[0]. Multi-root support itself stays out
-  // of scope (Story 6.11) — this just keeps detection and action in sync.
-  projectDetected = !!folder && isSpecScribeFolder(folder.uri.fsPath);
-  void vscode.commands.executeCommand('setContext', 'specscribe.projectDetected', projectDetected);
+  // Availability is now just "a folder is open" — the extension renders in ANY workspace, so there is no
+  // bmad/git marker check here anymore. Multi-root support itself stays out of scope (still folder[0]).
+  // [spec-vscode-any-workspace-and-processing-indicators]
+  folderOpen = !!folder;
+  void vscode.commands.executeCommand('setContext', 'specscribe.available', folderOpen);
 
   if (folder) {
     store = new SpecScribeStore(context, folder);
@@ -313,7 +310,16 @@ function openStatus(context: vscode.ExtensionContext, reveal: SurfaceTarget | Re
  * opening the panel (which reports "open a folder first"). */
 function refreshCommand(context: vscode.ExtensionContext) {
   if (store) {
-    void store.load().catch((err) =>
+    // Wrap the reload in a Window progress heartbeat so a manual Refresh shows a visible busy affordance for its
+    // whole duration (the status-bar spinner also lights up via `isLoading`), rather than looking like nothing
+    // happened until it settles (Goal B). [spec-vscode-any-workspace-and-processing-indicators]
+    const s = store;
+    // Same "rendering…" wording as the status-bar spinner and the cold-open notification, so the several busy
+    // affordances never disagree on their label (frozen boundary: one coherent busy signal). [review patch]
+    void vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Window, title: 'SpecScribe: rendering…' },
+      () => s.load(),
+    ).then(undefined, (err) =>
       vscode.window.showWarningMessage(`SpecScribe refresh failed: ${String(err)}`));
   } else {
     openStatus(context, 'dashboard');
@@ -411,6 +417,13 @@ function createController(
   // (fired as the initial load settles) never posts into a webview whose bridge script isn't installed yet.
   const sub = dataChanged.event(() => {
     if (disposed || !painted) return;
+    // Only re-push on a SETTLED load (fresh payload), never on the load-START fire. Goal B added a start-fire purely
+    // to light the status-bar spinner; if the panel also reacted to it, it would swap the surface with the STALE
+    // pre-refresh payload at start and again with fresh content at settle — a double swap that resets in-surface
+    // state (the Code page's pure-CSS Insights|Code tab) and re-flashes insight animations on every refresh.
+    // `isLoading` is true only between the start-fire and the settle-fire, so this cleanly keeps the single swap.
+    // [spec-vscode-any-workspace-and-processing-indicators review patch]
+    if (currentStore().isLoading) return;
     if (currentStore().payload) push(current, 'refresh');
   });
   p.onDidDispose(() => sub.dispose());
@@ -495,13 +508,17 @@ class SpecScribeStore {
   get outline(): ProjectOutline | undefined { return this.cache?.outline; }
   get lastError(): unknown | undefined { return this.error; }
   get isLoaded(): boolean { return this.cache !== undefined; }
+  /** True while a spawn is in flight — drives the status bar's "rendering…" busy indicator so an in-progress
+   * render never looks inert (Goal B). [spec-vscode-any-workspace-and-processing-indicators] */
+  get isLoading(): boolean { return this.loading !== undefined; }
 
   /** Spawn (or join an in-flight spawn) and update the shared cache. Fires the fan-out on every settle: on success
    * the cache + configured-output-root refresh and the error clears; on failure the LAST-GOOD cache is retained
    * (so the tree keeps showing data) and the error is recorded for the stale indicator. The promise still rejects
    * so a manual Refresh can surface a toast — auto (watcher) callers swallow it and rely on the stale UI. */
   load(): Promise<WebviewPayload> {
-    this.loading ??= runRenderer(this.context, this.folder.uri.fsPath)
+    if (this.loading) return this.loading;
+    this.loading = runRenderer(this.context, this.folder.uri.fsPath)
       .then(({ payload, diagnostics }) => {
         this.cache = payload;
         this.error = undefined;
@@ -523,6 +540,10 @@ class SpecScribeStore {
         this.loading = undefined;
         dataChanged.fire();
       });
+    // Fire the fan-out on load START too (not only on settle): the status bar reads `isLoading` and shows a
+    // spinner while the ~3.5s spawn runs, so an open/refresh never looks inert (Goal B). Reuses the same event the
+    // panel/tree/status bar already subscribe to — no new plumbing. [spec-vscode-any-workspace-and-processing-indicators]
+    dataChanged.fire();
     return this.loading;
   }
 
@@ -688,9 +709,10 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
         : [];
     }
 
-    // Root. In a non-SpecScribe workspace, return nothing so the `!projectDetected` viewsWelcome shows (and never
-    // spawn a render there). Detection + the manifest `when` are the single gate.
-    if (!projectDetected || !store) return [];
+    // Root. With no folder open, return nothing so the `!specscribe.available` viewsWelcome ("Open a folder…")
+    // shows (and never spawn a render there). A folder being open — not a bmad marker — is the single gate; a
+    // non-bmad folder still loads and simply shows the "no epics" state below.
+    if (!folderOpen || !store) return [];
 
     const outline = store.outline;
     if (!outline) {
@@ -712,7 +734,10 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
     // Stale/error affordance (AC #2): a failed refresh must be visible — surface it above the last-good data.
     if (store.lastError) nodes.push(messageNode('⚠ Last refresh failed — showing cached data', 'warning'));
     if (outline.epics.length === 0) {
-      nodes.push(messageNode('No epics found in this project', 'info'));
+      // No epics is the normal state for a non-bmad workspace (or a bmad project with no epics yet) — read it as
+      // designed guidance, not an error: the dashboard still renders this folder's code map & README.
+      // [spec-vscode-any-workspace-and-processing-indicators]
+      nodes.push(messageNode('No epics here — open the dashboard for this folder’s code map & README', 'info'));
       return nodes;
     }
     nodes.push(...outline.epics.map((epic): OutlineNode => ({ kind: 'epic', epic })));
@@ -764,7 +789,18 @@ class ShortcutsTreeProvider implements vscode.TreeDataProvider<Shortcut> {
 function renderStatusBar(): void {
   const item = statusBar;
   if (!item) return;
-  if (!projectDetected || !store) { item.hide(); return; }
+  if (!folderOpen || !store) { item.hide(); return; }
+
+  if (store.isLoading) {
+    // A spawn is in flight (first render, manual refresh, or watcher rebuild): show a live busy indicator so the
+    // user sees that work is happening rather than an inert or stale count (Goal B). Takes precedence over the
+    // last-good count and the stale-error state — we're actively re-rendering. [spec-vscode-any-workspace…]
+    item.text = '$(sync~spin) SpecScribe: rendering…';
+    item.tooltip = 'SpecScribe is rendering the project view…';
+    item.backgroundColor = undefined;
+    item.show();
+    return;
+  }
 
   if (store.lastError) {
     // A failed refresh must not leave the last-good count looking current (AC #2). Word this differently on a

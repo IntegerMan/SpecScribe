@@ -88,6 +88,7 @@ public class StylesheetTests
         Assert.Contains(".code-insight-contributors", css);
         Assert.Contains(".code-insight-coupled", css);
         Assert.Contains(".code-history-table", css);
+        Assert.Contains(".code-insight-more", css);
     }
 
     [Fact]

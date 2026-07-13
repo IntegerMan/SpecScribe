@@ -373,7 +373,7 @@ public class HtmlTemplaterTests
         // The three FR-9 baseline signals all surface in the new panel. [Story 3.1 AC #1]
         Assert.Contains("<h3>Git Pulse</h3>", html);
         Assert.Contains("in the last 30 days", html);                 // 30-day rolling count
-        Assert.Contains("Mon, Jan 5, 2026 at 12:00", html);           // exact last-commit timestamp
+        Assert.Contains("Jan 5, 2026 at 12:00", html);                // exact last-commit timestamp (one PortalDates token, 24h)
         Assert.Contains("src/Program.cs", html);                      // top changed file
         Assert.Contains("Top changed files", html);
 

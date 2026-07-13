@@ -143,7 +143,7 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         AssertNoErrors(events2);
 
         static string Stable(string html) =>
-            Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} [AP]M", "on <t>");
+            Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", "on <t>");
 
         var page2 = Path.Combine(site2, "code", "src", "Lib", "Referenced.cs.html");
         Assert.Equal(Stable(File.ReadAllText(ReferencedPage)), Stable(File.ReadAllText(page2)));

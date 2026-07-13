@@ -13,8 +13,7 @@
     "Other"
   ],
   "activationEvents": [
-    "workspaceContains:_bmad/config.toml",
-    "workspaceContains:_bmad-output"
+    "onStartupFinished"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -107,7 +106,7 @@
           "name": "Shortcuts",
           "icon": "media/specscribe-outline.svg",
           "contextualTitle": "SpecScribe",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "id": "specscribe.outline",
@@ -120,8 +119,8 @@
     "viewsWelcome": [
       {
         "view": "specscribe.outline",
-        "when": "!specscribe.projectDetected",
-        "contents": "No SpecScribe project detected in this folder.\nOpen a folder that contains a `_bmad-output` directory (or a `_bmad/config.toml`) to see its epics and stories here.\n[Open Folder](command:vscode.openFolder)"
+        "when": "!specscribe.available",
+        "contents": "Open a folder to see its SpecScribe insights.\nAny repository works — you get a code map and README overview, plus epics and stories when it's a BMad project.\n[Open Folder](command:vscode.openFolder)"
       }
     ],
     "colors": [
@@ -160,39 +159,39 @@
       "commandPalette": [
         {
           "command": "specscribe.openStatus",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.openDashboard",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.openEpics",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.refresh",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.openGeneratedSite",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.generateSite",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.watch",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.openProjectSettings",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.refreshOutline",
-          "when": "specscribe.projectDetected"
+          "when": "specscribe.available"
         },
         {
           "command": "specscribe.revealSurface",
@@ -210,14 +209,14 @@
       "explorer/context": [
         {
           "command": "specscribe.openStatus",
-          "when": "specscribe.projectDetected && resourcePath =~ /(^|\\/)_bmad-output(\\/|$)/",
+          "when": "specscribe.available && resourcePath =~ /(^|\\/)_bmad-output(\\/|$)/",
           "group": "navigation@99"
         }
       ],
       "editor/title": [
         {
           "command": "specscribe.openStatus",
-          "when": "specscribe.projectDetected && resourceExtname == .md && resourceDirname =~ /(^|\\/)_bmad-output(\\/|$)/",
+          "when": "specscribe.available && resourceExtname == .md && resourceDirname =~ /(^|\\/)_bmad-output(\\/|$)/",
           "group": "navigation@99"
         }
       ],

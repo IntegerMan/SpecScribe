@@ -103,6 +103,25 @@ public class SiteGeneratorCodeMapTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_WithCodeSourceBaseUrlConfigured_LinksTreemapCellsAndTableRowsToSource()
+    {
+        // Story 7.6 review: fileHref is now wired via the same guarded CodeItemHref resolver every other
+        // git-analytics surface uses. --code-url mode resolves for ANY walked file (no citation needed), so it's
+        // the simplest fixture to prove the seam is live (AC #3: "routes to its code page... when available").
+        var gen = new SiteGenerator(ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false,
+            codeSourceBaseUrl: "https://github.com/example/repo/blob/main"));
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(CodeMapPage);
+        var expectedHref = "https://github.com/example/repo/blob/main/src/Sample/Widget.cs";
+
+        // Both the SVG rect's <a> and the text-equivalent table's row link to the SAME resolved target.
+        Assert.Contains($"<a href=\"{expectedHref}\">", html);
+        Assert.Contains($"<a href=\"{expectedHref}\">src/Sample/Widget.cs</a>", html);
+    }
+
+    [Fact]
     public void GenerateAll_WithNoReadableSourceFiles_OmitsCodeMapPageAndNav()
     {
         // Remove every file under the repo root so the source-code walk finds nothing.

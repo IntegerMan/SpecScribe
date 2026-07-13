@@ -394,6 +394,15 @@ public sealed partial class HtmlRenderAdapter
                     var cls = "status-" + adrStatus.Split(' ')[0].ToLowerInvariant().Replace(' ', '-');
                     sb.Append($"    <p><span class=\"pill {PathUtil.Html(cls)}\">{PathUtil.Html(adrStatus)}</span></p>\n");
                 }
+                // Decision date + one-line summary (Story 10.4) — each omitted when the ADR body carried none.
+                if (card.Meta is { Length: > 0 } adrDate)
+                {
+                    sb.Append($"    <p class=\"index-card-meta\">{PathUtil.Html(adrDate)}</p>\n");
+                }
+                if (card.Summary is { Length: > 0 } adrSummary)
+                {
+                    sb.Append($"    <p class=\"index-card-summary\">{PathUtil.Html(adrSummary)}</p>\n");
+                }
                 sb.Append($"    <span class=\"index-card-path\">{PathUtil.Html(card.SourcePath)}</span>\n");
                 sb.Append("  </a>\n");
                 break;

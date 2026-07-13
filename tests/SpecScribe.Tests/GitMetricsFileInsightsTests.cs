@@ -188,6 +188,9 @@ public class GitMetricsFileInsightsTests
         Assert.Equal(3, insight.Contributors.Count);
         Assert.Equal(4, insight.CoupledFiles.Count);
         Assert.Equal(5, insight.History.Count);
+        // TotalContributors is the full distinct-author count BEFORE the top-N take, so a page can disclose
+        // truncation (review addition) instead of the capped list silently reading as complete.
+        Assert.Equal(20, insight.TotalContributors);
     }
 
     [Fact]

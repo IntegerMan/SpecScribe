@@ -4,7 +4,7 @@ namespace SpecScribe;
 
 /// <summary>Renders one "date page" — a static <c>commits/{yyyy-MM-dd}.html</c> summarizing what happened on
 /// that day: the commits that landed (short hash, author-local time, author, subject) and/or the artifacts
-/// edited (filesystem-mtime signal, each linking to its generated page), with previous/next links to the
+/// changed (git-derived from that day's commits, each linking to its generated page), with previous/next links to the
 /// adjacent active days. A synthesized page (no markdown source), so it builds its own shell the way
 /// <see cref="RequirementsTemplater"/> does rather than going through <see cref="HtmlTemplater.RenderPage"/>.
 /// The heatmap cell and the activity timeline both link here. Generalized from the original commit-only page in
@@ -87,10 +87,15 @@ public static class CommitDayTemplater
                 sb.Append("  </li>\n");
             }
             sb.Append("</ul>\n");
+            // One caption for the git clock's zone (Story 10.4 "captioned git"): commit times stay in each commit's
+            // authored offset — distinct from the machine-local, zone-labeled generation footer below.
+            sb.Append("<p class=\"git-pulse-zone-note\">Commit times shown in each commit&rsquo;s local time zone.</p>\n");
         }
 
-        // "Artifacts updated" — the read-only filesystem-mtime signal (Story 7.3): each artifact edited that day
-        // links to its generated page. Omitted (no empty heading) when the day has no artifact changes. Hrefs are
+        // "Artifacts updated" — the git-derived artifact-change signal: each recognized artifact that a commit on
+        // this day actually touched, linking to its generated page (Story 7.3 bug fix — replaces the old, misleading
+        // filesystem-mtime signal that collapsed every file onto the checkout day). Omitted (no empty heading) when
+        // no tracked artifact changed that day, and absent entirely without --deep-git. Hrefs are
         // output-root-relative, so this nested page prepends its own "../" prefix; labels/hrefs are escaped.
         if (hasArtifacts)
         {

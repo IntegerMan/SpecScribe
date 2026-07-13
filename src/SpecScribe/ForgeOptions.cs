@@ -101,7 +101,12 @@ public sealed class ForgeOptions
     /// <summary>Resolves paths for a run. Explicit values win; anything omitted is derived from the repo root,
     /// which is either the parent of an explicit <paramref name="source"/> or found by walking up from
     /// <paramref name="startDirectory"/> (defaults to the current working directory) until a directory
-    /// containing <c>_bmad-output</c> is found.</summary>
+    /// containing <c>_bmad-output</c> is found. When <paramref name="requireSource"/> is <c>true</c> (the default,
+    /// the CLI path) and no such directory is found, this throws an actionable
+    /// <see cref="DirectoryNotFoundException"/>. When <c>false</c> (the <c>webview</c>/extension path), it instead
+    /// falls back to <paramref name="startDirectory"/> as the repo root with a (possibly absent) conventional source
+    /// root, so generation degrades gracefully in any workspace rather than failing.
+    /// [spec-vscode-any-workspace-and-processing-indicators]</summary>
     public static ForgeOptions Resolve(
         string? source = null,
         string? adrs = null,
@@ -112,7 +117,8 @@ public sealed class ForgeOptions
         bool deepGitAnalytics = false,
         bool emitSpa = false,
         string? codeSourceBaseUrl = null,
-        bool autoDetectCodeUrl = false)
+        bool autoDetectCodeUrl = false,
+        bool requireSource = true)
     {
         string repoRoot;
         string sourceRoot;
@@ -131,15 +137,27 @@ public sealed class ForgeOptions
                 dir = dir.Parent;
             }
 
-            if (dir is null)
+            if (dir is not null)
+            {
+                repoRoot = dir.FullName;
+                sourceRoot = Path.Combine(repoRoot, SourceDirName);
+            }
+            else if (requireSource)
             {
                 throw new DirectoryNotFoundException(
                     $"Could not locate a repo root (a directory containing '{SourceDirName}') at or above the " +
                     "current directory. Run from inside a BMad project, or pass --source to point at your artifacts.");
             }
-
-            repoRoot = dir.FullName;
-            sourceRoot = Path.Combine(repoRoot, SourceDirName);
+            else
+            {
+                // Tolerant mode (the `webview`/extension path, requireSource:false): no `_bmad-output` marker exists
+                // anywhere up-tree, so treat the start directory as the repo root and point the (nonexistent) source
+                // root at its conventional location. Every downstream source/ADR read is Directory.Exists-guarded, so
+                // generation degrades to README + Code Map + git-if-present instead of failing — the extension must be
+                // usable in ANY workspace, not only bmad projects. [spec-vscode-any-workspace-and-processing-indicators]
+                repoRoot = Path.GetFullPath(startDirectory ?? Directory.GetCurrentDirectory());
+                sourceRoot = Path.Combine(repoRoot, SourceDirName);
+            }
         }
 
         return new ForgeOptions

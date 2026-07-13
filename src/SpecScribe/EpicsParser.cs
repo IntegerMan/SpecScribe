@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace SpecScribe;
@@ -160,7 +161,12 @@ public static class EpicsParser
     // "[Source: _bmad-output/path.md — note]" is a plain bracketed citation, not markdown link syntax —
     // the brackets and "Source:" label are decorative noise once SourceLinkifier turns the path into a
     // real link, so they're stripped before rendering rather than left as literal punctuation around it.
-    private static readonly Regex SourceCitationBrackets = new(@"\[Source:\s*(.*?)\]", RegexOptions.Compiled);
+    // The inner group is balance-aware over one level of "[...]" so a citation whose content is ITSELF a
+    // markdown link (or several) — "[Source: [X.cs:1](../x.cs), [Y.cs:2-3](../y.cs)]" (Story 7.2) — has only
+    // the OUTER wrapper stripped; a naive ".*?" would stop at the first inner label's "]" and corrupt the link
+    // into visible "[X.cs:1(../x.cs)" markdown. "[^\[\]]" (a non-bracket run) and "\[[^\]]*\]" (a balanced pair)
+    // are disjoint per position, so the match is linear — no catastrophic backtracking.
+    private static readonly Regex SourceCitationBrackets = new(@"\[Source:\s*((?:[^\[\]]|\[[^\]]*\])*)\]", RegexOptions.Compiled);
 
     private static readonly Regex DevAgentSubHeading = new(@"^### (.+)$", RegexOptions.Compiled);
 
@@ -271,7 +277,90 @@ public static class EpicsParser
         if (start < 0) return string.Empty;
 
         var slice = SourceCitationBrackets.Replace(string.Join("\n", lines[(start + 1)..end]).Trim(), "$1");
-        return slice.Length == 0 ? string.Empty : MarkdownConverter.RenderBlock(slice);
+        if (slice.Length == 0) return string.Empty;
+        // The Change Log gets a tolerant pass that reformats its dates through PortalDates and adds an ordinal cue
+        // to same-day runs so events sharing a date read in order (Story 10.4 AC2). Any unrecognized shape (a
+        // table, free prose) passes through untouched — never reordered, never dropped (NFR8).
+        if (exactHeading == "## Change Log") slice = SequenceChangeLog(slice);
+        return MarkdownConverter.RenderBlock(slice);
+    }
+
+    // A change-log list item that leads with an ISO date: "- 2026-07-06: <text>" (bullet may be - or *).
+    private static readonly Regex ChangeLogDatedItem =
+        new(@"^(?<bullet>\s*[-*]\s+)(?<date>\d{4}-\d{2}-\d{2})\s*:(?<rest>.*)$", RegexOptions.Compiled);
+
+    /// <summary>Tolerant same-day sequencing for the Change Log (Story 10.4 AC2). Recognizes the shipped
+    /// "- YYYY-MM-DD: text" list shape: reformats each visible date through <see cref="PortalDates.Day"/> and, for a
+    /// run of consecutive items sharing one date, appends an ordinal "(k of N)" cue so a reader can order events that
+    /// otherwise differ only in prose. Single-date items get no marker (unique days stay uncluttered). Continuation
+    /// lines and any non-list shape (a table, free prose) are left exactly as authored — this annotates existing
+    /// order, it never reorders or drops content (NFR8). Pure + repo-free so the rule is unit-testable. Degrades to
+    /// the input unchanged when no dated list item is present.</summary>
+    public static string SequenceChangeLog(string slice)
+    {
+        var lines = slice.Replace("\r\n", "\n").Split('\n');
+
+        // Pass 1: find the item-start lines and their parsed dates, in order.
+        var items = new List<(int LineIndex, DateOnly Date)>();
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var m = ChangeLogDatedItem.Match(lines[i]);
+            if (m.Success && DateOnly.TryParseExact(
+                    m.Groups["date"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            {
+                items.Add((i, date));
+            }
+        }
+        if (items.Count == 0) return slice; // not a recognizable dated list — degrade to as-is
+
+        // Group into runs of same-date items that are also ADJACENT in source order: two same-date items only join a
+        // run when no OTHER list-item bullet sits between them (an intervening bullet with a different/unparseable date
+        // is a distinct entry, so the two must not read as "1 of 2"/"2 of 2" across it). Continuation lines (indented,
+        // non-bullet) don't break adjacency — they belong to the preceding item.
+        var runs = new List<List<int>>();
+        for (var i = 0; i < items.Count; i++)
+        {
+            var startsNewRun = i == 0
+                || items[i].Date != items[i - 1].Date
+                || HasInterveningBullet(lines, items[i - 1].LineIndex, items[i].LineIndex);
+            if (startsNewRun) runs.Add(new List<int>());
+            runs[^1].Add(i);
+        }
+
+        var marker = new string?[items.Count];
+        foreach (var run in runs)
+        {
+            if (run.Count <= 1) continue; // unique day (or a broken run) stays uncluttered
+            for (var k = 0; k < run.Count; k++)
+            {
+                marker[run[k]] = $" ({k + 1} of {run.Count})";
+            }
+        }
+
+        // Pass 2: rewrite each item-start line — reformat the date, insert the marker before the colon.
+        for (var idx = 0; idx < items.Count; idx++)
+        {
+            var (lineIndex, date) = items[idx];
+            var m = ChangeLogDatedItem.Match(lines[lineIndex]);
+            lines[lineIndex] = $"{m.Groups["bullet"].Value}{PortalDates.Day(date)}{marker[idx] ?? string.Empty}:{m.Groups["rest"].Value}";
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    // Any markdown list-item bullet (dated or not), used to detect a distinct entry sitting between two dated items.
+    private static readonly Regex ChangeLogBullet = new(@"^\s*[-*]\s", RegexOptions.Compiled);
+
+    /// <summary>True when a list-item bullet line sits strictly between <paramref name="fromLine"/> and
+    /// <paramref name="toLine"/> — i.e. a distinct change-log entry (with a different or unparseable date) separates
+    /// two same-date items, so they must not be grouped into one "(k of N)" run.</summary>
+    private static bool HasInterveningBullet(string[] lines, int fromLine, int toLine)
+    {
+        for (var i = fromLine + 1; i < toLine; i++)
+        {
+            if (ChangeLogBullet.IsMatch(lines[i])) return true;
+        }
+        return false;
     }
 
     private static string ExtractSectionHtml(string[] lines, string exactHeading)

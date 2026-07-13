@@ -509,4 +509,71 @@ public class SiteGeneratorWebviewTests : IDisposable
         var about = bundle.Surfaces.Single(s => s.OutputRelativePath == SiteNav.AboutOutputPath);
         Assert.Null(about.SourcePath);
     }
+
+    [Fact]
+    public void Webview_DegradesToAValidBundleForANonBmadWorkspace()
+    {
+        // Goal A: the extension spawns `webview` in ANY folder. A plain workspace — no `_bmad-output`, just a README
+        // and a source file — must still produce a valid, error-free bundle (README + Code Map) with an EMPTY outline,
+        // never crash. Uses tolerant resolution (the webview command's path) anchored on the non-bmad dir, and mirrors
+        // the command's CapturePages=true. [spec-vscode-any-workspace-and-processing-indicators]
+        var plain = Directory.CreateTempSubdirectory("specscribe-nonbmad-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(plain, "README.md"), "# Plain Repo\n\nJust code, no BMad.\n");
+            File.WriteAllText(Path.Combine(plain, "Program.cs"), "public static class P { public static void M() { } }\n");
+
+            var options = ForgeOptions.Resolve(
+                startDirectory: plain, output: Path.Combine(plain, "site"), includeReadme: true, requireSource: false);
+            Assert.False(Directory.Exists(options.SourceRoot)); // no _bmad-output — the source root is absent
+
+            var gen = new SiteGenerator(options) { CapturePages = true };
+            Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+            var bundle = gen.RenderWebviewSurfaces();
+            Assert.Equal("index.html", bundle.EntryPath);
+            Assert.NotEmpty(bundle.Surfaces);                 // at minimum the dashboard renders
+            Assert.Empty(bundle.Outline.Epics);               // no epics — the "no epics" outline state, not an error
+            Assert.Equal(0, bundle.Outline.Summary.Total);
+            // The non-bmad value is real: the README page and the code map both come through as navigable surfaces.
+            Assert.Contains(bundle.Surfaces, s => s.OutputRelativePath == SiteNav.ReadmeOutputPath);
+            Assert.Contains(bundle.Surfaces, s => s.OutputRelativePath == SiteNav.CodeMapOutputPath);
+        }
+        finally
+        {
+            try { Directory.Delete(plain, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    [Fact]
+    public void Webview_DegradesToAValidBundleForATrulyEmptyWorkspace()
+    {
+        // The I/O matrix's most degenerate row: an empty folder — no README, no code, no git, no `_bmad-output`.
+        // The webview path must still produce a valid, error-free bundle (the dashboard always renders) with an
+        // empty outline, never a crash or a blank entry. [spec-vscode-any-workspace-and-processing-indicators]
+        var empty = Directory.CreateTempSubdirectory("specscribe-empty-").FullName;
+        try
+        {
+            var options = ForgeOptions.Resolve(
+                startDirectory: empty, output: Path.Combine(empty, "site"), includeReadme: true, requireSource: false);
+
+            var gen = new SiteGenerator(options) { CapturePages = true };
+            Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+            var bundle = gen.RenderWebviewSurfaces();
+            Assert.Equal("index.html", bundle.EntryPath);
+            Assert.NotEmpty(bundle.Surfaces);                 // the dashboard entry surface always renders
+            Assert.False(string.IsNullOrWhiteSpace(bundle.EntryDocument));
+            Assert.Empty(bundle.Outline.Epics);
+            Assert.Equal(0, bundle.Outline.Summary.Total);
+        }
+        finally
+        {
+            try { Directory.Delete(empty, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
 }

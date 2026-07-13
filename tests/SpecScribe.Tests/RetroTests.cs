@@ -104,7 +104,8 @@ public class RetroTests : IDisposable
         // The h1 drops the redundant "Epic 1 Retrospective:" prefix (the kicker above already carries it).
         Assert.Contains("<h1>Foundation</h1>", html);
         Assert.DoesNotContain("<h1>Epic 1 Retrospective", html);
-        Assert.Contains("<span class=\"pill\">2026-07-07</span>", html);
+        // The retro date now routes through the single PortalDates token (Story 10.4): bare ISO → "Jul 7, 2026".
+        Assert.Contains("<span class=\"pill\">Jul 7, 2026</span>", html);
         // Personas (LLM-generated retro participants) are NOT rendered — noise once the doc exists. [polish #7]
         Assert.DoesNotContain("retro-personas", html);
         Assert.DoesNotContain("persona-pill", html);

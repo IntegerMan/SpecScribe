@@ -84,8 +84,13 @@ public sealed record IndexCardView
     public string? Status { get; init; }
 
     /// <summary>The de-emphasized meta line. For a doc/PRD card this is the "date · author" join (rendered as a
-    /// <c>&lt;p&gt;</c>); for a retro card it is the date text (same <c>&lt;p&gt;</c> shape). Null emits nothing.</summary>
+    /// <c>&lt;p&gt;</c>); for a retro card it is the date text; for an ADR card it is the formatted decision date
+    /// (same <c>&lt;p&gt;</c> shape). Null emits nothing.</summary>
     public string? Meta { get; init; }
+
+    /// <summary>ADR only: a one-line summary of the decision (from the ADR body), rendered as a muted line under the
+    /// meta. Null emits nothing. [Story 10.4]</summary>
+    public string? Summary { get; init; }
 
     /// <summary>Primary-PRD only: the kicker text ("Primary document").</summary>
     public string? Kicker { get; init; }

@@ -118,7 +118,7 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         AssertNoErrors(events2);
 
         // The footer carries the generation timestamp — strip it, then the hub must be byte-identical.
-        static string Stable(string html) => Regex.Replace(html, @"on \d{4}-\d{2}-\d{2} \d{2}:\d{2}", "on <t>");
+        static string Stable(string html) => Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", "on <t>");
         var first = Stable(File.ReadAllText(HubPage));
         var second = Stable(File.ReadAllText(Path.Combine(site2, "git-insights.html")));
         Assert.Equal(first, second);

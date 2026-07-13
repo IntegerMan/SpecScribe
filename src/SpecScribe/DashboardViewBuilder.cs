@@ -366,6 +366,10 @@ public static class DashboardViewBuilder
         Href = PathUtil.NormalizeSlashes(adr.OutputRelativePath),
         SourcePath = PathUtil.NormalizeSlashes(adr.SourceRelativePath),
         Status = adr.Status is { Length: > 0 } s ? s : null,
+        // Date + one-line summary surfaced on the listing card (Story 10.4). Date routes through the single
+        // PortalDates formatter; both omit their line when the ADR body carried neither.
+        Meta = adr.Date is { } d ? PortalDates.Day(d) : null,
+        Summary = adr.Summary is { Length: > 0 } sum ? sum : null,
     };
 
     private static IndexCardView BuildRetroCard(RetroModel r) => new()
@@ -374,7 +378,7 @@ public static class DashboardViewBuilder
         Title = r.Title,
         Href = PathUtil.NormalizeSlashes(r.OutputRelativePath),
         SourcePath = PathUtil.NormalizeSlashes(r.SourceRelativePath),
-        Meta = r.DateText is { Length: > 0 } d ? d : null,
+        Meta = r.DateText is { Length: > 0 } d ? PortalDates.ReformatAuthored(d) : null,
     };
 
     /// <summary>The de-emphasized "date · author" meta line, or null when neither is present. Mirrors
@@ -382,7 +386,8 @@ public static class DashboardViewBuilder
     private static string? CardMeta(DocModel d)
     {
         var descParts = new List<string>();
-        if (d.Frontmatter.Date is { Length: > 0 } dt) descParts.Add(dt);
+        // Normalize a parseable authored date to the one portal token; free-text dates pass through (Story 10.4).
+        if (d.Frontmatter.Date is { Length: > 0 } dt) descParts.Add(PortalDates.ReformatAuthored(dt));
         if (d.Frontmatter.Author is { Length: > 0 } a) descParts.Add(a);
         return descParts.Count > 0 ? string.Join(" · ", descParts) : null;
     }

@@ -33,6 +33,13 @@ public sealed class SiteGenerator
     private static readonly Regex AdrStatusHeadingPattern = new(@"^#{2,3}\s+Status\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex MarkdownLinkPattern = new(@"\[(?<text>[^\]]+)\]\([^)]+\)", RegexOptions.Compiled);
 
+    // ADR date + summary extraction (Story 10.4), mirroring the tolerant status shapes: a "**Date:**" bold line
+    // (the shape all six real ADRs use), a "## Date" MADR heading fallback, and the "## Context" section whose
+    // first prose paragraph becomes the one-line summary (the most prevalent shape across the real ADRs).
+    private static readonly Regex AdrDatePattern = new(@"^\*\*Date:\*\*\s*(?<date>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex AdrDateHeadingPattern = new(@"^#{2,3}\s+Date\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex AdrContextHeadingPattern = new(@"^#{2,3}\s+Context\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private readonly ForgeOptions _options;
     private readonly Dictionary<string, DocModel> _docs = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _gate = new();
@@ -650,7 +657,11 @@ public sealed class SiteGenerator
                 if (isRecord)
                 {
                     var number = ParseAdrNumber(fileName);
-                    entries.Add(new AdrEntry(doc.Title, outputRelative, sourceRelative, tolerantStatus, number));
+                    // Date + one-line summary extracted from the same raw body, once, so the card and any future
+                    // page reuse of them agree — tolerant, null when the body carries neither (Story 10.4).
+                    var date = ExtractAdrDate(raw, parsed.Frontmatter);
+                    var summary = ExtractAdrSummary(raw, doc.Title);
+                    entries.Add(new AdrEntry(doc.Title, outputRelative, sourceRelative, tolerantStatus, number, date, summary));
                     if (number is null)
                     {
                         // The unnumbered shape is tolerated, not silent: one categorized non-fatal notice on
@@ -817,39 +828,77 @@ public sealed class SiteGenerator
         return events;
     }
 
-    /// <summary>Builds the read-only "artifact timestamps" signal (AC #1/#2): every recognized source artifact
-    /// (one that resolves to a generated page via <see cref="_referenceMap"/>) grouped by the day it was last
-    /// edited on disk. Future-skewed mtimes (clock/timezone) are clamped to <c>today</c> exactly as
-    /// <see cref="BuildArtifactCoverage"/> does, so nothing reads as "edited in the future". This is the git-free
-    /// signal that keeps the timeline/date pages working when git is absent. Never throws: a single unreadable
-    /// file degrades that one entry, and any wider failure yields an empty map (AD-4). Empty when no epics render
-    /// pass populated <see cref="_referenceMap"/> (e.g. no epics.md). [Story 7.3]</summary>
+    /// <summary>Builds the "artifacts updated" signal (Story 7.3 bug fix): every recognized source artifact
+    /// (one that resolves to a generated page via <see cref="_referenceMap"/>) grouped by the day a git commit
+    /// actually changed it. Derived from the ONE shared <c>--deep-git</c> per-file numstat fetch
+    /// (<see cref="DeepGitPulse.Commits"/> — commit <c>Timestamp</c> + touched <c>Files</c>), never from filesystem
+    /// mtime: <see cref="File.GetLastWriteTime"/> collapses to the checkout/generation day in a fresh clone, which
+    /// made the most-recent date falsely claim nearly every artifact changed then. When <c>--deep-git</c> is off
+    /// (<see cref="ProgressModel.DeepGit"/> null), git can't tell us which files changed when, so we emit NO
+    /// artifact signal rather than fabricate one — the timeline/date pages still render from the commit-day set,
+    /// just without the per-artifact detail. Because an artifact only changes inside a commit, these days are a
+    /// subset of the commit days, so the union never gains a page that git history doesn't back. Never throws
+    /// (AD-4); empty without deep-git data or a populated <see cref="_referenceMap"/>. [Story 7.3 / 10.4]</summary>
     private IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> BuildArtifactsByDay()
     {
         try
         {
+            if (_progress?.DeepGit is not { Commits.Count: > 0 } deep) return EmptyArtifactsByDay;
             if (_referenceMap.Count == 0) return EmptyArtifactsByDay;
 
-            var today = DateOnly.FromDateTime(DateTime.Now);
-            var items = new List<(DateOnly Day, string Label, string Href)>(_referenceMap.Count);
+            // Reconcile the two roots up front: _referenceMap keys are SourceRoot-relative; git reports
+            // RepoRoot-relative paths. Map each recognized artifact's repo-relative path → (source path, output href)
+            // once, so the commit walk is a cheap dictionary lookup. Case-insensitive to tolerate Windows casing.
+            var repoRelToArtifact = new Dictionary<string, (string SourceRel, string Href)>(StringComparer.OrdinalIgnoreCase);
             foreach (var (sourceRel, href) in _referenceMap)
             {
                 try
                 {
-                    var full = Path.Combine(_options.SourceRoot, sourceRel.Replace('/', Path.DirectorySeparatorChar));
-                    if (!File.Exists(full)) continue;
-
-                    var day = DateOnly.FromDateTime(File.GetLastWriteTime(full));
-                    if (day > today) day = today; // clamp clock/timezone skew, exactly as BuildArtifactCoverage does
-
-                    items.Add((day, ArtifactLabel(sourceRel, full), PathUtil.NormalizeSlashes(href)));
+                    var full = Path.GetFullPath(Path.Combine(_options.SourceRoot, sourceRel.Replace('/', Path.DirectorySeparatorChar)));
+                    var repoRel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.RepoRoot, full));
+                    if (repoRel.StartsWith("..", StringComparison.Ordinal)) continue; // outside the repo — git never reports it
+                    repoRelToArtifact[repoRel] = (sourceRel, PathUtil.NormalizeSlashes(href));
                 }
                 catch
                 {
-                    // A single unreadable artifact contributes no entry — never aborts the pass (AD-4).
+                    // A single malformed source path contributes no mapping — never aborts the whole signal (AD-4).
+                }
+            }
+            if (repoRelToArtifact.Count == 0) return EmptyArtifactsByDay;
+
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            var labelCache = new Dictionary<string, string>(StringComparer.Ordinal);
+            var items = new List<(DateOnly Day, string Label, string Href)>();
+            foreach (var commit in deep.Commits)
+            {
+                if (commit.Timestamp is not { } stamp) continue; // undated commit can't be placed on a day
+                var day = DateOnly.FromDateTime(stamp);
+                // Skip (don't clamp) a future-skewed commit: LinkedCommitDays excludes day > today too, so clamping to
+                // today would attribute an artifact change to a date page whose commit list never mentions that commit.
+                if (day > today) continue;
+
+                foreach (var file in commit.Files)
+                {
+                    try
+                    {
+                        var repoRel = PathUtil.NormalizeSlashes(file.Path);
+                        if (!repoRelToArtifact.TryGetValue(repoRel, out var art)) continue; // not a recognized artifact
+
+                        if (!labelCache.TryGetValue(art.SourceRel, out var label))
+                        {
+                            var full = Path.Combine(_options.SourceRoot, art.SourceRel.Replace('/', Path.DirectorySeparatorChar));
+                            labelCache[art.SourceRel] = label = ArtifactLabel(art.SourceRel, full);
+                        }
+                        items.Add((day, label, art.Href));
+                    }
+                    catch
+                    {
+                        // One unreadable/awkward file entry contributes nothing — the rest of the signal survives (AD-4).
+                    }
                 }
             }
 
+            // GroupArtifactsByDay dedups a (label, href) that recurs across commits on the same day.
             return ActivityModel.GroupArtifactsByDay(items);
         }
         catch
@@ -2075,9 +2124,9 @@ public sealed class SiteGenerator
     /// with a neutral fill + the "git data unavailable" notice), computes the squarified layout, and renders. Gated
     /// on the same source-code signal as its nav item, so a Code Map link is never emitted to a page that wasn't
     /// produced. Wrapped never-throw → any failure degrades to "surface omitted, generation still succeeds"
-    /// (AD-4 / NFR2), matching the old <c>WriteStructure</c> and every insight provider. The <c>fileHref</c> code-page
-    /// resolver is left <c>null</c> per the story: the seam is wired but dormant until an owner decision wires an
-    /// existing guarded resolver (Story 7.1/7.2 code pages now exist on this branch). [Story 7.6]</summary>
+    /// (AD-4 / NFR2), matching the old <c>WriteStructure</c> and every insight provider. Files route to their
+    /// in-portal code page via the same guarded <see cref="CodeItemHref"/> resolver the deep-analytics and
+    /// git-insights surfaces use. [Story 7.6]</summary>
     private void WriteCodeMap(SiteNav nav)
     {
         if (_codeFiles.Count == 0) return;
@@ -2099,7 +2148,7 @@ public sealed class SiteGenerator
 
         if (map.IsEmpty) return;
 
-        var html = CodeMapTemplater.RenderPage(map, layout, nav, fileHref: null);
+        var html = CodeMapTemplater.RenderPage(map, layout, nav, fileHref: CodeItemHref);
         WriteOutput(SiteNav.CodeMapOutputPath, ApplyReferenceLinks(html, SiteNav.CodeMapOutputPath));
     }
 
@@ -2583,6 +2632,108 @@ public sealed class SiteGenerator
         }
 
         return frontmatter.Status is { Length: > 0 } fromFrontmatter ? CleanAdrStatus(fromFrontmatter) : null;
+    }
+
+    /// <summary>The ADR's decision date, tolerantly extracted (Story 10.4), mirroring <see cref="ExtractAdrStatus"/>'s
+    /// three-shape tolerance: a "**Date:**" bold line (what all the real ADRs use), a "## Date" MADR heading, then
+    /// frontmatter <c>Date</c>. Parsed invariantly against a small set of common shapes; <c>null</c> when absent or
+    /// unparseable so the card shows no date rather than a wrong one.</summary>
+    private static DateOnly? ExtractAdrDate(string raw, Frontmatter frontmatter)
+    {
+        var bold = AdrDatePattern.Match(raw);
+        if (bold.Success && TryParseAdrDate(bold.Groups["date"].Value) is { } fromBoldLine)
+        {
+            return fromBoldLine;
+        }
+
+        var heading = AdrDateHeadingPattern.Match(raw);
+        if (heading.Success)
+        {
+            foreach (var line in raw[(heading.Index + heading.Length)..].Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.Length == 0) continue;
+                if (trimmed.StartsWith('#')) break;
+                if (IsDecorativeLine(trimmed)) continue;
+                if (TryParseAdrDate(trimmed) is { } fromHeading) return fromHeading;
+                break;
+            }
+        }
+
+        return frontmatter.Date is { Length: > 0 } fromFrontmatter ? TryParseAdrDate(fromFrontmatter) : null;
+    }
+
+    /// <summary>Tolerant date parse for the ADR date shapes, routed through the SINGLE <see cref="PortalDates.TryParseDay"/>
+    /// tolerance so the ADR path can't diverge from the retro/doc path (Story 10.4 review). Strips wrapping bold/backtick
+    /// markers, then also tries the string with a trailing parenthetical/semicolon note removed ("2026-07-10 (ratified …)"
+    /// or "July 10, 2026 (ratified)") — never splitting on '-', which is part of the ISO date. <c>null</c> when none match.</summary>
+    private static DateOnly? TryParseAdrDate(string value)
+    {
+        var cleaned = value.Trim().Trim('*', '`', ' ');
+        var tail = cleaned.IndexOfAny(new[] { '(', ';' });
+        var head = (tail >= 0 ? cleaned[..tail] : cleaned).Trim();
+        foreach (var candidate in new[] { cleaned, head })
+        {
+            if (PortalDates.TryParseDay(candidate, out var parsed)) return parsed;
+        }
+        return null;
+    }
+
+    /// <summary>A one-line ADR summary (Story 10.4): the first prose paragraph under "## Context" (the shape all the
+    /// real ADRs share), tag-/markdown-stripped and collapsed to a single line; falling back to the H1 title's
+    /// post-em-dash tail when there is no Context prose; <c>null</c> when neither exists (card shows title + date
+    /// only, never an empty line). Truncated so a long paragraph stays a one-liner.</summary>
+    private static string? ExtractAdrSummary(string raw, string title)
+    {
+        var heading = AdrContextHeadingPattern.Match(raw);
+        if (heading.Success)
+        {
+            var paragraph = new StringBuilder();
+            foreach (var line in raw[(heading.Index + heading.Length)..].Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.Length == 0)
+                {
+                    if (paragraph.Length > 0) break; // end of the first paragraph
+                    continue; // skip blank lines between the heading and the prose
+                }
+                if (trimmed.StartsWith('#')) break; // hit the next section before any prose
+                if (IsDecorativeLine(trimmed)) continue;
+                if (paragraph.Length > 0) paragraph.Append(' ');
+                paragraph.Append(trimmed);
+            }
+            if (CollapseSummary(paragraph.ToString()) is { Length: > 0 } fromContext) return fromContext;
+        }
+
+        // Fallback: the descriptive tail some ADR titles carry after a dash ("ADR 0006: … — JSON + SPA + npx …").
+        // Accept an em-dash, an en-dash, or a spaced ASCII hyphen so hyphenated titles get a summary too.
+        var dashIndex = title.IndexOfAny(new[] { '—', '–' });
+        if (dashIndex < 0)
+        {
+            var spaced = title.IndexOf(" - ", StringComparison.Ordinal);
+            if (spaced >= 0) dashIndex = spaced + 1; // point at the hyphen so the +1 below skips it
+        }
+        if (dashIndex >= 0 && CollapseSummary(title[(dashIndex + 1)..]) is { Length: > 0 } fromTitle) return fromTitle;
+
+        return null;
+    }
+
+    /// <summary>Strips markdown links/bold/backticks/leading structural markers and any HTML tags from a paragraph,
+    /// collapses interior whitespace, and truncates to a single readable line for the ADR card. Empty ⇒ empty (caller
+    /// treats as absent).</summary>
+    private static string CollapseSummary(string text)
+    {
+        var noLinks = MarkdownLinkPattern.Replace(text, "${text}");
+        var plain = PathUtil.StripHtmlTags(noLinks).Replace("*", string.Empty).Replace("`", string.Empty);
+        var collapsed = Regex.Replace(plain, @"\s+", " ").Trim();
+        // Strip a leading list/quote/table/image marker so a Context that opens with "- "/"> "/"| "/"1. "/"!" doesn't
+        // leak the marker into the card summary.
+        collapsed = Regex.Replace(collapsed, @"^(?:[-*+>|!]\s*|\d+\.\s+)+", string.Empty).Trim();
+        const int max = 160;
+        if (collapsed.Length <= max) return collapsed;
+        var cut = max - 1;
+        if (char.IsHighSurrogate(collapsed[cut - 1])) cut--; // don't split an astral char (emoji) across the ellipsis
+        return collapsed[..cut].TrimEnd() + "…";
     }
 
     /// <summary>True for a line made up solely of a single repeated markdown rule/separator character (e.g.

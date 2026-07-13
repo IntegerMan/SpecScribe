@@ -243,8 +243,11 @@ public sealed class CodeMap
     /// deepest levels simply render as a filled directory rect with no drawn children (NFR2 never-throw).</summary>
     private const int MaxDepth = 32;
 
-    /// <summary>Minimum inner width/height for a directory to bother tiling its children — below this the header
-    /// and gutter would swamp the region, so the directory renders as a solid rect.</summary>
+    /// <summary>Minimum inner width/height for a directory to reserve its usual header strip + gutter before
+    /// tiling children — below this the header/gutter would swamp the region, so children are tiled directly into
+    /// the directory's full rect (no header/gutter) instead, guaranteeing every descendant file still gets a
+    /// (possibly sub-pixel) slice rather than being dropped from the SVG entirely (AC #1: "each source file... as a
+    /// rectangle" — legibility degrades gracefully instead of the subtree vanishing outright).</summary>
     private const double MinTileable = 6;
 
     /// <summary>Computes the pure, deterministic squarified layout of this map within a fixed viewBox. Emits one
@@ -394,7 +397,14 @@ public sealed class CodeMap
         var innerY = y + DirHeader;
         var innerW = w - (2 * Pad);
         var innerH = h - DirHeader - Pad;
-        if (innerW < MinTileable || innerH < MinTileable) return;
+        if (innerW < MinTileable || innerH < MinTileable)
+        {
+            // Too small to reserve the usual header/gutter — tile children directly into the full parent rect
+            // (no inset) instead of dropping the whole subtree, so every descendant still emits a rect.
+            if (w <= 0 || h <= 0) return;
+            LayoutNodes(node.Children, x, y, w, h, depth + 1, output);
+            return;
+        }
         LayoutNodes(node.Children, innerX, innerY, innerW, innerH, depth + 1, output);
     }
 }

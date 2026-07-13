@@ -37,6 +37,33 @@ public class ForgeOptionsTests : IDisposable
     }
 
     [Fact]
+    public void Resolve_TolerantModeDoesNotThrowWhenNoBmadOutputAndAnchorsOnStartDirectory()
+    {
+        // A plain, non-bmad workspace: the tolerant (webview/extension) path must fall back to the start directory
+        // as the repo root with a (nonexistent) conventional source root, never throw — the extension is usable in
+        // ANY workspace. [spec-vscode-any-workspace-and-processing-indicators]
+        var plain = Directory.CreateDirectory(Path.Combine(_root, "plain-repo")).FullName;
+
+        var options = ForgeOptions.Resolve(startDirectory: plain, requireSource: false);
+
+        Assert.Equal(plain, options.RepoRoot);
+        Assert.Equal(Path.Combine(plain, "_bmad-output"), options.SourceRoot);
+        Assert.False(Directory.Exists(options.SourceRoot)); // the source root need not exist — generation degrades
+        Assert.Equal(Path.Combine(plain, "SpecScribeOutput"), options.OutputRoot);
+    }
+
+    [Fact]
+    public void Resolve_TolerantModeStillWalksUpToARealBmadProject()
+    {
+        // When a marker DOES exist up-tree, tolerant mode resolves it exactly like the default — the fallback only
+        // engages when nothing is found, so real bmad projects are unaffected.
+        var options = ForgeOptions.Resolve(startDirectory: Path.Combine(Repo, "nested", "deeper"), requireSource: false);
+
+        Assert.Equal(Repo, options.RepoRoot);
+        Assert.Equal(Path.Combine(Repo, "_bmad-output"), options.SourceRoot);
+    }
+
+    [Fact]
     public void Resolve_ExplicitSourceWinsAndAnchorsTheOtherDefaults()
     {
         var source = Path.Combine(Repo, "_bmad-output");

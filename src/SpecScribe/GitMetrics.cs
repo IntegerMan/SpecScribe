@@ -131,12 +131,16 @@ public sealed record CommitTouch(string ShortHash, DateOnly? Date, string Author
 /// (<paramref name="Contributors"/> — who has changed THIS file and how many times, never a cross-repo ranking),
 /// the files it most often changes alongside (<paramref name="CoupledFiles"/>, from the same co-change pair data
 /// the hub's coupling uses), and a bounded newest-first change history (<paramref name="History"/>). All lists are
-/// capped; every field is derived from the ONE shared <c>--deep-git</c> numstat fetch — no extra git call. [Story 7.4]</summary>
+/// capped; every field is derived from the ONE shared <c>--deep-git</c> numstat fetch — no extra git call.
+/// <paramref name="TotalContributors"/> is the file's full distinct-author count before the top-N take (mirrors
+/// <see cref="FileChangeStat.TotalContributors"/>), so the page can disclose when the shown list is truncated
+/// instead of silently rendering a partial list as if it were complete. [Story 7.4; review addition 2026-07-13]</summary>
 public sealed record FileInsight(
     int ChangeCount,
     IReadOnlyList<(string Author, int Commits)> Contributors,
     IReadOnlyList<(string Path, int CoChanges)> CoupledFiles,
-    IReadOnlyList<CommitTouch> History);
+    IReadOnlyList<CommitTouch> History,
+    int TotalContributors = 0);
 
 /// <summary>The aggregate views behind the Git Insights hub page (FR-10), all derived from the one shared
 /// bounded numstat fetch: per-file change frequency + churn + the file's contributors (the master-detail
@@ -247,7 +251,9 @@ public static class GitMetrics
                 hash,
                 subject.Length == 0 ? "(no subject)" : subject,
                 author.Length == 0 ? "Unknown" : author,
-                stamp.ToString("HH:mm", CultureInfo.InvariantCulture)));
+                // 24-hour time via the single PortalDates token (Story 10.4); same "HH:mm" shape LastCommitTimestamp
+                // parses back. Author-local (git's authored offset) — never converted.
+                PortalDates.TimeOfDay(stamp)));
         }
 
         var series = byDay
@@ -719,7 +725,7 @@ public static class GitMetrics
                     .ToList()
                 : new List<(string Path, int CoChanges)>();
 
-            result[path] = new FileInsight(a.ChangeCount, contributors, coupled, a.History);
+            result[path] = new FileInsight(a.ChangeCount, contributors, coupled, a.History, TotalContributors: a.Contributors.Count);
         }
 
         return result;

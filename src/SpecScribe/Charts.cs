@@ -537,8 +537,16 @@ public static class Charts
         // already carries these figures (avoids a duplicate summary line). [Story 3.1 consolidation]
         if (showHeadline)
         {
+            // The "last commit" date is a date in the context of a change — link it to that day's date page so the
+            // reader can click through (Story 7.3/10.4). Guarded on it being a linked day: normally it is (lastCommit
+            // has commits), but a future-skewed lastCommit is excluded from the linked set, so we fall back to plain
+            // text. Uses the same root-relative commits/ href the cells use — never a dead link.
+            var lastCommitText = DReadable(lastCommit);
+            var lastCommitHtml = linkedSet.Contains(lastCommit)
+                ? $"<a class=\"date-link\" href=\"commits/{D(lastCommit)}.html\">{Html(lastCommitText)}</a>"
+                : Html(lastCommitText);
             sb.Append($"<div class=\"heatmap-headline\"><strong>{totalCommits}</strong> {Plural(totalCommits, "commit", "commits")} &middot; " +
-                      $"<strong>{activeDays}</strong> active {Plural(activeDays, "day", "days")} &middot; last commit {DReadable(lastCommit)}</div>\n");
+                      $"<strong>{activeDays}</strong> active {Plural(activeDays, "day", "days")} &middot; last commit {lastCommitHtml}</div>\n");
         }
         // role="group" only when the day-page links exist (an img role would hide them from assistive
         // tech); a link-free render keeps role="img" so AT treats it as one named graphic.
@@ -558,7 +566,7 @@ public static class Charts
         for (var w = 0; w < weeks; w++)
         {
             var weekStart = start.AddDays(w * 7);
-            var monthName = weekStart.ToString("MMM", CultureInfo.InvariantCulture);
+            var monthName = PortalDates.MonthShort(weekStart);
             if (monthName != lastMonth)
             {
                 var x = leftGutter + w * (cell + gap);
@@ -624,7 +632,17 @@ public static class Charts
     /// whole-panel null case (no git at all) is the caller's `p.Git is {}` fallback. [Story 3.1 + consolidation]</summary>
     public static string GitPulsePanel(GitPulse git)
     {
-        var last = git.LastCommitTimestamp.ToString("ddd, MMM d, yyyy 'at' HH:mm", CultureInfo.InvariantCulture);
+        // The exact last-commit clock, routed through the single PortalDates formatter (Story 10.4): 24-hour,
+        // no per-row zone suffix — the git clock's zone is explained once by the caption below (owner-chosen
+        // "captioned git" treatment). Kept in the commit's authored offset, never converted.
+        var last = PortalDates.Timestamp(git.LastCommitTimestamp);
+        // The last-commit date is a date in the context of a change → link it to that day's date page, guarded on
+        // it being on-or-before today (a future-skewed commit gets no page, so no dead link). Root-relative href
+        // like the heatmap cells (this panel renders on the root index page).
+        var lastDay = DateOnly.FromDateTime(git.LastCommitTimestamp);
+        var lastLinked = lastDay <= DateOnly.FromDateTime(DateTime.Now)
+            ? $"<a class=\"date-link\" href=\"commits/{D(lastDay)}.html\">{Html(last)}</a>"
+            : Html(last);
 
         var sb = new StringBuilder();
         sb.Append("<div class=\"git-pulse\">\n");
@@ -634,11 +652,14 @@ public static class Charts
         sb.Append("  <div class=\"git-pulse-signals\">\n");
         sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-num\">{git.Last30DayCommitCount}</span>" +
                   $"<span class=\"git-pulse-caption\">{Plural(git.Last30DayCommitCount, "commit", "commits")} in the last 30 days</span></div>\n");
-        sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-when\">{Html(last)}</span>" +
+        sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-when\">{lastLinked}</span>" +
                   "<span class=\"git-pulse-caption\">last commit</span></div>\n");
         sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-num\">{git.ActiveDays}</span>" +
                   $"<span class=\"git-pulse-caption\">active {Plural(git.ActiveDays, "day", "days")}</span></div>\n");
         sb.Append("  </div>\n");
+        // One caption for the git clock's zone (owner-chosen "captioned git"): commit times stay in each commit's
+        // authored offset, so a reader knows this differs from the machine-local, zone-labeled generation footer.
+        sb.Append("  <p class=\"git-pulse-zone-note\">Commit times shown in each commit&rsquo;s local time zone.</p>\n");
 
         sb.Append("  <div class=\"git-pulse-body\">\n");
 
@@ -1148,12 +1169,14 @@ public static class Charts
     private static string Shorten(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
 
     /// <summary>Invariant ISO date for heatmap hrefs and per-day page filenames — a culture-sensitive
-    /// format would emit non-Gregorian dates (and mismatched links/filenames) on th-TH/fa-IR hosts.</summary>
-    public static string D(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    /// format would emit non-Gregorian dates (and mismatched links/filenames) on th-TH/fa-IR hosts. Delegates to
+    /// the single <see cref="PortalDates.IsoDay"/> machine token (Story 10.4).</summary>
+    public static string D(DateOnly day) => PortalDates.IsoDay(day);
 
     /// <summary>Human-readable date for user-visible text (tooltips, headline, page headings), e.g.
-    /// "Mon, Jul 6, 2026". Invariant so it reads the same regardless of host culture.</summary>
-    public static string DReadable(DateOnly day) => day.ToString("ddd, MMM d, yyyy", CultureInfo.InvariantCulture);
+    /// "Mon, Jul 6, 2026". Delegates to the single <see cref="PortalDates.DayWithWeekday"/> token so the heatmap's
+    /// weekday-prefixed date can never drift from the portal-wide date format (Story 10.4).</summary>
+    public static string DReadable(DateOnly day) => PortalDates.DayWithWeekday(day);
 
     /// <summary>The single source of truth for which days get a heatmap link AND a generated per-day page:
     /// active days (count &gt; 0), on or before <paramref name="today"/>, that carry a non-empty commit
@@ -1179,15 +1202,17 @@ public static class Charts
     /// (<c>tabindex="0"</c>) with a descriptive <c>aria-label</c> (name + active metric) and carries every metric as
     /// <c>data-*</c> attributes so the scoped JS enhancement re-fills it without a round-trip and the tooltip (the
     /// body-level <c>js-tip</c>/<c>data-tip</c> node) reads it. A file routes to its in-portal code page ONLY when
-    /// the guarded <paramref name="fileHref"/> returns non-null (dormant until Story 7.1) — otherwise a plain,
-    /// focusable rect, never a broken link. No <c>&lt;script&gt;</c> is required for this baseline to be correct.
+    /// the guarded <paramref name="fileHref"/> returns non-null — otherwise a plain, focusable rect, never a broken
+    /// link; when linked, <paramref name="prefix"/> is prepended to match the text table's link discipline
+    /// (<see cref="CodeMapTemplater"/>). No <c>&lt;script&gt;</c> is required for this baseline to be correct.
     /// Every label/path is HTML-escaped. [Story 7.6]</summary>
     public static string CodeTreemap(
         IReadOnlyList<TreemapRect> layout,
         double width,
         double height,
         bool hasMetrics,
-        Func<string, string?>? fileHref)
+        Func<string, string?>? fileHref,
+        string prefix = "")
     {
         if (layout.Count == 0) return "<div class=\"chart-empty\">No source files to map.</div>";
 
@@ -1214,7 +1239,7 @@ public static class Charts
             }
             else
             {
-                AppendTreemapFile(sb, rect, maxChanges, hasMetrics, fileHref);
+                AppendTreemapFile(sb, rect, maxChanges, hasMetrics, fileHref, prefix);
             }
         }
 
@@ -1240,7 +1265,7 @@ public static class Charts
         sb.Append($"  <text class=\"codemap-dir-label\" x=\"{tx}\" y=\"{ty}\" aria-hidden=\"true\">{Html(label)}</text>\n");
     }
 
-    private static void AppendTreemapFile(StringBuilder sb, TreemapRect rect, double maxChanges, bool hasMetrics, Func<string, string?>? fileHref)
+    private static void AppendTreemapFile(StringBuilder sb, TreemapRect rect, double maxChanges, bool hasMetrics, Func<string, string?>? fileHref, string prefix)
     {
         if (rect.W <= 0 || rect.H <= 0) return;
         var node = rect.Node;
@@ -1270,14 +1295,18 @@ public static class Charts
         var tip = BuildTreemapTip(node);
 
         var href = fileHref?.Invoke(node.RepoRelativePath);
+        var isLink = href is { Length: > 0 };
+        // role is omitted when wrapped in a real <a> — nesting role="link" inside an interactive <a> is invalid
+        // ARIA and doubles screen-reader announcements; the anchor itself already carries the link semantics.
+        var roleAttr = isLink ? string.Empty : "role=\"img\" ";
         var rectMarkup =
             $"<rect class=\"codemap-cell {levelClass} js-tip\" tabindex=\"0\"{data} " +
             $"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" " +
-            $"role=\"{(href is { Length: > 0 } ? "link" : "img")}\" aria-label=\"{Html(ariaLabel)}\" data-tip=\"{Html(tip)}\"></rect>";
+            $"{roleAttr}aria-label=\"{Html(ariaLabel)}\" data-tip=\"{Html(tip)}\"></rect>";
 
-        if (href is { Length: > 0 } target)
+        if (isLink)
         {
-            sb.Append($"  <a href=\"{Html(target)}\">{rectMarkup}</a>\n");
+            sb.Append($"  <a href=\"{Html(prefix + href)}\">{rectMarkup}</a>\n");
         }
         else
         {

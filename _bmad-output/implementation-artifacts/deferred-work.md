@@ -288,3 +288,33 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - **`publishDiagnostics` (Story 6.12) doesn't reuse this story's `lastRepoRoot` convention.** `extension/src/extension.ts:1034-1056` — anchors Problems-panel paths via `folder.uri.fsPath` instead of `lastRepoRoot`, so a subdir-open workspace gets wrong-path Problems entries — the exact bug class this story eliminated for reveal-source/tree-open, reintroduced by new 6.12 code that shipped in the same commit. Out of scope for 6.11 itself; flag for Story 6.12's own review.
 - **`SerializeDiagnostics` (Story 6.12) assumes every source-anchored notice lives under `resolved.SourceRoot`.** `src/SpecScribe/Commands.cs` (`SerializeDiagnostics`) — would mis-resolve an ADR-anchored notice (a different root). Out of scope for 6.11; flag for Story 6.12's own review.
 - **`parseDiagnostics`/severity mapping (Story 6.12) silently downgrades any unrecognized severity to `Warning`, with no `message`-type validation.** `extension/src/extension.ts` (`parseDiagnostics`/`publishDiagnostics`) — out of scope for 6.11; flag for Story 6.12's own review.
+
+## Deferred from: code review of spec-vscode-any-workspace-and-processing-indicators (2026-07-13)
+
+- source_spec: `spec-vscode-any-workspace-and-processing-indicators.md`
+  summary: A `webview` spawn in a very large or drive-root non-git workspace can exhaust the 60s renderer timeout and surface an error toast instead of the promised clean README + Code Map degrade.
+  evidence: `ForgeOptions.Resolve` tolerant mode now anchors `RepoRoot` to the cwd with no size bound (ForgeOptions.cs:153); `FallbackCodeWalk` (SiteGenerator.cs:2325) caps the FILE count at `MaxCodeMapFiles` but still traverses directories until that cap or exhaustion, so a huge tree with few matching files can run past the shim's 60s hard kill (extension.ts). Before the tolerant change such a folder threw instantly. Real edge (Edge Case Hunter). Fix belongs in the Story 7.6 code-map walk (bound/short-circuit directory traversal, not just the file cap), out of this spec's scope.
+
+- source_spec: `spec-vscode-any-workspace-and-processing-indicators.md`
+  summary: `generate`/`watch` commands now appear in the Command Palette for any open folder and dead-end in the terminal (the CLI still throws) when the folder is not a BMad project.
+  evidence: The gate rename to `specscribe.available` (a folder is open) intentionally removed bmad detection, so `specscribe.generateSite`/`specscribe.watch` are offered everywhere (package.json). Their terminal handoff correctly still hits the CLI's actionable `DirectoryNotFoundException` (CLI-honesty boundary), relocating the "not detected" dead-end into the terminal for these two commands. Minor discoverability wart; a targeted soft-gate (a separate bmad-project context key for just these two) would fix it without reintroducing detection as the main gate.
+
+- source_spec: `spec-vscode-any-workspace-and-processing-indicators.md`
+  summary: In a non-bmad workspace, editing actual source files does not refresh the Code Map / panel — only manual Refresh does.
+  evidence: The store's watch globs remain `_bmad-output/**`, `docs/adrs/**`, `_bmad/config.toml` (frozen by Story 6.11). In a plain code repo the Code Map is the headline value (Goal A), yet source-file edits fire no watcher, so live-update lags behind the "renders value from source code" framing. Widening the globs to source trees intersects the frozen Story 6.11 watch scope and its perf/debounce assumptions, so it belongs in a focused follow-up rather than this spec.
+
+- source_spec: `spec-code-page-relationships-history-tabs.md`
+  summary: In the Relationships tab, the "Referenced by" graph card (h2) and the "Often changed with" coupled card (h3) sit as visual peers in one grid, so the document outline reads the coupled h3 as a child of "Referenced by".
+  evidence: Blind Hunter finding (low severity). BuildRelationshipsCard emits <h2> while the shared BuildCoupledCard emits <h3> (locked at h3 by its correct nesting under "Advanced coverage" in the Insights tab). Defensible as-is (coupling is a secondary relationship signal), but the heading level is inconsistent with how the same card nests in Insights. A fix needs a small design call (panel-level umbrella heading for Relationships, or a level-agnostic coupled card) and is not worth expanding this diff.
+
+- source_spec: `spec-code-page-relationships-history-tabs.md`
+  summary: Two dynamic tab-state combinations from the I/O matrix have no dedicated test: insight-with-coupled-but-no-refs (Relationships tab holds only the coupled card) and history-only (History default-checked).
+  evidence: Edge Case Hunter enumerated both as correct-but-unverified; the history-only case is likely unreachable (non-empty History implies ChangeCount>0, which renders the Insights frequency card). Behavior was proven correct by path enumeration; adding the two targeted tests would close the matrix-coverage gap cheaply in a follow-up.
+
+- source_spec: `spec-7-3-10-4-honest-navigable-portal-dates.md`
+  summary: BuildArtifactsByDay's repo↔source path map uses OrdinalIgnoreCase, which on a case-sensitive filesystem (Linux) could match a git path to a wrong-cased artifact or collide two keys differing only in case.
+  evidence: Edge Case Hunter finding (low). Correct on Windows (the primary/local-first target); the collision requires two artifacts whose paths differ only in case, which is pathological. A cross-platform-correct fix would pick the comparer by OS (Ordinal on non-Windows). Not worth expanding this diff.
+
+- source_spec: `spec-7-3-10-4-honest-navigable-portal-dates.md`
+  summary: Git-derived artifact-change days do not follow renames — a commit that touched an artifact under its pre-rename path is not attributed to the current reference-map key, so that artifact's change days are silently incomplete.
+  evidence: Edge Case Hunter finding (low). This under-reports (shows fewer change days) but never mis-attributes, so it is an honest degradation consistent with the story's stance. Following renames needs git rename-detection (a --follow-style map) that is out of scope for this pass.

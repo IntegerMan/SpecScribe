@@ -16,8 +16,7 @@ public static class CodeMapTemplater
 {
     /// <summary>Renders the whole page. <paramref name="fileHref"/> is the guarded in-portal code-page resolver
     /// (Story 7.1): a non-null return routes a file to its code page, a null return (or a null resolver) leaves it a
-    /// plain, focusable rect — never a broken link. It is <c>null</c> today (7.1 not yet on <c>main</c>); the seam is
-    /// wired but dormant.</summary>
+    /// plain, focusable rect — never a broken link.</summary>
     public static string RenderPage(CodeMap map, IReadOnlyList<TreemapRect> layout, SiteNav nav, Func<string, string?>? fileHref = null)
     {
         var outputPath = SiteNav.CodeMapOutputPath;
@@ -75,7 +74,7 @@ public static class CodeMapTemplater
         }
 
         sb.Append("  <div class=\"codemap-viewport\">\n");
-        sb.Append(Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics, fileHref));
+        sb.Append(Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics, fileHref, prefix));
         sb.Append("  </div>\n");
         sb.Append("</section>\n\n");
 
@@ -112,12 +111,14 @@ public static class CodeMapTemplater
     /// colors), reusing the commit-heatmap ramp levels (a non-<c>--status-*</c> scale). [Subtask 4.3]</summary>
     private static void AppendLegend(StringBuilder sb)
     {
-        sb.Append("  <div class=\"codemap-legend\" aria-hidden=\"true\">Less ");
+        sb.Append("  <div class=\"codemap-legend\">");
+        sb.Append("<span id=\"codemap-legend-dim\" class=\"codemap-legend-dim\">Colorized by change frequency</span> ");
+        sb.Append("<span aria-hidden=\"true\">Less ");
         for (var l = 0; l <= 4; l++)
         {
             sb.Append($"<span class=\"codemap-legend-swatch level-{l}\"></span>");
         }
-        sb.Append(" More</div>\n");
+        sb.Append(" More</span></div>\n");
     }
 
     /// <summary>The text-equivalent table — the no-JS truth of the visualization and the screen-reader listing:

@@ -173,6 +173,94 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         Assert.DoesNotContain("Architecture Decision Records", IndexHtml());
     }
 
+    [Fact]
+    public void GenerateAll_AdrCard_ShowsDateAndOneLineSummaryFromBody()
+    {
+        // Story 10.4: the ADR listing card gains a date (the "**Date:**" line, formatted through PortalDates) and a
+        // one-line summary (the first "## Context" paragraph) — the shape all the real ADRs share.
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0001-dated.md"),
+            "# ADR 0001: A Dated Decision\n\n**Status:** Accepted\n**Date:** 2026-07-10\n\n"
+            + "## Context\n\nThe portal needs one consistent way to render dates so recency is never ambiguous.\n\n"
+            + "## Decision\n\nDo the thing.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        var card = CardBlock(IndexHtml(), "adrs/0001-dated.html");
+        Assert.Contains("class=\"index-card-meta\">Jul 10, 2026</p>", card);         // date via PortalDates
+        Assert.Contains("class=\"index-card-summary\">", card);
+        Assert.Contains("one consistent way to render dates", card);                 // the Context first paragraph
+    }
+
+    [Fact]
+    public void GenerateAll_AdrDate_ParsesLeadingIsoTokenWhenTrailingProseFollows()
+    {
+        // A date line with trailing prose ("2026-07-10 (ratified …)") must still resolve to the ISO date — the
+        // leading-token split must not shatter the ISO date on its own hyphens.
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0006-ratified.md"),
+            "# ADR 0006: Ratified Later\n\n**Status:** Accepted\n**Date:** 2026-07-10 (ratified by owner)\n\n## Context\n\nBody.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        Assert.Contains("class=\"index-card-meta\">Jul 10, 2026</p>", CardBlock(IndexHtml(), "adrs/0006-ratified.html"));
+    }
+
+    [Fact]
+    public void GenerateAll_AdrDate_ParsesMultiWordDateWithTrailingProse()
+    {
+        // A non-ISO authored date with trailing prose must still resolve (strip the "(…)" tail, don't space-split it),
+        // and it shares the SINGLE PortalDates tolerance with retro/doc dates (so "July 10, 2026" is accepted).
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0007-wordy.md"),
+            "# ADR 0007: Wordy Date\n\n**Status:** Accepted\n**Date:** July 10, 2026 (ratified by owner)\n\n## Context\n\nBody.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        Assert.Contains("class=\"index-card-meta\">Jul 10, 2026</p>", CardBlock(IndexHtml(), "adrs/0007-wordy.html"));
+    }
+
+    [Fact]
+    public void GenerateAll_AdrCard_OmitsDateAndSummaryWhenBodyHasNeither()
+    {
+        // Degrade to absent (NFR8): a record with no date and no Context prose shows title (+status) only — never
+        // an empty meta/summary line.
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0001-bare.md"), "# ADR 0001: Bare\n\n**Status:** Accepted\n\nJust a body line, no Context heading.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        var card = CardBlock(IndexHtml(), "adrs/0001-bare.html");
+        Assert.DoesNotContain("index-card-meta", card);
+        Assert.DoesNotContain("index-card-summary", card);
+    }
+
+    [Fact]
+    public void GenerateAll_SupersededAndDeprecatedStatuses_RenderDistinctlyOnPageAndCard()
+    {
+        // Story 10.4 AC2 "when they arrive": a multi-word "Superseded by …" and a "Deprecated" status must land on
+        // the distinct status-superseded / status-deprecated pill classes on BOTH the ADR page (full-status class)
+        // and the index card (first-word class) — the two paths derive the class differently but must agree.
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0001-superseded.md"), "# ADR 0001: Old Way\n\n**Status:** Superseded by ADR 0002\n\n## Context\n\nBody.\n");
+        File.WriteAllText(Path.Combine(Adrs, "0002-deprecated.md"), "# ADR 0002: Retired\n\n**Status:** Deprecated\n\n## Context\n\nBody.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        var index = IndexHtml();
+        Assert.Contains("pill status-superseded", CardBlock(index, "adrs/0001-superseded.html"));
+        Assert.Contains("pill status-deprecated", CardBlock(index, "adrs/0002-deprecated.html"));
+
+        // The ADR page pill (derived from the full lowercased status, a different code path) must land the same.
+        Assert.Contains("status-superseded", File.ReadAllText(Path.Combine(Site, "adrs", "0001-superseded.html")));
+        Assert.Contains("status-deprecated", File.ReadAllText(Path.Combine(Site, "adrs", "0002-deprecated.html")));
+    }
+
     /// <summary>The index-card anchor block for <paramref name="href"/> (from its opening tag to the closing
     /// anchor), so per-card assertions can't be satisfied by a neighboring card.</summary>
     private static string CardBlock(string indexHtml, string href)

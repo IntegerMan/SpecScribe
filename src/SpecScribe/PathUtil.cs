@@ -120,9 +120,12 @@ public static class PathUtil
     /// empty default. [Story 4.8 Task 5; About polish]</summary>
     public static string RenderFooter(string relativePrefix = "")
     {
-        // Human-friendly, e.g. "July 10, 2026 at 5:14 PM" — not the raw yyyy-MM-dd HH:mm this used to carry.
-        // InvariantCulture so the generated site reads the same on every machine/locale (deterministic output).
-        var generatedOn = DateTime.Now.ToString("MMMM d, yyyy 'at' h:mm tt", CultureInfo.InvariantCulture);
+        // Routed through the single PortalDates formatter (Story 10.4 "one date token"): 24-hour clock + an
+        // explicit machine-local zone label, so this generation clock is self-describing and distinguishable from
+        // the git-commit clock (which stays in each commit's authored offset). The zone/time legitimately varies per
+        // generating machine — the golden fingerprint normalizes the footer clock to keep output portable.
+        var now = DateTime.Now;
+        var generatedOn = PortalDates.Timestamp(now, PortalDates.LocalZoneLabel(now));
         return $"<footer class=\"doc-footer\">\n  Generated using <a href=\"{Html(RepositoryUrl)}\">SpecScribe</a> on {generatedOn} &middot; <a href=\"{Html(relativePrefix + SiteNav.AboutOutputPath)}\">View generation details</a>\n</footer>\n\n";
     }
 

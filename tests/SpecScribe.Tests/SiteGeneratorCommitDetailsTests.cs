@@ -69,9 +69,9 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         AssertNoErrors(events);
         Assert.False(Directory.Exists(CommitDir), "commit/ must not exist when --deep-git is off");
 
-        // Day pages may still render (Story 7.3 also emits an artifact-only date page for today), but none ever
-        // links into commit/ when --deep-git is off (the resolver has no pages). Any commit hashes that DO render
-        // stay plain <code>; an artifact-only day (no git history) simply has none.
+        // This fixture is not a git repo, so there are no date pages at all now (Story 7.3's date pages are
+        // git-derived — no mtime fallback). If any did render, none links into commit/ when --deep-git is off
+        // (the resolver has no pages) and any commit hashes stay plain <code>.
         if (Directory.Exists(CommitsDayDir))
         {
             foreach (var page in Directory.GetFiles(CommitsDayDir, "*.html"))
@@ -161,9 +161,10 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         AssertNoErrors(events1);
         AssertNoErrors(events2);
 
-        // Strip the human-friendly footer timestamp, then every commit page must be byte-identical run to run.
+        // Strip the human-friendly footer timestamp (24h + zone, Story 10.4), then every commit page must be
+        // byte-identical run to run.
         static string Stable(string html) =>
-            Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} [AP]M", "on <t>");
+            Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", "on <t>");
 
         var pages1 = Directory.GetFiles(CommitDir, "*.html").OrderBy(p => p, StringComparer.Ordinal).ToList();
         var pages2 = Directory.GetFiles(Path.Combine(site2, "commit"), "*.html").OrderBy(p => p, StringComparer.Ordinal).ToList();

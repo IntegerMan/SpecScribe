@@ -4,7 +4,7 @@ baseline_commit: 1d8cf2f6df49c198cf41df09406cbe8e5505d8ee
 
 # Story 7.4: Advanced Code and Git Coverage
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -264,6 +264,11 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
   - [x] Generation-level: opt-in on → section present; opt-out off → no section + baseline identical + `TryComputeDeep` not called; graceful degradation (no git → no section, no error); external mode → no pages/sections; determinism.
 - [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green. Baseline generate (no `--deep-git`) → code page shows no section, matches 7.1 baseline. Deep generate (`--deep-git`) → section shows contributors/frequency/coupled-files/history with guarded links, no JS, invariant dates, escaped content. Non-git run degrades cleanly.
+
+### Review Findings
+
+- [x] [Review][Patch] Stray `_extract.py` debug script committed at repo root, unrelated to Story 7.4 and missing from the Dev Agent Record's File List [_extract.py] — deleted
+- [x] [Review][Patch] `Contributors to this file` list is silently truncated at 8 with no disclosure, unlike the codebase's own precedent (`FileChangeStat.TotalContributors`) for exactly this problem [src/SpecScribe/CodeFileTemplater.cs:186-199] — added `FileInsight.TotalContributors` + a "+N more contributors" disclosure line (`.code-insight-more`), with new tests in `GitMetricsFileInsightsTests`/`CodeFileTemplaterTests`/`StylesheetTests`; golden fingerprint constant updated for the CSS-only shift
 
 ## Dev Notes
 

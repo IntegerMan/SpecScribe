@@ -39,9 +39,10 @@ public class PathUtilTests
         // Root page: the details link is a bare href (no relative prefix), relabelled from "About".
         Assert.Contains("href=\"about.html\"", footer);
         Assert.Contains(">View generation details</a>", footer);
-        // The generation date is humanized ("July 10, 2026 at 5:14 PM"), not the raw yyyy-MM-dd HH:mm it used to
-        // carry. Asserted by shape, not against DateTime.Now, so the test doesn't depend on the moment it runs.
-        Assert.Matches(@" on [A-Z][a-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} (AM|PM) &middot;", footer);
+        // Story 10.4: the generation clock now routes through PortalDates — one date token + 24-hour time + an
+        // explicit machine-local zone label ("Jul 10, 2026 at 17:14 UTC-04:00"). Asserted by shape, not against
+        // DateTime.Now, so the test doesn't depend on the moment it runs.
+        Assert.Matches(@" on [A-Z][a-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2} &middot;", footer);
     }
 
     [Fact]

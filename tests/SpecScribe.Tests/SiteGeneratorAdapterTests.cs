@@ -249,8 +249,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for the Story 7.6 code review pass: the codemap legend gained a "Colorized by …" dimension
         // label span + supporting CSS; specscribe.js gained the recolor()/setViewBox() review fixes. CSS/JS-only
         // for this fixture (no real repo files cited, so no code-map treemap cells render here).
+        // Regenerated for spec-7-3-10-4-honest-navigable-portal-dates: (1) the footer clock moved to the single
+        // PortalDates token — 24-hour + a machine-local UTC-offset zone label (FooterClock regex widened above);
+        // (2) the non-git fixture no longer emits timeline.html or any commits/ date page (Story 7.3's artifact
+        // signal is git-derived now, not filesystem-mtime, so it drops when git can't verify it — inventory above
+        // lost both); (3) ADR cards gained date + one-line summary lines; (4) doc/retro card dates + change-log
+        // dates now route through PortalDates. Every change is a deliberate, reviewed rendering change (AC #1).
         // [golden-diff-normalization-gotchas]
-        const string expected = "df8ad228cd513076d863a3eb7c279ef34b6f719031bd830ac05c869dee7f3f48";
+        const string expected = "17f693b88d5266bee1e41c5528c1fd2382420899aba6a23bbd44ed4d7aaef892";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -305,6 +305,45 @@ public class EpicsParserTests
         Assert.DoesNotContain("Status: in progress", remainder);    // leading status line never leaks
     }
 
+    // A story whose remainder cites source files via markdown-link "[Source: ...]" citations — the Story 7.2
+    // shape. Regression guard for the bug where the decorative-bracket stripper's non-greedy "(.*?)" matched
+    // the FIRST inner label's "]", corrupting "[Source: [A.cs:1](../a.cs), ...]" into visible "[A.cs:1(../a.cs)".
+    private const string CitationArtifact = """
+        # Story 7.9: Linked citations
+        Status: in progress
+
+        ## Story
+
+        As a developer, I want source citations to render as links.
+
+        ## Dev Notes
+
+        - Extend the fetch. [Source: [A.cs:1](../a.cs), [B.cs:2-3](../b.cs)]
+        - Guard the gate. [Source: [C.cs:5](../c.cs)]
+        - Doc note. [Source: _bmad-output/x.md — Overview]
+        """;
+
+    [Fact]
+    public void SplitStoryArtifact_PreservesMarkdownLinkCitationsWhenStrippingSourceWrapper()
+    {
+        var (_, remainder) = EpicsParser.SplitStoryArtifact(CitationArtifact);
+
+        // Multi-link citation: BOTH inner links survive as real anchors (this is the reported bug).
+        Assert.Contains("<a href=\"../a.cs\">A.cs:1</a>", remainder);
+        Assert.Contains("<a href=\"../b.cs\">B.cs:2-3</a>", remainder);
+        // Single-link citation: the link survives too.
+        Assert.Contains("<a href=\"../c.cs\">C.cs:5</a>", remainder);
+
+        // The decorative "[Source: ... ]" wrapper is stripped, never left as literal text.
+        Assert.DoesNotContain("[Source:", remainder);
+        // Bug signature: a link whose "]" was eaten leaves "(../" hanging as visible text. Must never appear.
+        Assert.DoesNotContain("A.cs:1(", remainder);
+        Assert.DoesNotContain("C.cs:5(", remainder);
+
+        // Plain-path citation still strips to bare text — no regression for the original single-shape case.
+        Assert.Contains("_bmad-output/x.md", remainder);
+    }
+
     [Fact]
     public void ExtractAcceptanceCriteria_NumbersEachCriterion()
     {

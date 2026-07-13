@@ -667,6 +667,37 @@ public class ChartsTests
     }
 
     [Fact]
+    public void CommitHeatmap_HeadlineLinksLastCommitDateToItsDatePage()
+    {
+        // Story 7.3/10.4: the "last commit" date is a date in the context of a change → a link to that day's date
+        // page (guarded on it being a linked commit day, which it is). Needs commitsByDay so the day is "linked".
+        var day = new DateOnly(2026, 1, 7);
+        var series = new (DateOnly Day, int Count)[] { (new DateOnly(2026, 1, 5), 3), (day, 1) };
+        var commitsByDay = new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>
+        {
+            [day] = new[] { new CommitInfo("aaa1111", "Change", "Alice", "09:15") },
+        };
+
+        var svg = Charts.CommitHeatmap(series, commitsByDay);
+
+        Assert.Contains($"last commit <a class=\"date-link\" href=\"commits/{Charts.D(day)}.html\">{Charts.DReadable(day)}</a>", svg);
+    }
+
+    [Fact]
+    public void GitPulsePanel_LastCommitLinksToDatePage_AndCaptionsItsZone()
+    {
+        var git = SampleGitPulse(new (string, int)[] { ("src/Program.cs", 3) });
+
+        var html = Charts.GitPulsePanel(git);
+
+        // The exact last-commit timestamp is a date-page link (day 2026-01-07 from LastCommitTimestamp)...
+        Assert.Contains("<span class=\"git-pulse-when\"><a class=\"date-link\" href=\"commits/2026-01-07.html\">", html);
+        Assert.Contains("Jan 7, 2026 at 09:15", html);                 // one PortalDates token, 24-hour, no AM/PM
+        // ...and the git clock's zone is captioned once (distinct from the machine-local, labeled footer).
+        Assert.Contains("git-pulse-zone-note", html);
+    }
+
+    [Fact]
     public void ProgressBar_CarriesProgressbarAria()
     {
         var html = Charts.ProgressBar("Implementation", 2, 4);
@@ -837,16 +868,35 @@ public class ChartsTests
         var map = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
         var layout = map.Layout();
 
-        // A resolver that yields a page → the rect is wrapped in an <a> and marked role="link".
+        // A resolver that yields a page → the rect is wrapped in an <a>; role="link" is omitted on the rect
+        // itself since nesting an interactive role inside the already-interactive <a> is invalid ARIA.
         var linked = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false,
             fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
         Assert.Contains("<a href=\"code/src/A.cs.html\">", linked);
-        Assert.Contains("role=\"link\"", linked);
+        Assert.DoesNotContain("role=\"link\"", linked);
+        // The whole-SVG root still carries role="img" (a separate, valid usage); only the per-rect role is omitted
+        // when the rect is wrapped in a real <a> — assert the rect markup itself has no role attribute.
+        Assert.Contains("<rect class=\"codemap-cell level-none js-tip\" tabindex=\"0\"", linked);
+        Assert.DoesNotContain("role=\"img\" aria-label=\"A.cs", linked);
 
         // No resolver → a plain, focusable rect, never a broken link (the 7.1-dormant seam).
         var plain = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
         Assert.DoesNotContain("<a href", plain);
         Assert.Contains("role=\"img\"", plain);
+    }
+
+    [Fact]
+    public void CodeTreemap_AppliesThePrefixToLinkedFileHrefs()
+    {
+        // Mirrors CodeMapTemplater.AppendFileTable's `prefix + target` discipline so the SVG rect and the
+        // text-equivalent table always agree on the same resolved link, even if code-map.html ever moves off
+        // the output root.
+        var map = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
+        var layout = map.Layout();
+
+        var linked = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false,
+            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null, prefix: "../");
+        Assert.Contains("<a href=\"../code/src/A.cs.html\">", linked);
     }
 
     [Fact]

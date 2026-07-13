@@ -60,7 +60,12 @@ public sealed class WebviewCommand : Command<SiteSettings>
 
     protected override int Execute(CommandContext context, SiteSettings settings, CancellationToken cancellationToken)
     {
-        var resolved = settings.Resolve();
+        // Tolerant resolution: the extension must render in ANY workspace, so a folder with no `_bmad-output` marker
+        // must NOT throw the CLI's "run from inside a BMad project" error — it falls back to the cwd as the repo root
+        // and lets the Directory.Exists-guarded generation degrade to README + Code Map + git-if-present. The
+        // interactive/CLI generate/watch commands keep the throwing Resolve() (CLI honesty).
+        // [spec-vscode-any-workspace-and-processing-indicators]
+        var resolved = settings.ResolveTolerant();
         var options = settings.Output is { Length: > 0 }
             ? resolved
             : RedirectOutputToScratch(resolved);

@@ -4,11 +4,12 @@ using SpecScribe;
 
 namespace SpecScribe.Tests;
 
-/// <summary>Generation-level coverage for Story 7.3's activity timeline + date pages. Exercises: the timeline
-/// page + dashboard link appearing when there is data; the union day set (an artifact-only day still gets a date
-/// page + timeline row, a dead day gets neither); graceful degradation (no epics/artifacts + no git → nothing,
-/// no error); determinism; and the commit-day + heatmap-link regression. Follows the temp-dir git-fixture style
-/// of <see cref="SiteGeneratorCommitDetailsTests"/>.</summary>
+/// <summary>Generation-level coverage for Story 7.3's activity timeline + date pages, updated for the git-derived
+/// artifact-day bug fix. Exercises: the timeline page + dashboard link appearing when git history exists; artifacts
+/// attributed to the day a commit actually changed them (--deep-git) rather than the checkout-day mtime collapse;
+/// honest degradation (artifacts on disk but no git → NO timeline, since git can't verify the change dates; no
+/// epics/artifacts + no git → nothing, no error); determinism; and the commit-day + heatmap-link regression.
+/// Follows the temp-dir git-fixture style of <see cref="SiteGeneratorCommitDetailsTests"/>.</summary>
 public class SiteGeneratorTimelineTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("specscribe-timeline-").FullName;
@@ -48,8 +49,9 @@ public class SiteGeneratorTimelineTests : IDisposable
         catch (UnauthorizedAccessException) { }
     }
 
-    private ForgeOptions Options(string? source = null, string? output = null) => ForgeOptions.Resolve(
-        source: source ?? Source, output: output ?? Site, projectName: "SpecScribe", includeReadme: false);
+    private ForgeOptions Options(string? source = null, string? output = null, bool deepGit = false) => ForgeOptions.Resolve(
+        source: source ?? Source, output: output ?? Site, projectName: "SpecScribe", includeReadme: false,
+        deepGitAnalytics: deepGit);
 
     private static void AssertNoErrors(IReadOnlyList<GenerationEvent> events)
     {
@@ -58,32 +60,48 @@ public class SiteGeneratorTimelineTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_WithArtifactsButNoGit_EmitsArtifactDrivenTimelineAndDatePage()
+    public void GenerateAll_WithArtifactsButNoGit_EmitsNoTimeline()
     {
-        // The fixture is not a git repository, so the pulse is null. AC #2: the artifact-mtime signal still
-        // drives an activity timeline + date pages, and the dashboard links to it — no error.
+        // The fixture has recognized artifacts on disk but is NOT a git repository, so git can't tell us when any
+        // of them actually changed. Story 7.3 bug fix: we DROP the artifact-updated claim rather than fabricate it
+        // from filesystem mtime (which collapsed every file onto the checkout day). No timeline, no date pages, no
+        // dashboard link — the honest degradation — and the rest of the site still generates with no error.
         var events = new SiteGenerator(Options()).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.True(File.Exists(Timeline), "timeline.html should be generated from the artifact-mtime signal alone");
+        Assert.False(File.Exists(Timeline), "no git → no verifiable activity dates → no timeline (no mtime fallback)");
+        Assert.False(Directory.Exists(CommitsDayDir), "no git → no date pages");
+        Assert.DoesNotContain("View activity timeline", File.ReadAllText(Index));
+        Assert.True(File.Exists(Path.Combine(Site, "epics.html")), "baseline generation must still succeed");
+    }
 
+    [Fact]
+    public void GenerateAll_DeepGitAttributesArtifactsToTheirRealCommitDay()
+    {
+        // The bug fix's core: with --deep-git, an artifact is listed as "updated" ONLY on the day a commit actually
+        // touched it — not bunched onto today. Here epics.md (a recognized artifact → epics.html) is committed, so
+        // its commit day's date page lists it under "Artifacts updated" and the timeline row counts it.
+        Assert.True(TryCommitArtifact(), "git CLI unavailable on this host — cannot exercise git-derived artifact days; install git rather than silently skipping this test");
+
+        var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
+        AssertNoErrors(events);
+
+        Assert.True(File.Exists(Timeline));
         var timeline = File.ReadAllText(Timeline);
-        Assert.Contains("<h1>Activity Timeline</h1>", timeline);
-        Assert.Contains("class=\"timeline-date\" href=\"commits/", timeline);
-        Assert.DoesNotContain("class=\"heatmap\"", timeline); // no git → no heatmap
+        Assert.Contains("artifact updated", timeline); // the summary counts the real artifact change ("1 artifact updated")
 
-        // The dashboard's Git Pulse panel links to the timeline.
-        Assert.Contains("View activity timeline", File.ReadAllText(Index));
+        // Exactly one date page (the single commit day) lists epics.md under "Artifacts updated" — linking to its
+        // generated page — and no page attributes an artifact to a day git didn't record a change on.
+        var dayPages = Directory.GetFiles(CommitsDayDir, "*.html");
+        Assert.NotEmpty(dayPages);
+        var withArtifacts = dayPages.Where(p => File.ReadAllText(p).Contains("artifacts-updated")).ToList();
+        Assert.Single(withArtifacts);
+        var page = File.ReadAllText(withArtifacts[0]);
+        Assert.Contains("class=\"artifact-update-list\"", page);
+        Assert.Contains("../epics.html", page); // the recognized artifact links to its page
 
-        // An artifact-only day (today) gets a real date page — neutral "Activity on …" heading, no commit list.
-        Assert.True(Directory.Exists(CommitsDayDir));
-        var today = Charts.D(DateOnly.FromDateTime(DateTime.Now));
-        var todayPage = Path.Combine(CommitsDayDir, $"{today}.html");
-        Assert.True(File.Exists(todayPage), "an artifact-edited day should get a date page even with no commit");
-        var page = File.ReadAllText(todayPage);
-        Assert.Contains("Activity on", page);
-        Assert.Contains("artifacts-updated", page);
-        Assert.DoesNotContain("commit-day-list", page);
+        // No stray attribution: tracked.txt is not a recognized artifact, so it never appears in the section.
+        Assert.DoesNotContain("tracked.txt", page);
     }
 
     [Fact]
@@ -157,7 +175,7 @@ public class SiteGeneratorTimelineTests : IDisposable
         AssertNoErrors(events2);
 
         static string Stable(string html) =>
-            Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} [AP]M", "on <t>");
+            Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", "on <t>");
 
         Assert.Equal(Stable(File.ReadAllText(Timeline)), Stable(File.ReadAllText(Path.Combine(site2, "timeline.html"))));
 
@@ -181,6 +199,16 @@ public class SiteGeneratorTimelineTests : IDisposable
         if (!Commit("Implement Story 1.1 foundation")) return false;
         File.WriteAllText(Path.Combine(_root, "tracked.txt"), "one\ntwo\n");
         return RunGit("add .") && Commit("Second commit");
+    }
+
+    /// <summary>Initializes a git repo and commits the whole fixture tree — including the recognized artifact
+    /// <c>_bmad-output/planning-artifacts/epics.md</c> — so the --deep-git per-file history attributes that artifact
+    /// to its real commit day. Returns false (test no-ops) when the git CLI is unavailable.</summary>
+    private bool TryCommitArtifact()
+    {
+        if (!RunGit("init")) return false;
+        File.WriteAllText(Path.Combine(_root, "tracked.txt"), "one\n");
+        return RunGit("add .") && Commit("Implement Story 1.1 foundation and add epics");
     }
 
     private bool Commit(string message) => RunGit(

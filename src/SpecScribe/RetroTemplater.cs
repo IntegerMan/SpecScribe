@@ -35,7 +35,7 @@ public static class RetroTemplater
             sb.Append($"  <a class=\"index-card\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(r.OutputRelativePath))}\">\n");
             sb.Append($"    <h2>{PathUtil.Html(r.Title)}</h2>\n");
             var meta = new List<string> { $"Epic {r.EpicNumber}" };
-            if (r.DateText is { Length: > 0 } d) meta.Add(d);
+            if (r.DateText is { Length: > 0 } d) meta.Add(PortalDates.ReformatAuthored(d));
             sb.Append($"    <p>{PathUtil.Html(string.Join(" · ", meta))}</p>\n");
             sb.Append($"    <span class=\"index-card-path\">{PathUtil.Html(PathUtil.NormalizeSlashes(r.SourceRelativePath))}</span>\n");
             sb.Append("  </a>\n");
@@ -76,7 +76,7 @@ public static class RetroTemplater
         main.Append("  <div class=\"meta-pills\">\n");
         if (retro.DateText is { Length: > 0 } date)
         {
-            main.Append($"    <span class=\"pill\">{PathUtil.Html(date)}</span>\n");
+            main.Append($"    <span class=\"pill\">{PathUtil.Html(PortalDates.ReformatAuthored(date))}</span>\n");
         }
         if (epicExists)
         {

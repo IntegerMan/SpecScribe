@@ -286,4 +286,21 @@ public class CodeMapTests
     {
         Assert.Empty(CodeMap.Empty.Layout());
     }
+
+    [Fact]
+    public void Layout_TinyDirectoryStillEmitsRectsForEveryDescendantFile()
+    {
+        // Review fix: a directory allotted a sub-pixel-header region (dwarfed by a huge sibling file) used to
+        // drop its ENTIRE file subtree from the layout, silently under-representing "each source file... as a
+        // rectangle" (AC #1). It must now still tile its children directly into its full rect (no header/gutter)
+        // rather than vanish outright.
+        var files = new List<(string, long)> { ("huge/Big.cs", 999_990) };
+        for (var i = 0; i < 5; i++) files.Add(($"tiny/Small{i}.cs", 1));
+
+        var map = CodeMap.Build(files, NoMetrics);
+        var layout = map.Layout();
+
+        var tinyFileRects = layout.Where(r => !r.Node.IsDirectory && r.Node.RepoRelativePath.StartsWith("tiny/")).ToList();
+        Assert.Equal(5, tinyFileRects.Count);
+    }
 }

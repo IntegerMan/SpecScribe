@@ -357,8 +357,12 @@
     var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // Mirror Charts.Bucket exactly (<=0.25/0.5/0.75) so the client re-fill agrees with the server-baked default.
+    // A degenerate single-point range (min === max, i.e. exactly one cell carries data for this dimension) always
+    // reads as the top bucket rather than falling through the max<=0 guard to "no activity" — the one file that
+    // DOES have data must not render identically to files with none.
     function bucket(value, max) {
-      if (max <= 0 || value <= 0) return 0;
+      if (max <= 0) return value > 0 ? 4 : 0;
+      if (value <= 0) return 0;
       var r = value / max;
       return r <= 0.25 ? 1 : r <= 0.5 ? 2 : r <= 0.75 ? 3 : 4;
     }
@@ -376,6 +380,24 @@
       return null;
     }
 
+    // Human-readable name for each dimension — used to keep the aria-label/tooltip/legend text equivalents in
+    // sync with whatever the color currently encodes (AC #4: color is never the sole signal).
+    var DIM_LABELS = {
+      changes: "change frequency",
+      last: "recency of last change",
+      created: "recency of first change",
+      avgchange: "average change size"
+    };
+
+    // Capture each cell's server-baked base label/tooltip once, before any recolor, so repeated dimension
+    // switches append to the ORIGINAL text rather than stacking onto a previously-appended suffix.
+    cells.forEach(function (c) {
+      if (!c.hasAttribute("data-base-label")) c.setAttribute("data-base-label", c.getAttribute("aria-label") || "");
+      if (!c.hasAttribute("data-base-tip")) c.setAttribute("data-base-tip", c.getAttribute("data-tip") || "");
+    });
+
+    var legendDim = document.getElementById("codemap-legend-dim");
+
     function recolor(dim) {
       // Dates are huge absolute day numbers, so they must be scaled against the file set's own [min,max]
       // window; counts/averages scale against max (min 0), matching the server's default (change-frequency) fill.
@@ -388,13 +410,28 @@
         if (v < min) min = v;
       });
       var range = isDate ? (max - min) : max;
+      var dimLabel = DIM_LABELS[dim] || dim;
       cells.forEach(function (c) {
         for (var l = 0; l <= 4; l++) c.classList.remove("level-" + l);
         c.classList.remove("level-none");
         var v = metricFor(c, dim);
-        if (v === null) { c.classList.add("level-none"); return; }
-        c.classList.add("level-" + bucket(isDate ? (v - min) : v, range));
+        var baseLabel = c.getAttribute("data-base-label") || "";
+        var baseTip = c.getAttribute("data-base-tip") || "";
+        if (v === null) {
+          c.classList.add("level-none");
+          c.setAttribute("aria-label", baseLabel + " — no data for " + dimLabel);
+          c.setAttribute("data-tip", baseTip + "\nNo data for " + dimLabel);
+          return;
+        }
+        var lvl = bucket(isDate ? (v - min) : v, range);
+        c.classList.add("level-" + lvl);
+        // The bucket level (0-4) IS exactly what the color encodes, so it's the honest text equivalent —
+        // never a raw day-number or other value the color itself doesn't literally represent.
+        var levelText = lvl === 0 ? "lowest" : lvl === 4 ? "highest" : "level " + lvl + " of 4";
+        c.setAttribute("aria-label", baseLabel + " — " + dimLabel + ": " + levelText);
+        c.setAttribute("data-tip", baseTip + "\n" + dimLabel + ": " + levelText);
       });
+      if (legendDim) legendDim.textContent = "Colorized by " + dimLabel;
     }
 
     // Reveal the colorize controls (hidden in the server HTML so no inert control ships in the no-JS page).
@@ -428,13 +465,27 @@
       return i >= 0 ? path.slice(i + 1) : path;
     }
 
+    // Zoom-tween duration is read from the shared --motion-* token system (Story 3.5), not a bare hardcoded
+    // number, so the treemap's motion feel stays in sync with every other animated surface. --motion-fast is the
+    // closest semantic fit (a direct-manipulation UI transition, not a one-time chart-entrance reveal); a
+    // 240ms fallback covers browsers/tests where the token can't be read (e.g. no document.documentElement).
+    function motionFastMs() {
+      try {
+        var raw = getComputedStyle(document.documentElement).getPropertyValue("--motion-fast").trim();
+        var ms = raw.endsWith("ms") ? parseFloat(raw) : parseFloat(raw) * 1000;
+        return ms > 0 ? ms : 240;
+      } catch (e) {
+        return 240;
+      }
+    }
+
     // Tween the viewBox with requestAnimationFrame when motion is allowed; snap instantly under reduced motion.
     function setViewBox(target, animate) {
       if (!animate || !window.requestAnimationFrame) { svg.setAttribute("viewBox", target); return; }
       var from = svg.getAttribute("viewBox").split(/\s+/).map(Number);
       var to = target.split(/\s+/).map(Number);
       if (from.length !== 4 || to.length !== 4) { svg.setAttribute("viewBox", target); return; }
-      var start = null, dur = 240;
+      var start = null, dur = motionFastMs();
       function step(ts) {
         if (start === null) start = ts;
         var t = Math.min(1, (ts - start) / dur);

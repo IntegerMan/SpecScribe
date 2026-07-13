@@ -97,7 +97,8 @@ public static class CommitDetailTemplater
         if (commit.Timestamp is { } ts)
         {
             var day = DateOnly.FromDateTime(ts);
-            var time = ts.ToString("HH:mm", CultureInfo.InvariantCulture);
+            // Single-sourced through PortalDates (Story 10.4) — byte-identical to the old "HH:mm" but no stray format.
+            var time = PortalDates.TimeOfDay(ts);
             sb.Append($" &middot; {PathUtil.Html(Charts.DReadable(day))} at {PathUtil.Html(time)}");
         }
         return sb.ToString();

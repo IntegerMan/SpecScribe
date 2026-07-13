@@ -43,4 +43,12 @@ public class SiteSettings : CommandSettings
     /// CI auto-detection of the external source base when <c>--code-url</c> is not given (library/test callers use
     /// <see cref="ForgeOptions.Resolve"/> directly, which leaves detection off for deterministic output).</summary>
     public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl, autoDetectCodeUrl: true);
+
+    /// <summary>Like <see cref="Resolve"/>, but does NOT throw when no <c>_bmad-output</c> marker is found up-tree —
+    /// it falls back to the current directory as the repo root with a (possibly absent) conventional source root.
+    /// Used only by the <c>webview</c>/extension path so the VS Code extension is usable in ANY workspace: generation
+    /// then degrades to README + Code Map + git-if-present rather than failing. The interactive/CLI
+    /// <c>generate</c>/<c>watch</c> commands keep <see cref="Resolve"/> and its actionable error (CLI honesty).
+    /// [spec-vscode-any-workspace-and-processing-indicators]</summary>
+    public ForgeOptions ResolveTolerant() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl, autoDetectCodeUrl: true, requireSource: false);
 }
