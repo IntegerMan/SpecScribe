@@ -34,6 +34,12 @@ so that I can inspect referenced code without leaving the portal.
 **Then** the page leads with a relationship view — a node-link graph of the artifacts that reference the file, each node linking to that artifact — and treats the source itself as secondary supporting detail
 **And** the reference relationships are also available as a plain text list (never colour- or image-only), and the per-line anchors stay reachable so Story 7.2's citation deep links continue to land. [Source: epics.md#Story 7.1; reopened 2026-07-12]
 
+4.
+**Given** a rendered code file page for a recognized language
+**When** I open it with JavaScript enabled
+**Then** the source is syntax-highlighted by language (from the file extension), multi-line constructs coloured correctly
+**And** with JavaScript disabled — or for an unrecognized file type — the page still renders as legible monospace with working line numbers and `#L{n}` anchors (highlighting is a pure progressive enhancement). [Source: epics.md#Story 7.1; reworked 2026-07-12]
+
 ---
 
 ## Developer Context
@@ -132,17 +138,18 @@ Today `BuildReferenceMap` maps every `.md` source → its output URL, and `Sourc
 Emit a line table. Minimal, robust shape:
 
 ```html
-<pre class="code-file"><code>
-<span class="code-line" id="L1"><span class="code-ln">1</span><span class="code-src">using System.Text;</span></span>
-<span class="code-line" id="L2"><span class="code-ln">2</span><span class="code-src"></span></span>
+<pre class="code-file"><code class="language-csharp"><span class="code-line" id="L1" data-ln="1">using System.Text;</span>
+<span class="code-line" id="L2" data-ln="2"></span>
 ...
 </code></pre>
 ```
 
 - Split on `\n`; normalize `\r\n`/`\r` first so line numbers match editors.
-- `PathUtil.Html(...)` each line's source; an empty line still emits its `<span class="code-src"></span>` so anchors stay 1:1 with real line numbers.
-- The `.code-ln` gutter is `user-select: none` and non-linking here (7.2/7.4 may make it a self-link later); `:target` highlights the addressed `.code-line` (mirror the `.ac-criterion :target` highlight pattern). [Source: `src/SpecScribe/assets/specscribe.css` AC-anchor `:target` rules]
-- Long lines: the `<pre>` scrolls horizontally (`overflow-x: auto`), the page body never does — same rule the doc-body `<pre>` already uses. [Source: `src/SpecScribe/assets/specscribe.css:422-431`]
+- `PathUtil.Html(...)` each line's source; each line is one anchored `.code-line` span, numbered from 1, including blank lines, so anchors stay 1:1 with real line numbers.
+- The line **number** is a CSS gutter counter (`.code-line::before { content: attr(data-ln) }`), deliberately **not** a text child, so the tokenizer only ever sees pure source and never colours a line number. The `::before` is absolutely positioned, so `.code-line` carries `min-height: 1.55em` to keep blank lines a full row tall.
+- `:target` highlights the addressed `.code-line` (mirror the `.ac-criterion :target` highlight pattern). [Source: `src/SpecScribe/assets/specscribe.css` AC-anchor `:target` rules]
+- Long lines: the `<pre>` scrolls horizontally (`overflow-x: auto`), the page body never does — same rule the doc-body `<pre>` already uses.
+- **Syntax highlighting (reworked 2026-07-12) is a progressive enhancement layered on this exact markup.** The `<code>` carries a `language-*` class from the file extension (`CodeFileTemplater.LanguageClass`); a vendored Prism.js bundle (embedded, copied out only when code pages exist) runs a small line-aware driver that tokenizes the whole block for correct multi-line colouring, splits the highlighted HTML by line, and injects each fragment into its existing `.code-line` span — so the locked `id="L{n}"` anchors and the no-JS fallback are never touched. See [`tools/prism-vendor/`](../../tools/prism-vendor/README.md).
 
 ---
 
@@ -322,24 +329,32 @@ Claude Opus 4.8 (GitHub Copilot)
 - **Safety / graceful degradation:** path-traversal guard (candidate must resolve inside `RepoRoot`, output must stay inside `OutputRoot`); binary detection (NUL byte / strict-UTF-8 failure, git's heuristic) and a ~1 MB size cap degrade to a placeholder page; every per-file render is wrapped in try/catch → `GenerationEvent`, so one bad file never throws out of the phase. `code/` is wiped+recreated each full pass (atomic rebuild).
 - **Deliberate golden-fingerprint update:** `SiteGeneratorAdapterTests.GenerateAll_GoldenContentFingerprint…` was rebaselined because `specscribe.css` gained the new `.code-file`/`.code-line`/`.code-ln`/`.code-src`/`:target`/`.code-placeholder` rules. The page-*inventory* golden was unaffected (the fixture cites no real repo files), confirming the drift is purely the intended CSS addition.
 - **Known limitation (per Dev Notes):** a source *code* file edit doesn't flow through the `_bmad-output` watch handlers, so code pages refresh only on a full generate — deliberate for 7.1; no code-file watch wiring was added.
+- **Syntax highlighting rework (2026-07-12):** code pages now colour source by language via a **vendored** Prism.js bundle (no CDN — offline + GitHub Pages safe). The source block became one contiguous `<code class="language-*">` (so multi-line constructs tokenize correctly) and the line number moved from a text `.code-src`/`.code-ln` pair to a CSS `::before` gutter counter on `data-ln`, keeping the tokenized text pure. A custom **line-aware driver** (Prism in manual mode) tokenizes the whole block, splits the highlighted HTML by line, and injects each fragment into the pre-rendered `.code-line` span — chosen over Prism's `keep-markup` plugin, which duplicated/mangled the per-line wrappers (verified via jsdom repro). Highlighting is pure progressive enhancement: JS-off or unknown extensions render as plain monospace with working anchors. Assets are copied to the output root **only when in-portal code pages exist**, so citation-free sites (and the golden inventory) are unchanged. Extension→grammar map in `CodeFileTemplater.LanguageClass`; language selection + bundle recipe in `tools/prism-vendor/`. Verified in-browser (C# page): 146 lines, 914 tokens, `:target` deep-link highlight intact, blank lines a full row tall (fixed an empty-line gutter-number overlap).
 
 ### File List
 
 **New:**
 - `src/SpecScribe/CodeReferenceScanner.cs`
 - `src/SpecScribe/CodeFileTemplater.cs`
+- `src/SpecScribe/assets/prism.js` — vendored Prism bundle (core + languages + line-aware driver), embedded resource.
+- `src/SpecScribe/assets/prism.css` — vendored Prism "tomorrow" token theme, embedded resource.
+- `tools/prism-vendor/{build.js,driver.js,package.json,README.md}` — reproducible bundle recipe (node_modules gitignored).
 - `tests/SpecScribe.Tests/CodeReferenceScannerTests.cs`
 - `tests/SpecScribe.Tests/CodeFileTemplaterTests.cs`
 - `tests/SpecScribe.Tests/SiteGeneratorCodePagesTests.cs`
 
 **Modified:**
-- `src/SpecScribe/SiteGenerator.cs` — `_codePages` field, `GenerateCodePagesInternal(...)` phase + `TryReadCodeText`/`SplitCodeLines` helpers + size/sniff constants, invoked from `GenerateAll` after the ADRs phase.
+- `src/SpecScribe/SiteGenerator.cs` — `_codePages` field, `GenerateCodePagesInternal(...)` phase + `TryReadCodeText`/`SplitCodeLines` helpers + size/sniff constants, invoked from `GenerateAll` after the ADRs phase; copies the vendored Prism assets to the output root when code pages are generated.
 - `src/SpecScribe/GenerationReporter.cs` — `GenerationPhase.CodePages` enum value + label.
-- `src/SpecScribe/ForgeOptions.cs` — optional `CodeSourceBaseUrl` property + `Resolve(...)` param.
+- `src/SpecScribe/ForgeOptions.cs` — optional `CodeSourceBaseUrl` property + `Resolve(...)` param; `CodeHighlightScriptName`/`CodeHighlightStyleName` asset constants.
+- `src/SpecScribe/CodeFileTemplater.cs` — highlight-ready markup (contiguous `language-*` `<code>`, `data-ln` gutter), `LanguageClass` ext→grammar map, `HighlightHead` Prism head injection.
+- `src/SpecScribe/PathUtil.cs` — optional `extraHead` param on `RenderHeadOpen` for page-specific head tags.
 - `src/SpecScribe/SiteSettings.cs` — `--code-url` CLI option + passed through `Resolve()`.
 - `src/SpecScribe/SettingsStore.cs` — `CodeUrl` on `SavedSettings` (+ `IsEmpty`), `TrySave`, and `ApplyTo` (CLI wins).
-- `src/SpecScribe/assets/specscribe.css` — `.code-file`/`.code-line`/`.code-ln`/`.code-src`/`.code-line:target`/`.code-placeholder` rules.
-- `tests/SpecScribe.Tests/StylesheetTests.cs` — assertion for the new code-page classes.
+- `src/SpecScribe/SpecScribe.csproj` — `prism.js`/`prism.css` embedded resources.
+- `src/SpecScribe/assets/specscribe.css` — code-page rules reworked: `::before` gutter counter, `min-height` for blank lines, Prism token-color neutralization + brand-tuned `.code-file .token.*`.
+- `tests/SpecScribe.Tests/StylesheetTests.cs` — assertions for `::before` gutter + `.code-file .token.comment`.
+- `tests/SpecScribe.Tests/CodeFileTemplaterTests.cs` — updated for the new markup + language class / Prism head coverage.
 - `tests/SpecScribe.Tests/SettingsStoreTests.cs` — `CodeUrl` round-trip, CLI-wins, and `IsEmpty` coverage.
 - `tests/SpecScribe.Tests/ForgeOptionsTests.cs` — `CodeSourceBaseUrl` default + `--code-url` flow-through coverage.
 - `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden content fingerprint rebaselined for the new CSS.
@@ -348,4 +363,5 @@ Claude Opus 4.8 (GitHub Copilot)
 
 - 2026-07-12: Implemented Story 7.1 (In-Portal Code File Browsing, FR15). Added referenced-source-file discovery, `code/<path>.html` page rendering with stable `L{n}` line anchors, the `--code-url` external-link strategy gate, and full safety/degradation handling. Full suite green (815 tests).
 - 2026-07-12: Reopened + reworked (owner feedback — the giant referenced-by list + un-highlighted code dump inverted the tool's intent). Added AC #3: the code page is now **relationship-first**. New `Charts.ReferenceGraph` renders a pure-SVG node-link "Referenced by" graph (this file at the center, one link per citing artifact) as the hero via `CodeFileTemplater.AppendRelationships`; raw source moved into a secondary `code-source-section` (kept **visible**, never collapsed, so `#L{n}` deep-links still land) with a `data-code-path` re-targeting hook; the full-title accessible list is retained. `.code-referenced-by` CSS replaced by `.code-relationships`/`.ref-graph`/`.code-source-section`. Golden fingerprint rebaselined (CSS-only for the citation-free fixture). Suite green.
+- 2026-07-12: Added AC #4 — **language-aware syntax highlighting** as a progressive enhancement. Vendored a Prism.js bundle (`tools/prism-vendor/`) embedded + copied out only when code pages exist; restructured the source block to a contiguous `language-*` `<code>` with a CSS `data-ln` gutter counter; a custom line-aware driver (Prism manual mode) tokenizes the whole block and re-injects per-line fragments into the pre-rendered `.code-line` spans, preserving the locked `#L{n}` anchors and the no-JS fallback. Fixed a blank-line gutter-number overlap (`min-height` on `.code-line`). Golden fingerprint rebaselined (CSS-only for the citation-free fixture). Full suite green (902 tests).
 

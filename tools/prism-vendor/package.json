@@ -1,0 +1,11 @@
+{
+  "name": "specscribe-prism-vendor",
+  "private": true,
+  "description": "Throwaway workspace for regenerating the vendored Prism.js bundle for SpecScribe code pages.",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "prismjs": "1.30.0"
+  }
+}

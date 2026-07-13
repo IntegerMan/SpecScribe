@@ -71,9 +71,11 @@ public class StylesheetTests
         var css = ReadStylesheet();
         Assert.Contains(".code-file", css);
         Assert.Contains(".code-line", css);
-        Assert.Contains(".code-ln", css);
-        Assert.Contains(".code-src", css);
+        // Line numbers are a CSS gutter counter on data-ln (kept out of tokenized text so Prism never colors them).
+        Assert.Contains(".code-line::before", css);
         Assert.Contains(".code-line:target", css);
+        // Prism token colors are scoped to the code surface so no other <code> on the site is recolored.
+        Assert.Contains(".code-file .token.comment", css);
     }
 
     [Fact]

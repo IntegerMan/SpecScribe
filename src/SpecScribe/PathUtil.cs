@@ -63,7 +63,7 @@ public static class PathUtil
     /// redeploy-invalidation guarantee. [Story 6.7 review]</summary>
     public static string CurrentAssetVersion => AssetVersion;
 
-    public static string RenderHeadOpen(string title, string cssHref, string scriptHref, string? description = null)
+    public static string RenderHeadOpen(string title, string cssHref, string scriptHref, string? description = null, string? extraHead = null)
     {
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n");
@@ -82,6 +82,12 @@ public static class PathUtil
         // never blocks render and runs after the DOM is parsed. Degrades to <title>/aria-label with JS off. [Story 1.5 Task 3]
         // Both shared assets carry a build-versioned query so a cached copy can't mask a redeployed one.
         sb.Append($"<script src=\"{Html(scriptHref)}?v={AssetVersion}\" defer></script>\n");
+        // Page-specific head additions (e.g. a code page's Prism stylesheet + highlighter script). Emitted verbatim
+        // by the caller, which owns the exact tags — kept out of the shared path so a normal page carries nothing extra.
+        if (extraHead is { Length: > 0 })
+        {
+            sb.Append(extraHead);
+        }
         sb.Append("</head>\n<body>\n");
         // Skip link is the first focusable element on every page — a keyboard user can jump straight past
         // the nav to the page's single <main id="main-content"> landmark. [Story 1.4 AC #1, UX-DR16]

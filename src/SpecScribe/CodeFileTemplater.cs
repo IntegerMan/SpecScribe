@@ -9,9 +9,12 @@ namespace SpecScribe;
 /// <see cref="CommitDayTemplater"/> does rather than going through <see cref="HtmlTemplater.RenderPage"/>.
 ///
 /// Every line gets a stable <c>id="L{n}"</c> anchor (1-based, GitHub-compatible) so citations rewritten in Story 7.2
-/// can deep-link to <c>code/&lt;path&gt;.html#L42</c>; that anchor scheme is a locked cross-story convention. No
-/// syntax highlighter and no client JS: "syntax-readable" here means legible-as-code (monospace, line numbers,
-/// preserved whitespace, horizontal scroll for long lines), not tokenized coloring.</summary>
+/// can deep-link to <c>code/&lt;path&gt;.html#L42</c>; that anchor scheme is a locked cross-story convention. The
+/// source renders as one contiguous <c>&lt;code class="language-&#42;"&gt;</c> block (per-line <c>.code-line</c> spans
+/// carry the anchors; line numbers come from a CSS <c>::before</c> counter on <c>data-ln</c>, never from tokenized
+/// text) so the vendored Prism highlighter tokenizes multi-line constructs correctly while its <c>keep-markup</c>
+/// plugin preserves the anchors. Highlighting is a pure progressive enhancement: with JS off the block is still
+/// legible monospace with working line numbers and <c>#L{n}</c> anchors.</summary>
 public static class CodeFileTemplater
 {
     /// <summary>Renders the full code page. In this tool a code page leads with its <em>relationships</em> — the
@@ -33,7 +36,7 @@ public static class CodeFileTemplater
         string? externalSourceUrl = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
-        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav);
+        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true);
 
         var count = lines.Count;
         sb.Append($"  <div class=\"meta-pills\"><span class=\"pill\">{count.ToString(CultureInfo.InvariantCulture)} {(count == 1 ? "line" : "lines")}</span></div>\n");
@@ -46,13 +49,17 @@ public static class CodeFileTemplater
         var source = new StringBuilder();
         source.Append($"<section class=\"code-source-section\" data-code-path=\"{PathUtil.Html(PathUtil.NormalizeSlashes(repoRelativePath))}\">\n");
         source.Append("  <div class=\"code-source-head\">\n    <h2>Source</h2>\n  </div>\n");
-        source.Append("<pre class=\"code-file\"><code>");
+        // One contiguous <code> so Prism can tokenize multi-line constructs (block comments, verbatim strings)
+        // correctly; the language class routes it to the right grammar (absent => Prism leaves it plain, the
+        // graceful path for unknown file types). Per-line spans carry the locked id="L{n}" anchor and a data-ln for
+        // the CSS gutter counter — deliberately NOT a text child, so the tokenized textContent stays pure source.
+        var langClass = LanguageClass(repoRelativePath);
+        source.Append(langClass is null ? "<pre class=\"code-file\"><code>" : $"<pre class=\"code-file\"><code class=\"{langClass}\">");
         for (var i = 0; i < count; i++)
         {
             var n = i + 1;
-            source.Append($"<span class=\"code-line\" id=\"L{n.ToString(CultureInfo.InvariantCulture)}\">")
-                  .Append($"<span class=\"code-ln\">{n.ToString(CultureInfo.InvariantCulture)}</span>")
-                  .Append($"<span class=\"code-src\">{PathUtil.Html(lines[i])}</span></span>\n");
+            var ns = n.ToString(CultureInfo.InvariantCulture);
+            source.Append($"<span class=\"code-line\" id=\"L{ns}\" data-ln=\"{ns}\">{PathUtil.Html(lines[i])}</span>\n");
         }
         source.Append("</code></pre>\n</section>\n");
 
@@ -211,15 +218,18 @@ public static class CodeFileTemplater
 
     /// <summary>Emits the head + nav + breadcrumb + open <c>&lt;main&gt;</c>/<c>&lt;header&gt;</c> shared by both the
     /// full page and the placeholder. Leaves the header open so each caller appends its own meta pill(s) and closes
-    /// it — mirroring the synthesized-page shape of <see cref="CommitDayTemplater"/>.</summary>
-    private static StringBuilder BeginShell(string repoRelativePath, string outputRelativePath, string prefix, SiteNav nav)
+    /// it — mirroring the synthesized-page shape of <see cref="CommitDayTemplater"/>. <paramref name="highlight"/>
+    /// adds the vendored Prism stylesheet + highlighter to the head (only the full page, which actually renders a
+    /// <c>&lt;code&gt;</c> block, asks for them).</summary>
+    private static StringBuilder BeginShell(string repoRelativePath, string outputRelativePath, string prefix, SiteNav nav, bool highlight = false)
     {
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
             $"{repoRelativePath} — {nav.SiteTitle}",
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
-            $"Source file {repoRelativePath} in {nav.SiteTitle}."));
+            $"Source file {repoRelativePath} in {nav.SiteTitle}.",
+            highlight ? HighlightHead(prefix) : null));
         sb.Append(nav.RenderNavBar(outputRelativePath));
         sb.Append(SiteNav.RenderBreadcrumb(outputRelativePath, new (string, string?)[]
         {
@@ -244,5 +254,75 @@ public static class CodeFileTemplater
         sb.Append(PathUtil.RenderFooter(prefix));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
+    }
+
+    /// <summary>The extra head tags a highlighted code page needs: the vendored Prism theme stylesheet and the
+    /// highlighter script (both build-versioned like every other asset). The script auto-highlights every
+    /// <c>&lt;code class="language-*"&gt;</c> on load and its bundled keep-markup plugin preserves our per-line
+    /// anchors. <c>defer</c> keeps it off the critical path; with JS off the page is still legible monospace.</summary>
+    private static string HighlightHead(string prefix)
+    {
+        var v = PathUtil.CurrentAssetVersion;
+        return $"<link rel=\"stylesheet\" href=\"{PathUtil.Html(prefix + ForgeOptions.CodeHighlightStyleName)}?v={v}\">\n" +
+               $"<script src=\"{PathUtil.Html(prefix + ForgeOptions.CodeHighlightScriptName)}?v={v}\" defer></script>\n";
+    }
+
+    /// <summary>Maps a repo-relative source path to its Prism grammar class (<c>language-&#42;</c>) by file
+    /// extension (and a couple of well-known extensionless names). Returns <c>null</c> for anything not in the
+    /// vendored bundle so the page renders as plain, un-tokenized monospace — the deliberate graceful fallback for
+    /// unknown file types rather than a wrong-grammar mangling.</summary>
+    private static string? LanguageClass(string repoRelativePath)
+    {
+        var norm = PathUtil.NormalizeSlashes(repoRelativePath);
+        var name = norm[(norm.LastIndexOf('/') + 1)..];
+
+        // A few source files are identified by name, not extension.
+        if (name.Equals("Dockerfile", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Dockerfile.", StringComparison.OrdinalIgnoreCase))
+        {
+            return "language-docker";
+        }
+
+        var dot = name.LastIndexOf('.');
+        if (dot < 0 || dot == name.Length - 1)
+        {
+            return null;
+        }
+
+        var grammar = name[(dot + 1)..].ToLowerInvariant() switch
+        {
+            "cs" => "csharp",
+            "ts" => "typescript",
+            "tsx" => "tsx",
+            "js" or "mjs" or "cjs" => "javascript",
+            "jsx" => "jsx",
+            "json" => "json",
+            "json5" => "json5",
+            "yml" or "yaml" => "yaml",
+            "toml" => "toml",
+            "ini" or "cfg" or "editorconfig" => "ini",
+            "sh" or "bash" or "zsh" => "bash",
+            "ps1" or "psm1" or "psd1" => "powershell",
+            "py" or "pyi" => "python",
+            "sql" => "sql",
+            "md" or "markdown" => "markdown",
+            "rs" => "rust",
+            "go" => "go",
+            "java" => "java",
+            "kt" or "kts" => "kotlin",
+            "swift" => "swift",
+            "rb" => "ruby",
+            "php" => "php",
+            "c" or "h" => "c",
+            "cpp" or "cc" or "cxx" or "hpp" or "hxx" => "cpp",
+            "css" => "css",
+            "graphql" or "gql" => "graphql",
+            "diff" or "patch" => "diff",
+            "html" or "htm" or "xml" or "svg" or "xaml" or "axaml" or "csproj" or "props"
+                or "targets" or "slnx" or "vbproj" or "fsproj" or "plist" or "resx" => "markup",
+            _ => null,
+        };
+
+        return grammar is null ? null : "language-" + grammar;
     }
 }

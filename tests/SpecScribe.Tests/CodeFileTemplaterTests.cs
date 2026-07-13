@@ -45,9 +45,14 @@ public class CodeFileTemplaterTests
         Assert.DoesNotContain("id=\"L4\"", html);
         // Count matches the input line count exactly (1:1).
         Assert.Equal(lines.Length, CountOccurrences(html, "class=\"code-line\""));
-        // The gutter carries the 1-based number and the source text sits in its own span.
-        Assert.Contains("<span class=\"code-ln\">1</span>", html);
-        Assert.Contains("<span class=\"code-src\">line one</span>", html);
+        // Each line carries its 1-based number in data-ln (a CSS gutter counter, not tokenized text) and the source
+        // text sits directly in the anchored span so Prism's tokenizer sees pure source.
+        Assert.Contains("<span class=\"code-line\" id=\"L1\" data-ln=\"1\">line one</span>", html);
+        // A .cs file routes to the csharp grammar so Prism highlights it.
+        Assert.Contains("<code class=\"language-csharp\">", html);
+        // Prism's stylesheet + highlighter are loaded on a rendered code page.
+        Assert.Contains("prism.css", html);
+        Assert.Contains("prism.js", html);
         // Line-count meta pill.
         Assert.Contains("<span class=\"pill\">3 lines</span>", html);
     }
@@ -64,8 +69,8 @@ public class CodeFileTemplaterTests
         Assert.Contains("id=\"L2\"", html);
         Assert.Contains("id=\"L3\"", html);
         Assert.Equal(3, CountOccurrences(html, "class=\"code-line\""));
-        // The blank line renders an empty (but present) source span.
-        Assert.Contains("<span class=\"code-ln\">2</span><span class=\"code-src\"></span>", html);
+        // The blank line renders an empty (but present) anchored span.
+        Assert.Contains("<span class=\"code-line\" id=\"L2\" data-ln=\"2\"></span>", html);
     }
 
     [Fact]
@@ -89,6 +94,19 @@ public class CodeFileTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_UnknownExtensionRendersPlainCodeBlockWithoutLanguageClass()
+    {
+        // A file type not in the vendored grammar bundle falls back to plain monospace rather than a wrong grammar.
+        const string path = "docs/notes.unknownext";
+        const string output = "code/docs/notes.unknownext.html";
+
+        var html = CodeFileTemplater.RenderPage(path, output, new[] { "just text" }, Nav());
+
+        Assert.Contains("<pre class=\"code-file\"><code>", html);
+        Assert.DoesNotContain("language-", html);
+    }
+
+    [Fact]
     public void RenderPlaceholder_RendersShellAndReasonWithoutLineTable()
     {
         var html = CodeFileTemplater.RenderPlaceholder(RepoRelative, OutputPath, "This file is too large to render inline.", Nav());
@@ -98,6 +116,8 @@ public class CodeFileTemplaterTests
         Assert.Contains("<p class=\"code-placeholder\">This file is too large to render inline.</p>", html);
         // No line table on a placeholder page.
         Assert.DoesNotContain("class=\"code-line\"", html);
+        // A placeholder renders no <code> block, so it does not pull in the highlighter.
+        Assert.DoesNotContain("prism.js", html);
         Assert.Contains("<span class=\"pill\">Not rendered</span>", html);
     }
 
@@ -160,7 +180,7 @@ public class CodeFileTemplaterTests
         Assert.Contains("View on GitHub", html);
         // The in-portal source is still fully rendered — the external link is additive, not a replacement.
         Assert.Contains("class=\"code-file\"", html);
-        Assert.Contains("<span class=\"code-src\">using System;</span>", html);
+        Assert.Contains("<span class=\"code-line\" id=\"L1\" data-ln=\"1\">using System;</span>", html);
     }
 
     [Fact]

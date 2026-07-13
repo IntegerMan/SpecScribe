@@ -1118,6 +1118,12 @@ public sealed class SiteGenerator
             return events;
         }
 
+        // The syntax highlighter ships only where it is used: copy the vendored Prism bundle + theme to the output
+        // root exactly when in-portal code pages are generated, so a site with no code pages stays byte-identical
+        // (and the golden fixtures, which cite no real repo files, never gain these assets).
+        CopyEmbeddedAsset("SpecScribe.assets.prism.js", ForgeOptions.CodeHighlightScriptName);
+        CopyEmbeddedAsset("SpecScribe.assets.prism.css", ForgeOptions.CodeHighlightStyleName);
+
         var referenced = _codeReferenced;
         var outputRootFull = Path.GetFullPath(_options.OutputRoot);
 

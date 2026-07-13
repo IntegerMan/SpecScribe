@@ -56,6 +56,13 @@ public sealed class ForgeOptions
     /// <c>&lt;title&gt;</c>/<c>aria-label</c> when JS is unavailable. [Story 1.5 Task 3]</summary>
     public const string ScriptName = "specscribe.js";
 
+    /// <summary>The vendored Prism.js bundle + theme (Story 7.1 rework) that syntax-highlight in-portal code pages.
+    /// Embedded resources like the core stylesheet/script, but copied to the output root ONLY when in-portal code
+    /// pages are actually generated (see <see cref="SiteGenerator"/>) so a site with no code pages stays byte-for-byte
+    /// unchanged. Loaded only on code pages; the highlighter degrades to plain monospace when JS is unavailable.</summary>
+    public const string CodeHighlightScriptName = "prism.js";
+    public const string CodeHighlightStyleName = "prism.css";
+
     public const string DefaultSiteTitle = "BMad Live Docs";
     public const string SourceDirName = "_bmad-output";
 

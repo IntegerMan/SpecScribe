@@ -1252,6 +1252,12 @@ So that I can inspect referenced code without leaving the portal.
 **Then** the page leads with a relationship view — a node-link graph of the artifacts that reference the file, each node linking to that artifact — and treats the source itself as secondary supporting detail
 **And** the reference relationships are also available as a plain text list (never colour- or image-only), and the per-line anchors stay reachable so citation deep links continue to land.
 
+4.
+**Given** a rendered code file page for a recognized language
+**When** I open it with JavaScript enabled
+**Then** the source is syntax-highlighted by language (detected from the file extension), with multi-line constructs coloured correctly
+**And** with JavaScript disabled — or for an unrecognized file type — the page still renders as legible monospace with working line numbers and line anchors (highlighting is a pure progressive enhancement, vendored offline, not a CDN dependency).
+
 ### Story 7.2: Source-Citation and Comment Linking to Code Pages
 
 <!-- 2026-07-11 (SCP 2026-07-11, correct-course) — owns VS Code recommendation R4.2 (link resolution): when this

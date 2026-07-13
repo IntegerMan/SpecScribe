@@ -41,6 +41,10 @@
     <!-- Embedded rather than copied content so the stylesheet + script survive global-tool packaging intact. -->
     <EmbeddedResource Include="assets\specscribe.css" />
     <EmbeddedResource Include="assets\specscribe.js" />
+    <!-- Vendored Prism.js bundle + theme (Story 7.1 rework): syntax highlighting for in-portal code pages. Copied
+         to the output root ONLY when in-portal code pages are generated, so sites without code pages stay identical. -->
+    <EmbeddedResource Include="assets\prism.js" />
+    <EmbeddedResource Include="assets\prism.css" />
     <!-- JSON+SPA delivery client (Story 6.7): copied to the output root ONLY when the SPA flag is passed. Off by
          default, so it never lands in a normal generate and the static site stays byte-identical. -->
     <EmbeddedResource Include="assets\specscribe-spa.js" />

@@ -469,7 +469,8 @@ code.color-swatch {
    numbers, preserved whitespace, horizontal scroll for long lines — the block scrolls, never the page body) with a
    non-selectable gutter and a :target line highlight so `code/<path>.html#L42` scrolls to and flags the addressed
    line (same no-JS mechanism as the AC-anchor highlight). Neutral ink/parchment/gold tokens only — the --status-*
-   lifecycle tokens are off-limits here. */
+   lifecycle tokens are off-limits here. Syntax coloring is a progressive enhancement layered by Prism (see the
+   `.code-file .token.*` overrides below); with JS off this same surface reads as plain monospace. */
 pre.code-file {
   margin: 1.5rem 0;
   padding: 1rem 0;
@@ -490,11 +491,43 @@ pre.code-file code {
   display: block;
 }
 
+/* Prism's vendored theme paints the inner <code class="language-*"> with its own dark block background + base color;
+   neutralize both so SpecScribe's brand surface shows through and the base ink stays cream. Only the per-token
+   colors from prism.css survive to do the highlighting. */
+pre.code-file code[class*="language-"] {
+  background: none;
+  color: inherit;
+  text-shadow: none;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: normal;
+}
+
 .code-line {
   display: block;
   white-space: pre;
+  position: relative;
+  padding-left: 4.5rem;
+  /* A blank source line has no in-flow content and the gutter number is an absolutely-positioned ::before (no
+     height of its own), so without this an empty line would collapse and its number would overlap the neighbor.
+     1.55em == the block's line-height, keeping every row exactly one line tall. */
+  min-height: 1.55em;
   /* Keep a jumped-to line clear of the sticky nav when reached via a "#L{n}" link. */
   scroll-margin-top: 5rem;
+}
+
+/* Line number from a CSS counter on data-ln, NOT a text child — so Prism's tokenizer only ever sees pure source and
+   never colors a line number. Non-selectable so copying the block yields clean code. */
+.code-line::before {
+  content: attr(data-ln);
+  position: absolute;
+  left: 0;
+  width: 3.25rem;
+  padding-right: 0.75rem;
+  text-align: right;
+  color: #b09c7a;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .code-line:target {
@@ -502,18 +535,18 @@ pre.code-file code {
   box-shadow: inset 3px 0 0 var(--gold);
 }
 
-.code-ln {
-  display: inline-block;
-  width: 3.5rem;
-  padding: 0 1rem 0 0.75rem;
-  text-align: right;
-  color: #b09c7a;
-  user-select: none;
-  -webkit-user-select: none;
+/* Prism "tomorrow" token colors tuned for the brand's dark-brown surface (lighter comment for contrast; the rest of
+   the palette reads well as-is). Scoped to .code-file so no other <code> on the site is affected. */
+.code-file .token.comment,
+.code-file .token.prolog,
+.code-file .token.doctype,
+.code-file .token.cdata {
+  color: #b6a684;
+  font-style: italic;
 }
 
-.code-src {
-  white-space: pre;
+.code-file .token.punctuation {
+  color: #d8c9a8;
 }
 
 /* Placeholder note shown when a referenced file exists but can't be rendered inline (binary/oversized/unreadable). */

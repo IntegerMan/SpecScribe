@@ -217,11 +217,11 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         var fingerprint = FingerprintTree(Site);
 
-        // Regenerated for Story 7.3: the artifact-mtime activity timeline + date pages now generate for this
-        // fixture (no git, but it has artifacts), adding timeline.html + a date page and the dashboard's "View
-        // activity timeline →" link; today's date is folded to a placeholder so the constant stays date-stable.
-        // [golden-diff-normalization-gotchas]
-        const string expected = "1a54b789956a57a684204f2b507834a81e992d253b97dfc5676e7372007bdb8a";
+        // Regenerated for Story 7.1 (rework): specscribe.css gained Prism syntax-highlight token rules and moved
+        // the code-page line gutter to a CSS ::before counter. The fixture cites no real repo files, so no code
+        // page (and no vendored prism.js/prism.css) is emitted here — the inventory is unchanged; only the
+        // stylesheet content shifted the fingerprint. [golden-diff-normalization-gotchas]
+        const string expected = "fa0ad13e1223ff02f00bc7ed57cfbbff71818e88541a6bc865d198bc8fa5e7a7";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
