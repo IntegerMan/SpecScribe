@@ -220,8 +220,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 7.1 (rework): specscribe.css gained Prism syntax-highlight token rules and moved
         // the code-page line gutter to a CSS ::before counter. The fixture cites no real repo files, so no code
         // page (and no vendored prism.js/prism.css) is emitted here — the inventory is unchanged; only the
-        // stylesheet content shifted the fingerprint. [golden-diff-normalization-gotchas]
-        const string expected = "fa0ad13e1223ff02f00bc7ed57cfbbff71818e88541a6bc865d198bc8fa5e7a7";
+        // stylesheet content shifted the fingerprint. Regenerated again for Story 7.4: specscribe.css gained the
+        // opt-in ".code-insights" advanced-coverage styles (CSS-only; the fixture is not a git repo and cites no
+        // real files, so no per-file insight section renders — again only the stylesheet content shifted).
+        // [golden-diff-normalization-gotchas]
+        const string expected = "e2654cd7822e039b0d93c295ade4f2812df3091c8dcf1e8fe4c48536766fc4b1";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

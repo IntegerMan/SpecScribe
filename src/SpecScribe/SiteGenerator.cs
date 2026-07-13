@@ -224,19 +224,21 @@ public sealed class SiteGenerator
             events.AddRange(GenerateAdrsInternal(nav));
             reporter?.EndPhase(GenerationPhase.Adrs);
 
-            // In-portal code file pages for source files referenced by planning/implementation artifacts (Story 7.1,
-            // FR15). Additive: a new page class under code/, discovered from citations, that Stories 7.2–7.4 build on.
-            // Skipped entirely in external-link mode (--code-url).
-            events.AddRange(GenerateCodePagesInternal(files, nav, reporter));
-
-            // Per-commit detail pages (Story 7.5, FR-10). Runs BEFORE the per-day pages and the Git Insights hub so
-            // _commitPages is populated when those two render their guarded hash links. Gated on the same opt-in
-            // deep-git data (Commits ride the --deep-git-bounded fetch): flag off / git absent → DeepGit null →
-            // Commits empty → no commit/ dir, no pages, and the day-page + hub hashes stay plain (AC #2).
+            // Per-commit detail pages (Story 7.5, FR-10). Runs BEFORE the code pages, the per-day pages, and the
+            // Git Insights hub so _commitPages is populated when those render their guarded hash links (the code
+            // pages' Story 7.4 "Advanced coverage" change-history links resolve against it too). Gated on the same
+            // opt-in deep-git data (Commits ride the --deep-git-bounded fetch): flag off / git absent → DeepGit null
+            // → Commits empty → no commit/ dir, no pages, and every hash stays plain (AC #2).
             if (_progress?.DeepGit is { Commits.Count: > 0 } deepCommits)
             {
                 events.AddRange(GenerateCommitDetailsInternal(deepCommits.Commits, nav));
             }
+
+            // In-portal code file pages for source files referenced by planning/implementation artifacts (Story 7.1,
+            // FR15). Additive: a new page class under code/, discovered from citations, that Stories 7.2–7.4 build on.
+            // Skipped entirely in external-link mode (--code-url). When --deep-git produced per-file insights each
+            // page gains an opt-in "Advanced coverage" section (Story 7.4); a null insight leaves it baseline.
+            events.AddRange(GenerateCodePagesInternal(files, nav, reporter));
 
             // Date pages + activity timeline (Story 7.3). Date pages are generated for the UNION of the git
             // commit days and the days any recognized artifact was last edited (filesystem mtime), so an
@@ -1155,6 +1157,9 @@ public sealed class SiteGenerator
                 var referencedBy = BuildReferencedBy(repoRelative);
                 // Story 7.7: additive link to the same file on its hosting platform (null unless a base is set/detected).
                 var externalUrl = BuildExternalSourceUrl(repoRelative);
+                // Story 7.4: opt-in per-file deep-git insight (null when --deep-git is off / no data → baseline page).
+                // Keyed by the same forward-slash repo path the numstat rows carry, so this joins cleanly.
+                var insight = _progress?.DeepGit?.FileInsights.GetValueOrDefault(PathUtil.NormalizeSlashes(repoRelative));
 
                 string html;
                 GenerationOutcome outcome;
@@ -1167,7 +1172,8 @@ public sealed class SiteGenerator
                 else if (TryReadCodeText(full, out var text))
                 {
                     var lines = SplitCodeLines(text);
-                    html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl);
+                    html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl,
+                        insight, CodePageHref, CommitHref);
                     outcome = GenerationOutcome.Generated;
                 }
                 else

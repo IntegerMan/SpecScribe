@@ -191,6 +191,124 @@ public class CodeFileTemplaterTests
         Assert.DoesNotContain("code-external-link", html);
     }
 
+    // ---- Story 7.4: opt-in "Advanced coverage" section ----
+
+    private static FileInsight SampleInsight() => new(
+        ChangeCount: 7,
+        Contributors: new[] { ("Alice", 5), ("Bob", 2) },
+        CoupledFiles: new[] { ("src/SpecScribe/Other.cs", 4), ("docs/notes.md", 1) },
+        History: new[]
+        {
+            new CommitTouch("abc1234", new DateOnly(2026, 7, 3), "Alice", "Refine the thing"),
+            new CommitTouch("def5678", new DateOnly(2026, 7, 1), "Bob", "Seed the thing"),
+        });
+
+    [Fact]
+    public void RenderPage_NullInsight_RendersNoAdvancedCoverageSection()
+    {
+        // A null insight (deep-git off / no data) must leave the page byte-identical to a plain render.
+        var baseline = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var withNull = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: null);
+
+        Assert.DoesNotContain("code-insights", withNull);
+        Assert.Equal(baseline, withNull);
+    }
+
+    [Fact]
+    public void RenderPage_PopulatedInsight_RendersContributorsFrequencyCoupledAndHistory()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        Assert.Contains("<section class=\"code-insights\"", html);
+        // Change frequency line.
+        Assert.Contains("Changed in <strong>7</strong> commits", html);
+        // Contributors — "N commits" attribution wording, no ranking language.
+        Assert.Contains(">Alice</span> <span class=\"contributor-count\">5 commits</span>", html);
+        Assert.Contains(">Bob</span> <span class=\"contributor-count\">2 commits</span>", html);
+        Assert.DoesNotContain("rank", html.ToLowerInvariant());
+        Assert.DoesNotContain("leaderboard", html.ToLowerInvariant());
+        Assert.DoesNotContain("top developer", html.ToLowerInvariant());
+        // Coupled files with co-change counts.
+        Assert.Contains("docs/notes.md", html);
+        Assert.Contains("class=\"coupled-count\">4&times;</span>", html);
+        // History rows: date, hash, author, subject, newest-first.
+        Assert.Contains("<table class=\"code-history-table\">", html);
+        Assert.Contains("2026-07-03", html);
+        Assert.Contains("Refine the thing", html);
+        var newer = html.IndexOf("Refine the thing", StringComparison.Ordinal);
+        var older = html.IndexOf("Seed the thing", StringComparison.Ordinal);
+        Assert.True(newer >= 0 && newer < older, "history must be newest-first");
+    }
+
+    [Fact]
+    public void RenderPage_CoupledLink_GuardedOnCodePageExistence()
+    {
+        // Only src/SpecScribe/Other.cs has a code page; docs/notes.md does not → plain <code>, never a dead link.
+        string? Resolve(string path) => path == "src/SpecScribe/Other.cs" ? "code/src/SpecScribe/Other.cs.html" : null;
+
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), coupledFileHref: Resolve);
+
+        // Resolved coupled file → a real link (prefixed to the code page's depth).
+        Assert.Contains("<a href=\"../../../code/src/SpecScribe/Other.cs.html\">src/SpecScribe/Other.cs</a>", html);
+        // Unresolved coupled file → plain <code>, no anchor.
+        Assert.Contains("<code>docs/notes.md</code>", html);
+        Assert.DoesNotContain("<a href=\"../../../docs/notes.md", html);
+    }
+
+    [Fact]
+    public void RenderPage_HistoryHashLink_GuardedOnCommitPageExistence()
+    {
+        // abc1234 has a per-commit page; def5678 does not → plain <code>, never a dead link.
+        string? Resolve(string shortHash) => shortHash == "abc1234" ? "commit/abc1234.html" : null;
+
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), commitHref: Resolve);
+
+        Assert.Contains("<a href=\"../../../commit/abc1234.html\"><code>abc1234</code></a>", html);
+        Assert.Contains("<code>def5678</code>", html);
+        Assert.DoesNotContain("<a href=\"../../../commit/def5678", html);
+    }
+
+    [Fact]
+    public void RenderPage_Insight_EscapesAuthorSubjectAndPath()
+    {
+        var insight = new FileInsight(
+            ChangeCount: 1,
+            Contributors: new[] { ("A<b>&\"lice", 1) },
+            CoupledFiles: new[] { ("src/<x>&.cs", 1) },
+            History: new[] { new CommitTouch("aaa1111", new DateOnly(2026, 7, 1), "E<v>il", "sub&<ject>\"") });
+
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
+
+        Assert.Contains("A&lt;b&gt;&amp;&quot;lice", html);
+        Assert.Contains("src/&lt;x&gt;&amp;.cs", html);
+        Assert.Contains("E&lt;v&gt;il", html);
+        Assert.Contains("sub&amp;&lt;ject&gt;&quot;", html);
+        // No raw metacharacters from the insight leak through.
+        Assert.DoesNotContain("E<v>il", html);
+    }
+
+    [Fact]
+    public void RenderPage_Insight_OmitsEmptySubPartsWithoutEmptyHeadings()
+    {
+        // Contributors present, but no coupling and no history → only the contributors + frequency parts render.
+        var insight = new FileInsight(
+            ChangeCount: 3,
+            Contributors: new[] { ("Alice", 3) },
+            CoupledFiles: Array.Empty<(string, int)>(),
+            History: Array.Empty<CommitTouch>());
+
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
+
+        Assert.Contains("code-insights", html);
+        Assert.Contains("Contributors to this file", html);
+        Assert.DoesNotContain("Often changed with", html);
+        Assert.DoesNotContain("Change history", html);
+        Assert.DoesNotContain("code-history-table", html);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;

@@ -26,14 +26,25 @@ public static class CodeFileTemplater
     /// newline normalization; escaping is applied here. <paramref name="referencedBy"/> (Story 7.2, AC #2) is the set
     /// of citing artifacts (output-relative URL + display title); an empty list omits the whole relationships block.
     /// <paramref name="externalSourceUrl"/> (Story 7.7), when set, adds an additive "view online" link to the hosted
-    /// source — it never replaces the in-portal page.</summary>
+    /// source — it never replaces the in-portal page.
+    ///
+    /// <para><paramref name="insight"/> (Story 7.4), when non-null, appends an opt-in "Advanced coverage" section
+    /// under the source: the file's contributors (attribution), change frequency, coupled files, and a bounded
+    /// change history — all gated on <c>--deep-git</c> upstream. A null insight renders nothing extra, so the
+    /// baseline page is byte-identical to a run without deep-git. <paramref name="coupledFileHref"/> resolves a
+    /// coupled file's repo-relative path to its <c>code/…html</c> page (null → plain text), and
+    /// <paramref name="commitHref"/> resolves a history entry's short hash to its <c>commit/…html</c> page (null →
+    /// plain <c>&lt;code&gt;</c>); both return output-relative paths that this method prefixes.</para></summary>
     public static string RenderPage(
         string repoRelativePath,
         string outputRelativePath,
         IReadOnlyList<string> lines,
         SiteNav nav,
         IReadOnlyList<(string OutputUrl, string Title)>? referencedBy = null,
-        string? externalSourceUrl = null)
+        string? externalSourceUrl = null,
+        FileInsight? insight = null,
+        Func<string, string?>? coupledFileHref = null,
+        Func<string, string?>? commitHref = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
         var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true);
@@ -65,7 +76,119 @@ public static class CodeFileTemplater
 
         AppendBody(sb, BuildAside(prefix, repoRelativePath, referencedBy, externalSourceUrl), source.ToString());
 
+        // Story 7.4: opt-in per-file "Advanced coverage" section, full-width under the source/relationships. Null
+        // insight => nothing appended => baseline-identical page (a run without --deep-git).
+        if (insight is not null)
+        {
+            sb.Append(BuildCoverageSection(prefix, insight, coupledFileHref, commitHref));
+        }
+
         return EndShell(sb, prefix);
+    }
+
+    /// <summary>Renders the opt-in "Advanced coverage" section (Story 7.4): the file's change frequency, file-scoped
+    /// contributor attribution ("N commits" — never a ranking), the files it most often changes alongside (guarded
+    /// links to their code pages), and a bounded newest-first change history (each row's hash a guarded link to its
+    /// per-commit page). Neutral chart tokens, no JS, everything escaped (author names / subjects / paths / hashes
+    /// are free-text injection surfaces). Empty sub-parts are omitted (no empty heading); a fully-empty insight
+    /// renders nothing so a later refactor can't leak a hollow section.</summary>
+    private static string BuildCoverageSection(
+        string prefix, FileInsight insight, Func<string, string?>? coupledFileHref, Func<string, string?>? commitHref)
+    {
+        var hasContributors = insight.Contributors.Count > 0;
+        var hasCoupled = insight.CoupledFiles.Count > 0;
+        var hasHistory = insight.History.Count > 0;
+        // A file with an insight but no change count and no sub-parts has nothing to say — omit the whole section.
+        if (insight.ChangeCount == 0 && !hasContributors && !hasCoupled && !hasHistory)
+        {
+            return string.Empty;
+        }
+
+        var sb = new StringBuilder();
+        sb.Append("<section class=\"code-insights\" aria-labelledby=\"advanced-coverage\">\n");
+        sb.Append("  <h2 id=\"advanced-coverage\">Advanced coverage</h2>\n");
+        sb.Append("  <p class=\"code-insights-note\">Opt-in git signals for this file: how often it changes, who changes it, what changes alongside it, and its recent history.</p>\n");
+
+        sb.Append("  <div class=\"code-insights-grid\">\n");
+
+        // Change frequency — always shown when the section renders (the anchoring "how often" signal).
+        sb.Append("    <div class=\"code-insight-block\">\n");
+        sb.Append("      <h3>Change frequency</h3>\n");
+        sb.Append($"      <p class=\"code-insight-frequency\">Changed in <strong>{insight.ChangeCount.ToString(CultureInfo.InvariantCulture)}</strong> {Charts.Plural(insight.ChangeCount, "commit", "commits")} in the analyzed history.</p>\n");
+        sb.Append("    </div>\n");
+
+        if (hasContributors)
+        {
+            sb.Append("    <div class=\"code-insight-block\">\n");
+            sb.Append("      <h3>Contributors to this file</h3>\n");
+            sb.Append("      <ul class=\"code-insight-contributors\">\n");
+            foreach (var (author, commits) in insight.Contributors)
+            {
+                sb.Append(
+                    $"        <li><span class=\"contributor-name\">{PathUtil.Html(author)}</span> " +
+                    $"<span class=\"contributor-count\">{commits.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(commits, "commit", "commits")}</span></li>\n");
+            }
+            sb.Append("      </ul>\n");
+            sb.Append("    </div>\n");
+        }
+
+        if (hasCoupled)
+        {
+            sb.Append("    <div class=\"code-insight-block\">\n");
+            sb.Append("      <h3>Often changed with</h3>\n");
+            sb.Append("      <ul class=\"code-insight-coupled\">\n");
+            foreach (var (path, coChanges) in insight.CoupledFiles)
+            {
+                var pathHtml = PathUtil.Html(PathUtil.NormalizeSlashes(path));
+                var target = coupledFileHref?.Invoke(path);
+                var nameCell = target is { Length: > 0 }
+                    ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(target))}\">{pathHtml}</a>"
+                    : $"<code>{pathHtml}</code>";
+                sb.Append(
+                    $"        <li>{nameCell} <span class=\"coupled-count\">{coChanges.ToString(CultureInfo.InvariantCulture)}&times;</span></li>\n");
+            }
+            sb.Append("      </ul>\n");
+            sb.Append("    </div>\n");
+        }
+
+        sb.Append("  </div>\n");
+
+        if (hasHistory)
+        {
+            sb.Append("  <div class=\"code-insight-history\">\n");
+            sb.Append("    <h3>Change history</h3>\n");
+            sb.Append("    <div class=\"table-scroll\">\n");
+            sb.Append("    <table class=\"code-history-table\">\n");
+            sb.Append("      <caption>Recent commits that changed this file, newest first.</caption>\n");
+            sb.Append("      <thead>\n        <tr>\n");
+            sb.Append("          <th scope=\"col\">Date</th>\n");
+            sb.Append("          <th scope=\"col\">Commit</th>\n");
+            sb.Append("          <th scope=\"col\">Author</th>\n");
+            sb.Append("          <th scope=\"col\">Summary</th>\n");
+            sb.Append("        </tr>\n      </thead>\n      <tbody>\n");
+            foreach (var touch in insight.History)
+            {
+                var hashHtml = PathUtil.Html(touch.ShortHash);
+                var target = commitHref?.Invoke(touch.ShortHash);
+                var hashCell = target is { Length: > 0 }
+                    ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(target))}\"><code>{hashHtml}</code></a>"
+                    : $"<code>{hashHtml}</code>";
+                var dateCell = touch.Date is { } d ? PathUtil.Html(Charts.D(d)) : "&mdash;";
+                var subject = touch.Subject.Length == 0 ? "(no subject)" : touch.Subject;
+                sb.Append("        <tr>\n");
+                sb.Append($"          <td class=\"code-history-date\">{dateCell}</td>\n");
+                sb.Append($"          <td class=\"code-history-hash\">{hashCell}</td>\n");
+                sb.Append($"          <td class=\"code-history-author\">{PathUtil.Html(touch.Author)}</td>\n");
+                sb.Append($"          <td class=\"code-history-subject\">{PathUtil.Html(subject)}</td>\n");
+                sb.Append("        </tr>\n");
+            }
+            sb.Append("      </tbody>\n    </table>\n");
+            sb.Append("    </div>\n");
+            sb.Append("  </div>\n");
+        }
+
+        sb.Append("</section>\n");
+        return sb.ToString();
     }
 
     /// <summary>Lays out the page body: the relationships aside beside the source in a two-column grid (the aside is

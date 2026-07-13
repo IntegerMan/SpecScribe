@@ -48,6 +48,15 @@ public sealed record DeepGitPulse(
     /// (never null) when the log was empty or predates the enriched fetch — the per-commit phase then generates
     /// no pages and the hub/day-page hash links stay plain (guarded). [Story 7.5]</summary>
     public IReadOnlyList<DeepCommit> Commits { get; init; } = Array.Empty<DeepCommit>();
+
+    /// <summary>Per-file deep-git signals keyed by repo-relative path (git's own forward-slash paths, the same
+    /// strings the numstat rows carry — so it joins cleanly to the code-page path map), for the opt-in
+    /// "Advanced coverage" section on Story 7.1's code pages (Story 7.4). Computed from the SAME shared numstat
+    /// parse (one fetch, one parse, several views) — no extra git call. Empty (never null) when the log was empty
+    /// or predates the enriched fetch, so a file with no insight renders no section and its baseline code page is
+    /// untouched. [Story 7.4]</summary>
+    public IReadOnlyDictionary<string, FileInsight> FileInsights { get; init; }
+        = new Dictionary<string, FileInsight>(StringComparer.Ordinal);
 }
 
 /// <summary>One file's numstat row within a commit. <paramref name="Added"/>/<paramref name="Deleted"/> are
@@ -88,6 +97,25 @@ public sealed record FileChangeStat(
     DateOnly? LastChangeDate,
     IReadOnlyList<FileContributor> Contributors,
     int TotalContributors);
+
+/// <summary>One commit that touched a file, for that file's bounded "change history" list (Story 7.4). The
+/// honest, bounded reading of "history/blame-style annotations" — recent commits that changed the file (from the
+/// shared numstat fetch), never a per-line <c>git blame</c> call. <paramref name="Date"/> is null when the source
+/// commit's timestamp failed to parse (the row still renders, dateless). <paramref name="ShortHash"/> is the 7-char
+/// abbreviation used to guard the link to the per-commit page (Story 7.5), matched by prefix. [Story 7.4]</summary>
+public sealed record CommitTouch(string ShortHash, DateOnly? Date, string Author, string Subject);
+
+/// <summary>The per-file deep-git signals surfaced on a code page's opt-in "Advanced coverage" section (Story 7.4,
+/// FR-19): how often the file changed (<paramref name="ChangeCount"/>), file-scoped contributor attribution
+/// (<paramref name="Contributors"/> — who has changed THIS file and how many times, never a cross-repo ranking),
+/// the files it most often changes alongside (<paramref name="CoupledFiles"/>, from the same co-change pair data
+/// the hub's coupling uses), and a bounded newest-first change history (<paramref name="History"/>). All lists are
+/// capped; every field is derived from the ONE shared <c>--deep-git</c> numstat fetch — no extra git call. [Story 7.4]</summary>
+public sealed record FileInsight(
+    int ChangeCount,
+    IReadOnlyList<(string Author, int Commits)> Contributors,
+    IReadOnlyList<(string Path, int CoChanges)> CoupledFiles,
+    IReadOnlyList<CommitTouch> History);
 
 /// <summary>The aggregate views behind the Git Insights hub page (FR-10), all derived from the one shared
 /// bounded numstat fetch: per-file change frequency + churn + the file's contributors (the master-detail
@@ -358,7 +386,7 @@ public static class GitMetrics
             .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
             .ToList();
 
-        return new DeepGitPulse(hotspots, coupling) { Insights = BuildInsights(commits), Commits = commits };
+        return new DeepGitPulse(hotspots, coupling) { Insights = BuildInsights(commits), Commits = commits, FileInsights = BuildFileInsights(commits) };
     }
 
     /// <summary>Commit-record boundary sentinel in the shared deep-git fetch (<c>%x01</c>): marks where each
@@ -542,6 +570,132 @@ public static class GitMetrics
             .ToList();
 
         return new GitInsightsData(files, activity, commits.Count, allAuthors.Count, fileStats.Count);
+    }
+
+    /// <summary>History rows kept per file — recent commits that touched it, newest-first. Bounded so a
+    /// long-lived file's "change history" list stays a scannable summary, not the whole log. [Story 7.4]</summary>
+    private const int FileInsightHistoryCap = 15;
+
+    /// <summary>Contributors shown per file (the file-scoped "who has changed this?" attribution). Bounded so a
+    /// widely-touched file lists its principal authors, not an unbounded roster. [Story 7.4]</summary>
+    private const int FileInsightContributorCap = 8;
+
+    /// <summary>Coupled files shown per file (the files it most often changes alongside). Bounded for the same
+    /// reason the hub's coupling is capped — a scannable "changes with" list, not every co-change ever. [Story 7.4]</summary>
+    private const int FileInsightCoupledCap = 8;
+
+    /// <summary>Display abbreviation length for a commit's <c>%H</c> hash in a file's change history (git's default
+    /// floor). The per-commit page guard (Story 7.5) matches this prefix against the full-hash page map. [Story 7.4]</summary>
+    private const int FileInsightShortHashLength = 7;
+
+    /// <summary>Per-file accumulator for <see cref="BuildFileInsights"/>: change frequency, the file's author
+    /// attribution (author → commits touching THIS file), and its bounded newest-first history. Mirrors
+    /// <see cref="FileAccum"/>'s small-mutable-class shape for a readable hot loop. [Story 7.4]</summary>
+    private sealed class FileInsightAccum
+    {
+        public int ChangeCount;
+        public readonly Dictionary<string, int> Contributors = new(StringComparer.Ordinal);
+        public readonly List<CommitTouch> History = new();
+    }
+
+    /// <summary>Builds the per-file deep-git insight map (Story 7.4) from the SAME parsed records the hotspot/
+    /// coupling/hub views consume — one fetch, one parse, several views; no extra git call. Per file:
+    /// <b>change count</b> (commits touching it, once per commit), <b>contributors</b> (author → per-file commit
+    /// count, file-scoped attribution — never a global ranking), <b>coupled files</b> (derived from the same
+    /// unordered co-change pairs the coupling view uses, respecting the <see cref="CouplingFileSetCap"/> bulk-commit
+    /// skip so per-file coupling matches the hub), and a <b>bounded newest-first history</b> of the commits that
+    /// touched it. Every list is capped (<see cref="FileInsightContributorCap"/>/<see cref="FileInsightCoupledCap"/>/
+    /// <see cref="FileInsightHistoryCap"/>). Pure and repo-free (mirrors <see cref="BuildInsights"/>): records arrive
+    /// newest-first, malformed input is already dropped upstream, empty input yields an empty map, and it never
+    /// throws. [Story 7.4]</summary>
+    public static IReadOnlyDictionary<string, FileInsight> BuildFileInsights(
+        IReadOnlyList<DeepCommit> commits,
+        int historyCap = FileInsightHistoryCap,
+        int contributorCap = FileInsightContributorCap,
+        int coupledCap = FileInsightCoupledCap)
+    {
+        var accum = new Dictionary<string, FileInsightAccum>(StringComparer.Ordinal);
+        // Canonical unordered file pair -> co-change count. Same rule as ParseNumstatLog's coupling so the per-file
+        // "changes with" list agrees with the hub, including the bulk-commit skip.
+        var pairCounts = new Dictionary<(string, string), int>();
+
+        foreach (var commit in commits)
+        {
+            // A commit's file SET: the same resolved path listed twice within one commit counts once.
+            var fileSet = new HashSet<string>(commit.Files.Select(f => f.Path), StringComparer.Ordinal);
+            if (fileSet.Count == 0) continue;
+
+            var day = commit.Timestamp is { } ts ? DateOnly.FromDateTime(ts) : (DateOnly?)null;
+            var shortHash = commit.Hash.Length > FileInsightShortHashLength
+                ? commit.Hash[..FileInsightShortHashLength]
+                : commit.Hash;
+
+            foreach (var path in fileSet)
+            {
+                if (!accum.TryGetValue(path, out var a))
+                {
+                    accum[path] = a = new FileInsightAccum();
+                }
+                a.ChangeCount++;
+                a.Contributors[commit.Author] = a.Contributors.GetValueOrDefault(commit.Author) + 1;
+                if (a.History.Count < historyCap)
+                {
+                    // Records are newest-first, so append preserves newest-first up to the cap.
+                    a.History.Add(new CommitTouch(shortHash, day, commit.Author, commit.Subject));
+                }
+            }
+
+            // Guard the O(n²) pair cost exactly as ParseNumstatLog does: a bulk/merge/vendored commit is not a
+            // meaningful co-change signal (it still counts toward change frequency above).
+            if (fileSet.Count >= 2 && fileSet.Count <= CouplingFileSetCap)
+            {
+                var files = fileSet.ToArray();
+                for (var i = 0; i < files.Length; i++)
+                {
+                    for (var j = i + 1; j < files.Length; j++)
+                    {
+                        var x = files[i];
+                        var y = files[j];
+                        var key = string.CompareOrdinal(x, y) <= 0 ? (x, y) : (y, x);
+                        pairCounts[key] = pairCounts.GetValueOrDefault(key) + 1;
+                    }
+                }
+            }
+        }
+
+        // Fan each unordered pair out to both members' "changes with" lists (the other file + shared-commit count).
+        var coupledByFile = new Dictionary<string, List<(string Path, int CoChanges)>>(StringComparer.Ordinal);
+        foreach (var (key, count) in pairCounts)
+        {
+            var (a, b) = key;
+            if (!coupledByFile.TryGetValue(a, out var listA)) coupledByFile[a] = listA = new();
+            listA.Add((b, count));
+            if (!coupledByFile.TryGetValue(b, out var listB)) coupledByFile[b] = listB = new();
+            listB.Add((a, count));
+        }
+
+        var result = new Dictionary<string, FileInsight>(StringComparer.Ordinal);
+        foreach (var (path, a) in accum)
+        {
+            var contributors = a.Contributors
+                .OrderByDescending(kv => kv.Value)
+                .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+                .Take(contributorCap)
+                .Select(kv => (Author: kv.Key, Commits: kv.Value))
+                .ToList();
+
+            var coupled = coupledByFile.TryGetValue(path, out var pairs)
+                ? pairs
+                    .OrderByDescending(p => p.CoChanges)
+                    .ThenBy(p => p.Path, StringComparer.Ordinal)
+                    .Take(coupledCap)
+                    .ToList()
+                : new List<(string Path, int CoChanges)>();
+
+            result[path] = new FileInsight(a.ChangeCount, contributors, coupled, a.History);
+        }
+
+        return result;
     }
 
     /// <summary>Resolves a `--numstat` path field to the file's current path, collapsing git's rename/move

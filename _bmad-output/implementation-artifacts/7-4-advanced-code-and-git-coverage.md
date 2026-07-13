@@ -1,6 +1,10 @@
+---
+baseline_commit: 1d8cf2f6df49c198cf41df09406cbe8e5505d8ee
+---
+
 # Story 7.4: Advanced Code and Git Coverage
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -242,24 +246,24 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Extend the shared deep-git fetch + parse for per-file signals (AC: #1, #2)**
-  - [ ] Change `TryComputeDeep`'s pretty-format to carry `%an`/`%ad`(/`%s`) on the `%x01` header line + `--date=format:%Y-%m-%d`; keep the `-n 300` bound and the single `--numstat` call. Coordinate the format with Story 7.5 (which adds `%b`). [Source: [GitMetrics.cs:213](../../src/SpecScribe/GitMetrics.cs)]
-  - [ ] Add `FileInsight` + `CommitTouch` records and a `FileInsights` map (empty, never null) to `DeepGitPulse`.
-  - [ ] Build the map in a pure helper (sibling `ParseFileInsights`, preferred — leaves `ParseNumstatLog` untouched): per commit, tally each touched file's change count, contributors (author → per-file commit count), coupled files (from the existing pair data, respecting `CouplingFileSetCap`), and a bounded newest-first history. Never-throw, skip malformed, document all caps.
-  - [ ] Keep existing `Hotspots`/`Coupling` output + tests intact.
-- [ ] **Task 2 — Render the advanced-coverage section on code pages (AC: #1)** *(after Story 7.1)*
-  - [ ] Add optional `FileInsight? insight = null` to `CodeFileTemplater.RenderPage`; render a neutral-token `code-insights` section (contributors as attribution, change frequency, coupled files, change history) only when non-null; render nothing extra when null (baseline-identical).
-  - [ ] Guard links: coupled file → `code/<path>.html` only when in `_codePages`; history hash → `commit/{hash}.html` only when in the commit-page set; plain otherwise.
-- [ ] **Task 3 — Wire the insight into the code-pages phase (AC: #1, #2)** *(after Story 7.1)*
-  - [ ] In `GenerateCodePagesInternal`, pass `_progress?.DeepGit?.FileInsights.GetValueOrDefault(path)` per file into `RenderPage`, plus `_codePages` and the `_commitPages` set (add the nullable empty-default field if 7.3 hasn't). Additive only; preserve the phase, wipe/recreate, try/catch, and the deep-git gate.
-- [ ] **Task 4 — Styling (AC: #1)**
-  - [ ] Add `.code-insights` (+ sub-part) styles in `src/SpecScribe/assets/specscribe.css` using neutral tokens (not `--status-*`); tables scroll inside their own container. Update `StylesheetTests` if it asserts class presence. **No JavaScript.**
-- [ ] **Task 5 — Tests (AC: #1, #2)**
-  - [ ] `GitMetricsFileInsightsTests`: per-file change count / contributors / coupling / history, attribution-not-ranking, bounding, malformed/partial/empty, `Hotspots`/`Coupling` back-compat.
-  - [ ] `CodeFileTemplater` tests: null→baseline, populated→section, guarded links (present/absent both), escaping, empty sub-parts omitted.
-  - [ ] Generation-level: opt-in on → section present; opt-out off → no section + baseline identical + `TryComputeDeep` not called; graceful degradation (no git → no section, no error); external mode → no pages/sections; determinism.
-- [ ] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green. Baseline generate (no `--deep-git`) → code page shows no section, matches 7.1 baseline. Deep generate (`--deep-git`) → section shows contributors/frequency/coupled-files/history with guarded links, no JS, invariant dates, escaped content. Non-git run degrades cleanly.
+- [x] **Task 1 — Extend the shared deep-git fetch + parse for per-file signals (AC: #1, #2)**
+  - [x] Change `TryComputeDeep`'s pretty-format to carry `%an`/`%ad`(/`%s`) on the `%x01` header line + `--date=format:%Y-%m-%d`; keep the `-n 300` bound and the single `--numstat` call. Coordinate the format with Story 7.5 (which adds `%b`). [Source: [GitMetrics.cs:213](../../src/SpecScribe/GitMetrics.cs)]
+  - [x] Add `FileInsight` + `CommitTouch` records and a `FileInsights` map (empty, never null) to `DeepGitPulse`.
+  - [x] Build the map in a pure helper (sibling `ParseFileInsights`, preferred — leaves `ParseNumstatLog` untouched): per commit, tally each touched file's change count, contributors (author → per-file commit count), coupled files (from the existing pair data, respecting `CouplingFileSetCap`), and a bounded newest-first history. Never-throw, skip malformed, document all caps.
+  - [x] Keep existing `Hotspots`/`Coupling` output + tests intact.
+- [x] **Task 2 — Render the advanced-coverage section on code pages (AC: #1)** *(after Story 7.1)*
+  - [x] Add optional `FileInsight? insight = null` to `CodeFileTemplater.RenderPage`; render a neutral-token `code-insights` section (contributors as attribution, change frequency, coupled files, change history) only when non-null; render nothing extra when null (baseline-identical).
+  - [x] Guard links: coupled file → `code/<path>.html` only when in `_codePages`; history hash → `commit/{hash}.html` only when in the commit-page set; plain otherwise.
+- [x] **Task 3 — Wire the insight into the code-pages phase (AC: #1, #2)** *(after Story 7.1)*
+  - [x] In `GenerateCodePagesInternal`, pass `_progress?.DeepGit?.FileInsights.GetValueOrDefault(path)` per file into `RenderPage`, plus `_codePages` and the `_commitPages` set (add the nullable empty-default field if 7.3 hasn't). Additive only; preserve the phase, wipe/recreate, try/catch, and the deep-git gate.
+- [x] **Task 4 — Styling (AC: #1)**
+  - [x] Add `.code-insights` (+ sub-part) styles in `src/SpecScribe/assets/specscribe.css` using neutral tokens (not `--status-*`); tables scroll inside their own container. Update `StylesheetTests` if it asserts class presence. **No JavaScript.**
+- [x] **Task 5 — Tests (AC: #1, #2)**
+  - [x] `GitMetricsFileInsightsTests`: per-file change count / contributors / coupling / history, attribution-not-ranking, bounding, malformed/partial/empty, `Hotspots`/`Coupling` back-compat.
+  - [x] `CodeFileTemplater` tests: null→baseline, populated→section, guarded links (present/absent both), escaping, empty sub-parts omitted.
+  - [x] Generation-level: opt-in on → section present; opt-out off → no section + baseline identical + `TryComputeDeep` not called; graceful degradation (no git → no section, no error); external mode → no pages/sections; determinism.
+- [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green. Baseline generate (no `--deep-git`) → code page shows no section, matches 7.1 baseline. Deep generate (`--deep-git`) → section shows contributors/frequency/coupled-files/history with guarded links, no JS, invariant dates, escaped content. Non-git run degrades cleanly.
 
 ## Dev Notes
 
@@ -293,8 +297,42 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ### Agent Model Used
 
+Claude Opus 4.8 (GitHub Copilot)
+
 ### Debug Log References
+
+- Generation-level test `GenerateAll_FlagOnWithHistory_RendersAdvancedCoverageSection` initially found no section: the fixture lacked `epics.md`, so the adapter's ingest callback never fired and `_progress` (which carries `DeepGit`/`FileInsights`) stayed null. Fixed by adding an `epics.md` to the fixture (matching `SiteGeneratorCommitDetailsTests`).
+- External-mode test assumption was stale: Story 7.7 made `--code-url` **additive** (in-portal code pages always generate). Updated the test to assert the section still renders alongside the "view online" link rather than expecting no `code/` dir.
+- Golden fingerprint (`GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`) shifted by the CSS-only `.code-insights` addition (the golden fixture is not a git repo and cites no real files, so no section renders — only `specscribe.css` bytes changed). Rebaselined the constant with a documenting comment.
 
 ### Completion Notes List
 
+- **The shared deep-git fetch was already enriched by Story 3.8** (`%x01%H%x1f%an%x1f%ad%x1f%s%x1f%b%x1f`) — author/date/subject/body already ride the one bounded `git log --numstat -n 300` call. Task 1's "extend the fetch format" was therefore already satisfied; net-new work was the per-file map only. **No new git call** was added.
+- Added `CommitTouch` + `FileInsight` records and a never-null `FileInsights` map to `DeepGitPulse`, built by a new pure `GitMetrics.BuildFileInsights` (sibling to `BuildInsights`) that consumes the same parsed records — one fetch, one parse, several views. Contributors/coupled/history are all bounded (`FileInsightContributorCap=8`, `FileInsightCoupledCap=8`, `FileInsightHistoryCap=15`); per-file coupling reuses the same unordered-pair + `CouplingFileSetCap` bulk-commit skip as the hub. Existing `Hotspots`/`Coupling`/`Insights`/`Commits` output is untouched.
+- **"History/blame-style" was scoped as a bounded per-file change history** (recent commits from the shared numstat pass), **not** literal per-line `git blame` — no per-file blame call was added (deferred, per the story's scope note).
+- `CodeFileTemplater.RenderPage` gained an optional `FileInsight? insight` + two guarded-link resolver delegates (`coupledFileHref`, `commitHref`). A null insight renders nothing extra → baseline byte-identical (proven by a unit test asserting equality with the plain render). Contributors are framed as file-scoped attribution ("N commits"), never a ranking. Neutral chart tokens only; pure HTML/CSS, no JS; every author/subject/path/hash escaped; invariant dates via `Charts.D`.
+- **Reordered `GenerateCommitDetailsInternal` to run before `GenerateCodePagesInternal`** so `_commitPages` (Story 7.5, now merged) is populated when the code pages render their guarded change-history links — otherwise all history hashes would degrade to plain `<code>` even though the commit pages exist. Coupled-file links resolve via `CodePageHref` (`_codePages`, populated up front in `DiscoverCodeReferences`); commit links via `CommitHref` (prefix-matched against the full-hash `_commitPages`). Both guard on target existence — never a dead link.
+- Everything stays behind the existing `--deep-git` gate (the AC #1 perf guarantee): flag off → `DeepGit` null → every per-file lookup null → no section, baseline pages byte-identical. Absent/partial git degrades non-fatally (AC #2, NFR-2).
+- Manual verification on this repo: baseline `generate` (no `--deep-git`) → code pages carry no `code-insights` section; deep `generate --deep-git` → `code/src/SpecScribe/GitMetrics.cs.html` shows change frequency (11 commits), file-scoped contributor attribution, 8 coupled files (7 linked to their code pages, the one `.yaml` non-code-page correctly plain `<code>`), and a 12-row change-history table with invariant dates and 11 commit-page links lit up. No JS, escaped content, degrades cleanly on a non-git run.
+- Full suite: **928 tests green** (+22 new: 17 parser/insight, wired templater cases, 5 generation-level, 1 stylesheet).
+
 ### File List
+
+**New:**
+- `tests/SpecScribe.Tests/GitMetricsFileInsightsTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorCodeInsightsTests.cs`
+
+**Modified:**
+- `src/SpecScribe/GitMetrics.cs` — `CommitTouch`/`FileInsight` records; `FileInsights` map on `DeepGitPulse`; pure `BuildFileInsights` helper + caps; wired into `ParseNumstatLog`'s return.
+- `src/SpecScribe/CodeFileTemplater.cs` — optional `FileInsight?` + guarded-link resolvers on `RenderPage`; `BuildCoverageSection` render.
+- `src/SpecScribe/SiteGenerator.cs` — reordered commit-details before code-pages; passed per-file insight + `CodePageHref`/`CommitHref` into `RenderPage`.
+- `src/SpecScribe/assets/specscribe.css` — `.code-insights` (+ sub-part) styles, neutral tokens, internally-scrolling history table.
+- `tests/SpecScribe.Tests/CodeFileTemplaterTests.cs` — advanced-coverage cases (null→baseline, populated, guarded links, escaping, empty sub-parts).
+- `tests/SpecScribe.Tests/StylesheetTests.cs` — `.code-insights` class-presence companion test.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden fingerprint rebaselined for the CSS-only addition.
+
+### Change Log
+
+| Date | Version | Description |
+|------|---------|-------------|
+| 2026-07-12 | 0.1 | Story 7.4 implemented: per-file deep-git `FileInsight` map on the shared numstat parse (no new git call); opt-in "Advanced coverage" section on code pages (contributors as attribution, change frequency, coupled files, bounded change history) with guarded links to code/commit pages; commit-details reordered before code-pages so history links light up; neutral-token CSS, no JS; 928 tests green. Status → review. |

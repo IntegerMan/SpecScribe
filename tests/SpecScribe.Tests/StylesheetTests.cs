@@ -79,6 +79,18 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_HasAdvancedCoverageStyles()
+    {
+        // Story 7.4 opt-in "Advanced coverage" section: the surface, its contributor/coupled lists, and the
+        // change-history table must survive later refactors so a deep-git run stays styled.
+        var css = ReadStylesheet();
+        Assert.Contains(".code-insights", css);
+        Assert.Contains(".code-insight-contributors", css);
+        Assert.Contains(".code-insight-coupled", css);
+        Assert.Contains(".code-history-table", css);
+    }
+
+    [Fact]
     public void Stylesheet_HasReferencedByStyles()
     {
         // Story 7.1 (rework) relationships block + reference graph on code pages — neutral tokens only, no --status-*.

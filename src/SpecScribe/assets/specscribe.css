@@ -740,6 +740,143 @@ pre.code-file code[class*="language-"] {
   }
 }
 
+/* Story 7.4 — opt-in "Advanced coverage" section: per-file git signals under the source. Neutral chart tokens
+   only (never --status-* lifecycle colors); pure HTML/CSS, no JS. Omitted entirely when --deep-git is off. */
+.code-insights {
+  margin-top: 2rem;
+  padding: 1.3rem 1.4rem;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--gold);
+  border-radius: 6px;
+  background: var(--parchment);
+}
+
+.code-insights > h2 {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+  color: var(--ink-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.code-insights-note {
+  margin: 0 0 1.1rem;
+  font-size: 0.85rem;
+  color: var(--ink-light);
+}
+
+.code-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.2rem 1.6rem;
+}
+
+.code-insight-block h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.code-insight-frequency {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.code-insight-contributors,
+.code-insight-coupled {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.code-insight-contributors li,
+.code-insight-coupled li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.code-insight-contributors .contributor-name {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code-insight-contributors .contributor-count,
+.code-insight-coupled .coupled-count {
+  flex: none;
+  color: var(--ink-light);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.code-insight-coupled a,
+.code-insight-coupled code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code-insight-history {
+  margin-top: 1.4rem;
+}
+
+.code-insight-history h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* The history table can be wide (subjects, paths) — it scrolls inside its own container, never the page body. */
+.code-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.code-history-table caption {
+  text-align: left;
+  color: var(--ink-light);
+  font-size: 0.8rem;
+  padding-bottom: 0.4rem;
+}
+
+.code-history-table th,
+.code-history-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.45rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.code-history-table th {
+  color: var(--ink-faded);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.code-history-date {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-light);
+}
+
+.code-history-author {
+  white-space: nowrap;
+}
+
 /* Every markdown-generated table carries .md-table (see MarkdownConverter.TagTables), so this styles
    pipe tables consistently everywhere — inside .doc-body and in stand-alone panels like Change Log. */
 .md-table {
