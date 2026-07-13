@@ -1128,4 +1128,129 @@ public class ChartsTests
         Assert.DoesNotContain("NaN", svg);
         Assert.Contains("role=\"img\"", svg);
     }
+
+    // ---- Story 7.8: ReferenceGraph second (related-file) population ----
+
+    private static readonly (string Href, string Title, string Short)[] TwoArtifacts =
+    {
+        ("epics/story-7-1.html", "Story 7.1: In-Portal Code File Browsing", "Story 7.1"),
+        ("epics/epic-8.html", "Epic 8: Dashboard Command Center", "Epic 8"),
+    };
+
+    [Fact]
+    public void ReferenceGraph_TwoPopulations_RenderDistinctShapesAndEdges()
+    {
+        var related = new (string?, string, string, int)[]
+        {
+            ("../code/src/Other.cs.html", "src/Other.cs", "Other.cs", 7),
+        };
+
+        var svg = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, related);
+
+        // Artifact half unchanged: gold circle nodes on solid edges.
+        Assert.Contains("class=\"ref-dot\"", svg);
+        Assert.Contains("class=\"ref-edge\"", svg);
+        // Related half: neutral diamond (polygon) nodes on DASHED edges — distinct by shape AND edge, not colour.
+        Assert.Contains("class=\"ref-file-dot\"", svg);
+        Assert.Contains("<polygon class=\"ref-file-dot\"", svg);
+        Assert.Contains("class=\"ref-edge-file\"", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_RelatedNode_LinkedWhenHrefPresentChipWhenNull()
+    {
+        var related = new (string?, string, string, int)[]
+        {
+            ("../code/src/Linked.cs.html", "src/Linked.cs", "Linked.cs", 3),
+            (null, "src/Unlinked.cs", "Unlinked.cs", 2),
+        };
+
+        var svg = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, related);
+
+        // Href present → an <a> node; href null → a non-link <g> chip. Never a dead link.
+        Assert.Contains("<a class=\"ref-file-node\" href=\"../code/src/Linked.cs.html\"", svg);
+        Assert.Contains("class=\"ref-file-node ref-file-node--chip\"", svg);
+        Assert.DoesNotContain("href=\"\"", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_RelatedNode_TooltipCarriesFullPathAndCoChangeStrength()
+    {
+        var related = new (string?, string, string, int)[]
+        {
+            ("../code/src/Other.cs.html", "src/Other.cs", "Other.cs", 7),
+            (null, "src/Once.cs", "Once.cs", 1),
+        };
+
+        var svg = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, related);
+
+        Assert.Contains("<title>src/Other.cs — changed together 7 times</title>", svg);
+        // Singular co-change wording ("1 time", not "1 times").
+        Assert.Contains("<title>src/Once.cs — changed together 1 time</title>", svg);
+        // The aria summary reflects both populations.
+        Assert.Contains("and changes alongside 2 files", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_EmptyRelated_ByteIdenticalToSinglePopulationCall()
+    {
+        // Passing an empty related list must reproduce the pre-7.8 single-population SVG exactly (additive overload +
+        // null-insight degradation). Same for passing null.
+        var singleArg = Charts.ReferenceGraph("Sample.cs", TwoArtifacts);
+        var emptyRelated = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, Array.Empty<(string?, string, string, int)>());
+        var nullRelated = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, null);
+
+        Assert.Equal(singleArg, emptyRelated);
+        Assert.Equal(singleArg, nullRelated);
+        Assert.DoesNotContain("ref-file-dot", singleArg);
+        Assert.DoesNotContain("ref-edge-file", singleArg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_ArtifactRingCapped_OverflowSurfacedNotDropped()
+    {
+        // More citing artifacts than the cap → only the cap's worth of ring nodes are drawn, but the summary
+        // aria-label reflects the TRUE total and an on-graph "+N more" marker is emitted (nothing silently dropped).
+        var many = new List<(string Href, string Title, string Short)>();
+        for (var i = 0; i < 20; i++)
+        {
+            many.Add(($"epics/a{i}.html", $"Artifact {i}", $"A{i}"));
+        }
+
+        var svg = Charts.ReferenceGraph("Sample.cs", many);
+
+        // Only the cap (14) circles drawn.
+        Assert.Equal(Charts.RefGraphArtifactNodeCap, CountOccurrences(svg, "class=\"ref-dot\""));
+        // True total in the summary + an honest overflow marker for the remaining 6.
+        Assert.Contains("is referenced by 20 artifacts", svg);
+        Assert.Contains("(14 shown)", svg);
+        Assert.Contains("class=\"ref-overflow\"", svg);
+        Assert.Contains("+6 more artifacts", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_RelatedNode_EscapesMetacharacters()
+    {
+        var related = new (string?, string, string, int)[]
+        {
+            ("../code/x.html", "src/<x>&\".cs", "<x>&\".cs", 2),
+        };
+
+        var svg = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, related);
+
+        Assert.Contains("src/&lt;x&gt;&amp;&quot;.cs", svg);
+        Assert.DoesNotContain("<x>&\".cs</text>", svg);
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+        return count;
+    }
 }

@@ -81,14 +81,16 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasAdvancedCoverageStyles()
     {
-        // Story 7.4 opt-in "Advanced coverage" section: the surface, its contributor/coupled lists, and the
-        // change-history table must survive later refactors so a deep-git run stays styled.
+        // Story 7.4 opt-in "Advanced coverage" section: the surface, its contributor list, and the change-history
+        // table must survive later refactors so a deep-git run stays styled. (Story 7.8 retired the visible coupled
+        // list here — coupling now renders on the reference graph.)
         var css = ReadStylesheet();
         Assert.Contains(".code-insights", css);
         Assert.Contains(".code-insight-contributors", css);
-        Assert.Contains(".code-insight-coupled", css);
         Assert.Contains(".code-history-table", css);
         Assert.Contains(".code-insight-more", css);
+        // The retired coupled-list styles are gone (its relationship moved to the graph).
+        Assert.DoesNotContain(".code-insight-coupled", css);
     }
 
     [Fact]
@@ -98,6 +100,11 @@ public class StylesheetTests
         var css = ReadStylesheet();
         Assert.Contains(".code-relationships", css);
         Assert.Contains(".ref-graph", css);
+        // Story 7.8 — the related-file node population is distinguished by shape (diamond) AND edge (dashed), never
+        // colour alone: the dedicated classes must be present and the dashed edge must carry a dash pattern.
+        Assert.Contains(".ref-edge-file", css);
+        Assert.Contains(".ref-file-dot", css);
+        Assert.Contains("stroke-dasharray", css);
     }
 
     [Fact]

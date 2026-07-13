@@ -108,11 +108,39 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         // Contributor attribution (the known fixture author), framed as commits — not a ranking.
         Assert.Contains("Insight Tester", html);
         Assert.Contains("Change frequency", html);
-        // Referenced.cs and Sibling.cs change together → the coupled-file link resolves to the sibling code page.
-        Assert.Contains("Often changed with", html);
+        // Story 7.8 (AC #2): the visible "Often changed with" list is GONE — the coupling now renders as a
+        // related-file node on the reference graph (neutral diamond + dashed edge) linking to the sibling's code page.
+        Assert.DoesNotContain("Often changed with", html);
+        Assert.Contains("class=\"ref-edge-file\"", html);
+        Assert.Contains("class=\"ref-file-dot\"", html);
         Assert.Contains("code/src/Lib/Sibling.cs.html", html);
+        // The accessible text equivalent of the related node is present with its co-change strength.
+        Assert.Contains("Files changed alongside this one:", html);
+        Assert.Contains("changed together", html);
         // Change history table with a real date.
         Assert.Contains("code-history-table", html);
+    }
+
+    [Fact]
+    public void GenerateAll_CoupledFileWithoutCodePage_RendersNonLinkChip()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the non-link chip path; install git rather than silently skipping this test");
+
+        // A third file that co-changes with Referenced.cs but is cited by NO artifact → it never gets a code page,
+        // so on Referenced.cs's graph it must be a non-link chip (still shown + tooltipped), never a dead link.
+        File.WriteAllText(Path.Combine(SrcDir, "Uncited.cs"), "namespace Lib;\npublic class Uncited { }\n");
+        File.WriteAllText(Path.Combine(SrcDir, "Referenced.cs"), "namespace Lib;\npublic class Referenced { /* v3 */ }\n");
+        Assert.True(RunGit("add .") && Commit("Change Referenced alongside an uncited helper"));
+
+        var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
+
+        AssertNoErrors(events);
+        var html = File.ReadAllText(ReferencedPage);
+
+        Assert.Contains("ref-file-node--chip", html);          // the uncited coupled file is a non-link chip
+        Assert.Contains("src/Lib/Uncited.cs", html);           // still surfaced (tooltip + sr-only text)
+        Assert.False(File.Exists(Path.Combine(Site, "code", "src", "Lib", "Uncited.cs.html")));
+        Assert.DoesNotContain("code/src/Lib/Uncited.cs.html", html);   // never a link to a page that does not exist
     }
 
     [Fact]

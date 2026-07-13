@@ -59,11 +59,11 @@ public static class CodeFileTemplater
 
         // Four independent views, each holding one facet of the file. A null insight => empty insights/history and
         // (when uncited) empty relationships => the page is byte-identical to a run without --deep-git for that facet.
-        //   Insights      — the git-signal coverage: change frequency, contributors, and the coupled-file card.
-        //   Relationships — the reference graph (what cites the file) plus the same coupled-file card (owner: both).
+        //   Insights      — the git-signal coverage: change frequency and contributors.
+        //   Relationships — the reference graph: what cites the file (solid) plus the files it co-changes with (dashed, Story 7.8).
         //   History       — the bounded change-history table.
         //   Code          — the source itself (always present).
-        var insightsPanel = BuildInsightsPanel(prefix, insight, coupledFileHref);
+        var insightsPanel = BuildInsightsPanel(insight);
         var relationshipsPanel = BuildRelationshipsPanel(prefix, repoRelativePath, referencedBy, insight, coupledFileHref);
         var historyPanel = BuildHistoryPanel(prefix, insight, commitHref);
 
@@ -156,19 +156,20 @@ public static class CodeFileTemplater
     }
 
     /// <summary>Builds the <em>Insights</em> panel: the opt-in "Advanced coverage" section (Story 7.4) — the file's
-    /// change frequency, file-scoped contributor attribution ("N commits" — never a ranking), and the files it most
-    /// often changes alongside (the coupled-file card, which also appears in the Relationships panel per owner
-    /// decision). The reference graph and the change-history table are NOT here — they own the Relationships and
-    /// History tabs. Returns empty when the insight is null or carries no frequency/contributors/coupled data, so the
-    /// caller drops the tab entirely; a null insight leaves the page byte-identical to a run without --deep-git.</summary>
-    private static string BuildInsightsPanel(string prefix, FileInsight? insight, Func<string, string?>? coupledFileHref)
+    /// change frequency and file-scoped contributor attribution ("N commits" — never a ranking). The files it most
+    /// often changes alongside are NOT listed here: as of Story 7.8 (AC #2) they live as related-file nodes on the
+    /// reference graph (the Relationships tab, the single relationship surface), so a visible list here would duplicate
+    /// them. The reference graph and the change-history table own the Relationships and History tabs. Returns empty
+    /// when the insight is null or carries no frequency/contributor data, so the caller drops the tab entirely; a null
+    /// insight leaves the page byte-identical to a run without --deep-git.</summary>
+    private static string BuildInsightsPanel(FileInsight? insight)
     {
         if (insight is null) return "";
 
         var hasContributors = insight.Contributors.Count > 0;
-        var hasCoupled = insight.CoupledFiles.Count > 0;
-        // A file with an insight but no change count and no sub-parts (history lives elsewhere now) has nothing to say.
-        if (insight.ChangeCount == 0 && !hasContributors && !hasCoupled)
+        // Coupling now lives on the relationship graph (Story 7.8), not here, so it no longer keeps this panel alive:
+        // a file with an insight but no change count and no contributors has nothing to say.
+        if (insight.ChangeCount == 0 && !hasContributors)
         {
             return string.Empty;
         }
@@ -208,59 +209,58 @@ public static class CodeFileTemplater
             sb.Append("    </section>\n");
         }
 
-        sb.Append(BuildCoupledCard(prefix, insight, coupledFileHref));
-
         sb.Append("  </div>\n");
         sb.Append("</section>\n");
         return sb.ToString();
     }
 
-    /// <summary>Builds the <em>Relationships</em> panel: the "Referenced by" reference graph (what cites this file)
-    /// as its card, followed by the same coupled-file card the Insights panel carries (owner decision: coupled files
-    /// are a relationship signal that lives in <em>both</em> tabs). Both cards share one responsive grid. Returns
-    /// empty when there is neither a graph (uncited) nor a coupled card, so the caller drops the tab.</summary>
+    /// <summary>Builds the <em>Relationships</em> panel: the "Referenced by" reference graph as its single card. The
+    /// graph carries two node populations (Story 7.8): the citing artifacts (always, as solid-spoke gold circles) and
+    /// — when the <paramref name="insight"/> carries coupled files — the files this file most often changes alongside
+    /// (dashed-spoke neutral diamonds, resolved to their code pages via <paramref name="coupledFileHref"/>). The graph
+    /// is now the single relationship surface (AC #2), so the old visible "Often changed with" list is gone; its text
+    /// equivalent lives in the card's sr-only list. Returns empty when there is neither a citation nor a related file,
+    /// so the caller drops the tab.</summary>
     private static string BuildRelationshipsPanel(
         string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)>? referencedBy,
         FileInsight? insight, Func<string, string?>? coupledFileHref)
     {
         var hasRefs = referencedBy is { Count: > 0 };
-        var coupledCard = insight is null ? "" : BuildCoupledCard(prefix, insight, coupledFileHref);
-        if (!hasRefs && coupledCard.Length == 0) return "";
+        var related = BuildRelatedNodes(prefix, insight, coupledFileHref);
+        if (!hasRefs && related.Count == 0) return "";
 
         var sb = new StringBuilder();
         sb.Append("<div class=\"insight-panels\">\n");
-        if (hasRefs) sb.Append(BuildRelationshipsCard(prefix, repoRelativePath, referencedBy!));
-        sb.Append(coupledCard);
+        sb.Append(BuildRelationshipsCard(
+            prefix, repoRelativePath, referencedBy ?? Array.Empty<(string, string)>(), related));
         sb.Append("</div>\n");
         return sb.ToString();
     }
 
-    /// <summary>The "Often changed with" coupled-file card (Story 7.4) — one bordered <c>.insight-panel</c> listing
-    /// the files that most often change alongside this one, each a guarded link to its <c>code/…html</c> page (null
-    /// resolution → plain <c>&lt;code&gt;</c>, never a dead link). Rendered in BOTH the Insights and Relationships
-    /// panels (owner decision), so it is factored out here to stay identical in both. Empty when there are no coupled
-    /// files. Paths are escaped (a free-text injection surface).</summary>
-    private static string BuildCoupledCard(string prefix, FileInsight insight, Func<string, string?>? coupledFileHref)
+    /// <summary>Maps the file's coupled-file list (Story 7.4's <see cref="FileInsight.CoupledFiles"/> — already
+    /// sorted, capped, and <c>--deep-git</c>-gated upstream) to related-file graph/list nodes (Story 7.8). Each entry
+    /// becomes <c>(Href?, fullPath, basename, coChanges)</c>: <c>Href</c> is the coupled file's <c>code/…html</c> page
+    /// resolved via <paramref name="coupledFileHref"/> and prefixed for this page — non-null only when that file has an
+    /// in-portal page (it too is cited), so an uncited coupled file becomes a non-link chip, never a dead link. Full
+    /// path rides the tooltip/list text; the basename is the on-graph label. A null insight or empty coupling yields an
+    /// empty list, so the graph stays citations-only (byte-identical to a run without deep-git).</summary>
+    private static IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> BuildRelatedNodes(
+        string prefix, FileInsight? insight, Func<string, string?>? coupledFileHref)
     {
-        if (insight.CoupledFiles.Count == 0) return "";
+        if (insight is null || insight.CoupledFiles.Count == 0)
+        {
+            return Array.Empty<(string?, string, string, int)>();
+        }
 
-        var sb = new StringBuilder();
-        sb.Append("    <section class=\"insight-panel code-insight-block\">\n");
-        sb.Append("      <h3>Often changed with</h3>\n");
-        sb.Append("      <ul class=\"code-insight-coupled\">\n");
+        var list = new List<(string? Href, string Title, string Short, int CoChanges)>(insight.CoupledFiles.Count);
         foreach (var (path, coChanges) in insight.CoupledFiles)
         {
-            var pathHtml = PathUtil.Html(PathUtil.NormalizeSlashes(path));
+            var norm = PathUtil.NormalizeSlashes(path);
             var target = coupledFileHref?.Invoke(path);
-            var nameCell = target is { Length: > 0 }
-                ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(target))}\">{pathHtml}</a>"
-                : $"<code>{pathHtml}</code>";
-            sb.Append(
-                $"        <li>{nameCell} <span class=\"coupled-count\">{coChanges.ToString(CultureInfo.InvariantCulture)}&times;</span></li>\n");
+            var href = target is { Length: > 0 } ? prefix + PathUtil.NormalizeSlashes(target) : null;
+            list.Add((href, norm, BaseName(path), coChanges));
         }
-        sb.Append("      </ul>\n");
-        sb.Append("    </section>\n");
-        return sb.ToString();
+        return list;
     }
 
     /// <summary>Builds the <em>History</em> panel: the bounded, newest-first change-history table (Story 7.4) — each
@@ -367,13 +367,16 @@ public static class CodeFileTemplater
         return sb.ToString();
     }
 
-    /// <summary>Builds the "Referenced by" relationship card for the insights tab: the pure-SVG node-link graph of the
-    /// artifacts that cite this file (Story 7.1 rework), plus a visually-hidden but present <c>&lt;ul&gt;</c> that
-    /// mirrors the graph's links for assistive tech (the <c>&lt;svg role="img"&gt;</c> exposes only its summary label,
-    /// so this is the accessible, keyboard-reachable equivalent — meaningful link text, never "click here",
-    /// NFR6/UX-DR16). Same markup the sidebar used, now a card among the insight panels.</summary>
+    /// <summary>Builds the relationship card for the insights tab: the pure-SVG node-link graph — the single visible
+    /// relationship surface (Story 7.8, AC #2) — carrying the artifacts that cite this file (Story 7.1) and, when
+    /// present, the files it most often changes alongside (<paramref name="related"/>, Story 7.8). A visually-hidden
+    /// but present <c>&lt;ul&gt;</c> mirrors BOTH node kinds for assistive tech (the <c>&lt;svg role="img"&gt;</c>
+    /// exposes only its summary label, so this is the accessible, keyboard-reachable equivalent — meaningful link text,
+    /// never "click here", NFR6/UX-DR16). When there are no related files the card is byte-identical to the Story 7.1
+    /// citations-only card (note text, graph, and list all unchanged).</summary>
     private static string BuildRelationshipsCard(
-        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)> referencedBy)
+        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)> referencedBy,
+        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> related)
     {
         // Resolve each citing artifact once to (href, full title, compact label) — shared by the graph and list.
         var nodes = new List<(string Href, string Title, string Short)>(referencedBy.Count);
@@ -382,17 +385,41 @@ public static class CodeFileTemplater
             nodes.Add((prefix + PathUtil.NormalizeSlashes(outputUrl), title, ShortLabel(title)));
         }
 
+        var hasRelated = related.Count > 0;
+        // The note gains the co-change population's framing ONLY when related files are present, so a baseline
+        // (no-deep-git) card stays byte-identical to Story 7.1 and never promises a dashed edge the graph won't draw.
+        var note = hasRelated
+            ? "The artifacts that cite this file (solid) and the files it most often changes alongside (dashed). These are citations and co-changes over time &#8212; not code call/dependency edges."
+            : "The artifacts that cite this file. References run artifact&#8594;file, so this shows what refers to the file — not code dependencies.";
+
         var sb = new StringBuilder();
         sb.Append("<section class=\"code-relationships\">\n");
         sb.Append("  <h2>Referenced by</h2>\n");
-        sb.Append("  <p class=\"code-relationships-note\">The artifacts that cite this file. References run artifact&#8594;file, so this shows what refers to the file — not code dependencies.</p>\n");
+        sb.Append($"  <p class=\"code-relationships-note\">{note}</p>\n");
         sb.Append("  <div class=\"ref-graph-wrap\">\n");
-        sb.Append(Charts.ReferenceGraph(BaseName(repoRelativePath), nodes));
+        sb.Append(Charts.ReferenceGraph(BaseName(repoRelativePath), nodes, 0, related));
         sb.Append("  </div>\n");
         sb.Append("  <ul class=\"ref-list sr-only\">\n");
         foreach (var (href, title, _) in nodes)
         {
             sb.Append($"    <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(title)}</a></li>\n");
+        }
+        if (hasRelated)
+        {
+            // The accessible text equivalent of the related-file nodes (AC #2's second half): a labelled sub-list of
+            // path + co-change strength, linked to the coupled file's code page when it has one, plain text otherwise.
+            sb.Append("    <li class=\"ref-list-related\">Files changed alongside this one:\n");
+            sb.Append("      <ul>\n");
+            foreach (var (href, title, _, coChanges) in related)
+            {
+                var pathHtml = PathUtil.Html(title);
+                var nameCell = href is { Length: > 0 }
+                    ? $"<a href=\"{PathUtil.Html(href)}\">{pathHtml}</a>"
+                    : pathHtml;
+                sb.Append($"        <li>{nameCell} &#8212; changed together {coChanges.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(coChanges, "time", "times")}</li>\n");
+            }
+            sb.Append("      </ul>\n");
+            sb.Append("    </li>\n");
         }
         sb.Append("  </ul>\n");
         sb.Append("</section>\n");

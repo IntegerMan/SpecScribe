@@ -260,7 +260,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // actual LinkedCommitDays membership instead of a bare day<=today comparison; ExtractAdrSummary's H1-tail
         // dash split now uses the LAST dash occurrence, not the first; PortalDates dropped the ambiguous
         // "M/d/yyyy" authored-date format. CSS/content-only for this fixture where those paths are exercised.
-        const string expected = "eebbfbf25be18505868de26c0ef05e44a0ffc5be336d425df6f75da95e22bf56";
+        // Regenerated for Story 7.8: specscribe.css gained the reference graph's related-file node styles
+        // (.ref-edge-file / .ref-file-dot / .ref-file-label / .ref-overflow) and dropped the retired visible
+        // coupled-list styles (.code-insight-coupled). The fixture is not a git repo and cites no real files, so
+        // no code page or per-file coupling renders here — again only the stylesheet content shifted the hash.
+        // [golden-diff-normalization-gotchas]
+        const string expected = "7696b7285d3c797b81585fc5fef719cfbe9a23fb039670bf2f8d38ef8c5571e0";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

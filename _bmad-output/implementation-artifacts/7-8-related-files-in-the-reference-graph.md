@@ -4,7 +4,7 @@ baseline_commit: 2f30ef9b696157c96d6c931304264f7bc138313d
 
 # Story 7.8: Related Files in the Reference Graph
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -260,26 +260,26 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Extend `Charts.ReferenceGraph` for a second node population (AC: #1, #2)**
-  - [ ] Add an additive overload/optional parameter carrying the related files: `IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)>` (or equivalent). Existing single-population call sites/tests keep compiling.
-  - [ ] Render related-file nodes as **neutral diamonds/rounded-squares with dashed edges** (owner design), `<a>` to the code page when `Href` is present, non-link `<g>` chip otherwise, each with a rich `<title>`/`aria-label` = full path + co-change strength (`Charts.Plural`).
-  - [ ] Lay the two populations out deterministically around the same center/ring, growing the canvas with the total node count; keep the artifact ring visually unchanged.
-  - [ ] Add a documented artifact-node cap (e.g. `RefGraphArtifactNodeCap`); over the cap → render top-N, reflect the true total in the summary `aria-label`, don't drop citers from the accessible path. Coupled files already capped at 8.
-- [ ] **Task 2 — Weave related nodes + sr-only equivalent into `CodeFileTemplater.BuildAside` (AC: #1, #2)**
-  - [ ] Thread the file's `FileInsight?` (coupled list) + `coupledFileHref` into `BuildAside`; map `CoupledFiles` → related-file nodes (guarded href via `coupledFileHref`), pass both populations to `ReferenceGraph`.
-  - [ ] Extend the sr-only `.ref-list` with a labelled related-files text equivalent (path + co-change count, linked when a page exists) — after the artifact `<li>`s, in the same `.sr-only` region.
-  - [ ] Null insight / empty coupling → zero related nodes, zero related sr-only entries → aside byte-identical to today (citations-only).
-- [ ] **Task 3 — Remove the redundant visible coupled list (AC: #2)**
-  - [ ] Delete the visible "Often changed with" `.code-insight-coupled` `<ul>` from `BuildCoverageSection`; keep change-frequency, contributors, and change-history intact.
-- [ ] **Task 4 — Styling (AC: #1)**
-  - [ ] Add related-file node classes (shape box/label + dashed `.ref-edge-file`) to `specscribe.css` using neutral tokens (not gold, not `--status-*`); verify light + dark, distinct-by-shape-and-edge (not color-only). Update `StylesheetTests` if it asserts class presence. **No JS.**
-- [ ] **Task 5 — Tests (AC: #1, #2)**
-  - [ ] `Charts.ReferenceGraph`: two-population distinctness, linked-vs-chip, rich tooltip w/ co-change strength, citations-only byte-identity, artifact-node cap + honest overflow, escaping.
-  - [ ] `CodeFileTemplaterTests`: null→baseline aside; populated→related nodes + sr-only entries; no visible coupled list; guarded related link; escaping.
-  - [ ] Generation-level (`SiteGeneratorCodeInsightsTests`): opt-in on → related nodes present + coupled list gone; opt-out off → citations-only baseline; non-git → degrades; coupled-without-page → non-link; determinism.
-  - [ ] Regenerate the golden content fingerprint (CSS-driven) with standard normalizations; confirm inventory unaffected.
-- [ ] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green. Baseline generate (no `--deep-git`) → citations-only graph, no visible coupled list. Deep generate (`--deep-git`) → distinct dashed-diamond related nodes with tooltips + guarded links, complete sr-only equivalent, legible hub graph, no JS, escaped content; non-git run degrades cleanly.
+- [x] **Task 1 — Extend `Charts.ReferenceGraph` for a second node population (AC: #1, #2)**
+  - [x] Add an additive overload/optional parameter carrying the related files: `IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)>` (or equivalent). Existing single-population call sites/tests keep compiling.
+  - [x] Render related-file nodes as **neutral diamonds/rounded-squares with dashed edges** (owner design), `<a>` to the code page when `Href` is present, non-link `<g>` chip otherwise, each with a rich `<title>`/`aria-label` = full path + co-change strength (`Charts.Plural`).
+  - [x] Lay the two populations out deterministically around the same center/ring, growing the canvas with the total node count; keep the artifact ring visually unchanged.
+  - [x] Add a documented artifact-node cap (e.g. `RefGraphArtifactNodeCap`); over the cap → render top-N, reflect the true total in the summary `aria-label`, don't drop citers from the accessible path. Coupled files already capped at 8.
+- [x] **Task 2 — Weave related nodes + sr-only equivalent into `CodeFileTemplater.BuildAside` (AC: #1, #2)**
+  - [x] Thread the file's `FileInsight?` (coupled list) + `coupledFileHref` into `BuildAside`; map `CoupledFiles` → related-file nodes (guarded href via `coupledFileHref`), pass both populations to `ReferenceGraph`. *(Note: the code page was refactored into the tabbed Insights|Code layout since the story was written — the graph now lives in `BuildInsightsPanel`/`BuildRelationshipsCard`, not `BuildAside`, which is placeholder-only. Wired the related nodes into that path.)*
+  - [x] Extend the sr-only `.ref-list` with a labelled related-files text equivalent (path + co-change count, linked when a page exists) — after the artifact `<li>`s, in the same `.sr-only` region.
+  - [x] Null insight / empty coupling → zero related nodes, zero related sr-only entries → aside byte-identical to today (citations-only).
+- [x] **Task 3 — Remove the redundant visible coupled list (AC: #2)**
+  - [x] Delete the visible "Often changed with" `.code-insight-coupled` `<ul>` from `BuildCoverageSection`; keep change-frequency, contributors, and change-history intact.
+- [x] **Task 4 — Styling (AC: #1)**
+  - [x] Add related-file node classes (shape box/label + dashed `.ref-edge-file`) to `specscribe.css` using neutral tokens (not gold, not `--status-*`); verify light + dark, distinct-by-shape-and-edge (not color-only). Update `StylesheetTests` if it asserts class presence. **No JS.** *(The standalone HTML site is single-theme parchment — no `prefers-color-scheme`/`data-theme` blocks; code pages are excluded from the VS Code webview, so the one HTML theme is the only surface. Verified the diamond/dashed/neutral distinction reads clearly against the gold circles there.)*
+- [x] **Task 5 — Tests (AC: #1, #2)**
+  - [x] `Charts.ReferenceGraph`: two-population distinctness, linked-vs-chip, rich tooltip w/ co-change strength, citations-only byte-identity, artifact-node cap + honest overflow, escaping.
+  - [x] `CodeFileTemplaterTests`: null→baseline aside; populated→related nodes + sr-only entries; no visible coupled list; guarded related link; escaping.
+  - [x] Generation-level (`SiteGeneratorCodeInsightsTests`): opt-in on → related nodes present + coupled list gone; opt-out off → citations-only baseline; non-git → degrades; coupled-without-page → non-link; determinism.
+  - [x] Regenerate the golden content fingerprint (CSS-driven) with standard normalizations; confirm inventory unaffected.
+- [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green (965). Baseline generate (no `--deep-git`) → citations-only graph, no visible coupled list. Deep generate (`--deep-git`) → distinct dashed-diamond related nodes with tooltips + guarded links, complete sr-only equivalent, legible hub graph (cap 14 + honest `+13 more`), no JS, escaped content; non-git run degrades cleanly.
 
 ## Dev Notes
 
@@ -316,8 +316,34 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ### Agent Model Used
 
+claude-opus-4-8 (Dev Story workflow, worktree `worktree-story-7-8-related-files-graph`).
+
 ### Debug Log References
+
+- Full suite green: 965/965 (`dotnet test tests/SpecScribe.Tests`).
+- Golden content fingerprint regenerated (CSS-only drift, page inventory unchanged): `96ae1efd…` → `da01bc10d9e5dbbff941432ce5e5ef74feb80bf294172c1023126ee150b66fc2` (`SiteGeneratorAdapterTests.cs:239`).
+- Deep-git real pass (this repo): 303 pages; `SiteGenerator.cs` graph capped at 14 artifact circles + honest `+13 more artifacts`; `GitMetrics.cs` related tooltips carry full path + co-change strength; 8 related entries per hub file (= `FileInsightCoupledCap`).
+- Baseline real pass (no `--deep-git`): citations-only graph (12 artifact circles), zero related nodes, no `code-insights` section, no visible coupled list — byte-behavior identical to pre-7.8.
+- Browser-verified computed styles (light/parchment theme): artifact node = gold `#b8860b` `<circle>` + solid `--border` edge; related node = parchment-filled `<polygon>` diamond + `--ink-light` stroke + dashed (`4 3`) `--ink-light` edge → distinct by shape AND edge AND colour.
 
 ### Completion Notes List
 
+- **AC #1** — the code-page reference graph now carries a second node population sourced from the already-computed `FileInsight.CoupledFiles` (Story 7.4; no new git call or parse). Related-file nodes are neutral diamonds on dashed spokes, `<a>`-linked to the coupled file's `code/…html` page when it has one (guarded via `CodePageHref`) or a non-link chip otherwise (never a dead link), each with a rich `<title>`/`aria-label` = full path + "changed together N times". Degrades to citations-only when `--deep-git` is off / no insight (byte-identical aside).
+- **AC #2** — the graph is the single relationship surface: removed Story 7.4's visible "Often changed with" `.code-insight-coupled` list (and its now-dead CSS) from `BuildCoverageSection`, and extended the sr-only `.ref-list` with a labelled related-files text equivalent (path + co-change count, linked when a page exists) so accessibility is not regressed. Both node populations are bounded: coupled files stay pre-capped at `FileInsightCoupledCap = 8`; a new documented `Charts.RefGraphArtifactNodeCap = 14` caps the artifact ring, with overflow surfaced honestly (on-graph `+N more artifacts` marker + true total in the summary `aria-label`) while the sr-only list keeps the **full** citer set.
+- **Design deviation from the story's line refs:** the code page was refactored into the tabbed Insights|Code layout after the story was written, so the graph lives in `CodeFileTemplater.BuildInsightsPanel`/`BuildRelationshipsCard` (not `BuildAside`, which is now placeholder-only). Wired the related nodes there; `SiteGenerator.cs` needed **no** change (the templater already received `insight` + `CodePageHref`).
+- **No git work, no JS, neutral tokens only, everything escaped, deterministic layout** — as scoped. `GitMetrics` untouched.
+
 ### File List
+
+- `src/SpecScribe/Charts.cs` — extended `ReferenceGraph` with an additive `related` population param + `RefGraphArtifactNodeCap` (diamonds, dashed edges, guarded `<a>`/chip, rich tooltips, honest artifact-ring cap + overflow, two-population aria summary; byte-identical when related is empty and artifacts ≤ cap).
+- `src/SpecScribe/CodeFileTemplater.cs` — threaded `FileInsight?` + `coupledFileHref` into `BuildInsightsPanel`; new `BuildRelatedNodes` mapping `CoupledFiles` → guarded related nodes; `BuildRelationshipsCard` now renders both populations + the sr-only related equivalent + conditional note; removed the visible coupled `<ul>` from `BuildCoverageSection` (and its `coupledFileHref` param).
+- `src/SpecScribe/assets/specscribe.css` — added `.ref-edge-file` / `.ref-file-dot` / `.ref-file-label` / `.ref-file-node`(+`--chip`) / `.ref-overflow` (neutral tokens, dashed edge, hover/focus); removed the retired `.code-insight-coupled` rules.
+- `tests/SpecScribe.Tests/ChartsTests.cs` — 6 new `ReferenceGraph` tests (two-population distinctness, linked-vs-chip, tooltip strength, empty-related byte-identity, artifact cap + overflow, escaping).
+- `tests/SpecScribe.Tests/CodeFileTemplaterTests.cs` — new related-node + citations-only byte-identity + guarded-related-link tests; updated the coverage-section test to assert the coupled list is gone.
+- `tests/SpecScribe.Tests/SiteGeneratorCodeInsightsTests.cs` — updated the deep-git render test (related graph nodes replace the coupled list); new non-link-chip generation test.
+- `tests/SpecScribe.Tests/StylesheetTests.cs` — assert the new related-file/dashed-edge classes; assert the retired coupled-list styles are gone.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — regenerated the golden content fingerprint (CSS-only drift; page inventory unaffected).
+
+## Change Log
+
+- 2026-07-13 — Story 7.8 implemented: related-file (co-change) nodes added to the code-page reference graph as a second, shape+edge-distinguished population; redundant visible "Often changed with" list removed with the sr-only text equivalent extended; both node populations bounded with honest overflow. 8 files modified, 965 tests green. Status → review.

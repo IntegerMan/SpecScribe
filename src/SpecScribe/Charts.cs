@@ -1092,43 +1092,90 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>Story 7.1 — the relationship-first hero of a code page: a pure-SVG hub-and-spoke graph with the
-    /// source file at the center and one linked node per citing artifact (story/epic/ADR/doc) around a ring. The
-    /// edges ARE the "referenced by" citations — this graph is artifact&#8594;file only (there is no file&#8594;file
-    /// citation edge), so it reads honestly as "what refers to this file", never as a code call/dependency graph.
-    /// Each ring node is a real link to the citing artifact's page: the full title rides its <c>&lt;title&gt;</c>/
-    /// <c>aria-label</c> while a compact label (e.g. "Story 7.1") stays legible on the ring. No JS. Neutral
-    /// ink/gold/border tokens only — the <c>--status-*</c> lifecycle tokens are off-limits on code surfaces (same
-    /// rule as <c>.code-file</c>). An empty reference set returns nothing (the caller omits the whole block).</summary>
+    /// <summary>The default cap on the number of citing-artifact nodes drawn on the reference-graph ring (Story 7.8,
+    /// AC #2 — "node/edge counts stay bounded so a hub file's graph remains legible"). A heavily-cited hub file would
+    /// otherwise crowd the ring into illegibility, and Story 7.8 adds a second (co-changed-file) population on the same
+    /// ring. Over the cap, only the first <see cref="RefGraphArtifactNodeCap"/> artifacts are DRAWN; the overflow count
+    /// is surfaced honestly (an on-graph "+N more" chip + the true total in the summary <c>aria-label</c>), and the
+    /// caller's sr-only list still enumerates ALL citers so the accessible equivalent never drops one. A seed value,
+    /// not a contract.</summary>
+    public const int RefGraphArtifactNodeCap = 14;
+
+    /// <summary>Story 7.1 / 7.8 — the relationship-first hero of a code page: a pure-SVG hub-and-spoke graph with the
+    /// source file at the center and, around a ring, TWO node populations distinguished by shape AND edge style (never
+    /// colour alone, NFR6/UX-DR16): (1) one linked node per citing artifact (story/epic/ADR/doc) as a gold circle on a
+    /// solid spoke — the "referenced by" citations, artifact&#8594;file only — and (2, Story 7.8, when
+    /// <paramref name="related"/> is supplied) one node per file this file most often changes alongside, as a neutral
+    /// diamond on a DASHED spoke. Both edge kinds read honestly as citations / temporal co-changes — never as code
+    /// call/dependency edges. Each artifact node is a real link to its page; each related node links to the coupled
+    /// file's <c>code/…html</c> page when it has one (<c>Href</c> set) or renders as a non-link chip otherwise (never a
+    /// dead link). Full titles / co-change strength ride each node's <c>&lt;title&gt;</c>/<c>aria-label</c>; a compact
+    /// label stays legible on the ring. No JS. Neutral ink/gold/border tokens only — the <c>--status-*</c> lifecycle
+    /// tokens are off-limits on code surfaces. The artifact ring is capped at <paramref name="artifactCap"/> (overflow
+    /// surfaced honestly); related files arrive already capped upstream. Both populations empty returns nothing (the
+    /// caller omits the whole block). When <paramref name="related"/> is null/empty AND the artifact count is within
+    /// the cap, the output is byte-identical to the pre-7.8 single-population graph.</summary>
     public static string ReferenceGraph(
         string centerLabel,
         IReadOnlyList<(string Href, string Title, string Short)> refs,
-        int size = 0)
+        int size = 0,
+        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)>? related = null,
+        int artifactCap = RefGraphArtifactNodeCap)
     {
-        var count = refs.Count;
-        if (count == 0) return string.Empty;
+        related ??= Array.Empty<(string?, string, string, int)>();
+        var refCount = refs.Count;
+        var relCount = related.Count;
+        if (refCount == 0 && relCount == 0) return string.Empty;
 
-        // Grow the canvas with the node count so the ring never crowds; bounded (the graph now lives in a ~320-360px
-        // sidebar and scales to fit, so an over-large viewBox would render its labels illegibly small).
-        if (size <= 0) size = Math.Clamp(360 + count * 14, 380, 560);
+        // Bound the artifact ring (AC #2): draw at most the cap, keep the true total for the honest overflow signal.
+        // Coupled files arrive pre-capped upstream (FileInsightCoupledCap). total = the nodes actually drawn.
+        var shownRefs = Math.Min(refCount, artifactCap);
+        var overflow = refCount - shownRefs;
+        var total = shownRefs + relCount;
+
+        // Grow the canvas with the drawn node count so the ring never crowds; bounded (the graph now lives in a
+        // ~320-360px sidebar and scales to fit, so an over-large viewBox would render its labels illegibly small).
+        if (size <= 0) size = Math.Clamp(360 + total * 14, 380, 560);
         var c = size / 2.0;
         var ringR = size * 0.26;
 
+        // Both populations share one ring: artifacts first (indices 0..shownRefs-1), then related files. A single
+        // deterministic sweep keeps the layout stable for the golden/parity fixtures.
+        double Ang(int i) => -Math.PI / 2 + 2 * Math.PI * i / total;
         (double X, double Y) Pos(int i)
         {
-            var ang = -Math.PI / 2 + 2 * Math.PI * i / count;
+            var ang = Ang(i);
             return (c + ringR * Math.Cos(ang), c + ringR * Math.Sin(ang));
         }
 
         var sb = new StringBuilder();
-        var aria = $"Reference graph: {centerLabel} is referenced by {count} {Plural(count, "artifact", "artifacts")}";
+        // Summary label is the real accessible name (the SVG is role="img"); it reflects BOTH populations and the true
+        // (uncapped) artifact total so assistive tech never sees a smaller number than the sr-only list enumerates.
+        string aria;
+        if (refCount == 0)
+        {
+            aria = $"Reference graph: {centerLabel} changes alongside {relCount} {Plural(relCount, "file", "files")}";
+        }
+        else
+        {
+            aria = $"Reference graph: {centerLabel} is referenced by {refCount} {Plural(refCount, "artifact", "artifacts")}";
+            if (overflow > 0) aria += $" ({shownRefs} shown)";
+            if (relCount > 0) aria += $", and changes alongside {relCount} {Plural(relCount, "file", "files")}";
+        }
         sb.Append($"<svg class=\"ref-graph\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
 
-        // Edges first so the nodes sit on top of them. Every spoke runs from the center file to one citing artifact.
-        for (var i = 0; i < count; i++)
+        // Edges first so the nodes sit on top of them. Artifact spokes are solid (.ref-edge); related-file spokes are
+        // dashed (.ref-edge-file) — the edge style is a primary distinguisher, so the two populations read apart even
+        // in monochrome / for colour-vision-deficient readers.
+        for (var i = 0; i < shownRefs; i++)
         {
             var (x, y) = Pos(i);
             sb.Append($"  <line class=\"ref-edge\" x1=\"{F(c)}\" y1=\"{F(c)}\" x2=\"{F(x)}\" y2=\"{F(y)}\" />\n");
+        }
+        for (var j = 0; j < relCount; j++)
+        {
+            var (x, y) = Pos(shownRefs + j);
+            sb.Append($"  <line class=\"ref-edge-file\" x1=\"{F(c)}\" y1=\"{F(c)}\" x2=\"{F(x)}\" y2=\"{F(y)}\" />\n");
         }
 
         // Center node: the file itself (a chip, not a link — you are already on its page).
@@ -1138,12 +1185,13 @@ public static class Charts
         sb.Append($"    <text class=\"ref-center-label\" x=\"{F(c)}\" y=\"{F(c)}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"15\">{Html(Shorten(centerLabel, 22))}</text>\n");
         sb.Append("  </g>\n");
 
-        // Ring nodes: one link per citing artifact, label anchored away from center so text clears the ring.
-        for (var i = 0; i < count; i++)
+        // Artifact ring nodes: one link per citing artifact, gold circle, label anchored away from center so text
+        // clears the ring. Unchanged from Story 7.1 (owner design: the artifact half looks the same).
+        for (var i = 0; i < shownRefs; i++)
         {
             var (x, y) = Pos(i);
             var (href, title, shortLabel) = refs[i];
-            var ang = -Math.PI / 2 + 2 * Math.PI * i / count;
+            var ang = Ang(i);
             var lx = c + (ringR + 14) * Math.Cos(ang);
             var ly = c + (ringR + 14) * Math.Sin(ang);
             var anchor = Math.Cos(ang) >= 0 ? "start" : "end";
@@ -1152,6 +1200,40 @@ public static class Charts
               .Append($"<circle class=\"ref-dot\" cx=\"{F(x)}\" cy=\"{F(y)}\" r=\"7\" />")
               .Append($"<text class=\"ref-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"14\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(shortLabel, 18))}</text>")
               .Append("</a>\n");
+        }
+
+        // Related-file ring nodes (Story 7.8): neutral diamonds, linked to the coupled file's code page when one
+        // exists (Href set) or a non-link chip otherwise. Tooltip/aria carry the full path + co-change strength.
+        for (var j = 0; j < relCount; j++)
+        {
+            var (href, title, shortLabel, coChanges) = related[j];
+            var (x, y) = Pos(shownRefs + j);
+            var ang = Ang(shownRefs + j);
+            var lx = c + (ringR + 14) * Math.Cos(ang);
+            var ly = c + (ringR + 14) * Math.Sin(ang);
+            var anchor = Math.Cos(ang) >= 0 ? "start" : "end";
+            var tip = $"{title} — changed together {coChanges} {Plural(coChanges, "time", "times")}";
+            // A diamond centred on (x,y), radius 7 to match the artifact dot's footprint.
+            var diamond = $"<polygon class=\"ref-file-dot\" points=\"{F(x)},{F(y - 7)} {F(x + 7)},{F(y)} {F(x)},{F(y + 7)} {F(x - 7)},{F(y)}\" />";
+            var label = $"<text class=\"ref-file-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"14\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(shortLabel, 18))}</text>";
+            var linked = href is { Length: > 0 };
+            if (linked)
+            {
+                sb.Append($"  <a class=\"ref-file-node\" href=\"{Html(href!)}\" aria-label=\"{Html(tip)}\">")
+                  .Append($"<title>{Html(tip)}</title>").Append(diamond).Append(label).Append("</a>\n");
+            }
+            else
+            {
+                sb.Append($"  <g class=\"ref-file-node ref-file-node--chip\" role=\"img\" aria-label=\"{Html(tip)}\">")
+                  .Append($"<title>{Html(tip)}</title>").Append(diamond).Append(label).Append("</g>\n");
+            }
+        }
+
+        // Honest overflow (AC #2): the artifact ring is capped, so tell the reader how many citers are not drawn. The
+        // full set stays in the caller's sr-only list, so nothing is hidden from assistive tech.
+        if (overflow > 0)
+        {
+            sb.Append($"  <text class=\"ref-overflow\" x=\"{F(c)}\" y=\"{F(size - 8)}\" text-anchor=\"middle\" font-size=\"13\">+{overflow} more {Plural(overflow, "artifact", "artifacts")}</text>\n");
         }
 
         sb.Append("</svg>\n");

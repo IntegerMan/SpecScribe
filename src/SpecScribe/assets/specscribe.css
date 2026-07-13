@@ -835,6 +835,64 @@ pre.code-file code[class*="language-"] {
   outline-offset: 2px;
 }
 
+/* Story 7.8 — the SECOND reference-graph population: the files this file most often changes alongside (co-change /
+   temporal coupling, never a code dependency). Distinguished from the citing-artifact nodes by SHAPE (diamond, not
+   circle) AND edge style (dashed, not solid) — not by colour alone (NFR6/UX-DR16) — using only the neutral
+   ink/border/parchment tokens (never --gold, never --status-*). The distinction must hold in light and dark themes. */
+.ref-edge-file {
+  stroke: var(--ink-light);
+  stroke-width: 1.5;
+  stroke-opacity: 0.7;
+  stroke-dasharray: 4 3;
+}
+
+.ref-file-dot {
+  fill: var(--parchment);
+  stroke: var(--ink-light);
+  stroke-width: 1.5;
+  transition: fill 0.12s ease, stroke 0.12s ease;
+}
+
+.ref-file-label {
+  fill: var(--ink-light);
+  font-family: system-ui, sans-serif;
+}
+
+/* A related-file node is a link when the coupled file has its own code page; otherwise a non-link chip (still shown,
+   still tooltipped — the coupling is real — but not interactive). */
+.ref-file-node {
+  cursor: pointer;
+}
+
+.ref-file-node--chip {
+  cursor: default;
+}
+
+.ref-file-node:hover .ref-file-dot,
+.ref-file-node:focus-visible .ref-file-dot {
+  fill: var(--ink-light);
+  stroke: var(--ink);
+}
+
+.ref-file-node:hover .ref-file-label,
+.ref-file-node:focus-visible .ref-file-label {
+  fill: var(--ink);
+  text-decoration: underline;
+}
+
+.ref-file-node:focus-visible {
+  outline: 2px solid var(--ink-light);
+  outline-offset: 2px;
+}
+
+/* The honest "+N more" overflow marker when a hub file's citing-artifact ring is capped (Story 7.8 AC #2). Muted so it
+   reads as a footnote to the graph, not another node; the full citer set stays in the sr-only list. */
+.ref-overflow {
+  fill: var(--ink-light);
+  font-style: italic;
+  font-family: system-ui, sans-serif;
+}
+
 /* Source is secondary supporting detail — the right column. min-width:0 lets the <pre> shrink and scroll internally
    (see .code-layout) instead of forcing the whole grid wider. */
 .code-source-section {
@@ -930,8 +988,9 @@ pre.code-file code[class*="language-"] {
   color: var(--ink);
 }
 
-.code-insight-contributors,
-.code-insight-coupled {
+/* Story 7.8 retired the visible "Often changed with" coupled list — those relationships now render as related-file
+   nodes on the reference graph (the single relationship surface, AC #2). The contributor list keeps this layout. */
+.code-insight-contributors {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -940,8 +999,7 @@ pre.code-file code[class*="language-"] {
   gap: 0.35rem;
 }
 
-.code-insight-contributors li,
-.code-insight-coupled li {
+.code-insight-contributors li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -956,19 +1014,11 @@ pre.code-file code[class*="language-"] {
   white-space: nowrap;
 }
 
-.code-insight-contributors .contributor-count,
-.code-insight-coupled .coupled-count {
+.code-insight-contributors .contributor-count {
   flex: none;
   color: var(--ink-light);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
-}
-
-.code-insight-coupled a,
-.code-insight-coupled code {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .code-insight-more {

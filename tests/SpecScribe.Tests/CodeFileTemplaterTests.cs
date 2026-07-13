@@ -215,7 +215,7 @@ public class CodeFileTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_PopulatedInsight_RendersContributorsFrequencyCoupledAndHistory()
+    public void RenderPage_PopulatedInsight_RendersContributorsFrequencyAndHistory()
     {
         var html = CodeFileTemplater.RenderPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
@@ -229,9 +229,11 @@ public class CodeFileTemplaterTests
         Assert.DoesNotContain("rank", html.ToLowerInvariant());
         Assert.DoesNotContain("leaderboard", html.ToLowerInvariant());
         Assert.DoesNotContain("top developer", html.ToLowerInvariant());
-        // Coupled files with co-change counts.
-        Assert.Contains("docs/notes.md", html);
-        Assert.Contains("class=\"coupled-count\">4&times;</span>", html);
+        // Story 7.8 (AC #2): coupled files are NO LONGER a visible list in the coverage section — the graph owns that
+        // relationship now. The redundant visible "Often changed with" list must be gone.
+        Assert.DoesNotContain("Often changed with", html);
+        Assert.DoesNotContain("code-insight-coupled", html);
+        Assert.DoesNotContain("coupled-count", html);
         // History rows: date, hash, author, subject, newest-first.
         Assert.Contains("<table class=\"code-history-table\">", html);
         Assert.Contains("2026-07-03", html);
@@ -241,19 +243,61 @@ public class CodeFileTemplaterTests
         Assert.True(newer >= 0 && newer < older, "history must be newest-first");
     }
 
+    // ---- Story 7.8: related-file nodes on the reference graph ----
+
     [Fact]
-    public void RenderPage_CoupledLink_GuardedOnCodePageExistence()
+    public void RenderPage_PopulatedInsight_RendersRelatedFilesAsGraphNodesAndSrOnlyEntries()
     {
-        // Only src/SpecScribe/Other.cs has a code page; docs/notes.md does not → plain <code>, never a dead link.
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // The co-changed files render as the graph's second node population (neutral diamonds + dashed edges) …
+        Assert.Contains("class=\"ref-edge-file\"", html);
+        Assert.Contains("class=\"ref-file-dot\"", html);
+        Assert.Contains("class=\"ref-file-label\"", html);
+        // … each with a rich tooltip carrying the full path + co-change strength.
+        Assert.Contains("<title>src/SpecScribe/Other.cs — changed together 4 times</title>", html);
+        Assert.Contains("<title>docs/notes.md — changed together 1 time</title>", html);
+        // The relationships note now frames both populations (solid citations + dashed co-changes).
+        Assert.Contains("changes alongside (dashed)", html);
+        // The sr-only list carries the related files as a labelled text equivalent (path + co-change count).
+        Assert.Contains("Files changed alongside this one:", html);
+        Assert.Contains("src/SpecScribe/Other.cs &#8212; changed together 4 times", html);
+        Assert.Contains("docs/notes.md &#8212; changed together 1 time", html);
+    }
+
+    [Fact]
+    public void RenderPage_NullInsight_GraphIsCitationsOnly_ByteIdenticalToBaseline()
+    {
+        // With no insight there are no related-file nodes: the relationships card (note, graph, list) must be exactly
+        // the Story 7.1 citations-only card. Byte-identity proves the additive overload and the degradation path.
+        var baseline = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var withNull = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: null);
+
+        Assert.Equal(baseline, withNull);
+        Assert.DoesNotContain("ref-edge-file", baseline);
+        Assert.DoesNotContain("ref-file-dot", baseline);
+        Assert.DoesNotContain("Files changed alongside this one:", baseline);
+        // Baseline note is the unchanged Story 7.1 citations-only framing.
+        Assert.Contains("References run artifact&#8594;file", baseline);
+        Assert.DoesNotContain("changes alongside (dashed)", baseline);
+    }
+
+    [Fact]
+    public void RenderPage_RelatedFileLink_GuardedOnCodePageExistence()
+    {
+        // Only src/SpecScribe/Other.cs has a code page; docs/notes.md does not → non-link chip, never a dead link.
         string? Resolve(string path) => path == "src/SpecScribe/Other.cs" ? "code/src/SpecScribe/Other.cs.html" : null;
 
         var html = CodeFileTemplater.RenderPage(
             RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), coupledFileHref: Resolve);
 
-        // Resolved coupled file → a real link (prefixed to the code page's depth).
+        // Resolved coupled file → a linked graph node + a linked sr-only entry (prefixed to the code page's depth).
+        Assert.Contains("<a class=\"ref-file-node\" href=\"../../../code/src/SpecScribe/Other.cs.html\"", html);
         Assert.Contains("<a href=\"../../../code/src/SpecScribe/Other.cs.html\">src/SpecScribe/Other.cs</a>", html);
-        // Unresolved coupled file → plain <code>, no anchor.
-        Assert.Contains("<code>docs/notes.md</code>", html);
+        // Unresolved coupled file → a non-link chip node + plain sr-only text, never a dead link.
+        Assert.Contains("class=\"ref-file-node ref-file-node--chip\"", html);
+        Assert.DoesNotContain("href=\"../../../code/docs/notes.md", html);
         Assert.DoesNotContain("<a href=\"../../../docs/notes.md", html);
     }
 
@@ -404,20 +448,6 @@ public class CodeFileTemplaterTests
         Assert.DoesNotContain("code-history-table", insightsPanel);
         Assert.Contains("code-history-table", historyPanel);
         Assert.Contains("Change history", historyPanel);
-    }
-
-    [Fact]
-    public void RenderPage_CoupledCard_AppearsInBothInsightsAndRelationships()
-    {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
-
-        // "Often changed with" (coupled files) is a relationship signal that owner-decision places in BOTH tabs.
-        Assert.Equal(2, CountOccurrences(html, "Often changed with"));
-        var insightsPanel = Between(html, "code-tabpanel--insights", "code-tabpanel--relationships");
-        var relPanel = Between(html, "code-tabpanel--relationships", "code-tabpanel--history");
-        Assert.Contains("Often changed with", insightsPanel);
-        Assert.Contains("Often changed with", relPanel);
     }
 
     [Fact]
