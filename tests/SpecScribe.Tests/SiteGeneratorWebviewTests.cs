@@ -451,6 +451,46 @@ public class SiteGeneratorWebviewTests : IDisposable
     }
 
     [Fact]
+    public void AdrLandingIsSynthesized_WhenTheRootReadmeExistsButFailsToRender()
+    {
+        // [Review][Patch] A README that EXISTS but can't be read/parsed (locked file, transient I/O error) must
+        // not suppress the fallback synthesis the way filename-match-alone previously did — otherwise the nav's
+        // adrs/index.html link stays unwritten and 404s despite the README being present on disk.
+        var readmePath = Path.Combine(Adrs, "README.md");
+        File.WriteAllText(readmePath, "# Decisions\n\n- [ADR 0001: A Decision](0001-a-decision.md)\n");
+
+        using (new FileStream(readmePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var gen = new SiteGenerator(Options());
+            var events = gen.GenerateAll();
+
+            Assert.Contains(events, e => e.Outcome == GenerationOutcome.Error
+                && e.RelativePath.Contains("README", StringComparison.OrdinalIgnoreCase));
+            Assert.True(File.Exists(Path.Combine(Site, "adrs", "index.html")),
+                "synthesized landing written despite the README failing to render");
+            var landingHtml = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+            Assert.Contains("0001-a-decision.html", landingHtml);
+        }
+    }
+
+    [Fact]
+    public void AdrLandingSynthesis_DoesNotClobberAnAdrFileThatAlreadyOccupiesTheLandingSlot()
+    {
+        // [Review][Patch] A non-record ADR file literally named "index.md" (no root README present) renders to
+        // the SAME output slot ("adrs/index.html") the synthesized landing would use. The real page must win —
+        // synthesis must not silently overwrite it.
+        File.Delete(Path.Combine(Adrs, "README.md"));
+        File.WriteAllText(Path.Combine(Adrs, "index.md"), "# Decisions Overview\n\nHand-authored index.\n");
+
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var landingHtml = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+        Assert.Contains("Decisions Overview", landingHtml);
+        Assert.Contains("Hand-authored index.", landingHtml);
+    }
+
+    [Fact]
     public void RepoReadmeSurface_CarriesItsSourcePath()
     {
         // readme.html renders straight from the repo README (never via _docs) — the spec's first-named page

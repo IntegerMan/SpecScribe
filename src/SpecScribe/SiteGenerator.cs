@@ -599,7 +599,12 @@ public sealed class SiteGenerator
         }
 
         var entries = new List<AdrEntry>();
-        var hasRootReadme = false;
+        // True once a real (non-synthesized) page has actually been WRITTEN to the landing's output slot — the
+        // ADR root's README normally, but ANY ADR file that happens to land at the same output path (e.g. a
+        // stray "index.md") counts too, since either way the synthesized landing below must not clobber it. Set
+        // only on a successful write (not on filename match alone): a README that exists but fails to parse/render
+        // must NOT suppress the fallback synthesis, or the landing the nav always links stays unwritten (a 404).
+        var landingPathAlreadyWritten = false;
         foreach (var file in EnumerateAdrFiles())
         {
             var sw = Stopwatch.StartNew();
@@ -607,7 +612,6 @@ public sealed class SiteGenerator
             var relativeToRoot = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.AdrSourceRoot, file));
             // README-as-landing applies to the ADR root's README only; a nested README renders as a regular page.
             var isReadme = string.Equals(relativeToRoot, "README.md", StringComparison.OrdinalIgnoreCase);
-            if (isReadme) hasRootReadme = true;
 
             var outputName = isReadme ? "index.html" : Path.ChangeExtension(relativeToRoot, ".html");
             var outputRelative = PathUtil.NormalizeSlashes($"{ForgeOptions.AdrOutputSubdir}/{outputName}");
@@ -653,6 +657,10 @@ public sealed class SiteGenerator
                 };
 
                 WriteOutput(outputRelative, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+                if (string.Equals(outputRelative, SiteNav.AdrsLandingOutputPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    landingPathAlreadyWritten = true;
+                }
 
                 if (isRecord)
                 {
@@ -692,12 +700,14 @@ public sealed class SiteGenerator
             .ToList();
 
         // The nav (and the dashboard quick link) point at adrs/index.html whenever records exist, but only a
-        // root README ever produced that landing — README-less repos shipped a 404 in the static site and a
-        // dead surface in the webview. Synthesize a minimal landing from the already-ordered records so the
-        // link always resolves (owner decision 2026-07-12, spec-webview-doc-page-surfaces review). An
-        // intentional render ADDITION on README-less repos only: repos WITH a root README (including the
-        // golden fixture) are byte-identical, so the golden gate is unaffected.
-        if (!hasRootReadme && _adrs.Count > 0)
+        // successfully-rendered root README (or a same-slot page) ever produced that landing — README-less repos,
+        // AND repos whose README exists but fails to parse/render, shipped a 404 in the static site and a dead
+        // surface in the webview. Synthesize a minimal landing from the already-ordered records so the link always
+        // resolves (owner decision 2026-07-12, spec-webview-doc-page-surfaces review; [Review][Patch] widened
+        // 2026-07-13 to also cover the failed-README case). An intentional render ADDITION on repos that didn't
+        // already get a landing written: repos WITH a successfully-rendered root README (including the golden
+        // fixture) are byte-identical, so the golden gate is unaffected.
+        if (!landingPathAlreadyWritten && _adrs.Count > 0)
         {
             var sw = Stopwatch.StartNew();
             try

@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-webview-doc-page-surfaces (2026-07-13)
+
+- source_spec: `spec-webview-doc-page-surfaces.md`
+  summary: ADR-landing hrefs (and most filename-derived hrefs site-wide) are HTML-entity-escaped but never
+  percent-encoded — a source `.md`/ADR filename containing `#`, `?`, or a space produces a link that truncates or
+  misresolves. Plausibly a real contributor to the `.md`-related 404s the owner reported, but it's a pre-existing,
+  site-wide pattern, not something novel to this spec.
+  evidence: Edge Case Hunter. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+
 ## Deferred from: code review of story-7-7 (2026-07-13)
 
 - source_spec: `7-7-external-source-linking-and-auto-detection.md`

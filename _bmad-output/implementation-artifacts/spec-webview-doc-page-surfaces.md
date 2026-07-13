@@ -76,6 +76,51 @@ context: []
 
 - **2026-07-12 (review checkpoint — Ask-First fired + owner decisions).** The frozen Ask-First clause ("per-commit/day drill pages if any turn out to be separate captured files") triggered: `commits/*.html` day pages ARE captured files and Story 7.5 (concurrent) adds `commit/*.html`. **Owner decided: exclude both** (alongside `code/**`, now matched as the exact `_codePages`/`_commitDays` sets rather than a path prefix, so a doc folder literally named `code/` still surfaces). **Owner also renegotiated the "byte-identical" Always for one case:** a repo whose ADR root lacks a README now gets a synthesized `adrs/index.html` landing (the nav linked a page that was never generated — a pre-existing 404 this spec surfaced); repos WITH a README stay byte-identical, so the golden gate is unaffected. Review patches applied without loopback: landmark-less captured pages are skipped (honest toast instead of a silent blank surface), `CapturePages`-after-`GenerateAll` throws, `BuildCapturedSourceMap` refuses root-escaping paths and maps `readme.html`, rejection-toast copy de-overpromised, payload serializer uses `UnsafeRelaxedJsonEscaping` (10.65 → 7.80 MB with the exclusions), divergence registry's mermaid entry widened to captured surfaces, tests tightened to the shim's case-sensitive key semantics + subdir href resolution + landing synthesis + readme sourcePath. KEEP: the 6.7 capture-seam approach, the family-surfaces-first ordering, and the exact-set exclusion pattern.
 
+### Review Findings
+
+Code review 2026-07-13 (diff `279d27e..5691d24`, scoped to this spec's Code Map files). Triggered by a follow-up
+to the Story 7.7 review: owner-reported live-site 404s on `.md` files referenced in stories. Conclusion: this
+diff's capture mechanism is memory-only and cannot cause a static-site 404 (confirmed at the `WriteOutput` seam);
+its one 404-relevant change (the ADR-landing synthesis) fixes a pre-existing 404 rather than causing one — BUT the
+fix itself had a real gap, patched below.
+
+- [x] [Review][Patch] The ADR-landing synthesis was gated on `hasRootReadme`, set from a filename match alone
+  (before the README's own parse/render was attempted) — so a `README.md` that exists but fails to render (locked
+  file, malformed content) permanently suppressed the fallback synthesis too, leaving `adrs/index.html`
+  unwritten while the nav still links it: a 404 that reproduces the exact symptom reported, and is the single
+  most plausible concrete finding from this pass. Fixed 2026-07-13: replaced with `landingPathAlreadyWritten`,
+  set only after a real page is successfully WRITTEN to that output slot (covers both the README case and any
+  other ADR file that happens to render to the same path). [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+- [x] [Review][Patch] A non-record ADR file named `index.md` (no root README present) renders to the same output
+  slot the synthesized landing would use; the synthesis ran unconditionally after and silently clobbered it.
+  Fixed 2026-07-13 as part of the same `landingPathAlreadyWritten` change — synthesis now no-ops whenever that
+  slot was already written. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+- [x] [Review][Dismiss] Two Blind Hunter findings (ADR-landing href "double-nesting" 404 risk; `BuildCapturedSourceMap`'s
+  ADR-prefix-strip fallback producing a bogus source path) are false positives — both `AdrEntry.OutputRelativePath`
+  and `SourceRelativePath` are always constructed via `$"{AdrOutputSubdir}/..."` string interpolation
+  (SiteGenerator.cs:613-614), so the `StartsWith(prefix)` check they worry about can never fail; the "unstripped"
+  branch is dead code, not a live bug.
+- [x] [Review][Dismiss] "`SourcePath` might leak into the live/static site as a public href" — checked and
+  confirmed false: `WebviewSurface.SourcePath` only flows into the `specscribe webview` JSON payload
+  (`Commands.cs:132`, consumed via `JSON.parse` by the extension shim), never written into generated HTML.
+- [ ] [Review][Defer] ADR-landing hrefs (and, by the same long-standing pattern, most filename-derived hrefs
+  across the site) are HTML-entity-escaped but never percent-encoded — a source `.md`/ADR filename containing a
+  `#`, `?`, or space produces a link that truncates or misresolves in the browser. Plausibly a real contributor to
+  `.md`-related 404s if any story/ADR file has such a name, but it's a pre-existing, site-wide pattern rather than
+  something novel to this spec — needs its own dedicated pass rather than a narrow fix here.
+  [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+- [x] [Review][Dismiss] Several Edge Case Hunter findings (naive `<main>`/breadcrumb substring landmark search
+  hijacked by literal landmark-shaped text in doc content; exact-set exclusion path-collision; deep-nesting
+  active-nav highlight; silent no-op when `CapturePages` was never enabled) are real only in theory — each
+  requires an already-unlikely precondition (raw HTML landmark text inside markdown-sourced content;
+  case-insensitive path collision between unrelated page classes; nav-highlight is cosmetic, not a broken
+  link; the "silent no-op" is the intended behavior for the one non-webview caller). Not actioned.
+- Informational, not a finding requiring a code change: the spec's own "Suggested Review Order" section cites
+  line numbers that have drifted (concurrent Stories 7.5/7.7/10.4 inserted hundreds of lines into
+  `SiteGenerator.cs` after this spec's line numbers were pinned) — a future reviewer following that section
+  literally will land in the wrong place. Worth a line-number refresh next time this spec is touched, not urgent
+  enough to action now.
+
 ## Verification
 
 **Commands:**
