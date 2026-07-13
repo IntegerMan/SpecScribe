@@ -13,7 +13,7 @@ public sealed partial class HtmlRenderAdapter
 {
     /// <summary>Renders the full <c>&lt;main&gt;…&lt;/main&gt;</c> dashboard body from its section view model —
     /// the string that becomes <see cref="PageView.BodyHtml"/>. [Story 6.2]</summary>
-    public string RenderDashboardBody(DashboardView view)
+    public string RenderDashboardBody(DashboardView view, Func<string, string?>? codeItemHref = null)
     {
         var sb = new StringBuilder();
 
@@ -22,7 +22,7 @@ public sealed partial class HtmlRenderAdapter
         sb.Append($"  <h1>{PathUtil.Html(view.SiteTitle)}</h1>\n");
         sb.Append("</header>\n\n");
 
-        AppendDashboardSection(sb, view);
+        AppendDashboardSection(sb, view, codeItemHref);
         AppendWorkTypesSection(sb, view.Work, view.OpenRetroActionItems);
         foreach (var band in view.IndexBands)
         {
@@ -33,7 +33,7 @@ public sealed partial class HtmlRenderAdapter
         return sb.ToString();
     }
 
-    private void AppendDashboardSection(StringBuilder sb, DashboardView view)
+    private void AppendDashboardSection(StringBuilder sb, DashboardView view, Func<string, string?>? codeItemHref = null)
     {
         var p = view.Progress;
 
@@ -105,7 +105,7 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("<h3>Git Pulse</h3>\n");
         }
         sb.Append(p.Git is { } pulse
-            ? Charts.GitPulsePanel(pulse)
+            ? Charts.GitPulsePanel(pulse, codeItemHref)
             : "<div class=\"chart-empty git-pulse-empty\" data-tooltip=\"Run in a git repository to enable commit stats\" tabindex=\"0\">—</div>\n");
         sb.Append("</div>\n\n");
 

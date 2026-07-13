@@ -28,7 +28,8 @@ public static class CommitDetailTemplater
     public static string RenderPage(
         DeepCommit commit,
         SiteNav nav,
-        Func<string, string?>? fileHref = null)
+        Func<string, string?>? fileHref = null,
+        EntityPager? pager = null)
     {
         var shortHash = ShortHash(commit.Hash);
         var outputPath = $"commit/{shortHash}.html";
@@ -51,6 +52,7 @@ public static class CommitDetailTemplater
         // Single <main id="main-content"> landmark / skip-link target. [Story 1.4 AC #1]
         sb.Append("<main id=\"main-content\" class=\"commit-detail\">\n");
         sb.Append("<header class=\"doc-header\">\n");
+        sb.Append(pager?.Render()); // Prev = newer commit, Next = older (newest-first order). [Prev/next navigation]
         sb.Append("  <div class=\"story-kicker\">Commit Detail</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(subject)}</h1>\n");
 

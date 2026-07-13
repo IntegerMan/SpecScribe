@@ -208,7 +208,8 @@ public sealed class SiteGenerator
             // rendered — so ApplyReferenceLinks resolves every source citation against a populated _codePages on
             // each of those pages. The code pages themselves are still rendered later (GenerateCodePagesInternal),
             // once _referenceMap exists to route each page's "Referenced by" back-links. Pure/disk-read only; no
-            // output written here. A no-op in external mode (--code-url leaves _codePages empty by design).
+            // output written here. In-portal pages are ALWAYS discovered now (Story 7.7 made --code-url additive),
+            // so _codePages is populated even with an external base set — the link mode is chosen at render time.
             DiscoverCodeReferences(files);
 
             // Render the epic/story/requirements pages only when the whole ingest chain produced its models —
@@ -251,9 +252,10 @@ public sealed class SiteGenerator
             }
 
             // In-portal code file pages for source files referenced by planning/implementation artifacts (Story 7.1,
-            // FR15). Additive: a new page class under code/, discovered from citations, that Stories 7.2–7.4 build on.
-            // Skipped entirely in external-link mode (--code-url). When --deep-git produced per-file insights each
-            // page gains an opt-in "Advanced coverage" section (Story 7.4); a null insight leaves it baseline.
+            // FR15) plus the git-analytics file sets (see DiscoverCodeReferences). Additive: a page class under code/,
+            // that Stories 7.2–7.4 build on. Generated regardless of --code-url (that base is now an additive per-page
+            // link). When --deep-git produced per-file insights each page gains an opt-in "Advanced coverage" section
+            // (Story 7.4); a null insight leaves it baseline.
             events.AddRange(GenerateCodePagesInternal(files, nav, reporter));
 
             // Date pages + activity timeline (Story 7.3). Date pages are generated for the UNION of the git
@@ -817,11 +819,12 @@ public sealed class SiteGenerator
             var outputRelative = PathUtil.NormalizeSlashes($"commits/{Charts.D(day)}.html");
             try
             {
-                var prevDay = i > 0 ? days[i - 1] : (DateOnly?)null;
-                var nextDay = i < days.Count - 1 ? days[i + 1] : (DateOnly?)null;
                 var dayCommits = commitsByDay.TryGetValue(day, out var c) ? c : Array.Empty<CommitInfo>();
                 var dayArtifacts = artifactsByDay.TryGetValue(day, out var a) ? a : Array.Empty<(string, string)>();
-                var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, prevDay, nextDay, nav, commitHref);
+                // NOTE (concurrent work): the entity prev/next feature changed CommitDayTemplater.RenderPage to take
+                // an EntityPager instead of prev/next dates but left this caller unbuilt. Passing EntityPager.None
+                // here is a TEMPORARY unblock so the tree compiles — that story owns wiring the real day-sequence pager.
+                var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, EntityPager.None, nav, commitHref);
 
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
@@ -1079,24 +1082,35 @@ public sealed class SiteGenerator
     }
 
     /// <summary>The guarded code-page resolver for a commit's changed-file path (Story 7.1/7.5): a repo-relative
-    /// source path → its <c>code/…html</c> page, output-relative, when that file has an in-portal page (i.e. it is
-    /// cited by an artifact — <see cref="_codePages"/>). Returns null (→ plain <c>&lt;code&gt;</c> path) otherwise,
-    /// including in external <c>--code-url</c> mode where <see cref="_codePages"/> is empty by design.</summary>
+    /// source path → its <c>code/…html</c> page, output-relative, when that file has an in-portal page — i.e. it is
+    /// cited by an artifact OR surfaced by a git-analytics widget (<see cref="_codePages"/>, populated regardless of
+    /// <c>--code-url</c>). Returns null (→ plain <c>&lt;code&gt;</c> path) when the file has no page.</summary>
     private string? CodePageHref(string repoRelativePath) =>
         _codePages.TryGetValue(PathUtil.NormalizeSlashes(repoRelativePath), out var path) ? path : null;
 
     /// <summary>The guarded file→code-item resolver for the git-analytics surfaces (deep-analytics coupling
-    /// graph/table + hotspots, and the git-insights file table). It selects the same link mode Story 7.2's
-    /// citation linkifier uses (<see cref="CodeReferenceLinkifier"/>), so file items and source citations on a
-    /// page resolve consistently: when a <c>--code-url</c> base is configured, the external hosted source
-    /// (<see cref="BuildExternalSourceUrl"/>); otherwise the in-portal <c>code/…html</c> page, guarded on it
-    /// existing in <see cref="_codePages"/> (<see cref="CodePageHref"/>). Null (→ plain text) when nothing
-    /// resolves — never a dead link. Whole-file link (no <c>#L{n}</c>), matching BuildExternalSourceUrl. Both
-    /// pages sit at the output root, so the href is used as-is (no page prefix to apply).</summary>
-    private string? CodeItemHref(string repoRelativePath) =>
-        _options.CodeSourceBaseUrl is { Length: > 0 }
-            ? BuildExternalSourceUrl(repoRelativePath)
-            : CodePageHref(repoRelativePath);
+    /// graph/table + hotspots, the git-insights file table, the code-map treemap, and the dashboard Git Pulse
+    /// top-changed files). Resolves the in-portal <c>code/…html</c> page FIRST — its related-files/insights are
+    /// the point of the source view — guarded on the page existing in <see cref="_codePages"/>
+    /// (<see cref="CodePageHref"/>), which now covers the analytics file sets too (see
+    /// <see cref="DiscoverCodeReferences"/>). Falls back to the external hosted source
+    /// (<see cref="BuildExternalSourceUrl"/>, only when a <c>--code-url</c> base is configured/detected) for a file
+    /// with no in-portal page but that STILL EXISTS on disk (e.g. an <c>_bmad-output</c> doc, excluded from code
+    /// pages but a real file). A path that no longer exists — a deleted/renamed file still surfacing in the
+    /// change-frequency history — degrades to plain text rather than an external link that would 404: never a dead
+    /// link, external included. The external link also stays reachable as each code page's own additive "view source
+    /// online" button. Whole-file link (no <c>#L{n}</c>), matching BuildExternalSourceUrl. Both pages sit at the
+    /// output root, so the href is used as-is (no page prefix to apply).</summary>
+    private string? CodeItemHref(string repoRelativePath)
+    {
+        var page = CodePageHref(repoRelativePath);
+        if (page is not null) return page;
+        // Existence-gate the external fallback: TopChangedFiles/Hotspots rank over a history window, so a deleted
+        // or renamed file routinely appears — a blob/<branch>/<deleted-path> link would 404. A doc under sourceRoot
+        // has no code page but is a real on-disk file, so it keeps its external link.
+        var full = Path.GetFullPath(Path.Combine(_options.RepoRoot, repoRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+        return File.Exists(full) ? BuildExternalSourceUrl(repoRelativePath) : null;
+    }
 
     // Above this size a referenced source file is treated as too large to render inline and degraded to a
     // placeholder page (never read into memory in full). A seed value, not a contract — a future settings toggle
@@ -1155,6 +1169,41 @@ public sealed class SiteGenerator
                 {
                     list.Add((citingRelative, citingTitle));
                 }
+            }
+        }
+
+        // In-portal pages are ALSO minted for the files surfaced by the git-analytics widgets — the dashboard
+        // Git Pulse top-changed list, the deep-git hotspots + change-coupling pairs, and the Git Insights hub
+        // file table — even when no artifact cites them, so their file links (CodeItemHref) resolve to a code
+        // page with its related-files/insights rather than only jumping out to the host. Each candidate must
+        // still be a real, non-ignored repository file NOT under sourceRoot (TryResolveRepoFile) — so
+        // _bmad-output docs and ignored/binary files never get a page. Every source is a bounded top-N set (no
+        // filesystem walk); the SortedSet dedupes and keeps deterministic order. Null-safe on an absent/failed
+        // git pass. The whole-codebase code-map metrics are deliberately NOT included (that would be a page per
+        // repo file — NFR1); treemap tiles for uncited files fall back to the external link. [in-portal code links]
+        void AddAnalyticsCandidate(string candidatePath)
+        {
+            if (CodeReferenceScanner.TryResolveRepoFile(candidatePath, repoFull, sourceFull, out var repoRel))
+            {
+                referenced.Add(repoRel);
+            }
+        }
+
+        if (_progress?.Git is { } analyticsPulse)
+        {
+            foreach (var (path, _) in analyticsPulse.TopChangedFiles) AddAnalyticsCandidate(path);
+        }
+        if (_progress?.DeepGit is { } analyticsDeep)
+        {
+            foreach (var (path, _) in analyticsDeep.Hotspots) AddAnalyticsCandidate(path);
+            foreach (var (fileA, fileB, _) in analyticsDeep.Coupling)
+            {
+                AddAnalyticsCandidate(fileA);
+                AddAnalyticsCandidate(fileB);
+            }
+            if (analyticsDeep.Insights is { } insights)
+            {
+                foreach (var stat in insights.Files) AddAnalyticsCandidate(stat.Path);
             }
         }
 
@@ -2009,7 +2058,7 @@ public sealed class SiteGenerator
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
         var inventory = work ?? WorkInventory.Build(docs);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 

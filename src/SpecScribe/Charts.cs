@@ -630,7 +630,7 @@ public static class Charts
     /// chart builders. When the bounded name-only git call came back empty but the rest of the pulse succeeded,
     /// the files section degrades to a graceful note rather than vanishing (partial data beats none; AD-4). The
     /// whole-panel null case (no git at all) is the caller's `p.Git is {}` fallback. [Story 3.1 + consolidation]</summary>
-    public static string GitPulsePanel(GitPulse git)
+    public static string GitPulsePanel(GitPulse git, Func<string, string?>? fileHref = null)
     {
         // The exact last-commit clock, routed through the single PortalDates formatter (Story 10.4): 24-hour,
         // no per-row zone suffix — the git clock's zone is explained once by the caption below (owner-chosen
@@ -681,8 +681,11 @@ public static class Charts
                 // Floor the fill so the least-changed file still shows a visible sliver; the exact count stays
                 // in text so the bar is decorative, not the sole information carrier (never color/size-only).
                 var pct = maxChanges <= 0 ? 0 : Math.Clamp((int)Math.Round((double)changeCount / maxChanges * 100), 6, 100);
+                // The label links to the file's in-portal code page (or external fallback) via the same seam the
+                // hotspots list uses; when no resolver is supplied (e.g. the webview path) CodeItemLink returns the
+                // plain escaped path, so the output is byte-identical to before.
                 sb.Append(
-                    $"        <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{Html(path)}</span>" +
+                    $"        <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{CodeItemLink(path, fileHref)}</span>" +
                     $"<span class=\"git-pulse-bar-track\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
                     $"<span class=\"git-pulse-bar-count\">{changeCount} {Plural(changeCount, "change", "changes")}</span></li>\n");
             }
@@ -1337,9 +1340,11 @@ public static class Charts
         sb.Append($"  <rect class=\"codemap-dir\" data-path=\"{path}\" data-depth=\"{rect.Depth}\" ")
           .Append($"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" aria-hidden=\"true\"></rect>\n");
 
-        // Only label a directory whose header strip is wide enough to read; truncate to what fits (~6px/char) so a
-        // long collapsed-chain label never spills past its rect.
-        if (rect.W < 34) return;
+        // Label ONLY top-level (root) directory rects — the project boundaries. Nested directories carry no text so
+        // the treemap reads as boxes + color; their identity lives in the per-file tooltip card and the text table.
+        // Still require a header strip wide enough to read; truncate to what fits (~6px/char) so a long collapsed-
+        // chain label never spills past its rect.
+        if (rect.Depth != 0 || rect.W < 34) return;
         var maxChars = Math.Max(4, (int)(rect.W / 6.2));
         var label = rect.Node.Label;
         if (label.Length > maxChars) label = label[..Math.Max(1, maxChars - 1)] + "\u2026";
@@ -1367,6 +1372,7 @@ public static class Charts
             data.Append($" data-churn=\"{m.TotalChurn.ToString(CultureInfo.InvariantCulture)}\"");
             if (m.FirstDate is { } fd) data.Append($" data-first=\"{fd.DayNumber.ToString(CultureInfo.InvariantCulture)}\"");
             if (m.LastDate is { } ld) data.Append($" data-last=\"{ld.DayNumber.ToString(CultureInfo.InvariantCulture)}\"");
+            if (m.AvgCoChanged is { } co) data.Append($" data-cochanged=\"{co.ToString("0.###", CultureInfo.InvariantCulture)}\"");
         }
 
         // Accessible name (name + the active metric value) — color is never the sole signal (AC #4).
@@ -1374,8 +1380,10 @@ public static class Charts
             ? $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, {ma.Changes} {Plural(ma.Changes, "change", "changes")}"
             : $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}";
 
-        // Rich multi-line tooltip via the shared body-level js-tip node (never a clipped ::after on the rect).
-        var tip = BuildTreemapTip(node);
+        // Rich, stylized tooltip: a server-built HTML card served through the shared body-level js-tip node (never a
+        // clipped ::after on the rect). The card markup is escaped ONCE more for the attribute so getAttribute →
+        // innerHTML round-trips it back to real markup (its dynamic parts are already Html-escaped inside the card).
+        var card = BuildTreemapCard(node);
 
         var href = fileHref?.Invoke(node.RepoRelativePath);
         var isLink = href is { Length: > 0 };
@@ -1385,7 +1393,7 @@ public static class Charts
         var rectMarkup =
             $"<rect class=\"codemap-cell {levelClass} js-tip\" tabindex=\"0\"{data} " +
             $"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" " +
-            $"{roleAttr}aria-label=\"{Html(ariaLabel)}\" data-tip=\"{Html(tip)}\"></rect>";
+            $"{roleAttr}aria-label=\"{Html(ariaLabel)}\" data-tip-html=\"{Html(card)}\"></rect>";
 
         if (isLink)
         {
@@ -1397,29 +1405,44 @@ public static class Charts
         }
     }
 
-    /// <summary>The multi-line tooltip text (rendered via <c>white-space: pre-line</c> in the shared tip node) for a
-    /// treemap file rect: path, line count, and — when present — the git metrics as text. [Story 7.6]</summary>
-    private static string BuildTreemapTip(CodeMapNode node)
+    /// <summary>Builds the stylized HTML tooltip card for a treemap file rect (served through the shared body-level
+    /// js-tip node via <c>data-tip-html</c>): a name heading, the monospaced repo path, and a definition list of every
+    /// available metric (lines, changes, churn, average change size, files changed together, first/last change days) —
+    /// each row present only when its metric exists. Dynamic parts are HTML-escaped here; the caller escapes the whole
+    /// card ONCE more for the attribute so the tip node's getAttribute → innerHTML path round-trips it back to real
+    /// markup. Because every metric is a labeled text row, color is never the sole signal for whichever dimension is
+    /// active (AC #4). Single-quoted internal attributes keep only the dynamic content in need of escaping. [Story 7.6]</summary>
+    private static string BuildTreemapCard(CodeMapNode node)
     {
         var sb = new StringBuilder();
-        sb.Append(node.RepoRelativePath).Append('\n');
-        sb.Append(node.Lines.ToString("N0", CultureInfo.InvariantCulture)).Append(' ').Append(Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines"));
+        sb.Append("<div class='codemap-card'>");
+        sb.Append("<strong class='codemap-card-name'>").Append(Html(node.Label)).Append("</strong>");
+        sb.Append("<code class='codemap-card-path'>").Append(Html(node.RepoRelativePath)).Append("</code>");
+        sb.Append("<dl class='codemap-card-metrics'>");
+        Row(sb, "Lines", node.Lines.ToString("N0", CultureInfo.InvariantCulture));
         if (node.Metrics is { } m)
         {
-            sb.Append('\n');
-            sb.Append(m.Changes.ToString("N0", CultureInfo.InvariantCulture)).Append(' ').Append(Plural(m.Changes, "change", "changes"));
-            sb.Append(" \u00b7 ").Append(m.TotalChurn.ToString("N0", CultureInfo.InvariantCulture)).Append(" churn");
+            Row(sb, "Changes", m.Changes.ToString("N0", CultureInfo.InvariantCulture));
+            Row(sb, "Churn", m.TotalChurn.ToString("N0", CultureInfo.InvariantCulture));
             if (m.Changes > 0)
             {
                 var avg = (double)m.TotalChurn / m.Changes;
-                sb.Append(" \u00b7 avg ").Append(avg.ToString("N0", CultureInfo.InvariantCulture));
+                Row(sb, "Avg change size", avg.ToString("N0", CultureInfo.InvariantCulture));
+            }
+            if (m.AvgCoChanged is { } co)
+            {
+                Row(sb, "Files changed together", co.ToString("N1", CultureInfo.InvariantCulture) + " avg");
             }
             if (m.FirstDate is { } fd && m.LastDate is { } ld)
             {
-                sb.Append('\n').Append("first ").Append(D(fd)).Append(" \u00b7 last ").Append(D(ld)).Append(" (within recent history)");
+                Row(sb, "First / last", D(fd) + " \u00b7 " + D(ld));
             }
         }
+        sb.Append("</dl></div>");
         return sb.ToString();
+
+        static void Row(StringBuilder sb, string label, string value) =>
+            sb.Append("<div><dt>").Append(Html(label)).Append("</dt><dd>").Append(Html(value)).Append("</dd></div>");
     }
 
     /// <summary>Quantizes a value onto the shared sequential ramp's 0..4 levels (the SAME discipline

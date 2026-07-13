@@ -16,8 +16,7 @@ public static class CommitDayTemplater
         DateOnly day,
         IReadOnlyList<CommitInfo> commits,
         IReadOnlyList<(string Label, string Href)> artifacts,
-        DateOnly? prevDay,
-        DateOnly? nextDay,
+        EntityPager? pager,
         SiteNav nav,
         Func<string, string?>? commitHref = null)
     {
@@ -48,6 +47,7 @@ public static class CommitDayTemplater
         // Single <main id="main-content"> landmark / skip-link target. [Story 1.4 AC #1]
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
+        sb.Append(pager?.Render()); // Prev = newer day, Next = older (newest-first order). [Prev/next navigation]
         sb.Append($"  <div class=\"story-kicker\">{PathUtil.Html(kicker)}</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(pageLabel)}</h1>\n");
         sb.Append("  <div class=\"meta-pills\">");
@@ -112,20 +112,8 @@ public static class CommitDayTemplater
 
         sb.Append("</article>\n\n");
 
-        // Prev/next hop across active days only (sibling pages in this same commits/ dir); omitted at the ends.
-        if (prevDay is not null || nextDay is not null)
-        {
-            sb.Append("<nav class=\"commit-day-nav\" aria-label=\"Adjacent active days\">\n");
-            if (prevDay is { } p)
-            {
-                sb.Append($"  <a class=\"commit-day-prev\" href=\"{Charts.D(p)}.html\">&laquo; {PathUtil.Html(Charts.DReadable(p))}</a>\n");
-            }
-            if (nextDay is { } n)
-            {
-                sb.Append($"  <a class=\"commit-day-next\" href=\"{Charts.D(n)}.html\">{PathUtil.Html(Charts.DReadable(n))} &raquo;</a>\n");
-            }
-            sb.Append("</nav>\n\n");
-        }
+        // Prev/next hop across active days now rides the inline header pager (see above), replacing the old
+        // bottom-of-page nav so every entity family navigates identically. [Prev/next navigation]
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter(prefix));

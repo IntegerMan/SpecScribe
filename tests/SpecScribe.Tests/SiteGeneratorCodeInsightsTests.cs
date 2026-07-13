@@ -122,15 +122,20 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_CoupledFileWithoutCodePage_RendersNonLinkChip()
+    public void GenerateAll_DeletedCoupledFile_RendersNonLinkChip()
     {
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the non-link chip path; install git rather than silently skipping this test");
 
-        // A third file that co-changes with Referenced.cs but is cited by NO artifact → it never gets a code page,
-        // so on Referenced.cs's graph it must be a non-link chip (still shown + tooltipped), never a dead link.
+        // A third file that co-changes with Referenced.cs but is cited by NO artifact AND is then deleted from disk.
+        // Analytics-discovered code pages still require a real on-disk repo file (TryResolveRepoFile), so this coupled
+        // file gets no page — on Referenced.cs's graph it must be a non-link chip (still shown + tooltipped from the
+        // co-change history), never a dead link. (A coupled file that still exists now DOES get a page; see
+        // GenerateAll_CoupledUncitedFile_NowGetsInPortalCodePage.)
         File.WriteAllText(Path.Combine(SrcDir, "Uncited.cs"), "namespace Lib;\npublic class Uncited { }\n");
         File.WriteAllText(Path.Combine(SrcDir, "Referenced.cs"), "namespace Lib;\npublic class Referenced { /* v3 */ }\n");
         Assert.True(RunGit("add .") && Commit("Change Referenced alongside an uncited helper"));
+        File.Delete(Path.Combine(SrcDir, "Uncited.cs"));
+        Assert.True(RunGit("add -A") && Commit("Remove the uncited helper (co-change history remains)"));
 
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
@@ -141,6 +146,54 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         Assert.Contains("src/Lib/Uncited.cs", html);           // still surfaced (tooltip + sr-only text)
         Assert.False(File.Exists(Path.Combine(Site, "code", "src", "Lib", "Uncited.cs.html")));
         Assert.DoesNotContain("code/src/Lib/Uncited.cs.html", html);   // never a link to a page that does not exist
+    }
+
+    [Fact]
+    public void GenerateAll_CoupledUncitedFile_NowGetsInPortalCodePage()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise analytics-discovered code pages; install git rather than silently skipping this test");
+
+        // A helper that co-changes with Referenced.cs but is cited by NO artifact. It IS a real on-disk source file,
+        // so the git-analytics discovery pass now mints an in-portal code page for it (its related-files/insights are
+        // the point of the source view) and Referenced.cs's related-file node links to that page instead of a chip.
+        File.WriteAllText(Path.Combine(SrcDir, "Helper.cs"), "namespace Lib;\npublic class Helper { }\n");
+        File.WriteAllText(Path.Combine(SrcDir, "Referenced.cs"), "namespace Lib;\npublic class Referenced { /* v4 */ }\n");
+        Assert.True(RunGit("add .") && Commit("Change Referenced alongside an uncited on-disk helper"));
+
+        var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
+
+        AssertNoErrors(events);
+        Assert.True(File.Exists(Path.Combine(Site, "code", "src", "Lib", "Helper.cs.html")),
+            "an uncited but on-disk coupled file should now get an in-portal code page");
+        var html = File.ReadAllText(ReferencedPage);
+        Assert.Contains("code/src/Lib/Helper.cs.html", html);   // linked on the reference graph, not a chip
+    }
+
+    [Fact]
+    public void GenerateAll_DeletedHotFile_ExternalMode_DegradesToPlainTextNotDeadLink()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the deleted-file external-link guard; install git rather than silently skipping this test");
+
+        // A file changed several times (so it ranks as a hot/top-changed file) then DELETED. With an external base
+        // configured, its analytics link must NOT become an external blob/<branch>/<deleted-path> URL that would
+        // 404 — a vanished file has no in-portal page and no valid external target, so it degrades to plain text.
+        var gone = Path.Combine(SrcDir, "Gone.cs");
+        File.WriteAllText(gone, "namespace Lib;\npublic class Gone { }\n");
+        Assert.True(RunGit("add .") && Commit("Add Gone"));
+        File.WriteAllText(gone, "namespace Lib;\npublic class Gone { /* churn */ }\n");
+        Assert.True(RunGit("add .") && Commit("Churn Gone"));
+        File.Delete(gone);
+        Assert.True(RunGit("add -A") && Commit("Delete Gone"));
+
+        var events = new SiteGenerator(Options(deepGit: true, codeSourceBaseUrl: "https://example.com/blob/main")).GenerateAll();
+
+        AssertNoErrors(events);
+        Assert.False(File.Exists(Path.Combine(Site, "code", "src", "Lib", "Gone.cs.html")));   // deleted → no page
+        // No surface (dashboard Git Pulse, deep-analytics, git-insights, code map) may link the vanished file out.
+        foreach (var page in Directory.EnumerateFiles(Site, "*.html", SearchOption.AllDirectories))
+        {
+            Assert.DoesNotContain("example.com/blob/main/src/Lib/Gone.cs", File.ReadAllText(page));
+        }
     }
 
     [Fact]

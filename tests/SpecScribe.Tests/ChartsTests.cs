@@ -856,7 +856,7 @@ public class ChartsTests
         // Focusable, with a rich body-level tooltip + accessible name (color never the sole signal, AC #4).
         Assert.Contains("tabindex=\"0\"", svg);
         Assert.Contains("js-tip", svg);
-        Assert.Contains("data-tip=", svg);
+        Assert.Contains("data-tip-html=", svg);
         Assert.Contains("aria-label=", svg);
         // The default (change-frequency) fill is baked in server-side — A.cs is the busiest, so level-4.
         Assert.Contains("codemap-cell level-4 js-tip", svg);
@@ -921,6 +921,41 @@ public class ChartsTests
         Assert.Contains("a&amp;b", svg);          // directory label + data-path escaped
         Assert.Contains("c&lt;d&gt;.cs", svg);    // file label/path escaped
         Assert.DoesNotContain("<d>", svg);        // no raw unescaped angle brackets leak through
+    }
+
+    [Fact]
+    public void CodeTreemap_LabelsOnlyTopLevelDirectories()
+    {
+        // Two sibling nested directories under one top-level dir. The top-level (depth 0) rect keeps its label; the
+        // nested (depth 1) directories carry no text — the treemap reads as boxes + color, identity lives in the tip.
+        var map = CodeMap.Build(
+            new[] { ("alpha/beta/A.cs", 100L), ("alpha/gamma/B.cs", 100L) },
+            new Dictionary<string, CodeFileMetrics>());
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+
+        Assert.Contains(">alpha</text>", svg);        // top-level directory label survives
+        Assert.DoesNotContain(">beta</text>", svg);   // nested directory labels are suppressed
+        Assert.DoesNotContain(">gamma</text>", svg);
+    }
+
+    [Fact]
+    public void CodeTreemap_RendersRichHtmlTooltipCardWithCoChangeMetric()
+    {
+        var map = CodeMap.Build(
+            new[] { ("src/A.cs", 100L) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/A.cs"] = new CodeFileMetrics(5, 120, new DateOnly(2026, 6, 1), new DateOnly(2026, 7, 1), AvgCoChanged: 3.4),
+            });
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
+
+        // The stylized card is served via data-tip-html (double-escaped for the attribute → innerHTML round-trip);
+        // the old plain-text data-tip attribute is gone.
+        Assert.Contains("data-tip-html=", svg);
+        Assert.DoesNotContain("data-tip=\"", svg);
+        // Co-change is both a data-* (for the JS dimension switch) and a labeled row inside the card.
+        Assert.Contains("data-cochanged=\"3.4\"", svg);
+        Assert.Contains("Files changed together", svg);
     }
 
     [Fact]

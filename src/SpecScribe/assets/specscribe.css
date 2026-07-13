@@ -230,7 +230,24 @@ body {
   margin: 0 auto;
   padding: 2.5rem 1.5rem 1.5rem;
   text-align: center;
+  position: relative; /* anchors the absolutely-positioned .entity-pager */
 }
+
+/* Inline sibling pager ("‹ Prev / Next ›"): floats in the header's top-padding whitespace so it adds no page
+   height and never collides with the centered title below it. Disabled (greyed) at a sequence end. [Prev/next navigation] */
+.entity-pager {
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  display: flex;
+  gap: 1.1rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+}
+.entity-pager-link { color: var(--teal); text-decoration: none; white-space: nowrap; }
+.entity-pager-link:hover { color: var(--rust); text-decoration: underline; }
+.entity-pager-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+.entity-pager-link.is-disabled { color: var(--ink-light); opacity: 0.4; pointer-events: none; }
 
 .doc-header h1 {
   font-size: 2rem;
@@ -2835,20 +2852,6 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   .commit-subject { grid-column: 1 / -1; }
 }
 
-/* Prev/next active-day links at the foot of the page. */
-.commit-day-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.1rem;
-  margin-top: 1.4rem;
-  font-size: 0.8rem;
-}
-.commit-day-nav a { color: var(--teal); text-decoration: none; }
-.commit-day-nav a:hover { color: var(--rust); text-decoration: underline; }
-.commit-day-nav a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
-/* When only "next" exists (earliest active day), keep it on the right edge. */
-.commit-day-nav .commit-day-next { margin-left: auto; }
-
 /* The day-page hash becomes a link into its per-commit detail page (Story 7.5) when one exists; the inner
    <code class="commit-hash"> keeps the gold monospace look, the wrapper only adds the affordance. */
 .commit-hash-link { text-decoration: none; }
@@ -3279,6 +3282,23 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   pointer-events: none;
 }
 .ss-tooltip[hidden] { display: none; }
+
+/* Rich code-map tooltip card — rendered as innerHTML in the shared .ss-tooltip node for treemap cells. Every metric
+   is a labeled row (label / value), so color is never the sole signal for whichever colorize dimension is active. */
+.codemap-card { display: block; white-space: normal; min-width: 11rem; max-width: 17rem; }
+.codemap-card-name { display: block; font-weight: 700; color: var(--ink); font-size: 0.8rem; }
+.codemap-card-path {
+  display: block;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.66rem;
+  color: var(--ink-faded);
+  margin: 0.1rem 0 0.4rem;
+  word-break: break-all;
+}
+.codemap-card-metrics { margin: 0; display: grid; grid-template-columns: auto auto; gap: 0.08rem 0.7rem; }
+.codemap-card-metrics > div { display: contents; }
+.codemap-card-metrics dt { color: var(--ink-faded); font-weight: 400; }
+.codemap-card-metrics dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
 
 /* ====================== QUICK-LINK PILLS (Story 1.5 F1 slim + B5 family accents) ======================
    "Explore Key Views" duplicated the top nav and the bottom index sections, so it's slimmed from a card

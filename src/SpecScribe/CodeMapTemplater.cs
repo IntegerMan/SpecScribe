@@ -97,6 +97,7 @@ public static class CodeMapTemplater
         AppendRadio(sb, "last", "Recently changed", false);
         AppendRadio(sb, "created", "First changed", false);
         AppendRadio(sb, "avgchange", "Avg change size", false);
+        AppendRadio(sb, "cochange", "Files changed together", false);
         sb.Append("  </form>\n");
     }
 
@@ -141,7 +142,7 @@ public static class CodeMapTemplater
         sb.Append("    <thead><tr><th scope=\"col\">File</th><th scope=\"col\" class=\"num\">Lines</th>");
         if (hasMetrics)
         {
-            sb.Append("<th scope=\"col\" class=\"num\">Changes</th><th scope=\"col\" class=\"num\">Churn</th><th scope=\"col\" class=\"num\">Avg</th><th scope=\"col\">First</th><th scope=\"col\">Last</th>");
+            sb.Append("<th scope=\"col\" class=\"num\">Changes</th><th scope=\"col\" class=\"num\">Churn</th><th scope=\"col\" class=\"num\">Avg</th><th scope=\"col\" class=\"num\">Together</th><th scope=\"col\">First</th><th scope=\"col\">Last</th>");
         }
         sb.Append("</tr></thead>\n    <tbody>\n");
 
@@ -159,16 +160,18 @@ public static class CodeMapTemplater
                 if (file.Metrics is { } m)
                 {
                     var avg = m.Changes > 0 ? ((double)m.TotalChurn / m.Changes).ToString("N0", CultureInfo.InvariantCulture) : "\u2014";
+                    var together = m.AvgCoChanged is { } co ? co.ToString("N1", CultureInfo.InvariantCulture) : "\u2014";
                     var first = m.FirstDate is { } fd ? Charts.D(fd) : "\u2014";
                     var last = m.LastDate is { } ld ? Charts.D(ld) : "\u2014";
                     sb.Append($"<td class=\"num\">{m.Changes.ToString("N0", CultureInfo.InvariantCulture)}</td>");
                     sb.Append($"<td class=\"num\">{m.TotalChurn.ToString("N0", CultureInfo.InvariantCulture)}</td>");
                     sb.Append($"<td class=\"num\">{avg}</td>");
+                    sb.Append($"<td class=\"num\">{together}</td>");
                     sb.Append($"<td>{first}</td><td>{last}</td>");
                 }
                 else
                 {
-                    sb.Append("<td class=\"num\">\u2014</td><td class=\"num\">\u2014</td><td class=\"num\">\u2014</td><td>\u2014</td><td>\u2014</td>");
+                    sb.Append("<td class=\"num\">\u2014</td><td class=\"num\">\u2014</td><td class=\"num\">\u2014</td><td class=\"num\">\u2014</td><td>\u2014</td><td>\u2014</td>");
                 }
             }
             sb.Append("</tr>\n");

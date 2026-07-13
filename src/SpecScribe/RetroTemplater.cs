@@ -48,7 +48,7 @@ public static class RetroTemplater
         return sb.ToString();
     }
 
-    public static string RenderPage(RetroModel retro, EpicsModel? epics, SiteNav nav)
+    public static string RenderPage(RetroModel retro, EpicsModel? epics, SiteNav nav, EntityPager? pager = null)
     {
         var outputPath = retro.OutputRelativePath;
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -70,6 +70,7 @@ public static class RetroTemplater
 
         var main = new StringBuilder();
         main.Append("<header class=\"doc-header retro-header\">\n");
+        main.Append(pager?.Render()); // Prev/next across retros in ascending epic order. [Prev/next navigation]
         main.Append($"  <div class=\"story-kicker\">Epic {retro.EpicNumber} Retrospective</div>\n");
         main.Append($"  <h1>{PathUtil.Html(HeadingTitle(retro))}</h1>\n");
 

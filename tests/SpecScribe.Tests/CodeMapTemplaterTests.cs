@@ -15,8 +15,8 @@ public class CodeMapTemplaterTests
         new[] { ("src/A.cs", 300L), ("src/B.cs", 50L) },
         new Dictionary<string, CodeFileMetrics>
         {
-            ["src/A.cs"] = new CodeFileMetrics(8, 200, new DateOnly(2026, 6, 1), new DateOnly(2026, 7, 10)),
-            ["src/B.cs"] = new CodeFileMetrics(2, 20, new DateOnly(2026, 6, 15), new DateOnly(2026, 6, 20)),
+            ["src/A.cs"] = new CodeFileMetrics(8, 200, new DateOnly(2026, 6, 1), new DateOnly(2026, 7, 10), AvgCoChanged: 3.4),
+            ["src/B.cs"] = new CodeFileMetrics(2, 20, new DateOnly(2026, 6, 15), new DateOnly(2026, 6, 20), AvgCoChanged: 1.0),
         });
 
     [Fact]
@@ -37,6 +37,11 @@ public class CodeMapTemplaterTests
         Assert.Contains("name=\"codemap-dim\"", html);
         Assert.Contains("value=\"changes\"", html);
         Assert.Contains("value=\"avgchange\"", html);
+        Assert.Contains("value=\"cochange\"", html);          // the new "Files changed together" colorize dimension
+
+        // The text table gains a "Together" column carrying the per-file average co-changed file count.
+        Assert.Contains(">Together</th>", html);
+        Assert.Contains(">3.4</td>", html);                   // src/A.cs's average co-changed files
         Assert.Contains("class=\"codemap-controls\" id=\"codemap-controls\" aria-label=\"Colorize the treemap by\" hidden", html);
         Assert.Contains("class=\"codemap-drill\" aria-label=\"Treemap zoom\" hidden", html);
 

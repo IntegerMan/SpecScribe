@@ -16,6 +16,7 @@
   var activeSeg = null;
   var activeTitle = null;
   var activeText = null;
+  var activeHtml = null; // when set, the tip renders this as innerHTML (rich card) instead of plain text
 
   function ensureTip() {
     if (!tip) {
@@ -31,6 +32,16 @@
   function activate(el) {
     if (activeSeg === el) return;
     deactivate();
+    // Elements opt into a fully stylized HTML card via data-tip-html (e.g. the code-map cells). The markup is
+    // server-built and escaped, so setting it as innerHTML is safe — it renders a rich card a plain-text tip can't.
+    var dataHtml = el.getAttribute ? el.getAttribute("data-tip-html") : null;
+    if (dataHtml) {
+      activeSeg = el;
+      activeTitle = null;
+      activeText = null;
+      activeHtml = dataHtml;
+      return;
+    }
     // HTML elements opt into the (body-level, never-clipped) tooltip via data-tip — used for rich, multi-line
     // card/wheel tips that a clipped CSS ::after can't show. SVG segments keep the <title> path.
     var dataTip = el.getAttribute ? el.getAttribute("data-tip") : null;
@@ -38,12 +49,14 @@
       activeSeg = el;
       activeTitle = null;
       activeText = dataTip;
+      activeHtml = null;
       return;
     }
     var t = el.querySelector("title");
     activeSeg = el;
     activeTitle = t;
     activeText = t ? t.textContent : el.getAttribute("aria-label");
+    activeHtml = null;
     if (t) t.remove();
   }
 
@@ -52,13 +65,14 @@
     activeSeg = null;
     activeTitle = null;
     activeText = null;
+    activeHtml = null;
   }
 
   function showTip(el, x, y) {
     activate(el);
-    if (!activeText) { deactivate(); return; }
+    if (!activeText && !activeHtml) { deactivate(); return; }
     var t = ensureTip();
-    t.textContent = activeText;
+    if (activeHtml) { t.innerHTML = activeHtml; } else { t.textContent = activeText; }
     t.hidden = false;
     // Clamp within the viewport so an edge segment's tooltip never spills off-screen. `x`/`y` are viewport
     // (client) coords; the tooltip is absolutely positioned against the body, so convert BOTH axes to page
@@ -377,6 +391,7 @@
         var churn = num(cell, "data-churn"), ch = num(cell, "data-changes");
         return (churn === null || !ch) ? null : churn / ch;
       }
+      if (dim === "cochange") return num(cell, "data-cochanged");
       return null;
     }
 
@@ -386,14 +401,17 @@
       changes: "change frequency",
       last: "recency of last change",
       created: "recency of first change",
-      avgchange: "average change size"
+      avgchange: "average change size",
+      cochange: "files changed together"
     };
 
     // Capture each cell's server-baked base label/tooltip once, before any recolor, so repeated dimension
     // switches append to the ORIGINAL text rather than stacking onto a previously-appended suffix.
+    // The tooltip is a static, server-built HTML card (data-tip-html) listing every metric, so it already satisfies
+    // "color is never the sole signal" for any active dimension — no per-dimension tooltip rewrite is needed. Only
+    // the aria-label (and the legend) track the active dimension, so we snapshot just the base label.
     cells.forEach(function (c) {
       if (!c.hasAttribute("data-base-label")) c.setAttribute("data-base-label", c.getAttribute("aria-label") || "");
-      if (!c.hasAttribute("data-base-tip")) c.setAttribute("data-base-tip", c.getAttribute("data-tip") || "");
     });
 
     var legendDim = document.getElementById("codemap-legend-dim");
@@ -416,11 +434,9 @@
         c.classList.remove("level-none");
         var v = metricFor(c, dim);
         var baseLabel = c.getAttribute("data-base-label") || "";
-        var baseTip = c.getAttribute("data-base-tip") || "";
         if (v === null) {
           c.classList.add("level-none");
           c.setAttribute("aria-label", baseLabel + " — no data for " + dimLabel);
-          c.setAttribute("data-tip", baseTip + "\nNo data for " + dimLabel);
           return;
         }
         var lvl = bucket(isDate ? (v - min) : v, range);
@@ -429,7 +445,6 @@
         // never a raw day-number or other value the color itself doesn't literally represent.
         var levelText = lvl === 0 ? "lowest" : lvl === 4 ? "highest" : "level " + lvl + " of 4";
         c.setAttribute("aria-label", baseLabel + " — " + dimLabel + ": " + levelText);
-        c.setAttribute("data-tip", baseTip + "\n" + dimLabel + ": " + levelText);
       });
       if (legendDim) legendDim.textContent = "Colorized by " + dimLabel;
     }

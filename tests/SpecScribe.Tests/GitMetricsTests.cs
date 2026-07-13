@@ -697,6 +697,53 @@ public class GitMetricsTests
     }
 
     [Fact]
+    public void BuildCodeMapMetrics_AveragesCoChangedFilesAndExcludesBulkCommits()
+    {
+        // A.cs is touched by: {A,B} (1 other), {A,B,C} (2 others), {A} alone (0 others), and a 51-file bulk commit
+        // (distinct > CouplingFileSetCap=50 -> excluded from the co-change average, though it STILL counts as a change).
+        var bulk = Enumerable.Range(0, 50).Select(i => ($"src/Bulk{i:00}.cs", 1, 0)).Prepend(("A.cs", 1, 0)).ToArray();
+        var commits = new[]
+        {
+            Commit("h4", "Alice", "2026-07-04T10:00", bulk),                     // 51 files -> excluded
+            Commit("h3", "Alice", "2026-07-03T10:00", ("A.cs", 1, 0)),           // alone -> 0 others
+            Commit("h2", "Alice", "2026-07-02T10:00", ("A.cs", 1, 0), ("B.cs", 1, 0), ("C.cs", 1, 0)), // 2 others
+            Commit("h1", "Alice", "2026-07-01T10:00", ("A.cs", 1, 0), ("B.cs", 1, 0)),                 // 1 other
+        };
+
+        var a = GitMetrics.BuildCodeMapMetrics(commits)["A.cs"];
+
+        Assert.Equal(4, a.Changes);                       // bulk commit still counts toward change frequency
+        Assert.NotNull(a.AvgCoChanged);
+        Assert.Equal(1.0, a.AvgCoChanged!.Value, 3);      // (1 + 2 + 0) / 3 qualifying commits — bulk excluded
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_FileTouchedOnlyAloneHasZeroCoChangeNotNull()
+    {
+        var commits = new[]
+        {
+            Commit("h2", "Alice", "2026-07-02T10:00", ("A.cs", 1, 0)),
+            Commit("h1", "Alice", "2026-07-01T10:00", ("A.cs", 1, 0)),
+        };
+
+        var a = GitMetrics.BuildCodeMapMetrics(commits)["A.cs"];
+
+        Assert.Equal(0.0, a.AvgCoChanged);                // solo commits count in the denominator, contributing 0
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_FileOnlyInBulkCommitsHasNullCoChange()
+    {
+        // X.cs appears only in a sweeping 51-file commit -> no qualifying (non-bulk) commit -> null co-change,
+        // but it is still a real change.
+        var bulk = Enumerable.Range(0, 50).Select(i => ($"src/Bulk{i:00}.cs", 1, 0)).Prepend(("X.cs", 1, 0)).ToArray();
+        var map = GitMetrics.BuildCodeMapMetrics(new[] { Commit("h1", "Alice", "2026-07-01T10:00", bulk) });
+
+        Assert.Equal(1, map["X.cs"].Changes);
+        Assert.Null(map["X.cs"].AvgCoChanged);
+    }
+
+    [Fact]
     public void ParseNumstatLog_CarriesTheCodeMapMetricsFromTheSameParse()
     {
         // One parse, several views: the pulse also carries the untruncated treemap metric map.

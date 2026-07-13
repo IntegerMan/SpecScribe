@@ -44,10 +44,11 @@ public static class CodeFileTemplater
         string? externalSourceUrl = null,
         FileInsight? insight = null,
         Func<string, string?>? coupledFileHref = null,
-        Func<string, string?>? commitHref = null)
+        Func<string, string?>? commitHref = null,
+        EntityPager? pager = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
-        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true);
+        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true, pager: pager);
 
         var count = lines.Count;
         sb.Append($"  <div class=\"meta-pills\"><span class=\"pill\">{count.ToString(CultureInfo.InvariantCulture)} {(count == 1 ? "line" : "lines")}</span></div>\n");
@@ -520,10 +521,11 @@ public static class CodeFileTemplater
         string reason,
         SiteNav nav,
         IReadOnlyList<(string OutputUrl, string Title)>? referencedBy = null,
-        string? externalSourceUrl = null)
+        string? externalSourceUrl = null,
+        EntityPager? pager = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
-        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav);
+        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, pager: pager);
 
         sb.Append("  <div class=\"meta-pills\"><span class=\"pill\">Not rendered</span></div>\n");
         sb.Append("</header>\n\n");
@@ -541,7 +543,7 @@ public static class CodeFileTemplater
     /// it — mirroring the synthesized-page shape of <see cref="CommitDayTemplater"/>. <paramref name="highlight"/>
     /// adds the vendored Prism stylesheet + highlighter to the head (only the full page, which actually renders a
     /// <c>&lt;code&gt;</c> block, asks for them).</summary>
-    private static StringBuilder BeginShell(string repoRelativePath, string outputRelativePath, string prefix, SiteNav nav, bool highlight = false)
+    private static StringBuilder BeginShell(string repoRelativePath, string outputRelativePath, string prefix, SiteNav nav, bool highlight = false, EntityPager? pager = null)
     {
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
@@ -563,6 +565,7 @@ public static class CodeFileTemplater
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<div class=\"code-page\">\n");
         sb.Append("<header class=\"doc-header\">\n");
+        sb.Append(pager?.Render()); // Prev/next across sibling files in the same directory (alphabetical). [Prev/next navigation]
         sb.Append("  <div class=\"story-kicker\">Source File</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(repoRelativePath)}</h1>\n");
         return sb;

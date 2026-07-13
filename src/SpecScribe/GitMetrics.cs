@@ -77,8 +77,12 @@ public sealed record DeepGitPulse(
 /// guarded). <paramref name="FirstDate"/>/<paramref name="LastDate"/> are the oldest/newest commit day within the
 /// <b>analyzed window</b> touching this file — NOT true repository creation/modification: the shared fetch is bounded
 /// (<c>-n 300</c>), so these are "recency within recent history", matching the AC's deliberate "<b>relative</b>
-/// creation date" wording. Either date is null when no parsed record for the file carried a timestamp. [Story 7.6]</summary>
-public sealed record CodeFileMetrics(int Changes, int TotalChurn, DateOnly? FirstDate, DateOnly? LastDate);
+/// creation date" wording. Either date is null when no parsed record for the file carried a timestamp.
+/// <paramref name="AvgCoChanged"/> = the average number of <b>other</b> files touched in the same commits as this file
+/// (its typical "blast radius" per change), averaged over the non-bulk commits touching it — a commit whose distinct
+/// file set exceeds <see cref="GitMetrics.CouplingFileSetCap"/> is excluded as sweeping noise (matching the coupling
+/// view), while a solo commit contributes 0. Null when no non-bulk commit touched the file. [Story 7.6; co-change dimension]</summary>
+public sealed record CodeFileMetrics(int Changes, int TotalChurn, DateOnly? FirstDate, DateOnly? LastDate, double? AvgCoChanged = null);
 
 /// <summary>One file's numstat row within a commit. <paramref name="Added"/>/<paramref name="Deleted"/> are
 /// null for binary files (git prints <c>-</c> for both counts) — the path still counts as a change. [Story 3.8]</summary>
@@ -740,6 +744,8 @@ public static class GitMetrics
         public int TotalChurn;
         public DateOnly? FirstDate; // oldest day seen (records are newest-first, so the LAST assignment wins — keep overwriting)
         public DateOnly? LastDate;  // newest day seen (records are newest-first, so the FIRST non-null day is latest)
+        public long CoChangedTotal;  // Σ over non-bulk commits touching this file of (other files in that commit)
+        public int CoChangeCommits;  // count of those non-bulk commits (the co-change average's denominator)
     }
 
     /// <summary>Builds the untruncated per-file treemap metric map (Story 7.6) from the SAME parsed records the
@@ -748,7 +754,9 @@ public static class GitMetrics
     /// entry, so a whole-codebase treemap can colorize each file with history. Per file: <b>Changes</b> (commits
     /// touching it, once per commit — a file listed twice in one commit is one change, mirroring
     /// <see cref="BuildInsights"/>'s <c>seenInCommit</c> guard), <b>TotalChurn</b> (Σ added + deleted across every
-    /// numstat row; binary rows contribute 0), and the <b>oldest/newest</b> commit day within the window. Records
+    /// numstat row; binary rows contribute 0), the <b>oldest/newest</b> commit day within the window, and the
+    /// <b>average co-changed file count</b> (mean number of other files touched in the same non-bulk commits — the
+    /// file's typical blast radius; bulk commits above <see cref="CouplingFileSetCap"/> excluded). Records
     /// arrive newest-first, so <c>LastDate</c> is the first non-null day seen and <c>FirstDate</c> is the last
     /// (oldest) day seen (kept overwriting). Pure and repo-free (mirrors <see cref="BuildInsights"/>): empty input
     /// yields an empty map and it never throws. [Story 7.6]</summary>
@@ -762,6 +770,12 @@ public static class GitMetrics
             // Once-per-commit-per-file change counting: a file listed twice in one commit is still one change.
             var seenInCommit = new HashSet<string>(StringComparer.Ordinal);
 
+            // Co-change blast radius: distinct files in THIS commit, minus self, credited to each member — but only
+            // for non-bulk commits (a sweeping commit above the cap is excluded from BOTH numerator and denominator,
+            // matching the coupling view's CouplingFileSetCap discipline). Solo commits (distinct==1) contribute 0.
+            var distinctCount = commit.Files.Select(f => f.Path).Distinct(StringComparer.Ordinal).Count();
+            var coChangeQualifies = distinctCount is > 0 and <= CouplingFileSetCap;
+
             foreach (var file in commit.Files)
             {
                 if (!accum.TryGetValue(file.Path, out var a))
@@ -774,6 +788,11 @@ public static class GitMetrics
                 if (seenInCommit.Add(file.Path))
                 {
                     a.Changes++;
+                    if (coChangeQualifies)
+                    {
+                        a.CoChangedTotal += distinctCount - 1;
+                        a.CoChangeCommits++;
+                    }
                 }
 
                 // Dates: records are newest-first. The first non-null day seen is the file's latest; keep
@@ -789,7 +808,8 @@ public static class GitMetrics
         var result = new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal);
         foreach (var (path, a) in accum)
         {
-            result[path] = new CodeFileMetrics(a.Changes, a.TotalChurn, a.FirstDate, a.LastDate);
+            double? avgCoChanged = a.CoChangeCommits > 0 ? (double)a.CoChangedTotal / a.CoChangeCommits : null;
+            result[path] = new CodeFileMetrics(a.Changes, a.TotalChurn, a.FirstDate, a.LastDate, avgCoChanged);
         }
 
         return result;
