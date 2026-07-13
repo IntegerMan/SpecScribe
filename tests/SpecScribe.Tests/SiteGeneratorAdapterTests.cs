@@ -158,9 +158,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         var events = gen.GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        // The activity timeline + date pages (Story 7.3) fire on the artifact-mtime signal even without git, so
-        // this fixture now yields timeline.html plus a date page for today (all fixture files share checkout
-        // mtime). The date-stamped filename is folded to a stable placeholder so the golden isn't date-fragile.
+        // The activity timeline + date pages are now git-derived (Story 7.3 bug fix): they no longer fire on the
+        // filesystem-mtime signal, so this NON-git fixture yields NEITHER timeline.html NOR any commits/ date page —
+        // the honest degradation of "drop the claim when git can't verify it" (the mtime signal collapsed every
+        // artifact onto the checkout day). The date-fold is kept defensively in case any surface still stamps today.
         var todayIso = Charts.D(DateOnly.FromDateTime(DateTime.Now));
         var actual = Directory.EnumerateFiles(Site, "*", SearchOption.AllDirectories)
             .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)).Replace(todayIso, "<date>"))
@@ -179,8 +180,8 @@ public class SiteGeneratorAdapterTests : IDisposable
             // Story 7.6: code-map.html replaced the retired Story 3.4 structure.html (source-code treemap; the
             // fixture's repo-root walk finds its markdown files, so the surface generates).
             "code-map.html",
-            // Story 7.3: artifact-mtime-driven date page (today, folded) + the activity timeline surface.
-            "commits/<date>.html",
+            // Story 7.3 bug fix: timeline.html + commits/ date pages are git-derived now, so this non-git fixture
+            // emits none of them (previously the mtime signal produced a today-stamped date page + timeline here).
             "diagnostics.html",
             "epics.html",
             "epics/epic-1.html",
@@ -197,7 +198,6 @@ public class SiteGeneratorAdapterTests : IDisposable
             "specscribe.css",
             "specscribe.js",
             "sprint.html",
-            "timeline.html",
         }.OrderBy(p => p, StringComparer.Ordinal).ToList();
 
         Assert.Equal(expected, actual);
@@ -238,8 +238,19 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for spec-website-nib-favicon: the every-page favicon in RenderHeadOpen changed from the
         // retired gold-quill-spark star to the Scribe's Nib mark on a teal tile (reusing HtmlRenderAdapter.NibPathData),
         // so every page's <head> data-URI icon shifted. No file-set change; content-only.
+        // Regenerated for spec-code-page-relationships-history-tabs: the code page's tab strip grew from two views
+        // to four (Insights | Relationships | History | Code) with per-tab icons, so specscribe.css gained the
+        // four-modifier panel-toggle rule, a generalized deep-link :target override, and a .code-tab .ss-icon reset.
+        // CSS-only for this fixture (it cites no real repo files, so no code page renders here) — only the
+        // every-page stylesheet content shifted the fingerprint; the file set is unchanged.
+        // Regenerated for the Story 7.4 code review pass: FileInsight gained TotalContributors + a
+        // ".code-insight-more" truncation-disclosure style so a capped contributor list no longer reads as
+        // complete. CSS-only for this fixture (no real repo files cited, so no insight section renders here).
+        // Regenerated for the Story 7.6 code review pass: the codemap legend gained a "Colorized by …" dimension
+        // label span + supporting CSS; specscribe.js gained the recolor()/setViewBox() review fixes. CSS/JS-only
+        // for this fixture (no real repo files cited, so no code-map treemap cells render here).
         // [golden-diff-normalization-gotchas]
-        const string expected = "4c2ce594b3c8db103fab66e0484df193298c8d5567c9a776f4154c5af8533dd8";
+        const string expected = "df8ad228cd513076d863a3eb7c279ef34b6f719031bd830ac05c869dee7f3f48";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -247,7 +258,9 @@ public class SiteGeneratorAdapterTests : IDisposable
     }
 
     // The footer date is now human-friendly + culture-invariant, e.g. "on July 10, 2026 at 5:14 PM".
-    private static readonly Regex FooterClock = new(@"on [A-Za-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} [AP]M", RegexOptions.Compiled);
+    // Story 10.4: the footer clock is now "on {PortalDates day} at HH:mm UTC±HH:mm" (24-hour + machine-local zone
+    // label). Widened from the old 12-hour "[AP]M" shape so the per-machine time+zone can't leak into the hash.
+    private static readonly Regex FooterClock = new(@"on [A-Za-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", RegexOptions.Compiled);
     private static readonly Regex AssetCacheBust = new(@"\?v=[0-9a-fA-F]+", RegexOptions.Compiled);
     private static readonly Regex SubtitleVersion = new(@"SpecScribe v[^<]+", RegexOptions.Compiled);
     private static readonly Regex VersionRow = new(@"(<dt>Version</dt><dd>)[^<]*(</dd>)", RegexOptions.Compiled);

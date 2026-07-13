@@ -591,8 +591,9 @@ pre.code-file code[class*="language-"] {
   padding: 0 1.5rem 2.5rem;
 }
 
-/* Story 7.1 (tabbed) — a code page splits into two pure-CSS, no-JS views: "Insights & relationships" (the reader
-   asked to be led by what the code MEANS) and "Code". Radio inputs drive it; :has(:checked) toggles the panels so no
+/* Story 7.1 (tabbed) — a code page splits into up to four pure-CSS, no-JS views: "Insights" (git-signal coverage),
+   "Relationships" (the reference graph + coupled files), "History" (the change-history table), and "Code". Empty
+   views drop out; the first surviving tab leads. Radio inputs drive it; :has(:checked) toggles the panels so no
    script is needed, honoring the pure-SVG/HTML charting rule. Neutral ink/border/parchment/gold tokens only. */
 .code-tabs {
   margin-top: 1.5rem;
@@ -623,6 +624,13 @@ pre.code-file code[class*="language-"] {
   border-radius: 7px;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
+}
+
+/* The tab's flex gap owns the icon-to-label spacing, so drop the icon's default trailing margin (it would double up
+   with the gap). The glyph inherits the tab's currentColor, so it flips to parchment along with the label when the
+   tab reads active. */
+.code-tab .ss-icon {
+  margin-right: 0;
 }
 
 /* The radio itself is removed from view but stays in the a11y tree and keyboard-focusable (native arrow-key group
@@ -658,6 +666,8 @@ pre.code-file code[class*="language-"] {
 }
 
 .code-tabs:has(.code-tab--insights .code-tab-input:checked) .code-tabpanel--insights,
+.code-tabs:has(.code-tab--relationships .code-tab-input:checked) .code-tabpanel--relationships,
+.code-tabs:has(.code-tab--history .code-tab-input:checked) .code-tabpanel--history,
 .code-tabs:has(.code-tab--source .code-tab-input:checked) .code-tabpanel--source {
   display: block;
 }
@@ -667,7 +677,7 @@ pre.code-file code[class*="language-"] {
    tab defaulted, no JavaScript. The :has() argument is spelled with `.code-line:target` so these rules match the
    specificity of the :has(:checked) rules above AND follow them in source order — the tie-breaker that lets a live
    deep link override the default checked tab. */
-.code-tabs:has(.code-tabpanel--source .code-line:target) .code-tabpanel--insights {
+.code-tabs:has(.code-tabpanel--source .code-line:target) .code-tabpanel {
   display: none;
 }
 
@@ -961,14 +971,20 @@ pre.code-file code[class*="language-"] {
   white-space: nowrap;
 }
 
-.code-insight-history {
-  margin-top: 1.4rem;
+.code-insight-more {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  font-style: italic;
 }
 
-.code-insight-history h3 {
+/* History is now its own tab panel (was a sub-card under "Advanced coverage"), so its heading is a top-level panel
+   heading styled to match "Referenced by" / "Advanced coverage" — not the old faded sub-heading — and the former
+   top margin that separated it from preceding insight cards is dropped (it is the panel's sole child now). */
+.code-insight-history > h2 {
   margin: 0 0 0.5rem;
-  font-size: 0.8rem;
-  color: var(--ink-faded);
+  font-size: 0.9rem;
+  color: var(--ink-light);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1266,6 +1282,21 @@ pre.code-file code[class*="language-"] {
   /* Was --parchment-deep (#d4b896) on --warm-white ≈1.6:1 — fails WCAG. --ink-light clears 4.5:1. [UXO H1] */
   color: var(--ink-light);
 }
+
+/* ADR listing card date + one-line summary (Story 10.4). Muted meta lines that reuse the card's existing
+   de-emphasized vocabulary — the date routes through PortalDates, the summary comes from the ADR body. */
+.index-card .index-card-meta { margin: 0.15rem 0 0; font-size: 0.72rem; color: var(--ink-light); }
+.index-card .index-card-summary { margin: 0.3rem 0 0; font-size: 0.8rem; color: var(--ink-light); line-height: 1.45; }
+
+/* A date rendered "in the context of a change" that links through to its date page (Story 7.3/10.4): the heatmap
+   headline's "last commit" date, the Git Pulse last-commit timestamp. Inherits the surrounding text colour so it
+   reads as part of the sentence, with an underline affordance on hover/focus. Neutral — never a --status-* token. */
+.date-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--ink-light); }
+.date-link:hover, .date-link:focus { text-decoration: none; border-bottom-color: var(--ink); }
+
+/* One-line caption for the git commit clock's timezone (Story 10.4 "captioned git"): commit times are shown in
+   each commit's authored offset, distinct from the machine-local, zone-labeled generation footer. */
+.git-pulse-zone-note { margin: 0.4rem 0 0; font-size: 0.68rem; color: var(--ink-light); font-style: italic; }
 
 /* The status badge sits between the card title and the de-emphasized date·author line; it is inline-block so
    it needs a little breathing room above the following <p>. [Story 2.4 Task 2] */
@@ -2465,6 +2496,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   color: var(--ink-light);
   margin-top: 0.4rem;
 }
+.codemap-legend-dim { font-weight: 600; margin-right: 0.4rem; }
 .codemap-legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .codemap-legend-swatch.level-0 { background: var(--parchment-dark); opacity: 0.35; }
 .codemap-legend-swatch.level-1 { background: #ecd18f; }

@@ -57,13 +57,25 @@ public static class CodeFileTemplater
         // code, not at the insights — so it survives even when there is no insights tab.
         var source = BuildSource(repoRelativePath, lines, externalSourceUrl);
 
-        // The insights view collects everything ABOUT the file — its relationship graph and (Story 7.4) the opt-in
-        // git-signal panels — and the code view holds the source. A null insight => empty coverage => the page is
-        // byte-identical to a run without --deep-git for that half.
-        var coverage = insight is null ? "" : BuildCoverageSection(prefix, insight, coupledFileHref, commitHref);
-        var insights = BuildInsightsPanel(prefix, repoRelativePath, referencedBy, coverage);
+        // Four independent views, each holding one facet of the file. A null insight => empty insights/history and
+        // (when uncited) empty relationships => the page is byte-identical to a run without --deep-git for that facet.
+        //   Insights      — the git-signal coverage: change frequency, contributors, and the coupled-file card.
+        //   Relationships — the reference graph (what cites the file) plus the same coupled-file card (owner: both).
+        //   History       — the bounded change-history table.
+        //   Code          — the source itself (always present).
+        var insightsPanel = BuildInsightsPanel(prefix, insight, coupledFileHref);
+        var relationshipsPanel = BuildRelationshipsPanel(prefix, repoRelativePath, referencedBy, insight, coupledFileHref);
+        var historyPanel = BuildHistoryPanel(prefix, insight, commitHref);
 
-        if (insights.Length == 0)
+        // Assemble in a fixed order (Insights → Relationships → History → Code); empty panels drop out so a file only
+        // ever shows tabs it can back with content. The first surviving tab is the default-checked one.
+        var tabs = new List<CodeTab>(4);
+        if (insightsPanel.Length > 0) tabs.Add(new CodeTab("insights", "Insights", insightsPanel));
+        if (relationshipsPanel.Length > 0) tabs.Add(new CodeTab("relationships", "Relationships", relationshipsPanel));
+        if (historyPanel.Length > 0) tabs.Add(new CodeTab("history", "History", historyPanel));
+        tabs.Add(new CodeTab("source", "Code", source));
+
+        if (tabs.Count == 1)
         {
             // Nothing to say about the file (uncited, no external link, no deep-git insight) — no point in tabs; the
             // source spans the full width exactly as the pre-tab layout did for an uncited file.
@@ -71,12 +83,18 @@ public static class CodeFileTemplater
             return EndShell(sb, prefix);
         }
 
-        // Two pure-CSS tabbed views: insights lead (the reader asked to be led by what the code MEANS, not the code),
-        // code second. A deep link to code/<path>.html#L42 still lands: a :target on a source line forces the code
-        // view forward in CSS (see .code-tabs :target rules), so the locked #L{n} convention survives the tabs.
-        AppendTabs(sb, outputRelativePath, insights, source);
+        // A deep link to code/<path>.html#L42 still lands: a :target on a source line forces the code view forward in
+        // CSS (see .code-tabs :target rules), so the locked #L{n} convention survives regardless of the default tab.
+        AppendTabs(sb, outputRelativePath, tabs);
         return EndShell(sb, prefix);
     }
+
+    /// <summary>One tab in the code page's pure-CSS tab strip: a css modifier (<c>insights</c>/<c>relationships</c>/
+    /// <c>history</c>/<c>source</c>) shared between its <c>.code-tab--{Mod}</c> radio label and its
+    /// <c>.code-tabpanel--{Mod}</c> panel, a visible <c>Label</c> (also the <see cref="Icons.ForCodeTab"/> key), and
+    /// the pre-rendered panel HTML. <c>source</c> is kept as the Code tab's modifier so the locked <c>#L{n}</c>
+    /// deep-link CSS keys (<c>.code-tabpanel--source</c>) still resolve.</summary>
+    private readonly record struct CodeTab(string Mod, string Label, string Panel);
 
     /// <summary>Builds the secondary "Source" panel: the file's contents as one contiguous
     /// <c>&lt;code class="language-*"&gt;</c> block so Prism can tokenize multi-line constructs (block comments,
@@ -106,65 +124,51 @@ public static class CodeFileTemplater
         return source.ToString();
     }
 
-    /// <summary>Wraps the two views in a pure-CSS, no-JS tab shell ([[charting-is-pure-svg-no-js]]): a
-    /// <c>&lt;fieldset&gt;</c> of two radio "tabs" (a visually-hidden legend names the choice for assistive tech) plus
-    /// two sibling panels. The insights tab is <c>checked</c> so the page LEADS with what the file means; CSS
-    /// <c>:has(:checked)</c> toggles the panels and <c>:target</c> forces the code panel forward for <c>#L{n}</c> deep
+    /// <summary>Wraps the surviving views in a pure-CSS, no-JS tab shell ([[charting-is-pure-svg-no-js]]): a
+    /// <c>&lt;fieldset&gt;</c> of radio "tabs" (a visually-hidden legend names the choice for assistive tech) plus one
+    /// sibling panel each. Every tab carries a decorative <see cref="Icons.ForCodeTab"/> glyph before its text label.
+    /// The first tab is <c>checked</c> so the page LEADS with the first surviving view (Insights when present); CSS
+    /// <c>:has(:checked)</c> toggles the panels and <c>:target</c> forces the Code panel forward for <c>#L{n}</c> deep
     /// links. The radio group name is per-page unique so several code pages consolidated into one document
     /// (SPA/webview capture) don't cross-wire their tabs.</summary>
-    private static void AppendTabs(StringBuilder sb, string outputRelativePath, string insightsPanel, string sourcePanel)
+    private static void AppendTabs(StringBuilder sb, string outputRelativePath, IReadOnlyList<CodeTab> tabs)
     {
         var group = PathUtil.Html(TabGroupName(outputRelativePath));
         sb.Append("<div class=\"code-tabs\">\n");
         sb.Append("  <fieldset class=\"code-tablist\">\n");
         sb.Append("    <legend class=\"sr-only\">Choose a view for this file</legend>\n");
-        sb.Append($"    <label class=\"code-tab code-tab--insights\"><input type=\"radio\" class=\"code-tab-input\" name=\"{group}\" checked><span>Insights</span></label>\n");
-        sb.Append($"    <label class=\"code-tab code-tab--source\"><input type=\"radio\" class=\"code-tab-input\" name=\"{group}\"><span>Code</span></label>\n");
+        for (var i = 0; i < tabs.Count; i++)
+        {
+            var tab = tabs[i];
+            var check = i == 0 ? " checked" : "";
+            sb.Append(
+                $"    <label class=\"code-tab code-tab--{tab.Mod}\"><input type=\"radio\" class=\"code-tab-input\" name=\"{group}\"{check}>" +
+                $"{Icons.ForCodeTab(tab.Label)}<span>{tab.Label}</span></label>\n");
+        }
         sb.Append("  </fieldset>\n");
-        sb.Append("  <div class=\"code-tabpanel code-tabpanel--insights\">\n");
-        sb.Append(insightsPanel);
-        sb.Append("  </div>\n");
-        sb.Append("  <div class=\"code-tabpanel code-tabpanel--source\">\n");
-        sb.Append(sourcePanel);
-        sb.Append("  </div>\n");
+        foreach (var tab in tabs)
+        {
+            sb.Append($"  <div class=\"code-tabpanel code-tabpanel--{tab.Mod}\">\n");
+            sb.Append(tab.Panel);
+            sb.Append("  </div>\n");
+        }
         sb.Append("</div>\n\n");
     }
 
-    /// <summary>Assembles the insights view: the "Referenced by" relationship graph as a card, followed by the opt-in
-    /// advanced-coverage panels (<paramref name="coverage"/>). Returns empty when there is nothing to show (uncited
-    /// and no insight) so the caller drops the tabs entirely and renders the source full-width.</summary>
-    private static string BuildInsightsPanel(
-        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)>? referencedBy,
-        string coverage)
+    /// <summary>Builds the <em>Insights</em> panel: the opt-in "Advanced coverage" section (Story 7.4) — the file's
+    /// change frequency, file-scoped contributor attribution ("N commits" — never a ranking), and the files it most
+    /// often changes alongside (the coupled-file card, which also appears in the Relationships panel per owner
+    /// decision). The reference graph and the change-history table are NOT here — they own the Relationships and
+    /// History tabs. Returns empty when the insight is null or carries no frequency/contributors/coupled data, so the
+    /// caller drops the tab entirely; a null insight leaves the page byte-identical to a run without --deep-git.</summary>
+    private static string BuildInsightsPanel(string prefix, FileInsight? insight, Func<string, string?>? coupledFileHref)
     {
-        var hasRefs = referencedBy is { Count: > 0 };
-        if (!hasRefs && coverage.Length == 0) return "";
+        if (insight is null) return "";
 
-        var sb = new StringBuilder();
-        if (hasRefs)
-        {
-            sb.Append("<div class=\"insight-panels\">\n");
-            sb.Append(BuildRelationshipsCard(prefix, repoRelativePath, referencedBy!));
-            sb.Append("</div>\n");
-        }
-        sb.Append(coverage);
-        return sb.ToString();
-    }
-
-    /// <summary>Renders the opt-in "Advanced coverage" section (Story 7.4): the file's change frequency, file-scoped
-    /// contributor attribution ("N commits" — never a ranking), the files it most often changes alongside (guarded
-    /// links to their code pages), and a bounded newest-first change history (each row's hash a guarded link to its
-    /// per-commit page). Neutral chart tokens, no JS, everything escaped (author names / subjects / paths / hashes
-    /// are free-text injection surfaces). Empty sub-parts are omitted (no empty heading); a fully-empty insight
-    /// renders nothing so a later refactor can't leak a hollow section.</summary>
-    private static string BuildCoverageSection(
-        string prefix, FileInsight insight, Func<string, string?>? coupledFileHref, Func<string, string?>? commitHref)
-    {
         var hasContributors = insight.Contributors.Count > 0;
         var hasCoupled = insight.CoupledFiles.Count > 0;
-        var hasHistory = insight.History.Count > 0;
-        // A file with an insight but no change count and no sub-parts has nothing to say — omit the whole section.
-        if (insight.ChangeCount == 0 && !hasContributors && !hasCoupled && !hasHistory)
+        // A file with an insight but no change count and no sub-parts (history lives elsewhere now) has nothing to say.
+        if (insight.ChangeCount == 0 && !hasContributors && !hasCoupled)
         {
             return string.Empty;
         }
@@ -173,8 +177,8 @@ public static class CodeFileTemplater
         sb.Append("<section class=\"code-insights\" aria-labelledby=\"advanced-coverage\">\n");
         sb.Append("  <h2 id=\"advanced-coverage\">Advanced coverage</h2>\n");
 
-        // Each git signal is its own bordered child panel, laid out in a responsive grid — no wrapper card, no
-        // explanatory preamble; the panel headings carry the meaning.
+        // Each git signal is its own bordered child panel, laid out in a responsive grid — no explanatory preamble;
+        // the panel headings carry the meaning.
         sb.Append("  <div class=\"insight-panels\">\n");
 
         // Change frequency — always shown when the section renders (the anchoring "how often" signal).
@@ -195,64 +199,108 @@ public static class CodeFileTemplater
                     $"<span class=\"contributor-count\">{commits.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(commits, "commit", "commits")}</span></li>\n");
             }
             sb.Append("      </ul>\n");
+            // Disclose truncation rather than let a capped top-N list read as the complete contributor set.
+            var moreContributors = insight.TotalContributors - insight.Contributors.Count;
+            if (moreContributors > 0)
+            {
+                sb.Append($"      <p class=\"code-insight-more\">+{moreContributors.ToString(CultureInfo.InvariantCulture)} more {Charts.Plural(moreContributors, "contributor", "contributors")}</p>\n");
+            }
             sb.Append("    </section>\n");
         }
 
-        if (hasCoupled)
-        {
-            sb.Append("    <section class=\"insight-panel code-insight-block\">\n");
-            sb.Append("      <h3>Often changed with</h3>\n");
-            sb.Append("      <ul class=\"code-insight-coupled\">\n");
-            foreach (var (path, coChanges) in insight.CoupledFiles)
-            {
-                var pathHtml = PathUtil.Html(PathUtil.NormalizeSlashes(path));
-                var target = coupledFileHref?.Invoke(path);
-                var nameCell = target is { Length: > 0 }
-                    ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(target))}\">{pathHtml}</a>"
-                    : $"<code>{pathHtml}</code>";
-                sb.Append(
-                    $"        <li>{nameCell} <span class=\"coupled-count\">{coChanges.ToString(CultureInfo.InvariantCulture)}&times;</span></li>\n");
-            }
-            sb.Append("      </ul>\n");
-            sb.Append("    </section>\n");
-        }
+        sb.Append(BuildCoupledCard(prefix, insight, coupledFileHref));
 
         sb.Append("  </div>\n");
+        sb.Append("</section>\n");
+        return sb.ToString();
+    }
 
-        if (hasHistory)
+    /// <summary>Builds the <em>Relationships</em> panel: the "Referenced by" reference graph (what cites this file)
+    /// as its card, followed by the same coupled-file card the Insights panel carries (owner decision: coupled files
+    /// are a relationship signal that lives in <em>both</em> tabs). Both cards share one responsive grid. Returns
+    /// empty when there is neither a graph (uncited) nor a coupled card, so the caller drops the tab.</summary>
+    private static string BuildRelationshipsPanel(
+        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)>? referencedBy,
+        FileInsight? insight, Func<string, string?>? coupledFileHref)
+    {
+        var hasRefs = referencedBy is { Count: > 0 };
+        var coupledCard = insight is null ? "" : BuildCoupledCard(prefix, insight, coupledFileHref);
+        if (!hasRefs && coupledCard.Length == 0) return "";
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"insight-panels\">\n");
+        if (hasRefs) sb.Append(BuildRelationshipsCard(prefix, repoRelativePath, referencedBy!));
+        sb.Append(coupledCard);
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The "Often changed with" coupled-file card (Story 7.4) — one bordered <c>.insight-panel</c> listing
+    /// the files that most often change alongside this one, each a guarded link to its <c>code/…html</c> page (null
+    /// resolution → plain <c>&lt;code&gt;</c>, never a dead link). Rendered in BOTH the Insights and Relationships
+    /// panels (owner decision), so it is factored out here to stay identical in both. Empty when there are no coupled
+    /// files. Paths are escaped (a free-text injection surface).</summary>
+    private static string BuildCoupledCard(string prefix, FileInsight insight, Func<string, string?>? coupledFileHref)
+    {
+        if (insight.CoupledFiles.Count == 0) return "";
+
+        var sb = new StringBuilder();
+        sb.Append("    <section class=\"insight-panel code-insight-block\">\n");
+        sb.Append("      <h3>Often changed with</h3>\n");
+        sb.Append("      <ul class=\"code-insight-coupled\">\n");
+        foreach (var (path, coChanges) in insight.CoupledFiles)
         {
-            sb.Append("  <section class=\"insight-panel code-insight-history\">\n");
-            sb.Append("    <h3>Change history</h3>\n");
-            sb.Append("    <div class=\"table-scroll\">\n");
-            sb.Append("    <table class=\"code-history-table\">\n");
-            sb.Append("      <caption>Recent commits that changed this file, newest first.</caption>\n");
-            sb.Append("      <thead>\n        <tr>\n");
-            sb.Append("          <th scope=\"col\">Date</th>\n");
-            sb.Append("          <th scope=\"col\">Commit</th>\n");
-            sb.Append("          <th scope=\"col\">Author</th>\n");
-            sb.Append("          <th scope=\"col\">Summary</th>\n");
-            sb.Append("        </tr>\n      </thead>\n      <tbody>\n");
-            foreach (var touch in insight.History)
-            {
-                var hashHtml = PathUtil.Html(touch.ShortHash);
-                var target = commitHref?.Invoke(touch.ShortHash);
-                var hashCell = target is { Length: > 0 }
-                    ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(target))}\"><code>{hashHtml}</code></a>"
-                    : $"<code>{hashHtml}</code>";
-                var dateCell = touch.Date is { } d ? PathUtil.Html(Charts.D(d)) : "&mdash;";
-                var subject = touch.Subject.Length == 0 ? "(no subject)" : touch.Subject;
-                sb.Append("        <tr>\n");
-                sb.Append($"          <td class=\"code-history-date\">{dateCell}</td>\n");
-                sb.Append($"          <td class=\"code-history-hash\">{hashCell}</td>\n");
-                sb.Append($"          <td class=\"code-history-author\">{PathUtil.Html(touch.Author)}</td>\n");
-                sb.Append($"          <td class=\"code-history-subject\">{PathUtil.Html(subject)}</td>\n");
-                sb.Append("        </tr>\n");
-            }
-            sb.Append("      </tbody>\n    </table>\n");
-            sb.Append("    </div>\n");
-            sb.Append("  </section>\n");
+            var pathHtml = PathUtil.Html(PathUtil.NormalizeSlashes(path));
+            var target = coupledFileHref?.Invoke(path);
+            var nameCell = target is { Length: > 0 }
+                ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(target))}\">{pathHtml}</a>"
+                : $"<code>{pathHtml}</code>";
+            sb.Append(
+                $"        <li>{nameCell} <span class=\"coupled-count\">{coChanges.ToString(CultureInfo.InvariantCulture)}&times;</span></li>\n");
         }
+        sb.Append("      </ul>\n");
+        sb.Append("    </section>\n");
+        return sb.ToString();
+    }
 
+    /// <summary>Builds the <em>History</em> panel: the bounded, newest-first change-history table (Story 7.4) — each
+    /// row's hash a guarded link to its per-commit page (null → plain <c>&lt;code&gt;</c>). Everything escaped (author
+    /// names / subjects / hashes are free-text injection surfaces). Returns empty when the insight is null or carries
+    /// no history, so the caller drops the tab.</summary>
+    private static string BuildHistoryPanel(string prefix, FileInsight? insight, Func<string, string?>? commitHref)
+    {
+        if (insight is null || insight.History.Count == 0) return "";
+
+        var sb = new StringBuilder();
+        sb.Append("<section class=\"insight-panel code-insight-history\">\n");
+        sb.Append("  <h2>Change history</h2>\n");
+        sb.Append("  <div class=\"table-scroll\">\n");
+        sb.Append("  <table class=\"code-history-table\">\n");
+        sb.Append("    <caption>Recent commits that changed this file, newest first.</caption>\n");
+        sb.Append("    <thead>\n      <tr>\n");
+        sb.Append("        <th scope=\"col\">Date</th>\n");
+        sb.Append("        <th scope=\"col\">Commit</th>\n");
+        sb.Append("        <th scope=\"col\">Author</th>\n");
+        sb.Append("        <th scope=\"col\">Summary</th>\n");
+        sb.Append("      </tr>\n    </thead>\n    <tbody>\n");
+        foreach (var touch in insight.History)
+        {
+            var hashHtml = PathUtil.Html(touch.ShortHash);
+            var target = commitHref?.Invoke(touch.ShortHash);
+            var hashCell = target is { Length: > 0 }
+                ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(target))}\"><code>{hashHtml}</code></a>"
+                : $"<code>{hashHtml}</code>";
+            var dateCell = touch.Date is { } d ? PathUtil.Html(Charts.D(d)) : "&mdash;";
+            var subject = touch.Subject.Length == 0 ? "(no subject)" : touch.Subject;
+            sb.Append("      <tr>\n");
+            sb.Append($"        <td class=\"code-history-date\">{dateCell}</td>\n");
+            sb.Append($"        <td class=\"code-history-hash\">{hashCell}</td>\n");
+            sb.Append($"        <td class=\"code-history-author\">{PathUtil.Html(touch.Author)}</td>\n");
+            sb.Append($"        <td class=\"code-history-subject\">{PathUtil.Html(subject)}</td>\n");
+            sb.Append("      </tr>\n");
+        }
+        sb.Append("    </tbody>\n  </table>\n");
+        sb.Append("  </div>\n");
         sb.Append("</section>\n");
         return sb.ToString();
     }

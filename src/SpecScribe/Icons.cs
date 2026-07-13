@@ -70,6 +70,20 @@ public static class Icons
         _ => Svg("<path d=\"M8 2.2 12.8 4v4.2c0 3-2.1 4.9-4.8 5.8-2.7-.9-4.8-2.8-4.8-5.8V4Z\"/>"),
     };
 
+    /// <summary>One glyph per code-file-page tab (Story 7.x tab split): the four view labels the code page's tab
+    /// strip emits — "Insights" (a lightbulb: what the file <em>means</em>), "Relationships" (a node-link/share
+    /// mark: what refers to it), "History" (a clock with a rewind arc: how it changed over time), and "Code" (angle
+    /// brackets: the source itself). Decorative like every other icon — each tab keeps its visible text label, so an
+    /// unrecognized label gracefully returns an empty string and the tab renders label-only.</summary>
+    public static string ForCodeTab(string label) => label switch
+    {
+        "Insights" => Svg("<path d=\"M8 2.2a3.6 3.6 0 0 0-2.2 6.4c.5.4.8 1 .9 1.6h2.6c.1-.6.4-1.2.9-1.6A3.6 3.6 0 0 0 8 2.2Z\"/><path d=\"M6.4 12.2h3.2M7 13.6h2\"/>"),
+        "Relationships" => Svg("<circle cx=\"4\" cy=\"8\" r=\"1.7\"/><circle cx=\"12\" cy=\"4.2\" r=\"1.7\"/><circle cx=\"12\" cy=\"11.8\" r=\"1.7\"/><path d=\"M5.5 7.2 10.5 4.8M5.5 8.8 10.5 11.2\"/>"),
+        "History" => Svg("<path d=\"M2.8 8a5.2 5.2 0 1 1 1.6 3.75\"/><path d=\"M2.4 11.6 2.4 9 5 9\"/><path d=\"M8 5.2V8l2 1.3\"/>"),
+        "Code" => Svg("<path d=\"M5.6 4 2.2 8l3.4 4\"/><path d=\"M10.4 4 13.8 8l-3.4 4\"/><path d=\"M9.2 3.2 6.8 12.8\"/>"),
+        _ => string.Empty,
+    };
+
     /// <summary>Wraps glyph markup in the shared decorative-icon shell: <c>aria-hidden</c>/<c>focusable="false"</c>
     /// (the text label carries the meaning), the <c>ss-icon</c> css hook for sizing, and <c>currentColor</c>
     /// stroke/fill so every icon inherits the surrounding label/badge color — never a hard-coded hex.</summary>

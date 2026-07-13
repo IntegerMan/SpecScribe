@@ -309,6 +309,160 @@ public class CodeFileTemplaterTests
         Assert.DoesNotContain("code-history-table", html);
     }
 
+    [Fact]
+    public void RenderPage_Insight_DisclosesTruncatedContributorList()
+    {
+        // Shown list is capped at 2, but TotalContributors (12) says the file really has 12 — the page must not
+        // let the capped list read as complete (code review addition, mirrors FileChangeStat.TotalContributors).
+        var insight = new FileInsight(
+            ChangeCount: 12,
+            Contributors: new[] { ("Alice", 5), ("Bob", 4) },
+            CoupledFiles: Array.Empty<(string, int)>(),
+            History: Array.Empty<CommitTouch>(),
+            TotalContributors: 12);
+
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
+
+        Assert.Contains("+10 more contributors", html);
+    }
+
+    [Fact]
+    public void RenderPage_Insight_OmitsMoreContributorsNoteWhenListIsComplete()
+    {
+        // TotalContributors equals the shown count (or is unset/default) — nothing was truncated, so no note.
+        var insight = new FileInsight(
+            ChangeCount: 2,
+            Contributors: new[] { ("Alice", 2) },
+            CoupledFiles: Array.Empty<(string, int)>(),
+            History: Array.Empty<CommitTouch>(),
+            TotalContributors: 1);
+
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
+
+        Assert.DoesNotContain("code-insight-more", html);
+    }
+
+    // ---- Tab split: Insights | Relationships | History | Code, each iconed ----
+
+    [Fact]
+    public void RenderPage_FullData_RendersFourIconedTabsWithInsightsDefault()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // Four tabs, in order, each with its modifier + a visible text label.
+        foreach (var (mod, label) in new[] { ("insights", "Insights"), ("relationships", "Relationships"), ("history", "History"), ("source", "Code") })
+        {
+            Assert.Contains($"code-tab code-tab--{mod}", html);
+            Assert.Contains($"code-tabpanel code-tabpanel--{mod}", html);
+            Assert.Contains($"<span>{label}</span>", html);
+        }
+
+        // Each tab carries a decorative icon before its label — count within the tablist only (the reference graph
+        // renders its own node icons elsewhere in the page).
+        var tablist = Between(html, "code-tablist", "</fieldset>");
+        Assert.Equal(4, CountOccurrences(tablist, "class=\"ss-icon\""));
+
+        // Insights is the first tab and the only one checked (leads by default).
+        var insightsTab = html.IndexOf("code-tab--insights", StringComparison.Ordinal);
+        var relTab = html.IndexOf("code-tab--relationships", StringComparison.Ordinal);
+        Assert.True(insightsTab >= 0 && insightsTab < relTab, "Insights must be the first tab");
+        // Structural: exactly one radio carries the checked attribute (matching the input's closing bracket avoids
+        // false hits on fixture text — an author or path containing the word "checked").
+        Assert.Equal(1, CountOccurrences(html, " checked>"));
+        // The checked attribute sits on the Insights radio (before the relationships tab appears).
+        var checkedIndex = html.IndexOf("checked", StringComparison.Ordinal);
+        Assert.True(checkedIndex > insightsTab && checkedIndex < relTab, "the checked radio must be the Insights tab");
+    }
+
+    [Fact]
+    public void RenderPage_Graph_LivesInRelationshipsTabOnly_NotInsights()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // The reference graph section renders exactly once, inside the relationships panel.
+        Assert.Equal(1, CountOccurrences(html, "<section class=\"code-relationships\">"));
+        var insightsPanel = Between(html, "code-tabpanel--insights", "code-tabpanel--relationships");
+        var relPanel = Between(html, "code-tabpanel--relationships", "code-tabpanel--history");
+        Assert.DoesNotContain("code-relationships", insightsPanel);
+        Assert.DoesNotContain("ref-graph", insightsPanel);
+        Assert.Contains("code-relationships", relPanel);
+        Assert.Contains("ref-graph", relPanel);
+    }
+
+    [Fact]
+    public void RenderPage_History_LivesInHistoryTabOnly_NotInsights()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // The history table renders exactly once, inside the history panel — not in Insights.
+        Assert.Equal(1, CountOccurrences(html, "code-history-table"));
+        var insightsPanel = Between(html, "code-tabpanel--insights", "code-tabpanel--relationships");
+        var historyPanel = Between(html, "code-tabpanel--history", "code-tabpanel--source");
+        Assert.DoesNotContain("code-history-table", insightsPanel);
+        Assert.Contains("code-history-table", historyPanel);
+        Assert.Contains("Change history", historyPanel);
+    }
+
+    [Fact]
+    public void RenderPage_CoupledCard_AppearsInBothInsightsAndRelationships()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // "Often changed with" (coupled files) is a relationship signal that owner-decision places in BOTH tabs.
+        Assert.Equal(2, CountOccurrences(html, "Often changed with"));
+        var insightsPanel = Between(html, "code-tabpanel--insights", "code-tabpanel--relationships");
+        var relPanel = Between(html, "code-tabpanel--relationships", "code-tabpanel--history");
+        Assert.Contains("Often changed with", insightsPanel);
+        Assert.Contains("Often changed with", relPanel);
+    }
+
+    [Fact]
+    public void RenderPage_RefsOnlyNoInsight_ShowsRelationshipsAndCodeWithRelationshipsDefault()
+    {
+        // No deep-git insight → no Insights tab and no History tab. Relationships leads (first surviving tab).
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+
+        Assert.Contains("code-tab--relationships", html);
+        Assert.Contains("code-tab--source", html);
+        Assert.DoesNotContain("code-tab--insights", html);
+        Assert.DoesNotContain("code-tab--history", html);
+        // Exactly one checked radio, and it is the (leading) relationships tab.
+        // Structural: exactly one radio carries the checked attribute (matching the input's closing bracket avoids
+        // false hits on fixture text — an author or path containing the word "checked").
+        Assert.Equal(1, CountOccurrences(html, " checked>"));
+        var relTab = html.IndexOf("code-tab--relationships", StringComparison.Ordinal);
+        var checkedIndex = html.IndexOf("checked", StringComparison.Ordinal);
+        var sourceTab = html.IndexOf("code-tab--source", StringComparison.Ordinal);
+        Assert.True(checkedIndex > relTab && checkedIndex < sourceTab, "relationships must be the default-checked tab");
+    }
+
+    [Fact]
+    public void RenderPage_Uncited_NoInsight_RendersNoTabChrome()
+    {
+        // Only the source has content → no tabs at all; the source spans full width exactly as pre-tab.
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav());
+
+        Assert.DoesNotContain("code-tabs", html);
+        Assert.DoesNotContain("code-tablist", html);
+        Assert.Contains("<section class=\"code-source-section\"", html);
+    }
+
+    /// <summary>The HTML slice between the first occurrence of <paramref name="startMarker"/> and the next occurrence
+    /// of <paramref name="endMarker"/> — a coarse but reliable way to assert which tab panel a fragment lands in,
+    /// since the panels render as ordered siblings.</summary>
+    private static string Between(string html, string startMarker, string endMarker)
+    {
+        var start = html.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"marker not found: {startMarker}");
+        var end = html.IndexOf(endMarker, start, StringComparison.Ordinal);
+        if (end < 0) end = html.Length;
+        return html[start..end];
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;
