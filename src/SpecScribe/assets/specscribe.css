@@ -526,12 +526,36 @@ pre.code-file code {
   font-style: italic;
 }
 
-/* Story 7.1 (rework) — the relationships block is the hero of a code page: a hub-and-spoke reference graph plus a
-   full-title list of the artifacts that cite this file. Neutral ink/border/parchment/gold tokens only — the
-   --status-* lifecycle tokens are off-limits on code surfaces (same rule as .code-file). */
+/* Story 7.1 (rework) — a code page is a centered column with comfortable side gutters (this synthesized page has no
+   markdown .doc-body of its own to supply them, so content otherwise ran to the window edge), laid out as two
+   columns: the relationships graph on the left, the source on the right. Neutral ink/border/parchment/gold tokens
+   only — the --status-* lifecycle tokens are off-limits on code surfaces (same rule as .code-file). */
+.code-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2.5rem;
+}
+
+/* Graph beside code. The aside is a sticky sidebar so a tall file scrolls past a still-visible graph; min-width:0 on
+   the source column lets its <pre> shrink and scroll internally instead of blowing out the grid. */
+.code-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+  margin-top: 1.5rem;
+}
+
+.code-aside {
+  position: sticky;
+  top: 5rem;
+  align-self: start;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
 .code-relationships {
-  margin: 1.5rem 0 2rem;
-  padding: 1.25rem 1.4rem;
+  padding: 1.1rem 1.2rem;
   border: 1px solid var(--border);
   border-left: 3px solid var(--gold);
   border-radius: 6px;
@@ -540,27 +564,39 @@ pre.code-file code {
 
 .code-relationships > h2 {
   margin: 0 0 0.3rem;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--ink-light);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .code-relationships-note {
-  margin: 0 0 0.75rem;
-  font-size: 0.85rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
   color: var(--ink-light);
 }
 
-/* The graph can be wider than the column on a heavily-cited file — scroll it inside its own box, never the page. */
 .ref-graph-wrap {
-  overflow-x: auto;
   text-align: center;
 }
 
 .ref-graph {
   max-width: 100%;
   height: auto;
+}
+
+/* Visually-hidden but present for assistive tech and keyboard use (the graph <svg role="img"> exposes only its
+   summary label). The standard clip-rect technique — off-screen without display:none, so it stays in the a11y tree. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .ref-edge {
@@ -614,55 +650,41 @@ pre.code-file code {
   outline-offset: 2px;
 }
 
-/* Full-title equivalent of the graph (graph labels are compact): always present for screen readers and no-image
-   contexts, and where the complete artifact titles live. Two columns when there's room. */
-.ref-list {
-  margin: 0.75rem 0 0;
-  padding-left: 1.2rem;
-  columns: 2 16rem;
-  column-gap: 2rem;
-}
-
-.ref-list li {
-  margin: 0.2rem 0;
-  color: var(--ink);
-  break-inside: avoid;
-}
-
-/* Source is secondary supporting detail on a code page — a muted section label under the relationships graph. */
+/* Source is secondary supporting detail — the right column. min-width:0 lets the <pre> shrink and scroll internally
+   (see .code-layout) instead of forcing the whole grid wider. */
 .code-source-section {
-  margin-top: 1.5rem;
-}
-
-.code-source-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .code-source-head h2 {
-  margin: 0;
+  margin: 0 0 0.4rem;
   font-size: 0.85rem;
   color: var(--ink-light);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
-/* Story 7.7 — additive "view online" link to the same file on its hosting platform (never replaces the page). */
+/* Story 7.7 — additive "view online" action in the sidebar, below the graph. A full-width pill button with the host
+   mark so it's an obvious jump-off to the canonical source, and it stays in view with the sticky aside. */
+.code-actions {
+  margin-top: 1rem;
+}
+
 .code-external-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.7rem;
-  font-size: 0.82rem;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--parchment);
   color: var(--ink);
   text-decoration: none;
-  white-space: nowrap;
+}
+
+.code-external-link .host-icon {
+  flex: none;
 }
 
 .code-external-link:hover,
@@ -671,8 +693,18 @@ pre.code-file code {
   color: var(--gold-dark, var(--gold));
 }
 
-.code-external-standalone {
-  margin: 1rem 0;
+/* Below the two-column breakpoint: stack (graph on top, source below), and release the sticky/height cap so the
+   sidebar flows naturally above the code. */
+@media (max-width: 900px) {
+  .code-layout {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .code-aside {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 /* Every markdown-generated table carries .md-table (see MarkdownConverter.TagTables), so this styles
@@ -2377,6 +2409,37 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .commit-hash-link { text-decoration: none; }
 .commit-hash-link:hover .commit-hash { text-decoration: underline; }
 .commit-hash-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
+/* ====================== ACTIVITY TIMELINE (timeline.html) & DATE-PAGE ARTIFACTS (Story 7.3) ======================
+   Neutral chart/ink tokens only — never --status-* lifecycle colors: activity is not a backlog/ready/done status. */
+
+/* "Artifacts updated" section on a date page: the read-only filesystem-mtime signal, one link per changed artifact. */
+.artifacts-updated { margin-top: 1.4rem; }
+.artifacts-updated h2 { font-size: 0.95rem; color: var(--ink-light); margin: 0 0 0.5rem; }
+.artifact-update-list { list-style: none; margin: 0; padding: 0; }
+.artifact-update-list li { padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
+.artifact-update-list li:last-child { border-bottom: none; }
+.artifact-update-list a { color: var(--teal); text-decoration: none; }
+.artifact-update-list a:hover { color: var(--rust); text-decoration: underline; }
+.artifact-update-list a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
+/* The timeline page: a heatmap panel over a newest-first dated list. */
+.timeline-heatmap { overflow-x: auto; } /* a wide heatmap scrolls inside its own container, never the page body */
+.timeline-list { list-style: none; margin: 1.2rem 0 0; padding: 0; }
+.timeline-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.9rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.timeline-row:last-child { border-bottom: none; }
+.timeline-date { color: var(--teal); text-decoration: none; font-weight: bold; font-size: 0.92rem; }
+.timeline-date:hover { color: var(--rust); text-decoration: underline; }
+.timeline-date:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+.timeline-summary { color: var(--ink-light); font-size: 0.82rem; }
+.timeline-empty { color: var(--ink-light); font-style: italic; }
 
 /* ============ PER-COMMIT DETAIL PAGE (Story 7.5) ============
    Neutral tokens only (ink / border / parchment family) — never --status-* lifecycle colors: a commit page is

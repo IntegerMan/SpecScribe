@@ -1,10 +1,10 @@
 ---
-baseline_commit: 279d27e230ff391ce9f73bb1e438ca24775ceaa4
+baseline_commit: 2d9ae3544fef07edf7baf0b3936651dee5e7edc8
 ---
 
 # Story 7.3: Activity Timeline and Date Pages
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -229,29 +229,30 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Artifact-timestamp day map (AC: #1, #2)**
-  - [ ] In `SiteGenerator`, widen the mtime gather beyond canonical families: stat every *recognized* source artifact (one that resolves to a generated page via the reference map), `File.GetLastWriteTime` → `DateOnly`, future-skew-clamped to `today`, never-throw per file.
-  - [ ] Build `artifactsByDay: IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>>` mapping each source path to its output page (reuse `BuildReferenceMap`/`ResolveFamilyHref`). Keep the grouping logic in a pure, testable helper.
-- [ ] **Task 2 — Union day set + generalized date pages (AC: #1, #2)**
-  - [ ] Compute the date-page day set = `LinkedCommitDays(...)` ∪ `artifactsByDay.Keys`, ascending, `<= today`.
-  - [ ] Rename `GenerateCommitDaysInternal` → `GenerateDatePagesInternal`; iterate the union with prev/next across the union; pass each day's commits (maybe empty) + artifacts (maybe empty) + `commitPageExists`. Preserve wipe/recreate `commits/`, `ApplyReferenceLinks`, per-page try/catch, entry recording.
-  - [ ] Extend/generalize `CommitDayEntry` → date-page entry so the timeline + tests can enumerate generated pages.
-- [ ] **Task 3 — Date-page templater enrichment (AC: #2)**
-  - [ ] Extend `CommitDayTemplater.RenderPage`: commit list only when non-empty; new "Artifacts updated" section (links to artifact pages) only when non-empty; neutral heading for artifact-only days; keep the a11y shell + prev/next.
-  - [ ] Guarded per-commit hash link: `<a href="{prefix}commit/{shortHash}.html">` when `commitPageExists(hash)`, else plain `<code>`. Add nullable `_commitPages` set (empty default) in the generator for 7.5 to populate.
-- [ ] **Task 4 — Timeline surface (AC: #1)**
-  - [ ] Add `TimelineTemplater.RenderPage` (cloned shell): reused `Charts.CommitHeatmap` (git present) over a newest-first dated list, each row linking to its date page with a "N commits · M artifacts updated" summary. Degrade to artifact-only list when git absent.
-  - [ ] Add `SiteNav.TimelineOutputPath`; add `GenerateTimelineInternal` gated on data present; cache `_timelinePath`; add `GenerationPhase.Timeline` + description.
-- [ ] **Task 5 — Discovery / entry point (AC: #1)**
-  - [ ] Dashboard Git Pulse panel "View activity timeline →" link, rendered only when `_timelinePath` is set (mirror the deep-analytics guarded link). Breadcrumb `Home / Timeline` on the page.
-- [ ] **Task 6 — Styling (AC: #1, #2)**
-  - [ ] Add `.timeline`/date-row/artifacts-section styles in `src/SpecScribe/assets/specscribe.css` using neutral tokens (not `--status-*`); wide content scrolls in its own container. Update `StylesheetTests` if it asserts class presence. **No JavaScript.**
-- [ ] **Task 7 — Tests (AC: #1, #2)**
-  - [ ] `TimelineTemplaterTests`: a11y contract, per-day rows + links, newest-first, git-absent fallback, escaping, empty union.
-  - [ ] Date-page tests: guarded hash link (present/absent), artifacts-updated section (present/empty), artifact-only day, escaping.
-  - [ ] Generation-level: timeline exists when data does + dashboard link; union day set (artifact-only day gets a page/row, dead day gets neither); graceful degradation (no git + no artifacts → nothing, no error); determinism; heatmap-link + commit-day regression.
-- [ ] **Task 8 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green. Real generate (default `SpecScribeOutput/`): timeline heatmap + newest-first dated list, each date links to its page, inactive dates absent; date page shows commits + artifacts-updated; dashboard shows "View activity timeline →". Verify graceful degradation with git disabled.
+- [x] **Task 1 — Artifact-timestamp day map (AC: #1, #2)**
+  - [x] In `SiteGenerator`, widen the mtime gather beyond canonical families: stat every *recognized* source artifact (one that resolves to a generated page via the reference map), `File.GetLastWriteTime` → `DateOnly`, future-skew-clamped to `today`, never-throw per file. (`BuildArtifactsByDay` over `_referenceMap`.)
+  - [x] Build `artifactsByDay: IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>>` mapping each source path to its output page (reuses the cached `_referenceMap`). Grouping is the pure, testable `ActivityModel.GroupArtifactsByDay`; label = the artifact H1 title (fallback: file stem).
+- [x] **Task 2 — Union day set + generalized date pages (AC: #1, #2)**
+  - [x] Compute the date-page day set = `LinkedCommitDays(...)` ∪ `artifactsByDay.Keys`, ascending, `<= today` (pure `ActivityModel.UnionDays`).
+  - [x] Renamed `GenerateCommitDaysInternal` → `GenerateDatePagesInternal`; iterates the union with prev/next across the union; passes each day's commits (maybe empty) + artifacts (maybe empty) + the `CommitHref` resolver. Preserves wipe/recreate `commits/`, `ApplyReferenceLinks`, per-page try/catch, entry recording.
+  - [x] `CommitDayEntry (Date, OutputRelativePath)` already captures the day + path — reused (not renamed) so the generator can enumerate every generated date page.
+- [x] **Task 3 — Date-page templater enrichment (AC: #2)**
+  - [x] Extended `CommitDayTemplater.RenderPage`: commit list only when non-empty; new "Artifacts updated" section (links to artifact pages) only when non-empty; neutral "Activity on {date}" heading for artifact-only days; a11y shell + prev/next preserved; commit-bearing/no-artifact days stay byte-identical.
+  - [x] Guarded per-commit hash link: **already implemented by Story 7.5** (`CommitHref` resolver + `_commitPages`, both merged) — reused, not rebuilt. Link when a `commit/{hash}.html` page exists, plain `<code>` otherwise.
+- [x] **Task 4 — Timeline surface (AC: #1)**
+  - [x] Added `TimelineTemplater.RenderPage`: reused `Charts.CommitHeatmap` (git present) over a newest-first dated list, each row linking to its date page with a "N commits &middot; M artifacts updated" summary. Degrades to the artifact-only list when git absent; friendly note on empty union.
+  - [x] Added `SiteNav.TimelineOutputPath`; `GenerateTimelineInternal` gated on data present; cached `_timelinePath`; `GenerationPhase.Timeline` + description.
+- [x] **Task 5 — Discovery / entry point (AC: #1)**
+  - [x] Dashboard Git Pulse panel "View activity timeline →" link, rendered only when `_timelinePath` is set, threaded via `DashboardView.HasTimeline` (so HTML/webview/SPA stay in parity). Breadcrumb `Home / Timeline` on the page.
+- [x] **Task 6 — Styling (AC: #1, #2)**
+  - [x] Added `.timeline-*`/`.artifacts-updated`/`.artifact-update-list` styles in `src/SpecScribe/assets/specscribe.css` using neutral tokens (not `--status-*`); the heatmap scrolls in its own `overflow-x` container. No JavaScript. (`StylesheetTests` asserts no class presence for these.)
+- [x] **Task 7 — Tests (AC: #1, #2)**
+  - [x] `ActivityModelTests` (pure): grouping ordering/dedup, union distinct-ascending, artifact-only days.
+  - [x] `TimelineTemplaterTests`: a11y contract, per-day rows + links, newest-first, git-absent fallback (no heatmap), empty union note.
+  - [x] `CommitDayTemplaterTests` (date-page): guarded hash link (present/absent), artifacts-updated section (present/empty), artifact-only day (neutral heading, no commit list), escaping.
+  - [x] Generation-level `SiteGeneratorTimelineTests`: timeline exists when data does + dashboard link; union day set (artifact-only day gets a page/row, dead day gets neither); graceful degradation (no epics/artifacts + no git → nothing, no error); determinism; heatmap-link + commit-day regression. Golden inventory/fingerprint + one 7.5 test updated for the new artifact-driven pages.
+- [x] **Task 8 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green (901 passed). Real generate against this repo (`SpecScribeOutput/`): timeline heatmap + newest-first dated list (9 active dates), each date links to an existing date page, inactive dates absent; date page shows commits + artifacts-updated; hashes plain `<code>` (deep-git off); dashboard shows "View activity timeline →". Graceful degradation (git absent / no artifacts) covered by `SiteGeneratorTimelineTests`.
 
 ## Dev Notes
 
@@ -289,8 +290,49 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Code, dev-story workflow)
+
 ### Debug Log References
+
+- **Concurrent-work hazard at start:** the working tree had uncommitted edits from a separate `spec-webview-doc-page-surfaces` effort touching `SiteGenerator.cs` (line numbers shifted mid-read). Halted and surfaced to the owner; owner cleared/committed it (HEAD moved `279d27e` → `2d9ae35`, +2 commits: whole-site webview surfaces + code-browsing enhancements). Reset `baseline_commit` to `2d9ae35` so the review diff scopes to 7.3.
+- **Story 7.5 already merged:** those two commits landed Story 7.5's per-commit machinery (`GenerateCommitDetailsInternal`, `_commitPages`, the `CommitHref` resolver already threaded into `CommitDayTemplater.RenderPage`). The guarded per-commit hash link 7.3 planned to build already existed — reused it instead of rebuilding.
+- **Blast radius from the always-on artifact signal:** because the artifact-mtime timeline fires even without git, every fixture with source artifacts now also emits `timeline.html` + a date page + the dashboard link. Fixed the fallout: 7.5's flag-off test (artifact-only day legitimately has no commit hash), and the two golden tests (`GoldenOutputInventory` + `GoldenContentFingerprint`) — the date-stamped `commits/{today}.html` is inherently daily-volatile, so added a today-date fold (ISO + readable) to keep the golden date-stable; regenerated the fingerprint constant to `1a54b789…`.
+- **Middot escaping:** the timeline summary joined parts with a raw `·`, which `WebUtility.HtmlEncode` turned into `&#183;`; switched to joining escaped parts with the literal `&middot;` (matching the heatmap headline convention).
 
 ### Completion Notes List
 
+- Net-new code is small, per the story's reuse mandate: two pure helpers (`ActivityModel.GroupArtifactsByDay`/`UnionDays`), one templater (`TimelineTemplater`), one generator gather (`BuildArtifactsByDay`) + phase (`GenerateTimelineInternal`), and the generalization of the commit-day page/phase into date pages. The heatmap, day-set helper (`LinkedCommitDays`), git pulse, and the `CommitHref`/`_commitPages` guard were all reused.
+- **One day-set source of truth:** `ActivityModel.UnionDays(LinkedCommitDays(...), artifactsByDay.Keys)` drives the generated date pages, the timeline list, and prev/next — so no surface can link a day with no page (verified live: all 9 timeline rows resolve to existing pages).
+- **Baseline, not deep-git:** the artifact half is filesystem mtimes over `_referenceMap`; the commit half is the existing pulse. No second git call, no numstat. Per-commit hash links stay plain until `--deep-git` populates `_commitPages` (verified: deep-git off → plain `<code>` hashes).
+- **Graceful degradation:** no git → artifact-driven timeline/date pages, no heatmap; no epics/artifacts + no git → no timeline, no `commits/` dir, no dashboard link, no error (both covered by `SiteGeneratorTimelineTests`).
+- **Parity-safe dashboard link:** `HasTimeline` lives on the shared `DashboardView`, so HTML/webview/SPA render identically; the generator passes `_timelinePath is not null` to all three index call sites. Byte-identical for the pre-existing deep-git-only header case (default `HasTimeline == false`).
+- Neutral tokens only, pure SVG + native links/lists, no JavaScript. 901 tests green.
+
 ### File List
+
+**New:**
+- `src/SpecScribe/ActivityModel.cs`
+- `src/SpecScribe/TimelineTemplater.cs`
+- `tests/SpecScribe.Tests/ActivityModelTests.cs`
+- `tests/SpecScribe.Tests/TimelineTemplaterTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorTimelineTests.cs`
+
+**Modified:**
+- `src/SpecScribe/CommitDayTemplater.cs` — generalized to a date-page templater (artifacts section, neutral heading, commits-optional; commit-bearing/no-artifact days byte-identical).
+- `src/SpecScribe/SiteGenerator.cs` — `BuildArtifactsByDay`, `ArtifactLabel`, `GenerateDatePagesInternal` (was `GenerateCommitDaysInternal`, now union-driven), `GenerateTimelineInternal`, `_timelinePath` + empty-map fields; index call sites pass `HasTimeline`.
+- `src/SpecScribe/SiteNav.cs` — `TimelineOutputPath` constant.
+- `src/SpecScribe/GenerationReporter.cs` — `GenerationPhase.Timeline` + descriptions.
+- `src/SpecScribe/DashboardView.cs` — `HasTimeline` property.
+- `src/SpecScribe/DashboardViewBuilder.cs` — `hasTimeline` param.
+- `src/SpecScribe/HtmlTemplater.cs` — `hasTimeline` param on `RenderIndex`/`BuildIndexPage`.
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — guarded "View activity timeline →" link in the Git Pulse panel.
+- `src/SpecScribe/assets/specscribe.css` — `.timeline-*` / `.artifacts-updated` styles (neutral tokens).
+- `tests/SpecScribe.Tests/CommitDayTemplaterTests.cs` — new signature + date-page tests.
+- `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs` — flag-off assertion updated for artifact-only day pages.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden inventory + fingerprint updated (today-date fold, +timeline.html + date page, regenerated constant).
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-07-12 | Implemented Story 7.3: activity timeline (`timeline.html`) + generalized date pages (union of commit + artifact-mtime days) with an "Artifacts updated" section, reusing Story 7.5's guarded per-commit hash link. Dashboard "View activity timeline →" link (parity-safe via `DashboardView.HasTimeline`). Pure SVG + links, no JS, neutral tokens, graceful degradation. 901 tests green. Status → review. |

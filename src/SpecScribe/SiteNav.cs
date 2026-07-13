@@ -25,6 +25,13 @@ public sealed class SiteNav
     /// between the generator (writes the file) and the templaters (link to it) so the two can't disagree. [Story 3.8]</summary>
     public const string GitInsightsOutputPath = "git-insights.html";
 
+    /// <summary>The chronological activity timeline page (heatmap + a newest-first list of active dates linking to
+    /// their date pages). Written only when there is activity to show (git history OR artifact-change days); the
+    /// dashboard's Git Pulse panel links here when the page exists. Deliberately NOT a top-nav item — nav is built
+    /// before git is computed, so a nav entry could dangle — reached via the dashboard + breadcrumb instead. Shared
+    /// between the generator (writes the file) and the templaters (link to it) so the two can't disagree. [Story 7.3]</summary>
+    public const string TimelineOutputPath = "timeline.html";
+
     /// <summary>The interactive project/artifact structure tree page. Written only when the source-artifact file
     /// set is non-empty; the nav item and dashboard quick link gate on the same signal so a link is never emitted
     /// to a page that wasn't produced. Shared between the generator (writes the file) and the templater/nav

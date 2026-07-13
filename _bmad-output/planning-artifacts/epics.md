@@ -1390,6 +1390,26 @@ So that readers can reach the canonical, syntax-highlighted source without my ha
 **Then** in-portal code pages are still generated and each gains an additive "view source online" link to the hosted file
 **And** source citations continue to resolve to the in-portal pages — the external base is additive, never a replacement — and the setting is reachable from both the CLI and the interactive menu (NFR7).
 
+### Story 7.8: Related Files in the Reference Graph
+
+As a reviewer exploring a code file,
+I want the file's reference graph to also show the files it most frequently changes alongside,
+So that I can see a file's real neighbourhood — the artifacts that cite it and the code that co-evolves with it — in one view.
+
+**Acceptance Criteria:**
+
+1.
+**Given** deep-git analysis is available (the change-coupling / co-change data SpecScribe already computes)
+**When** a code page's reference graph renders
+**Then** the graph also includes nodes for the files most frequently changed together with this file, visually distinguished from the citing-artifact nodes and linking to those files' code pages
+**And** each related-file node carries a rich tooltip (the file and its co-change strength), and the graph degrades to citations-only when deep-git data is unavailable.
+
+2.
+**Given** the graph now carries both citing-artifact and related-file nodes with tooltips and clickthroughs
+**When** the page renders
+**Then** the graph is the single relationship surface — no redundant visible list duplicating what the nodes already convey
+**And** an accessible text equivalent of every node/link is still present for assistive tech (NFR6/UX-DR16), and node/edge counts stay bounded so a hub file's graph remains legible.
+
 ## Epic 8: Dashboard Command Center — Trustworthy Status at a Glance
 
 Give the Driver an accurate 30-second pulse and a friction-free path to the next unit of work: one canonical status vocabulary everywhere, counts that always agree, progress and workflow state paired, readiness self-explanatory, and state-aware next-step commands. Optimizes the home dashboard for the daily journeys (1–2) defined in docs/UserJourneys.md.

@@ -126,8 +126,9 @@ public class CodeFileTemplaterTests
         Assert.Contains("<title>Story 7.1: In-Portal Code File Browsing</title>", html);
         Assert.Contains(">Story 7.1</text>", html);   // compact ring label (identifier before the colon)
 
-        // The always-present accessible list carries the FULL titles and meaningful link text.
-        Assert.Contains("class=\"ref-list\"", html);
+        // The always-present accessible list carries the FULL titles and meaningful link text — visually hidden
+        // (sr-only) so the visible surface is just the graph, but present in the DOM for assistive tech.
+        Assert.Contains("class=\"ref-list sr-only\"", html);
         Assert.Contains(">Story 7.1: In-Portal Code File Browsing</a>", html);
         Assert.Contains(">Epic 8: Dashboard Command Center</a>", html);
 

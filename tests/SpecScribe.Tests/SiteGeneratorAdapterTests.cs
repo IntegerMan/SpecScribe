@@ -158,8 +158,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         var events = gen.GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
+        // The activity timeline + date pages (Story 7.3) fire on the artifact-mtime signal even without git, so
+        // this fixture now yields timeline.html plus a date page for today (all fixture files share checkout
+        // mtime). The date-stamped filename is folded to a stable placeholder so the golden isn't date-fragile.
+        var todayIso = Charts.D(DateOnly.FromDateTime(DateTime.Now));
         var actual = Directory.EnumerateFiles(Site, "*", SearchOption.AllDirectories)
-            .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)))
+            .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)).Replace(todayIso, "<date>"))
             .OrderBy(p => p, StringComparer.Ordinal)
             .ToList();
 
@@ -172,6 +176,8 @@ public class SiteGeneratorAdapterTests : IDisposable
             // change (this story adds pages + a site-wide footer link), unlike the byte-parity 4.1/4.2 stories.
             "about.html",
             "adrs/index.html",
+            // Story 7.3: artifact-mtime-driven date page (today, folded) + the activity timeline surface.
+            "commits/<date>.html",
             "diagnostics.html",
             "epics.html",
             "epics/epic-1.html",
@@ -189,6 +195,7 @@ public class SiteGeneratorAdapterTests : IDisposable
             "specscribe.js",
             "sprint.html",
             "structure.html",
+            "timeline.html",
         }.OrderBy(p => p, StringComparer.Ordinal).ToList();
 
         Assert.Equal(expected, actual);
@@ -210,10 +217,11 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         var fingerprint = FingerprintTree(Site);
 
-        // Regenerated for Story 7.1 (rework): adds the relationships-graph + secondary-source + external-link
-        // styling to specscribe.css. The output FILE SET is unchanged for this fixture (it has no [Source:]
-        // citations, so no code/ pages), so only the stylesheet bytes moved. [golden-diff-normalization-gotchas]
-        const string expected = "ff6dee84fda9fd5fbab4275115900aaf887688ee14138553622771ee06d42cdc";
+        // Regenerated for Story 7.3: the artifact-mtime activity timeline + date pages now generate for this
+        // fixture (no git, but it has artifacts), adding timeline.html + a date page and the dashboard's "View
+        // activity timeline →" link; today's date is folded to a placeholder so the constant stays date-stable.
+        // [golden-diff-normalization-gotchas]
+        const string expected = "1a54b789956a57a684204f2b507834a81e992d253b97dfc5676e7372007bdb8a";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -238,15 +246,25 @@ public class SiteGeneratorAdapterTests : IDisposable
             .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(root, p)))
             .OrderBy(p => p, StringComparer.Ordinal))
         {
-            sb.Append(rel).Append('\n')
+            sb.Append(FoldToday(rel)).Append('\n')
               .Append(NormalizeVolatile(File.ReadAllText(Path.Combine(root, rel)))).Append("\n \n");
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
     }
 
+    /// <summary>Folds today's date (the ISO filename/href form and the readable heading form) to stable
+    /// placeholders. Story 7.3's artifact-mtime date page + timeline are stamped with the generation date, so
+    /// without this the fingerprint would drift day to day even with no rendering change.</summary>
+    private static string FoldToday(string s)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        return s.Replace(Charts.DReadable(today), "<date-readable>").Replace(Charts.D(today), "<date-iso>");
+    }
+
     private string NormalizeVolatile(string content)
     {
         content = content.Replace("\r\n", "\n");
+        content = FoldToday(content);
         // The diagnostics page prints the ABSOLUTE repo root (a random per-run temp dir, and machine-specific);
         // fold every form of the fixture root to a placeholder so the golden pins rendered content, not the box.
         content = content.Replace(PathUtil.NormalizeSlashes(_root), "<root>").Replace(_root, "<root>");

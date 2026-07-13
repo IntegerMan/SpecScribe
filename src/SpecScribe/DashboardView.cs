@@ -206,4 +206,9 @@ public sealed record DashboardView
     /// <summary>The home index-grid bands (planning / implementation / spec-kernel / unrecognized-folder / ADR /
     /// retro), in render order, fully grouped and classified by the builder.</summary>
     public required IReadOnlyList<IndexBand> IndexBands { get; init; }
+
+    /// <summary>True when the activity-timeline page (<c>timeline.html</c>) was generated, so the Git Pulse
+    /// panel renders the guarded "View activity timeline →" link. Defaults false — the generator sets it from
+    /// its cached <c>_timelinePath</c>, so a link is never emitted to a page that wasn't produced. [Story 7.3]</summary>
+    public bool HasTimeline { get; init; }
 }

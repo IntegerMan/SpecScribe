@@ -135,13 +135,14 @@ development_status:
   epic-6-retrospective: done # retrospective completed 2026-07-12 (epic-6-retro-2026-07-12.md)
 
   epic-7: in-progress
-  7-1-in-portal-code-file-browsing: review # reopened + reworked 2026-07-12: code page is now relationship-first — a pure-SVG node-link "Referenced by" graph (Charts.ReferenceGraph) is the hero, raw source de-emphasized into a secondary section (line anchors kept visible so #L{n} deep-links still land); accessible full-title list retained; golden rebaselined for the new .code-relationships/.ref-graph CSS
+  7-1-in-portal-code-file-browsing: review # reopened + reworked 2026-07-12: code page is now relationship-first — a pure-SVG node-link "Referenced by" graph (Charts.ReferenceGraph) is the hero, raw source de-emphasized into a secondary section (line anchors kept visible so #L{n} deep-links still land); UX round 2 (owner feedback): two-column layout (sticky graph aside beside code) inside a gutter'd .code-page container, GitHub logo on the view-source link, the redundant visible list made sr-only (graph tooltips/clickthroughs carry it). golden rebaselined for the new CSS/markup
   7-2-source-citation-and-comment-linking-to-code-pages: review # dev-story 2026-07-12: CodeReferenceLinkifier in ApplyReferenceLinks (href + inline/comment matchers, anchor-aware), two-phase code discovery (DiscoverCodeReferences before epics/doc/ADR render so _codePages is populated), "Referenced by" back-nav via _codeReverseMap, external --code-url mode; shared CodeReferenceScanner resolver (no drift); .md/SourceLinkifier untouched. 837 tests green (+21); golden rebaselined for .code-referenced-by CSS only (fixture cites no real files → linkifier no-ops)
-  7-3-activity-timeline-and-date-pages: in-progress
+  7-3-activity-timeline-and-date-pages: review
   7-4-advanced-code-and-git-coverage: ready-for-dev
   7-5-per-commit-detail-pages: review
   7-6-source-code-treemap-for-codebase-exploration: ready-for-dev # moved from Story 3.4 (SCP 2026-07-08)
   7-7-external-source-linking-and-auto-detection: review # added 2026-07-12: --code-url is now ADDITIVE (in-portal pages always generate; each gains a "view source online" link) not a replacement; CodeSourceUrlResolver auto-detects the blob base from the git remote (GitHub/GitLab, HTTPS+SSH+.git) or the GitHub Pages/CI env, explicit --code-url wins; GitMetrics remote/branch reads; menu parity in ConfigurePaths; diagnostics row. 881 tests green (+22)
+  7-8-related-files-in-the-reference-graph: backlog # owner ask 2026-07-12: extend the code-page reference graph with related-FILE nodes = the files most frequently changed alongside this one, from the deep-git change-coupling data SpecScribe already computes (GitMetrics deep numstat / CouplingGraph). Distinct node style, rich tooltips + clickthrough to those files' code pages; deep-git-gated (degrade to citations-only). Graph becomes the single relationship surface (sr-only text equivalent kept for a11y); bound node/edge counts for hub files
   epic-7-retrospective: optional
 
   # Epics 8–10 added to epics.md 2026-07-09 from the site-wide UX review; only Epic 8 is seeded here

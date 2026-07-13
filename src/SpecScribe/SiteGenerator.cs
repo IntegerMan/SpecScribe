@@ -59,6 +59,11 @@ public sealed class SiteGenerator
     private List<CommitDetailEntry> _commitDetails = new();
     private Dictionary<string, string> _commitPages = new(StringComparer.Ordinal);
 
+    // Story 7.3: the chronological activity timeline output path once written (else null), so WriteIndex / the
+    // dashboard Git Pulse panel render the "View activity timeline →" link ONLY when the page exists — the same
+    // cache-and-guard pattern _progress.DeepGit(.Insights) uses for the deep-analytics / git-insights links.
+    private string? _timelinePath;
+
     // Story 7.1: repo-relative source path (forward slashes) -> code-page output-relative path (code/<path>.html).
     // Populated by GenerateCodePagesInternal, cached the same way _adrs/_commitDays are so Story 7.2 can reuse it
     // to linkify source citations without re-running discovery. Empty in external mode (--code-url) and when no
@@ -233,15 +238,23 @@ public sealed class SiteGenerator
                 events.AddRange(GenerateCommitDetailsInternal(deepCommits.Commits, nav));
             }
 
-            // Per-day commit pages the heatmap links to. Git is only computed by the epics-phase progress
-            // enrichment, so a project without an epics.md has no pulse here — which is consistent: no
-            // heatmap renders either, so there's nothing to link to. The commit-detail resolver lights up each
-            // day's hash as a link into commit/ when a per-commit page exists (plain otherwise). [Story 7.5]
-            if (_progress?.Git is { } gitPulse)
+            // Date pages + activity timeline (Story 7.3). Date pages are generated for the UNION of the git
+            // commit days and the days any recognized artifact was last edited (filesystem mtime), so an
+            // artifact-only day (a doc edited with no commit) still gets a page for the timeline to link to.
+            // Both surfaces derive their day set from ActivityModel.UnionDays, so no link can point at a missing
+            // page. The commit-detail resolver lights up each day's hash as a link into commit/ when a per-commit
+            // page exists (Story 7.5, plain otherwise). Everything degrades non-fatally: no git AND no artifacts
+            // → no pages, no timeline, no dashboard link, no error, the rest of the site still generates (AC #2).
+            _timelinePath = null;
+            var artifactsByDay = BuildArtifactsByDay();
+            var gitPulse = _progress?.Git;
+            if (gitPulse is not null || artifactsByDay.Count > 0)
             {
                 reporter?.BeginPhase(GenerationPhase.CommitDays);
-                events.AddRange(GenerateCommitDaysInternal(gitPulse, nav, CommitHref));
+                events.AddRange(GenerateDatePagesInternal(gitPulse, artifactsByDay, nav, CommitHref));
                 reporter?.EndPhase(GenerationPhase.CommitDays);
+
+                GenerateTimelineInternal(gitPulse, artifactsByDay, nav, events, reporter);
             }
 
             // Opt-in deep-git analytics page (hotspots + change-coupling graph). Generated only when --deep-git
@@ -732,7 +745,20 @@ public sealed class SiteGenerator
     /// links to the adjacent active days. Mirrors <see cref="GenerateAdrsInternal"/>: wipe+recreate the dir,
     /// render a bespoke page, run reference-linkification so "Story N.M"/"FR25" mentions in subjects become
     /// links, and write.</summary>
-    private List<GenerationEvent> GenerateCommitDaysInternal(GitPulse git, SiteNav nav, Func<string, string?>? commitHref = null)
+    /// <summary>Generates one date page (<c>commits/{yyyy-MM-dd}.html</c>) per day in the UNION of the git
+    /// commit days (<see cref="Charts.LinkedCommitDays"/>) and the artifact-change days (<paramref name="artifactsByDay"/>),
+    /// ascending, with prev/next walking the same union — so a day with only an artifact edit (no commit) still
+    /// gets a page, and no future-skewed or empty day is ever emitted (AC #1). Each page carries that day's
+    /// commits (may be empty) and artifact changes (may be empty); the <paramref name="commitHref"/> resolver
+    /// lights up per-commit hash links when Story 7.5's pages exist. Preserves the original commit-days phase's
+    /// discipline: wipe+recreate the <c>commits/</c> dir (atomic rebuild), <see cref="ApplyReferenceLinks"/> per
+    /// page, per-page try/catch → <see cref="GenerationEvent"/>, and recording the generated entries. Generalized
+    /// from the former <c>GenerateCommitDaysInternal</c>. [Story 7.3]</summary>
+    private List<GenerationEvent> GenerateDatePagesInternal(
+        GitPulse? git,
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> artifactsByDay,
+        SiteNav nav,
+        Func<string, string?>? commitHref = null)
     {
         var events = new List<GenerationEvent>();
 
@@ -742,7 +768,11 @@ public sealed class SiteGenerator
             Directory.Delete(commitsDir, recursive: true);
         }
 
-        var days = Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now));
+        var commitsByDay = git?.CommitsByDay ?? EmptyCommitsByDay;
+        var commitDays = git is not null
+            ? Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now))
+            : (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
+        var days = ActivityModel.UnionDays(commitDays, artifactsByDay.Keys);
         if (days.Count == 0) return events;
 
         Directory.CreateDirectory(commitsDir);
@@ -756,7 +786,9 @@ public sealed class SiteGenerator
             {
                 var prevDay = i > 0 ? days[i - 1] : (DateOnly?)null;
                 var nextDay = i < days.Count - 1 ? days[i + 1] : (DateOnly?)null;
-                var html = CommitDayTemplater.RenderPage(day, git.CommitsByDay[day], prevDay, nextDay, nav, commitHref);
+                var dayCommits = commitsByDay.TryGetValue(day, out var c) ? c : Array.Empty<CommitInfo>();
+                var dayArtifacts = artifactsByDay.TryGetValue(day, out var a) ? a : Array.Empty<(string, string)>();
+                var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, prevDay, nextDay, nav, commitHref);
 
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
@@ -771,6 +803,108 @@ public sealed class SiteGenerator
 
         _commitDays = entries;
         return events;
+    }
+
+    /// <summary>Builds the read-only "artifact timestamps" signal (AC #1/#2): every recognized source artifact
+    /// (one that resolves to a generated page via <see cref="_referenceMap"/>) grouped by the day it was last
+    /// edited on disk. Future-skewed mtimes (clock/timezone) are clamped to <c>today</c> exactly as
+    /// <see cref="BuildArtifactCoverage"/> does, so nothing reads as "edited in the future". This is the git-free
+    /// signal that keeps the timeline/date pages working when git is absent. Never throws: a single unreadable
+    /// file degrades that one entry, and any wider failure yields an empty map (AD-4). Empty when no epics render
+    /// pass populated <see cref="_referenceMap"/> (e.g. no epics.md). [Story 7.3]</summary>
+    private IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> BuildArtifactsByDay()
+    {
+        try
+        {
+            if (_referenceMap.Count == 0) return EmptyArtifactsByDay;
+
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            var items = new List<(DateOnly Day, string Label, string Href)>(_referenceMap.Count);
+            foreach (var (sourceRel, href) in _referenceMap)
+            {
+                try
+                {
+                    var full = Path.Combine(_options.SourceRoot, sourceRel.Replace('/', Path.DirectorySeparatorChar));
+                    if (!File.Exists(full)) continue;
+
+                    var day = DateOnly.FromDateTime(File.GetLastWriteTime(full));
+                    if (day > today) day = today; // clamp clock/timezone skew, exactly as BuildArtifactCoverage does
+
+                    items.Add((day, ArtifactLabel(sourceRel, full), PathUtil.NormalizeSlashes(href)));
+                }
+                catch
+                {
+                    // A single unreadable artifact contributes no entry — never aborts the pass (AD-4).
+                }
+            }
+
+            return ActivityModel.GroupArtifactsByDay(items);
+        }
+        catch
+        {
+            return EmptyArtifactsByDay;
+        }
+    }
+
+    /// <summary>A human-readable name for an artifact in the "Artifacts updated" list: its Markdown H1 title
+    /// (a cheap single-line read, like the existing <see cref="ExtractArtifactTitle"/> uses), falling back to the
+    /// file-name stem when the doc has no heading or can't be read — never a raw source path where a title
+    /// exists. [Story 7.3]</summary>
+    private static string ArtifactLabel(string sourceRelative, string fullPath)
+    {
+        var stem = Path.GetFileNameWithoutExtension(sourceRelative);
+        try
+        {
+            return ExtractArtifactTitle(MarkdownConverter.ReadAllTextShared(fullPath), stem);
+        }
+        catch
+        {
+            return stem;
+        }
+    }
+
+    /// <summary>Writes the chronological activity timeline (<c>timeline.html</c>) — the reused commit heatmap over
+    /// a newest-first list of the union date-page days, each linking to its date page — and caches
+    /// <see cref="_timelinePath"/> so the dashboard renders "View activity timeline →" only when the page exists.
+    /// Gated by the caller on there being data to show (git pulse OR artifact days). Mirrors the deep-analytics /
+    /// git-insights cache-and-guard pattern: a write failure clears <see cref="_timelinePath"/> so the dashboard
+    /// link can never dangle (AD-4 / NFR2). [Story 7.3]</summary>
+    private void GenerateTimelineInternal(
+        GitPulse? git,
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> artifactsByDay,
+        SiteNav nav,
+        List<GenerationEvent> events,
+        IGenerationReporter? reporter)
+    {
+        var commitsByDay = git?.CommitsByDay ?? EmptyCommitsByDay;
+        var commitDays = git is not null
+            ? Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now))
+            : (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
+        var days = ActivityModel.UnionDays(commitDays, artifactsByDay.Keys);
+        if (days.Count == 0)
+        {
+            _timelinePath = null;
+            return;
+        }
+
+        reporter?.BeginPhase(GenerationPhase.Timeline);
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var newestFirst = days.OrderByDescending(d => d).ToList();
+            var html = TimelineTemplater.RenderPage(git, newestFirst, commitsByDay, artifactsByDay, nav);
+            WriteOutput(SiteNav.TimelineOutputPath, ApplyReferenceLinks(html, SiteNav.TimelineOutputPath));
+            _timelinePath = SiteNav.TimelineOutputPath;
+            events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.TimelineOutputPath, sw.Elapsed));
+        }
+        catch (Exception ex)
+        {
+            events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.TimelineOutputPath, sw.Elapsed, ex.Message));
+            // The page was never written — clear the cache so the dashboard's "View activity timeline" link
+            // (gated on _timelinePath) doesn't point at a page that doesn't exist.
+            _timelinePath = null;
+        }
+        reporter?.EndPhase(GenerationPhase.Timeline);
     }
 
     /// <summary>Emits one <c>commit/{shortHash}.html</c> detail page per commit in the bounded (<c>-n 300</c>),
@@ -964,7 +1098,7 @@ public sealed class SiteGenerator
     /// a "Referenced by" back-link block to the artifacts that cite it (Story 7.2, AC #2). The referenced set is
     /// discovered up front by <see cref="DiscoverCodeReferences"/> (NOT a filesystem walk), so only the small
     /// purposeful set renders (NFR1) and non-referenced files are omitted with no broken navigation (AC #1). Mirrors
-    /// <see cref="GenerateCommitDaysInternal"/>/<see cref="GenerateAdrsInternal"/>: wipe+recreate the output dir each
+    /// <see cref="GenerateDatePagesInternal"/>/<see cref="GenerateAdrsInternal"/>: wipe+recreate the output dir each
     /// pass (atomic rebuild, AD-5) and per-file try/catch → <see cref="GenerationEvent"/> so one bad file never
     /// throws out of the phase (NFR2). When an external source base is configured/detected (<c>--code-url</c>,
     /// Story 7.7) each page additionally carries an additive "view source online" link — the pages still generate.</summary>
@@ -1349,7 +1483,7 @@ public sealed class SiteGenerator
             var docs = _docs.Values.ToList();
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                WorkInventory.Build(docs), _sprint, _retros, _coverage);
+                WorkInventory.Build(docs), _sprint, _retros, _coverage, _timelinePath is not null);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -1599,7 +1733,7 @@ public sealed class SiteGenerator
         var docs = _docs.Values.ToList();
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            WorkInventory.Build(docs), _sprint, _retros, _coverage);
+            WorkInventory.Build(docs), _sprint, _retros, _coverage, _timelinePath is not null);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
@@ -1766,7 +1900,7 @@ public sealed class SiteGenerator
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
         var inventory = work ?? WorkInventory.Build(docs);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
@@ -2162,6 +2296,12 @@ public sealed class SiteGenerator
     }
 
     private static readonly IReadOnlyDictionary<string, DateOnly> EmptyDates = new Dictionary<string, DateOnly>();
+
+    // Story 7.3: shared empty maps for the date-page / timeline paths (git-absent, artifact-absent branches).
+    private static readonly IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> EmptyArtifactsByDay
+        = new Dictionary<DateOnly, IReadOnlyList<(string Label, string Href)>>();
+    private static readonly IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> EmptyCommitsByDay
+        = new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>();
 
     // The memlog frontmatter's single "updated: <date>" field — a one-line regex read (like ForgeOptions'
     // project_name read), NOT a full YAML parse. Captures just the yyyy-MM-dd prefix of the timestamp.

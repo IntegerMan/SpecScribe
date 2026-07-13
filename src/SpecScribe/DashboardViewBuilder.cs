@@ -40,7 +40,8 @@ public static class DashboardViewBuilder
         WorkInventory work,
         SprintStatus? sprint,
         IReadOnlyList<RetroModel>? retros,
-        ArtifactCoverage? coverage)
+        ArtifactCoverage? coverage,
+        bool hasTimeline = false)
     {
         return new DashboardView
         {
@@ -57,6 +58,7 @@ public static class DashboardViewBuilder
             Work = work,
             OpenRetroActionItems = sprint?.OpenActionItems.Count ?? 0,
             IndexBands = BuildIndexBands(docs, epicsModel, adrs, retros, work),
+            HasTimeline = hasTimeline,
         };
     }
 

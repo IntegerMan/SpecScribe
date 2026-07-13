@@ -1063,8 +1063,9 @@ public static class Charts
         var count = refs.Count;
         if (count == 0) return string.Empty;
 
-        // Grow the canvas with the node count so the ring never crowds; bounded so a heavily-cited file stays sane.
-        if (size <= 0) size = Math.Clamp(360 + count * 16, 380, 760);
+        // Grow the canvas with the node count so the ring never crowds; bounded (the graph now lives in a ~320-360px
+        // sidebar and scales to fit, so an over-large viewBox would render its labels illegibly small).
+        if (size <= 0) size = Math.Clamp(360 + count * 14, 380, 560);
         var c = size / 2.0;
         var ringR = size * 0.26;
 
@@ -1089,7 +1090,7 @@ public static class Charts
         var cw = Math.Max(90.0, Shorten(centerLabel, 24).Length * 7 + 20);
         sb.Append("  <g class=\"ref-center\">\n");
         sb.Append($"    <rect class=\"ref-center-box\" x=\"{F(c - cw / 2)}\" y=\"{F(c - 16)}\" width=\"{F(cw)}\" height=\"32\" rx=\"6\" />\n");
-        sb.Append($"    <text class=\"ref-center-label\" x=\"{F(c)}\" y=\"{F(c)}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"13\">{Html(Shorten(centerLabel, 24))}</text>\n");
+        sb.Append($"    <text class=\"ref-center-label\" x=\"{F(c)}\" y=\"{F(c)}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"15\">{Html(Shorten(centerLabel, 22))}</text>\n");
         sb.Append("  </g>\n");
 
         // Ring nodes: one link per citing artifact, label anchored away from center so text clears the ring.
@@ -1104,7 +1105,7 @@ public static class Charts
             sb.Append($"  <a class=\"ref-node\" href=\"{Html(href)}\" aria-label=\"{Html(title)}\">")
               .Append($"<title>{Html(title)}</title>")
               .Append($"<circle class=\"ref-dot\" cx=\"{F(x)}\" cy=\"{F(y)}\" r=\"7\" />")
-              .Append($"<text class=\"ref-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"12\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(shortLabel, 20))}</text>")
+              .Append($"<text class=\"ref-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"14\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(Shorten(shortLabel, 18))}</text>")
               .Append("</a>\n");
         }
 

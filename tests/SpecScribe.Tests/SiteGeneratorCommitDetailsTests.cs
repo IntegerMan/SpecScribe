@@ -69,14 +69,19 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         AssertNoErrors(events);
         Assert.False(Directory.Exists(CommitDir), "commit/ must not exist when --deep-git is off");
 
-        // With history present, day pages still render — just with plain hashes (the resolver has no pages).
+        // Day pages may still render (Story 7.3 also emits an artifact-only date page for today), but none ever
+        // links into commit/ when --deep-git is off (the resolver has no pages). Any commit hashes that DO render
+        // stay plain <code>; an artifact-only day (no git history) simply has none.
         if (Directory.Exists(CommitsDayDir))
         {
             foreach (var page in Directory.GetFiles(CommitsDayDir, "*.html"))
             {
                 var day = File.ReadAllText(page);
-                Assert.Contains("<code class=\"commit-hash\">", day);
                 Assert.DoesNotContain("../commit/", day);
+                if (day.Contains("commit-day-list"))
+                {
+                    Assert.Contains("<code class=\"commit-hash\">", day);
+                }
             }
         }
     }

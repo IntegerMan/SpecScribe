@@ -80,16 +80,25 @@ public sealed partial class HtmlRenderAdapter
         sb.Append(Charts.RefinementFunnel(p));
         sb.Append("</div>\n\n");
 
-        // Consolidated Git Pulse panel — header links fork on deep-git, body forks on git presence.
+        // Consolidated Git Pulse panel — header links fork on the timeline (baseline, always-available) and
+        // deep-git (opt-in); body forks on git presence. Each link is guarded on its target page existing.
         sb.Append("<div class=\"chart-panel git-pulse-panel\">\n");
-        if (p.DeepGit is not null)
+        if (view.HasTimeline || p.DeepGit is not null)
         {
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Git Pulse</h3><span class=\"git-pulse-header-links\">");
-            if (p.DeepGit.Insights is not null)
+            if (view.HasTimeline)
             {
-                sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.GitInsightsOutputPath}\">View all git insights &rarr;</a>");
+                sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.TimelineOutputPath}\">View activity timeline &rarr;</a>");
             }
-            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.DeepAnalyticsOutputPath}\">View Deep Analytics &rarr;</a></span></div>\n");
+            if (p.DeepGit is not null)
+            {
+                if (p.DeepGit.Insights is not null)
+                {
+                    sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.GitInsightsOutputPath}\">View all git insights &rarr;</a>");
+                }
+                sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.DeepAnalyticsOutputPath}\">View Deep Analytics &rarr;</a>");
+            }
+            sb.Append("</span></div>\n");
         }
         else
         {
