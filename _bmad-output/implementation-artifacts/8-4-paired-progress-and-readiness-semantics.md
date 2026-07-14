@@ -236,6 +236,10 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Dev Notes
 
+### Cross-surface note from Story 8.1 (2026-07-14)
+
+Surfaces A/B/D (paired badges, mosaic sentence, dashed no-plan cards) are **shared-path** — they live in `BodyHtml` / shared CSS consumed by HTML, webview, and SPA. Surface C column tooltips via `js-tip`/`specscribe.js` are progressive enhancement: **HTML + SPA**; webview will not show the rich tip. Prefer pairing Column meanings with a visible/accessible affordance that works without JS (native `title`, or text already in the header), and/or fold meanings through 8.2’s always-visible legend when available. No CLI projection.
+
 - **The sharp edge is scope, not difficulty.** Every surface is a small string/CSS change, but two adjacent temptations belong to other stories: the story-*page* evidence strip is **9.4**, and the "no task plan yet" *consolidation banner* is **8.6**. 8.4 pairs what's already shown, restates one count as a sentence, adds four tooltips, and dashes the no-plan cards — nothing more.
 - **Byte parity moves on purpose.** Unlike 8.3 (which may be byte-identical if inputs agree), 8.4 deliberately changes rendered HTML on the epic page, the mosaic, and the sprint board. Expect a golden-fingerprint regen and verify the diff is exactly the four intended surfaces. [memory: [[golden-diff-normalization-gotchas]]]
 - **Section facts vs. bytes.** The `RenderParity.SectionFacts` harness checks meaning (id/status/task tally), which is unchanged; the byte harness/golden fingerprint checks HTML, which changes. Both must end green — facts unchanged, fingerprint regenerated. [memory: [[story-6-2-section-view-models-live]]]

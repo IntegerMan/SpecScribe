@@ -244,6 +244,14 @@ No external libraries or APIs are introduced, so there is no version/security re
 
 ## Dev Notes
 
+### Cross-surface note from Story 8.1 (2026-07-14)
+
+Spike traced the live status path: `StatusStyles` + `--status-*` tokens → shared `PageView.BodyHtml` → HTML / webview / SPA. Classifier + badge markup in the body is **shared-path**. Two placement/affordance choices need attention here:
+
+1. **Do not put the legend key only in `PathUtil.RenderFooter`.** That footer is appended by `HtmlRenderAdapter.Render` (HTML shell only). `WebviewRenderAdapter.RenderContent` / `JsonSpaRenderAdapter.RenderContent` emit nav + breadcrumb + `BodyHtml` and **never include the footer**. Prefer rendering `LegendKey()` once into the content region (body/chrome that all three adapters share), or also inject it where webview/SPA wrap content — otherwise the legend is HTML-only by accident.
+2. **Badge `js-tip` / `data-tip` tooltips** depend on `specscribe.js`. Webview does not load that script (CSP + documented progressive-enhancement exclusion). The always-visible legend key is the webview-safe channel (matches this story’s a11y note). Optionally add a native `title=` on badges as a non-JS fallback; do not treat webview hover tips as required for AC #2.
+3. **CLI:** unrecognized-status notices via `GenerationEvent` / `ConsoleUi.PrintInitialSummary` are correct — CLI does not project lifecycle badges.
+
 - **The one behavior change with a sharp edge:** *absent* status (`null`/empty) stays "drafted"; only a *present, unmatched* string becomes "unrecognized". Encode and test this precisely — the inverse would drown the portal in false unrecognized notices for every not-yet-drafted story.
 - **Accessibility of the tooltip:** a `<span>` badge is not keyboard-focusable, so the hover/focus tooltip is a **progressive enhancement**, not the accessible channel. The accessible explanation is the **always-visible legend key** plus each badge's own color+icon+word. Do **not** blanket-add `tabindex="0"` to badges (tab-order noise). If you later want a keyboard-reachable per-badge tip, do it deliberately for a specific interactive badge, not globally.
 - **"Unrecognized" must look unrecognized.** Pick a treatment (hatched fill / dashed outline / neutral grey with a distinct glyph) that cannot be confused with any of the six real stages or with `deferred`. If it reads as "pending", you've reintroduced the silent-mislabel that AC #3 exists to kill.

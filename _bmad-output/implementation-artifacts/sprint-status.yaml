@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-14T00:00:00-04:00
+last_updated: 2026-07-14T14:45:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -152,7 +152,7 @@ development_status:
   # Item #3: every net-new epic verifies the feature reaches all live UI surfaces before dev starts. Epic 8's
   # stories 8.2-8.8 (formerly 8.1-8.7) were already drafted with none started, so this was the last clean
   # window to insert it - same pattern as Stories 6.3/6.6. 8.2-8.8 renumbered from 8.1-8.7 in the same change.
-  8-1-integration-spike-cross-surface-status-verification: ready-for-dev
+  8-1-integration-spike-cross-surface-status-verification: review # spike 2026-07-14: shared StatusStyles/BodyHtml path confirmed for HTML+webview+SPA; CLI is generation-event/outcome channel only (no lifecycle badges); gaps fed into 8.2-8.8 Dev Notes (footer≠webview legend home; js-tip progressive; 8.5 stageCommand optional). No production code. No ADR.
   8-2-canonical-status-model-with-portal-wide-legend: ready-for-dev
   8-3-single-source-of-truth-for-every-count: ready-for-dev
   8-4-paired-progress-and-readiness-semantics: ready-for-dev
@@ -312,7 +312,7 @@ action_items:
   - epic: 6
     action: "Every net-new epic opens with an Integration Spike verifying the feature reaches ALL live UI surfaces - HTML/web, VS Code extension + webview, CLI, and (future) desktop app - including a live-host smoke check; widens the greenfield-spike pattern (6.3/6.6/Epics 11-15) into a standing surface-coverage gate."
     owner: "Matthew (Project Lead) + create-story runner"
-    status: in-progress # 2026-07-14 (epic-7 retro): Story 8.1 inserted into Epic 8 (its stories were already drafted, none started) via correct-course - seated, not yet executed. Wording also flagged as needing a fix: "opens with" implies a moment that never arrives once an epic's stories are already drafted (the normal case by retro time); should read "before the first story in a net-new epic moves to in-progress."
+    status: in-progress # 2026-07-14: Epic 8 instance executed (Story 8.1 → review). Standing rule remains for future net-new epics (wording still needs "before first story moves to in-progress" fix).
   - epic: 6
     action: "Fix KnownIndexGroups omitting 'adrs'/'retros' (carried from Epic 4 Action #1) - now in DashboardViewBuilder after Story 6.2's byte-identical relocation; needs its own story with the golden-diff drill, not a byte-identical patch."
     owner: "Charlie (Senior Dev)"
@@ -328,4 +328,4 @@ action_items:
   - epic: 7
     action: "Execute Story 8.1 (the newly-seated integration spike inserted this retro) before starting Story 8.2."
     owner: "Developer (next dev-story run)"
-    status: open
+    status: done # 2026-07-14: executed via bmad-dev-story; spike → review

@@ -228,6 +228,10 @@ No external libraries or APIs are introduced — pure in-repo C# date/string wor
 
 ## Dev Notes
 
+### Cross-surface note from Story 8.1 (2026-07-14)
+
+Commits-tile + story-card `Updated <date>` markers are **shared-path** (view model / `BodyHtml`). They reach HTML, webview, and SPA automatically. CLI does not show recency widgets. No surface-specific work expected; keep markers wall-clock-free so all surfaces stay deterministic together.
+
 - **The sharp edge is determinism + path reconciliation, not difficulty.** Every edit is small, but two disciplines constrain them: **no wall clock in any marker** (the whole point of AC #1 — and why the existing "Nd ago" is being replaced, not extended), and the **git-path key** must be `SourceDirName + "/" + ArtifactSourcePath` normalized, matched ordinally, with an unmatched path falling back rather than mismatching.
 - **Resolve once, in `ProgressCalculator`.** It already reads each artifact and holds the deep pulse — do the change-log parse off that same read and set `StoryInfo.LastUpdatedDate`, exactly like `Status`/`TasksDone`. Don't scatter recency logic across the view builders.
 - **Precedence is git → change-log → nothing.** Git is the authoritative "when did this file actually change"; change-log is the authored fallback; nothing is correct when neither exists (AC #2). Never invent a date.

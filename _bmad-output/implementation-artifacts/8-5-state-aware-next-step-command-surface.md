@@ -266,6 +266,15 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Dev Notes
 
+### Cross-surface note from Story 8.1 (2026-07-14)
+
+`NextStepsHtml` is an opaque fragment in `BodyHtml` → **shared-path** for the rendered primary/alternates panel on HTML, webview, and SPA. Two surface-specific gaps to plan for (not architecture blockers):
+
+1. **Copy / send menu** uses `specscribe.js` (`data-copy`). Webview does not load that script — command text remains visible; click-to-copy will not work there unless you route through the existing host clipboard helper or the documented `stageCommand` seam.
+2. **`stageCommand` extension point** is documented in `WebviewRenderAdapter` (comment currently mis-labels it “Story 8.4 / R4.3”; the owning story is **8.5** / native R4.3). Handler is intentionally unbuilt. Decide in this story whether to implement webview “stage in terminal” now or defer; either way, do not assume HTML copy UX covers VS Code.
+
+CLI does not render Next Steps panels.
+
 - **The sharp edge is scope + fidelity, not difficulty.** Every change is a small string/CSS edit in one file, but three shipped specs constrain it: don't re-add code-review to `ready`, don't re-add create-story/retro to the story panel, don't touch the `Next Steps` heading. Audit them (AC #3) and build *on* them.
 - **Primacy is a render-time decision, not a build-time flag.** Because `Add` null-drops unavailable commands, `suggestions[0]` after building is always the correct, installed primary — which is exactly what makes NFR8's "primary not exposed → next survivor is primary" fall out for free. Do not pre-compute an `IsPrimary` bool.
 - **Byte parity moves on purpose** across *every* Next Steps panel (home, epic, story) — a bigger golden-fingerprint diff than 8.4. Verify the diff is *only* next-steps structure + the new `correct-course` rows before regenerating the constant. [memory: [[golden-diff-normalization-gotchas]]]

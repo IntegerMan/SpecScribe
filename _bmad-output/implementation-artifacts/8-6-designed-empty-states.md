@@ -246,6 +246,10 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Dev Notes
 
+### Cross-surface note from Story 8.1 (2026-07-14)
+
+Epic undrafted banner + sprint empty-lane placeholders are **shared-path** (`EpicPageView` opaque fragment / `SprintTemplater.RenderBoard` → `BodyHtml` + CSS). HTML, webview, and SPA all receive them; home Now & Next board shares `RenderBoard` so empty-lane copy appears there too. CLI is out of scope (no empty-state projection). Banner command copy still depends on `specscribe.js` / catalog affordances — same progressive-enhancement caveat as 8.5 for webview click-to-copy.
+
 - **The sharp edge is scope + fidelity, not difficulty.** Every change is a small string/CSS edit, but three disciplines constrain it: the banner is an *opaque fragment* built in the builder (not the adapter), the undrafted predicate must be the *same* `ArtifactOutputPath is null` the cards use, and the threshold is *2+* (a lone undrafted story is untouched). Get those three right and the golden diff is exactly banners + plain notes + empty lanes.
 - **Consolidation removes clutter, not information.** Every undrafted card still says it has no plan; the one banner command is the honest single next move (`create-story` is one-at-a-time). Don't strip the per-card note entirely — keep the plain text, move only the command up to the banner.
 - **The empty state is text-first.** The dashed border is reinforcement; the guidance copy carries the meaning, and the lane's `0` count still shows. Don't make emptiness border-only, and don't hide the zero.

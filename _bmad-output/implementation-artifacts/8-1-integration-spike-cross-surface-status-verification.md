@@ -1,6 +1,10 @@
+---
+baseline_commit: 03fd47503b1a39c72682df465399b38b3f690683
+---
+
 # Story 8.1: Integration Spike — Cross-Surface Status Verification
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -38,16 +42,16 @@ This is a **light** spike, not a full architecture investigation like 6.3. Epic 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Trace the current cross-surface status path (AC: #1)**
-  - [ ] Read `StatusStyles.cs`, the `--status-*` tokens in `specscribe.css`, and confirm `HtmlRenderAdapter`, `WebviewRenderAdapter` (Story 6.4), and the SPA adapter (Story 6.7) all consume the same view models with no surface re-deriving its own status word or color.
-  - [ ] Confirm the CLI's `ConsoleUi.PrintInitialSummary` (non-fatal notices, counts) draws from the same generation data, not a parallel calculation.
-  - [ ] Note any surface that reads status/counts through a different path than the other two.
-- [ ] **Task 2 — Map Epic 8's seven stories against the three surfaces (AC: #2)**
-  - [ ] For each of Stories 8.2–8.8, note (in a short table) whether its deliverable is: (a) shared-path — reaches all three surfaces automatically once built once; (b) surface-specific — needs dedicated work per surface (e.g. a webview-only or CLI-only rendering); (c) HTML-only by design (e.g. a chart or layout that intentionally doesn't apply to the CLI summary).
-  - [ ] Where a gap is found, add a short note to that story's own file (Dev Notes section) pointing back here, so the owning dev doesn't discover it mid-story.
-- [ ] **Task 3 — Record findings, no production changes (AC: #3)**
-  - [ ] Write findings directly into this story's Completion Notes below.
-  - [ ] If a genuine architectural gap is found (not just a "surface-specific work needed" note), flag it to the Project Lead and consider a light `correct-course` — don't silently decide it here.
+- [x] **Task 1 — Trace the current cross-surface status path (AC: #1)**
+  - [x] Read `StatusStyles.cs`, the `--status-*` tokens in `specscribe.css`, and confirm `HtmlRenderAdapter`, `WebviewRenderAdapter` (Story 6.4), and the SPA adapter (Story 6.7) all consume the same view models with no surface re-deriving its own status word or color.
+  - [x] Confirm the CLI's `ConsoleUi.PrintInitialSummary` (non-fatal notices, counts) draws from the same generation data, not a parallel calculation.
+  - [x] Note any surface that reads status/counts through a different path than the other two.
+- [x] **Task 2 — Map Epic 8's seven stories against the three surfaces (AC: #2)**
+  - [x] For each of Stories 8.2–8.8, note (in a short table) whether its deliverable is: (a) shared-path — reaches all three surfaces automatically once built once; (b) surface-specific — needs dedicated work per surface (e.g. a webview-only or CLI-only rendering); (c) HTML-only by design (e.g. a chart or layout that intentionally doesn't apply to the CLI summary).
+  - [x] Where a gap is found, add a short note to that story's own file (Dev Notes section) pointing back here, so the owning dev doesn't discover it mid-story.
+- [x] **Task 3 — Record findings, no production changes (AC: #3)**
+  - [x] Write findings directly into this story's Completion Notes below.
+  - [x] If a genuine architectural gap is found (not just a "surface-specific work needed" note), flag it to the Project Lead and consider a light `correct-course` — don't silently decide it here.
 
 ## Dev Notes
 
@@ -68,12 +72,62 @@ This is a **light** spike, not a full architecture investigation like 6.3. Epic 
 
 ### Agent Model Used
 
+Composer (Cursor agent router)
+
 ### Debug Log References
+
+- Traced `StatusStyles` → templaters/`HtmlRenderAdapter.Render*Body` → `PageView.BodyHtml` → `WebviewRenderAdapter.RenderContent` / `JsonSpaRenderAdapter.RenderContent` (identical nav + breadcrumb + body composition).
+- Confirmed `HtmlRenderAdapter.Render` alone appends `PathUtil.RenderFooter`; webview/SPA content regions omit the footer.
+- Confirmed webview inlines `specscribe.css` but does not load `specscribe.js` (tooltips / `data-copy` are progressive on HTML/SPA only).
+- Confirmed `ConsoleUi.PrintInitialSummary` tallies `GenerationEvent` outcomes only — no lifecycle badge path.
+- Outline payload in `SiteGenerator` already uses `StatusStyles.ForStory` / `ForEpicWithRetrospective` (webview tree) — same classifier, not a fork.
 
 ### Completion Notes List
 
+**Verdict:** Epic 6's shared render path still holds. Status words/colors are not re-derived per surface. No ADR / `correct-course` required — gaps are placement and progressive-enhancement caveats for owning stories.
+
+#### AC #1 — Current status path
+
+| Surface | Status word / color | Counts |
+|---|---|---|
+| **HTML** (`HtmlRenderAdapter`) | `StatusStyles` → badges/charts in `BodyHtml`; colors via `--status-*` in `specscribe.css` | `ProgressCalculator` / view builders |
+| **Webview** (`WebviewRenderAdapter`) | Same `PageView.BodyHtml` + same CSS inlined; no reclassification | Same body |
+| **SPA** (`JsonSpaRenderAdapter`) | Same `RenderContent` region as webview; production CSS | Same body |
+| **CLI** (`ConsoleUi.PrintInitialSummary`) | **Does not project lifecycle status** | Generation outcome tallies (`Generated`/`Updated`/`Skipped`/`Error`) from the same `GenerationEvent` list — not a parallel progress calculator |
+
+Portal surfaces (HTML + webview + SPA) share one status seam. CLI shares the generation-event stream for notices/outcome counts, not the lifecycle vocabulary — **by design**, not a drift bug.
+
+#### AC #2 — Epic 8 story × surface map
+
+| Story | Class | Notes |
+|---|---|---|
+| **8.2** Legend + classifier harden | **Mostly shared; placement gap** | Classifier/`Badge` in body = shared. **Legend must not live only in `RenderFooter`** (HTML shell only — webview/SPA omit footer). `js-tip` tooltips = HTML+SPA progressive; legend key is the webview-safe channel. CLI = notice channel for unrecognized status. |
+| **8.3** `ProjectCounts` | **Shared-path** (+ CLI notice) | Ledger → view builders → body. Divergence notice on CLI. |
+| **8.4** Paired progress | **Shared-path** (+ tooltip caveat) | Body/CSS shared. Column `js-tip` weak on webview — pair with non-JS affordance. |
+| **8.5** Next-step commands | **Shared fragment + surface-specific** | Panel HTML shared. Copy/`data-copy` needs JS (HTML/SPA). Optional webview `stageCommand` seam documented but unbuilt (comment mis-labels owning story as 8.4). |
+| **8.6** Empty states | **Shared-path** | Banner + empty lanes in body; board shared with home Now & Next. |
+| **8.7** One primary view | **Shared-path** | Pure CSS `:has()` toggle works on webview (no JS). |
+| **8.8** Recency markers | **Shared-path** | View-model dates in body; CLI N/A. |
+
+Sibling Dev Notes updated: `8-2` … `8-8` each carry a "Cross-surface note from Story 8.1" block.
+
+#### AC #3 — No production code
+
+Zero changes under `src/` or `tests/`. Artifacts only: this story + sprint-status + sibling story Dev Notes.
+
 ### File List
+
+- `_bmad-output/implementation-artifacts/8-1-integration-spike-cross-surface-status-verification.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/8-2-canonical-status-model-with-portal-wide-legend.md`
+- `_bmad-output/implementation-artifacts/8-3-single-source-of-truth-for-every-count.md`
+- `_bmad-output/implementation-artifacts/8-4-paired-progress-and-readiness-semantics.md`
+- `_bmad-output/implementation-artifacts/8-5-state-aware-next-step-command-surface.md`
+- `_bmad-output/implementation-artifacts/8-6-designed-empty-states.md`
+- `_bmad-output/implementation-artifacts/8-7-one-primary-view-per-dashboard-dataset.md`
+- `_bmad-output/implementation-artifacts/8-8-generation-time-recency-signals.md`
 
 ## Change Log
 
 - 2026-07-14 — Story created (correct-course, epic-7 retrospective). Seats Epic 6 Retrospective Action Item #3 for Epic 8. Renumbered Epic 8's existing Stories 8.1–8.7 to 8.2–8.8 in the same change (`epics.md` and `sprint-status.yaml` updated together per Epic 6 Action Item #2).
+- 2026-07-14 — Spike completed: cross-surface path verified; surface map written; gaps fed into 8.2–8.8 Dev Notes; no production code. Status → review.

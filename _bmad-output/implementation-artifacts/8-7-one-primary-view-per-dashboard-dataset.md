@@ -229,6 +229,10 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Dev Notes
 
+### Cross-surface note from Story 8.1 (2026-07-14)
+
+Requirements radio-toggle + epics-index subtitle trim are **shared-path**. Pure CSS `:has()` / radios ship in the same `specscribe.css` webview inlines and SPA loads — no JS required, so the toggle works on all three portal surfaces. CLI N/A. No gap found for this story beyond regenerating golden bytes once.
+
 - **The sharp edge is fidelity + scope, not difficulty.** Every change is a small markup/CSS edit, but three disciplines constrain it: the toggle is a **structural clone** of the sprint pattern (don't reinvent it, don't reuse its ids), the grid **stays in the DOM** as the flow's text-twin (never remove/replace/link-out), and AC #2 removes a **display** only (never a count/source). Get those three right and the golden diff is exactly the toggle wrappers + the subtitle trim.
 - **The toggle IS the accessibility answer.** Keeping both views in the DOM (only `display:none` when unselected, like the sprint board) is precisely what satisfies "the text-twin is never removed" — a link-out would have failed AC #2. The flow's own `role="img"` + `<title>`s carry the default view; the focusable radio reaches the grid.
 - **Order flips on purpose.** Flow renders before grid now (primary first). That reorder is part of the expected golden diff — verify it's the *only* home-page change besides the wrappers.

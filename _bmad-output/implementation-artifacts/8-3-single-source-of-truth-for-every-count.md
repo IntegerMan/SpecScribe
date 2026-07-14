@@ -269,6 +269,10 @@ No external libraries or APIs are introduced — pure in-repo C# over existing m
 
 ## Dev Notes
 
+### Cross-surface note from Story 8.1 (2026-07-14)
+
+`ProjectCounts` consumed by dashboard / epics-index / sprint / action-items view builders is **shared-path** — those surfaces ride the same `BodyHtml` into HTML, webview, and SPA. No per-surface recount. Divergence notice via `GenerationEvent` / `ConsoleUi.PrintInitialSummary` (or `AdapterDiagnostic` if 4.1 landed) is the **CLI notice channel** by design — CLI does not display portal count widgets. Outline tree `StoriesDone`/`StoriesTotal` (webview activity bar) already derives from `StatusStyles` in `SiteGenerator`; if this ledger ever feeds the outline, thread the named fields rather than inventing a fourth recount.
+
 - **The sharp edge:** don't collapse `StoriesDefined` and `StoriesTracked` into one number to "make them agree." The AC wants *structural* agreement for the *same named* quantity, and *honest surfacing* of the (legitimate) difference between two *different* quantities. Collapsing re-buries the exact drift this story exists to expose.
 - **Byte parity:** if this repo's `epics.md` and `sprint-status.yaml` currently agree, the refactor should produce **byte-identical** output (same numbers, just re-sourced) — the golden fingerprint won't move. If they've drifted, expect a count change + a new notice; regenerate the fingerprint and explain the diff. Either way, run the golden test to know which case you're in. [memory: [[golden-diff-normalization-gotchas]]]
 - **Keep the ledger a plain data record** (JSON-serializable) — it slots into Story 6.2's "data records" half and helps 6.4's webview export; don't hang rendering or IO off it.
