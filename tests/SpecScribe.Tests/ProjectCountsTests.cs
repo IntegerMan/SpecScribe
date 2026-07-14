@@ -143,6 +143,26 @@ public class ProjectCountsTests
     }
 
     [Fact]
+    public void Build_TrackedStagePartitionIncludesRetired()
+    {
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: done
+              1-2-b: in-progress
+              3-4-interactive-tree: retired
+            """)!;
+
+        var counts = ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty);
+
+        Assert.Equal(3, counts.StoriesTracked);
+        Assert.Equal(counts.StoriesTracked, counts.TrackedStoryStages.Sum(s => s.Count));
+        var retired = Assert.Single(counts.TrackedStoryStages, s => s.CssClass == "retired");
+        Assert.Equal(1, retired.Count);
+        Assert.Equal("Retired", retired.Label);
+        Assert.Equal(0, counts.TrackedStoryStages.Single(s => s.CssClass == "unrecognized").Count);
+    }
+
+    [Fact]
     public void Empty_IsAllZero()
     {
         var e = ProjectCounts.Empty;

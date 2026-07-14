@@ -163,9 +163,11 @@ public class StatusStylesTests
     // retrospective + action-item statuses ride the same colors.
     [InlineData("optional", "pending")]
     [InlineData("open", "ready")]
-    // present-but-unmapped → unrecognized; empty/null stays pending. [Story 8.2 AC #3]
+    // present-but-unmapped → unrecognized; retired is first-class; empty/null stays pending. [Story 8.2 AC #3]
     [InlineData("blocked", "unrecognized")]
-    [InlineData("retired", "unrecognized")]
+    [InlineData("retired", "retired")]
+    [InlineData("Retired", "retired")]
+    [InlineData("RETIRED", "retired")]
     [InlineData("", "pending")]
     [InlineData(null, "pending")]
     public void ForSprint_MapsLifecycleOntoSharedColors(string? status, string expected)
@@ -179,6 +181,7 @@ public class StatusStylesTests
     [InlineData("backlog", "Backlog")]
     [InlineData("optional", "Optional")]
     [InlineData("open", "Open")]
+    [InlineData("retired", "Retired")]
     // forward-compat value still reads as a real word (title-cased), never a raw token.
     [InlineData("blocked", "Blocked")]
     public void SprintLabel_MapsEachLifecycleValueToAWord(string status, string expected)
@@ -225,6 +228,7 @@ public class StatusStylesTests
     [InlineData("drafted")]
     [InlineData("pending")]
     [InlineData("deferred")]
+    [InlineData("retired")]
     [InlineData("unrecognized")]
     public void Icon_ReturnsAGlyphForEveryKnownCssClass(string cssClass)
         => Assert.False(string.IsNullOrEmpty(StatusStyles.Icon(cssClass)));
@@ -252,9 +256,17 @@ public class StatusStylesTests
     [InlineData("review")]
     [InlineData("done")]
     [InlineData("deferred")]
+    [InlineData("retired")]
     [InlineData("unrecognized")]
     public void StageMeaning_ReturnsNonEmptyMeaningForEveryLegendStage(string cssClass)
         => Assert.False(string.IsNullOrWhiteSpace(StatusStyles.StageMeaning(cssClass)));
+
+    [Fact]
+    public void StageMeaning_RetiredIsDistinctFromDeferred()
+    {
+        Assert.NotEqual(StatusStyles.StageMeaning("retired"), StatusStyles.StageMeaning("deferred"));
+        Assert.Contains("ledger", StatusStyles.StageMeaning("retired"), StringComparison.OrdinalIgnoreCase);
+    }
 
     [Fact]
     public void Badge_AttachesJsTipAndDataTipFromStageMeaning()
@@ -279,8 +291,9 @@ public class StatusStylesTests
             Assert.Contains($"status-legend-key-swatch {stage}", html);
             Assert.Contains(StatusStyles.StageMeaning(stage), html);
         }
-        // Static reference key — no zero-suppression (all eight rows present).
+        // Static reference key — no zero-suppression (all legend stages present).
         Assert.Equal(StatusStyles.LegendStages.Count, System.Text.RegularExpressions.Regex.Matches(html, "status-legend-key-row").Count);
+        Assert.Contains("retired", StatusStyles.LegendStages);
     }
 
     [Fact]
@@ -298,6 +311,7 @@ public class StatusStylesTests
         Assert.False(StatusStyles.IsUnrecognizedSprintStatus(null));
         Assert.False(StatusStyles.IsUnrecognizedSprintStatus(""));
         Assert.False(StatusStyles.IsUnrecognizedSprintStatus("in-progress"));
+        Assert.False(StatusStyles.IsUnrecognizedSprintStatus("retired"));
         Assert.True(StatusStyles.IsUnrecognizedSprintStatus("blocked"));
     }
 

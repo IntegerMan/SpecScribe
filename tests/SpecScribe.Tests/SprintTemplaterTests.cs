@@ -67,8 +67,8 @@ public class SprintTemplaterTests
     {
         var html = SprintTemplater.RenderIndex(Sample(), SampleEpics(), Nav(), SprintCommands());
 
-        // Six lifecycle lanes (incl. unrecognized for present-but-unmapped values), each with the mapped status class.
-        foreach (var cls in new[] { "pending", "ready", "active", "review", "done", "unrecognized" })
+        // Seven lifecycle lanes (incl. retired + unrecognized), each with the mapped status class.
+        foreach (var cls in new[] { "pending", "ready", "active", "review", "done", "retired", "unrecognized" })
             Assert.Contains($"<section class=\"sprint-lane {cls}\"", html);
 
         // Cards carry the story's stage color + the js-tip hook; done story 1.1 and in-progress 1.2 link out.
@@ -187,6 +187,7 @@ public class SprintTemplaterTests
         Assert.Contains("class=\"sprint-lane-empty\">Nothing in progress — pick from Ready.", board);
         Assert.Contains("class=\"sprint-lane-empty\">Nothing awaiting review.", board);
         Assert.Contains("class=\"sprint-lane-empty\">Nothing finished yet.", board);
+        Assert.Contains("class=\"sprint-lane-empty\">Nothing retired from the plan.", board);
         Assert.Contains("aria-label=\"In progress: 0 stories\"", board);
 
         // Populated columns never get an empty placeholder.
@@ -288,6 +289,7 @@ public class SprintTemplaterTests
                      ("active", "In progress"),
                      ("review", "In review"),
                      ("done", "Done"),
+                     ("retired", "Retired"),
                      ("unrecognized", "Unrecognized"),
                  })
         {
@@ -318,6 +320,60 @@ public class SprintTemplaterTests
         Assert.DoesNotContain("class=\"sprint-card js-tip active no-plan\"", board);
         Assert.Contains("class=\"sprint-card js-tip pending no-plan\"", board); // 2.6 + orphan
         Assert.Contains("role=\"progressbar\"", board); // planned story still gets the bar
+    }
+
+    [Fact]
+    public void RenderBoard_RetiredStoryLandsInRetiredLaneNotUnrecognized()
+    {
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              3-4-interactive-tree: retired
+              1-1-a: done
+              9-9-blocked: blocked
+            """)!;
+        var board = SprintTemplater.RenderBoard(sprint, null);
+
+        Assert.Contains("sprint-lane retired", board);
+        Assert.Contains("sprint-card js-tip retired", board);
+        Assert.Contains("Interactive Tree", board); // prettified slug
+        // Retired lane owns the retired card; unrecognized still owns truly unmapped words.
+        var retiredLaneIdx = board.IndexOf("sprint-lane retired", StringComparison.Ordinal);
+        var unrecognizedLaneIdx = board.IndexOf("sprint-lane unrecognized", StringComparison.Ordinal);
+        Assert.True(retiredLaneIdx >= 0 && unrecognizedLaneIdx > retiredLaneIdx);
+        var retiredLane = board[retiredLaneIdx..unrecognizedLaneIdx];
+        Assert.Contains("sprint-card js-tip retired", retiredLane);
+        Assert.DoesNotContain("sprint-card js-tip unrecognized", retiredLane);
+        Assert.Contains("sprint-card js-tip unrecognized", board[unrecognizedLaneIdx..]);
+    }
+
+    [Fact]
+    public void RenderProgressWheel_DenominatorExcludesRetired()
+    {
+        // Spec matrix: 41 done → use small numbers mirroring M = tracked − retired.
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: done
+              1-2-b: done
+              1-3-c: in-progress
+              3-4-retired: retired
+            """)!;
+        var wheel = SprintTemplater.RenderProgressWheel(sprint);
+
+        // 2 done / 3 non-retired tracked (done+done+active); retired excluded from M.
+        Assert.Contains("2 / 3 done", wheel);
+        Assert.Contains("Retired: 1", wheel);
+        Assert.DoesNotContain("donut-seg retired", wheel);
+    }
+
+    [Fact]
+    public void RenderProgressWheel_AllRetired_ReturnsEmpty()
+    {
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              3-4-a: retired
+              3-4-b: retired
+            """)!;
+        Assert.Equal(string.Empty, SprintTemplater.RenderProgressWheel(sprint));
     }
 
     private static int CountOccurrences(string haystack, string needle)

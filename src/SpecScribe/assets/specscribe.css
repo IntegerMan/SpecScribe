@@ -1860,6 +1860,8 @@ a.ref-file-node:focus-visible {
    The base .status-badge already carries these values; the explicit rule documents the mapping and pins it
    against future base changes. [Story 2.3 Task 2] */
 .status-badge.pending { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
+/* Sprint ledger history (removed from active plan) — same parchment/grey as deferred; own class. */
+.status-badge.retired { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
 /* Present-but-unmapped native status: dashed outline + cool slate, never a lifecycle fill. [Story 8.2] */
 .status-badge.unrecognized {
   background: repeating-linear-gradient(
@@ -3310,6 +3312,8 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .status-badge.deferred { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
 .donut-seg.deferred { stroke: var(--status-deferred); }
 .donut-legend .swatch.deferred { background: var(--status-deferred); }
+.donut-seg.retired { stroke: var(--status-deferred); }
+.donut-legend .swatch.retired { background: var(--status-deferred); }
 .donut-seg.unrecognized { stroke: var(--status-unrecognized); }
 .donut-legend .swatch.unrecognized { background: var(--status-unrecognized); }
 
@@ -3362,6 +3366,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .status-legend-key-swatch.review { background: var(--status-review); }
 .status-legend-key-swatch.done { background: var(--status-done); }
 .status-legend-key-swatch.deferred { background: var(--status-deferred); }
+.status-legend-key-swatch.retired { background: var(--status-deferred); }
 .status-legend-key-swatch.unrecognized {
   background: repeating-linear-gradient(
     -45deg,
@@ -4023,6 +4028,7 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
 .sprint-card.active { border-left-color: var(--status-active); }
 .sprint-card.review { border-left-color: var(--status-review); }
 .sprint-card.done { border-left-color: var(--status-done); }
+.sprint-card.retired { border-left-color: var(--status-deferred); }
 /* Story 8.4 / UX-DR24: stories without a task plan — dashed + muted, mirroring .sb-noplan. */
 .sprint-card.no-plan {
   border-style: dashed;
@@ -4054,11 +4060,12 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
 .sprint-card-progress-fill.partial { background: var(--status-ready); }
 .sprint-card-progress-fill.empty { background: transparent; }
 
-/* The Kanban board: equal-width lanes on wide screens; horizontally scrollable when the five columns don't
+/* The Kanban board: equal-width lanes on wide screens; horizontally scrollable when the seven columns don't
    fit (small screens / the narrower home panel), so cards never crush. */
 .sprint-board {
   display: grid;
-  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  /* Backlog → Done + Retired + Unrecognized (seven BoardColumns). */
+  grid-template-columns: repeat(7, minmax(150px, 1fr));
   gap: 0.7rem;
   overflow-x: auto;
   padding-bottom: 0.3rem;
@@ -4109,6 +4116,7 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
 .sprint-lane.active .sprint-lane-head { border-bottom-color: var(--status-active); }
 .sprint-lane.review .sprint-lane-head { border-bottom-color: var(--status-review); }
 .sprint-lane.done .sprint-lane-head { border-bottom-color: var(--status-done); }
+.sprint-lane.retired .sprint-lane-head { border-bottom-color: var(--status-deferred); }
 
 .sprint-cards { display: flex; flex-direction: column; gap: 0.45rem; }
 .sprint-lane-more {

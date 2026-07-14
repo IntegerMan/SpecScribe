@@ -319,7 +319,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // renders here — only the shared stylesheet content shifted the hash. Commits-tile absolute-date fix is
         // likewise invisible (fixture has "no git history"). Marker + CommitStatSub determinism are covered by
         // unit tests. [Story 8.8; golden-diff-normalization-gotchas]
-        const string expected = "1bb87887c3ada44dd55211adb807f61706ade14c2d9e39d36be7c4e73e84a39c";
+        // Regenerated for spec-3-4-retired-status-first-class: ForSprint maps retired → first-class stage;
+        // LegendStages + LegendKey gain a Retired row; sprint board gains a Retired lane (empty here — fixture
+        // has no retired yaml rows); RenderProgressWheel M excludes retired; specscribe.css gains retired
+        // badge/lane/card/legend hooks reusing --status-deferred grey + seven-column board grid. Sunburst /
+        // ForStatus / StoryStages untouched. [spec-3-4-retired-status-first-class]
+        const string expected = "ee85ee1bd29ed19c57d5c93f40add0a9a6fb5978ff4d15da1f1385565963458d";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

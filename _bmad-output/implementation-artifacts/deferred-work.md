@@ -429,6 +429,18 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
   project's existing "seed, not contract" stance on graph caps) rather than fixed now; revisit if a real repo
   surfaces a crowded hub. [Charts.cs](../../src/SpecScribe/Charts.cs)
 
+## Deferred from: code review of spec-3-4-retired-status-first-class (2026-07-14)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-retired-status-first-class.md`
+  summary: `SprintTemplater.StageOrder` is a dead private field (counts come from `ProjectCounts.TrackedStoryStages`); keeping it "in sync" still risks silent drift until the dead field is deleted or wired.
+  evidence: Blind Hunter. Pre-existing unused field; this change only extended it.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-retired-status-first-class.md`
+  summary: No generator/adapter test asserts a real `retired` yaml row no longer emits the Story 8.2 Unsupported diagnostic — coverage stops at `IsUnrecognizedSprintStatus("retired") == false`.
+  evidence: Blind Hunter.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-retired-status-first-class.md`
+  summary: SiteGeneratorAdapter golden fingerprint fixture has no retired sprint rows, so it locks chrome/CSS/legend delta but not the happy-path Retired lane content on a real board.
+  evidence: Blind Hunter.
+
 ## Deferred from: code review of story-7-8 (2026-07-13)
 
 - source_spec: `7-8-related-files-in-the-reference-graph.md`

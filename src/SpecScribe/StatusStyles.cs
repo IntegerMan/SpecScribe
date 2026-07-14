@@ -9,14 +9,15 @@ namespace SpecScribe;
 /// map into this seam rather than into templaters. <see cref="IArtifactAdapter"/> (Story 4.1) deliberately does
 /// <em>not</em> classify status — it emits raw native strings on the parsed models; classification stays here.</para>
 /// <para><b>Canonical lifecycle</b> (one vocabulary per entity type that uses it):
-/// <c>pending → drafted → ready → active → review → done</c>, plus <c>deferred</c> for requirements and
-/// <c>unrecognized</c> when a present native word has no mapping. Entity → classifier:
+/// <c>pending → drafted → ready → active → review → done</c>, plus <c>deferred</c> for requirements,
+/// <c>retired</c> for sprint-ledger history (removed from the active plan), and <c>unrecognized</c> when a
+/// present native word has no mapping. Entity → classifier:
 /// stories / free-text Status lines → <see cref="ForStatus"/>; epics → <see cref="ForEpic"/> /
 /// <see cref="ForEpicWithRetrospective"/>; requirements → <see cref="ForRequirement"/>; sprint ledger →
 /// <see cref="ForSprint"/>; planning-doc self-reported words → <see cref="ForDoc"/> (not a lifecycle claim).</para>
 /// <para>Color comes only from the <c>--status-*</c> CSS tokens — parchment = pending · gold = drafted/ready
-/// (planned, no dev yet) · teal = active · deep teal = review · green = done only · grey = deferred · distinct
-/// hatched neutral = unrecognized. Keeping classification here stops "green creep" and silent mislabel.</para>
+/// (planned, no dev yet) · teal = active · deep teal = review · green = done only · grey = deferred/retired ·
+/// distinct hatched neutral = unrecognized. Keeping classification here stops "green creep" and silent mislabel.</para>
 /// </summary>
 public static class StatusStyles
 {
@@ -163,6 +164,7 @@ public static class StatusStyles
             "open" => "ready",                // action item awaiting action — gold, same "to do" tier as ready
             "backlog" => "pending",           // parchment
             "optional" => "pending",          // retrospective not yet done — parchment
+            "retired" => "retired",           // removed from active plan; ledger history (not deferred)
             _ => "unrecognized",
         };
     }
@@ -179,6 +181,7 @@ public static class StatusStyles
         "backlog" => "Backlog",
         "optional" => "Optional",
         "open" => "Open",
+        "retired" => "Retired",
         "" => "Unknown",
         _ => TitleCase(Normalize(status)),
     };
@@ -229,15 +232,16 @@ public static class StatusStyles
         "review" => "Implementation complete; awaiting review or retrospective",
         "done" => "Finished and closed",
         "deferred" => "Shelved on purpose for later",
+        "retired" => "Removed from the active plan; kept for ledger history",
         "unrecognized" => "Native status word has no canonical mapping",
         _ => "Status stage",
     };
 
     /// <summary>Canonical stages shown in the portal-wide status legend key, in teaching order
-    /// (pending → … → done), then deferred and unrecognized. Always complete — never zero-suppressed.
+    /// (pending → … → done), then deferred, retired, and unrecognized. Always complete — never zero-suppressed.
     /// [Story 8.2] <para>// 10.3: vocabulary-explanation seam — extend, don't duplicate</para></summary>
     public static readonly IReadOnlyList<string> LegendStages =
-        new[] { "pending", "drafted", "ready", "active", "review", "done", "deferred", "unrecognized" };
+        new[] { "pending", "drafted", "ready", "active", "review", "done", "deferred", "retired", "unrecognized" };
 
     /// <summary>Renders a complete <c>.status-badge</c> span with its icon prepended before the text — the one
     /// place icon+text pairing is defined, so every badge site calls this instead of hand-inlining the icon
@@ -270,6 +274,7 @@ public static class StatusStyles
                 "review" => "In review",
                 "done" => "Done",
                 "deferred" => "Deferred",
+                "retired" => "Retired",
                 "unrecognized" => "Unrecognized",
                 _ => StoryLabel(stage),
             };

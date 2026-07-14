@@ -11,9 +11,9 @@ namespace SpecScribe;
 /// from the yaml so it never reads as contradicting the derived Now &amp; Next (Story 1.5). [Story 2.3]</summary>
 public static class SprintTemplater
 {
-    /// <summary>The lifecycle stages in donut/legend display order (done → … → backlog), each paired with its
-    /// shared status css class and human label. Unrecognized is last — present-but-unmapped ledger values.
-    /// [Story 2.3; Story 8.2]</summary>
+    /// <summary>Lifecycle stages in summary display order (done → … → backlog → retired → unrecognized).
+    /// Kept in sync with <see cref="ProjectCounts"/> TrackedStageOrder for documentation; live tallies
+    /// come from <see cref="ProjectCounts.TrackedStoryStages"/>. [Story 2.3; Story 8.2]</summary>
     private static readonly (string CssClass, string Label)[] StageOrder =
     {
         ("done", "Done"),
@@ -21,11 +21,12 @@ public static class SprintTemplater
         ("active", "In progress"),
         ("ready", "Ready for dev"),
         ("pending", "Backlog"),
+        ("retired", "Retired"),
         ("unrecognized", "Unrecognized"),
     };
 
-    /// <summary>The Kanban board columns, left-to-right in workflow order (Backlog → Done), plus Unrecognized
-    /// for present-but-unmapped ledger values. [Story 2.3 redesign; Story 8.2]</summary>
+    /// <summary>The Kanban board columns, left-to-right in workflow order (Backlog → Done), then Retired,
+    /// then Unrecognized for present-but-unmapped ledger values. [Story 2.3 redesign; Story 8.2]</summary>
     private static readonly (string CssClass, string Label)[] BoardColumns =
     {
         ("pending", "Backlog"),
@@ -33,6 +34,7 @@ public static class SprintTemplater
         ("active", "In progress"),
         ("review", "In review"),
         ("done", "Done"),
+        ("retired", "Retired"),
         ("unrecognized", "Unrecognized"),
     };
 
@@ -45,6 +47,7 @@ public static class SprintTemplater
         "active" => "Nothing in progress — pick from Ready.",
         "review" => "Nothing awaiting review.",
         "done" => "Nothing finished yet.",
+        "retired" => "Nothing retired from the plan.",
         _ => "Nothing here yet.",
     };
 
@@ -113,7 +116,7 @@ public static class SprintTemplater
         return sb.ToString();
     }
 
-    /// <summary>The Kanban board: five lifecycle columns (Backlog → Done) of story cards. Story entries only —
+    /// <summary>The Kanban board: lifecycle columns (Backlog → Done), then Retired, then Unrecognized. Story entries only —
     /// epics/retrospectives are not cards. When <paramref name="capPerColumn"/> is set, a column with more than
     /// that many stories shows the first N cards then a "+K more" link to <paramref name="moreHref"/> (the home
     /// board caps; the sprint page does not). Columns render even when empty — an empty "Done" column is
@@ -257,22 +260,30 @@ public static class SprintTemplater
     /// <summary>A compact status progress wheel: the lifecycle segments as a small donut with NO center number
     /// (the sibling "N / M done" label carries it — a number crammed into a tiny ring just reads as noise) and a
     /// hover tooltip of the breakdown. Shared by the sprint page's top strip and the home Now &amp; Next header.
-    /// Totals are the sum of the ledger's tracked-stage segments. Returns empty when no stories are tracked.
+    /// Denominator <c>M</c> and donut segments exclude retired (ledger history must not inflate incomplete work);
+    /// retired may still appear as a tip line. Returns empty when no stories are tracked.
     /// [Story 2.3 redesign; Story 8.3]</summary>
     public static string RenderProgressWheel(ProjectCounts counts)
     {
         var stages = counts.TrackedStoryStages;
-        var total = stages.Sum(c => c.Count);
+        if (stages.Sum(c => c.Count) == 0) return string.Empty;
+
+        var retired = stages.FirstOrDefault(c => c.CssClass == "retired").Count;
+        var segments = stages.Where(c => c.CssClass != "retired").Select(c => (c.Label, c.Count, c.CssClass)).ToList();
+        var total = segments.Sum(s => s.Count); // M excludes retired
+        // All-retired (or otherwise zero active-plan weight): no delivery wheel — avoid "0 / 0 done".
         if (total == 0) return string.Empty;
 
-        var segments = stages.Select(c => (c.Label, c.Count, c.CssClass)).ToList();
         var nonZero = segments.Where(s => s.Count > 0).ToList();
         var done = stages.First(c => c.CssClass == "done").Count;
         var ariaParts = string.Join(", ", nonZero.Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
+        if (retired > 0) ariaParts = $"{ariaParts}, {retired} retired";
 
         // Rich single tooltip via the body-level (never-clipped) js-tip node; suppress the donut's per-segment
         // <title> so the tiny wheel shows just this one clean breakdown. [Story 2.3 polish]
-        var tip = "Sprint delivery\n" + string.Join("\n", nonZero.Select(s => $"{s.Label}: {s.Count}"));
+        var tipLines = nonZero.Select(s => $"{s.Label}: {s.Count}").ToList();
+        if (retired > 0) tipLines.Add($"Retired: {retired}");
+        var tip = "Sprint delivery\n" + string.Join("\n", tipLines);
         var sb = new StringBuilder();
         sb.Append($"<div class=\"sprint-wheel js-tip\" data-tip=\"{PathUtil.Html(tip)}\">");
         sb.Append(Charts.Donut(segments, size: 46, showCenterText: false, segmentTitles: false, ariaLabel: $"Sprint delivery: {ariaParts}"));

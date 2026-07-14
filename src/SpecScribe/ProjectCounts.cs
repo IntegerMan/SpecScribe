@@ -76,6 +76,7 @@ public sealed record ProjectCounts
         ("active", "In progress"),
         ("ready", "Ready for dev"),
         ("pending", "Backlog"),
+        ("retired", "Retired"),
         ("unrecognized", "Unrecognized"),
     };
 
