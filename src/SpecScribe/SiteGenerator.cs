@@ -251,20 +251,15 @@ public sealed class SiteGenerator
                 events.AddRange(GenerateCommitDetailsInternal(deepCommits.Commits, nav));
             }
 
-            // In-portal code file pages for source files referenced by planning/implementation artifacts (Story 7.1,
-            // FR15) plus the git-analytics file sets (see DiscoverCodeReferences). Additive: a page class under code/,
-            // that Stories 7.2–7.4 build on. Generated regardless of --code-url (that base is now an additive per-page
-            // link). When --deep-git produced per-file insights each page gains an opt-in "Advanced coverage" section
-            // (Story 7.4); a null insight leaves it baseline.
-            events.AddRange(GenerateCodePagesInternal(files, nav, reporter));
-
-            // Date pages + activity timeline (Story 7.3). Date pages are generated for the UNION of the git
-            // commit days and the days any recognized artifact was last edited (filesystem mtime), so an
-            // artifact-only day (a doc edited with no commit) still gets a page for the timeline to link to.
-            // Both surfaces derive their day set from ActivityModel.UnionDays, so no link can point at a missing
-            // page. The commit-detail resolver lights up each day's hash as a link into commit/ when a per-commit
-            // page exists (Story 7.5, plain otherwise). Everything degrades non-fatally: no git AND no artifacts
-            // → no pages, no timeline, no dashboard link, no error, the rest of the site still generates (AC #2).
+            // Date pages + activity timeline (Story 7.3). Runs BEFORE the code pages so _commitDays is populated
+            // when those render the History tab's date links (mirrors the commit-detail pages' ordering above, for
+            // the same reason). Date pages are generated for the UNION of the git commit days and the days any
+            // recognized artifact was last edited (filesystem mtime), so an artifact-only day (a doc edited with no
+            // commit) still gets a page for the timeline to link to. Both surfaces derive their day set from
+            // ActivityModel.UnionDays, so no link can point at a missing page. The commit-detail resolver lights up
+            // each day's hash as a link into commit/ when a per-commit page exists (Story 7.5, plain otherwise).
+            // Everything degrades non-fatally: no git AND no artifacts → no pages, no timeline, no dashboard link,
+            // no error, the rest of the site still generates (AC #2).
             _timelinePath = null;
             var artifactsByDay = BuildArtifactsByDay();
             var gitPulse = _progress?.Git;
@@ -276,6 +271,13 @@ public sealed class SiteGenerator
 
                 GenerateTimelineInternal(gitPulse, artifactsByDay, nav, events, reporter);
             }
+
+            // In-portal code file pages for source files referenced by planning/implementation artifacts (Story 7.1,
+            // FR15) plus the git-analytics file sets (see DiscoverCodeReferences). Additive: a page class under code/,
+            // that Stories 7.2–7.4 build on. Generated regardless of --code-url (that base is now an additive per-page
+            // link). When --deep-git produced per-file insights each page gains an opt-in "Advanced coverage" section
+            // (Story 7.4); a null insight leaves it baseline.
+            events.AddRange(GenerateCodePagesInternal(files, nav, reporter));
 
             // Opt-in deep-git analytics page (hotspots + change-coupling graph). Generated only when --deep-git
             // produced data (DeepGit is only non-null when the flag gated the deep pass on); the dashboard's Git
@@ -856,8 +858,12 @@ public sealed class SiteGenerator
 
         Directory.CreateDirectory(commitsDir);
         var entries = new List<CommitDayEntry>();
-        // Days come ascending (oldest→newest); the pager reads newest-first, so Prev = newer day and Next = older. [Prev/next navigation]
-        var daysNewestFirst = days.Reverse().ToList();
+        // Owner-requested exception to EntityPager's usual "display order" rule (see EntityPager's own doc comment):
+        // for the two chronological commit surfaces — this one and GenerateCommitDetailsInternal's — Prev/Next read
+        // as calendar direction (Prev = earlier, Next = later) rather than list-display direction, even though the
+        // underlying lists (and every other pager family: epics, stories, ADRs, retros, code files) stay in their
+        // existing display order. Days come ascending (oldest→newest) already, so no reordering is needed here —
+        // Prev = the earlier day, Next = the later one. [Prev/next navigation]
         for (var i = 0; i < days.Count; i++)
         {
             var day = days[i];
@@ -868,7 +874,7 @@ public sealed class SiteGenerator
                 var dayCommits = commitsByDay.TryGetValue(day, out var c) ? c : Array.Empty<CommitInfo>();
                 var dayArtifacts = artifactsByDay.TryGetValue(day, out var a) ? a : Array.Empty<(string, string)>();
                 var prefix = PathUtil.RelativePrefix(outputRelative);
-                var pager = EntityPager.FromSequence(daysNewestFirst, days.Count - 1 - i,
+                var pager = EntityPager.FromSequence(days, i,
                     d => prefix + PathUtil.NormalizeSlashes($"commits/{Charts.D(d)}.html"),
                     Charts.DReadable);
                 var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, pager, nav, commitHref);
@@ -1078,8 +1084,11 @@ public sealed class SiteGenerator
             }
         }
 
-        // Pass 2: render each page with its pager. Commits arrive newest-first (git-log order), so Prev = newer and
-        // Next = older; the tooltip names the sibling by subject (short hash when the subject is empty).
+        // Pass 2: render each page with its pager. Commits arrive newest-first (git-log order) in `slots`, but the
+        // pager reads chronologically — Prev = the earlier commit, Next = the later one — so it takes the raw
+        // FromSequence result against the original (newest-first) order and swaps sides, rather than keeping a
+        // second, reversed copy of the slot list in sync. The tooltip names the sibling by subject (short hash when
+        // the subject is empty). [Prev/next navigation]
         for (var i = 0; i < slots.Count; i++)
         {
             var (commit, outputRelative) = slots[i];
@@ -1087,9 +1096,10 @@ public sealed class SiteGenerator
             try
             {
                 var prefix = PathUtil.RelativePrefix(outputRelative);
-                var pager = EntityPager.FromSequence(slots, i,
+                var raw = EntityPager.FromSequence(slots, i,
                     s => prefix + s.OutputRelative,
                     s => CommitPagerLabel(s.Commit));
+                var pager = new EntityPager(raw.Next, raw.Prev);
                 var html = CommitDetailTemplater.RenderPage(commit, nav, CodePageHref, pager);
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
@@ -1187,6 +1197,16 @@ public sealed class SiteGenerator
         return null;
     }
 
+    /// <summary>The guarded per-day resolver: a commit date → its <c>commits/{date}.html</c> page, output-relative.
+    /// Populated by <see cref="GenerateDatePagesInternal"/>, which runs before the code pages precisely so this
+    /// resolves when the code page's History tab links a change's date (mirrors <see cref="CommitHref"/>). Returns
+    /// null (→ plain date text) when no day page was generated for that date. A linear scan, same as
+    /// <see cref="CommitHref"/>: <see cref="_commitDays"/> is bounded by the deep-git commit window (≤300 distinct
+    /// days) and each call site's own history is capped even smaller (≤15 rows/file), so the worst case per code
+    /// page is trivial.</summary>
+    private string? DayHref(DateOnly date) =>
+        _commitDays.FirstOrDefault(e => e.Date == date)?.OutputRelativePath;
+
     /// <summary>The guarded code-page resolver for a commit's changed-file path (Story 7.1/7.5): a repo-relative
     /// source path → its <c>code/…html</c> page, output-relative, when that file has an in-portal page — i.e. it is
     /// cited by an artifact OR surfaced by a git-analytics widget (<see cref="_codePages"/>, populated regardless of
@@ -1223,13 +1243,16 @@ public sealed class SiteGenerator
     // (Epic 5 / AD-3) could surface it; there is deliberately no knob for it yet. [Story 7.1]
     private const long MaxCodeFileBytes = 1_048_576; // ~1 MB
 
-    /// <summary>Story 7.2 Phase A — discovers the referenced code-file set from the source-artifact corpus and
-    /// populates <see cref="_codePages"/> (forward map) + <see cref="_codeReverseMap"/> (file → citing artifacts,
-    /// for each code page's "Referenced by" block) UP FRONT, before any citing page is rendered. This is what lets
-    /// <see cref="ApplyReferenceLinks"/> resolve citations on the story/doc/ADR pages that render before the code
-    /// pages themselves. Pure discovery: reads the small <c>*.md</c> set (shared access) and touches no output.
-    /// In-portal pages are ALWAYS discovered — the external source base (<c>--code-url</c>, Story 7.7) is additive
-    /// (a link out from each page), so it no longer suppresses this pass.</summary>
+    /// <summary>Story 7.2 Phase A — discovers the referenced code-file set from the source-artifact corpus AND the
+    /// ADR tree (<see cref="EnumerateAdrFiles"/>) and populates <see cref="_codePages"/> (forward map) +
+    /// <see cref="_codeReverseMap"/> (file → citing artifacts, for each code page's "Referenced by" block) UP FRONT,
+    /// before any citing page is rendered. [Review][Patch] ADR files are scanned here too — every ADR page runs
+    /// through <see cref="ApplyReferenceLinks"/> the same as story/doc pages, so an ADR-only code citation must be
+    /// discovered here or it silently never resolves. This is what lets <see cref="ApplyReferenceLinks"/> resolve
+    /// citations on the story/doc/ADR pages that render before the code pages themselves. Pure discovery: reads the
+    /// small <c>*.md</c> set (shared access) and touches no output. In-portal pages are ALWAYS discovered — the
+    /// external source base (<c>--code-url</c>, Story 7.7) is additive (a link out from each page), so it no longer
+    /// suppresses this pass.</summary>
     private void DiscoverCodeReferences(List<string> sourceFiles)
     {
         _codePages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1240,7 +1263,12 @@ public sealed class SiteGenerator
         var sourceFull = Path.GetFullPath(_options.SourceRoot);
         var referenced = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var file in sourceFiles)
+        // [Review][Patch] One shared scan body for every corpus that can carry a code citation and is run through
+        // ApplyReferenceLinks (CodeReferenceLinkifier included) — the _bmad-output planning/implementation corpus
+        // AND the ADR tree (GenerateAdrsInternal linkifies every ADR page too, so an ADR-only citation of a file
+        // must be discovered here as well or it silently never resolves). citingRelative identifies the citer for
+        // BuildReferencedBy's back-nav lookup (which safely omits any citer BuildReferencedBy can't map).
+        void ScanArtifact(string file, string citingRelative)
         {
             string raw;
             string dir;
@@ -1252,10 +1280,9 @@ public sealed class SiteGenerator
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // Non-fatal: an artifact we can't read simply contributes no citations.
-                continue;
+                return;
             }
 
-            var citingRelative = PathUtil.NormalizeSlashes(ToSourceRelative(file));
             var citingTitle = ExtractArtifactTitle(raw, citingRelative);
 
             foreach (var citation in CodeReferenceScanner.ExtractTargets(raw))
@@ -1276,6 +1303,17 @@ public sealed class SiteGenerator
                     list.Add((citingRelative, citingTitle));
                 }
             }
+        }
+
+        foreach (var file in sourceFiles)
+        {
+            ScanArtifact(file, PathUtil.NormalizeSlashes(ToSourceRelative(file)));
+        }
+
+        foreach (var file in EnumerateAdrFiles())
+        {
+            var adrRelative = PathUtil.NormalizeSlashes($"{ForgeOptions.AdrOutputSubdir}/{Path.GetRelativePath(_options.AdrSourceRoot, file)}");
+            ScanArtifact(file, adrRelative);
         }
 
         // In-portal pages are ALSO minted for the files surfaced by the git-analytics widgets — the dashboard
@@ -1326,12 +1364,43 @@ public sealed class SiteGenerator
     // to the source-relative path when a doc has no heading. A cheap single-line read (like the project_name /
     // memlog-date reads), not a full parse.
     private static readonly Regex ArtifactTitlePattern = new(
-        @"^\s{0,3}#\s+(?<title>.+?)\s*#*\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
+        @"^\s{0,3}#\s+(?<title>.+?)\s*#*\s*$", RegexOptions.Compiled);
+    private static readonly Regex FenceMarker = new(@"^\s{0,3}(```|~~~)", RegexOptions.Compiled);
 
+    /// <summary>The first real ATX heading in the document, skipping lines inside a fenced code block (``` or ~~~)
+    /// and a leading YAML frontmatter block (--- ... ---) — [Review][Patch] a "# ..." line inside either of those
+    /// isn't the artifact's title and previously produced a misleading "Referenced by"/timeline label.</summary>
     private static string ExtractArtifactTitle(string markdown, string fallbackRelative)
     {
-        var m = ArtifactTitlePattern.Match(markdown);
-        return m.Success ? m.Groups["title"].Value.Trim() : fallbackRelative;
+        var lines = markdown.Split('\n');
+        var inFence = false;
+        var i = 0;
+
+        if (i < lines.Length && lines[i].TrimEnd('\r').Trim() == "---")
+        {
+            var closing = -1;
+            for (var j = i + 1; j < lines.Length; j++)
+            {
+                if (lines[j].TrimEnd('\r').Trim() == "---") { closing = j; break; }
+            }
+            if (closing >= 0) i = closing + 1;
+        }
+
+        for (; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimEnd('\r');
+            if (FenceMarker.IsMatch(line))
+            {
+                inFence = !inFence;
+                continue;
+            }
+            if (inFence) continue;
+
+            var m = ArtifactTitlePattern.Match(line);
+            if (m.Success) return m.Groups["title"].Value.Trim();
+        }
+
+        return fallbackRelative;
     }
 
     /// <summary>Renders each referenced, readable repository source file into <c>code/&lt;repo-relative-path&gt;.html</c>
@@ -1438,7 +1507,7 @@ public sealed class SiteGenerator
                 {
                     var lines = SplitCodeLines(text);
                     html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl,
-                        insight, CodePageHref, CommitHref, pager);
+                        insight, CodePageHref, CommitHref, dayHref: DayHref, pager: pager);
                     outcome = GenerationOutcome.Generated;
                 }
                 else
@@ -1467,8 +1536,9 @@ public sealed class SiteGenerator
     /// <summary>Resolves a code file's citing artifacts (captured by <see cref="DiscoverCodeReferences"/>) to the
     /// output-relative URLs of their generated pages + a display title — the "Referenced by" back-navigation on the
     /// code page (Story 7.2, AC #2). Routing reuses the epics render pass's <see cref="_referenceMap"/> (which maps
-    /// every source file, story artifacts included, to its page), falling back to a plain extension swap for the rare
-    /// citer that predates an epics render. Order is deterministic (reverse-map insertion follows the sorted source
+    /// every source file, story artifacts included, to its page). [Review][Patch] A citer missing from
+    /// <see cref="_referenceMap"/> is OMITTED rather than guessed via a naive extension swap — never link to a page
+    /// we can't confirm was actually mapped. Order is deterministic (reverse-map insertion follows the sorted source
     /// walk).</summary>
     private IReadOnlyList<(string OutputUrl, string Title)> BuildReferencedBy(string repoRelative)
     {

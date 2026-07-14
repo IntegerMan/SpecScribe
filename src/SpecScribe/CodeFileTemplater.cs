@@ -34,7 +34,9 @@ public static class CodeFileTemplater
     /// baseline page is byte-identical to a run without deep-git. <paramref name="coupledFileHref"/> resolves a
     /// coupled file's repo-relative path to its <c>code/…html</c> page (null → plain text), and
     /// <paramref name="commitHref"/> resolves a history entry's short hash to its <c>commit/…html</c> page (null →
-    /// plain <c>&lt;code&gt;</c>); both return output-relative paths that this method prefixes.</para></summary>
+    /// plain <c>&lt;code&gt;</c>), and <paramref name="dayHref"/> resolves a history entry's date to its
+    /// <c>commits/{date}.html</c> page (null → plain text); all three return output-relative paths that this method
+    /// prefixes.</para></summary>
     public static string RenderPage(
         string repoRelativePath,
         string outputRelativePath,
@@ -45,6 +47,7 @@ public static class CodeFileTemplater
         FileInsight? insight = null,
         Func<string, string?>? coupledFileHref = null,
         Func<string, string?>? commitHref = null,
+        Func<DateOnly, string?>? dayHref = null,
         EntityPager? pager = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
@@ -66,7 +69,7 @@ public static class CodeFileTemplater
         //   Code          — the source itself (always present).
         var insightsPanel = BuildInsightsPanel(insight);
         var relationshipsPanel = BuildRelationshipsPanel(prefix, repoRelativePath, referencedBy, insight, coupledFileHref);
-        var historyPanel = BuildHistoryPanel(prefix, insight, commitHref);
+        var historyPanel = BuildHistoryPanel(prefix, insight, commitHref, dayHref);
 
         // Assemble in a fixed order (Insights → Relationships → History → Code); empty panels drop out so a file only
         // ever shows tabs it can back with content. The first surviving tab is the default-checked one.
@@ -265,10 +268,12 @@ public static class CodeFileTemplater
     }
 
     /// <summary>Builds the <em>History</em> panel: the bounded, newest-first change-history table (Story 7.4) — each
-    /// row's hash a guarded link to its per-commit page (null → plain <c>&lt;code&gt;</c>). Everything escaped (author
-    /// names / subjects / hashes are free-text injection surfaces). Returns empty when the insight is null or carries
-    /// no history, so the caller drops the tab.</summary>
-    private static string BuildHistoryPanel(string prefix, FileInsight? insight, Func<string, string?>? commitHref)
+    /// row's hash a guarded link to its per-commit page (null → plain <c>&lt;code&gt;</c>), and its date a guarded
+    /// link to that day's <c>commits/{date}.html</c> page (null → plain text). Everything escaped (author names /
+    /// subjects / hashes are free-text injection surfaces). Returns empty when the insight is null or carries no
+    /// history, so the caller drops the tab.</summary>
+    private static string BuildHistoryPanel(
+        string prefix, FileInsight? insight, Func<string, string?>? commitHref, Func<DateOnly, string?>? dayHref)
     {
         if (insight is null || insight.History.Count == 0) return "";
 
@@ -291,7 +296,15 @@ public static class CodeFileTemplater
             var hashCell = target is { Length: > 0 }
                 ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(target))}\"><code>{hashHtml}</code></a>"
                 : $"<code>{hashHtml}</code>";
-            var dateCell = touch.Date is { } d ? PathUtil.Html(Charts.D(d)) : "&mdash;";
+            var dateCell = "&mdash;";
+            if (touch.Date is { } d)
+            {
+                var dateText = PathUtil.Html(Charts.D(d));
+                var dateTarget = dayHref?.Invoke(d);
+                dateCell = dateTarget is { Length: > 0 }
+                    ? $"<a href=\"{PathUtil.Html(prefix + PathUtil.NormalizeSlashes(dateTarget))}\">{dateText}</a>"
+                    : dateText;
+            }
             var subject = touch.Subject.Length == 0 ? "(no subject)" : touch.Subject;
             sb.Append("      <tr>\n");
             sb.Append($"        <td class=\"code-history-date\">{dateCell}</td>\n");

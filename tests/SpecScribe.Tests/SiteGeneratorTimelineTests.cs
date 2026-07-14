@@ -189,7 +189,7 @@ public class SiteGeneratorTimelineTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_DatePagePager_IsNewestFirst_PrevIsNewerDay_NextIsOlder()
+    public void GenerateAll_DatePagePager_IsChronological_PrevIsEarlierDay_NextIsLater()
     {
         // Three commits on three distinct days so the MIDDLE date page has a sibling on each side. [Prev/next navigation]
         Assert.True(TryCreateBackdatedHistory(), "git CLI unavailable on this host — cannot exercise the date pager; install git rather than silently skipping this test");
@@ -201,11 +201,11 @@ public class SiteGeneratorTimelineTests : IDisposable
         Assert.True(File.Exists(middle), "expected a date page for the middle backdated day");
         var html = File.ReadAllText(middle);
 
-        // Newest-first: Prev links to the NEWER adjacent day, Next to the OLDER — the user-chosen direction.
+        // Chronological: Prev links to the EARLIER adjacent day, Next to the LATER — the user-chosen direction.
         var prev = Regex.Match(html, "entity-pager-prev\"[^>]*href=\"([^\"]+)\"").Groups[1].Value;
         var next = Regex.Match(html, "entity-pager-next\"[^>]*href=\"([^\"]+)\"").Groups[1].Value;
-        Assert.Contains("2026-03-03.html", prev);
-        Assert.Contains("2026-03-01.html", next);
+        Assert.Contains("2026-03-01.html", prev);
+        Assert.Contains("2026-03-03.html", next);
         // The pager rides the header (before the article); the retired bottom nav is gone.
         Assert.Contains("<nav class=\"entity-pager\"", html);
         Assert.DoesNotContain("commit-day-nav", html);

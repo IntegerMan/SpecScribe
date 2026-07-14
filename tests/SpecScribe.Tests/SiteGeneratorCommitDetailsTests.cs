@@ -118,6 +118,34 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_CommitDetailPager_IsChronological_PrevIsEarlierCommit_NextIsLater()
+    {
+        // Two commits, oldest first: "Implement Story 1.1 foundation" then "Second commit". [Prev/next navigation]
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the commit pager; install git rather than silently skipping this test");
+
+        var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
+        AssertNoErrors(events);
+
+        // The subject "Story 1.1" gets linkified inside <h1> (see the reference-linkification test below), so
+        // match on the h1's inner text loosely rather than the exact escaped subject string.
+        var pages = Directory.GetFiles(CommitDir, "*.html");
+        var olderPage = pages.Single(p => Regex.Match(File.ReadAllText(p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("foundation"));
+        var olderHtml = File.ReadAllText(olderPage);
+        var newerPage = pages.Single(p => Regex.Match(File.ReadAllText(p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("Second commit"));
+        var newerHtml = File.ReadAllText(newerPage);
+
+        // The oldest commit's page has no earlier sibling (Prev disabled) and Next points at the newer commit.
+        Assert.Contains("entity-pager-prev is-disabled", olderHtml);
+        var olderNext = Regex.Match(olderHtml, "entity-pager-next\"[^>]*href=\"([^\"]+)\"").Groups[1].Value;
+        Assert.EndsWith(Path.GetFileName(newerPage), olderNext);
+
+        // The newest commit's page has no later sibling (Next disabled) and Prev points back at the older commit.
+        Assert.Contains("entity-pager-next is-disabled", newerHtml);
+        var newerPrev = Regex.Match(newerHtml, "entity-pager-prev\"[^>]*href=\"([^\"]+)\"").Groups[1].Value;
+        Assert.EndsWith(Path.GetFileName(olderPage), newerPrev);
+    }
+
+    [Fact]
     public void GenerateAll_FlagOnWithHistory_LightsUpDayPageAndHubHashLinks()
     {
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise gated hash-link wiring; install git rather than silently skipping this test");

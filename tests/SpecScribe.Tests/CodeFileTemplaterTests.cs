@@ -316,6 +316,19 @@ public class CodeFileTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_HistoryDateLink_GuardedOnDayPageExistence()
+    {
+        // 2026-07-03 has a day page; 2026-07-01 does not → plain date text, never a dead link.
+        string? Resolve(DateOnly date) => date == new DateOnly(2026, 7, 3) ? "commits/2026-07-03.html" : null;
+
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), dayHref: Resolve);
+
+        Assert.Contains("<a href=\"../../../commits/2026-07-03.html\">2026-07-03</a>", html);
+        Assert.DoesNotContain("<a href=\"../../../commits/2026-07-01.html\"", html);
+    }
+
+    [Fact]
     public void RenderPage_Insight_EscapesAuthorSubjectAndPath()
     {
         var insight = new FileInsight(

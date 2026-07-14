@@ -9,10 +9,15 @@ public sealed record PagerLink(string Href, string Label);
 /// <summary>A compact <c>&lsaquo; Prev</c> / <c>Next &rsaquo;</c> sibling-navigation control for a leaf entity page
 /// (commit, date, epic, story, ADR, retro, code file). Each side is <c>null</c> when the current page sits at that
 /// end of its family's canonical order — rendered disabled, never wrapping.
-/// <para>One rule spans every family: <c>Prev</c> is the predecessor and <c>Next</c> the successor in that family's
-/// DISPLAY order. A newest-first chronological family (commits, dates) therefore yields Prev = newer / Next = older;
-/// an ascending-numbered family (epics, stories, ADRs, retros) yields Prev = lower / Next = higher; code files order
-/// alphabetically within their directory. The family only chooses its sort — the pager stays a single code path.
+/// <para>The general rule: <c>Prev</c> is the predecessor and <c>Next</c> the successor in whatever order the caller
+/// hands <see cref="FromSequence{T}"/> — an ascending-numbered family (epics, stories, ADRs, retros) yields Prev =
+/// lower / Next = higher; code files order alphabetically within their directory. The family only chooses its sort
+/// and index — the pager itself stays a single code path with no ordering logic of its own.
+/// <para>Exception (owner-requested): the two chronological commit surfaces — the per-day pages
+/// (<c>commits/{date}.html</c>) and the per-commit pages (<c>commit/{hash}.html</c>) — read Prev/Next as calendar
+/// direction (Prev = the earlier day/commit, Next = the later one) rather than their underlying list's display
+/// order, which for commits is newest-first (git-log order). See the call sites in <c>SiteGenerator</c> for how each
+/// achieves that without changing its list's own order.</para>
 /// The visible text is always the fixed <c>&lsaquo; Prev</c> / <c>Next &rsaquo;</c>; the sibling's real name rides a
 /// <c>title=</c> tooltip. Pure HTML/CSS, no JS. [Prev/next navigation]</para></summary>
 public sealed record EntityPager(PagerLink? Prev, PagerLink? Next)
