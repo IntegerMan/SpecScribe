@@ -3141,6 +3141,16 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    heights. Center both badges on the cross axis so they line up with each other. */
 .story-card-header .status-badge { align-self: center; }
 
+/* Generation-time recency marker on drafted story cards (Story 8.8) — muted, right-aligned when
+   the flex row wraps; tokens only, never a wall-clock "ago". */
+.story-card-header .story-card-updated {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--ink-light);
+  white-space: nowrap;
+  align-self: center;
+}
+
 .story-card .not-detailed-note {
   font-size: 0.76rem;
   color: var(--ink-light);

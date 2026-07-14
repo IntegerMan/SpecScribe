@@ -243,6 +243,12 @@ public sealed partial class HtmlRenderAdapter
         {
             sb.Append($"    {TaskBadge(card.TasksDone, card.TasksTotal)}\n");
         }
+
+        // Generation-time absolute date only — omit entirely when unresolved (AC #2). [Story 8.8]
+        if (card.UpdatedDate is { } updated)
+        {
+            sb.Append($"    <span class=\"story-card-updated\">Updated {PortalDates.Day(updated)}</span>\n");
+        }
         sb.Append("  </div>\n");
 
         if (card.UserStoryNoteHtml.Length > 0)

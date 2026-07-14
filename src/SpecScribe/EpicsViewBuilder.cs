@@ -115,6 +115,7 @@ public static class EpicsViewBuilder
             UserStoryNoteHtml = story.UserStoryNoteHtml,
             AcBlocksHtml = story.AcBlocksHtml,
             NoteHtml = noteHtml,
+            UpdatedDate = story.LastUpdatedDate,
         };
     }
 

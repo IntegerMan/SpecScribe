@@ -78,6 +78,34 @@ public static class EpicsParser
         return m.Success ? m.Groups[1].Value.Trim() : null;
     }
 
+    // Leading ISO date on a change-log row: list bullet ("- 2026-07-08 …") or table cell ("| 2026-07-08 | …").
+    private static readonly Regex ChangeLogLeadingIsoDate =
+        new(@"^\s*(?:[-*]\s+|\|\s*)?(\d{4}-\d{2}-\d{2})\b", RegexOptions.Compiled);
+
+    /// <summary>Returns the latest ISO <c>yyyy-MM-dd</c> date found in the artifact's <c>## Change Log</c>
+    /// section (table or list form), or null when the section is absent / has no parseable date.
+    /// Malformed rows are skipped — never throws. Pure + repo-free. [Story 8.8]</summary>
+    public static DateOnly? ExtractLatestChangeLogDate(string raw)
+    {
+        var lines = raw.Replace("\r\n", "\n").Split('\n');
+        var (start, end) = FindSection(lines, "## Change Log", 0, lines.Length);
+        if (start < 0) return null;
+
+        DateOnly? max = null;
+        for (var i = start + 1; i < end; i++)
+        {
+            var m = ChangeLogLeadingIsoDate.Match(lines[i]);
+            if (!m.Success) continue;
+            if (!DateOnly.TryParseExact(m.Groups[1].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var date))
+            {
+                continue;
+            }
+            if (max is null || date > max) max = date;
+        }
+        return max;
+    }
+
     /// <summary>Splits a story implementation-artifact into its lead "## Story" blurb (the As-a/I-want/
     /// So-that narrative) and the rest of the plan, stopping before "## Dev Agent Record". Both the
     /// "## Acceptance Criteria" section (surfaced as its own anchored panel via

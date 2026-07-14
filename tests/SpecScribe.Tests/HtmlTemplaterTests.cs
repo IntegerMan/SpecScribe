@@ -335,6 +335,46 @@ public class HtmlTemplaterTests
         Assert.Contains($"class=\"stat-label\">{expectedLabel}</div>", html);
     }
 
+    // ---- Story 8.8 Commits-tile absolute recency ----------------------------------------------------------
+
+    [Fact]
+    public void RenderIndex_CommitStatSub_UsesAbsoluteDate_NotRelativeAgo()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var day = new DateOnly(2026, 1, 5);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressWithCommits(3),
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        Assert.Contains($"last commit {PortalDates.Day(day)}", html);
+        Assert.DoesNotContain(" ago", html);
+        Assert.DoesNotContain("d ago", html);
+        Assert.DoesNotContain("yesterday", html);
+        Assert.DoesNotContain("today", html);
+    }
+
+    [Fact]
+    public void RenderIndex_CommitStatSub_IsDeterministicAcrossRepeatedBuilds()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        string Render() => HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressWithCommits(3),
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        Assert.Equal(Render(), Render());
+    }
+
     [Fact]
     public void RenderIndex_WiresHeatmapDayLinksThroughDashboard()
     {

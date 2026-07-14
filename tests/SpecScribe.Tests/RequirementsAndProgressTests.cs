@@ -343,4 +343,165 @@ public class ProgressCalculatorTests : IDisposable
         Assert.Equal(0, progress.TasksTotal);
         Assert.Equal(1, progress.StoriesWithArtifact);
     }
+
+    // ---- Story 8.8 LastUpdatedDate resolution ------------------------------------------------------------
+
+    [Fact]
+    public void Compute_LastUpdatedDate_PrefersGitFileDateOverChangeLog()
+    {
+        var artifact = WriteArtifact("1-1-scaffold.md", """
+            # Story 1.1
+            Status: ready-for-dev
+
+            ## Tasks / Subtasks
+            - [ ] Task
+
+            ## Change Log
+            - 2026-07-01: Change-log date (should lose)
+            """);
+
+        var epics = Epics;
+        epics.Epics[0].Stories[0].ArtifactSourcePath = "implementation-artifacts/1-1-scaffold.md";
+
+        var deep = new DeepGitPulse(Array.Empty<(string, int)>(), Array.Empty<(string, string, int)>())
+        {
+            Insights = new GitInsightsData(
+                Files: new[]
+                {
+                    new FileChangeStat(
+                        "_bmad-output/implementation-artifacts/1-1-scaffold.md",
+                        2, 10, 1, "abc1234",
+                        new DateOnly(2026, 7, 14),
+                        Array.Empty<FileContributor>(), 0),
+                },
+                Activity: Array.Empty<(DateOnly, int)>(),
+                CommitCount: 1,
+                ContributorCount: 1,
+                TotalFilesTouched: 1),
+        };
+
+        ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null, deep);
+
+        Assert.Equal(new DateOnly(2026, 7, 14), epics.Epics[0].Stories[0].LastUpdatedDate);
+    }
+
+    [Fact]
+    public void Compute_LastUpdatedDate_FallsBackToChangeLogWhenDeepNull()
+    {
+        var artifact = WriteArtifact("1-1-scaffold.md", """
+            # Story 1.1
+            Status: ready-for-dev
+
+            ## Tasks / Subtasks
+            - [ ] Task
+
+            ## Change Log
+            - 2026-07-08: Only source
+            """);
+
+        var epics = Epics;
+        epics.Epics[0].Stories[0].ArtifactSourcePath = "implementation-artifacts/1-1-scaffold.md";
+
+        ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null, deep: null);
+
+        Assert.Equal(new DateOnly(2026, 7, 8), epics.Epics[0].Stories[0].LastUpdatedDate);
+    }
+
+    [Fact]
+    public void Compute_LastUpdatedDate_FallsBackWhenGitPathUnmatched()
+    {
+        var artifact = WriteArtifact("1-1-scaffold.md", """
+            # Story 1.1
+            Status: ready-for-dev
+
+            ## Tasks / Subtasks
+            - [ ] Task
+
+            ## Change Log
+            - 2026-07-10: Fallback after unmatched path
+            """);
+
+        var epics = Epics;
+        epics.Epics[0].Stories[0].ArtifactSourcePath = "implementation-artifacts/1-1-scaffold.md";
+
+        var deep = new DeepGitPulse(Array.Empty<(string, int)>(), Array.Empty<(string, string, int)>())
+        {
+            Insights = new GitInsightsData(
+                Files: new[]
+                {
+                    new FileChangeStat(
+                        "src/other.cs", 1, 1, 0, "deadbeef",
+                        new DateOnly(2026, 7, 14),
+                        Array.Empty<FileContributor>(), 0),
+                },
+                Activity: Array.Empty<(DateOnly, int)>(),
+                CommitCount: 1,
+                ContributorCount: 1,
+                TotalFilesTouched: 1),
+        };
+
+        ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null, deep);
+
+        Assert.Equal(new DateOnly(2026, 7, 10), epics.Epics[0].Stories[0].LastUpdatedDate);
+    }
+
+    [Fact]
+    public void Compute_LastUpdatedDate_NullWhenNeitherGitNorChangeLog()
+    {
+        var artifact = WriteArtifact("1-1-scaffold.md", """
+            # Story 1.1
+            Status: ready-for-dev
+
+            ## Tasks / Subtasks
+            - [ ] Task
+            """);
+
+        var epics = Epics;
+        epics.Epics[0].Stories[0].ArtifactSourcePath = "implementation-artifacts/1-1-scaffold.md";
+
+        ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null);
+
+        Assert.Null(epics.Epics[0].Stories[0].LastUpdatedDate);
+    }
+
+    [Fact]
+    public void Compute_LastUpdatedDate_PathKeyUsesSourceDirNamePlusArtifactSourcePath()
+    {
+        // Guards the path-reconciliation sharp edge: ArtifactSourcePath is relative to _bmad-output/,
+        // while git paths are repo-root-relative.
+        var artifact = WriteArtifact("renamed.md", """
+            # Story 1.1
+            Status: ready-for-dev
+
+            ## Tasks / Subtasks
+            - [ ] Task
+
+            ## Change Log
+            - 2026-01-01: Should lose to git
+            """);
+
+        var epics = Epics;
+        epics.Epics[0].Stories[0].ArtifactSourcePath = "implementation-artifacts/renamed.md";
+
+        var expectedKey = PathUtil.NormalizeSlashes($"{ForgeOptions.SourceDirName}/implementation-artifacts/renamed.md");
+        Assert.Equal("_bmad-output/implementation-artifacts/renamed.md", expectedKey);
+
+        var deep = new DeepGitPulse(Array.Empty<(string, int)>(), Array.Empty<(string, string, int)>())
+        {
+            Insights = new GitInsightsData(
+                Files: new[]
+                {
+                    new FileChangeStat(expectedKey, 1, 5, 0, "abc", new DateOnly(2026, 6, 15),
+                        Array.Empty<FileContributor>(), 0),
+                },
+                Activity: Array.Empty<(DateOnly, int)>(),
+                CommitCount: 1,
+                ContributorCount: 1,
+                TotalFilesTouched: 1),
+        };
+
+        ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null, deep);
+
+        Assert.Equal(new DateOnly(2026, 6, 15), epics.Epics[0].Stories[0].LastUpdatedDate);
+    }
 }

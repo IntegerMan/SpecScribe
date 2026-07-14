@@ -1,6 +1,10 @@
+---
+baseline_commit: ce8f4c27c9d8f35433cbe0a580377fd75142f932
+---
+
 # Story 8.8: Generation-Time Recency Signals
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -207,24 +211,24 @@ No external libraries or APIs are introduced — pure in-repo C# date/string wor
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Deterministic date formatter (AC: #1)**
-  - [ ] Add a single pure `Recency.FormatDate(DateOnly)` (or `PathUtil.FormatRecencyDate`) → `date.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)`. Route every marker through it.
-- [ ] **Task 2 — Change-log date parser (AC: #1, #2)**
-  - [ ] Add pure `EpicsParser.ExtractLatestChangeLogDate(string raw)` → `DateOnly?`: isolate the `## Change Log` section, scan for leading ISO dates in both table (`| 2026-07-08 |`) and list (`- 2026-07-08 …`) forms, invariant `TryParseExact`, return the max (null when none). Skip malformed rows, never throw.
-- [ ] **Task 3 — Resolve per-story recency in `ProgressCalculator` (AC: #1, #2)**
-  - [ ] Add `StoryInfo.LastUpdatedDate { get; set; }` (`DateOnly?`).
-  - [ ] In `Compute`: build the deep-git per-file date map once (`deep?.Insights?.Files` → dict keyed by normalized repo-relative path, non-null dates only). Per story with an artifact: set `LastUpdatedDate` = git date at `NormalizeSlashes(SourceDirName + "/" + ArtifactSourcePath)` → else change-log date (from the raw the pass already read) → else null.
-- [ ] **Task 4 — Fix the Commits stat tile (AC: #1)**
-  - [ ] Rewrite `DashboardViewBuilder.CommitStatSub` to `"{ActiveDays} active {day/days} · last commit {Recency.FormatDate(git.LastCommitDate)}"`; delete the `DateTime.Now`/`daysAgo` lines.
-- [ ] **Task 5 — Render the story-card marker (AC: #1, #2)**
-  - [ ] Add `DateOnly? UpdatedDate` to `StoryCardView`; set it in `BuildStoryCard` from `story.LastUpdatedDate`.
-  - [ ] In `AppendStoryCard`, emit `<span class="story-card-updated">Updated {formatted}</span>` in the card header only when `UpdatedDate` is non-null.
-  - [ ] Add the `.story-card-updated` muted CSS (tokens only, no hex) + a `StylesheetTests` assertion.
-- [ ] **Task 6 — Tests (AC: #1, #2)**
-  - [ ] Parser: max-date, table + list forms, null cases. Resolution: git-wins / change-log-fallback / null; path-key match. Render: span present when set / absent when null. Commits tile: absolute date, no "ago", determinism (build twice, compare).
-  - [ ] Confirm `RenderSectionParity` + section serialization green; run the golden drill and regenerate `GoldenContentFingerprint` **only** if the fixture actually moves (verify the diff is only `Updated` spans).
-- [ ] **Task 7 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green; real generation to `SpecScribeOutput/` (with and without `--deep-git`); eyeball the Commits tile (absolute date, no "Nd ago") and drafted story cards ("Updated <date>", shifting to git dates under `--deep-git`).
+- [x] **Task 1 — Deterministic date formatter (AC: #1)**
+  - [x] Add a single pure `Recency.FormatDate(DateOnly)` (or `PathUtil.FormatRecencyDate`) → `date.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)`. Route every marker through it.
+- [x] **Task 2 — Change-log date parser (AC: #1, #2)**
+  - [x] Add pure `EpicsParser.ExtractLatestChangeLogDate(string raw)` → `DateOnly?`: isolate the `## Change Log` section, scan for leading ISO dates in both table (`| 2026-07-08 |`) and list (`- 2026-07-08 …`) forms, invariant `TryParseExact`, return the max (null when none). Skip malformed rows, never throw.
+- [x] **Task 3 — Resolve per-story recency in `ProgressCalculator` (AC: #1, #2)**
+  - [x] Add `StoryInfo.LastUpdatedDate { get; set; }` (`DateOnly?`).
+  - [x] In `Compute`: build the deep-git per-file date map once (`deep?.Insights?.Files` → dict keyed by normalized repo-relative path, non-null dates only). Per story with an artifact: set `LastUpdatedDate` = git date at `NormalizeSlashes(SourceDirName + "/" + ArtifactSourcePath)` → else change-log date (from the raw the pass already read) → else null.
+- [x] **Task 4 — Fix the Commits stat tile (AC: #1)**
+  - [x] Rewrite `DashboardViewBuilder.CommitStatSub` to `"{ActiveDays} active {day/days} · last commit {Recency.FormatDate(git.LastCommitDate)}"`; delete the `DateTime.Now`/`daysAgo` lines.
+- [x] **Task 5 — Render the story-card marker (AC: #1, #2)**
+  - [x] Add `DateOnly? UpdatedDate` to `StoryCardView`; set it in `BuildStoryCard` from `story.LastUpdatedDate`.
+  - [x] In `AppendStoryCard`, emit `<span class="story-card-updated">Updated {formatted}</span>` in the card header only when `UpdatedDate` is non-null.
+  - [x] Add the `.story-card-updated` muted CSS (tokens only, no hex) + a `StylesheetTests` assertion.
+- [x] **Task 6 — Tests (AC: #1, #2)**
+  - [x] Parser: max-date, table + list forms, null cases. Resolution: git-wins / change-log-fallback / null; path-key match. Render: span present when set / absent when null. Commits tile: absolute date, no "ago", determinism (build twice, compare).
+  - [x] Confirm `RenderSectionParity` + section serialization green; run the golden drill and regenerate `GoldenContentFingerprint` **only** if the fixture actually moves (verify the diff is only `Updated` spans).
+- [x] **Task 7 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green; real generation to `SpecScribeOutput/` (with and without `--deep-git`); eyeball the Commits tile (absolute date, no "Nd ago") and drafted story cards ("Updated <date>", shifting to git dates under `--deep-git`).
 
 ## Dev Notes
 
@@ -263,8 +267,41 @@ Commits-tile + story-card `Updated <date>` markers are **shared-path** (view mod
 
 ### Agent Model Used
 
+Composer (Auto)
+
 ### Debug Log References
+
+- Accidental `git stash` mid-session briefly hid source edits; restored via `git stash pop` before completion.
+- Golden fingerprint moved CSS-only (fixture stories have no `## Change Log` and no git) → regenerated to `1bb87887…`.
 
 ### Completion Notes List
 
+- Routed all recency markers through existing `PortalDates.Day` (Story 10.4 one-date-token) rather than inventing a parallel `Recency` class — same `"MMM d, yyyy"` InvariantCulture contract the story required.
+- Added `EpicsParser.ExtractLatestChangeLogDate` (table + list ISO forms; max date; null/malformed degrade).
+- `ProgressCalculator` resolves `StoryInfo.LastUpdatedDate` once per artifact read: deep-git file map (`SourceDirName/ArtifactSourcePath`) → change-log date → null.
+- Replaced `CommitStatSub`'s `DateTime.Now` "Nd ago" with absolute `PortalDates.Day(git.LastCommitDate)`.
+- Epic-page story cards emit muted `.story-card-updated` only when `UpdatedDate` is set.
+- Tests: 1151 green. Live gen: Commits tile `last commit Jul 14, 2026` (no ago); drafted cards show `Updated <date>` with and without `--deep-git`.
+
 ### File List
+
+- `src/SpecScribe/EpicsModel.cs`
+- `src/SpecScribe/EpicsParser.cs`
+- `src/SpecScribe/ProgressCalculator.cs`
+- `src/SpecScribe/DashboardViewBuilder.cs`
+- `src/SpecScribe/EpicsView.cs`
+- `src/SpecScribe/EpicsViewBuilder.cs`
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs`
+- `src/SpecScribe/assets/specscribe.css`
+- `tests/SpecScribe.Tests/EpicsParserTests.cs`
+- `tests/SpecScribe.Tests/RequirementsAndProgressTests.cs`
+- `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs`
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs`
+- `tests/SpecScribe.Tests/StylesheetTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
+- `_bmad-output/implementation-artifacts/8-8-generation-time-recency-signals.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Change Log
+
+- 2026-07-14: Implemented Story 8.8 — generation-time absolute recency markers on Commits tile + epic story cards (git-first, change-log fallback); removed `DateTime.Now` "Nd ago"; tests + golden fingerprint CSS-only regen. Status → review.

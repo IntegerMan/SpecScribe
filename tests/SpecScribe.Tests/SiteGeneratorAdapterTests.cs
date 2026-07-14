@@ -314,7 +314,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // header subtitle drops its epic/drafted count restatement (the stat grid below is the single count
         // display); specscribe.css gains the .req-view/.req-panel:has(#rv-grid:checked) toggle rules. A before/
         // after byte-diff confirmed those are the ONLY rendering changes. [Story 8.7; golden-diff-normalization-gotchas]
-        const string expected = "f8739b6855751791042d368de477b59b64efb2263a0a8ef1f44c6a2dbe5168b7";
+        // Regenerated for Story 8.8: specscribe.css gained .story-card-updated (muted recency marker on epic-page
+        // story cards). This non-git fixture's story artifacts have no ## Change Log, so no "Updated <date>" span
+        // renders here — only the shared stylesheet content shifted the hash. Commits-tile absolute-date fix is
+        // likewise invisible (fixture has "no git history"). Marker + CommitStatSub determinism are covered by
+        // unit tests. [Story 8.8; golden-diff-normalization-gotchas]
+        const string expected = "1bb87887c3ada44dd55211adb807f61706ade14c2d9e39d36be7c4e73e84a39c";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -168,7 +168,8 @@ public class HtmlRenderAdapterTests
         string? status = "review",
         string statusStage = "review",
         int tasksDone = 5,
-        int tasksTotal = 5) => new()
+        int tasksTotal = 5,
+        DateOnly? updatedDate = null) => new()
     {
         Id = id,
         TitleHtml = "Paired Progress Story",
@@ -181,6 +182,7 @@ public class HtmlRenderAdapterTests
         ViewPlanHref = "epics/story-1-1.html",
         UserStoryHtml = "<p>As a maintainer…</p>",
         AcBlocksHtml = Array.Empty<string>(),
+        UpdatedDate = updatedDate,
     };
 
     private static EpicPageView EpicPage(params StoryCardView[] cards) => new()
@@ -246,6 +248,27 @@ public class HtmlRenderAdapterTests
         Assert.Contains("2/4 tasks", html);
         // No lifecycle status badge — only the task badge.
         Assert.DoesNotContain("status-badge review", html);
+    }
+
+    // ---- Story 8.8 story-card recency marker ---------------------------------------------------------------
+
+    [Fact]
+    public void RenderEpicBody_EmitsStoryCardUpdatedWhenUpdatedDateSet()
+    {
+        var day = new DateOnly(2026, 7, 9);
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(EpicPage(Card(updatedDate: day)));
+
+        Assert.Contains("class=\"story-card-updated\"", html);
+        Assert.Contains($"Updated {PortalDates.Day(day)}", html);
+    }
+
+    [Fact]
+    public void RenderEpicBody_OmitsStoryCardUpdatedWhenUpdatedDateNull()
+    {
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(EpicPage(Card(updatedDate: null)));
+
+        Assert.DoesNotContain("story-card-updated", html);
+        Assert.DoesNotContain("Updated ", html);
     }
 
     // ---- Story 8.6 undrafted-banner consolidation ---------------------------------------------------------

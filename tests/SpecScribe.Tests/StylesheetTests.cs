@@ -65,6 +65,8 @@ public class StylesheetTests
         // Story 8.6 designed empty states
         Assert.Contains(".epic-undrafted-banner", css);
         Assert.Contains(".sprint-lane-empty", css);
+        // Story 8.8 generation-time recency marker on story cards
+        Assert.Contains(".story-card-updated", css);
     }
 
     [Fact]

@@ -104,16 +104,11 @@ public static class DashboardViewBuilder
         return tiles;
     }
 
-    /// <summary>The commit stat's sub-line: active days plus a recency signal. Relocated verbatim from
-    /// <c>HtmlTemplater.CommitStatSub</c>. [Story 1.5 F3]</summary>
+    /// <summary>The commit stat's sub-line: active days plus a deterministic absolute-date recency signal.
+    /// Uses <see cref="PortalDates.Day"/> (never <c>DateTime.Now</c>) so a from-scratch regen of the same
+    /// inputs is byte-identical. [Story 1.5 F3; Story 8.8]</summary>
     private static string CommitStatSub(GitPulse git)
-    {
-        var daysAgo = DateOnly.FromDateTime(DateTime.Now).DayNumber - git.LastCommitDate.DayNumber;
-        var recency = daysAgo <= 0 ? "last commit today"
-            : daysAgo == 1 ? "last commit yesterday"
-            : $"last commit {daysAgo}d ago";
-        return $"{git.ActiveDays} active {Charts.Plural(git.ActiveDays, "day", "days")} · {recency}";
-    }
+        => $"{git.ActiveDays} active {Charts.Plural(git.ActiveDays, "day", "days")} · last commit {PortalDates.Day(git.LastCommitDate)}";
 
     // ----- Overall Progress bars ----------------------------------------------------------------------------
 

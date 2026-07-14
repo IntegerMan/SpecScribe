@@ -269,6 +269,65 @@ public class EpicsParserTests
     public void ExtractStatus_ReturnsNullWhenAbsent()
         => Assert.Null(EpicsParser.ExtractStatus("# Story 1.1\nNo status here.\n"));
 
+    // ---- Story 8.8 change-log recency dates ---------------------------------------------------------------
+
+    [Fact]
+    public void ExtractLatestChangeLogDate_PicksMaxAcrossListForm()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            - 2026-07-06: First entry
+            - 2026-07-14: Later entry
+            - 2026-07-08: Middle entry
+            """;
+        Assert.Equal(new DateOnly(2026, 7, 14), EpicsParser.ExtractLatestChangeLogDate(raw));
+    }
+
+    [Fact]
+    public void ExtractLatestChangeLogDate_ParsesTableForm()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            | Date       | Version | Description |
+            | ---------- | ------- | ----------- |
+            | 2026-07-08 | 0.1.0   | Drafted     |
+            | 2026-07-14 | 1.0     | Implemented |
+            """;
+        Assert.Equal(new DateOnly(2026, 7, 14), EpicsParser.ExtractLatestChangeLogDate(raw));
+    }
+
+    [Fact]
+    public void ExtractLatestChangeLogDate_ReturnsNullWhenSectionAbsent()
+        => Assert.Null(EpicsParser.ExtractLatestChangeLogDate("# Story 1.1\nNo change log here.\n"));
+
+    [Fact]
+    public void ExtractLatestChangeLogDate_ReturnsNullWhenSectionHasNoIsoDate()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            | Date | Description |
+            | ---- | ----------- |
+            | TBD  | Nothing yet |
+            """;
+        Assert.Null(EpicsParser.ExtractLatestChangeLogDate(raw));
+    }
+
+    [Fact]
+    public void ExtractLatestChangeLogDate_SkipsMalformedRowsWithoutThrowing()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            - not-a-date: garbage
+            - 2026-13-99: impossible
+            - 2026-07-09: real
+            """;
+        Assert.Equal(new DateOnly(2026, 7, 9), EpicsParser.ExtractLatestChangeLogDate(raw));
+    }
+
     private const string SampleArtifact = """
         # Story 1.1: Scaffold
         Status: in progress

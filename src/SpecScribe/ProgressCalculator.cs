@@ -1,12 +1,17 @@
 namespace SpecScribe;
 
 /// <summary>Tallies epic/story/task progress from a parsed <see cref="EpicsModel"/> and its resolved
-/// implementation artifacts. As a side effect, fills in each <see cref="StoryInfo"/>'s TasksDone/TasksTotal
-/// so per-story task bars need no extra plumbing downstream.</summary>
+/// implementation artifacts. As a side effect, fills in each <see cref="StoryInfo"/>'s TasksDone/TasksTotal/
+/// Status/<see cref="StoryInfo.LastUpdatedDate"/> so per-story badges and recency markers need no extra
+/// plumbing downstream.</summary>
 public static class ProgressCalculator
 {
     public static ProgressModel Compute(EpicsModel epics, IReadOnlyDictionary<string, string> artifactMap, GitPulse? git, DeepGitPulse? deep = null)
     {
+        // Deep-git per-file dates, keyed by normalized repo-root-relative path (git's own forward-slash paths).
+        // Built once; unmatched story paths fall through to the change-log date. [Story 8.8]
+        var gitFileDates = BuildGitFileDateMap(deep);
+
         var perEpic = new List<EpicProgress>();
         int storiesTotal = 0, storiesWithArtifact = 0, tasksDone = 0, tasksTotal = 0;
 
@@ -23,10 +28,11 @@ public static class ProgressCalculator
                     storiesWithArtifact++;
                     epicStoriesWithArtifact++;
 
-                    var (done, total, status) = ReadArtifactProgress(artifactFullPath);
+                    var (done, total, status, changeLogDate) = ReadArtifactProgress(artifactFullPath);
                     story.TasksDone = done;
                     story.TasksTotal = total;
                     story.Status = status;
+                    story.LastUpdatedDate = ResolveLastUpdated(story, gitFileDates, changeLogDate);
                     epicTasksDone += done;
                     epicTasksTotal += total;
                 }
@@ -69,7 +75,38 @@ public static class ProgressCalculator
         };
     }
 
-    private static (int Done, int Total, string? Status) ReadArtifactProgress(string artifactFullPath)
+    /// <summary>Git date at <c>SourceDirName/ArtifactSourcePath</c> wins; else the change-log date; else null.
+    /// Never invents a date. [Story 8.8]</summary>
+    private static DateOnly? ResolveLastUpdated(
+        StoryInfo story,
+        IReadOnlyDictionary<string, DateOnly> gitFileDates,
+        DateOnly? changeLogDate)
+    {
+        if (story.ArtifactSourcePath is { Length: > 0 } sourceRel)
+        {
+            var key = PathUtil.NormalizeSlashes($"{ForgeOptions.SourceDirName}/{sourceRel}");
+            if (gitFileDates.TryGetValue(key, out var gitDate)) return gitDate;
+        }
+        return changeLogDate;
+    }
+
+    private static Dictionary<string, DateOnly> BuildGitFileDateMap(DeepGitPulse? deep)
+    {
+        var map = new Dictionary<string, DateOnly>(StringComparer.Ordinal);
+        var files = deep?.Insights?.Files;
+        if (files is null) return map;
+
+        foreach (var file in files)
+        {
+            if (file.LastChangeDate is not { } date) continue;
+            var path = PathUtil.NormalizeSlashes(file.Path);
+            // First-seen wins: Insights.Files is already newest-first aggregated per path.
+            map.TryAdd(path, date);
+        }
+        return map;
+    }
+
+    private static (int Done, int Total, string? Status, DateOnly? ChangeLogDate) ReadArtifactProgress(string artifactFullPath)
     {
         try
         {
@@ -83,11 +120,11 @@ public static class ProgressCalculator
             var done = tasks.Count(t => t.Done);
             var total = tasks.Count;
 
-            return (done, total, EpicsParser.ExtractStatus(raw));
+            return (done, total, EpicsParser.ExtractStatus(raw), EpicsParser.ExtractLatestChangeLogDate(raw));
         }
         catch (IOException)
         {
-            return (0, 0, null);
+            return (0, 0, null, null);
         }
     }
 }

@@ -61,6 +61,11 @@ public sealed record StoryCardView
     /// <summary>The pre-rendered "no plan yet — draft it with…" guidance HTML for an undrafted story, or null
     /// when the story has an artifact. Command-catalog driven, so pre-rendered (named opaque fragment).</summary>
     public string? NoteHtml { get; init; }
+
+    /// <summary>Generation-time "Updated &lt;date&gt;" marker for the card header — resolved from git or the
+    /// story change log by <see cref="ProgressCalculator"/>; null omits the marker (AC #2). Never a wall clock.
+    /// [Story 8.8]</summary>
+    public DateOnly? UpdatedDate { get; init; }
 }
 
 /// <summary>One "Dev Agent Record" row as DATA: the row label + its already-projected content HTML (a named

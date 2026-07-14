@@ -37,6 +37,11 @@ public sealed class StoryInfo
     /// <summary>The artifact's "Status:" line (e.g. "ready-for-dev"); null when no artifact exists.
     /// Set by <see cref="ProgressCalculator"/>.</summary>
     public string? Status { get; set; }
+
+    /// <summary>Generation-time recency for the story card: the story file's last git change date when
+    /// deep-git matched the path, else the latest <c>## Change Log</c> ISO date, else null.
+    /// Set by <see cref="ProgressCalculator"/>. Never a wall clock. [Story 8.8]</summary>
+    public DateOnly? LastUpdatedDate { get; set; }
 }
 
 public sealed class EpicInfo
