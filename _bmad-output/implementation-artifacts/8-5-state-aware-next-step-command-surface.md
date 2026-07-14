@@ -1,6 +1,10 @@
+---
+baseline_commit: a1d9a915af289e178e1f7b9466f0b15adfb08824
+---
+
 # Story 8.5: State-Aware Next-Step Command Surface
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -248,21 +252,21 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Primary/alternate hierarchy in the shared renderer (AC: #1)**
-  - [ ] In `RenderInner`, render `suggestions[0]` as `.next-steps-primary` (emphasized) and, when `Count > 1`, the rest under a `.next-steps-alternates` group with an `Other actions` label + `.next-steps-alt` muted rows. Reuse `RenderCommandBadge` + `.next-steps-desc` for every command. Keep the `Next Steps` heading and the `.next-steps-list` scaffold.
-  - [ ] Add `.next-steps-primary` / `.next-steps-alternates` / `.next-steps-alt` CSS via `--status-*`/`--ink-light` tokens (accent for primary, muted for alternates); no literal hex. Add `StylesheetTests` assertions.
-- [ ] **Task 2 — Unhappy-path commands in `ForStory` (AC: #1, #2)**
-  - [ ] `in-progress`: add `correct-course` alternate (after code-review) with a mid-sprint caption. `review`: add one `correct-course` alternate with a review-scoped caption. Both via `Add(commands.Command("correct-course"), …)` (no id).
-  - [ ] Re-order the no-plan fall-through so `create-story {id}` is primary and `check-implementation-readiness` (`.1` only) is the demoted alternate.
-  - [ ] Update the `ForStory` doc comment to describe the primary/alternate model.
-- [ ] **Task 3 — Done-state muted escape hatch (AC: #1)**
-  - [ ] Thread `CommandCatalog` into `RenderAllDonePanel` (via `RenderNextSteps`). Keep the celebratory checkmark + "All done"; append one muted `Other actions` `correct-course` action when exposed; render purely celebratory (today's bytes) when not. Never code-review, never primary.
-- [ ] **Task 4 — Tests (AC: #1, #2, #3)**
-  - [ ] `BmadCommandsTests`: exactly-one-primary per panel; primary identity per state; done celebratory + muted escape hatch (and pure-celebration when `correct-course` absent); NFR8 degradation incl. primary-promotion; every command has a caption; shipped-spec regressions (no code-review on `ready`, no create-story/retro on review, bare `Next Steps` heading, `ForProject`/`ForEpic` still render).
-  - [ ] `StylesheetTests`: new classes present.
-  - [ ] Confirm `RenderSectionParity` facts unchanged; regenerate `GoldenContentFingerprint` after confirming the byte diff is Next Steps panels only.
-- [ ] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball an `in-progress` story (dev-story hero + code-review/correct-course demoted), a `done` story (celebration + muted correct-course), and the home panel (one hero + demoted rest).
+- [x] **Task 1 — Primary/alternate hierarchy in the shared renderer (AC: #1)**
+  - [x] In `RenderInner`, render `suggestions[0]` as `.next-steps-primary` (emphasized) and, when `Count > 1`, the rest under a `.next-steps-alternates` group with an `Other actions` label + `.next-steps-alt` muted rows. Reuse `RenderCommandBadge` + `.next-steps-desc` for every command. Keep the `Next Steps` heading and the `.next-steps-list` scaffold.
+  - [x] Add `.next-steps-primary` / `.next-steps-alternates` / `.next-steps-alt` CSS via `--status-*`/`--ink-light` tokens (accent for primary, muted for alternates); no literal hex. Add `StylesheetTests` assertions.
+- [x] **Task 2 — Unhappy-path commands in `ForStory` (AC: #1, #2)**
+  - [x] `in-progress`: add `correct-course` alternate (after code-review) with a mid-sprint caption. `review`: add one `correct-course` alternate with a review-scoped caption. Both via `Add(commands.Command("correct-course"), …)` (no id).
+  - [x] Re-order the no-plan fall-through so `create-story {id}` is primary and `check-implementation-readiness` (`.1` only) is the demoted alternate.
+  - [x] Update the `ForStory` doc comment to describe the primary/alternate model.
+- [x] **Task 3 — Done-state muted escape hatch (AC: #1)**
+  - [x] Thread `CommandCatalog` into `RenderAllDonePanel` (via `RenderNextSteps`). Keep the celebratory checkmark + "All done"; append one muted `Other actions` `correct-course` action when exposed; render purely celebratory (today's bytes) when not. Never code-review, never primary.
+- [x] **Task 4 — Tests (AC: #1, #2, #3)**
+  - [x] `BmadCommandsTests`: exactly-one-primary per panel; primary identity per state; done celebratory + muted escape hatch (and pure-celebration when `correct-course` absent); NFR8 degradation incl. primary-promotion; every command has a caption; shipped-spec regressions (no code-review on `ready`, no create-story/retro on review, bare `Next Steps` heading, `ForProject`/`ForEpic` still render).
+  - [x] `StylesheetTests`: new classes present.
+  - [x] Confirm `RenderSectionParity` facts unchanged; regenerate `GoldenContentFingerprint` after confirming the byte diff is Next Steps panels only.
+- [x] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball an `in-progress` story (dev-story hero + code-review/correct-course demoted), a `done` story (celebration + muted correct-course), and the home panel (one hero + demoted rest).
 
 ## Dev Notes
 
@@ -309,8 +313,36 @@ CLI does not render Next Steps panels.
 
 ### Agent Model Used
 
+Composer (Auto / Cursor agent router)
+
 ### Debug Log References
+
+- Full suite: `dotnet test` → 1125 passed, 0 failed (2026-07-14).
+- Generation: `dotnet run --project src/SpecScribe -- generate` → 164 pages to `SpecScribeOutput/`.
+- Manual eyeball: `story-8-5.html` (in-progress: primary `dev-story` + alts `code-review`/`correct-course`); `story-1-1.html` (done: celebration + muted `correct-course`); `story-8-4.html` / `epic-8.html` (review/epic primary hierarchy).
 
 ### Completion Notes List
 
+- Implemented hero-primary + always-visible demoted `Other actions` in shared `RenderInner` / `RenderAlternatesGroup`; primacy is render-time (`suggestions[0]`).
+- Added `correct-course` unhappy-path alts on `in-progress` and `review`; reordered no-plan fall-through so `create-story` is primary and readiness is alternate on `.1`.
+- Done panel: threaded `CommandCatalog`; muted escape hatch when exposed; pure celebration when not. Never primary / never code-review.
+- CSS: `.next-steps-primary` (`--status-active` border), `.next-steps-alternates` / label / `.next-steps-alt` via `--ink-light` / `--border`.
+- **AC #3 audited + preserved:** (1) `spec-hide-code-review-button-ready-for-dev` — ready still emits only `dev-story`, no code-review. (2) `spec-story-next-steps-review-command` — code-review still carries `story.Id`; review/done still withhold `create-story`/`retrospective`; only `correct-course` added as recovery. (3) `spec-home-next-steps-label-and-code-review` — heading remains bare `Next Steps`; `ForProject` still surfaces awaiting-review (now as primary via shared renderer).
+- **Deferred** webview `stageCommand` host handler (documented comment ownership corrected 8.4→8.5); HTML copy/send path unchanged. Out of task scope; spike note remains optional follow-up.
+- Golden fingerprint regenerated for Next Steps hierarchy + CSS (`4063690d…`). RenderSectionParity unchanged (opaque fragment).
+
 ### File List
+
+- `src/SpecScribe/BmadCommands.cs`
+- `src/SpecScribe/assets/specscribe.css`
+- `src/SpecScribe/WebviewRenderAdapter.cs` (comment ownership fix only)
+- `tests/SpecScribe.Tests/ModuleContextTests.cs`
+- `tests/SpecScribe.Tests/StylesheetTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorOutlineTests.cs`
+- `_bmad-output/implementation-artifacts/8-5-state-aware-next-step-command-surface.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Change Log
+
+- 2026-07-14: Story 8.5 — state-aware Next Steps primary/alternate hierarchy, `correct-course` unhappy-path actions, done escape hatch; tests + golden fingerprint.

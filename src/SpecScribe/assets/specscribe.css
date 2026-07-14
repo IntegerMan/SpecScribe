@@ -2027,9 +2027,27 @@ a.ref-file-node:focus-visible {
 
 .next-steps-desc { display: block; margin-top: 0.25rem; font-size: 0.78rem; color: var(--ink-light); line-height: 1.5; }
 
-/* Done-story actions pane: a finished story has no next command, so it gets a celebratory terminal state
-   (green success accent + the shared done checkmark) instead of a code-review nudge. Distinct from the muted,
-   italic .all-done-note used on the epic Up Next card. [spec-sunburst-retro] */
+/* Hero primary: the one recommended command per state. Accent border mirrors .next-steps.all-done. [Story 8.5] */
+.next-steps-primary {
+  border-left: 3px solid var(--status-active);
+  padding-left: 0.65rem;
+}
+
+/* Demoted alternates / unhappy-path actions — always visible, muted, labeled in text (not color-only). [Story 8.5] */
+.next-steps-alternates { margin-top: 0.85rem; }
+.next-steps-alternates-label {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  font-weight: 600;
+}
+.next-steps-alt { opacity: 0.88; }
+.next-steps-alt .cmd-badge { border-color: var(--border); background: transparent; }
+
+/* Done-story actions pane: celebratory terminal state (green success accent + shared done checkmark),
+   optionally with one muted correct-course escape hatch under Other actions. [spec-sunburst-retro; Story 8.5] */
 .next-steps.all-done { border-left: 3px solid var(--status-done); }
 .all-done-complete { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--moss); font-weight: 600; }
 .all-done-icon { display: inline-flex; }

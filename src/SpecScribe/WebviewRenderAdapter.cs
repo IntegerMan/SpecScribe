@@ -201,7 +201,7 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
               return;
             }
 
-            // AC #2 command-staging extension point — DOCUMENTED here, BUILT in Story 8.4 (R4.3). A future
+            // AC #2 command-staging extension point — DOCUMENTED here; owning story is 8.5 (native R4.3). A future
             // next-step-command surface emits an element carrying its command text; a branch like the one above
             // would post `{ type: 'stageCommand', command: <text> }`, and the shim's handler would reuse the
             // existing `stageTerminalCommand` primitive (createTerminal + sendText(command, /* execute: */ false))

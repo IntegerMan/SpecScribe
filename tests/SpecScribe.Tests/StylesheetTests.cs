@@ -58,6 +58,10 @@ public class StylesheetTests
         Assert.Contains(".sprint-card.no-plan", css);
         Assert.Contains(".sprint-lane-head.js-tip", css);
         Assert.Contains(".epic-mosaic-delivery", css);
+        // Story 8.5 primary / demoted-alternates next-steps hierarchy
+        Assert.Contains(".next-steps-primary", css);
+        Assert.Contains(".next-steps-alternates", css);
+        Assert.Contains(".next-steps-alt", css);
     }
 
     [Fact]

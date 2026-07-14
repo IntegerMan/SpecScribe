@@ -29,18 +29,20 @@ public static class BmadCommands
 
     public static string RenderNextSteps(StoryInfo story, CommandCatalog commands) =>
         StatusStyles.ForStory(story) == "done"
-            ? RenderAllDonePanel()
+            ? RenderAllDonePanel(commands)
             : RenderPanel(ForStory(story, commands));
 
     /// <summary>The FULL status-gated next-step command list for a story — the exact set the story page's
     /// "Next Steps" panel renders (<see cref="RenderNextSteps"/> routes the same <see cref="ForStory"/> list),
     /// projected as data for a non-HTML host (the VS Code outline's "Copy BMad Command…" Quick Pick shows the
-    /// LITERAL command each entry copies), in the page's order — dev-story leads when ready/active, code-review
-    /// when in review, and an undrafted first-of-epic (X.1) story may lead with check-implementation-readiness
-    /// ahead of its create-story. Empty for a done story (no next action — the page shows the "All done" panel
-    /// instead) and when the detected module exposes none — the host then omits the action entirely, so the
-    /// gating (e.g. no code-review before work is reviewable) lives here, never in TypeScript (AD-2).
-    /// Whitespace-only catalog values are dropped so the emitted list never carries a blank command.
+    /// LITERAL command each entry copies), in the page's order — first surviving entry is the primary
+    /// recommended command (dev-story when ready/active, code-review when in review, create-story when
+    /// undrafted; an undrafted first-of-epic (X.1) may also carry check-implementation-readiness as an
+    /// alternate). Empty for a done story (no next action — the page shows the "All done" panel instead,
+    /// optionally with a muted correct-course escape hatch) and when the detected module exposes none —
+    /// the host then omits the action entirely, so the gating (e.g. no code-review before work is
+    /// reviewable) lives here, never in TypeScript (AD-2). Whitespace-only catalog values are dropped so
+    /// the emitted list never carries a blank command.
     /// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick]</summary>
     public static IReadOnlyList<OutlineStoryCommand> StoryCommands(StoryInfo story, CommandCatalog commands) =>
         StatusStyles.ForStory(story) == "done"
@@ -70,13 +72,29 @@ public static class BmadCommands
     public static string RenderEpicNextStepsInner(EpicInfo epic, CommandCatalog commands) =>
         RenderInner(ForEpic(epic, commands));
 
-    /// <summary>The story actions pane for a DONE story: no command list — a finished story needs no next
-    /// action, so it gets a celebratory terminal state (checkmark + success styling) instead of the code-review
-    /// nudge a review/in-progress story shows. Reuses the shared done glyph (<see cref="Icons.ForStatus"/>) so
-    /// the checkmark stays anchored to the one status-icon seam. [spec-sunburst-retro]</summary>
-    private static string RenderAllDonePanel() =>
-        "<div class=\"chart-panel next-steps all-done\">\n<h3>Next Steps</h3>\n" +
-        $"<p class=\"all-done-complete\"><span class=\"all-done-icon\">{Icons.ForStatus("done")}</span>All done — this story is complete.</p>\n</div>\n\n";
+    /// <summary>The story actions pane for a DONE story: celebratory terminal state (checkmark + success
+    /// styling) instead of a primary command or code-review nudge. When the module exposes
+    /// <c>correct-course</c>, a single muted "Other actions" escape hatch is appended for the rare re-open
+    /// case; otherwise the panel stays purely celebratory. Reuses the shared done glyph
+    /// (<see cref="Icons.ForStatus"/>). [spec-sunburst-retro; Story 8.5]</summary>
+    private static string RenderAllDonePanel(CommandCatalog commands)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel next-steps all-done\">\n<h3>Next Steps</h3>\n");
+        sb.Append($"<p class=\"all-done-complete\"><span class=\"all-done-icon\">{Icons.ForStatus("done")}</span>All done — this story is complete.</p>\n");
+
+        var escape = commands.Command("correct-course");
+        if (escape is not null)
+        {
+            sb.Append(RenderAlternatesGroup(
+            [
+                new Suggestion(escape, "Re-open this story if it needs rework."),
+            ]));
+        }
+
+        sb.Append("</div>\n\n");
+        return sb.ToString();
+    }
 
     private static string RenderPanel(List<Suggestion> suggestions)
     {
@@ -86,21 +104,43 @@ public static class BmadCommands
             : $"<div class=\"chart-panel next-steps\">\n{inner}</div>\n\n";
     }
 
+    /// <summary>Shared panel body: <c>suggestions[0]</c> is the emphasized primary; any further survivors
+    /// render under a labeled, demoted "Other actions" group. Primacy is decided here at render time —
+    /// not at <see cref="Add"/> — so a null-dropped intended primary correctly promotes the next survivor.
+    /// [Story 8.5]</summary>
     private static string RenderInner(List<Suggestion> suggestions)
     {
         if (suggestions.Count == 0) return string.Empty;
 
         var sb = new StringBuilder();
         sb.Append("<h3>Next Steps</h3>\n<ul class=\"next-steps-list\">\n");
-        foreach (var s in suggestions)
+        var primary = suggestions[0];
+        sb.Append("  <li class=\"next-steps-primary\">" +
+                  RenderCommandBadge(primary.Command) +
+                  $"<span class=\"next-steps-desc\">{PathUtil.Html(primary.Description)}</span></li>\n");
+        sb.Append("</ul>\n");
+
+        if (suggestions.Count > 1)
         {
-            // Each command renders as one unified badge (command text + Copy + send menu); the description
-            // sits on its own line beneath it.
-            sb.Append("  <li>" +
+            sb.Append(RenderAlternatesGroup(suggestions.Skip(1)));
+        }
+
+        return sb.ToString();
+    }
+
+    private static string RenderAlternatesGroup(IEnumerable<Suggestion> alternates)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"next-steps-alternates\">\n");
+        sb.Append("<p class=\"next-steps-alternates-label\">Other actions</p>\n");
+        sb.Append("<ul class=\"next-steps-list\">\n");
+        foreach (var s in alternates)
+        {
+            sb.Append("  <li class=\"next-steps-alt\">" +
                       RenderCommandBadge(s.Command) +
                       $"<span class=\"next-steps-desc\">{PathUtil.Html(s.Description)}</span></li>\n");
         }
-        sb.Append("</ul>\n");
+        sb.Append("</ul>\n</div>\n");
         return sb.ToString();
     }
 
@@ -235,9 +275,12 @@ public static class BmadCommands
     /// <summary>A story page only suggests actions on *this* story — drafting other stories and
     /// retrospectives are epic/project-level moves that belong on those pages (<see cref="ForEpic"/>,
     /// <see cref="ForProject"/>). The one exception is `create-story` with the story's own id when no plan
-    /// exists yet: that drafts the story being viewed, not a different one. Where a code-review suggestion
-    /// is offered, it carries the story id so the exact command (e.g. <c>/bmad-code-review 2.1</c>) is one
-    /// copy away — but a `ready` story has no changes yet, so it gets no code-review suggestion at all.</summary>
+    /// exists yet: that drafts the story being viewed, not a different one. Suggestions are built in
+    /// priority order (most-recommended first); <see cref="RenderInner"/> treats index 0 as the primary
+    /// and demotes the rest under "Other actions". Where a code-review suggestion is offered, it carries
+    /// the story id — but a `ready` story has no changes yet, so it gets no code-review at all. Mid-sprint
+    /// / review recovery uses a demoted <c>correct-course</c> alternate when the module exposes it.
+    /// [Story 8.5]</summary>
     private static List<Suggestion> ForStory(StoryInfo story, CommandCatalog commands)
     {
         var status = story.Status?.Trim().ToLowerInvariant() ?? string.Empty;
@@ -258,6 +301,8 @@ public static class BmadCommands
                 "Resumes implementation from the unchecked tasks in the story plan.");
             Add(suggestions, commands.Command("code-review", story.Id),
                 "Review the work so far — worth running before marking the story done.");
+            Add(suggestions, commands.Command("correct-course"),
+                "Re-plan this story mid-sprint if scope shifted or something's blocking.");
             return suggestions;
         }
 
@@ -265,6 +310,8 @@ public static class BmadCommands
         {
             Add(suggestions, commands.Command("code-review", story.Id),
                 "Final adversarial pass over the story's changes.");
+            Add(suggestions, commands.Command("correct-course"),
+                "If review surfaces a scope problem, re-plan before re-review.");
             return suggestions;
         }
 
@@ -275,17 +322,16 @@ public static class BmadCommands
             return suggestions;
         }
 
-        // No recognizable status — the plan doesn't exist yet. Before the epic's first story starts, it's
-        // worth confirming the plan artifacts still agree — cheaper to catch a misalignment here than
-        // mid-implementation.
+        // No recognizable status — the plan doesn't exist yet. create-story advances *this* story (primary);
+        // for an epic's first story, readiness check is a demoted preparatory alternate.
+        Add(suggestions, commands.Command("create-story", story.Id),
+            "Generates the dedicated story file with full implementation context.");
+
         if (story.Id.EndsWith(".1", StringComparison.Ordinal))
         {
             Add(suggestions, commands.Command("check-implementation-readiness"),
                 "Verifies the requirements, UX, architecture, and epics stay aligned before this epic's first story begins.");
         }
-
-        Add(suggestions, commands.Command("create-story", story.Id),
-            "Generates the dedicated story file with full implementation context.");
 
         return suggestions;
     }

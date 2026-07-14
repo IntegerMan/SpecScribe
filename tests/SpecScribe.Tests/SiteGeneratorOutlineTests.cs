@@ -397,8 +397,9 @@ public class SiteGeneratorOutlineTests : IDisposable
         // The load-bearing "mirrors the page" claim, asserted against the ACTUAL RenderNextSteps output rather
         // than by construction: for every status the panel offers exactly the commands StoryCommands emits
         // (badge count == list count, each command present), and a done story renders the all-done panel with
-        // an empty list. Includes the undrafted X.1 case, where check-implementation-readiness LEADS the list
-        // (a two-entry list whose first entry is not create-story) — and PrimaryStoryCommand must track it.
+        // an empty list. Includes the undrafted X.1 case, where create-story is primary and
+        // check-implementation-readiness is the demoted alternate — and PrimaryStoryCommand must track the
+        // first surviving entry. [Story 8.5]
         var commands = new CommandCatalog("BMad Method", new Dictionary<string, string>
         {
             ["dev-story"] = "/bmad-dev-story",
@@ -411,7 +412,7 @@ public class SiteGeneratorOutlineTests : IDisposable
         {
             var story = new StoryInfo
             {
-                Id = "9.1", // X.1 so the blank-status branch exercises readiness-leads-create-story
+                Id = "9.1", // X.1 so the blank-status branch exercises create-story primary + readiness alternate
                 EpicNumber = 9,
                 Title = "Parity Story",
                 UserStoryHtml = "",

@@ -301,7 +301,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // epic mosaic gains DeliverySentence as aria-label + .epic-mosaic-delivery line; sprint lane heads gain
         // js-tip/data-tip/title/tabindex from StageMeaning; no-plan sprint cards gain .no-plan; specscribe.css
         // gains the four companion rules. StageMeaning pending/ready phrasings also update badge tips + legend.
-        const string expected = "0674f5c532075b6ff3e6866a4b960ac60b92d4deb582655510e532b6b060b91e";
+        // Regenerated for Story 8.5: every Next Steps panel gains primary/alternate hierarchy markup
+        // (.next-steps-primary + optional .next-steps-alternates / .next-steps-alt) and specscribe.css gains the
+        // companion rules; done panels stay celebratory when the fixture catalog lacks correct-course. [Story 8.5]
+        const string expected = "4063690d7f33bf819b8f0ae674ddb72deb8ee79e99e8a5a69b244d9b7d51968e";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
