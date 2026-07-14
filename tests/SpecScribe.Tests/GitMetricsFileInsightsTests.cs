@@ -238,4 +238,64 @@ public class GitMetricsFileInsightsTests
         Assert.NotNull(deep.FileInsights);
         Assert.Empty(deep.FileInsights);
     }
+
+    // ---- reference-graph epic grouping + relationships: exposing the pair-count map for arbitrary lookups ----
+
+    [Fact]
+    public void BuildFileInsights_OutOverload_ExposesTheSamePairCountsBuildFileInsightsAlreadyComputed()
+    {
+        // (A,B) co-change twice, (A,C) once — the SAME pairCounts BuildFileInsights already builds internally to
+        // derive A.cs's CoupledFiles list, now also handed back via the out overload (no second scan/git call).
+        var commits = new[]
+        {
+            Commit("h3", "Alice", "2026-07-03T10:00", "s3", "A.cs", "C.cs"),
+            Commit("h2", "Alice", "2026-07-02T10:00", "s2", "A.cs", "B.cs"),
+            Commit("h1", "Alice", "2026-07-01T10:00", "s1", "A.cs", "B.cs"),
+        };
+
+        GitMetrics.BuildFileInsights(commits, out var pairs);
+
+        Assert.Equal(2, GitMetrics.CoChangeCount(pairs, "A.cs", "B.cs"));
+        Assert.Equal(1, GitMetrics.CoChangeCount(pairs, "A.cs", "C.cs"));
+        // Canonicalized order doesn't matter to the caller.
+        Assert.Equal(2, GitMetrics.CoChangeCount(pairs, "B.cs", "A.cs"));
+        // A pair that never co-occurred is 0, never a throw/missing-key exception.
+        Assert.Equal(0, GitMetrics.CoChangeCount(pairs, "B.cs", "C.cs"));
+    }
+
+    [Fact]
+    public void CoChangeCount_EmptyMapOrEmptyPath_ReturnsZeroNeverThrows()
+    {
+        var empty = new Dictionary<(string, string), int>();
+        Assert.Equal(0, GitMetrics.CoChangeCount(empty, "A.cs", "B.cs"));
+        Assert.Equal(0, GitMetrics.CoChangeCount(empty, "", "B.cs"));
+    }
+
+    [Fact]
+    public void ParseNumstatLog_CoChangePairs_MirrorsTheHubCouplingViewForArbitraryPairLookup()
+    {
+        var fs = ((char)0x1f).ToString();
+        var sentinel = ((char)0x01).ToString();
+        string Rec(string hash, string author, string date, string subject, params string[] rows)
+            => sentinel + hash + fs + author + fs + date + fs + subject + fs + "" + fs + "\n" +
+               string.Concat(rows.Select(r => r + "\n"));
+
+        var log =
+            Rec("h1", "Alice", "2026-07-01T09:00", "s1", "1\t0\tsrc/A.cs", "1\t0\tsrc/B.cs") +
+            Rec("h2", "Alice", "2026-07-02T09:00", "s2", "1\t0\tsrc/A.cs", "1\t0\tsrc/B.cs");
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        Assert.NotNull(deep.CoChangePairs);
+        Assert.Equal(2, GitMetrics.CoChangeCount(deep.CoChangePairs, "src/A.cs", "src/B.cs"));
+        Assert.Contains((("src/A.cs", "src/B.cs"), 2), deep.CoChangePairs.Select(kv => (kv.Key, kv.Value)));
+    }
+
+    [Fact]
+    public void ParseNumstatLog_EmptyLog_ExposesEmptyCoChangePairsNeverNull()
+    {
+        var deep = GitMetrics.ParseNumstatLog(string.Empty);
+        Assert.NotNull(deep.CoChangePairs);
+        Assert.Empty(deep.CoChangePairs);
+    }
 }

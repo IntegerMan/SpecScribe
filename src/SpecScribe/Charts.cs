@@ -1123,7 +1123,11 @@ public static class Charts
         IReadOnlyList<(string Href, string Title, string Short)> refs,
         int size = 0,
         IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)>? related = null,
-        int artifactCap = RefGraphArtifactNodeCap)
+        int artifactCap = RefGraphArtifactNodeCap,
+        IReadOnlyList<(int EpicNumber, string EpicTitle)?>? refEpics = null,
+        bool groupByEpic = false,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? crossEdges = null,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedEdges = null)
     {
         related ??= Array.Empty<(string?, string, string, int)>();
         var refCount = refs.Count;
@@ -1132,12 +1136,19 @@ public static class Charts
 
         // Bound the artifact ring (AC #2): draw at most the cap, keep the true total for the honest overflow signal.
         // Coupled files arrive pre-capped upstream (FileInsightCoupledCap). total = the nodes actually drawn.
+        // EPIC-GROUPING CAP RULE (reference-graph epic grouping + relationships): the cap applies to the FLAT citer
+        // list BEFORE any epic bucketing — once a citer survives this single global cap it is drawn in full under
+        // its epic hub with no second, per-hub truncation layer. This keeps one honest overflow count (no "shown
+        // under this hub" vs "shown overall" discrepancy) and keeps a hub's member count implicitly bounded by the
+        // same artifactCap that already bounds the whole ring.
         var shownRefs = Math.Min(refCount, artifactCap);
         var overflow = refCount - shownRefs;
         var total = shownRefs + relCount;
 
         // Grow the canvas with the drawn node count so the ring never crowds; bounded (the graph now lives in a
         // ~320-360px sidebar and scales to fit, so an over-large viewBox would render its labels illegibly small).
+        // The SAME formula (keyed off shownRefs+relCount, never the hub count) is used regardless of groupByEpic so
+        // all four precomputed toggle variants share one canvas size — toggling never causes a visual "jump".
         if (size <= 0) size = Math.Clamp(360 + total * 14, 380, 560);
         var c = size / 2.0;
         var ringR = size * 0.26;
@@ -1150,6 +1161,80 @@ public static class Charts
             var ang = Ang(i);
             return (c + ringR * Math.Cos(ang), c + ringR * Math.Sin(ang));
         }
+
+        // Epic-hub bucketing (only consulted when groupByEpic + refEpics are both supplied): a single forward pass
+        // over the shown refs assigns each ref either its own top-level main-ring slot (no epic, e.g. an ADR/doc
+        // citer) or — the first time an epic number is seen — a NEW hub slot that subsequent same-epic refs attach
+        // to instead of getting their own slot. This keeps slot order tied directly to input order (deterministic,
+        // no secondary sort) and non-story citers untouched (AC: "non-story citers unaffected").
+        var mainSlots = new List<(bool IsHub, int EpicNumber, string EpicTitle, List<int> Members)>();
+        var refSlotOf = new int[shownRefs]; // main-ring slot index that owns refs[i]'s spoke-from-center (hub or itself)
+        if (groupByEpic && refEpics is not null)
+        {
+            var epicSlotIndex = new Dictionary<int, int>();
+            for (var i = 0; i < shownRefs; i++)
+            {
+                var epic = i < refEpics.Count ? refEpics[i] : null;
+                if (epic is { } e)
+                {
+                    if (!epicSlotIndex.TryGetValue(e.EpicNumber, out var slotIdx))
+                    {
+                        slotIdx = mainSlots.Count;
+                        mainSlots.Add((true, e.EpicNumber, e.EpicTitle, new List<int>()));
+                        epicSlotIndex[e.EpicNumber] = slotIdx;
+                    }
+                    mainSlots[slotIdx].Members.Add(i);
+                    refSlotOf[i] = slotIdx;
+                }
+                else
+                {
+                    var slotIdx = mainSlots.Count;
+                    mainSlots.Add((false, 0, "", new List<int> { i }));
+                    refSlotOf[i] = slotIdx;
+                }
+            }
+        }
+        else
+        {
+            for (var i = 0; i < shownRefs; i++)
+            {
+                mainSlots.Add((false, 0, "", new List<int> { i }));
+                refSlotOf[i] = i;
+            }
+        }
+
+        var grouped = groupByEpic && refEpics is not null && mainSlots.Any(s => s.IsHub);
+        var mainSlotCount = mainSlots.Count;
+        // Ring-position resolver: in flat mode (the default / pre-grouping shape) this is IDENTICAL to the original
+        // Pos(i)/Ang(i) sweep. In grouped mode the main ring now holds slots (hubs + ungrouped refs), not raw ref
+        // indices, and each hub's member story nodes sit on a small secondary arc just outside their hub.
+        double SlotAng(int slot) => grouped
+            ? -Math.PI / 2 + 2 * Math.PI * slot / (mainSlotCount + relCount)
+            : Ang(slot);
+        (double X, double Y) SlotPos(int slot)
+        {
+            var ang = SlotAng(slot);
+            return (c + ringR * Math.Cos(ang), c + ringR * Math.Sin(ang));
+        }
+        (double X, double Y) RefPos(int i)
+        {
+            if (!grouped) return Pos(i);
+            var slot = refSlotOf[i];
+            var (isHub, _, _, members) = mainSlots[slot];
+            if (!isHub) return SlotPos(slot);
+            // Spread this hub's members over a small arc just outside the hub's own ring angle so they read as
+            // "nested under" the hub rather than colliding with it or their neighbours.
+            var hubAng = SlotAng(slot);
+            var idx = members.IndexOf(i);
+            var m = members.Count;
+            var halfWidth = Math.Min(Math.PI / (mainSlotCount + relCount), 0.5); // never wider than the slot gap
+            var offset = m == 1 ? 0.0 : -halfWidth + 2 * halfWidth * (idx + 1) / (m + 1);
+            var ang = hubAng + offset;
+            var subR = ringR + 34;
+            return (c + subR * Math.Cos(ang), c + subR * Math.Sin(ang));
+        }
+        (double X, double Y) RelatedPos(int j) => grouped ? SlotPos(mainSlotCount + j) : Pos(shownRefs + j);
+        double RelatedAng(int j) => grouped ? SlotAng(mainSlotCount + j) : Ang(shownRefs + j);
 
         var sb = new StringBuilder();
         // Summary label is the real accessible name (the SVG is role="img"); it reflects BOTH populations and the true
@@ -1170,15 +1255,61 @@ public static class Charts
         // Edges first so the nodes sit on top of them. Artifact spokes are solid (.ref-edge); related-file spokes are
         // dashed (.ref-edge-file) — the edge style is a primary distinguisher, so the two populations read apart even
         // in monochrome / for colour-vision-deficient readers.
-        for (var i = 0; i < shownRefs; i++)
+        if (!grouped)
         {
-            var (x, y) = Pos(i);
-            sb.Append($"  <line class=\"ref-edge\" x1=\"{F(c)}\" y1=\"{F(c)}\" x2=\"{F(x)}\" y2=\"{F(y)}\" />\n");
+            for (var i = 0; i < shownRefs; i++)
+            {
+                var (x, y) = Pos(i);
+                sb.Append($"  <line class=\"ref-edge\" x1=\"{F(c)}\" y1=\"{F(c)}\" x2=\"{F(x)}\" y2=\"{F(y)}\" />\n");
+            }
+        }
+        else
+        {
+            // One solid center-spoke per main-ring slot (a hub counts once here, not once per member) plus one
+            // dashed hub->story spoke per member — so a hub reads as "file -> epic -> story" instead of every
+            // story fanning straight back to the file.
+            for (var slot = 0; slot < mainSlotCount; slot++)
+            {
+                var (x, y) = SlotPos(slot);
+                sb.Append($"  <line class=\"ref-edge\" x1=\"{F(c)}\" y1=\"{F(c)}\" x2=\"{F(x)}\" y2=\"{F(y)}\" />\n");
+                var (isHub, _, _, members) = mainSlots[slot];
+                if (!isHub) continue;
+                foreach (var i in members)
+                {
+                    var (sx, sy) = RefPos(i);
+                    sb.Append($"  <line class=\"ref-hub-spoke\" x1=\"{F(x)}\" y1=\"{F(y)}\" x2=\"{F(sx)}\" y2=\"{F(sy)}\" />\n");
+                }
+            }
         }
         for (var j = 0; j < relCount; j++)
         {
-            var (x, y) = Pos(shownRefs + j);
+            var (x, y) = RelatedPos(j);
             sb.Append($"  <line class=\"ref-edge-file\" x1=\"{F(c)}\" y1=\"{F(c)}\" x2=\"{F(x)}\" y2=\"{F(y)}\" />\n");
+        }
+
+        // "Show relationships" cross edges (opt-in): story<->related-file and related-file<->related-file. Drawn
+        // in a visually lighter/thinner neutral style than either citation spoke so all edge kinds — solid gold
+        // spoke, dashed related spoke, dashed hub spoke, and this dash-dot cross edge — stay distinguishable
+        // (never colour alone, NFR6/UX-DR16). Indices are validated defensively (never throw on a stale index).
+        if (crossEdges is { Count: > 0 })
+        {
+            foreach (var (refIndex, relatedIndex) in crossEdges)
+            {
+                if (refIndex < 0 || refIndex >= shownRefs || relatedIndex < 0 || relatedIndex >= relCount) continue;
+                var (x1, y1) = RefPos(refIndex);
+                var (x2, y2) = RelatedPos(relatedIndex);
+                sb.Append($"  <line class=\"ref-edge-cross\" x1=\"{F(x1)}\" y1=\"{F(y1)}\" x2=\"{F(x2)}\" y2=\"{F(y2)}\" />\n");
+            }
+        }
+        if (relatedEdges is { Count: > 0 })
+        {
+            foreach (var (aIdx, bIdx) in relatedEdges)
+            {
+                if (aIdx < 0 || aIdx >= relCount || bIdx < 0 || bIdx >= relCount || aIdx == bIdx) continue;
+                var (x1, y1) = RelatedPos(aIdx);
+                var (x2, y2) = RelatedPos(bIdx);
+                sb.Append($"  <line class=\"ref-edge-cross\" x1=\"{F(x1)}\" y1=\"{F(y1)}\" x2=\"{F(x2)}\" y2=\"{F(y2)}\" />\n");
+            }
         }
 
         // Center node: the file itself (a chip, not a link — you are already on its page).
@@ -1188,15 +1319,60 @@ public static class Charts
         sb.Append($"    <text class=\"ref-center-label\" x=\"{F(c)}\" y=\"{F(c)}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"15\">{Html(Shorten(centerLabel, 22))}</text>\n");
         sb.Append("  </g>\n");
 
+        // Epic hub nodes (grouped mode only): a distinct neutral chip — deliberately not gold (artifact) or a
+        // diamond (related file) — between the center file and its nested story nodes.
+        if (grouped)
+        {
+            for (var slot = 0; slot < mainSlotCount; slot++)
+            {
+                var (isHub, epicNumber, epicTitle, _) = mainSlots[slot];
+                if (!isHub) continue;
+                var (x, y) = SlotPos(slot);
+                var ang = SlotAng(slot);
+                var lx = c + (ringR + 14) * Math.Cos(ang);
+                var ly = c + (ringR + 14) * Math.Sin(ang);
+                var anchor = Math.Cos(ang) >= 0 ? "start" : "end";
+                var label = $"Epic {epicNumber}";
+                var shortLabel = Shorten(label, 12);
+                var tip = string.IsNullOrEmpty(epicTitle) ? label : $"{label}: {epicTitle}";
+                // Sized from the shortened label (mirrors the center chip's cw computation) so a wider epic number
+                // never clips inside a hardcoded box.
+                var hw = Math.Max(30.0, shortLabel.Length * 6.5 + 14);
+                sb.Append($"  <g class=\"ref-epic-hub\" role=\"img\" aria-label=\"{Html(tip)}\">")
+                  .Append($"<title>{Html(tip)}</title>")
+                  .Append($"<rect class=\"ref-epic-hub-box\" x=\"{F(x - hw / 2)}\" y=\"{F(y - 11)}\" width=\"{F(hw)}\" height=\"22\" rx=\"5\" />")
+                  .Append($"<text class=\"ref-epic-hub-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"12\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(shortLabel)}</text>")
+                  .Append("</g>\n");
+            }
+        }
+
         // Artifact ring nodes: one link per citing artifact, gold circle, label anchored away from center so text
-        // clears the ring. Unchanged from Story 7.1 (owner design: the artifact half looks the same).
+        // clears the ring. Node shape/colour unchanged from Story 7.1 — only its (x,y) moves under epic grouping.
         for (var i = 0; i < shownRefs; i++)
         {
-            var (x, y) = Pos(i);
+            var (x, y) = RefPos(i);
             var (href, title, shortLabel) = refs[i];
-            var ang = Ang(i);
+            // Non-hub slots sit exactly at SlotAng(slot) (no need to re-derive the angle via atan2); only a
+            // hub-nested node's angle must be recomputed, since RefPos offset it off the slot's own ring angle.
+            double ang;
+            if (!grouped)
+            {
+                ang = Ang(i);
+            }
+            else
+            {
+                var slot = refSlotOf[i];
+                ang = mainSlots[slot].IsHub ? Math.Atan2(y - c, x - c) : SlotAng(slot);
+            }
             var lx = c + (ringR + 14) * Math.Cos(ang);
             var ly = c + (ringR + 14) * Math.Sin(ang);
+            // For nested story nodes the label anchors off their own (already offset) position, not the ring radius,
+            // so it doesn't fly back toward the center when a hub pushes the node off-ring.
+            if (grouped && mainSlots[refSlotOf[i]].IsHub)
+            {
+                lx = x + 14 * Math.Cos(ang);
+                ly = y + 14 * Math.Sin(ang);
+            }
             var anchor = Math.Cos(ang) >= 0 ? "start" : "end";
             sb.Append($"  <a class=\"ref-node\" href=\"{Html(href)}\" aria-label=\"{Html(title)}\">")
               .Append($"<title>{Html(title)}</title>")
@@ -1210,8 +1386,8 @@ public static class Charts
         for (var j = 0; j < relCount; j++)
         {
             var (href, title, shortLabel, coChanges) = related[j];
-            var (x, y) = Pos(shownRefs + j);
-            var ang = Ang(shownRefs + j);
+            var (x, y) = RelatedPos(j);
+            var ang = RelatedAng(j);
             var lx = c + (ringR + 14) * Math.Cos(ang);
             var ly = c + (ringR + 14) * Math.Sin(ang);
             var anchor = Math.Cos(ang) >= 0 ? "start" : "end";

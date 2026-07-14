@@ -910,6 +910,61 @@ pre.code-file code[class*="language-"] {
   font-family: system-ui, sans-serif;
 }
 
+/* Reference graph: "Group by epic" + "Show relationships" toggles (epic grouping + cross-relationship edges).
+   PURE CSS, no script required — mirrors CodeMap.BuildVariants' two-checkbox idiom (specscribe.css's
+   .codemap-filter-checkbox / .codemap-view rules above). Plain, unwrapped <input>+<label> siblings so the
+   sibling-combinator toggle below sees them at the same nesting level as the .ref-graph-view panels they control. */
+.refgraph-toggle { margin: 0.5rem 0 0 0.1rem; vertical-align: middle; cursor: pointer; }
+.refgraph-toggle:first-of-type { margin-left: 0; }
+.refgraph-toggle-label { font-size: 0.8rem; color: var(--ink-light); margin-right: 1.25rem; cursor: pointer; }
+
+/* Four precomputed (epic x relationships) panels: exactly one is visible at a time, picked by the two checkboxes'
+   :checked state via plain CSS sibling combinators keyed on the checkbox CLASSES (not id — ids are page-unique so
+   several code pages can be consolidated into one document without cross-wiring their <label for>/<input id>
+   pairs; the class names are the same on every code page and the sibling relationship is local to each page's own
+   <section class="code-relationships">, so class-keyed selectors need no per-page duplication here). */
+.ref-graph-view { display: none; }
+.refgraph-toggle-epic:not(:checked) ~ .refgraph-toggle-rel:not(:checked) ~ .ref-graph-view[data-view="flat-flat"],
+.refgraph-toggle-epic:checked ~ .refgraph-toggle-rel:not(:checked) ~ .ref-graph-view[data-view="epic-flat"],
+.refgraph-toggle-epic:not(:checked) ~ .refgraph-toggle-rel:checked ~ .ref-graph-view[data-view="flat-rel"],
+.refgraph-toggle-epic:checked ~ .refgraph-toggle-rel:checked ~ .ref-graph-view[data-view="epic-rel"] {
+  display: block;
+}
+
+/* "Group by epic" hub node: a distinct NEUTRAL chip between the center file and its nested story nodes — never
+   gold (the citing-artifact color) and never the related-file diamond shape, so all three node kinds stay
+   distinguishable at a glance (NFR6/UX-DR16). */
+.ref-epic-hub-box {
+  fill: var(--parchment);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.ref-epic-hub-label {
+  fill: var(--ink);
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+}
+
+/* Hub -> story spoke: distinguishes a nested citation from a direct one (dotted, thinner than the solid file -> hub
+   spoke it extends), while both still read as "citation" edges (never mistaken for a code dependency). */
+.ref-hub-spoke {
+  stroke: var(--ink-light);
+  stroke-width: 1.2;
+  stroke-opacity: 0.75;
+  stroke-dasharray: 1.5 2.5;
+}
+
+/* "Show relationships" cross edges (story<->related-file, related-file<->related-file): a THIRD distinct edge
+   style — lighter/thinner and dash-dot — so it never reads as either the solid gold citation spoke or the dashed
+   related-file spoke. Neutral tokens only (no --gold, no --status-*), matching the rest of this graph. */
+.ref-edge-cross {
+  stroke: var(--ink-light);
+  stroke-width: 1;
+  stroke-opacity: 0.55;
+  stroke-dasharray: 5 2 1 2;
+}
+
 /* Source is secondary supporting detail — the right column. min-width:0 lets the <pre> shrink and scroll internally
    (see .code-layout) instead of forcing the whole grid wider. */
 .code-source-section {

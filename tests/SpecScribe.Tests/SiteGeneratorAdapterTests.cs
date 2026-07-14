@@ -277,7 +277,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for spec-code-map-declutter-and-cochange round 2: the colorize-dropdown/churn-option/exclude-
         // filter-checkbox styles landed in specscribe.css (again, this non-git fixture never renders code-map.html
         // itself — only the shared stylesheet content shifted the hash).
-        const string expected = "06702d484947448f406982fee45922a1c4dc79315207707a74bbdd16b0933058";
+        // Regenerated for spec-reference-graph-epic-grouping-and-relationships: specscribe.css gained the "Group by
+        // epic"/"Show relationships" toggle-checkbox styles, the four .ref-graph-view sibling-combinator rules, the
+        // epic-hub node styles, and the hub-spoke/cross-edge line styles. This non-git fixture cites no real repo
+        // files, so no code page's reference graph itself renders here — only the shared stylesheet content shifted
+        // the hash (the new toggle/hub/edge behavior is covered by Charts/CodeFileTemplater/SiteGenerator tests).
+        const string expected = "27a18e8eaa4198ca3c626b4046eb00d531fe5b3ea84d6d84fd26d51cd3d1aacf";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

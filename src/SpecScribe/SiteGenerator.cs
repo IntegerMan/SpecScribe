@@ -86,6 +86,18 @@ public sealed class SiteGenerator
     private List<string> _codeReferenced = new();
     private Dictionary<string, List<(string CitingSourceRelative, string Title)>> _codeReverseMap = new(StringComparer.OrdinalIgnoreCase);
 
+    // Forward map (citing artifact SOURCE-relative path -> the set of repo-relative code files it cites), built in
+    // the SAME discovery pass as _codeReverseMap (no second scan) — lets the "Show relationships" reference-graph
+    // toggle answer "does this citing story ALSO cite one of the center file's related files?" without re-reading
+    // any artifact. [reference-graph epic grouping + relationships]
+    private Dictionary<string, HashSet<string>> _citerToFiles = new(StringComparer.OrdinalIgnoreCase);
+
+    // Story page path (output-relative, normalized) -> owning epic (number + title), resolved ONCE from
+    // _epicsModel right before code pages render (BuildStoryEpicLookup) — the reference graph's "Group by epic"
+    // toggle joins each citing story's OutputUrl against this map; a miss (ADR/doc citer, or a story with no
+    // resolvable page) simply means "no epic", never a throw. [reference-graph epic grouping + relationships]
+    private Dictionary<string, (int Number, string Title)>? _storyEpicByOutputPath;
+
     // Story 7.6: the source-code walk (repo-relative path + line count), enumerated ONCE per full generation
     // (EnumerateCodeFiles — git ls-files with a bounded fallback) and cached so both the nav gate (built early)
     // and WriteCodeMap (written after the pages phase) read the same set. Empty when no readable source files were
@@ -1258,6 +1270,7 @@ public sealed class SiteGenerator
         _codePages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _codeReferenced = new List<string>();
         _codeReverseMap = new Dictionary<string, List<(string, string)>>(StringComparer.OrdinalIgnoreCase);
+        _citerToFiles = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
         var repoFull = Path.GetFullPath(_options.RepoRoot);
         var sourceFull = Path.GetFullPath(_options.SourceRoot);
@@ -1302,6 +1315,13 @@ public sealed class SiteGenerator
                 {
                     list.Add((citingRelative, citingTitle));
                 }
+
+                // Forward map (same pass, no extra scan): this citer also cites repoRel — feeds the "Show
+                // relationships" story<->related-file cross edge.
+                var files = _citerToFiles.TryGetValue(citingRelative, out var existingFiles)
+                    ? existingFiles
+                    : _citerToFiles[citingRelative] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                files.Add(PathUtil.NormalizeSlashes(repoRel));
             }
         }
 
@@ -1416,6 +1436,9 @@ public sealed class SiteGenerator
     {
         var events = new List<GenerationEvent>();
 
+        // "Group by epic" join key — built once, right before any code page renders. [reference-graph epic grouping + relationships]
+        BuildStoryEpicLookup();
+
         var codeDir = Path.Combine(_options.OutputRoot, "code");
         if (Directory.Exists(codeDir))
         {
@@ -1485,6 +1508,14 @@ public sealed class SiteGenerator
                 // Keyed by the same forward-slash repo path the numstat rows carry, so this joins cleanly.
                 var insight = _progress?.DeepGit?.FileInsights.GetValueOrDefault(PathUtil.NormalizeSlashes(repoRelative));
 
+                // "Show relationships" cross edges (opt-in toggle): reuses the SAME citer list BuildReferencedBy
+                // just walked (index-aligned) and the SAME shared numstat pair map — no new git call, no re-read.
+                var citersForRelative = _codeReverseMap.TryGetValue(repoRelative, out var citersList)
+                    ? citersList
+                    : new List<(string, string)>();
+                var storyRelatedEdges = BuildStoryRelatedEdges(citersForRelative, insight);
+                var relatedRelatedEdges = BuildRelatedRelatedEdges(insight, _progress?.DeepGit?.CoChangePairs);
+
                 // Prev/next across sibling files in this file's directory (tooltip = filename).
                 var rel = PathUtil.NormalizeSlashes(repoRelative);
                 var slash = rel.LastIndexOf('/');
@@ -1507,7 +1538,8 @@ public sealed class SiteGenerator
                 {
                     var lines = SplitCodeLines(text);
                     html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl,
-                        insight, CodePageHref, CommitHref, dayHref: DayHref, pager: pager);
+                        insight, CodePageHref, CommitHref, dayHref: DayHref, pager: pager,
+                        storyRelatedEdges: storyRelatedEdges, relatedRelatedEdges: relatedRelatedEdges);
                     outcome = GenerationOutcome.Generated;
                 }
                 else
@@ -1540,20 +1572,118 @@ public sealed class SiteGenerator
     /// <see cref="_referenceMap"/> is OMITTED rather than guessed via a naive extension swap — never link to a page
     /// we can't confirm was actually mapped. Order is deterministic (reverse-map insertion follows the sorted source
     /// walk).</summary>
-    private IReadOnlyList<(string OutputUrl, string Title)> BuildReferencedBy(string repoRelative)
+    private IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)> BuildReferencedBy(string repoRelative)
     {
         if (!_codeReverseMap.TryGetValue(repoRelative, out var citers) || citers.Count == 0)
         {
-            return Array.Empty<(string, string)>();
+            return Array.Empty<(string, string, (int, string)?)>();
         }
 
-        var result = new List<(string OutputUrl, string Title)>(citers.Count);
+        var result = new List<(string OutputUrl, string Title, (int, string)? Epic)>(citers.Count);
         foreach (var (citingSourceRelative, title) in citers)
         {
             var url = _referenceMap.TryGetValue(citingSourceRelative, out var mapped)
                 ? mapped
                 : PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(citingSourceRelative));
-            result.Add((url, title));
+            var epic = _storyEpicByOutputPath is { } lookup &&
+                       lookup.TryGetValue(PathUtil.NormalizeSlashes(url), out var e)
+                ? e
+                : ((int, string)?)null;
+            result.Add((url, title, epic));
+        }
+        return result;
+    }
+
+    /// <summary>Resolves each story's generated page path (<c>ArtifactOutputPath</c>, falling back to the
+    /// synthesized <see cref="StoryEpicLinkifier.StoryPagePath"/> a placeholder story page uses) to its owning
+    /// epic's number/title — the "Group by epic" reference-graph toggle's join key. Built ONCE, right before code
+    /// pages render (so <see cref="_epicsModel"/> is fully populated), no new parsing of titles/paths (reuses the
+    /// same fields the epics render pass already carries). A null/absent <see cref="_epicsModel"/> (no epics.md)
+    /// leaves the lookup null — every citer then resolves to "no epic", the graceful non-story-shaped degradation.
+    /// [reference-graph epic grouping + relationships]</summary>
+    private void BuildStoryEpicLookup()
+    {
+        if (_epicsModel is null)
+        {
+            _storyEpicByOutputPath = null;
+            return;
+        }
+
+        var lookup = new Dictionary<string, (int, string)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var epic in _epicsModel.Epics)
+        {
+            foreach (var story in epic.Stories)
+            {
+                // TryAdd (not the indexer): a duplicate output path is a pre-existing data anomaly upstream
+                // (two stories resolving to the same page), not something to silently overwrite — the first
+                // epic seen (in the model's own iteration order) wins deterministically.
+                var path = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
+                lookup.TryAdd(PathUtil.NormalizeSlashes(path), (epic.Number, epic.Title));
+            }
+        }
+        _storyEpicByOutputPath = lookup;
+    }
+
+    /// <summary>"Show relationships" edge #1 (reference-graph epic grouping + relationships): for each citing
+    /// artifact (index-aligned with <paramref name="citers"/>, the SAME order <see cref="BuildReferencedBy"/> walks
+    /// so the caller's ref index lines up with the graph's artifact-node index), checks whether that artifact ALSO
+    /// cites one of this file's related/coupled files (index-aligned with <paramref name="insight"/>'s
+    /// <see cref="FileInsight.CoupledFiles"/>, the same order <c>CodeFileTemplater.BuildRelatedNodes</c> renders) —
+    /// using the forward map <see cref="_citerToFiles"/> built in the SAME discovery pass as the reverse map (no
+    /// re-read of any artifact). Returns empty (never throws) when there is no insight/coupling or no citers.</summary>
+    private IReadOnlyList<(int RefIndex, int RelatedIndex)> BuildStoryRelatedEdges(
+        IReadOnlyList<(string CitingSourceRelative, string Title)> citers, FileInsight? insight)
+    {
+        if (insight is null || insight.CoupledFiles.Count == 0 || citers.Count == 0)
+        {
+            return Array.Empty<(int, int)>();
+        }
+
+        var result = new List<(int, int)>();
+        for (var i = 0; i < citers.Count; i++)
+        {
+            if (!_citerToFiles.TryGetValue(citers[i].CitingSourceRelative, out var citedFiles) || citedFiles.Count == 0)
+            {
+                continue;
+            }
+            for (var j = 0; j < insight.CoupledFiles.Count; j++)
+            {
+                if (citedFiles.Contains(PathUtil.NormalizeSlashes(insight.CoupledFiles[j].Path)))
+                {
+                    result.Add((i, j));
+                }
+            }
+        }
+        return result;
+    }
+
+    /// <summary>"Show relationships" edge #2 (reference-graph epic grouping + relationships): every pair of this
+    /// file's related/coupled files (<see cref="FileInsight.CoupledFiles"/>, index-aligned with the graph's
+    /// related-node index) that are THEMSELVES frequently co-changed — reusing <see cref="GitMetrics.CoChangeCount"/>
+    /// over the already-computed <see cref="DeepGitPulse.CoChangePairs"/> map (no new git call, no re-scan). "Frequently"
+    /// mirrors the SAME &gt;= 2 threshold <see cref="GitMetrics.ParseNumstatLog"/>'s own top-level coupling view uses,
+    /// so a related-file pair only earns a cross edge here when it would also have qualified for the hub's coupling
+    /// list. Returns empty (never throws) when there is no insight, fewer than two related files, or no pair data.</summary>
+    private static IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)> BuildRelatedRelatedEdges(
+        FileInsight? insight, IReadOnlyDictionary<(string FileA, string FileB), int>? pairs)
+    {
+        if (insight is null || insight.CoupledFiles.Count < 2 || pairs is null || pairs.Count == 0)
+        {
+            return Array.Empty<(int, int)>();
+        }
+
+        var files = insight.CoupledFiles;
+        var normalized = new string[files.Count];
+        for (var i = 0; i < files.Count; i++) normalized[i] = PathUtil.NormalizeSlashes(files[i].Path);
+
+        var result = new List<(int, int)>();
+        for (var a = 0; a < files.Count; a++)
+        {
+            for (var b = a + 1; b < files.Count; b++)
+            {
+                var count = GitMetrics.CoChangeCount(pairs, normalized[a], normalized[b]);
+                if (count >= 2) result.Add((a, b));
+            }
         }
         return result;
     }

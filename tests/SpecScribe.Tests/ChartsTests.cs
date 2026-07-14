@@ -1287,6 +1287,157 @@ public class ChartsTests
         Assert.DoesNotContain("<x>&\".cs</text>", svg);
     }
 
+    // ---- reference-graph epic grouping + relationships ----
+
+    [Fact]
+    public void ReferenceGraph_GroupByEpicOff_ByteIdenticalToStory78Output()
+    {
+        // Both toggles off (groupByEpic false, no refEpics/crossEdges/relatedEdges passed at all) must reproduce
+        // the pre-existing Story 7.8 call exactly — AC "byte-identical to pre-existing Story 7.8 output".
+        var related = new (string?, string, string, int)[] { ("../code/src/Other.cs.html", "src/Other.cs", "Other.cs", 7) };
+        var story78 = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, related);
+        var flatFlat = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, related, groupByEpic: false, refEpics: null, crossEdges: null, relatedEdges: null);
+
+        Assert.Equal(story78, flatFlat);
+    }
+
+    [Fact]
+    public void ReferenceGraph_GroupByEpic_TwoEpics_NestsStoriesUnderTwoDistinctHubs()
+    {
+        var refs = new (string Href, string Title, string Short)[]
+        {
+            ("epics/story-1-1.html", "Story 1.1: Alpha", "Story 1.1"),
+            ("epics/story-1-2.html", "Story 1.2: Beta", "Story 1.2"),
+            ("epics/story-2-1.html", "Story 2.1: Gamma", "Story 2.1"),
+        };
+        var refEpics = new (int EpicNumber, string EpicTitle)?[]
+        {
+            (1, "Foundation"),
+            (1, "Foundation"),
+            (2, "Growth"),
+        };
+
+        var svg = Charts.ReferenceGraph("Sample.cs", refs, 0, null, refEpics: refEpics, groupByEpic: true);
+
+        // Exactly two hub nodes (one per distinct epic), even though three stories cite the file.
+        Assert.Equal(2, CountOccurrences(svg, "<g class=\"ref-epic-hub\""));
+        Assert.Contains(">Epic 1</text>", svg);
+        Assert.Contains(">Epic 2</text>", svg);
+        // All three story nodes still render as ordinary gold artifact nodes (shape/colour unchanged).
+        Assert.Equal(3, CountOccurrences(svg, "class=\"ref-dot\""));
+        // Hub->story spokes exist (nesting), distinct from the file->hub spokes.
+        Assert.Contains("class=\"ref-hub-spoke\"", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_GroupByEpic_NonStoryCiterStaysAtTopLevel()
+    {
+        var refs = new (string Href, string Title, string Short)[]
+        {
+            ("epics/story-1-1.html", "Story 1.1: Alpha", "Story 1.1"),
+            ("adrs/0005.html", "ADR 0005: Delivery architecture", "ADR 0005"),
+        };
+        var refEpics = new (int EpicNumber, string EpicTitle)?[] { (1, "Foundation"), null };
+
+        var svg = Charts.ReferenceGraph("Sample.cs", refs, 0, null, refEpics: refEpics, groupByEpic: true);
+
+        // One hub (for the story) — the ADR never gets a hub or a hub-spoke, it keeps a direct file->node spoke.
+        Assert.Equal(1, CountOccurrences(svg, "<g class=\"ref-epic-hub\""));
+        Assert.Contains(">ADR 0005</text>", svg);
+        Assert.Equal(2, CountOccurrences(svg, "class=\"ref-dot\""));
+    }
+
+    [Fact]
+    public void ReferenceGraph_ShowRelationships_StoryToRelatedFileEdgeDrawn()
+    {
+        var related = new (string?, string, string, int)[] { ("../code/src/Other.cs.html", "src/Other.cs", "Other.cs", 7) };
+
+        var svg = Charts.ReferenceGraph(
+            "Sample.cs", TwoArtifacts, 0, related,
+            crossEdges: new[] { (RefIndex: 0, RelatedIndex: 0) });
+
+        Assert.Contains("class=\"ref-edge-cross\"", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_ShowRelationships_RelatedToRelatedEdgeDrawn()
+    {
+        var related = new (string?, string, string, int)[]
+        {
+            ("../code/src/A.cs.html", "src/A.cs", "A.cs", 5),
+            ("../code/src/B.cs.html", "src/B.cs", "B.cs", 4),
+        };
+
+        var svg = Charts.ReferenceGraph(
+            "Sample.cs", TwoArtifacts, 0, related,
+            relatedEdges: new[] { (RelatedIndexA: 0, RelatedIndexB: 1) });
+
+        Assert.Contains("class=\"ref-edge-cross\"", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_ShowRelationships_NoOverlaps_NoCrossEdgesRendered()
+    {
+        var related = new (string?, string, string, int)[] { ("../code/src/Other.cs.html", "src/Other.cs", "Other.cs", 7) };
+
+        // No cross-edge data supplied at all (the "no overlaps found" case) — identical to the toggle-off render.
+        var svg = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, related, crossEdges: null, relatedEdges: null);
+
+        Assert.DoesNotContain("ref-edge-cross", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_CrossEdges_OutOfRangeIndicesAreIgnoredNotThrown()
+    {
+        var related = new (string?, string, string, int)[] { ("../code/src/Other.cs.html", "src/Other.cs", "Other.cs", 7) };
+
+        // Stale/out-of-bounds indices (defensive: never throw on a bad index).
+        var svg = Charts.ReferenceGraph(
+            "Sample.cs", TwoArtifacts, 0, related,
+            crossEdges: new[] { (RefIndex: 99, RelatedIndex: 0) },
+            relatedEdges: new[] { (RelatedIndexA: 0, RelatedIndexB: 0) }); // self-pair also ignored
+
+        Assert.DoesNotContain("ref-edge-cross", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_GroupByEpic_ArtifactCapAppliesBeforeBucketingAndBoundsHubMembership()
+    {
+        // Cap-interaction rule (documented in Charts.ReferenceGraph): the global RefGraphArtifactNodeCap applies to
+        // the FLAT citer list BEFORE epic bucketing, so a hub's member count can never exceed the cap regardless of
+        // how many same-epic citers exist upstream.
+        var refs = new List<(string Href, string Title, string Short)>();
+        var refEpics = new List<(int EpicNumber, string EpicTitle)?>();
+        for (var i = 0; i < 20; i++)
+        {
+            refs.Add(($"epics/story-1-{i}.html", $"Story 1.{i}", $"Story 1.{i}"));
+            refEpics.Add((1, "Foundation"));
+        }
+
+        var svg = Charts.ReferenceGraph("Sample.cs", refs, 0, null, refEpics: refEpics, groupByEpic: true);
+
+        // Exactly the cap's worth of story nodes drawn (all under the single hub), true total honestly disclosed.
+        Assert.Equal(Charts.RefGraphArtifactNodeCap, CountOccurrences(svg, "class=\"ref-dot\""));
+        Assert.Equal(1, CountOccurrences(svg, "<g class=\"ref-epic-hub\""));
+        Assert.Contains("is referenced by 20 artifacts", svg);
+        Assert.Contains("class=\"ref-overflow\"", svg);
+    }
+
+    [Fact]
+    public void ReferenceGraph_NoDeepGitData_BothTogglesRenderNoVisualChange()
+    {
+        // "--deep-git off / no FileInsight" degradation: refEpics null and no cross-edge data at all → every
+        // combination of groupByEpic/crossEdges/relatedEdges collapses to the SAME flat, edge-free graph.
+        var flatOff = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, null, groupByEpic: false, refEpics: null, crossEdges: null, relatedEdges: null);
+        var epicOnNoData = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, null, groupByEpic: true, refEpics: null, crossEdges: null, relatedEdges: null);
+        var relOnNoData = Charts.ReferenceGraph("Sample.cs", TwoArtifacts, 0, null, groupByEpic: false, refEpics: null, crossEdges: Array.Empty<(int, int)>(), relatedEdges: Array.Empty<(int, int)>());
+
+        Assert.Equal(flatOff, epicOnNoData);
+        Assert.Equal(flatOff, relOnNoData);
+        Assert.DoesNotContain("ref-epic-hub", flatOff);
+        Assert.DoesNotContain("ref-edge-cross", flatOff);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;

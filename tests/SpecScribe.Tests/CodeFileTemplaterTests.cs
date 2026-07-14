@@ -121,10 +121,10 @@ public class CodeFileTemplaterTests
         Assert.Contains("<span class=\"pill\">Not rendered</span>", html);
     }
 
-    private static readonly (string OutputUrl, string Title)[] Refs =
+    private static readonly (string OutputUrl, string Title, (int Number, string Title)? Epic)[] Refs =
     {
-        ("epics/story-7-1.html", "Story 7.1: In-Portal Code File Browsing"),
-        ("epics/epic-8.html", "Epic 8: Dashboard Command Center"),
+        ("epics/story-7-1.html", "Story 7.1: In-Portal Code File Browsing", null),
+        ("epics/epic-8.html", "Epic 8: Dashboard Command Center", null),
     };
 
     [Fact]
@@ -492,6 +492,110 @@ public class CodeFileTemplaterTests
         Assert.DoesNotContain("code-tabs", html);
         Assert.DoesNotContain("code-tablist", html);
         Assert.Contains("<section class=\"code-source-section\"", html);
+    }
+
+    // ---- reference-graph epic grouping + relationships: checkboxes, 4 variants, sr-only enumeration ----
+
+    private static readonly (string OutputUrl, string Title, (int Number, string Title)? Epic)[] RefsWithEpics =
+    {
+        ("epics/story-7-1.html", "Story 7.1: In-Portal Code File Browsing", (7, "Code Insights")),
+        ("epics/epic-8.html", "Epic 8: Dashboard Command Center", null),
+    };
+
+    [Fact]
+    public void RenderPage_Cited_AlwaysRendersBothToggleCheckboxesAndFourVariants()
+    {
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+
+        Assert.Contains("class=\"refgraph-toggle refgraph-toggle-epic\"", html);
+        Assert.Contains("class=\"refgraph-toggle refgraph-toggle-rel\"", html);
+        Assert.Contains(">Group by epic</label>", html);
+        Assert.Contains(">Show relationships</label>", html);
+        foreach (var view in new[] { "flat-flat", "epic-flat", "flat-rel", "epic-rel" })
+        {
+            Assert.Contains($"data-view=\"{view}\"", html);
+        }
+        Assert.Equal(4, CountOccurrences(html, "class=\"ref-graph-wrap ref-graph-view\""));
+    }
+
+    [Fact]
+    public void RenderPage_EpicGrouping_NestsCitingStoryUnderEpicHubInGroupedVariants()
+    {
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics);
+
+        var flatFlat = Between(html, "data-view=\"flat-flat\"", "data-view=\"epic-flat\"");
+        var epicFlat = Between(html, "data-view=\"epic-flat\"", "data-view=\"flat-rel\"");
+        // The flat variant never shows an epic hub; the grouped variant does, for the story that resolved an epic.
+        Assert.DoesNotContain("ref-epic-hub", flatFlat);
+        Assert.Contains("ref-epic-hub", epicFlat);
+        Assert.Contains(">Epic 7</text>", epicFlat);
+        // The non-story citer (Epic 8 page, no resolved Epic) still renders as an ordinary top-level node.
+        Assert.Contains(">Epic 8</text>", epicFlat);
+
+        // The sr-only list always discloses epic membership, regardless of which panel is visible.
+        Assert.Contains("(Epic 7: Code Insights)", html);
+    }
+
+    [Fact]
+    public void RenderPage_ShowRelationships_StoryRelatedEdgeAppearsOnlyInRelVariants()
+    {
+        var related = new[] { (0, 0) }; // story index 0 also cites related-file index 0
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight(),
+            storyRelatedEdges: related);
+
+        var flatFlat = Between(html, "data-view=\"flat-flat\"", "data-view=\"epic-flat\"");
+        var flatRel = Between(html, "data-view=\"flat-rel\"", "data-view=\"epic-rel\"");
+        Assert.DoesNotContain("ref-edge-cross", flatFlat);
+        Assert.Contains("ref-edge-cross", flatRel);
+
+        // The sr-only equivalent enumerates the cross edge unconditionally.
+        Assert.Contains("also cites src/SpecScribe/Other.cs", html);
+    }
+
+    [Fact]
+    public void RenderPage_ShowRelationships_RelatedToRelatedEdgeAppearsOnlyInRelVariants()
+    {
+        var pairEdges = new[] { (0, 1) }; // related-file index 0 <-> related-file index 1
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight(),
+            relatedRelatedEdges: pairEdges);
+
+        var flatFlat = Between(html, "data-view=\"flat-flat\"", "data-view=\"epic-flat\"");
+        var flatRel = Between(html, "data-view=\"flat-rel\"", "data-view=\"epic-rel\"");
+        Assert.DoesNotContain("ref-edge-cross", flatFlat);
+        Assert.Contains("ref-edge-cross", flatRel);
+
+        Assert.Contains("also co-changed with", html);
+    }
+
+    [Fact]
+    public void RenderPage_NoDeepGitInsight_TogglesRenderButProduceNoVisualDifference()
+    {
+        // "--deep-git off / no FileInsight" degradation: no insight → no related population, no epic data, no
+        // cross-edge data. Checkboxes still appear (control surface never disappears) but the four variants are
+        // visually identical (the underlying graph has nothing to group/relate).
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+
+        Assert.Contains("refgraph-toggle-epic", html);
+        Assert.Contains("refgraph-toggle-rel", html);
+
+        var flatFlat = Between(html, "data-view=\"flat-flat\"", "data-view=\"epic-flat\"");
+        var epicRel = Between(html, "data-view=\"epic-rel\"", "</ul>");
+        Assert.DoesNotContain("ref-epic-hub", flatFlat);
+        Assert.DoesNotContain("ref-epic-hub", epicRel);
+        Assert.DoesNotContain("ref-edge-cross", flatFlat);
+        Assert.DoesNotContain("ref-edge-cross", epicRel);
+    }
+
+    [Fact]
+    public void RenderPage_EpicGroupingAndRelationships_NeverThrowsWithoutInsightOrEpics()
+    {
+        // A minimal citer set with no epic info and no insight at all — the whole card must render without
+        // throwing, exactly the graceful-degradation contract.
+        var ex = Record.Exception(() =>
+            CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs));
+        Assert.Null(ex);
     }
 
     /// <summary>The HTML slice between the first occurrence of <paramref name="startMarker"/> and the next occurrence

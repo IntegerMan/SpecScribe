@@ -393,3 +393,23 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
   evidence: Blind Hunter finding, confirmed and reasoned through directly with two rejected fix attempts against the real test suite and corpus.
 - **`BuildReferencedBy`'s fallback (`PathUtil.ToOutputRelative`) guesses a URL for a citing artifact missing from `_referenceMap`, rather than confirming it.** `src/SpecScribe/SiteGenerator.cs:1523-1539` — attempted an "omit rather than guess" patch during this review, but reverted after it regressed `SiteGeneratorCodeCitationTests.CodePage_HasReferencedByBackToCitingArtifacts`: without an `epics.md`, `_referenceMap` is never populated, and the naive fallback formula is exactly correct for ordinary docs in that case (identical to `GenerateOneInternal`'s own output-path computation) — so omitting throws away legitimate back-links. The guess is only unreliable for entities with a non-naive output path, and those (drafted stories) are always correctly overridden in `_referenceMap` when present. No unambiguous safe fix found within this pass.
   evidence: Acceptance Auditor + Blind Hunter agreed; verified directly against the real test suite (one attempted fix reverted after a confirmed regression).
+
+## Deferred from: code review of spec-reference-graph-epic-grouping-and-relationships (2026-07-13)
+
+- source_spec: `spec-reference-graph-epic-grouping-and-relationships.md`
+  summary: Co-change pair counts are computed twice from the same commit list — `GitMetrics.ParseNumstatLog`'s
+  top-level `pairCounts` (feeding `DeepGitPulse.Coupling`, the hub's top-10 hotspots) and `BuildFileInsights`'s own
+  separate `pairCounts` (feeding both `FileInsight.CoupledFiles` and the new `DeepGitPulse.CoChangePairs`) are two
+  independent in-memory tallies over the same `commits`, rather than the codebase converging on one shared
+  computation. Pre-existing duplication from Story 7.4, surfaced incidentally while this feature exposed the second
+  tally as `CoChangePairs` — not a new git call/scan (this feature's own "Never" constraint), just an existing
+  redundant pass this feature builds on top of instead of first consolidating.
+  evidence: Blind Hunter. [GitMetrics.cs](../../src/SpecScribe/GitMetrics.cs)
+- source_spec: `spec-reference-graph-epic-grouping-and-relationships.md`
+  summary: An epic hub with many member stories packs them into a fixed angular arc
+  (`halfWidth = min(pi/(mainSlotCount+relCount), 0.5)`) with no per-hub sub-cap or "+N more" overflow marker, so a
+  hub with most/all of the artifact cap's members could read as visually crowded (mathematically distinct
+  positions, but tightly packed labels/nodes) — no test asserts node-position legibility, only node count.
+  evidence: Blind Hunter + Edge Case Hunter agreed. Accepted as a documented seed-value limitation (mirrors the
+  project's existing "seed, not contract" stance on graph caps) rather than fixed now; revisit if a real repo
+  surfaces a crowded hub. [Charts.cs](../../src/SpecScribe/Charts.cs)

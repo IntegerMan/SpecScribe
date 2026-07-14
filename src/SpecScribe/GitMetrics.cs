@@ -68,6 +68,17 @@ public sealed record DeepGitPulse(
     /// gets a neutral fill (per-file graceful degradation, AC #2). [Story 7.6]</summary>
     public IReadOnlyDictionary<string, CodeFileMetrics> CodeMapMetrics { get; set; }
         = new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal);
+
+    /// <summary>The full (uncapped) canonical unordered file-pair co-change count map, keyed the same way
+    /// <see cref="GitMetrics.BuildFileInsights"/> and <see cref="GitMetrics.ParseNumstatLog"/>'s own internal
+    /// coupling tally key their pairs (ordinal-ordered <c>(A,B)</c> with <c>A &lt;= B</c>) — this is the SAME
+    /// dictionary already built once inside <see cref="GitMetrics.BuildFileInsights"/> for the per-file "coupled
+    /// files" view, simply returned instead of discarded, so callers can ask "are these two arbitrary files
+    /// co-changed?" without a second git call or a second commit scan. Look up via
+    /// <see cref="GitMetrics.CoChangeCount"/> (it canonicalizes the pair order for you). Empty (never null) when
+    /// deep-git found no non-bulk multi-file commits. [reference-graph epic grouping + relationships]</summary>
+    public IReadOnlyDictionary<(string FileA, string FileB), int> CoChangePairs { get; init; }
+        = new Dictionary<(string, string), int>();
 }
 
 /// <summary>The per-file git-derived signals a source-code treemap colorizes by (Story 7.6). <paramref name="Changes"/>
@@ -417,12 +428,14 @@ public static class GitMetrics
             .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
             .ToList();
 
+        var fileInsights = BuildFileInsights(commits, out var coChangePairs);
         return new DeepGitPulse(hotspots, coupling)
         {
             Insights = BuildInsights(commits),
             Commits = commits,
-            FileInsights = BuildFileInsights(commits),
+            FileInsights = fileInsights,
             CodeMapMetrics = BuildCodeMapMetrics(commits),
+            CoChangePairs = coChangePairs,
         };
     }
 
@@ -650,6 +663,19 @@ public static class GitMetrics
         int historyCap = FileInsightHistoryCap,
         int contributorCap = FileInsightContributorCap,
         int coupledCap = FileInsightCoupledCap)
+        => BuildFileInsights(commits, out _, historyCap, contributorCap, coupledCap);
+
+    /// <summary>Same as the four-argument overload, but also surfaces the full (uncapped) canonical file-pair
+    /// co-change map it computes internally via <paramref name="coChangePairs"/> — the ONE dictionary this method
+    /// already builds to derive each file's capped <see cref="FileInsight.CoupledFiles"/> list, just also handed
+    /// back instead of discarded. This is how <see cref="DeepGitPulse.CoChangePairs"/> gets populated without a
+    /// second git call or a second commit scan. [reference-graph epic grouping + relationships]</summary>
+    public static IReadOnlyDictionary<string, FileInsight> BuildFileInsights(
+        IReadOnlyList<DeepCommit> commits,
+        out IReadOnlyDictionary<(string FileA, string FileB), int> coChangePairs,
+        int historyCap = FileInsightHistoryCap,
+        int contributorCap = FileInsightContributorCap,
+        int coupledCap = FileInsightCoupledCap)
     {
         var accum = new Dictionary<string, FileInsightAccum>(StringComparer.Ordinal);
         // Canonical unordered file pair -> co-change count. Same rule as ParseNumstatLog's coupling so the per-file
@@ -732,7 +758,21 @@ public static class GitMetrics
             result[path] = new FileInsight(a.ChangeCount, contributors, coupled, a.History, TotalContributors: a.Contributors.Count);
         }
 
+        coChangePairs = pairCounts;
         return result;
+    }
+
+    /// <summary>Looks up an arbitrary file pair's co-change count in a <see cref="DeepGitPulse.CoChangePairs"/> map,
+    /// canonicalizing the pair order the same way <see cref="BuildFileInsights"/>/<see cref="ParseNumstatLog"/>
+    /// key their own internal tally (ordinal-ordered <c>(A,B)</c> with <c>A &lt;= B</c>) — so callers never need to
+    /// know or guess the canonical order themselves. 0 (never throws) when the pair never co-occurred, when either
+    /// path is empty, or when the map itself is empty (e.g. no deep-git data). [reference-graph epic grouping +
+    /// relationships]</summary>
+    public static int CoChangeCount(IReadOnlyDictionary<(string FileA, string FileB), int> pairs, string a, string b)
+    {
+        if (pairs is null || pairs.Count == 0 || a.Length == 0 || b.Length == 0) return 0;
+        var key = string.CompareOrdinal(a, b) <= 0 ? (a, b) : (b, a);
+        return pairs.GetValueOrDefault(key);
     }
 
     /// <summary>Per-file accumulator for <see cref="BuildCodeMapMetrics"/>: change frequency, total churn, and the

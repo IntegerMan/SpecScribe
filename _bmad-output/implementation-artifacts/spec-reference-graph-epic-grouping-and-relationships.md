@@ -2,7 +2,7 @@
 title: 'Reference graph: epic grouping + cross-relationship edges'
 type: 'feature'
 created: '2026-07-13'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 context: []
 baseline_commit: '0c59e0a2cb062e6a5aaaae420154bbc9a00ecb00'
@@ -92,3 +92,55 @@ Mirror `CodeMap.BuildVariants`: precompute all 4 `(epic × relationships)` combi
 
 **Manual checks (if no CLI):**
 - Open a code page for a file cited by stories from ≥2 epics with `--deep-git` on; verify epic-hub nesting reads clearly in both light/dark and the relationship edges don't collide with existing spokes on a hub file near the artifact cap.
+
+## Suggested Review Order
+
+**Epic-hub grouping (the graph's new layout math)**
+
+- Entry point — the extended signature carrying the two new opt-in populations (`refEpics`/`groupByEpic`/`crossEdges`/`relatedEdges`), all additive and defaulting to the pre-existing flat behavior.
+  [`Charts.cs:1121`](../../src/SpecScribe/Charts.cs#L1121)
+
+- One forward pass buckets each citer into its own top-level slot or a shared epic hub, in input order — deterministic, no secondary sort, non-story citers untouched.
+  [`Charts.cs:1165`](../../src/SpecScribe/Charts.cs#L1165)
+
+- Epic hub chip rendering, sized from the shortened label (mirrors the center chip) after review flagged the original hardcoded box width.
+  [`Charts.cs:1322`](../../src/SpecScribe/Charts.cs#L1322)
+
+- Where the citing artifacts + epic data get resolved once per file and threaded into the render call.
+  [`SiteGenerator.cs:1604`](../../src/SpecScribe/SiteGenerator.cs#L1604)
+
+**"Show relationships" cross edges (the new relationship data)**
+
+- Draws the two new edge kinds (story↔related-file, related-file↔related-file) in a visually distinct dash-dot style so no edge kind reads as ambiguous.
+  [`Charts.cs:1290`](../../src/SpecScribe/Charts.cs#L1290)
+
+- Story↔related-file overlap: which citing stories also cite one of this file's co-changed neighbors.
+  [`SiteGenerator.cs:1634`](../../src/SpecScribe/SiteGenerator.cs#L1634)
+
+- Related-file↔related-file overlap: reuses the existing numstat pair tally exposed as `CoChangePairs` — no new git call.
+  [`SiteGenerator.cs:1667`](../../src/SpecScribe/SiteGenerator.cs#L1667)
+
+- The exposed, canonicalized pair lookup this all rests on.
+  [`GitMetrics.cs:771`](../../src/SpecScribe/GitMetrics.cs#L771)
+
+**Wiring + the pure-CSS toggle (no JS)**
+
+- The 4 precomputed toggle-combination variants, rendered server-side and switched by two checkboxes.
+  [`CodeFileTemplater.cs:397`](../../src/SpecScribe/CodeFileTemplater.cs#L397)
+
+- Assembles the graph + the sr-only accessible-text equivalent (epic membership + cross-edges) for every node.
+  [`CodeFileTemplater.cs:423`](../../src/SpecScribe/CodeFileTemplater.cs#L423)
+
+- The sibling-combinator CSS driving the 4-variant show/hide, keyed on checkbox class (not id).
+  [`specscribe.css:927`](../../src/SpecScribe/assets/specscribe.css#L927)
+
+**Tests + golden fingerprint (peripheral)**
+
+- Two-population/epic-grouping/cross-edge coverage, including the byte-identity-when-off and cap-before-bucketing cases.
+  [`ChartsTests.cs`](../../tests/SpecScribe.Tests/ChartsTests.cs)
+
+- Templater-level coverage for the sr-only equivalent and guarded links.
+  [`CodeFileTemplaterTests.cs`](../../tests/SpecScribe.Tests/CodeFileTemplaterTests.cs)
+
+- Regenerated golden content fingerprint (CSS/HTML-driven drift only).
+  [`SiteGeneratorAdapterTests.cs`](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs)

@@ -230,6 +230,59 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         Assert.Equal(Stable(File.ReadAllText(ReferencedPage)), Stable(File.ReadAllText(page2)));
     }
 
+    // ---- reference-graph epic grouping + relationships (wiring through SiteGenerator) ----
+
+    [Fact]
+    public void GenerateAll_FlagOnWithHistory_EpicGroupingResolvesCitingStoryToOwningEpic()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise epic-grouping wiring; install git rather than silently skipping this test");
+
+        var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
+
+        AssertNoErrors(events);
+        var html = File.ReadAllText(ReferencedPage);
+
+        // Story 1.1 cites Referenced.cs and belongs to Epic 1 (per the fixture's epics.md) — the "epic-flat"/"epic-rel"
+        // variants must nest it under an "Epic 1" hub; the sr-only list must disclose the membership unconditionally.
+        Assert.Contains("class=\"ref-epic-hub", html);
+        Assert.Contains(">Epic 1</text>", html);
+        Assert.Contains("(Epic 1: Foundation)", html);
+    }
+
+    [Fact]
+    public void GenerateAll_FlagOnWithHistory_ShowRelationships_StoryThatCitesBothFilesDrawsCrossEdge()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the relationships cross edge; install git rather than silently skipping this test");
+
+        var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
+
+        AssertNoErrors(events);
+        var html = File.ReadAllText(ReferencedPage);
+
+        // Story 1.1's notes cite BOTH Referenced.cs (the center file) and Sibling.cs (a related/coupled file) — so
+        // "Show relationships" must draw a story<->related-file cross edge, and the sr-only text must name it.
+        Assert.Contains("class=\"ref-edge-cross\"", html);
+        Assert.Contains("also cites src/Lib/Sibling.cs", html);
+    }
+
+    [Fact]
+    public void GenerateAll_FlagOff_ShowRelationshipsHasNoVisualEffectWithoutInsight()
+    {
+        // No --deep-git → no FileInsight → no related-file population and no co-change data → "Show relationships"
+        // has nothing to draw (no cross edges possible without a related population). "Group by epic" is
+        // independent of --deep-git (it only needs the already-loaded _epicsModel), so it still renders/works —
+        // but the checkboxes themselves are present either way (control surface never disappears), and nothing
+        // ever throws.
+        var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
+
+        AssertNoErrors(events);
+        var html = File.ReadAllText(ReferencedPage);
+
+        Assert.Contains("refgraph-toggle-epic", html);
+        Assert.Contains("refgraph-toggle-rel", html);
+        Assert.DoesNotContain("ref-edge-cross", html);
+    }
+
     /// <summary>Initializes a real git repo in the fixture root with two commits by a known author, the second
     /// changing both cited files together (so Referenced.cs gains a contributor, a change history, and a coupling
     /// with Sibling.cs). Returns false (test no-ops) when the git CLI is unavailable.</summary>

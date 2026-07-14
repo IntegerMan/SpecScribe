@@ -42,13 +42,15 @@ public static class CodeFileTemplater
         string outputRelativePath,
         IReadOnlyList<string> lines,
         SiteNav nav,
-        IReadOnlyList<(string OutputUrl, string Title)>? referencedBy = null,
+        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy = null,
         string? externalSourceUrl = null,
         FileInsight? insight = null,
         Func<string, string?>? coupledFileHref = null,
         Func<string, string?>? commitHref = null,
         Func<DateOnly, string?>? dayHref = null,
-        EntityPager? pager = null)
+        EntityPager? pager = null,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
         var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true, pager: pager);
@@ -68,7 +70,8 @@ public static class CodeFileTemplater
         //   History       — the bounded change-history table.
         //   Code          — the source itself (always present).
         var insightsPanel = BuildInsightsPanel(insight);
-        var relationshipsPanel = BuildRelationshipsPanel(prefix, repoRelativePath, referencedBy, insight, coupledFileHref);
+        var relationshipsPanel = BuildRelationshipsPanel(
+            prefix, repoRelativePath, outputRelativePath, referencedBy, insight, coupledFileHref, storyRelatedEdges, relatedRelatedEdges);
         var historyPanel = BuildHistoryPanel(prefix, insight, commitHref, dayHref);
 
         // Assemble in a fixed order (Insights → Relationships → History → Code); empty panels drop out so a file only
@@ -226,8 +229,11 @@ public static class CodeFileTemplater
     /// equivalent lives in the card's sr-only list. Returns empty when there is neither a citation nor a related file,
     /// so the caller drops the tab.</summary>
     private static string BuildRelationshipsPanel(
-        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)>? referencedBy,
-        FileInsight? insight, Func<string, string?>? coupledFileHref)
+        string prefix, string repoRelativePath, string outputRelativePath,
+        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy,
+        FileInsight? insight, Func<string, string?>? coupledFileHref,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges)
     {
         var hasRefs = referencedBy is { Count: > 0 };
         var related = BuildRelatedNodes(prefix, insight, coupledFileHref);
@@ -236,7 +242,9 @@ public static class CodeFileTemplater
         var sb = new StringBuilder();
         sb.Append("<div class=\"insight-panels\">\n");
         sb.Append(BuildRelationshipsCard(
-            prefix, repoRelativePath, referencedBy ?? Array.Empty<(string, string)>(), related));
+            prefix, repoRelativePath, outputRelativePath,
+            referencedBy ?? Array.Empty<(string, string, (int, string)?)>(), related,
+            storyRelatedEdges, relatedRelatedEdges));
         sb.Append("</div>\n");
         return sb.ToString();
     }
@@ -339,7 +347,8 @@ public static class CodeFileTemplater
     /// role="img"&gt;</c> exposes only its summary label, so this is the accessible, keyboard-reachable equivalent —
     /// meaningful link text, never "click here", NFR6/UX-DR16), while the visible surface stays just the graph.</summary>
     private static string BuildAside(
-        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)>? referencedBy, string? externalSourceUrl)
+        string prefix, string repoRelativePath,
+        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy, string? externalSourceUrl)
     {
         var hasRefs = referencedBy is { Count: > 0 };
         var external = externalSourceUrl is { Length: > 0 } u ? ExternalSourceAnchor(u) : "";
@@ -352,7 +361,7 @@ public static class CodeFileTemplater
         {
             // Resolve each citing artifact once to (href, full title, compact label) — shared by the graph and list.
             var nodes = new List<(string Href, string Title, string Short)>(referencedBy!.Count);
-            foreach (var (outputUrl, title) in referencedBy)
+            foreach (var (outputUrl, title, _) in referencedBy)
             {
                 nodes.Add((prefix + PathUtil.NormalizeSlashes(outputUrl), title, ShortLabel(title)));
             }
@@ -381,22 +390,50 @@ public static class CodeFileTemplater
         return sb.ToString();
     }
 
-    /// <summary>Builds the relationship card for the insights tab: the pure-SVG node-link graph — the single visible
-    /// relationship surface (Story 7.8, AC #2) — carrying the artifacts that cite this file (Story 7.1) and, when
-    /// present, the files it most often changes alongside (<paramref name="related"/>, Story 7.8). A visually-hidden
-    /// but present <c>&lt;ul&gt;</c> mirrors BOTH node kinds for assistive tech (the <c>&lt;svg role="img"&gt;</c>
-    /// exposes only its summary label, so this is the accessible, keyboard-reachable equivalent — meaningful link text,
-    /// never "click here", NFR6/UX-DR16). When there are no related files the card is byte-identical to the Story 7.1
-    /// citations-only card (note text, graph, and list all unchanged).</summary>
-    private static string BuildRelationshipsCard(
-        string prefix, string repoRelativePath, IReadOnlyList<(string OutputUrl, string Title)> referencedBy,
-        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> related)
+    /// <summary>The four precomputed reference-graph toggle combinations (mirrors <see cref="CodeMap.BuildVariants"/>
+    /// / <see cref="CodeMapTemplater"/>'s pure-CSS multi-checkbox idiom), keyed exactly like
+    /// <c>data-view="flat-flat|epic-flat|flat-rel|epic-rel"</c> per the Design Notes: first flag = "Group by epic",
+    /// second = "Show relationships".</summary>
+    private static readonly (string Key, bool Epic, bool Rel)[] RefGraphVariants =
     {
-        // Resolve each citing artifact once to (href, full title, compact label) — shared by the graph and list.
+        ("flat-flat", false, false),
+        ("epic-flat", true, false),
+        ("flat-rel", false, true),
+        ("epic-rel", true, true),
+    };
+
+    /// <summary>Builds the <em>Referenced by</em> relationship card: the pure-SVG reference graph plus two
+    /// independent, pure-CSS opt-in toggles — <b>"Group by epic"</b> (nests citing-story nodes under a parent epic
+    /// hub instead of a flat ring; non-story citers stay at the top level, unaffected) and <b>"Show relationships"</b>
+    /// (draws extra neutral edges: story&#8596;related-file when that story also cites the related file, and
+    /// related-file&#8596;related-file when that pair is itself frequently co-changed). All four combinations are
+    /// pre-rendered server-side (mirroring <see cref="CodeMap.BuildVariants"/>) into sibling <c>.ref-graph-view</c>
+    /// panels switched by two checkboxes via CSS <c>~</c> sibling-combinator selectors keyed on CLASS (not id — a
+    /// page-unique id still backs each checkbox's <c>for</c>/<c>id</c> pair for correct label semantics when several
+    /// code pages are consolidated into one document, but the show/hide selectors themselves only need to see the
+    /// SAME two checkbox classes repeat per <c>&lt;section&gt;</c>, so they need no per-page duplication in
+    /// specscribe.css). When both toggles are off (the default, unchecked state) the visible "flat-flat" panel is
+    /// produced by calling <see cref="Charts.ReferenceGraph"/> with no epic/edge data at all — BYTE-IDENTICAL to the
+    /// pre-existing Story 7.8 call. <paramref name="storyRelatedEdges"/>/<paramref name="relatedRelatedEdges"/> being
+    /// null/empty (no <c>--deep-git</c>, or nothing to relate) means all four variants render identically — the
+    /// checkboxes still appear (so the control surface never disappears) but toggling them is a visual no-op, the
+    /// graceful-degradation path. The sr-only list is toggle-agnostic: it always enumerates epic membership and
+    /// cross-edges (when present) regardless of which panel is currently visible, so assistive tech never has less
+    /// information than the richest sighted view.</summary>
+    private static string BuildRelationshipsCard(
+        string prefix, string repoRelativePath, string outputRelativePath,
+        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)> referencedBy,
+        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> related,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges)
+    {
+        // Resolve each citing artifact once to (href, full title, compact label, epic) — shared by the graph and list.
         var nodes = new List<(string Href, string Title, string Short)>(referencedBy.Count);
-        foreach (var (outputUrl, title) in referencedBy)
+        var refEpics = new List<(int EpicNumber, string EpicTitle)?>(referencedBy.Count);
+        foreach (var (outputUrl, title, epic) in referencedBy)
         {
             nodes.Add((prefix + PathUtil.NormalizeSlashes(outputUrl), title, ShortLabel(title)));
+            refEpics.Add(epic is { } e ? (e.Number, e.Title) : null);
         }
 
         var hasRelated = related.Count > 0;
@@ -410,27 +447,54 @@ public static class CodeFileTemplater
         sb.Append("<section class=\"code-relationships\">\n");
         sb.Append("  <h2>Referenced by</h2>\n");
         sb.Append($"  <p class=\"code-relationships-note\">{note}</p>\n");
-        sb.Append("  <div class=\"ref-graph-wrap\">\n");
-        sb.Append(Charts.ReferenceGraph(BaseName(repoRelativePath), nodes, 0, related));
-        sb.Append("  </div>\n");
-        sb.Append("  <ul class=\"ref-list sr-only\">\n");
-        foreach (var (href, title, _) in nodes)
+
+        // Two independent pure-CSS toggles, always rendered once the card itself renders (even with no epic/edge
+        // data — AC "both checkboxes present ... no exception"). Page-unique ids only for the <label for>/<input id>
+        // pair's correctness under document consolidation (mirrors TabGroupName); the CSS toggle logic itself keys
+        // off the checkbox CLASSES, which are the same on every code page.
+        var group = RefGraphGroupSlug(outputRelativePath);
+        sb.Append($"  <input type=\"checkbox\" id=\"refgraph-epic-{group}\" class=\"refgraph-toggle refgraph-toggle-epic\">");
+        sb.Append($"<label for=\"refgraph-epic-{group}\" class=\"refgraph-toggle-label\">Group by epic</label>\n");
+        sb.Append($"  <input type=\"checkbox\" id=\"refgraph-rel-{group}\" class=\"refgraph-toggle refgraph-toggle-rel\">");
+        sb.Append($"<label for=\"refgraph-rel-{group}\" class=\"refgraph-toggle-label\">Show relationships</label>\n");
+
+        foreach (var (key, epicOn, relOn) in RefGraphVariants)
         {
-            sb.Append($"    <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(title)}</a></li>\n");
+            sb.Append($"  <div class=\"ref-graph-wrap ref-graph-view\" data-view=\"{key}\">\n");
+            sb.Append(Charts.ReferenceGraph(
+                BaseName(repoRelativePath), nodes, 0, related,
+                refEpics: epicOn ? refEpics : null,
+                groupByEpic: epicOn,
+                crossEdges: relOn ? storyRelatedEdges : null,
+                relatedEdges: relOn ? relatedRelatedEdges : null));
+            sb.Append("  </div>\n");
+        }
+
+        sb.Append("  <ul class=\"ref-list sr-only\">\n");
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            var (href, title, _) = nodes[i];
+            var epicSuffix = refEpics[i] is { } epic ? $" (Epic {epic.EpicNumber}: {PathUtil.Html(epic.EpicTitle)})" : "";
+            var crossSuffix = BuildStoryCrossSuffix(i, storyRelatedEdges, related);
+            sb.Append($"    <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(title)}</a>{epicSuffix}{crossSuffix}</li>\n");
         }
         if (hasRelated)
         {
             // The accessible text equivalent of the related-file nodes (AC #2's second half): a labelled sub-list of
             // path + co-change strength, linked to the coupled file's code page when it has one, plain text otherwise.
+            // Also enumerates any "Show relationships" cross edges touching each related file, so the sr-only text
+            // stays complete regardless of which toggle combination happens to be visible.
             sb.Append("    <li class=\"ref-list-related\">Files changed alongside this one:\n");
             sb.Append("      <ul>\n");
-            foreach (var (href, title, _, coChanges) in related)
+            for (var j = 0; j < related.Count; j++)
             {
+                var (href, title, _, coChanges) = related[j];
                 var pathHtml = PathUtil.Html(title);
                 var nameCell = href is { Length: > 0 }
                     ? $"<a href=\"{PathUtil.Html(href)}\">{pathHtml}</a>"
                     : pathHtml;
-                sb.Append($"        <li>{nameCell} &#8212; changed together {coChanges.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(coChanges, "time", "times")}</li>\n");
+                var relatedCrossSuffix = BuildRelatedCrossSuffix(j, storyRelatedEdges, relatedRelatedEdges, nodes, related);
+                sb.Append($"        <li>{nameCell} &#8212; changed together {coChanges.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(coChanges, "time", "times")}{relatedCrossSuffix}</li>\n");
             }
             sb.Append("      </ul>\n");
             sb.Append("    </li>\n");
@@ -440,13 +504,71 @@ public static class CodeFileTemplater
         return sb.ToString();
     }
 
-    /// <summary>A per-page-unique radio-group name for the view tabs, derived from the page's output-relative path
-    /// (non-alphanumeric runs collapse to a single hyphen). Uniqueness matters when several code pages are captured
-    /// into one document (SPA/webview consolidation): a shared name would make their radio groups mutually exclusive
-    /// and cross-wire the tabs.</summary>
-    private static string TabGroupName(string outputRelativePath)
+    /// <summary>The sr-only suffix on a citing-artifact's list item naming any related file it ALSO cites (the
+    /// "Show relationships" story&#8596;related-file edge's text equivalent).</summary>
+    private static string BuildStoryCrossSuffix(
+        int refIndex, IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
+        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> related)
     {
-        var sb = new StringBuilder("code-view-");
+        if (storyRelatedEdges is not { Count: > 0 }) return "";
+        var names = storyRelatedEdges
+            .Where(e => e.RefIndex == refIndex && e.RelatedIndex >= 0 && e.RelatedIndex < related.Count)
+            .Select(e => related[e.RelatedIndex].Title)
+            .ToList();
+        if (names.Count == 0) return "";
+        return $" &#8212; also cites {string.Join("; ", names.Select(PathUtil.Html))}";
+    }
+
+    /// <summary>The sr-only suffix on a related-file's list item naming any citing story that also cites it, and
+    /// any OTHER related file it is itself frequently co-changed with (the "Show relationships" edges' text
+    /// equivalent for the related-file population).</summary>
+    private static string BuildRelatedCrossSuffix(
+        int relatedIndex,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges,
+        IReadOnlyList<(string Href, string Title, string Short)> nodes,
+        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> related)
+    {
+        var parts = new List<string>();
+        if (storyRelatedEdges is { Count: > 0 })
+        {
+            var citerNames = storyRelatedEdges
+                .Where(e => e.RelatedIndex == relatedIndex && e.RefIndex >= 0 && e.RefIndex < nodes.Count)
+                .Select(e => nodes[e.RefIndex].Title)
+                .ToList();
+            if (citerNames.Count > 0) parts.Add($"also cited by {string.Join("; ", citerNames.Select(PathUtil.Html))}");
+        }
+        if (relatedRelatedEdges is { Count: > 0 })
+        {
+            var otherNames = relatedRelatedEdges
+                .Where(e => e.RelatedIndexA != e.RelatedIndexB && (e.RelatedIndexA == relatedIndex || e.RelatedIndexB == relatedIndex))
+                .Select(e => e.RelatedIndexA == relatedIndex ? e.RelatedIndexB : e.RelatedIndexA)
+                .Where(idx => idx >= 0 && idx < related.Count)
+                .Select(idx => related[idx].Title)
+                .ToList();
+            if (otherNames.Count > 0) parts.Add($"also co-changed with {string.Join("; ", otherNames.Select(PathUtil.Html))}");
+        }
+        return parts.Count == 0 ? "" : $" &#8212; {string.Join("; ", parts)}";
+    }
+
+    /// <summary>A per-page-unique slug for the reference graph's two toggle-checkbox ids — so several code pages
+    /// consolidated into one document (SPA/webview capture) never cross-wire their <c>label for</c>/<c>input id</c>
+    /// pairs. Built from the same <see cref="Slugify"/> helper <see cref="TabGroupName"/> uses (independently, not by
+    /// slicing its output), so the two stay correct even if one's prefix ever changes. The show/hide CSS itself does
+    /// not depend on this slug (it matches the shared checkbox classes instead), so this exists purely for correct
+    /// label semantics, not for the toggle mechanism.</summary>
+    private static string RefGraphGroupSlug(string outputRelativePath) => Slugify(outputRelativePath);
+
+    /// <summary>A per-page-unique radio-group name for the view tabs, derived from the page's output-relative path.
+    /// Uniqueness matters when several code pages are captured into one document (SPA/webview consolidation): a
+    /// shared name would make their radio groups mutually exclusive and cross-wire the tabs.</summary>
+    private static string TabGroupName(string outputRelativePath) => "code-view-" + Slugify(outputRelativePath);
+
+    /// <summary>Collapses non-alphanumeric runs in a path to a single hyphen and lowercases it — the shared slug
+    /// primitive behind both <see cref="TabGroupName"/> and <see cref="RefGraphGroupSlug"/>.</summary>
+    private static string Slugify(string outputRelativePath)
+    {
+        var sb = new StringBuilder();
         var prevHyphen = false;
         foreach (var c in outputRelativePath)
         {
@@ -533,7 +655,7 @@ public static class CodeFileTemplater
         string outputRelativePath,
         string reason,
         SiteNav nav,
-        IReadOnlyList<(string OutputUrl, string Title)>? referencedBy = null,
+        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy = null,
         string? externalSourceUrl = null,
         EntityPager? pager = null)
     {
