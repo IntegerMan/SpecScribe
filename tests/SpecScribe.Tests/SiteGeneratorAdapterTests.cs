@@ -282,7 +282,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // epic-hub node styles, and the hub-spoke/cross-edge line styles. This non-git fixture cites no real repo
         // files, so no code page's reference graph itself renders here — only the shared stylesheet content shifted
         // the hash (the new toggle/hub/edge behavior is covered by Charts/CodeFileTemplater/SiteGenerator tests).
-        const string expected = "27a18e8eaa4198ca3c626b4046eb00d531fe5b3ea84d6d84fd26d51cd3d1aacf";
+        // Regenerated post-merge review fixes: removed the redundant margin-top on .refgraph-toggle (it shifted the
+        // checkbox out of vertical alignment with its own label — spacing from the note above is already covered by
+        // .code-relationships-note's margin-bottom). CSS-only for this non-git fixture.
+        const string expected = "6f3f794820c6b6ed37df91700b417cc4af137e68e0bfcf8248a7a5710ad614ab";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

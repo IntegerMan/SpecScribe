@@ -914,7 +914,10 @@ pre.code-file code[class*="language-"] {
    PURE CSS, no script required — mirrors CodeMap.BuildVariants' two-checkbox idiom (specscribe.css's
    .codemap-filter-checkbox / .codemap-view rules above). Plain, unwrapped <input>+<label> siblings so the
    sibling-combinator toggle below sees them at the same nesting level as the .ref-graph-view panels they control. */
-.refgraph-toggle { margin: 0.5rem 0 0 0.1rem; vertical-align: middle; cursor: pointer; }
+/* No top margin here: the preceding .code-relationships-note already carries margin-bottom for row spacing —
+   a top margin on this inline checkbox would shift its border-box down within the line, throwing its
+   vertical-align:middle out of alignment with its own label (the actual cause of a prior visual misalignment). */
+.refgraph-toggle { margin: 0 0 0 0.1rem; vertical-align: middle; cursor: pointer; }
 .refgraph-toggle:first-of-type { margin-left: 0; }
 .refgraph-toggle-label { font-size: 0.8rem; color: var(--ink-light); margin-right: 1.25rem; cursor: pointer; }
 

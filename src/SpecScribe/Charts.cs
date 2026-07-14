@@ -1328,20 +1328,18 @@ public static class Charts
                 var (isHub, epicNumber, epicTitle, _) = mainSlots[slot];
                 if (!isHub) continue;
                 var (x, y) = SlotPos(slot);
-                var ang = SlotAng(slot);
-                var lx = c + (ringR + 14) * Math.Cos(ang);
-                var ly = c + (ringR + 14) * Math.Sin(ang);
-                var anchor = Math.Cos(ang) >= 0 ? "start" : "end";
                 var label = $"Epic {epicNumber}";
                 var shortLabel = Shorten(label, 12);
                 var tip = string.IsNullOrEmpty(epicTitle) ? label : $"{label}: {epicTitle}";
                 // Sized from the shortened label (mirrors the center chip's cw computation) so a wider epic number
-                // never clips inside a hardcoded box.
+                // never clips inside a hardcoded box. The label sits INSIDE the box, centered on the same (x,y) the
+                // box itself is centered on — unlike the ring/related nodes' labels (which sit beside a small dot
+                // and so are pushed outward to ringR+14), the hub IS the box, so its label has nowhere else to go.
                 var hw = Math.Max(30.0, shortLabel.Length * 6.5 + 14);
                 sb.Append($"  <g class=\"ref-epic-hub\" role=\"img\" aria-label=\"{Html(tip)}\">")
                   .Append($"<title>{Html(tip)}</title>")
                   .Append($"<rect class=\"ref-epic-hub-box\" x=\"{F(x - hw / 2)}\" y=\"{F(y - 11)}\" width=\"{F(hw)}\" height=\"22\" rx=\"5\" />")
-                  .Append($"<text class=\"ref-epic-hub-label\" x=\"{F(lx)}\" y=\"{F(ly)}\" font-size=\"12\" text-anchor=\"{anchor}\" dominant-baseline=\"middle\">{Html(shortLabel)}</text>")
+                  .Append($"<text class=\"ref-epic-hub-label\" x=\"{F(x)}\" y=\"{F(y)}\" font-size=\"12\" text-anchor=\"middle\" dominant-baseline=\"middle\">{Html(shortLabel)}</text>")
                   .Append("</g>\n");
             }
         }
