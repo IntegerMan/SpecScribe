@@ -18,6 +18,8 @@ baseline_commit: 19553fe8404e152b3adc7d11f243f63fcfcb3eb2
 
 *(Renegotiated 2026-07-13, round 2: the human owner found the label-reserved header gutter still rendered as a blank, uncolored band even after nested labels were suppressed — since `.codemap-dir` has no fill, the reserved space for the (now-removed) label text showed through as visual noise. Resolution: remove labels at ALL depths, including the top-level rects that originally kept one, and shrink the directory inset from an asymmetric 16px header + 2px pad to a uniform 3px gutter on all sides. Also requested: tooltip/table dates use the app's standard human-readable format, not raw ISO.)*
 
+*(Renegotiated 2026-07-13, round 3: the human owner asked for the colorize control as a dropdown instead of a radio list, "Churn" added as a colorize dimension, and two checkboxes to exclude (a) spec-driven development directories and (b) tests from the treemap. Resolution: the colorize radios became a `<select>`; churn reuses the already-emitted `data-churn` attribute. The exclude filters required genuine re-tiling — not just hiding cells, which would recreate the round-2 blank-area problem — so the generator precomputes all four filter combinations (`CodeMap.BuildVariants`) server-side and the page renders four self-contained panels, toggled by two checkboxes via pure CSS sibling selectors (no JavaScript needed for the toggle itself). "Spec-driven development directories" = `.agents/`, `.claude/`, `_bmad/`, `_bmad-output/`, and `.github/agents/` (a GitHub Copilot mirror of the same BMad agent definitions — found and fixed during browser verification, since `.github/workflows/` is legitimate CI config and must stay). "Tests" = any path segment (directory or file name) containing "test" case-insensitively.)*
+
 ## Boundaries & Constraints
 
 **Always:**
@@ -25,14 +27,17 @@ baseline_commit: 19553fe8404e152b3adc7d11f243f63fcfcb3eb2
 - Everything works with JS off (server treemap + legend + full text table, incl. the new column); JS only enhances. Color is never the sole signal — the card and table carry every metric as text. [[charting-is-pure-svg-no-js]]
 - Keep the ramp off `--status-*`; reuse the `.codemap-cell level-N` heatmap ramp. [[specscribe-status-token-system]]
 - The HTML tooltip is opt-in per element (`data-tip-html`); every existing plain-text `data-tip`/`<title>` tip must render exactly as before. Card content is server-built, dynamic parts escaped via `PathUtil.Html`.
+- Round 3: the exclude-filter checkboxes must genuinely re-tile the treemap (compute a fresh squarified layout for the filtered file set) — never just hide cells while leaving the layout geometry unchanged, which would recreate the round-2 blank-area problem at filter scale.
 
 **Ask First:**
 - Dropping directory boundary strokes entirely (boundaries stay even with no labels — AC #1 "clear boundaries").
 - Changing the co-change definition (denominator, cap, solo-commit handling) from the I/O matrix.
+- Changing which directories count as "spec-driven development" or what "test" matches (round 3, see I/O matrix).
 
 **Never:**
 - Do not route co-change color through `--status-*`; do not build a second tooltip node (reuse `.ss-tooltip`). [[tooltip-clipping-use-ss-tooltip-node]]
 - Do not add incremental treemap regeneration or edit `docs/live/specscribe.css` — only the embedded `src/SpecScribe/assets/specscribe.css`. [[generate-output-dir-is-specscribeoutput]]
+- Round 3: do not port the squarified layout algorithm to client-side JS (two implementations of the same algorithm risk silently diverging); do not make the exclude-filter toggle itself depend on JavaScript — it must work with JS off.
 
 ## I/O & Edge-Case Matrix
 
@@ -45,19 +50,26 @@ baseline_commit: 19553fe8404e152b3adc7d11f243f63fcfcb3eb2
 | No git record for file | metrics null / `--deep-git` off | No co-change value; `data-cochanged` omitted; card/table show "—"; cell neutral on this dimension | Degrades to neutral |
 | Hover treemap cell (JS on) | Cell has `data-tip-html` | `.ss-tooltip` renders the styled card via innerHTML | N/A |
 | Hover other chart segment | Element has plain `data-tip` or `<title>` | Renders plain text via textContent, unchanged | N/A |
+| Path under `.agents/`, `.claude/`, `_bmad/`, `_bmad-output/`, or `.github/agents/` | "Exclude spec-driven development directories" checked | File dropped from that panel's tree; layout re-tiles | N/A |
+| Path with any segment containing "test" (case-insensitive) | "Exclude tests" checked | File/directory-and-descendants dropped; layout re-tiles | N/A |
+| Both filters checked | | The intersection (files failing BOTH predicates) shown | N/A |
+| A filter combination excludes every file | E.g. a repo that is 100% tests | That panel shows "No files match this filter." instead of an empty treemap | Never throws, never a blank SVG |
+| Filter checkboxes with JS off | No script runs | Checking a box still swaps the visible panel (pure CSS) | N/A |
 
 </frozen-after-approval>
 
 ## Code Map
 
 - `src/SpecScribe/GitMetrics.cs` -- `CodeFileMetrics` record (add `double? AvgCoChanged`); `BuildCodeMapMetrics` (accumulate co-change over non-bulk commits, `CouplingFileSetCap` already here); `CodeMapAccum`.
-- `src/SpecScribe/CodeMap.cs` -- squarified layout inset: replaced the asymmetric `DirHeader`(16px)+`Pad`(2px) with a uniform `Pad`(3px) on all sides, now that no directory reserves header space for a label.
-- `src/SpecScribe/Charts.cs` -- `AppendTreemapDir` (no label at any depth, boundary rect only); `AppendTreemapFile` (emit `data-cochanged`, swap `data-tip` → `data-tip-html`); `BuildTreemapTip` → `BuildTreemapCard` (styled HTML card, dates via `DReadable`).
-- `src/SpecScribe/CodeMapTemplater.cs` -- `AppendControls` (new "Files changed together" radio); `AppendFileTable` (new "Together" column; First/Last via `PortalDates.Day`, not raw ISO).
-- `src/SpecScribe/assets/specscribe.js` -- tip `activate`/`showTip` (opt-in `data-tip-html` → innerHTML branch); treemap `metricFor`/`DIM_LABELS`/`recolor` (add `cochange` dim; drop dead `data-tip` mutation since the card is static, keep aria-label + legend refresh).
-- `src/SpecScribe/assets/specscribe.css` -- `.ss-tooltip` card styles (heading, mono path, metric rows); removed the now-dead `.codemap-dir-label` rule.
-- `tests/SpecScribe.Tests/GitMetricsTests.cs`, `ChartsTests.cs`, `CodeMapTemplaterTests.cs` -- co-change math, no-label-at-any-depth, card markup, new column, readable-date assertions.
-- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` -- golden inventory + whole-site content fingerprint (regenerated). [[golden-diff-normalization-gotchas]]
+- `src/SpecScribe/CodeMap.cs` -- squarified layout inset (round 2: uniform 3px `Pad`); round 3: `IsSpecDevPath`/`IsTestPath` pure predicates + `CodeMapVariant` record + `CodeMap.BuildVariants` (computes all four filter-combination `Build`+`Layout` pairs in one pass).
+- `src/SpecScribe/Charts.cs` -- `AppendTreemapDir` (no label, boundary only); `AppendTreemapFile`/`BuildTreemapCard` (rich card, `data-tip-html`, `DReadable` dates); round 3: dropped the SVG's `id="codemap-svg"` (up to four render per page now — a duplicate id is invalid HTML).
+- `src/SpecScribe/SiteGenerator.cs` -- round 3: `WriteCodeMap` now calls `CodeMap.BuildVariants` once and gates the page/nav on the "full" variant only.
+- `src/SpecScribe/CodeMapTemplater.cs` -- round 3: `RenderPage` takes `IReadOnlyList<CodeMapVariant>`; colorize control is a `<select>` (was radios) with a new "Churn" option; two pure-CSS filter checkboxes + four `AppendVariantPanel` panels (each a self-contained `.codemap-view` — treemap card and table card as sibling `.chart-panel`s, never nested).
+- `src/SpecScribe/assets/specscribe.js` -- round 2: `data-tip-html` tip branch, `cochange` dim. Round 3: `churn` dim; `initCodeMap` refactored from a single-SVG IIFE into `initCodeMapPanel(panel)`, called once per `.codemap-view` (every lookup scoped via `panel.querySelector`, no `getElementById`); dropdown wiring (`select.addEventListener("change", ...)`) replaces the old radio-group form listener.
+- `src/SpecScribe/assets/specscribe.css` -- round 2: `.ss-tooltip` card styles, dropped `.codemap-dir-label`. Round 3: `.codemap-dim-select` (dropdown), `.codemap-filter-checkbox`/`-label`, and the `#cm-exclude-spec`/`#cm-exclude-tests` sibling-combinator rules that show exactly one `.codemap-view` panel.
+- `tests/SpecScribe.Tests/CodeMapTests.cs` -- round 3: `IsSpecDevPath`/`IsTestPath` theory tests (incl. the `.github/agents/` vs `.github/workflows/` distinction found during browser verification) + `BuildVariants` tests.
+- `tests/SpecScribe.Tests/CodeMapTemplaterTests.cs`, `ChartsTests.cs`, `SiteGeneratorCodeMapTests.cs` -- rewritten for the `CodeMapVariant`-based `RenderPage` signature; new dropdown/churn/four-panel/checkbox assertions.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` -- golden inventory + whole-site content fingerprint (regenerated each round). [[golden-diff-normalization-gotchas]]
 
 ## Tasks & Acceptance
 
@@ -68,14 +80,20 @@ baseline_commit: 19553fe8404e152b3adc7d11f243f63fcfcb3eb2
 - [x] `src/SpecScribe/CodeMapTemplater.cs` -- Added the `cochange` radio and the "Together" column (`N1`, em-dash fallback); First/Last cells now use `PortalDates.Day` (was raw ISO `Charts.D`).
 - [x] `src/SpecScribe/assets/specscribe.js` -- Shared tip `activate`/`showTip` gained a `data-tip-html` → `innerHTML` branch (all other tips unchanged). Treemap `metricFor`/`DIM_LABELS` gained `cochange`; `recolor` no longer mutates the tooltip (static card), still refreshes aria-label + legend.
 - [x] `src/SpecScribe/assets/specscribe.css` -- Styled `.codemap-card*` inside `.ss-tooltip` (heading, mono path, two-column `<dl>` grid); removed the dead `.codemap-dir-label` rule (round 2).
-- [x] `tests/SpecScribe.Tests/*` -- Co-change math tests (bulk exclusion / solo=0 / null-when-no-qualifying), no-label-at-any-depth + rich-card `CodeTreemap` tests, "Together" column + readable-date templater assertions. **Full suite green: 1034/1034, golden fingerprint regenerated and stable.**
+- [x] `src/SpecScribe/CodeMap.cs` -- Round 3: `IsSpecDevPath`/`IsTestPath` pure predicates; `CodeMapVariant(Key, ExcludesSpecDev, ExcludesTests, Map, Layout)`; `BuildVariants` computes all four combinations (`full`/`no-spec`/`no-tests`/`no-spec-no-tests`), each its own `Build`+`Layout` call so a filtered view genuinely re-tiles.
+- [x] `src/SpecScribe/SiteGenerator.cs` -- Round 3: `WriteCodeMap` calls `BuildVariants` once, gates on the `full` variant, passes all four to `CodeMapTemplater.RenderPage`.
+- [x] `src/SpecScribe/CodeMapTemplater.cs` -- Round 3: colorize control is now a `<select>` with a "Churn" option added; two unwrapped `<input type=checkbox>`+`<label for>` filter toggles; `AppendVariantPanel` renders each of the four panels as sibling `.chart-panel` cards (treemap + table), with a "No files match this filter." notice when a combination filters down to nothing.
+- [x] `src/SpecScribe/assets/specscribe.js` -- Round 3: `churn` added to `metricFor`/`DIM_LABELS`; `initCodeMap` refactored to `initCodeMapPanel(panel)`, invoked once per `.codemap-view` via `querySelectorAll` + `forEach` (no global ids); dropdown `change` listener replaces the radio-group form listener.
+- [x] `src/SpecScribe/assets/specscribe.css` -- Round 3: dropdown + checkbox styles; the `#cm-exclude-spec`/`#cm-exclude-tests` sibling-combinator rules toggling exactly one `.codemap-view`.
+- [x] `tests/SpecScribe.Tests/*` -- Co-change math tests; no-label-at-any-depth + rich-card tests; round 3: `IsSpecDevPath`/`IsTestPath`/`BuildVariants` tests, rewritten templater tests for the variant-list `RenderPage` signature, dropdown/churn/checkbox/four-panel assertions. **Full suite green: 1053/1053, golden fingerprint regenerated and stable.**
 
 **Acceptance Criteria:**
 - Given a deep-git run, when I open the code map, then no directory rect at any depth carries a text label, boundary rects are still drawn at every depth, and every directory/file is identifiable via its tooltip or the text table.
 - Given I hover a file cell, when the tooltip appears, then it is a styled card showing the path and all available metrics as labeled text (dates in the portal's readable format), including "files changed together".
-- Given deep-git metrics exist, when I pick the "Files changed together" colorize option, then cells recolor on the sequential ramp by their average co-change value, the legend reads "Colorized by files changed together", aria-labels name that dimension, and the text table shows the per-file value.
+- Given deep-git metrics exist, when I open the colorize dropdown, then I can pick "Churn" or "Files changed together" among six dimensions; cells recolor on the sequential ramp, the legend and aria-labels name the active dimension, and the text table shows the per-file value.
 - Given `--deep-git` is off or a file has no git record, when the code map renders, then no co-change value is shown for it (card/table "—", neutral fill) and generation still succeeds.
-- Given JS is disabled, when I load the page, then the treemap, legend, and the full text table (with the "Together" column, readable dates) render correctly with no tooltip dependency.
+- Given JS is disabled, when I load the page, then the treemap, legend, full text table, AND the two exclude-filter checkboxes all work correctly with no script dependency — only the colorize dropdown and directory zoom require JS.
+- Given I check "Exclude spec-driven development directories" and/or "Exclude tests", when the corresponding panel becomes visible, then it shows a genuinely re-tiled treemap (no leftover blank gaps) containing only the surviving files, with a text note of what was excluded.
 
 ## Design Notes
 
@@ -89,13 +107,20 @@ The card is per-element opt-in: only treemap cells set `data-tip-html`; the shar
 
 **Round 2 — dates:** the card and table First/Last previously used `Charts.D` (the raw ISO machine token, `PortalDates.IsoDay`, e.g. "2026-07-05") — fine for URLs/filenames but not meant for human reading. Card now uses `Charts.DReadable` (`PortalDates.DayWithWeekday`, e.g. "Mon, Jul 5, 2026") — its own doc comment calls out "tooltips" as its designated use. The table uses plain `PortalDates.Day` ("Jul 5, 2026", no weekday) since a dense multi-column table favors compactness over the weekday prefix.
 
-**Golden fingerprint:** a background auto-committer landed two commits mid-session (`537ff8c`, `a5aca55`) that bundled this story's round-1 code together with a concurrent "entity prev/next navigation" story and reconciled the tree (see [worktree-edits-must-target-worktree-path]). Once `main` compiled cleanly and no other session was contending, the fingerprint was regenerated directly and is now stable at `d004d31cba855143d78ee9c6461957e9e1162f20a5e808d9042c03e99613c116`.
+**Golden fingerprint:** a background auto-committer landed several commits mid-session (`537ff8c`, `a5aca55`, `2903b9f`, `85b5491`) that bundled this story's round-1/round-2 code together with concurrent "entity prev/next navigation" and "prism.js" stories and reconciled the tree (see [[worktree-edits-must-target-worktree-path]]). Round 3 landed once `main` was uncontested; the fingerprint was regenerated directly each time it drifted and is now stable at `06702d484947448f406982fee45922a1c4dc79315207707a74bbdd16b0933058`.
+
+**Round 3 — why four precomputed panels, not client-side relayout:** the exclude checkboxes need the treemap to genuinely re-tile (freed space must be reclaimed, or excluding a large directory just recreates round 2's blank-area bug at filter scale). The codebase's established principle is "layout computed once in C#, no client layout math" (repeated throughout Story 7.6's own notes). Porting the squarified algorithm to JS would violate that, double the surface area for layout bugs (two implementations to keep in sync), AND make the filter depend on JavaScript. Instead, `CodeMap.BuildVariants` computes all four filter combinations server-side in one pass; the page ships four self-contained panels and a pure-CSS sibling-combinator toggle (`#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-view[data-view="no-spec-no-tests"] { display: block; }`) — the ONLY feature on this page that needs zero JavaScript, not even as a progressive enhancement.
+
+**Round 3 — no shared ids across panels:** with up to four copies of the same markup shape on one page, nothing that used to be `id="codemap-svg"`/`id="codemap-controls"`/`id="codemap-legend-dim"`/`id="codemap-breadcrumb"` can keep that id (duplicate ids are invalid HTML and `getElementById` would only ever find the first). Every one of those became a class, and `specscribe.js`'s `initCodeMap` IIFE became `initCodeMapPanel(panel)`, called once per `.codemap-view` via `querySelectorAll`+`forEach`, with every internal lookup scoped through `panel.querySelector(...)`.
+
+**Round 3 — "spec-driven development directories" scope:** initially `.agents/`, `.claude/`, `_bmad/`, `_bmad-output/` (the repo's own BMad Method scaffolding, inferred from the directory listing + the original screenshot showing them dominating the treemap). Browser verification caught a gap: `.github/agents/` mirrors the same BMad agent definitions for GitHub Copilot, while `.github/workflows/` (CI config) is genuinely not spec-dev — so the filter needed a sub-path exclusion, not a blanket `.github/` exclusion, added as its own prefix in `SpecDevPathPrefixes`.
 
 ## Verification
 
 **Commands:**
-- `dotnet test SpecScribe.slnx` -- result: **1034/1034 green**, golden fingerprint stable at `d004d31cba855143d78ee9c6461957e9e1162f20a5e808d9042c03e99613c116`.
-- `dotnet run --project src/SpecScribe -- generate --deep-git` then open `code-map.html` -- result (verified live in-browser): zero `<text>` elements in the SVG, 205 directory boundary rects still drawn, the top gutter above every directory's children measures 3px (was 16px), hovering a cell renders the styled card (dates e.g. "Mon, Jul 6, 2026 · Mon, Jul 13, 2026"), "Files changed together" recolors the map + updates the legend, the "All files" table has a "Together" column with `Jul 5, 2026`-style dates.
+- `dotnet test SpecScribe.slnx` -- result: **1053/1053 green**, golden fingerprint stable at `06702d484947448f406982fee45922a1c4dc79315207707a74bbdd16b0933058`.
+- `dotnet run --project src/SpecScribe -- generate --deep-git` then open `code-map.html` -- result (verified live in-browser, round 2): zero `<text>` elements in the SVG, 205 directory boundary rects still drawn, the top gutter above every directory's children measures 3px, hovering a cell renders the styled card, "Files changed together" recolors the map + updates the legend, the "All files" table has a "Together" column with readable dates.
+- Round 3 (verified live in-browser): zero duplicate `id`s across the 4 panels; only the "full" panel visible by default; checking "Exclude spec-driven development directories" alone shows the "no-spec" panel (847→243 cells, 94.9% SVG area coverage — a genuine re-tile, not a blank void); checking both shows "no-spec-no-tests" (160 cells, zero spec-dev/test path leaks after the `.github/agents/` fix); the dropdown's "Churn" option recolors the currently-visible panel and updates its legend/aria-labels correctly, scoped to that panel only.
 
 **Manual checks:**
 - Confirm a sweeping bulk commit does not inflate co-change for the files it touched (spot-check a file also edited in a large commit against the table value).
@@ -147,3 +172,34 @@ The card is per-element opt-in: only treemap cells set `data-tip-html`; the shar
 
 - Label suppression + rich-card/`data-cochanged` render.
   [`ChartsTests.cs:927`](../../tests/SpecScribe.Tests/ChartsTests.cs#L927)
+
+**Round 3 — exclude filters (entry point for this round)**
+
+- The filter predicates — the `.github/agents/` vs `.github/workflows/` distinction is the one subtlety here.
+  [`CodeMap.cs:107`](../../src/SpecScribe/CodeMap.cs#L107)
+
+- `BuildVariants` — the single place all four filter combinations are computed, each with its own genuine re-tile.
+  [`CodeMap.cs:209`](../../src/SpecScribe/CodeMap.cs#L209)
+
+- `WriteCodeMap` now builds variants once and gates on the "full" one.
+  [`SiteGenerator.cs:2333`](../../src/SpecScribe/SiteGenerator.cs#L2333)
+
+- `RenderPage`'s new signature + the four-panel render loop; the checkboxes must stay unwrapped siblings of the panels.
+  [`CodeMapTemplater.cs:23`](../../src/SpecScribe/CodeMapTemplater.cs#L23)
+
+- The colorize control is now a `<select>` (was radios) with "Churn" added.
+  [`CodeMapTemplater.cs:86`](../../src/SpecScribe/CodeMapTemplater.cs#L86)
+
+- The pure-CSS sibling-combinator toggle — the only feature on this page needing zero JavaScript.
+  [`specscribe.css:2567`](../../src/SpecScribe/assets/specscribe.css#L2567)
+
+- `initCodeMap` → `initCodeMapPanel(panel)`, invoked once per panel; every lookup is now scoped, not global-id-based.
+  [`specscribe.js:368`](../../src/SpecScribe/assets/specscribe.js#L368)
+
+**Round 3 tests**
+
+- Filter predicates + `BuildVariants` (including the all-excluded and empty-input edge cases).
+  [`CodeMapTests.cs`](../../tests/SpecScribe.Tests/CodeMapTests.cs)
+
+- Four-panel render + checkbox markup + dropdown/churn assertions.
+  [`CodeMapTemplaterTests.cs`](../../tests/SpecScribe.Tests/CodeMapTemplaterTests.cs)

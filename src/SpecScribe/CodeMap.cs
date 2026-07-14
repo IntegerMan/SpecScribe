@@ -21,9 +21,19 @@ public sealed record CodeMapNode(
 /// <summary>One positioned rectangle in the squarified treemap layout: the <see cref="Node"/> it draws, its
 /// position/size within the fixed viewBox (<see cref="X"/>/<see cref="Y"/>/<see cref="W"/>/<see cref="H"/>), and
 /// its nesting <see cref="Depth"/> (0 = a root-level node). Directory rects contain their children's rects (drawn
-/// as group boundaries + a label header); file rects are the leaves. Positions are pure functions of the (already
-/// deterministic) node order, so the layout is byte-stable for snapshot tests. [Story 7.6]</summary>
+/// as unlabeled group boundaries — no directory carries a text label at any depth); file rects are the leaves.
+/// Positions are pure functions of the (already deterministic) node order, so the layout is byte-stable for
+/// snapshot tests. [Story 7.6]</summary>
 public sealed record TreemapRect(CodeMapNode Node, double X, double Y, double W, double H, int Depth);
+
+/// <summary>One precomputed code-map filter combination the page bakes ahead of time (Story 7.6 round 2's "exclude
+/// spec-driven development directories" / "exclude tests" checkboxes). Rather than relaying out the treemap client
+/// side — which would need a second, JS-ported copy of the squarified algorithm and risks the two implementations
+/// silently diverging — the generator computes all four combinations once in C# (the single source of truth for
+/// tiling) and the page swaps between four pre-rendered panels via pure CSS, so the toggle needs no JavaScript at
+/// all and every combination is fully correct — including re-tiled, gap-free layouts — with JS off.
+/// <see cref="Key"/> is the CSS class/id suffix distinguishing the four panels.</summary>
+public sealed record CodeMapVariant(string Key, bool ExcludesSpecDev, bool ExcludesTests, CodeMap Map, IReadOnlyList<TreemapRect> Layout);
 
 /// <summary>A pure, source-code-derived treemap model of a repository's files sized by lines of code and nested by
 /// directory. Mirrors the shape every pure model in this repo uses (<see cref="WorkInventory"/>,
@@ -77,6 +87,48 @@ public sealed class CodeMap
     /// <summary>A file leaf captured during the trie build: its full repo-relative path, line count, and the
     /// optional per-file git metrics (null when the file has no git record).</summary>
     private sealed record FileLeaf(string RepoRelativePath, long Lines, CodeFileMetrics? Metrics);
+
+    /// <summary>The path prefixes that hold this repo's own spec-driven-development scaffolding (BMad Method
+    /// agents/skills/workflows and their generated planning/implementation artifacts) rather than product source.
+    /// Mostly whole top-level directories, but <c>.github/agents/</c> is a narrower sub-path — a mirror of the same
+    /// BMad agent definitions for GitHub Copilot, sitting alongside the genuinely-not-spec-dev <c>.github/workflows/</c>
+    /// CI config, so only that one subdirectory (not all of <c>.github/</c>) is excluded. Exposed so the code-map's
+    /// "exclude spec-driven development directories" filter and its test coverage share one list instead of
+    /// duplicating the segment names.</summary>
+    private static readonly string[] SpecDevPathPrefixes =
+        { ".agents", ".claude", "_bmad", "_bmad-output", ".github/agents" };
+
+    /// <summary>True when a repo-relative path lives under one of the repo's spec-driven-development directories
+    /// (<see cref="SpecDevPathPrefixes"/>) — the code-map's "exclude spec-driven development directories" checkbox
+    /// filter. Normalizes via <see cref="PathUtil.NormalizeSlashes"/> internally (raw, un-normalized paths are safe
+    /// to pass) so callers can filter the flat source-file list the same way <see cref="Build"/> normalizes it.
+    /// Ordinal-case-sensitive: these are fixed, dotfile-style directory names this project itself defines, not
+    /// user-authored paths that might vary in case. Pure string check, never throws.</summary>
+    public static bool IsSpecDevPath(string repoRelativePath)
+    {
+        var norm = PathUtil.NormalizeSlashes(repoRelativePath);
+        foreach (var prefix in SpecDevPathPrefixes)
+        {
+            if (norm.StartsWith(prefix + "/", StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>True when ANY '/'-split segment of a repo-relative path — a directory name or the file's own name —
+    /// contains "test" case-insensitively. Matches a whole directory (and therefore every descendant beneath it,
+    /// since the filter drops the file from the flat list before <see cref="Build"/> ever nests it) as well as an
+    /// individually test-named file inside an otherwise ordinary directory (e.g. <c>src/Foo/HelperTests.cs</c>).
+    /// Culture-invariant casing so "Test"/"test"/"TEST" all match identically regardless of host locale.
+    /// Normalizes via <see cref="PathUtil.NormalizeSlashes"/> internally. Pure string check, never throws.</summary>
+    public static bool IsTestPath(string repoRelativePath)
+    {
+        var norm = PathUtil.NormalizeSlashes(repoRelativePath);
+        foreach (var segment in norm.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment.Contains("test", StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
 
     /// <summary>Builds the treemap model over already-resolved inputs — NO disk access. Each source file's
     /// repo-relative path is normalized through <see cref="PathUtil.NormalizeSlashes"/> and split on <c>/</c> into
@@ -144,6 +196,42 @@ public sealed class CodeMap
             DirectoryCount = dirCount,
             TotalLines = totalLines,
         };
+    }
+
+    /// <summary>Builds all four <see cref="CodeMapVariant"/> filter combinations (full / exclude spec-dev dirs /
+    /// exclude tests / exclude both) in one pass — the single place the "exclude spec-driven development
+    /// directories" and "exclude tests" checkboxes' filtering happens, so the page-level toggle is pure CSS with
+    /// no client-side relayout. Each combination gets its own <see cref="Build"/> + <see cref="Layout"/> call (the
+    /// SAME deterministic squarified algorithm every other variant uses), so a filtered view genuinely re-tiles to
+    /// fill the freed space rather than leaving the excluded files' rectangles as unfilled gaps. Pure, never throws
+    /// (an individual combo that filters down to nothing degrades to that variant's own <see cref="Empty"/>, exactly
+    /// like the unfiltered page does when there are no source files at all).</summary>
+    public static IReadOnlyList<CodeMapVariant> BuildVariants(
+        IReadOnlyList<(string RepoRelativePath, long Lines)> sourceFiles,
+        IReadOnlyDictionary<string, CodeFileMetrics> gitMetrics)
+    {
+        var combos = new (string Key, bool ExcludesSpecDev, bool ExcludesTests)[]
+        {
+            ("full", false, false),
+            ("no-spec", true, false),
+            ("no-tests", false, true),
+            ("no-spec-no-tests", true, true),
+        };
+
+        var result = new List<CodeMapVariant>(combos.Length);
+        foreach (var (key, excludeSpec, excludeTests) in combos)
+        {
+            IReadOnlyList<(string RepoRelativePath, long Lines)> filtered = (excludeSpec || excludeTests)
+                ? sourceFiles
+                    .Where(f => (!excludeSpec || !IsSpecDevPath(f.RepoRelativePath))
+                        && (!excludeTests || !IsTestPath(f.RepoRelativePath)))
+                    .ToList()
+                : sourceFiles;
+
+            var map = Build(filtered, gitMetrics);
+            result.Add(new CodeMapVariant(key, excludeSpec, excludeTests, map, map.Layout()));
+        }
+        return result;
     }
 
     /// <summary>Tallies real files and directories over the raw trie (the virtual root is not itself a directory),

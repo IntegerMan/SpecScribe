@@ -303,4 +303,89 @@ public class CodeMapTests
         var tinyFileRects = layout.Where(r => !r.Node.IsDirectory && r.Node.RepoRelativePath.StartsWith("tiny/")).ToList();
         Assert.Equal(5, tinyFileRects.Count);
     }
+
+    // ---- Exclude filters + variants (round 2: "exclude spec-driven development directories" / "exclude tests") ----
+
+    [Theory]
+    [InlineData(".agents/skills/bmad-dev/workflow.md", true)]
+    [InlineData(".claude/skills/bmad-quick-dev/step-01.md", true)]
+    [InlineData("_bmad/bmm/config.yaml", true)]
+    [InlineData("_bmad-output/implementation-artifacts/spec-foo.md", true)]
+    [InlineData(".github/agents/bmad-agent-analyst.agent.md", true)]  // BMad agent mirror for GitHub Copilot
+    [InlineData(".github/workflows/ci.yml", false)]                   // sibling CI config is NOT spec-dev scaffolding
+    [InlineData("src/SpecScribe/GitMetrics.cs", false)]
+    [InlineData("docs/adrs/0001-foo.md", false)]
+    [InlineData(".agentsxyz/Foo.cs", false)] // a directory that merely STARTS WITH ".agents" is not a match — full segment only
+    public void IsSpecDevPath_MatchesTheScaffoldDirectoriesIncludingTheGithubAgentsMirror(string path, bool expected)
+    {
+        Assert.Equal(expected, CodeMap.IsSpecDevPath(path));
+    }
+
+    [Theory]
+    [InlineData("tests/SpecScribe.Tests/GitMetricsTests.cs", true)]      // directory segment contains "Test"
+    [InlineData("src/SpecScribe/GitMetricsTests.cs", true)]              // file's own name contains "Tests"
+    [InlineData("src/SpecScribe/TESTUTIL.CS", true)]                     // case-insensitive
+    [InlineData("src/SpecScribe/GitMetrics.cs", false)]
+    [InlineData("src/Contests/Leaderboard.cs", true)]                    // substring match is intentional ("contains", not whole-word)
+    public void IsTestPath_MatchesAnySegmentContainingTestCaseInsensitively(string path, bool expected)
+    {
+        Assert.Equal(expected, CodeMap.IsTestPath(path));
+    }
+
+    [Fact]
+    public void BuildVariants_ReturnsFourCombinationsFilteringSpecDevAndTestPathsIndependently()
+    {
+        var files = new (string, long)[]
+        {
+            (".agents/skills/bmad-dev/workflow.md", 10),
+            ("tests/SpecScribe.Tests/GitMetricsTests.cs", 20),
+            ("src/SpecScribe/GitMetrics.cs", 30),
+        };
+
+        var variants = CodeMap.BuildVariants(files, NoMetrics);
+
+        Assert.Equal(4, variants.Count);
+        var full = variants.Single(v => v.Key == "full");
+        var noSpec = variants.Single(v => v.Key == "no-spec");
+        var noTests = variants.Single(v => v.Key == "no-tests");
+        var noBoth = variants.Single(v => v.Key == "no-spec-no-tests");
+
+        Assert.Equal(3, full.Map.FileCount);
+        Assert.False(full.ExcludesSpecDev);
+        Assert.False(full.ExcludesTests);
+
+        Assert.Equal(2, noSpec.Map.FileCount); // drops the .agents/ file
+        Assert.True(noSpec.ExcludesSpecDev);
+        Assert.DoesNotContain(noSpec.Map.Files(), f => f.RepoRelativePath.StartsWith(".agents/", StringComparison.Ordinal));
+
+        Assert.Equal(2, noTests.Map.FileCount); // drops the tests/ file
+        Assert.True(noTests.ExcludesTests);
+        Assert.DoesNotContain(noTests.Map.Files(), f => f.RepoRelativePath.Contains("Tests", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(1, noBoth.Map.FileCount); // only src/SpecScribe/GitMetrics.cs survives both filters
+        Assert.Equal("src/SpecScribe/GitMetrics.cs", noBoth.Map.Files().Single().RepoRelativePath);
+
+        // Each variant's own layout tiles its OWN (smaller) file set — never leftover rects for excluded files.
+        Assert.Equal(noBoth.Map.FileCount, noBoth.Layout.Count(r => !r.Node.IsDirectory));
+    }
+
+    [Fact]
+    public void BuildVariants_AFilterThatExcludesEverythingYieldsAnEmptyVariantNotAThrow()
+    {
+        var files = new (string, long)[] { ("tests/OnlyTests/FooTests.cs", 10) };
+
+        var variants = CodeMap.BuildVariants(files, NoMetrics);
+
+        var noTests = variants.Single(v => v.Key == "no-tests");
+        Assert.True(noTests.Map.IsEmpty);
+        Assert.Empty(noTests.Layout);
+    }
+
+    [Fact]
+    public void BuildVariants_EmptyInputYieldsFourEmptyVariants()
+    {
+        var variants = CodeMap.BuildVariants(Array.Empty<(string, long)>(), NoMetrics);
+        Assert.Equal(4, variants.Count);
+        Assert.All(variants, v => Assert.True(v.Map.IsEmpty));
+    }
 }

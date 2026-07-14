@@ -86,12 +86,16 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.Contains("class=\"breadcrumb\"", html);
 
         // The server-rendered SVG treemap + the no-JS text-equivalent table listing the walked source file.
-        Assert.Contains("id=\"codemap-svg\"", html);
+        Assert.Contains("class=\"codemap\"", html);
         Assert.Contains("codemap-cell", html);
         Assert.Contains("codemap-table", html);
         Assert.Contains("src/Sample/Widget.cs", html);
         // Non-git temp repo → no deep-git metrics → sized-by-LOC with the graceful-degradation notice.
         Assert.Contains("codemap-notice", html);
+        // Round 2: the two pure-CSS exclude-filter checkboxes and their four precomputed panels are always present.
+        Assert.Contains("id=\"cm-exclude-spec\"", html);
+        Assert.Contains("id=\"cm-exclude-tests\"", html);
+        Assert.Contains("data-view=\"full\"", html);
 
         // The Code Map nav item + dashboard quick link appear and point at the page.
         var index = File.ReadAllText(IndexPage);

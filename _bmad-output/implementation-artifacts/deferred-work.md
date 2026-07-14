@@ -381,3 +381,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
   post-write second pass) was out of scope for the feature; it bypasses the codebase's otherwise-strict
   "never a dead link" discipline.
   evidence: Blind Hunter + Edge Case Hunter agreed. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+
+## Deferred from: code review of story-7.2 (2026-07-13)
+
+- source_spec: `7-2-source-citation-and-comment-linking-to-code-pages.md`
+- **Code-reference resolution requires an extension on the last path segment and doesn't percent-decode paths.** `src/SpecScribe/CodeReferenceLinkifier.cs:165-183` (`IsRelativeCodeHref`) — citations to extensionless files (`Dockerfile`, `Makefile`, `LICENSE`) or filenames with percent-encoded characters (e.g. `%20` for a space) never resolve via the href form and silently degrade to plain text. Pre-existing completeness gap in the new linkifier, not required by AC #1/#2 and not a regression.
+  evidence: Edge Case Hunter finding (low), reviewed and reasoned about directly against the merged code.

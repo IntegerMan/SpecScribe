@@ -846,8 +846,9 @@ public class ChartsTests
         var map = TreemapWithMetrics();
         var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
 
-        // Server-rendered SVG (no client layout math), one file rect carrying every metric as data-*.
-        Assert.Contains("<svg id=\"codemap-svg\"", svg);
+        // Server-rendered SVG (no client layout math), one file rect carrying every metric as data-*. No id on the
+        // <svg> itself — the page can render up to four of these (round 2), and a duplicate id is invalid HTML.
+        Assert.Contains("<svg class=\"codemap\"", svg);
         Assert.Contains("class=\"codemap-cell", svg);
         Assert.Contains("data-path=\"src/A.cs\"", svg);
         Assert.Contains("data-lines=\"100\"", svg);

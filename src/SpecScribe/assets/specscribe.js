@@ -354,16 +354,23 @@
     try { enhanceSortableTable(table); } catch (err) { /* degrade silently — the server-sorted table stands */ }
   });
 
-  // ---- Source-code treemap: dimension switch + directory zoom [Story 7.6] ------------------
-  // Progressive enhancement ONLY. The server ships a correct, sized-by-LOC treemap with the default
-  // (change-frequency) colorize baked in, a legend, and a full text-equivalent table; with JS off this block
-  // never runs and all of that stands. When it runs it (1) reveals the hidden colorize controls + drill
+  // ---- Source-code treemap: dimension switch + directory zoom [Story 7.6, round 2] ---------
+  // Progressive enhancement ONLY. The server ships up to four self-contained ".codemap-view" panels (one per
+  // exclude-spec-dev / exclude-tests filter combination — Story 7.6 round 2), each with a correct, sized-by-LOC
+  // treemap, the default (change-frequency) colorize baked in, a legend, and a full text-equivalent table; with JS
+  // off this block never runs and all of that stands. The panel TOGGLE itself (the two checkboxes) is pure CSS and
+  // needs no JS at all. This block only wires, PER PANEL, (1) reveals the hidden colorize dropdown + drill
   // breadcrumb, (2) re-fills the rects when the dimension changes (reading the same data-* the server wrote,
-  // re-bucketing with the SAME thresholds Charts.Bucket uses so the default matches byte-for-byte), and
-  // (3) zooms the SVG viewBox into a directory — deep-linkable via the URL hash — respecting reduced motion
-  // (the reduce branch snaps instead of tweening).
-  (function initCodeMap() {
-    var svg = document.getElementById("codemap-svg");
+  // re-bucketing with the SAME thresholds Charts.Bucket uses so the default matches byte-for-byte), and (3) zooms
+  // the SVG viewBox into a directory — deep-linkable via the URL hash — respecting reduced motion (the reduce
+  // branch snaps instead of tweening). Nothing here uses a global id (four panels share one shape), so every
+  // lookup is scoped with querySelector against the panel it belongs to.
+  Array.prototype.forEach.call(document.querySelectorAll(".codemap-view"), function (panel) {
+    initCodeMapPanel(panel);
+  });
+
+  function initCodeMapPanel(panel) {
+    var svg = panel.querySelector(".codemap");
     if (!svg) return;
 
     var cells = Array.prototype.slice.call(svg.querySelectorAll(".codemap-cell"));
@@ -392,6 +399,7 @@
         return (churn === null || !ch) ? null : churn / ch;
       }
       if (dim === "cochange") return num(cell, "data-cochanged");
+      if (dim === "churn") return num(cell, "data-churn");
       return null;
     }
 
@@ -402,7 +410,8 @@
       last: "recency of last change",
       created: "recency of first change",
       avgchange: "average change size",
-      cochange: "files changed together"
+      cochange: "files changed together",
+      churn: "churn"
     };
 
     // Capture each cell's server-baked base label/tooltip once, before any recolor, so repeated dimension
@@ -414,7 +423,7 @@
       if (!c.hasAttribute("data-base-label")) c.setAttribute("data-base-label", c.getAttribute("aria-label") || "");
     });
 
-    var legendDim = document.getElementById("codemap-legend-dim");
+    var legendDim = panel.querySelector(".codemap-legend-dim");
 
     function recolor(dim) {
       // Dates are huge absolute day numbers, so they must be scaled against the file set's own [min,max]
@@ -449,17 +458,16 @@
       if (legendDim) legendDim.textContent = "Colorized by " + dimLabel;
     }
 
-    // Reveal the colorize controls (hidden in the server HTML so no inert control ships in the no-JS page).
-    var controls = document.getElementById("codemap-controls");
-    if (controls) {
+    // Reveal the colorize dropdown (hidden in the server HTML so no inert control ships in the no-JS page).
+    var controls = panel.querySelector(".codemap-controls");
+    var select = panel.querySelector(".codemap-dim-select");
+    if (controls && select) {
       controls.hidden = false;
-      controls.addEventListener("change", function (e) {
-        if (e.target && e.target.name === "codemap-dim") recolor(e.target.value);
-      });
+      select.addEventListener("change", function () { recolor(select.value); });
     }
 
-    var drill = document.querySelector(".codemap-drill");
-    var crumbs = document.getElementById("codemap-breadcrumb");
+    var drill = panel.querySelector(".codemap-drill");
+    var crumbs = panel.querySelector(".codemap-breadcrumb");
     var dirs = Array.prototype.slice.call(svg.querySelectorAll(".codemap-dir"));
 
     function cssEscape(s) {
@@ -566,5 +574,5 @@
     }
     window.addEventListener("popstate", applyHash);
     applyHash();
-  })();
+  }
 })();

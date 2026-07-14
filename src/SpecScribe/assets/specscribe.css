@@ -2503,7 +2503,9 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    activity), zoomable via a small progressive-enhancement script. Code mass/churn is NOT a lifecycle stage, so
    nothing here routes through the --status-* tokens (those stay the single stage→color source); the ramp reuses
    the commit-heatmap sequential levels. Everything is correct with JS off (baked default fill + legend + the text
-   table below); the drill breadcrumb + colorize controls are revealed by script. [Story 7.6] */
+   table below); the drill breadcrumb + colorize dropdown are revealed by script. The "exclude spec-driven
+   development directories" / "exclude tests" filter checkboxes need NO script at all — they pick among four
+   precomputed panels via pure CSS (round 2). [Story 7.6] */
 .codemap-panel .chart-lead { margin-top: 0; }
 
 /* The SVG scales to the panel width; on a very narrow screen the viewport scrolls internally (a last resort per
@@ -2535,19 +2537,40 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-dir[role="button"]:hover { stroke: var(--rust); stroke-opacity: 1; }
 .codemap-dir:focus-visible { outline: none; stroke: var(--teal); stroke-width: 2; stroke-opacity: 1; }
 
-/* Colorize controls (revealed by script; hidden in the no-JS page so no inert control ships). */
-.codemap-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.9rem;
-  margin: 0.6rem 0 0.3rem;
-  padding: 0;
-  border: 0;
+/* Colorize control (revealed by script; hidden in the no-JS page so no inert control ships). A <select> dropdown
+   (round 2) rather than a radio group — six dimensions read better as one compact control than a six-item list. */
+.codemap-controls { margin: 0.6rem 0 0.3rem; font-size: 0.85rem; }
+.codemap-controls-label { color: var(--ink-light); font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; }
+.codemap-dim-select {
+  font: inherit;
   font-size: 0.85rem;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
 }
-.codemap-controls-label { color: var(--ink-light); font-weight: 600; }
-.codemap-radio { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.codemap-dim-select:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+
+/* The two exclude-filter checkboxes (round 2) — PURE CSS, no script required; see the .codemap-view rules below.
+   Plain, unwrapped <input>+<label> siblings (not nested in a fieldset) since the sibling-combinator panel toggle
+   needs them at the same nesting level as the .codemap-view panels they control. */
+.codemap-filter-checkbox { margin: 0.5rem 0 0 0.1rem; vertical-align: middle; cursor: pointer; }
+.codemap-filter-checkbox:first-of-type { margin-left: 0; }
+.codemap-filter-label { font-size: 0.85rem; color: var(--ink-light); margin-right: 1.25rem; cursor: pointer; }
+
+/* Four precomputed filter-combination panels (round 2): exactly one is visible at a time, picked by the two
+   checkboxes' :checked state via plain CSS sibling combinators — no JavaScript is needed for filtering to work,
+   and each panel is independently, correctly re-tiled server-side (never a leftover blank gap where an excluded
+   file's rectangle used to be). */
+.codemap-view { display: none; }
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ .codemap-view[data-view="full"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ .codemap-view[data-view="no-spec"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ .codemap-view[data-view="no-tests"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-view[data-view="no-spec-no-tests"] {
+  display: block;
+}
+.codemap-view-note { color: var(--ink-light); font-size: 0.8rem; margin: 0.5rem 0 0; }
 
 /* Legend — always visible (it explains the baked-in default colors). Same ramp tokens as the cells + heatmap. */
 .codemap-legend {

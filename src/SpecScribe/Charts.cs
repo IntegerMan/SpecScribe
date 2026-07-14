@@ -1311,7 +1311,9 @@ public static class Charts
         }
 
         var sb = new StringBuilder();
-        sb.Append($"<svg id=\"codemap-svg\" class=\"codemap\" viewBox=\"0 0 {F(width)} {F(height)}\" ")
+        // No `id` — the page can render up to four of these (one per filter combination, Story 7.6 round 2), and
+        // the JS enhancement scopes every lookup to the enclosing `.codemap-view` panel rather than a global id.
+        sb.Append($"<svg class=\"codemap\" viewBox=\"0 0 {F(width)} {F(height)}\" ")
           .Append($"width=\"{F(width)}\" height=\"{F(height)}\" role=\"img\" ")
           .Append("aria-label=\"Source-code treemap: each rectangle is a file sized by its line count, nested by directory. The text table below lists every file and its metrics.\" preserveAspectRatio=\"xMidYMid meet\">\n");
 

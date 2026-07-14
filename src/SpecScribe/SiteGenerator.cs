@@ -2334,24 +2334,25 @@ public sealed class SiteGenerator
     {
         if (_codeFiles.Count == 0) return;
 
-        CodeMap map;
-        IReadOnlyList<TreemapRect> layout;
+        IReadOnlyList<CodeMapVariant> variants;
         try
         {
             var metrics = _progress?.DeepGit?.CodeMapMetrics
                 ?? (IReadOnlyDictionary<string, CodeFileMetrics>)new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal);
-            map = CodeMap.Build(_codeFiles, metrics);
-            layout = map.Layout();
+            variants = CodeMap.BuildVariants(_codeFiles, metrics);
         }
         catch (Exception)
         {
-            map = CodeMap.Empty;
-            layout = Array.Empty<TreemapRect>();
+            variants = Array.Empty<CodeMapVariant>();
         }
 
-        if (map.IsEmpty) return;
+        // Gate on the unfiltered ("full") variant only — the two exclude checkboxes are a view onto the same
+        // underlying source walk, not a second independent surface, so they share one nav/page gate (AC parity
+        // with every other insight provider's single-signal gate).
+        var full = variants.FirstOrDefault(v => v.Key == "full");
+        if (full is null || full.Map.IsEmpty) return;
 
-        var html = CodeMapTemplater.RenderPage(map, layout, nav, fileHref: CodeItemHref);
+        var html = CodeMapTemplater.RenderPage(variants, nav, fileHref: CodeItemHref);
         WriteOutput(SiteNav.CodeMapOutputPath, ApplyReferenceLinks(html, SiteNav.CodeMapOutputPath));
     }
 
