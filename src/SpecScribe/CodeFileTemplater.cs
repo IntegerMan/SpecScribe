@@ -633,9 +633,9 @@ public static class CodeFileTemplater
             "go" => "go",
             "java" => "java",
             "kt" or "kts" => "kotlin",
-            // "swift" intentionally NOT mapped: the vendored Prism bundle (tools/prism-vendor/build.js) does not
-            // include the Swift grammar, so a "language-swift" class would silently no-op instead of highlighting —
-            // falls through to plain monospace via the null return below instead.
+            // "swift" intentionally NOT mapped here even though the vendored bundle now carries the Swift grammar
+            // (tools/prism-vendor/build.js's WANT list requests it) — wiring it up is a separate decision; for now
+            // ".swift" falls through to plain monospace via the null return below.
             "rb" => "ruby",
             "php" => "php",
             "c" or "h" => "c",
