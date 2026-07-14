@@ -339,4 +339,120 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("cmd-badge", html);
         Assert.Contains("class=\"not-detailed-note\">No detailed story plan yet.</div>", html);
     }
+
+    // ---- Story 8.7: one primary view per dashboard dataset ------------------------------------------------
+
+    private static RequirementInfo Fr(int number, int epic) => new()
+    {
+        Kind = RequirementKind.Functional,
+        Number = number,
+        TextHtml = "Requirement " + number,
+        CoverageEpicNumber = epic,
+        CoverageEpicNumbers = new[] { epic },
+        Status = RequirementStatus.Active,
+    };
+
+    private static EpicsModel RequirementsEpics() => new()
+    {
+        OverviewHtml = string.Empty,
+        RequirementsInventoryHtml = string.Empty,
+        Epics = new[] { EpicWith(Drafted("1.1", "A")) },
+    };
+
+    private static DashboardView DashboardWithRequirements(bool withEpics) => new()
+    {
+        SiteTitle = "SpecScribe",
+        StatTiles = Array.Empty<StatTile>(),
+        Commands = CommandCatalog.Empty,
+        Progress = ProgressModel.Empty,
+        ProgressBars = Array.Empty<ProgressBarView>(),
+        QuickLinks = Array.Empty<NavQuickLink>(),
+        Work = WorkInventory.Empty,
+        OpenRetroActionItems = 0,
+        Counts = ProjectCounts.Empty,
+        IndexBands = Array.Empty<IndexBand>(),
+        Requirements = new RequirementsModel { Functional = new[] { Fr(1, 1) }, NonFunctional = Array.Empty<RequirementInfo>() },
+        Epics = withEpics ? RequirementsEpics() : null,
+    };
+
+    [Fact]
+    public void RenderDashboardBody_RequirementsWithEpics_ConsolidatesBehindFlowFirstToggle()
+    {
+        // AC #1: the coverage flow is the single default-visible primary (checked), the status-block grid is the
+        // demoted alternate, and the reused sprint radio-toggle chrome drives the switch. [Story 8.7]
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWithRequirements(withEpics: true));
+
+        // The panel-scoped toggle uses panel-unique ids/name (never the sprint radios), flow checked by default.
+        Assert.Contains("<input type=\"radio\" id=\"rv-flow\" name=\"req-view\" class=\"board-tab-radio\" checked>", body);
+        Assert.Contains("<input type=\"radio\" id=\"rv-grid\" name=\"req-view\" class=\"board-tab-radio\">", body);
+        Assert.Contains("<label for=\"rv-flow\" class=\"board-tab\">Flow</label>", body);
+        Assert.Contains("<label for=\"rv-grid\" class=\"board-tab\">Status grid</label>", body);
+
+        // Both views live in the DOM, each in its own wrapper; the flow (role="img" SVG) renders BEFORE the grid.
+        var flowWrap = body.IndexOf("<div class=\"req-view req-view-flow\">", StringComparison.Ordinal);
+        var gridWrap = body.IndexOf("<div class=\"req-view req-view-grid\">", StringComparison.Ordinal);
+        Assert.True(flowWrap >= 0 && gridWrap >= 0 && flowWrap < gridWrap, $"flow must render before grid: {flowWrap}/{gridWrap}");
+        Assert.Contains("class=\"req-flow-svg\"", body);
+        Assert.Contains("class=\"req-status-grid\"", body);
+        Assert.True(body.IndexOf("class=\"req-flow-svg\"", StringComparison.Ordinal)
+            < body.IndexOf("class=\"req-status-grid\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RenderDashboardBody_RequirementsWithoutEpics_RendersGridAloneWithNoToggle()
+    {
+        // AC #1 single-view branch: no flow → the status grid renders alone, no toggle, no .req-view wrappers.
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWithRequirements(withEpics: false));
+
+        Assert.Contains("class=\"req-status-grid\"", body); // text-twin still present (AC #2 guardrail)
+        Assert.DoesNotContain("id=\"rv-flow\"", body);
+        Assert.DoesNotContain("req-view-flow", body);
+        Assert.DoesNotContain("req-view-grid", body);
+        Assert.DoesNotContain("class=\"req-flow-svg\"", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_KeepsTheStatusBlockTextTwinInTheDom()
+    {
+        // AC #2 text-twin guardrail: the status-block grid is never removed whenever requirements exist,
+        // whether or not the flow (and thus the toggle) is present.
+        Assert.Contains("class=\"req-status-grid\"", HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWithRequirements(withEpics: true)));
+        Assert.Contains("class=\"req-status-grid\"", HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWithRequirements(withEpics: false)));
+    }
+
+    [Fact]
+    public void RenderDashboardBody_IsDeterministicForTheRequirementsPanel()
+    {
+        var a = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWithRequirements(withEpics: true));
+        var b = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWithRequirements(withEpics: true));
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void RenderEpicsIndexBody_SubtitleNoLongerRestatesTheStatGridCounts()
+    {
+        // AC #2 dedup: the header subtitle drops the epic/drafted count restatement; the stat grid below stays
+        // the single authoritative count display ("Epics drafted" + "Stories defined" tiles). [Story 8.7]
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                EpicWith(Drafted("1.1", "A")),
+            },
+        };
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var view = EpicsViewBuilder.BuildIndex(model, ProgressModel.Empty, nav, CommandCatalog.Empty);
+        var body = HtmlRenderAdapter.Shared.RenderEpicsIndexBody(view);
+
+        // The subtitle keeps the site title only — the duplicated counts are gone.
+        Assert.Contains("<div class=\"doc-subtitle\">SpecScribe</div>", body);
+        // The old count restatement (a middot-joined "N epics · M with stories drafted") no longer ships.
+        Assert.DoesNotContain("with stories drafted", body);
+
+        // The stat grid remains the single count home.
+        Assert.Contains("Epics drafted", body);
+        Assert.Contains("Stories defined", body);
+    }
 }

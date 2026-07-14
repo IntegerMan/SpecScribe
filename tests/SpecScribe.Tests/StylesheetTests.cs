@@ -226,6 +226,19 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_HasRequirementsViewToggleRules()
+    {
+        // Story 8.7: the home requirements panel consolidates its two renderings behind a panel-scoped
+        // pure-CSS toggle (flow default, status-block grid demoted). The view-switch rules and the active-tab
+        // styling for the panel-unique rv-flow/rv-grid radios must ship so the toggle can't silently regress.
+        var css = ReadStylesheet();
+        Assert.Contains(".req-view-grid { display: none; }", css);
+        Assert.Contains(".req-panel:has(#rv-grid:checked) .req-view-flow { display: none; }", css);
+        Assert.Contains(".req-panel:has(#rv-grid:checked) .req-view-grid { display: block; }", css);
+        Assert.Contains("#rv-flow:focus-visible ~ .board-tabbar label[for=\"rv-flow\"]", css);
+    }
+
+    [Fact]
     public void Stylesheet_RequirementsPanelsShareTheFlushColumn()
     {
         // Round-2 width fix: the status-tile + flow chart-panels join the requirements page's flush 860px

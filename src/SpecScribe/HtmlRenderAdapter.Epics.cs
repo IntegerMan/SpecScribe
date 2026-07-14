@@ -20,7 +20,10 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>Epics &amp; Stories</h1>\n");
-        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(view.SiteTitle)} &middot; {view.EpicCount} epics &middot; {view.DraftedCount} with stories drafted</div>\n");
+        // Story 8.7: the epic/drafted count restatement is trimmed here — the stat-grid tiles below
+        // (AppendEpicsProgressPanel) are the single authoritative count display. The subtitle keeps only
+        // the site title; no count source or view-model field changes.
+        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(view.SiteTitle)}</div>\n");
         sb.Append("</header>\n\n");
 
         sb.Append("<section class=\"dashboard\">\n");

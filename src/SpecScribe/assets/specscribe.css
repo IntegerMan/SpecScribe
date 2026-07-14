@@ -4170,6 +4170,24 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 .sprint-page:has(#sv-epic:checked) .board-view-status { display: none; }
 .sprint-page:has(#sv-epic:checked) .board-view-epic { display: block; }
 
+/* Requirements panel view toggle (Story 8.7): a panel-scoped clone of the sprint board toggle above,
+   with panel-unique ids (rv-flow/rv-grid, name req-view) so it can't collide with the sprint radios.
+   The coverage flow is the default-visible primary; the status-block grid is the demoted alternate
+   (kept in the DOM as the flow's text-twin). The :has() switch is scoped to .req-panel because the tabs
+   sit in the panel header, not next to the views. */
+#rv-flow:checked ~ .board-tabbar label[for="rv-flow"],
+#rv-grid:checked ~ .board-tabbar label[for="rv-grid"] {
+  background: var(--warm-white);
+  color: var(--ink);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+#rv-flow:focus-visible ~ .board-tabbar label[for="rv-flow"],
+#rv-grid:focus-visible ~ .board-tabbar label[for="rv-grid"] { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.req-view-grid { display: none; }
+.req-panel:has(#rv-grid:checked) .req-view-flow { display: none; }
+.req-panel:has(#rv-grid:checked) .req-view-grid { display: block; }
+
 /* Retros link + open-items flag buttons in the control row. Retros reuses the .cmd-menu-toggle chrome as an
    <a>; the flag is a small review-tinted pill with a ⚑ glyph. */
 a.cmd-menu-toggle { text-decoration: none; display: inline-block; }

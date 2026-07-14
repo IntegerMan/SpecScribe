@@ -209,15 +209,49 @@ public sealed partial class HtmlRenderAdapter
     {
         if (requirements is null || !requirements.All.Any()) return;
 
+        var grid = Charts.RequirementStatusGrid(requirements.All.ToList(), prefix: string.Empty);
+
         sb.Append("<div class=\"chart-panel req-panel\">\n");
-        sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements</h3>");
-        sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
-        sb.Append(Charts.RequirementStatusGrid(requirements.All.ToList(), prefix: string.Empty));
         if (epicsModel is not null)
         {
+            // Two renderings of one dataset are consolidated behind a panel-scoped clone of the sprint
+            // board's pure-CSS radio toggle: the coverage flow is the default-visible primary and the
+            // status-block grid is the demoted alternate. Both stay in the DOM (the grid is the flow's
+            // Story-3.7 accessibility text-twin, never removed). [Story 8.7]
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements</h3>");
+            sb.Append(RenderRequirementsTabs());
+            sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
+            sb.Append("<div class=\"req-view req-view-flow\">");
             sb.Append(Charts.RequirementFlow(requirements, epicsModel));
+            sb.Append("</div>\n");
+            sb.Append("<div class=\"req-view req-view-grid\">");
+            sb.Append(grid);
+            sb.Append("</div>\n");
+        }
+        else
+        {
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements</h3>");
+            sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
+            sb.Append(grid);
         }
         sb.Append("</div>\n\n");
+    }
+
+    /// <summary>The pure-CSS view toggle for the requirements panel: a panel-scoped clone of
+    /// <c>SprintTemplater.RenderBoardTabs</c> with panel-unique ids/name (<c>rv-flow</c>/<c>rv-grid</c>,
+    /// <c>req-view</c>) so it can never collide with the sprint radios. Reuses the generic
+    /// <c>.board-tabs/.board-tabbar/.board-tab/.board-tab-radio</c> chrome. [Story 8.7]</summary>
+    private static string RenderRequirementsTabs()
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"board-tabs\">");
+        sb.Append("<input type=\"radio\" id=\"rv-flow\" name=\"req-view\" class=\"board-tab-radio\" checked>");
+        sb.Append("<input type=\"radio\" id=\"rv-grid\" name=\"req-view\" class=\"board-tab-radio\">");
+        sb.Append("<div class=\"board-tabbar\">");
+        sb.Append("<label for=\"rv-flow\" class=\"board-tab\">Flow</label>");
+        sb.Append("<label for=\"rv-grid\" class=\"board-tab\">Status grid</label>");
+        sb.Append("</div></div>");
+        return sb.ToString();
     }
 
     /// <summary>The "Explore Key Views" quick-link pill row. Re-homed from

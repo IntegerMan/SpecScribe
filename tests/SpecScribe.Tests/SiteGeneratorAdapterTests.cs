@@ -307,7 +307,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 8.6: empty sprint/home board lanes gain .sprint-lane-empty ghost-card placeholders;
         // multi-undrafted epics would gain .epic-undrafted-banner (this fixture's epics stay under the 2+ threshold);
         // specscribe.css gains both companion rules. [Story 8.6]
-        const string expected = "8fe8ae28b00ee0bff80b65b106ad8f45db57af2ae5f3b61a83d14a58c07de229";
+        // Regenerated for Story 8.7: the home Requirements panel consolidates its two renderings behind a
+        // panel-scoped pure-CSS radio-toggle — the coverage flow is the default-visible primary (rendered
+        // FIRST now, a deliberate order flip) inside .req-view-flow, the status-block grid the demoted
+        // alternate inside .req-view-grid (kept in the DOM as the flow's Story-3.7 text-twin); the epics-index
+        // header subtitle drops its epic/drafted count restatement (the stat grid below is the single count
+        // display); specscribe.css gains the .req-view/.req-panel:has(#rv-grid:checked) toggle rules. A before/
+        // after byte-diff confirmed those are the ONLY rendering changes. [Story 8.7; golden-diff-normalization-gotchas]
+        const string expected = "f8739b6855751791042d368de477b59b64efb2263a0a8ef1f44c6a2dbe5168b7";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

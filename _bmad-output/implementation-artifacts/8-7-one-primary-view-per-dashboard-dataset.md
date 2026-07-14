@@ -1,6 +1,10 @@
+---
+baseline_commit: df853374362c2dc419a8a8ba7f4ff6d3dfa6197e
+---
+
 # Story 8.7: One Primary View per Dashboard Dataset
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -212,20 +216,20 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Home Requirements panel radio-toggle (AC: #1, #2 twin guardrail)**
-  - [ ] In `AppendRequirementsPanel`, when `epicsModel is not null`: emit the `board-tabs` clone (radios `rv-flow` checked / `rv-grid`, name `req-view`, labels "Flow" / "Status grid") in the header row, then `<div class="req-view req-view-flow">`(flow)`</div>` and `<div class="req-view req-view-grid">`(grid)`</div>`.
-  - [ ] When `epicsModel is null`: render the grid alone, no toggle, no `.req-view` wrappers (byte-stable branch).
-  - [ ] Keep both `Charts.RequirementFlow` / `Charts.RequirementStatusGrid` calls unchanged; the grid stays in the DOM (text-twin never removed).
-- [ ] **Task 2 — Toggle CSS (AC: #1)**
-  - [ ] In `specscribe.css` next to the sprint `.board-tabs` block: add `#rv-flow`/`#rv-grid` active-tab + `:focus-visible` rules; add `.req-view-grid { display: none }` and the `.req-panel:has(#rv-grid:checked)` view-switch rules. Reuse the generic `.board-tabs/.board-tabbar/.board-tab/.board-tab-radio` chrome. Tokens only, no hex.
-  - [ ] Add `StylesheetTests` assertion for the `.req-view` toggle rules.
-- [ ] **Task 3 — Epics-index count dedup (AC: #2)**
-  - [ ] In `RenderEpicsIndexBody`, trim the header subtitle to `{SiteTitle}` (drop the epic/drafted count restatement); leave the stat grid + "Progress by Epic" mosaic untouched.
-- [ ] **Task 4 — Tests (AC: #1, #2)**
-  - [ ] `HtmlRenderAdapterTests`: toggle-present (requirements + epics) with flow default + grid alternate + `board-tabs`; single-view (requirements, no epics) grid-only no toggle; text-twin grid present; epics-index subtitle no longer restates counts while stat tiles remain.
-  - [ ] Confirm `RenderSectionParity` dashboard facts unchanged; regenerate `GoldenContentFingerprint` after confirming the byte diff is only the toggle wrappers/reorder + the subtitle trim.
-- [ ] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball the home Requirements panel (flow default, "Flow / Status grid" tabs, one view at a time) and the epics page (subtitle no longer repeats the stat-grid counts).
+- [x] **Task 1 — Home Requirements panel radio-toggle (AC: #1, #2 twin guardrail)**
+  - [x] In `AppendRequirementsPanel`, when `epicsModel is not null`: emit the `board-tabs` clone (radios `rv-flow` checked / `rv-grid`, name `req-view`, labels "Flow" / "Status grid") in the header row, then `<div class="req-view req-view-flow">`(flow)`</div>` and `<div class="req-view req-view-grid">`(grid)`</div>`.
+  - [x] When `epicsModel is null`: render the grid alone, no toggle, no `.req-view` wrappers (byte-stable branch).
+  - [x] Keep both `Charts.RequirementFlow` / `Charts.RequirementStatusGrid` calls unchanged; the grid stays in the DOM (text-twin never removed).
+- [x] **Task 2 — Toggle CSS (AC: #1)**
+  - [x] In `specscribe.css` next to the sprint `.board-tabs` block: add `#rv-flow`/`#rv-grid` active-tab + `:focus-visible` rules; add `.req-view-grid { display: none }` and the `.req-panel:has(#rv-grid:checked)` view-switch rules. Reuse the generic `.board-tabs/.board-tabbar/.board-tab/.board-tab-radio` chrome. Tokens only, no hex.
+  - [x] Add `StylesheetTests` assertion for the `.req-view` toggle rules.
+- [x] **Task 3 — Epics-index count dedup (AC: #2)**
+  - [x] In `RenderEpicsIndexBody`, trim the header subtitle to `{SiteTitle}` (drop the epic/drafted count restatement); leave the stat grid + "Progress by Epic" mosaic untouched.
+- [x] **Task 4 — Tests (AC: #1, #2)**
+  - [x] `HtmlRenderAdapterTests`: toggle-present (requirements + epics) with flow default + grid alternate + `board-tabs`; single-view (requirements, no epics) grid-only no toggle; text-twin grid present; epics-index subtitle no longer restates counts while stat tiles remain.
+  - [x] Confirm `RenderSectionParity` dashboard facts unchanged; regenerate `GoldenContentFingerprint` after confirming the byte diff is only the toggle wrappers/reorder + the subtitle trim.
+- [x] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball the home Requirements panel (flow default, "Flow / Status grid" tabs, one view at a time) and the epics page (subtitle no longer repeats the stat-grid counts).
 
 ## Dev Notes
 
@@ -265,8 +269,34 @@ Requirements radio-toggle + epics-index subtitle trim are **shared-path**. Pure 
 
 ### Agent Model Used
 
+Opus 4.8 (Cursor dev-story workflow)
+
 ### Debug Log References
+
+- `dotnet build src/SpecScribe/SpecScribe.csproj` — clean (0 warnings, 0 errors).
+- `dotnet test` — **1137 passed, 0 failed**. Only new failure during development was the expected `GoldenContentFingerprint` flip (regenerated after byte-diff confirmation) and one over-broad `DoesNotContain("epics &middot;")` assertion (the sunburst hint legitimately contains that phrase) — tightened to target the subtitle only.
+- Real generation: `dotnet run --project src/SpecScribe -- generate` → 164 pages, 0 errors.
 
 ### Completion Notes List
 
+- **AC #1 — home Requirements panel consolidated behind a pure-CSS radio toggle.** `AppendRequirementsPanel` now wraps the two renderings in a panel-scoped clone of the sprint board's `board-tabs` toggle (panel-unique ids `rv-flow`/`rv-grid`, name `req-view`). The coverage-flow Sankey is the default-visible primary (`rv-flow` `checked`, rendered first in `.req-view-flow`); the status-block grid is the demoted alternate (`.req-view-grid`). The order deliberately flipped (flow now precedes grid). When `epicsModel is null` there is no flow, so the grid renders alone with no toggle and no `.req-view` wrappers (single-view branch).
+- **AC #2 — text-twin guardrail met by construction.** The status-block grid is never removed: it stays in the DOM inside `.req-view-grid` (only `display:none` when the flow tab is active), reachable via the focusable radio — exactly like the sprint board's hidden view. Both `Charts.RequirementFlow` / `Charts.RequirementStatusGrid` calls are unchanged.
+- **AC #2 — epics-index count dedup.** `RenderEpicsIndexBody` subtitle trimmed from `{SiteTitle} · {N} epics · {M} with stories drafted` to `{SiteTitle}` alone; the stat-grid tiles ("Epics drafted", "Stories defined") remain the single authoritative count display. No count, count source, status token, or view-model field changed.
+- **Toggle CSS** added beside the sprint `.board-tabs` block: `#rv-flow`/`#rv-grid` active-tab + `:focus-visible` rules and the `.req-panel:has(#rv-grid:checked)` view-switch rules (tokens only, no hex). Reuses the generic `.board-tabs/.board-tabbar/.board-tab/.board-tab-radio` chrome verbatim.
+- **No JS, no NuGet package, no new page, no view-model field.** Pure CSS `:has()` toggle + string-building, consistent with the sprint board pattern.
+- **Byte-diff verified:** a before/after generation confirmed the ONLY rendering changes from this story are (1) the home Requirements panel's new toggle wrappers + flow-before-grid reorder, (2) the epics-index subtitle losing its counts, and (3) the new toggle CSS block. `RenderParity` (semantic) stayed green (the toggle adds no tracked section fact); the byte-level `GoldenContentFingerprint` was regenerated to `f8739b68…5168b7`.
+
 ### File List
+
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — `AppendRequirementsPanel` wraps flow+grid in the panel-scoped toggle (flow default) when epics exist; grid-only, no toggle, when null. Added `RenderRequirementsTabs` helper.
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs` — `RenderEpicsIndexBody` subtitle trimmed to the site title (count restatement removed).
+- `src/SpecScribe/assets/specscribe.css` — added the `.req-view` / `.req-panel:has(#rv-grid:checked)` toggle rules + `#rv-flow`/`#rv-grid` active-tab & focus-visible styling, beside the sprint `.board-tabs` block.
+- `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs` — Story 8.7 AC coverage (toggle present + flow-before-grid, single-view grid-only, text-twin guardrail, determinism, epics-index subtitle dedup).
+- `tests/SpecScribe.Tests/StylesheetTests.cs` — assertion that the `.req-view` toggle rules ship in the embedded stylesheet.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — regenerated `GoldenContentFingerprint` constant + documenting comment.
+
+## Change Log
+
+| Date       | Version | Description                                                                                   | Author |
+| ---------- | ------- | --------------------------------------------------------------------------------------------- | ------ |
+| 2026-07-14 | 1.0     | Implemented Story 8.7: home Requirements panel radio-toggle (flow primary, grid demoted text-twin) + epics-index subtitle count dedup; toggle CSS; tests; golden fingerprint regenerated. Status → review. | Amelia (dev-story) |
