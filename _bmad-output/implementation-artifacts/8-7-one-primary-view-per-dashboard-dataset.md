@@ -1,4 +1,4 @@
-# Story 8.6: One Primary View per Dashboard Dataset
+# Story 8.7: One Primary View per Dashboard Dataset
 
 Status: ready-for-dev
 
@@ -16,13 +16,13 @@ so that I never reconcile multiple renderings of the same data.
 **Given** the home dashboard currently renders requirements multiple ways (today: the status-block grid **and** the requirements-flow Sankey, stacked in one panel)
 **When** the page is generated
 **Then** the coverage-flow Sankey is the single primary (default-visible) representation, with the status-block grid demoted behind a toggle
-**And** the sprint page's By Status / By Epic radio-toggle is the reused pattern. [Source: epics.md#Story 8.6; Epic3UXFeedback.md#T2]
+**And** the sprint page's By Status / By Epic radio-toggle is the reused pattern. [Source: epics.md#Story 8.7; Epic3UXFeedback.md#T2]
 
 2.
 **Given** the status-block grid is the requirements-flow Sankey's accessibility text-twin (Story 3.7's contract)
 **When** the views are consolidated behind the toggle
 **Then** the text-twin grid is never removed — it stays in the DOM (both views live in the DOM, the way the sprint board's two views do)
-**And** duplicated work-count displays on the epics-index page (the header subtitle restating the epic/story counts the stat-grid tiles show immediately below) are consolidated to one authoritative display. [Source: epics.md#Story 8.6; Epic3UXFeedback.md#T2; 3-7-requirements-flow-and-status-blocks.md]
+**And** duplicated work-count displays on the epics-index page (the header subtitle restating the epic/story counts the stat-grid tiles show immediately below) are consolidated to one authoritative display. [Source: epics.md#Story 8.7; Epic3UXFeedback.md#T2; 3-7-requirements-flow-and-status-blocks.md]
 
 ---
 
@@ -31,13 +31,13 @@ so that I never reconcile multiple renderings of the same data.
 **This is a presentation-only consolidation story.** No new page, no data-model or count change, no parser touch, no view-model field. It removes the "same data rendered several ways on one screen, forcing the reader to verify the views agree" failure mode (the T2 finding, graded 🔴 against the daily-pulse journey) on **two surfaces**:
 
 1. **AC #1 — the home dashboard's Requirements panel.** Today [`AppendRequirementsPanel`](../../src/SpecScribe/HtmlRenderAdapter.Dashboard.cs:199) stacks **two** renderings of the same requirements dataset in one `.req-panel`: the [`RequirementStatusGrid`](../../src/SpecScribe/Charts.cs:1146) (the status-block "badge list") **then** the [`RequirementFlow`](../../src/SpecScribe/Charts.cs:1210) Sankey (definition → epic-coverage → implementation-state — the "coverage matrix" / "per-epic breakdown" the UX review counted as the 2nd and 3rd renderings). This story wraps them in a **panel-scoped clone of the sprint page's pure-CSS radio-toggle**, so the **flow is the default-visible primary** and the **grid is the demoted alternate** — one view at a time, **both kept in the DOM**.
-2. **AC #2 — the epics-index page's duplicated counts.** Today [`RenderEpicsIndexBody`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:20) prints a header subtitle (`{N} epics · {M} with stories drafted`) that restates the **exact same** epic/drafted figures the stat-grid tiles ([`AppendEpicsProgressPanel`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:72): "Epics drafted M/N", "Stories defined X") show inches below. This story **consolidates that literal duplication to one authoritative display** — keep the stat-grid tiles (the richer, tooltip'd, Story-8.2 count home) and trim the redundant count restatement out of the subtitle.
+2. **AC #2 — the epics-index page's duplicated counts.** Today [`RenderEpicsIndexBody`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:20) prints a header subtitle (`{N} epics · {M} with stories drafted`) that restates the **exact same** epic/drafted figures the stat-grid tiles ([`AppendEpicsProgressPanel`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:72): "Epics drafted M/N", "Stories defined X") show inches below. This story **consolidates that literal duplication to one authoritative display** — keep the stat-grid tiles (the richer, tooltip'd, Story-8.3 count home) and trim the redundant count restatement out of the subtitle.
 
 Both are direct fixes for the live UX-review finding graded against the daily-pulse / shared-portal journeys:
 
 > Home shows requirements three ways (inline badge list, coverage matrix, per-epic breakdown) … Story counts appear in the epics header and again per epic card … Each view is individually defensible, but stacked on one page they force the reader to verify the views agree. **Recommendation:** per page, pick one primary representation and demote alternates behind a toggle — the sprint page's existing By Status / By Epic radio toggle is the right pattern to copy — never cut a chart's text-twin table. [Source: [Epic3UXFeedback.md#T2](../../docs/Epic3UXFeedback.md); [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md)]
 
-It sits alongside its Epic 8 siblings but touches a **different seam** than any of them: **8.1** owns status words/colors (`StatusStyles`); **8.2** owns count *correctness* / single-source (`ProjectCounts`); **8.3** owns progress+state pairing; **8.4** owns the Next Steps command surface (`BmadCommands`); **8.5** owns the two empty-state surfaces (`EpicsViewBuilder` banner + `SprintTemplater` empty lane). **8.6 owns view *consolidation*** on two rendered surfaces: the home Requirements panel (`HtmlRenderAdapter.Dashboard.cs`) and the epics-index header subtitle (`HtmlRenderAdapter.Epics.cs`) — plus the toggle CSS. **No file overlap with 8.1/8.2/8.4/8.5.** A light adjacency with 8.3 (both may touch `HtmlRenderAdapter.Epics.cs`) — non-overlapping hunks (8.3 = card/lane headers + tooltips; 8.6 = the epics-index header subtitle only).
+It sits alongside its Epic 8 siblings but touches a **different seam** than any of them: **8.2** owns status words/colors (`StatusStyles`); **8.3** owns count *correctness* / single-source (`ProjectCounts`); **8.4** owns progress+state pairing; **8.5** owns the Next Steps command surface (`BmadCommands`); **8.6** owns the two empty-state surfaces (`EpicsViewBuilder` banner + `SprintTemplater` empty lane). **8.7 owns view *consolidation*** on two rendered surfaces: the home Requirements panel (`HtmlRenderAdapter.Dashboard.cs`) and the epics-index header subtitle (`HtmlRenderAdapter.Epics.cs`) — plus the toggle CSS. **No file overlap with 8.2/8.3/8.5/8.6.** A light adjacency with 8.4 (both may touch `HtmlRenderAdapter.Epics.cs`) — non-overlapping hunks (8.4 = card/lane headers + tooltips; 8.7 = the epics-index header subtitle only).
 
 ### Owner-selected design decisions (visual intent elicited at create-story — do not re-litigate)
 
@@ -45,7 +45,7 @@ It sits alongside its Epic 8 siblings but touches a **different seam** than any 
 
 **2. Primary view → "Requirements-flow Sankey is the default; status-block grid is the toggled alternate" (owner pick).** The definition→epic-coverage→state flow is the "coverage matrix" AC #1 calls the single primary, so its tab is `checked` and it renders first/visible; the compact status-block grid becomes the toggled-in alternate (and stays in the DOM as the flow's text-twin). [Owner decision, this story]
 
-**3. AC #2 count dedup → "Epics-index header subtitle vs. stat-grid" (owner pick).** The concrete duplication to fix is the epics-index page: the header subtitle restates the epic/drafted counts the stat-grid tiles show directly below. Keep the stat tiles; trim the subtitle's count restatement. Count *correctness* across pages (the historical 38-vs-39 clash) stays **Story 8.2's** job — this story only removes a redundant *display*, it does not touch any count source. [Owner decision, this story]
+**3. AC #2 count dedup → "Epics-index header subtitle vs. stat-grid" (owner pick).** The concrete duplication to fix is the epics-index page: the header subtitle restates the epic/drafted counts the stat-grid tiles show directly below. Keep the stat tiles; trim the subtitle's count restatement. Count *correctness* across pages (the historical 38-vs-39 clash) stays **Story 8.3's** job — this story only removes a redundant *display*, it does not touch any count source. [Owner decision, this story]
 
 ### The rendering model (read carefully — this is where the change lives)
 
@@ -76,7 +76,7 @@ It sits alongside its Epic 8 siblings but touches a **different seam** than any 
 
 ### Scope boundaries (read carefully)
 
-- **Do NOT change any count, count source, status word, or status color.** AC #2 removes a redundant *display* of counts that already agree by construction (both read the same `progress`/view fields); it does not reclassify, recompute, or reconcile any number. Count correctness/single-source is 8.2's seam. [memory: [[specscribe-status-token-system]]]
+- **Do NOT change any count, count source, status word, or status color.** AC #2 removes a redundant *display* of counts that already agree by construction (both read the same `progress`/view fields); it does not reclassify, recompute, or reconcile any number. Count correctness/single-source is 8.3's seam. [memory: [[specscribe-status-token-system]]]
 - **Do NOT delete, gut, or bypass `RequirementStatusGrid` or the grid's markup.** It is the flow's text-twin (Story 3.7) — it moves into the `.req-view-grid` wrapper, still rendered, still in the DOM. Removing it (or replacing it with a link-out) is an accessibility regression and violates AC #2.
 - **Do NOT add a client-side script or NuGet package.** The toggle is pure CSS `:has()` + hidden radios, exactly like the sprint board. [memory: [[charting-is-pure-svg-no-js]]]
 - **Do NOT reuse the sprint radios' ids/name** (`sprint-view` / `sv-status` / `sv-epic`) or the `.board-view-epic { display:none }` rule — those are board-specific. Use `req-view` / `rv-flow` / `rv-grid` and new `.req-view-*` classes so the two toggles never interfere (a home page has no sprint page markup, but keeping them distinct is the correct, collision-proof design).
@@ -102,7 +102,7 @@ It sits alongside its Epic 8 siblings but touches a **different seam** than any 
 - **DON'T remove the status-block grid, replace it with a link, or hide it outside the DOM** — it is the flow's Story-3.7 text-twin; it must remain rendered in the `.req-view-grid` wrapper.
 - **DON'T introduce JS or a NuGet package** — the toggle is pure CSS `:has()`, like the sprint board.
 - **DON'T reuse the sprint toggle's ids/name/classes** for the requirements toggle — use `req-view`/`rv-flow`/`rv-grid`/`.req-view-*`.
-- **DON'T change any count, count source, status token, or view model** — AC #2 removes a duplicate display only; correctness is 8.2's.
+- **DON'T change any count, count source, status token, or view model** — AC #2 removes a duplicate display only; correctness is 8.3's.
 - **DON'T touch other multi-render surfaces** (Deep Analytics coupling, the sprint page) — out of scope.
 
 ---
@@ -113,7 +113,7 @@ Relevant invariants [Source: [ARCHITECTURE-SPINE.md](../specs/spec-specscribe/AR
 
 - **Truthfulness over convenience** — consolidation removes *redundant renderings*, not *information*: the flow's text-twin grid stays in the DOM and one tab-click away; the epics-index counts stay in the stat grid. Nothing the reader could learn before is now unavailable — they just no longer have to cross-check three copies of it.
 - **Accessibility is part of the rendering contract (NFR6, UX-DR17; Story 3.7 AC #3)** — the flow keeps its `role="img"` name + `<title>`s; the text-twin grid is never removed (in the DOM, reachable via a focusable radio); the toggle tabs are keyboard-operable `<label for>`/radio pairs with a focus ring, cloned from the already-accessible sprint pattern. Meaning is carried in text and structure, never color/visibility alone.
-- **Single source of truth** — the requirements panel renders from the one `view.Requirements` + `view.Epics` input (no parallel model); the epics-index counts stay sourced from the one `progress`/view fields (this story removes a second *display*, not a second *source*). The 38-vs-39 correctness class of clash is 8.2's; this story can neither cause nor fix it.
+- **Single source of truth** — the requirements panel renders from the one `view.Requirements` + `view.Epics` input (no parallel model); the epics-index counts stay sourced from the one `progress`/view fields (this story removes a second *display*, not a second *source*). The 38-vs-39 correctness class of clash is 8.3's; this story can neither cause nor fix it.
 - **Deterministic, generation-time-only output** — the toggle is static markup + CSS; a from-scratch regen of identical inputs is byte-identical. No per-visitor/interaction state persists.
 - **Seed, not invariant** — no Core/Adapters package split, no view-model change; changes stay in `HtmlRenderAdapter.Dashboard.cs` + `HtmlRenderAdapter.Epics.cs` + `specscribe.css` (+ tests). The Story 6.1/6.2 delivery seam is untouched: presentational wrapper markup adds no `SemanticFacts`/`SectionFacts`, so `RenderParity` stays green. [memory: [[story-6-1-delivery-seam-live]]; [[story-6-2-section-view-models-live]]]
 
@@ -170,7 +170,7 @@ Cover explicitly:
 
 ## Previous Story Intelligence
 
-**Story 8.5 (Designed Empty States — `ready-for-dev`, sibling)** established the create-story discipline this story follows: elicit visual intent up front and record owner picks as non-re-litigable decisions; keep presentation-only changes off the count/status/view-model seams; expect a golden-fingerprint move and confirm the byte diff is *only* the intended change before regenerating. No file overlap (8.5 = `EpicsViewBuilder`/`SprintTemplater` empty states; 8.6 = the requirements panel + epics-index subtitle). [Source: [8-5-designed-empty-states.md](8-5-designed-empty-states.md)]
+**Story 8.6 (Designed Empty States — `ready-for-dev`, sibling)** established the create-story discipline this story follows: elicit visual intent up front and record owner picks as non-re-litigable decisions; keep presentation-only changes off the count/status/view-model seams; expect a golden-fingerprint move and confirm the byte diff is *only* the intended change before regenerating. No file overlap (8.6 = `EpicsViewBuilder`/`SprintTemplater` empty states; 8.7 = the requirements panel + epics-index subtitle). [Source: [8-6-designed-empty-states.md](8-6-designed-empty-states.md)]
 
 **Story 6.2 (Section View Models — `review`)** re-homed the dashboard + epics bodies into `HtmlRenderAdapter.*.cs` driven by section view models, with a **semantic** parity harness (`RenderParity`) that tracks *facts*, not bytes. This story adds only presentational wrapper markup (no fact), so parity holds — the golden test is the byte gate, `RenderParity` is unaffected. Build the toggle inside the adapter where the panel already lives; do not push it back into a view model. [memory: [[story-6-2-section-view-models-live]]]
 
@@ -181,13 +181,13 @@ Cover explicitly:
 **Recurring lessons that apply here:**
 
 - **Elicit visual intent up front** (Epic 3 retro, open action) — the mechanism (toggle vs. link-out), the default-primary view, and the count-dedup target were offered as named directions and the owner picked *radio-toggle*, *flow-as-primary*, and *epics-index subtitle*. Build those. [memory: [[create-story-elicit-visual-intent]]]
-- **Split, don't absorb** — if this tempts you into re-pairing counts (8.2), restyling badges (8.1/8.3), or consolidating Deep Analytics' coupling views, stop; 8.6 is the home requirements toggle + the epics-index subtitle dedup only. [Source: Epic 2/3 retros]
+- **Split, don't absorb** — if this tempts you into re-pairing counts (8.3), restyling badges (8.2/8.4), or consolidating Deep Analytics' coupling views, stop; 8.7 is the home requirements toggle + the epics-index subtitle dedup only. [Source: Epic 2/3 retros]
 
 ---
 
 ## Git Intelligence Summary
 
-Recent history is planning/spike/merge churn on `main` (`Code review`, `Decision-making and ADRs`, `Merge branch 'spike/delivery-arch-6-6'`) — no in-flight code touches `AppendRequirementsPanel`, the epics-index subtitle, or the `.board-tabs` CSS, so this change is additive and uncontended against siblings 8.1/8.2/8.4/8.5. Light adjacency with 8.3 if both edit `HtmlRenderAdapter.Epics.cs` (8.3 = card/lane headers + tooltips; 8.6 = the header subtitle only — non-overlapping hunks); both regenerate the golden fingerprint, so re-run the drill against whichever lands second. **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
+Recent history is planning/spike/merge churn on `main` (`Code review`, `Decision-making and ADRs`, `Merge branch 'spike/delivery-arch-6-6'`) — no in-flight code touches `AppendRequirementsPanel`, the epics-index subtitle, or the `.board-tabs` CSS, so this change is additive and uncontended against siblings 8.2/8.3/8.5/8.6. Light adjacency with 8.4 if both edit `HtmlRenderAdapter.Epics.cs` (8.4 = card/lane headers + tooltips; 8.7 = the header subtitle only — non-overlapping hunks); both regenerate the golden fingerprint, so re-run the drill against whichever lands second. **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
 
 ---
 
@@ -200,7 +200,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 ## Project Context Reference
 
 - Epic 8 goal + FR/UX-DR/NFR coverage: [Source: [epics.md:1165-1169](../planning-artifacts/epics.md:1165)]
-- Story 8.6 user story + both ACs: [Source: [epics.md:1282-1300](../planning-artifacts/epics.md:1282)]
+- Story 8.7 user story + both ACs: [Source: [epics.md:1282-1300](../planning-artifacts/epics.md:1282)]
 - The T2 finding (same data multiple ways; toggle recommendation; never cut a text-twin) + the home-page "coverage matrix is the keeper" note: [Source: [Epic3UXFeedback.md:25-32](../../docs/Epic3UXFeedback.md), [Epic3UXFeedback.md:71](../../docs/Epic3UXFeedback.md)]
 - The UX review that seeded Epics 8–10: [Source: [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md)]
 - Story 3.7 text-twin contract: [Source: [3-7-requirements-flow-and-status-blocks.md](3-7-requirements-flow-and-status-blocks.md); [Charts.cs:1208-1209](../../src/SpecScribe/Charts.cs:1208)]
@@ -233,8 +233,8 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 - **The toggle IS the accessibility answer.** Keeping both views in the DOM (only `display:none` when unselected, like the sprint board) is precisely what satisfies "the text-twin is never removed" — a link-out would have failed AC #2. The flow's own `role="img"` + `<title>`s carry the default view; the focusable radio reaches the grid.
 - **Order flips on purpose.** Flow renders before grid now (primary first). That reorder is part of the expected golden diff — verify it's the *only* home-page change besides the wrappers.
 - **No view model, no fact.** The requirements panel renders straight from `view.Requirements` + `view.Epics`; the toggle is presentational chrome the adapter owns. `RenderParity` (semantic) stays green; only the byte-level golden test moves. [memory: [[story-6-2-section-view-models-live]]]
-- **Count dedup loses no information.** The epics-index counts remain in the stat grid two lines below the subtitle; only the duplicate restatement goes. Correctness across pages is 8.2's, not this story's.
-- **Scope guard for later 8.x:** recency signals (8.7) sit near the dashboard but are NOT this story. 8.6 is the home requirements toggle + the epics-index subtitle dedup.
+- **Count dedup loses no information.** The epics-index counts remain in the stat grid two lines below the subtitle; only the duplicate restatement goes. Correctness across pages is 8.3's, not this story's.
+- **Scope guard for later 8.x:** recency signals (8.8) sit near the dashboard but are NOT this story. 8.7 is the home requirements toggle + the epics-index subtitle dedup.
 
 ### Project Structure Notes
 
@@ -243,7 +243,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ### References
 
-- [Source: [epics.md:1282-1300](../planning-artifacts/epics.md:1282)] — Story 8.6 user story + both ACs.
+- [Source: [epics.md:1282-1300](../planning-artifacts/epics.md:1282)] — Story 8.7 user story + both ACs.
 - [Source: [epics.md:1165-1169](../planning-artifacts/epics.md:1165)] — Epic 8 goal; FRs; UX-DRs; NFR8.
 - [Source: [Epic3UXFeedback.md:25-32](../../docs/Epic3UXFeedback.md)] — T2 (same data multiple ways; toggle recommendation; never cut a text-twin).
 - [Source: [Epic3UXFeedback.md:71](../../docs/Epic3UXFeedback.md)] — home-page "coverage matrix is the keeper".

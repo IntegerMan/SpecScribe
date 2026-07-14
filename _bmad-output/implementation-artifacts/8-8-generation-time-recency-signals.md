@@ -1,4 +1,4 @@
-# Story 8.7: Generation-Time Recency Signals
+# Story 8.8: Generation-Time Recency Signals
 
 Status: ready-for-dev
 
@@ -49,7 +49,7 @@ Two surfaces, mapped to the two AC nouns:
 
 **`ProgressCalculator` is the one place that already has both inputs a story needs.** [`ProgressCalculator.Compute`](../../src/SpecScribe/ProgressCalculator.cs:8) already (a) receives the `DeepGitPulse? deep` argument and (b) reads **each story's raw artifact markdown** to tally tasks/status (`ReadArtifactProgress` → `MarkdownConverter.ReadAllTextShared`), setting `story.TasksDone/TasksTotal/Status` as a side effect. Resolve the recency date in the **same pass, off the same read** — no second file read, no new plumbing — and set it on a new `StoryInfo.LastUpdatedDate` property (mirroring how `Status`/`TasksDone` are already back-filled onto `StoryInfo`). The epic-page story-card builder then just reads `story.LastUpdatedDate`.
 
-**Path reconciliation is the sharp edge for the git branch.** `story.ArtifactSourcePath` is relative to `_bmad-output/` (e.g. `implementation-artifacts/8-7-….md`), but git (`FileChangeStat.Path`) reports **repo-root-relative** paths (e.g. `_bmad-output/implementation-artifacts/8-7-….md`). [`ForgeOptions.Resolve`](../../src/SpecScribe/ForgeOptions.cs:108) always sets `SourceRoot = RepoRoot/_bmad-output`, so the repo-relative key is `ForgeOptions.SourceDirName + "/" + ArtifactSourcePath`, normalized via [`PathUtil.NormalizeSlashes`](../../src/SpecScribe/PathUtil.cs). Match ordinally after normalizing both sides. **Heed the rename gotcha** (memory: [[deep-git-single-numstat-path]]): git's numstat rename display is already collapsed to the *current* path by `ResolveRenamedPath`, so a recently-renamed story file's date resolves against its new name — but a story whose current file has *no* commits under its current path simply won't match, and correctly falls back to the change-log date (AC #2). Don't force a match; unmatched → fallback.
+**Path reconciliation is the sharp edge for the git branch.** `story.ArtifactSourcePath` is relative to `_bmad-output/` (e.g. `implementation-artifacts/8-8-….md`), but git (`FileChangeStat.Path`) reports **repo-root-relative** paths (e.g. `_bmad-output/implementation-artifacts/8-8-….md`). [`ForgeOptions.Resolve`](../../src/SpecScribe/ForgeOptions.cs:108) always sets `SourceRoot = RepoRoot/_bmad-output`, so the repo-relative key is `ForgeOptions.SourceDirName + "/" + ArtifactSourcePath`, normalized via [`PathUtil.NormalizeSlashes`](../../src/SpecScribe/PathUtil.cs). Match ordinally after normalizing both sides. **Heed the rename gotcha** (memory: [[deep-git-single-numstat-path]]): git's numstat rename display is already collapsed to the *current* path by `ResolveRenamedPath`, so a recently-renamed story file's date resolves against its new name — but a story whose current file has *no* commits under its current path simply won't match, and correctly falls back to the change-log date (AC #2). Don't force a match; unmatched → fallback.
 
 **Change-log dates are authored strings in the artifact — deterministic by construction.** The story `## Change Log` section (already extracted for display via [`EpicsParser.ExtractNamedSectionHtml(raw, "## Change Log")`](../../src/SpecScribe/SiteGenerator.cs:711)) contains ISO `yyyy-MM-dd` dates in two shapes seen across the repo's own stories: **table rows** (`| 2026-07-08 | … |`) and **list rows** (`- 2026-07-08 (polish #8): …`). Add a pure `EpicsParser.ExtractLatestChangeLogDate(raw)` → `DateOnly?` that scans the change-log section and returns the **maximum** ISO date (invariant parse), null when none. Since it reads from the committed artifact, it is identical across builds.
 
@@ -57,7 +57,7 @@ Two surfaces, mapped to the two AC nouns:
 
 - **Do NOT introduce any new `DateTime.Now` / `DateTime.UtcNow` / `DateOnly.FromDateTime(DateTime.Now)` read.** Every marker is a function of `git.LastCommitDate`, `FileChangeStat.LastChangeDate`, or a parsed change-log date. The one new determinism rule for this story: **no wall-clock in a recency marker.** (The footer's own generation clock at [PathUtil.cs:106](../../src/SpecScribe/PathUtil.cs:106) is a separate, already-normalized concern — leave it alone.)
 - **Do NOT add a per-visitor or JS-computed "time ago".** No script, no NuGet — markers are static generation-time text (memory: [[charting-is-pure-svg-no-js]]).
-- **Do NOT change any count, status word, or status color.** Recency is orthogonal to the count seam (8.2) and the status-token seam (8.1) (memory: [[specscribe-status-token-system]]). This story adds a date label; it touches no tally.
+- **Do NOT change any count, status word, or status color.** Recency is orthogonal to the count seam (8.3) and the status-token seam (8.2) (memory: [[specscribe-status-token-system]]). This story adds a date label; it touches no tally.
 - **Do NOT add markers to the dashboard Now & Next / sprint-board cards, or the standalone story detail page header.** Those are navigation cards and a different seam; the sprint page already surfaces `sprint-status.yaml`'s `last_updated` ([SprintTemplater.cs:63](../../src/SpecScribe/SprintTemplater.cs:63)). Scope is the **Commits stat tile** + the **epic-page story cards** only. (Out-of-scope surfaces are a deliberate boundary, not an oversight.)
 - **Do NOT block generation on any recency failure.** A malformed change-log date, a null deep pulse, an unmatched path → skip the marker (AC #2). Never throw from the resolver (mirror `ReadArtifactProgress`'s `catch`).
 - **Do NOT write back to any source.** Local-first, read-only invariant.
@@ -158,9 +158,9 @@ Cover explicitly:
 
 ## Previous Story Intelligence
 
-**Story 8.6 (One Primary View per Dashboard Dataset — `ready-for-dev`, sibling)** established the create-story discipline this story follows: elicit visual/scope intent up front and record owner picks as non-re-litigable; keep additive presentation off the count/status/view-model *section* seams; expect a possible golden-fingerprint move and confirm the byte diff is *only* the intended change before regenerating. No file overlap in the render layer, but **both** may edit `HtmlRenderAdapter.Epics.cs` (8.6 = the epics-index header subtitle; 8.7 = `AppendStoryCard`) and `specscribe.css` — **non-overlapping hunks**; re-run the golden drill against whichever lands second. [Source: [8-6-one-primary-view-per-dashboard-dataset.md](8-6-one-primary-view-per-dashboard-dataset.md)]
+**Story 8.7 (One Primary View per Dashboard Dataset — `ready-for-dev`, sibling)** established the create-story discipline this story follows: elicit visual/scope intent up front and record owner picks as non-re-litigable; keep additive presentation off the count/status/view-model *section* seams; expect a possible golden-fingerprint move and confirm the byte diff is *only* the intended change before regenerating. No file overlap in the render layer, but **both** may edit `HtmlRenderAdapter.Epics.cs` (8.7 = the epics-index header subtitle; 8.8 = `AppendStoryCard`) and `specscribe.css` — **non-overlapping hunks**; re-run the golden drill against whichever lands second. [Source: [8-7-one-primary-view-per-dashboard-dataset.md](8-7-one-primary-view-per-dashboard-dataset.md)]
 
-**Story 8.2 (Single Source of Truth for Every Count — `ready-for-dev`, sibling)** owns count *correctness*; this story adds a date label and touches **no** count. Keep the seams distinct: recency ≠ tally.
+**Story 8.3 (Single Source of Truth for Every Count — `ready-for-dev`, sibling)** owns count *correctness*; this story adds a date label and touches **no** count. Keep the seams distinct: recency ≠ tally.
 
 **Story 3.1 / 3.2 / 3.8 (git pulse + deep-git — done)** built exactly the data this story consumes: `GitPulse.LastCommitDate` (3.1), the opt-in deep pass (3.2), and the per-file `FileChangeStat.LastChangeDate` on `Insights.Files` (3.8). Consume them; do **not** add a second git call (memory: [[deep-git-single-numstat-path]] — 3.2/3.8/7.4/7.5 all share the one numstat fetch; recency reads its output, adds no fetch). The renamed-file undercount caveat (3.1/3.2) is why an unmatched current path must fall back to the change-log date rather than mismatch. [Source: [3-1-baseline-git-pulse-insights-on-dashboard.md](3-1-baseline-git-pulse-insights-on-dashboard.md); [3-8-git-insights-hub-page.md](3-8-git-insights-hub-page.md)]
 
@@ -168,15 +168,15 @@ Cover explicitly:
 
 **Recurring lessons that apply here:**
 
-- **Elicit visual intent up front** (Epic 3 retro, open action) — the marker format (absolute vs. relative), the fix-the-existing-line decision, and the story-card date source were offered as named directions; the owner picked *absolute date*, *fix it in 8.7*, and *git-first with change-log fallback*. Build those. [memory: [[create-story-elicit-visual-intent]]]
-- **Split, don't absorb** — if this tempts you into re-pairing counts (8.2), restyling badges (8.1), or adding dates to sprint/Now-Next cards, stop; 8.7 is the Commits tile + epic-page story cards only. [Source: Epic 2/3 retros; [[epic-2-retro-scope-and-debt]]]
+- **Elicit visual intent up front** (Epic 3 retro, open action) — the marker format (absolute vs. relative), the fix-the-existing-line decision, and the story-card date source were offered as named directions; the owner picked *absolute date*, *fix it in 8.8*, and *git-first with change-log fallback*. Build those. [memory: [[create-story-elicit-visual-intent]]]
+- **Split, don't absorb** — if this tempts you into re-pairing counts (8.3), restyling badges (8.2), or adding dates to sprint/Now-Next cards, stop; 8.8 is the Commits tile + epic-page story cards only. [Source: Epic 2/3 retros; [[epic-2-retro-scope-and-debt]]]
 - **The "what real-world input shape does this parser silently drop?" check** (Epic 3 review action) — apply it to `ExtractLatestChangeLogDate`: cover both the table and list change-log shapes the repo actually uses; don't silently drop one.
 
 ---
 
 ## Git Intelligence Summary
 
-Recent history is planning/spike/merge churn on `main` (`Merge branch 'worktree-bmad-dev-story-6-4'`, `Review notes`, `Story 6.4 …`) — no in-flight code touches `CommitStatSub`, `ProgressCalculator`, `EpicsParser`'s section extractors, or `AppendStoryCard`, so this change is additive and uncontended against siblings 8.1/8.2/8.6. Light adjacency with 8.6 on `HtmlRenderAdapter.Epics.cs` + `specscribe.css` (non-overlapping hunks). **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
+Recent history is planning/spike/merge churn on `main` (`Merge branch 'worktree-bmad-dev-story-6-4'`, `Review notes`, `Story 6.4 …`) — no in-flight code touches `CommitStatSub`, `ProgressCalculator`, `EpicsParser`'s section extractors, or `AppendStoryCard`, so this change is additive and uncontended against siblings 8.2/8.3/8.7. Light adjacency with 8.7 on `HtmlRenderAdapter.Epics.cs` + `specscribe.css` (non-overlapping hunks). **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
 
 ---
 
@@ -192,7 +192,7 @@ No external libraries or APIs are introduced — pure in-repo C# date/string wor
 ## Project Context Reference
 
 - Epic 8 goal + FR/UX-DR/NFR coverage: [Source: [epics.md:1165-1169](../planning-artifacts/epics.md:1165)]
-- Story 8.7 user story + both ACs: [Source: [epics.md:1302-1320](../planning-artifacts/epics.md:1302)]
+- Story 8.8 user story + both ACs: [Source: [epics.md:1302-1320](../planning-artifacts/epics.md:1302)]
 - The recency data sources: [Source: [GitMetrics.cs:18-27](../../src/SpecScribe/GitMetrics.cs:18) (GitPulse.LastCommitDate), [GitMetrics.cs:75-83](../../src/SpecScribe/GitMetrics.cs:75) (FileChangeStat.LastChangeDate), [GitMetrics.cs:91-96](../../src/SpecScribe/GitMetrics.cs:91) (Insights.Files)]
 - The existing non-deterministic recency line to fix: [Source: [DashboardViewBuilder.cs:99-108](../../src/SpecScribe/DashboardViewBuilder.cs:99)]
 - The change-log extraction already in the pipeline: [Source: [SiteGenerator.cs:711](../../src/SpecScribe/SiteGenerator.cs:711); story `## Change Log` sections, e.g. [3-1](3-1-baseline-git-pulse-insights-on-dashboard.md) table form, [2-3](2-3-sprint-status-page-and-dashboard-widget.md) list form]
@@ -242,7 +242,7 @@ No external libraries or APIs are introduced — pure in-repo C# date/string wor
 
 ### References
 
-- [Source: [epics.md:1302-1320](../planning-artifacts/epics.md:1302)] — Story 8.7 user story + both ACs.
+- [Source: [epics.md:1302-1320](../planning-artifacts/epics.md:1302)] — Story 8.8 user story + both ACs.
 - [Source: [epics.md:1165-1169](../planning-artifacts/epics.md:1165)] — Epic 8 goal; FRs; UX-DRs; NFR8.
 - [Source: [DashboardViewBuilder.cs:99-108](../../src/SpecScribe/DashboardViewBuilder.cs:99)] — `CommitStatSub` (the `DateTime.Now` recency line to fix).
 - [Source: [GitMetrics.cs:18-27](../../src/SpecScribe/GitMetrics.cs:18), [75-96](../../src/SpecScribe/GitMetrics.cs:75)] — `GitPulse.LastCommitDate`, `FileChangeStat.LastChangeDate`, `Insights.Files`.

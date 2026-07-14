@@ -1,4 +1,4 @@
-# Story 8.5: Designed Empty States
+# Story 8.6: Designed Empty States
 
 Status: ready-for-dev
 
@@ -16,13 +16,13 @@ so that zero-counts and repeated CLI hints do not read as errors or clutter.
 **Given** multiple stories in an epic lack task plans
 **When** the epics page renders
 **Then** per-story CLI hints consolidate into one banner per epic with a single copy-able command affordance
-**And** hint text is adapter-supplied, not hard-coded (NFR8). [Source: epics.md#Story 8.5; UX-DR9]
+**And** hint text is adapter-supplied, not hard-coded (NFR8). [Source: epics.md#Story 8.6; UX-DR9]
 
 2.
 **Given** a sprint board column is empty
 **When** the board renders
 **Then** the column shows intentional guidance copy (for example "Nothing in progress — pick from Ready")
-**And** empty states are visually styled as designed states, not bare zero-counts. [Source: epics.md#Story 8.5; UX-DR9]
+**And** empty states are visually styled as designed states, not bare zero-counts. [Source: epics.md#Story 8.6; UX-DR9]
 
 ---
 
@@ -37,7 +37,7 @@ Both are direct fixes for live UX-review findings graded against the shared-port
 
 > Repeated per-story CLI hints and bare zero-count columns read as errors or clutter to a stakeholder. Consolidate the hints into one guided banner per epic, and give empty board columns intentional, designed empty-state copy. [Source: [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md); UX-DR9]
 
-It sits alongside its Epic 8 siblings but touches a **different seam** than any of them: **8.1** owns status words/colors (`StatusStyles`); **8.2** owns counts (`ProjectCounts`); **8.3** owns progress+state pairing + sprint-board *tooltips*; **8.4** owns the Next Steps *command surface* (`BmadCommands.ForStory/ForEpic/ForProject`). **8.5 owns two empty-state surfaces**: the epic-page undrafted-story banner (`EpicsViewBuilder` + `HtmlRenderAdapter.Epics`) and the sprint-board empty lane (`SprintTemplater.RenderBoard`). No file overlap with 8.1/8.2/8.3; a light, non-contended adjacency with 8.4 (both read `commands.Command("create-story", …)` through the same catalog seam, but 8.4 edits `BmadCommands.cs` and 8.5 does not).
+It sits alongside its Epic 8 siblings but touches a **different seam** than any of them: **8.2** owns status words/colors (`StatusStyles`); **8.3** owns counts (`ProjectCounts`); **8.4** owns progress+state pairing + sprint-board *tooltips*; **8.5** owns the Next Steps *command surface* (`BmadCommands.ForStory/ForEpic/ForProject`). **8.6 owns two empty-state surfaces**: the epic-page undrafted-story banner (`EpicsViewBuilder` + `HtmlRenderAdapter.Epics`) and the sprint-board empty lane (`SprintTemplater.RenderBoard`). No file overlap with 8.2/8.3/8.4; a light, non-contended adjacency with 8.5 (both read `commands.Command("create-story", …)` through the same catalog seam, but 8.5 edits `BmadCommands.cs` and 8.6 does not).
 
 ### Owner-selected design decisions (visual intent elicited at create-story — do not re-litigate)
 
@@ -62,7 +62,7 @@ The predicate `ArtifactOutputPath is null` is deliberately the **same** one `Bui
 
 **Why the command carries the *next* undrafted id (not a bare `create-story` and not one-per-story):** `create-story` processes **one** story at a time, so the truthful single affordance is "draft the next one" — copy it, run it, and when that story gains a plan the banner recomputes to the following undrafted story. This mirrors `ForEpic`'s existing `create-story {nextUndetailed.Id}` behavior, so the two surfaces stay consistent.
 
-**NFR8 (AC #1's "adapter-supplied, not hard-coded"):** the command string comes from `commands.Command("create-story", id)`, which returns the module-correct slash command (`/bmad-create-story 8.6` for BMad, `/gds-create-story …` for a GDS project) or **null** when the module exposes no such step. `InlineGuidance` returns its plain `fallback` text when the command is null, so a module without a create-story workflow shows the count sentence with **no** command affordance rather than a hard-coded or broken command. The surrounding English lead is a fixed template exactly as every other `InlineGuidance` caller does it — the *command* is the adapter-supplied part, and it already routes through the catalog. [Source: [BmadCommands.cs:191](../../src/SpecScribe/BmadCommands.cs:191); [ModuleContext.cs:43](../../src/SpecScribe/ModuleContext.cs:43)]
+**NFR8 (AC #1's "adapter-supplied, not hard-coded"):** the command string comes from `commands.Command("create-story", id)`, which returns the module-correct slash command (`/bmad-create-story 8.7` for BMad, `/gds-create-story …` for a GDS project) or **null** when the module exposes no such step. `InlineGuidance` returns its plain `fallback` text when the command is null, so a module without a create-story workflow shows the count sentence with **no** command affordance rather than a hard-coded or broken command. The surrounding English lead is a fixed template exactly as every other `InlineGuidance` caller does it — the *command* is the adapter-supplied part, and it already routes through the catalog. [Source: [BmadCommands.cs:191](../../src/SpecScribe/BmadCommands.cs:191); [ModuleContext.cs:43](../../src/SpecScribe/ModuleContext.cs:43)]
 
 **AC #2 — the empty lane placeholder in the shared board renderer.** [`RenderBoard`](../../src/SpecScribe/SprintTemplater.cs:103) already loops the five `BoardColumns` and renders every column even when empty ("an empty Done column is meaningful on a board"). Today when `col.Count == 0` the `.sprint-cards` container is simply empty. Change: when `col.Count == 0`, append **one** `.sprint-lane-empty` dashed placeholder carrying that column's guidance copy (see the copy table below). `RenderBoard` is **shared** by the sprint page **and** the home dashboard's Now & Next board [memory: [[now-and-next-is-the-sprint-board]]], so the designed empty state appears consistently on both — keep the placeholder compact (a single line of copy in a dashed card) so it doesn't bloat the compact home panel.
 
@@ -82,8 +82,8 @@ Wire the copy off the same `cssClass` the loop already has (a small `switch`/loo
 
 ### Scope boundaries (read carefully)
 
-- **Do NOT change any count, status word, or status color.** AC #1's banner restates a count that already exists (the number of undrafted stories) — derive it from `epic.Stories`, do not introduce a parallel counter or reclassify a status. That's 8.1/8.2's seam. [memory: [[specscribe-status-token-system]]]
-- **Do NOT touch `BmadCommands.cs`** (that's 8.4's file this sprint) beyond *calling* the existing public `InlineGuidance` / `Command` — no new method there. If a genuinely shared helper is unavoidable, prefer adding it in `EpicsViewBuilder`/`SprintTemplater`, not `BmadCommands`, to stay uncontended with 8.4.
+- **Do NOT change any count, status word, or status color.** AC #1's banner restates a count that already exists (the number of undrafted stories) — derive it from `epic.Stories`, do not introduce a parallel counter or reclassify a status. That's 8.2/8.3's seam. [memory: [[specscribe-status-token-system]]]
+- **Do NOT touch `BmadCommands.cs`** (that's 8.5's file this sprint) beyond *calling* the existing public `InlineGuidance` / `Command` — no new method there. If a genuinely shared helper is unavoidable, prefer adding it in `EpicsViewBuilder`/`SprintTemplater`, not `BmadCommands`, to stay uncontended with 8.5.
 - **Do NOT touch the `RenderBoardByEpic` (By-epic) view.** AC #2 is about the *status-column* board (`RenderBoard`). The by-epic view's "empty" case is an epic with no stories — a different surface, explicitly out of scope here.
 - **Do NOT change the `Up Next` / `Next Steps` panels.** The banner is a *new* top-of-list element, separate from the existing `NextActionsPanelHtml`; do not fold undrafted-story consolidation into those panels (owner picked the top-of-list banner, decision 1).
 - **Do NOT add a client-side script or NuGet package.** Pure C# string-building + CSS; reuse the existing `cmd-badge` copy/send-menu JS unchanged for the banner's command. [memory: [[charting-is-pure-svg-no-js]]]
@@ -110,7 +110,7 @@ Wire the copy off the same `cssClass` the loop already has (a small `switch`/loo
 - **DON'T print one banner command per undrafted story** — exactly one copy-able command (the next undrafted id) per epic banner (AC #1's "single copy-able command affordance").
 - **DON'T render the banner for a single undrafted story** — threshold is 2+ (owner decision 2); a lone undrafted card keeps its inline command.
 - **DON'T hard-code the create-story slash command** — always through `commands.Command("create-story", id)` so it degrades to plain fallback text under NFR8.
-- **DON'T edit `BmadCommands.cs`, `StatusStyles`, or any count source** — call the existing public helpers only; this story owns no logic in those files (8.4/8.1/8.2 do).
+- **DON'T edit `BmadCommands.cs`, `StatusStyles`, or any count source** — call the existing public helpers only; this story owns no logic in those files (8.5/8.2/8.3 do).
 - **DON'T touch `RenderBoardByEpic`** or the Up Next / Next Steps panels.
 - **DON'T add JS or a NuGet package**, and don't move any section fact.
 
@@ -184,9 +184,9 @@ Cover explicitly:
 
 ## Previous Story Intelligence
 
-**Story 8.4 (State-Aware Next-Step Command Surface — `ready-for-dev`, sibling)** edits `BmadCommands.cs` (the Next Steps command surface) + `.next-steps*` CSS. 8.5 **calls** `BmadCommands.InlineGuidance` but does **not** edit `BmadCommands.cs` — the two are uncontended. If both land in the same sprint, expect independent golden-fingerprint moves (8.4 = Next Steps panels; 8.5 = undrafted banners + empty lanes); regenerate the constant against whichever lands second. [Source: [8-4-state-aware-next-step-command-surface.md](8-4-state-aware-next-step-command-surface.md)]
+**Story 8.5 (State-Aware Next-Step Command Surface — `ready-for-dev`, sibling)** edits `BmadCommands.cs` (the Next Steps command surface) + `.next-steps*` CSS. 8.6 **calls** `BmadCommands.InlineGuidance` but does **not** edit `BmadCommands.cs` — the two are uncontended. If both land in the same sprint, expect independent golden-fingerprint moves (8.5 = Next Steps panels; 8.6 = undrafted banners + empty lanes); regenerate the constant against whichever lands second. [Source: [8-5-state-aware-next-step-command-surface.md](8-5-state-aware-next-step-command-surface.md)]
 
-**Story 8.3 (Paired Progress & Readiness — `ready-for-dev`, sibling)** adds sprint-board column *tooltips* + badge pairing in `HtmlRenderAdapter.Epics`/`SprintTemplater`/`Charts`. 8.5 also edits `SprintTemplater.RenderBoard` (the empty-lane branch) and `HtmlRenderAdapter.Epics` (emitting the banner) — a **light adjacency**: 8.3 touches card/lane *headers* and tooltips, 8.5 touches the *empty* lane body and adds a top-of-list banner. Coordinate at merge (small, non-overlapping hunks in the same methods); both regenerate the golden fingerprint. [Source: [8-3-paired-progress-and-readiness-semantics.md](8-3-paired-progress-and-readiness-semantics.md)]
+**Story 8.4 (Paired Progress & Readiness — `ready-for-dev`, sibling)** adds sprint-board column *tooltips* + badge pairing in `HtmlRenderAdapter.Epics`/`SprintTemplater`/`Charts`. 8.6 also edits `SprintTemplater.RenderBoard` (the empty-lane branch) and `HtmlRenderAdapter.Epics` (emitting the banner) — a **light adjacency**: 8.4 touches card/lane *headers* and tooltips, 8.6 touches the *empty* lane body and adds a top-of-list banner. Coordinate at merge (small, non-overlapping hunks in the same methods); both regenerate the golden fingerprint. [Source: [8-4-paired-progress-and-readiness-semantics.md](8-4-paired-progress-and-readiness-semantics.md)]
 
 **Story 6.2 (Section View Models — `review`)** established that command-catalog-driven guidance HTML on the epic page is carried as **named opaque fragments** (`NextActionsPanelHtml`, `NextStepsHtml`, `RetroAffordanceHtml`) built in `EpicsViewBuilder` and emitted verbatim by the adapter — the exact pattern the new `UndraftedBannerHtml` follows, so no adapter/contract change and no section-fact movement. [memory: [[story-6-2-section-view-models-live]]]
 
@@ -195,13 +195,13 @@ Cover explicitly:
 **Recurring lessons that apply here:**
 
 - **Elicit visual intent up front** (Epic 3 retro, open action) — both new visual surfaces (the per-epic banner silhouette + the empty-lane treatment) were offered as named directions and the owner picked *top-of-list consolidated banner* and *dashed ghost-card placeholder*. Build those, not a re-invented silhouette. [memory: [[create-story-elicit-visual-intent]]]
-- **Split, don't absorb** — if this tempts you into restyling badges (8.1/8.3), re-pairing counts (8.2), or reshaping the Next Steps command surface (8.4), stop; 8.5 is the two empty-state surfaces only. [Source: Epic 2/3 retros]
+- **Split, don't absorb** — if this tempts you into restyling badges (8.2/8.4), re-pairing counts (8.3), or reshaping the Next Steps command surface (8.5), stop; 8.6 is the two empty-state surfaces only. [Source: Epic 2/3 retros]
 
 ---
 
 ## Git Intelligence Summary
 
-Recent history is planning/spike/merge churn on `main` (`Decision-making and ADRs`, `Merge branch 'spike/delivery-arch-6-6'`, `Work on technical spike`) — no in-flight code touches `EpicsViewBuilder.cs`, `SprintTemplater.RenderBoard`, or the `.sprint-lane`/empty-state CSS, so this change is additive and uncontended against siblings 8.1/8.2/8.4 (they touch `StatusStyles`/`ProjectCounts`/`BmadCommands`), with only the light 8.3 adjacency noted above (same methods, non-overlapping hunks). **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
+Recent history is planning/spike/merge churn on `main` (`Decision-making and ADRs`, `Merge branch 'spike/delivery-arch-6-6'`, `Work on technical spike`) — no in-flight code touches `EpicsViewBuilder.cs`, `SprintTemplater.RenderBoard`, or the `.sprint-lane`/empty-state CSS, so this change is additive and uncontended against siblings 8.2/8.3/8.5 (they touch `StatusStyles`/`ProjectCounts`/`BmadCommands`), with only the light 8.4 adjacency noted above (same methods, non-overlapping hunks). **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
 
 ---
 
@@ -214,7 +214,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 ## Project Context Reference
 
 - Epic 8 goal + FR/UX-DR/NFR coverage: [Source: [epics.md:1165-1169](../planning-artifacts/epics.md:1165)]
-- Story 8.5 user story + both ACs: [Source: [epics.md:1262-1280](../planning-artifacts/epics.md:1262)]
+- Story 8.6 user story + both ACs: [Source: [epics.md:1262-1280](../planning-artifacts/epics.md:1262)]
 - UX-DR9 (Now & Next cards as full-surface links with explicit empty states), NFR8 (framework-agnostic, adapter-supplied guidance): [Source: [epics.md:121](../planning-artifacts/epics.md:121); [epics.md](../planning-artifacts/epics.md)]
 - The UX review that seeded Epics 8–10: [Source: [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md)]
 - Architecture invariants (framework-agnostic/NFR8, single-source, truthfulness, accessibility, deterministic, seed-not-invariant): [Source: [ARCHITECTURE-SPINE.md](../specs/spec-specscribe/ARCHITECTURE-SPINE.md), [rendering-architecture.md](../specs/spec-specscribe/rendering-architecture.md)]
@@ -252,7 +252,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 - **`RenderBoard` is shared** by the sprint page and the home Now & Next board — the empty-lane placeholder appears on both by design; keep it compact so it doesn't bloat the home panel. [memory: [[now-and-next-is-the-sprint-board]]]
 - **Byte parity moves on purpose** across every multi-undrafted epic page (this repo has several: Epics 11–16) and any empty board lane — verify the diff is *only* those before regenerating the constant. [memory: [[golden-diff-normalization-gotchas]]]
 - **Opaque fragment stays opaque.** `UndraftedBannerHtml` mirrors the existing `NextActionsPanelHtml`/`RetroAffordanceHtml` fields exactly — a `required string` set in the builder, emitted verbatim by the adapter, round-tripped as a plain string in the serialization test. Keep all logic in `EpicsViewBuilder`. [memory: [[story-6-2-section-view-models-live]]]
-- **Scope guard for later 8.x:** one-view-per-dataset (8.6) and recency signals (8.7) sit near the dashboard but are NOT this story. 8.5 is the two empty-state surfaces — the per-epic undrafted banner and the empty board lane.
+- **Scope guard for later 8.x:** one-view-per-dataset (8.7) and recency signals (8.8) sit near the dashboard but are NOT this story. 8.6 is the two empty-state surfaces — the per-epic undrafted banner and the empty board lane.
 
 ### Project Structure Notes
 
@@ -261,7 +261,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ### References
 
-- [Source: [epics.md:1262-1280](../planning-artifacts/epics.md:1262)] — Story 8.5 user story + both ACs.
+- [Source: [epics.md:1262-1280](../planning-artifacts/epics.md:1262)] — Story 8.6 user story + both ACs.
 - [Source: [epics.md:1165-1169](../planning-artifacts/epics.md:1165)] — Epic 8 goal; FRs; UX-DR21–24; NFR8.
 - [Source: [epics.md:121](../planning-artifacts/epics.md:121)] — UX-DR9 (Now & Next full-surface links with explicit empty states).
 - [Source: [EpicsViewBuilder.cs:37-101](../../src/SpecScribe/EpicsViewBuilder.cs:37)] — `BuildEpic` + `BuildStoryCard` (banner build + consolidation flag).

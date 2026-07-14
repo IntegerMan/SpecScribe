@@ -1,4 +1,4 @@
-# Story 8.3: Paired Progress and Readiness Semantics
+# Story 8.4: Paired Progress and Readiness Semantics
 
 Status: ready-for-dev
 
@@ -16,13 +16,13 @@ so that "5/5 tasks done" while in review reads as one coherent fact, not a contr
 **Given** a story surface shows task completion and the story has a workflow state
 **When** both are available
 **Then** they render paired (for example "5/5 tasks · awaiting review") everywhere both appear
-**And** epic dual-count badges restate as sentences (for example "6 of 7 done, 1 in review"). [Source: epics.md#Story 8.3; UX-DR23]
+**And** epic dual-count badges restate as sentences (for example "6 of 7 done, 1 in review"). [Source: epics.md#Story 8.4; UX-DR23]
 
 2.
 **Given** the sprint board columns Backlog and Ready for dev
 **When** I hover or focus a column header
 **Then** a tooltip distinguishes them (for example "Ready = task plan exists and dependencies met")
-**And** stories lacking task plans are visually separated from actionable ones. [Source: epics.md#Story 8.3; UX-DR24]
+**And** stories lacking task plans are visually separated from actionable ones. [Source: epics.md#Story 8.4; UX-DR24]
 
 ---
 
@@ -35,7 +35,7 @@ so that "5/5 tasks done" while in review reads as one coherent fact, not a contr
 > 🟡 **Backlog vs Ready for dev** both read as "not started" to outsiders; a column-header tooltip ("Ready = task plan exists and dependencies met") fixes it cheaply.
 > [Source: [docs/Epic3UXFeedback.md:70,78,83](../../docs/Epic3UXFeedback.md); UX-DR23/UX-DR24]
 
-It sits between its two Epic 8 siblings: **8.1 (canonical status vocabulary + status legend)** locks the *words and colors* this story pairs; **8.2 (`ProjectCounts` ledger)** locks the *counts* this story reads. Both are `ready-for-dev`. Read the coordination notes below — you extend the same badge/tooltip seams they touch, but on a different axis (arrangement + readiness, not vocabulary or count-sourcing).
+It sits between its two Epic 8 siblings: **8.2 (canonical status vocabulary + status legend)** locks the *words and colors* this story pairs; **8.3 (`ProjectCounts` ledger)** locks the *counts* this story reads. Both are `ready-for-dev`. Read the coordination notes below — you extend the same badge/tooltip seams they touch, but on a different axis (arrangement + readiness, not vocabulary or count-sourcing).
 
 ### The four surfaces in scope (each has a precise site)
 
@@ -50,28 +50,28 @@ It sits between its two Epic 8 siblings: **8.1 (canonical status vocabulary + st
 
 **1. Badge pairing form → grouped pair with a separator (Surface A).** Do **not** merge the status badge and task badge into one fused pill, and do **not** demote the task tally to a sub-line. Keep the two existing badges — `StatusStyles.Badge(...)` and `TaskBadge(...)` — with their current styling intact, but wrap them in **one paired group** (`<span class="story-status-pair">…</span>`) that renders them joined by a visible middot separator so the pair reads as a single fact: `( [In review] · [✓ 5/5 tasks] )`. This is the lowest-risk silhouette: it preserves every existing `.status-badge` / `.task-badge` rule (and the six lifecycle colors), so the only new CSS is the wrapper's fl[ex] gap + separator. [Owner decision, this story — visual intent elicited at create-story]
 
-**2. No-task-plan separation → dashed/muted card treatment (Surface D).** A sprint card for a story with **no task plan** (`story is null` OR `story.TasksTotal == 0`) gets a **dashed border + muted fill**, mirroring the sunburst's existing `.sb-noplan` dashed no-plan arc ([`Charts.AppendNoPlanArc`](../../src/SpecScribe/Charts.cs:269-279)). Actionable cards keep their current solid treatment. This reuses a treatment the portal already teaches ("dashed = no plan yet") rather than inventing a new visual language, and it needs no per-card text (that keeps it clear of Story 8.5's "no task plan yet" consolidation banner — see boundaries). [Owner decision, this story — visual intent elicited at create-story]
+**2. No-task-plan separation → dashed/muted card treatment (Surface D).** A sprint card for a story with **no task plan** (`story is null` OR `story.TasksTotal == 0`) gets a **dashed border + muted fill**, mirroring the sunburst's existing `.sb-noplan` dashed no-plan arc ([`Charts.AppendNoPlanArc`](../../src/SpecScribe/Charts.cs:269-279)). Actionable cards keep their current solid treatment. This reuses a treatment the portal already teaches ("dashed = no plan yet") rather than inventing a new visual language, and it needs no per-card text (that keeps it clear of Story 8.6's "no task plan yet" consolidation banner — see boundaries). [Owner decision, this story — visual intent elicited at create-story]
 
 **3. Epic dual-count → one accessible sentence, built from the same tally (Surface B).** The epic mosaic donut currently passes **no `ariaLabel`** (it renders decorative/`aria-hidden` with per-segment `<title>`s only — that is the "Done: 6 · In review: 1" the review saw as disconnected counts). Give it a single, ordered, plain-language sentence built from the same `EpicProgress.StoryStatusCounts` it already rings — "6 of 7 done, 1 in review" — as the donut's `aria-label` **and** as a visible restatement line, so the dual counts read as one framed statement for pointer, keyboard, and screen-reader users alike. Keep the existing "N/N stories detailed" sub-label (it answers a different question — planning depth, not delivery) OR fold it in; decide by which reads cleaner and note the choice. [Owner decision, this story]
 
-**4. Column-meaning tooltip → all five columns, Backlog/Ready load-bearing (Surface C).** Give every board column header a one-line meaning tooltip via the body-level `.ss-tooltip`/`js-tip`/`data-tip` node, with **Backlog** and **Ready for dev** carrying the distinguishing text the AC names ("Backlog = not yet ready to pick up"; "Ready = task plan exists and dependencies met"). A per-column meaning key is coherent and coordinates with 8.1's `StageMeaning` seam (below); do it for all five so the board is self-teaching, not just the two named columns. [Owner decision, this story]
+**4. Column-meaning tooltip → all five columns, Backlog/Ready load-bearing (Surface C).** Give every board column header a one-line meaning tooltip via the body-level `.ss-tooltip`/`js-tip`/`data-tip` node, with **Backlog** and **Ready for dev** carrying the distinguishing text the AC names ("Backlog = not yet ready to pick up"; "Ready = task plan exists and dependencies met"). A per-column meaning key is coherent and coordinates with 8.2's `StageMeaning` seam (below); do it for all five so the board is self-teaching, not just the two named columns. [Owner decision, this story]
 
-### Relationship to Story 8.1 (status vocabulary + `StageMeaning` — both `ready-for-dev`, coordinate)
+### Relationship to Story 8.2 (status vocabulary + `StageMeaning` — both `ready-for-dev`, coordinate)
 
-8.1 is adding a **`StatusStyles.StageMeaning(cssClass)`** (or `LegendEntries`) one-line-meaning source plus a per-badge hover/focus tooltip and a page-level status legend key. 8.3's column-header tooltips (Surface C) are **the same kind of "what does this stage mean" affordance**, so:
+8.2 is adding a **`StatusStyles.StageMeaning(cssClass)`** (or `LegendEntries`) one-line-meaning source plus a per-badge hover/focus tooltip and a page-level status legend key. 8.4's column-header tooltips (Surface C) are **the same kind of "what does this stage mean" affordance**, so:
 
-- **If 8.1 has landed first:** source the column-header meaning text from `StatusStyles.StageMeaning(...)` (extending it if the sprint-column phrasing — "Ready = task plan exists and dependencies met" — needs to be richer than the generic stage meaning). Do **not** author a second, parallel stage→meaning map. One seam.
-- **If 8.3 lands first:** put the column-meaning strings in a small local helper in `SprintTemplater` and leave a `// TODO(8.1): fold into StatusStyles.StageMeaning` marker so 8.1 subsumes it. Record the choice in Completion Notes.
-- **No vocabulary change here.** 8.1 owns which *word/class* a status gets and the "unrecognized" state; 8.3 never changes a status word — it only arranges words+counts and explains columns. If 8.1 adds an `"unrecognized"` stage, Surface B's sentence and Surface D's no-plan gate must tolerate it (they will: the sentence iterates `StoryStages`, and the no-plan gate keys on `TasksTotal`, not on stage). [Source: [8-1-canonical-status-model-with-portal-wide-legend.md](8-1-canonical-status-model-with-portal-wide-legend.md)]
+- **If 8.2 has landed first:** source the column-header meaning text from `StatusStyles.StageMeaning(...)` (extending it if the sprint-column phrasing — "Ready = task plan exists and dependencies met" — needs to be richer than the generic stage meaning). Do **not** author a second, parallel stage→meaning map. One seam.
+- **If 8.4 lands first:** put the column-meaning strings in a small local helper in `SprintTemplater` and leave a `// TODO(8.2): fold into StatusStyles.StageMeaning` marker so 8.2 subsumes it. Record the choice in Completion Notes.
+- **No vocabulary change here.** 8.2 owns which *word/class* a status gets and the "unrecognized" state; 8.4 never changes a status word — it only arranges words+counts and explains columns. If 8.2 adds an `"unrecognized"` stage, Surface B's sentence and Surface D's no-plan gate must tolerate it (they will: the sentence iterates `StoryStages`, and the no-plan gate keys on `TasksTotal`, not on stage). [Source: [8-2-canonical-status-model-with-portal-wide-legend.md](8-2-canonical-status-model-with-portal-wide-legend.md)]
 
-### Relationship to Story 8.2 (`ProjectCounts` ledger — `ready-for-dev`)
+### Relationship to Story 8.3 (`ProjectCounts` ledger — `ready-for-dev`)
 
-8.2 centralizes the four count families (stories, epics, deferred, action items) into a `ProjectCounts` ledger and **explicitly scopes OUT per-epic story tallies** (decision 4 in that story). Surface B's "6 of 7 done, 1 in review" is exactly a per-epic delivery tally — so **read it directly from `EpicProgress.StoryStatusCounts`, the way `Charts.EpicMosaic`/`DeliverySegments` already do**; do not route it through 8.2's ledger and do not add a new recount. Per-story task tallies (Surfaces A/D) likewise come straight off `StoryInfo`/`StoryCardView`, untouched by 8.2. The two stories don't overlap on data; note in Completion Notes that Surface B intentionally reads the per-epic tally, not the ledger. [Source: [8-2-single-source-of-truth-for-every-count.md](8-2-single-source-of-truth-for-every-count.md)]
+8.3 centralizes the four count families (stories, epics, deferred, action items) into a `ProjectCounts` ledger and **explicitly scopes OUT per-epic story tallies** (decision 4 in that story). Surface B's "6 of 7 done, 1 in review" is exactly a per-epic delivery tally — so **read it directly from `EpicProgress.StoryStatusCounts`, the way `Charts.EpicMosaic`/`DeliverySegments` already do**; do not route it through 8.3's ledger and do not add a new recount. Per-story task tallies (Surfaces A/D) likewise come straight off `StoryInfo`/`StoryCardView`, untouched by 8.3. The two stories don't overlap on data; note in Completion Notes that Surface B intentionally reads the per-epic tally, not the ledger. [Source: [8-3-single-source-of-truth-for-every-count.md](8-3-single-source-of-truth-for-every-count.md)]
 
 ### Scope boundaries (read carefully)
 
-- **Do NOT build Story 9.4's verification evidence strip.** 9.4 owns the story-*page* "5/5 tasks · 586 tests green · verified 2026-07-09" evidence strip near the status badge ([epics.md#Story 9.4](../planning-artifacts/epics.md); [Epic3UXFeedback.md:97](../../docs/Epic3UXFeedback.md)). On the story **page** header ([`RenderStoryBody`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:274-284)) the workflow-state badge is present but the task tally lives in the Task Breakdown sunburst below — pairing there is 9.4's evidence-strip job, not this story's. **8.3's Surface A pairing is the epic-page story CARD** (where both badges already sit together) — do not pre-build the page-header evidence strip. If you touch the story-page header at all, keep it to arrangement of what's already there. Flag the seam for 9.4 in Completion Notes.
-- **Do NOT build Story 8.5's empty-state consolidation.** 8.5 owns consolidating per-story "no task plan yet" hints into one per-epic banner and the designed empty-column copy ([epics.md#Story 8.5](../planning-artifacts/epics.md)). 8.3's Surface D is a **visual treatment of individual no-plan cards** (dashed/muted), not a consolidated banner and not empty-column copy. No per-card "no task plan" text (the tooltip already says it — [`BuildCardTip`](../../src/SpecScribe/SprintTemplater.cs:301-303)).
+- **Do NOT build Story 9.4's verification evidence strip.** 9.4 owns the story-*page* "5/5 tasks · 586 tests green · verified 2026-07-09" evidence strip near the status badge ([epics.md#Story 9.4](../planning-artifacts/epics.md); [Epic3UXFeedback.md:97](../../docs/Epic3UXFeedback.md)). On the story **page** header ([`RenderStoryBody`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:274-284)) the workflow-state badge is present but the task tally lives in the Task Breakdown sunburst below — pairing there is 9.4's evidence-strip job, not this story's. **8.4's Surface A pairing is the epic-page story CARD** (where both badges already sit together) — do not pre-build the page-header evidence strip. If you touch the story-page header at all, keep it to arrangement of what's already there. Flag the seam for 9.4 in Completion Notes.
+- **Do NOT build Story 8.6's empty-state consolidation.** 8.6 owns consolidating per-story "no task plan yet" hints into one per-epic banner and the designed empty-column copy ([epics.md#Story 8.6](../planning-artifacts/epics.md)). 8.4's Surface D is a **visual treatment of individual no-plan cards** (dashed/muted), not a consolidated banner and not empty-column copy. No per-card "no task plan" text (the tooltip already says it — [`BuildCardTip`](../../src/SpecScribe/SprintTemplater.cs:301-303)).
 - **Do NOT change any status word, color, or count value.** Only arrangement (pairing), one derived sentence, one dashed treatment, and column tooltips. If a *rendered number* changes, you have a bug — the values are all pre-existing.
 - **Do NOT add a client-side script or NuGet package.** Pure SVG + CSS + the one sanctioned `specscribe.js` tooltip node. [memory: [[charting-is-pure-svg-no-js]]]
 - **Do NOT write back to any source.** Local-first, read-only invariant.
@@ -83,8 +83,8 @@ It sits between its two Epic 8 siblings: **8.1 (canonical status vocabulary + st
 ### DO
 
 - **Surface A — pair the two badges on the epic-page story card.** In [`HtmlRenderAdapter.AppendStoryCard`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:211-250), the status badge ([:220](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:220)) and the task badge ([:224](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:224)) currently emit as two independent siblings inside `.story-card-header`. Wrap the two (when both are present) in a single `<span class="story-status-pair">` and render a visible `·` separator between them so they read as one paired fact. When only one is present (status but no tasks, or the reverse), render the single badge without an orphan separator. Keep the existing `StatusStyles.Badge(...)` and `TaskBadge(...)` calls and their output bytes intact — you are grouping, not rewriting them.
-- **Surface B — restate the epic delivery dual-count as a sentence.** Add a small helper (e.g. `Charts.DeliverySentence(IReadOnlyDictionary<string,int> counts)` or a method on `StatusStyles`) that turns `EpicProgress.StoryStatusCounts` into an ordered, plain sentence over `StatusStyles.StoryStages` — "6 of 7 done, 1 in review" (total = Σ segments, leading with done, omitting zero stages, using `StatusStyles.StoryLabel` for each stage word and `Charts.Plural` for agreement). In [`Charts.EpicMosaic`](../../src/SpecScribe/Charts.cs:440-467), pass that sentence as the mosaic `Donut(...)`'s `ariaLabel` (so the ring stops being `aria-hidden`) **and** render it as a visible restatement in `.epic-mosaic-label`. Derive the total from the summed segments, never a parallel field (structural total==Σsegments discipline, per 8.2).
-- **Surface C — column-header meaning tooltips + focus reach.** In [`SprintTemplater.RenderBoard`](../../src/SpecScribe/SprintTemplater.cs:115-131), give each `.sprint-lane-head` a `js-tip` class + `data-tip="{meaning}"` (escaped via `PathUtil.Html`) and `tabindex="0"` so it is hover- AND focus-reachable (five headers is a fine tab-order cost — this is the deliberate exception to 8.1's "don't tabindex dozens of badges" rule, because it's a small, fixed, meaning-bearing set). Backlog → "Backlog = not yet ready to pick up"; Ready for dev → "Ready = task plan exists and dependencies met"; the other three get their one-line meanings too. Source the strings from 8.1's `StageMeaning` if landed, else a local helper with the `// TODO(8.1)` marker.
+- **Surface B — restate the epic delivery dual-count as a sentence.** Add a small helper (e.g. `Charts.DeliverySentence(IReadOnlyDictionary<string,int> counts)` or a method on `StatusStyles`) that turns `EpicProgress.StoryStatusCounts` into an ordered, plain sentence over `StatusStyles.StoryStages` — "6 of 7 done, 1 in review" (total = Σ segments, leading with done, omitting zero stages, using `StatusStyles.StoryLabel` for each stage word and `Charts.Plural` for agreement). In [`Charts.EpicMosaic`](../../src/SpecScribe/Charts.cs:440-467), pass that sentence as the mosaic `Donut(...)`'s `ariaLabel` (so the ring stops being `aria-hidden`) **and** render it as a visible restatement in `.epic-mosaic-label`. Derive the total from the summed segments, never a parallel field (structural total==Σsegments discipline, per 8.3).
+- **Surface C — column-header meaning tooltips + focus reach.** In [`SprintTemplater.RenderBoard`](../../src/SpecScribe/SprintTemplater.cs:115-131), give each `.sprint-lane-head` a `js-tip` class + `data-tip="{meaning}"` (escaped via `PathUtil.Html`) and `tabindex="0"` so it is hover- AND focus-reachable (five headers is a fine tab-order cost — this is the deliberate exception to 8.2's "don't tabindex dozens of badges" rule, because it's a small, fixed, meaning-bearing set). Backlog → "Backlog = not yet ready to pick up"; Ready for dev → "Ready = task plan exists and dependencies met"; the other three get their one-line meanings too. Source the strings from 8.2's `StageMeaning` if landed, else a local helper with the `// TODO(8.2)` marker.
 - **Surface D — dashed/muted no-plan cards.** In [`SprintTemplater.AppendBoardCard`](../../src/SpecScribe/SprintTemplater.cs:257-286), add a `no-plan` modifier class to the `.sprint-card` when the story has no task plan (`story is null` OR `story.TasksTotal == 0` — the inverse of the existing progress-bar gate at [:280](../../src/SpecScribe/SprintTemplater.cs:280)). Add `.sprint-card.no-plan` CSS (dashed border + muted fill) mirroring `.sb-noplan`. Keep the existing `BuildCardTip` "No task plan yet" line — it already names the state for the tooltip; do not add visible per-card text.
 - **Route every new swatch/color through the `--status-*` tokens.** The paired separator, the no-plan muted fill, and any accent must use existing tokens/neutrals — never literal hex. [memory: [[specscribe-status-token-system]]]
 - **Reuse the body-level tooltip node.** Column tooltips use the existing `.ss-tooltip` / `js-tip` / `data-tip` plumbing served by `specscribe.js` (no JS change — `HOVER = SEG + ", .js-tip"` already picks up `.js-tip` elements). [memory: [[tooltip-clipping-use-ss-tooltip-node]]]
@@ -93,11 +93,11 @@ It sits between its two Epic 8 siblings: **8.1 (canonical status vocabulary + st
 ### DON'T
 
 - **DON'T fuse the two badges into one pill or move tasks to a sub-line** — the owner picked the grouped-pair-with-separator silhouette (decision 1). A single merged badge or a sub-line is a different, rejected design.
-- **DON'T recompute any count.** Task tallies come off `StoryInfo`/`StoryCardView`; the epic delivery sentence comes off `EpicProgress.StoryStatusCounts`. No new `.Count(...)` at a render site (that is 8.2's anti-pattern too).
-- **DON'T change status words, the six lifecycle colors, or chart legends.** That's 8.1's territory. You arrange and explain; you don't reclassify.
-- **DON'T add per-card "no task plan" text** (Surface D is visual-only; the text consolidation is 8.5).
+- **DON'T recompute any count.** Task tallies come off `StoryInfo`/`StoryCardView`; the epic delivery sentence comes off `EpicProgress.StoryStatusCounts`. No new `.Count(...)` at a render site (that is 8.3's anti-pattern too).
+- **DON'T change status words, the six lifecycle colors, or chart legends.** That's 8.2's territory. You arrange and explain; you don't reclassify.
+- **DON'T add per-card "no task plan" text** (Surface D is visual-only; the text consolidation is 8.6).
 - **DON'T build the story-page verification evidence strip** (Story 9.4).
-- **DON'T add `tabindex="0"` to the badges** — only the five column headers get focus (a small, meaning-bearing set); badges stay hover/pointer progressive enhancements as 8.1 established.
+- **DON'T add `tabindex="0"` to the badges** — only the five column headers get focus (a small, meaning-bearing set); badges stay hover/pointer progressive enhancements as 8.2 established.
 - **DON'T add JS or a NuGet package.** Pure SVG/CSS + the existing tooltip node.
 
 ---
@@ -119,7 +119,7 @@ Relevant invariants [Source: [ARCHITECTURE-SPINE.md](../specs/spec-specscribe/AR
 
 - **.NET 10 / C#**, `Nullable` + `ImplicitUsings` enabled. **No new NuGet packages.** [Source: [SpecScribe.Tests.csproj](../../tests/SpecScribe.Tests/SpecScribe.Tests.csproj)]
 - **Reuse, don't reinvent (all already in-repo):**
-  - [`StatusStyles.Badge` / `StoryLabel` / `SprintLabel` / `Icon` / `StoryStages`](../../src/SpecScribe/StatusStyles.cs:34,49,180,185) — the badge renderer + stage words + canonical stage order the pairing and the delivery sentence build on. (If 8.1 landed: `StatusStyles.StageMeaning` for the column tooltips.)
+  - [`StatusStyles.Badge` / `StoryLabel` / `SprintLabel` / `Icon` / `StoryStages`](../../src/SpecScribe/StatusStyles.cs:34,49,180,185) — the badge renderer + stage words + canonical stage order the pairing and the delivery sentence build on. (If 8.2 landed: `StatusStyles.StageMeaning` for the column tooltips.)
   - [`HtmlRenderAdapter.TaskBadge`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:253-264) — the existing task-completion badge to group beside the status badge (keep as-is).
   - [`Charts.EpicMosaic` / `DeliverySegments` / `Donut` / `Plural`](../../src/SpecScribe/Charts.cs:440,472,48) — the epic delivery ring + segment builder + the `Donut(ariaLabel:)` parameter to populate; `Plural` for singular/plural agreement.
   - [`Charts.AppendNoPlanArc` / `.sb-noplan`](../../src/SpecScribe/Charts.cs:269-279) + [specscribe.css](../../src/SpecScribe/assets/specscribe.css) — the established dashed "no plan yet" treatment to mirror for Surface D.
@@ -139,7 +139,7 @@ Relevant invariants [Source: [ARCHITECTURE-SPINE.md](../specs/spec-specscribe/AR
 - [`src/SpecScribe/Charts.cs`](../../src/SpecScribe/Charts.cs) — **Surface B:** add the `DeliverySentence(...)` helper; in `EpicMosaic` ([:440-467](../../src/SpecScribe/Charts.cs:440)) pass it to the `Donut` `ariaLabel` and render the visible restatement in `.epic-mosaic-label`. **Preserve** the ring, the delivery segments, and the "N/N stories detailed" sub-label decision.
 - [`src/SpecScribe/SprintTemplater.cs`](../../src/SpecScribe/SprintTemplater.cs) — **Surface C:** `.sprint-lane-head` gains `js-tip` + `data-tip` + `tabindex="0"` in `RenderBoard` ([:119](../../src/SpecScribe/SprintTemplater.cs:119)); add the column-meaning helper. **Surface D:** `AppendBoardCard` ([:257-286](../../src/SpecScribe/SprintTemplater.cs:257)) adds the `no-plan` class when `story is null || story.TasksTotal == 0`.
 - [`src/SpecScribe/assets/specscribe.css`](../../src/SpecScribe/assets/specscribe.css) — add `.story-status-pair` (flex gap + `·` separator, via `::after` or an inline dot span) near `.status-badge.task-badge` ([:1151-1160](../../src/SpecScribe/assets/specscribe.css:1151)); add `.sprint-card.no-plan` (dashed border + muted fill) near `.sprint-card-progress` ([:2996-3001](../../src/SpecScribe/assets/specscribe.css:2996)); any lane-head `js-tip` cursor affordance near `.sprint-lane-head` ([:3019-3050](../../src/SpecScribe/assets/specscribe.css:3019)); the epic-mosaic delivery-sentence line near the mosaic styles. Route colors through `--status-*` / existing neutrals. **`StylesheetTests` asserts on stylesheet content — add companion assertions for any new class.**
-- [`src/SpecScribe/StatusStyles.cs`](../../src/SpecScribe/StatusStyles.cs) — **only if** the delivery-sentence or column-meaning logic reads best as a `StatusStyles` method (vs. `Charts`/`SprintTemplater`). If 8.1's `StageMeaning` isn't landed and you add a local column-meaning map, prefer a private helper in `SprintTemplater` with the `// TODO(8.1)` marker (don't pre-empt 8.1's public seam).
+- [`src/SpecScribe/StatusStyles.cs`](../../src/SpecScribe/StatusStyles.cs) — **only if** the delivery-sentence or column-meaning logic reads best as a `StatusStyles` method (vs. `Charts`/`SprintTemplater`). If 8.2's `StageMeaning` isn't landed and you add a local column-meaning map, prefer a private helper in `SprintTemplater` with the `// TODO(8.2)` marker (don't pre-empt 8.2's public seam).
 
 **Tests to update / add:**
 
@@ -173,9 +173,9 @@ Cover explicitly:
 
 ## Previous Story Intelligence
 
-**Story 8.1 (Canonical Status Model — `ready-for-dev`, sibling)** locks the status words/colors (`StatusStyles`) this story pairs and adds the `StageMeaning` seam + per-badge tooltips + status legend. Coordinate the `StageMeaning` reuse (column tooltips) and tolerate a possible `"unrecognized"` stage. Whichever lands second reconciles the meaning-source. [Source: [8-1-canonical-status-model-with-portal-wide-legend.md](8-1-canonical-status-model-with-portal-wide-legend.md)]
+**Story 8.2 (Canonical Status Model — `ready-for-dev`, sibling)** locks the status words/colors (`StatusStyles`) this story pairs and adds the `StageMeaning` seam + per-badge tooltips + status legend. Coordinate the `StageMeaning` reuse (column tooltips) and tolerate a possible `"unrecognized"` stage. Whichever lands second reconciles the meaning-source. [Source: [8-2-canonical-status-model-with-portal-wide-legend.md](8-2-canonical-status-model-with-portal-wide-legend.md)]
 
-**Story 8.2 (Single Source of Truth for Every Count — `ready-for-dev`, sibling)** centralizes the four count families but scopes OUT per-epic tallies — so Surface B reads `EpicProgress.StoryStatusCounts` directly (as the mosaic already does), not the ledger. No overlap on data. [Source: [8-2-single-source-of-truth-for-every-count.md](8-2-single-source-of-truth-for-every-count.md)]
+**Story 8.3 (Single Source of Truth for Every Count — `ready-for-dev`, sibling)** centralizes the four count families but scopes OUT per-epic tallies — so Surface B reads `EpicProgress.StoryStatusCounts` directly (as the mosaic already does), not the ledger. No overlap on data. [Source: [8-3-single-source-of-truth-for-every-count.md](8-3-single-source-of-truth-for-every-count.md)]
 
 **Story 6.2 (Section View Models — `review`)** decomposed the epics/dashboard bodies into builder→adapter section view models with a byte-parity + `RenderParity.SectionFacts` harness. Surfaces A/B are adapter render changes over unchanged view-model DATA — keep the split; don't push arrangement logic back into the builder. [Source: [[story-6-2-section-view-models-live]]]
 
@@ -187,13 +187,13 @@ Cover explicitly:
 
 - **Truthfulness over convenience** — pair the two true facts; never suppress one to remove the apparent contradiction. [Source: [`StatusStyles.cs:3-5`](../../src/SpecScribe/StatusStyles.cs)]
 - **Elicit visual intent up front** (Epic 3 retro, open action) — the two new visual surfaces (badge pairing, no-plan treatment) were offered as named directions and the owner picked *grouped-pair-with-separator* and *dashed/muted card*; the dev builds those, not a re-invented silhouette. [memory: [[create-story-elicit-visual-intent]]]
-- **Split, don't absorb** — if pairing tempts you into building 9.4's evidence strip or 8.5's empty-state banner, stop: those are separate stories. [Source: Epic 2/3 retros]
+- **Split, don't absorb** — if pairing tempts you into building 9.4's evidence strip or 8.6's empty-state banner, stop: those are separate stories. [Source: Epic 2/3 retros]
 
 ---
 
 ## Git Intelligence Summary
 
-Recent history is planning/retro churn on `main` (`Review`; `6.2, planning 6.3/6.4`; `Addressed UX issues and future planning`; `Epic 4 Retro`) — no in-flight code touches `HtmlRenderAdapter.Epics`, `SprintTemplater`, `Charts.EpicMosaic`, or `StatusStyles`, so this change is additive and uncontended against its siblings 8.1/8.2 (which touch adjacent seams, not the same lines). **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
+Recent history is planning/retro churn on `main` (`Review`; `6.2, planning 6.3/6.4`; `Addressed UX issues and future planning`; `Epic 4 Retro`) — no in-flight code touches `HtmlRenderAdapter.Epics`, `SprintTemplater`, `Charts.EpicMosaic`, or `StatusStyles`, so this change is additive and uncontended against its siblings 8.2/8.3 (which touch adjacent seams, not the same lines). **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
 
 ---
 
@@ -206,7 +206,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 ## Project Context Reference
 
 - Epic 8 goal + FR/UX-DR/NFR coverage: [Source: [epics.md:1084-1088](../planning-artifacts/epics.md:1084)]
-- Story 8.3 user story + both ACs: [Source: [epics.md:1136-1154](../planning-artifacts/epics.md:1136)]
+- Story 8.4 user story + both ACs: [Source: [epics.md:1136-1154](../planning-artifacts/epics.md:1136)]
 - UX-DR23 (progress + state always paired; dual-count epic badges restated as sentences): [Source: [epics.md:135](../planning-artifacts/epics.md:135)]
 - UX-DR24 (readiness self-explanatory: column tooltips distinguish backlog vs ready; no-plan stories visually separated): [Source: [epics.md:136](../planning-artifacts/epics.md:136)]
 - The concrete UX-review findings this story fixes (progress clash, epic dual-count, backlog-vs-ready): [Source: [docs/Epic3UXFeedback.md:70,78,83](../../docs/Epic3UXFeedback.md); [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md)]
@@ -224,7 +224,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
   - [ ] Add `Charts.DeliverySentence(counts)` → ordered plain sentence over `StatusStyles.StoryStages` ("6 of 7 done, 1 in review"; total = Σ segments; zero stages omitted; `StoryLabel` + `Plural`).
   - [ ] In `Charts.EpicMosaic`, pass the sentence as the mosaic donut `ariaLabel` (ring becomes `role="img"`) and render it as a visible line in `.epic-mosaic-label`; keep/fold the "N/N stories detailed" sub-label and note the choice.
 - [ ] **Task 3 — Surface C: column-header meaning tooltips (AC: #2)**
-  - [ ] In `SprintTemplater.RenderBoard`, add `js-tip` + escaped `data-tip` + `tabindex="0"` to each `.sprint-lane-head`; Backlog and Ready carry the distinguishing strings. Source meanings from 8.1's `StageMeaning` if landed, else a local helper + `// TODO(8.1)` marker (record choice in Completion Notes).
+  - [ ] In `SprintTemplater.RenderBoard`, add `js-tip` + escaped `data-tip` + `tabindex="0"` to each `.sprint-lane-head`; Backlog and Ready carry the distinguishing strings. Source meanings from 8.2's `StageMeaning` if landed, else a local helper + `// TODO(8.2)` marker (record choice in Completion Notes).
   - [ ] Add any lane-head `js-tip` cursor affordance CSS.
 - [ ] **Task 4 — Surface D: dashed/muted no-plan cards (AC: #2)**
   - [ ] In `AppendBoardCard`, add `no-plan` to `.sprint-card` when `story is null || story.TasksTotal == 0`. Add `.sprint-card.no-plan` CSS (dashed border + muted fill) mirroring `.sb-noplan`. No visible per-card text (tooltip already says "No task plan yet").
@@ -236,11 +236,11 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Dev Notes
 
-- **The sharp edge is scope, not difficulty.** Every surface is a small string/CSS change, but two adjacent temptations belong to other stories: the story-*page* evidence strip is **9.4**, and the "no task plan yet" *consolidation banner* is **8.5**. 8.3 pairs what's already shown, restates one count as a sentence, adds four tooltips, and dashes the no-plan cards — nothing more.
-- **Byte parity moves on purpose.** Unlike 8.2 (which may be byte-identical if inputs agree), 8.3 deliberately changes rendered HTML on the epic page, the mosaic, and the sprint board. Expect a golden-fingerprint regen and verify the diff is exactly the four intended surfaces. [memory: [[golden-diff-normalization-gotchas]]]
+- **The sharp edge is scope, not difficulty.** Every surface is a small string/CSS change, but two adjacent temptations belong to other stories: the story-*page* evidence strip is **9.4**, and the "no task plan yet" *consolidation banner* is **8.6**. 8.4 pairs what's already shown, restates one count as a sentence, adds four tooltips, and dashes the no-plan cards — nothing more.
+- **Byte parity moves on purpose.** Unlike 8.3 (which may be byte-identical if inputs agree), 8.4 deliberately changes rendered HTML on the epic page, the mosaic, and the sprint board. Expect a golden-fingerprint regen and verify the diff is exactly the four intended surfaces. [memory: [[golden-diff-normalization-gotchas]]]
 - **Section facts vs. bytes.** The `RenderParity.SectionFacts` harness checks meaning (id/status/task tally), which is unchanged; the byte harness/golden fingerprint checks HTML, which changes. Both must end green — facts unchanged, fingerprint regenerated. [memory: [[story-6-2-section-view-models-live]]]
-- **Coordinate the meaning-source with 8.1.** If 8.1's `StageMeaning` is in the tree, use it for the column tooltips; if not, keep a local helper with a `// TODO(8.1)` marker so 8.1 folds it in — never two parallel stage→meaning maps.
-- **Scope guard for later 8.x/9.x:** state-aware next-steps (8.4), empty states (8.5), one-view-per-dataset (8.6), recency (8.7), and the verification evidence strip (9.4) all sit near these surfaces but are NOT this story. 8.3 makes progress+state read as one fact and makes readiness self-explaining.
+- **Coordinate the meaning-source with 8.2.** If 8.2's `StageMeaning` is in the tree, use it for the column tooltips; if not, keep a local helper with a `// TODO(8.2)` marker so 8.2 folds it in — never two parallel stage→meaning maps.
+- **Scope guard for later 8.x/9.x:** state-aware next-steps (8.5), empty states (8.6), one-view-per-dataset (8.7), recency (8.8), and the verification evidence strip (9.4) all sit near these surfaces but are NOT this story. 8.4 makes progress+state read as one fact and makes readiness self-explaining.
 
 ### Project Structure Notes
 
@@ -249,7 +249,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ### References
 
-- [Source: [epics.md:1136-1154](../planning-artifacts/epics.md:1136)] — Story 8.3 user story + both ACs.
+- [Source: [epics.md:1136-1154](../planning-artifacts/epics.md:1136)] — Story 8.4 user story + both ACs.
 - [Source: [epics.md:1084-1088](../planning-artifacts/epics.md:1084), [epics.md:135-136](../planning-artifacts/epics.md:135)] — Epic 8 goal; UX-DR23; UX-DR24.
 - [Source: [docs/Epic3UXFeedback.md:70,78,83](../../docs/Epic3UXFeedback.md)] — the three UX-review findings (progress clash, epic dual-count, backlog-vs-ready) this story fixes.
 - [Source: [HtmlRenderAdapter.Epics.cs:211-264](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs:211)] — `AppendStoryCard` + `TaskBadge` (Surface A).
@@ -259,7 +259,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 - [Source: [assets/specscribe.css:1151-1160,2996-3001,3019-3050](../../src/SpecScribe/assets/specscribe.css:1151)] — `.task-badge`, `.sprint-card-progress`, `.sprint-lane-head` (styling seams).
 - [Source: [assets/specscribe.js](../../src/SpecScribe/assets/specscribe.js)] — the `.ss-tooltip`/`js-tip`/`data-tip` node (no JS change).
 - [Source: [EpicsView.cs:12-55](../../src/SpecScribe/EpicsView.cs)] — `StoryCardView` (StatusStage/Status/TasksDone/TasksTotal — the data Surface A pairs).
-- [Source: [8-1-canonical-status-model-with-portal-wide-legend.md](8-1-canonical-status-model-with-portal-wide-legend.md), [8-2-single-source-of-truth-for-every-count.md](8-2-single-source-of-truth-for-every-count.md)] — sibling coordination (StageMeaning; per-epic tally scoped out of the ledger).
+- [Source: [8-2-canonical-status-model-with-portal-wide-legend.md](8-2-canonical-status-model-with-portal-wide-legend.md), [8-3-single-source-of-truth-for-every-count.md](8-3-single-source-of-truth-for-every-count.md)] — sibling coordination (StageMeaning; per-epic tally scoped out of the ledger).
 - [Source: [ARCHITECTURE-SPINE.md](../specs/spec-specscribe/ARCHITECTURE-SPINE.md), [rendering-architecture.md](../specs/spec-specscribe/rendering-architecture.md)] — single-source, truthfulness, accessibility, deterministic, seed-not-invariant.
 - [Source: [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md)] — the UX review that seeded Epics 8–10.
 

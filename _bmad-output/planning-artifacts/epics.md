@@ -19,7 +19,7 @@ inputDocuments:
   - docs/Epic3UXFeedback.md
   - docs/UserJourneys.md
 ---
-<!-- 2026-07-09 extension run: FR20–FR31, NFR8, UX-DR21–UX-DR30 extracted from the site-wide UX review; Epics 8–10 with Stories 8.1–8.7, 9.1–9.6, 10.1–10.6 created; final validation in progress. -->
+<!-- 2026-07-09 extension run: FR20–FR31, NFR8, UX-DR21–UX-DR30 extracted from the site-wide UX review; Epics 8–10 with Stories 8.2–8.8, 9.1–9.6, 10.1–10.6 created; final validation in progress. -->
 
 # SpecScribe - Epic Breakdown
 
@@ -276,7 +276,7 @@ Extend first-class BMad support beyond the BMM core to BMad's own module and exp
 
 <!-- 2026-07-11: Story 5.4 (OSS onboarding/reference docs) removed from Epic 5 and folded into Epic 16 Story 16.6; FR18 coverage moved Epic 5 → Epic 16. -->
 
-<!-- 2026-07-11: Epic 6 native-integration Stories 6.8–6.12 seated from docs/VSCodeIntegrationRecommendations.md (FR35); existing Stories 5.2/7.1/7.2/8.4/16.5/6.7 annotated with the recommendation IDs they own. -->
+<!-- 2026-07-11: Epic 6 native-integration Stories 6.8–6.12 seated from docs/VSCodeIntegrationRecommendations.md (FR35); existing Stories 5.2/7.1/7.2/8.5/16.5/6.7 annotated with the recommendation IDs they own. -->
 
 <!-- 2026-07-11: Delivery run order (numbers are stable IDs, not execution order) — feature work (Epics 1–4, 6–15) and exploratory Epic 18 → Epic 5 (CLI) → Epic 17 (hardening) → Epic 16 (publication). See the Overview delivery-sequence note; sprint-status.yaml is the operational truth. -->
 
@@ -850,7 +850,7 @@ Expose the same shared projection in a read-only VS Code webview for in-editor v
      Native-Integration Recommendations (docs/VSCodeIntegrationRecommendations.md, R1–R8). Stories 6.1–6.7
      unchanged. The two Epic 6 invariants hold throughout: rendering stays in C#, the extension stays
      read-only (ADR 0005 AD-1/AD-2, ADR 0003 AD-6). Several recommendations seat in OTHER stories they
-     belong to (annotated in place): R5.3→5.2, R4.2→7.1/7.2, R4.3→8.4, R1.4/R1.6/R8.1→16.5, R8.2→6.7. -->
+     belong to (annotated in place): R5.3→5.2, R4.2→7.1/7.2, R4.3→8.5, R1.4/R1.6/R8.2→16.5, R8.3→6.7. -->
 
 ### Story 6.1: Shared View-Model Contract for HTML and Webview Adapters
 
@@ -1028,7 +1028,7 @@ So that we either commit to the pivot with evidence (and re-plan Epics 6/16) or 
 
 ### Story 6.7: JSON + Client-Renderer (SPA) Delivery Adapter
 
-<!-- 2026-07-11 (SCP 2026-07-11, correct-course) — carries VS Code recommendation R8.2: keep the WebviewBundle
+<!-- 2026-07-11 (SCP 2026-07-11, correct-course) — carries VS Code recommendation R8.3: keep the WebviewBundle
      payload shape compatible with this story's JSON data-layer schema, so the webview can OPTIONALLY consume
      committed/CI-generated JSON for instant first paint (with the live spawn refreshing behind it). Design note
      only — a JSON-only consumer cannot regenerate, so the binary remains the live path (the ADR 0006 trade-off). -->
@@ -1140,8 +1140,8 @@ So that I can glance at epic/story status and jump to any surface without openin
 ### Story 6.10: Editor ↔ Artifact Bridges (Reveal-Source)
 
 <!-- Seats R4.1 (reveal-source from the webview → showTextDocument). Also establishes the structured-link
-     seam that R4.2 (Epic 7 code citations → showTextDocument at a line) and R4.3 (Story 8.4 next-step
-     command → terminal handoff) plug into — those two implement in their owning stories (7.1/7.2, 8.4),
+     seam that R4.2 (Epic 7 code citations → showTextDocument at a line) and R4.3 (Story 8.5 next-step
+     command → terminal handoff) plug into — those two implement in their owning stories (7.1/7.2, 8.5),
      annotated there. Read-only: opens editors, changes nothing. -->
 
 As a VS Code user,
@@ -1157,10 +1157,10 @@ So that the portal and my files feel like one thing rather than two disconnected
 **And** the path resolution reuses the core-resolved roots (no duplicated path assumptions).
 
 2.
-**Given** future code-citation (Epic 7) and next-step-command (Story 8.4) surfaces
+**Given** future code-citation (Epic 7) and next-step-command (Story 8.5) surfaces
 **When** those surfaces emit links
 **Then** the core emits them with structured data attributes (e.g. `data-code-path`/`data-line`, or command text) so the VS Code host can re-target them natively (editor at a line; command staged in a terminal), while the HTML surface keeps its portal/GitHub links
-**And** the re-targeting behavior itself is implemented in the owning stories (7.1/7.2, 8.4), this story only guarantees the seam exists.
+**And** the re-targeting behavior itself is implemented in the owning stories (7.1/7.2, 8.5), this story only guarantees the seam exists.
 
 ### Story 6.11: File-Change Reactivity Hardening
 
@@ -1191,7 +1191,7 @@ So that the panel never silently shows stale sprint or config data.
 
 ### Story 6.12: Native Diagnostics — Problems Panel Integration
 
-<!-- Seats R8.3 (map the per-artifact generation errors the `specscribe webview` command already streams on
+<!-- Seats R8.4 (map the per-artifact generation errors the `specscribe webview` command already streams on
      stderr into VS Code Diagnostics on the offending files). Depends on Story 4.8's diagnostics work for the
      core-owned structured (JSON-lines: path/message/severity) format; rides with or after 4.8. Pure data
      transport — arguably the most "native" integration in the recommendations. -->
@@ -1422,7 +1422,36 @@ Give the Driver an accurate 30-second pulse and a friction-free path to the next
 
 **FRs covered:** FR20, FR21, FR25, FR31 · **UX-DRs:** UX-DR21, UX-DR22, UX-DR23, UX-DR24 · **NFRs:** NFR8
 
-### Story 8.1: Canonical Status Model with Portal-Wide Legend
+<!-- 2026-07-14 (epic-7 retrospective, correct-course): Story 8.1 inserted per Epic 6 Retrospective Action
+     Item #3 (every net-new epic verifies cross-surface reach before dev starts). Stories 8.1-8.7 were already
+     drafted with none started, so this was the last clean window - same pattern as Stories 6.3/6.6. Renumbered
+     8.1-8.7 -> 8.2-8.8 in the same change (sprint-status.yaml and story files updated together). -->
+
+### Story 8.1: Integration Spike — Cross-Surface Status Verification
+
+As the SpecScribe maintainer,
+I want a quick hands-on check that Epic 8's canonical status vocabulary, counts, and next-step commands can actually reach every live surface — HTML/web, the VS Code extension + webview, and the CLI console summary — before any of Epic 8's seven stories start,
+So that a rework doesn't surface mid-epic the way Epic 6's webview/theming work would have without its own spikes (6.3, 6.6).
+
+**Acceptance Criteria:**
+
+1.
+**Given** the current `StatusStyles`/`--status-*` token system, the shared view-model contract (Story 6.1), and the webview/SPA render adapters (Stories 6.4, 6.7)
+**When** a status word, count, or badge is projected today
+**Then** this spike confirms (by tracing actual code, not assumption) that all three live surfaces — `HtmlRenderAdapter`, `WebviewRenderAdapter`, and the CLI's `ConsoleUi` summary — read from the same single source, and names any surface that does not.
+
+2.
+**Given** Epic 8's planned additions (a status legend affordance, a single count source, paired progress/readiness, state-aware next-step commands, empty states, one primary view per dataset, recency signals)
+**When** each is mapped against the three live surfaces
+**Then** the spike records, per surface, whether the addition is expected to reach it automatically (because it rides the shared `HtmlRenderAdapter.RenderStoryBody`/view-model path), needs surface-specific work, or is HTML-only by design (and why)
+**And** any surface gap found is fed into the owning story's Dev Notes before that story starts.
+
+3.
+**Given** the spike's findings
+**When** it concludes
+**Then** no production code changes land from this story — it is a tracing/verification pass, not a build — and its output is a short findings note appended to this story's Completion Notes (no new ADR required unless a surface gap forces an architectural choice).
+
+### Story 8.2: Canonical Status Model with Portal-Wide Legend
 
 As a maintainer scanning any page,
 I want every status badge to use one canonical vocabulary per entity type,
@@ -1448,7 +1477,7 @@ So that I never have to mentally map between competing status words.
 **Then** the entity renders in a visible "unrecognized" state rather than being silently mislabeled
 **And** generation completes with a non-fatal notice.
 
-### Story 8.2: Single Source of Truth for Every Count
+### Story 8.3: Single Source of Truth for Every Count
 
 As a maintainer doing the daily pulse,
 I want all summary counts derived from one generator-side source,
@@ -1468,7 +1497,7 @@ So that summary widgets and detail views can never disagree.
 **Then** the count on the card matches what the detail page shows
 **And** the historical 38-vs-39 story-count class of clash is structurally impossible.
 
-### Story 8.3: Paired Progress and Readiness Semantics
+### Story 8.4: Paired Progress and Readiness Semantics
 
 As a maintainer,
 I want task progress and workflow state always shown together,
@@ -1488,7 +1517,7 @@ So that "5/5 tasks done" while in review reads as one coherent fact, not a contr
 **Then** a tooltip distinguishes them (for example "Ready = task plan exists and dependencies met")
 **And** stories lacking task plans are visually separated from actionable ones.
 
-### Story 8.4: State-Aware Next-Step Command Surface
+### Story 8.5: State-Aware Next-Step Command Surface
 
 <!-- 2026-07-11 (SCP 2026-07-11, correct-course) — carries VS Code recommendation R4.3: in the webview, pair the
      existing copy-command helper with "Open in Terminal" (createTerminal + sendText(command, execute:false) — the
@@ -1519,7 +1548,7 @@ So that I copy the right command without hunting.
 **When** this story is implemented
 **Then** it audits and extends that shipped behavior rather than duplicating it.
 
-### Story 8.5: Designed Empty States
+### Story 8.6: Designed Empty States
 
 As a stakeholder viewing a shared portal,
 I want empty sections to read as intentional guidance,
@@ -1539,7 +1568,7 @@ So that zero-counts and repeated CLI hints do not read as errors or clutter.
 **Then** the column shows intentional guidance copy (for example "Nothing in progress — pick from Ready")
 **And** empty states are visually styled as designed states, not bare zero-counts.
 
-### Story 8.6: One Primary View per Dashboard Dataset
+### Story 8.7: One Primary View per Dashboard Dataset
 
 As a maintainer doing a 30-second scan,
 I want each dataset shown one primary way with alternates demoted behind a toggle,
@@ -1559,7 +1588,7 @@ So that I never reconcile multiple renderings of the same data.
 **Then** the text-twin table is never removed (accessibility contract per Story 3.7)
 **And** duplicated story-count displays across a page are consolidated to one.
 
-### Story 8.7: Generation-Time Recency Signals
+### Story 8.8: Generation-Time Recency Signals
 
 As a maintainer returning to the portal,
 I want "last updated" markers on dashboard widgets and story cards,
@@ -1617,7 +1646,7 @@ So that non-functional obligations are not second-class.
 **Given** the epics page shows an FR coverage map
 **When** the page renders
 **Then** parallel (or combined) coverage maps exist for NFRs and UX-DRs
-**And** they use the same canonical status vocabulary as Story 8.1.
+**And** they use the same canonical status vocabulary as Story 8.2.
 
 2.
 **Given** an NFR with no per-story implementation state
@@ -2179,7 +2208,7 @@ So that releases are one action and never depend on a local machine's state.
 <!-- 2026-07-11 (SCP 2026-07-11, correct-course) — owns VS Code recommendations R1.4 (contributes.walkthroughs
      first-run onboarding — the single best Marketplace-launch onboarding lever), R1.6 (Marketplace metadata
      polish: real categories, keywords, icon, repository, README with screenshots — already implied by AC #1),
-     and R8.1 (platform-specific VSIX targets: `vsce package --target win32-x64` etc. so the Marketplace serves
+     and R8.2 (platform-specific VSIX targets: `vsce package --target win32-x64` etc. so the Marketplace serves
      each user only their platform's build, turning ADR 0005's ~73 MB-per-RID from a multiplied download into a
      single-RID one). PREREQUISITE: the Workspace-Trust posture (R5.4) in Story 6.8 must be in place before this
      publish — it is a Marketplace review-bar item. -->

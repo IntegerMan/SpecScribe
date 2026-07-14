@@ -1,4 +1,4 @@
-# Story 8.4: State-Aware Next-Step Command Surface
+# Story 8.5: State-Aware Next-Step Command Surface
 
 Status: ready-for-dev
 
@@ -16,24 +16,24 @@ so that I copy the right command without hunting.
 **Given** a story in any lifecycle state
 **When** its next-step commands render
 **Then** exactly one primary recommended command shows, plus applicable alternate/unhappy-path actions (for example correct-course mid-sprint, retro on done)
-**And** commands inapplicable to the state never render — a done story no longer surfaces code-review as the next step. [Source: epics.md#Story 8.4; UX-DR22]
+**And** commands inapplicable to the state never render — a done story no longer surfaces code-review as the next step. [Source: epics.md#Story 8.5; UX-DR22]
 
 2.
 **Given** the command surface is adapter-supplied data (NFR8)
 **When** a framework lacks a command workflow
 **Then** the next-step section degrades to absent rather than showing wrong or empty commands
-**And** each surfaced command carries a one-line caption explaining what it does. [Source: epics.md#Story 8.4; NFR8]
+**And** each surfaced command carries a one-line caption explaining what it does. [Source: epics.md#Story 8.5; NFR8]
 
 3.
 **Given** existing next-steps specs (spec-hide-code-review-button-ready-for-dev, spec-story-next-steps-review-command, spec-home-next-steps-label-and-code-review)
 **When** this story is implemented
-**Then** it audits and extends that shipped behavior rather than duplicating it. [Source: epics.md#Story 8.4]
+**Then** it audits and extends that shipped behavior rather than duplicating it. [Source: epics.md#Story 8.5]
 
 ---
 
 ## Developer Context
 
-**This is a presentation + command-routing story, not a new page or a data-model change.** The "Next Steps" panels already exist, are already state-aware, and already degrade when a command isn't installed. Story 8.4 does three things on top of that shipped foundation:
+**This is a presentation + command-routing story, not a new page or a data-model change.** The "Next Steps" panels already exist, are already state-aware, and already degrade when a command isn't installed. Story 8.5 does three things on top of that shipped foundation:
 
 1. **Adds a visual hierarchy** — today every suggestion in a panel renders as an equal-weight `<li>`. This story makes exactly **one** command the emphasized *primary* and demotes the rest into a labeled *Other actions* group (AC #1).
 2. **Adds the missing unhappy-path actions** — chiefly `correct-course` mid-sprint, and a muted "whoops, this is broken" escape hatch on the celebratory done panel (AC #1's "for example correct-course mid-sprint, retro on done").
@@ -45,7 +45,7 @@ It is a direct fix for a live UX-review finding graded against journeys 1–2 (t
 
 > The Next Steps panel lists several commands at equal weight, so a reader must reason about which one actually applies to the current state — and mid-sprint recovery moves (correct-course) aren't offered at all. Surface **one** recommended command per state, demote the rest, and add the unhappy-path actions. [Source: [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md); UX-DR22]
 
-It sits alongside its Epic 8 siblings but touches a **different seam** than any of them: **8.1** owns status *words/colors* + the status legend (`StatusStyles`); **8.2** owns *counts* (`ProjectCounts`); **8.3** owns progress+state *pairing* (badges) + sprint-board tooltips. 8.4 owns the **command surface** (`BmadCommands`). No file overlap with 8.1/8.2/8.3 — this change is uncontended against them.
+It sits alongside its Epic 8 siblings but touches a **different seam** than any of them: **8.2** owns status *words/colors* + the status legend (`StatusStyles`); **8.3** owns *counts* (`ProjectCounts`); **8.4** owns progress+state *pairing* (badges) + sprint-board tooltips. 8.5 owns the **command surface** (`BmadCommands`). No file overlap with 8.2/8.3/8.4 — this change is uncontended against them.
 
 ### Owner-selected design decisions (visual intent elicited at create-story — do not re-litigate)
 
@@ -96,8 +96,8 @@ Record in Completion Notes, per spec, that each behavior was audited and preserv
 
 ### Scope boundaries (read carefully)
 
-- **Do NOT change any status word, color, or the six lifecycle colors.** That's 8.1. You route commands and add emphasis styling through existing `--status-*` tokens/neutrals; you never reclassify a status. [memory: [[specscribe-status-token-system]]]
-- **Do NOT recompute or restate any count.** That's 8.2/8.3. This story emits commands + captions only.
+- **Do NOT change any status word, color, or the six lifecycle colors.** That's 8.2. You route commands and add emphasis styling through existing `--status-*` tokens/neutrals; you never reclassify a status. [memory: [[specscribe-status-token-system]]]
+- **Do NOT recompute or restate any count.** That's 8.3/8.4. This story emits commands + captions only.
 - **Do NOT re-introduce `create-story`/`retrospective` to the story panel** ([spec-story-next-steps-review-command] removed them on purpose) and **do NOT add code-review to the `ready` branch** ([spec-hide-code-review-button-ready-for-dev]).
 - **Do NOT change the `Next Steps` heading** ([spec-home-next-steps-label-and-code-review]).
 - **Do NOT use the `<details>` disclosure (`RenderCommandMenu`) for the alternates** — the owner picked the always-visible demoted group (decision 1).
@@ -203,9 +203,9 @@ Cover explicitly:
 
 ## Previous Story Intelligence
 
-**Story 8.3 (Paired Progress & Readiness — `ready-for-dev`, sibling)** pairs badges + adds sprint-board column tooltips in `HtmlRenderAdapter.Epics`/`SprintTemplater`/`Charts` — a **different seam** than 8.4's `BmadCommands`. No overlap. It reaffirms the same disciplines: truthfulness over convenience, route colors through `--status-*` tokens, byte parity moves on purpose (regenerate the golden fingerprint), section FACTS stay green. [Source: [8-3-paired-progress-and-readiness-semantics.md](8-3-paired-progress-and-readiness-semantics.md)]
+**Story 8.4 (Paired Progress & Readiness — `ready-for-dev`, sibling)** pairs badges + adds sprint-board column tooltips in `HtmlRenderAdapter.Epics`/`SprintTemplater`/`Charts` — a **different seam** than 8.5's `BmadCommands`. No overlap. It reaffirms the same disciplines: truthfulness over convenience, route colors through `--status-*` tokens, byte parity moves on purpose (regenerate the golden fingerprint), section FACTS stay green. [Source: [8-4-paired-progress-and-readiness-semantics.md](8-4-paired-progress-and-readiness-semantics.md)]
 
-**Story 8.1 (Canonical Status Model — `ready-for-dev`, sibling)** owns status words/colors + the status legend + a possible `"unrecognized"` stage. 8.4 reads `StatusStyles.ForStory` but never changes a status word; if 8.1 adds an `"unrecognized"` stage, `ForStory`'s status branches already fall through to the no-plan/create-story path, which is safe. [Source: [8-1-canonical-status-model-with-portal-wide-legend.md](8-1-canonical-status-model-with-portal-wide-legend.md)]
+**Story 8.2 (Canonical Status Model — `ready-for-dev`, sibling)** owns status words/colors + the status legend + a possible `"unrecognized"` stage. 8.5 reads `StatusStyles.ForStory` but never changes a status word; if 8.2 adds an `"unrecognized"` stage, `ForStory`'s status branches already fall through to the no-plan/create-story path, which is safe. [Source: [8-2-canonical-status-model-with-portal-wide-legend.md](8-2-canonical-status-model-with-portal-wide-legend.md)]
 
 **Story 6.2 (Section View Models — `review`)** established that `NextStepsHtml` is a **named opaque fragment** built in `EpicsViewBuilder` and carried through the view model — so a change to the command renderer needs no view-model or adapter change and doesn't move section FACTS. [Source: [[story-6-2-section-view-models-live]]]
 
@@ -218,13 +218,13 @@ Cover explicitly:
 **Recurring lessons that apply here:**
 
 - **Elicit visual intent up front** (Epic 3 retro, open action) — the new visual surface (primary/alternate hierarchy + the done escape hatch) was offered as named directions and the owner picked *hero-primary + quiet always-visible alternates* and *celebratory-done + muted secondary escape hatch*. Build those, not a re-invented silhouette (e.g. a `<details>` popout). [memory: [[create-story-elicit-visual-intent]]]
-- **Split, don't absorb** — if this tempts you into 8.5's empty-state banners or restyling badges (8.1/8.3), stop; 8.4 is the command surface only. [Source: Epic 2/3 retros]
+- **Split, don't absorb** — if this tempts you into 8.6's empty-state banners or restyling badges (8.2/8.4), stop; 8.5 is the command surface only. [Source: Epic 2/3 retros]
 
 ---
 
 ## Git Intelligence Summary
 
-Recent history is planning/spike/merge churn on `main` (`Merge branch 'spike/vscode-6-3'`, `Planning and spikes`, `Review`) — no in-flight code touches `BmadCommands.cs` or the `.next-steps*` CSS, so this change is additive and uncontended against siblings 8.1/8.2/8.3 (they touch `StatusStyles`/`ProjectCounts`/`HtmlRenderAdapter.Epics`+`SprintTemplater`, not `BmadCommands`). **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
+Recent history is planning/spike/merge churn on `main` (`Merge branch 'spike/vscode-6-3'`, `Planning and spikes`, `Review`) — no in-flight code touches `BmadCommands.cs` or the `.next-steps*` CSS, so this change is additive and uncontended against siblings 8.2/8.3/8.4 (they touch `StatusStyles`/`ProjectCounts`/`HtmlRenderAdapter.Epics`+`SprintTemplater`, not `BmadCommands`). **Heed the worktree rule:** if this runs in a worktree, edit files at the **worktree path** — `main` has a background auto-committer, so never re-root paths at `C:\Dev\SpecScribe`. [memory: [[worktree-edits-must-target-worktree-path]]]
 
 ---
 
@@ -237,7 +237,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 ## Project Context Reference
 
 - Epic 8 goal + FR/UX-DR/NFR coverage: [Source: [epics.md:1134-1138](../planning-artifacts/epics.md:1134)]
-- Story 8.4 user story + all three ACs: [Source: [epics.md:1206-1229](../planning-artifacts/epics.md:1206)]
+- Story 8.5 user story + all three ACs: [Source: [epics.md:1206-1229](../planning-artifacts/epics.md:1206)]
 - UX-DR22 (state-aware next-step commands: one primary per state + unhappy-path actions), NFR8 (framework-agnostic, adapter-supplied command surface): [Source: [epics.md](../planning-artifacts/epics.md)]
 - The three shipped next-steps specs this story audits + extends: [Source: [spec-hide-code-review-button-ready-for-dev.md](spec-hide-code-review-button-ready-for-dev.md); [spec-story-next-steps-review-command.md](spec-story-next-steps-review-command.md); [spec-home-next-steps-label-and-code-review.md](spec-home-next-steps-label-and-code-review.md)]
 - The UX review that seeded Epics 8–10: [Source: [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md)]
@@ -268,10 +268,10 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 - **The sharp edge is scope + fidelity, not difficulty.** Every change is a small string/CSS edit in one file, but three shipped specs constrain it: don't re-add code-review to `ready`, don't re-add create-story/retro to the story panel, don't touch the `Next Steps` heading. Audit them (AC #3) and build *on* them.
 - **Primacy is a render-time decision, not a build-time flag.** Because `Add` null-drops unavailable commands, `suggestions[0]` after building is always the correct, installed primary — which is exactly what makes NFR8's "primary not exposed → next survivor is primary" fall out for free. Do not pre-compute an `IsPrimary` bool.
-- **Byte parity moves on purpose** across *every* Next Steps panel (home, epic, story) — a bigger golden-fingerprint diff than 8.3. Verify the diff is *only* next-steps structure + the new `correct-course` rows before regenerating the constant. [memory: [[golden-diff-normalization-gotchas]]]
+- **Byte parity moves on purpose** across *every* Next Steps panel (home, epic, story) — a bigger golden-fingerprint diff than 8.4. Verify the diff is *only* next-steps structure + the new `correct-course` rows before regenerating the constant. [memory: [[golden-diff-normalization-gotchas]]]
 - **Opaque fragment stays opaque.** `NextStepsHtml` is built in `EpicsViewBuilder` and rendered opaquely by the adapter — keep all logic in `BmadCommands`; section FACTS don't move. [memory: [[story-6-2-section-view-models-live]]]
 - **Accessibility is text-first.** The `Other actions` label carries the demotion in words; muted color is reinforcement only. Keep every command a real focusable badge with a caption.
-- **Scope guard for later 8.x/9.x:** empty states (8.5), one-view-per-dataset (8.6), recency (8.7), verification evidence strip (9.4) all sit near the dashboard but are NOT this story. 8.4 makes the command surface recommend one clear next move per state.
+- **Scope guard for later 8.x/9.x:** empty states (8.6), one-view-per-dataset (8.7), recency (8.8), verification evidence strip (9.4) all sit near the dashboard but are NOT this story. 8.5 makes the command surface recommend one clear next move per state.
 
 ### Project Structure Notes
 
@@ -280,7 +280,7 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ### References
 
-- [Source: [epics.md:1206-1229](../planning-artifacts/epics.md:1206)] — Story 8.4 user story + all three ACs.
+- [Source: [epics.md:1206-1229](../planning-artifacts/epics.md:1206)] — Story 8.5 user story + all three ACs.
 - [Source: [epics.md:1134-1138](../planning-artifacts/epics.md:1134)] — Epic 8 goal; FRs FR20/FR21/FR25/FR31; UX-DR21–24; NFR8.
 - [Source: [BmadCommands.cs:30-52](../../src/SpecScribe/BmadCommands.cs:30)] — `RenderNextSteps`/`RenderAllDonePanel` entry points (thread `CommandCatalog` into the done panel).
 - [Source: [BmadCommands.cs:62-78](../../src/SpecScribe/BmadCommands.cs:62)] — `RenderInner` (the shared renderer to split into primary + alternates).

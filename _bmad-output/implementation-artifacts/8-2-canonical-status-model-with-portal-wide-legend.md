@@ -1,4 +1,4 @@
-# Story 8.1: Canonical Status Model with Portal-Wide Legend
+# Story 8.2: Canonical Status Model with Portal-Wide Legend
 
 Status: ready-for-dev
 
@@ -16,25 +16,25 @@ so that I never have to mentally map between competing status words.
 **Given** the projection model defines one canonical lifecycle per entity type (requirement, epic, story)
 **When** any framework's artifacts are projected
 **Then** the framework's native status vocabulary maps to the canonical lifecycle at the mapping seam, with the mapping documented
-**And** no framework-specific status label is hard-coded in shared rendering (NFR8). [Source: epics.md#Story 8.1; FR20, NFR8]
+**And** no framework-specific status label is hard-coded in shared rendering (NFR8). [Source: epics.md#Story 8.2; FR20, NFR8]
 
 2.
 **Given** any badge, chart segment, or legend renders a status
 **When** the page is generated
 **Then** the status routes through the `--status-*` token system so a given state always gets the same word and the same color everywhere
-**And** a status-legend affordance reachable from any badge explains what each stage means. [Source: epics.md#Story 8.1; FR20, UX-DR17]
+**And** a status-legend affordance reachable from any badge explains what each stage means. [Source: epics.md#Story 8.2; FR20, UX-DR17]
 
 3.
 **Given** the classifier encounters a native status with no canonical mapping
 **When** projection runs
 **Then** the entity renders in a visible "unrecognized" state rather than being silently mislabeled
-**And** generation completes with a non-fatal notice. [Source: epics.md#Story 8.1; FR20, NFR2]
+**And** generation completes with a non-fatal notice. [Source: epics.md#Story 8.2; FR20, NFR2]
 
 ---
 
 ## Developer Context
 
-**This is the first story of Epic 8 (Dashboard Command Center) and a foundation stone for Epics 8–10.** Epic 8's later stories and Epics 9–10 all lean on the canonical status vocabulary this story hardens — the epics file says so explicitly for Story 8.2 ("they use the same canonical status vocabulary as Story 8.1", epics.md:1252). So the deliverable here is **not** a new feature surface so much as *locking and self-explaining the status system that already exists*, then extending it in three precise ways.
+**This is the first substantive story of Epic 8 (Dashboard Command Center) and a foundation stone for Epics 8–10 — Story 8.1 is a short cross-surface integration spike ahead of it, added 2026-07-14.** Epic 8's later stories and Epics 9–10 all lean on the canonical status vocabulary this story hardens — the epics file says so explicitly for Story 8.3 ("they use the same canonical status vocabulary as Story 8.2", epics.md:1252). So the deliverable here is **not** a new feature surface so much as *locking and self-explaining the status system that already exists*, then extending it in three precise ways.
 
 **The good news: the hard part is already built.** SpecScribe already has a single status→stage classifier (`StatusStyles.cs`) and a single stage→color source (the `--status-*` CSS tokens). Story 1.5 established this so the sunburst, donuts, funnel, and badges can never disagree on what color a stage is. Do **not** rebuild that — study it, then extend it. [Source: `src/SpecScribe/StatusStyles.cs`, `src/SpecScribe/assets/specscribe.css:33-40`; project memory — status-token system]
 
@@ -50,23 +50,23 @@ so that I never have to mentally map between competing status words.
 
 **Legend affordance form → badge tooltip + shared legend key.** Every `StatusStyles.Badge(...)` gains a hover/focus tooltip (via the existing body-level `.ss-tooltip` / `js-tip` + `data-tip` plumbing) that names what that lifecycle stage means. Additionally, a compact six-stage legend **key** (swatch + icon + word + one-line meaning) renders once per page so the vocabulary is legible without any interaction. This reuses infrastructure that already exists (see "Reuse, don't reinvent") and is literally "reachable from any badge." [Owner decision, this story]
 
-**Adapter-abstraction scope → harden `StatusStyles` in place; defer the formal adapter contract to Epic 4.** Do **NOT** build a new `ICanonicalStatusAdapter` / framework-adapter contract in this story. Story 4.1 (`ready-for-dev`) owns the shared adapter contract — and reading it **confirms this boundary**: 4.1's `IArtifactAdapter` is an *ingestion* seam that emits the already-parsed models (`EpicsModel`, `SprintStatus`, …) with **raw native `Status` strings intact** — it explicitly does *not* map status vocabulary ("do not re-shape the existing models", templaters unchanged, byte-for-byte identical output). So native→canonical status mapping is **not** adapter-ingestion work; it stays downstream in `StatusStyles`. For 8.1, **`StatusStyles` *is* the mapping seam** — AC #1's "adapter layer" is satisfied by making `StatusStyles` the single, documented native→canonical mapping point (BMad is today's only "framework"; its keyword mapping stays). Structure/document the seam so a foreign adapter (Stories 4.3–4.7) can later supply its own per-framework native→canonical status map without rewriting `StatusStyles` — but do **not** build that injection now (no second vocabulary exists yet). Make the seam explicit, documented, and self-explaining — not speculatively abstract. [Owner decision, this story; see "Relationship to Story 4.1" below]
+**Adapter-abstraction scope → harden `StatusStyles` in place; defer the formal adapter contract to Epic 4.** Do **NOT** build a new `ICanonicalStatusAdapter` / framework-adapter contract in this story. Story 4.1 (`ready-for-dev`) owns the shared adapter contract — and reading it **confirms this boundary**: 4.1's `IArtifactAdapter` is an *ingestion* seam that emits the already-parsed models (`EpicsModel`, `SprintStatus`, …) with **raw native `Status` strings intact** — it explicitly does *not* map status vocabulary ("do not re-shape the existing models", templaters unchanged, byte-for-byte identical output). So native→canonical status mapping is **not** adapter-ingestion work; it stays downstream in `StatusStyles`. For 8.2, **`StatusStyles` *is* the mapping seam** — AC #1's "adapter layer" is satisfied by making `StatusStyles` the single, documented native→canonical mapping point (BMad is today's only "framework"; its keyword mapping stays). Structure/document the seam so a foreign adapter (Stories 4.3–4.7) can later supply its own per-framework native→canonical status map without rewriting `StatusStyles` — but do **not** build that injection now (no second vocabulary exists yet). Make the seam explicit, documented, and self-explaining — not speculatively abstract. [Owner decision, this story; see "Relationship to Story 4.1" below]
 
 ### Relationship to Story 4.1 (both `ready-for-dev` — coordinate)
 
-Story 4.1 (Shared Framework Adapter Contract) is now written and `ready-for-dev`; it and 8.1 touch adjacent seams, so read this before starting:
+Story 4.1 (Shared Framework Adapter Contract) is now written and `ready-for-dev`; it and 8.2 touch adjacent seams, so read this before starting:
 
-- **No status-mapping conflict.** 4.1's `IArtifactAdapter`/`ArtifactBundle` is ingestion only and carries **raw parsed models** — it does not classify status. 8.1's `StatusStyles` work runs entirely in the downstream projection/rendering path on those same models. The two do not overlap on status logic; 8.1 stays valid whether 4.1 has landed or not. [Source: `_bmad-output/implementation-artifacts/4-1-shared-framework-adapter-contract-and-projection-path.md` — Scope Decision, Dev Notes]
+- **No status-mapping conflict.** 4.1's `IArtifactAdapter`/`ArtifactBundle` is ingestion only and carries **raw parsed models** — it does not classify status. 8.2's `StatusStyles` work runs entirely in the downstream projection/rendering path on those same models. The two do not overlap on status logic; 8.2 stays valid whether 4.1 has landed or not. [Source: `_bmad-output/implementation-artifacts/4-1-shared-framework-adapter-contract-and-projection-path.md` — Scope Decision, Dev Notes]
 - **They DO overlap on the non-fatal-diagnostics channel (AC #3).** 4.1 introduces a typed **`AdapterDiagnostic`** with categories `Unsupported | Malformed | Skipped | Error`, formalizing today's ad-hoc `GenerationOutcome.Error` events into one contract. An **unrecognized status is conceptually an `Unsupported` diagnostic** (a valid artifact carrying an unmapped field value). Coordinate by sequencing:
-  - **If 4.1 has landed first:** route 8.1's unrecognized-status notice through the `AdapterDiagnostic` channel (`Unsupported` category) rather than emitting a bespoke `GenerationEvent` — reuse the typed contract, don't fork it.
-  - **If 8.1 lands first:** use the existing `GenerationEvent`/`ConsoleUi.PrintInitialSummary` path (as specified below); leave a `// TODO(4.1): fold into AdapterDiagnostic` marker so 4.1 subsumes it into the typed channel.
+  - **If 4.1 has landed first:** route 8.2's unrecognized-status notice through the `AdapterDiagnostic` channel (`Unsupported` category) rather than emitting a bespoke `GenerationEvent` — reuse the typed contract, don't fork it.
+  - **If 8.2 lands first:** use the existing `GenerationEvent`/`ConsoleUi.PrintInitialSummary` path (as specified below); leave a `// TODO(4.1): fold into AdapterDiagnostic` marker so 4.1 subsumes it into the typed channel.
   - Either way, **do not end up with two parallel notice mechanisms** — whichever story lands second reconciles them. Note your choice in Completion Notes.
 - **Shared "seam Epic 4 generalizes" idiom.** 4.1 documents `ArtifactCoverage.Specs`, `ModuleContext.Detect`, and `CommandCatalog` as existing "one seam a future adapter swaps" precedents. `StatusStyles` should read as another member of that family — a documented seam a foreign adapter's status map will feed, matching that established idiom (not a competing abstraction). [Source: `4-1-...md` Dev Notes — "existing generalization seams"]
 
 ### Scope boundaries (read carefully)
 
-- **This is not the glossary — but build the legend as a reusable seam for the one that's coming.** Epic 10 Story 10.3 (FR29) owns the full "how to read this portal" glossary/orientation page + first-use acronym expansion + adapter-supplied vocabulary. **10.3 is deliberately NOT drafted yet**: it's a legibility layer that annotates surfaces still being reshaped by Epics 8–9 and Story 10.1 (nav overhaul / Structure-page retirement), so specifying it now would target a moving IA. That is fine for 8.1 — but it means 8.1's per-badge tooltip + legend key are the portal's **first "define a term where it appears" surface, and 10.3 will generalize them.** So:
-  - Keep 8.1's affordance the **status lifecycle stages only** — a focused status key, not a general glossary. Do **not** build a standalone glossary page here.
+- **This is not the glossary — but build the legend as a reusable seam for the one that's coming.** Epic 10 Story 10.3 (FR29) owns the full "how to read this portal" glossary/orientation page + first-use acronym expansion + adapter-supplied vocabulary. **10.3 is deliberately NOT drafted yet**: it's a legibility layer that annotates surfaces still being reshaped by Epics 8–9 and Story 10.1 (nav overhaul / Structure-page retirement), so specifying it now would target a moving IA. That is fine for 8.2 — but it means 8.2's per-badge tooltip + legend key are the portal's **first "define a term where it appears" surface, and 10.3 will generalize them.** So:
+  - Keep 8.2's affordance the **status lifecycle stages only** — a focused status key, not a general glossary. Do **not** build a standalone glossary page here.
   - Build the tooltip + legend-key rendering as a **single, small, documented, reusable helper** (e.g. the `StatusStyles.StageMeaning`/`LegendKey` seam), rendered from **exactly one code location** — explicitly so 10.3 can later *absorb, extend, or link to* it rather than reverse-engineering or duplicating a one-off. A bespoke, hard-to-reuse legend here would force a refactor (or a confusing second "what does this mean?" affordance) when 10.3 lands.
   - **Forward-coordination:** when 10.3 is eventually drafted (after its upstream UI-overhaul epics), flag this seam into its context as the existing vocabulary-explanation primitive to build on. Leave a short `// 10.3: vocabulary-explanation seam — extend, don't duplicate` marker at the helper so the thread isn't lost.
 - **Don't touch the chart legends' zero-suppression.** The dashboard's Epic-Status and Requirements chart legends deliberately suppress zero-count rows (Story 1.5). The **new status-legend key is different**: it is a static *reference* key that always shows all six stages (plus deferred), regardless of counts, because its job is to teach the vocabulary — not summarize this project's data. Keep these two concepts separate. [Source: project memory — status-token system]
@@ -96,13 +96,13 @@ Getting this boundary wrong would reclassify every not-yet-drafted story as "unr
 - **Extend `StatusStyles.Badge(...)` to attach the tooltip.** Add `js-tip` to the badge's class list and a `data-tip="<stage meaning>"` attribute, sourced from a new stage→meaning method (e.g. `StatusStyles.StageMeaning(cssClass)`). A `<span class="status-badge {cls} js-tip" data-tip="…">` is picked up automatically by the existing tooltip JS (`HOVER = SEG + ", .js-tip"`). Escape the tip text (`PathUtil.Html`). [Source: `src/SpecScribe/StatusStyles.cs:168-172`, `src/SpecScribe/assets/specscribe.js:31-48,80-81`]
 - **Render the six-stage legend key once per page.** Add a `StatusStyles.LegendKey()` (or a small helper) that emits all stages (swatch + icon + word + short meaning). The single, deterministic home that already appears on every content page is the shared footer — render it there via `PathUtil.RenderFooter`, or gate it into the status-bearing templaters if you prefer a tighter scope. Whatever you pick, render it in **exactly one place in code** so it can't drift. [Source: `src/SpecScribe/PathUtil.cs:73-74`]
 - **Make "unrecognized" a first-class stage in the vocabulary.** Add an `"unrecognized"` css class, a `--status-unrecognized` token with a *visibly distinct, non-lifecycle* treatment (e.g. hatched/outlined neutral — it must NOT read as one of the six real stages), an `Icons.ForStatus` glyph for it, and a `StatusStyles` label (e.g. "Unrecognized"). Keep the entity's **raw native word** as the badge text where one exists (don't blank it) so the reader sees *what* the unmapped value was. [Source: `src/SpecScribe/StatusStyles.cs`, `src/SpecScribe/Icons.cs`, `src/SpecScribe/assets/specscribe.css:33-40`]
-- **Surface the non-fatal notice through the typed diagnostics channel — coordinated with Story 4.1.** If 4.1 has landed, route the unrecognized-status notice through its `AdapterDiagnostic` (`Unsupported` category); if 8.1 lands first, use the existing console summary that already prints Skipped/Error counts (`ConsoleUi.PrintInitialSummary`) — a Skipped-style/warning line naming the unmapped value(s) — and leave a `// TODO(4.1): fold into AdapterDiagnostic` marker. **Exactly one** notice mechanism, never two (see "Relationship to Story 4.1"). Generation must still complete successfully (NFR2). Derive the notice **only** from input data so a from-scratch CI regen is identical. [Source: `src/SpecScribe/ConsoleUi.cs:120-146`, `src/SpecScribe/SiteGenerator.cs` (GenerationEvent/Outcome); `4-1-...md` Task 4 (AdapterDiagnostic)]
+- **Surface the non-fatal notice through the typed diagnostics channel — coordinated with Story 4.1.** If 4.1 has landed, route the unrecognized-status notice through its `AdapterDiagnostic` (`Unsupported` category); if 8.2 lands first, use the existing console summary that already prints Skipped/Error counts (`ConsoleUi.PrintInitialSummary`) — a Skipped-style/warning line naming the unmapped value(s) — and leave a `// TODO(4.1): fold into AdapterDiagnostic` marker. **Exactly one** notice mechanism, never two (see "Relationship to Story 4.1"). Generation must still complete successfully (NFR2). Derive the notice **only** from input data so a from-scratch CI regen is identical. [Source: `src/SpecScribe/ConsoleUi.cs:120-146`, `src/SpecScribe/SiteGenerator.cs` (GenerationEvent/Outcome); `4-1-...md` Task 4 (AdapterDiagnostic)]
 - **Audit shared rendering for hard-coded status words (NFR8).** Grep every templater for inline status string literals used as visible labels; route any stragglers through `StatusStyles.*Label`. This audit is AC #1's teeth. [Source: `StatusStyles.Badge` call sites — `EpicsTemplater.cs`, `RequirementsTemplater.cs`, `SprintTemplater.cs`, `ActionItemsTemplater.cs`, `RetroActionStyler.cs`, `HtmlTemplater.cs`]
 
 ### DON'T
 
 - **DON'T build an adapter contract / `ICanonicalStatusAdapter` / framework registry.** That is Epic 4 (FR1), still backlog. `StatusStyles` is the seam for now (owner decision above). Speculative abstraction here is out of scope.
-- **DON'T build a glossary page.** Story 10.3 (FR29) owns that. Keep 8.1's legend a focused *status* key.
+- **DON'T build a glossary page.** Story 10.3 (FR29) owns that. Keep 8.2's legend a focused *status* key.
 - **DON'T change the six lifecycle colors or the existing chart legends.** Sunburst/donut/funnel/req-flow legends stay exactly as they are (including dashboard zero-row suppression). You are *adding* a static reference key and per-badge tooltips, not touching chart legends.
 - **DON'T reclassify absent statuses as "unrecognized."** `null`/empty → "drafted" (unchanged). Only a *present, unmatched* string becomes "unrecognized" (see the critical distinction above).
 - **DON'T make "unrecognized" reuse a lifecycle color.** It must be visually distinct from pending/drafted/ready/active/review/done, or it silently mislabels — the exact failure AC #3 forbids.
@@ -117,7 +117,7 @@ Getting this boundary wrong would reclassify every not-yet-drafted story as "unr
 Relevant invariants [Source: `_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md`]:
 
 - **Graceful degradation is contractual** — an unmapped status degrades to a *visible* "unrecognized" badge + non-fatal notice; generation always completes (NFR2). Never throw on an unknown status. [AC #3]
-- **Deterministic, generation-time-only output** — the legend key, tooltips, and unrecognized notices derive solely from input artifacts; a from-scratch regen of the same inputs is byte-identical. No per-visitor or cross-build state. (This is also the shape Story 8.7 will formalize for recency signals — keep the discipline.)
+- **Deterministic, generation-time-only output** — the legend key, tooltips, and unrecognized notices derive solely from input artifacts; a from-scratch regen of the same inputs is byte-identical. No per-visitor or cross-build state. (This is also the shape Story 8.8 will formalize for recency signals — keep the discipline.)
 - **Single source of truth** — `StatusStyles` (stage) + `--status-*` tokens (color) remain the single sources; this story reinforces them, it does not add a parallel one. [Source: project memory — status-token system]
 - **Accessibility is part of the rendering contract** (NFR6, UX-DR16, UX-DR17): status is never color-only; the legend key gives a persistent, non-hover explanation. [UX-DR17]
 - **Seed, not invariant** — the Core/Adapters package split in `rendering-architecture.md` is aspirational; the current monolithic `StatusStyles` + per-page templater pattern is the established one. Follow it; don't force the split (and don't pre-build Epic 4's adapter contract). [Source: `_bmad-output/specs/spec-specscribe/rendering-architecture.md`]
@@ -179,7 +179,7 @@ Cover explicitly:
 
 ## Previous Story Intelligence
 
-**This is Story 8.1 — the first story in Epic 8** — so there is no prior story *in this epic*. The relevant prior art is the entire status system, built incrementally; study these before writing:
+**This is Story 8.2 — the first substantive story in Epic 8** (Story 8.1 is a short cross-surface integration spike, non-blocking on this story's content) — so there is no prior *substantive* story in this epic. The relevant prior art is the entire status system, built incrementally; study these before writing:
 
 - **Story 1.5 (Dashboard Insight Polish & Visual Truthfulness)** — introduced the `--status-*` single stage→color source and killed the sunburst/donut color drift. This is the invariant you're reinforcing. [Source: project memory — status-token system; `src/SpecScribe/assets/specscribe.css:33-40`]
 - **Story 2.3 (Sprint Status)** — added `StatusStyles.ForSprint`/`SprintLabel` (the yaml lifecycle mapping you're extending with "unrecognized"). Note its deliberate "unknown → title-cased word, not invented color" behavior — your change keeps the *word* but adds the unrecognized *class* + notice. [Source: `src/SpecScribe/StatusStyles.cs:102-135`]
@@ -248,7 +248,7 @@ No external libraries or APIs are introduced, so there is no version/security re
 - **Accessibility of the tooltip:** a `<span>` badge is not keyboard-focusable, so the hover/focus tooltip is a **progressive enhancement**, not the accessible channel. The accessible explanation is the **always-visible legend key** plus each badge's own color+icon+word. Do **not** blanket-add `tabindex="0"` to badges (tab-order noise). If you later want a keyboard-reachable per-badge tip, do it deliberately for a specific interactive badge, not globally.
 - **"Unrecognized" must look unrecognized.** Pick a treatment (hatched fill / dashed outline / neutral grey with a distinct glyph) that cannot be confused with any of the six real stages or with `deferred`. If it reads as "pending", you've reintroduced the silent-mislabel that AC #3 exists to kill.
 - **Legend key ≠ chart legend.** The chart legends (sunburst/donut/funnel) summarize *this project's counts* and suppress zeros; the status legend key *teaches the vocabulary* and always shows every stage. Keep them separate — don't "helpfully" unify them.
-- **Scope guard for later stories:** the full glossary (10.3), the single count source (8.2), paired progress/readiness (8.3), and state-aware next-steps (8.4) are **not** this story. 8.1 gives them the locked, self-explaining status vocabulary they consume.
+- **Scope guard for later stories:** the full glossary (10.3), the single count source (8.3), paired progress/readiness (8.4), and state-aware next-steps (8.5) are **not** this story. 8.2 gives them the locked, self-explaining status vocabulary they consume.
 
 ### Project Structure Notes
 
@@ -257,7 +257,7 @@ No external libraries or APIs are introduced, so there is no version/security re
 
 ### References
 
-- [Source: `_bmad-output/planning-artifacts/epics.md:1063-1087`] — Story 8.1 user story + all three ACs.
+- [Source: `_bmad-output/planning-artifacts/epics.md:1063-1087`] — Story 8.2 user story + all three ACs.
 - [Source: `_bmad-output/planning-artifacts/epics.md:1057-1061,201-203`] — Epic 8 goal + FR/UX-DR/NFR coverage.
 - [Source: `_bmad-output/planning-artifacts/epics.md:58,82,120`] — FR20, NFR8, UX-DR17.
 - [Source: `src/SpecScribe/StatusStyles.cs`] — the single classifier + `Badge`/`Icon`/`*Label`/`ForStatus`/`ForSprint` to extend; `null→drafted` fallback to preserve.
@@ -271,7 +271,7 @@ No external libraries or APIs are introduced, so there is no version/security re
 - [Source: `tests/SpecScribe.Tests/StatusStylesTests.cs:27-37`] — the test to update for the absent-vs-unmapped change.
 - [Source: `tests/SpecScribe.Tests/StylesheetTests.cs`] — stylesheet-content assertions to extend.
 - [Source: `_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md`, `rendering-architecture.md`] — invariants + "seed, not invariant" (no forced adapter split).
-- [Source: `_bmad-output/implementation-artifacts/4-1-shared-framework-adapter-contract-and-projection-path.md`] — the ingestion adapter contract (`IArtifactAdapter`/`ArtifactBundle`/`AdapterDiagnostic`) 8.1 coordinates its AC #3 notice with; confirms status mapping is NOT adapter-ingestion work (stays in `StatusStyles`).
+- [Source: `_bmad-output/implementation-artifacts/4-1-shared-framework-adapter-contract-and-projection-path.md`] — the ingestion adapter contract (`IArtifactAdapter`/`ArtifactBundle`/`AdapterDiagnostic`) 8.2 coordinates its AC #3 notice with; confirms status mapping is NOT adapter-ingestion work (stays in `StatusStyles`).
 - [Source: `_bmad-output/implementation-artifacts/spec-site-ux-review-journeys-and-feedback.md`] — the UX review that seeded Epics 8–10.
 
 ## Dev Agent Record
