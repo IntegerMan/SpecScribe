@@ -119,8 +119,9 @@ public static class SprintTemplater
     /// <summary>The Kanban board: lifecycle columns (Backlog → Done), then Retired, then Unrecognized. Story entries only —
     /// epics/retrospectives are not cards. When <paramref name="capPerColumn"/> is set, a column with more than
     /// that many stories shows the first N cards then a "+K more" link to <paramref name="moreHref"/> (the home
-    /// board caps; the sprint page does not). Columns render even when empty — an empty "Done" column is
-    /// meaningful on a board. Reused by the home Now &amp; Next and the sprint page. [Story 2.3 redesign]</summary>
+    /// board caps; the sprint page does not). Core columns (Backlog → Done) render even when empty — an empty
+    /// "Done" column is meaningful on a board; Retired and Unrecognized lanes omit entirely when empty so they
+    /// don't steal width. Reused by the home Now &amp; Next and the sprint page. [Story 2.3 redesign]</summary>
     public static string RenderBoard(SprintStatus sprint, EpicsModel? epics, int? capPerColumn = null, string? moreHref = null, string prefix = "")
     {
         var stories = sprint.Entries.Where(e => e.Kind == SprintEntryKind.Story).ToList();
@@ -131,9 +132,14 @@ public static class SprintTemplater
             if (byColumn.TryGetValue(cls, out var list)) list.Add(s);
         }
 
+        // Core lanes always show; retired/unrecognized only when they hold cards (width + noise).
+        var visible = BoardColumns
+            .Where(c => byColumn[c.CssClass].Count > 0 || c.CssClass is not ("retired" or "unrecognized"))
+            .ToList();
+
         var sb = new StringBuilder();
-        sb.Append("<div class=\"sprint-board\">\n");
-        foreach (var (cssClass, label) in BoardColumns)
+        sb.Append($"<div class=\"sprint-board\" style=\"--lane-count: {visible.Count}\">\n");
+        foreach (var (cssClass, label) in visible)
         {
             var col = byColumn[cssClass];
             // Column-meaning tip from StatusStyles.StageMeaning (Story 8.2 seam) — Backlog vs Ready carry the

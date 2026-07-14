@@ -1316,11 +1316,10 @@ a.ref-file-node:focus-visible {
 /* ====================== FOOTER ====================== */
 .doc-footer {
   margin: auto 0 0;
-  padding: 1.1rem 1.25rem;
+  padding: 0.85rem 1.25rem 1rem;
   text-align: center;
   font-size: 0.78rem;
   color: var(--ink-light);
-  font-style: italic;
   background: linear-gradient(180deg, var(--warm-white), var(--cream));
   border-top: 2px solid var(--parchment-deep);
 }
@@ -1334,6 +1333,15 @@ a.ref-file-node:focus-visible {
 .doc-footer a:hover {
   color: var(--rust);
   border-bottom-color: var(--rust-light);
+}
+
+/* Credit line under the status legend — italic generation stamp stays the quiet footer voice. */
+.doc-footer-credit {
+  margin: 0.7rem auto 0;
+  padding-top: 0.65rem;
+  max-width: 1100px;
+  border-top: 1px solid var(--border);
+  font-style: italic;
 }
 
 /* ====================== INDEX PAGE ====================== */
@@ -3319,45 +3327,60 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 
 /* ====================== STATUS LEGEND KEY (Story 8.2) ======================
    Static reference vocabulary — always shows every stage (unlike chart legends that zero-suppress).
+   Compact multi-column layout so it reads as footer chrome, not a stranded body section.
    Swatches route through --status-* tokens only. // 10.3: vocabulary-explanation seam */
 .status-legend-key {
-  max-width: 860px;
-  margin: 1.6rem auto 0.4rem;
-  padding: 0.85rem 1rem 0.95rem;
-  border-top: 1px solid var(--border);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0;
   color: var(--ink-faded);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
+  text-align: left;
+}
+/* Webview/SPA emit the key after <main> (no HTML footer shell) — soft top rule so it doesn't float. */
+main + .status-legend-key,
+main ~ .status-legend-key {
+  margin-top: 1.2rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
 }
 .status-legend-key-title {
   font-family: 'Courier New', monospace;
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-light);
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.45rem;
 }
 .status-legend-key-list {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-  gap: 0.35rem 1.2rem;
+  grid-template-columns: 1fr;
+  gap: 0.4rem 1.4rem;
   margin: 0;
   padding: 0;
 }
+@media (min-width: 560px) {
+  .status-legend-key-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  .status-legend-key-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* Swatch + stacked label/meaning — narrow cells so 2–3 columns fit without a wide single-line row. */
 .status-legend-key-row {
   display: grid;
-  grid-template-columns: 0.85rem minmax(0, auto) 1fr;
-  align-items: baseline;
-  gap: 0.45rem;
-  line-height: 1.35;
+  grid-template-columns: 0.7rem minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0.4rem;
+  line-height: 1.3;
 }
 .status-legend-key-swatch {
-  width: 0.75rem;
-  height: 0.75rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-top: 0.2rem;
   border-radius: 2px;
   border: 1px solid var(--border);
   flex-shrink: 0;
-  align-self: center;
 }
 .status-legend-key-swatch.pending { background: var(--status-pending); }
 .status-legend-key-swatch.drafted { background: var(--status-drafted); }
@@ -3377,15 +3400,24 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   );
   border: 1px dashed var(--status-unrecognized);
 }
+.status-legend-key-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
 .status-legend-key-label {
   font-family: 'Courier New', monospace;
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--ink);
-  white-space: nowrap;
 }
-.status-legend-key-meaning { color: var(--ink-light); }
+.status-legend-key-meaning {
+  color: var(--ink-light);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
 
 /* Requirements index: every section shares one flush 860px column so the dashboard, group navigator,
    dividers, and cards all line up on the same left/right edges (the shared .dashboard/.section-divider
@@ -4060,12 +4092,12 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
 .sprint-card-progress-fill.partial { background: var(--status-ready); }
 .sprint-card-progress-fill.empty { background: transparent; }
 
-/* The Kanban board: equal-width lanes on wide screens; horizontally scrollable when the seven columns don't
-   fit (small screens / the narrower home panel), so cards never crush. */
+/* The Kanban board: equal-width lanes on wide screens; horizontally scrollable when the visible columns don't
+   fit (small screens / the narrower home panel), so cards never crush. --lane-count is set by RenderBoard from
+   the visible lane set (core Backlog→Done always; retired/unrecognized only when non-empty). */
 .sprint-board {
   display: grid;
-  /* Backlog → Done + Retired + Unrecognized (seven BoardColumns). */
-  grid-template-columns: repeat(7, minmax(150px, 1fr));
+  grid-template-columns: repeat(var(--lane-count, 5), minmax(11.5rem, 1fr));
   gap: 0.7rem;
   overflow-x: auto;
   padding-bottom: 0.3rem;
@@ -4075,10 +4107,11 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.5rem 0.5rem 0.6rem;
-  min-width: 150px;
+  min-width: 11.5rem;
 }
 .sprint-lane-head {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
@@ -4097,8 +4130,10 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
   font-size: 0.68rem;
   font-weight: bold;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.05em;
   color: var(--ink-light);
+  white-space: nowrap;
+  min-width: 0;
 }
 .sprint-lane-count {
   font-family: 'Courier New', monospace;
@@ -4108,6 +4143,7 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0 0.45rem;
+  flex-shrink: 0;
 }
 /* Lane header accent picks up the shared status color so a reader who learned the palette elsewhere reads
    the board for free. */

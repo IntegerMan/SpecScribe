@@ -67,9 +67,12 @@ public class SprintTemplaterTests
     {
         var html = SprintTemplater.RenderIndex(Sample(), SampleEpics(), Nav(), SprintCommands());
 
-        // Seven lifecycle lanes (incl. retired + unrecognized), each with the mapped status class.
-        foreach (var cls in new[] { "pending", "ready", "active", "review", "done", "retired", "unrecognized" })
+        // Five core lifecycle lanes always; retired/unrecognized only when the sample has such stories (it doesn't).
+        foreach (var cls in new[] { "pending", "ready", "active", "review", "done" })
             Assert.Contains($"<section class=\"sprint-lane {cls}\"", html);
+        Assert.DoesNotContain("sprint-lane retired", html);
+        Assert.DoesNotContain("sprint-lane unrecognized", html);
+        Assert.Contains("style=\"--lane-count: 5\"", html);
 
         // Cards carry the story's stage color + the js-tip hook; done story 1.1 and in-progress 1.2 link out.
         // Sample stories have no task plan → Story 8.4 also stamps .no-plan on the card class list.
@@ -187,7 +190,8 @@ public class SprintTemplaterTests
         Assert.Contains("class=\"sprint-lane-empty\">Nothing in progress — pick from Ready.", board);
         Assert.Contains("class=\"sprint-lane-empty\">Nothing awaiting review.", board);
         Assert.Contains("class=\"sprint-lane-empty\">Nothing finished yet.", board);
-        Assert.Contains("class=\"sprint-lane-empty\">Nothing retired from the plan.", board);
+        Assert.DoesNotContain("sprint-lane retired", board);
+        Assert.DoesNotContain("sprint-lane unrecognized", board);
         Assert.Contains("aria-label=\"In progress: 0 stories\"", board);
 
         // Populated columns never get an empty placeholder.
@@ -280,6 +284,7 @@ public class SprintTemplaterTests
     [Fact]
     public void RenderBoard_LaneHeadsCarryStageMeaningTipsAndFocus()
     {
+        // Core lanes always present; optional lanes asserted via the retired/unrecognized fixture below.
         var board = SprintTemplater.RenderBoard(Sample(), SampleEpics());
 
         foreach (var (cls, label) in new[]
@@ -289,8 +294,6 @@ public class SprintTemplaterTests
                      ("active", "In progress"),
                      ("review", "In review"),
                      ("done", "Done"),
-                     ("retired", "Retired"),
-                     ("unrecognized", "Unrecognized"),
                  })
         {
             var tip = $"{label} = {StatusStyles.StageMeaning(cls)}";
@@ -299,11 +302,34 @@ public class SprintTemplaterTests
             Assert.Contains($"title=\"{tip}\"", board);
         }
 
+        Assert.DoesNotContain("sprint-lane retired", board);
+        Assert.DoesNotContain("sprint-lane unrecognized", board);
         Assert.Contains("sprint-lane-head js-tip", board);
         Assert.Contains("tabindex=\"0\"", board);
         // AC distinguishing phrases (StageMeaning seam, enriched for readiness).
         Assert.Contains("not yet ready to pick up", board, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("task plan exists and dependencies met", board, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RenderBoard_OmitsEmptyRetiredAndUnrecognizedLanes()
+    {
+        var emptyOptional = SprintTemplater.RenderBoard(Sample(), SampleEpics());
+        Assert.DoesNotContain("sprint-lane retired", emptyOptional);
+        Assert.DoesNotContain("sprint-lane unrecognized", emptyOptional);
+        Assert.Contains("--lane-count: 5", emptyOptional);
+
+        var withOptional = SprintTemplater.RenderBoard(SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: done
+              3-4-retired: retired
+              9-9-blocked: blocked
+            """)!, null);
+        Assert.Contains("sprint-lane retired", withOptional);
+        Assert.Contains("sprint-lane unrecognized", withOptional);
+        Assert.Contains("--lane-count: 7", withOptional);
+        Assert.Contains($"data-tip=\"Retired = {StatusStyles.StageMeaning("retired")}\"", withOptional);
+        Assert.Contains($"data-tip=\"Unrecognized = {StatusStyles.StageMeaning("unrecognized")}\"", withOptional);
     }
 
     [Fact]

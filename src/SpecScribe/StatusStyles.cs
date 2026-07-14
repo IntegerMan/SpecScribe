@@ -281,8 +281,10 @@ public static class StatusStyles
             var meaning = PathUtil.Html(StageMeaning(stage));
             sb.Append("    <li class=\"status-legend-key-row\">\n");
             sb.Append($"      <span class=\"status-legend-key-swatch {stage}\" aria-hidden=\"true\"></span>\n");
-            sb.Append($"      <span class=\"status-legend-key-label\">{Icon(stage)}{PathUtil.Html(word)}</span>\n");
-            sb.Append($"      <span class=\"status-legend-key-meaning\">{meaning}</span>\n");
+            sb.Append("      <span class=\"status-legend-key-text\">\n");
+            sb.Append($"        <span class=\"status-legend-key-label\">{Icon(stage)}{PathUtil.Html(word)}</span>\n");
+            sb.Append($"        <span class=\"status-legend-key-meaning\">{meaning}</span>\n");
+            sb.Append("      </span>\n");
             sb.Append("    </li>\n");
         }
         sb.Append("  </ul>\n</aside>\n\n");

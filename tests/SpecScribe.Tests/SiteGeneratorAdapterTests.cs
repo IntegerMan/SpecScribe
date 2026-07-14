@@ -319,12 +319,13 @@ public class SiteGeneratorAdapterTests : IDisposable
         // renders here — only the shared stylesheet content shifted the hash. Commits-tile absolute-date fix is
         // likewise invisible (fixture has "no git history"). Marker + CommitStatSub determinism are covered by
         // unit tests. [Story 8.8; golden-diff-normalization-gotchas]
-        // Regenerated for spec-3-4-retired-status-first-class: ForSprint maps retired → first-class stage;
-        // LegendStages + LegendKey gain a Retired row; sprint board gains a Retired lane (empty here — fixture
-        // has no retired yaml rows); RenderProgressWheel M excludes retired; specscribe.css gains retired
-        // badge/lane/card/legend hooks reusing --status-deferred grey + seven-column board grid. Sunburst /
-        // ForStatus / StoryStages untouched. [spec-3-4-retired-status-first-class]
-        const string expected = "ee85ee1bd29ed19c57d5c93f40add0a9a6fb5978ff4d15da1f1385565963458d";
+        // Regenerated for status-legend footer polish: LegendKey nests inside .doc-footer (shared footer chrome);
+        // each legend row stacks label+meaning for a compact 1/2/3-column layout; .doc-footer-credit wraps the
+        // generation stamp. Every page's footer bytes + specscribe.css shift. [Story 8.2 UI polish]
+        // Regenerated for sprint-board density polish: empty retired/unrecognized lanes omit entirely;
+        // --lane-count drives grid columns; lane labels use nowrap + a slightly wider min track so
+        // "Ready for Dev" doesn't wrap alone under width pressure. [board UX feedback]
+        const string expected = "639d10b2e96a661e3b1a1db2a56bc54206e82e40452b44021e2a893a2da92a8a";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

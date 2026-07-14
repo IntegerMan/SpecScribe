@@ -53,11 +53,16 @@ public class StylesheetTests
         Assert.Contains(".status-legend-key", css);
         Assert.Contains(".status-legend-key-swatch.unrecognized", css);
         Assert.Contains(".status-badge.unrecognized", css);
+        Assert.Contains(".doc-footer-credit", css);
+        Assert.Contains("grid-template-columns: repeat(3, minmax(0, 1fr))", css); // wide legend columns
+        Assert.Contains(".status-legend-key-text", css);
         Assert.Contains(".status-badge.retired", css);
         Assert.Contains(".status-legend-key-swatch.retired", css);
         Assert.Contains(".sprint-lane.retired .sprint-lane-head", css);
         Assert.Contains(".sprint-card.retired", css);
-        Assert.Contains("grid-template-columns: repeat(7, minmax(150px, 1fr))", css);
+        Assert.Contains("grid-template-columns: repeat(var(--lane-count, 5), minmax(11.5rem, 1fr))", css);
+        Assert.Contains(".sprint-lane-label", css);
+        Assert.Contains("white-space: nowrap", css); // lane labels stay single-line with the count badge
         // Story 8.4 paired progress + readiness surfaces
         Assert.Contains(".story-status-pair", css);
         Assert.Contains(".sprint-card.no-plan", css);
