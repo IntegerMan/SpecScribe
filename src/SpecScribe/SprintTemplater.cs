@@ -36,19 +36,22 @@ public static class SprintTemplater
         ("unrecognized", "Unrecognized"),
     };
 
-    /// <summary>Per-stage story counts over the tracked <c>development_status</c> (stories only), in
-    /// <see cref="StageOrder"/>. Shared by the page summary and the dashboard widget. [Story 2.3]</summary>
-    public static IReadOnlyList<(string Label, int Count, string CssClass)> StoryStageCounts(SprintStatus sprint)
-    {
-        var stories = sprint.Entries.Where(e => e.Kind == SprintEntryKind.Story).ToList();
-        return StageOrder
-            .Select(s => (s.Label, Count: stories.Count(st => StatusStyles.ForSprint(st.Status) == s.CssClass), s.CssClass))
-            .ToList();
-    }
+    /// <summary>Per-stage story counts from the portal-wide ledger (tracked tally). Shared by the page summary
+    /// and the dashboard widget — one computation in <see cref="ProjectCounts.Build"/>, consumed everywhere.
+    /// [Story 2.3; Story 8.3]</summary>
+    public static IReadOnlyList<(string Label, int Count, string CssClass)> StoryStageCounts(ProjectCounts counts) =>
+        counts.TrackedStoryStages.Select(s => (s.Label, s.Count, s.CssClass)).ToList();
+
+    /// <summary>Convenience overload for call sites that only have a sprint — builds a ephemeral ledger from
+    /// the yaml alone so tracked stage counts stay defined. Prefer the <see cref="ProjectCounts"/> overload
+    /// when the shared generation ledger is available. [Story 8.3]</summary>
+    public static IReadOnlyList<(string Label, int Count, string CssClass)> StoryStageCounts(SprintStatus sprint) =>
+        StoryStageCounts(ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty));
 
     public static string RenderIndex(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
-        IReadOnlyList<RetroModel>? retros = null)
+        IReadOnlyList<RetroModel>? retros = null, ProjectCounts? counts = null)
     {
+        var ledger = counts ?? ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty);
         var outputPath = SiteNav.SprintOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — sprint.html is at the output root.
 
@@ -61,8 +64,8 @@ public static class SprintTemplater
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Sprint Status", null) }));
 
-        var epicCount = sprint.Entries.Count(e => e.Kind == SprintEntryKind.Epic);
-        var storyCount = sprint.Entries.Count(e => e.Kind == SprintEntryKind.Story);
+        var epicCount = ledger.EpicsTracked;
+        var storyCount = ledger.StoriesTracked;
         var updated = sprint.LastUpdated is { Length: > 0 } lu ? $" &middot; updated {PathUtil.Html(lu)}" : string.Empty;
         var subtitle = $"{PathUtil.Html(nav.SiteTitle)} &middot; {epicCount} {Charts.Plural(epicCount, "epic", "epics")} &middot; {storyCount} {Charts.Plural(storyCount, "story", "stories")} &middot; from sprint-status.yaml{updated}";
 
@@ -76,7 +79,7 @@ public static class SprintTemplater
         sb.Append($"    <div class=\"doc-subtitle\">{subtitle}</div>\n");
         sb.Append("  </div>\n");
         sb.Append("  <div class=\"sprint-topbar-aside\">\n");
-        sb.Append(RenderProgressWheel(sprint));
+        sb.Append(RenderProgressWheel(ledger));
         sb.Append(RenderBoardTabs());
         sb.Append(BmadCommands.RenderCommandMenu("Commands", new (string?, string)[]
         {
@@ -85,7 +88,7 @@ public static class SprintTemplater
             (commands.Command("correct-course"), "Handle a mid-sprint change"),
             (commands.Command("retrospective"), "Capture lessons after an epic"),
         }));
-        AppendRetroButtons(sb, sprint, retros ?? Array.Empty<RetroModel>());
+        AppendRetroButtons(sb, ledger, retros ?? Array.Empty<RetroModel>());
         sb.Append("  </div>\n");
         sb.Append("</div>\n\n");
 
@@ -208,8 +211,8 @@ public static class SprintTemplater
 
     /// <summary>The control-row buttons that link to the retrospectives index and the open-action-items page.
     /// "Retros" shows when any retro exists (rich tooltip: count + latest); the flag "⚑ N" shows only when there
-    /// are open action items. Both are plain links to real pages (no modal). [Story 2.3 polish #5]</summary>
-    private static void AppendRetroButtons(StringBuilder sb, SprintStatus sprint, IReadOnlyList<RetroModel> retros)
+    /// are open action items. Both are plain links to real pages (no modal). [Story 2.3 polish #5; Story 8.3]</summary>
+    private static void AppendRetroButtons(StringBuilder sb, ProjectCounts counts, IReadOnlyList<RetroModel> retros)
     {
         if (retros.Count > 0)
         {
@@ -219,7 +222,7 @@ public static class SprintTemplater
             sb.Append($"<a class=\"cmd-menu-toggle js-tip\" href=\"{SiteNav.RetrosOutputPath}\" data-tip=\"{PathUtil.Html(tip)}\">Retros</a>");
         }
 
-        var open = sprint.OpenActionItems.Count;
+        var open = counts.OpenActionItems;
         if (open > 0)
         {
             var tip = $"{open} open action {Charts.Plural(open, "item", "items")} — review & resolve";
@@ -230,16 +233,17 @@ public static class SprintTemplater
     /// <summary>A compact status progress wheel: the lifecycle segments as a small donut with NO center number
     /// (the sibling "N / M done" label carries it — a number crammed into a tiny ring just reads as noise) and a
     /// hover tooltip of the breakdown. Shared by the sprint page's top strip and the home Now &amp; Next header.
-    /// Returns empty when no stories are tracked. [Story 2.3 redesign]</summary>
-    public static string RenderProgressWheel(SprintStatus sprint)
+    /// Totals are the sum of the ledger's tracked-stage segments. Returns empty when no stories are tracked.
+    /// [Story 2.3 redesign; Story 8.3]</summary>
+    public static string RenderProgressWheel(ProjectCounts counts)
     {
-        var counts = StoryStageCounts(sprint);
-        var total = counts.Sum(c => c.Count);
+        var stages = counts.TrackedStoryStages;
+        var total = stages.Sum(c => c.Count);
         if (total == 0) return string.Empty;
 
-        var segments = counts.Select(c => (c.Label, c.Count, c.CssClass)).ToList();
+        var segments = stages.Select(c => (c.Label, c.Count, c.CssClass)).ToList();
         var nonZero = segments.Where(s => s.Count > 0).ToList();
-        var done = counts.First(c => c.CssClass == "done").Count;
+        var done = stages.First(c => c.CssClass == "done").Count;
         var ariaParts = string.Join(", ", nonZero.Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
 
         // Rich single tooltip via the body-level (never-clipped) js-tip node; suppress the donut's per-segment
@@ -252,6 +256,11 @@ public static class SprintTemplater
         sb.Append("</div>");
         return sb.ToString();
     }
+
+    /// <summary>Convenience overload — builds an ephemeral ledger from the yaml alone. Prefer
+    /// <see cref="RenderProgressWheel(ProjectCounts)"/> when the shared generation ledger is available. [Story 8.3]</summary>
+    public static string RenderProgressWheel(SprintStatus sprint) =>
+        RenderProgressWheel(ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty));
 
 
     /// <summary>One board card for a story: the whole card is a link to the story's generated page (real or

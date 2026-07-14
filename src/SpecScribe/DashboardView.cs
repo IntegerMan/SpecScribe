@@ -205,8 +205,12 @@ public sealed record DashboardView
     public required WorkInventory Work { get; init; }
 
     /// <summary>The count of open retrospective action items — the "Retro Action Items" callout in the work band
-    /// (from the sprint status). 0 omits the callout.</summary>
+    /// (from the portal-wide <see cref="Counts"/> ledger). 0 omits the callout. [Story 8.3]</summary>
     public required int OpenRetroActionItems { get; init; }
+
+    /// <summary>The portal-wide count ledger — THE source for every summary count this view surfaces
+    /// (stat tiles, progress bars, action-item callout, sprint wheel). [Story 8.3; FR21]</summary>
+    public required ProjectCounts Counts { get; init; }
 
     /// <summary>The home index-grid bands (planning / implementation / spec-kernel / unrecognized-folder / ADR /
     /// retro), in render order, fully grouped and classified by the builder.</summary>

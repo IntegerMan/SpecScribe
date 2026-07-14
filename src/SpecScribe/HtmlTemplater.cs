@@ -104,18 +104,18 @@ public static class HtmlTemplater
     /// footer) is assembled by the same adapter from the <see cref="PageView"/> — the DELIVERY-seam contract
     /// (AD-2). This is 6.1's opaque <see cref="PageView.BodyHtml"/> seam now carrying an adapter-rendered-from-data
     /// body instead of a templater-hand-built one; bytes unchanged. [Story 6.1; Story 6.2]</summary>
-    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null, bool hasTimeline = false, Func<string, string?>? codeItemHref = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildIndexPage(docs, nav, progress, epicsModel, requirements, adrs, commands, work, sprint, retros, coverage, hasTimeline, codeItemHref)).Content;
+    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null, bool hasTimeline = false, Func<string, string?>? codeItemHref = null, ProjectCounts? counts = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildIndexPage(docs, nav, progress, epicsModel, requirements, adrs, commands, work, sprint, retros, coverage, hasTimeline, codeItemHref, counts)).Content;
 
     /// <summary>Builds the dashboard's <see cref="PageView"/> without committing to a surface — the mechanical
     /// split of <see cref="RenderIndex"/> (which now just feeds this through the HTML adapter, bytes unchanged)
     /// that lets the webview surface render the SAME page model through its own <see cref="IRenderAdapter"/>
     /// instead of duplicating the view/PageView assembly. [Story 6.4]</summary>
-    public static PageView BuildIndexPage(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null, bool hasTimeline = false, Func<string, string?>? codeItemHref = null)
+    public static PageView BuildIndexPage(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null, bool hasTimeline = false, Func<string, string?>? codeItemHref = null, ProjectCounts? counts = null)
     {
         var inventory = work ?? WorkInventory.Empty;
 
-        var view = DashboardViewBuilder.Build(docs, nav, progress, epicsModel, requirements, adrs, commands, inventory, sprint, retros, coverage, hasTimeline);
+        var view = DashboardViewBuilder.Build(docs, nav, progress, epicsModel, requirements, adrs, commands, inventory, sprint, retros, coverage, hasTimeline, counts);
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view, codeItemHref);
 
         // Home carries a descriptive title (sub-pages are already "Title — Site") + OG/description, no

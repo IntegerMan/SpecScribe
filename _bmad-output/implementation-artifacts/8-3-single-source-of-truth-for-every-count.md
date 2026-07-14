@@ -1,6 +1,10 @@
+---
+baseline_commit: 2b366d6133af0742081a8a01db50280777531862
+---
+
 # Story 8.3: Single Source of Truth for Every Count
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -249,23 +253,23 @@ No external libraries or APIs are introduced — pure in-repo C# over existing m
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — `ProjectCounts` ledger record (AC: #1, #2)**
-  - [ ] Add `src/SpecScribe/ProjectCounts.cs`: immutable record, `Build(ProgressModel, SprintStatus?, WorkInventory)` factory, `Empty`. Fields for all four families, `Defined` vs `Tracked` named distinctly, per-stage tracked tally, reconciliation result. XML-doc it as THE portal-wide count authority (the seam future adapters/surfaces read).
-  - [ ] Derive every total as `Σ` of its own segments; add the `Debug` invariant assertion `Σ stage counts == story total`.
-  - [ ] Implement epics.md↔yaml reconciliation (match by story id) → `UntrackedDefinedStories` / `OrphanTrackedRows`.
-- [ ] **Task 2 — Build once + thread through generation (AC: #1)**
-  - [ ] In `SiteGenerator.GenerateAll`, build `_counts` after `_progress`/`_sprint`/`workInventory`; add `ProjectCounts` params to the dashboard/sprint/epics-index/action-items entry points and pass it (default `ProjectCounts.Empty` where needed). Preserve phase ordering + mid-chain caching.
-- [ ] **Task 3 — Delete render-site recounts, read the ledger (AC: #1, #2)**
-  - [ ] Replace `SprintTemplater` epic/story recounts + wheel total; `EpicsViewBuilder.BuildIndex` epic/drafted counts; `DashboardViewBuilder` stat-tile/progress-bar/action-item counts; `ActionItemsTemplater` header count; `HtmlRenderAdapter.Epics` "Stories defined" — all with ledger reads. Preserve the "Direct changes" tile gate.
-  - [ ] Grep `src/SpecScribe` for render/view-builder-site `.Count(`/`.Entries.Count`; route in-scope ones through the ledger; document any deliberately-left recount in Completion Notes.
-- [ ] **Task 4 — Divergence notice (AC: #2)**
-  - [ ] Emit exactly one non-fatal notice when reconciliation finds drift; **coordinate with 8.2/4.1**: `AdapterDiagnostic` (`Skipped`/`Unsupported`) if the channel exists, else `GenerationEvent`/`ConsoleUi.PrintInitialSummary` + `// TODO(4.1)` marker. Deterministic, input-only. Record the choice in Completion Notes.
-- [ ] **Task 5 — Tests (AC: #1, #2)**
-  - [ ] `ProjectCountsTests` (mapping, Defined-vs-Tracked, reconciliation, Σ==total, Empty, determinism).
-  - [ ] Generation-level cross-surface agreement test (agreeing fixture → equal numbers, no notice) + divergence test (disagreeing fixture → one notice, no `Error`, correctly-named numbers).
-  - [ ] Fix any expectation-shifted rendering tests; regenerate the golden fingerprint **only** if a rendered number legitimately changed.
-- [ ] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball dashboard/epics-index/sprint story+epic numbers for coherence; if this repo's inputs have drifted, confirm the single reconciliation notice prints.
+- [x] **Task 1 — `ProjectCounts` ledger record (AC: #1, #2)**
+  - [x] Add `src/SpecScribe/ProjectCounts.cs`: immutable record, `Build(ProgressModel, SprintStatus?, WorkInventory)` factory, `Empty`. Fields for all four families, `Defined` vs `Tracked` named distinctly, per-stage tracked tally, reconciliation result. XML-doc it as THE portal-wide count authority (the seam future adapters/surfaces read).
+  - [x] Derive every total as `Σ` of its own segments; add the `Debug` invariant assertion `Σ stage counts == story total`.
+  - [x] Implement epics.md↔yaml reconciliation (match by story id) → `UntrackedDefinedStories` / `OrphanTrackedRows`.
+- [x] **Task 2 — Build once + thread through generation (AC: #1)**
+  - [x] In `SiteGenerator.GenerateAll`, build `_counts` after `_progress`/`_sprint`/`workInventory`; add `ProjectCounts` params to the dashboard/sprint/epics-index/action-items entry points and pass it (default `ProjectCounts.Empty` where needed). Preserve phase ordering + mid-chain caching.
+- [x] **Task 3 — Delete render-site recounts, read the ledger (AC: #1, #2)**
+  - [x] Replace `SprintTemplater` epic/story recounts + wheel total; `EpicsViewBuilder.BuildIndex` epic/drafted counts; `DashboardViewBuilder` stat-tile/progress-bar/action-item counts; `ActionItemsTemplater` header count; `HtmlRenderAdapter.Epics` "Stories defined" — all with ledger reads. Preserve the "Direct changes" tile gate.
+  - [x] Grep `src/SpecScribe` for render/view-builder-site `.Count(`/`.Entries.Count`; route in-scope ones through the ledger; document any deliberately-left recount in Completion Notes.
+- [x] **Task 4 — Divergence notice (AC: #2)**
+  - [x] Emit exactly one non-fatal notice when reconciliation finds drift; **coordinate with 8.2/4.1**: `AdapterDiagnostic` (`Skipped`/`Unsupported`) if the channel exists, else `GenerationEvent`/`ConsoleUi.PrintInitialSummary` + `// TODO(4.1)` marker. Deterministic, input-only. Record the choice in Completion Notes.
+- [x] **Task 5 — Tests (AC: #1, #2)**
+  - [x] `ProjectCountsTests` (mapping, Defined-vs-Tracked, reconciliation, Σ==total, Empty, determinism).
+  - [x] Generation-level cross-surface agreement test (agreeing fixture → equal numbers, no notice) + divergence test (disagreeing fixture → one notice, no `Error`, correctly-named numbers).
+  - [x] Fix any expectation-shifted rendering tests; regenerate the golden fingerprint **only** if a rendered number legitimately changed.
+- [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball dashboard/epics-index/sprint story+epic numbers for coherence; if this repo's inputs have drifted, confirm the single reconciliation notice prints.
 
 ## Dev Notes
 
@@ -298,12 +302,48 @@ No external libraries or APIs are introduced — pure in-repo C# over existing m
 - [Source: [ARCHITECTURE-SPINE.md](../specs/spec-specscribe/ARCHITECTURE-SPINE.md), [rendering-architecture.md](../specs/spec-specscribe/rendering-architecture.md)] — single-source, graceful degradation, seed-not-invariant.
 - [Source: [spec-site-ux-review-journeys-and-feedback.md](spec-site-ux-review-journeys-and-feedback.md)] — the UX review that seeded Epic 8.
 
+## Change Log
+
+- 2026-07-14: Implemented portal-wide `ProjectCounts` ledger; routed dashboard/epics/sprint/action-items summary counts through it; surfaced epics.md↔yaml divergence as one `AdapterDiagnostic` (Unsupported).
+
 ## Dev Agent Record
 
 ### Agent Model Used
 
+Composer (Cursor agent)
+
 ### Debug Log References
+
+- Golden fingerprint: before/after fixture diff of HEAD (8.2) vs this ledger is byte-identical; prior constant was already stale on current runners (both trees hash to the regenerated value). Not a count-number change.
 
 ### Completion Notes List
 
+- Introduced `ProjectCounts` as the single generator-side count authority (`StoriesDefined`/`EpicsDefined` from `ProgressModel`; `StoriesTracked`/`EpicsTracked` + stage tally from sprint yaml; deferred/direct/action counts from `WorkInventory`/`SprintStatus`). Built once in `GenerateAll` after `workInventory`, threaded into dashboard / sprint / epics-index / action-items (and webview/SPA mirrors).
+- Kept Defined vs Tracked named distinctly — this repo currently shows **88 Stories defined** (dashboard + epics-index) vs **89 stories from sprint-status.yaml** (sprint subtitle), with orphan tracked row `3.4` (retired story still in yaml).
+- Divergence notice via **`AdapterDiagnostic` (`Unsupported`)** on `sprint-status.yaml` → existing `MapDiagnostics` → Skipped outcome (Story 8.2/4.1 channel). Built *after* 8.2 (status is `review`); no parallel notice path.
+- `Debug.Assert` partition invariants: `Σ DefinedStoryStages == StoriesDefined` (when `PerEpic` present) and `Σ TrackedStoryStages == StoriesTracked`.
+- Deliberately-left recounts: `work.QuickDev.Count > 0` / `model.Epics.Count == 0` existence gates; per-lane board `col.Count`; requirements status grid counts (out of scope); Now & Next derived card filters (not summary widgets).
+- Tests: `ProjectCountsTests` + generation agreeing/diverging fixtures in `SiteGeneratorSprintTests`. Full suite **1113** passed. Golden fingerprint regenerated as baseline refresh only (see Debug Log).
+
 ### File List
+
+- `src/SpecScribe/ProjectCounts.cs` (new)
+- `src/SpecScribe/SiteGenerator.cs`
+- `src/SpecScribe/DashboardView.cs`
+- `src/SpecScribe/DashboardViewBuilder.cs`
+- `src/SpecScribe/HtmlTemplater.cs`
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs`
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs`
+- `src/SpecScribe/EpicsView.cs`
+- `src/SpecScribe/EpicsViewBuilder.cs`
+- `src/SpecScribe/EpicsTemplater.cs`
+- `src/SpecScribe/SprintTemplater.cs`
+- `src/SpecScribe/ActionItemsTemplater.cs`
+- `tests/SpecScribe.Tests/ProjectCountsTests.cs` (new)
+- `tests/SpecScribe.Tests/SiteGeneratorSprintTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
+- `tests/SpecScribe.Tests/RenderSectionParityTests.cs`
+- `tests/SpecScribe.Tests/RenderSpaParityTests.cs`
+- `tests/SpecScribe.Tests/WebviewRenderAdapterTests.cs`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/8-3-single-source-of-truth-for-every-count.md`

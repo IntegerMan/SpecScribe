@@ -24,7 +24,7 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</header>\n\n");
 
         sb.Append("<section class=\"dashboard\">\n");
-        AppendEpicsProgressPanel(sb, view.Progress);
+        AppendEpicsProgressPanel(sb, view.Progress, view.Counts);
         sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
         sb.Append(Charts.Sunburst(model, commands: view.Commands));
         sb.Append("</div>\n");
@@ -67,25 +67,27 @@ public sealed partial class HtmlRenderAdapter
         return sb.ToString();
     }
 
-    /// <summary>The epics-index progress panel (stat-grid + Epic Status donut + mosaic). Re-homed from
-    /// <c>EpicsTemplater.AppendProgressPanel</c>.</summary>
-    private void AppendEpicsProgressPanel(StringBuilder sb, ProgressModel progress)
+    /// <summary>The epics-index progress panel (stat-grid + Epic Status donut + mosaic). Headline counts come
+    /// from the portal-wide ledger; the mosaic still needs per-epic detail from <paramref name="progress"/>.
+    /// Donut segment values are the ledger fields; their sum is the structural total. [Story 6.2; Story 8.3]</summary>
+    private void AppendEpicsProgressPanel(StringBuilder sb, ProgressModel progress, ProjectCounts counts)
     {
         sb.Append("<div class=\"stat-grid\">\n");
-        sb.Append(Charts.StatCard($"{progress.EpicsDrafted}/{progress.EpicsTotal}", "Epics drafted"));
-        sb.Append(Charts.StatCard(progress.StoriesTotal.ToString(), "Stories defined", $"{progress.StoriesWithArtifact} with a task plan"));
-        sb.Append(progress.TasksTotal > 0
-            ? Charts.StatCard($"{progress.TasksDone}/{progress.TasksTotal}", "Tasks done", $"across {progress.StoriesWithArtifact} planned stor{(progress.StoriesWithArtifact == 1 ? "y" : "ies")}")
+        sb.Append(Charts.StatCard($"{counts.EpicsDrafted}/{counts.EpicsDefined}", "Epics drafted"));
+        sb.Append(Charts.StatCard(counts.StoriesDefined.ToString(), "Stories defined", $"{counts.StoriesWithArtifact} with a task plan"));
+        sb.Append(counts.TasksTotal > 0
+            ? Charts.StatCard($"{counts.TasksDone}/{counts.TasksTotal}", "Tasks done", $"across {counts.StoriesWithArtifact} planned stor{(counts.StoriesWithArtifact == 1 ? "y" : "ies")}")
             : Charts.StatCard("—", "Tasks done", "none tracked yet"));
         sb.Append("</div>\n\n");
 
         sb.Append("<div class=\"chart-panel\">\n<h3>Epic Status</h3>\n<div class=\"donut-and-legend\">\n");
         var epicStatusSegments = new (string Label, int Value, string CssClass)[]
         {
-            ("Drafted", progress.EpicsDrafted, "drafted"),
-            ("Pending", progress.EpicsPending, "pending"),
+            ("Drafted", counts.EpicsDrafted, "drafted"),
+            ("Pending", counts.EpicsPending, "pending"),
         };
-        sb.Append(Charts.Donut(epicStatusSegments, ariaLabel: $"Epic status: {progress.EpicsDrafted} drafted, {progress.EpicsPending} pending"));
+        // Structural: segments are the ledger fields; their sum equals EpicsDefined (asserted in ProjectCounts).
+        sb.Append(Charts.Donut(epicStatusSegments, ariaLabel: $"Epic status: {counts.EpicsDrafted} drafted, {counts.EpicsPending} pending"));
         sb.Append(Charts.DonutLegend(epicStatusSegments));
         sb.Append("</div>\n</div>\n\n");
 

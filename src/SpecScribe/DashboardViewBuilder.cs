@@ -28,7 +28,8 @@ public static class DashboardViewBuilder
         KnownIndexGroups.Any(g => g.Prefix.Length > 0 && string.Equals(g.Prefix, folder, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Assembles the full dashboard section view model. Same inputs (and defaults) as the former
-    /// <c>HtmlTemplater.RenderIndex</c> so the templater becomes a thin builder → adapter call. [Story 6.2]</summary>
+    /// <c>HtmlTemplater.RenderIndex</c> so the templater becomes a thin builder → adapter call. Summary counts
+    /// come exclusively from <paramref name="counts"/> (the portal-wide ledger). [Story 6.2; Story 8.3]</summary>
     public static DashboardView Build(
         IReadOnlyList<DocModel> docs,
         SiteNav nav,
@@ -41,22 +42,27 @@ public static class DashboardViewBuilder
         SprintStatus? sprint,
         IReadOnlyList<RetroModel>? retros,
         ArtifactCoverage? coverage,
-        bool hasTimeline = false)
+        bool hasTimeline = false,
+        ProjectCounts? counts = null)
     {
+        // Production always passes the shared SiteGenerator ledger. Null → build an equivalent ephemeral
+        // ledger from the same inputs so tests/stubs that omit counts keep correct Defined/Tracked numbers.
+        var ledger = counts ?? ProjectCounts.Build(progress, sprint, work, epicsModel);
         return new DashboardView
         {
             SiteTitle = nav.SiteTitle,
-            StatTiles = BuildStatTiles(progress, work),
+            StatTiles = BuildStatTiles(ledger, progress, work),
             NowNext = BuildNowNext(epicsModel, sprint),
             Epics = epicsModel,
             Commands = commands,
             Progress = progress,
-            ProgressBars = BuildProgressBars(progress),
+            ProgressBars = BuildProgressBars(ledger),
             Requirements = requirements,
             Coverage = coverage,
             QuickLinks = nav.QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description)).ToList(),
             Work = work,
-            OpenRetroActionItems = sprint?.OpenActionItems.Count ?? 0,
+            OpenRetroActionItems = ledger.OpenActionItems,
+            Counts = ledger,
             IndexBands = BuildIndexBands(docs, epicsModel, adrs, retros, work),
             HasTimeline = hasTimeline,
         };
@@ -64,20 +70,20 @@ public static class DashboardViewBuilder
 
     // ----- Stat tiles ---------------------------------------------------------------------------------------
 
-    /// <summary>The headline stat-grid row, forks resolved. Mirrors <c>AppendDashboard</c>'s five
-    /// <see cref="Charts.StatCard"/> calls exactly (the fifth "Direct changes" tile only when there is
-    /// quick-dev/deferred work — a byte-load-bearing conditional). [Story 6.2]</summary>
-    private static IReadOnlyList<StatTile> BuildStatTiles(ProgressModel p, WorkInventory work)
+    /// <summary>The headline stat-grid row, forks resolved. Count values come from the portal-wide ledger;
+    /// the fifth "Direct changes" tile still gates on <paramref name="work"/>.IsEmpty (byte-load-bearing).
+    /// Git/commit tile stays on <paramref name="progress"/> (out of Story 8.3 scope). [Story 6.2; Story 8.3]</summary>
+    private static IReadOnlyList<StatTile> BuildStatTiles(ProjectCounts c, ProgressModel p, WorkInventory work)
     {
         var tiles = new List<StatTile>
         {
-            new($"{p.EpicsDrafted}/{p.EpicsTotal}", "Epics drafted",
+            new($"{c.EpicsDrafted}/{c.EpicsDefined}", "Epics drafted",
                 Tooltip: "Epics with at least one story drafted, out of all epics."),
-            new(p.StoriesTotal.ToString(), "Stories defined", $"{p.StoriesWithArtifact} with a task plan",
+            new(c.StoriesDefined.ToString(), "Stories defined", $"{c.StoriesWithArtifact} with a task plan",
                 "Stories listed across every epic; the sub-line counts those with a BMad task checklist."),
-            p.TasksTotal > 0
-                ? new($"{p.TasksDone}/{p.TasksTotal}", "Planned tasks done", $"{p.StoriesWithArtifact}/{p.StoriesTotal} stories planned",
-                    $"Checklist tasks done across the {p.StoriesWithArtifact} stories that have a task plan — not the whole project.")
+            c.TasksTotal > 0
+                ? new($"{c.TasksDone}/{c.TasksTotal}", "Planned tasks done", $"{c.StoriesWithArtifact}/{c.StoriesDefined} stories planned",
+                    $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.")
                 : new("—", "Planned tasks done", "none tracked yet"),
             p.Git is { } git
                 ? new(git.TotalCommits.ToString(), Charts.Plural(git.TotalCommits, "Commit", "Commits"), CommitStatSub(git),
@@ -87,11 +93,11 @@ public static class DashboardViewBuilder
 
         if (!work.IsEmpty)
         {
-            var deferredCount = work.Deferred?.OpenItemCount ?? 0;
+            var deferredCount = c.DeferredOpenItems;
             var sub = work.Deferred is not null
                 ? $"{deferredCount} deferred {Charts.Plural(deferredCount, "item", "items")}"
                 : "outside the epic plan";
-            tiles.Add(new(work.QuickDev.Count.ToString(), "Direct changes", sub,
+            tiles.Add(new(c.DirectChanges.ToString(), "Direct changes", sub,
                 "Quick-dev / one-shot changes and deferred-work notes — tracked separately from the epic/story plan, never counted as epic or story completion."));
         }
 
@@ -111,12 +117,12 @@ public static class DashboardViewBuilder
 
     // ----- Overall Progress bars ----------------------------------------------------------------------------
 
-    /// <summary>The two "Overall Progress" bars, the tasks fork resolved. Mirrors <c>AppendDashboard</c>. [Story 6.2]</summary>
-    private static IReadOnlyList<ProgressBarView> BuildProgressBars(ProgressModel p) => new[]
+    /// <summary>The two "Overall Progress" bars, the tasks fork resolved — values from the ledger. [Story 6.2; Story 8.3]</summary>
+    private static IReadOnlyList<ProgressBarView> BuildProgressBars(ProjectCounts c) => new[]
     {
-        new ProgressBarView("Planning", p.EpicsDrafted, p.EpicsTotal, $"{p.EpicsDrafted} / {p.EpicsTotal} epics"),
-        p.TasksTotal > 0
-            ? new ProgressBarView("Implementation", p.TasksDone, p.TasksTotal, $"{p.TasksDone} / {p.TasksTotal} tasks ({p.StoriesWithArtifact} of {p.StoriesTotal} stories planned)")
+        new ProgressBarView("Planning", c.EpicsDrafted, c.EpicsDefined, $"{c.EpicsDrafted} / {c.EpicsDefined} epics"),
+        c.TasksTotal > 0
+            ? new ProgressBarView("Implementation", c.TasksDone, c.TasksTotal, $"{c.TasksDone} / {c.TasksTotal} tasks ({c.StoriesWithArtifact} of {c.StoriesDefined} stories planned)")
             : new ProgressBarView("Implementation", 0, 0, "not started"),
     };
 

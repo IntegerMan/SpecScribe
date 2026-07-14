@@ -105,6 +105,9 @@ public sealed class SiteGenerator
     private IReadOnlyList<(string RepoRelativePath, long Lines)> _codeFiles = Array.Empty<(string, long)>();
 
     private SprintStatus? _sprint;
+    // Story 8.3: portal-wide count ledger — built once after progress/sprint/workInventory are known and
+    // threaded into every summary surface so no render site recounts. Null until the index/work phase.
+    private ProjectCounts? _counts;
     private List<RetroModel> _retros = new();
     private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
 
@@ -334,16 +337,30 @@ public sealed class SiteGenerator
             // the panel omits, and generation still succeeds (AD-4 / NFR2). [Story 3.3 Task 2; review: reordered]
             _coverage = BuildArtifactCoverage(sourceRelatives);
 
-            // The sprint page reads the epics model (for real story/epic titles + links), so it's written
-            // after the epics phase. Gated on parsed sprint data; a no-op when there is none. [Story 2.3 Task 3/5]
+            // Built once and shared with WriteSprint / WriteActionItems / WriteIndex. Lifted above WriteSprint
+            // so the sprint page can consume the shared ledger without moving the sprint write later in the
+            // phase order (diagnostics event ordering is load-bearing for the golden fingerprint). [Story 2.3 review; Story 8.3]
+            var workInventory = WorkInventory.Build(_docs.Values.ToList());
+            // Story 8.3: one portal-wide count ledger. Divergence → exactly one Unsupported AdapterDiagnostic
+            // (same channel as Story 8.2 / 4.1).
+            _counts = ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, workInventory, _epicsModel);
+            if (_counts.HasDivergence)
+            {
+                events.AddRange(MapDiagnostics(new[]
+                {
+                    new AdapterDiagnostic(
+                        AdapterDiagnosticCategory.Unsupported,
+                        BmadArtifactAdapter.SprintStatusFileName,
+                        _counts.DivergenceMessage()),
+                }));
+            }
+            // Sprint page reads the epics model (titles/links) + the shared ledger (tracked totals). [Story 2.3; 8.3]
             WriteSprint(nav);
             // The source-code treemap reads the cached source-code walk + the (now-populated) deep-git per-file
             // metrics, so it's written after the pages/git phases — like WriteSprint, gated on the same source-code
             // signal as its nav item. Replaced the retired Story 3.4 structure tree. [Story 7.6]
             WriteCodeMap(nav);
             WriteRetroIndex(nav);
-            // Built once and shared with WriteIndex below — both used to rebuild it independently. [Story 2.3 review]
-            var workInventory = WorkInventory.Build(_docs.Values.ToList());
             WriteActionItems(nav, workInventory);
 
             reporter?.BeginPhase(GenerationPhase.Index);
@@ -1838,7 +1855,11 @@ public sealed class SiteGenerator
             // story `.md` and `configuredOutputRoot` use — no `_bmad-output` literal anywhere host-side.
             _epicsSourcePath = RepoRelative(epicsFullPath);
 
-            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands), "epics.html"));
+            // Counts ledger may not exist yet (built after workInventory in GenerateAll) — provisional Build
+            // shares the same Defined/Tracked fields the final ledger will (workInventory only affects
+            // deferred/direct, which this page does not show). [Story 8.3]
+            var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, WorkInventory.Empty, model);
+            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts), "epics.html"));
 
             // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
             // undrafted story that got a placeholder and then vanished — can't leave a stale page behind,
@@ -1980,9 +2001,11 @@ public sealed class SiteGenerator
             // Dashboard — the same inputs WriteIndex hands the templater, so the webview dashboard can never
             // disagree with the generated index.html.
             var docs = _docs.Values.ToList();
+            var work = WorkInventory.Build(docs);
+            var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                WorkInventory.Build(docs), _sprint, _retros, _coverage, _timelinePath is not null);
+                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -1991,7 +2014,7 @@ public sealed class SiteGenerator
             if (_epicsModel is { } model && _progress is { } progress)
             {
                 var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands), _epicsSourcePath));
+                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts), _epicsSourcePath));
 
                 foreach (var epic in model.Epics)
                 {
@@ -2230,15 +2253,17 @@ public sealed class SiteGenerator
         // airtight (AC #4). Mirrors RenderWebviewSurfaces' iteration exactly (same models, retro map, placeholder
         // rule, fragment pipeline).
         var docs = _docs.Values.ToList();
+        var work = WorkInventory.Build(docs);
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            WorkInventory.Build(docs), _sprint, _retros, _coverage, _timelinePath is not null);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
         {
             var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-            AddSpaSurface(pages, familyPaths, EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands));
+            AddSpaSurface(pages, familyPaths, EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts));
 
             foreach (var epic in model.Epics)
             {
@@ -2399,7 +2424,9 @@ public sealed class SiteGenerator
         var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
         var inventory = work ?? WorkInventory.Build(docs);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref);
+        // Incremental paths may call WriteIndex without going through GenerateAll's ledger build — rebuild then.
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
@@ -2528,7 +2555,8 @@ public sealed class SiteGenerator
     private void WriteSprint(SiteNav nav)
     {
         if (_sprint is null) return;
-        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros);
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, WorkInventory.Empty, _epicsModel);
+        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, counts);
         WriteOutput(SiteNav.SprintOutputPath, ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
 
@@ -2596,7 +2624,8 @@ public sealed class SiteGenerator
         // NOT reference-linkified: the "Resolve with AI" data-copy payload embeds the action text (which can
         // contain "Epic N"/"Story N.M" mentions); the linkifier would wrap those in <a> tags INSIDE the
         // attribute value and corrupt the copyable command. [Story 2.3 polish #5]
-        var html = ActionItemsTemplater.RenderPage(open, EpicRetroMap, _module.Commands, nav, deferredHref);
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work ?? WorkInventory.Empty, _epicsModel);
+        var html = ActionItemsTemplater.RenderPage(open, EpicRetroMap, _module.Commands, nav, deferredHref, counts);
         WriteOutput(SiteNav.ActionItemsOutputPath, html);
     }
 

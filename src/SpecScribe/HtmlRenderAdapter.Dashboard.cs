@@ -23,7 +23,7 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</header>\n\n");
 
         AppendDashboardSection(sb, view, codeItemHref);
-        AppendWorkTypesSection(sb, view.Work, view.OpenRetroActionItems);
+        AppendWorkTypesSection(sb, view.Work, view.OpenRetroActionItems, view.Counts);
         foreach (var band in view.IndexBands)
         {
             AppendIndexBand(sb, band);
@@ -50,7 +50,7 @@ public sealed partial class HtmlRenderAdapter
         // Now & Next: sprint board when tracked, else the derived cards; omitted entirely when the view is null.
         if (view.NowNext is { } nowNext)
         {
-            AppendNowAndNext(sb, nowNext, view.Epics);
+            AppendNowAndNext(sb, nowNext, view.Epics, view.Counts);
         }
 
         // The sunburst headline panel — present only when there is an epics model.
@@ -177,7 +177,7 @@ public sealed partial class HtmlRenderAdapter
     /// <summary>The "Now &amp; Next" panel. Re-homed from <c>HtmlTemplater.AppendNowAndNext</c>: the sprint-board
     /// branch renders from the tracked <see cref="SprintStatus"/> + the dashboard's epics model; the derived
     /// branch renders the pre-computed cards.</summary>
-    private void AppendNowAndNext(StringBuilder sb, DashboardNowNext nowNext, EpicsModel? epicsModel)
+    private void AppendNowAndNext(StringBuilder sb, DashboardNowNext nowNext, EpicsModel? epicsModel, ProjectCounts counts)
     {
         if (nowNext.SprintBoard is { } sprint && epicsModel is not null)
         {
@@ -185,7 +185,7 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("<div class=\"chart-panel-header-row sprint-board-header\">\n");
             sb.Append("  <h3>Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span></h3>\n");
             sb.Append("  <div class=\"sprint-board-header-aside\">");
-            sb.Append(SprintTemplater.RenderProgressWheel(sprint));
+            sb.Append(SprintTemplater.RenderProgressWheel(counts));
             sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a>");
             sb.Append("</div>\n</div>\n");
             sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath));
@@ -253,13 +253,16 @@ public sealed partial class HtmlRenderAdapter
     }
 
     /// <summary>The "Direct &amp; Quick-Dev Work" band. Re-homed from <c>HtmlTemplater.AppendWorkTypesSection</c>,
-    /// driven by the <see cref="WorkInventory"/> domain input + the open-retro count.</summary>
-    private void AppendWorkTypesSection(StringBuilder sb, WorkInventory work, int openRetro)
+    /// driven by the <see cref="WorkInventory"/> domain input; the open deferred/action counts come from the
+    /// portal-wide ledger. [Story 6.2; Story 8.3]</summary>
+    private void AppendWorkTypesSection(StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts)
     {
         if (work.IsEmpty && openRetro == 0) return;
 
         sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept("Direct & Quick-Dev Work")}Direct &amp; Quick-Dev Work</div>\n");
 
+        // Existence gate for the quick-dev card grid (must iterate work.QuickDev for cards); displayed Direct
+        // changes tile count is ledger-sourced in BuildStatTiles. [Story 8.3]
         if (work.QuickDev.Count > 0)
         {
             sb.Append("<div class=\"index-grid\">\n");
@@ -290,7 +293,7 @@ public sealed partial class HtmlRenderAdapter
 
         if (work.Deferred is { } deferred)
         {
-            var count = deferred.OpenItemCount;
+            var count = counts.DeferredOpenItems;
             sb.Append($"<a class=\"work-callout\" href=\"{PathUtil.Html(deferred.OutputPath)}\">\n");
             sb.Append($"  <span class=\"work-callout-label\">{Icons.ForConcept("Deferred")}Deferred Work</span>\n");
             sb.Append($"  <span class=\"work-callout-count\">{count} open {Charts.Plural(count, "item", "items")}</span>\n");

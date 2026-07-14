@@ -17,17 +17,24 @@ public static class EpicsViewBuilder
 
     // ----- Epics index --------------------------------------------------------------------------------------
 
-    public static EpicsIndexView BuildIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands) => new()
+    public static EpicsIndexView BuildIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null)
     {
-        SiteTitle = nav.SiteTitle,
-        EpicCount = model.Epics.Count,
-        DraftedCount = model.Epics.Count(e => e.Status == EpicStatus.Drafted),
-        Progress = progress,
-        Epics = model,
-        Commands = commands,
-        VerticalSliceChips = model.Epics.Where(e => e.Section == EpicSection.VerticalSlice).Select(BuildChip).ToList(),
-        FurtherDevelopmentChips = model.Epics.Where(e => e.Section == EpicSection.FurtherDevelopment).Select(BuildChip).ToList(),
-    };
+        // Production always passes the shared ledger. Null → keep the model-derived subtitle (test/stub path)
+        // while panel stats fall through Empty (same zeros ProgressModel.Empty previously produced). [Story 8.3]
+        var ledger = counts ?? ProjectCounts.Empty;
+        return new()
+        {
+            SiteTitle = nav.SiteTitle,
+            EpicCount = counts?.EpicsDefined ?? model.Epics.Count,
+            DraftedCount = counts?.EpicsDrafted ?? model.Epics.Count(e => e.Status == EpicStatus.Drafted),
+            Progress = progress,
+            Counts = ledger,
+            Epics = model,
+            Commands = commands,
+            VerticalSliceChips = model.Epics.Where(e => e.Section == EpicSection.VerticalSlice).Select(BuildChip).ToList(),
+            FurtherDevelopmentChips = model.Epics.Where(e => e.Section == EpicSection.FurtherDevelopment).Select(BuildChip).ToList(),
+        };
+    }
 
     private static EpicChip BuildChip(EpicInfo epic) =>
         new(epic.Number, epic.Title, StatusStyles.ForEpicWithRetrospective(epic), $"epics/epic-{epic.Number}.html");

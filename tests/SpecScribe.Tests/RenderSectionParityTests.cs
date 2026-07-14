@@ -26,6 +26,7 @@ public class RenderSectionParityTests
         QuickLinks = Array.Empty<NavQuickLink>(),
         Work = WorkInventory.Empty,
         OpenRetroActionItems = 0,
+        Counts = ProjectCounts.Empty,
         IndexBands = Array.Empty<IndexBand>(),
     };
 
@@ -99,6 +100,7 @@ public class RenderSectionParityTests
             Deferred = null,
         },
         OpenRetroActionItems = 0,
+        Counts = ProjectCounts.Empty,
         IndexBands = new[]
         {
             new IndexBand

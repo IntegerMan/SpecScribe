@@ -140,6 +140,78 @@ public class SiteGeneratorSprintTests : IDisposable
         AssertNoBrokenLocalLinks(IndexPage);
     }
 
+    /// <summary>Story 8.3 AC #1/#2: when epics.md and sprint-status.yaml agree, dashboard "Stories defined",
+    /// epics-index "Stories defined", and the sprint subtitle all render the same story count — and no count
+    /// divergence notice is reported. [Story 8.3]</summary>
+    [Fact]
+    public void GenerateAll_AgreeingCounts_CrossSurfaceAgreement_NoDivergenceNotice()
+    {
+        File.WriteAllText(SprintYaml, SprintYamlContent);
+        var gen = new SiteGenerator(Options());
+        var events = gen.GenerateAll();
+
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+        Assert.DoesNotContain(events, e =>
+            e.Message is { } m && m.Contains("Count divergence", StringComparison.Ordinal));
+
+        var index = File.ReadAllText(IndexPage);
+        var epics = File.ReadAllText(Path.Combine(Site, "epics.html"));
+        var sprint = File.ReadAllText(SprintPage);
+
+        Assert.Contains("Stories defined", index);
+        Assert.Contains("Stories defined", epics);
+        // Sprint subtitle: "2 stories · from sprint-status.yaml" (StoriesTracked).
+        Assert.Contains("2 stories", sprint);
+        Assert.Contains("from sprint-status.yaml", sprint);
+
+        // Extract the Stories-defined number from dashboard + epics-index stat cards — must match.
+        var dashStories = Regex.Match(
+            index, @"<div class=""stat-number"">(\d+)</div><div class=""stat-label"">Stories defined</div>");
+        var epicsStories = Regex.Match(
+            epics, @"<div class=""stat-number"">(\d+)</div><div class=""stat-label"">Stories defined</div>");
+        Assert.True(dashStories.Success, "dashboard Stories defined stat missing");
+        Assert.True(epicsStories.Success, "epics-index Stories defined stat missing");
+        Assert.Equal(dashStories.Groups[1].Value, epicsStories.Groups[1].Value);
+        Assert.Equal("2", dashStories.Groups[1].Value);
+    }
+
+    /// <summary>Story 8.3 AC #2: an orphan tracked yaml row yields exactly one non-fatal Unsupported notice,
+    /// GenerateAll reports no Error, and each surface keeps its correctly-named count. [Story 8.3]</summary>
+    [Fact]
+    public void GenerateAll_DivergentCounts_OneNonFatalNotice_NamedCountsCorrect()
+    {
+        File.WriteAllText(SprintYaml, """
+            last_updated: 2026-07-06T22:00:00-04:00
+            development_status:
+              epic-1: in-progress
+              1-1-foundation: in-progress
+              1-2-undrafted: backlog
+              9-9-orphan: backlog
+              epic-1-retrospective: optional
+            """);
+        var gen = new SiteGenerator(Options());
+        var events = gen.GenerateAll();
+
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+        var notices = events.Where(e =>
+            e.Message is { } m && m.Contains("Count divergence", StringComparison.Ordinal)).ToList();
+        Assert.Single(notices);
+        Assert.Equal(GenerationOutcome.Skipped, notices[0].Outcome);
+        Assert.Contains("[Unsupported]", notices[0].Message);
+        Assert.Contains("9.9", notices[0].Message!);
+
+        var sprint = File.ReadAllText(SprintPage);
+        // Tracked total includes the orphan → 3 stories from sprint-status.yaml.
+        Assert.Contains("3 stories", sprint);
+        Assert.Contains("from sprint-status.yaml", sprint);
+
+        var index = File.ReadAllText(IndexPage);
+        var dashStories = Regex.Match(
+            index, @"<div class=""stat-number"">(\d+)</div><div class=""stat-label"">Stories defined</div>");
+        Assert.True(dashStories.Success);
+        Assert.Equal("2", dashStories.Groups[1].Value); // Defined stays the epics.md count
+    }
+
     /// <summary>Every local (non-anchor, non-http) href on the page resolves to a file that was actually
     /// generated — the "never a broken link" guarantee (AC#1, NFR2).</summary>
     private void AssertNoBrokenLocalLinks(string pagePath)

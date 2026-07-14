@@ -130,6 +130,7 @@ public class RenderSpaParityTests
             QuickLinks = new[] { new NavQuickLink("Epics", "epics.html", "All epics & stories") },
             Work = WorkInventory.Empty,
             OpenRetroActionItems = 0,
+            Counts = ProjectCounts.Empty,
             IndexBands = Array.Empty<IndexBand>(),
         };
         var page = new PageView

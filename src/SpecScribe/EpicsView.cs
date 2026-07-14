@@ -85,8 +85,12 @@ public sealed record EpicsIndexView
     /// <summary>Count of epics with stories drafted (header subtitle).</summary>
     public required int DraftedCount { get; init; }
 
-    /// <summary>The progress snapshot — the stat-grid + Epic-Status donut + mosaic input.</summary>
+    /// <summary>The progress snapshot — mosaic + funnel detail (per-epic). Headline counts come from
+    /// <see cref="Counts"/>. [Story 6.2; Story 8.3]</summary>
     public required ProgressModel Progress { get; init; }
+
+    /// <summary>The portal-wide count ledger — EpicCount/DraftedCount/stat-grid sources. [Story 8.3]</summary>
+    public required ProjectCounts Counts { get; init; }
 
     /// <summary>The epics model — the sunburst input, the chip/card source, and the carrier of the overview +
     /// requirements-inventory opaque fragments and the roadmap diagram input.</summary>

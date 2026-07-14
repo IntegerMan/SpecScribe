@@ -9,19 +9,19 @@ namespace SpecScribe;
 /// (the golden regression is the gate). [Story 6.1; Story 6.2]</para></summary>
 public static class EpicsTemplater
 {
-    public static string RenderIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands) =>
-        HtmlRenderAdapter.Shared.Render(BuildIndexPage(model, progress, nav, commands)).Content;
+    public static string RenderIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildIndexPage(model, progress, nav, commands, counts)).Content;
 
     /// <summary>Builds the epics-index <see cref="PageView"/> without committing to a surface — the mechanical
     /// split of <see cref="RenderIndex"/> (bytes unchanged: it now just feeds this through the HTML adapter) that
     /// lets the webview surface render the SAME page model through <see cref="WebviewRenderAdapter"/> instead of
     /// duplicating the view/PageView assembly. Same split as the other <c>Build*Page</c> methods here. [Story 6.4]</summary>
-    public static PageView BuildIndexPage(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands)
+    public static PageView BuildIndexPage(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null)
     {
         const string outputPath = SiteNav.EpicsOutputPath;
         var breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Epics", null) });
 
-        var view = EpicsViewBuilder.BuildIndex(model, progress, nav, commands);
+        var view = EpicsViewBuilder.BuildIndex(model, progress, nav, commands, counts);
         var body = HtmlRenderAdapter.Shared.RenderEpicsIndexBody(view);
 
         // The epics index drills down to each epic page; its parent is Home (from the breadcrumb). The roadmap

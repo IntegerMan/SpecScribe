@@ -293,7 +293,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // webview+SPA BodyHtml append), every StatusStyles.Badge gained js-tip + data-tip + title, specscribe.css
         // gained --status-unrecognized + legend/badge rules, and sprint board gained an unrecognized lane.
         // Fixture statuses are all known keywords — no unrecognized badges render here; delta is chrome + CSS.
-        const string expected = "4393329efcf501b359e9afe433cff2974edb6a026491f98e139d8c9228905e62";
+        // Reconfirmed during Story 8.3: a before/after fixture diff of HEAD (8.2) vs the ProjectCounts ledger
+        // is byte-identical for every rendered page (only the diagnostics absolute repo-root path differed —
+        // already folded by NormalizeVolatile). The previous constant was stale on current runners; both
+        // trees produce this hash, so regenerating is a baseline refresh, not a count-number change. [Story 8.3]
+        const string expected = "932f7c208e0e00149c910e3067dcdfbc9796e64c220e4021c129694b333a3103";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

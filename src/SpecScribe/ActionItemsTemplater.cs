@@ -9,10 +9,12 @@ namespace SpecScribe;
 /// sprint page's flag button and the home "Retro Action Items" callout. [Story 2.3 retro action items]</summary>
 public static class ActionItemsTemplater
 {
-    public static string RenderPage(IReadOnlyList<SprintActionItem> openItems, IReadOnlyDictionary<int, string>? epicRetroMap, CommandCatalog commands, SiteNav nav, string? deferredWorkHref = null)
+    public static string RenderPage(IReadOnlyList<SprintActionItem> openItems, IReadOnlyDictionary<int, string>? epicRetroMap, CommandCatalog commands, SiteNav nav, string? deferredWorkHref = null, ProjectCounts? counts = null)
     {
         var outputPath = SiteNav.ActionItemsOutputPath;
         var quickDev = commands.Command("quick-dev");
+        // Header count from the portal-wide ledger when available — same OpenActionItems every surface reads. [Story 8.3]
+        var openCount = counts?.OpenActionItems ?? openItems.Count;
 
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
@@ -29,7 +31,7 @@ public static class ActionItemsTemplater
 
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>Open Action Items</h1>\n");
-        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {openItems.Count} open {Charts.Plural(openItems.Count, "item", "items")} &middot; from retrospectives</div>\n");
+        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {openCount} open {Charts.Plural(openCount, "item", "items")} &middot; from retrospectives</div>\n");
         sb.Append("</header>\n\n");
 
         sb.Append("<main id=\"main-content\">\n<section class=\"action-items-wrap\">\n");
