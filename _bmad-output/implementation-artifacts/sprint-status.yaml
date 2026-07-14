@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-14T15:45:00-04:00
+last_updated: 2026-07-14T16:20:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -157,7 +157,7 @@ development_status:
   8-3-single-source-of-truth-for-every-count: review
   8-4-paired-progress-and-readiness-semantics: review
   8-5-state-aware-next-step-command-surface: review
-  8-6-designed-empty-states: ready-for-dev
+  8-6-designed-empty-states: review
   8-7-one-primary-view-per-dashboard-dataset: ready-for-dev
   8-8-generation-time-recency-signals: ready-for-dev
   epic-8-retrospective: optional

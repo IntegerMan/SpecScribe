@@ -56,6 +56,11 @@ public static class EpicsViewBuilder
             bars.Add(new ProgressBarView("Tasks", progress.TasksDone, progress.TasksTotal));
         }
 
+        // Consolidate repeated "no plan yet" CLI hints into one banner when 2+ stories lack an artifact —
+        // a lone undrafted story keeps today's per-card create-story note (not clutter). [Story 8.6]
+        var undrafted = epic.Stories.Where(s => s.ArtifactOutputPath is null).ToList();
+        var consolidated = undrafted.Count >= 2;
+
         return new EpicPageView
         {
             Number = epic.Number,
@@ -69,15 +74,16 @@ public static class EpicsViewBuilder
             NextActionsPanelHtml = RenderNextActionsPanel(epic, prefix, commands),
             NextStepsHtml = BmadCommands.RenderEpicNextSteps(epic, commands),
             RetroAffordanceHtml = RenderRetroAffordance(epic, epicClass, prefix, commands, epicRetroPath),
+            UndraftedBannerHtml = consolidated ? RenderUndraftedBanner(epic, undrafted, commands) : string.Empty,
             Epic = epic,
             Commands = commands,
             Prefix = prefix,
-            StoryCards = epic.Stories.Select(s => BuildStoryCard(s, prefix, commands)).ToList(),
+            StoryCards = epic.Stories.Select(s => BuildStoryCard(s, prefix, commands, consolidated)).ToList(),
             Pager = pager ?? EntityPager.None,
         };
     }
 
-    private static StoryCardView BuildStoryCard(StoryInfo story, string prefix, CommandCatalog commands)
+    private static StoryCardView BuildStoryCard(StoryInfo story, string prefix, CommandCatalog commands, bool consolidated)
     {
         var hasArtifact = story.ArtifactOutputPath is not null;
         var titleTarget = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
@@ -85,10 +91,13 @@ public static class EpicsViewBuilder
         string? noteHtml = null;
         if (!hasArtifact)
         {
-            noteHtml = BmadCommands.InlineGuidance(
-                commands.Command("create-story", story.Id),
-                "No detailed story plan yet — draft it with",
-                "No detailed story plan yet.");
+            // Consolidated path: the banner carries the single create-story affordance; cards keep a plain label.
+            noteHtml = consolidated
+                ? "No detailed story plan yet."
+                : BmadCommands.InlineGuidance(
+                    commands.Command("create-story", story.Id),
+                    "No detailed story plan yet — draft it with",
+                    "No detailed story plan yet.");
         }
 
         return new StoryCardView
@@ -210,6 +219,20 @@ public static class EpicsViewBuilder
             string.Empty);
         if (guidance.Length == 0) return string.Empty;
         return $"<div class=\"epic-card epic-retro-affordance\">\n  <div class=\"pending-note\">{guidance}</div>\n</div>\n\n";
+    }
+
+    /// <summary>One designed banner when an epic has 2+ undrafted stories: a count sentence plus a single
+    /// create-story affordance for the next undrafted id (catalog-driven; NFR8 degrades to count-only).
+    /// [Story 8.6]</summary>
+    private static string RenderUndraftedBanner(EpicInfo epic, IReadOnlyList<StoryInfo> undrafted, CommandCatalog commands)
+    {
+        _ = epic; // signature kept parallel to other opaque-fragment builders for the epic page
+        var n = undrafted.Count;
+        var guidance = BmadCommands.InlineGuidance(
+            commands.Command("create-story", undrafted[0].Id),
+            $"{n} stories in this epic need task plans — draft the next with",
+            $"{n} stories in this epic need task plans.");
+        return $"<div class=\"epic-undrafted-banner\">{guidance}</div>\n";
     }
 
     /// <summary>Relocated from <c>EpicsTemplater.AppendNextActionsPanel</c> + <c>AppendUpNextCard</c> — one panel

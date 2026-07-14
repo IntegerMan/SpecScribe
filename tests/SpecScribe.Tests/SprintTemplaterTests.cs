@@ -170,6 +170,59 @@ public class SprintTemplaterTests
     }
 
     [Fact]
+    public void RenderBoard_EmptyColumnShowsDashedPlaceholderWithColumnCopy()
+    {
+        // Active lane empty (AC #2 example); ready + backlog populated; review/done empty too. [Story 8.6]
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: in-progress
+              1-1-a: ready-for-dev
+              1-2-b: backlog
+            """)!;
+        var epics = EpicsWith(Epic(1, "Foundation",
+            Story("1.1", 1, "A", "epics/story-1-1.html"),
+            Story("1.2", 1, "B", "epics/story-1-2.html")));
+        var board = SprintTemplater.RenderBoard(sprint, epics);
+
+        Assert.Contains("class=\"sprint-lane-empty\">Nothing in progress — pick from Ready.", board);
+        Assert.Contains("class=\"sprint-lane-empty\">Nothing awaiting review.", board);
+        Assert.Contains("class=\"sprint-lane-empty\">Nothing finished yet.", board);
+        Assert.Contains("aria-label=\"In progress: 0 stories\"", board);
+
+        // Populated columns never get an empty placeholder.
+        Assert.DoesNotContain("sprint-lane-empty\">Nothing ready to pick up", board);
+        Assert.DoesNotContain("sprint-lane-empty\">Backlog is clear", board);
+
+        var noReady = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: in-progress
+            """)!;
+        Assert.Contains(
+            "class=\"sprint-lane-empty\">Nothing ready to pick up — draft or refine the next story.",
+            SprintTemplater.RenderBoard(noReady, epics));
+    }
+
+    [Fact]
+    public void RenderBoard_EmptyLanePlaceholderMatchesOnCappedHomeBoard()
+    {
+        // Shared renderer: page (uncapped) and home (capped) empty lanes must match. [Story 8.6]
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: ready-for-dev
+            """)!;
+        var epics = EpicsWith(Epic(1, "E", Story("1.1", 1, "A", "epics/story-1-1.html")));
+
+        var page = SprintTemplater.RenderBoard(sprint, epics);
+        var home = SprintTemplater.RenderBoard(sprint, epics, capPerColumn: 3, moreHref: "sprint.html");
+
+        Assert.Contains("class=\"sprint-lane-empty\">Nothing in progress — pick from Ready.", page);
+        Assert.Contains("class=\"sprint-lane-empty\">Nothing in progress — pick from Ready.", home);
+        Assert.Equal(
+            CountOccurrences(page, "sprint-lane-empty"),
+            CountOccurrences(home, "sprint-lane-empty"));
+    }
+
+    [Fact]
     public void RenderIndex_HasRetrosLinkAndOpenItemsFlagButtonNotAModal()
     {
         var withOpen = SprintStatusParser.Parse("""

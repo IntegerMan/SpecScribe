@@ -62,6 +62,9 @@ public class StylesheetTests
         Assert.Contains(".next-steps-primary", css);
         Assert.Contains(".next-steps-alternates", css);
         Assert.Contains(".next-steps-alt", css);
+        // Story 8.6 designed empty states
+        Assert.Contains(".epic-undrafted-banner", css);
+        Assert.Contains(".sprint-lane-empty", css);
     }
 
     [Fact]

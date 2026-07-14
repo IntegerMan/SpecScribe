@@ -36,6 +36,18 @@ public static class SprintTemplater
         ("unrecognized", "Unrecognized"),
     };
 
+    /// <summary>Column-specific empty-lane guidance keyed on <see cref="BoardColumns"/> cssClass — designed
+    /// empty states, not bare blank columns. [Story 8.6; UX-DR9]</summary>
+    private static string EmptyLaneCopy(string cssClass) => cssClass switch
+    {
+        "pending" => "Backlog is clear — every story is scheduled.",
+        "ready" => "Nothing ready to pick up — draft or refine the next story.",
+        "active" => "Nothing in progress — pick from Ready.",
+        "review" => "Nothing awaiting review.",
+        "done" => "Nothing finished yet.",
+        _ => "Nothing here yet.",
+    };
+
     /// <summary>Per-stage story counts from the portal-wide ledger (tracked tally). Shared by the page summary
     /// and the dashboard widget — one computation in <see cref="ProjectCounts.Build"/>, consumed everywhere.
     /// [Story 2.3; Story 8.3]</summary>
@@ -129,13 +141,21 @@ public static class SprintTemplater
             sb.Append($"    <div class=\"sprint-lane-head js-tip\" data-tip=\"{tip}\" title=\"{tip}\" tabindex=\"0\"><span class=\"sprint-lane-label\">{PathUtil.Html(label)}</span><span class=\"sprint-lane-count\">{col.Count}</span></div>\n");
             sb.Append("    <div class=\"sprint-cards\">\n");
 
-            var shown = capPerColumn is { } cap && col.Count > cap ? col.Take(cap) : col;
-            foreach (var story in shown) AppendBoardCard(sb, story, epics, prefix);
-
-            if (capPerColumn is { } c && col.Count > c && moreHref is { Length: > 0 })
+            if (col.Count == 0)
             {
-                var extra = col.Count - c;
-                sb.Append($"      <a class=\"sprint-lane-more\" href=\"{PathUtil.Html(prefix + moreHref)}\">+{extra} more &rarr;</a>\n");
+                // Dashed ghost-card placeholder — shared by sprint page + home Now & Next. [Story 8.6]
+                sb.Append($"      <div class=\"sprint-lane-empty\">{PathUtil.Html(EmptyLaneCopy(cssClass))}</div>\n");
+            }
+            else
+            {
+                var shown = capPerColumn is { } cap && col.Count > cap ? col.Take(cap) : col;
+                foreach (var story in shown) AppendBoardCard(sb, story, epics, prefix);
+
+                if (capPerColumn is { } c && col.Count > c && moreHref is { Length: > 0 })
+                {
+                    var extra = col.Count - c;
+                    sb.Append($"      <a class=\"sprint-lane-more\" href=\"{PathUtil.Html(prefix + moreHref)}\">+{extra} more &rarr;</a>\n");
+                }
             }
 
             sb.Append("    </div>\n  </section>\n");

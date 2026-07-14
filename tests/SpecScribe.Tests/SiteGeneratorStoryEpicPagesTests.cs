@@ -153,8 +153,84 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         GenerateSite();
 
         // The epic page must still treat 1.2 as undetailed: guidance note present, no full-plan link.
+        // Lone undrafted story → no consolidation banner; per-card note kept (fixture has no create-story
+        // catalog → plain fallback; command path covered by EpicsViewBuilder unit tests). [Story 8.6]
         var html = File.ReadAllText(EpicPage);
         Assert.Contains("class=\"not-detailed-note\"", html);
+        Assert.DoesNotContain("epic-undrafted-banner", html);
+        Assert.Contains("No detailed story plan yet.", html);
+    }
+
+    [Fact]
+    public void GenerateAll_MultipleUndraftedStories_ConsolidatesHintsIntoOneBanner()
+    {
+        // 2+ undrafted → one banner + plain card notes (count-only without a module catalog). [Story 8.6]
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), """
+            # Epics
+
+            ## Epic List
+
+            ### Epic 1: Foundation
+
+            Stand up the portal.
+
+            ## Epic 1: Foundation
+
+            ### Story 1.1: Drafted Story
+
+            As a contributor,
+            I want a drafted story,
+            So that pages render.
+
+            **Acceptance Criteria:**
+
+            1.
+            **Given** a plan
+            **When** it renders
+            **Then** links appear
+
+            ### Story 1.2: Future Story
+
+            As a contributor,
+            I want a future story,
+            So that placeholders exist.
+
+            **Acceptance Criteria:**
+
+            1.
+            **Given** an undrafted story
+            **When** the site generates
+            **Then** a placeholder page exists
+
+            ### Story 1.3: Another Future
+
+            As a contributor,
+            I want another future story,
+            So that consolidation applies.
+
+            **Acceptance Criteria:**
+
+            1.
+            **Given** two undrafted stories
+            **When** the epic page renders
+            **Then** hints consolidate
+            """);
+
+        GenerateSite();
+
+        var html = File.ReadAllText(EpicPage);
+        Assert.Equal(1, CountOccurrences(html, "class=\"epic-undrafted-banner\""));
+        Assert.Contains("2 stories in this epic need task plans.", html);
+        Assert.Contains("class=\"not-detailed-note\">No detailed story plan yet.</div>", html);
+        Assert.DoesNotContain("No detailed story plan yet — draft it with", html);
+        Assert.Equal(2, CountOccurrences(html, "class=\"not-detailed-note\""));
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        int count = 0, i = 0;
+        while ((i = haystack.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { count++; i += needle.Length; }
+        return count;
     }
 
     [Fact]

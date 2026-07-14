@@ -1,6 +1,10 @@
+---
+baseline_commit: 8537c8521d2b9622517d2d547a8d2d7d30426d80
+---
+
 # Story 8.6: Designed Empty States
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -224,25 +228,25 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Undrafted-story banner as an opaque fragment (AC: #1)**
-  - [ ] Add `UndraftedBannerHtml` (`required string`) to `EpicPageView` in `EpicsView.cs`, parallel to the existing opaque fragments.
-  - [ ] In `EpicsViewBuilder.BuildEpic`, compute `undrafted = epic.Stories.Where(s => s.ArtifactOutputPath is null).ToList()`; when `Count >= 2`, set `UndraftedBannerHtml = RenderUndraftedBanner(epic, undrafted, commands)` and pass `consolidated: true` into `BuildStoryCard`; else empty string + `consolidated: false`.
-  - [ ] Add `RenderUndraftedBanner`: count sentence + one `create-story {undrafted[0].Id}` command via `BmadCommands.InlineGuidance`, wrapped in `<div class="epic-undrafted-banner">`.
-  - [ ] Extend `BuildStoryCard` with a `bool consolidated` param: undrafted + consolidated → plain `No detailed story plan yet.` note; undrafted + not consolidated → today's inline-command note.
-  - [ ] Emit `view.UndraftedBannerHtml` in `HtmlRenderAdapter.RenderEpicBody` after the retro affordance, before the story-card loop (not a TOC entry).
-- [ ] **Task 2 — Empty sprint-board lane placeholder (AC: #2)**
-  - [ ] In `SprintTemplater.RenderBoard`, add the per-column copy table (keyed on `cssClass`, next to `BoardColumns`); when `col.Count == 0`, append one `<div class="sprint-lane-empty">{copy}</div>` inside `.sprint-cards`.
-  - [ ] Leave `RenderBoardByEpic` and non-empty columns untouched; confirm the change flows to both the sprint page and the home board (shared renderer).
-- [ ] **Task 3 — CSS + stylesheet assertions (AC: #1, #2)**
-  - [ ] Add `.epic-undrafted-banner` (drafted-token accent, designed banner) near `.pending-note`/`.empty-state`; add `.sprint-lane-empty` (dashed, muted, card-shaped) near `.sprint-card`/`.sprint-cards`. Tokens only, no hex.
-  - [ ] Add `StylesheetTests` assertions for both classes.
-- [ ] **Task 4 — Tests (AC: #1, #2)**
-  - [ ] `SiteGeneratorStoryEpicPagesTests`: add a 2+-undrafted fixture (one banner + single command + plain card notes); confirm the existing single-undrafted test still passes (no banner, inline note kept).
-  - [ ] `SprintTemplaterTests`: empty column → one `.sprint-lane-empty` with column copy; populated column → none; caps/lane assertions still pass; shared-surface (page vs. home) parity.
-  - [ ] NFR8 degradation: catalog without `create-story` → banner count-only, plain card notes.
-  - [ ] Confirm `RenderSectionParity` facts unchanged; update `SectionViewModelSerialization` fixture for the new field; regenerate `GoldenContentFingerprint` after confirming the byte diff is banners + plain notes + empty lanes only.
-- [ ] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball an all-backlog epic page (one banner + plain notes) and the sprint page (dashed empty-lane placeholders with guidance copy).
+- [x] **Task 1 — Undrafted-story banner as an opaque fragment (AC: #1)**
+  - [x] Add `UndraftedBannerHtml` (`required string`) to `EpicPageView` in `EpicsView.cs`, parallel to the existing opaque fragments.
+  - [x] In `EpicsViewBuilder.BuildEpic`, compute `undrafted = epic.Stories.Where(s => s.ArtifactOutputPath is null).ToList()`; when `Count >= 2`, set `UndraftedBannerHtml = RenderUndraftedBanner(epic, undrafted, commands)` and pass `consolidated: true` into `BuildStoryCard`; else empty string + `consolidated: false`.
+  - [x] Add `RenderUndraftedBanner`: count sentence + one `create-story {undrafted[0].Id}` command via `BmadCommands.InlineGuidance`, wrapped in `<div class="epic-undrafted-banner">`.
+  - [x] Extend `BuildStoryCard` with a `bool consolidated` param: undrafted + consolidated → plain `No detailed story plan yet.` note; undrafted + not consolidated → today's inline-command note.
+  - [x] Emit `view.UndraftedBannerHtml` in `HtmlRenderAdapter.RenderEpicBody` after the retro affordance, before the story-card loop (not a TOC entry).
+- [x] **Task 2 — Empty sprint-board lane placeholder (AC: #2)**
+  - [x] In `SprintTemplater.RenderBoard`, add the per-column copy table (keyed on `cssClass`, next to `BoardColumns`); when `col.Count == 0`, append one `<div class="sprint-lane-empty">{copy}</div>` inside `.sprint-cards`.
+  - [x] Leave `RenderBoardByEpic` and non-empty columns untouched; confirm the change flows to both the sprint page and the home board (shared renderer).
+- [x] **Task 3 — CSS + stylesheet assertions (AC: #1, #2)**
+  - [x] Add `.epic-undrafted-banner` (drafted-token accent, designed banner) near `.pending-note`/`.empty-state`; add `.sprint-lane-empty` (dashed, muted, card-shaped) near `.sprint-card`/`.sprint-cards`. Tokens only, no hex.
+  - [x] Add `StylesheetTests` assertions for both classes.
+- [x] **Task 4 — Tests (AC: #1, #2)**
+  - [x] `SiteGeneratorStoryEpicPagesTests`: add a 2+-undrafted fixture (one banner + single command + plain card notes); confirm the existing single-undrafted test still passes (no banner, inline note kept).
+  - [x] `SprintTemplaterTests`: empty column → one `.sprint-lane-empty` with column copy; populated column → none; caps/lane assertions still pass; shared-surface (page vs. home) parity.
+  - [x] NFR8 degradation: catalog without `create-story` → banner count-only, plain card notes.
+  - [x] Confirm `RenderSectionParity` facts unchanged; update `SectionViewModelSerialization` fixture for the new field; regenerate `GoldenContentFingerprint` after confirming the byte diff is banners + plain notes + empty lanes only.
+- [x] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball an all-backlog epic page (one banner + plain notes) and the sprint page (dashed empty-lane placeholders with guidance copy).
 
 ## Dev Notes
 
@@ -288,8 +292,34 @@ Epic undrafted banner + sprint empty-lane placeholders are **shared-path** (`Epi
 
 ### Agent Model Used
 
+Composer (Cursor agent)
+
 ### Debug Log References
+
+- Live sprint board currently has stories in every lifecycle column, so empty-lane placeholders are covered by unit tests rather than a live empty column on this repo's sprint.html.
 
 ### Completion Notes List
 
+- AC #1: `UndraftedBannerHtml` opaque fragment on `EpicPageView`; `BuildEpic` consolidates at 2+ undrafted (`ArtifactOutputPath is null`); single command for next undrafted id via `InlineGuidance`/`Command("create-story")`; cards flip to plain "No detailed story plan yet."; adapter emits banner after retro, before story cards.
+- AC #2: `RenderBoard` appends `.sprint-lane-empty` with column-specific copy when `col.Count == 0`; shared by sprint page + home Now & Next; `RenderBoardByEpic` untouched.
+- CSS: `.epic-undrafted-banner` (`--status-drafted` accent) + `.sprint-lane-empty` (dashed ghost-card); StylesheetTests assert both.
+- Tests: consolidation / single-undrafted / NFR8 degradation; empty-lane copy + page/home parity; golden fingerprint regenerated (`8fe8ae28…`). Full suite 1131 passed. Live gen: Epic 11 shows one banner + plain card notes.
+
 ### File List
+
+- `src/SpecScribe/EpicsView.cs`
+- `src/SpecScribe/EpicsViewBuilder.cs`
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs`
+- `src/SpecScribe/SprintTemplater.cs`
+- `src/SpecScribe/assets/specscribe.css`
+- `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs`
+- `tests/SpecScribe.Tests/SprintTemplaterTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorStoryEpicPagesTests.cs`
+- `tests/SpecScribe.Tests/StylesheetTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
+- `_bmad-output/implementation-artifacts/8-6-designed-empty-states.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Change Log
+
+- 2026-07-14: Story 8.6 — designed empty states (epic undrafted banner + sprint empty-lane placeholders); tests + golden fingerprint; status → review.

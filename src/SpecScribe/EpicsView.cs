@@ -150,6 +150,10 @@ public sealed record EpicPageView
     /// <summary>The pre-rendered retrospective-affordance HTML (named opaque fragment; empty when nothing shows).</summary>
     public required string RetroAffordanceHtml { get; init; }
 
+    /// <summary>The pre-rendered consolidated undrafted-story banner HTML (named opaque fragment; empty when
+    /// fewer than two stories lack a task plan). [Story 8.6]</summary>
+    public required string UndraftedBannerHtml { get; init; }
+
     /// <summary>The epic — the Story-Breakdown sunburst's chart input.</summary>
     public required EpicInfo Epic { get; init; }
 

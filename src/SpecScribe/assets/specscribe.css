@@ -1628,6 +1628,20 @@ a.ref-file-node:focus-visible {
 
 .pending-note { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
 
+/* Story 8.6: consolidated undrafted-story banner — drafted-but-unplanned accent, one create-story affordance. */
+.epic-undrafted-banner {
+  max-width: 860px;
+  margin: 0.8rem auto 1rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--status-drafted);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--ink-light);
+  line-height: 1.45;
+}
+
 .view-epic-link {
   display: inline-block;
   font-size: 0.82rem;
@@ -4004,6 +4018,21 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
   border-style: dashed;
   background: var(--parchment-dark);
   opacity: 0.88;
+}
+/* Story 8.6: empty Kanban lane — dashed ghost-card with column-specific guidance (sprint + home board). */
+.sprint-lane-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.6rem;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-light);
+  font-size: 0.78rem;
+  font-style: italic;
+  line-height: 1.35;
+  text-align: center;
 }
 .sprint-card-head { display: flex; align-items: center; gap: 0.4rem; }
 .sprint-card-id { font-family: 'Courier New', monospace; font-size: 0.7rem; font-weight: bold; color: var(--ink-light); letter-spacing: 0.02em; }

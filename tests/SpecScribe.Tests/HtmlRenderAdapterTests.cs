@@ -195,6 +195,7 @@ public class HtmlRenderAdapterTests
         NextActionsPanelHtml = string.Empty,
         NextStepsHtml = string.Empty,
         RetroAffordanceHtml = string.Empty,
+        UndraftedBannerHtml = string.Empty,
         Epic = new EpicInfo
         {
             Number = 1,
@@ -245,5 +246,97 @@ public class HtmlRenderAdapterTests
         Assert.Contains("2/4 tasks", html);
         // No lifecycle status badge — only the task badge.
         Assert.DoesNotContain("status-badge review", html);
+    }
+
+    // ---- Story 8.6 undrafted-banner consolidation ---------------------------------------------------------
+
+    private static StoryInfo Undrafted(string id, string title) => new()
+    {
+        Id = id,
+        EpicNumber = 1,
+        Title = title,
+        UserStoryHtml = string.Empty,
+        AcBlocksHtml = Array.Empty<string>(),
+        ArtifactOutputPath = null,
+    };
+
+    private static StoryInfo Drafted(string id, string title) => new()
+    {
+        Id = id,
+        EpicNumber = 1,
+        Title = title,
+        UserStoryHtml = string.Empty,
+        AcBlocksHtml = Array.Empty<string>(),
+        ArtifactOutputPath = $"epics/story-{id.Replace('.', '-')}.html",
+        Status = "ready-for-dev",
+    };
+
+    private static EpicInfo EpicWith(params StoryInfo[] stories) => new()
+    {
+        Number = 1,
+        Title = "Foundation",
+        GoalHtml = string.Empty,
+        Status = EpicStatus.Drafted,
+        Section = EpicSection.VerticalSlice,
+        Stories = stories,
+    };
+
+    private static EpicProgress ProgressFor(EpicInfo epic) => new()
+    {
+        Number = epic.Number,
+        Title = epic.Title,
+        StoryCount = epic.Stories.Count,
+        StoriesWithArtifact = epic.Stories.Count(s => s.ArtifactOutputPath is not null),
+        TasksDone = 0,
+        TasksTotal = 0,
+        Status = epic.Status,
+        StoryStatusCounts = new Dictionary<string, int>(),
+    };
+
+    private static CommandCatalog CreateStoryCatalog() => new("BMad", new Dictionary<string, string>
+    {
+        ["create-story"] = "/bmad-create-story",
+    });
+
+    [Fact]
+    public void BuildEpic_TwoPlusUndrafted_EmitsOneBannerWithNextCreateStoryCommand()
+    {
+        var epic = EpicWith(Drafted("1.1", "A"), Undrafted("1.2", "B"), Undrafted("1.3", "C"));
+        var view = EpicsViewBuilder.BuildEpic(epic, ProgressFor(epic), CreateStoryCatalog(), epicRetroPath: null);
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(view);
+
+        Assert.Contains("class=\"epic-undrafted-banner\"", html);
+        Assert.Equal(1, html.Split("class=\"epic-undrafted-banner\"", StringSplitOptions.None).Length - 1);
+        Assert.Contains("2 stories in this epic need task plans", html);
+        Assert.Contains("data-copy=\"/bmad-create-story 1.2\"", html);
+        Assert.DoesNotContain("data-copy=\"/bmad-create-story 1.3\"", html);
+        Assert.Contains("class=\"not-detailed-note\">No detailed story plan yet.</div>", html);
+        Assert.DoesNotContain("No detailed story plan yet — draft it with", html);
+    }
+
+    [Fact]
+    public void BuildEpic_SingleUndrafted_KeepsInlineCommandAndNoBanner()
+    {
+        var epic = EpicWith(Drafted("1.1", "A"), Undrafted("1.2", "B"));
+        var view = EpicsViewBuilder.BuildEpic(epic, ProgressFor(epic), CreateStoryCatalog(), epicRetroPath: null);
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(view);
+
+        Assert.DoesNotContain("epic-undrafted-banner", html);
+        Assert.Contains("No detailed story plan yet — draft it with", html);
+        Assert.Contains("data-copy=\"/bmad-create-story 1.2\"", html);
+    }
+
+    [Fact]
+    public void BuildEpic_TwoPlusUndrafted_WithoutCreateStory_DegradesToCountOnlyBanner()
+    {
+        // NFR8: catalog without create-story → count sentence, no hard-coded slash command. [Story 8.6]
+        var epic = EpicWith(Undrafted("1.1", "A"), Undrafted("1.2", "B"));
+        var view = EpicsViewBuilder.BuildEpic(epic, ProgressFor(epic), CommandCatalog.Empty, epicRetroPath: null);
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(view);
+
+        Assert.Contains("class=\"epic-undrafted-banner\">2 stories in this epic need task plans.</div>", html);
+        Assert.DoesNotContain("create-story", html);
+        Assert.DoesNotContain("cmd-badge", html);
+        Assert.Contains("class=\"not-detailed-note\">No detailed story plan yet.</div>", html);
     }
 }

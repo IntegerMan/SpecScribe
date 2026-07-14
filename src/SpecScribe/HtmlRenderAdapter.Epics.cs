@@ -197,6 +197,7 @@ public sealed partial class HtmlRenderAdapter
         }
 
         main.Append(view.RetroAffordanceHtml);
+        main.Append(view.UndraftedBannerHtml);
 
         foreach (var card in view.StoryCards)
         {

@@ -304,7 +304,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 8.5: every Next Steps panel gains primary/alternate hierarchy markup
         // (.next-steps-primary + optional .next-steps-alternates / .next-steps-alt) and specscribe.css gains the
         // companion rules; done panels stay celebratory when the fixture catalog lacks correct-course. [Story 8.5]
-        const string expected = "4063690d7f33bf819b8f0ae674ddb72deb8ee79e99e8a5a69b244d9b7d51968e";
+        // Regenerated for Story 8.6: empty sprint/home board lanes gain .sprint-lane-empty ghost-card placeholders;
+        // multi-undrafted epics would gain .epic-undrafted-banner (this fixture's epics stay under the 2+ threshold);
+        // specscribe.css gains both companion rules. [Story 8.6]
+        const string expected = "8fe8ae28b00ee0bff80b65b106ad8f45db57af2ae5f3b61a83d14a58c07de229";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
