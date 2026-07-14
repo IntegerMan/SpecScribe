@@ -428,3 +428,12 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
   evidence: Blind Hunter + Edge Case Hunter agreed. Accepted as a documented seed-value limitation (mirrors the
   project's existing "seed, not contract" stance on graph caps) rather than fixed now; revisit if a real repo
   surfaces a crowded hub. [Charts.cs](../../src/SpecScribe/Charts.cs)
+
+## Deferred from: code review of story-7-8 (2026-07-13)
+
+- source_spec: `7-8-related-files-in-the-reference-graph.md`
+  summary: No test exercises the combined worst case of an artifact-ring overflow (>14 citers) plus a full related-file population (8) on the same graph — whether the honest "+N more artifacts" footnote visually collides with a related-file diamond near the bottom of the ring is unverified.
+  evidence: Blind Hunter. [ChartsTests.cs](../../tests/SpecScribe.Tests/ChartsTests.cs)
+- source_spec: `7-8-related-files-in-the-reference-graph.md`
+  summary: `Charts.ReferenceGraph`'s new `artifactCap` parameter (default `RefGraphArtifactNodeCap = 14`) has no lower-bound validation; a caller passing a negative value that exactly offsets `relCount` drives `total` to zero, causing a divide-by-zero in the ring-angle math (`Ang(i)`) and NaN coordinates in the emitted SVG. Unreachable today — both production call sites use the default — but it's latent robustness debt on a public API surface.
+  evidence: Edge Case Hunter. [Charts.cs:1126,1146](../../src/SpecScribe/Charts.cs)

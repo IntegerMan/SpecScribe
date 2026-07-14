@@ -4,7 +4,7 @@ baseline_commit: 2f30ef9b696157c96d6c931304264f7bc138313d
 
 # Story 7.8: Related Files in the Reference Graph
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -280,6 +280,13 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
   - [x] Regenerate the golden content fingerprint (CSS-driven) with standard normalizations; confirm inventory unaffected.
 - [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green (965). Baseline generate (no `--deep-git`) → citations-only graph, no visible coupled list. Deep generate (`--deep-git`) → distinct dashed-diamond related nodes with tooltips + guarded links, complete sr-only equivalent, legible hub graph (cap 14 + honest `+13 more`), no JS, escaped content; non-git run degrades cleanly.
+
+### Review Findings
+
+- [x] [Review][Patch] Chip nodes get link-style hover/focus affordance despite being non-interactive [src/SpecScribe/assets/specscribe.css:888-898] — fixed, hover/focus-visible rules scoped to `a.ref-file-node`
+- [x] [Review][Patch] `StylesheetTests` dashed-edge assertion doesn't actually verify `.ref-edge-file`'s dasharray [tests/SpecScribe.Tests/StylesheetTests.cs:105-107] — fixed, assertion now scoped to the `.ref-edge-file` rule block via regex
+- [x] [Review][Defer] No test exercises artifact-overflow + full related population on the same graph [tests/SpecScribe.Tests/ChartsTests.cs] — deferred, pre-existing test-coverage gap, not a functional break
+- [x] [Review][Defer] `artifactCap` has no lower-bound validation; a negative value could drive ring math to divide-by-zero [src/SpecScribe/Charts.cs:1126,1146] — deferred, unreachable via any current call site (both callers use the default), latent robustness debt on a public API
 
 ## Dev Notes
 

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -104,7 +105,9 @@ public class StylesheetTests
         // colour alone: the dedicated classes must be present and the dashed edge must carry a dash pattern.
         Assert.Contains(".ref-edge-file", css);
         Assert.Contains(".ref-file-dot", css);
-        Assert.Contains("stroke-dasharray", css);
+        // [Review][Patch] scoped to the .ref-edge-file rule block itself — stroke-dasharray also appears in
+        // unrelated pre-existing rules, so a bare Assert.Contains would pass even if this rule lost its dash pattern.
+        Assert.Matches(new Regex(@"\.ref-edge-file\s*\{[^}]*stroke-dasharray"), css);
     }
 
     [Fact]

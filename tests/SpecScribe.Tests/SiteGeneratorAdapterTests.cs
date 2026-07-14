@@ -285,7 +285,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated post-merge review fixes: removed the redundant margin-top on .refgraph-toggle (it shifted the
         // checkbox out of vertical alignment with its own label — spacing from the note above is already covered by
         // .code-relationships-note's margin-bottom). CSS-only for this non-git fixture.
-        const string expected = "6f3f794820c6b6ed37df91700b417cc4af137e68e0bfcf8248a7a5710ad614ab";
+        // Regenerated for the Story 7.8 code-review patch pass: the related-file node hover/focus-visible rules in
+        // specscribe.css are now scoped to `a.ref-file-node` (link nodes only) instead of the shared `.ref-file-node`
+        // class, so non-link chip nodes no longer get link-style hover/focus affordance. CSS-only for this non-git
+        // fixture (no code page renders here) — only the stylesheet content shifted the hash.
+        const string expected = "61819feadd9448092847ab434bf23f4e289eb8522c74af0599627920a91390b7";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

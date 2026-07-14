@@ -885,19 +885,19 @@ pre.code-file code[class*="language-"] {
   cursor: default;
 }
 
-.ref-file-node:hover .ref-file-dot,
-.ref-file-node:focus-visible .ref-file-dot {
+a.ref-file-node:hover .ref-file-dot,
+a.ref-file-node:focus-visible .ref-file-dot {
   fill: var(--ink-light);
   stroke: var(--ink);
 }
 
-.ref-file-node:hover .ref-file-label,
-.ref-file-node:focus-visible .ref-file-label {
+a.ref-file-node:hover .ref-file-label,
+a.ref-file-node:focus-visible .ref-file-label {
   fill: var(--ink);
   text-decoration: underline;
 }
 
-.ref-file-node:focus-visible {
+a.ref-file-node:focus-visible {
   outline: 2px solid var(--ink-light);
   outline-offset: 2px;
 }
