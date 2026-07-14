@@ -121,8 +121,12 @@ public static class SprintTemplater
         foreach (var (cssClass, label) in BoardColumns)
         {
             var col = byColumn[cssClass];
+            // Column-meaning tip from StatusStyles.StageMeaning (Story 8.2 seam) — Backlog vs Ready carry the
+            // distinguishing readiness text. Focusable: a small fixed set of meaning-bearing headers.
+            // title= fallback for non-JS surfaces (webview). [Story 8.4; UX-DR24]
+            var tip = PathUtil.Html(ColumnMeaning(cssClass, label));
             sb.Append($"  <section class=\"sprint-lane {cssClass}\" aria-label=\"{PathUtil.Html($"{label}: {col.Count} {Charts.Plural(col.Count, "story", "stories")}")}\">\n");
-            sb.Append($"    <div class=\"sprint-lane-head\"><span class=\"sprint-lane-label\">{PathUtil.Html(label)}</span><span class=\"sprint-lane-count\">{col.Count}</span></div>\n");
+            sb.Append($"    <div class=\"sprint-lane-head js-tip\" data-tip=\"{tip}\" title=\"{tip}\" tabindex=\"0\"><span class=\"sprint-lane-label\">{PathUtil.Html(label)}</span><span class=\"sprint-lane-count\">{col.Count}</span></div>\n");
             sb.Append("    <div class=\"sprint-cards\">\n");
 
             var shown = capPerColumn is { } cap && col.Count > cap ? col.Take(cap) : col;
@@ -280,8 +284,12 @@ public static class SprintTemplater
         // Unmatched entries (no model story, so no href) still need to be keyboard-reachable — they're
         // exactly the stale/unmatched cases a maintainer most wants to inspect. [Story 2.3 review]
         var focusAttr = href is null ? " tabindex=\"0\" role=\"group\"" : string.Empty;
+        // No-plan cards (null story or TasksTotal == 0) get a dashed/muted treatment — the visual inverse of
+        // the progress-bar gate — so they separate from actionable cards at a glance. [Story 8.4; UX-DR24]
+        var noPlan = story is null || story.TasksTotal == 0;
+        var noPlanClass = noPlan ? " no-plan" : string.Empty;
 
-        sb.Append($"      <{tag} class=\"sprint-card js-tip {cssClass}\"{hrefAttr}{focusAttr} data-tip=\"{dataTip}\">\n");
+        sb.Append($"      <{tag} class=\"sprint-card js-tip {cssClass}{noPlanClass}\"{hrefAttr}{focusAttr} data-tip=\"{dataTip}\">\n");
         sb.Append("        <div class=\"sprint-card-head\">\n");
         sb.Append($"          <span class=\"sprint-card-id\">Story {PathUtil.Html(id)}</span>\n");
         sb.Append("        </div>\n");
@@ -379,6 +387,12 @@ public static class SprintTemplater
         }
         return (PathUtil.Html(PrettifySlug(entry.RawKey)), null, null);
     }
+
+    /// <summary>One-line column meaning for a board lane header: <c>"{Label} = {StageMeaning}"</c>, sourced
+    /// from <see cref="StatusStyles.StageMeaning"/> so badge tips, legend, and column tips share one seam.
+    /// [Story 8.4; UX-DR24]</summary>
+    private static string ColumnMeaning(string cssClass, string label) =>
+        $"{label} = {StatusStyles.StageMeaning(cssClass)}";
 
     /// <summary>Human title from a yaml story slug: strip the leading <c>N-M-</c> id prefix, replace dashes
     /// with spaces, title-case — used only when the epics model has no matching story. [Story 2.3]</summary>

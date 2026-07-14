@@ -220,9 +220,11 @@ public static class StatusStyles
     /// <para>// 10.3: vocabulary-explanation seam — extend, don't duplicate</para></summary>
     public static string StageMeaning(string cssClass) => cssClass switch
     {
-        "pending" => "Listed, but not yet planned or started",
+        // Pending/ready phrasings distinguish backlog vs ready-for-dev readiness (Story 8.4 UX-DR24);
+        // also the shared source for sprint column-header tooltips.
+        "pending" => "Not yet ready to pick up",
         "drafted" => "Stories or a plan exist; work has not started",
-        "ready" => "Has a plan and is ready to build",
+        "ready" => "Task plan exists and dependencies met",
         "active" => "Actively being developed",
         "review" => "Implementation complete; awaiting review or retrospective",
         "done" => "Finished and closed",

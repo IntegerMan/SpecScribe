@@ -363,6 +363,51 @@ public class ChartsTests
     }
 
     [Fact]
+    public void DeliverySentence_OrdersDoneFirstOmitsZeroAndUsesStoryLabels()
+    {
+        var sentence = Charts.DeliverySentence(new Dictionary<string, int>
+        {
+            ["done"] = 6,
+            ["review"] = 1,
+            ["active"] = 0,
+        });
+
+        Assert.Equal("6 of 7 done, 1 in review", sentence);
+    }
+
+    [Fact]
+    public void DeliverySentence_SingleStage_HasNoTrailingClause()
+    {
+        Assert.Equal("7 of 7 done", Charts.DeliverySentence(new Dictionary<string, int> { ["done"] = 7 }));
+    }
+
+    [Fact]
+    public void EpicMosaic_ExposesDeliverySentenceAsAriaLabelAndVisibleLine()
+    {
+        var epic = new EpicProgress
+        {
+            Number = 1,
+            Title = "Mid-dev epic",
+            StoryCount = 7,
+            StoriesWithArtifact = 7,
+            TasksDone = 10,
+            TasksTotal = 10,
+            Status = EpicStatus.Drafted,
+            StoryStatusCounts = new Dictionary<string, int> { ["done"] = 6, ["review"] = 1 },
+        };
+
+        var html = Charts.EpicMosaic(new[] { epic }, _ => "epics/epic-1.html");
+        const string sentence = "6 of 7 done, 1 in review";
+
+        Assert.Contains($"aria-label=\"{sentence}\"", html);
+        Assert.Contains("role=\"img\"", html);
+        Assert.DoesNotContain("aria-hidden=\"true\"", html.Substring(html.IndexOf("epic-mosaic-donut", StringComparison.Ordinal)));
+        Assert.Contains($"class=\"epic-mosaic-delivery\">{sentence}</span>", html);
+        // Planning-depth sub-label kept alongside the delivery sentence.
+        Assert.Contains("7 / 7 stories detailed", html);
+    }
+
+    [Fact]
     public void Donut_WithAriaLabel_IsRoleImgWithName()
     {
         var svg = Charts.Donut(new (string, int, string)[]

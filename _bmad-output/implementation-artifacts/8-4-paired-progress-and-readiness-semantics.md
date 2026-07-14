@@ -1,6 +1,10 @@
+---
+baseline_commit: f4017dd1ab26b835dc6432ad39bbdd26f055fea0
+---
+
 # Story 8.4: Paired Progress and Readiness Semantics
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -217,22 +221,22 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Surface A: pair the story-card badges (AC: #1)**
-  - [ ] In `HtmlRenderAdapter.AppendStoryCard`, wrap the status badge + task badge in one `.story-status-pair` joined by a visible `·` separator when both are present; render the single badge with no orphan separator when only one is. Preserve the `StatusStyles.Badge`/`TaskBadge` inner output.
-  - [ ] Add `.story-status-pair` CSS (flex gap + separator) near `.status-badge.task-badge`; route colors through tokens/neutrals.
-- [ ] **Task 2 — Surface B: epic dual-count as a sentence (AC: #1)**
-  - [ ] Add `Charts.DeliverySentence(counts)` → ordered plain sentence over `StatusStyles.StoryStages` ("6 of 7 done, 1 in review"; total = Σ segments; zero stages omitted; `StoryLabel` + `Plural`).
-  - [ ] In `Charts.EpicMosaic`, pass the sentence as the mosaic donut `ariaLabel` (ring becomes `role="img"`) and render it as a visible line in `.epic-mosaic-label`; keep/fold the "N/N stories detailed" sub-label and note the choice.
-- [ ] **Task 3 — Surface C: column-header meaning tooltips (AC: #2)**
-  - [ ] In `SprintTemplater.RenderBoard`, add `js-tip` + escaped `data-tip` + `tabindex="0"` to each `.sprint-lane-head`; Backlog and Ready carry the distinguishing strings. Source meanings from 8.2's `StageMeaning` if landed, else a local helper + `// TODO(8.2)` marker (record choice in Completion Notes).
-  - [ ] Add any lane-head `js-tip` cursor affordance CSS.
-- [ ] **Task 4 — Surface D: dashed/muted no-plan cards (AC: #2)**
-  - [ ] In `AppendBoardCard`, add `no-plan` to `.sprint-card` when `story is null || story.TasksTotal == 0`. Add `.sprint-card.no-plan` CSS (dashed border + muted fill) mirroring `.sb-noplan`. No visible per-card text (tooltip already says "No task plan yet").
-- [ ] **Task 5 — Tests (AC: #1, #2)**
-  - [ ] `HtmlRenderAdapterTests` (pairing cases), `ChartsTests` (`DeliverySentence` + mosaic aria/visible), `SprintTemplaterTests` (column tips + focus; no-plan class), `StylesheetTests` (new classes).
-  - [ ] Confirm `RenderSectionParity` facts unchanged; regenerate `GoldenContentFingerprint` after confirming the byte diff is exactly the four surfaces.
-- [ ] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball the paired badge on an epic-page story card, the mosaic delivery sentence, the Backlog/Ready column tooltips (hover AND keyboard focus), and a dashed no-plan card beside a solid one.
+- [x] **Task 1 — Surface A: pair the story-card badges (AC: #1)**
+  - [x] In `HtmlRenderAdapter.AppendStoryCard`, wrap the status badge + task badge in one `.story-status-pair` joined by a visible `·` separator when both are present; render the single badge with no orphan separator when only one is. Preserve the `StatusStyles.Badge`/`TaskBadge` inner output.
+  - [x] Add `.story-status-pair` CSS (flex gap + separator) near `.status-badge.task-badge`; route colors through tokens/neutrals.
+- [x] **Task 2 — Surface B: epic dual-count as a sentence (AC: #1)**
+  - [x] Add `Charts.DeliverySentence(counts)` → ordered plain sentence over `StatusStyles.StoryStages` ("6 of 7 done, 1 in review"; total = Σ segments; zero stages omitted; `StoryLabel` + `Plural`).
+  - [x] In `Charts.EpicMosaic`, pass the sentence as the mosaic donut `ariaLabel` (ring becomes `role="img"`) and render it as a visible line in `.epic-mosaic-label`; keep/fold the "N/N stories detailed" sub-label and note the choice.
+- [x] **Task 3 — Surface C: column-header meaning tooltips (AC: #2)**
+  - [x] In `SprintTemplater.RenderBoard`, add `js-tip` + escaped `data-tip` + `tabindex="0"` to each `.sprint-lane-head`; Backlog and Ready carry the distinguishing strings. Source meanings from 8.2's `StageMeaning` if landed, else a local helper + `// TODO(8.2)` marker (record choice in Completion Notes).
+  - [x] Add any lane-head `js-tip` cursor affordance CSS.
+- [x] **Task 4 — Surface D: dashed/muted no-plan cards (AC: #2)**
+  - [x] In `AppendBoardCard`, add `no-plan` to `.sprint-card` when `story is null || story.TasksTotal == 0`. Add `.sprint-card.no-plan` CSS (dashed border + muted fill) mirroring `.sb-noplan`. No visible per-card text (tooltip already says "No task plan yet").
+- [x] **Task 5 — Tests (AC: #1, #2)**
+  - [x] `HtmlRenderAdapterTests` (pairing cases), `ChartsTests` (`DeliverySentence` + mosaic aria/visible), `SprintTemplaterTests` (column tips + focus; no-plan class), `StylesheetTests` (new classes).
+  - [x] Confirm `RenderSectionParity` facts unchanged; regenerate `GoldenContentFingerprint` after confirming the byte diff is exactly the four surfaces.
+- [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball the paired badge on an epic-page story card, the mosaic delivery sentence, the Backlog/Ready column tooltips (hover AND keyboard focus), and a dashed no-plan card beside a solid one.
 
 ## Dev Notes
 
@@ -271,8 +275,35 @@ Surfaces A/B/D (paired badges, mosaic sentence, dashed no-plan cards) are **shar
 
 ### Agent Model Used
 
+Composer (Auto / agent router)
+
 ### Debug Log References
+
+None.
 
 ### Completion Notes List
 
+- **Surface A:** Epic-page story cards wrap status + task badges in `.story-status-pair` with a `·` separator when both present; single-badge cases have no orphan separator. Badge inner HTML unchanged (`StatusStyles.Badge` / `TaskBadge`). Story-page evidence strip left to 9.4.
+- **Surface B:** Added `Charts.DeliverySentence` over `EpicProgress.StoryStatusCounts` / `StoryStages` (Σ segments; zero-omission; `StoryLabel` lowercased). Passed as mosaic donut `ariaLabel` + visible `.epic-mosaic-delivery`. **Kept** "N/N stories detailed" as a separate sub-label (planning depth ≠ delivery). Intentionally reads per-epic tally, not 8.3's `ProjectCounts` ledger.
+- **Surface C:** 8.2's `StageMeaning` had already landed — column tips source from it (format `"{Label} = {StageMeaning}"`), plus native `title` for non-JS/webview. Enriched pending/ready StageMeaning text to the AC distinguishing phrases (one seam for badges, legend, and columns). All board columns (incl. unrecognized) get `js-tip` + `tabindex="0"`.
+- **Surface D:** `.sprint-card.no-plan` when `story is null || TasksTotal == 0`; dashed + muted CSS mirroring `.sb-noplan`. No per-card text (8.6 owns consolidation).
+- **Verification:** 1121 tests green; golden fingerprint regenerated to `0674f5c5…`; real gen to `SpecScribeOutput/` eyeballed all four surfaces.
+
 ### File List
+
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs`
+- `src/SpecScribe/Charts.cs`
+- `src/SpecScribe/SprintTemplater.cs`
+- `src/SpecScribe/StatusStyles.cs`
+- `src/SpecScribe/assets/specscribe.css`
+- `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs`
+- `tests/SpecScribe.Tests/ChartsTests.cs`
+- `tests/SpecScribe.Tests/SprintTemplaterTests.cs`
+- `tests/SpecScribe.Tests/StylesheetTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
+- `_bmad-output/implementation-artifacts/8-4-paired-progress-and-readiness-semantics.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Change Log
+
+- 2026-07-14: Implemented Story 8.4 — paired progress/state badges, epic delivery sentence, column meaning tips, dashed no-plan cards; tests + golden fingerprint updated.

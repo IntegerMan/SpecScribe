@@ -162,4 +162,88 @@ public class HtmlRenderAdapterTests
 
         Assert.DoesNotContain("md-comment", html);
     }
+
+    private static StoryCardView Card(
+        string id = "1.1",
+        string? status = "review",
+        string statusStage = "review",
+        int tasksDone = 5,
+        int tasksTotal = 5) => new()
+    {
+        Id = id,
+        TitleHtml = "Paired Progress Story",
+        AnchorId = $"story-{id.Replace('.', '-')}",
+        StatusStage = statusStage,
+        Status = status,
+        TasksDone = tasksDone,
+        TasksTotal = tasksTotal,
+        TitleHref = "epics/story-1-1.html",
+        ViewPlanHref = "epics/story-1-1.html",
+        UserStoryHtml = "<p>As a maintainer…</p>",
+        AcBlocksHtml = Array.Empty<string>(),
+    };
+
+    private static EpicPageView EpicPage(params StoryCardView[] cards) => new()
+    {
+        Number = 1,
+        TitleHtml = "Paired Progress",
+        StatusClass = "active",
+        StatusLabel = "In development",
+        GoalHtml = string.Empty,
+        HasStories = true,
+        ProgressBars = Array.Empty<ProgressBarView>(),
+        NextActionsPanelHtml = string.Empty,
+        NextStepsHtml = string.Empty,
+        RetroAffordanceHtml = string.Empty,
+        Epic = new EpicInfo
+        {
+            Number = 1,
+            Title = "Paired Progress",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.VerticalSlice,
+            Stories = Array.Empty<StoryInfo>(),
+        },
+        Commands = CommandCatalog.Empty,
+        Prefix = string.Empty,
+        StoryCards = cards,
+    };
+
+    [Fact]
+    public void RenderEpicBody_PairsStatusAndTaskBadgesWhenBothPresent()
+    {
+        var statusBadge = StatusStyles.Badge("review", "review");
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(EpicPage(Card()));
+
+        Assert.Contains("class=\"story-status-pair\"", html);
+        Assert.Contains("story-status-pair-sep", html);
+        Assert.Contains(" · ", html);
+        // Inner badge bytes unchanged — grouped, not rewritten.
+        Assert.Contains(statusBadge, html);
+        Assert.Contains("status-badge task-badge complete", html);
+        Assert.Contains("&#10003; 5 tasks", html);
+    }
+
+    [Fact]
+    public void RenderEpicBody_StatusOnly_EmitsBadgeWithoutPairOrOrphanSeparator()
+    {
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(EpicPage(Card(tasksTotal: 0)));
+
+        Assert.DoesNotContain("story-status-pair", html);
+        Assert.DoesNotContain("story-status-pair-sep", html);
+        Assert.Contains(StatusStyles.Badge("review", "review"), html);
+        Assert.DoesNotContain("task-badge", html);
+    }
+
+    [Fact]
+    public void RenderEpicBody_TasksOnly_EmitsTaskBadgeWithoutPairOrOrphanSeparator()
+    {
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(EpicPage(Card(status: null, tasksDone: 2, tasksTotal: 4)));
+
+        Assert.DoesNotContain("story-status-pair", html);
+        Assert.DoesNotContain("story-status-pair-sep", html);
+        Assert.Contains("2/4 tasks", html);
+        // No lifecycle status badge — only the task badge.
+        Assert.DoesNotContain("status-badge review", html);
+    }
 }

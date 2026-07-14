@@ -218,11 +218,24 @@ public sealed partial class HtmlRenderAdapter
         sb.Append($"    <span class=\"story-id\">{PathUtil.Html(card.Id)}</span>\n");
         sb.Append($"    <a class=\"story-title story-title-link\" href=\"{PathUtil.Html(card.TitleHref)}\">{card.TitleHtml}</a>\n");
 
-        if (card.Status is { Length: > 0 } status)
+        // Pair status + task badges into one grouped unit ("[In review] · [✓ 5 tasks]") so progress and
+        // workflow state read as one coherent fact. Preserve each badge's bytes; wrap only when both present.
+        // [Story 8.4; UX-DR23]
+        var hasStatus = card.Status is { Length: > 0 };
+        var hasTasks = card.TasksTotal > 0;
+        if (hasStatus && hasTasks)
         {
-            sb.Append($"    {StatusStyles.Badge(card.StatusStage, status)}\n");
+            sb.Append("    <span class=\"story-status-pair\">");
+            sb.Append(StatusStyles.Badge(card.StatusStage, card.Status!));
+            sb.Append("<span class=\"story-status-pair-sep\" aria-hidden=\"true\"> · </span>");
+            sb.Append(TaskBadge(card.TasksDone, card.TasksTotal));
+            sb.Append("</span>\n");
         }
-        if (card.TasksTotal > 0)
+        else if (hasStatus)
+        {
+            sb.Append($"    {StatusStyles.Badge(card.StatusStage, card.Status!)}\n");
+        }
+        else if (hasTasks)
         {
             sb.Append($"    {TaskBadge(card.TasksDone, card.TasksTotal)}\n");
         }

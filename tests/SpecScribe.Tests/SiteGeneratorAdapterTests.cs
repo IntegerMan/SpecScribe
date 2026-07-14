@@ -297,7 +297,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // is byte-identical for every rendered page (only the diagnostics absolute repo-root path differed —
         // already folded by NormalizeVolatile). The previous constant was stale on current runners; both
         // trees produce this hash, so regenerating is a baseline refresh, not a count-number change. [Story 8.3]
-        const string expected = "932f7c208e0e00149c910e3067dcdfbc9796e64c220e4021c129694b333a3103";
+        // Regenerated for Story 8.4: epic-page story cards wrap status+task badges in .story-status-pair;
+        // epic mosaic gains DeliverySentence as aria-label + .epic-mosaic-delivery line; sprint lane heads gain
+        // js-tip/data-tip/title/tabindex from StageMeaning; no-plan sprint cards gain .no-plan; specscribe.css
+        // gains the four companion rules. StageMeaning pending/ready phrasings also update badge tips + legend.
+        const string expected = "0674f5c532075b6ff3e6866a4b960ac60b92d4deb582655510e532b6b060b91e";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -1877,6 +1877,20 @@ a.ref-file-node:focus-visible {
 .status-badge.task-badge.complete { color: var(--ink-faded); border-color: var(--ink-light); }
 .status-badge.task-badge.none-done { color: var(--ink-light); border-style: dashed; }
 
+/* Story 8.4: status + task badges grouped as one paired fact ("[In review] · [✓ 5 tasks]"). */
+.story-status-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+  align-self: center;
+}
+.story-status-pair-sep {
+  color: var(--ink-light);
+  font-weight: normal;
+  user-select: none;
+}
+
 /* Shared icon hook (Story 2.5): every glyph is inline SVG colored with currentColor (no per-status hex here —
    that stays in .status-badge.* above), em-relative so it scales with the surrounding text, sitting on the
    baseline inside badges/pills/nav links with a small trailing gap before the label. Icons are static, so
@@ -2850,6 +2864,13 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 
 .epic-mosaic-sub { font-size: 0.7rem; color: var(--ink-light); }
+
+/* Story 8.4: visible restatement of the delivery dual-count as one sentence. */
+.epic-mosaic-delivery {
+  font-size: 0.72rem;
+  color: var(--ink-faded);
+  line-height: 1.3;
+}
 
 /* ====================== COMMIT HEATMAP (GitHub-style) ====================== */
 /* The heatmap is the primary "how has the work gone" visual, so let it scale up to fill its panel rather
@@ -3960,6 +3981,12 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
 .sprint-card.active { border-left-color: var(--status-active); }
 .sprint-card.review { border-left-color: var(--status-review); }
 .sprint-card.done { border-left-color: var(--status-done); }
+/* Story 8.4 / UX-DR24: stories without a task plan — dashed + muted, mirroring .sb-noplan. */
+.sprint-card.no-plan {
+  border-style: dashed;
+  background: var(--parchment-dark);
+  opacity: 0.88;
+}
 .sprint-card-head { display: flex; align-items: center; gap: 0.4rem; }
 .sprint-card-id { font-family: 'Courier New', monospace; font-size: 0.7rem; font-weight: bold; color: var(--ink-light); letter-spacing: 0.02em; }
 .sprint-card-title { font-size: 0.82rem; font-weight: bold; color: var(--ink); line-height: 1.3; }
@@ -3994,6 +4021,13 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
   padding: 0.1rem 0.2rem 0.5rem;
   border-bottom: 2px solid var(--border);
   margin-bottom: 0.5rem;
+}
+/* Story 8.4: column-meaning tip affordance (hover + keyboard focus). */
+.sprint-lane-head.js-tip { cursor: help; }
+.sprint-lane-head.js-tip:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 .sprint-lane-label {
   font-size: 0.68rem;

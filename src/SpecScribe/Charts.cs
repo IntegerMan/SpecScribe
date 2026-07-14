@@ -450,20 +450,50 @@ public static class Charts
 
             sb.Append($"  <a class=\"epic-mosaic-card\" href=\"{Html(href)}\">\n");
             sb.Append("    <div class=\"epic-mosaic-donut\">\n");
+            // Delivery sentence is both the accessible name and a visible restatement so dual counts
+            // ("Done: 6 · In review: 1") read as one framed fact. Keep "N/N stories detailed" — it answers
+            // planning depth, not delivery. [Story 8.4; UX-DR23]
+            var delivery = hasStories ? DeliverySentence(epic.StoryStatusCounts) : null;
             sb.Append(hasStories
-                ? Donut(DeliverySegments(epic.StoryStatusCounts), size: 64)
+                ? Donut(DeliverySegments(epic.StoryStatusCounts), size: 64, ariaLabel: delivery)
                 : Donut(Array.Empty<(string, int, string)>(), size: 64));
             sb.Append("    </div>\n");
             sb.Append("    <div class=\"epic-mosaic-label\">\n");
             sb.Append($"      <span class=\"epic-mosaic-num\">Epic {epic.Number}</span>\n");
             sb.Append($"      <span class=\"epic-mosaic-title\">{epic.Title}</span>\n");
-            sb.Append(hasStories
-                ? $"      <span class=\"epic-mosaic-sub\">{epic.StoriesWithArtifact} / {epic.StoryCount} stories detailed</span>\n"
-                : "      <span class=\"epic-mosaic-sub\">Not yet drafted</span>\n");
+            if (hasStories)
+            {
+                sb.Append($"      <span class=\"epic-mosaic-delivery\">{Html(delivery!)}</span>\n");
+                sb.Append($"      <span class=\"epic-mosaic-sub\">{epic.StoriesWithArtifact} / {epic.StoryCount} stories detailed</span>\n");
+            }
+            else
+            {
+                sb.Append("      <span class=\"epic-mosaic-sub\">Not yet drafted</span>\n");
+            }
             sb.Append("    </div>\n  </a>\n");
         }
         sb.Append("</div>\n");
         return sb.ToString();
+    }
+
+    /// <summary>Restates an epic's per-status story tally as one ordered plain-language sentence over
+    /// <see cref="StatusStyles.StoryStages"/> — e.g. "6 of 7 done, 1 in review". Total is Σ segments
+    /// (never a parallel field); zero stages are omitted; stage words come from <see cref="StatusStyles.StoryLabel"/>.
+    /// Pure projection of existing counts — no recount. [Story 8.4; UX-DR23]</summary>
+    public static string DeliverySentence(IReadOnlyDictionary<string, int> counts)
+    {
+        var total = StatusStyles.StoryStages.Sum(stage => Math.Max(0, counts.GetValueOrDefault(stage)));
+        if (total == 0) return "0 of 0 done";
+
+        var parts = new List<string>();
+        foreach (var stage in StatusStyles.StoryStages)
+        {
+            var n = counts.GetValueOrDefault(stage);
+            if (n <= 0) continue;
+            var word = StatusStyles.StoryLabel(stage).ToLowerInvariant();
+            parts.Add(parts.Count == 0 ? $"{n} of {total} {word}" : $"{n} {word}");
+        }
+        return string.Join(", ", parts);
     }
 
     /// <summary>Turns an epic's per-status story tally into ordered donut segments (done → … → pending) for

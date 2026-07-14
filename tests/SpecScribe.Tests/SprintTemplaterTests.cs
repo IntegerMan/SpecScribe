@@ -72,8 +72,9 @@ public class SprintTemplaterTests
             Assert.Contains($"<section class=\"sprint-lane {cls}\"", html);
 
         // Cards carry the story's stage color + the js-tip hook; done story 1.1 and in-progress 1.2 link out.
-        Assert.Contains("class=\"sprint-card js-tip done\"", html);
-        Assert.Contains("class=\"sprint-card js-tip active\"", html);
+        // Sample stories have no task plan → Story 8.4 also stamps .no-plan on the card class list.
+        Assert.Contains("sprint-card js-tip done no-plan", html);
+        Assert.Contains("sprint-card js-tip active no-plan", html);
         Assert.Contains("href=\"epics/story-1-1.html\"", html);
 
         // Pure-CSS toggle scaffolding (no JS) and both views present.
@@ -105,9 +106,10 @@ public class SprintTemplaterTests
         Assert.Contains("<span class=\"sprint-card-id\">Story 2.3</span>", html);
         Assert.DoesNotContain("sprint-card-epic", html);
         // data-tip carries epic name + story name + task info (\n-separated); each card is a js-tip.
-        Assert.Contains("class=\"sprint-card js-tip active\"", html);
+        Assert.Contains("sprint-card js-tip active\"", html); // planned — no no-plan modifier
         Assert.Contains("data-tip=\"Epic 2: Rendering\nStory 2.3: Sprint Widget\n3 of 8 tasks done\"", html);
         Assert.Contains("data-tip=\"Epic 2: Rendering\nStory 2.6: Later Story\nNo task plan yet\"", html);
+        Assert.Contains("sprint-card js-tip pending no-plan", html); // 2.6 has no plan
         // Progress bar only for the story WITH a task plan: 3/8 = 38%, partial fill; no per-bar tooltip now.
         Assert.Contains("role=\"progressbar\"", html);
         Assert.Contains("aria-valuenow=\"38\"", html);
@@ -219,6 +221,50 @@ public class SprintTemplaterTests
         Assert.Contains("<main id=\"main-content\"", html);
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
         Assert.Contains("from sprint-status.yaml", html);
+    }
+
+    [Fact]
+    public void RenderBoard_LaneHeadsCarryStageMeaningTipsAndFocus()
+    {
+        var board = SprintTemplater.RenderBoard(Sample(), SampleEpics());
+
+        foreach (var (cls, label) in new[]
+                 {
+                     ("pending", "Backlog"),
+                     ("ready", "Ready for dev"),
+                     ("active", "In progress"),
+                     ("review", "In review"),
+                     ("done", "Done"),
+                     ("unrecognized", "Unrecognized"),
+                 })
+        {
+            var tip = $"{label} = {StatusStyles.StageMeaning(cls)}";
+            Assert.Contains($"class=\"sprint-lane {cls}\"", board);
+            Assert.Contains($"data-tip=\"{tip}\"", board);
+            Assert.Contains($"title=\"{tip}\"", board);
+        }
+
+        Assert.Contains("sprint-lane-head js-tip", board);
+        Assert.Contains("tabindex=\"0\"", board);
+        // AC distinguishing phrases (StageMeaning seam, enriched for readiness).
+        Assert.Contains("not yet ready to pick up", board, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("task plan exists and dependencies met", board, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RenderBoard_NoPlanCardsGetDashedModifier_PlannedCardsDoNot()
+    {
+        var sprint = SprintStatusParser.Parse("development_status:\n  epic-2: in-progress\n  2-3-widget: in-progress\n  2-6-later: backlog\n  2-9-orphan: backlog\n")!;
+        var epics = EpicsWith(Epic(2, "Rendering",
+            Story("2.3", 2, "Sprint Widget", "epics/story-2-3.html", tasksDone: 3, tasksTotal: 8),
+            Story("2.6", 2, "Later Story", artifactOutputPath: null))); // TasksTotal == 0
+
+        var board = SprintTemplater.RenderBoard(sprint, epics);
+
+        Assert.Contains("class=\"sprint-card js-tip active\"", board); // planned — no no-plan
+        Assert.DoesNotContain("class=\"sprint-card js-tip active no-plan\"", board);
+        Assert.Contains("class=\"sprint-card js-tip pending no-plan\"", board); // 2.6 + orphan
+        Assert.Contains("role=\"progressbar\"", board); // planned story still gets the bar
     }
 
     private static int CountOccurrences(string haystack, string needle)
