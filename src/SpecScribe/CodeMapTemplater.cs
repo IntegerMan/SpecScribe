@@ -161,8 +161,8 @@ public static class CodeMapTemplater
                 {
                     var avg = m.Changes > 0 ? ((double)m.TotalChurn / m.Changes).ToString("N0", CultureInfo.InvariantCulture) : "\u2014";
                     var together = m.AvgCoChanged is { } co ? co.ToString("N1", CultureInfo.InvariantCulture) : "\u2014";
-                    var first = m.FirstDate is { } fd ? Charts.D(fd) : "\u2014";
-                    var last = m.LastDate is { } ld ? Charts.D(ld) : "\u2014";
+                    var first = m.FirstDate is { } fd ? PortalDates.Day(fd) : "\u2014";
+                    var last = m.LastDate is { } ld ? PortalDates.Day(ld) : "\u2014";
                     sb.Append($"<td class=\"num\">{m.Changes.ToString("N0", CultureInfo.InvariantCulture)}</td>");
                     sb.Append($"<td class=\"num\">{m.TotalChurn.ToString("N0", CultureInfo.InvariantCulture)}</td>");
                     sb.Append($"<td class=\"num\">{avg}</td>");

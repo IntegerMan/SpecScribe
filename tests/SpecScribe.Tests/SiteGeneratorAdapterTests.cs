@@ -270,7 +270,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // git repo, so no commit/date/code pages exist to gain one). specscribe.css gained the .entity-pager* rules
         // + .doc-header position:relative and dropped the retired bottom-of-page .commit-day-nav styles. Every
         // change is a deliberate, reviewed rendering change (AC #1).
-        const string expected = "d8e61996f42b9ebffb92f7cb2252f2bd79f87034a0b52ed50cc0d50f7529a5d0";
+        // Regenerated for spec-code-map-declutter-and-cochange: this fixture is not a git repo (no --deep-git), so
+        // code-map.html never renders here — only specscribe.css shifted the hash (.codemap-dir-label rule removed;
+        // .codemap-dir comment updated). The treemap's own label-removal/date-format/co-change changes are covered
+        // by CodeMap/Charts/CodeMapTemplater tests, not this fixture.
+        const string expected = "d004d31cba855143d78ee9c6461957e9e1162f20a5e808d9042c03e99613c116";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

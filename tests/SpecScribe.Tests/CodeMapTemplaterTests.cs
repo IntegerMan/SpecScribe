@@ -42,6 +42,10 @@ public class CodeMapTemplaterTests
         // The text table gains a "Together" column carrying the per-file average co-changed file count.
         Assert.Contains(">Together</th>", html);
         Assert.Contains(">3.4</td>", html);                   // src/A.cs's average co-changed files
+
+        // First/Last dates render via the portal's human-readable token, not raw ISO.
+        Assert.Contains("Jun 1, 2026", html);
+        Assert.DoesNotContain("2026-06-01", html);
         Assert.Contains("class=\"codemap-controls\" id=\"codemap-controls\" aria-label=\"Colorize the treemap by\" hidden", html);
         Assert.Contains("class=\"codemap-drill\" aria-label=\"Treemap zoom\" hidden", html);
 

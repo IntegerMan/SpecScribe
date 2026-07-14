@@ -924,18 +924,21 @@ public class ChartsTests
     }
 
     [Fact]
-    public void CodeTreemap_LabelsOnlyTopLevelDirectories()
+    public void CodeTreemap_DirectoriesCarryNoTextLabelAtAnyDepth()
     {
-        // Two sibling nested directories under one top-level dir. The top-level (depth 0) rect keeps its label; the
-        // nested (depth 1) directories carry no text — the treemap reads as boxes + color, identity lives in the tip.
+        // A top-level dir and two nested sibling directories. No directory — at any depth — emits a <text> label;
+        // the treemap is pure boxes + color, and every name lives in the tooltip card + text table instead.
         var map = CodeMap.Build(
             new[] { ("alpha/beta/A.cs", 100L), ("alpha/gamma/B.cs", 100L) },
             new Dictionary<string, CodeFileMetrics>());
         var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
 
-        Assert.Contains(">alpha</text>", svg);        // top-level directory label survives
-        Assert.DoesNotContain(">beta</text>", svg);   // nested directory labels are suppressed
+        Assert.DoesNotContain("<text", svg);
+        Assert.DoesNotContain(">alpha</text>", svg);
+        Assert.DoesNotContain(">beta</text>", svg);
         Assert.DoesNotContain(">gamma</text>", svg);
+        // Boundary rects are still drawn at every depth (AC #1 "clear boundaries") — just unlabeled.
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"codemap-dir\"").Count);
     }
 
     [Fact]
@@ -956,6 +959,12 @@ public class ChartsTests
         // Co-change is both a data-* (for the JS dimension switch) and a labeled row inside the card.
         Assert.Contains("data-cochanged=\"3.4\"", svg);
         Assert.Contains("Files changed together", svg);
+        // Dates render via the portal's human-readable token (Charts.DReadable), not the raw ISO machine token —
+        // the card is user-facing text, matching the rest of the app's tooltip date convention.
+        Assert.Contains("Jun 1, 2026", svg);
+        Assert.Contains("Jul 1, 2026", svg);
+        Assert.DoesNotContain("2026-06-01", svg);
+        Assert.DoesNotContain("2026-07-01", svg);
     }
 
     [Fact]

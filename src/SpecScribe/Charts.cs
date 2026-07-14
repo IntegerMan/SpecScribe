@@ -1333,24 +1333,16 @@ public static class Charts
         return sb.ToString();
     }
 
+    /// <summary>Draws only the directory boundary rect — no text label at any depth (owner decision: labels
+    /// competed with the color signal at every nesting level, including the top-level project rects that used to
+    /// keep one). The treemap reads as pure boxes + color; every directory/file's identity lives entirely in the
+    /// tooltip card and the text-equivalent table.</summary>
     private static void AppendTreemapDir(StringBuilder sb, TreemapRect rect)
     {
         if (rect.W <= 0 || rect.H <= 0) return;
         var path = Html(rect.Node.RepoRelativePath);
         sb.Append($"  <rect class=\"codemap-dir\" data-path=\"{path}\" data-depth=\"{rect.Depth}\" ")
           .Append($"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" aria-hidden=\"true\"></rect>\n");
-
-        // Label ONLY top-level (root) directory rects — the project boundaries. Nested directories carry no text so
-        // the treemap reads as boxes + color; their identity lives in the per-file tooltip card and the text table.
-        // Still require a header strip wide enough to read; truncate to what fits (~6px/char) so a long collapsed-
-        // chain label never spills past its rect.
-        if (rect.Depth != 0 || rect.W < 34) return;
-        var maxChars = Math.Max(4, (int)(rect.W / 6.2));
-        var label = rect.Node.Label;
-        if (label.Length > maxChars) label = label[..Math.Max(1, maxChars - 1)] + "\u2026";
-        var tx = F(rect.X + 4);
-        var ty = F(rect.Y + 11);
-        sb.Append($"  <text class=\"codemap-dir-label\" x=\"{tx}\" y=\"{ty}\" aria-hidden=\"true\">{Html(label)}</text>\n");
     }
 
     private static void AppendTreemapFile(StringBuilder sb, TreemapRect rect, double maxChanges, bool hasMetrics, Func<string, string?>? fileHref, string prefix)
@@ -1435,7 +1427,7 @@ public static class Charts
             }
             if (m.FirstDate is { } fd && m.LastDate is { } ld)
             {
-                Row(sb, "First / last", D(fd) + " \u00b7 " + D(ld));
+                Row(sb, "First / last", DReadable(fd) + " \u00b7 " + DReadable(ld));
             }
         }
         sb.Append("</dl></div>");

@@ -2527,18 +2527,13 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-cell:focus-visible { outline: none; stroke: var(--teal); stroke-width: 2; }
 .codemap a { cursor: pointer; }
 
-/* Directory boundaries + labels: neutral guide-rule tone, transparent fill so the child cells read through. When
-   the script makes a directory an activatable zoom target it gains the same hover/focus affordance as a cell. */
+/* Directory boundaries: neutral guide-rule tone, transparent fill so the child cells read through — no text label
+   at any depth (identity lives in the tooltip card + text table). When the script makes a directory an activatable
+   zoom target it gains the same hover/focus affordance as a cell. */
 .codemap-dir { fill: none; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
 .codemap-dir[role="button"] { cursor: pointer; }
 .codemap-dir[role="button"]:hover { stroke: var(--rust); stroke-opacity: 1; }
 .codemap-dir:focus-visible { outline: none; stroke: var(--teal); stroke-width: 2; stroke-opacity: 1; }
-.codemap-dir-label {
-  font-size: 10px;
-  fill: var(--ink-faded);
-  font-family: 'Courier New', monospace;
-  pointer-events: none;
-}
 
 /* Colorize controls (revealed by script; hidden in the no-JS page so no inert control ships). */
 .codemap-controls {
