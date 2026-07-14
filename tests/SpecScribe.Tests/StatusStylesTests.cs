@@ -31,8 +31,12 @@ public class StatusStylesTests
     [InlineData("in progress", "active")]
     [InlineData("in-dev", "active")]
     [InlineData("ready-for-dev", "ready")]
-    [InlineData("something else", "drafted")]
+    [InlineData("drafted", "drafted")]
+    [InlineData("something else", "unrecognized")]
+    [InlineData("frobnicated", "unrecognized")]
     [InlineData(null, "drafted")]
+    [InlineData("", "drafted")]
+    [InlineData("   ", "drafted")]
     public void ForStory_MapsStatusKeywords(string? status, string expected)
         => Assert.Equal(expected, StatusStyles.ForStory(Story(status)));
 
@@ -137,6 +141,7 @@ public class StatusStylesTests
     [InlineData("ready", "Ready for dev")]
     [InlineData("drafted", "Drafted")]
     [InlineData("pending", "Pending")]
+    [InlineData("unrecognized", "Unrecognized")]
     public void StoryLabel_MapsEachStage(string cssClass, string expected)
         => Assert.Equal(expected, StatusStyles.StoryLabel(cssClass));
 
@@ -144,6 +149,7 @@ public class StatusStylesTests
     [InlineData("done", "done")]
     [InlineData("ready-for-dev", "ready")]
     [InlineData(null, "drafted")]
+    [InlineData("frobnicated", "unrecognized")]
     public void ForStatus_MapsRawStatusText(string? status, string expected)
         => Assert.Equal(expected, StatusStyles.ForStatus(status));
 
@@ -157,8 +163,9 @@ public class StatusStylesTests
     // retrospective + action-item statuses ride the same colors.
     [InlineData("optional", "pending")]
     [InlineData("open", "ready")]
-    // unknown/forward-compat + empty → pending, never an invented color.
-    [InlineData("blocked", "pending")]
+    // present-but-unmapped → unrecognized; empty/null stays pending. [Story 8.2 AC #3]
+    [InlineData("blocked", "unrecognized")]
+    [InlineData("retired", "unrecognized")]
     [InlineData("", "pending")]
     [InlineData(null, "pending")]
     public void ForSprint_MapsLifecycleOntoSharedColors(string? status, string expected)
@@ -189,7 +196,7 @@ public class StatusStylesTests
     [InlineData("ready-for-dev", "ready")]
     [InlineData("draft", "drafted")]
     [InlineData("proposed", "drafted")]
-    // empty/null/unknown → parchment pending, never an invented color.
+    // empty/null/unknown → parchment pending, never an invented color. (Doc path stays pending — not unrecognized.)
     [InlineData("something-new", "pending")]
     [InlineData("", "pending")]
     [InlineData(null, "pending")]
@@ -218,6 +225,7 @@ public class StatusStylesTests
     [InlineData("drafted")]
     [InlineData("pending")]
     [InlineData("deferred")]
+    [InlineData("unrecognized")]
     public void Icon_ReturnsAGlyphForEveryKnownCssClass(string cssClass)
         => Assert.False(string.IsNullOrEmpty(StatusStyles.Icon(cssClass)));
 
@@ -229,8 +237,71 @@ public class StatusStylesTests
     public void Badge_RendersIconAndTextInsideTheStatusBadgeSpan()
     {
         var badge = StatusStyles.Badge("done", "Done");
-        Assert.Contains("class=\"status-badge done\"", badge);
+        Assert.Contains("class=\"status-badge done js-tip\"", badge);
         Assert.Contains("aria-hidden=\"true\"", badge); // the icon is decorative
         Assert.Contains("Done", badge); // the word always stays (UX-DR17: never icon-only)
     }
+
+    // ---- Story 8.2: stage meanings, tooltips, legend key --------------------------------------
+
+    [Theory]
+    [InlineData("pending")]
+    [InlineData("drafted")]
+    [InlineData("ready")]
+    [InlineData("active")]
+    [InlineData("review")]
+    [InlineData("done")]
+    [InlineData("deferred")]
+    [InlineData("unrecognized")]
+    public void StageMeaning_ReturnsNonEmptyMeaningForEveryLegendStage(string cssClass)
+        => Assert.False(string.IsNullOrWhiteSpace(StatusStyles.StageMeaning(cssClass)));
+
+    [Fact]
+    public void Badge_AttachesJsTipAndDataTipFromStageMeaning()
+    {
+        var tip = StatusStyles.StageMeaning("ready");
+        var badge = StatusStyles.Badge("ready", "Ready for dev");
+        Assert.Contains("js-tip", badge);
+        Assert.Contains($"data-tip=\"{PathUtil.Html(tip)}\"", badge);
+        Assert.Contains($"title=\"{PathUtil.Html(tip)}\"", badge);
+        Assert.Contains("status-badge ready", badge);
+        Assert.Contains("Ready for dev", badge);
+    }
+
+    [Fact]
+    public void LegendKey_RendersEveryCanonicalStageWithTokenSwatch()
+    {
+        var html = StatusStyles.LegendKey();
+        Assert.Contains("class=\"status-legend-key\"", html);
+        Assert.Contains("Status legend", html);
+        foreach (var stage in StatusStyles.LegendStages)
+        {
+            Assert.Contains($"status-legend-key-swatch {stage}", html);
+            Assert.Contains(StatusStyles.StageMeaning(stage), html);
+        }
+        // Static reference key — no zero-suppression (all eight rows present).
+        Assert.Equal(StatusStyles.LegendStages.Count, System.Text.RegularExpressions.Regex.Matches(html, "status-legend-key-row").Count);
+    }
+
+    [Fact]
+    public void IsUnrecognizedStatus_AbsentStaysFalse_PresentUnmappedIsTrue()
+    {
+        Assert.False(StatusStyles.IsUnrecognizedStatus(null));
+        Assert.False(StatusStyles.IsUnrecognizedStatus(""));
+        Assert.False(StatusStyles.IsUnrecognizedStatus("ready-for-dev"));
+        Assert.True(StatusStyles.IsUnrecognizedStatus("frobnicated"));
+    }
+
+    [Fact]
+    public void IsUnrecognizedSprintStatus_EmptyStaysFalse_PresentUnmappedIsTrue()
+    {
+        Assert.False(StatusStyles.IsUnrecognizedSprintStatus(null));
+        Assert.False(StatusStyles.IsUnrecognizedSprintStatus(""));
+        Assert.False(StatusStyles.IsUnrecognizedSprintStatus("in-progress"));
+        Assert.True(StatusStyles.IsUnrecognizedSprintStatus("blocked"));
+    }
+
+    [Fact]
+    public void StoryStages_IncludesUnrecognized()
+        => Assert.Contains("unrecognized", StatusStyles.StoryStages);
 }

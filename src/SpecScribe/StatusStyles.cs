@@ -1,8 +1,23 @@
+using System.Text;
+
 namespace SpecScribe;
 
-/// <summary>The single source of truth for status → color semantics across every chart, chip, and badge:
-/// parchment = pending · gold = drafted/ready (planned, no dev yet) · teal = active dev · green = done only.
-/// Keeping this in one place is what stops "green creep" — planned work must never read as finished.</summary>
+/// <summary>
+/// <para><b>Native-vocabulary → canonical-lifecycle mapping seam</b> (Story 8.2 / FR20). This class is the
+/// single place a framework's native status words become SpecScribe's canonical lifecycle stages. Today BMad's
+/// keyword map lives here; a future framework adapter (Epic 4 Stories 4.3–4.7) plugs its own native→canonical
+/// map into this seam rather than into templaters. <see cref="IArtifactAdapter"/> (Story 4.1) deliberately does
+/// <em>not</em> classify status — it emits raw native strings on the parsed models; classification stays here.</para>
+/// <para><b>Canonical lifecycle</b> (one vocabulary per entity type that uses it):
+/// <c>pending → drafted → ready → active → review → done</c>, plus <c>deferred</c> for requirements and
+/// <c>unrecognized</c> when a present native word has no mapping. Entity → classifier:
+/// stories / free-text Status lines → <see cref="ForStatus"/>; epics → <see cref="ForEpic"/> /
+/// <see cref="ForEpicWithRetrospective"/>; requirements → <see cref="ForRequirement"/>; sprint ledger →
+/// <see cref="ForSprint"/>; planning-doc self-reported words → <see cref="ForDoc"/> (not a lifecycle claim).</para>
+/// <para>Color comes only from the <c>--status-*</c> CSS tokens — parchment = pending · gold = drafted/ready
+/// (planned, no dev yet) · teal = active · deep teal = review · green = done only · grey = deferred · distinct
+/// hatched neutral = unrecognized. Keeping classification here stops "green creep" and silent mislabel.</para>
+/// </summary>
 public static class StatusStyles
 {
     /// <summary>CSS class for a story: from its artifact's Status line when present, else whether it's
@@ -11,21 +26,30 @@ public static class StatusStyles
 
     /// <summary>Maps a raw "Status:" string (a story's, or a quick-dev doc's frontmatter status) onto the
     /// shared six-stage lifecycle css class, so every chart/badge routes through this one classifier rather
-    /// than reimplementing the keyword match. An empty/unrecognized status falls back to "drafted" (listed,
-    /// not yet classified) — the same fallback a drafted-but-unstarted story has always used.</summary>
+    /// than reimplementing the keyword match.
+    /// <para><b>Absent vs. unmapped (Story 8.2 AC #3):</b> null/empty/whitespace → <c>drafted</c> (listed in
+    /// epics.md, not yet classified — unchanged). A non-empty string matching no known keyword →
+    /// <c>unrecognized</c> (never silently coerced to a real stage).</para></summary>
     public static string ForStatus(string? status)
     {
-        if (status is { Length: > 0 } value)
+        if (status is not { Length: > 0 } value)
         {
-            var s = value.Trim().ToLowerInvariant();
-            if (s.Contains("done") || s.Contains("complete")) return "done";
-            if (s.Contains("review")) return "review";
-            if (s.Contains("progress") || s.Contains("in-dev")) return "active";
-            if (s.Contains("ready")) return "ready";
+            // Drafted in epics.md but no implementation artifact yet — OR a blank Status line.
+            return "drafted";
         }
 
-        // Drafted in epics.md but no implementation artifact yet.
-        return "drafted";
+        var s = value.Trim();
+        if (s.Length == 0) return "drafted";
+
+        s = s.ToLowerInvariant();
+        if (s.Contains("done") || s.Contains("complete")) return "done";
+        if (s.Contains("review")) return "review";
+        if (s.Contains("progress") || s.Contains("in-dev") || s.Contains("in progress")) return "active";
+        if (s.Contains("ready")) return "ready";
+        // Explicit drafted/draft words are known canonical synonyms (not "unrecognized").
+        if (s.Contains("draft")) return "drafted";
+
+        return "unrecognized";
     }
 
     /// <summary>Human label for a story-lifecycle css class — the accessible/tooltip name for the delivery
@@ -38,15 +62,17 @@ public static class StatusStyles
         "active" => "In development",
         "ready" => "Ready for dev",
         "drafted" => "Drafted",
+        "unrecognized" => "Unrecognized",
         _ => "Pending",
     };
 
-    /// <summary>The story-lifecycle css classes in narrative order (done → … → drafted), the canonical order
-    /// the delivery mosaic and any status roll-up iterate so segments and legends read consistently.
-    /// "pending" is excluded: <see cref="ForStory"/>/<see cref="ForStatus"/> never produce it (an
-    /// unrecognized status falls back to "drafted"), so it would only ever be a dead, unreachable stage
-    /// here — unlike <see cref="ForEpic"/>, which does have a real "pending" tier.</summary>
-    public static readonly IReadOnlyList<string> StoryStages = new[] { "done", "review", "active", "ready", "drafted" };
+    /// <summary>The story-lifecycle css classes in narrative order (done → … → drafted), then
+    /// <c>unrecognized</c>. The delivery mosaic and status roll-ups iterate this list so segments and legends
+    /// stay consistent. "pending" is excluded: <see cref="ForStory"/>/<see cref="ForStatus"/> never produce it
+    /// (an absent status falls back to "drafted"), so it would only ever be a dead stage here — unlike
+    /// <see cref="ForEpic"/>, which does have a real "pending" tier. [Story 8.2]</summary>
+    public static readonly IReadOnlyList<string> StoryStages =
+        new[] { "done", "review", "active", "ready", "drafted", "unrecognized" };
 
     /// <summary>CSS class for an epic, derived from its stories: green only when every story is done;
     /// teal once any story has entered dev; gold "ready" once any story is ready-for-dev (mirroring the
@@ -94,7 +120,9 @@ public static class StatusStyles
     };
 
     /// <summary>CSS class for a requirement, mapping its rolled-up status onto the same color vocabulary
-    /// used for epics/stories, with a distinct grey "deferred" for requirements shelved for later.</summary>
+    /// used for epics/stories, with a distinct grey "deferred" for requirements shelved for later.
+    /// Requirement status is a parsed enum — it cannot be "unrecognized" (that applies only to free-text
+    /// classifiers). [Story 8.2]</summary>
     public static string ForRequirement(RequirementInfo req) => req.Status switch
     {
         RequirementStatus.Done => "done",       // green
@@ -118,19 +146,26 @@ public static class StatusStyles
     /// artifact status), but a reader who learned the colors on the sunburst must read the sprint page for
     /// free. Covers development_status (<c>backlog→ready-for-dev→in-progress→review→done</c>), retrospective
     /// (<c>optional</c>/<c>done</c>), and action-item (<c>open</c>/<c>in-progress</c>/<c>done</c>) values.
-    /// Unknown/forward-compat values fall back to <c>pending</c> (parchment) rather than inventing a color.
-    /// [Story 2.3 Task 2]</summary>
-    public static string ForSprint(string? status) => Normalize(status) switch
+    /// <para><b>Absent vs. unmapped (Story 8.2 AC #3):</b> null/empty → <c>pending</c> (unchanged). A non-empty
+    /// string matching no known value → <c>unrecognized</c> (preserves the word via <see cref="SprintLabel"/>,
+    /// never invents a lifecycle color).</para> [Story 2.3 Task 2; Story 8.2]</summary>
+    public static string ForSprint(string? status)
     {
-        "done" => "done",                 // green
-        "review" => "review",             // deep teal
-        "in-progress" => "active",        // teal
-        "ready-for-dev" => "ready",       // gold
-        "open" => "ready",                // action item awaiting action — gold, same "to do" tier as ready
-        "backlog" => "pending",           // parchment
-        "optional" => "pending",          // retrospective not yet done — parchment
-        _ => "pending",
-    };
+        var n = Normalize(status);
+        if (n.Length == 0) return "pending";
+
+        return n switch
+        {
+            "done" => "done",                 // green
+            "review" => "review",             // deep teal
+            "in-progress" => "active",        // teal
+            "ready-for-dev" => "ready",       // gold
+            "open" => "ready",                // action item awaiting action — gold, same "to do" tier as ready
+            "backlog" => "pending",           // parchment
+            "optional" => "pending",          // retrospective not yet done — parchment
+            _ => "unrecognized",
+        };
+    }
 
     /// <summary>Human, on-brand label for a sprint lifecycle value — the visible badge text. Every status is a
     /// word (UX-DR17), color is reinforcement only. Unknown values are title-cased so a forward-compat status
@@ -153,7 +188,8 @@ public static class StatusStyles
     /// vocabulary as stories/epics/sprint, so a reader who learned the colors elsewhere reads a planning-card
     /// badge for free. This is a third, independent signal — the document's self-reported state — deliberately
     /// NOT reconciled with the sprint or derived-artifact status (Story 1.5 truthfulness). Empty/null/unknown
-    /// falls back to <c>pending</c> (parchment) rather than inventing a color. [Story 2.4 Task 1]</summary>
+    /// falls back to <c>pending</c> (parchment) rather than inventing a color — freeform doc words are expected
+    /// and are NOT the Story 8.2 unrecognized/notice path. [Story 2.4 Task 1]</summary>
     public static string ForDoc(string? status) => Normalize(status) switch
     {
         "final" or "approved" or "done" or "complete" or "published" => "done",   // green
@@ -179,11 +215,82 @@ public static class StatusStyles
     /// strings. Adds a shape channel alongside the existing color+text — no new status vocabulary. [Story 2.5]</summary>
     public static string Icon(string cssClass) => Icons.ForStatus(cssClass);
 
+    /// <summary>One-line plain-language meaning for a lifecycle css class — the shared source for badge
+    /// tooltips and the portal-wide legend key. Unknown classes get a conservative fallback. [Story 8.2]
+    /// <para>// 10.3: vocabulary-explanation seam — extend, don't duplicate</para></summary>
+    public static string StageMeaning(string cssClass) => cssClass switch
+    {
+        "pending" => "Listed, but not yet planned or started",
+        "drafted" => "Stories or a plan exist; work has not started",
+        "ready" => "Has a plan and is ready to build",
+        "active" => "Actively being developed",
+        "review" => "Implementation complete; awaiting review or retrospective",
+        "done" => "Finished and closed",
+        "deferred" => "Shelved on purpose for later",
+        "unrecognized" => "Native status word has no canonical mapping",
+        _ => "Status stage",
+    };
+
+    /// <summary>Canonical stages shown in the portal-wide status legend key, in teaching order
+    /// (pending → … → done), then deferred and unrecognized. Always complete — never zero-suppressed.
+    /// [Story 8.2] <para>// 10.3: vocabulary-explanation seam — extend, don't duplicate</para></summary>
+    public static readonly IReadOnlyList<string> LegendStages =
+        new[] { "pending", "drafted", "ready", "active", "review", "done", "deferred", "unrecognized" };
+
     /// <summary>Renders a complete <c>.status-badge</c> span with its icon prepended before the text — the one
     /// place icon+text pairing is defined, so every badge site calls this instead of hand-inlining the icon
-    /// and risking drift (UX-DR17: color + icon + word, never icon-only). [Story 2.5 Task 3]</summary>
-    public static string Badge(string cssClass, string label) =>
-        $"<span class=\"status-badge {cssClass}\">{Icon(cssClass)}{PathUtil.Html(label)}</span>";
+    /// and risking drift (UX-DR17: color + icon + word, never icon-only). Attaches <c>js-tip</c> +
+    /// <c>data-tip</c> (and a native <c>title</c> fallback for non-JS surfaces) from <see cref="StageMeaning"/>.
+    /// [Story 2.5 Task 3; Story 8.2]</summary>
+    public static string Badge(string cssClass, string label)
+    {
+        var tip = PathUtil.Html(StageMeaning(cssClass));
+        return $"<span class=\"status-badge {cssClass} js-tip\" data-tip=\"{tip}\" title=\"{tip}\">{Icon(cssClass)}{PathUtil.Html(label)}</span>";
+    }
+
+    /// <summary>Compact always-visible status legend key (swatch + icon + word + meaning) for every canonical
+    /// stage. Static reference — never suppresses zero-count rows. Token-driven swatches only.
+    /// [Story 8.2] <para>// 10.3: vocabulary-explanation seam — extend, don't duplicate</para></summary>
+    public static string LegendKey()
+    {
+        var sb = new StringBuilder();
+        sb.Append("<aside class=\"status-legend-key\" aria-label=\"Status legend\">\n");
+        sb.Append("  <div class=\"status-legend-key-title\">Status legend</div>\n");
+        sb.Append("  <ul class=\"status-legend-key-list\">\n");
+        foreach (var stage in LegendStages)
+        {
+            var word = stage switch
+            {
+                "pending" => "Pending",
+                "drafted" => "Drafted",
+                "ready" => "Ready for dev",
+                "active" => "In development",
+                "review" => "In review",
+                "done" => "Done",
+                "deferred" => "Deferred",
+                "unrecognized" => "Unrecognized",
+                _ => StoryLabel(stage),
+            };
+            var meaning = PathUtil.Html(StageMeaning(stage));
+            sb.Append("    <li class=\"status-legend-key-row\">\n");
+            sb.Append($"      <span class=\"status-legend-key-swatch {stage}\" aria-hidden=\"true\"></span>\n");
+            sb.Append($"      <span class=\"status-legend-key-label\">{Icon(stage)}{PathUtil.Html(word)}</span>\n");
+            sb.Append($"      <span class=\"status-legend-key-meaning\">{meaning}</span>\n");
+            sb.Append("    </li>\n");
+        }
+        sb.Append("  </ul>\n</aside>\n\n");
+        return sb.ToString();
+    }
+
+    /// <summary>True when a free-text classifier would emit the unrecognized stage for a <em>present</em>
+    /// status string. Used by generation to emit non-fatal <see cref="AdapterDiagnostic"/> notices. [Story 8.2]</summary>
+    public static bool IsUnrecognizedStatus(string? status) =>
+        status is { Length: > 0 } s && s.Trim().Length > 0 && ForStatus(s) == "unrecognized";
+
+    /// <summary>True when a sprint-ledger value is present but unmapped. Empty stays pending (not a notice).
+    /// [Story 8.2]</summary>
+    public static bool IsUnrecognizedSprintStatus(string? status) =>
+        status is { Length: > 0 } s && s.Trim().Length > 0 && ForSprint(s) == "unrecognized";
 
     private static string Normalize(string? status) => (status ?? string.Empty).Trim().ToLowerInvariant();
 

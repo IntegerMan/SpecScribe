@@ -12,7 +12,8 @@ namespace SpecScribe;
 public static class SprintTemplater
 {
     /// <summary>The lifecycle stages in donut/legend display order (done → … → backlog), each paired with its
-    /// shared status css class and human label. [Story 2.3]</summary>
+    /// shared status css class and human label. Unrecognized is last — present-but-unmapped ledger values.
+    /// [Story 2.3; Story 8.2]</summary>
     private static readonly (string CssClass, string Label)[] StageOrder =
     {
         ("done", "Done"),
@@ -20,10 +21,11 @@ public static class SprintTemplater
         ("active", "In progress"),
         ("ready", "Ready for dev"),
         ("pending", "Backlog"),
+        ("unrecognized", "Unrecognized"),
     };
 
-    /// <summary>The Kanban board columns, left-to-right in workflow order (Backlog → Done) — the natural
-    /// reading direction for a board (todo on the left, done on the right). [Story 2.3 redesign]</summary>
+    /// <summary>The Kanban board columns, left-to-right in workflow order (Backlog → Done), plus Unrecognized
+    /// for present-but-unmapped ledger values. [Story 2.3 redesign; Story 8.2]</summary>
     private static readonly (string CssClass, string Label)[] BoardColumns =
     {
         ("pending", "Backlog"),
@@ -31,6 +33,7 @@ public static class SprintTemplater
         ("active", "In progress"),
         ("review", "In review"),
         ("done", "Done"),
+        ("unrecognized", "Unrecognized"),
     };
 
     /// <summary>Per-stage story counts over the tracked <c>development_status</c> (stories only), in

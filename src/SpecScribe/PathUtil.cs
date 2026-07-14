@@ -114,10 +114,12 @@ public static class PathUtil
     /// <summary>The site-wide footer at the bottom of every page: the SpecScribe credit link, the generation
     /// timestamp (human-friendly), and a "View generation details" link on to the About page — the owner-chosen
     /// reachability path to the About page and, through it, the diagnostics run log, so it appears on every page.
-    /// The generation date is formatted here (single source) rather than by each caller. The details link's href is
+    /// Preceded by the shared status legend key (Story 8.2) so every HTML page teaches the lifecycle vocabulary;
+    /// webview/SPA inject the same <see cref="StatusStyles.LegendKey"/> after BodyHtml because they omit this
+    /// footer. The generation date is formatted here (single source) rather than by each caller. The details link's href is
     /// resolved from <paramref name="relativePrefix"/> (the same <c>../</c> math the nav uses) so it points at the
     /// output-root <c>about.html</c> correctly from a nested page (e.g. <c>adrs/index.html</c>). Root pages pass the
-    /// empty default. [Story 4.8 Task 5; About polish]</summary>
+    /// empty default. [Story 4.8 Task 5; About polish; Story 8.2]</summary>
     public static string RenderFooter(string relativePrefix = "")
     {
         // Routed through the single PortalDates formatter (Story 10.4 "one date token"): 24-hour clock + an
@@ -126,7 +128,8 @@ public static class PathUtil
         // generating machine — the golden fingerprint normalizes the footer clock to keep output portable.
         var now = DateTime.Now;
         var generatedOn = PortalDates.Timestamp(now, PortalDates.LocalZoneLabel(now));
-        return $"<footer class=\"doc-footer\">\n  Generated using <a href=\"{Html(RepositoryUrl)}\">SpecScribe</a> on {generatedOn} &middot; <a href=\"{Html(relativePrefix + SiteNav.AboutOutputPath)}\">View generation details</a>\n</footer>\n\n";
+        return StatusStyles.LegendKey()
+            + $"<footer class=\"doc-footer\">\n  Generated using <a href=\"{Html(RepositoryUrl)}\">SpecScribe</a> on {generatedOn} &middot; <a href=\"{Html(relativePrefix + SiteNav.AboutOutputPath)}\">View generation details</a>\n</footer>\n\n";
     }
 
     // Singleline so a tag whose attributes contain newlines still strips cleanly — e.g. an "(AC: #N)"

@@ -307,4 +307,67 @@ public class BmadArtifactAdapterTests : IDisposable
         Assert.True(ingest.StoryArtifactsById.ContainsKey("1.1"));
         Assert.DoesNotContain(ingest.StoryArtifactsById.Values, v => v.Contains("overflow"));
     }
+
+    [Fact]
+    public void Ingest_UnrecognizedStoryStatus_YieldsUnsupportedDiagnostic()
+    {
+        // Story 8.2 AC #3: a present, unmapped Status: is Unsupported (non-fatal), not silently "drafted".
+        File.WriteAllText(
+            Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"),
+            """
+            # Story 1.1: Foundation Story
+
+            Status: frobnicated
+
+            ## Story
+
+            As a maintainer, I want the foundation.
+
+            ## Acceptance Criteria
+
+            1. It works.
+
+            ## Tasks / Subtasks
+
+            - [x] Task 1: Do it (AC: #1)
+            """);
+
+        var bundle = new BmadArtifactAdapter().Ingest(Options(), SourceFiles(), Project);
+
+        var diag = Assert.Single(bundle.Diagnostics, d => d.Message.Contains("frobnicated", StringComparison.Ordinal));
+        Assert.Equal(AdapterDiagnosticCategory.Unsupported, diag.Category);
+        Assert.Contains("Unrecognized status", diag.Message);
+        Assert.Equal("unrecognized", StatusStyles.ForStory(bundle.Epics!.Epics[0].Stories.Single(s => s.Id == "1.1")));
+    }
+
+    [Fact]
+    public void Ingest_AbsentStoryStatus_StaysDraftedWithNoDiagnostic()
+    {
+        // Story 1.2 has no artifact → Status null → drafted, no notice. [Story 8.2 absent-vs-unmapped]
+        var bundle = new BmadArtifactAdapter().Ingest(Options(), SourceFiles(), Project);
+
+        Assert.Empty(bundle.Diagnostics);
+        var undrafted = bundle.Epics!.Epics[0].Stories.Single(s => s.Id == "1.2");
+        Assert.Null(undrafted.Status);
+        Assert.Equal("drafted", StatusStyles.ForStory(undrafted));
+    }
+
+    [Fact]
+    public void Ingest_UnrecognizedSprintStatus_YieldsUnsupportedDiagnostic()
+    {
+        File.WriteAllText(SprintYaml, """
+            last_updated: 2026-07-06T22:00:00-04:00
+            development_status:
+              epic-1: in-progress
+              1-1-foundation: blocked
+            """);
+
+        var bundle = new BmadArtifactAdapter().Ingest(Options(), SourceFiles(), Project);
+
+        var diag = Assert.Single(bundle.Diagnostics);
+        Assert.Equal(AdapterDiagnosticCategory.Unsupported, diag.Category);
+        Assert.Contains("blocked", diag.Message);
+        Assert.Contains("1-1-foundation", diag.Message);
+        Assert.NotNull(bundle.Sprint); // generation still has the sprint model
+    }
 }

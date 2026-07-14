@@ -43,6 +43,9 @@ public class PathUtilTests
         // explicit machine-local zone label ("Jul 10, 2026 at 17:14 UTC-04:00"). Asserted by shape, not against
         // DateTime.Now, so the test doesn't depend on the moment it runs.
         Assert.Matches(@" on [A-Z][a-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2} &middot;", footer);
+        // Story 8.2: the shared status legend key rides before the footer credit on every HTML page.
+        Assert.Contains("class=\"status-legend-key\"", footer);
+        Assert.Contains("status-legend-key-swatch unrecognized", footer);
     }
 
     [Fact]

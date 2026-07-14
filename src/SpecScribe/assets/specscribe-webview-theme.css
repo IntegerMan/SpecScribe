@@ -125,6 +125,7 @@
   --status-review: #4d9ab5;
   --status-done: #8fbb82;
   --status-deferred: #a89887;
+  --status-unrecognized: #9aa3ad;
 
   --teal: #5fb3c6;
   --teal-deep: #4d9ab5;
@@ -145,6 +146,7 @@
   --status-review: #4aa8ff;
   --status-done: #7fe08a;
   --status-deferred: #cfc0aa;
+  --status-unrecognized: #c8d0d8;
 
   --teal: #56d0ff;
   --teal-deep: #4aa8ff;
@@ -166,6 +168,7 @@
   --status-review: #0e3947;
   --status-done: #2f5a2a;
   --status-deferred: #5a4535;
+  --status-unrecognized: #3d4650;
 
   --teal: #14606f;
   --teal-deep: #0e3947;
@@ -189,6 +192,7 @@
 .vscode-dark .status-badge.review,
 .vscode-dark .status-badge.ready,
 .vscode-dark .status-badge.drafted,
+.vscode-dark .status-badge.unrecognized,
 .vscode-dark .epic-status.done,
 .vscode-dark .epic-status.review,
 .vscode-dark .epic-status.active,
@@ -203,6 +207,7 @@
 .vscode-high-contrast .status-badge.review,
 .vscode-high-contrast .status-badge.ready,
 .vscode-high-contrast .status-badge.drafted,
+.vscode-high-contrast .status-badge.unrecognized,
 .vscode-high-contrast .epic-status.done,
 .vscode-high-contrast .epic-status.review,
 .vscode-high-contrast .epic-status.active,

@@ -48,6 +48,11 @@ public class StylesheetTests
         Assert.Contains("--status-active:", css);
         Assert.Contains("--status-review:", css);
         Assert.Contains("--status-done:", css);
+        Assert.Contains("--status-deferred:", css);
+        Assert.Contains("--status-unrecognized:", css); // Story 8.2
+        Assert.Contains(".status-legend-key", css);
+        Assert.Contains(".status-legend-key-swatch.unrecognized", css);
+        Assert.Contains(".status-badge.unrecognized", css);
     }
 
     [Fact]

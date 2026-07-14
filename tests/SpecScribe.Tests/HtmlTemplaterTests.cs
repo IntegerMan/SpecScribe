@@ -883,7 +883,7 @@ public class HtmlTemplaterTests
         // Dedicated first-class section with a status badge (not flat text) for the quick-dev entry. The badge
         // carries its icon ahead of the still-present status word (Story 2.5: never icon-only).
         Assert.Contains("Direct &amp; Quick-Dev Work", html);
-        Assert.Contains("class=\"status-badge done\"", html);
+        Assert.Contains("class=\"status-badge done", html);
         Assert.Contains(">done</span>", html);
         // Deferred-work callout with its open-item count.
         Assert.Contains("work-callout", html);
@@ -1218,9 +1218,9 @@ public class HtmlTemplaterTests
 
         // (a) status is an on-brand badge with the mapped class — not the old " · "-joined plain text. The
         // badge's decorative icon rides ahead of the still-present status word (Story 2.5).
-        Assert.Contains("class=\"status-badge done\"", html);   // PRD: final → done/"Final"
+        Assert.Contains("class=\"status-badge done", html);   // PRD: final → done/"Final"
         Assert.Contains(">Final</span>", html);
-        Assert.Contains("class=\"status-badge drafted\"", html); // brief: draft → drafted/"Draft"
+        Assert.Contains("class=\"status-badge drafted", html); // brief: draft → drafted/"Draft"
         Assert.Contains(">Draft</span>", html);
         Assert.DoesNotContain("final · 2026-07-05", html);                          // no middot status text run
 

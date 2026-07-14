@@ -22,6 +22,8 @@ public static class Icons
         "drafted" => Svg("<path d=\"M10.6 2.9 13 5.3 5.4 12.9 2.6 13.3 3 10.5Z\"/>"),
         "pending" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M8 5.2V8l2.3 1.4\"/>"),
         "deferred" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.6 5.6 10.4 10.4M10.4 5.6 5.6 10.4\"/>"),
+        // Question-mark in a dashed ring — visibly distinct from every lifecycle glyph. [Story 8.2]
+        "unrecognized" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\" stroke-dasharray=\"2 1.5\"/><path d=\"M5.8 5.6c0-1.4 1-2.2 2.2-2.2s2.2.8 2.2 2c0 1.2-1.1 1.6-1.6 2.2-.4.4-.6.8-.6 1.4\"/><circle cx=\"8\" cy=\"12.2\" r=\".7\" fill=\"currentColor\" stroke=\"none\"/>"),
         _ => string.Empty,
     };
 

@@ -63,12 +63,12 @@ public class SprintTemplaterTests
         Story("1.3", 1, "Backlogged Story", "epics/story-1-3.html")));
 
     [Fact]
-    public void RenderIndex_RendersFiveColumnBoardWithMappedLanesLinkedCardsToggleAndCommands()
+    public void RenderIndex_RendersSixColumnBoardWithMappedLanesLinkedCardsToggleAndCommands()
     {
         var html = SprintTemplater.RenderIndex(Sample(), SampleEpics(), Nav(), SprintCommands());
 
-        // Five lifecycle lanes, each with the mapped status class.
-        foreach (var cls in new[] { "pending", "ready", "active", "review", "done" })
+        // Six lifecycle lanes (incl. unrecognized for present-but-unmapped values), each with the mapped status class.
+        foreach (var cls in new[] { "pending", "ready", "active", "review", "done", "unrecognized" })
             Assert.Contains($"<section class=\"sprint-lane {cls}\"", html);
 
         // Cards carry the story's stage color + the js-tip hook; done story 1.1 and in-progress 1.2 link out.

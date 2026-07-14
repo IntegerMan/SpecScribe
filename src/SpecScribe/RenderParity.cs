@@ -315,9 +315,10 @@ public static class RenderParity
         "<div class=\"story-card\" id=\"(?<id>[^\"]+)\">(?<body>.*?)</div>\\n\\n",
         RegexOptions.Compiled | RegexOptions.Singleline);
     // A story card's OWN status stage is a single-word status-badge class; the task badge (status-badge
-    // task-badge …) has a hyphenated class and is deliberately excluded by the trailing quote.
+    // task-badge …) has a hyphenated class and is deliberately excluded. Extra progressive-enhancement classes
+    // (e.g. js-tip from Story 8.2) may follow the stage token before the closing quote.
     private static readonly Regex StoryStageRegex = new(
-        "<span class=\"status-badge (?<stage>[a-z]+)\"", RegexOptions.Compiled);
+        "<span class=\"status-badge (?<stage>[a-z]+)(?:\"|\\s)", RegexOptions.Compiled);
     private static readonly Regex StoryTitleHrefRegex = new(
         "<a class=\"story-title story-title-link\" href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
     // Dashboard body facts (Story 6.2 review — AC #3 card/panel/drill broadening). Each class is unique WITHIN the

@@ -153,6 +153,9 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
             if (progress is not null)
             {
                 requirements = RequirementsParser.Parse(raw, parsed, progress);
+                // Story 8.2 AC #3: present-but-unmapped Status: lines → Unsupported AdapterDiagnostic
+                // (typed channel from Story 4.1 — not a bespoke GenerationEvent).
+                CollectUnrecognizedStoryStatuses(parsed, ToSourceRelative(options, epicsSourceFile), diagnostics);
             }
         }
         catch (Exception ex)
@@ -162,6 +165,26 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
         }
 
         return new EpicsIngest(epicsSourceFile, model, requirements, artifactMap, consumed, diagnostics);
+    }
+
+    /// <summary>Emits one non-fatal <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per story whose
+    /// free-text <c>Status:</c> is present but unmapped. Absent/empty status stays "drafted" with no notice.
+    /// [Story 8.2 AC #3]</summary>
+    private static void CollectUnrecognizedStoryStatuses(
+        EpicsModel model, string epicsSourceRel, List<AdapterDiagnostic> diagnostics)
+    {
+        foreach (var epic in model.Epics)
+        {
+            foreach (var story in epic.Stories)
+            {
+                if (!StatusStyles.IsUnrecognizedStatus(story.Status)) continue;
+                var path = story.ArtifactSourcePath ?? epicsSourceRel;
+                diagnostics.Add(new AdapterDiagnostic(
+                    AdapterDiagnosticCategory.Unsupported,
+                    path,
+                    $"Unrecognized status '{story.Status}' — no canonical lifecycle mapping; rendered as unrecognized"));
+            }
+        }
     }
 
     /// <summary>Locates and parses the sprint tracking file (well-known name, anywhere under the source root —
@@ -185,9 +208,36 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
                 AdapterDiagnosticCategory.Unsupported,
                 ToSourceRelative(options, sprintPath),
                 "sprint tracking file has no usable development_status map; sprint surfaces are omitted"));
+            return null;
         }
 
+        // Story 8.2 AC #3: present-but-unmapped sprint ledger values → Unsupported (non-fatal).
+        CollectUnrecognizedSprintStatuses(sprint, ToSourceRelative(options, sprintPath), diagnostics);
         return sprint;
+    }
+
+    /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per sprint ledger or action-item
+    /// status that is present but has no canonical mapping. [Story 8.2 AC #3]</summary>
+    private static void CollectUnrecognizedSprintStatuses(
+        SprintStatus sprint, string sprintSourceRel, List<AdapterDiagnostic> diagnostics)
+    {
+        foreach (var entry in sprint.Entries)
+        {
+            if (!StatusStyles.IsUnrecognizedSprintStatus(entry.Status)) continue;
+            diagnostics.Add(new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Unsupported,
+                sprintSourceRel,
+                $"Unrecognized sprint status '{entry.Status}' on '{entry.RawKey}' — no canonical lifecycle mapping; rendered as unrecognized"));
+        }
+
+        foreach (var item in sprint.ActionItems)
+        {
+            if (!StatusStyles.IsUnrecognizedSprintStatus(item.Status)) continue;
+            diagnostics.Add(new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Unsupported,
+                sprintSourceRel,
+                $"Unrecognized action-item status '{item.Status}' — no canonical lifecycle mapping; rendered as unrecognized"));
+        }
     }
 
     /// <summary>Parses the retrospective notes (<c>epic-N-retro-*.md</c>), ordered by epic then filename.

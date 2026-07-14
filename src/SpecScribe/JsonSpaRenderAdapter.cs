@@ -45,6 +45,9 @@ public sealed class JsonSpaRenderAdapter : IRenderAdapter
         sb.Append(HtmlRenderAdapter.Shared.RenderNavMarkup(page.Nav));
         sb.Append(HtmlRenderAdapter.Shared.RenderBreadcrumb(page.OutputRelativePath, page.Breadcrumb));
         sb.Append(page.BodyHtml);
+        // HTML surface places the status legend via PathUtil.RenderFooter; SPA content regions omit the footer,
+        // so inject the shared LegendKey here (Story 8.1 cross-surface note / Story 8.2).
+        sb.Append(StatusStyles.LegendKey());
         return sb.ToString();
     }
 }

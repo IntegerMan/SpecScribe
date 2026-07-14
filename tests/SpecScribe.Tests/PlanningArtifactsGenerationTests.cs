@@ -81,10 +81,10 @@ public class PlanningArtifactsGenerationTests : IDisposable
         // PRD is the prominent primary card carrying its own "Final" badge.
         Assert.Contains("index-card--primary", index);
         Assert.Contains($"<h2><a href=\"{PrdHref}\">", index);
-        Assert.Contains("class=\"status-badge done\"", index);
+        Assert.Contains("class=\"status-badge done", index);
+        Assert.Contains("class=\"status-badge drafted", index);
         Assert.Contains(">Final</span>", index);
         // Brief is a distinct card with a "Draft" badge; UX docs are paired.
-        Assert.Contains("class=\"status-badge drafted\"", index);
         Assert.Contains(">Draft</span>", index);
         Assert.Contains("<div class=\"index-subgroup-label\">UX</div>", index);
         Assert.Contains($"href=\"{BriefHref}\"", index);

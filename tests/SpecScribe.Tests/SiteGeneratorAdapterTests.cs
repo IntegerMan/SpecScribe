@@ -289,7 +289,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // specscribe.css are now scoped to `a.ref-file-node` (link nodes only) instead of the shared `.ref-file-node`
         // class, so non-link chip nodes no longer get link-style hover/focus affordance. CSS-only for this non-git
         // fixture (no code page renders here) — only the stylesheet content shifted the hash.
-        const string expected = "61819feadd9448092847ab434bf23f4e289eb8522c74af0599627920a91390b7";
+        // Regenerated for Story 8.2: every page gained the shared status-legend-key (via RenderFooter /
+        // webview+SPA BodyHtml append), every StatusStyles.Badge gained js-tip + data-tip + title, specscribe.css
+        // gained --status-unrecognized + legend/badge rules, and sprint board gained an unrecognized lane.
+        // Fixture statuses are all known keywords — no unrecognized badges render here; delta is chrome + CSS.
+        const string expected = "4393329efcf501b359e9afe433cff2974edb6a026491f98e139d8c9228905e62";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -501,7 +505,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // The epic HEADER badge reads "In review". No story here is in review (Story 2.1 is done), so a
         // review-class status badge on this page can only be the epic's own header badge.
         var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
-        Assert.Contains("<span class=\"status-badge review\">", epic2);
+        Assert.Contains("<span class=\"status-badge review", epic2);
 
         // …and the epics-index chip for Epic 2 agrees (the same retro-gated classifier), so the surfaces are
         // consistent rather than one reading "Done" and another "In review".

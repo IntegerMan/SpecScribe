@@ -1,6 +1,10 @@
+---
+baseline_commit: 87ee77d7e760109140f0272b081240b320382d6e
+---
+
 # Story 8.2: Canonical Status Model with Portal-Wide Legend
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -221,26 +225,26 @@ No external libraries or APIs are introduced, so there is no version/security re
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Document + lock the canonical lifecycle (AC: #1)**
-  - [ ] Add/extend `StatusStyles` XML-doc: the canonical six-stage lifecycle, which classifier maps which entity type, and the explicit statement that this class is the native→canonical **mapping seam** future adapters (Epic 4) plug into. (No adapter contract — see scope decision.)
-  - [ ] Audit the 12 `StatusStyles.Badge` call sites + templaters for any hard-coded visible status word; route stragglers through `StatusStyles.*Label` (NFR8). Note findings in Completion Notes.
-- [ ] **Task 2 — Stage meanings + badge tooltip (AC: #2)**
-  - [ ] Add `StatusStyles.StageMeaning(cssClass)` (or a `LegendEntries` list) giving each stage a one-line plain-language meaning.
-  - [ ] Extend `StatusStyles.Badge(...)` to add `js-tip` to the class list and `data-tip="{StageMeaning}"` (escaped). Verify the existing tooltip JS picks it up (`HOVER = SEG + ", .js-tip"`), no JS change needed.
-- [ ] **Task 3 — Shared six-stage legend key (AC: #2)**
-  - [ ] Add `StatusStyles.LegendKey()` rendering all canonical stages: swatch (`var(--status-*)`) + `Icon` + word + meaning. Do **not** suppress zero rows — it's a static reference key.
-  - [ ] Render it once per page (single code location — footer via `PathUtil.RenderFooter` recommended). Add `.status-legend-key` styles routing swatches through the tokens.
-- [ ] **Task 4 — Unrecognized status state (AC: #3)**
-  - [ ] Add `--status-unrecognized` token (visually distinct, non-lifecycle) + `.status-badge.unrecognized` styles + `Icons.ForStatus` glyph + a `StatusStyles` label.
-  - [ ] Change `ForStatus`/`ForSprint` so a **present-but-unmatched** string classifies as `"unrecognized"` while **null/empty stays "drafted"** (`ForStatus`) / existing empty behavior (`ForSprint`); preserve the raw native word as the badge text. Add the unrecognized stage to the legend key.
-- [ ] **Task 5 — Non-fatal generation notice (AC: #3)**
-  - [ ] Collect unrecognized-status occurrences during generation and emit a non-fatal notice; generation still completes with no `Error` outcome. Derive solely from input (deterministic).
-  - [ ] **Coordinate with Story 4.1:** if its `AdapterDiagnostic` channel exists, use it (`Unsupported` category); otherwise emit via `GenerationEvent`/`ConsoleUi.PrintInitialSummary` and leave a `// TODO(4.1)` marker. One mechanism only. Record the choice in Completion Notes.
-- [ ] **Task 6 — Tests (AC: #1, #2, #3)**
-  - [ ] Update `StatusStylesTests` for the absent-vs-unmapped distinction; add badge-tooltip, `StageMeaning`, `LegendKey`, and `ForSprint`-unmapped cases.
-  - [ ] Add `--status-unrecognized`/legend-key assertions to `StylesheetTests`; add a generation-level unrecognized-status + non-fatal-notice test; fix any `status-badge` HTML assertions broken by the added attributes.
-- [ ] **Task 7 — Full generation pass + manual verify (AC: #1, #2, #3)**
-  - [ ] `dotnet test` green; run a real generation (default `SpecScribeOutput/`). Hover a badge → tooltip; confirm the legend key renders; temporarily set a bogus `Status:` → unrecognized badge + console notice, then revert.
+- [x] **Task 1 — Document + lock the canonical lifecycle (AC: #1)**
+  - [x] Add/extend `StatusStyles` XML-doc: the canonical six-stage lifecycle, which classifier maps which entity type, and the explicit statement that this class is the native→canonical **mapping seam** future adapters (Epic 4) plug into. (No adapter contract — see scope decision.)
+  - [x] Audit the 12 `StatusStyles.Badge` call sites + templaters for any hard-coded visible status word; route stragglers through `StatusStyles.*Label` (NFR8). Note findings in Completion Notes.
+- [x] **Task 2 — Stage meanings + badge tooltip (AC: #2)**
+  - [x] Add `StatusStyles.StageMeaning(cssClass)` (or a `LegendEntries` list) giving each stage a one-line plain-language meaning.
+  - [x] Extend `StatusStyles.Badge(...)` to add `js-tip` to the class list and `data-tip="{StageMeaning}"` (escaped). Verify the existing tooltip JS picks it up (`HOVER = SEG + ", .js-tip"`), no JS change needed.
+- [x] **Task 3 — Shared six-stage legend key (AC: #2)**
+  - [x] Add `StatusStyles.LegendKey()` rendering all canonical stages: swatch (`var(--status-*)`) + `Icon` + word + meaning. Do **not** suppress zero rows — it's a static reference key.
+  - [x] Render it once per page (single code location — footer via `PathUtil.RenderFooter` recommended). Add `.status-legend-key` styles routing swatches through the tokens.
+- [x] **Task 4 — Unrecognized status state (AC: #3)**
+  - [x] Add `--status-unrecognized` token (visually distinct, non-lifecycle) + `.status-badge.unrecognized` styles + `Icons.ForStatus` glyph + a `StatusStyles` label.
+  - [x] Change `ForStatus`/`ForSprint` so a **present-but-unmatched** string classifies as `"unrecognized"` while **null/empty stays "drafted"** (`ForStatus`) / existing empty behavior (`ForSprint`); preserve the raw native word as the badge text. Add the unrecognized stage to the legend key.
+- [x] **Task 5 — Non-fatal generation notice (AC: #3)**
+  - [x] Collect unrecognized-status occurrences during generation and emit a non-fatal notice; generation still completes with no `Error` outcome. Derive solely from input (deterministic).
+  - [x] **Coordinate with Story 4.1:** if its `AdapterDiagnostic` channel exists, use it (`Unsupported` category); otherwise emit via `GenerationEvent`/`ConsoleUi.PrintInitialSummary` and leave a `// TODO(4.1)` marker. One mechanism only. Record the choice in Completion Notes.
+- [x] **Task 6 — Tests (AC: #1, #2, #3)**
+  - [x] Update `StatusStylesTests` for the absent-vs-unmapped distinction; add badge-tooltip, `StageMeaning`, `LegendKey`, and `ForSprint`-unmapped cases.
+  - [x] Add `--status-unrecognized`/legend-key assertions to `StylesheetTests`; add a generation-level unrecognized-status + non-fatal-notice test; fix any `status-badge` HTML assertions broken by the added attributes.
+- [x] **Task 7 — Full generation pass + manual verify (AC: #1, #2, #3)**
+  - [x] `dotnet test` green; run a real generation (default `SpecScribeOutput/`). Hover a badge → tooltip; confirm the legend key renders; temporarily set a bogus `Status:` → unrecognized badge + console notice, then revert.
 
 ## Dev Notes
 
@@ -286,8 +290,43 @@ Spike traced the live status path: `StatusStyles` + `--status-*` tokens → shar
 
 ### Agent Model Used
 
+Composer (Auto)
+
 ### Debug Log References
 
 ### Completion Notes List
 
+- Hardened `StatusStyles` as the documented native→canonical mapping seam (AC #1): XML-doc locks the six-stage lifecycle + entity→classifier map; future Epic 4 adapters plug maps here, not into templaters.
+- Badge audit (NFR8): all 12 `StatusStyles.Badge` call sites already route labels through `*Label` or raw native words. Sprint kanban column headers (`SprintTemplater.BoardColumns`/`StageOrder`) remain local sprint-board vocabulary mirrors (Backlog/In progress) — not Badge-rendered entity labels. Diagnostics "All clear" and task-badge counts are not lifecycle words. No templater stragglers required routing.
+- AC #2: `StageMeaning` + `LegendKey` (static key: six stages + deferred + unrecognized); badges gain `js-tip`/`data-tip`/`title`. Legend injected via `PathUtil.RenderFooter` (HTML) and after `BodyHtml` in webview/SPA (Story 8.1 cross-surface note — footer is HTML-only).
+- AC #3: present-but-unmapped → `unrecognized` (hatched slate, dashed border, distinct glyph); null/empty `ForStatus` → drafted; empty `ForSprint` → pending. Added `draft` keyword so explicit "drafted" stays mapped.
+- **Story 4.1 coordination:** 4.1 already landed — unrecognized notices use `AdapterDiagnostic(Unsupported)` collected in `BmadArtifactAdapter` (stories + sprint ledger), mapped to Skipped (non-fatal). No parallel GenerationEvent path.
+- Real-repo generation: legend + tooltips present; sprint `retired` (story 3-4) correctly surfaces as unrecognized lane + Unsupported diagnostic (2 Skipped, 0 Error). 1104 tests green.
+
 ### File List
+
+- `src/SpecScribe/StatusStyles.cs`
+- `src/SpecScribe/Icons.cs`
+- `src/SpecScribe/PathUtil.cs`
+- `src/SpecScribe/BmadArtifactAdapter.cs`
+- `src/SpecScribe/WebviewRenderAdapter.cs`
+- `src/SpecScribe/JsonSpaRenderAdapter.cs`
+- `src/SpecScribe/SprintTemplater.cs`
+- `src/SpecScribe/RenderParity.cs`
+- `src/SpecScribe/assets/specscribe.css`
+- `src/SpecScribe/assets/specscribe-webview-theme.css`
+- `tests/SpecScribe.Tests/StatusStylesTests.cs`
+- `tests/SpecScribe.Tests/StylesheetTests.cs`
+- `tests/SpecScribe.Tests/PathUtilTests.cs`
+- `tests/SpecScribe.Tests/BmadArtifactAdapterTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorStatusStylesTests.cs` (new)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
+- `tests/SpecScribe.Tests/SprintTemplaterTests.cs`
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs`
+- `tests/SpecScribe.Tests/PlanningArtifactsGenerationTests.cs`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/8-2-canonical-status-model-with-portal-wide-legend.md`
+
+### Change Log
+
+- 2026-07-14: Implemented canonical status model lock, portal-wide legend key + badge tooltips, unrecognized stage + AdapterDiagnostic notices (Story 8.2).
