@@ -123,7 +123,9 @@ public static class CommitDayTemplater
 
     /// <summary>The page's meta/OG description, phrased to match what the day actually carries: commits only
     /// (the original wording, unchanged for byte-parity on existing commit pages), commits + artifacts, or an
-    /// artifact-only day. Counts drive the singular/plural so the summary never reads "1 commits".</summary>
+    /// artifact-only day. Counts drive the singular/plural so the summary never reads "1 commits"; the artifact
+    /// noun phrase reuses <see cref="Charts.Plural"/> so it matches the visible pill's wording exactly (was
+    /// hand-rolled here with different phrasing — Review finding).</summary>
     private static string BuildMetaDescription(string readable, string siteTitle, int commitCount, int artifactCount)
     {
         if (commitCount > 0 && artifactCount == 0)
@@ -132,8 +134,8 @@ public static class CommitDayTemplater
         }
         if (commitCount > 0)
         {
-            return $"The {commitCount} commit{(commitCount == 1 ? string.Empty : "s")} and {artifactCount} artifact update{(artifactCount == 1 ? string.Empty : "s")} on {readable} in {siteTitle}.";
+            return $"The {commitCount} commit{(commitCount == 1 ? string.Empty : "s")} and {artifactCount} {Charts.Plural(artifactCount, "artifact updated", "artifacts updated")} on {readable} in {siteTitle}.";
         }
-        return $"{artifactCount} artifact{(artifactCount == 1 ? string.Empty : "s")} updated on {readable} in {siteTitle}.";
+        return $"{artifactCount} {Charts.Plural(artifactCount, "artifact updated", "artifacts updated")} on {readable} in {siteTitle}.";
     }
 }

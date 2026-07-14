@@ -108,6 +108,19 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_HasTimelineAndArtifactsUpdatedStyles()
+    {
+        // Story 7.3 — the timeline.html surface and the date pages' "Artifacts updated" section. Neutral tokens
+        // only (never --status-*, activity is not a lifecycle state). [Review][Patch] no companion test existed.
+        var css = ReadStylesheet();
+        Assert.Contains(".timeline-list", css);
+        Assert.Contains(".timeline-row", css);
+        Assert.Contains(".timeline-heatmap", css);
+        Assert.Contains(".artifacts-updated", css);
+        Assert.Contains(".artifact-update-list", css);
+    }
+
+    [Fact]
     public void Stylesheet_HasSendMenuStyles()
     {
         // The unified command badge and its send menu (native <details>) with shared menu rows.

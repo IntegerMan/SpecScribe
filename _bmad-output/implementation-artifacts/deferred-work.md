@@ -11,6 +11,21 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
   site-wide pattern, not something novel to this spec.
   evidence: Edge Case Hunter. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
 
+## Deferred from: code review of story-7-3 (2026-07-13)
+
+- source_spec: `7-3-activity-timeline-and-date-pages.md`
+  summary: Watch-mode (`GenerateOne`) never refreshes the timeline/date-page signal — editing an artifact's mtime in watch mode doesn't recompute `BuildArtifactsByDay`/date pages/timeline, only the next full generate does.
+  evidence: Acceptance Auditor. Owner decision (2026-07-13): accept documented staleness for now; revisit alongside other watch-mode work. [SiteGenerator.cs:337-351](../../src/SpecScribe/SiteGenerator.cs)
+- source_spec: `7-3-activity-timeline-and-date-pages.md`
+  summary: `ArtifactLabel` silently swallows read failures (permission/I-O errors) into a bare filename stem with no `GenerationEvent`/diagnostic, unlike most other per-item failure paths in the same file.
+  evidence: Blind Hunter. Pre-existing degrade-silently pattern extended here, low impact. [SiteGenerator.cs:853-864](../../src/SpecScribe/SiteGenerator.cs)
+- source_spec: `7-3-activity-timeline-and-date-pages.md`
+  summary: `ActivityModel.GroupArtifactsByDay` sorts/dedups by `(Label, Href)` text only; two distinct artifacts sharing a generic title (e.g. two docs both titled "Overview") render as adjacent, visually indistinguishable list entries with no path/type disambiguation.
+  evidence: Edge Case Hunter + Blind Hunter (independently flagged). Cosmetic edge case, low likelihood. [ActivityModel.cs:9-36](../../src/SpecScribe/ActivityModel.cs)
+- source_spec: `7-3-activity-timeline-and-date-pages.md`
+  summary: The unbounded `GitPulse.CommitsByDay` used for date pages/timeline (unlike the 300-commit-capped `_commitPages`/deep-git correlation from Story 7.5) means date pages beyond that window can never resolve their commit hashes to a detail page — degrades safely to plain `<code>`.
+  evidence: Blind Hunter. Completeness gap inherited from 7.5's cap, extended (not introduced) by this story. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+
 ## Deferred from: code review of story-7-7 (2026-07-13)
 
 - source_spec: `7-7-external-source-linking-and-auto-detection.md`

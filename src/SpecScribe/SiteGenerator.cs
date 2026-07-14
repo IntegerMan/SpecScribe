@@ -907,44 +907,62 @@ public sealed class SiteGenerator
     }
 
     /// <summary>Builds the "artifacts updated" signal (Story 7.3 bug fix): every recognized source artifact
-    /// (one that resolves to a generated page via <see cref="_referenceMap"/>) grouped by the day a git commit
-    /// actually changed it. Derived from the ONE shared <c>--deep-git</c> per-file numstat fetch
+    /// (one that resolves to a generated page — epic/story family via <see cref="_referenceMap"/>, standalone
+    /// docs via <see cref="_docs"/>, ADRs via <see cref="_adrs"/>) grouped by the day a git commit actually
+    /// changed it. Derived from the ONE shared <c>--deep-git</c> per-file numstat fetch
     /// (<see cref="DeepGitPulse.Commits"/> — commit <c>Timestamp</c> + touched <c>Files</c>), never from filesystem
     /// mtime: <see cref="File.GetLastWriteTime"/> collapses to the checkout/generation day in a fresh clone, which
     /// made the most-recent date falsely claim nearly every artifact changed then. When <c>--deep-git</c> is off
     /// (<see cref="ProgressModel.DeepGit"/> null), git can't tell us which files changed when, so we emit NO
     /// artifact signal rather than fabricate one — the timeline/date pages still render from the commit-day set,
     /// just without the per-artifact detail. Because an artifact only changes inside a commit, these days are a
-    /// subset of the commit days, so the union never gains a page that git history doesn't back. Never throws
-    /// (AD-4); empty without deep-git data or a populated <see cref="_referenceMap"/>. [Story 7.3 / 10.4]</summary>
+    /// subset of the commit days, so the union never gains a page that git history doesn't back. Reading from all
+    /// three page families (not just <see cref="_referenceMap"/>, which only exists when <c>epics.md</c> renders)
+    /// means a docs/ADR-only project still gets the signal (Review finding: was silently epics.md-gated). Never
+    /// throws (AD-4); empty without deep-git data or any recognized page. [Story 7.3 / 10.4]</summary>
     private IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> BuildArtifactsByDay()
     {
         try
         {
             if (_progress?.DeepGit is not { Commits.Count: > 0 } deep) return EmptyArtifactsByDay;
-            if (_referenceMap.Count == 0) return EmptyArtifactsByDay;
 
-            // Reconcile the two roots up front: _referenceMap keys are SourceRoot-relative; git reports
-            // RepoRoot-relative paths. Map each recognized artifact's repo-relative path → (source path, output href)
-            // once, so the commit walk is a cheap dictionary lookup. Case-insensitive to tolerate Windows casing.
-            var repoRelToArtifact = new Dictionary<string, (string SourceRel, string Href)>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (sourceRel, href) in _referenceMap)
+            // Reconcile source roots up front and map each recognized artifact's repo-relative path → (source path,
+            // output href, resolved full path) once, so the commit walk is a cheap dictionary lookup. Pulled from
+            // every page family that's actually available this run — epics/story pages resolve against SourceRoot
+            // via _referenceMap (only populated when epics.md renders); standalone doc pages resolve against
+            // SourceRoot via _docs (always populated); ADR pages resolve against AdrSourceRoot via _adrs (always
+            // populated) — their SourceRelativePath carries a synthetic "adrs/" bookkeeping prefix that must be
+            // stripped before joining to AdrSourceRoot. Case-insensitive to tolerate Windows casing.
+            var repoRelToArtifact = new Dictionary<string, (string SourceRel, string Href, string FullPath)>(StringComparer.OrdinalIgnoreCase);
+            void Track(string sourceRel, string href, string root)
             {
                 try
                 {
-                    var full = Path.GetFullPath(Path.Combine(_options.SourceRoot, sourceRel.Replace('/', Path.DirectorySeparatorChar)));
+                    var full = Path.GetFullPath(Path.Combine(root, sourceRel.Replace('/', Path.DirectorySeparatorChar)));
                     var repoRel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.RepoRoot, full));
-                    if (repoRel.StartsWith("..", StringComparison.Ordinal)) continue; // outside the repo — git never reports it
+                    if (repoRel.StartsWith("..", StringComparison.Ordinal)) return; // outside the repo — git never reports it
                     // TryAdd (not an overwriting indexer): if two artifacts normalize to the same repo-relative path
                     // (e.g. case-only variants under the OrdinalIgnoreCase comparer), the first one found keeps the
                     // git-day attribution rather than silently losing it to whichever entry happened to iterate last.
-                    repoRelToArtifact.TryAdd(repoRel, (sourceRel, PathUtil.NormalizeSlashes(href)));
+                    repoRelToArtifact.TryAdd(repoRel, (sourceRel, PathUtil.NormalizeSlashes(href), full));
                 }
                 catch
                 {
                     // A single malformed source path contributes no mapping — never aborts the whole signal (AD-4).
                 }
             }
+
+            foreach (var (sourceRel, href) in _referenceMap) Track(sourceRel, href, _options.SourceRoot);
+            foreach (var doc in _docs.Values) Track(doc.SourceRelativePath, doc.OutputRelativePath, _options.SourceRoot);
+            foreach (var adr in _adrs)
+            {
+                var adrPrefix = ForgeOptions.AdrOutputSubdir + "/";
+                var relativeToAdrRoot = adr.SourceRelativePath.StartsWith(adrPrefix, StringComparison.Ordinal)
+                    ? adr.SourceRelativePath[adrPrefix.Length..]
+                    : adr.SourceRelativePath;
+                Track(relativeToAdrRoot, adr.OutputRelativePath, _options.AdrSourceRoot);
+            }
+
             if (repoRelToArtifact.Count == 0) return EmptyArtifactsByDay;
 
             var today = DateOnly.FromDateTime(DateTime.Now);
@@ -967,8 +985,7 @@ public sealed class SiteGenerator
 
                         if (!labelCache.TryGetValue(art.SourceRel, out var label))
                         {
-                            var full = Path.Combine(_options.SourceRoot, art.SourceRel.Replace('/', Path.DirectorySeparatorChar));
-                            labelCache[art.SourceRel] = label = ArtifactLabel(art.SourceRel, full);
+                            labelCache[art.SourceRel] = label = ArtifactLabel(art.SourceRel, art.FullPath);
                         }
                         items.Add((day, label, art.Href));
                     }
@@ -1008,7 +1025,11 @@ public sealed class SiteGenerator
     /// <summary>Writes the chronological activity timeline (<c>timeline.html</c>) — the reused commit heatmap over
     /// a newest-first list of the union date-page days, each linking to its date page — and caches
     /// <see cref="_timelinePath"/> so the dashboard renders "View activity timeline →" only when the page exists.
-    /// Gated by the caller on there being data to show (git pulse OR artifact days). Mirrors the deep-analytics /
+    /// Gated by the caller on there being data to show (git pulse OR artifact days), and always called right after
+    /// <see cref="GenerateDatePagesInternal"/> in the same phase. Sources its day set from <see cref="_commitDays"/>
+    /// (the pages that phase actually wrote) rather than independently recomputing the union — so a day whose page
+    /// failed to write, or a same-run midnight rollover between two separately-read "now"s, can never leave the
+    /// timeline linking to a page that doesn't exist (Review finding: dead-link race). Mirrors the deep-analytics /
     /// git-insights cache-and-guard pattern: a write failure clears <see cref="_timelinePath"/> so the dashboard
     /// link can never dangle (AD-4 / NFR2). [Story 7.3]</summary>
     private void GenerateTimelineInternal(
@@ -1019,10 +1040,7 @@ public sealed class SiteGenerator
         IGenerationReporter? reporter)
     {
         var commitsByDay = git?.CommitsByDay ?? EmptyCommitsByDay;
-        var commitDays = git is not null
-            ? Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now))
-            : (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
-        var days = ActivityModel.UnionDays(commitDays, artifactsByDay.Keys);
+        var days = _commitDays.Select(e => e.Date).ToList();
         if (days.Count == 0)
         {
             _timelinePath = null;
