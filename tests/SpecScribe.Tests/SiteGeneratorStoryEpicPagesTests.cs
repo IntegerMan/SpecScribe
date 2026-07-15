@@ -264,7 +264,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
 
         var gen = GenerateSite();
         // Sanity: all done + retro present ⇒ the epic header badge is "Done", never the retro-gated "In review".
-        Assert.Contains("status-badge done", File.ReadAllText(EpicPage));
+        Assert.Contains("status-badge done js-tip", File.ReadAllText(EpicPage));
         Assert.DoesNotContain("status-badge review", File.ReadAllText(EpicPage));
 
         // A watch edit to a story file triggers an incremental epics regen (retros are NOT re-parsed on this path).
@@ -273,7 +273,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
 
         // Still "Done" — before the fix the epic flipped to "In review" on the incremental rebuild.
         var epicHtml = File.ReadAllText(EpicPage);
-        Assert.Contains("status-badge done", epicHtml);
+        Assert.Contains("status-badge done js-tip", epicHtml);
         Assert.DoesNotContain("status-badge review", epicHtml);
     }
 

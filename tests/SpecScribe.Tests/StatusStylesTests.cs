@@ -30,6 +30,8 @@ public class StatusStylesTests
     [InlineData("ready-for-review", "review")]
     [InlineData("in progress", "active")]
     [InlineData("in-dev", "active")]
+    [InlineData("active", "active")]
+    [InlineData("WIP", "active")]
     [InlineData("ready-for-dev", "ready")]
     [InlineData("drafted", "drafted")]
     [InlineData("something else", "unrecognized")]
@@ -68,6 +70,11 @@ public class StatusStylesTests
         => Assert.Equal("drafted", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null), Story("something else"))));
 
     [Fact]
+    public void ForEpic_AllUnrecognizedStoriesAreUnrecognized()
+        => Assert.Equal("unrecognized",
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("frobnicated"), Story("something else"))));
+
+    [Fact]
     public void EpicStages_CoversEveryForEpicOutputAndEachHasALabel()
     {
         // Representative epics exercising each reachable epic-class branch. EpicStages is the single list the Epic
@@ -82,6 +89,7 @@ public class StatusStylesTests
             StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("ready-for-dev"))),                 // ready
             StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story(null))),                            // drafted
             StatusStyles.ForEpic(Epic(EpicStatus.Pending, Story("done"))),                          // pending
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("frobnicated"))),                   // unrecognized
         };
 
         Assert.All(outputs, o => Assert.Contains(o, StatusStyles.EpicStages));
@@ -101,6 +109,7 @@ public class StatusStylesTests
     [InlineData("ready", "Ready for dev")]
     [InlineData("drafted", "Stories drafted")]
     [InlineData("pending", "Pending")]
+    [InlineData("unrecognized", "Unrecognized")]
     public void EpicLabel_MapsEachTier(string cssClass, string expected)
         => Assert.Equal(expected, StatusStyles.EpicLabel(cssClass));
 
@@ -158,7 +167,9 @@ public class StatusStylesTests
     [InlineData("done", "done")]
     [InlineData("review", "review")]
     [InlineData("in-progress", "active")]
+    [InlineData("in progress", "active")]
     [InlineData("ready-for-dev", "ready")]
+    [InlineData("ready for dev", "ready")]
     [InlineData("backlog", "pending")]
     // retrospective + action-item statuses ride the same colors.
     [InlineData("optional", "pending")]
@@ -245,7 +256,7 @@ public class StatusStylesTests
         Assert.Contains("js-tip", badge);
         Assert.Contains($"data-tip=\"{PathUtil.Html(tip)}\"", badge);
         Assert.Contains($"title=\"{PathUtil.Html(tip)}\"", badge);
-        Assert.Contains("status-badge ready", badge);
+        Assert.Contains("class=\"status-badge ready js-tip\"", badge);
         Assert.Contains("Ready for dev", badge);
     }
 

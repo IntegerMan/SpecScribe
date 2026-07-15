@@ -126,6 +126,7 @@
   --status-done: #8fbb82;
   --status-deferred: #a89887;
   --status-unrecognized: #9aa3ad;
+  --status-unrecognized-hatch: #3a414a;
 
   --teal: #5fb3c6;
   --teal-deep: #4d9ab5;
@@ -147,6 +148,7 @@
   --status-done: #7fe08a;
   --status-deferred: #cfc0aa;
   --status-unrecognized: #c8d0d8;
+  --status-unrecognized-hatch: #2a3038;
 
   --teal: #56d0ff;
   --teal-deep: #4aa8ff;
@@ -198,6 +200,7 @@
 .vscode-dark .epic-status.active,
 .vscode-dark .epic-status.ready,
 .vscode-dark .epic-status.drafted,
+.vscode-dark .epic-status.unrecognized,
 .vscode-dark .gherkin-kw.kw-given,
 .vscode-dark .gherkin-kw.kw-when,
 .vscode-dark .gherkin-kw.kw-then,
@@ -213,6 +216,7 @@
 .vscode-high-contrast .epic-status.active,
 .vscode-high-contrast .epic-status.ready,
 .vscode-high-contrast .epic-status.drafted,
+.vscode-high-contrast .epic-status.unrecognized,
 .vscode-high-contrast .gherkin-kw.kw-given,
 .vscode-high-contrast .gherkin-kw.kw-when,
 .vscode-high-contrast .gherkin-kw.kw-then,

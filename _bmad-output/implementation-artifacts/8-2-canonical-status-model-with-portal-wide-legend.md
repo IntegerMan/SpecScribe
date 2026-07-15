@@ -4,7 +4,7 @@ baseline_commit: 87ee77d7e760109140f0272b081240b320382d6e
 
 # Story 8.2: Canonical Status Model with Portal-Wide Legend
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -246,6 +246,17 @@ No external libraries or APIs are introduced, so there is no version/security re
 - [x] **Task 7 — Full generation pass + manual verify (AC: #1, #2, #3)**
   - [x] `dotnet test` green; run a real generation (default `SpecScribeOutput/`). Hover a badge → tooltip; confirm the legend key renders; temporarily set a bogus `Status:` → unrecognized badge + console notice, then revert.
 
+### Review Findings
+
+- [x] [Review][Patch] Epic rollup: when every story is unrecognized, `ForEpic` must return `unrecognized` (not `drafted`); mixed unrecognized + drafted/ready stays drafted/ready unless a higher tier applies; add `unrecognized` to `EpicStages` / `EpicLabel` as needed [StatusStyles.cs:81-121]
+- [x] [Review][Patch] `ForStatus` treats bare `active` / `wip` as unrecognized [StatusStyles.cs:46-53]
+- [x] [Review][Patch] `ForSprint` rejects spaced aliases (`in progress`, `ready for dev`) that sibling classifiers accept [StatusStyles.cs:158-169]
+- [x] [Review][Patch] Unrecognized hatch hardcodes `#e8ecf0`; webview dark/HC overrides miss legend swatches [specscribe.css:1987-1996,3609-3617; specscribe-webview-theme.css:195-220]
+- [x] [Review][Patch] Badge `.js-tip` tooltips flicker on icon↔text mouse moves (mouseout lacks relatedTarget containment) [specscribe.js:106-109]
+- [x] [Review][Patch] Several HTML assertions were loosened to `status-badge done` prefix matches after Badge gained `js-tip` — prefer exact class+attr checks where practical [HtmlTemplaterTests / PlanningArtifactsGenerationTests / SiteGeneratorAdapterTests / SprintTemplaterTests]
+- [x] [Review][Defer] Substring `Contains` classifiers can still invent lifecycle stages (`incomplete`→done, etc.) [StatusStyles.cs:46-51] — deferred, pre-existing
+- [x] [Review][Defer] LegendKey stage words are a second table beside `*Label` helpers (drift risk) [StatusStyles.cs:245-257] — deferred, pre-existing duplication pattern
+
 ## Dev Notes
 
 ### Cross-surface note from Story 8.1 (2026-07-14)
@@ -330,3 +341,4 @@ Composer (Auto)
 ### Change Log
 
 - 2026-07-14: Implemented canonical status model lock, portal-wide legend key + badge tooltips, unrecognized stage + AdapterDiagnostic notices (Story 8.2).
+- 2026-07-15: Code review patches — ForStatus `active`/`wip`, ForSprint spaced aliases, all-unrecognized epic rollup, hatch token + webview dark remaps, js-tip mouseout containment, tighter badge assertions.

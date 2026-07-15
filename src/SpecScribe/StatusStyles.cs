@@ -45,7 +45,9 @@ public static class StatusStyles
         s = s.ToLowerInvariant();
         if (s.Contains("done") || s.Contains("complete")) return "done";
         if (s.Contains("review")) return "review";
-        if (s.Contains("progress") || s.Contains("in-dev") || s.Contains("in progress")) return "active";
+        // Bare "active"/"wip" are canonical synonyms (exact) — Distinct from Contains("progress").
+        if (s is "active" or "wip" || s.Contains("progress") || s.Contains("in-dev") || s.Contains("in progress"))
+            return "active";
         if (s.Contains("ready")) return "ready";
         // Explicit drafted/draft words are known canonical synonyms (not "unrecognized").
         if (s.Contains("draft")) return "drafted";
@@ -88,6 +90,9 @@ public static class StatusStyles
         // Any ready-for-dev story (with none further along) lifts the epic to the ready tier the story layer
         // already distinguishes, so the epic ring stops reading as merely "drafted" under ready stories.
         if (storyClasses.Any(c => c == "ready")) return "ready";
+        // All present-but-unmapped stories → visible unrecognized (never silently "drafted"). Mixed
+        // unrecognized + drafted (or empty Status → drafted) stays drafted. [Story 8.2 review]
+        if (storyClasses.Count > 0 && storyClasses.All(c => c == "unrecognized")) return "unrecognized";
         return "drafted";
     }
 
@@ -108,7 +113,8 @@ public static class StatusStyles
     /// (done → … → pending). Mirrors <see cref="StoryStages"/>: one authored list, iterated by every epic
     /// roll-up consumer (e.g. the Epic Status donut), so a class can never be silently dropped by a consumer
     /// that forgot to bucket it. Unlike <see cref="StoryStages"/>, "pending" is a real reachable tier here.</summary>
-    public static readonly IReadOnlyList<string> EpicStages = new[] { "done", "review", "active", "ready", "drafted", "pending" };
+    public static readonly IReadOnlyList<string> EpicStages =
+        new[] { "done", "review", "active", "ready", "drafted", "pending", "unrecognized" };
 
     public static string EpicLabel(string cssClass) => cssClass switch
     {
@@ -117,6 +123,7 @@ public static class StatusStyles
         "active" => "In development",
         "ready" => "Ready for dev",
         "drafted" => "Stories drafted",
+        "unrecognized" => "Unrecognized",
         _ => "Pending",
     };
 
@@ -152,7 +159,8 @@ public static class StatusStyles
     /// never invents a lifecycle color).</para> [Story 2.3 Task 2; Story 8.2]</summary>
     public static string ForSprint(string? status)
     {
-        var n = Normalize(status);
+        // Spaced aliases ("in progress", "ready for dev") normalize to kebab so they match the yaml forms.
+        var n = Normalize(status).Replace(' ', '-');
         if (n.Length == 0) return "pending";
 
         return n switch

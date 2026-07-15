@@ -339,7 +339,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // drops its side legend (hover titles only); Overall Progress is a compact ring without the repetitive
         // Planning/Implementation legend; Retro → "Action Items" with an icon; Stories defined → Requirements.
         // [journey-nav-key-views-unified-tiles]
-        const string expected = "26428b62903b15dc920841fcd60f9db1ca1e25e936f9a27575e1cf7d8ebaba40";
+        const string expected = "887ef4227d104723d05fe26c5088c4b5a3033804b51e621e7e2bd56b596d92aa";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -553,7 +553,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // The epic HEADER badge reads "In review". No story here is in review (Story 2.1 is done), so a
         // review-class status badge on this page can only be the epic's own header badge.
         var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
-        Assert.Contains("<span class=\"status-badge review", epic2);
+        Assert.Contains("<span class=\"status-badge review js-tip\"", epic2);
 
         // …and the epics-index chip for Epic 2 agrees (the same retro-gated classifier), so the surfaces are
         // consistent rather than one reading "Done" and another "In review".

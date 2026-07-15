@@ -2,6 +2,11 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 8-2-canonical-status-model-with-portal-wide-legend.md (2026-07-15)
+
+- Substring `Contains` classifiers in `ForStatus` can still invent lifecycle stages (e.g. `incomplete` → done) and bypass the unrecognized safety net — pre-existing fuzzy matching, not introduced by 8.2's absent-vs-unmapped change. [`StatusStyles.cs`]
+- `LegendKey()` keeps an inline stage→word switch beside `StoryLabel` / siblings — drift risk if labels diverge later; words currently match. [`StatusStyles.cs`]
+
 ## Deferred from: code review of 8-1-integration-spike-cross-surface-status-verification.md (2026-07-14)
 
 - Epic 6 standing surface-coverage action lacks a machine-readable split between the Epic 8 instance (claimed executed) and the standing rule (still open); readers can misread the whole `in-progress` item. Pre-existing process/status shape; wording fix already flagged on the same action item. [`sprint-status.yaml:315`]

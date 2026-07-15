@@ -50,6 +50,8 @@ public class StylesheetTests
         Assert.Contains("--status-done:", css);
         Assert.Contains("--status-deferred:", css);
         Assert.Contains("--status-unrecognized:", css); // Story 8.2
+        Assert.Contains("--status-unrecognized-hatch:", css);
+        Assert.Contains("var(--status-unrecognized-hatch)", css);
         Assert.Contains(".status-legend", css);
         Assert.Contains(".status-legend-toggle", css);
         Assert.Contains(".status-legend-panel", css);

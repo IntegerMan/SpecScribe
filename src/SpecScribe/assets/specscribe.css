@@ -54,6 +54,8 @@
   /* Non-lifecycle: present native status with no canonical map. Cool slate outline — must NOT read as any
      of the six real stages or deferred (AC #3). [Story 8.2] */
   --status-unrecognized: #5c6570;
+  /* Alternate hatch stripe for unrecognized chrome — token so dark/webview remaps can retune it. */
+  --status-unrecognized-hatch: #e8ecf0;
 
   /* Diagnostics severity background (Story 4.8) — a pale rust tint pairing with --rust, deliberately outside
      the six-stage --status-* vocabulary (a run notice isn't a delivery stage) but still a named token rather
@@ -1737,6 +1739,17 @@ a.ref-file-node:focus-visible {
 .epic-status.ready,
 .epic-status.drafted { background: #f5ecd4; color: var(--gold); border: 1px solid var(--gold-light); }
 .epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--border); }
+.epic-status.unrecognized {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--warm-white),
+    var(--warm-white) 3px,
+    var(--status-unrecognized-hatch) 3px,
+    var(--status-unrecognized-hatch) 6px
+  );
+  color: var(--status-unrecognized);
+  border: 1px dashed var(--status-unrecognized);
+}
 
 .epic-goal { font-size: 0.85rem; color: var(--ink-faded); line-height: 1.55; margin-bottom: 0.5rem; }
 
@@ -1989,8 +2002,8 @@ a.ref-file-node:focus-visible {
     -45deg,
     var(--warm-white),
     var(--warm-white) 3px,
-    #e8ecf0 3px,
-    #e8ecf0 6px
+    var(--status-unrecognized-hatch) 3px,
+    var(--status-unrecognized-hatch) 6px
   );
   color: var(--status-unrecognized);
   border: 1px dashed var(--status-unrecognized);
@@ -2065,6 +2078,7 @@ a.ref-file-node:focus-visible {
 .sb-ready { fill: var(--status-ready); }
 .sb-drafted { fill: var(--status-drafted); }
 .sb-pending { fill: var(--status-pending); }
+.sb-unrecognized { fill: var(--status-unrecognized); }
 
 /* E4 placeholder arc: a story with no task plan yet. Faint dashed OUTLINE (transparent fill) reads as
    "nothing here yet — a next action", distinct from both a filled task slice and a story off the edge of the
@@ -3611,8 +3625,8 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
     -45deg,
     var(--warm-white),
     var(--warm-white) 2px,
-    #e8ecf0 2px,
-    #e8ecf0 4px
+    var(--status-unrecognized-hatch) 2px,
+    var(--status-unrecognized-hatch) 4px
   );
   border: 1px dashed var(--status-unrecognized);
 }

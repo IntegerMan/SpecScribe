@@ -105,7 +105,11 @@
   });
   document.addEventListener("mouseout", function (e) {
     var seg = e.target.closest ? e.target.closest(HOVER) : null;
-    if (seg) hideTip();
+    if (!seg) return;
+    // Stay showing while the pointer moves between children of the same tip host (e.g. badge icon ↔ text).
+    var into = e.relatedTarget;
+    if (into && (into === seg || (seg.contains && seg.contains(into)))) return;
+    hideTip();
   });
 
   // Keyboard focus: a focused chart segment shows the tooltip anchored to its own box. This covers both the

@@ -68,8 +68,8 @@ public class RetroTests : IDisposable
         Assert.DoesNotContain("<strong>Date:</strong>", retro.BodyHtml);
         Assert.DoesNotContain("<strong>Participants:</strong>", retro.BodyHtml);
         // The Action Items table's Status cells are badged (open → ready, done → done); no bare status cells.
-        Assert.Contains("status-badge ready", retro.BodyHtml);
-        Assert.Contains("status-badge done", retro.BodyHtml);
+        Assert.Contains("status-badge ready js-tip", retro.BodyHtml);
+        Assert.Contains("status-badge done js-tip", retro.BodyHtml);
         Assert.DoesNotContain("<td>open</td>", retro.BodyHtml);
         // The Owner column is dropped entirely — header + every owner cell (LLM personas, not real assignees).
         Assert.DoesNotContain("Owner", retro.BodyHtml);
