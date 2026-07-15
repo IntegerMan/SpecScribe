@@ -382,7 +382,7 @@ public class ChartsTests
     }
 
     [Fact]
-    public void EpicMosaic_ExposesDeliverySentenceAsAriaLabelAndVisibleLine()
+    public void EpicMosaic_ExposesDeliverySentenceAsVisibleLine_DonutStaysDecorative()
     {
         var epic = new EpicProgress
         {
@@ -399,9 +399,14 @@ public class ChartsTests
         var html = Charts.EpicMosaic(new[] { epic }, _ => "epics/epic-1.html");
         const string sentence = "6 of 7 done, 1 in review";
 
-        Assert.Contains($"aria-label=\"{sentence}\"", html);
-        Assert.Contains("role=\"img\"", html);
-        Assert.DoesNotContain("aria-hidden=\"true\"", html.Substring(html.IndexOf("epic-mosaic-donut", StringComparison.Ordinal)));
+        // Visible sentence inside the card <a> is the accessible name; naming the Donut would couple to
+        // per-slice tabindex and nest interactives in the link. [Story 8.4 review]
+        var donutHtml = html.Substring(html.IndexOf("epic-mosaic-donut", StringComparison.Ordinal));
+        donutHtml = donutHtml[..donutHtml.IndexOf("epic-mosaic-label", StringComparison.Ordinal)];
+        Assert.Contains("aria-hidden=\"true\"", donutHtml);
+        Assert.DoesNotContain("role=\"img\"", donutHtml);
+        Assert.DoesNotContain("tabindex=\"0\"", donutHtml);
+        Assert.DoesNotContain($"aria-label=\"{sentence}\"", html);
         Assert.Contains($"class=\"epic-mosaic-delivery\">{sentence}</span>", html);
         // Planning-depth sub-label kept alongside the delivery sentence.
         Assert.Contains("7 / 7 stories detailed", html);

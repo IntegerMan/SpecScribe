@@ -298,9 +298,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // already folded by NormalizeVolatile). The previous constant was stale on current runners; both
         // trees produce this hash, so regenerating is a baseline refresh, not a count-number change. [Story 8.3]
         // Regenerated for Story 8.4: epic-page story cards wrap status+task badges in .story-status-pair;
-        // epic mosaic gains DeliverySentence as aria-label + .epic-mosaic-delivery line; sprint lane heads gain
+        // epic mosaic gains DeliverySentence as visible .epic-mosaic-delivery (Donut stays decorative so
+        // ariaLabel does not nest per-slice tabindex inside the card <a>); sprint lane heads gain
         // js-tip/data-tip/title/tabindex from StageMeaning; no-plan sprint cards gain .no-plan; specscribe.css
         // gains the four companion rules. StageMeaning pending/ready phrasings also update badge tips + legend.
+        // Regenerated for Story 8.4 code-review patch: mosaic Donut drops aria-label/role=img (decorative
+        // again); visible delivery sentence remains the accessible restatement inside the card link.
         // Regenerated for Story 8.5: every Next Steps panel gains primary/alternate hierarchy markup
         // (.next-steps-primary + optional .next-steps-alternates / .next-steps-alt) and specscribe.css gains the
         // companion rules; done panels stay celebratory when the fixture catalog lacks correct-course. [Story 8.5]
@@ -341,7 +344,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // [journey-nav-key-views-unified-tiles]
         // Regenerated for Story 8.3 review patches: funnel reads ProjectCounts (byte-identical counts; hash
         // refresh after ledger wiring + OpenActionItems empty-entries fix).
-        const string expected = "73b1dc85de6658df0ad3ed7c592c5664d8f2dd8b4c1d6f04293acb2d9723eaf0";
+        const string expected = "36a3eaaf50479a67d00ddaeb7707d494a6339f8dc4e1bd66ce18cd6ccf3d9127";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

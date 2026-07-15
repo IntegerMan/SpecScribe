@@ -459,12 +459,13 @@ public static class Charts
 
             sb.Append($"  <a class=\"epic-mosaic-card\" href=\"{Html(href)}\">\n");
             sb.Append("    <div class=\"epic-mosaic-donut\">\n");
-            // Delivery sentence is both the accessible name and a visible restatement so dual counts
-            // ("Done: 6 · In review: 1") read as one framed fact. Keep "N/N stories detailed" — it answers
-            // planning depth, not delivery. [Story 8.4; UX-DR23]
+            // Visible delivery sentence restates dual counts as one fact ("6 of 7 done, 1 in review").
+            // Donut stays decorative (no ariaLabel): naming it would enable per-slice tabindex inside this
+            // <a>, nesting interactives. Keep "N/N stories detailed" — planning depth, not delivery.
+            // [Story 8.4; UX-DR23; code-review 2026-07-15]
             var delivery = hasStories ? DeliverySentence(epic.StoryStatusCounts) : null;
             sb.Append(hasStories
-                ? Donut(DeliverySegments(epic.StoryStatusCounts), size: 64, ariaLabel: delivery)
+                ? Donut(DeliverySegments(epic.StoryStatusCounts), size: 64)
                 : Donut(Array.Empty<(string, int, string)>(), size: 64));
             sb.Append("    </div>\n");
             sb.Append("    <div class=\"epic-mosaic-label\">\n");

@@ -4,7 +4,7 @@ baseline_commit: f4017dd1ab26b835dc6432ad39bbdd26f055fea0
 
 # Story 8.4: Paired Progress and Readiness Semantics
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -238,6 +238,10 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 - [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball the paired badge on an epic-page story card, the mosaic delivery sentence, the Backlog/Ready column tooltips (hover AND keyboard focus), and a dashed no-plan card beside a solid one.
 
+### Review Findings
+
+- [x] [Review][Patch] Nested focusable Donut slices inside epic mosaic card links [Charts.cs:467] — Passing `ariaLabel: delivery` into `Donut` inside `<a class="epic-mosaic-card">` enables per-slice `tabindex="0"` (Donut couples non-empty ariaLabel → segment focus). That nests interactive content in a link, adds extra tab stops per epic×segment, and duplicates the delivery sentence for SRs (same string also in `.epic-mosaic-delivery`). Donut’s own docs say omit ariaLabel when an enclosing labeled card already names the chart — mosaic now has the visible sentence. Fix: keep `Donut` decorative at this call site (no `ariaLabel`); retain the visible delivery line; update mosaic tests that require donut `aria-label`/`role="img"`. **Patched 2026-07-15:** mosaic Donut is decorative again; golden fingerprint regenerated to `36a3eaaf…`.
+
 ## Dev Notes
 
 ### Cross-surface note from Story 8.1 (2026-07-14)
@@ -284,10 +288,10 @@ None.
 ### Completion Notes List
 
 - **Surface A:** Epic-page story cards wrap status + task badges in `.story-status-pair` with a `·` separator when both present; single-badge cases have no orphan separator. Badge inner HTML unchanged (`StatusStyles.Badge` / `TaskBadge`). Story-page evidence strip left to 9.4.
-- **Surface B:** Added `Charts.DeliverySentence` over `EpicProgress.StoryStatusCounts` / `StoryStages` (Σ segments; zero-omission; `StoryLabel` lowercased). Passed as mosaic donut `ariaLabel` + visible `.epic-mosaic-delivery`. **Kept** "N/N stories detailed" as a separate sub-label (planning depth ≠ delivery). Intentionally reads per-epic tally, not 8.3's `ProjectCounts` ledger.
+- **Surface B:** Added `Charts.DeliverySentence` over `EpicProgress.StoryStatusCounts` / `StoryStages` (Σ segments; zero-omission; `StoryLabel` lowercased). Rendered as visible `.epic-mosaic-delivery` inside the mosaic card link; **Donut stays decorative** (no `ariaLabel`) so segment `tabindex` does not nest inside the `<a>` — code-review 2026-07-15. **Kept** "N/N stories detailed" as a separate sub-label (planning depth ≠ delivery). Intentionally reads per-epic tally, not 8.3's `ProjectCounts` ledger.
 - **Surface C:** 8.2's `StageMeaning` had already landed — column tips source from it (format `"{Label} = {StageMeaning}"`), plus native `title` for non-JS/webview. Enriched pending/ready StageMeaning text to the AC distinguishing phrases (one seam for badges, legend, and columns). All board columns (incl. unrecognized) get `js-tip` + `tabindex="0"`.
 - **Surface D:** `.sprint-card.no-plan` when `story is null || TasksTotal == 0`; dashed + muted CSS mirroring `.sb-noplan`. No per-card text (8.6 owns consolidation).
-- **Verification:** 1121 tests green; golden fingerprint regenerated to `0674f5c5…`; real gen to `SpecScribeOutput/` eyeballed all four surfaces.
+- **Verification:** 1121 tests green; golden fingerprint regenerated; real gen to `SpecScribeOutput/` eyeballed all four surfaces. **Code review 2026-07-15:** nested mosaic Donut focus patched; fingerprint `36a3eaaf…`.
 
 ### File List
 
@@ -307,3 +311,4 @@ None.
 ## Change Log
 
 - 2026-07-14: Implemented Story 8.4 — paired progress/state badges, epic delivery sentence, column meaning tips, dashed no-plan cards; tests + golden fingerprint updated.
+- 2026-07-15: Code review — mosaic Donut left decorative (no nested slice tabindex inside card links); golden fingerprint `36a3eaaf…`.

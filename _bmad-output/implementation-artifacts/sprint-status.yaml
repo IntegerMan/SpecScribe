@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: 2026-07-15 (8-3 → done via code review)
+# last_updated: 2026-07-15 (8-4 → done via code review)
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-15T15:30:00-04:00
+last_updated: 2026-07-15T16:58:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -155,7 +155,7 @@ development_status:
   8-1-integration-spike-cross-surface-status-verification: done # spike 2026-07-14: shared StatusStyles/BodyHtml path confirmed for HTML+webview+SPA; CLI is generation-event/outcome channel only (no lifecycle badges); gaps fed into 8.2-8.8 Dev Notes (footer≠webview legend home; js-tip progressive; 8.5 stageCommand optional). Tracing-only — live-host smoke deferred. No production code. No ADR. Code review → done.
   8-2-canonical-status-model-with-portal-wide-legend: done
   8-3-single-source-of-truth-for-every-count: done
-  8-4-paired-progress-and-readiness-semantics: review
+  8-4-paired-progress-and-readiness-semantics: done
   8-5-state-aware-next-step-command-surface: review
   8-6-designed-empty-states: review
   8-7-one-primary-view-per-dashboard-dataset: review
