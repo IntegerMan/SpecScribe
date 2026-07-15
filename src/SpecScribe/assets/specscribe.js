@@ -231,7 +231,7 @@
   // contain command badges that each have their own send-menu, so dismissal is by containment: a click closes
   // every open menu that does NOT contain the click target — this keeps an ancestor popout open while you use a
   // badge inside it, and closes unrelated menus. Escape closes all.
-  var MENU_SELECTOR = "details.send-menu[open], details.cmd-menu[open], details.status-legend[open]";
+  var MENU_SELECTOR = "details.send-menu[open], details.cmd-menu[open], details.status-legend[open], details.sprint-epic-filter[open]";
 
   document.addEventListener("click", function (e) {
     var target = e.target;
@@ -356,8 +356,8 @@
 
   // ---- Sprint epic filter (home widget + sprint page) --------------------------------------
   // Progressive enhancement ONLY (mirrors js-sortable): SSR already applies the default active-epic
-  // visibility + home cap. This injects the epic multi-select from data-epics / data-default-epics so
-  // no-JS never sees inert checkboxes. Progress wheel / totals stay untouched.
+  // visibility + home cap. This injects a compact epic multi-select dropdown from data-epics /
+  // data-default-epics so no-JS never sees inert controls. Progress wheel / totals stay untouched.
   function enhanceSprintEpicFilter(root) {
     if (root.querySelector(".sprint-epic-filter")) return;
     var raw = root.getAttribute("data-epics") || "[]";
@@ -372,21 +372,31 @@
     });
 
     var emptyHint = root.querySelector(".sprint-filter-empty");
-    var filter = document.createElement("div");
+    var filter = document.createElement("details");
     filter.className = "sprint-epic-filter";
-    filter.setAttribute("role", "group");
-    filter.setAttribute("aria-label", "Filter stories by epic");
 
-    var label = document.createElement("span");
-    label.className = "sprint-epic-filter-label";
-    label.textContent = "Epics";
-    filter.appendChild(label);
+    var summary = document.createElement("summary");
+    summary.className = "sprint-epic-filter-summary";
+    summary.setAttribute("aria-label", "Filter stories by epic");
+    var summaryLabel = document.createElement("span");
+    summaryLabel.className = "sprint-epic-filter-label";
+    summaryLabel.textContent = "Epics";
+    var summaryCount = document.createElement("span");
+    summaryCount.className = "sprint-epic-filter-count";
+    summary.appendChild(summaryLabel);
+    summary.appendChild(summaryCount);
+    filter.appendChild(summary);
+
+    var panel = document.createElement("div");
+    panel.className = "sprint-epic-filter-panel";
+    panel.setAttribute("role", "group");
+    panel.setAttribute("aria-label", "Epics");
 
     var allBtn = document.createElement("button");
     allBtn.type = "button";
     allBtn.className = "sprint-epic-filter-all";
     allBtn.textContent = "All";
-    filter.appendChild(allBtn);
+    panel.appendChild(allBtn);
 
     catalog.forEach(function (entry) {
       var id = String(entry.id);
@@ -398,8 +408,9 @@
       if (defaultSet[id]) input.checked = true;
       opt.appendChild(input);
       opt.appendChild(document.createTextNode(" " + (entry.label || ("Epic " + id))));
-      filter.appendChild(opt);
+      panel.appendChild(opt);
     });
+    filter.appendChild(panel);
 
     if (emptyHint && emptyHint.parentNode === root) root.insertBefore(filter, emptyHint);
     else root.insertBefore(filter, root.firstChild);
@@ -411,14 +422,22 @@
     function selectedSet() {
       var set = {};
       var any = false;
+      var count = 0;
       Array.prototype.forEach.call(boxes, function (b) {
-        if (b.checked) { set[b.value] = true; any = true; }
+        if (b.checked) { set[b.value] = true; any = true; count++; }
       });
-      return { set: set, any: any };
+      return { set: set, any: any, count: count };
+    }
+
+    function updateSummary(sel) {
+      if (sel.count === 0) summaryCount.textContent = "none selected";
+      else if (sel.count === boxes.length) summaryCount.textContent = "all (" + sel.count + ")";
+      else summaryCount.textContent = sel.count + " selected";
     }
 
     function apply() {
       var sel = selectedSet();
+      updateSummary(sel);
       if (emptyHint) emptyHint.hidden = sel.any;
 
       Array.prototype.forEach.call(root.querySelectorAll(".sprint-card[data-epic]"), function (card) {
@@ -449,11 +468,10 @@
           cardsHost.insertBefore(empty, cardsHost.firstChild);
         }
         if (empty) {
-          // Show lane-empty when a selection is active but yields nothing; hide when selection cleared
-          // (global empty hint covers that) or when matching cards will show.
           empty.hidden = matching.length > 0 || !sel.any;
         }
 
+        // Cap always applies to the *visible filtered* matching set (home widget).
         if (cap > 0) {
           matching.forEach(function (c, i) {
             if (i >= cap) {
