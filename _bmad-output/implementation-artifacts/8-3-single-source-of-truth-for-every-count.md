@@ -4,7 +4,7 @@ baseline_commit: 2b366d6133af0742081a8a01db50280777531862
 
 # Story 8.3: Single Source of Truth for Every Count
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -270,6 +270,19 @@ No external libraries or APIs are introduced — pure in-repo C# over existing m
   - [x] Fix any expectation-shifted rendering tests; regenerate the golden fingerprint **only** if a rendered number legitimately changed.
 - [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball dashboard/epics-index/sprint story+epic numbers for coherence; if this repo's inputs have drifted, confirm the single reconciliation notice prints.
+
+### Review Findings
+
+- [x] [Review][Patch] Wire Story Pipeline funnel to `ProjectCounts` (owner: wire funnel to `DefinedStoryStages`/`StoriesDefined`, not parallel `ProgressModel` recount) [`Charts.cs` / `HtmlRenderAdapter.Dashboard.cs`]
+- [x] [Review][Patch] `OpenActionItems` zeroed when sprint `Entries` empty but action items exist [`ProjectCounts.cs:137`]
+- [x] [Review][Patch] Epic Status donut comment claims partition assert that does not exist [`HtmlRenderAdapter.Epics.cs:95`]
+- [x] [Review][Patch] `EpicsViewBuilder` null-counts path uses `Empty` while subtitle fields still recount from the model [`EpicsViewBuilder.cs:24`]
+- [x] [Review][Patch] `ActionItemsTemplater` null-counts fallback recounts via `openItems.Count` [`ActionItemsTemplater.cs:17`]
+- [x] [Review][Patch] Unused `SprintTemplater.StageOrder` left after ledger move (rots vs `TrackedStageOrder`) [`SprintTemplater.cs:17`]
+- [x] [Review][Defer] Incremental `_counts` rebuild paths do not re-emit divergence notice [`SiteGenerator.cs:2428`] — deferred, pre-existing
+- [x] [Review][Defer] `Reconcile` collapses duplicate defined story ids via `ToHashSet` [`ProjectCounts.cs:197`] — deferred, pre-existing
+- [x] [Review][Defer] `DivergenceMessage` embeds unbounded id lists [`ProjectCounts.cs:145`] — deferred, pre-existing
+- [x] [Review][Defer] Cross-surface tests never assert funnel drafted total == `StoriesDefined` / ledger field identities [`SiteGeneratorSprintTests.cs`] — deferred, pre-existing
 
 ## Dev Notes
 

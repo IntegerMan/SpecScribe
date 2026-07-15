@@ -19,14 +19,14 @@ public static class EpicsViewBuilder
 
     public static EpicsIndexView BuildIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null)
     {
-        // Production always passes the shared ledger. Null → keep the model-derived subtitle (test/stub path)
-        // while panel stats fall through Empty (same zeros ProgressModel.Empty previously produced). [Story 8.3]
-        var ledger = counts ?? ProjectCounts.Empty;
+        // Production always passes the shared ledger. Null → build an equivalent ephemeral ledger from the
+        // same inputs so tests/stubs that omit counts keep coherent subtitle + panel stats. [Story 8.3]
+        var ledger = counts ?? ProjectCounts.Build(progress, null, WorkInventory.Empty, model);
         return new()
         {
             SiteTitle = nav.SiteTitle,
-            EpicCount = counts?.EpicsDefined ?? model.Epics.Count,
-            DraftedCount = counts?.EpicsDrafted ?? model.Epics.Count(e => e.Status == EpicStatus.Drafted),
+            EpicCount = ledger.EpicsDefined,
+            DraftedCount = ledger.EpicsDrafted,
             Progress = progress,
             Counts = ledger,
             Epics = model,

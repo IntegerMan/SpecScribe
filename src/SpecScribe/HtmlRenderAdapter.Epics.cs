@@ -92,7 +92,8 @@ public sealed partial class HtmlRenderAdapter
             ("Drafted", counts.EpicsDrafted, "drafted"),
             ("Pending", counts.EpicsPending, "pending"),
         };
-        // Structural: segments are the ledger fields; their sum equals EpicsDefined (asserted in ProjectCounts).
+        // Structural: segments are the ledger fields; EpicsDrafted + EpicsPending partition EpicsDefined
+        // (every epic is Drafted or Pending — see ProgressCalculator).
         sb.Append(Charts.Donut(epicStatusSegments, ariaLabel: $"Epic status: {counts.EpicsDrafted} drafted, {counts.EpicsPending} pending"));
         sb.Append(Charts.DonutLegend(epicStatusSegments));
         sb.Append("</div>\n</div>\n\n");

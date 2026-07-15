@@ -163,6 +163,20 @@ public class ProjectCountsTests
     }
 
     [Fact]
+    public void Build_OpenActionItemsWhenDevelopmentStatusEmpty()
+    {
+        var sprint = new SprintStatus
+        {
+            Entries = Array.Empty<SprintEntry>(),
+            ActionItems = new[] { new SprintActionItem("Follow up", "open", 1, "Owner") },
+        };
+
+        var counts = ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty);
+
+        Assert.Equal(1, counts.OpenActionItems);
+    }
+
+    [Fact]
     public void Empty_IsAllZero()
     {
         var e = ProjectCounts.Empty;

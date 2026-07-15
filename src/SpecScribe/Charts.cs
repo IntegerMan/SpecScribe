@@ -751,28 +751,24 @@ public static class Charts
     /// height/color-only), and the hint line + per-band tooltips spell out the reached-at-least reading. A
     /// zero-count stage keeps its labeled column with a dashed placeholder band, and a nonzero stage is
     /// floored to a visible height so 1-beside-dozens never renders as a hairline. Stage tallies come from the
-    /// per-epic <see cref="EpicProgress.StoryStatusCounts"/> already on the model — no re-parsing. Pure inline
-    /// SVG + status-token CSS classes, no JS. [Story 3.6, owner-redirected from requirements-maturation]</summary>
-    public static string RefinementFunnel(ProgressModel p)
+    /// portal-wide <see cref="ProjectCounts.DefinedStoryStages"/> ledger — no re-parsing at render time.
+    /// Pure inline SVG + status-token CSS classes, no JS. [Story 3.6; Story 8.3]</summary>
+    public static string RefinementFunnel(ProgressModel p) =>
+        RefinementFunnel(ProjectCounts.Build(p, null, WorkInventory.Empty));
+
+    /// <summary>Story Pipeline funnel from the portal-wide count ledger. [Story 8.3]</summary>
+    public static string RefinementFunnel(ProjectCounts counts)
     {
-        if (p.StoriesTotal == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
+        var total = counts.StoriesDefined;
+        if (total == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
 
-        // Whole-project story-status tally: sum the per-epic StoryStatusCounts (every story lands in exactly
-        // one StatusStyles.StoryStages class, so the classes partition StoriesTotal).
-        var byStatus = new Dictionary<string, int>();
-        foreach (var epic in p.PerEpic)
-        {
-            foreach (var (status, n) in epic.StoryStatusCounts)
-            {
-                byStatus[status] = byStatus.GetValueOrDefault(status) + n;
-            }
-        }
-        var done = byStatus.GetValueOrDefault("done");
-        var reachedReview = done + byStatus.GetValueOrDefault("review");
-        var reachedDev = reachedReview + byStatus.GetValueOrDefault("active");
-        var reachedReady = reachedDev + byStatus.GetValueOrDefault("ready");
+        int StageCount(string css) =>
+            counts.DefinedStoryStages.FirstOrDefault(s => s.CssClass == css).Count;
 
-        var total = p.StoriesTotal;
+        var done = StageCount("done");
+        var reachedReview = done + StageCount("review");
+        var reachedDev = reachedReview + StageCount("active");
+        var reachedReady = reachedDev + StageCount("ready");
         var stages = new (string Css, int Count, string Label, string AriaPhrase)[]
         {
             ("funnel-drafted", total, "Drafted", $"{total} {Plural(total, "story", "stories")} drafted"),

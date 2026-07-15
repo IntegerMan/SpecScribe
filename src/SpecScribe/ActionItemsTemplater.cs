@@ -13,8 +13,12 @@ public static class ActionItemsTemplater
     {
         var outputPath = SiteNav.ActionItemsOutputPath;
         var quickDev = commands.Command("quick-dev");
-        // Header count from the portal-wide ledger when available — same OpenActionItems every surface reads. [Story 8.3]
-        var openCount = counts?.OpenActionItems ?? openItems.Count;
+        // Header count from the portal-wide ledger — same OpenActionItems every surface reads. [Story 8.3]
+        counts ??= ProjectCounts.Build(
+            ProgressModel.Empty,
+            new SprintStatus { Entries = Array.Empty<SprintEntry>(), ActionItems = openItems },
+            WorkInventory.Empty);
+        var openCount = counts.OpenActionItems;
 
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(

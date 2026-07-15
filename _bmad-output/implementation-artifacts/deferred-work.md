@@ -2,6 +2,13 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 8-3-single-source-of-truth-for-every-count.md (2026-07-15)
+
+- Incremental `WriteIndex` / `WriteSprint` / `WriteActionItems` rebuild `_counts` when null but have no events list to re-emit the Unsupported divergence notice — same watch-mode notice-gap pattern as prior stories. [`SiteGenerator.cs`]
+- `Reconcile` builds defined ids with `ToHashSet`, so a duplicated story id in `epics.md` is silently collapsed for untracked/orphan reporting. [`ProjectCounts.cs`]
+- `DivergenceMessage` joins every untracked/orphan id with no cap — large drift sets produce unbounded diagnostic strings. [`ProjectCounts.cs`]
+- Generation-level 8.3 tests regex HTML for "Stories defined" / sprint subtitle but never assert Story Pipeline funnel drafted total == `StoriesDefined` or that Defined vs Tracked stay distinct on every surface under drift. [`SiteGeneratorSprintTests.cs`]
+
 ## Deferred from: code review of 8-2-canonical-status-model-with-portal-wide-legend.md (2026-07-15)
 
 - Substring `Contains` classifiers in `ForStatus` can still invent lifecycle stages (e.g. `incomplete` → done) and bypass the unrecognized safety net — pre-existing fuzzy matching, not introduced by 8.2's absent-vs-unmapped change. [`StatusStyles.cs`]

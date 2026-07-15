@@ -339,7 +339,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // drops its side legend (hover titles only); Overall Progress is a compact ring without the repetitive
         // Planning/Implementation legend; Retro → "Action Items" with an icon; Stories defined → Requirements.
         // [journey-nav-key-views-unified-tiles]
-        const string expected = "887ef4227d104723d05fe26c5088c4b5a3033804b51e621e7e2bd56b596d92aa";
+        // Regenerated for Story 8.3 review patches: funnel reads ProjectCounts (byte-identical counts; hash
+        // refresh after ledger wiring + OpenActionItems empty-entries fix).
+        const string expected = "73b1dc85de6658df0ad3ed7c592c5664d8f2dd8b4c1d6f04293acb2d9723eaf0";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

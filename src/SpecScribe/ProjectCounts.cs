@@ -134,7 +134,7 @@ public sealed record ProjectCounts
             DefinedStoryStages = definedStages,
             DeferredOpenItems = work.Deferred?.OpenItemCount ?? 0,
             DirectChanges = work.QuickDev.Count,
-            OpenActionItems = hasSprint ? sprint!.OpenActionItems.Count : 0,
+            OpenActionItems = sprint?.OpenActionItems.Count ?? 0,
             UntrackedDefinedStories = untracked,
             OrphanTrackedRows = orphans,
         };

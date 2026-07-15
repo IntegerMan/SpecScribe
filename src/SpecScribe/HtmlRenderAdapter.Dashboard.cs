@@ -55,9 +55,9 @@ public sealed partial class HtmlRenderAdapter
             AppendNowAndNext(sb, nowNext, view.Epics, view.Counts);
         }
 
-        // Story Pipeline funnel — unconditional (the builder owns its empty-state via ProgressModel.Empty).
+        // Story Pipeline funnel — reads the portal-wide ledger (drafted total == StoriesDefined). [Story 8.3]
         sb.Append("<div class=\"chart-panel funnel-panel\">\n<h3>Story Pipeline</h3>\n");
-        sb.Append(Charts.RefinementFunnel(p));
+        sb.Append(Charts.RefinementFunnel(view.Counts));
         sb.Append("</div>\n\n");
 
         // Consolidated Git Pulse panel — header links fork on the timeline (baseline, always-available) and

@@ -11,22 +11,9 @@ namespace SpecScribe;
 /// from the yaml so it never reads as contradicting the derived Now &amp; Next (Story 1.5). [Story 2.3]</summary>
 public static class SprintTemplater
 {
-    /// <summary>Lifecycle stages in summary display order (done → … → backlog → retired → unrecognized).
-    /// Kept in sync with <see cref="ProjectCounts"/> TrackedStageOrder for documentation; live tallies
-    /// come from <see cref="ProjectCounts.TrackedStoryStages"/>. [Story 2.3; Story 8.2]</summary>
-    private static readonly (string CssClass, string Label)[] StageOrder =
-    {
-        ("done", "Done"),
-        ("review", "In review"),
-        ("active", "In progress"),
-        ("ready", "Ready for dev"),
-        ("pending", "Backlog"),
-        ("retired", "Retired"),
-        ("unrecognized", "Unrecognized"),
-    };
-
     /// <summary>The Kanban board columns, left-to-right in workflow order (Backlog → Done), then Retired,
-    /// then Unrecognized for present-but-unmapped ledger values. [Story 2.3 redesign; Story 8.2]</summary>
+    /// then Unrecognized for present-but-unmapped ledger values. Tallies mirror
+    /// <see cref="ProjectCounts.TrackedStageOrder"/>. [Story 2.3 redesign; Story 8.2]</summary>
     private static readonly (string CssClass, string Label)[] BoardColumns =
     {
         ("pending", "Backlog"),
