@@ -4,7 +4,7 @@ baseline_commit: 03fd47503b1a39c72682df465399b38b3f690683
 
 # Story 8.1: Integration Spike — Cross-Surface Status Verification
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -53,6 +53,13 @@ This is a **light** spike, not a full architecture investigation like 6.3. Epic 
   - [x] Write findings directly into this story's Completion Notes below.
   - [x] If a genuine architectural gap is found (not just a "surface-specific work needed" note), flag it to the Project Lead and consider a light `correct-course` — don't silently decide it here.
 
+### Review Findings
+
+- [x] [Review][Patch] Annotate tracing-only scope: smoke deferred for Epic 8 instance [`8-1-integration-spike-cross-surface-status-verification.md` Completion Notes + `sprint-status.yaml` Epic 6 action comment] — owner chose accept tracing-only (2026-07-14)
+- [x] [Review][Patch] Reclassify AC #2 surface map into Task 2's a/b/c taxonomy [`8-1-integration-spike-cross-surface-status-verification.md:100`]
+- [x] [Review][Patch] Add file/line anchors to Debug Log References [`8-1-integration-spike-cross-surface-status-verification.md:78`]
+- [x] [Review][Defer] Epic 6 standing surface-coverage action lacks machine-readable instance-vs-standing status [`sprint-status.yaml:315`] — deferred, pre-existing
+
 ## Dev Notes
 
 - This spike should be quick — it's a tracing exercise over code that already exists and was already proven cross-surface-capable by Epic 6 (`RenderParity`, the shared `IRenderAdapter` contract). Don't rebuild or refactor anything found here; that belongs to the owning story if a gap surfaces.
@@ -76,15 +83,17 @@ Composer (Cursor agent router)
 
 ### Debug Log References
 
-- Traced `StatusStyles` → templaters/`HtmlRenderAdapter.Render*Body` → `PageView.BodyHtml` → `WebviewRenderAdapter.RenderContent` / `JsonSpaRenderAdapter.RenderContent` (identical nav + breadcrumb + body composition).
-- Confirmed `HtmlRenderAdapter.Render` alone appends `PathUtil.RenderFooter`; webview/SPA content regions omit the footer.
-- Confirmed webview inlines `specscribe.css` but does not load `specscribe.js` (tooltips / `data-copy` are progressive on HTML/SPA only).
-- Confirmed `ConsoleUi.PrintInitialSummary` tallies `GenerationEvent` outcomes only — no lifecycle badge path.
-- Outline payload in `SiteGenerator` already uses `StatusStyles.ForStory` / `ForEpicWithRetrospective` (webview tree) — same classifier, not a fork.
+- Traced `StatusStyles` → templaters / `PageView.BodyHtml` → `WebviewRenderAdapter.RenderContent` (`WebviewRenderAdapter.cs:62-68`) / `JsonSpaRenderAdapter.RenderContent` (`JsonSpaRenderAdapter.cs:42-48`) — identical nav + breadcrumb + body composition.
+- Confirmed `HtmlRenderAdapter.Render` alone appends `PathUtil.RenderFooter` (`HtmlRenderAdapter.cs:27-40`, `PathUtil.cs:121`); webview/SPA `RenderContent` regions omit the footer.
+- Confirmed webview inlines `specscribe.css` but does not load `specscribe.js` (`WebviewRenderAdapter.cs:14-16`, `:76-79`); SPA/HTML keep the script (`JsonSpaRenderAdapter.cs:14`). Tooltips / `data-copy` are progressive on HTML/SPA only.
+- Confirmed `ConsoleUi.PrintInitialSummary` tallies `GenerationEvent` outcomes only — no lifecycle badge path (`ConsoleUi.cs:120-148`).
+- Outline payload in `SiteGenerator` already uses `StatusStyles.ForStory` / `ForEpicWithRetrospective` (`SiteGenerator.cs:2049-2070`) — same classifier, not a fork.
 
 ### Completion Notes List
 
 **Verdict:** Epic 6's shared render path still holds. Status words/colors are not re-derived per surface. No ADR / `correct-course` required — gaps are placement and progressive-enhancement caveats for owning stories.
+
+**Scope note (code review 2026-07-14):** This spike is **tracing-only** per AC #1–#3. Epic 6's standing action also mentions a live-host smoke check; that smoke was **intentionally deferred** for the Epic 8 instance (not performed here). Future net-new epic spikes should still record smoke passed/skipped explicitly.
 
 #### AC #1 — Current status path
 
@@ -99,15 +108,17 @@ Portal surfaces (HTML + webview + SPA) share one status seam. CLI shares the gen
 
 #### AC #2 — Epic 8 story × surface map
 
+Taxonomy (Task 2): **(a)** shared-path — reaches portal surfaces once built once; **(b)** surface-specific — dedicated work per surface; **(c)** HTML-only by design.
+
 | Story | Class | Notes |
 |---|---|---|
-| **8.2** Legend + classifier harden | **Mostly shared; placement gap** | Classifier/`Badge` in body = shared. **Legend must not live only in `RenderFooter`** (HTML shell only — webview/SPA omit footer). `js-tip` tooltips = HTML+SPA progressive; legend key is the webview-safe channel. CLI = notice channel for unrecognized status. |
-| **8.3** `ProjectCounts` | **Shared-path** (+ CLI notice) | Ledger → view builders → body. Divergence notice on CLI. |
-| **8.4** Paired progress | **Shared-path** (+ tooltip caveat) | Body/CSS shared. Column `js-tip` weak on webview — pair with non-JS affordance. |
-| **8.5** Next-step commands | **Shared fragment + surface-specific** | Panel HTML shared. Copy/`data-copy` needs JS (HTML/SPA). Optional webview `stageCommand` seam documented but unbuilt (comment mis-labels owning story as 8.4). |
-| **8.6** Empty states | **Shared-path** | Banner + empty lanes in body; board shared with home Now & Next. |
-| **8.7** One primary view | **Shared-path** | Pure CSS `:has()` toggle works on webview (no JS). |
-| **8.8** Recency markers | **Shared-path** | View-model dates in body; CLI N/A. |
+| **8.2** Legend + classifier harden | **(a)** | Classifier/`Badge` in body = (a). Legend must land in the shared content region — footer-only would become **(c) by accident** (HTML shell only; webview/SPA omit footer), not by design. `js-tip` = HTML+SPA progressive; legend key is the webview-safe channel. CLI = notice channel for unrecognized status. |
+| **8.3** `ProjectCounts` | **(a)** | Ledger → view builders → body. Divergence notice on CLI (same generation stream). |
+| **8.4** Paired progress | **(a)** | Body/CSS shared. Column `js-tip` weak on webview — pair with non-JS affordance (progressive, not a second classifier). |
+| **8.5** Next-step commands | **(b)** | Panel HTML fragment is (a); copy/`data-copy` (JS) and optional webview `stageCommand` are (b). Comment mis-labels owning story as 8.4. CLI does not render Next Steps. |
+| **8.6** Empty states | **(a)** | Banner + empty lanes in body; board shared with home Now & Next. CLI out of scope (not (c)). |
+| **8.7** One primary view | **(a)** | Pure CSS `:has()` toggle works on webview (no JS). CLI N/A. |
+| **8.8** Recency markers | **(a)** | View-model dates in body; CLI N/A. |
 
 Sibling Dev Notes updated: `8-2` … `8-8` each carry a "Cross-surface note from Story 8.1" block.
 
@@ -131,3 +142,4 @@ Zero changes under `src/` or `tests/`. Artifacts only: this story + sprint-statu
 
 - 2026-07-14 — Story created (correct-course, epic-7 retrospective). Seats Epic 6 Retrospective Action Item #3 for Epic 8. Renumbered Epic 8's existing Stories 8.1–8.7 to 8.2–8.8 in the same change (`epics.md` and `sprint-status.yaml` updated together per Epic 6 Action Item #2).
 - 2026-07-14 — Spike completed: cross-surface path verified; surface map written; gaps fed into 8.2–8.8 Dev Notes; no production code. Status → review.
+- 2026-07-14 — Code review patches: tracing-only/smoke-deferred scope note; AC #2 map reclassified to (a)/(b)/(c); Debug Log file/line anchors. Status → done.

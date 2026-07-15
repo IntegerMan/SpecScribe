@@ -115,7 +115,8 @@ public class RenderSectionParityTests
 
         // Each broadened fact is genuinely recovered from the rendered body — not merely both-empty.
         Assert.Equal(new[] { "active|In dev|Story 1.1|epics/story-1-1.html", "ready|Up next|Story 1.2|epics/story-1-2.html" }, actual.NowNextCards);
-        Assert.Equal(new[] { "Planning|3 / 5 epics", "Implementation|1 / 2" }, actual.ProgressBars);
+        // Overall Progress is a single ring now — the repetitive Planning/Implementation legend is gone.
+        Assert.Empty(actual.ProgressBars);
     }
 
     [Fact]

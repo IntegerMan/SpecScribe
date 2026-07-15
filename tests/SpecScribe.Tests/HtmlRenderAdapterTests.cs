@@ -555,7 +555,7 @@ public class HtmlRenderAdapterTests
         };
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkDashboard(work, openRetro: 1));
 
-        Assert.Contains("dashboard-summary-band", body);
+        Assert.Contains("dashboard-tile-band", body);
         Assert.Contains("work-summary-card deferred", body);
         Assert.Contains("work-summary-card retro", body);
         Assert.DoesNotContain("quick-dev-card", body);

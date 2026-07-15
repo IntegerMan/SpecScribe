@@ -688,14 +688,15 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        // The discoverable key views now live in the global journey-grouped nav menu (the white sub-header band),
-        // which renders as chrome ahead of the dashboard body — before the summary band and the Sunburst. The
-        // dashboard's own identity header and the old "Explore Key Views" panel are gone.
+        // Dark-bar journey menu + white key-views chips precede the unified tile band and Sunburst.
         var menu = html.IndexOf("site-nav-links", StringComparison.Ordinal);
-        var band = html.IndexOf("dashboard-summary-band", StringComparison.Ordinal);
+        var keyViews = html.IndexOf("site-nav-key-views", StringComparison.Ordinal);
+        var band = html.IndexOf("dashboard-tile-band", StringComparison.Ordinal);
         var glance = html.IndexOf("Project at a Glance", StringComparison.Ordinal);
-        Assert.True(menu >= 0 && band >= 0 && glance >= 0, "nav menu, band, and glance should render");
-        Assert.True(menu < band && band < glance, "the nav menu precedes the summary band, which precedes Project at a Glance");
+        Assert.True(menu >= 0 && keyViews >= 0 && band >= 0 && glance >= 0, "menu, key-views, tile band, and glance should render");
+        Assert.True(menu < keyViews && keyViews < band && band < glance,
+            "journey menu precedes key-views, which precedes the tile band, which precedes Project at a Glance");
+        Assert.Contains("quick-link-pill", html);
         Assert.DoesNotContain("dashboard-header", html);
         Assert.DoesNotContain("<h3>Explore Key Views</h3>", html);
     }
@@ -717,8 +718,8 @@ public class HtmlTemplaterTests
             commands: CommandCatalog.Empty);
 
         Assert.Contains("Epic Status", html);
-        Assert.Contains("In development (1)", html);
-        // Zero-count rows are suppressed (B4): no "Done (0)" noise.
+        // Side legend removed — the donut slice's <title> hover tip carries the rollup count.
+        Assert.Contains("<title>In development: 1</title>", html);
         Assert.DoesNotContain("Done (0)", html);
     }
 
@@ -762,7 +763,8 @@ public class HtmlTemplaterTests
         Assert.True(host >= 0 && board > host, "home epic filter host must precede the sprint board");
         // Open retro action items are surfaced as a compact summary card (beside deferred work) in the band.
         Assert.Contains("summary-card work-summary-card retro", html);
-        Assert.Contains("Retro Action Items", html);
+        Assert.Contains("Action Items", html);
+        Assert.DoesNotContain("Retro Action Items", html);
         Assert.Contains("1 open item", html);
     }
 

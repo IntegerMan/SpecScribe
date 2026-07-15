@@ -34,18 +34,9 @@ public sealed partial class HtmlRenderAdapter
 
         sb.Append("<section class=\"dashboard\">\n");
 
-        // Stat headline row — the tiles carry the already-resolved forks.
-        sb.Append("<div class=\"stat-grid\">\n");
-        foreach (var tile in view.StatTiles)
-        {
-            sb.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
-        }
-        sb.Append("</div>\n\n");
-
-        // Summary band directly below the headline stats: the Epic-Status donut + Overall-Progress bars pulled
-        // up alongside the Deferred/Retro work cards and the Explore Key Views links, so the at-a-glance status,
-        // outstanding follow-up work, and key navigation all sit in one row near the top of the page.
-        AppendSummaryBand(sb, view, p);
+        // One flex-wrap tile band: the five headline stats plus Epic Status / Overall Progress / Deferred /
+        // Action Items — all siblings with shared sizing, with top padding clearing the white key-views bar.
+        AppendTileBand(sb, view, p);
 
         // Sunburst — the glance-at-structure scan path — then Now & Next / sprint board.
         // [spec-sprint-epic-filter-and-home-layout]
@@ -122,37 +113,33 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</section>\n\n");
     }
 
-    /// <summary>The dashboard summary band — a single responsive row placed directly under the headline
-    /// stat-grid. It gathers the Epic-Status donut and Overall-Progress bars (previously a mid-page chart-row)
-    /// together with the Deferred/Retro follow-up cards and the Explore Key Views quick links, so a reader sees
-    /// project status, outstanding work, and primary navigation without scrolling to the bottom of the page.</summary>
-    private void AppendSummaryBand(StringBuilder sb, DashboardView view, ProgressModel p)
+    /// <summary>The unified homepage tile band — headline stats + Epic Status + Overall Progress + Deferred +
+    /// Action Items, all siblings in one flex-wrap panel so they share sizing and wrap together. Top padding
+    /// clears the white key-views sub-header.</summary>
+    private void AppendTileBand(StringBuilder sb, DashboardView view, ProgressModel p)
     {
-        sb.Append("<div class=\"dashboard-summary-band\">\n");
+        sb.Append("<div class=\"dashboard-tile-band\">\n");
+        foreach (var tile in view.StatTiles)
+        {
+            sb.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
+        }
 
-        // Each band card gets a clickthrough to the page that owns its detail: Epic Status → the epics page,
-        // Overall Progress → the sprint board when one is tracked (else the epics page). The chart cards route via
-        // a header "View →" link (their interactive donut legends rule out wrapping the whole card in an anchor);
-        // the Deferred/Retro cards are whole-card links (AppendWorkSummaryCards).
         var epicsHref = view.Epics is { Epics.Count: > 0 } ? SiteNav.EpicsOutputPath : null;
         var progressHref = view.NowNext?.SprintBoard is not null ? SiteNav.SprintOutputPath : epicsHref;
 
-        AppendEpicStatusPanel(sb, p, view.Epics, epicsHref);
-        AppendOverallProgress(sb, view.ProgressBars, progressHref);
+        AppendEpicStatusTile(sb, p, view.Epics, epicsHref);
+        AppendOverallProgressTile(sb, view.ProgressBars, progressHref);
         AppendWorkSummaryCards(sb, view.Work, view.OpenRetroActionItems, view.Counts);
-
         sb.Append("</div>\n\n");
     }
 
-    /// <summary>The "Overall Progress" panel, collapsed from two side-by-side bars into a single completion ring
-    /// with a compact fraction legend beneath — a lighter read that also visually distinguishes from the adjacent
-    /// segmented Epic-Status donut. The ring prefers the Implementation (tasks) fraction, falling back to Planning
-    /// (epics) when no tasks are tracked. The legend keeps the same <c>progress-label</c>/<c>progress-value</c>
-    /// pairs the old bars used, so the section's progress-bar parity facts are unchanged.</summary>
-    private void AppendOverallProgress(StringBuilder sb, IReadOnlyList<ProgressBarView> bars, string? viewHref = null)
+    /// <summary>Compact Overall Progress tile — a single completion ring (Implementation when tracked, else
+    /// Planning). The repetitive Planning/Implementation legend is omitted (the headline stats above already
+    /// carry those fractions). Clickthrough via a header "View →" link.</summary>
+    private void AppendOverallProgressTile(StringBuilder sb, IReadOnlyList<ProgressBarView> bars, string? viewHref = null)
     {
-        sb.Append("<div class=\"chart-panel overall-progress-panel\">\n");
-        sb.Append("<div class=\"chart-panel-header-row\"><h3>Overall Progress</h3>");
+        sb.Append("<div class=\"tile-card overall-progress-tile\">\n");
+        sb.Append("<div class=\"tile-card-header\"><h3>Overall Progress</h3>");
         if (viewHref is { Length: > 0 })
         {
             var viewLabel = string.Equals(viewHref, SiteNav.SprintOutputPath, StringComparison.OrdinalIgnoreCase) ? "View sprint" : "View epics";
@@ -169,37 +156,26 @@ public sealed partial class HtmlRenderAdapter
                 ("Remaining", Math.Max(0, ring.Max - ring.Value), "pending"),
             };
 
-            // The ring wrapper carries progressbar semantics (role + valuenow/min/max) so the collapsed
-            // single-ring overall-progress keeps the same assistive-tech contract the two bars had. [Story 1.4 AC #1]
+            // Ring carries progressbar semantics so assistive tech still gets the single completion value. [Story 1.4 AC #1]
             sb.Append($"<div class=\"overall-progress-body\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Overall progress: {pct}%\">\n");
-            sb.Append(Charts.Donut(segments, ariaLabel: $"Overall progress: {pct}%", centerText: $"{pct}%"));
-            sb.Append("<div class=\"overall-legend\">\n");
-            foreach (var bar in bars)
-            {
-                var value = bar.RightLabel ?? $"{bar.Value} / {bar.Max}";
-                sb.Append($"  <div class=\"overall-legend-item\"><div class=\"progress-label\">{PathUtil.Html(bar.Label)}</div><div class=\"progress-value\">{PathUtil.Html(value)}</div></div>\n");
-            }
-            sb.Append("</div>\n");
+            sb.Append(Charts.Donut(segments, size: 72, ariaLabel: $"Overall progress: {pct}%", centerText: $"{pct}%"));
             sb.Append("</div>\n");
         }
         sb.Append("</div>\n");
     }
 
-    /// <summary>The Epic Status donut. Re-homed from <c>HtmlTemplater.AppendEpicStatusPanel</c> — the donut derives
-    /// its segments from the retro-gated <see cref="StatusStyles.ForEpicWithRetrospective"/> roll-up (an all-done
-    /// epic with no retrospective reads as "In review", harmonizing with the sunburst/chips/badge surfaces that
-    /// already used it), so nothing is re-modelled. [Story 6.2 review: harmonized the epic-status surfaces.]</summary>
-    private void AppendEpicStatusPanel(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, string? viewHref = null)
+    /// <summary>Compact Epic Status donut tile. Segments come from the retro-gated
+    /// <see cref="StatusStyles.ForEpicWithRetrospective"/> roll-up. The side legend is omitted — each slice's
+    /// <c>&lt;title&gt;</c> hover tip carries the count, and the center shows done/total.</summary>
+    private void AppendEpicStatusTile(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, string? viewHref = null)
     {
-        sb.Append("<div class=\"chart-panel\">\n");
-        sb.Append("<div class=\"chart-panel-header-row\"><h3>Epic Status");
-        sb.Append(StatusStyles.LegendKey());
-        sb.Append("</h3>");
+        sb.Append("<div class=\"tile-card epic-status-tile\">\n");
+        sb.Append("<div class=\"tile-card-header\"><h3>Epic Status</h3>");
         if (viewHref is { Length: > 0 })
         {
             sb.Append($"<a class=\"view-epic-link\" href=\"{PathUtil.Html(viewHref)}\">View epics &rarr;</a>");
         }
-        sb.Append("</div>\n<div class=\"donut-and-legend\">\n");
+        sb.Append("</div>\n");
 
         List<(string Label, int Value, string CssClass)> segments;
         string? centerText;
@@ -227,9 +203,8 @@ public sealed partial class HtmlRenderAdapter
             ? string.Join(", ", nonZero.Select(s => $"{s.Value} {s.Label.ToLowerInvariant()}"))
             : "no epics yet";
 
-        sb.Append(Charts.Donut(segments, ariaLabel: $"Epic status: {ariaParts}", centerText: centerText));
-        sb.Append(Charts.DonutLegend(nonZero));
-        sb.Append("</div>\n</div>\n\n");
+        sb.Append(Charts.Donut(segments, size: 72, ariaLabel: $"Epic status: {ariaParts}", centerText: centerText));
+        sb.Append("</div>\n");
     }
 
     /// <summary>The "Now &amp; Next" panel. Re-homed from <c>HtmlTemplater.AppendNowAndNext</c>: the sprint-board
@@ -326,19 +301,30 @@ public sealed partial class HtmlRenderAdapter
         return sb.ToString();
     }
 
-    /// <summary>Display title for a nav/key-view label — "Epics" reads as "Epics &amp; Stories" in the menu.
-    /// Consumed by the journey-grouped nav menu (<see cref="AppendNavMenu"/>).</summary>
+    /// <summary>Display title for a nav/key-view label — "Epics" reads as "Epics &amp; Stories" in the menu
+    /// and key-views chips. Consumed by <see cref="AppendNavMenu"/> and <see cref="AppendKeyViewsBand"/>.</summary>
     private static string QuickLinkTitle(string label) => label switch
     {
         "Epics" => "Epics & Stories",
         _ => label,
     };
 
-    /// <summary>The Deferred / Retro follow-up cards for the summary band. Each is a compact "traditional" card
-    /// (label + open-count) rather than the old full-width callout bar, so the two sit as tiles alongside the
-    /// status/progress panels and the Explore Key Views links. Each card is independently gated: the Deferred card
-    /// when there is deferred work, the Retro card when there are open action items; the "Direct changes" stat
-    /// tile still carries the quick-dev count. Counts come from the portal-wide ledger. [Story 8.3]</summary>
+    /// <summary>Artifact-family accent class for a key-view chip (planning / architecture / epics / requirements).</summary>
+    private static string QuickLinkFamily(string label)
+    {
+        if (label.Contains("Architecture", StringComparison.OrdinalIgnoreCase) || label.Contains("ADR", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Code Map", StringComparison.OrdinalIgnoreCase))
+            return "family-architecture";
+        if (label.Equals("Epics", StringComparison.OrdinalIgnoreCase) || label.Equals("Sprint", StringComparison.OrdinalIgnoreCase))
+            return "family-epics";
+        if (label.Contains("Requirement", StringComparison.OrdinalIgnoreCase))
+            return "family-requirements";
+        return "family-planning";
+    }
+
+    /// <summary>Deferred Work / Action Items follow-up tiles for the unified tile band. Each is a whole-card
+    /// link (label + open-count). Independently gated: Deferred when there is deferred work, Action Items when
+    /// there are open retro items. Counts from the portal-wide ledger. [Story 8.3]</summary>
     private void AppendWorkSummaryCards(StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts)
     {
         if (work.Deferred is { } deferred)
@@ -353,7 +339,7 @@ public sealed partial class HtmlRenderAdapter
         if (openRetro > 0)
         {
             sb.Append($"<a class=\"summary-card work-summary-card retro\" href=\"{PathUtil.Html(SiteNav.ActionItemsOutputPath)}\">\n");
-            sb.Append($"  <span class=\"summary-card-label\">{Icons.ForConcept("Retrospective")}Retro Action Items</span>\n");
+            sb.Append($"  <span class=\"summary-card-label\">{Icons.ForConcept("Action Items")}Action Items</span>\n");
             sb.Append($"  <span class=\"summary-card-count\">{openRetro} open {Charts.Plural(openRetro, "item", "items")}</span>\n");
             sb.Append("</a>\n");
         }

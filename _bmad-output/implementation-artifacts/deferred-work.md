@@ -2,6 +2,10 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 8-1-integration-spike-cross-surface-status-verification.md (2026-07-14)
+
+- Epic 6 standing surface-coverage action lacks a machine-readable split between the Epic 8 instance (claimed executed) and the standing rule (still open); readers can misread the whole `in-progress` item. Pre-existing process/status shape; wording fix already flagged on the same action item. [`sprint-status.yaml:315`]
+
 ## Deferred from: code review of spec-webview-doc-page-surfaces (2026-07-13)
 
 - source_spec: `spec-webview-doc-page-surfaces.md`

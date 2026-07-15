@@ -76,8 +76,9 @@ public static class DashboardViewBuilder
         ProjectCounts c, ProgressModel p, WorkInventory work, EpicsModel? epicsModel, SprintStatus? sprint, bool hasTimeline)
     {
         var epicsHref = epicsModel is { Epics.Count: > 0 } ? SiteNav.EpicsOutputPath : null;
-        // A tracked sprint board is the richer story/task view; without one, fall back to the Epics index.
-        var storyHref = sprint is { IsEmpty: false } ? SiteNav.SprintOutputPath : epicsHref;
+        // Stories defined → Requirements (traceability journey); tasks still prefer the sprint board when tracked.
+        var storiesHref = epicsModel is { Epics.Count: > 0 } ? SiteNav.RequirementsOutputPath : null;
+        var tasksHref = sprint is { IsEmpty: false } ? SiteNav.SprintOutputPath : epicsHref;
         var commitsHref = hasTimeline ? SiteNav.TimelineOutputPath : null;
 
         var tiles = new List<StatTile>
@@ -85,11 +86,11 @@ public static class DashboardViewBuilder
             new($"{c.EpicsDrafted}/{c.EpicsDefined}", "Epics drafted",
                 Tooltip: "Epics with at least one story drafted, out of all epics.", Href: epicsHref),
             new(c.StoriesDefined.ToString(), "Stories defined", $"{c.StoriesWithArtifact} with a task plan",
-                "Stories listed across every epic; the sub-line counts those with a BMad task checklist.", storyHref),
+                "Stories listed across every epic; the sub-line counts those with a BMad task checklist.", storiesHref),
             c.TasksTotal > 0
                 ? new($"{c.TasksDone}/{c.TasksTotal}", "Planned tasks done", $"{c.StoriesWithArtifact}/{c.StoriesDefined} stories planned",
-                    $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.", storyHref)
-                : new("—", "Planned tasks done", "none tracked yet", Href: storyHref),
+                    $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.", tasksHref)
+                : new("—", "Planned tasks done", "none tracked yet", Href: tasksHref),
             p.Git is { } git
                 ? new(git.TotalCommits.ToString(), Charts.Plural(git.TotalCommits, "Commit", "Commits"), CommitStatSub(git),
                     "Total commits in the repository; the sub-line shows active days and how recently work landed.", commitsHref)
