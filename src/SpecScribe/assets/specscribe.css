@@ -3176,14 +3176,30 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   margin: 0.5rem 0 0;
 }
 
-.work-callout {
-  max-width: 1100px;
-  margin: 0 auto 1.5rem;
-  padding: 0.7rem 1.5rem;
+/* Summary band — one responsive row directly under the headline stat-grid. It holds the Epic-Status and
+   Overall-Progress chart panels alongside the Deferred/Retro follow-up cards and the Explore Key Views links.
+   The status/progress panels take more room (flex-grow 2); the lighter cards/links take a single share, and the
+   whole row wraps gracefully on narrow viewports. All members stretch to a shared height so the band reads as
+   one cohesive strip. */
+.dashboard-summary-band {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.8rem;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  align-items: stretch;
+  margin-bottom: 1.2rem;
+}
+.dashboard-summary-band > .chart-panel { flex: 2 1 260px; margin-bottom: 0; }
+.dashboard-summary-band > .dashboard-quick-links { flex: 1 1 220px; }
+.dashboard-summary-band > .summary-card { flex: 1 1 180px; }
+
+/* A "traditional" compact card for the Deferred / Retro follow-up counts (replaces the old full-width callout
+   bar). Left-accent tokenizes the class: deferred = the deferred token, retro = the review token. */
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.9rem 1rem;
   background: var(--cream);
   border: 1px solid var(--border);
   border-left: 3px solid var(--status-deferred);
@@ -3192,12 +3208,11 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   color: inherit;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
-.work-callout:hover { box-shadow: 0 3px 10px var(--shadow); transform: translateY(-1px); }
-.work-callout:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-.work-callout-label { font-weight: bold; color: var(--ink); letter-spacing: 0.04em; }
-.work-callout-count { font-size: 0.8rem; color: var(--ink-light); font-family: 'Courier New', monospace; }
-/* Open retro action items ride the same callout, tinted with the review token to read as its own class. */
-.work-callout.retro-callout { border-left-color: var(--status-review); }
+.summary-card:hover { box-shadow: 0 3px 10px var(--shadow); transform: translateY(-1px); border-color: var(--rust-light); }
+.summary-card:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.summary-card.retro { border-left-color: var(--status-review); }
+.summary-card-label { font-weight: bold; color: var(--ink); letter-spacing: 0.04em; }
+.summary-card-count { font-size: 0.8rem; color: var(--ink-light); font-family: 'Courier New', monospace; }
 
 /* ====================== REQUIREMENTS ====================== */
 /* Inline FR/NFR reference links, kept subtle so dense "FRs covered" lines stay readable. */
@@ -3988,6 +4003,7 @@ a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2
   .now-next-card:hover,
   .quick-link-card:hover,
   .epic-mosaic-card:hover,
+  .summary-card:hover,
   .stat-card:hover {
     transform: none;
   }
@@ -4079,7 +4095,14 @@ a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2
 
 /* Home Now & Next board header: title (+ inline source) on the left; the progress wheel and CTA on the right. */
 .sprint-board-header { align-items: center; }
-.sprint-board-header-aside { display: flex; align-items: center; gap: 1rem; }
+.sprint-board-header-aside { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end; }
+/* Home widget: epic dropdown mounts in the header aside — no extra row above the board. */
+.sprint-epic-filter-host { display: inline-flex; align-items: center; }
+.sprint-board-header-aside .sprint-epic-filter { max-width: none; }
+.sprint-board-header-aside .sprint-epic-filter-panel {
+  left: auto;
+  right: 0;
+}
 
 /* Epic multi-select filter — JS-injected details dropdown; SSR applies default visibility. */
 .sprint-filterable { display: flex; flex-direction: column; gap: 0.65rem; min-width: 0; }

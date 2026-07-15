@@ -23,7 +23,6 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</header>\n\n");
 
         AppendDashboardSection(sb, view, codeItemHref);
-        AppendWorkTypesSection(sb, view.Work, view.OpenRetroActionItems, view.Counts);
 
         sb.Append("</main>\n\n");
         return sb.ToString();
@@ -43,7 +42,12 @@ public sealed partial class HtmlRenderAdapter
         }
         sb.Append("</div>\n\n");
 
-        // Sunburst first — the glance-at-structure scan path — then Now & Next / sprint board.
+        // Summary band directly below the headline stats: the Epic-Status donut + Overall-Progress bars pulled
+        // up alongside the Deferred/Retro work cards and the Explore Key Views links, so the at-a-glance status,
+        // outstanding follow-up work, and key navigation all sit in one row near the top of the page.
+        AppendSummaryBand(sb, view, p);
+
+        // Sunburst — the glance-at-structure scan path — then Now & Next / sprint board.
         // [spec-sprint-epic-filter-and-home-layout]
         if (view.Epics is { } epicsForSunburst)
         {
@@ -59,18 +63,6 @@ public sealed partial class HtmlRenderAdapter
         {
             AppendNowAndNext(sb, nowNext, view.Epics, view.Counts);
         }
-
-        // Epic-status donut + overall-progress bars share a row.
-        sb.Append("<div class=\"chart-row\">\n");
-        AppendEpicStatusPanel(sb, p, view.Epics);
-
-        sb.Append("<div class=\"chart-panel\">\n<h3>Overall Progress</h3>\n");
-        foreach (var bar in view.ProgressBars)
-        {
-            sb.Append(Charts.ProgressBar(bar.Label, bar.Value, bar.Max, bar.RightLabel));
-        }
-        sb.Append("</div>\n");
-        sb.Append("</div>\n\n");
 
         // Story Pipeline funnel — unconditional (the builder owns its empty-state via ProgressModel.Empty).
         sb.Append("<div class=\"chart-panel funnel-panel\">\n<h3>Story Pipeline</h3>\n");
@@ -127,9 +119,30 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("</div>\n\n");
         }
 
+        sb.Append("</section>\n\n");
+    }
+
+    /// <summary>The dashboard summary band — a single responsive row placed directly under the headline
+    /// stat-grid. It gathers the Epic-Status donut and Overall-Progress bars (previously a mid-page chart-row)
+    /// together with the Deferred/Retro follow-up cards and the Explore Key Views quick links, so a reader sees
+    /// project status, outstanding work, and primary navigation without scrolling to the bottom of the page.</summary>
+    private void AppendSummaryBand(StringBuilder sb, DashboardView view, ProgressModel p)
+    {
+        sb.Append("<div class=\"dashboard-summary-band\">\n");
+
+        AppendEpicStatusPanel(sb, p, view.Epics);
+
+        sb.Append("<div class=\"chart-panel\">\n<h3>Overall Progress</h3>\n");
+        foreach (var bar in view.ProgressBars)
+        {
+            sb.Append(Charts.ProgressBar(bar.Label, bar.Value, bar.Max, bar.RightLabel));
+        }
+        sb.Append("</div>\n");
+
+        AppendWorkSummaryCards(sb, view.Work, view.OpenRetroActionItems, view.Counts);
         AppendDashboardQuickLinks(sb, view.QuickLinks);
 
-        sb.Append("</section>\n\n");
+        sb.Append("</div>\n\n");
     }
 
     /// <summary>The Epic Status donut. Re-homed from <c>HtmlTemplater.AppendEpicStatusPanel</c> — the donut derives
@@ -181,16 +194,22 @@ public sealed partial class HtmlRenderAdapter
     {
         if (nowNext.SprintBoard is { } sprint && epicsModel is not null)
         {
+            // One filterable root wraps header + board so the epic dropdown can sit in the header aside
+            // (less vertical chrome than a row above the lanes). [spec-sprint-epic-filter-and-home-layout]
             sb.Append("<div class=\"chart-panel sprint-board-panel\">\n");
+            sb.Append(SprintTemplater.OpenEpicFilterable(sprint, epicsModel, capPerColumn: 3));
             sb.Append("<div class=\"chart-panel-header-row sprint-board-header\">\n");
             sb.Append("  <h3>Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span>");
             sb.Append(StatusStyles.LegendKey());
             sb.Append("</h3>\n");
             sb.Append("  <div class=\"sprint-board-header-aside\">");
+            sb.Append(SprintTemplater.EpicFilterHostMarkup);
             sb.Append(SprintTemplater.RenderProgressWheel(counts));
             sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a>");
             sb.Append("</div>\n</div>\n");
-            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath));
+            sb.Append(SprintTemplater.EpicFilterEmptyHintMarkup);
+            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath, wrapWithEpicFilter: false));
+            sb.Append(SprintTemplater.CloseEpicFilterable());
             sb.Append("</div>\n\n");
             return;
         }
@@ -294,33 +313,28 @@ public sealed partial class HtmlRenderAdapter
         return "family-planning";
     }
 
-    /// <summary>The "Direct &amp; Quick-Dev Work" band. Re-homed from <c>HtmlTemplater.AppendWorkTypesSection</c>,
-    /// driven by the <see cref="WorkInventory"/> domain input; the open deferred/action counts come from the
-    /// portal-wide ledger. [Story 6.2; Story 8.3]</summary>
-    private void AppendWorkTypesSection(StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts)
+    /// <summary>The Deferred / Retro follow-up cards for the summary band. Each is a compact "traditional" card
+    /// (label + open-count) rather than the old full-width callout bar, so the two sit as tiles alongside the
+    /// status/progress panels and the Explore Key Views links. Each card is independently gated: the Deferred card
+    /// when there is deferred work, the Retro card when there are open action items; the "Direct changes" stat
+    /// tile still carries the quick-dev count. Counts come from the portal-wide ledger. [Story 8.3]</summary>
+    private void AppendWorkSummaryCards(StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts)
     {
-        // Gate on the surfaces this section still renders — the Deferred callout and the Retro callout. A
-        // quick-dev-only project (QuickDev items but no deferred, no open retro) renders no orphan heading; the
-        // "Direct changes" stat tile still carries that count. [spec-declutter-home-dashboard]
-        if (work.Deferred is null && openRetro == 0) return;
-
-        sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept("Direct & Quick-Dev Work")}Direct &amp; Quick-Dev Work</div>\n");
-
         if (work.Deferred is { } deferred)
         {
             var count = counts.DeferredOpenItems;
-            sb.Append($"<a class=\"work-callout\" href=\"{PathUtil.Html(deferred.OutputPath)}\">\n");
-            sb.Append($"  <span class=\"work-callout-label\">{Icons.ForConcept("Deferred")}Deferred Work</span>\n");
-            sb.Append($"  <span class=\"work-callout-count\">{count} open {Charts.Plural(count, "item", "items")}</span>\n");
-            sb.Append("</a>\n\n");
+            sb.Append($"<a class=\"summary-card work-summary-card deferred\" href=\"{PathUtil.Html(deferred.OutputPath)}\">\n");
+            sb.Append($"  <span class=\"summary-card-label\">{Icons.ForConcept("Deferred")}Deferred Work</span>\n");
+            sb.Append($"  <span class=\"summary-card-count\">{count} open {Charts.Plural(count, "item", "items")}</span>\n");
+            sb.Append("</a>\n");
         }
 
         if (openRetro > 0)
         {
-            sb.Append($"<a class=\"work-callout retro-callout\" href=\"{PathUtil.Html(SiteNav.ActionItemsOutputPath)}\">\n");
-            sb.Append($"  <span class=\"work-callout-label\">{Icons.ForConcept("Retrospective")}Retro Action Items</span>\n");
-            sb.Append($"  <span class=\"work-callout-count\">{openRetro} open {Charts.Plural(openRetro, "item", "items")}</span>\n");
-            sb.Append("</a>\n\n");
+            sb.Append($"<a class=\"summary-card work-summary-card retro\" href=\"{PathUtil.Html(SiteNav.ActionItemsOutputPath)}\">\n");
+            sb.Append($"  <span class=\"summary-card-label\">{Icons.ForConcept("Retrospective")}Retro Action Items</span>\n");
+            sb.Append($"  <span class=\"summary-card-count\">{openRetro} open {Charts.Plural(openRetro, "item", "items")}</span>\n");
+            sb.Append("</a>\n");
         }
     }
 }

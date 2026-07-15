@@ -412,7 +412,9 @@
     });
     filter.appendChild(panel);
 
-    if (emptyHint && emptyHint.parentNode === root) root.insertBefore(filter, emptyHint);
+    var host = root.querySelector(".sprint-epic-filter-host");
+    if (host) host.appendChild(filter);
+    else if (emptyHint && emptyHint.parentNode === root) root.insertBefore(filter, emptyHint);
     else root.insertBefore(filter, root.firstChild);
 
     var boxes = filter.querySelectorAll("input[type=checkbox]");

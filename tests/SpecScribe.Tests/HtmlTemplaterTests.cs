@@ -672,7 +672,7 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_SurfacesProjectAtAGlanceAheadOfExploreKeyViews()
+    public void RenderIndex_SurfacesExploreKeyViewsInSummaryBandAboveProjectAtAGlance()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -685,11 +685,13 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        // The most valuable panel leads; the slimmed link grid trails it. [Story 1.5 F1]
+        // Explore Key Views now rides the summary band directly under the stat tiles, above the Sunburst.
+        var band = html.IndexOf("dashboard-summary-band", StringComparison.Ordinal);
         var glance = html.IndexOf("Project at a Glance", StringComparison.Ordinal);
         var explore = html.IndexOf("Explore Key Views", StringComparison.Ordinal);
-        Assert.True(glance >= 0 && explore >= 0, "both panels should render");
-        Assert.True(glance < explore, "Project at a Glance must appear before Explore Key Views");
+        Assert.True(band >= 0 && glance >= 0 && explore >= 0, "band + both panels should render");
+        Assert.True(explore < glance, "Explore Key Views (summary band) must appear before Project at a Glance");
+        Assert.True(band < explore, "the summary band opens before its Explore Key Views panel");
     }
 
     [Fact]
@@ -760,14 +762,19 @@ public class HtmlTemplaterTests
         Assert.Contains("class=\"sprint-board\"", html);
         Assert.Contains("href=\"sprint.html\"", html);
         Assert.Contains("sprint-filterable", html);
+        Assert.Contains("sprint-epic-filter-host", html);
         Assert.Contains("data-epics=", html);
         // Sunburst leads; sprint board follows. [spec-sprint-epic-filter-and-home-layout]
         var glance = html.IndexOf("Project at a Glance", StringComparison.Ordinal);
         var sprintBoard = html.IndexOf("sprint-board-panel", StringComparison.Ordinal);
         Assert.True(glance >= 0 && sprintBoard >= 0);
         Assert.True(glance < sprintBoard, "Project at a Glance must appear before the sprint widget");
-        // Open retro action items are surfaced as a callout (beside deferred work) linking to the sprint page.
-        Assert.Contains("work-callout retro-callout", html);
+        // Epic filter host lives in the header aside (before the board), not as a row above the lanes.
+        var host = html.IndexOf("sprint-epic-filter-host", StringComparison.Ordinal);
+        var board = html.IndexOf("class=\"sprint-board\"", StringComparison.Ordinal);
+        Assert.True(host >= 0 && board > host, "home epic filter host must precede the sprint board");
+        // Open retro action items are surfaced as a compact summary card (beside deferred work) in the band.
+        Assert.Contains("summary-card work-summary-card retro", html);
         Assert.Contains("Retro Action Items", html);
         Assert.Contains("1 open item", html);
     }
@@ -853,11 +860,11 @@ public class HtmlTemplaterTests
     });
 
     [Fact]
-    public void RenderIndex_SurfacesDeferredCalloutButNoQuickDevCardGrid()
+    public void RenderIndex_SurfacesDeferredCardButNoQuickDevCardGrid()
     {
         // spec-declutter-home-dashboard: the quick-dev card grid + all home index bands are removed. A project
-        // with deferred work still renders the compact work section (heading + Deferred callout); the quick-dev
-        // card grid and the generic index-card listings are gone (docs stay reachable by direct URL / nav).
+        // with deferred work still renders the compact Deferred summary card in the band; the quick-dev card
+        // grid and the generic index-card listings are gone (docs stay reachable by direct URL / nav).
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var quickDev = Doc("implementation-artifacts/spec-foo.md", "implementation-artifacts/spec-foo.html", "A quick fix",
             new Frontmatter { Status = "done", Route = "one-shot", Type = "chore" });
@@ -869,9 +876,9 @@ public class HtmlTemplaterTests
         var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
             adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
 
-        // The work section heading + Deferred callout with its open-item count remain.
-        Assert.Contains("Direct &amp; Quick-Dev Work", html);
-        Assert.Contains("work-callout", html);
+        // The Deferred summary card with its open-item count remains (now a compact card in the band).
+        Assert.Contains("summary-card work-summary-card deferred", html);
+        Assert.Contains("Deferred Work", html);
         Assert.Contains("2 open items", html);
 
         // No quick-dev card grid and no generic index-card listings below the pulse panels.

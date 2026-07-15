@@ -338,11 +338,34 @@ public static class SprintTemplater
         sb.Append('\n');
     }
 
+    /// <summary>Opens a <c>.sprint-filterable</c> root with epic catalog data attributes (no UI — JS injects
+    /// the dropdown). Used by the sprint page and the home board (home places a filter host in the panel
+    /// header). [spec-sprint-epic-filter-and-home-layout]</summary>
+    public static string OpenEpicFilterable(SprintStatus sprint, EpicsModel? epics, int? capPerColumn = null)
+    {
+        var defaultEpics = ActiveEpicNumbers(sprint);
+        var (order, _, _, stories) = GroupByEpic(sprint);
+        var epicIds = order.Where(n => n >= 0 && stories.TryGetValue(n, out var list) && list.Count > 0).ToList();
+        var effectiveDefaults = defaultEpics.Count > 0 ? defaultEpics : epicIds;
+        var sb = new StringBuilder();
+        AppendEpicFilterOpen(sb, sprint, epics, effectiveDefaults, capPerColumn, emitEmptyHint: false);
+        return sb.ToString();
+    }
+
+    public static string CloseEpicFilterable() => "</div>\n";
+
+    /// <summary>Mount point for the JS-injected epic dropdown in the home board header.</summary>
+    public static string EpicFilterHostMarkup =>
+        "<div class=\"sprint-epic-filter-host\"></div>";
+
+    public static string EpicFilterEmptyHintMarkup =>
+        "<p class=\"sprint-filter-empty\" hidden role=\"status\">Select an epic to show stories on the board.</p>\n";
+
     /// <summary>Filter root + epic catalog as data attributes. The checkbox UI is JS-injected (like
     /// <c>js-sortable</c> table filters) so no-JS pages never show inert controls — SSR already applies the
     /// default active-epic visibility/cap. [spec-sprint-epic-filter-and-home-layout]</summary>
     private static void AppendEpicFilterOpen(StringBuilder sb, SprintStatus sprint, EpicsModel? epics,
-        IReadOnlyList<int> defaultEpics, int? capPerColumn)
+        IReadOnlyList<int> defaultEpics, int? capPerColumn, bool emitEmptyHint = true)
     {
         var (order, _, _, stories) = GroupByEpic(sprint);
         var epicIds = order.Where(n => n >= 0 && stories.TryGetValue(n, out var list) && list.Count > 0).ToList();
@@ -355,11 +378,10 @@ public static class SprintTemplater
         }).ToList();
         var epicsJson = System.Text.Json.JsonSerializer.Serialize(catalog);
         sb.Append($"<div class=\"sprint-filterable\" data-default-epics=\"{PathUtil.Html(defaults)}\" data-epics=\"{PathUtil.Html(epicsJson)}\"{capAttr}>\n");
-        // Empty hint starts hidden; JS reveals it when the injected selection is cleared.
-        sb.Append("<p class=\"sprint-filter-empty\" hidden role=\"status\">Select an epic to show stories on the board.</p>\n");
+        if (emitEmptyHint) sb.Append(EpicFilterEmptyHintMarkup);
     }
 
-    private static void AppendEpicFilterClose(StringBuilder sb) => sb.Append("</div>\n");
+    private static void AppendEpicFilterClose(StringBuilder sb) => sb.Append(CloseEpicFilterable());
 
 
     /// <summary>The control-row buttons that link to the retrospectives index and the open-action-items page.
