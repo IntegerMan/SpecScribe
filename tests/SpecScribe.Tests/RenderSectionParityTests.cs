@@ -116,7 +116,6 @@ public class RenderSectionParityTests
         // Each broadened fact is genuinely recovered from the rendered body — not merely both-empty.
         Assert.Equal(new[] { "active|In dev|Story 1.1|epics/story-1-1.html", "ready|Up next|Story 1.2|epics/story-1-2.html" }, actual.NowNextCards);
         Assert.Equal(new[] { "Planning|3 / 5 epics", "Implementation|1 / 2" }, actual.ProgressBars);
-        Assert.Equal(new[] { "epics.html", "requirements.html" }, actual.QuickLinks);
     }
 
     [Fact]
@@ -129,18 +128,6 @@ public class RenderSectionParityTests
         var divergences = RenderParity.FindSectionDivergences(
             RenderParity.FromDashboardView(lying), RenderParity.ExtractDashboardSection(body), "html");
         Assert.Contains(divergences, d => d.StartsWith("section.nowNextCards", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Dashboard_FindSectionDivergences_CatchesADroppedQuickLink()
-    {
-        var view = RichDashboard();
-        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
-
-        var lying = view with { QuickLinks = view.QuickLinks.Take(1).ToList() };
-        var divergences = RenderParity.FindSectionDivergences(
-            RenderParity.FromDashboardView(lying), RenderParity.ExtractDashboardSection(body), "html");
-        Assert.Contains(divergences, d => d.StartsWith("section.quickLinks", StringComparison.Ordinal));
     }
 
     [Fact]

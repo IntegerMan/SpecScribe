@@ -62,10 +62,6 @@ public sealed record SectionFacts
     /// <c>rightLabel ?? "value / max"</c>), in render order. Empty on non-dashboard surfaces. [Story 6.2 review.]</summary>
     public required IReadOnlyList<string> ProgressBars { get; init; }
 
-    /// <summary>The dashboard "Explore Key Views" quick-link DRILL targets (normalized href), in render order.
-    /// Empty on non-dashboard surfaces. [Story 6.2 review: AC #3 drill-target broadening.]</summary>
-    public required IReadOnlyList<string> QuickLinks { get; init; }
-
     /// <summary>The all-empty facts — the shared default the per-surface builders fill selectively.</summary>
     public static SectionFacts Empty { get; } = new()
     {
@@ -74,7 +70,6 @@ public sealed record SectionFacts
         StoryRows = Array.Empty<string>(),
         NowNextCards = Array.Empty<string>(),
         ProgressBars = Array.Empty<string>(),
-        QuickLinks = Array.Empty<string>(),
     };
 }
 
@@ -104,9 +99,11 @@ public static class RenderParity
     public static SemanticFacts FromPageView(PageView page) => new()
     {
         SiteTitle = page.Nav.SiteTitle,
-        Nav = page.Nav.Items
-            .Select(i => new NavFact(i.Label, NormalizeTarget(i.OutputRelativePath),
-                PathsEqual(i.OutputRelativePath, page.Nav.ActiveOutputRelativePath)))
+        // The nav graph is the journey-grouped menu the adapter renders (top-nav items merged with the
+        // quick-link superset), taken in render order from the ONE source both share so this can't drift.
+        Nav = HtmlRenderAdapter.Shared.NavMenuOrder(page.Nav)
+            .Select(e => new NavFact(e.Label, NormalizeTarget(e.OutputRelativePath),
+                PathsEqual(e.OutputRelativePath, page.Nav.ActiveOutputRelativePath)))
             .ToList(),
         Breadcrumb = page.Breadcrumb.Crumbs
             .Select(c => new CrumbFact(c.Label, c.OutputRelativePath is null ? null : NormalizeTarget(c.OutputRelativePath)))
@@ -324,8 +321,6 @@ public static class RenderParity
     private static readonly Regex ProgressBarRegex = new(
         "<div class=\"progress-label\">(?<label>[^<]*)</div>.*?<div class=\"progress-value\">(?<val>[^<]*)</div>",
         RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex QuickLinkRegex = new(
-        "<a class=\"quick-link-pill [^\"]*\" href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
 
     /// <summary>The dashboard's SECTION facts as its view model DECLARES them — the stat-tile row (the parity
     /// reference for the HTML surface, and the checklist a webview is held to). [Story 6.2]</summary>
@@ -336,7 +331,6 @@ public static class RenderParity
             .Select(c => $"{c.CssClass}|{PathUtil.Html(c.Kicker)}|{PathUtil.Html(c.Title)}|{NormalizeTarget(c.Href)}").ToList(),
         ProgressBars = view.ProgressBars
             .Select(b => $"{PathUtil.Html(b.Label)}|{PathUtil.Html(b.RightLabel ?? $"{b.Value} / {b.Max}")}").ToList(),
-        QuickLinks = view.QuickLinks.Select(q => NormalizeTarget(q.OutputRelativePath)).ToList(),
     };
 
     /// <summary>The dashboard's SECTION facts as the rendered body EVIDENCES them. [Story 6.2]</summary>
@@ -345,7 +339,6 @@ public static class RenderParity
         StatTiles = ExtractStatTiles(html),
         NowNextCards = ExtractNowNextCards(html),
         ProgressBars = ExtractProgressBars(html),
-        QuickLinks = ExtractQuickLinks(html),
     };
 
     /// <summary>The epics-index SECTION facts (the chip rows) as its view model DECLARES them. [Story 6.2]</summary>
@@ -399,7 +392,6 @@ public static class RenderParity
         Check("section.storyRows", expected.StoryRows, actual.StoryRows);
         Check("section.nowNextCards", expected.NowNextCards, actual.NowNextCards);
         Check("section.progressBars", expected.ProgressBars, actual.ProgressBars);
-        Check("section.quickLinks", expected.QuickLinks, actual.QuickLinks);
         return divergences;
     }
 
@@ -458,16 +450,6 @@ public static class RenderParity
             bars.Add($"{m.Groups["label"].Value}|{m.Groups["val"].Value}");
         }
         return bars;
-    }
-
-    private static IReadOnlyList<string> ExtractQuickLinks(string html)
-    {
-        var links = new List<string>();
-        foreach (Match m in QuickLinkRegex.Matches(html))
-        {
-            links.Add(NormalizeTarget(m.Groups["href"].Value));
-        }
-        return links;
     }
 
 }

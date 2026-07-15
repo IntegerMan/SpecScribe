@@ -97,10 +97,10 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.Contains("id=\"cm-exclude-tests\"", html);
         Assert.Contains("data-view=\"full\"", html);
 
-        // The Code Map nav item + dashboard quick link appear and point at the page.
+        // Code Map is reachable from the global journey nav menu (the Codebase group), pointing at the page.
         var index = File.ReadAllText(IndexPage);
         Assert.Contains("href=\"code-map.html\"", index);
-        Assert.Contains("Explore the codebase by size and change activity.", index);
+        Assert.Contains(">Code Map</a>", index);
 
         AssertNoBrokenLocalLinks(CodeMapPage);
         AssertNoBrokenLocalLinks(IndexPage);

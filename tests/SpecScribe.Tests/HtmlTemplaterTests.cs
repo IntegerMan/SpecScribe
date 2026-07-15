@@ -22,7 +22,9 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        Assert.Contains("dashboard-quick-links", html);
+        // The discoverable key views now live in the global journey-grouped nav menu (the white sub-header band),
+        // not a dashboard-body strip — so every target is reachable from the menu on every page.
+        Assert.Contains("site-nav-links", html);
         Assert.Contains("href=\"epics.html\"", html);
         Assert.Contains("href=\"requirements.html\"", html);
         Assert.Contains("href=\"adrs/index.html\"", html);
@@ -43,9 +45,10 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        Assert.Contains("dashboard-quick-links", html);
+        // Readme becomes a menu entry (the Docs group / a flat link) rather than a described dashboard pill.
+        Assert.Contains("site-nav-links", html);
         Assert.Contains("href=\"readme.html\"", html);
-        Assert.Contains("Read the project overview.", html);
+        Assert.Contains(">Readme</a>", html);
     }
 
     private static DocModel Doc(string sourceRel, string title) => new()
@@ -672,7 +675,7 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_SurfacesKeyViewsSubheaderAboveSummaryBandAndGlance()
+    public void RenderIndex_JourneyNavMenuPrecedesSummaryBandAndGlance()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -685,35 +688,16 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        // Explore Key Views is now the dashboard header's second row (a sub-header menu), so it renders ahead of
-        // the summary band and the Sunburst. The old bordered "Explore Key Views" panel heading is gone.
-        var header = html.IndexOf("dashboard-header", StringComparison.Ordinal);
-        var keyViews = html.IndexOf("key-views dashboard-quick-links", StringComparison.Ordinal);
+        // The discoverable key views now live in the global journey-grouped nav menu (the white sub-header band),
+        // which renders as chrome ahead of the dashboard body — before the summary band and the Sunburst. The
+        // dashboard's own identity header and the old "Explore Key Views" panel are gone.
+        var menu = html.IndexOf("site-nav-links", StringComparison.Ordinal);
         var band = html.IndexOf("dashboard-summary-band", StringComparison.Ordinal);
         var glance = html.IndexOf("Project at a Glance", StringComparison.Ordinal);
-        Assert.True(header >= 0 && keyViews >= 0 && band >= 0 && glance >= 0, "header, key-views, band, and glance should render");
-        Assert.True(header < keyViews, "the key-views menu sits inside the dashboard header");
-        Assert.True(keyViews < band && band < glance, "key-views precedes the summary band, which precedes Project at a Glance");
+        Assert.True(menu >= 0 && band >= 0 && glance >= 0, "nav menu, band, and glance should render");
+        Assert.True(menu < band && band < glance, "the nav menu precedes the summary band, which precedes Project at a Glance");
+        Assert.DoesNotContain("dashboard-header", html);
         Assert.DoesNotContain("<h3>Explore Key Views</h3>", html);
-    }
-
-    [Fact]
-    public void RenderIndex_QuickLinkPillsCarryFamilyAccents()
-    {
-        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
-
-        var html = HtmlTemplater.RenderIndex(
-            docs: Array.Empty<DocModel>(),
-            nav: nav,
-            progress: ProgressModel.Empty,
-            epicsModel: null,
-            requirements: null,
-            adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
-
-        // Slimmed to pills, accented by artifact family. [Story 1.5 F1/B5]
-        Assert.Contains("quick-link-pill family-epics", html);
-        Assert.Contains("quick-link-pill family-requirements", html);
     }
 
     [Fact]
@@ -889,8 +873,9 @@ public class HtmlTemplaterTests
         Assert.DoesNotContain("class=\"index-card\"", html);
         Assert.DoesNotContain("index-grid", html);
 
-        // The Deferred doc is still linked (its callout); the quick-dev + plain docs are no longer listed on home.
-        Assert.Equal(1, CountOccurrences(html, "href=\"implementation-artifacts/deferred-work.html\""));
+        // The Deferred doc is linked twice now — from its summary card AND the "Direct changes" stat tile (both
+        // legitimate drill targets); the quick-dev + plain docs are still not listed on home.
+        Assert.Equal(2, CountOccurrences(html, "href=\"implementation-artifacts/deferred-work.html\""));
         Assert.Equal(0, CountOccurrences(html, "href=\"implementation-artifacts/spec-foo.html\""));
         Assert.Equal(0, CountOccurrences(html, "href=\"implementation-artifacts/some-note.html\""));
     }

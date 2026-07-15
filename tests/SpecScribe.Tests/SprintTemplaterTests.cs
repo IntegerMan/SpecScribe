@@ -117,7 +117,10 @@ public class SprintTemplaterTests
         Assert.Contains("role=\"progressbar\"", html);
         Assert.Contains("aria-valuenow=\"38\"", html);
         Assert.Contains("class=\"sprint-card-progress-fill partial\" style=\"width:38%\"", html);
-        Assert.DoesNotContain("data-tooltip=", html);
+        // No per-bar tooltip on the sprint board body (the global nav's attribution badge carries a data-tooltip,
+        // so scope this to the page body after the chrome).
+        var body = html[(html.IndexOf("</nav>", StringComparison.Ordinal) + "</nav>".Length)..];
+        Assert.DoesNotContain("data-tooltip=", body);
     }
 
     [Fact]

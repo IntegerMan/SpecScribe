@@ -178,7 +178,10 @@ public class SiteNavTests
         Assert.Contains("aria-hidden=\"true\" focusable=\"false\"", html);
         foreach (var label in nav.Items.Select(i => i.Label))
         {
-            Assert.Contains($">{label}</a>", html);
+            // The menu renames "Epics" to "Epics & Stories" for display; every other item shows its label
+            // verbatim. Either way the text label is present alongside its decorative icon (never icon-only).
+            var display = label == "Epics" ? "Epics &amp; Stories" : label;
+            Assert.Contains($">{display}</a>", html);
         }
     }
 
