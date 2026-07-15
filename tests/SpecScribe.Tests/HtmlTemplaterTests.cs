@@ -59,67 +59,6 @@ public class HtmlTemplaterTests
     };
 
     [Fact]
-    public void RenderIndex_UnrecognizedTopLevelFoldersGetOwnTitledBands()
-    {
-        // Story 4.2 Task 3: docs under folders outside the well-known set degrade to one coherently-titled
-        // band per folder (humanized name), never a silent "Other" dump and never a BMad title.
-        var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe");
-        var html = HtmlTemplater.RenderIndex(
-            docs: new[]
-            {
-                Doc("design-notes/ideas.md", "Ideas"),
-                Doc("design-notes/palette.md", "Palette"),
-                Doc("research/paper.md", "Paper"),
-                Doc("notes.md", "Root Notes"),
-            },
-            nav: nav,
-            progress: ProgressModel.Empty,
-            epicsModel: null,
-            requirements: null,
-            adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
-
-        Assert.Contains("Design Notes</div>", html);
-        Assert.Contains("Research</div>", html);
-        Assert.DoesNotContain(">Other</div>", html);
-
-        // The root doc still flows through Overview, and both folder docs sit in the Design Notes band.
-        Assert.Contains("Overview</div>", html);
-        var designNotes = html.IndexOf("Design Notes</div>", StringComparison.Ordinal);
-        var research = html.IndexOf("Research</div>", StringComparison.Ordinal);
-        Assert.True(designNotes < research, "unknown-folder bands are ordered alphabetically");
-        Assert.Contains("href=\"design-notes/ideas.html\"", html);
-        Assert.Contains("href=\"research/paper.html\"", html);
-    }
-
-    [Fact]
-    public void RenderIndex_WellKnownFoldersKeepFriendlyTitlesAndOrder()
-    {
-        // The known set renders exactly as always: friendly titles in fixed order, no humanized duplicates.
-        var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe");
-        var html = HtmlTemplater.RenderIndex(
-            docs: new[]
-            {
-                Doc("implementation-artifacts/deferred-work-notes.md", "Deferred Notes"),
-                Doc("specs/spec-x/rendering.md", "Rendering Spec"),
-                Doc("planning-artifacts/plan.md", "Plan"),
-            },
-            nav: nav,
-            progress: ProgressModel.Empty,
-            epicsModel: null,
-            requirements: null,
-            adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
-
-        var planning = html.IndexOf("Planning Artifacts</div>", StringComparison.Ordinal);
-        var specs = html.IndexOf("Spec Kernel</div>", StringComparison.Ordinal);
-        var impl = html.IndexOf("Implementation Artifacts</div>", StringComparison.Ordinal);
-        Assert.True(planning >= 0 && specs > planning && impl > specs,
-            $"expected Planning < Spec Kernel < Implementation, got {planning}/{specs}/{impl}");
-        Assert.DoesNotContain(">Other</div>", html);
-    }
-
-    [Fact]
     public void RenderIndex_EmitsSkipLinkAndSingleMainLandmark()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
@@ -914,8 +853,11 @@ public class HtmlTemplaterTests
     });
 
     [Fact]
-    public void RenderIndex_SurfacesQuickDevAndDeferredAsFirstClassWorkWithStatusBadge()
+    public void RenderIndex_SurfacesDeferredCalloutButNoQuickDevCardGrid()
     {
+        // spec-declutter-home-dashboard: the quick-dev card grid + all home index bands are removed. A project
+        // with deferred work still renders the compact work section (heading + Deferred callout); the quick-dev
+        // card grid and the generic index-card listings are gone (docs stay reachable by direct URL / nav).
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var quickDev = Doc("implementation-artifacts/spec-foo.md", "implementation-artifacts/spec-foo.html", "A quick fix",
             new Frontmatter { Status = "done", Route = "one-shot", Type = "chore" });
@@ -927,19 +869,20 @@ public class HtmlTemplaterTests
         var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
             adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
 
-        // Dedicated first-class section with a status badge (not flat text) for the quick-dev entry. The badge
-        // carries its icon ahead of the still-present status word (Story 2.5: never icon-only).
+        // The work section heading + Deferred callout with its open-item count remain.
         Assert.Contains("Direct &amp; Quick-Dev Work", html);
-        Assert.Contains("class=\"status-badge done", html);
-        Assert.Contains(">done</span>", html);
-        // Deferred-work callout with its open-item count.
         Assert.Contains("work-callout", html);
         Assert.Contains("2 open items", html);
-        // Not double-listed: the quick-dev + deferred docs are promoted out of the generic grid (their page
-        // link appears exactly once), while the plain artifact stays in the grid. [Story 2.1 Task 2]
-        Assert.Equal(1, CountOccurrences(html, "href=\"implementation-artifacts/spec-foo.html\""));
+
+        // No quick-dev card grid and no generic index-card listings below the pulse panels.
+        Assert.DoesNotContain("quick-dev-card", html);
+        Assert.DoesNotContain("class=\"index-card\"", html);
+        Assert.DoesNotContain("index-grid", html);
+
+        // The Deferred doc is still linked (its callout); the quick-dev + plain docs are no longer listed on home.
         Assert.Equal(1, CountOccurrences(html, "href=\"implementation-artifacts/deferred-work.html\""));
-        Assert.Contains("href=\"implementation-artifacts/some-note.html\"", html);
+        Assert.Equal(0, CountOccurrences(html, "href=\"implementation-artifacts/spec-foo.html\""));
+        Assert.Equal(0, CountOccurrences(html, "href=\"implementation-artifacts/some-note.html\""));
     }
 
     [Fact]
@@ -973,35 +916,6 @@ public class HtmlTemplaterTests
         }
         // And no "Direct changes" card at all when there's no such work (four-card row preserved).
         Assert.DoesNotContain("Direct changes", withoutWork);
-    }
-
-    [Fact]
-    public void RenderIndex_EmitsSpecKernelSectionWithClearTitleAndKeepsItOutOfOther()
-    {
-        // Nav built without the spec source so this test isolates the index grouping — the kernel quick-link
-        // pill (which also targets SPEC.html) is exercised separately in SiteNavTests.
-        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
-        // The SPEC hub's own H1 is the generic project name "SpecScribe"; it carries id: SPEC-* frontmatter so
-        // its index card must read as a clear, disambiguating label instead. Companions title clearly from H1.
-        var spec = Doc("specs/spec-x/SPEC.md", "specs/spec-x/SPEC.html", "SpecScribe", new Frontmatter { Id = "SPEC-x" });
-        var companion = Doc("specs/spec-x/requirements-catalog.md", "specs/spec-x/requirements-catalog.html", "Requirements Catalog", Frontmatter.Empty);
-        var docs = new[] { spec, companion };
-
-        var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
-            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
-
-        // Labeled "Spec Kernel" band (AC #1), not the generic "Other" bucket. The band's icon (Story 2.5)
-        // rides ahead of the still-present text.
-        Assert.Contains("class=\"index-section-title\">", html);
-        Assert.Contains(">Spec Kernel</div>", html);
-        Assert.DoesNotContain("<div class=\"index-section-title\">Other</div>", html);
-        // Both kernel docs are carded under it; the SPEC hub carries the clear title, not a bare "SpecScribe".
-        Assert.Contains(">SPEC — Canonical Contract</h2>", html);
-        Assert.DoesNotContain(">SpecScribe</h2>", html);
-        Assert.Contains(">Requirements Catalog</h2>", html);
-        // Each kernel doc is listed exactly once (claimed by the Spec Kernel group, not double-listed).
-        Assert.Equal(1, CountOccurrences(html, "href=\"specs/spec-x/SPEC.html\""));
-        Assert.Equal(1, CountOccurrences(html, "href=\"specs/spec-x/requirements-catalog.html\""));
     }
 
     [Fact]
@@ -1256,88 +1170,6 @@ public class HtmlTemplaterTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         return HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
             adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
-    }
-
-    [Fact]
-    public void RenderIndex_PlanningSection_BadgesPrdProminentUxPairedRubricFoldedUnderPrd()
-    {
-        var html = RenderPlanning(BriefDoc(), ExperienceDoc(), RubricDoc(), PrdDoc(), DesignDoc());
-
-        // (a) status is an on-brand badge with the mapped class — not the old " · "-joined plain text. The
-        // badge's decorative icon rides ahead of the still-present status word (Story 2.5).
-        Assert.Contains("class=\"status-badge done", html);   // PRD: final → done/"Final"
-        Assert.Contains(">Final</span>", html);
-        Assert.Contains("class=\"status-badge drafted", html); // brief: draft → drafted/"Draft"
-        Assert.Contains(">Draft</span>", html);
-        Assert.DoesNotContain("final · 2026-07-05", html);                          // no middot status text run
-
-        // (b) the PRD is a prominent primary card, ahead of the brief and the UX pair.
-        Assert.Contains("class=\"index-card index-card--primary\"", html);
-        Assert.Contains($"<h2><a href=\"{PrdOut}\">SpecScribe PRD</a></h2>", html);
-        var prdPos = html.IndexOf("index-card--primary", StringComparison.Ordinal);
-        Assert.True(prdPos >= 0 && prdPos < html.IndexOf(BriefOut, StringComparison.Ordinal), "PRD leads the band");
-        Assert.True(prdPos < html.IndexOf("index-subgroup-label", StringComparison.Ordinal), "PRD precedes the UX pair");
-
-        // (c) UX Design + UX Experience are grouped under one shared "UX" sub-label, adjacent.
-        Assert.Contains("<div class=\"index-subgroup-label\">UX</div>", html);
-        var design = html.IndexOf("ux-x/DESIGN.html", StringComparison.Ordinal);
-        var experience = html.IndexOf("ux-x/EXPERIENCE.html", StringComparison.Ordinal);
-        Assert.True(design >= 0 && experience >= 0);
-        Assert.True(design < experience, "Design precedes Experience in the pair");
-        Assert.DoesNotContain(BriefOut, html[design..experience]); // nothing else wedged between the UX pair
-
-        // (d) the rubric is NOT a standalone card...
-        Assert.DoesNotContain($"<a class=\"index-card\" href=\"{RubricOut}\">", html);
-        Assert.DoesNotContain("PRD Quality Review", html); // its title never appears as a peer card
-        // (e) ...it is reachable as a branch link from the PRD card.
-        Assert.Contains($"<a class=\"index-card-branch\" href=\"{RubricOut}\">Quality review", html);
-        Assert.Equal(1, CountOccurrences(html, RubricOut)); // exactly one reference: the branch link
-
-        // Story 1.4 a11y floor preserved by reusing the RenderIndex shell.
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
-        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
-    }
-
-    [Fact]
-    public void RenderIndex_PlanningSection_NoPrd_OmitsPrimaryCardAndRubricLinkButStillRenders()
-    {
-        // Rubric present but no PRD to fold it into → it degrades to an ordinary card (never orphan-linked/dropped),
-        // and the section still renders whatever exists with no empty "PRD" slot. [Story 2.4 Task 3/4 graceful]
-        var html = RenderPlanning(BriefDoc(), DesignDoc(), ExperienceDoc(), RubricDoc());
-
-        Assert.Contains(">Planning Artifacts</div>", html);
-        Assert.DoesNotContain("index-card--primary", html);
-        Assert.DoesNotContain("index-card-branch", html);
-        // The unfolded rubric is a normal card, not a broken link.
-        Assert.Contains($"<a class=\"index-card\" href=\"{RubricOut}\">", html);
-        // The UX pair and brief still render.
-        Assert.Contains("<div class=\"index-subgroup-label\">UX</div>", html);
-        Assert.Contains($"href=\"{BriefOut}\"", html);
-    }
-
-    [Fact]
-    public void RenderIndex_PlanningSection_PrdWithoutRubric_ShowsNoQualityReviewLink()
-    {
-        var html = RenderPlanning(PrdDoc(), BriefDoc());
-
-        // PRD is still the prominent primary card, but with no rubric there is no dangling quality-review link.
-        Assert.Contains("index-card--primary", html);
-        Assert.DoesNotContain("index-card-branch", html);
-        Assert.DoesNotContain("Quality review", html);
-        // No UX docs → no empty "UX" labeled group.
-        Assert.DoesNotContain("index-subgroup-label", html);
-    }
-
-    [Fact]
-    public void RenderIndex_PlanningSection_UnrecognizedDocsOnly_RenderAsOrdinaryCardsWithoutEmptyGroups()
-    {
-        var note = Doc("planning-artifacts/misc/note.md", "planning-artifacts/misc/note.html", "A Note", Frontmatter.Empty);
-        var html = RenderPlanning(note);
-
-        Assert.Contains(">Planning Artifacts</div>", html);
-        Assert.Contains("<a class=\"index-card\" href=\"planning-artifacts/misc/note.html\">", html);
-        Assert.DoesNotContain("index-card--primary", html);
-        Assert.DoesNotContain("index-subgroup-label", html);
     }
 
     [Fact]

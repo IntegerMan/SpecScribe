@@ -66,15 +66,6 @@ public sealed record SectionFacts
     /// Empty on non-dashboard surfaces. [Story 6.2 review: AC #3 drill-target broadening.]</summary>
     public required IReadOnlyList<string> QuickLinks { get; init; }
 
-    /// <summary>The dashboard home index-grid CARDS as <c>title|href</c>, in render order, across every band
-    /// (planning PRD/UX/other, spec, implementation, ADR, retro). Excludes the quick-dev work cards
-    /// (<see cref="WorkCards"/>). Empty on non-dashboard surfaces. [Story 6.2 review: AC #3 card broadening.]</summary>
-    public required IReadOnlyList<string> IndexCards { get; init; }
-
-    /// <summary>The dashboard "Direct &amp; Quick-Dev Work" cards as <c>title|href</c>, in render order. Empty on
-    /// non-dashboard surfaces. [Story 6.2 review: AC #3 card broadening.]</summary>
-    public required IReadOnlyList<string> WorkCards { get; init; }
-
     /// <summary>The all-empty facts — the shared default the per-surface builders fill selectively.</summary>
     public static SectionFacts Empty { get; } = new()
     {
@@ -84,8 +75,6 @@ public sealed record SectionFacts
         NowNextCards = Array.Empty<string>(),
         ProgressBars = Array.Empty<string>(),
         QuickLinks = Array.Empty<string>(),
-        IndexCards = Array.Empty<string>(),
-        WorkCards = Array.Empty<string>(),
     };
 }
 
@@ -335,19 +324,6 @@ public static class RenderParity
         RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex QuickLinkRegex = new(
         "<a class=\"quick-link-pill [^\"]*\" href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
-    // An ordinary index card is an anchor whose class is EXACTLY "index-card" (the trailing quote excludes both the
-    // "index-card index-card--primary" div and the "index-card quick-dev-card" work card).
-    private static readonly Regex IndexCardRegex = new(
-        "<a class=\"index-card\" href=\"(?<href>[^\"]*)\">\\s*<h2>(?<title>[^<]*)</h2>",
-        RegexOptions.Compiled | RegexOptions.Singleline);
-    // The prominent primary-PRD card carries its drill href inside the <h2> anchor, not on the card element.
-    private static readonly Regex PrimaryCardRegex = new(
-        "<div class=\"index-card index-card--primary\">\\s*<span class=\"index-card-kicker\">[^<]*</span>\\s*"
-        + "<h2><a href=\"(?<href>[^\"]*)\">(?<title>[^<]*)</a></h2>",
-        RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex WorkCardRegex = new(
-        "<a class=\"index-card quick-dev-card\" href=\"(?<href>[^\"]*)\">\\s*<h2>(?<title>[^<]*)</h2>",
-        RegexOptions.Compiled | RegexOptions.Singleline);
 
     /// <summary>The dashboard's SECTION facts as its view model DECLARES them — the stat-tile row (the parity
     /// reference for the HTML surface, and the checklist a webview is held to). [Story 6.2]</summary>
@@ -359,10 +335,6 @@ public static class RenderParity
         ProgressBars = view.ProgressBars
             .Select(b => $"{PathUtil.Html(b.Label)}|{PathUtil.Html(b.RightLabel ?? $"{b.Value} / {b.Max}")}").ToList(),
         QuickLinks = view.QuickLinks.Select(q => NormalizeTarget(q.OutputRelativePath)).ToList(),
-        IndexCards = view.IndexBands.SelectMany(FlattenBandCards)
-            .Select(c => $"{PathUtil.Html(c.Title)}|{NormalizeTarget(c.Href)}").ToList(),
-        WorkCards = view.Work.QuickDev
-            .Select(e => $"{PathUtil.Html(e.Title)}|{NormalizeTarget(e.OutputPath)}").ToList(),
     };
 
     /// <summary>The dashboard's SECTION facts as the rendered body EVIDENCES them. [Story 6.2]</summary>
@@ -372,23 +344,7 @@ public static class RenderParity
         NowNextCards = ExtractNowNextCards(html),
         ProgressBars = ExtractProgressBars(html),
         QuickLinks = ExtractQuickLinks(html),
-        IndexCards = ExtractIndexCards(html),
-        WorkCards = ExtractWorkCards(html),
     };
-
-    /// <summary>Flattens a home-index band's cards into render order — the special planning band emits its PRD, then
-    /// the UX subgroup, then the remaining cards; every other band is a flat card list. [Story 6.2 review]</summary>
-    private static IEnumerable<IndexCardView> FlattenBandCards(IndexBand band)
-    {
-        if (band.Planning is { } planning)
-        {
-            if (planning.Prd is { } prd) yield return prd;
-            foreach (var c in planning.UxCards) yield return c;
-            foreach (var c in planning.OtherCards) yield return c;
-            yield break;
-        }
-        foreach (var c in band.Cards) yield return c;
-    }
 
     /// <summary>The epics-index SECTION facts (the chip rows) as its view model DECLARES them. [Story 6.2]</summary>
     public static SectionFacts FromEpicsIndexView(EpicsIndexView view) => SectionFacts.Empty with
@@ -442,8 +398,6 @@ public static class RenderParity
         Check("section.nowNextCards", expected.NowNextCards, actual.NowNextCards);
         Check("section.progressBars", expected.ProgressBars, actual.ProgressBars);
         Check("section.quickLinks", expected.QuickLinks, actual.QuickLinks);
-        Check("section.indexCards", expected.IndexCards, actual.IndexCards);
-        Check("section.workCards", expected.WorkCards, actual.WorkCards);
         return divergences;
     }
 
@@ -514,31 +468,4 @@ public static class RenderParity
         return links;
     }
 
-    /// <summary>Recovers the home-index cards in DOCUMENT order across the two card shapes (ordinary anchor card +
-    /// the primary-PRD div whose href lives in its <c>&lt;h2&gt;</c> anchor), sorting the combined matches by
-    /// position so a webview emitting them in the wrong order is caught. Quick-dev work cards are excluded by the
-    /// exact-class match and recovered separately by <see cref="ExtractWorkCards"/>. [Story 6.2 review]</summary>
-    private static IReadOnlyList<string> ExtractIndexCards(string html)
-    {
-        var cards = new List<(int Index, string Fact)>();
-        foreach (Match m in IndexCardRegex.Matches(html))
-        {
-            cards.Add((m.Index, $"{m.Groups["title"].Value}|{NormalizeTarget(m.Groups["href"].Value)}"));
-        }
-        foreach (Match m in PrimaryCardRegex.Matches(html))
-        {
-            cards.Add((m.Index, $"{m.Groups["title"].Value}|{NormalizeTarget(m.Groups["href"].Value)}"));
-        }
-        return cards.OrderBy(c => c.Index).Select(c => c.Fact).ToList();
-    }
-
-    private static IReadOnlyList<string> ExtractWorkCards(string html)
-    {
-        var cards = new List<string>();
-        foreach (Match m in WorkCardRegex.Matches(html))
-        {
-            cards.Add($"{m.Groups["title"].Value}|{NormalizeTarget(m.Groups["href"].Value)}");
-        }
-        return cards;
-    }
 }

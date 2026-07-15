@@ -36,125 +36,11 @@ public sealed record NowNextCard(string CssClass, string Kicker, string Title, s
 /// <param name="Cards">The derived now/next cards (empty when <see cref="SprintBoard"/> drives the panel).</param>
 public sealed record DashboardNowNext(SprintStatus? SprintBoard, IReadOnlyList<NowNextCard> Cards);
 
-/// <summary>The rendering variant of an <see cref="IndexCardView"/> — the home index grid mixes a few card
-/// shapes (a plain doc card, the prominent primary-PRD card, an ADR card with a raw status pill, a retrospective
-/// card with a date line, and a quick-dev work card with a status badge + type pill). The card carries its data;
-/// this tells the adapter which markup to emit. [Story 6.2]</summary>
-public enum IndexCardStyle
-{
-    /// <summary>An ordinary artifact card: title, optional status BADGE (via <see cref="StatusStyles.ForDoc"/>),
-    /// optional date·author meta, source path.</summary>
-    Doc,
-
-    /// <summary>The prominent primary-PRD card: a kicker, a title LINK (so it can also carry a branch link),
-    /// status badge, meta, source path, and an optional "Quality review →" branch link.</summary>
-    PrimaryPrd,
-
-    /// <summary>An ADR card: title, optional status as a raw <c>pill</c> (class derived from the status' first
-    /// word — NOT a status-badge), source path.</summary>
-    Adr,
-
-    /// <summary>A retrospective card: title, an optional date line (as a <c>&lt;p&gt;</c>), source path. No status.</summary>
-    Retro,
-}
-
-/// <summary>One home-index card as pure DATA. The common core is <c>{ Title, Href, Status?, Meta?, SourcePath }</c>
-/// (as the story specifies); <see cref="Style"/> plus a few style-specific optionals cover the handful of card
-/// variants the index actually renders. All values are already RESOLVED data (e.g. the SPEC-hub card rename, the
-/// "date · author" meta join) — the adapter only maps them to markup and routes <see cref="Status"/> through the
-/// per-style status rendering. No HTML in any field. [Story 6.2]</summary>
-public sealed record IndexCardView
-{
-    /// <summary>Which card markup to emit.</summary>
-    public required IndexCardStyle Style { get; init; }
-
-    /// <summary>The card title (already resolved — e.g. the SPEC hub's disambiguated label).</summary>
-    public required string Title { get; init; }
-
-    /// <summary>The card's drill href (output-relative, already normalized).</summary>
-    public required string Href { get; init; }
-
-    /// <summary>The literal text of the <c>index-card-path</c> line — a source path for artifact/adr/retro
-    /// cards, or the literal "Quick-dev · one-shot" for a quick-dev card.</summary>
-    public required string SourcePath { get; init; }
-
-    /// <summary>The RAW status word, or null for no status. Rendered per <see cref="Style"/>: a status-badge for
-    /// <see cref="IndexCardStyle.Doc"/>/<see cref="IndexCardStyle.PrimaryPrd"/> (via <see cref="StatusStyles.ForDoc"/>),
-    /// or a raw <c>pill</c> for <see cref="IndexCardStyle.Adr"/>.</summary>
-    public string? Status { get; init; }
-
-    /// <summary>The de-emphasized meta line. For a doc/PRD card this is the "date · author" join (rendered as a
-    /// <c>&lt;p&gt;</c>); for a retro card it is the date text; for an ADR card it is the formatted decision date
-    /// (same <c>&lt;p&gt;</c> shape). Null emits nothing.</summary>
-    public string? Meta { get; init; }
-
-    /// <summary>ADR only: a one-line summary of the decision (from the ADR body), rendered as a muted line under the
-    /// meta. Null emits nothing. [Story 10.4]</summary>
-    public string? Summary { get; init; }
-
-    /// <summary>Primary-PRD only: the kicker text ("Primary document").</summary>
-    public string? Kicker { get; init; }
-
-    /// <summary>Primary-PRD only: the branch-link href (the quality-review rubric page), or null.</summary>
-    public string? BranchHref { get; init; }
-
-    /// <summary>Primary-PRD only: the branch-link label ("Quality review →" text), or null.</summary>
-    public string? BranchLabel { get; init; }
-}
-
-/// <summary>The special-layout data for the "Planning Artifacts" home band, which is NOT a flat card grid: a
-/// prominent primary-PRD card, a paired "UX" subgroup, and the remaining planning docs as ordinary cards. Each
-/// slot is optional/possibly-empty so a missing PRD/UX simply omits that block (never an empty labeled group).
-/// Present on the planning <see cref="IndexBand"/> only; every other band uses <see cref="IndexBand.Cards"/>. [Story 6.2]</summary>
-/// <param name="Prd">The prominent primary-PRD card (Style = <see cref="IndexCardStyle.PrimaryPrd"/>), or null.</param>
-/// <param name="UxCards">The UX Design + UX Experience cards under the "UX" sub-label (empty → no subgroup).</param>
-/// <param name="OtherCards">The Product Brief + remaining planning cards (empty → no trailing grid).</param>
-public sealed record PlanningLayout(
-    IndexCardView? Prd,
-    IReadOnlyList<IndexCardView> UxCards,
-    IReadOnlyList<IndexCardView> OtherCards);
-
-/// <summary>One home-index band (section) as DATA: its title + icon concept key, an optional right-aligned
-/// "more" link (the ADR band's "All ADRs →"), whether the title uses the title-ROW layout (ADR) or a plain
-/// title, whether the icon is suppressed (the Retrospectives band emits its title with no icon), and either a
-/// flat list of <see cref="Cards"/> or the special <see cref="Planning"/> layout. The band ORDER and membership
-/// (which doc lands where, PRD prominence, unrecognized-folder degradation) are computed by
-/// <see cref="DashboardViewBuilder"/>, so the adapter renders bands top-to-bottom with no grouping logic. [Story 6.2]</summary>
-public sealed record IndexBand
-{
-    /// <summary>The band's section title text.</summary>
-    public required string Title { get; init; }
-
-    /// <summary>The <see cref="Icons.ForConcept"/> key for the band's leading glyph (usually equal to
-    /// <see cref="Title"/>). Ignored when <see cref="NoIcon"/> is set.</summary>
-    public required string ConceptKey { get; init; }
-
-    /// <summary>The band's cards, in render order. Empty when <see cref="Planning"/> drives the band.</summary>
-    public required IReadOnlyList<IndexCardView> Cards { get; init; }
-
-    /// <summary>True for the ADR band, which renders its title in the <c>index-section-title-row</c> layout with a
-    /// trailing <see cref="MoreLinkHref"/> link rather than a plain title.</summary>
-    public bool TitleRow { get; init; }
-
-    /// <summary>The "more" link href (ADR band's "All ADRs →"), or null.</summary>
-    public string? MoreLinkHref { get; init; }
-
-    /// <summary>The "more" link label text, or null.</summary>
-    public string? MoreLinkLabel { get; init; }
-
-    /// <summary>True for the Retrospectives band, whose title renders with NO leading icon (matching today's
-    /// bytes). Every other plain band prefixes the concept icon.</summary>
-    public bool NoIcon { get; init; }
-
-    /// <summary>The special planning-band layout, or null for an ordinary card-grid band.</summary>
-    public PlanningLayout? Planning { get; init; }
-}
-
 /// <summary>The host-neutral SECTION view model for the dashboard (home) page body — the typed decomposition of
 /// <c>HtmlTemplater.RenderIndex</c> + <c>AppendDashboard</c> that fills 6.1's opaque <see cref="PageView.BodyHtml"/>
 /// seam for this one surface (memory: story-6-1-delivery-seam-live). It carries the data-shaped sections as pure
-/// records (<see cref="StatTiles"/>, <see cref="ProgressBars"/>, <see cref="NowNext"/>, <see cref="QuickLinks"/>,
-/// <see cref="IndexBands"/>) and the chart/rich panels as their already-projected DOMAIN INPUT
+/// records (<see cref="StatTiles"/>, <see cref="ProgressBars"/>, <see cref="NowNext"/>, <see cref="QuickLinks"/>)
+/// and the chart/rich panels as their already-projected DOMAIN INPUT
 /// (<see cref="Epics"/>, <see cref="Progress"/>, <see cref="Requirements"/>, <see cref="Coverage"/>,
 /// <see cref="Work"/>) so the adapter re-renders them by calling the existing <c>Charts.*</c> helpers with no
 /// re-parsing (AD-2). Every optional section is nullable so an absent input renders byte-for-byte nothing (the
@@ -211,10 +97,6 @@ public sealed record DashboardView
     /// <summary>The portal-wide count ledger — THE source for every summary count this view surfaces
     /// (stat tiles, progress bars, action-item callout, sprint wheel). [Story 8.3; FR21]</summary>
     public required ProjectCounts Counts { get; init; }
-
-    /// <summary>The home index-grid bands (planning / implementation / spec-kernel / unrecognized-folder / ADR /
-    /// retro), in render order, fully grouped and classified by the builder.</summary>
-    public required IReadOnlyList<IndexBand> IndexBands { get; init; }
 
     /// <summary>True when the activity-timeline page (<c>timeline.html</c>) was generated, so the Git Pulse
     /// panel renders the guarded "View activity timeline →" link. Defaults false — the generator sets it from

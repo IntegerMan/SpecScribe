@@ -279,10 +279,9 @@ public class SiteGeneratorTraceabilityTests : IDisposable
         Assert.Contains("href=\"0002-second.html\"", adrHtml);
         Assert.Contains("href=\"index.html\"", adrHtml);
 
-        // Scope the status assertion to ADR 0001's actual status pill so an unrelated occurrence of the word
-        // "Accepted" (legend, CSS, another card) can't satisfy it.
-        var index = File.ReadAllText(HomeIndex);
-        Assert.Contains("status-accepted\">Accepted</span>", index);
+        // The ADR's status is surfaced on its own standalone page (the home index band was removed by
+        // spec-declutter-home-dashboard, so status is no longer duplicated on the home dashboard).
+        Assert.Contains("status-accepted", adrHtml);
     }
 
     [Fact]
@@ -296,7 +295,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     }
 
     [Fact]
-    public void RegenerateAdrs_RemovesStalePageAndIndexCard_WhenAdrDeleted()
+    public void RegenerateAdrs_RemovesStalePage_WhenAdrDeleted()
     {
         var gen = GenerateSite();
         Assert.True(File.Exists(Path.Combine(Site, "adrs", "0002-second.html")));
@@ -304,13 +303,9 @@ public class SiteGeneratorTraceabilityTests : IDisposable
         File.Delete(Path.Combine(Adrs, "0002-second.md"));
         Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateAdrs().Outcome);
 
+        // The stale ADR page is removed; the untouched ADR 0001 page survives the regeneration intact.
         Assert.False(File.Exists(Path.Combine(Site, "adrs", "0002-second.html")));
-        var index = File.ReadAllText(HomeIndex);
-        Assert.DoesNotContain("0002-second.html", index);
-        // Positive control: the untouched ADR 0001 must survive the regeneration intact, so "card removed"
-        // can't be confused with "the whole ADR section failed to render".
-        Assert.Contains("0001-first.html", index);
-        Assert.Contains("status-accepted\">Accepted</span>", index);
+        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0001-first.html")));
     }
 
     [Fact]
@@ -329,7 +324,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     }
 
     [Fact]
-    public void RegenerateAdrs_ReflectsChangedStatus_OnIndexCard()
+    public void RegenerateAdrs_ReflectsChangedStatus_OnAdrPage()
     {
         var gen = GenerateSite();
 
@@ -337,10 +332,10 @@ public class SiteGeneratorTraceabilityTests : IDisposable
             "# ADR 0002: Second Decision\n\n**Status:** Superseded by [0001](0001-first.md)\n\nBody.\n");
         Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateAdrs().Outcome);
 
-        // Status extraction flattens the markdown link in the status line to plain text for the card.
-        var index = File.ReadAllText(HomeIndex);
-        Assert.Contains("Superseded by 0001", index);
-        // Prove the card was REPLACED, not appended to: the old "Proposed" status must be gone.
-        Assert.DoesNotContain("Proposed", index);
+        // The changed status is reflected on the regenerated ADR page (the home index card was removed by
+        // spec-declutter-home-dashboard). The page was REPLACED, not appended to: the old status is gone.
+        var adrPage = File.ReadAllText(Path.Combine(Site, "adrs", "0002-second.html"));
+        Assert.Contains("status-superseded", adrPage);
+        Assert.DoesNotContain("Proposed", adrPage);
     }
 }

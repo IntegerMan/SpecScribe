@@ -1,12 +1,12 @@
 namespace SpecScribe;
 
 /// <summary>Builds the host-neutral <see cref="DashboardView"/> from the already-projected domain models — the
-/// rendering-core half of Story 6.2's dashboard decomposition. ALL of the classification / grouping / fork logic
-/// that used to sit inline in <c>HtmlTemplater.RenderIndex</c> + <c>AppendDashboard</c> lives here (which stat
-/// tile the tasks/commits fork resolves to, which now/next cards the derived view yields, which home band each
-/// doc lands in, PRD prominence, unrecognized-folder degradation). The <see cref="HtmlRenderAdapter"/> then maps
-/// the resulting DATA to bytes with no branching of its own (memory: story-6-1-delivery-seam-live — the
-/// re-home-don't-rewrite discipline, one level down from 6.1's chrome). [Story 6.2]</summary>
+/// rendering-core half of Story 6.2's dashboard decomposition. The fork/derivation logic that used to sit inline
+/// in <c>HtmlTemplater.RenderIndex</c> + <c>AppendDashboard</c> lives here (which stat tile the tasks/commits fork
+/// resolves to, which now/next cards the derived view yields, the overall-progress bars). The
+/// <see cref="HtmlRenderAdapter"/> then maps the resulting DATA to bytes with no branching of its own (memory:
+/// story-6-1-delivery-seam-live — the re-home-don't-rewrite discipline, one level down from 6.1's chrome).
+/// [Story 6.2; home-index bands removed in spec-declutter-home-dashboard]</summary>
 public static class DashboardViewBuilder
 {
     /// <summary>The ordered WELL-KNOWN home-index groups (friendly title + source-path prefix), fixed order
@@ -31,16 +31,13 @@ public static class DashboardViewBuilder
     /// <c>HtmlTemplater.RenderIndex</c> so the templater becomes a thin builder → adapter call. Summary counts
     /// come exclusively from <paramref name="counts"/> (the portal-wide ledger). [Story 6.2; Story 8.3]</summary>
     public static DashboardView Build(
-        IReadOnlyList<DocModel> docs,
         SiteNav nav,
         ProgressModel progress,
         EpicsModel? epicsModel,
         RequirementsModel? requirements,
-        IReadOnlyList<AdrEntry> adrs,
         CommandCatalog commands,
         WorkInventory work,
         SprintStatus? sprint,
-        IReadOnlyList<RetroModel>? retros,
         ArtifactCoverage? coverage,
         bool hasTimeline = false,
         ProjectCounts? counts = null)
@@ -63,7 +60,6 @@ public static class DashboardViewBuilder
             Work = work,
             OpenRetroActionItems = ledger.OpenActionItems,
             Counts = ledger,
-            IndexBands = BuildIndexBands(docs, epicsModel, adrs, retros, work),
             HasTimeline = hasTimeline,
         };
     }
@@ -201,229 +197,4 @@ public static class DashboardViewBuilder
         return dot >= 0 && int.TryParse(storyId.AsSpan(dot + 1), out var minor) ? minor : int.MaxValue;
     }
 
-    // ----- Index bands --------------------------------------------------------------------------------------
-
-    /// <summary>Groups every home-index doc into ordered bands exactly as <c>HtmlTemplater.RenderIndex</c>'s band
-    /// loop did: the well-known groups (with the planning band's special layout), then each unrecognized top-level
-    /// folder as its own coherently-titled band, then the ADR band and the Retrospectives band. [Story 6.2]</summary>
-    private static IReadOnlyList<IndexBand> BuildIndexBands(
-        IReadOnlyList<DocModel> docs, EpicsModel? epicsModel, IReadOnlyList<AdrEntry> adrs,
-        IReadOnlyList<RetroModel>? retros, WorkInventory work)
-    {
-        var bands = new List<IndexBand>();
-
-        // Quick-dev + deferred docs are promoted to the work section (rendered separately), so keep them out of
-        // the generic grids here — same as the templater's promotedOutputs/used seeding.
-        var promotedOutputs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var q in work.QuickDev) promotedOutputs.Add(q.OutputPath);
-        if (work.Deferred is { } def) promotedOutputs.Add(def.OutputPath);
-
-        var used = new HashSet<DocModel>(
-            docs.Where(d => promotedOutputs.Contains(PathUtil.NormalizeSlashes(d.OutputRelativePath))));
-
-        foreach (var (groupTitle, groupPrefix) in KnownIndexGroups)
-        {
-            var inGroup = docs
-                .Where(d => !used.Contains(d))
-                .Where(d => groupPrefix.Length == 0
-                    ? !PathUtil.NormalizeSlashes(d.SourceRelativePath).Contains('/')
-                    : groupPrefix.Equals(BmadArtifactAdapter.ImplementationArtifactsDirName, StringComparison.OrdinalIgnoreCase)
-                        ? BmadArtifactAdapter.IsUnderImplementationArtifacts(d.SourceRelativePath)
-                        : PathUtil.NormalizeSlashes(d.SourceRelativePath).StartsWith(groupPrefix + "/", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (inGroup.Count == 0) continue;
-            foreach (var d in inGroup) used.Add(d);
-
-            if (groupPrefix == "planning-artifacts")
-            {
-                bands.Add(BuildPlanningBand(inGroup));
-                continue;
-            }
-
-            bands.Add(new IndexBand
-            {
-                Title = groupTitle,
-                ConceptKey = groupTitle,
-                Cards = inGroup.Select(BuildDocCard).ToList(),
-            });
-        }
-
-        // Unrecognized top-level folders → their own coherently-titled bands (NFR8), appended after the known
-        // groups, ordered by folder key.
-        var remaining = docs.Where(d => !used.Contains(d)).ToList();
-        foreach (var folderGroup in remaining
-            .GroupBy(d => TopLevelFolder(d.SourceRelativePath), StringComparer.OrdinalIgnoreCase)
-            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            var title = folderGroup.Key.Length == 0 ? "Other" : HumanizeFolderName(folderGroup.Key);
-            bands.Add(new IndexBand
-            {
-                Title = title,
-                ConceptKey = title,
-                Cards = folderGroup.OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase).Select(BuildDocCard).ToList(),
-            });
-        }
-
-        if (adrs.Count > 0)
-        {
-            bands.Add(new IndexBand
-            {
-                Title = "Architecture Decision Records",
-                ConceptKey = "ADRs",
-                TitleRow = true,
-                MoreLinkHref = PathUtil.NormalizeSlashes(SiteNav.AdrsLandingOutputPath),
-                MoreLinkLabel = "All ADRs",
-                Cards = adrs.Select(BuildAdrCard).ToList(),
-            });
-        }
-
-        if (retros is { Count: > 0 })
-        {
-            bands.Add(new IndexBand
-            {
-                Title = "Retrospectives",
-                ConceptKey = "Retrospectives",
-                NoIcon = true,
-                Cards = retros.Select(BuildRetroCard).ToList(),
-            });
-        }
-
-        return bands;
-    }
-
-    /// <summary>The special "Planning Artifacts" band: PRD-prominent primary card, paired UX subgroup, and the
-    /// remaining planning docs as ordinary cards. Reproduces <c>HtmlTemplater.AppendPlanningSection</c>'s
-    /// classification (well-known-filename match, rubric-folds-under-PRD, claimed-set bookkeeping). [Story 6.2]</summary>
-    private static IndexBand BuildPlanningBand(IReadOnlyList<DocModel> docs)
-    {
-        DocModel? prd = FindByFileName(docs, ModuleContext.WellKnownDocs.Prd);
-        DocModel? rubric = FindByFileName(docs, ModuleContext.WellKnownDocs.PrdReviewRubric);
-        DocModel? uxDesign = FindByFileName(docs, ModuleContext.WellKnownDocs.UxDesign);
-        DocModel? uxExperience = FindByFileName(docs, ModuleContext.WellKnownDocs.UxExperience);
-        DocModel? brief = FindByFileName(docs, ModuleContext.WellKnownDocs.Brief);
-
-        var rubricFolded = prd is not null && rubric is not null;
-
-        var claimed = new HashSet<DocModel>();
-        void Claim(DocModel? d) { if (d is not null) claimed.Add(d); }
-        Claim(prd);
-        Claim(uxDesign);
-        Claim(uxExperience);
-        Claim(brief);
-        if (rubricFolded) Claim(rubric);
-
-        var uxCards = new List<IndexCardView>();
-        if (uxDesign is not null) uxCards.Add(BuildDocCard(uxDesign));
-        if (uxExperience is not null) uxCards.Add(BuildDocCard(uxExperience));
-
-        var others = new List<DocModel>();
-        if (brief is not null) others.Add(brief);
-        others.AddRange(docs.Where(d => !claimed.Contains(d))
-            .OrderBy(d => d.Title, StringComparer.OrdinalIgnoreCase));
-
-        return new IndexBand
-        {
-            Title = "Planning Artifacts",
-            ConceptKey = "Planning Artifacts",
-            Cards = Array.Empty<IndexCardView>(),
-            Planning = new PlanningLayout(
-                Prd: prd is not null ? BuildPrimaryPrdCard(prd, rubricFolded ? rubric : null) : null,
-                UxCards: uxCards,
-                OtherCards: others.Select(BuildDocCard).ToList()),
-        };
-    }
-
-    /// <summary>An ordinary artifact card's data. Title is the SPEC-hub-aware <see cref="IndexCardTitle"/>; status
-    /// is the trimmed raw word (null when blank); meta is the "date · author" join. [Story 6.2]</summary>
-    private static IndexCardView BuildDocCard(DocModel d) => new()
-    {
-        Style = IndexCardStyle.Doc,
-        Title = IndexCardTitle(d),
-        Href = PathUtil.NormalizeSlashes(d.OutputRelativePath),
-        SourcePath = PathUtil.NormalizeSlashes(d.SourceRelativePath),
-        Status = d.Frontmatter.Status?.Trim() is { Length: > 0 } s ? s : null,
-        Meta = CardMeta(d),
-    };
-
-    private static IndexCardView BuildPrimaryPrdCard(DocModel prd, DocModel? rubric) => new()
-    {
-        Style = IndexCardStyle.PrimaryPrd,
-        Kicker = "Primary document",
-        Title = IndexCardTitle(prd),
-        Href = PathUtil.NormalizeSlashes(prd.OutputRelativePath),
-        SourcePath = PathUtil.NormalizeSlashes(prd.SourceRelativePath),
-        Status = prd.Frontmatter.Status?.Trim() is { Length: > 0 } s ? s : null,
-        Meta = CardMeta(prd),
-        BranchHref = rubric is not null ? PathUtil.NormalizeSlashes(rubric.OutputRelativePath) : null,
-        BranchLabel = rubric is not null ? "Quality review" : null,
-    };
-
-    private static IndexCardView BuildAdrCard(AdrEntry adr) => new()
-    {
-        Style = IndexCardStyle.Adr,
-        Title = adr.Title,
-        Href = PathUtil.NormalizeSlashes(adr.OutputRelativePath),
-        SourcePath = PathUtil.NormalizeSlashes(adr.SourceRelativePath),
-        Status = adr.Status is { Length: > 0 } s ? s : null,
-        // Date + one-line summary surfaced on the listing card (Story 10.4). Date routes through the single
-        // PortalDates formatter; both omit their line when the ADR body carried neither.
-        Meta = adr.Date is { } d ? PortalDates.Day(d) : null,
-        Summary = adr.Summary is { Length: > 0 } sum ? sum : null,
-    };
-
-    private static IndexCardView BuildRetroCard(RetroModel r) => new()
-    {
-        Style = IndexCardStyle.Retro,
-        Title = r.Title,
-        Href = PathUtil.NormalizeSlashes(r.OutputRelativePath),
-        SourcePath = PathUtil.NormalizeSlashes(r.SourceRelativePath),
-        Meta = r.DateText is { Length: > 0 } d ? PortalDates.ReformatAuthored(d) : null,
-    };
-
-    /// <summary>The de-emphasized "date · author" meta line, or null when neither is present. Mirrors
-    /// <c>HtmlTemplater.AppendCardMeta</c>. [Story 6.2]</summary>
-    private static string? CardMeta(DocModel d)
-    {
-        var descParts = new List<string>();
-        // Normalize a parseable authored date to the one portal token; free-text dates pass through (Story 10.4).
-        if (d.Frontmatter.Date is { Length: > 0 } dt) descParts.Add(PortalDates.ReformatAuthored(dt));
-        if (d.Frontmatter.Author is { Length: > 0 } a) descParts.Add(a);
-        return descParts.Count > 0 ? string.Join(" · ", descParts) : null;
-    }
-
-    /// <summary>The first path segment of a source-relative path, or "" for a root-level doc. Relocated from
-    /// <c>HtmlTemplater.TopLevelFolder</c>. [Story 4.2 Task 3]</summary>
-    private static string TopLevelFolder(string sourceRelativePath)
-    {
-        var norm = PathUtil.NormalizeSlashes(sourceRelativePath);
-        var slash = norm.IndexOf('/');
-        return slash < 0 ? string.Empty : norm[..slash];
-    }
-
-    /// <summary>A human band title for an unrecognized top-level folder. Relocated verbatim from
-    /// <c>HtmlTemplater.HumanizeFolderName</c>. [Story 4.2 Task 3]</summary>
-    private static string HumanizeFolderName(string folder)
-    {
-        var ti = System.Globalization.CultureInfo.InvariantCulture.TextInfo;
-        var words = folder.Split('-', '_', ' ', '.')
-            .Where(w => w.Length > 0)
-            .Select(w => ti.ToTitleCase(w.ToLowerInvariant()))
-            .ToList();
-        return words.Count == 0 ? folder : string.Join(" ", words);
-    }
-
-    /// <summary>The first doc whose filename matches <paramref name="fileName"/> (case-insensitive, anywhere in
-    /// its source path). Relocated from <c>HtmlTemplater.FindByFileName</c>. [Story 2.4 Task 3]</summary>
-    private static DocModel? FindByFileName(IReadOnlyList<DocModel> docs, string fileName) =>
-        docs.FirstOrDefault(d => string.Equals(
-            Path.GetFileName(PathUtil.NormalizeSlashes(d.SourceRelativePath)), fileName, StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>The title to show on a doc's index card — the SPEC-hub rename. Relocated from
-    /// <c>HtmlTemplater.IndexCardTitle</c>. [Story 2.2 Task 2]</summary>
-    private static string IndexCardTitle(DocModel d) =>
-        d.Frontmatter.Id is { Length: > 0 } id && id.StartsWith("SPEC-", StringComparison.OrdinalIgnoreCase)
-            ? "SPEC — Canonical Contract"
-            : d.Title;
 }

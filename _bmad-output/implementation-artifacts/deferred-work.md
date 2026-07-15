@@ -455,3 +455,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-sprint-epic-filter-and-home-layout.md`
   summary: No automated browser/JS coverage for enhanceSprintEpicFilter (toggle, All, empty selection, live aria-label/cap recount) — regressions in the PE half rely on manual checks.
   evidence: Blind Hunter. [specscribe.js](../../src/SpecScribe/assets/specscribe.js)
+
+## Deferred from: code review of spec-declutter-home-dashboard (2026-07-14)
+
+- source_spec: `spec-declutter-home-dashboard.md`
+  summary: Both delivery/webview spikes (`spike/delivery/exporter/Program.cs:56`, `spike/vscode/renderer/Program.cs:54`) call `SiteNav.Build(..., hasStructure: ...)`, but `SiteNav.Build` no longer has a `hasStructure` parameter (replaced by `hasCodeMap` in an earlier story) — the spikes were already non-compiling against the current signature before this change. Not caused by the declutter; surfaced when re-checking spike compilation.
+  evidence: Edge Case Hunter. Pre-existing; baseline `SiteNav.Build` call already used the stale `hasStructure` arg.

@@ -223,7 +223,6 @@ public class WebviewRenderAdapterTests
             Work = WorkInventory.Empty,
             OpenRetroActionItems = 0,
             Counts = ProjectCounts.Empty,
-            IndexBands = Array.Empty<IndexBand>(),
         };
         var page = new PageView
         {

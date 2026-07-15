@@ -393,7 +393,6 @@ public class HtmlRenderAdapterTests
         Work = WorkInventory.Empty,
         OpenRetroActionItems = 0,
         Counts = ProjectCounts.Empty,
-        IndexBands = Array.Empty<IndexBand>(),
         Requirements = new RequirementsModel { Functional = new[] { Fr(1, 1) }, NonFunctional = Array.Empty<RequirementInfo>() },
         Epics = withEpics ? RequirementsEpics() : null,
     };
@@ -477,5 +476,89 @@ public class HtmlRenderAdapterTests
         // The stat grid remains the single count home.
         Assert.Contains("Epics drafted", body);
         Assert.Contains("Stories defined", body);
+    }
+
+    // ----- Work-section gate + declutter guarantees (spec-declutter-home-dashboard) --------------------------
+
+    /// <summary>A minimal dashboard view with a configurable work inventory + open-retro count, everything else
+    /// empty — the fixture the four work-section gate scenarios drive.</summary>
+    private static DashboardView WorkDashboard(WorkInventory work, int openRetro) => new()
+    {
+        SiteTitle = "SpecScribe",
+        StatTiles = Array.Empty<StatTile>(),
+        Commands = CommandCatalog.Empty,
+        Progress = ProgressModel.Empty,
+        ProgressBars = Array.Empty<ProgressBarView>(),
+        QuickLinks = Array.Empty<NavQuickLink>(),
+        Work = work,
+        OpenRetroActionItems = openRetro,
+        Counts = ProjectCounts.Empty,
+    };
+
+    [Fact]
+    public void RenderDashboardBody_QuickDevOnly_OmitsWorkSectionEntirely()
+    {
+        // I/O matrix: quick-dev work but no deferred / no open retro → the work section is omitted entirely
+        // (no orphan "Direct & Quick-Dev Work" heading). The quick-dev card grid no longer renders at all.
+        var work = new WorkInventory
+        {
+            QuickDev = new[] { new QuickDevEntry("Fix the footer", "quick/fix-footer.html", "done", "chore") },
+            Deferred = null,
+        };
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkDashboard(work, openRetro: 0));
+
+        Assert.DoesNotContain("Direct &amp; Quick-Dev Work", body);
+        Assert.DoesNotContain("quick-dev-card", body);
+        Assert.DoesNotContain("work-callout", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_DeferredOnly_RendersHeadingAndDeferredCalloutNoGrid()
+    {
+        // I/O matrix: deferred work, no quick-dev, no open retro → heading + Deferred callout only.
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred Work", "deferred-work.html", 3),
+        };
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkDashboard(work, openRetro: 0));
+
+        Assert.Contains("Direct &amp; Quick-Dev Work", body);
+        Assert.Contains("class=\"work-callout\"", body);
+        Assert.Contains("Deferred Work", body);
+        Assert.DoesNotContain("retro-callout", body);
+        Assert.DoesNotContain("quick-dev-card", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_RetroOnly_RendersHeadingAndRetroCallout()
+    {
+        // I/O matrix: open retro action items, empty work inventory → heading + Retro callout only.
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkDashboard(WorkInventory.Empty, openRetro: 4));
+
+        Assert.Contains("Direct &amp; Quick-Dev Work", body);
+        Assert.Contains("retro-callout", body);
+        Assert.Contains("4 open items", body);
+        Assert.DoesNotContain("quick-dev-card", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_FullWork_RendersBothCalloutsButNoIndexCardMarkup()
+    {
+        // I/O matrix (full project): both Deferred + Retro callouts present, but NO quick-dev card grid and NO
+        // index-card / index-grid / index-section-title-row markup anywhere below the pulse panels.
+        var work = new WorkInventory
+        {
+            QuickDev = new[] { new QuickDevEntry("Fix the footer", "quick/fix-footer.html", "done", "chore") },
+            Deferred = new DeferredWorkEntry("Deferred Work", "deferred-work.html", 2),
+        };
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkDashboard(work, openRetro: 1));
+
+        Assert.Contains("class=\"work-callout\"", body);
+        Assert.Contains("retro-callout", body);
+        Assert.DoesNotContain("quick-dev-card", body);
+        Assert.DoesNotContain("class=\"index-card\"", body);
+        Assert.DoesNotContain("index-grid", body);
+        Assert.DoesNotContain("index-section-title-row", body);
     }
 }

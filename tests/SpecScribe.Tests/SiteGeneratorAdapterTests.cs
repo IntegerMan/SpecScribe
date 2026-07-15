@@ -326,7 +326,13 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for sprint-board density polish: empty retired/unrecognized lanes omit entirely;
         // --lane-count drives grid columns; lane labels use nowrap + a slightly wider min track so
         // "Ready for Dev" doesn't wrap alone under width pressure. [board UX feedback]
-        const string expected = "f3e85799b44b9a6128e27fe0c3b7044aa623bf85d55919deb149a775e4351a63";
+        // Regenerated for spec-declutter-home-dashboard: the home dashboard body dropped the quick-dev card grid
+        // and ALL home index bands (planning/spec/implementation/overview/ADR/retro card lists); the work-section
+        // omit gate changed to `work.Deferred is null && openRetro == 0` (a quick-dev-only project renders no
+        // orphan heading). Every kept pulse panel, the Explore Key Views pills, and the Deferred/Retro callouts
+        // are byte-unchanged — the fingerprint delta is only the removed grid + removed bands (confirmed by
+        // inspecting the generated home page). [spec-declutter-home-dashboard]
+        const string expected = "25d81efe0dd291230bf51a76536c2ecd8e423d47c57ffe829bd35e73bb1def4f";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -406,10 +412,11 @@ public class SiteGeneratorAdapterTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_UnrecognizedTopLevelFolder_RendersOwnBandAndReportsStructureNotice()
+    public void GenerateAll_UnrecognizedTopLevelFolder_RendersPageAndReportsStructureNotice()
     {
-        // Story 4.2 Tasks 3/5: an unknown folder degrades to its own coherently-titled home band AND emits
-        // one categorized non-fatal structure notice on the diagnostic channel (input for Story 4.8's page).
+        // Story 4.2 Tasks 3/5: an unknown folder emits one categorized non-fatal structure notice on the
+        // diagnostic channel (input for Story 4.8's page) and still renders its doc's page. The home index band
+        // for the folder was removed by spec-declutter-home-dashboard (the page stays reachable by direct URL).
         Directory.CreateDirectory(Path.Combine(Source, "design-notes"));
         File.WriteAllText(Path.Combine(Source, "design-notes", "ideas.md"), "# Ideas\n\nBody.\n");
 
@@ -419,10 +426,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         var notice = Assert.Single(events, e => e.Outcome == GenerationOutcome.Skipped && e.RelativePath == "design-notes/");
         Assert.Contains("unrecognized top-level folder", notice.Message);
 
+        // The doc page still renders; the home no longer carries the (removed) unrecognized-folder index band.
+        Assert.True(File.Exists(Path.Combine(Site, "design-notes", "ideas.html")));
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
-        Assert.Contains("Design Notes</div>", index);
-        Assert.DoesNotContain(">Other</div>", index);
-        Assert.Contains("href=\"design-notes/ideas.html\"", index);
+        Assert.DoesNotContain("Design Notes</div>", index);
+        Assert.DoesNotContain("href=\"design-notes/ideas.html\"", index);
     }
 
     [Fact]

@@ -100,19 +100,18 @@ public class SiteGeneratorSpecKernelTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_SurfacesSpecKernelSectionAndQuickLinkOnHome()
+    public void GenerateAll_SurfacesSpecQuickLinkOnHome_WithoutTheRemovedKernelBand()
     {
         GenerateSite();
 
         var index = File.ReadAllText(HomeIndex);
-        // Labeled band + clear SPEC card title, out of "Other".
-        Assert.Contains(">Spec Kernel</div>", index);
-        Assert.Contains(">SPEC — Canonical Contract</h2>", index);
-        Assert.Contains("href=\"specs/spec-x/SPEC.html\"", index);
-        // The dashboard quick-link pill reads the friendlier "Spec", while the home-index band stays the more
-        // descriptive "Spec Kernel". [Story 2.2 polish]
+        // The Spec quick-link pill is the surviving reachability net for the spec kernel on home. [spec-declutter-home-dashboard]
         Assert.Contains(">Spec</a>", index);
-        Assert.DoesNotContain(">Spec Kernel</a>", index);
+        // The home Spec Kernel index band was removed with the rest of the home index bands — no band title,
+        // no SPEC card, no generic index-card listing on home (the SPEC page stays reachable via the pill + nav).
+        Assert.DoesNotContain(">Spec Kernel</div>", index);
+        Assert.DoesNotContain("index-section-title\">Spec Kernel", index);
+        Assert.DoesNotContain(">SPEC — Canonical Contract</h2>", index);
     }
 
     [Fact]

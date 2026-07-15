@@ -57,9 +57,9 @@ try
     var docs = BuildDocs(options, files, bundle);
     var work = WorkInventory.Build(docs);
     var dashboardView = DashboardViewBuilder.Build(
-        docs, nav, progress, bundle.Epics, bundle.Requirements,
-        adrs: Array.Empty<AdrEntry>(), commands: bundle.Module.Commands, work: work,
-        sprint: bundle.Sprint, retros: bundle.Retros, coverage: null);
+        nav, progress, bundle.Epics, bundle.Requirements,
+        commands: bundle.Module.Commands, work: work,
+        sprint: bundle.Sprint, coverage: null);
     var dashboardBody = HtmlRenderAdapter.Shared.RenderDashboardBody(dashboardView);
 
     // ── Epics surface: identical builder + adapter path as EpicsTemplater.RenderIndex ─────────────────────────

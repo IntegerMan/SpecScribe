@@ -63,62 +63,6 @@ public class SectionViewModelSerializationTests
     }
 
     [Fact]
-    public void IndexBand_WithEveryCardStyleAndPlanningLayout_RoundTrips()
-    {
-        var planningBand = new IndexBand
-        {
-            Title = "Planning Artifacts",
-            ConceptKey = "Planning Artifacts",
-            Cards = Array.Empty<IndexCardView>(),
-            Planning = new PlanningLayout(
-                Prd: new IndexCardView
-                {
-                    Style = IndexCardStyle.PrimaryPrd,
-                    Kicker = "Primary document",
-                    Title = "Product Requirements",
-                    Href = "planning-artifacts/prd.html",
-                    SourcePath = "planning-artifacts/prd.md",
-                    Status = "approved",
-                    Meta = "2026-07-01 · Alice",
-                    BranchHref = "planning-artifacts/prd-review.html",
-                    BranchLabel = "Quality review",
-                },
-                UxCards: new[]
-                {
-                    new IndexCardView { Style = IndexCardStyle.Doc, Title = "UX Design", Href = "planning-artifacts/ux.html", SourcePath = "planning-artifacts/ux.md" },
-                },
-                OtherCards: Array.Empty<IndexCardView>()),
-        };
-
-        var adrBand = new IndexBand
-        {
-            Title = "Architecture Decision Records",
-            ConceptKey = "ADRs",
-            TitleRow = true,
-            MoreLinkHref = "adrs/index.html",
-            MoreLinkLabel = "All ADRs",
-            Cards = new[]
-            {
-                new IndexCardView { Style = IndexCardStyle.Adr, Title = "ADR 1", Href = "adrs/adr-1.html", SourcePath = "docs/adrs/adr-1.md", Status = "Accepted" },
-            },
-        };
-
-        var retroBand = new IndexBand
-        {
-            Title = "Retrospectives",
-            ConceptKey = "Retrospectives",
-            NoIcon = true,
-            Cards = new[]
-            {
-                new IndexCardView { Style = IndexCardStyle.Retro, Title = "Epic 1 Retro", Href = "retro-1.html", SourcePath = "impl/retro-1.md", Meta = "2026-07-07" },
-            },
-        };
-
-        var bands = new List<IndexBand> { planningBand, adrBand, retroBand };
-        AssertRoundTripsLossless(bands);
-    }
-
-    [Fact]
     public void EpicChipAndStoryCard_RoundTrip()
     {
         var chips = new List<EpicChip>

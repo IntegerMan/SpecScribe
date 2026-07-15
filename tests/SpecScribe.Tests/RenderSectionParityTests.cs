@@ -27,7 +27,6 @@ public class RenderSectionParityTests
         Work = WorkInventory.Empty,
         OpenRetroActionItems = 0,
         Counts = ProjectCounts.Empty,
-        IndexBands = Array.Empty<IndexBand>(),
     };
 
     [Fact]
@@ -70,9 +69,9 @@ public class RenderSectionParityTests
 
     // ----- Dashboard cards / panels / drill targets (AC #3 broadening) --------------------------------------
 
-    /// <summary>A dashboard carrying every broadened section fact: derived Now &amp; Next cards, Overall-Progress
-    /// bars, quick-link drill targets, a planning band (primary PRD + UX + other) and an ADR band, and a quick-dev
-    /// work card.</summary>
+    /// <summary>A dashboard carrying every broadened section fact still on the home body: derived Now &amp; Next
+    /// cards, Overall-Progress bars, and quick-link drill targets. The home index bands and quick-dev card grid
+    /// were removed by spec-declutter-home-dashboard, so those facts are no longer projected. [spec-declutter-home-dashboard]</summary>
     private static DashboardView RichDashboard() => new()
     {
         SiteTitle = "SpecScribe",
@@ -101,25 +100,6 @@ public class RenderSectionParityTests
         },
         OpenRetroActionItems = 0,
         Counts = ProjectCounts.Empty,
-        IndexBands = new[]
-        {
-            new IndexBand
-            {
-                Title = "Planning Artifacts", ConceptKey = "Planning", Cards = Array.Empty<IndexCardView>(),
-                Planning = new PlanningLayout(
-                    Prd: new IndexCardView { Style = IndexCardStyle.PrimaryPrd, Title = "PRD", Href = "planning/prd.html", SourcePath = "prd.md", Kicker = "Primary document" },
-                    UxCards: new[] { new IndexCardView { Style = IndexCardStyle.Doc, Title = "UX Design", Href = "planning/ux.html", SourcePath = "ux.md" } },
-                    OtherCards: new[] { new IndexCardView { Style = IndexCardStyle.Doc, Title = "Product Brief", Href = "planning/brief.html", SourcePath = "brief.md" } }),
-            },
-            new IndexBand
-            {
-                Title = "Architecture Decisions", ConceptKey = "ADR", Cards = new[]
-                {
-                    new IndexCardView { Style = IndexCardStyle.Adr, Title = "ADR 0001", Href = "adrs/0001.html", SourcePath = "0001.md", Status = "Accepted" },
-                },
-                TitleRow = true, MoreLinkHref = "adrs/index.html", MoreLinkLabel = "All ADRs",
-            },
-        },
     };
 
     [Fact]
@@ -137,9 +117,6 @@ public class RenderSectionParityTests
         Assert.Equal(new[] { "active|In dev|Story 1.1|epics/story-1-1.html", "ready|Up next|Story 1.2|epics/story-1-2.html" }, actual.NowNextCards);
         Assert.Equal(new[] { "Planning|3 / 5 epics", "Implementation|1 / 2" }, actual.ProgressBars);
         Assert.Equal(new[] { "epics.html", "requirements.html" }, actual.QuickLinks);
-        // Document order across the two card shapes: primary PRD, then UX, then Product Brief, then the ADR card.
-        Assert.Equal(new[] { "PRD|planning/prd.html", "UX Design|planning/ux.html", "Product Brief|planning/brief.html", "ADR 0001|adrs/0001.html" }, actual.IndexCards);
-        Assert.Equal(new[] { "Fix the footer|quick/fix-footer.html" }, actual.WorkCards);
     }
 
     [Fact]
@@ -155,35 +132,15 @@ public class RenderSectionParityTests
     }
 
     [Fact]
-    public void Dashboard_FindSectionDivergences_CatchesAMisreportedIndexCardDrillTarget()
+    public void Dashboard_FindSectionDivergences_CatchesADroppedQuickLink()
     {
         var view = RichDashboard();
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
 
-        // A reference claiming the ADR card drills somewhere the body never linked → an index-card divergence.
-        var adrBand = view.IndexBands[1];
-        var lyingBand = adrBand with { Cards = new[] { adrBand.Cards[0] with { Href = "adrs/9999.html" } } };
-        var lying = view with { IndexBands = new[] { view.IndexBands[0], lyingBand } };
-        var divergences = RenderParity.FindSectionDivergences(
-            RenderParity.FromDashboardView(lying), RenderParity.ExtractDashboardSection(body), "html");
-        Assert.Contains(divergences, d => d.StartsWith("section.indexCards", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Dashboard_FindSectionDivergences_CatchesADroppedQuickLinkAndWorkCard()
-    {
-        var view = RichDashboard();
-        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
-
-        var lying = view with
-        {
-            QuickLinks = view.QuickLinks.Take(1).ToList(),
-            Work = new WorkInventory { QuickDev = Array.Empty<QuickDevEntry>(), Deferred = null },
-        };
+        var lying = view with { QuickLinks = view.QuickLinks.Take(1).ToList() };
         var divergences = RenderParity.FindSectionDivergences(
             RenderParity.FromDashboardView(lying), RenderParity.ExtractDashboardSection(body), "html");
         Assert.Contains(divergences, d => d.StartsWith("section.quickLinks", StringComparison.Ordinal));
-        Assert.Contains(divergences, d => d.StartsWith("section.workCards", StringComparison.Ordinal));
     }
 
     [Fact]

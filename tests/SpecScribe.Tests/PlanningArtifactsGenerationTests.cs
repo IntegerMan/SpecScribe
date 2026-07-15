@@ -73,41 +73,34 @@ public class PlanningArtifactsGenerationTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_CardsPrdProminentWithFinalBadgeAndLinksTheRubric()
+    public void GenerateAll_PlanningPagesStillGenerated_ButNoHomeIndexBand()
     {
+        // spec-declutter-home-dashboard removed the home planning index band (PRD primary card, UX subgroup,
+        // rubric branch link). The planning PAGES are still generated on disk (reachable by direct URL / nav) —
+        // only the duplicated home listing is gone.
         GenerateSite();
         var index = File.ReadAllText(IndexPage);
 
-        // PRD is the prominent primary card carrying its own "Final" badge.
-        Assert.Contains("index-card--primary", index);
-        Assert.Contains($"<h2><a href=\"{PrdHref}\">", index);
-        Assert.Contains("class=\"status-badge done", index);
-        Assert.Contains("class=\"status-badge drafted", index);
-        Assert.Contains(">Final</span>", index);
-        // Brief is a distinct card with a "Draft" badge; UX docs are paired.
-        Assert.Contains(">Draft</span>", index);
-        Assert.Contains("<div class=\"index-subgroup-label\">UX</div>", index);
-        Assert.Contains($"href=\"{BriefHref}\"", index);
-
-        // The rubric is linked from the PRD card, but is NOT a standalone top-level card...
-        Assert.Contains($"<a class=\"index-card-branch\" href=\"{RubricHref}\">Quality review", index);
+        // No home index-band card markup for the planning artifacts anymore.
+        Assert.DoesNotContain("index-card--primary", index);
+        Assert.DoesNotContain("index-card-branch", index);
+        Assert.DoesNotContain("<div class=\"index-subgroup-label\">UX</div>", index);
         Assert.DoesNotContain($"<a class=\"index-card\" href=\"{RubricHref}\">", index);
-        // ...and its page is still generated on disk (the link resolves — no 404).
+
+        // Every planning page is still generated on disk (the removal never orphaned a generated page).
         Assert.True(File.Exists(RubricPage), "review-rubric.html must still be generated");
         Assert.True(File.Exists(PrdPage), "prd.html must be generated");
     }
 
     [Fact]
-    public void GenerateAll_WithoutRubric_PrdCardDropsTheQualityReviewLinkCleanly()
+    public void GenerateAll_WithoutRubric_StillGeneratesNoRubricPageAndNoHomeBranchLink()
     {
-        // The rename/remove scenario from Task 6: no rubric → the PRD card has no dangling quality-review link,
-        // and no broken reference to a page that wasn't generated.
+        // The rename/remove scenario from Task 6: no rubric → no rubric page and no dangling reference on home.
         File.Delete(Path.Combine(Source, "planning-artifacts", "prds", "prd-x", "review-rubric.md"));
         GenerateSite();
         var index = File.ReadAllText(IndexPage);
 
-        Assert.Contains("index-card--primary", index);            // PRD still prominent
-        Assert.DoesNotContain("index-card-branch", index);        // but no quality-review link
+        Assert.DoesNotContain("index-card-branch", index);        // no quality-review link on home
         Assert.DoesNotContain(RubricHref, index);                 // no reference to the (absent) rubric page
         Assert.False(File.Exists(RubricPage));
     }

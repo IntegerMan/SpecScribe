@@ -115,7 +115,7 @@ public static class HtmlTemplater
     {
         var inventory = work ?? WorkInventory.Empty;
 
-        var view = DashboardViewBuilder.Build(docs, nav, progress, epicsModel, requirements, adrs, commands, inventory, sprint, retros, coverage, hasTimeline, counts);
+        var view = DashboardViewBuilder.Build(nav, progress, epicsModel, requirements, commands, inventory, sprint, coverage, hasTimeline, counts);
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view, codeItemHref);
 
         // Home carries a descriptive title (sub-pages are already "Title — Site") + OG/description, no

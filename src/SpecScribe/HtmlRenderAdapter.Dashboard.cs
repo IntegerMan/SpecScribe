@@ -24,10 +24,6 @@ public sealed partial class HtmlRenderAdapter
 
         AppendDashboardSection(sb, view, codeItemHref);
         AppendWorkTypesSection(sb, view.Work, view.OpenRetroActionItems, view.Counts);
-        foreach (var band in view.IndexBands)
-        {
-            AppendIndexBand(sb, band);
-        }
 
         sb.Append("</main>\n\n");
         return sb.ToString();
@@ -303,39 +299,12 @@ public sealed partial class HtmlRenderAdapter
     /// portal-wide ledger. [Story 6.2; Story 8.3]</summary>
     private void AppendWorkTypesSection(StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts)
     {
-        if (work.IsEmpty && openRetro == 0) return;
+        // Gate on the surfaces this section still renders — the Deferred callout and the Retro callout. A
+        // quick-dev-only project (QuickDev items but no deferred, no open retro) renders no orphan heading; the
+        // "Direct changes" stat tile still carries that count. [spec-declutter-home-dashboard]
+        if (work.Deferred is null && openRetro == 0) return;
 
         sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept("Direct & Quick-Dev Work")}Direct &amp; Quick-Dev Work</div>\n");
-
-        // Existence gate for the quick-dev card grid (must iterate work.QuickDev for cards); displayed Direct
-        // changes tile count is ledger-sourced in BuildStatTiles. [Story 8.3]
-        if (work.QuickDev.Count > 0)
-        {
-            sb.Append("<div class=\"index-grid\">\n");
-            foreach (var entry in work.QuickDev)
-            {
-                sb.Append($"  <a class=\"index-card quick-dev-card\" href=\"{PathUtil.Html(entry.OutputPath)}\">\n");
-                sb.Append($"    <h2>{PathUtil.Html(entry.Title)}</h2>\n");
-
-                var badges = new StringBuilder();
-                if (entry.Status is { Length: > 0 } status)
-                {
-                    badges.Append(StatusStyles.Badge(StatusStyles.ForStatus(status), status));
-                }
-                if (entry.Type is { Length: > 0 } type)
-                {
-                    badges.Append($"<span class=\"pill\">{PathUtil.Html(type)}</span>");
-                }
-                if (badges.Length > 0)
-                {
-                    sb.Append($"    <p class=\"work-card-badges\">{badges}</p>\n");
-                }
-
-                sb.Append("    <span class=\"index-card-path\">Quick-dev · one-shot</span>\n");
-                sb.Append("  </a>\n");
-            }
-            sb.Append("</div>\n\n");
-        }
 
         if (work.Deferred is { } deferred)
         {
@@ -353,145 +322,5 @@ public sealed partial class HtmlRenderAdapter
             sb.Append($"  <span class=\"work-callout-count\">{openRetro} open {Charts.Plural(openRetro, "item", "items")}</span>\n");
             sb.Append("</a>\n\n");
         }
-    }
-
-    /// <summary>Renders one home-index band. Re-homed from the band loop + <c>AppendPlanningSection</c> /
-    /// <c>AppendAdrSection</c> / <c>AppendRetrosSection</c> in <c>HtmlTemplater</c>, now driven by <see cref="IndexBand"/>.</summary>
-    private void AppendIndexBand(StringBuilder sb, IndexBand band)
-    {
-        if (band.TitleRow)
-        {
-            // ADR band: the title-row layout with a trailing "more" link.
-            sb.Append("<div class=\"index-section-title-row\">\n");
-            sb.Append($"  <span class=\"index-section-title\">{Icons.ForConcept(band.ConceptKey)}{PathUtil.Html(band.Title)}</span>\n");
-            sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(band.MoreLinkHref!)}\">{PathUtil.Html(band.MoreLinkLabel!)} &rarr;</a>\n");
-            sb.Append("</div>\n");
-            sb.Append("<div class=\"index-grid\">\n");
-            foreach (var card in band.Cards) AppendIndexCard(sb, card);
-            sb.Append("</div>\n\n");
-            return;
-        }
-
-        if (band.Planning is { } planning)
-        {
-            AppendPlanningBand(sb, band, planning);
-            return;
-        }
-
-        var titleGlyph = band.NoIcon ? string.Empty : Icons.ForConcept(band.ConceptKey);
-        sb.Append($"<div class=\"index-section-title\">{titleGlyph}{PathUtil.Html(band.Title)}</div>\n");
-        sb.Append("<div class=\"index-grid\">\n");
-        foreach (var card in band.Cards) AppendIndexCard(sb, card);
-        sb.Append("</div>\n\n");
-    }
-
-    private void AppendPlanningBand(StringBuilder sb, IndexBand band, PlanningLayout planning)
-    {
-        sb.Append($"<div class=\"index-section-title\">{Icons.ForConcept(band.ConceptKey)}{PathUtil.Html(band.Title)}</div>\n");
-
-        if (planning.Prd is { } prd)
-        {
-            sb.Append("<div class=\"index-grid\">\n");
-            AppendIndexCard(sb, prd);
-            sb.Append("</div>\n");
-        }
-
-        if (planning.UxCards.Count > 0)
-        {
-            sb.Append("<div class=\"index-subgroup-label\">UX</div>\n");
-            sb.Append("<div class=\"index-grid\">\n");
-            foreach (var card in planning.UxCards) AppendIndexCard(sb, card);
-            sb.Append("</div>\n");
-        }
-
-        if (planning.OtherCards.Count > 0)
-        {
-            sb.Append("<div class=\"index-grid\">\n");
-            foreach (var card in planning.OtherCards) AppendIndexCard(sb, card);
-            sb.Append("</div>\n");
-        }
-
-        sb.Append("\n");
-    }
-
-    /// <summary>Renders one index card per its <see cref="IndexCardStyle"/>. Re-homed from
-    /// <c>HtmlTemplater.AppendIndexCard</c> / <c>AppendAdrCard</c> / <c>AppendPrimaryPrdCard</c> /
-    /// <c>AppendRetrosSection</c>'s card loop.</summary>
-    private void AppendIndexCard(StringBuilder sb, IndexCardView card)
-    {
-        switch (card.Style)
-        {
-            case IndexCardStyle.PrimaryPrd:
-                sb.Append("  <div class=\"index-card index-card--primary\">\n");
-                sb.Append($"    <span class=\"index-card-kicker\">{PathUtil.Html(card.Kicker!)}</span>\n");
-                sb.Append($"    <h2><a href=\"{PathUtil.Html(card.Href)}\">{PathUtil.Html(card.Title)}</a></h2>\n");
-                AppendCardStatusBadge(sb, card.Status);
-                AppendCardMeta(sb, card.Meta);
-                sb.Append($"    <span class=\"index-card-path\">{PathUtil.Html(card.SourcePath)}</span>\n");
-                if (card.BranchHref is { } branchHref)
-                {
-                    sb.Append($"    <a class=\"index-card-branch\" href=\"{PathUtil.Html(branchHref)}\">{PathUtil.Html(card.BranchLabel!)} &rarr;</a>\n");
-                }
-                sb.Append("  </div>\n");
-                break;
-
-            case IndexCardStyle.Adr:
-                sb.Append($"  <a class=\"index-card\" href=\"{PathUtil.Html(card.Href)}\">\n");
-                sb.Append($"    <h2>{PathUtil.Html(card.Title)}</h2>\n");
-                if (card.Status is { Length: > 0 } adrStatus)
-                {
-                    var cls = "status-" + adrStatus.Split(' ')[0].ToLowerInvariant().Replace(' ', '-');
-                    sb.Append($"    <p><span class=\"pill {PathUtil.Html(cls)}\">{PathUtil.Html(adrStatus)}</span></p>\n");
-                }
-                // Decision date + one-line summary (Story 10.4) — each omitted when the ADR body carried none.
-                if (card.Meta is { Length: > 0 } adrDate)
-                {
-                    sb.Append($"    <p class=\"index-card-meta\">{PathUtil.Html(adrDate)}</p>\n");
-                }
-                if (card.Summary is { Length: > 0 } adrSummary)
-                {
-                    sb.Append($"    <p class=\"index-card-summary\">{PathUtil.Html(adrSummary)}</p>\n");
-                }
-                sb.Append($"    <span class=\"index-card-path\">{PathUtil.Html(card.SourcePath)}</span>\n");
-                sb.Append("  </a>\n");
-                break;
-
-            case IndexCardStyle.Retro:
-                sb.Append($"  <a class=\"index-card\" href=\"{PathUtil.Html(card.Href)}\">\n");
-                sb.Append($"    <h2>{PathUtil.Html(card.Title)}</h2>\n");
-                if (card.Meta is { Length: > 0 } date)
-                {
-                    sb.Append($"    <p>{PathUtil.Html(date)}</p>\n");
-                }
-                sb.Append($"    <span class=\"index-card-path\">{PathUtil.Html(card.SourcePath)}</span>\n");
-                sb.Append("  </a>\n");
-                break;
-
-            default: // Doc
-                sb.Append($"  <a class=\"index-card\" href=\"{PathUtil.Html(card.Href)}\">\n");
-                sb.Append($"    <h2>{PathUtil.Html(card.Title)}</h2>\n");
-                AppendCardStatusBadge(sb, card.Status);
-                AppendCardMeta(sb, card.Meta);
-                sb.Append($"    <span class=\"index-card-path\">{PathUtil.Html(card.SourcePath)}</span>\n");
-                sb.Append("  </a>\n");
-                break;
-        }
-    }
-
-    /// <summary>A doc/PRD card's status BADGE via <see cref="StatusStyles.ForDoc"/>/<see cref="StatusStyles.DocLabel"/>
-    /// — the single status-color seam. Emits nothing for a blank status. Re-homed from
-    /// <c>HtmlTemplater.AppendCardStatusBadge</c>.</summary>
-    private static void AppendCardStatusBadge(StringBuilder sb, string? status)
-    {
-        if (status?.Trim() is not { Length: > 0 } trimmed) return;
-        sb.Append($"    {StatusStyles.Badge(StatusStyles.ForDoc(trimmed), StatusStyles.DocLabel(trimmed))}\n");
-    }
-
-    /// <summary>The de-emphasized meta line (<c>&lt;p&gt;</c>). Emits nothing when null. Re-homed from
-    /// <c>HtmlTemplater.AppendCardMeta</c>.</summary>
-    private static void AppendCardMeta(StringBuilder sb, string? meta)
-    {
-        if (meta is not { Length: > 0 }) return;
-        sb.Append($"    <p>{PathUtil.Html(meta)}</p>\n");
     }
 }
