@@ -111,13 +111,13 @@ public static class PathUtil
     /// attribute for an author URL, so it lives here as a constant, mirroring <see cref="RepositoryUrl"/>.</summary>
     public const string AuthorUrl = "https://MattEland.dev";
 
-    /// <summary>The site-wide footer at the bottom of every page: the shared status legend key (Story 8.2),
-    /// then the SpecScribe credit link, generation timestamp, and "View generation details" link. Nesting the
-    /// legend inside the footer chrome makes it read as footer chrome rather than a stranded body section;
-    /// webview/SPA inject <see cref="StatusStyles.LegendKey"/> after BodyHtml because they omit this shell.
+    /// <summary>The site-wide footer at the bottom of every page: the SpecScribe credit link, the generation
+    /// timestamp (human-friendly), and a "View generation details" link on to the About page — the owner-chosen
+    /// reachability path to the About page and, through it, the diagnostics run log, so it appears on every page.
+    /// The status legend is on-demand beside status surfaces (<see cref="StatusStyles.LegendKey"/>), not footer chrome.
     /// The generation date is formatted here (single source). The details link's href is resolved from
     /// <paramref name="relativePrefix"/> so nested pages reach output-root <c>about.html</c>.
-    /// [Story 4.8 Task 5; About polish; Story 8.2]</summary>
+    /// [Story 4.8 Task 5; About polish]</summary>
     public static string RenderFooter(string relativePrefix = "")
     {
         // Routed through the single PortalDates formatter (Story 10.4 "one date token"): 24-hour clock + an
@@ -126,10 +126,7 @@ public static class PathUtil
         // generating machine — the golden fingerprint normalizes the footer clock to keep output portable.
         var now = DateTime.Now;
         var generatedOn = PortalDates.Timestamp(now, PortalDates.LocalZoneLabel(now));
-        return "<footer class=\"doc-footer\">\n"
-            + StatusStyles.LegendKey()
-            + $"  <p class=\"doc-footer-credit\">Generated using <a href=\"{Html(RepositoryUrl)}\">SpecScribe</a> on {generatedOn} &middot; <a href=\"{Html(relativePrefix + SiteNav.AboutOutputPath)}\">View generation details</a></p>\n"
-            + "</footer>\n\n";
+        return $"<footer class=\"doc-footer\">\n  Generated using <a href=\"{Html(RepositoryUrl)}\">SpecScribe</a> on {generatedOn} &middot; <a href=\"{Html(relativePrefix + SiteNav.AboutOutputPath)}\">View generation details</a>\n</footer>\n\n";
     }
 
     // Singleline so a tag whose attributes contain newlines still strips cleanly — e.g. an "(AC: #N)"

@@ -142,7 +142,10 @@ public sealed partial class HtmlRenderAdapter
     /// already used it), so nothing is re-modelled. [Story 6.2 review: harmonized the epic-status surfaces.]</summary>
     private void AppendEpicStatusPanel(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel)
     {
-        sb.Append("<div class=\"chart-panel\">\n<h3>Epic Status</h3>\n<div class=\"donut-and-legend\">\n");
+        sb.Append("<div class=\"chart-panel\">\n");
+        sb.Append("<div class=\"chart-panel-header-row\"><h3>Epic Status");
+        sb.Append(StatusStyles.LegendKey());
+        sb.Append("</h3></div>\n<div class=\"donut-and-legend\">\n");
 
         List<(string Label, int Value, string CssClass)> segments;
         string? centerText;
@@ -184,7 +187,9 @@ public sealed partial class HtmlRenderAdapter
         {
             sb.Append("<div class=\"chart-panel sprint-board-panel\">\n");
             sb.Append("<div class=\"chart-panel-header-row sprint-board-header\">\n");
-            sb.Append("  <h3>Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span></h3>\n");
+            sb.Append("  <h3>Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span>");
+            sb.Append(StatusStyles.LegendKey());
+            sb.Append("</h3>\n");
             sb.Append("  <div class=\"sprint-board-header-aside\">");
             sb.Append(SprintTemplater.RenderProgressWheel(counts));
             sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a>");
@@ -194,7 +199,9 @@ public sealed partial class HtmlRenderAdapter
             return;
         }
 
-        sb.Append("<div class=\"chart-panel\">\n<h3>Now &amp; Next</h3>\n<div class=\"now-next\">\n");
+        sb.Append("<div class=\"chart-panel\">\n<h3>Now &amp; Next");
+        sb.Append(StatusStyles.LegendKey());
+        sb.Append("</h3>\n<div class=\"now-next\">\n");
         foreach (var card in nowNext.Cards)
         {
             sb.Append($"  <a class=\"now-next-card {card.CssClass}\" href=\"{PathUtil.Html(card.Href)}\">\n");
@@ -219,7 +226,9 @@ public sealed partial class HtmlRenderAdapter
             // board's pure-CSS radio toggle: the coverage flow is the default-visible primary and the
             // status-block grid is the demoted alternate. Both stay in the DOM (the grid is the flow's
             // Story-3.7 accessibility text-twin, never removed). [Story 8.7]
-            sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements</h3>");
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements");
+            sb.Append(StatusStyles.LegendKey());
+            sb.Append("</h3>");
             sb.Append(RenderRequirementsTabs());
             sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
             sb.Append("<div class=\"req-view req-view-flow\">");
@@ -231,7 +240,9 @@ public sealed partial class HtmlRenderAdapter
         }
         else
         {
-            sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements</h3>");
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements");
+            sb.Append(StatusStyles.LegendKey());
+            sb.Append("</h3>");
             sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
             sb.Append(grid);
         }

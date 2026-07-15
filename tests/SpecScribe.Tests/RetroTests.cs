@@ -193,7 +193,8 @@ public class RetroTests : IDisposable
 
         var html = ActionItemsTemplater.RenderPage(open, map, commands, nav);
 
-        Assert.Contains("<h1>Open Action Items</h1>", html);
+        Assert.Contains("<h1>Open Action Items", html);
+        Assert.Contains("class=\"status-legend\"", html);
         Assert.Contains("Route deferred tech debt", html);
         // Owners are NOT shown — they're LLM-generated retro personas, not real assignees. [polish #7]
         Assert.DoesNotContain(">Dana</span>", html);

@@ -254,15 +254,19 @@ public static class StatusStyles
         return $"<span class=\"status-badge {cssClass} js-tip\" data-tip=\"{tip}\" title=\"{tip}\">{Icon(cssClass)}{PathUtil.Html(label)}</span>";
     }
 
-    /// <summary>Compact always-visible status legend key (swatch + icon + word + meaning) for every canonical
-    /// stage. Static reference — never suppresses zero-count rows. Token-driven swatches only.
+    /// <summary>On-demand status legend disclosure: a compact "?" toggle that opens a single-column popover
+    /// (swatch + icon + word + meaning) for every canonical stage. Static reference — never zero-suppresses.
+    /// Call beside status-bearing headers/badges; native <c>&lt;details&gt;</c> so it works with JS off and under
+    /// webview CSP. Token-driven swatches only.
     /// [Story 8.2] <para>// 10.3: vocabulary-explanation seam — extend, don't duplicate</para></summary>
     public static string LegendKey()
     {
         var sb = new StringBuilder();
-        sb.Append("<aside class=\"status-legend-key\" aria-label=\"Status legend\">\n");
-        sb.Append("  <div class=\"status-legend-key-title\">Status legend</div>\n");
-        sb.Append("  <ul class=\"status-legend-key-list\">\n");
+        sb.Append("<details class=\"status-legend\">\n");
+        sb.Append("  <summary class=\"status-legend-toggle\" aria-label=\"Show status legend\">?</summary>\n");
+        sb.Append("  <div class=\"status-legend-panel\" role=\"region\" aria-label=\"Status legend\">\n");
+        sb.Append("    <div class=\"status-legend-key-title\">Status legend</div>\n");
+        sb.Append("    <ul class=\"status-legend-key-list\">\n");
         foreach (var stage in LegendStages)
         {
             var word = stage switch
@@ -279,15 +283,13 @@ public static class StatusStyles
                 _ => StoryLabel(stage),
             };
             var meaning = PathUtil.Html(StageMeaning(stage));
-            sb.Append("    <li class=\"status-legend-key-row\">\n");
-            sb.Append($"      <span class=\"status-legend-key-swatch {stage}\" aria-hidden=\"true\"></span>\n");
-            sb.Append("      <span class=\"status-legend-key-text\">\n");
+            sb.Append("      <li class=\"status-legend-key-row\">\n");
+            sb.Append($"        <span class=\"status-legend-key-swatch {stage}\" aria-hidden=\"true\"></span>\n");
             sb.Append($"        <span class=\"status-legend-key-label\">{Icon(stage)}{PathUtil.Html(word)}</span>\n");
             sb.Append($"        <span class=\"status-legend-key-meaning\">{meaning}</span>\n");
-            sb.Append("      </span>\n");
-            sb.Append("    </li>\n");
+            sb.Append("      </li>\n");
         }
-        sb.Append("  </ul>\n</aside>\n\n");
+        sb.Append("    </ul>\n  </div>\n</details>");
         return sb.ToString();
     }
 

@@ -231,7 +231,7 @@
   // contain command badges that each have their own send-menu, so dismissal is by containment: a click closes
   // every open menu that does NOT contain the click target — this keeps an ancestor popout open while you use a
   // badge inside it, and closes unrelated menus. Escape closes all.
-  var MENU_SELECTOR = "details.send-menu[open], details.cmd-menu[open]";
+  var MENU_SELECTOR = "details.send-menu[open], details.cmd-menu[open], details.status-legend[open]";
 
   document.addEventListener("click", function (e) {
     var target = e.target;

@@ -1316,10 +1316,11 @@ a.ref-file-node:focus-visible {
 /* ====================== FOOTER ====================== */
 .doc-footer {
   margin: auto 0 0;
-  padding: 0.85rem 1.25rem 1rem;
+  padding: 1.1rem 1.25rem;
   text-align: center;
   font-size: 0.78rem;
   color: var(--ink-light);
+  font-style: italic;
   background: linear-gradient(180deg, var(--warm-white), var(--cream));
   border-top: 2px solid var(--parchment-deep);
 }
@@ -1333,15 +1334,6 @@ a.ref-file-node:focus-visible {
 .doc-footer a:hover {
   color: var(--rust);
   border-bottom-color: var(--rust-light);
-}
-
-/* Credit line under the status legend — italic generation stamp stays the quiet footer voice. */
-.doc-footer-credit {
-  margin: 0.7rem auto 0;
-  padding-top: 0.65rem;
-  max-width: 1100px;
-  border-top: 1px solid var(--border);
-  font-style: italic;
 }
 
 /* ====================== INDEX PAGE ====================== */
@@ -1936,7 +1928,7 @@ a.ref-file-node:focus-visible {
   margin-bottom: 0.9rem;
 }
 
-.chart-panel-header-row h3 { margin-bottom: 0; }
+.chart-panel-header-row h3 { margin-bottom: 0; display: inline-flex; align-items: center; gap: 0; }
 .chart-panel-header-row .view-epic-link { margin-top: 0; white-space: nowrap; }
 .sunburst { display: block; margin: 0 auto; max-width: 100%; height: auto; }
 
@@ -3325,24 +3317,69 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .donut-seg.unrecognized { stroke: var(--status-unrecognized); }
 .donut-legend .swatch.unrecognized { background: var(--status-unrecognized); }
 
-/* ====================== STATUS LEGEND KEY (Story 8.2) ======================
-   Static reference vocabulary — always shows every stage (unlike chart legends that zero-suppress).
-   Compact multi-column layout so it reads as footer chrome, not a stranded body section.
-   Swatches route through --status-* tokens only. // 10.3: vocabulary-explanation seam */
-.status-legend-key {
-  max-width: 1100px;
-  margin: 0 auto;
+/* ====================== STATUS LEGEND (Story 8.2 — on-demand) ======================
+   "?" disclosure next to status-bearing headers/badges. Opens a single-column popover.
+   Native <details> → works with JS off and under webview CSP. // 10.3: vocabulary seam */
+.status-legend {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+}
+.status-legend-toggle {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
   padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--warm-white);
+  color: var(--ink-light);
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.status-legend-toggle::-webkit-details-marker { display: none; }
+.status-legend-toggle::marker { content: ""; }
+.status-legend-toggle:hover,
+.status-legend[open] > .status-legend-toggle {
+  color: var(--teal-deep);
+  border-color: var(--teal);
+  background: var(--parchment);
+}
+.status-legend-toggle:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.status-legend-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 340;
+  width: max-content;
+  max-width: min(22rem, calc(100vw - 2rem));
+  padding: 0.65rem 0.75rem 0.7rem;
+  text-align: left;
+  background: var(--warm-white);
+  border: 1px solid var(--parchment-deep);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px var(--shadow);
   color: var(--ink-faded);
   font-size: 0.74rem;
-  text-align: left;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
 }
-/* Webview/SPA emit the key after <main> (no HTML footer shell) — soft top rule so it doesn't float. */
-main + .status-legend-key,
-main ~ .status-legend-key {
-  margin-top: 1.2rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--border);
+.sprint-board-header-aside .status-legend-panel,
+.sprint-topbar-aside .status-legend-panel {
+  left: auto;
+  right: 0;
 }
 .status-legend-key-title {
   font-family: 'Courier New', monospace;
@@ -3354,33 +3391,26 @@ main ~ .status-legend-key {
 }
 .status-legend-key-list {
   list-style: none;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.4rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   margin: 0;
   padding: 0;
 }
-@media (min-width: 560px) {
-  .status-legend-key-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 900px) {
-  .status-legend-key-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-/* Swatch + stacked label/meaning — narrow cells so 2–3 columns fit without a wide single-line row. */
 .status-legend-key-row {
   display: grid;
-  grid-template-columns: 0.7rem minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 0.7rem auto 1fr;
+  align-items: baseline;
   column-gap: 0.4rem;
   line-height: 1.3;
 }
 .status-legend-key-swatch {
   width: 0.65rem;
   height: 0.65rem;
-  margin-top: 0.2rem;
   border-radius: 2px;
   border: 1px solid var(--border);
   flex-shrink: 0;
+  align-self: center;
 }
 .status-legend-key-swatch.pending { background: var(--status-pending); }
 .status-legend-key-swatch.drafted { background: var(--status-drafted); }
@@ -3400,23 +3430,32 @@ main ~ .status-legend-key {
   );
   border: 1px dashed var(--status-unrecognized);
 }
-.status-legend-key-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  min-width: 0;
-}
 .status-legend-key-label {
   font-family: 'Courier New', monospace;
   font-size: 0.64rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--ink);
+  white-space: nowrap;
 }
 .status-legend-key-meaning {
   color: var(--ink-light);
   font-size: 0.72rem;
   line-height: 1.3;
+}
+h1 .status-legend,
+h3 .status-legend,
+.chart-panel-header-row .status-legend,
+.kicker-row .status-legend,
+.meta-pills .status-legend {
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+h1:has(> .status-legend) {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Requirements index: every section shares one flush 860px column so the dashboard, group navigator,

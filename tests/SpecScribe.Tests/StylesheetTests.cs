@@ -50,12 +50,14 @@ public class StylesheetTests
         Assert.Contains("--status-done:", css);
         Assert.Contains("--status-deferred:", css);
         Assert.Contains("--status-unrecognized:", css); // Story 8.2
-        Assert.Contains(".status-legend-key", css);
+        Assert.Contains(".status-legend", css);
+        Assert.Contains(".status-legend-toggle", css);
+        Assert.Contains(".status-legend-panel", css);
         Assert.Contains(".status-legend-key-swatch.unrecognized", css);
         Assert.Contains(".status-badge.unrecognized", css);
-        Assert.Contains(".doc-footer-credit", css);
-        Assert.Contains("grid-template-columns: repeat(3, minmax(0, 1fr))", css); // wide legend columns
-        Assert.Contains(".status-legend-key-text", css);
+        Assert.DoesNotContain(".doc-footer-credit", css);
+        Assert.DoesNotContain("grid-template-columns: repeat(3, minmax(0, 1fr))", css); // no triple-wide footer legend
+        Assert.DoesNotContain(".status-legend-key-text", css);
         Assert.Contains(".status-badge.retired", css);
         Assert.Contains(".status-legend-key-swatch.retired", css);
         Assert.Contains(".sprint-lane.retired .sprint-lane-head", css);

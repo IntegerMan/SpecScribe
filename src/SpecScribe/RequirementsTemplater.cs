@@ -17,7 +17,9 @@ public static class RequirementsTemplater
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Requirements", null) }));
 
         sb.Append("<header class=\"doc-header\">\n");
-        sb.Append("  <h1>Requirements</h1>\n");
+        sb.Append("  <h1>Requirements");
+        sb.Append(StatusStyles.LegendKey());
+        sb.Append("</h1>\n");
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {model.Functional.Count} functional &middot; {model.NonFunctional.Count} non-functional</div>\n");
         sb.Append("</header>\n\n");
 
@@ -112,6 +114,7 @@ public static class RequirementsTemplater
         sb.Append($"  <div class=\"story-kicker\">{PathUtil.Html(kindLabel)}</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(req.Id)}</h1>\n");
         sb.Append($"  <div class=\"meta-pills\">{StatusStyles.Badge(statusClass, StatusStyles.RequirementLabel(req.Status))}");
+        sb.Append(StatusStyles.LegendKey());
         if (req.Category is { Length: > 0 } cat)
         {
             sb.Append($"<span class=\"pill\">{PathUtil.Html(cat)}</span>");

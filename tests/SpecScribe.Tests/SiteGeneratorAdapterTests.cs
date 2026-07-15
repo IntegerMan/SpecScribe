@@ -319,13 +319,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // renders here — only the shared stylesheet content shifted the hash. Commits-tile absolute-date fix is
         // likewise invisible (fixture has "no git history"). Marker + CommitStatSub determinism are covered by
         // unit tests. [Story 8.8; golden-diff-normalization-gotchas]
-        // Regenerated for status-legend footer polish: LegendKey nests inside .doc-footer (shared footer chrome);
-        // each legend row stacks label+meaning for a compact 1/2/3-column layout; .doc-footer-credit wraps the
-        // generation stamp. Every page's footer bytes + specscribe.css shift. [Story 8.2 UI polish]
+        // Regenerated for status-legend on-demand polish: always-visible footer/multi-column legend
+        // removed; LegendKey is a "?" <details> popover (single-column) beside status-bearing surfaces;
+        // webview/SPA no longer append a page-level legend. Also absorbs the prior sprint-board epic-filter
+        // layout commit's fixture delta. [Story 8.2 UI feedback]
         // Regenerated for sprint-board density polish: empty retired/unrecognized lanes omit entirely;
         // --lane-count drives grid columns; lane labels use nowrap + a slightly wider min track so
         // "Ready for Dev" doesn't wrap alone under width pressure. [board UX feedback]
-        const string expected = "639d10b2e96a661e3b1a1db2a56bc54206e82e40452b44021e2a893a2da92a8a";
+        const string expected = "f3e85799b44b9a6128e27fe0c3b7044aa623bf85d55919deb149a775e4351a63";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

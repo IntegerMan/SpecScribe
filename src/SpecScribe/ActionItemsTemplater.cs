@@ -30,7 +30,9 @@ public static class ActionItemsTemplater
         }));
 
         sb.Append("<header class=\"doc-header\">\n");
-        sb.Append("  <h1>Open Action Items</h1>\n");
+        sb.Append("  <h1>Open Action Items");
+        sb.Append(StatusStyles.LegendKey());
+        sb.Append("</h1>\n");
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {openCount} open {Charts.Plural(openCount, "item", "items")} &middot; from retrospectives</div>\n");
         sb.Append("</header>\n\n");
 

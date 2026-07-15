@@ -89,7 +89,8 @@ public class SiteGeneratorStatusStylesTests : IDisposable
         var oddPage = File.ReadAllText(Path.Combine(Site, "epics", "story-1-1.html"));
         Assert.Contains("status-badge unrecognized", oddPage);
         Assert.Contains("frobnicated", oddPage);
-        Assert.Contains("class=\"status-legend-key\"", oddPage);
+        Assert.Contains("class=\"status-legend\"", oddPage);
+        Assert.Contains("Show status legend", oddPage);
 
         var placeholder = File.ReadAllText(Path.Combine(Site, "epics", "story-1-2.html"));
         Assert.DoesNotContain("status-badge unrecognized", placeholder);

@@ -281,11 +281,14 @@ public class StatusStylesTests
     }
 
     [Fact]
-    public void LegendKey_RendersEveryCanonicalStageWithTokenSwatch()
+    public void LegendKey_RendersOnDemandDisclosureWithEveryCanonicalStage()
     {
         var html = StatusStyles.LegendKey();
-        Assert.Contains("class=\"status-legend-key\"", html);
+        Assert.Contains("class=\"status-legend\"", html);
+        Assert.Contains("status-legend-toggle", html);
+        Assert.Contains("Show status legend", html);
         Assert.Contains("Status legend", html);
+        Assert.DoesNotContain("status-legend-key-text", html); // single-column row, not stacked footer cells
         foreach (var stage in StatusStyles.LegendStages)
         {
             Assert.Contains($"status-legend-key-swatch {stage}", html);

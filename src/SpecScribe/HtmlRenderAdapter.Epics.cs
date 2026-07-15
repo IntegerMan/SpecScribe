@@ -83,7 +83,10 @@ public sealed partial class HtmlRenderAdapter
             : Charts.StatCard("—", "Tasks done", "none tracked yet"));
         sb.Append("</div>\n\n");
 
-        sb.Append("<div class=\"chart-panel\">\n<h3>Epic Status</h3>\n<div class=\"donut-and-legend\">\n");
+        sb.Append("<div class=\"chart-panel\">\n");
+        sb.Append("<div class=\"chart-panel-header-row\"><h3>Epic Status");
+        sb.Append(StatusStyles.LegendKey());
+        sb.Append("</h3></div>\n<div class=\"donut-and-legend\">\n");
         var epicStatusSegments = new (string Label, int Value, string CssClass)[]
         {
             ("Drafted", counts.EpicsDrafted, "drafted"),
@@ -159,6 +162,7 @@ public sealed partial class HtmlRenderAdapter
         main.Append("  <div class=\"kicker-row\">\n");
         main.Append($"    <span class=\"story-kicker\">Epic {view.Number}</span>\n");
         main.Append($"    {StatusStyles.Badge(view.StatusClass, view.StatusLabel)}\n");
+        main.Append(StatusStyles.LegendKey());
         main.Append("  </div>\n");
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");
         main.Append("</header>\n\n");
@@ -309,6 +313,7 @@ public sealed partial class HtmlRenderAdapter
         {
             main.Append($"    {StatusStyles.Badge(view.StatusStage, status)}\n");
         }
+        main.Append(StatusStyles.LegendKey());
         main.Append(view.RetroLinkHtml);
         main.Append("  </div>\n");
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");
@@ -396,6 +401,7 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("  <div class=\"kicker-row\">\n");
         sb.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(view.Id)}</span>\n");
         sb.Append($"    {StatusStyles.Badge(view.StatusStage, "Not yet drafted")}\n");
+        sb.Append(StatusStyles.LegendKey());
         sb.Append(view.RetroLinkHtml);
         sb.Append("  </div>\n");
         sb.Append($"  <h1>{view.TitleHtml}</h1>\n");
