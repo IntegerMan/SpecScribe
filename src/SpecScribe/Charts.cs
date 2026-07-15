@@ -11,11 +11,20 @@ public static class Charts
     /// <summary>A dashboard stat card. When <paramref name="tooltip"/> is supplied the card gains an on-brand
     /// CSS definition tooltip (via <c>data-tooltip</c>) and becomes keyboard-focusable so it's reachable by
     /// hover, focus and touch — used to define what a number actually counts (UX-DR4). [Story 1.5 C2]</summary>
-    public static string StatCard(string number, string label, string? sub = null, string? tooltip = null)
+    public static string StatCard(string number, string label, string? sub = null, string? tooltip = null, string? href = null)
     {
         var subHtml = sub is { Length: > 0 } ? $"<div class=\"stat-sub\">{Html(sub)}</div>" : string.Empty;
+        var inner = $"<div class=\"stat-number\">{Html(number)}</div><div class=\"stat-label\">{Html(label)}</div>{subHtml}";
+        // A tile with a drill target becomes a link (natively focusable — no tabindex needed); otherwise it stays a
+        // static div, adding tabindex only when a tooltip makes keyboard focus meaningful. The inner markup is
+        // identical in both forms so the stat-tile parity/regression facts stay stable across the fork.
+        if (href is { Length: > 0 })
+        {
+            var linkTip = tooltip is { Length: > 0 } ? $" data-tooltip=\"{Html(tooltip)}\"" : string.Empty;
+            return $"<a class=\"stat-card stat-card-link\" href=\"{Html(href)}\"{linkTip}>{inner}</a>";
+        }
         var tipAttrs = tooltip is { Length: > 0 } ? $" data-tooltip=\"{Html(tooltip)}\" tabindex=\"0\"" : string.Empty;
-        return $"<div class=\"stat-card\"{tipAttrs}><div class=\"stat-number\">{Html(number)}</div><div class=\"stat-label\">{Html(label)}</div>{subHtml}</div>";
+        return $"<div class=\"stat-card\"{tipAttrs}>{inner}</div>";
     }
 
     public static string ProgressBar(string label, int value, int max, string? rightLabel = null)

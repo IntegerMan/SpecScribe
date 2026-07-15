@@ -48,7 +48,7 @@ public static class DashboardViewBuilder
         return new DashboardView
         {
             SiteTitle = nav.SiteTitle,
-            StatTiles = BuildStatTiles(ledger, progress, work),
+            StatTiles = BuildStatTiles(ledger, progress, work, epicsModel, sprint, hasTimeline),
             NowNext = BuildNowNext(epicsModel, sprint),
             Epics = epicsModel,
             Commands = commands,
@@ -68,22 +68,31 @@ public static class DashboardViewBuilder
 
     /// <summary>The headline stat-grid row, forks resolved. Count values come from the portal-wide ledger;
     /// the fifth "Direct changes" tile still gates on <paramref name="work"/>.IsEmpty (byte-load-bearing).
-    /// Git/commit tile stays on <paramref name="progress"/> (out of Story 8.3 scope). [Story 6.2; Story 8.3]</summary>
-    private static IReadOnlyList<StatTile> BuildStatTiles(ProjectCounts c, ProgressModel p, WorkInventory work)
+    /// Git/commit tile stays on <paramref name="progress"/> (out of Story 8.3 scope). Each tile drills to the
+    /// most relevant standalone view when that page exists — epics/story tiles to Epics (or the Sprint board when
+    /// a sprint is tracked), the commit tile to the activity timeline, and Direct changes to the deferred-work
+    /// page — so the headline numbers double as navigation. [Story 6.2; Story 8.3]</summary>
+    private static IReadOnlyList<StatTile> BuildStatTiles(
+        ProjectCounts c, ProgressModel p, WorkInventory work, EpicsModel? epicsModel, SprintStatus? sprint, bool hasTimeline)
     {
+        var epicsHref = epicsModel is { Epics.Count: > 0 } ? SiteNav.EpicsOutputPath : null;
+        // A tracked sprint board is the richer story/task view; without one, fall back to the Epics index.
+        var storyHref = sprint is { IsEmpty: false } ? SiteNav.SprintOutputPath : epicsHref;
+        var commitsHref = hasTimeline ? SiteNav.TimelineOutputPath : null;
+
         var tiles = new List<StatTile>
         {
             new($"{c.EpicsDrafted}/{c.EpicsDefined}", "Epics drafted",
-                Tooltip: "Epics with at least one story drafted, out of all epics."),
+                Tooltip: "Epics with at least one story drafted, out of all epics.", Href: epicsHref),
             new(c.StoriesDefined.ToString(), "Stories defined", $"{c.StoriesWithArtifact} with a task plan",
-                "Stories listed across every epic; the sub-line counts those with a BMad task checklist."),
+                "Stories listed across every epic; the sub-line counts those with a BMad task checklist.", storyHref),
             c.TasksTotal > 0
                 ? new($"{c.TasksDone}/{c.TasksTotal}", "Planned tasks done", $"{c.StoriesWithArtifact}/{c.StoriesDefined} stories planned",
-                    $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.")
-                : new("—", "Planned tasks done", "none tracked yet"),
+                    $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.", storyHref)
+                : new("—", "Planned tasks done", "none tracked yet", Href: storyHref),
             p.Git is { } git
                 ? new(git.TotalCommits.ToString(), Charts.Plural(git.TotalCommits, "Commit", "Commits"), CommitStatSub(git),
-                    "Total commits in the repository; the sub-line shows active days and how recently work landed.")
+                    "Total commits in the repository; the sub-line shows active days and how recently work landed.", commitsHref)
                 : new("—", "Commits", "no git history"),
         };
 
@@ -94,7 +103,8 @@ public static class DashboardViewBuilder
                 ? $"{deferredCount} deferred {Charts.Plural(deferredCount, "item", "items")}"
                 : "outside the epic plan";
             tiles.Add(new(c.DirectChanges.ToString(), "Direct changes", sub,
-                "Quick-dev / one-shot changes and deferred-work notes — tracked separately from the epic/story plan, never counted as epic or story completion."));
+                "Quick-dev / one-shot changes and deferred-work notes — tracked separately from the epic/story plan, never counted as epic or story completion.",
+                work.Deferred?.OutputPath));
         }
 
         return tiles;

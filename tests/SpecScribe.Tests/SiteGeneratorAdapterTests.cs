@@ -330,11 +330,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // and ALL home index bands (planning/spec/implementation/overview/ADR/retro card lists); the work-section
         // omit gate changed to `work.Deferred is null && openRetro == 0` (a quick-dev-only project renders no
         // orphan heading). Every kept pulse panel, the Explore Key Views pills, and the Deferred/Retro callouts
-        // are byte-unchanged — the fingerprint delta is the removed grid + removed bands, plus the follow-up
-        // dashboard-summary-band relayout (Epic-Status + Overall-Progress + Deferred/Retro cards + Explore Key
-        // Views pulled into one row under the stat tiles; Deferred/Retro are now compact cards, not callout bars).
-        // Confirmed by inspecting the generated home page. [spec-declutter-home-dashboard]
-        const string expected = "ff9d9fb283ba0c247b08be0d7f276e76a973ec8d13f94160a4fff664c893aff7";
+        // are byte-unchanged — the fingerprint delta is the removed grid + removed bands, plus the dashboard
+        // relayout: a two-row header (project name + SpecScribe brand badge, and the Explore Key Views pills as a
+        // sub-header menu), linked stat tiles, Overall Progress collapsed to a single completion ring + legend,
+        // and white Deferred/Retro cards. Confirmed by inspecting the generated home page. [spec-declutter-home-dashboard]
+        const string expected = "5cceda507ca4deb94e062cec827f25f4fc1923ab16c91a4fdeb00252e8753aba";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

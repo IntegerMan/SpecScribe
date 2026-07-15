@@ -8,7 +8,9 @@ namespace SpecScribe;
 /// <param name="Label">The tile label (already pluralized).</param>
 /// <param name="Sub">The optional sub-line, or null for none.</param>
 /// <param name="Tooltip">The optional on-brand tooltip, or null for none.</param>
-public sealed record StatTile(string Number, string Label, string? Sub = null, string? Tooltip = null);
+/// <param name="Href">The optional drill target (output-relative). When set, the tile renders as a link to the
+/// most relevant standalone view; null keeps it a static tile. Only set when the target page exists.</param>
+public sealed record StatTile(string Number, string Label, string? Sub = null, string? Tooltip = null, string? Href = null);
 
 /// <summary>One "Overall Progress" bar as pure DATA — the inputs <see cref="Charts.ProgressBar"/> takes. The
 /// Planning/Implementation fork (the "not started" 0/0 bar when no tasks are tracked) is resolved into these

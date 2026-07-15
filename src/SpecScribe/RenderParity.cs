@@ -294,8 +294,10 @@ public static class RenderParity
 
     // Body-region markup the section facts are recovered from. Each is scoped to its own element so a fact from
     // one section can't leak into another (e.g. a task-badge span is not a story status stage).
+    // A stat tile renders either as a static <div> or, when it has a drill target, as an <a class="stat-card
+    // stat-card-link"> — the inner number/label markup is identical in both forms, so match either wrapper.
     private static readonly Regex StatCardRegex = new(
-        "<div class=\"stat-card\"[^>]*><div class=\"stat-number\">(?<num>.*?)</div><div class=\"stat-label\">(?<label>.*?)</div>",
+        "<(?:div|a) class=\"stat-card[^\"]*\"[^>]*><div class=\"stat-number\">(?<num>.*?)</div><div class=\"stat-label\">(?<label>.*?)</div>",
         RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex EpicChipRegex = new(
         "<a class=\"epic-chip (?<stage>[^\"]+)\" href=\"(?<href>[^\"]*)\"><span class=\"num\">(?<num>\\d+)</span>",

@@ -672,7 +672,7 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
-    public void RenderIndex_SurfacesExploreKeyViewsInSummaryBandAboveProjectAtAGlance()
+    public void RenderIndex_SurfacesKeyViewsSubheaderAboveSummaryBandAndGlance()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -685,13 +685,16 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        // Explore Key Views now rides the summary band directly under the stat tiles, above the Sunburst.
+        // Explore Key Views is now the dashboard header's second row (a sub-header menu), so it renders ahead of
+        // the summary band and the Sunburst. The old bordered "Explore Key Views" panel heading is gone.
+        var header = html.IndexOf("dashboard-header", StringComparison.Ordinal);
+        var keyViews = html.IndexOf("key-views dashboard-quick-links", StringComparison.Ordinal);
         var band = html.IndexOf("dashboard-summary-band", StringComparison.Ordinal);
         var glance = html.IndexOf("Project at a Glance", StringComparison.Ordinal);
-        var explore = html.IndexOf("Explore Key Views", StringComparison.Ordinal);
-        Assert.True(band >= 0 && glance >= 0 && explore >= 0, "band + both panels should render");
-        Assert.True(explore < glance, "Explore Key Views (summary band) must appear before Project at a Glance");
-        Assert.True(band < explore, "the summary band opens before its Explore Key Views panel");
+        Assert.True(header >= 0 && keyViews >= 0 && band >= 0 && glance >= 0, "header, key-views, band, and glance should render");
+        Assert.True(header < keyViews, "the key-views menu sits inside the dashboard header");
+        Assert.True(keyViews < band && band < glance, "key-views precedes the summary band, which precedes Project at a Glance");
+        Assert.DoesNotContain("<h3>Explore Key Views</h3>", html);
     }
 
     [Fact]
