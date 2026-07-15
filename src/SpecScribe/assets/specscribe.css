@@ -4042,6 +4042,36 @@ a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2
 .sprint-board-header { align-items: center; }
 .sprint-board-header-aside { display: flex; align-items: center; gap: 1rem; }
 
+/* Epic multi-select filter — JS-injected chrome; SSR applies default visibility. */
+.sprint-filterable { display: flex; flex-direction: column; gap: 0.65rem; min-width: 0; }
+.sprint-epic-filter {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 0.65rem;
+  padding: 0.45rem 0.55rem; background: var(--parchment); border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.sprint-epic-filter-label {
+  font-family: 'Courier New', monospace; font-size: 0.72rem; font-weight: bold;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-light); margin-right: 0.15rem;
+}
+.sprint-epic-filter-all {
+  font: inherit; font-size: 0.78rem; color: var(--rust); background: transparent;
+  border: 1px solid var(--border); border-radius: 3px; padding: 0.15rem 0.45rem; cursor: pointer;
+}
+.sprint-epic-filter-all:hover { border-color: var(--rust-light); }
+.sprint-epic-filter-all:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.sprint-epic-filter-opt {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.8rem; color: var(--ink); cursor: pointer; max-width: 100%;
+}
+.sprint-epic-filter-opt input { accent-color: var(--rust); }
+.sprint-filter-empty {
+  margin: 0; padding: 0.75rem 0.9rem; font-size: 0.88rem; color: var(--ink-light);
+  border: 1px dashed var(--border); border-radius: 4px; background: var(--parchment);
+}
+
 /* Board story card: id top-left, epic badge top-right, title, and a hairline task-progress bar at the bottom.
    Shared by the sprint board and the home Now & Next board. Status color rides the left border. */
 .sprint-card {

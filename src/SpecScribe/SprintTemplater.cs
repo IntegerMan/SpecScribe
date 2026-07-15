@@ -90,7 +90,9 @@ public static class SprintTemplater
         sb.Append("<main id=\"main-content\" class=\"sprint-page\">\n\n");
         sb.Append("<div class=\"sprint-topbar\">\n");
         sb.Append("  <div class=\"sprint-topbar-head\">\n");
-        sb.Append("    <h1>Sprint Status</h1>\n");
+        sb.Append("    <h1>Sprint Status");
+        sb.Append(StatusStyles.LegendKey());
+        sb.Append("</h1>\n");
         sb.Append($"    <div class=\"doc-subtitle\">{subtitle}</div>\n");
         sb.Append("  </div>\n");
         sb.Append("  <div class=\"sprint-topbar-aside\">\n");
@@ -116,14 +118,64 @@ public static class SprintTemplater
         return sb.ToString();
     }
 
-    /// <summary>The Kanban board: lifecycle columns (Backlog → Done), then Retired, then Unrecognized. Story entries only —
-    /// epics/retrospectives are not cards. When <paramref name="capPerColumn"/> is set, a column with more than
-    /// that many stories shows the first N cards then a "+K more" link to <paramref name="moreHref"/> (the home
-    /// board caps; the sprint page does not). Core columns (Backlog → Done) render even when empty — an empty
-    /// "Done" column is meaningful on a board; Retired and Unrecognized lanes omit entirely when empty so they
-    /// don't steal width. Reused by the home Now &amp; Next and the sprint page. [Story 2.3 redesign]</summary>
-    public static string RenderBoard(SprintStatus sprint, EpicsModel? epics, int? capPerColumn = null, string? moreHref = null, string prefix = "")
+    /// <summary>Epics that should be selected by default on sprint boards: any epic with ≥1 story in
+    /// <c>in-progress</c>/<c>review</c>/<c>done</c> whose yaml <c>epic-N-retrospective</c> is not <c>done</c>;
+    /// if none, the first <c>epic-N</c> in file order whose status is not <c>done</c>. Yaml ledger only.
+    /// [spec-sprint-epic-filter-and-home-layout]</summary>
+    public static IReadOnlyList<int> ActiveEpicNumbers(SprintStatus sprint)
     {
+        var (order, epicEntry, retroEntry, stories) = GroupByEpic(sprint);
+        var active = new List<int>();
+        foreach (var n in order)
+        {
+            if (n < 0) continue;
+            if (RetroIsDone(retroEntry, n)) continue;
+            if (!stories.TryGetValue(n, out var list)) continue;
+            if (list.Any(IsActiveStoryStatus)) active.Add(n);
+        }
+        if (active.Count > 0) return active;
+
+        foreach (var n in order)
+        {
+            if (n < 0) continue;
+            if (!epicEntry.TryGetValue(n, out var ee)) continue;
+            if (ee.Status.Equals("done", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!stories.TryGetValue(n, out var list) || list.Count == 0) continue;
+            return new[] { n };
+        }
+        return Array.Empty<int>();
+    }
+
+    private static bool RetroIsDone(Dictionary<int, SprintEntry> retros, int epicNumber) =>
+        retros.TryGetValue(epicNumber, out var re)
+        && re.Status.Equals("done", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsActiveStoryStatus(SprintEntry story)
+    {
+        var n = story.Status.Trim();
+        return n.Equals("in-progress", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("review", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("done", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The Kanban board: lifecycle columns (Backlog → Done), then Retired, then Unrecognized. Story entries only —
+    /// epics/retrospectives are not cards. When <paramref name="capPerColumn"/> is set, the cap applies <em>after</em>
+    /// the default epic filter (active epics). Non-default and overflow cards stay in the DOM as <c>hidden</c> so the
+    /// progressive epic selector can reveal them. Core columns (Backlog → Done) render even when empty.
+    /// [Story 2.3 redesign; spec-sprint-epic-filter-and-home-layout]</summary>
+    public static string RenderBoard(SprintStatus sprint, EpicsModel? epics, int? capPerColumn = null, string? moreHref = null, string prefix = "", bool wrapWithEpicFilter = true)
+    {
+        var defaultEpics = ActiveEpicNumbers(sprint);
+        var grouped = GroupByEpic(sprint);
+        var epicIdsWithStories = grouped.Order
+            .Where(n => n >= 0 && grouped.Stories.TryGetValue(n, out var list) && list.Count > 0)
+            .ToList();
+        // When no active/fallback epic remains (e.g. every epic-N is done), default to all epics so the board
+        // is not an unexplained blank — selector still lets the user narrow. [review patch]
+        var effectiveDefaults = defaultEpics.Count > 0 ? defaultEpics : epicIdsWithStories;
+        var defaultSet = effectiveDefaults.ToHashSet();
+        var filtering = defaultSet.Count > 0;
+
         var stories = sprint.Entries.Where(e => e.Kind == SprintEntryKind.Story).ToList();
         var byColumn = BoardColumns.ToDictionary(c => c.CssClass, _ => new List<SprintEntry>());
         foreach (var s in stories)
@@ -138,31 +190,47 @@ public static class SprintTemplater
             .ToList();
 
         var sb = new StringBuilder();
+        if (wrapWithEpicFilter) AppendEpicFilterOpen(sb, sprint, epics, effectiveDefaults, capPerColumn);
+
         sb.Append($"<div class=\"sprint-board\" style=\"--lane-count: {visible.Count}\">\n");
         foreach (var (cssClass, label) in visible)
         {
             var col = byColumn[cssClass];
-            // Column-meaning tip from StatusStyles.StageMeaning (Story 8.2 seam) — Backlog vs Ready carry the
-            // distinguishing readiness text. Focusable: a small fixed set of meaning-bearing headers.
-            // title= fallback for non-JS surfaces (webview). [Story 8.4; UX-DR24]
+            var matching = filtering
+                ? col.Where(s => s.EpicNumber is { } n && defaultSet.Contains(n)).ToList()
+                : col.ToList();
+            var other = filtering
+                ? col.Where(s => s.EpicNumber is not { } n || !defaultSet.Contains(n)).ToList()
+                : new List<SprintEntry>();
+            // Cap after filter so home columns stay relevant to the default epic set.
+            var shown = capPerColumn is { } cap && matching.Count > cap ? matching.Take(cap).ToList() : matching;
+            var overflow = capPerColumn is { } c && matching.Count > c ? matching.Skip(c).ToList() : new List<SprintEntry>();
+            var filteredCount = matching.Count;
+
             var tip = PathUtil.Html(ColumnMeaning(cssClass, label));
-            sb.Append($"  <section class=\"sprint-lane {cssClass}\" aria-label=\"{PathUtil.Html($"{label}: {col.Count} {Charts.Plural(col.Count, "story", "stories")}")}\">\n");
-            sb.Append($"    <div class=\"sprint-lane-head js-tip\" data-tip=\"{tip}\" title=\"{tip}\" tabindex=\"0\"><span class=\"sprint-lane-label\">{PathUtil.Html(label)}</span><span class=\"sprint-lane-count\">{col.Count}</span></div>\n");
+            sb.Append($"  <section class=\"sprint-lane {cssClass}\" data-lane-label=\"{PathUtil.Html(label)}\" aria-label=\"{PathUtil.Html($"{label}: {filteredCount} {Charts.Plural(filteredCount, "story", "stories")}")}\">\n");
+            sb.Append($"    <div class=\"sprint-lane-head js-tip\" data-tip=\"{tip}\" title=\"{tip}\" tabindex=\"0\"><span class=\"sprint-lane-label\">{PathUtil.Html(label)}</span><span class=\"sprint-lane-count\">{filteredCount}</span></div>\n");
             sb.Append("    <div class=\"sprint-cards\">\n");
 
             if (col.Count == 0)
             {
-                // Dashed ghost-card placeholder — shared by sprint page + home Now & Next. [Story 8.6]
                 sb.Append($"      <div class=\"sprint-lane-empty\">{PathUtil.Html(EmptyLaneCopy(cssClass))}</div>\n");
+            }
+            else if (matching.Count == 0)
+            {
+                // Default filter emptied this lane — filter-specific copy, with other-epic cards kept as hidden.
+                sb.Append($"      <div class=\"sprint-lane-empty\" data-filter-empty=\"1\">{PathUtil.Html(FilteredEmptyLaneCopy())}</div>\n");
+                foreach (var story in other) AppendBoardCard(sb, story, epics, prefix, hidden: true);
             }
             else
             {
-                var shown = capPerColumn is { } cap && col.Count > cap ? col.Take(cap) : col;
-                foreach (var story in shown) AppendBoardCard(sb, story, epics, prefix);
+                foreach (var story in shown) AppendBoardCard(sb, story, epics, prefix, hidden: false);
+                foreach (var story in overflow) AppendBoardCard(sb, story, epics, prefix, hidden: true, capOverflow: true);
+                foreach (var story in other) AppendBoardCard(sb, story, epics, prefix, hidden: true);
 
-                if (capPerColumn is { } c && col.Count > c && moreHref is { Length: > 0 })
+                if (capPerColumn is { } capLimit && matching.Count > capLimit && moreHref is { Length: > 0 })
                 {
-                    var extra = col.Count - c;
+                    var extra = matching.Count - capLimit;
                     sb.Append($"      <a class=\"sprint-lane-more\" href=\"{PathUtil.Html(prefix + moreHref)}\">+{extra} more &rarr;</a>\n");
                 }
             }
@@ -170,20 +238,37 @@ public static class SprintTemplater
             sb.Append("    </div>\n  </section>\n");
         }
         sb.Append("</div>\n");
+        if (wrapWithEpicFilter) AppendEpicFilterClose(sb);
         return sb.ToString();
     }
 
+    private static string FilteredEmptyLaneCopy() =>
+        "No stories from the selected epics in this column.";
+
+
     /// <summary>The epic-grouped board view: one swimlane section per epic (file order) with the epic header
     /// (linked, tracked badge, retrospective note) and its stories as status-colored cards in a wrap row.
-    /// [Story 2.3 redesign]</summary>
-    public static string RenderBoardByEpic(SprintStatus sprint, EpicsModel? epics, string prefix = "")
+    /// Non-default epics start <c>hidden</c> for the epic filter default. [Story 2.3 redesign; spec-sprint-epic-filter]</summary>
+    public static string RenderBoardByEpic(SprintStatus sprint, EpicsModel? epics, string prefix = "", bool wrapWithEpicFilter = true)
     {
         var (order, epicEntry, retroEntry, stories) = GroupByEpic(sprint);
+        var defaultEpics = ActiveEpicNumbers(sprint);
+        var epicIdsWithStories = order
+            .Where(n => n >= 0 && stories.TryGetValue(n, out var list) && list.Count > 0)
+            .ToList();
+        var effectiveDefaults = defaultEpics.Count > 0 ? defaultEpics : epicIdsWithStories;
+        var defaultSet = effectiveDefaults.ToHashSet();
 
         var sb = new StringBuilder();
+        if (wrapWithEpicFilter) AppendEpicFilterOpen(sb, sprint, epics, effectiveDefaults, capPerColumn: null);
+
         foreach (var n in order)
         {
-            sb.Append("<section class=\"sprint-epic-lane\">\n");
+            // Align with status board: hide non-selected epics whenever a default set exists.
+            var laneHidden = n >= 0 && defaultSet.Count > 0 && !defaultSet.Contains(n);
+            var hiddenAttr = laneHidden ? " hidden" : string.Empty;
+            var epicAttr = n >= 0 ? $" data-epic=\"{n}\"" : string.Empty;
+            sb.Append($"<section class=\"sprint-epic-lane\"{epicAttr}{hiddenAttr}>\n");
             sb.Append("  <div class=\"sprint-epic-head\">\n");
 
             var (epicTitle, epicHref) = ResolveEpic(n, epics);
@@ -208,11 +293,12 @@ public static class SprintTemplater
             if (stories[n].Count > 0)
             {
                 sb.Append("  <div class=\"sprint-cards-row\">\n");
-                foreach (var story in stories[n]) AppendBoardCard(sb, story, epics, prefix);
+                foreach (var story in stories[n]) AppendBoardCard(sb, story, epics, prefix, hidden: false);
                 sb.Append("  </div>\n");
             }
             sb.Append("</section>\n\n");
         }
+        if (wrapWithEpicFilter) AppendEpicFilterClose(sb);
         return sb.ToString();
     }
 
@@ -234,13 +320,47 @@ public static class SprintTemplater
 
     private static void AppendBoardViews(StringBuilder sb, SprintStatus sprint, EpicsModel? epics, string prefix)
     {
+        // One filter drives both status and by-epic views (CSS :has() swaps which view is visible).
+        var defaultEpics = ActiveEpicNumbers(sprint);
+        var grouped = GroupByEpic(sprint);
+        var epicIdsWithStories = grouped.Order
+            .Where(n => n >= 0 && grouped.Stories.TryGetValue(n, out var list) && list.Count > 0)
+            .ToList();
+        var effectiveDefaults = defaultEpics.Count > 0 ? defaultEpics : epicIdsWithStories;
+        AppendEpicFilterOpen(sb, sprint, epics, effectiveDefaults, capPerColumn: null);
         sb.Append("<div class=\"board-view board-view-status\">\n");
-        sb.Append(RenderBoard(sprint, epics, prefix: prefix));
+        sb.Append(RenderBoard(sprint, epics, prefix: prefix, wrapWithEpicFilter: false));
         sb.Append("</div>\n");
         sb.Append("<div class=\"board-view board-view-epic\">\n");
-        sb.Append(RenderBoardByEpic(sprint, epics, prefix));
-        sb.Append("</div>\n\n");
+        sb.Append(RenderBoardByEpic(sprint, epics, prefix, wrapWithEpicFilter: false));
+        sb.Append("</div>\n");
+        AppendEpicFilterClose(sb);
+        sb.Append('\n');
     }
+
+    /// <summary>Filter root + epic catalog as data attributes. The checkbox UI is JS-injected (like
+    /// <c>js-sortable</c> table filters) so no-JS pages never show inert controls — SSR already applies the
+    /// default active-epic visibility/cap. [spec-sprint-epic-filter-and-home-layout]</summary>
+    private static void AppendEpicFilterOpen(StringBuilder sb, SprintStatus sprint, EpicsModel? epics,
+        IReadOnlyList<int> defaultEpics, int? capPerColumn)
+    {
+        var (order, _, _, stories) = GroupByEpic(sprint);
+        var epicIds = order.Where(n => n >= 0 && stories.TryGetValue(n, out var list) && list.Count > 0).ToList();
+        var defaults = string.Join(",", defaultEpics);
+        var capAttr = capPerColumn is { } c ? $" data-cap=\"{c}\"" : string.Empty;
+        var catalog = epicIds.Select(n =>
+        {
+            var (titleHtml, _) = ResolveEpic(n, epics);
+            return new Dictionary<string, object> { ["id"] = n, ["label"] = PathUtil.StripHtmlTags(titleHtml) };
+        }).ToList();
+        var epicsJson = System.Text.Json.JsonSerializer.Serialize(catalog);
+        sb.Append($"<div class=\"sprint-filterable\" data-default-epics=\"{PathUtil.Html(defaults)}\" data-epics=\"{PathUtil.Html(epicsJson)}\"{capAttr}>\n");
+        // Empty hint starts hidden; JS reveals it when the injected selection is cleared.
+        sb.Append("<p class=\"sprint-filter-empty\" hidden role=\"status\">Select an epic to show stories on the board.</p>\n");
+    }
+
+    private static void AppendEpicFilterClose(StringBuilder sb) => sb.Append("</div>\n");
+
 
     /// <summary>The control-row buttons that link to the retrospectives index and the open-action-items page.
     /// "Retros" shows when any retro exists (rich tooltip: count + latest); the flag "⚑ N" shows only when there
@@ -307,7 +427,8 @@ public static class SprintTemplater
     /// <summary>One board card for a story: the whole card is a link to the story's generated page (real or
     /// placeholder — always exists for a model story), colored by its tracked lifecycle stage. Falls back to a
     /// non-link <c>div</c> only when the yaml key has no matching model story (no page to point at). [Story 2.3]</summary>
-    private static void AppendBoardCard(StringBuilder sb, SprintEntry entry, EpicsModel? epics, string prefix)
+    private static void AppendBoardCard(StringBuilder sb, SprintEntry entry, EpicsModel? epics, string prefix,
+        bool hidden = false, bool capOverflow = false)
     {
         var (title, href, story) = ResolveStory(entry, epics);
         var cssClass = StatusStyles.ForSprint(entry.Status);
@@ -325,8 +446,11 @@ public static class SprintTemplater
         // the progress-bar gate — so they separate from actionable cards at a glance. [Story 8.4; UX-DR24]
         var noPlan = story is null || story.TasksTotal == 0;
         var noPlanClass = noPlan ? " no-plan" : string.Empty;
+        var epicAttr = entry.EpicNumber is { } en ? $" data-epic=\"{en}\"" : string.Empty;
+        var hiddenAttr = hidden ? " hidden" : string.Empty;
+        var overflowAttr = capOverflow ? " data-cap-overflow=\"1\"" : string.Empty;
 
-        sb.Append($"      <{tag} class=\"sprint-card js-tip {cssClass}{noPlanClass}\"{hrefAttr}{focusAttr} data-tip=\"{dataTip}\">\n");
+        sb.Append($"      <{tag} class=\"sprint-card js-tip {cssClass}{noPlanClass}\"{hrefAttr}{focusAttr}{epicAttr}{hiddenAttr}{overflowAttr} data-tip=\"{dataTip}\">\n");
         sb.Append("        <div class=\"sprint-card-head\">\n");
         sb.Append($"          <span class=\"sprint-card-id\">Story {PathUtil.Html(id)}</span>\n");
         sb.Append("        </div>\n");

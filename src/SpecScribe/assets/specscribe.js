@@ -354,6 +354,153 @@
     try { enhanceSortableTable(table); } catch (err) { /* degrade silently — the server-sorted table stands */ }
   });
 
+  // ---- Sprint epic filter (home widget + sprint page) --------------------------------------
+  // Progressive enhancement ONLY (mirrors js-sortable): SSR already applies the default active-epic
+  // visibility + home cap. This injects the epic multi-select from data-epics / data-default-epics so
+  // no-JS never sees inert checkboxes. Progress wheel / totals stay untouched.
+  function enhanceSprintEpicFilter(root) {
+    if (root.querySelector(".sprint-epic-filter")) return;
+    var raw = root.getAttribute("data-epics") || "[]";
+    var catalog;
+    try { catalog = JSON.parse(raw); } catch (err) { return; }
+    if (!Array.isArray(catalog) || catalog.length === 0) return;
+
+    var defaultSet = {};
+    String(root.getAttribute("data-default-epics") || "").split(",").forEach(function (part) {
+      var id = part.trim();
+      if (id) defaultSet[id] = true;
+    });
+
+    var emptyHint = root.querySelector(".sprint-filter-empty");
+    var filter = document.createElement("div");
+    filter.className = "sprint-epic-filter";
+    filter.setAttribute("role", "group");
+    filter.setAttribute("aria-label", "Filter stories by epic");
+
+    var label = document.createElement("span");
+    label.className = "sprint-epic-filter-label";
+    label.textContent = "Epics";
+    filter.appendChild(label);
+
+    var allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = "sprint-epic-filter-all";
+    allBtn.textContent = "All";
+    filter.appendChild(allBtn);
+
+    catalog.forEach(function (entry) {
+      var id = String(entry.id);
+      var opt = document.createElement("label");
+      opt.className = "sprint-epic-filter-opt";
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = id;
+      if (defaultSet[id]) input.checked = true;
+      opt.appendChild(input);
+      opt.appendChild(document.createTextNode(" " + (entry.label || ("Epic " + id))));
+      filter.appendChild(opt);
+    });
+
+    if (emptyHint && emptyHint.parentNode === root) root.insertBefore(filter, emptyHint);
+    else root.insertBefore(filter, root.firstChild);
+
+    var boxes = filter.querySelectorAll("input[type=checkbox]");
+    var cap = parseInt(root.getAttribute("data-cap") || "", 10);
+    if (isNaN(cap) || cap < 1) cap = 0;
+
+    function selectedSet() {
+      var set = {};
+      var any = false;
+      Array.prototype.forEach.call(boxes, function (b) {
+        if (b.checked) { set[b.value] = true; any = true; }
+      });
+      return { set: set, any: any };
+    }
+
+    function apply() {
+      var sel = selectedSet();
+      if (emptyHint) emptyHint.hidden = sel.any;
+
+      Array.prototype.forEach.call(root.querySelectorAll(".sprint-card[data-epic]"), function (card) {
+        var epic = card.getAttribute("data-epic");
+        card.hidden = !sel.any || !sel.set[epic];
+        card.removeAttribute("data-cap-overflow");
+      });
+
+      Array.prototype.forEach.call(root.querySelectorAll(".sprint-epic-lane[data-epic]"), function (lane) {
+        var epic = lane.getAttribute("data-epic");
+        lane.hidden = !sel.any || !sel.set[epic];
+      });
+
+      Array.prototype.forEach.call(root.querySelectorAll(".sprint-lane"), function (lane) {
+        var cardsHost = lane.querySelector(".sprint-cards");
+        if (!cardsHost) return;
+        var cards = Array.prototype.slice.call(cardsHost.querySelectorAll(".sprint-card[data-epic]"));
+        var matching = cards.filter(function (c) {
+          var epic = c.getAttribute("data-epic");
+          return sel.any && sel.set[epic];
+        });
+        var empty = cardsHost.querySelector(".sprint-lane-empty");
+        if (!empty && matching.length === 0 && cards.length > 0) {
+          empty = document.createElement("div");
+          empty.className = "sprint-lane-empty";
+          empty.setAttribute("data-filter-empty", "1");
+          empty.textContent = "No stories from the selected epics in this column.";
+          cardsHost.insertBefore(empty, cardsHost.firstChild);
+        }
+        if (empty) {
+          // Show lane-empty when a selection is active but yields nothing; hide when selection cleared
+          // (global empty hint covers that) or when matching cards will show.
+          empty.hidden = matching.length > 0 || !sel.any;
+        }
+
+        if (cap > 0) {
+          matching.forEach(function (c, i) {
+            if (i >= cap) {
+              c.hidden = true;
+              c.setAttribute("data-cap-overflow", "1");
+            } else {
+              c.hidden = false;
+            }
+          });
+        } else {
+          matching.forEach(function (c) { c.hidden = false; });
+        }
+
+        var countEl = lane.querySelector(".sprint-lane-count");
+        var laneLabel = lane.getAttribute("data-lane-label") || "";
+        if (countEl) countEl.textContent = String(matching.length);
+        if (laneLabel) {
+          var plural = matching.length === 1 ? "story" : "stories";
+          lane.setAttribute("aria-label", laneLabel + ": " + matching.length + " " + plural);
+        }
+
+        var more = cardsHost.querySelector(".sprint-lane-more");
+        if (more && cap > 0) {
+          if (matching.length > cap) {
+            more.hidden = false;
+            more.textContent = "+" + (matching.length - cap) + " more →";
+          } else {
+            more.hidden = true;
+          }
+        }
+      });
+    }
+
+    Array.prototype.forEach.call(boxes, function (b) {
+      b.addEventListener("change", apply);
+    });
+    allBtn.addEventListener("click", function () {
+      Array.prototype.forEach.call(boxes, function (b) { b.checked = true; });
+      apply();
+    });
+    apply();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".sprint-filterable"), function (root) {
+    try { enhanceSprintEpicFilter(root); } catch (err) { /* degrade — server default remains */ }
+  });
+
   // ---- Source-code treemap: dimension switch + directory zoom [Story 7.6, round 2] ---------
   // Progressive enhancement ONLY. The server ships up to four self-contained ".codemap-view" panels (one per
   // exclude-spec-dev / exclude-tests filter combination — Story 7.6 round 2), each with a correct, sized-by-LOC

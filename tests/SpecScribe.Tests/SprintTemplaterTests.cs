@@ -145,9 +145,12 @@ public class SprintTemplaterTests
     [Fact]
     public void RenderBoard_CapsEachColumnAndLinksToMore()
     {
-        // Six done stories, capped at 2 → two cards + a "+4 more" link to the target.
+        // Six done stories, capped at 2 → two visible cards + four hidden overflow + a "+4 more" link.
+        // Cap applies after the default epic filter (here: epic 1 is active via done stories + open retro).
         var sprint = SprintStatusParser.Parse("""
             development_status:
+              epic-1: in-progress
+              epic-1-retrospective: optional
               1-1-a: done
               1-2-b: done
               1-3-c: done
@@ -163,12 +166,13 @@ public class SprintTemplaterTests
         var board = SprintTemplater.RenderBoard(sprint, epics, capPerColumn: 2, moreHref: "sprint.html");
 
         Assert.Contains("class=\"sprint-lane-more\" href=\"sprint.html\">+4 more", board);
-        // Only the first 2 of 6 done cards are shown before the "more" link.
-        Assert.Equal(2, CountOccurrences(board, "sprint-card js-tip done"));
+        Assert.Equal(6, CountOccurrences(board, "sprint-card js-tip done"));
+        Assert.Equal(2, CountVisibleSprintCards(board));
+        Assert.Contains("data-cap-overflow=\"1\"", board);
 
-        // Uncapped render shows all six.
+        // Uncapped render shows all six visible.
         var full = SprintTemplater.RenderBoard(sprint, epics);
-        Assert.Equal(6, CountOccurrences(full, "sprint-card js-tip done"));
+        Assert.Equal(6, CountVisibleSprintCards(full));
         Assert.DoesNotContain("sprint-lane-more", full);
     }
 
@@ -402,10 +406,140 @@ public class SprintTemplaterTests
         Assert.Equal(string.Empty, SprintTemplater.RenderProgressWheel(sprint));
     }
 
+    [Fact]
+    public void ActiveEpicNumbers_PrefersEpicsWithInFlightOrDoneAndOpenRetro()
+    {
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: done
+              1-1-old: done
+              epic-1-retrospective: done
+              epic-3: in-progress
+              3-1-live: in-progress
+              epic-3-retrospective: optional
+              epic-4: backlog
+              4-1-later: backlog
+              epic-4-retrospective: optional
+            """)!;
+
+        Assert.Equal(new[] { 3 }, SprintTemplater.ActiveEpicNumbers(sprint));
+    }
+
+    [Fact]
+    public void ActiveEpicNumbers_FallsBackToFirstNonDoneEpic()
+    {
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: done
+              1-1-old: done
+              epic-1-retrospective: done
+              epic-2: in-progress
+              2-1-ready: ready-for-dev
+              epic-2-retrospective: optional
+              epic-3: backlog
+              3-1-later: backlog
+            """)!;
+
+        // No in-progress/review/done with open retro → first epic-N ≠ done is epic 2.
+        Assert.Equal(new[] { 2 }, SprintTemplater.ActiveEpicNumbers(sprint));
+    }
+
+    [Fact]
+    public void RenderBoard_DefaultsToActiveEpicsAndKeepsOthersHidden()
+    {
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: done
+              1-1-old: done
+              epic-1-retrospective: done
+              epic-3: in-progress
+              3-1-live: in-progress
+              epic-3-retrospective: optional
+            """)!;
+        var epics = EpicsWith(
+            Epic(1, "Done Epic", Story("1.1", 1, "Old", "epics/story-1-1.html")),
+            Epic(3, "Live", Story("3.1", 3, "Live Story", "epics/story-3-1.html")));
+
+        var board = SprintTemplater.RenderBoard(sprint, epics);
+
+        Assert.Contains("class=\"sprint-filterable\"", board);
+        Assert.Contains("data-default-epics=\"3\"", board);
+        Assert.Contains("data-epics=", board);
+        Assert.DoesNotContain("sprint-epic-filter", board); // injected by JS — absent in SSR
+        Assert.Contains("data-epic=\"3\"", board);
+        Assert.Contains("data-epic=\"1\" hidden", board);
+        Assert.Equal(1, CountVisibleSprintCards(board));
+        Assert.Contains("Story 3.1", board);
+    }
+
+    [Fact]
+    public void RenderBoard_CapAppliesAfterActiveEpicFilter()
+    {
+        // Mixed epics in the active lane: without filter-before-cap the first 3 would be epic 1+2;
+        // with default=epic 2 only, the three visible cards must all be epic 2.
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: done
+              1-1-a: in-progress
+              1-2-b: in-progress
+              1-3-c: in-progress
+              epic-1-retrospective: done
+              epic-2: in-progress
+              2-1-a: in-progress
+              2-2-b: in-progress
+              2-3-c: in-progress
+              2-4-d: in-progress
+              2-5-e: in-progress
+              epic-2-retrospective: optional
+            """)!;
+        var epics = EpicsWith(
+            Epic(1, "Old",
+                Story("1.1", 1, "A", "epics/story-1-1.html"), Story("1.2", 1, "B", "epics/story-1-2.html"),
+                Story("1.3", 1, "C", "epics/story-1-3.html")),
+            Epic(2, "Live",
+                Story("2.1", 2, "A", "epics/story-2-1.html"), Story("2.2", 2, "B", "epics/story-2-2.html"),
+                Story("2.3", 2, "C", "epics/story-2-3.html"), Story("2.4", 2, "D", "epics/story-2-4.html"),
+                Story("2.5", 2, "E", "epics/story-2-5.html")));
+
+        var board = SprintTemplater.RenderBoard(sprint, epics, capPerColumn: 3, moreHref: "sprint.html");
+
+        Assert.Contains("data-default-epics=\"2\"", board);
+        Assert.Equal(3, CountVisibleSprintCards(board));
+        Assert.Equal(3, CountOccurrences(board, "data-epic=\"2\" data-tip="));
+        Assert.Contains("+2 more", board);
+    }
+
+    [Fact]
+    public void RenderIndex_SharesOneEpicFilterAcrossBoardViews()
+    {
+        var html = SprintTemplater.RenderIndex(Sample(), SampleEpics(), Nav(), SprintCommands());
+        Assert.Equal(1, CountOccurrences(html, "class=\"sprint-filterable\""));
+        Assert.Contains("data-default-epics=\"1\"", html);
+        Assert.Contains("class=\"board-view board-view-status\"", html);
+        Assert.Contains("class=\"board-view board-view-epic\"", html);
+        Assert.Contains("sprint-epic-lane\" data-epic=\"1\"", html);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         int count = 0, i = 0;
         while ((i = haystack.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { count++; i += needle.Length; }
+        return count;
+    }
+
+    /// <summary>Counts sprint cards whose opening tag does not include the <c>hidden</c> attribute.</summary>
+    private static int CountVisibleSprintCards(string html)
+    {
+        int count = 0, i = 0;
+        const string needle = "sprint-card js-tip";
+        while ((i = html.IndexOf(needle, i, StringComparison.Ordinal)) >= 0)
+        {
+            var tagEnd = html.IndexOf('>', i);
+            if (tagEnd < 0) break;
+            var open = html[i..tagEnd];
+            if (!open.Contains(" hidden", StringComparison.Ordinal)) count++;
+            i = tagEnd + 1;
+        }
         return count;
     }
 }

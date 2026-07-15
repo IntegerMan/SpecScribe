@@ -820,6 +820,13 @@ public class HtmlTemplaterTests
         Assert.Contains("Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span>", html);
         Assert.Contains("class=\"sprint-board\"", html);
         Assert.Contains("href=\"sprint.html\"", html);
+        Assert.Contains("sprint-filterable", html);
+        Assert.Contains("data-epics=", html);
+        // Sunburst leads; sprint board follows. [spec-sprint-epic-filter-and-home-layout]
+        var glance = html.IndexOf("Project at a Glance", StringComparison.Ordinal);
+        var sprintBoard = html.IndexOf("sprint-board-panel", StringComparison.Ordinal);
+        Assert.True(glance >= 0 && sprintBoard >= 0);
+        Assert.True(glance < sprintBoard, "Project at a Glance must appear before the sprint widget");
         // Open retro action items are surfaced as a callout (beside deferred work) linking to the sprint page.
         Assert.Contains("work-callout retro-callout", html);
         Assert.Contains("Retro Action Items", html);

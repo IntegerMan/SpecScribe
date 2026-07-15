@@ -47,13 +47,8 @@ public sealed partial class HtmlRenderAdapter
         }
         sb.Append("</div>\n\n");
 
-        // Now & Next: sprint board when tracked, else the derived cards; omitted entirely when the view is null.
-        if (view.NowNext is { } nowNext)
-        {
-            AppendNowAndNext(sb, nowNext, view.Epics, view.Counts);
-        }
-
-        // The sunburst headline panel — present only when there is an epics model.
+        // Sunburst first — the glance-at-structure scan path — then Now & Next / sprint board.
+        // [spec-sprint-epic-filter-and-home-layout]
         if (view.Epics is { } epicsForSunburst)
         {
             sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
@@ -61,6 +56,12 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("<a class=\"view-epic-link\" href=\"epics.html\">View Epics &amp; Stories &rarr;</a></div>\n");
             sb.Append(Charts.Sunburst(epicsForSunburst, commands: view.Commands));
             sb.Append("</div>\n\n");
+        }
+
+        // Now & Next: sprint board when tracked, else the derived cards; omitted entirely when the view is null.
+        if (view.NowNext is { } nowNext)
+        {
+            AppendNowAndNext(sb, nowNext, view.Epics, view.Counts);
         }
 
         // Epic-status donut + overall-progress bars share a row.

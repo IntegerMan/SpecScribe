@@ -449,3 +449,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `7-8-related-files-in-the-reference-graph.md`
   summary: `Charts.ReferenceGraph`'s new `artifactCap` parameter (default `RefGraphArtifactNodeCap = 14`) has no lower-bound validation; a caller passing a negative value that exactly offsets `relCount` drives `total` to zero, causing a divide-by-zero in the ring-angle math (`Ang(i)`) and NaN coordinates in the emitted SVG. Unreachable today — both production call sites use the default — but it's latent robustness debt on a public API surface.
   evidence: Edge Case Hunter. [Charts.cs:1126,1146](../../src/SpecScribe/Charts.cs)
+
+## Deferred from: code review of spec-sprint-epic-filter-and-home-layout (2026-07-14)
+
+- source_spec: `spec-sprint-epic-filter-and-home-layout.md`
+  summary: No automated browser/JS coverage for enhanceSprintEpicFilter (toggle, All, empty selection, live aria-label/cap recount) — regressions in the PE half rely on manual checks.
+  evidence: Blind Hunter. [specscribe.js](../../src/SpecScribe/assets/specscribe.js)
