@@ -4,7 +4,7 @@ baseline_commit: 8537c8521d2b9622517d2d547a8d2d7d30426d80
 
 # Story 8.6: Designed Empty States
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -76,7 +76,7 @@ These are the board's own canonical lifecycle columns (not framework-native stat
 
 | Column (`cssClass`) | Label | Empty-state copy |
 |---|---|---|
-| `pending` | Backlog | `Backlog is clear — every story is scheduled.` |
+| `pending` | Backlog | `No cards in backlog` |
 | `ready` | Ready for dev | `Nothing ready to pick up — draft or refine the next story.` |
 | `active` | In progress | `Nothing in progress — pick from Ready.` *(the AC's own example)* |
 | `review` | In review | `Nothing awaiting review.` |
@@ -248,6 +248,10 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 - [x] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball an all-backlog epic page (one banner + plain notes) and the sprint page (dashed empty-lane placeholders with guidance copy).
 
+### Review Findings
+
+- [x] [Review][Patch] Empty Backlog copy shortened to "No cards in backlog" [`SprintTemplater.cs` EmptyLaneCopy] — resolved in review; avoids claiming stories were scheduled when the board is empty.
+
 ## Dev Notes
 
 ### Cross-surface note from Story 8.1 (2026-07-14)
@@ -323,3 +327,4 @@ Composer (Cursor agent)
 ## Change Log
 
 - 2026-07-14: Story 8.6 — designed empty states (epic undrafted banner + sprint empty-lane placeholders); tests + golden fingerprint; status → review.
+- 2026-07-15: Code review — Backlog empty-lane copy → "No cards in backlog"; golden fingerprint regenerated; status → done.

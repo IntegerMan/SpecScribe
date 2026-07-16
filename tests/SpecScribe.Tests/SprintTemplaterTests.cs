@@ -203,7 +203,7 @@ public class SprintTemplaterTests
 
         // Populated columns never get an empty placeholder.
         Assert.DoesNotContain("sprint-lane-empty\">Nothing ready to pick up", board);
-        Assert.DoesNotContain("sprint-lane-empty\">Backlog is clear", board);
+        Assert.DoesNotContain("sprint-lane-empty\">No cards in backlog", board);
 
         var noReady = SprintStatusParser.Parse("""
             development_status:
@@ -211,6 +211,9 @@ public class SprintTemplaterTests
             """)!;
         Assert.Contains(
             "class=\"sprint-lane-empty\">Nothing ready to pick up — draft or refine the next story.",
+            SprintTemplater.RenderBoard(noReady, epics));
+        Assert.Contains(
+            "class=\"sprint-lane-empty\">No cards in backlog",
             SprintTemplater.RenderBoard(noReady, epics));
     }
 

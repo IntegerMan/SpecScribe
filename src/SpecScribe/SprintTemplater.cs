@@ -29,7 +29,7 @@ public static class SprintTemplater
     /// empty states, not bare blank columns. [Story 8.6; UX-DR9]</summary>
     private static string EmptyLaneCopy(string cssClass) => cssClass switch
     {
-        "pending" => "Backlog is clear — every story is scheduled.",
+        "pending" => "No cards in backlog",
         "ready" => "Nothing ready to pick up — draft or refine the next story.",
         "active" => "Nothing in progress — pick from Ready.",
         "review" => "Nothing awaiting review.",
