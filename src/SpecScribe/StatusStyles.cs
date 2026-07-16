@@ -136,7 +136,11 @@ public static class StatusStyles
         RequirementStatus.Done => "done",       // green
         RequirementStatus.Active => "active",   // teal — partially implemented
         RequirementStatus.Ready => "ready",     // gold
-        RequirementStatus.Planned => "pending", // tan
+        RequirementStatus.Planned => "pending", // tan — covered, not started
+        // Unmapped reuses the SAME tan --status-pending family as Planned (owner decision #1: no 7th token) —
+        // the two states differ by icon + word (and, in the requirements-flow Sankey, a distinct bucket), never
+        // by color. Deferred keeps its own dedicated grey --status-deferred. [Story 9.3 Task 2]
+        RequirementStatus.Unmapped => "pending",
         _ => "deferred",                        // grey
     };
 
@@ -146,8 +150,23 @@ public static class StatusStyles
         RequirementStatus.Active => "Partially implemented",
         RequirementStatus.Ready => "Ready for dev",
         RequirementStatus.Planned => "Planned",
+        RequirementStatus.Unmapped => "Not yet mapped",
         _ => "Deferred",
     };
+
+    /// <summary>The complete status badge (color + icon + word) for a requirement, keyed off its enum status so
+    /// the one <see cref="RequirementStatus.Unmapped"/> case carries its OWN distinct icon glyph while still
+    /// routing its COLOR through the shared <c>pending</c>/tan class (owner decision #1: Unmapped reuses
+    /// <c>--status-pending</c>, no 7th <c>--status-*</c> token). Because Unmapped and Planned share a color, the
+    /// icon + word are what keep them distinct — satisfying "never color-only" (UX-DR17) independently of the
+    /// color difference from Deferred. Every other status reads its icon from the same class as its color.
+    /// [Story 9.3 Task 2]</summary>
+    public static string RequirementBadge(RequirementInfo req)
+    {
+        var cssClass = ForRequirement(req);
+        var iconClass = req.Status == RequirementStatus.Unmapped ? "unmapped" : cssClass;
+        return Badge(cssClass, RequirementLabel(req.Status), iconClass);
+    }
 
     /// <summary>Maps a <c>sprint-status.yaml</c> lifecycle value onto the SAME six-stage color vocabulary as
     /// stories/epics — the yaml is the authoritative <em>tracking</em> ledger (distinct from the derived
@@ -213,6 +232,9 @@ public static class StatusStyles
         "review" => "Implementation complete; awaiting review or retrospective",
         "done" => "Finished and closed",
         "deferred" => "Shelved on purpose for later",
+        // Distinct from "deferred" (a deliberate shelving) — a requirement with no covering epic at all. Reuses
+        // the pending/tan color but carries this own meaning + glyph in a requirement badge. [Story 9.3]
+        "unmapped" => "Listed, but not yet mapped to any epic or story",
         "retired" => "Removed from the active plan; kept for ledger history",
         "unrecognized" => "Native status word has no canonical mapping",
         _ => "Status stage",
@@ -229,10 +251,17 @@ public static class StatusStyles
     /// and risking drift (UX-DR17: color + icon + word, never icon-only). Attaches <c>js-tip</c> +
     /// <c>data-tip</c> (and a native <c>title</c> fallback for non-JS surfaces) from <see cref="StageMeaning"/>.
     /// [Story 2.5 Task 3; Story 8.2]</summary>
-    public static string Badge(string cssClass, string label)
+    public static string Badge(string cssClass, string label) => Badge(cssClass, label, cssClass);
+
+    /// <summary>Badge overload that lets the icon + tooltip meaning come from a DIFFERENT key than the color
+    /// class. The one caller is <see cref="RequirementBadge"/>'s Unmapped case: it needs the tan
+    /// <c>pending</c> color (owner decision #1) but its own <c>unmapped</c> glyph + meaning, so Unmapped stays
+    /// visually distinct from Planned by icon + word alone. When <paramref name="iconClass"/> equals
+    /// <paramref name="cssClass"/> the output is byte-identical to the two-arg overload. [Story 9.3 Task 2]</summary>
+    public static string Badge(string cssClass, string label, string iconClass)
     {
-        var tip = PathUtil.Html(StageMeaning(cssClass));
-        return $"<span class=\"status-badge {cssClass} js-tip\" data-tip=\"{tip}\" title=\"{tip}\">{Icon(cssClass)}{PathUtil.Html(label)}</span>";
+        var tip = PathUtil.Html(StageMeaning(iconClass));
+        return $"<span class=\"status-badge {cssClass} js-tip\" data-tip=\"{tip}\" title=\"{tip}\">{Icon(iconClass)}{PathUtil.Html(label)}</span>";
     }
 
     /// <summary>On-demand status legend disclosure: a compact "?" toggle that opens a single-column popover

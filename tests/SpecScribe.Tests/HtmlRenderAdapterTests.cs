@@ -646,16 +646,17 @@ public class HtmlRenderAdapterTests
             Assert.Equal(-1, body.IndexOf(needle, first + needle.Length, StringComparison.Ordinal));
         }
         Assert.Contains("tile-journey-label\">Requirements</span>", body);
-        Assert.Contains("tile-journey-execution", body);
+        Assert.Contains("tile-journey-label\">Execution</span>", body);
         Assert.Contains("journey-execution", body);
+        Assert.Contains("journey-lead", body);
         Assert.Contains("overall-progress-tile", body);
         Assert.Contains("stat-label\">Overall progress</div>", body);
         Assert.Contains("stat-label\">Epic status</div>", body);
-        // Direct changes rides with Execution (before Overall Progress in the execution cluster).
-        var execAt = body.IndexOf("tile-journey-execution", StringComparison.Ordinal);
+        // Direct changes rides with Execution (after Planned tasks, before Overall Progress).
+        var plannedAt = body.IndexOf("stat-label\">Planned tasks done</div>", StringComparison.Ordinal);
         var directAt = body.IndexOf("stat-label\">Direct changes</div>", StringComparison.Ordinal);
         var progressAt = body.IndexOf("overall-progress-tile", StringComparison.Ordinal);
-        Assert.True(execAt >= 0 && directAt > execAt && progressAt > directAt);
+        Assert.True(plannedAt >= 0 && directAt > plannedAt && progressAt > directAt);
     }
 
     [Fact]
@@ -668,7 +669,6 @@ public class HtmlRenderAdapterTests
         };
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
         Assert.DoesNotContain("overall-progress-tile", body);
-        Assert.DoesNotContain("tile-journey-execution", body);
         Assert.DoesNotContain("journey-execution", body);
     }
 

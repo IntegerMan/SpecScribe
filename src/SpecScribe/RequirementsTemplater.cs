@@ -111,11 +111,11 @@ public static class RequirementsTemplater
         return sb.ToString();
     }
 
-    public static string RenderRequirement(RequirementInfo req, EpicInfo? coveringEpic, ProgressModel progress, SiteNav nav, EpicsModel epics)
+    public static string RenderRequirement(RequirementInfo req, EpicInfo? coveringEpic, ProgressModel progress, SiteNav nav, EpicsModel epics,
+        IReadOnlyDictionary<int, string>? epicRetroMap = null, string? deferredWorkHref = null)
     {
         var outputPath = $"requirements/{req.Slug}.html";
         var prefix = PathUtil.RelativePrefix(outputPath);
-        var statusClass = StatusStyles.ForRequirement(req);
         var kindLabel = req.Kind switch
         {
             RequirementKind.Functional => "Functional Requirement",
@@ -139,7 +139,7 @@ public static class RequirementsTemplater
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <div class=\"story-kicker\">{PathUtil.Html(kindLabel)}</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(req.Id)}</h1>\n");
-        sb.Append($"  <div class=\"meta-pills\">{StatusStyles.Badge(statusClass, StatusStyles.RequirementLabel(req.Status))}");
+        sb.Append($"  <div class=\"meta-pills\">{StatusStyles.RequirementBadge(req)}");
         sb.Append(StatusStyles.LegendKey());
         if (req.Category is { Length: > 0 } cat)
         {
@@ -165,11 +165,12 @@ public static class RequirementsTemplater
         //     9.1 distinguishes them in COPY only — do not merge these branches). [seam: Story 9.3] ---
         if (req.Deferred)
         {
-            sb.Append("  <p class=\"pending-note\">Deferred — not yet assigned to an epic.</p>\n");
+            sb.Append($"  <p class=\"pending-note\">{StatusStyles.RequirementBadge(req)} Deferred — not yet assigned to an epic.</p>\n");
             if (req.CoverageNote is { Length: > 0 } dn)
             {
                 sb.Append($"  <p class=\"epic-goal\">{PathUtil.Html(dn)}</p>\n");
             }
+            AppendDeferralSourceLinks(sb, req, epicRetroMap, deferredWorkHref, prefix);
         }
         // --- Branch B: covered by one or more epics — list every covering epic's stories, grouped by epic. ---
         else if (coveringEpics.Count > 0)
@@ -211,7 +212,7 @@ public static class RequirementsTemplater
         //     deferred branch (AC #2); Story 9.3 adds the distinct visual treatment. [seam: Story 9.3] ---
         else
         {
-            sb.Append("  <p class=\"pending-note\">Not yet mapped to any epic or story.</p>\n");
+            sb.Append($"  <p class=\"pending-note\">{StatusStyles.RequirementBadge(req)} Not yet mapped to any epic or story.</p>\n");
         }
         sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + SiteNav.RequirementsOutputPath)}\">&larr; All requirements</a>\n");
         sb.Append("</div>\n\n");
@@ -220,6 +221,42 @@ public static class RequirementsTemplater
         sb.Append(PathUtil.RenderFooter(prefix));
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
+    }
+
+    /// <summary>Best-effort deferral-source links for a deferred requirement (AC #2): when its free-text
+    /// <see cref="RequirementInfo.CoverageNote"/> names an "Epic N" whose retrospective page exists, link to that
+    /// retro; when the note reads as deferred/debt language and a deferred-work backlog page exists, link to it.
+    /// Reuses the SAME <see cref="DeferralHeuristics"/> pattern <see cref="ActionItemsTemplater"/> ships — no new
+    /// authoring schema. Renders nothing when nothing resolves (explicitly optional — AC #2's "when one exists");
+    /// never fabricates a link or throws on a missing target. The hrefs (retro / deferred-work paths) are
+    /// output-root-relative, so they are prefixed to the requirement detail page's depth. [Story 9.3 Task 5]</summary>
+    private static void AppendDeferralSourceLinks(
+        StringBuilder sb, RequirementInfo req, IReadOnlyDictionary<int, string>? epicRetroMap, string? deferredWorkHref, string prefix)
+    {
+        var note = req.CoverageNote;
+        if (note is not { Length: > 0 }) return;
+
+        var links = new List<string>();
+
+        if (DeferralHeuristics.EpicMention(note) is { } epicNumber &&
+            epicRetroMap is not null && epicRetroMap.TryGetValue(epicNumber, out var retroPath) &&
+            retroPath is { Length: > 0 })
+        {
+            var href = prefix + PathUtil.NormalizeSlashes(retroPath);
+            links.Add($"<a class=\"deferral-source-link\" href=\"{PathUtil.Html(href)}\">From Epic {epicNumber} retrospective &rarr;</a>");
+        }
+
+        if (deferredWorkHref is { Length: > 0 } dw && DeferralHeuristics.IsDebtRelated(note))
+        {
+            var href = prefix + PathUtil.NormalizeSlashes(dw);
+            links.Add($"<a class=\"deferral-source-link\" href=\"{PathUtil.Html(href)}\">In deferred-work backlog &rarr;</a>");
+        }
+
+        if (links.Count == 0) return;
+
+        sb.Append("  <p class=\"deferral-sources\">Deferral source: ");
+        sb.Append(string.Join(" &middot; ", links));
+        sb.Append("</p>\n");
     }
 
     /// <summary>The covering epic rendered as a linked card: a task-completion donut (falling back to
@@ -298,10 +335,10 @@ public static class RequirementsTemplater
     }
 
     /// <summary>Dedicated "Non-functional &amp; design coverage" section — per-item verification treatment for
-    /// NFRs and UX-DRs. Section-local "Not yet mapped" presentation (not a RequirementStatus enum value — the
-    /// FR flow/grid iterate that enum and must not change). Story 9.3 will give Deferred vs Unmapped fully
-    /// distinct visual treatment; this seam leaves them shareable via the deferred/grey css class with
-    /// distinct words. [Story 9.2 Tasks 3–4]</summary>
+    /// NFRs and UX-DRs. Status badges read through the real <see cref="RequirementStatus"/> enum (including the
+    /// Story 9.3 <see cref="RequirementStatus.Unmapped"/> tier) via <see cref="StatusStyles.RequirementBadge"/> —
+    /// one "Not yet mapped" implementation portal-wide, not a section-local special-case. [Story 9.2 Tasks 3–4;
+    /// Story 9.3 Task 6]</summary>
     private static void AppendNfrUxDrCoverageSection(StringBuilder sb, RequirementsModel model, EpicsModel epics)
     {
         var hasNfr = model.NonFunctional.Count > 0;
@@ -342,26 +379,13 @@ public static class RequirementsTemplater
         var href = $"{prefix}requirements/{req.Slug}.html";
         var byNumber = epics.Epics.ToDictionary(e => e.Number);
 
-        // Section-local presentation — do not mutate RequirementStatus. [Story 9.2 Task 3]
-        string badgeHtml;
-        if (req.Deferred)
-        {
-            badgeHtml = StatusStyles.Badge("deferred", "Deferred");
-        }
-        else if (req.CoverageEpicNumbers.Count == 0)
-        {
-            // "Not yet mapped" reuses deferred/grey color; word must read "Not yet mapped", not "Deferred".
-            // Story 9.3 will give them fully distinct visual treatment — leave this seam clean.
-            badgeHtml = StatusStyles.Badge("deferred", "Not yet mapped");
-        }
-        else
-        {
-            badgeHtml = StatusStyles.Badge(StatusStyles.ForRequirement(req), StatusStyles.RequirementLabel(req.Status));
-        }
-
-        var rowClass = req.Deferred || req.CoverageEpicNumbers.Count == 0
-            ? "deferred"
-            : StatusStyles.ForRequirement(req);
+        // Story 9.3 Task 6: retired 9.2's section-local Deferred/"Not yet mapped" special-casing. RequirementStatus
+        // now carries a real Unmapped tier (DeriveStatus derives it from empty CoverageEpicNumbers + not deferred),
+        // so these NFR/UX-DR rows read the SAME canonical badge + class as every other requirement surface — one
+        // "Not yet mapped" implementation, not two. Unmapped now sits in the tan pending family (owner decision #1)
+        // instead of borrowing the grey deferred color; Deferred keeps its own grey. [Story 9.3 Task 6]
+        var badgeHtml = StatusStyles.RequirementBadge(req);
+        var rowClass = StatusStyles.ForRequirement(req);
 
         sb.Append($"<div class=\"req-card nfr-uxdr-row {rowClass}\" id=\"cov-{PathUtil.Html(req.Slug)}\">\n");
         sb.Append("  <div class=\"req-card-head\">\n");
@@ -415,7 +439,7 @@ public static class RequirementsTemplater
         sb.Append($"<div class=\"req-card {statusClass}\" id=\"{PathUtil.Html(req.Slug)}\">\n");
         sb.Append("  <div class=\"req-card-head\">\n");
         sb.Append($"    <a class=\"req-id-link\" href=\"{PathUtil.Html(href)}\">{PathUtil.Html(req.Id)}</a>\n");
-        sb.Append($"    {StatusStyles.Badge(statusClass, StatusStyles.RequirementLabel(req.Status))}\n");
+        sb.Append($"    {StatusStyles.RequirementBadge(req)}\n");
 
         if (req.Deferred)
         {
@@ -425,6 +449,13 @@ public static class RequirementsTemplater
         {
             sb.Append($"    <a class=\"req-epic\" href=\"{PathUtil.Html(prefix)}epics/epic-{epicNumber}.html\">Epic {epicNumber}</a>\n");
         }
+        else
+        {
+            // Genuinely unmapped (not deferred, no covering epic): today this else was silent, leaving the card
+            // with no coverage chip at all. Flag it explicitly so an unmapped requirement is visibly called out,
+            // mirroring the deferred chip's shape but in the pending/tan family (owner decision #1). [Story 9.3 Task 4]
+            sb.Append("    <span class=\"req-epic unmapped\">Not yet mapped</span>\n");
+        }
         sb.Append("  </div>\n");
 
         sb.Append($"  <div class=\"req-text\">{req.TextHtml}</div>\n");
@@ -433,12 +464,12 @@ public static class RequirementsTemplater
 
     private static void AppendStatusDonut(StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs)
     {
-        var (done, active, ready, planned, deferred) = StatusCounts(reqs);
+        var (done, active, ready, planned, unmapped, deferred) = StatusCounts(reqs);
 
         sb.Append("<div class=\"chart-panel\">\n");
         sb.Append($"<h3>{PathUtil.Html(label)} ({reqs.Count})</h3>\n<div class=\"donut-and-legend\">\n");
         var statusSegments = StatusSegments(reqs);
-        sb.Append(Charts.Donut(statusSegments, ariaLabel: $"{label} requirements: {done} done, {active} partially implemented, {ready} ready for dev, {planned} planned, {deferred} deferred"));
+        sb.Append(Charts.Donut(statusSegments, ariaLabel: $"{label} requirements: {done} done, {active} partially implemented, {ready} ready for dev, {planned} planned, {unmapped} not yet mapped, {deferred} deferred"));
         sb.Append(Charts.DonutLegend(statusSegments));
         sb.Append("</div>\n</div>\n\n");
     }
@@ -457,22 +488,26 @@ public static class RequirementsTemplater
         sb.Append("    </div>\n  </a>\n");
     }
 
-    private static (int Done, int Active, int Ready, int Planned, int Deferred) StatusCounts(IReadOnlyList<RequirementInfo> reqs) => (
+    private static (int Done, int Active, int Ready, int Planned, int Unmapped, int Deferred) StatusCounts(IReadOnlyList<RequirementInfo> reqs) => (
         reqs.Count(r => r.Status == RequirementStatus.Done),
         reqs.Count(r => r.Status == RequirementStatus.Active),
         reqs.Count(r => r.Status == RequirementStatus.Ready),
         reqs.Count(r => r.Status == RequirementStatus.Planned),
+        reqs.Count(r => r.Status == RequirementStatus.Unmapped),
         reqs.Count(r => r.Status == RequirementStatus.Deferred));
 
     private static (string, int, string)[] StatusSegments(IReadOnlyList<RequirementInfo> reqs)
     {
-        var (done, active, ready, planned, deferred) = StatusCounts(reqs);
+        var (done, active, ready, planned, unmapped, deferred) = StatusCounts(reqs);
         return new (string, int, string)[]
         {
             ("Done", done, "done"),
             ("Partially implemented", active, "active"),
             ("Ready for dev", ready, "ready"),
             ("Planned", planned, "pending"),
+            // Unmapped reuses the pending/tan swatch (owner decision #1) but is a distinct, separately-counted
+            // legend segment so "no plan exists yet" never hides inside "Planned". [Story 9.3 Task 4]
+            ("Not yet mapped", unmapped, "pending"),
             ("Deferred", deferred, "deferred"),
         };
     }

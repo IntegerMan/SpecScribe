@@ -2695,6 +2695,11 @@ public sealed class SiteGenerator
         var requirementsDir = Path.Combine(_options.OutputRoot, "requirements");
         Directory.CreateDirectory(requirementsDir);
 
+        // Deferral-source inputs for a deferred requirement's best-effort link (AC #2): the SAME epic→retro map
+        // and deferred-work-page href WriteActionItems already resolves — threaded in, not re-derived. Both are
+        // output-root-relative; RenderRequirement prefixes them to the detail page's depth. [Story 9.3 Task 5]
+        var deferredWorkHref = WorkInventory.Build(_docs.Values.ToList()).Deferred?.OutputPath;
+
         // Everything (FR+NFR+Design) so UX-DR detail pages generate alongside FR/NFR. [Story 9.2 Task 5]
         foreach (var req in requirements.Everything)
         {
@@ -2702,7 +2707,7 @@ public sealed class SiteGenerator
                 ? model.Epics.FirstOrDefault(e => e.Number == n)
                 : null;
             var outputRelative = $"requirements/{req.Slug}.html";
-            var html = RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav, model);
+            var html = RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav, model, EpicRetroMap, deferredWorkHref);
             WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative, skipRequirementId: req.Id));
         }
     }

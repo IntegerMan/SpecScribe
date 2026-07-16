@@ -301,4 +301,67 @@ public class StatusStylesTests
     [Fact]
     public void StoryStages_IncludesUnrecognized()
         => Assert.Contains("unrecognized", StatusStyles.StoryStages);
+
+    // ---- Story 9.3: Unmapped requirement tier ----
+
+    private static RequirementInfo Requirement(RequirementStatus status, bool deferred = false) => new()
+    {
+        Kind = RequirementKind.Functional,
+        Number = 1,
+        TextHtml = "A requirement",
+        Status = status,
+        Deferred = deferred,
+        CoverageEpicNumbers = System.Array.Empty<int>(),
+    };
+
+    [Fact]
+    public void ForRequirement_UnmappedSharesPendingColor_ButDeferredKeepsItsOwn()
+    {
+        // Owner decision #1: Unmapped reuses the tan pending token (no 7th --status-* token); Deferred keeps grey.
+        Assert.Equal("pending", StatusStyles.ForRequirement(Requirement(RequirementStatus.Unmapped)));
+        Assert.Equal("pending", StatusStyles.ForRequirement(Requirement(RequirementStatus.Planned)));
+        Assert.Equal("deferred", StatusStyles.ForRequirement(Requirement(RequirementStatus.Deferred, deferred: true)));
+        // Planned and Unmapped intentionally SHARE the class; Deferred is a different class.
+        Assert.NotEqual(
+            StatusStyles.ForRequirement(Requirement(RequirementStatus.Unmapped)),
+            StatusStyles.ForRequirement(Requirement(RequirementStatus.Deferred, deferred: true)));
+    }
+
+    [Fact]
+    public void RequirementLabel_UnmappedReadsNotYetMapped_DistinctFromPlannedAndDeferred()
+    {
+        Assert.Equal("Not yet mapped", StatusStyles.RequirementLabel(RequirementStatus.Unmapped));
+        Assert.Equal("Planned", StatusStyles.RequirementLabel(RequirementStatus.Planned));
+        Assert.Equal("Deferred", StatusStyles.RequirementLabel(RequirementStatus.Deferred));
+    }
+
+    [Fact]
+    public void RequirementBadge_Unmapped_UsesPendingColorButDistinctUnmappedIconAndWord()
+    {
+        var badge = StatusStyles.RequirementBadge(Requirement(RequirementStatus.Unmapped));
+
+        // Color class stays pending (tan family)...
+        Assert.Contains("class=\"status-badge pending js-tip\"", badge);
+        // ...word reads "Not yet mapped"...
+        Assert.Contains("Not yet mapped", badge);
+        // ...and the icon is the DISTINCT unmapped glyph, not pending's clock — so it never reads color-only.
+        Assert.Contains(Icons.ForStatus("unmapped"), badge);
+        Assert.NotEqual(Icons.ForStatus("unmapped"), Icons.ForStatus("pending"));
+
+        // A Planned requirement in the same color family still uses pending's own icon (the two differ by glyph).
+        var planned = StatusStyles.RequirementBadge(Requirement(RequirementStatus.Planned));
+        Assert.Contains(Icons.ForStatus("pending"), planned);
+        Assert.DoesNotContain(Icons.ForStatus("unmapped"), planned);
+    }
+
+    [Fact]
+    public void Icon_UnmappedHasItsOwnGlyph()
+        => Assert.False(string.IsNullOrEmpty(StatusStyles.Icon("unmapped")));
+
+    [Fact]
+    public void StageMeaning_UnmappedIsDistinctFromDeferredAndPending()
+    {
+        Assert.NotEqual(StatusStyles.StageMeaning("unmapped"), StatusStyles.StageMeaning("deferred"));
+        Assert.NotEqual(StatusStyles.StageMeaning("unmapped"), StatusStyles.StageMeaning("pending"));
+    }
 }

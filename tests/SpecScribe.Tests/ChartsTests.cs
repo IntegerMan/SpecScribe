@@ -1216,6 +1216,39 @@ public class ChartsTests
     }
 
     [Fact]
+    public void RequirementFlowConservation_UnmappedIsItsOwnBucket_SeparateFromPlanned()
+    {
+        // FlowFixture: FR3 deferred, FR4 unmapped, NFR1 uncovered (→ unmapped). The unmapped bucket must be
+        // counted separately from planned/pending, and the deferred bucket separately again — the split AC #2
+        // requires the flow to carry. Conservation still holds across the 6 buckets. [Story 9.3 Task 3]
+        var (reqs, _) = FlowFixture();
+        var (entering, byState) = Charts.RequirementFlowConservation(reqs.All.ToList());
+
+        Assert.True(byState.ContainsKey("unmapped"));
+        Assert.True(byState.ContainsKey("deferred"));
+        Assert.True(byState.ContainsKey("pending"));
+        // FR4 (unmapped FR) + NFR1 (uncovered NFR) land in unmapped; FR3 in deferred — never merged.
+        Assert.Equal(2, byState["unmapped"]);
+        Assert.Equal(1, byState["deferred"]);
+        Assert.Equal(entering, byState.Values.Sum());
+    }
+
+    [Fact]
+    public void RequirementFlow_RendersUnmappedAndDeferredAsTwoDistinctStateNodes()
+    {
+        var (reqs, epics) = FlowFixture();
+        var svg = Charts.RequirementFlow(reqs, epics);
+
+        // Two separate, separately-labeled terminal state nodes — not one merged "pending" node.
+        Assert.Contains("req-flow-state unmapped", svg);
+        Assert.Contains("req-flow-state deferred", svg);
+        Assert.Contains("Not yet mapped (", svg);
+        Assert.Contains("Deferred (", svg);
+        // The aria text twin reports the unmapped count on its own (AC #2 accessibility twin).
+        Assert.Contains("not yet mapped", svg);
+    }
+
+    [Fact]
     public void RequirementFlow_EmptyFunctional_ReturnsChartEmptyPlaceholder()
     {
         var epics = new EpicsModel { OverviewHtml = "", RequirementsInventoryHtml = "", Epics = Array.Empty<EpicInfo>() };

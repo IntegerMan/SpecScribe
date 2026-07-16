@@ -341,16 +341,18 @@ public static class RequirementsParser
 
     /// <summary>Rolls a requirement's status up from ALL of its covering epics via
     /// <see cref="StatusStyles.ForEpic"/> (the single epic→status classifier, which already means "a story has
-    /// entered dev/review/done" for its "active" tier). Least→most complete: <c>Deferred</c>; <c>Planned</c>
-    /// (no covering epic — an unmapped FR or an uncovered NFR — or the covering epics are merely drafted);
-    /// <c>Ready</c> (a covering epic has task-planned stories but none started); <c>Active</c> = partially
-    /// implemented (a covering epic has a story in flight, but not every covering epic is done); <c>Done</c>
-    /// (every covering epic is fully done).
+    /// entered dev/review/done" for its "active" tier). Least→most complete: <c>Deferred</c>; <c>Unmapped</c>
+    /// (no covering epic named at all — a genuine coverage gap, distinct from Planned); <c>Planned</c>
+    /// (covering epic(s) exist but none have started); <c>Ready</c> (a covering epic has task-planned stories
+    /// but none started); <c>Active</c> = partially implemented (a covering epic has a story in flight, but
+    /// not every covering epic is done); <c>Done</c> (every covering epic is fully done).
     /// <para>Because the map is epic-level, "Active" is an epic-level approximation of the covering epics'
     /// aggregate progress — it does NOT use <see cref="StoriesFor"/> to check whether the specific stories
     /// this requirement maps to are the ones in flight; any story anywhere in a covering epic being active is
     /// enough. This supersedes the earlier refusal to surface any mid-development state, but it is the same
-    /// coarse epic-level signal as every other tier here, not a finer per-requirement claim.</para></summary>
+    /// coarse epic-level signal as every other tier here, not a finer per-requirement claim.</para>
+    /// <para>The Unmapped/Planned split (Story 9.3) kills the false-oversight-vs-intentional-scope confusion
+    /// that previously let a requirement with no covering epic silently read as "Planned."</para></summary>
     private static RequirementStatus DeriveStatus(
         bool deferred,
         IReadOnlyList<int> epicNumbers,
@@ -358,10 +360,21 @@ public static class RequirementsParser
     {
         if (deferred) return RequirementStatus.Deferred;
 
+        // No covering epic named at all — a genuinely UNMAPPED requirement (an unmapped FR, or an uncovered
+        // NFR/UX-DR): no plan exists yet. Distinct from "Planned" (a real covering epic that simply hasn't
+        // started); collapsing the two into one "Planned" bucket is exactly the false-oversight-vs-intentional-
+        // scope confusion Story 9.3 removes. [Story 9.3 Task 1]
+        if (epicNumbers.Count == 0) return RequirementStatus.Unmapped;
+
         var classes = epicNumbers
             .Where(epicsByNumber.ContainsKey)
             .Select(n => StatusStyles.ForEpic(epicsByNumber[n]))
             .ToList();
+        // The coverage line named epic(s) but none resolve to a known epic (e.g. a typo'd or since-removed epic
+        // number). Author intent to map exists, so this reads "covered but not started" (Planned), not Unmapped.
+        // Kept deliberately, NOT dead code for this input shape: without it, `classes.All(… == "done")` below is
+        // vacuously true on an empty list and would over-claim Done — the "parser silently over-claims a real
+        // input shape" class of bug the Epic 3 retro flagged. [Story 9.3]
         if (classes.Count == 0) return RequirementStatus.Planned;
 
         if (classes.All(c => c == "done")) return RequirementStatus.Done;

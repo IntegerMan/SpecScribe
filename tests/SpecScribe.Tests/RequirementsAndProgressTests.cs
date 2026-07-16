@@ -119,7 +119,7 @@ public class RequirementsParserTests
 
         FR1: Epic 1 - just the first
         FR2: Epics 1 & 2 - spans two epics
-        FR3: Deferred - post slice
+        FR3: Deferred - tech debt carried from Epic 1; revisit later
         FR4: covered somewhere but no epic number
         NFR1: Epic 1 - also on the map
 
@@ -192,6 +192,68 @@ public class RequirementsParserTests
         Assert.Null(unmapped.CoverageEpicNumber);
     }
 
+    // ---- Story 9.3: deferred-on-purpose vs unmapped as distinct status tiers ----
+
+    [Fact]
+    public void DeriveStatus_NoCoveringEpicNotDeferred_IsUnmapped_DistinctFromPlannedAndDeferred()
+    {
+        var reqs = ParseMultiEpic().Reqs;
+
+        // FR4 (and the uncovered NFR2 / UX-DR2) have no covering epic and are not deferred → the new Unmapped
+        // tier, NOT the old overloaded "Planned". This is the false-oversight-vs-intentional-scope fix. [Story 9.3]
+        Assert.Equal(RequirementStatus.Unmapped, reqs.ById["FR4"].Status);
+        Assert.Equal(RequirementStatus.Unmapped, reqs.ById["NFR2"].Status);
+        Assert.Equal(RequirementStatus.Unmapped, reqs.ById["UX-DR2"].Status);
+
+        // Deferred-on-purpose stays its own distinct tier — never conflated with unmapped.
+        Assert.Equal(RequirementStatus.Deferred, reqs.ById["FR3"].Status);
+
+        // A requirement WITH a real covering epic that simply hasn't started stays Planned (both Epic 1 & 2 are
+        // merely drafted here) — the legitimate reading of "Planned", now no longer sharing a bucket with a gap.
+        Assert.Equal(RequirementStatus.Planned, reqs.ById["FR2"].Status);
+        Assert.Equal(RequirementStatus.Planned, reqs.ById["FR1"].Status);
+    }
+
+    [Fact]
+    public void DeriveStatus_NamedEpicThatDoesNotExist_StaysPlannedNotUnmappedNorDone()
+    {
+        // Edge shape the parser must not over-claim: a coverage line names an epic number with no matching epic
+        // in the model. Author intent to map exists (not Unmapped), the epic can't roll up to done (not Done) →
+        // it reads "covered but not started" = Planned. Guards the vacuous-All-on-empty Done trap. [Story 9.3]
+        var md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            **Core**
+            FR1: Names a phantom epic
+
+            ### FR Coverage Map
+
+            FR1: Epic 99 - typo'd or since-removed epic number
+
+            ## Epic List
+
+            ### Epic 1: Real
+
+            Goal.
+
+            ## Epic 1: Real
+
+            ### Story 1.1: A
+
+            As a user, I want a, so that b.
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse(md, epics, progress);
+
+        Assert.Equal(new[] { 99 }, reqs.ById["FR1"].CoverageEpicNumbers);
+        Assert.Equal(RequirementStatus.Planned, reqs.ById["FR1"].Status);
+    }
+
     [Fact]
     public void StoriesFor_ResolvesCoveringEpicsToTheirStories_InSourceOrder()
     {
@@ -223,9 +285,9 @@ public class RequirementsParserTests
             // FR1 (Epic 1, in-progress story) and FR2 (Epics 1 & 2 — Epic 1 active) both read "partially implemented".
             Assert.Equal(RequirementStatus.Active, reqs.ById["FR1"].Status);
             Assert.Equal(RequirementStatus.Active, reqs.ById["FR2"].Status);
-            // The uncovered/deferred ones are unaffected.
+            // Deferred is unaffected; the genuinely-unmapped FR4 now reads Unmapped, not Planned. [Story 9.3]
             Assert.Equal(RequirementStatus.Deferred, reqs.ById["FR3"].Status);
-            Assert.Equal(RequirementStatus.Planned, reqs.ById["FR4"].Status);
+            Assert.Equal(RequirementStatus.Unmapped, reqs.ById["FR4"].Status);
         }
         finally { Directory.Delete(dir, recursive: true); }
     }
@@ -485,6 +547,86 @@ public class RequirementsParserTests
         // Neither uncovered requirement fabricates a story card.
         Assert.DoesNotContain("coverage-story-card", deferred);
         Assert.DoesNotContain("coverage-story-card", unmapped);
+    }
+
+    // ---- Story 9.3: distinct visual treatment + deferral-source linking ----
+
+    [Fact]
+    public void RenderRequirement_Unmapped_ShowsNotYetMappedBadge_NotPlanned_WithDistinctIcon()
+    {
+        // FR4 is unmapped: its header badge (and coverage-body note) must read "Not yet mapped", never the
+        // misleading "Planned", in the tan pending family with the distinct unmapped glyph. [Story 9.3 Task 5]
+        var html = RenderDetail("FR4");
+
+        Assert.Contains(">Not yet mapped<", html);
+        Assert.DoesNotContain(">Planned<", html);
+        // Reuses the pending/tan color class (owner decision #1 — no 7th token)...
+        Assert.Contains("status-badge pending", html);
+        // ...but carries the unmapped icon glyph (the dashed-slot rect), so it never reads color-only vs Planned.
+        Assert.Contains(Icons.ForStatus("unmapped"), html);
+    }
+
+    [Fact]
+    public void RenderIndex_UnmappedRequirement_ShowsDistinctTreatmentAcrossGridCardsAndDonut()
+    {
+        var (reqs, epics) = ParseMultiEpic();
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+
+        // The donut legend gains a distinct "Not yet mapped" segment separate from "Planned".
+        Assert.Contains("Not yet mapped", html);
+        Assert.Contains(">Planned<", html); // FR1/FR2 are genuinely Planned — still present, not swallowed
+        // The requirement card for the unmapped FR4 flags it explicitly (was a silent no-chip else before).
+        Assert.Contains("req-epic unmapped", html);
+        // The unmapped requirement never renders a misleading "Planned" badge on its own card.
+        var fr4 = html[html.IndexOf("id=\"fr4\"", StringComparison.Ordinal)..];
+        var fr4End = fr4.IndexOf("</div>\n\n", StringComparison.Ordinal);
+        var fr4Card = fr4End >= 0 ? fr4[..fr4End] : fr4;
+        Assert.Contains("Not yet mapped", fr4Card);
+        Assert.DoesNotContain(">Planned<", fr4Card);
+    }
+
+    private static string RenderDetailWithSources(string reqId, IReadOnlyDictionary<int, string>? retroMap, string? deferredWorkHref)
+    {
+        var (reqs, epics) = ParseMultiEpic();
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var req = reqs.ById[reqId];
+        var coveringEpic = req.CoverageEpicNumber is { } n ? epics.Epics.FirstOrDefault(e => e.Number == n) : null;
+        return RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav, epics, retroMap, deferredWorkHref);
+    }
+
+    [Fact]
+    public void RenderRequirement_DeferredWithResolvableSource_LinksToRetroAndDeferredWork()
+    {
+        // FR3's note is "tech debt carried from Epic 1; revisit later" — the heuristic resolves BOTH an Epic 1
+        // retro link and (debt language) the deferred-work backlog link. [Story 9.3 Task 5 / AC #2]
+        var retroMap = new Dictionary<int, string> { [1] = "retros/epic-1-retro.html" };
+        var html = RenderDetailWithSources("FR3", retroMap, "deferred-work.html");
+
+        Assert.Contains("deferral-sources", html);
+        Assert.Contains("From Epic 1 retrospective", html);
+        Assert.Contains("In deferred-work backlog", html);
+        // Hrefs are prefixed to the detail page's requirements/ depth — never a broken root-relative link.
+        Assert.Contains("href=\"../retros/epic-1-retro.html\"", html);
+        Assert.Contains("href=\"../deferred-work.html\"", html);
+    }
+
+    [Fact]
+    public void RenderRequirement_DeferredWithNoMatchingSource_RendersNoLink_Gracefully()
+    {
+        // A deferred requirement whose note names no epic and no debt language, OR whose targets don't exist,
+        // renders plain text — never a fabricated or broken link (AC #2 "when one exists"; NFR2 degrade). [Story 9.3]
+
+        // (a) note matches "Epic 1" + debt, but no maps supplied → no link surface at all.
+        var noMaps = RenderDetailWithSources("FR3", retroMap: null, deferredWorkHref: null);
+        Assert.DoesNotContain("deferral-sources", noMaps);
+
+        // (b) maps supplied, but the note names an epic with no retro in the map and no debt page → still no link.
+        var unrelated = RenderDetailWithSources("FR3", new Dictionary<int, string> { [7] = "retros/epic-7-retro.html" }, deferredWorkHref: null);
+        Assert.DoesNotContain("deferral-sources", unrelated);
     }
 }
 

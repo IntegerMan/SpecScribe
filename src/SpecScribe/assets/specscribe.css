@@ -2617,11 +2617,15 @@ a.ref-file-node:focus-visible {
 .req-flow-state.active { fill: var(--status-active); }
 .req-flow-state.ready { fill: var(--status-ready); }
 .req-flow-state.pending { fill: var(--status-pending); }
+/* Unmapped reuses the pending/tan token for FILL (owner decision #1: no 7th --status-* token); it is kept a
+   separate Sankey bucket + labelled distinctly ("not yet mapped") so the split reads without a new color. */
+.req-flow-state.unmapped { fill: var(--status-pending); }
 .req-flow-state.deferred { fill: var(--status-deferred); }
 .req-flow-ribbon.done { fill: var(--status-done); opacity: 0.5; }
 .req-flow-ribbon.active { fill: var(--status-active); opacity: 0.5; }
 .req-flow-ribbon.ready { fill: var(--status-ready); opacity: 0.5; }
 .req-flow-ribbon.pending { fill: var(--status-pending); opacity: 0.5; }
+.req-flow-ribbon.unmapped { fill: var(--status-pending); opacity: 0.5; }
 .req-flow-ribbon.deferred { fill: var(--status-deferred); opacity: 0.5; }
 .req-flow-hint { font-size: 0.72rem; color: var(--ink-light); text-align: center; font-style: italic; }
 
@@ -3376,45 +3380,21 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 
 /* ====================== DASHBOARD TILE BAND ====================== */
-/* Homepage tiles pack as journey CLUSTERS (caption + tightly-gapped cards). Clusters wrap as units so
-   same-group cards stay together; row gap is roomier than in-group gap so captions can breathe. */
+/* Homepage tiles share one flex-wrap panel (typically two dense rows). Journey identity is an accent rail
+   on each card plus a floating caption above the first card of a group — not separate cluster wrappers. */
 .dashboard-tile-band {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.55rem 1.35rem;
-  align-items: flex-start;
-  padding-top: 0.35rem;
+  gap: 1.35rem 1rem;
+  align-items: stretch;
+  padding-top: 1.45rem;
   margin-bottom: 1.5rem;
 }
-.tile-journey {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.4rem;
-  flex: 0 1 auto;
-  min-width: 0;
-}
-.tile-journey-label {
-  margin: 0;
-  padding: 0 0.1rem;
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faded);
-  text-align: left;
-  white-space: nowrap;
-}
-.tile-journey-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  align-items: stretch;
-}
-.tile-journey-cards > .stat-card,
-.tile-journey-cards > .tile-card {
+.dashboard-tile-band .stat-card,
+.dashboard-tile-band .tile-card {
   flex: 1 1 150px;
   min-width: 140px;
-  max-width: 210px;
+  max-width: 220px;
   margin-bottom: 0;
   box-sizing: border-box;
 }
@@ -3423,6 +3403,26 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .journey-card.journey-execution { border-left: 3px solid var(--teal); }
 .journey-card.journey-followup { border-left: 3px solid var(--status-review); }
 .journey-card.journey-insights { border-left: 3px solid var(--gold-light); }
+.journey-lead {
+  position: relative;
+  margin-top: 0.15rem;
+}
+.journey-lead .tile-journey-label {
+  position: absolute;
+  top: -1.15rem;
+  left: 0;
+  right: 0;
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
 
 /* Donut tiles match Stories Defined language: visual centered above, label centered below. */
 .tile-card {
@@ -3558,6 +3558,15 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 .req-epic:hover { text-decoration: underline; }
 .req-epic.deferred { color: var(--ink-light); }
+/* Unmapped coverage chip — muted, non-link. Distinct from the grey deferred chip by word; the tan family lives
+   on the status badge beside it (owner decision #1: no 7th --status-* token). [Story 9.3] */
+.req-epic.unmapped { color: var(--ink-light); font-style: italic; }
+
+/* Deferral-source links on a deferred requirement's detail page — best-effort links back to the retro / deferred-
+   work backlog where the deferral was decided (AC #2). Absent when nothing resolves. [Story 9.3] */
+.deferral-sources { font-size: 0.8rem; color: var(--ink-light); margin-top: 0.4rem; }
+.deferral-source-link { color: var(--teal); text-decoration: none; }
+.deferral-source-link:hover { text-decoration: underline; }
 
 .req-donut-label {
   font-size: 0.8rem;
@@ -3959,9 +3968,8 @@ body:has(main.req-detail) .doc-header {
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .tile-journey { flex: 1 1 100%; }
-  .tile-journey-cards > .stat-card,
-  .tile-journey-cards > .tile-card { max-width: none; flex-basis: calc(50% - 0.3rem); }
+  .dashboard-tile-band .stat-card,
+  .dashboard-tile-band .tile-card { max-width: none; flex-basis: calc(50% - 0.5rem); }
 }
 
 /* ====================== ON-BRAND TOOLTIPS (Story 1.5 C1/C2) ======================

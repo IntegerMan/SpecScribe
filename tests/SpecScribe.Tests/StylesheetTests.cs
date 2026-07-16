@@ -102,8 +102,8 @@ public class StylesheetTests
         Assert.Contains(".key-view-panel", css);
         Assert.Contains(".key-view-group.is-open", css);
         Assert.Contains(".journey-card", css);
-        Assert.Contains(".tile-journey", css);
-        Assert.Contains(".tile-journey-cards", css);
+        Assert.Contains(".journey-lead", css);
+        Assert.Contains(".tile-journey-label", css);
         Assert.Contains(".journey-requirements", css);
         Assert.Contains(".journey-followup", css);
         Assert.Contains(".tile-card-visual", css);
@@ -252,6 +252,8 @@ public class StylesheetTests
         Assert.Contains(".req-flow-state.active { fill: var(--status-active); }", css);
         Assert.Contains(".req-flow-state.ready { fill: var(--status-ready); }", css);
         Assert.Contains(".req-flow-state.pending { fill: var(--status-pending); }", css);
+        // Unmapped reuses the pending/tan token for fill (owner decision #1: no 7th --status-* token). [Story 9.3]
+        Assert.Contains(".req-flow-state.unmapped { fill: var(--status-pending); }", css);
         Assert.Contains(".req-flow-state.deferred { fill: var(--status-deferred); }", css);
         // Structural nodes are NOT status tokens — they use the neutral parchment chrome.
         Assert.Contains(".req-flow-epic { fill: var(--parchment-dark)", css);

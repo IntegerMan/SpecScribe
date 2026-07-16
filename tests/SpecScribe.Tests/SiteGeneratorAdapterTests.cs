@@ -350,8 +350,8 @@ public class SiteGeneratorAdapterTests : IDisposable
         // empty overall-progress omitted; stat-card-link exempt from two-tap touch; key-view click toggle.
         // Regenerated for dense two-row tile band: journey accents on cards, floating group captions, StatCard
         // follow-ups, donut tiles with bottom labels, commits sub-line without active-day count.
-        // Regenerated for journey clusters: left-aligned captions, tighter in-group gaps, Direct changes under
-        // Execution, Follow up rename, planned-tasks sub-line removed.
+        // Regenerated after reverting journey *clusters* (they broke the compact 2-row wrap) — back to floating
+        // left-aligned captions; Direct changes stays under Execution; Follow up rename; planned-tasks sub removed.
         // Regenerated for Story 8.3 review patches: funnel reads ProjectCounts (byte-identical counts; hash
         // refresh after ledger wiring + OpenActionItems empty-entries fix).
         // Regenerated for Story 8.6 review: empty Backlog lane copy shortened to "No cards in backlog".
@@ -367,7 +367,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 9.2 UX follow-up: covering epics in the NFR/UX-DR coverage section moved from
         // header chips to a labeled "Delivered by" card list under each requirement description
         // (.nfr-uxdr-epics / .nfr-uxdr-epic-card). Fixture has no UX-DR inventory — delta is primarily CSS.
-        const string expected = "62409562b8ea91cd1689bf12b07da29e35fbdda5e1365277b711764e582231b0";
+        const string expected = "41ab246800364e01dd1ebd8847d47e0cf1091c8663a49aef8652b61f1773c8cc";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

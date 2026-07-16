@@ -22,6 +22,10 @@ public static class Icons
         "drafted" => Svg("<path d=\"M10.6 2.9 13 5.3 5.4 12.9 2.6 13.3 3 10.5Z\"/>"),
         "pending" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M8 5.2V8l2.3 1.4\"/>"),
         "deferred" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.6 5.6 10.4 10.4M10.4 5.6 5.6 10.4\"/>"),
+        // A dashed-outline empty slot — "listed, but not yet mapped to a place." Reuses the pending/tan color in
+        // a requirement badge but is visibly distinct from pending's clock AND deferred's crossed circle (and
+        // from unrecognized's dashed circle-with-question-mark), so Unmapped never reads color-only. [Story 9.3]
+        "unmapped" => Svg("<rect x=\"3.2\" y=\"3.2\" width=\"9.6\" height=\"9.6\" rx=\"1.6\" stroke-dasharray=\"2.2 1.6\"/>"),
         // Same crossed-circle as deferred (grey ledger history); class+label keep retired distinct. [spec-3-4]
         "retired" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.6 5.6 10.4 10.4M10.4 5.6 5.6 10.4\"/>"),
         // Question-mark in a dashed ring — visibly distinct from every lifecycle glyph. [Story 8.2]

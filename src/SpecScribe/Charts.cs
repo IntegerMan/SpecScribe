@@ -1722,15 +1722,29 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The five implementation-state buckets, in narrative order (most → least complete), keyed by the
-    /// css class <see cref="StatusStyles.ForRequirement"/> produces. The single source both the flow's state
-    /// column and <see cref="RequirementFlowConservation"/> iterate, so they can never disagree. "active" is the
-    /// story-derived "partially implemented" tier (Story 3.7 follow-up).</summary>
+    /// <summary>The six implementation-state buckets, in narrative order (most → least complete), keyed by
+    /// <see cref="FlowStateKey"/> (which equals <see cref="StatusStyles.ForRequirement"/> everywhere except it
+    /// splits Unmapped out of the shared tan <c>pending</c> class into its own <c>unmapped</c> bucket). The
+    /// single source both the flow's state column and <see cref="RequirementFlowConservation"/> iterate, so they
+    /// can never disagree. "active" is the story-derived "partially implemented" tier (Story 3.7 follow-up); the
+    /// <c>unmapped</c> bucket sits alongside — not replacing — <c>pending</c>/"planned" so the Sankey and its
+    /// aria text twin carry the deferred/unmapped/planned split even though the badge color reuses
+    /// <c>--status-pending</c> for both (owner decision #1). [Story 9.3 Task 3]</summary>
     private static readonly (string Css, string Word)[] FlowStates =
     {
         ("done", "done"), ("active", "partially implemented"), ("ready", "ready for dev"),
-        ("pending", "planned"), ("deferred", "deferred"),
+        ("pending", "planned"), ("unmapped", "not yet mapped"), ("deferred", "deferred"),
     };
+
+    /// <summary>The requirements-flow's own terminal-state bucket key. Identical to
+    /// <see cref="StatusStyles.ForRequirement"/> everywhere except it routes <see cref="RequirementStatus.Unmapped"/>
+    /// to its own <c>unmapped</c> bucket instead of the shared tan <c>pending</c> class the badge/card/grid/donut
+    /// deliberately reuse for it. This is the ONE documented place the flow needs a bucket distinct from
+    /// <see cref="StatusStyles.ForRequirement"/> — AC #2 requires the deferred/unmapped/planned split visible in
+    /// the diagram (and its aria twin) even though the badge color does not get a 7th token. Do not let this
+    /// exception leak into any other consumer. [Story 9.3 Task 3]</summary>
+    private static string FlowStateKey(RequirementInfo req) =>
+        req.Status == RequirementStatus.Unmapped ? "unmapped" : StatusStyles.ForRequirement(req);
 
     /// <summary>The conservation contract behind <see cref="RequirementFlow"/>, exposed for testing: the count
     /// of requirements ENTERING the flow at "definition" (= the requirement total) and how they partition across
@@ -1742,7 +1756,7 @@ public static class Charts
         IReadOnlyList<RequirementInfo> requirements)
     {
         var byState = FlowStates.ToDictionary(s => s.Css, _ => 0);
-        foreach (var req in requirements) byState[StatusStyles.ForRequirement(req)]++;
+        foreach (var req in requirements) byState[FlowStateKey(req)]++;
         return (requirements.Count, byState);
     }
 
@@ -1798,9 +1812,10 @@ public static class Charts
         var (_, stateCount) = RequirementFlowConservation(all);
         var stateKeys = FlowStates.Where(s => stateCount[s.Css] > 0).Select(s => s.Css).ToList();
 
-        // Fractional weight flowing from an L1 node into a terminal state.
+        // Fractional weight flowing from an L1 node into a terminal state. Keys by FlowStateKey (not
+        // StatusStyles.ForRequirement) so Unmapped routes to its own bucket, kept split from Planned. [Story 9.3]
         double PairWeight(int l1, string state) =>
-            all.Where(r => StatusStyles.ForRequirement(r) == state).Sum(r => Weight(r, l1));
+            all.Where(r => FlowStateKey(r) == state).Sum(r => Weight(r, l1));
 
         // Geometry. Three node columns joined by proportional ribbons; a single unit-height (pixels per
         // requirement) is shared across all columns so a ribbon of a given weight has the SAME thickness at both
@@ -1837,10 +1852,14 @@ public static class Charts
         var active = stateCount["active"];
         var ready = stateCount["ready"];
         var planned = stateCount["pending"];
+        var unmapped = stateCount["unmapped"];
         var deferred = stateCount["deferred"];
         var noCov = all.Count(NoCoverage);
+        // Unmapped is reported as its own count, never folded into "planned" — this aria string doubles as the
+        // accessibility text twin AC #2 requires the split to reach. [Story 9.3 Task 3]
         var aria = $"Requirements flow: {n} {Plural(n, "requirement", "requirements")}: " +
-                   $"{done} done, {active} partially implemented, {ready} ready for dev, {planned} planned, {deferred} deferred; " +
+                   $"{done} done, {active} partially implemented, {ready} ready for dev, {planned} planned, " +
+                   $"{unmapped} not yet mapped, {deferred} deferred; " +
                    $"{epicKeys.Count} covering {Plural(epicKeys.Count, "epic", "epics")}, {noCov} with no coverage";
 
         sb.Append("<div class=\"req-flow\">\n");
