@@ -184,6 +184,9 @@ public class HtmlRenderAdapterTests
         var noteIdx = html.IndexOf("pending-note", System.StringComparison.Ordinal);
         var acIdx = html.IndexOf("ac-panel", System.StringComparison.Ordinal);
         Assert.True(noteIdx >= 0 && acIdx > noteIdx, "Create-story note must render above the AC panel");
+        // Note must be a sibling ahead of the AC section — not nested inside it.
+        Assert.DoesNotContain("ac-list\">\n  <div class=\"epic-card\">", html);
+        Assert.Contains("<div class=\"epic-card\">", html[..acIdx]);
     }
 
     private static StoryCardView Card(

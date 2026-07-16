@@ -481,3 +481,12 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-declutter-home-dashboard.md`
   summary: Both delivery/webview spikes (`spike/delivery/exporter/Program.cs:56`, `spike/vscode/renderer/Program.cs:54`) call `SiteNav.Build(..., hasStructure: ...)`, but `SiteNav.Build` no longer has a `hasStructure` parameter (replaced by `hasCodeMap` in an earlier story) — the spikes were already non-compiling against the current signature before this change. Not caused by the declutter; surfaced when re-checking spike compilation.
   evidence: Edge Case Hunter. Pre-existing; baseline `SiteNav.Build` call already used the stale `hasStructure` arg.
+
+## Deferred from: code review of spec-undrafted-create-story-panel-above-ac (2026-07-16)
+
+- source_spec: `spec-undrafted-create-story-panel-above-ac.md`
+  summary: Epic-page story cards still render undrafted guidance after AC blocks, while placeholder pages now put create-story guidance above AC — sibling surfaces disagree on CTA placement.
+  evidence: Blind Hunter. `AppendStoryCard` leaves `not-detailed-note` after AC; placeholder reorder was intentional scope for the full story page only.
+- source_spec: `spec-undrafted-create-story-panel-above-ac.md`
+  summary: SiteGeneratorAdapter golden fixture's undrafted story has no Acceptance Criteria, so the reordered AC branch is invisible to the byte-parity gate.
+  evidence: Blind Hunter. Pre-existing fixture gap; only the new unit test covers note-above-AC ordering.
