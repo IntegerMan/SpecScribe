@@ -3706,6 +3706,72 @@ h1:has(> .status-legend) {
 .nfr-uxdr-coverage .nfr-uxdr-subgroup-title:first-of-type { margin-top: 0.4rem; }
 .nfr-uxdr-coverage .req-card { margin-left: 0; margin-right: 0; }
 
+/* Covering epics sit under the requirement text as a labeled card list — not header chips. */
+.nfr-uxdr-epics { margin-top: 0.75rem; padding-top: 0.7rem; border-top: 1px solid var(--border); }
+.nfr-uxdr-epics-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0.45rem;
+}
+.nfr-uxdr-epics-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  font-style: italic;
+}
+.nfr-uxdr-epic-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+.nfr-uxdr-epic-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 11rem;
+  max-width: 22rem;
+  flex: 1 1 11rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--parchment-dark);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.nfr-uxdr-epic-card:hover {
+  border-color: var(--gold);
+  box-shadow: 0 2px 8px var(--shadow);
+  transform: translateY(-1px);
+}
+.nfr-uxdr-epic-card:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.nfr-uxdr-epic-card.done { border-left-color: var(--status-done); }
+.nfr-uxdr-epic-card.active { border-left-color: var(--status-active); }
+.nfr-uxdr-epic-card.ready { border-left-color: var(--status-ready); }
+.nfr-uxdr-epic-card.drafted { border-left-color: var(--status-drafted); }
+.nfr-uxdr-epic-card.pending { border-left-color: var(--status-pending); }
+.nfr-uxdr-epic-card.review { border-left-color: var(--status-review); }
+.nfr-uxdr-epic-num {
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  font-weight: bold;
+  color: var(--gold);
+}
+.nfr-uxdr-epic-title {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.nfr-uxdr-epic-card .status-badge { margin-top: 0.15rem; }
+
 /* Requirements detail pages share the same stretched column + gutters as the index. [Story 9.2 UX] */
 .req-detail {
   max-width: 1100px;

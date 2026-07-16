@@ -335,8 +335,8 @@ public static class RequirementsTemplater
         }
     }
 
-    /// <summary>One NFR/UX-DR coverage row: id → detail page, text, covering-epic chip(s), state badge.
-    /// Reuses req-card / req-epic / status-badge vocabulary. [Story 9.2 Task 4]</summary>
+    /// <summary>One NFR/UX-DR coverage row: id + badge, then description, then a "Delivered by" epic card
+    /// list (never jammed into the header). Reuses req-card / status-badge vocabulary. [Story 9.2 Task 4]</summary>
     private static void AppendCoverageRow(StringBuilder sb, RequirementInfo req, EpicsModel epics, string prefix)
     {
         var href = $"{prefix}requirements/{req.Slug}.html";
@@ -367,28 +367,43 @@ public static class RequirementsTemplater
         sb.Append("  <div class=\"req-card-head\">\n");
         sb.Append($"    <a class=\"req-id-link\" href=\"{PathUtil.Html(href)}\">{PathUtil.Html(req.Id)}</a>\n");
         sb.Append($"    {badgeHtml}\n");
+        sb.Append("  </div>\n");
+        sb.Append($"  <div class=\"req-text\">{req.TextHtml}</div>\n");
 
+        // Covering epics (or honest absence) sit AFTER the description as a labeled list of cards —
+        // not as header chips. [Story 9.2 UX follow-up]
+        sb.Append("  <div class=\"nfr-uxdr-epics\">\n");
         if (req.Deferred)
         {
+            sb.Append("    <p class=\"nfr-uxdr-epics-note\">Deferred — not yet assigned to a delivering epic.");
             if (req.CoverageNote is { Length: > 0 } note)
             {
-                sb.Append($"    <span class=\"req-epic deferred\">{PathUtil.Html(note)}</span>\n");
+                sb.Append($" {PathUtil.Html(note)}");
             }
+            sb.Append("</p>\n");
         }
         else if (req.CoverageEpicNumbers.Count == 0)
         {
-            sb.Append("    <span class=\"req-epic deferred\">Not yet mapped to a delivering epic.</span>\n");
+            sb.Append("    <p class=\"nfr-uxdr-epics-note\">Not yet mapped to a delivering epic.</p>\n");
         }
         else
         {
+            sb.Append("    <div class=\"nfr-uxdr-epics-label\">Delivered by</div>\n");
+            sb.Append("    <ul class=\"nfr-uxdr-epic-list\">\n");
             foreach (var n in req.CoverageEpicNumbers)
             {
-                if (!byNumber.ContainsKey(n)) continue;
-                sb.Append($"    <a class=\"req-epic\" href=\"{PathUtil.Html(prefix)}epics/epic-{n}.html\">Epic {n}</a>\n");
+                if (!byNumber.TryGetValue(n, out var epic)) continue;
+                var epicHref = $"{prefix}epics/epic-{n}.html";
+                var statusClass = StatusStyles.ForEpic(epic);
+                sb.Append($"      <li><a class=\"nfr-uxdr-epic-card {statusClass}\" href=\"{PathUtil.Html(epicHref)}\">");
+                sb.Append($"<span class=\"nfr-uxdr-epic-num\">Epic {n}</span>");
+                sb.Append($"<span class=\"nfr-uxdr-epic-title\">{epic.Title}</span>");
+                sb.Append($"{StatusStyles.Badge(statusClass, StatusStyles.EpicLabel(statusClass))}");
+                sb.Append("</a></li>\n");
             }
+            sb.Append("    </ul>\n");
         }
         sb.Append("  </div>\n");
-        sb.Append($"  <div class=\"req-text\">{req.TextHtml}</div>\n");
         sb.Append("</div>\n\n");
     }
 

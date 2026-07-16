@@ -267,6 +267,8 @@ public class StylesheetTests
         Assert.Contains(".req-index", css);
         Assert.Contains(".req-index .chart-panel", css);
         Assert.Contains("main.req-detail", css);
+        Assert.Contains(".nfr-uxdr-epic-list", css);
+        Assert.Contains(".nfr-uxdr-epic-card", css);
     }
 
     [Fact]

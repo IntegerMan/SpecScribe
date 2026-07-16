@@ -341,8 +341,12 @@ public class RequirementsParserTests
         Assert.Contains("Design (", html); // Design donut
         Assert.Contains("design</div>", html); // subtitle count includes design
 
-        // Covered UX-DR/NFR: linked epic chip.
-        Assert.Contains("href=\"epics/epic-1.html\">Epic 1</a>", html);
+        // Covered UX-DR/NFR: "Delivered by" epic cards after the description (not header chips).
+        Assert.Contains("nfr-uxdr-epics-label", html);
+        Assert.Contains("Delivered by", html);
+        Assert.Contains("nfr-uxdr-epic-card", html);
+        Assert.Contains("href=\"epics/epic-1.html\"", html);
+        Assert.Contains("nfr-uxdr-epic-num\">Epic 1<", html);
 
         // Unmapped: "Not yet mapped" badge (icon+word via StatusStyles.Badge) — never a bare "Planned".
         Assert.Contains(">Not yet mapped<", html);
