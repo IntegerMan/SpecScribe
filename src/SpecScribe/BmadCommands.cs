@@ -33,33 +33,44 @@ public static class BmadCommands
             : RenderPanel(ForStory(story, commands));
 
     /// <summary>The FULL status-gated next-step command list for a story — the exact set the story page's
-    /// "Next Steps" panel renders (<see cref="RenderNextSteps"/> routes the same <see cref="ForStory"/> list),
-    /// projected as data for a non-HTML host (the VS Code outline's "Copy BMad Command…" Quick Pick shows the
-    /// LITERAL command each entry copies), in the page's order — first surviving entry is the primary
-    /// recommended command (dev-story when ready/active, code-review when in review, create-story when
-    /// undrafted; an undrafted first-of-epic (X.1) may also carry check-implementation-readiness as an
-    /// alternate). Empty for a done story (no next action — the page shows the "All done" panel instead,
-    /// optionally with a muted correct-course escape hatch) and when the detected module exposes none —
-    /// the host then omits the action entirely, so the gating (e.g. no code-review before work is
-    /// reviewable) lives here, never in TypeScript (AD-2). Whitespace-only catalog values are dropped so
-    /// the emitted list never carries a blank command.
-    /// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick]</summary>
-    public static IReadOnlyList<OutlineStoryCommand> StoryCommands(StoryInfo story, CommandCatalog commands) =>
-        StatusStyles.ForStory(story) == "done"
-            ? Array.Empty<OutlineStoryCommand>()
-            : ForStory(story, commands)
-                .Where(s => !string.IsNullOrWhiteSpace(s.Command))
-                .Select(s => new OutlineStoryCommand(s.Command, s.Description))
-                .ToList();
+    /// "Next Steps" panel renders (<see cref="RenderNextSteps"/>), projected as data for a non-HTML host
+    /// (the VS Code outline's "Copy BMad Command…" Quick Pick shows the LITERAL command each entry copies),
+    /// in the page's order — first surviving entry is the primary recommended command (dev-story when
+    /// ready/active, code-review when in review, create-story when undrafted; an undrafted first-of-epic
+    /// (X.1) may also carry check-implementation-readiness as an alternate). For a done story the list is
+    /// empty, or a single muted <c>correct-course</c> escape hatch when the module exposes it (mirrors the
+    /// celebratory panel's Other actions — never a primary; see <see cref="PrimaryStoryCommand"/>). Empty
+    /// when the detected module exposes none — the host then omits the action entirely, so the gating
+    /// (e.g. no code-review before work is reviewable) lives here, never in TypeScript (AD-2).
+    /// Whitespace-only catalog values are dropped so the emitted list never carries a blank command.
+    /// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick; Story 8.5]</summary>
+    public static IReadOnlyList<OutlineStoryCommand> StoryCommands(StoryInfo story, CommandCatalog commands)
+    {
+        if (StatusStyles.ForStory(story) == "done")
+        {
+            var hatch = DoneEscapeHatch(commands);
+            return hatch is null
+                ? Array.Empty<OutlineStoryCommand>()
+                : [new OutlineStoryCommand(hatch.Command, hatch.Description)];
+        }
 
-    /// <summary>The single most-actionable slash command for a story — always the FIRST entry of
-    /// <see cref="StoryCommands"/>, kept as one string for payload back-compat (an older shim reads only this)
-    /// and as the single-command convenience for tests/hosts. Delegates so it can never drift from the list.
-    /// Returns null when the story is done (no next action) or the detected module exposes no matching command —
-    /// the caller then omits the action, never printing a command that isn't installed. Composed here in C# so
-    /// the shim authors no command (AD-2). [Story 6.9]</summary>
+        return ForStory(story, commands)
+            .Where(s => !string.IsNullOrWhiteSpace(s.Command))
+            .Select(s => new OutlineStoryCommand(s.Command, s.Description))
+            .ToList();
+    }
+
+    /// <summary>The single most-actionable slash command for a story — the FIRST entry of
+    /// <see cref="StoryCommands"/> for non-done statuses, kept as one string for payload back-compat
+    /// (an older shim reads only this) and as the single-command convenience for tests/hosts.
+    /// Returns null when the story is done (celebratory terminal state — a muted correct-course hatch in
+    /// <see cref="StoryCommands"/> is not a primary) or the detected module exposes no matching command —
+    /// the caller then omits the action, never printing a command that isn't installed. Composed here in C#
+    /// so the shim authors no command (AD-2). [Story 6.9; Story 8.5]</summary>
     public static string? PrimaryStoryCommand(StoryInfo story, CommandCatalog commands) =>
-        StoryCommands(story, commands).FirstOrDefault()?.Command;
+        StatusStyles.ForStory(story) == "done"
+            ? null
+            : StoryCommands(story, commands).FirstOrDefault()?.Command;
 
     public static string RenderEpicNextSteps(EpicInfo epic, CommandCatalog commands) =>
         RenderPanel(ForEpic(epic, commands));
@@ -83,17 +94,25 @@ public static class BmadCommands
         sb.Append("<div class=\"chart-panel next-steps all-done\">\n<h3>Next Steps</h3>\n");
         sb.Append($"<p class=\"all-done-complete\"><span class=\"all-done-icon\">{Icons.ForStatus("done")}</span>All done — this story is complete.</p>\n");
 
-        var escape = commands.Command("correct-course");
-        if (escape is not null)
+        var hatch = DoneEscapeHatch(commands);
+        if (hatch is not null)
         {
-            sb.Append(RenderAlternatesGroup(
-            [
-                new Suggestion(escape, "Re-open this story if it needs rework."),
-            ]));
+            sb.Append(RenderAlternatesGroup([hatch]));
         }
 
         sb.Append("</div>\n\n");
         return sb.ToString();
+    }
+
+    /// <summary>Muted done-panel / outline escape hatch when the module exposes a non-blank
+    /// <c>correct-course</c>; null otherwise (whitespace-only catalog values drop like
+    /// <see cref="StoryCommands"/>). [Story 8.5]</summary>
+    private static Suggestion? DoneEscapeHatch(CommandCatalog commands)
+    {
+        var escape = commands.Command("correct-course");
+        return string.IsNullOrWhiteSpace(escape)
+            ? null
+            : new Suggestion(escape, "Re-open this story if it needs rework.");
     }
 
     private static string RenderPanel(List<Suggestion> suggestions)

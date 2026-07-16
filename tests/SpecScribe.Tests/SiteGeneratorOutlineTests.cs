@@ -132,14 +132,15 @@ public class SiteGeneratorOutlineTests : IDisposable
         - [x] Task 1: Ship it (AC: #1)
         """;
 
-    // Only "core" and "bmm" modules; the csv gives create-story/dev-story/code-review so per-story helper
-    // commands resolve to /bmad-* strings (matching ModuleContextTests' seeding).
+    // Only "core" and "bmm" modules; the csv gives create-story/dev-story/code-review/correct-course so
+    // per-story helper commands and the done escape hatch resolve to /bmad-* strings. [Story 8.5]
     private const string BmmCsv = """
         module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
         BMad Method,_meta,,,,,,,,,false,url,
         BMad Method,bmad-create-story,Create Story,CS,Prepare the next story,create,,4-implementation,,,true,implementation_artifacts,story
         BMad Method,bmad-dev-story,Dev Story,DS,Execute the story,,,4-implementation,,,true,,
         BMad Method,bmad-code-review,Code Review,CR,Review the changes,,,4-implementation,,,false,,
+        BMad Method,bmad-correct-course,Correct Course,CC,Navigate significant changes,,,anytime,,,false,planning_artifacts,change proposal
         """;
 
     public SiteGeneratorOutlineTests()
@@ -372,15 +373,17 @@ public class SiteGeneratorOutlineTests : IDisposable
     {
         // ONE generation for all four assertions (Story(id) would re-run GenerateAll per call). The tree's
         // Quick Pick option set IS the story page's Next Steps set (one BmadCommands source): in-progress →
-        // dev-story + code-review; review → code-review only; done → EMPTY (no copy action shown host-side);
-        // undrafted → create-story for the story being viewed.
+        // dev-story + code-review + correct-course; review → code-review + correct-course; done → muted
+        // correct-course hatch only (HelperCommand stays null); undrafted → create-story. [Story 8.5]
         var stories = Outline().Epics.SelectMany(e => e.Stories).ToDictionary(s => s.Id);
 
-        Assert.Equal(new[] { "/bmad-dev-story 1.1", "/bmad-code-review 1.1" },
+        Assert.Equal(new[] { "/bmad-dev-story 1.1", "/bmad-code-review 1.1", "/bmad-correct-course" },
             stories["1.1"].Commands.Select(c => c.Command).ToArray());
-        Assert.Equal(new[] { "/bmad-code-review 1.3" },
+        Assert.Equal(new[] { "/bmad-code-review 1.3", "/bmad-correct-course" },
             stories["1.3"].Commands.Select(c => c.Command).ToArray());
-        Assert.Empty(stories["2.1"].Commands);
+        Assert.Equal(new[] { "/bmad-correct-course" },
+            stories["2.1"].Commands.Select(c => c.Command).ToArray());
+        Assert.Null(stories["2.1"].HelperCommand); // hatch is not a primary
         Assert.Equal(new[] { "/bmad-create-story 1.2" },
             stories["1.2"].Commands.Select(c => c.Command).ToArray());
 
@@ -396,16 +399,16 @@ public class SiteGeneratorOutlineTests : IDisposable
     {
         // The load-bearing "mirrors the page" claim, asserted against the ACTUAL RenderNextSteps output rather
         // than by construction: for every status the panel offers exactly the commands StoryCommands emits
-        // (badge count == list count, each command present), and a done story renders the all-done panel with
-        // an empty list. Includes the undrafted X.1 case, where create-story is primary and
-        // check-implementation-readiness is the demoted alternate — and PrimaryStoryCommand must track the
-        // first surviving entry. [Story 8.5]
+        // (badge count == list count, each command present). Done stories keep PrimaryStoryCommand null while
+        // the list may carry the muted correct-course hatch. Undrafted X.1: create-story primary + readiness
+        // alternate. [Story 8.5]
         var commands = new CommandCatalog("BMad Method", new Dictionary<string, string>
         {
             ["dev-story"] = "/bmad-dev-story",
             ["code-review"] = "/bmad-code-review",
             ["create-story"] = "/bmad-create-story",
             ["check-implementation-readiness"] = "/bmad-check-implementation-readiness",
+            ["correct-course"] = "/bmad-correct-course",
         });
 
         foreach (var status in new[] { "ready-for-dev", "in-progress", "in-review", "done", "" })
@@ -421,16 +424,22 @@ public class SiteGeneratorOutlineTests : IDisposable
             };
             var list = BmadCommands.StoryCommands(story, commands);
             var html = BmadCommands.RenderNextSteps(story, commands);
-
-            Assert.Equal(list.FirstOrDefault()?.Command, BmadCommands.PrimaryStoryCommand(story, commands));
+            var primary = BmadCommands.PrimaryStoryCommand(story, commands);
 
             if (StatusStyles.ForStory(story) == "done")
             {
-                Assert.Empty(list);
+                Assert.Null(primary);
+                Assert.Equal(new[] { "/bmad-correct-course" }, list.Select(c => c.Command).ToArray());
                 Assert.Contains("all-done", html);
+                Assert.Equal(list.Count, html.Split("cmd-copy").Length - 1);
+                foreach (var c in list)
+                {
+                    Assert.Contains(PathUtil.Html(c.Command), html);
+                }
                 continue;
             }
 
+            Assert.Equal(list.FirstOrDefault()?.Command, primary);
             Assert.NotEmpty(list);
             Assert.Equal(list.Count, html.Split("cmd-copy").Length - 1); // one copy badge per emitted command
             foreach (var c in list)

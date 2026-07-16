@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: 2026-07-15 (8-4 → done via code review)
+# last_updated: 2026-07-15 (8-5 → done via code review)
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -156,7 +156,7 @@ development_status:
   8-2-canonical-status-model-with-portal-wide-legend: done
   8-3-single-source-of-truth-for-every-count: done
   8-4-paired-progress-and-readiness-semantics: done
-  8-5-state-aware-next-step-command-surface: review
+  8-5-state-aware-next-step-command-surface: done # code-review 2026-07-15: done hatch in StoryCommands + PrimaryStoryCommand null; whitespace guard; outline tests; comment fix
   8-6-designed-empty-states: review
   8-7-one-primary-view-per-dashboard-dataset: review
   8-8-generation-time-recency-signals: review

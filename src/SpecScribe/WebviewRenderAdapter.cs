@@ -202,8 +202,8 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
             // next-step-command surface emits an element carrying its command text; a branch like the one above
             // would post `{ type: 'stageCommand', command: <text> }`, and the shim's handler would reuse the
             // existing `stageTerminalCommand` primitive (createTerminal + sendText(command, /* execute: */ false))
-            // to STAGE it at a prompt — the user presses Enter, SpecScribe never does (AD-6/ADR 0003). This story
-            // deliberately does NOT build that handler or emit the control; 8.4 owns the command surface and
+            // to STAGE it at a prompt — the user presses Enter, SpecScribe never does (AD-6/ADR 0003). Story 8.5
+            // deliberately does NOT build that handler or emit the control; the HTML/copy Next Steps surface
             // designs against this known shape rather than retrofitting it.
 
             var href = a.getAttribute('href') || '';

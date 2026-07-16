@@ -4,7 +4,7 @@ baseline_commit: a1d9a915af289e178e1f7b9466f0b15adfb08824
 
 # Story 8.5: State-Aware Next-Step Command Surface
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -268,6 +268,13 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 - [x] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball an `in-progress` story (dev-story hero + code-review/correct-course demoted), a `done` story (celebration + muted correct-course), and the home panel (one hero + demoted rest).
 
+### Review Findings
+
+- [x] [Review][Patch] Done-story: include muted `correct-course` in `StoryCommands` when catalog exposes it; keep `PrimaryStoryCommand` null for done (hatch is not a primary) [`BmadCommands.cs:47`]
+- [x] [Review][Patch] WebviewRenderAdapter stageCommand comment still says "8.4 owns the command surface" after claiming 8.5 owns R4.3 [`WebviewRenderAdapter.cs:201`]
+- [x] [Review][Patch] `RenderAllDonePanel` accepts whitespace-only `correct-course` via `is not null` while `StoryCommands` drops whitespace — guard with `IsNullOrWhiteSpace` [`BmadCommands.cs:86`]
+- [x] [Review][Patch] Outline/`StoryCommands` tests: include `correct-course` in parity catalog; assert done list carries the hatch and primary stays null [`SiteGeneratorOutlineTests.cs:403`]
+
 ## Dev Notes
 
 ### Cross-surface note from Story 8.1 (2026-07-14)
@@ -336,6 +343,8 @@ Composer (Auto / Cursor agent router)
 - `src/SpecScribe/BmadCommands.cs`
 - `src/SpecScribe/assets/specscribe.css`
 - `src/SpecScribe/WebviewRenderAdapter.cs` (comment ownership fix only)
+- `src/SpecScribe/SiteGenerator.cs` (HelperCommand via PrimaryStoryCommand)
+- `src/SpecScribe/ProjectOutline.cs` (docs: done hatch vs primary)
 - `tests/SpecScribe.Tests/ModuleContextTests.cs`
 - `tests/SpecScribe.Tests/StylesheetTests.cs`
 - `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
@@ -346,3 +355,4 @@ Composer (Auto / Cursor agent router)
 ## Change Log
 
 - 2026-07-14: Story 8.5 — state-aware Next Steps primary/alternate hierarchy, `correct-course` unhappy-path actions, done escape hatch; tests + golden fingerprint.
+- 2026-07-15: Code review — done hatch mirrored in `StoryCommands` (primary stays null); whitespace guard; outline parity tests; WebviewRenderAdapter comment.

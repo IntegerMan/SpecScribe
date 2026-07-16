@@ -2047,17 +2047,16 @@ public sealed class SiteGenerator
                         surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
 
                         var storyStage = StatusStyles.ForStory(story);
-                        // ONE StoryCommands call feeds both fields: `commands` (the full status-gated list the
-                        // story page's Next Steps panel renders — the Quick Pick's option set) and the legacy
-                        // single `helperCommand` (its first entry, kept for older-shim back-compat), so the tree
-                        // can never disagree with the page. [spec-vscode-sidebar-shortcuts-…-quickpick]
+                        // `commands` = full Next Steps set (incl. done's muted correct-course hatch when exposed);
+                        // `helperCommand` = PrimaryStoryCommand (null for done — hatch is not a primary).
+                        // [spec-vscode-sidebar-shortcuts-…-quickpick; Story 8.5]
                         var storyCommands = BmadCommands.StoryCommands(story, _module.Commands);
                         outlineStories.Add(new OutlineStory(
                             story.Id, story.Title, storyStage, StatusStyles.StoryLabel(storyStage),
                             PathUtil.NormalizeSlashes(storyPage.OutputRelativePath),
                             storySourcePath,
                             story.TasksDone, story.TasksTotal,
-                            storyCommands.Count > 0 ? storyCommands[0].Command : null,
+                            BmadCommands.PrimaryStoryCommand(story, _module.Commands),
                             storyCommands));
                     }
 

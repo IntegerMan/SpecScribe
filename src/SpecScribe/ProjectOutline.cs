@@ -35,16 +35,16 @@ public sealed record OutlineStoryCommand(string Command, string Description);
 /// (Story 6.10 AC #1 "no duplicated path assumptions").</param>
 /// <param name="TasksDone">Checked task/subtask count from the artifact; 0 when there is no artifact.</param>
 /// <param name="TasksTotal">Total task/subtask count from the artifact; 0 when there is no artifact.</param>
-/// <param name="HelperCommand">The single most-actionable BMad command for this story's status — always the
-/// FIRST entry of <paramref name="Commands"/> (null when that list is empty). Kept for payload back-compat: an
-/// older shim reads only this. Note the first entry is usually the story's own step command but not always
-/// (an undrafted X.1 story may lead with check-implementation-readiness — see
-/// <see cref="BmadCommands.StoryCommands"/>). Composed in C#, never authored in TypeScript (AD-2).</param>
+/// <param name="HelperCommand">The single most-actionable BMad command for this story's status —
+/// <see cref="BmadCommands.PrimaryStoryCommand"/> (null when done or when <paramref name="Commands"/> has no
+/// primary). Kept for payload back-compat: an older shim reads only this. For non-done stories this is the
+/// first entry of <paramref name="Commands"/>; a done story may still list a muted correct-course hatch in
+/// <paramref name="Commands"/> while this stays null. Composed in C#, never authored in TypeScript (AD-2).</param>
 /// <param name="Commands">The FULL status-gated next-step command list — the exact set the story page's
-/// "Next Steps" panel renders (<see cref="BmadCommands.StoryCommands"/>), in the page's order. Empty for a done
-/// story or when the module exposes none; the host then omits its "Copy BMad Command…" action, so all gating
-/// (e.g. no code-review before work is reviewable) is decided here, never in the shim (AD-2).
-/// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick]</param>
+/// "Next Steps" panel renders (<see cref="BmadCommands.StoryCommands"/>), in the page's order. For a done story
+/// this is empty or a single muted correct-course escape hatch when the module exposes it; empty when the
+/// module exposes none. The host omits "Copy BMad Command…" when the list is empty; all gating is decided
+/// here, never in the shim (AD-2). [spec-vscode-sidebar-shortcuts-and-story-command-quickpick; Story 8.5]</param>
 public sealed record OutlineStory(
     string Id,
     string Title,
