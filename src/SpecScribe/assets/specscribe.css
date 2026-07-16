@@ -4264,9 +4264,12 @@ a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2
 .panel-source-note { font-size: 0.72rem; color: var(--ink-light); font-style: italic; margin: -0.2rem 0 0.6rem; }
 .panel-source-inline { font-size: 0.72rem; font-weight: normal; font-style: italic; color: var(--ink-light); margin-left: 0.5rem; }
 
-/* Home Now & Next board header: title (+ inline source) on the left; the progress wheel and CTA on the right. */
-.sprint-board-header { align-items: center; }
-.sprint-board-header-aside { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end; }
+/* Home Now & Next board header: title (+ inline source) on the left; the progress wheel and CTA on the right.
+   Requirements panel (Story 8.7 review): same two-peer title | aside pattern for the Flow/Status-grid toggle + CTA. */
+.sprint-board-header,
+.req-panel-header { align-items: center; }
+.sprint-board-header-aside,
+.req-panel-header-aside { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end; }
 /* Home widget: epic dropdown mounts in the header aside — no extra row above the board. */
 .sprint-epic-filter-host { display: inline-flex; align-items: center; }
 .sprint-board-header-aside .sprint-epic-filter { max-width: none; }

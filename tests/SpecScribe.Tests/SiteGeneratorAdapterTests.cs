@@ -345,7 +345,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 8.3 review patches: funnel reads ProjectCounts (byte-identical counts; hash
         // refresh after ledger wiring + OpenActionItems empty-entries fix).
         // Regenerated for Story 8.6 review: empty Backlog lane copy shortened to "No cards in backlog".
-        const string expected = "6c2f03cb0d4ca684ae254dcd9c7a25fffab64281ee7672272d884dbb9dcafe8b";
+        // Regenerated for Story 8.7 review patches: Requirements panel header wraps Flow/Status-grid toggle +
+        // View Requirements CTA in .req-panel-header-aside (title | controls, mirroring Now & Next).
+        const string expected = "1d3797a26ba6fbdc2afbebf1c7419e43058353254c39a1c3c9ba141006c6728e";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

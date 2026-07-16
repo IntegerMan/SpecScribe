@@ -4,7 +4,7 @@ baseline_commit: df853374362c2dc419a8a8ba7f4ff6d3dfa6197e
 
 # Story 8.7: One Primary View per Dashboard Dataset
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -231,6 +231,13 @@ No external libraries or APIs are introduced — pure in-repo C# string-building
 - [x] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green; real generation to `SpecScribeOutput/`; eyeball the home Requirements panel (flow default, "Flow / Status grid" tabs, one view at a time) and the epics page (subtitle no longer repeats the stat-grid counts).
 
+### Review Findings
+
+- [x] [Review][Patch] Wrap Requirements toggle + link in a header-aside — mirror Now & Next's `.sprint-board-header-aside` (flex-wrap) so `.chart-panel-header-row` stays title | controls instead of three crowded peers [`src/SpecScribe/HtmlRenderAdapter.Dashboard.cs`, `src/SpecScribe/assets/specscribe.css`]
+- [x] [Review][Patch] Strengthen stylesheet toggle assertions — assert `#rv-flow:checked ~ .board-tabbar` / `#rv-grid:checked ~ …` active-tab rules and `#rv-grid:focus-visible` (today only view-switch + `#rv-flow:focus-visible` are pinned) [`tests/SpecScribe.Tests/StylesheetTests.cs:245`]
+- [x] [Review][Patch] Assert status grid is inside `.req-view-grid` — toggle-present test only checks that both class strings appear in order, not that `req-status-grid` is nested in the demoted wrapper [`tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs`]
+- [x] [Review][Patch] Tighten epics-index subtitle dedup assertion — also forbid the middot epic-count restatement pattern in `.doc-subtitle`, not only the phrase `with stories drafted` [`tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs`]
+
 ## Dev Notes
 
 ### Cross-surface note from Story 8.1 (2026-07-14)
@@ -300,3 +307,4 @@ Opus 4.8 (Cursor dev-story workflow)
 | Date       | Version | Description                                                                                   | Author |
 | ---------- | ------- | --------------------------------------------------------------------------------------------- | ------ |
 | 2026-07-14 | 1.0     | Implemented Story 8.7: home Requirements panel radio-toggle (flow primary, grid demoted text-twin) + epics-index subtitle count dedup; toggle CSS; tests; golden fingerprint regenerated. Status → review. | Amelia (dev-story) |
+| 2026-07-15 | 1.1     | Code review: wrap Flow/Status-grid toggle + CTA in `.req-panel-header-aside`; strengthen stylesheet + containment + subtitle assertions; golden fingerprint regenerated. Status → done. | Amelia (code-review) |

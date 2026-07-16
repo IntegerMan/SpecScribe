@@ -261,11 +261,16 @@ public sealed partial class HtmlRenderAdapter
             // board's pure-CSS radio toggle: the coverage flow is the default-visible primary and the
             // status-block grid is the demoted alternate. Both stay in the DOM (the grid is the flow's
             // Story-3.7 accessibility text-twin, never removed). [Story 8.7]
-            sb.Append("<div class=\"chart-panel-header-row\"><h3>Requirements");
+            // Title left; toggle + CTA grouped in a wrap-friendly aside (same pattern as Now & Next's
+            // .sprint-board-header-aside) so the header stays two flex peers instead of three crowded ones.
+            sb.Append("<div class=\"chart-panel-header-row req-panel-header\">\n");
+            sb.Append("<h3>Requirements");
             sb.Append(StatusStyles.LegendKey());
-            sb.Append("</h3>");
+            sb.Append("</h3>\n");
+            sb.Append("<div class=\"req-panel-header-aside\">");
             sb.Append(RenderRequirementsTabs());
-            sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
+            sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a>");
+            sb.Append("</div>\n</div>\n");
             sb.Append("<div class=\"req-view req-view-flow\">");
             sb.Append(Charts.RequirementFlow(requirements, epicsModel));
             sb.Append("</div>\n");

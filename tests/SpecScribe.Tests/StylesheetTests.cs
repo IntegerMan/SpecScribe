@@ -251,7 +251,11 @@ public class StylesheetTests
         Assert.Contains(".req-view-grid { display: none; }", css);
         Assert.Contains(".req-panel:has(#rv-grid:checked) .req-view-flow { display: none; }", css);
         Assert.Contains(".req-panel:has(#rv-grid:checked) .req-view-grid { display: block; }", css);
+        Assert.Contains("#rv-flow:checked ~ .board-tabbar label[for=\"rv-flow\"]", css);
+        Assert.Contains("#rv-grid:checked ~ .board-tabbar label[for=\"rv-grid\"]", css);
         Assert.Contains("#rv-flow:focus-visible ~ .board-tabbar label[for=\"rv-flow\"]", css);
+        Assert.Contains("#rv-grid:focus-visible ~ .board-tabbar label[for=\"rv-grid\"]", css);
+        Assert.Contains(".req-panel-header-aside", css);
     }
 
     [Fact]

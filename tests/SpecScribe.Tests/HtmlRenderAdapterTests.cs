@@ -409,13 +409,16 @@ public class HtmlRenderAdapterTests
         Assert.Contains("<input type=\"radio\" id=\"rv-grid\" name=\"req-view\" class=\"board-tab-radio\">", body);
         Assert.Contains("<label for=\"rv-flow\" class=\"board-tab\">Flow</label>", body);
         Assert.Contains("<label for=\"rv-grid\" class=\"board-tab\">Status grid</label>", body);
+        // Toggle + CTA share a wrap-friendly header aside (title | controls), mirroring Now & Next.
+        Assert.Contains("class=\"req-panel-header-aside\"", body);
 
         // Both views live in the DOM, each in its own wrapper; the flow (role="img" SVG) renders BEFORE the grid.
         var flowWrap = body.IndexOf("<div class=\"req-view req-view-flow\">", StringComparison.Ordinal);
         var gridWrap = body.IndexOf("<div class=\"req-view req-view-grid\">", StringComparison.Ordinal);
         Assert.True(flowWrap >= 0 && gridWrap >= 0 && flowWrap < gridWrap, $"flow must render before grid: {flowWrap}/{gridWrap}");
         Assert.Contains("class=\"req-flow-svg\"", body);
-        Assert.Contains("class=\"req-status-grid\"", body);
+        // Status grid must be nested inside the demoted wrapper (not a sibling outside it).
+        Assert.Contains("<div class=\"req-view req-view-grid\"><div class=\"req-status-grid\">", body);
         Assert.True(body.IndexOf("class=\"req-flow-svg\"", StringComparison.Ordinal)
             < body.IndexOf("class=\"req-status-grid\"", StringComparison.Ordinal));
     }
@@ -470,8 +473,14 @@ public class HtmlRenderAdapterTests
 
         // The subtitle keeps the site title only — the duplicated counts are gone.
         Assert.Contains("<div class=\"doc-subtitle\">SpecScribe</div>", body);
-        // The old count restatement (a middot-joined "N epics · M with stories drafted") no longer ships.
-        Assert.DoesNotContain("with stories drafted", body);
+        // Pin the subtitle region itself so a partial middot count restatement cannot sneak back in.
+        var subOpen = body.IndexOf("<div class=\"doc-subtitle\">", StringComparison.Ordinal);
+        Assert.True(subOpen >= 0);
+        var subClose = body.IndexOf("</div>", subOpen, StringComparison.Ordinal);
+        var subtitle = body.Substring(subOpen, subClose - subOpen);
+        Assert.DoesNotContain("&middot;", subtitle, StringComparison.Ordinal);
+        Assert.DoesNotContain("epics", subtitle, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("with stories drafted", subtitle, StringComparison.Ordinal);
 
         // The stat grid remains the single count home.
         Assert.Contains("Epics drafted", body);

@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: 2026-07-15 (8-6 → done via code review)
+# last_updated: 2026-07-15 (8-7 → done via code review)
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: 2026-07-15T22:45:00-04:00
+last_updated: 2026-07-15T23:15:00-04:00
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -158,7 +158,7 @@ development_status:
   8-4-paired-progress-and-readiness-semantics: done
   8-5-state-aware-next-step-command-surface: done # code-review 2026-07-15: done hatch in StoryCommands + PrimaryStoryCommand null; whitespace guard; outline tests; comment fix
   8-6-designed-empty-states: done
-  8-7-one-primary-view-per-dashboard-dataset: review
+  8-7-one-primary-view-per-dashboard-dataset: done
   8-8-generation-time-recency-signals: review
   epic-8-retrospective: optional
 
