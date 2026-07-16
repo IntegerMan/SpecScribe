@@ -79,16 +79,22 @@ public static class EpicsParser
     }
 
     // Leading ISO date on a change-log row: list bullet ("- 2026-07-08 …") or table cell ("| 2026-07-08 | …").
+    // Prefix required so prose lines that merely open with yyyy-MM-dd cannot poison the max. [Review][Patch]
     private static readonly Regex ChangeLogLeadingIsoDate =
-        new(@"^\s*(?:[-*]\s+|\|\s*)?(\d{4}-\d{2}-\d{2})\b", RegexOptions.Compiled);
+        new(@"^\s*(?:[-*]\s+|\|\s*)(\d{4}-\d{2}-\d{2})\b", RegexOptions.Compiled);
 
     /// <summary>Returns the latest ISO <c>yyyy-MM-dd</c> date found in the artifact's <c>## Change Log</c>
-    /// section (table or list form), or null when the section is absent / has no parseable date.
-    /// Malformed rows are skipped — never throws. Pure + repo-free. [Story 8.8]</summary>
-    public static DateOnly? ExtractLatestChangeLogDate(string raw)
+    /// (or <c>### Change Log</c>) section (table or list form), or null when the section is absent / has no
+    /// parseable date. Malformed rows are skipped — never throws. Pure + repo-free. [Story 8.8]</summary>
+    public static DateOnly? ExtractLatestChangeLogDate(string? raw)
     {
+        if (raw is null) return null;
+
         var lines = raw.Replace("\r\n", "\n").Split('\n');
+        // Prefer H2; fall back to H3 — several drafted artifacts in this repo use ### Change Log.
         var (start, end) = FindSection(lines, "## Change Log", 0, lines.Length);
+        if (start < 0)
+            (start, end) = FindSection(lines, "### Change Log", 0, lines.Length);
         if (start < 0) return null;
 
         DateOnly? max = null;

@@ -8,7 +8,7 @@ public static class ProgressCalculator
 {
     public static ProgressModel Compute(EpicsModel epics, IReadOnlyDictionary<string, string> artifactMap, GitPulse? git, DeepGitPulse? deep = null)
     {
-        // Deep-git per-file dates, keyed by normalized repo-root-relative path (git's own forward-slash paths).
+        // Deep-git per-file dates from uncapped CodeMapMetrics, keyed by normalized repo-root-relative path.
         // Built once; unmatched story paths fall through to the change-log date. [Story 8.8]
         var gitFileDates = BuildGitFileDateMap(deep);
 
@@ -35,6 +35,11 @@ public static class ProgressCalculator
                     story.LastUpdatedDate = ResolveLastUpdated(story, gitFileDates, changeLogDate);
                     epicTasksDone += done;
                     epicTasksTotal += total;
+                }
+                else
+                {
+                    // Reused StoryInfo graphs (e.g. watch-mode) must not keep a stale marker. [Review][Patch]
+                    story.LastUpdatedDate = null;
                 }
             }
 
@@ -90,18 +95,19 @@ public static class ProgressCalculator
         return changeLogDate;
     }
 
+    /// <summary>Uncapped per-file last-change dates from <see cref="DeepGitPulse.CodeMapMetrics"/> —
+    /// not the top-N <see cref="GitInsightsData.Files"/> hub list, which would miss quietly-edited story
+    /// markdown. [Story 8.8][Review][Patch]</summary>
     private static Dictionary<string, DateOnly> BuildGitFileDateMap(DeepGitPulse? deep)
     {
         var map = new Dictionary<string, DateOnly>(StringComparer.Ordinal);
-        var files = deep?.Insights?.Files;
-        if (files is null) return map;
+        var metrics = deep?.CodeMapMetrics;
+        if (metrics is null || metrics.Count == 0) return map;
 
-        foreach (var file in files)
+        foreach (var (path, file) in metrics)
         {
-            if (file.LastChangeDate is not { } date) continue;
-            var path = PathUtil.NormalizeSlashes(file.Path);
-            // First-seen wins: Insights.Files is already newest-first aggregated per path.
-            map.TryAdd(path, date);
+            if (file.LastDate is not { } date) continue;
+            map.TryAdd(PathUtil.NormalizeSlashes(path), date);
         }
         return map;
     }
@@ -122,7 +128,7 @@ public static class ProgressCalculator
 
             return (done, total, EpicsParser.ExtractStatus(raw), EpicsParser.ExtractLatestChangeLogDate(raw));
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return (0, 0, null, null);
         }

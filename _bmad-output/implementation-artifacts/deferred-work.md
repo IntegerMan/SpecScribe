@@ -2,6 +2,10 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 8-8-generation-time-recency-signals.md (2026-07-15)
+
+- Path map for story git dates uses `StringComparer.Ordinal`, matching the git layer's Ordinal path keys — case-only mismatches between git and `ArtifactSourcePath` on Windows silently miss the git date. Low likelihood; revisit if IgnoreCase is adopted git-wide. [`ProgressCalculator.cs`]
+
 ## Deferred from: code review of 8-3-single-source-of-truth-for-every-count.md (2026-07-15)
 
 - Incremental `WriteIndex` / `WriteSprint` / `WriteActionItems` rebuild `_counts` when null but have no events list to re-emit the Unsupported divergence notice — same watch-mode notice-gap pattern as prior stories. [`SiteGenerator.cs`]

@@ -4,7 +4,7 @@ baseline_commit: ce8f4c27c9d8f35433cbe0a580377fd75142f932
 
 # Story 8.8: Generation-Time Recency Signals
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -230,6 +230,17 @@ No external libraries or APIs are introduced — pure in-repo C# date/string wor
 - [x] **Task 7 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green; real generation to `SpecScribeOutput/` (with and without `--deep-git`); eyeball the Commits tile (absolute date, no "Nd ago") and drafted story cards ("Updated <date>", shifting to git dates under `--deep-git`).
 
+### Review Findings
+
+- [x] [Review][Patch] Also accept `### Change Log` when extracting latest change-log date [`EpicsParser.cs:88`] — owner chose H3 parity with H2 so artifacts like 3-5/8-2/3-3/7-6/7-4 still get markers.
+- [x] [Review][Patch] Build git date map from uncapped `CodeMapMetrics.LastDate`, not top-N `Insights.Files` [`ProgressCalculator.cs:93`] — `BuildInsights` truncates to 50 files by change count; quietly-edited story markdown almost never appears, so the git-first path silently degrades even with `--deep-git`. `DeepGitPulse.CodeMapMetrics` already holds every file's `LastDate`.
+- [x] [Review][Patch] Catch `UnauthorizedAccessException` in `ReadArtifactProgress` [`ProgressCalculator.cs:125`] — `FileStream` can throw it; rest of the codebase catches IO + Unauthorized together; AC #2 requires non-fatal degrade.
+- [x] [Review][Patch] Null-guard `ExtractLatestChangeLogDate` [`EpicsParser.cs:88`] — public "never throws" API NRE on null `raw`.
+- [x] [Review][Patch] Clear `LastUpdatedDate` when a story has no artifact on recompute [`ProgressCalculator.cs:26`] — otherwise a reused `StoryInfo` can keep a stale marker.
+- [x] [Review][Patch] Require bullet or pipe prefix for change-log ISO dates [`EpicsParser.cs:82`] — optional prefix lets prose lines starting with `yyyy-MM-dd` poison the max date.
+- [x] [Review][Patch] Add test: git date wins when older than change-log date [`RequirementsAndProgressTests.cs`] — precedence rule is implemented but only tested when git is newer.
+- [x] [Review][Defer] Path map uses `StringComparer.Ordinal` [`ProgressCalculator.cs:95`] — deferred, pre-existing; matches git-layer Ordinal keys; case-only mismatches on Windows are rare.
+
 ## Dev Notes
 
 ### Cross-surface note from Story 8.1 (2026-07-14)
@@ -304,4 +315,5 @@ Composer (Auto)
 
 ## Change Log
 
+- 2026-07-15: Code review — patched git dates to use uncapped `CodeMapMetrics`, H3 Change Log support, UnauthorizedAccess catch, null/stale guards, stricter ISO-row regex; 7 patches applied, 1 deferred. Status → done.
 - 2026-07-14: Implemented Story 8.8 — generation-time absolute recency markers on Commits tile + epic story cards (git-first, change-log fallback); removed `DateTime.Now` "Nd ago"; tests + golden fingerprint CSS-only regen. Status → review.

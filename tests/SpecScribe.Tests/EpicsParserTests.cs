@@ -328,6 +328,34 @@ public class EpicsParserTests
         Assert.Equal(new DateOnly(2026, 7, 9), EpicsParser.ExtractLatestChangeLogDate(raw));
     }
 
+    [Fact]
+    public void ExtractLatestChangeLogDate_AcceptsH3Heading()
+    {
+        var raw = """
+            # Story 1.1
+            ### Change Log
+            - 2026-07-08: Drafted under H3
+            - 2026-07-12: Reviewed
+            """;
+        Assert.Equal(new DateOnly(2026, 7, 12), EpicsParser.ExtractLatestChangeLogDate(raw));
+    }
+
+    [Fact]
+    public void ExtractLatestChangeLogDate_ReturnsNullOnNullRaw()
+        => Assert.Null(EpicsParser.ExtractLatestChangeLogDate(null));
+
+    [Fact]
+    public void ExtractLatestChangeLogDate_IgnoresProseLineStartingWithIsoDate()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            2026-12-31 was mentioned in prose but is not a row
+            - 2026-07-09: Real list entry
+            """;
+        Assert.Equal(new DateOnly(2026, 7, 9), EpicsParser.ExtractLatestChangeLogDate(raw));
+    }
+
     private const string SampleArtifact = """
         # Story 1.1: Scaffold
         Status: in progress
