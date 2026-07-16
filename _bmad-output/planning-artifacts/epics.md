@@ -233,8 +233,9 @@ Give the Driver an accurate 30-second pulse and a friction-free path to the next
 **FRs covered:** FR20, FR21, FR25, FR31 · **UX-DRs:** UX-DR21, UX-DR22, UX-DR23, UX-DR24 · **NFRs:** NFR8
 
 ### Epic 9: Traceability and Review Follow-Through
-Complete the requirement → epic → story chain so a Stakeholder can click from any requirement to its delivering stories, a Reviewer can judge a "done" claim in one glance, and follow-up items carry provenance and resolution paths. Serves the review journey (3), the traceability differentiator (4), and debt follow-through (7).
+Complete the requirement → epic → story chain so a Stakeholder can click from any requirement to its delivering stories, a Reviewer can judge a "done" claim in one glance, and follow-up items carry provenance and resolution paths — including visibility in the primary remaining-work geometry (sunburst) and coherent Driver/Stakeholder workflows for authoring and satisfaction status. Serves the daily Driver journeys (1–2), the review journey (3), the traceability differentiator (4), and debt follow-through (7).
 **FRs covered:** FR22, FR23, FR24, FR26, FR30 · **UX-DRs:** UX-DR26 · **NFRs:** NFR8
+<!-- 2026-07-15 (epic-8 retrospective): Stories 9.7–9.9 seated — sunburst/remaining-work follow-ups, authoring/delivery workflow coherence, requirement-satisfaction status at a glance. -->
 
 ### Epic 10: Portal Legibility for Every Audience
 Make every surface navigable and correctly interpretable by first-time visitors, non-BMAD stakeholders, and tech leads: insight pages reachable from the nav, every chart self-explaining (legend, time window, why-it-matters), vocabulary defined in place, and consistent dates, references, and TOC treatment. Serves onboarding (5) and health-insight (6) journeys — the adoption deciders.
@@ -1610,9 +1611,14 @@ So that I can spot recent movement without diffing pages.
 
 ## Epic 9: Traceability and Review Follow-Through
 
-Complete the requirement → epic → story chain so a Stakeholder can click from any requirement to its delivering stories, a Reviewer can judge a "done" claim in one glance, and follow-up items carry provenance and resolution paths. Serves the review journey (3), the traceability differentiator (4), and debt follow-through (7) defined in docs/UserJourneys.md.
+Complete the requirement → epic → story chain so a Stakeholder can click from any requirement to its delivering stories, a Reviewer can judge a "done" claim in one glance, and follow-up items carry provenance and resolution paths — including visibility in the primary remaining-work geometry (sunburst) and coherent Driver/Stakeholder workflows for authoring and satisfaction status. Serves the daily Driver journeys (1–2), the review journey (3), the traceability differentiator (4), and debt follow-through (7) defined in docs/UserJourneys.md.
 
 **FRs covered:** FR22, FR23, FR24, FR26, FR30 · **UX-DRs:** UX-DR26 · **NFRs:** NFR8
+
+<!-- 2026-07-15 (epic-8 retrospective, correct-course): Stories 9.7–9.9 appended. 9.7 extends FR30 into the
+     sunburst / remaining-work geometry (not absorbed into 9.6). 9.8–9.9 are journey-shaped holistic passes
+     for authoring/delivery workflow and requirement-satisfaction status. epics.md + sprint-status.yaml
+     updated together (Epic 6 process rule). -->
 
 ### Story 9.1: Requirement Pages Link to Their Covering Stories
 
@@ -1738,6 +1744,82 @@ So that promises visibly leave the list when resolved.
 **Given** a framework without retro or deferred-work artifact types
 **When** the portal generates
 **Then** these surfaces degrade to absent rather than empty-but-present (NFR8).
+
+### Story 9.7: Open Follow-Ups in the Remaining-Work Geometry
+
+As a maintainer scanning what's left to work on,
+I want open action items and retro commitments represented in the sunburst and related remaining-work surfaces,
+So that process follow-through is visible in the same primary attention surface as stories and tasks — not only on the dedicated follow-ups pages.
+
+**Acceptance Criteria:**
+
+1.
+**Given** open retrospective action items (and deferred-work entries when present) exist in the project
+**When** the epic/project remaining-work geometry renders (sunburst and any sibling "what's left" summaries that feed the Driver's daily scan)
+**Then** those open follow-ups appear as first-class remaining work — countable and navigable into their detail/provenance surfaces
+**And** counts agree with the Story 8.3 `ProjectCounts` ledger (`OpenActionItems` and related) rather than a parallel recount.
+
+2.
+**Given** follow-up items are not stories or tasks
+**When** the visualization is designed
+**Then** they are not silently mislabeled as stories; the treatment is distinct (shape, label, or ring) and never color-only
+**And** Story 9.6 remains the provenance/resolution owner on follow-up pages — this story does not absorb 9.6's card/grouping work.
+
+3.
+**Given** a project with zero open action items and no deferred-work surface
+**When** generation runs
+**Then** the sunburst/remaining-work geometry degrades cleanly (no empty fake wedges, no broken links) per NFR8.
+
+### Story 9.8: Authoring and Delivery Workflow Coherence
+
+As a maintainer using SpecScribe to drive work,
+I want the portal's create-story, next-step, empty-state, and related Driver surfaces to form one coherent workflow from requirements gathering through story creation and development,
+So that the tool actively guides daily journeys rather than only reflecting completed artifacts.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the existing next-step command surface (Story 8.5), designed empty states (Story 8.6), and undrafted/create-story affordances
+**When** this story audits the Driver path (requirements → story creation → development → review)
+**Then** gaps, dead ends, and contradictory guidance are identified and closed with concrete portal changes
+**And** the work extends those shipped seams rather than duplicating a parallel command/empty-state system.
+
+2.
+**Given** a maintainer starting from Home or an epic with undrafted / ready / in-progress work
+**When** they follow the portal's primary recommended path
+**Then** each step's primary affordance matches the lifecycle state and leads to the next sensible unit of work
+**And** framework-specific commands remain adapter-supplied (NFR8) with degrade-to-absent when a step is unsupported.
+
+3.
+**Given** visual or interaction changes this story introduces
+**When** create-story / implementation proceeds
+**Then** owner-selected silhouette directions are elicited up front (Epic 3/7/8 visual-intent practice) and not re-litigated at review.
+
+### Story 9.9: Requirement Satisfaction Status at a Glance
+
+As a stakeholder or reviewer,
+I want a holistic reading of requirement satisfaction status across the portal,
+So that I can judge whether requirements are satisfied without assembling the picture from disconnected pages.
+
+**Acceptance Criteria:**
+
+1.
+**Given** FR/NFR/UX-DR coverage data and covering-story links (Stories 9.1–9.3)
+**When** the portal presents satisfaction status (dashboard and/or requirements hub surfaces)
+**Then** a maintainer can answer "what is satisfied, deferred on purpose, unmapped, or in flight?" in one coherent scan
+**And** status vocabulary routes through Story 8.2's canonical `StatusStyles` / `--status-*` system — no parallel words or colors.
+
+2.
+**Given** a requirement with covering stories
+**When** satisfaction status renders
+**Then** it reflects delivering-story lifecycle honestly (including in-progress / review, not only done-vs-not)
+**And** missing coverage uses Story 9.3's deferred-vs-unmapped distinction when that story has landed (coordinate; do not re-implement the tier).
+
+3.
+**Given** this is a holistic pass over surfaces that Stories 9.1–9.3 also touch
+**When** scope is planned at create-story
+**Then** it does not absorb 9.1–9.3's page-level deliverables; it composes and closes journey-level gaps those stories leave
+**And** empty/absent framework coverage degrades per NFR8.
 
 ## Epic 10: Portal Legibility for Every Audience
 
