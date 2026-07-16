@@ -1951,8 +1951,21 @@ public sealed class SiteGenerator
             .Select(ac => ac with { Html = SourceLinkifier.Linkify(ac.Html, referenceMap, storyPrefix) })
             .ToList();
         devAgentRecord = devAgentRecord
-            .Select(e => (e.Label, ContentHtml: SourceLinkifier.Linkify(e.ContentHtml, referenceMap, storyPrefix)))
+            .Select(e =>
+            {
+                var html = SourceLinkifier.Linkify(e.ContentHtml, referenceMap, storyPrefix);
+                if (e.Label == "File List")
+                    html = FileListLinkifier.LinkifyHtml(html, CodePageHrefForStory);
+                return (e.Label, ContentHtml: html);
+            })
             .ToList();
+
+        string? CodePageHrefForStory(string repoRelativePath)
+        {
+            var norm = PathUtil.NormalizeSlashes(ChangeSurface.NormalizeFileListPath(repoRelativePath));
+            if (!_codePages.TryGetValue(norm, out var page)) return null;
+            return storyPrefix + page;
+        }
 
         // Deep-link every "(AC: #N)" reference in the plan to its criterion panel above.
         var criteriaByNumber = acceptanceCriteria.ToDictionary(ac => ac.Number, ac => ac.PlainText);
@@ -1973,7 +1986,14 @@ public sealed class SiteGenerator
             changelog?.Date,
             changelog?.IsVerification ?? false);
 
-        var changeSurface = ChangeSurface.Build(artifactRaw, story.Status, acceptanceCriteria);
+        var verifyBeforeReviewHtml = EpicsParser.ExtractSubsectionHtml(artifactRaw, "### Verify before marking review");
+        if (verifyBeforeReviewHtml.Length > 0)
+            verifyBeforeReviewHtml = SourceLinkifier.Linkify(verifyBeforeReviewHtml, referenceMap, storyPrefix);
+        else
+            verifyBeforeReviewHtml = null;
+
+        var changeSurface = ChangeSurface.Build(
+            artifactRaw, story.Status, acceptanceCriteria, CodePageHrefForStory, verifyBeforeReviewHtml);
 
         return new StoryPageFragments(
             artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,

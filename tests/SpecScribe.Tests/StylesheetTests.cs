@@ -92,7 +92,8 @@ public class StylesheetTests
         // ADR 0007 change-surface panel
         Assert.Contains(".change-surface", css);
         Assert.Contains(".change-surface-verify", css);
-        Assert.Contains(".change-surface-file", css);
+        Assert.Contains(".change-surface-files", css);
+        Assert.Contains(".change-surface-panel", css);
         Assert.DoesNotContain(".evidence-latest", css);
         Assert.DoesNotContain(".evidence-link", css);
     }

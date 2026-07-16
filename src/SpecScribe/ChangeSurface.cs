@@ -10,15 +10,23 @@ public static class ChangeSurface
     private static readonly Regex FileListBullet = new(@"^\s*[-*]\s+`?([^`\n]+?)`?\s*$", RegexOptions.Compiled);
     private static readonly Regex FileListBacktick = new(@"`([^`\n]+)`", RegexOptions.Compiled);
 
+    /// <summary>One row from the Dev Agent Record File List — normalized path for classification/links plus the
+    /// authored label (may include annotations like <c>(new)</c>).</summary>
+    public sealed record FileListEntry(string Path, string DisplayLabel);
+
     /// <summary>Extracts file paths from <c>## Dev Agent Record</c> → <c>### File List</c>. Returns an empty
     /// list when the subsection is absent or has no parseable paths. Never throws. [ADR 0007]</summary>
     public static IReadOnlyList<string> ExtractFileList(string? raw)
+        => ExtractFileListEntries(raw).Select(e => e.Path).ToList();
+
+    /// <summary>Like <see cref="ExtractFileList"/> but preserves authored display labels.</summary>
+    public static IReadOnlyList<FileListEntry> ExtractFileListEntries(string? raw)
     {
-        if (raw is null) return Array.Empty<string>();
+        if (raw is null) return Array.Empty<FileListEntry>();
 
         var lines = raw.Replace("\r\n", "\n").Split('\n');
         var devIdx = Array.FindIndex(lines, l => l.TrimEnd() == "## Dev Agent Record");
-        if (devIdx < 0) return Array.Empty<string>();
+        if (devIdx < 0) return Array.Empty<FileListEntry>();
 
         var sectionEnd = lines.Length;
         for (var i = devIdx + 1; i < lines.Length; i++)
@@ -31,7 +39,7 @@ public static class ChangeSurface
         {
             if (lines[i].TrimEnd() == "### File List") { fileListIdx = i; break; }
         }
-        if (fileListIdx < 0) return Array.Empty<string>();
+        if (fileListIdx < 0) return Array.Empty<FileListEntry>();
 
         var subEnd = sectionEnd;
         for (var i = fileListIdx + 1; i < sectionEnd; i++)
@@ -39,7 +47,7 @@ public static class ChangeSurface
             if (lines[i].StartsWith("### ", StringComparison.Ordinal)) { subEnd = i; break; }
         }
 
-        var paths = new List<string>();
+        var paths = new List<FileListEntry>();
         for (var i = fileListIdx + 1; i < subEnd; i++)
         {
             var line = lines[i].Trim();
@@ -48,15 +56,17 @@ public static class ChangeSurface
             var bullet = FileListBullet.Match(line);
             if (bullet.Success)
             {
-                var path = bullet.Groups[1].Value.Trim();
-                if (path.Length > 0) paths.Add(NormalizePath(path));
+                var rawPath = bullet.Groups[1].Value.Trim();
+                if (rawPath.Length > 0)
+                    paths.Add(new FileListEntry(NormalizeFileListPath(rawPath), rawPath));
                 continue;
             }
 
             foreach (Match m in FileListBacktick.Matches(line))
             {
-                var path = m.Groups[1].Value.Trim();
-                if (path.Length > 0) paths.Add(NormalizePath(path));
+                var rawPath = m.Groups[1].Value.Trim();
+                if (rawPath.Length > 0)
+                    paths.Add(new FileListEntry(NormalizeFileListPath(rawPath), rawPath));
             }
         }
 
@@ -64,7 +74,23 @@ public static class ChangeSurface
     }
 
     private static string NormalizePath(string path)
-        => path.Replace('\\', '/').Trim();
+        => NormalizeFileListPath(path);
+
+    /// <summary>Strips decorative annotations like <c>(new)</c> from a File List row before path resolution.</summary>
+    public static string NormalizeFileListPath(string path)
+    {
+        path = path.Replace('\\', '/').Trim();
+        var paren = path.LastIndexOf(" (", StringComparison.Ordinal);
+        if (paren > 0 && path.EndsWith(')'))
+            path = path[..paren].TrimEnd();
+        return path;
+    }
+
+    private static string FileListLabel(string displayLabel)
+    {
+        var label = Path.GetFileName(displayLabel.Replace('\\', '/'));
+        return label.Length > 0 ? label : displayLabel;
+    }
 
     /// <summary>Classifies changed file paths into surface buckets per ADR 0007. Returns human-readable
     /// labels suitable for display (e.g. "visual", "rendered UI", "plumbing (no new visible surface)").</summary>
@@ -152,10 +178,21 @@ public static class ChangeSurface
     public static StoryChangeSurface Build(
         string? rawArtifact,
         string? status,
-        IReadOnlyList<AcceptanceCriterion> acceptanceCriteria)
+        IReadOnlyList<AcceptanceCriterion> acceptanceCriteria,
+        Func<string, string?>? resolveCodePageHref = null,
+        string? verifyBeforeReviewHtml = null)
     {
-        var files = ExtractFileList(rawArtifact);
-        var classifications = ClassifyPaths(files);
+        var entries = ExtractFileListEntries(rawArtifact);
+        var classifications = ClassifyPaths(entries.Select(e => e.Path).ToList());
+
+        var changedFiles = entries
+            .Select(e =>
+            {
+                var label = FileListLabel(e.DisplayLabel);
+                var href = resolveCodePageHref?.Invoke(e.Path);
+                return new ChangeSurfaceFile(e.Path, label, href);
+            })
+            .ToList();
 
         var checklist = acceptanceCriteria
             .Select(ac => (ac.Number, ac.PlainText))
@@ -176,6 +213,6 @@ public static class ChangeSurface
             }
         }
 
-        return new StoryChangeSurface(classifications, checklist, files, shipLine);
+        return new StoryChangeSurface(classifications, checklist, changedFiles, shipLine, verifyBeforeReviewHtml);
     }
 }

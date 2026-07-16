@@ -331,18 +331,25 @@ public sealed partial class HtmlRenderAdapter
     private static string EmptyEvidencePill(string label, string icon = "")
         => $"<span class=\"status-badge evidence-pill empty\">{icon}{PathUtil.Html(label)}</span>";
 
-    private const int ChangeSurfaceFileCap = 8;
-
-    /// <summary>Projects the ADR 0007 change footprint — classification, AC verify checklist, touched files,
-    /// ship line — so a reviewer knows what to confirm without opening Dev Agent Record. [Story 9.4]</summary>
-    private static string ChangeSurfacePanel(StoryChangeSurface surface, bool hasDevRecord)
+    private static string ChangeSurfaceChartPanel(StoryChangeSurface surface)
     {
         var sb = new StringBuilder();
-        sb.Append("  <div class=\"change-surface\" id=\"sec-change-surface\">\n");
+        sb.Append("<div class=\"chart-panel change-surface-panel\" id=\"sec-change-surface\">\n");
+        sb.Append("<h3>Change Surface</h3>\n");
+        sb.Append(ChangeSurfacePanelInner(surface));
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Projects the ADR 0007 change footprint — classification, verify guidance, touched files,
+    /// ship line — below Task Breakdown / Next Steps so reviewers see what to confirm. [Story 9.4]</summary>
+    private static string ChangeSurfacePanelInner(StoryChangeSurface surface)
+    {
+        var sb = new StringBuilder();
+        sb.Append("  <div class=\"change-surface\">\n");
 
         // Classification line
         sb.Append("    <div class=\"change-surface-head\">");
-        sb.Append("<span class=\"change-surface-label\">Change surface</span>");
         if (surface.Classifications.Count > 0)
         {
             sb.Append($"<span class=\"change-surface-class\">{PathUtil.Html(string.Join(" + ", surface.Classifications))}</span>");
@@ -353,11 +360,18 @@ public sealed partial class HtmlRenderAdapter
         }
         sb.Append("</div>\n");
 
-        // Verify checklist (ACs)
+        // Verify — manual checklist first when authors include it; ACs secondary.
         sb.Append("    <div class=\"change-surface-section\">\n");
         sb.Append("      <div class=\"change-surface-section-label\">Verify</div>\n");
+        var hasVerifyManual = surface.VerifyBeforeReviewHtml is { Length: > 0 };
+        if (hasVerifyManual)
+        {
+            sb.Append($"      <div class=\"change-surface-verify-manual\">{surface.VerifyBeforeReviewHtml}</div>\n");
+        }
         if (surface.VerifyChecklist.Count > 0)
         {
+            if (hasVerifyManual)
+                sb.Append("      <div class=\"change-surface-section-sublabel\">Acceptance criteria</div>\n");
             sb.Append("      <ul class=\"change-surface-verify\">\n");
             foreach (var (number, plainText) in surface.VerifyChecklist)
             {
@@ -366,26 +380,26 @@ public sealed partial class HtmlRenderAdapter
             }
             sb.Append("      </ul>\n");
         }
-        else
+        else if (!hasVerifyManual)
         {
-            sb.Append("      <p class=\"change-surface-empty\">no acceptance criteria recorded</p>\n");
+            sb.Append("      <p class=\"change-surface-empty\">no verification guidance recorded</p>\n");
         }
         sb.Append("    </div>\n");
 
-        // Touched files
+        // Touched files — bulleted list with links to code pages when available.
         sb.Append("    <div class=\"change-surface-section\">\n");
         sb.Append("      <div class=\"change-surface-section-label\">Touched</div>\n");
         if (surface.ChangedFiles.Count > 0)
         {
-            var display = surface.ChangedFiles.Take(ChangeSurfaceFileCap).ToList();
-            var chips = display.Select(f => $"<span class=\"change-surface-file\">{PathUtil.Html(Path.GetFileName(f))}</span>");
-            sb.Append($"      <p class=\"change-surface-files\">{string.Join(" ", chips)}");
-            var remaining = surface.ChangedFiles.Count - display.Count;
-            if (remaining > 0 && hasDevRecord)
-                sb.Append($" <a class=\"change-surface-more\" href=\"#sec-dev-agent-record\">+{remaining} more</a>");
-            else if (remaining > 0)
-                sb.Append($" <span class=\"change-surface-more\">+{remaining} more</span>");
-            sb.Append("</p>\n");
+            sb.Append("      <ul class=\"change-surface-files\">\n");
+            foreach (var file in surface.ChangedFiles)
+            {
+                if (file.Href is { Length: > 0 } href)
+                    sb.Append($"        <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(file.Label)}</a></li>\n");
+                else
+                    sb.Append($"        <li>{PathUtil.Html(file.Label)}</li>\n");
+            }
+            sb.Append("      </ul>\n");
         }
         else
         {
@@ -434,14 +448,12 @@ public sealed partial class HtmlRenderAdapter
         main.Append(StatusStyles.LegendKey());
         main.Append(view.RetroLinkHtml);
         main.Append("  </div>\n");
-        // Evidence strip + ADR 0007 change-surface panel — same Status guard. [Story 9.4]
+        // Evidence strip — compact pills only in the header; change-surface panel sits below charts. [Story 9.4]
         if (view.Status is { Length: > 0 })
         {
             main.Append("  <div class=\"evidence-block\">\n");
             main.Append(EvidenceStrip(view.Evidence));
-            main.Append(ChangeSurfacePanel(view.ChangeSurface, view.DevAgentRecord.Count > 0));
             main.Append("  </div>\n");
-            toc.Add(new Toc.Entry(2, "Change Surface", "sec-change-surface"));
         }
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");
         main.Append("</header>\n\n");
@@ -462,6 +474,12 @@ public sealed partial class HtmlRenderAdapter
         }
         main.Append(view.NextStepsHtml);
         main.Append("</div>\n");
+
+        if (view.Status is { Length: > 0 })
+        {
+            main.Append(ChangeSurfaceChartPanel(view.ChangeSurface));
+            toc.Add(new Toc.Entry(2, "Change Surface", "sec-change-surface"));
+        }
 
         if (view.AcceptanceCriteria.Count > 0)
         {
@@ -544,6 +562,9 @@ public sealed partial class HtmlRenderAdapter
             sb.Append($"<div class=\"story-lead user-story\">{view.UserStoryHtml}</div>\n\n");
         }
 
+        // Create-story action sits above AC so the primary next step is visible before the criteria dump.
+        sb.Append($"<div class=\"epic-card\">\n  <div class=\"pending-note\">{view.NoteHtml}</div>\n</div>\n\n");
+
         if (view.AcBlocksHtml.Count > 0)
         {
             sb.Append("<section class=\"dashboard-narrow\">\n");
@@ -554,8 +575,6 @@ public sealed partial class HtmlRenderAdapter
             }
             sb.Append("</div>\n</div>\n</section>\n\n");
         }
-
-        sb.Append($"<div class=\"epic-card\">\n  <div class=\"pending-note\">{view.NoteHtml}</div>\n</div>\n\n");
 
         sb.Append("<section class=\"dashboard-narrow\">\n");
         sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(view.BackHref)}\">&larr; Back to Epic {view.EpicNumber}</a>\n");

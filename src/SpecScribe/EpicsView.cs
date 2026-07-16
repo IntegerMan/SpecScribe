@@ -187,14 +187,18 @@ public sealed record StoryEvidence(
     DateOnly? VerifiedDate,
     bool VerifiedIsReview);
 
+/// <summary>One file from the Dev Agent Record File List with an optional link to its code page.</summary>
+public sealed record ChangeSurfaceFile(string Path, string Label, string? Href);
+
 /// <summary>Host-neutral projection of a story's testable change footprint — derived from standard BMAD
 /// sections only (File List, Acceptance Criteria, Status/Change Log). Data only; markup lives in the
 /// renderer. [ADR 0007; Story 9.4]</summary>
 public sealed record StoryChangeSurface(
     IReadOnlyList<string> Classifications,
     IReadOnlyList<(int Number, string PlainText)> VerifyChecklist,
-    IReadOnlyList<string> ChangedFiles,
-    string? ShipLine);
+    IReadOnlyList<ChangeSurfaceFile> ChangedFiles,
+    string? ShipLine,
+    string? VerifyBeforeReviewHtml);
 
 /// <summary>The host-neutral SECTION view model for a drafted STORY page body. Its identity/status/drill are
 /// data; the task-breakdown sunburst renders from <see cref="Tasks"/>; everything else the story page shows is

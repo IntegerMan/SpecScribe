@@ -382,7 +382,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // specscribe.css gains .action-items-group / .action-item-cross / .deferred-* resolved treatment.
         // Golden fixture has no open action_items and no deferred-work.md — delta is primarily shared CSS.
         // [Story 9.6; golden-diff-normalization-gotchas]
-        const string expected = "cca91956db0578d20d4e9a9f12bf4f613c530ff92a71b60f54dae3c344a43e14";
+        // Regenerated for Story 9.4 change-surface UX polish: panel moved below Task Breakdown / Next Steps
+        // (chart-panel); touched files are a linked bulleted list; opportunistic ### Verify before marking review
+        // subsection surfaces in the panel; Dev Agent Record File List rows link to code pages when present.
+        // [Story 9.4; golden-diff-normalization-gotchas]
+        const string expected = "84eea163f2055125d2c04fe4b0bd7855009ee4c286a5008713f69f42804bb7b1";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

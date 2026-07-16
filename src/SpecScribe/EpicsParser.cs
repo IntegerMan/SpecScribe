@@ -395,6 +395,33 @@ public static class EpicsParser
         return MarkdownConverter.RenderBlock(slice);
     }
 
+    /// <summary>Extracts an H3 subsection anywhere in the artifact (e.g. <c>### Verify before marking review</c> under
+    /// Dev Notes), ending at the next H3 or H2. Citation brackets stripped; returns "" when absent. [ADR 0007]</summary>
+    public static string ExtractSubsectionHtml(string raw, string exactHeading)
+    {
+        var lines = raw.Replace("\r\n", "\n").Split('\n');
+        var idx = -1;
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].TrimEnd() == exactHeading) { idx = i; break; }
+        }
+        if (idx < 0) return string.Empty;
+
+        var end = lines.Length;
+        for (var i = idx + 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("### ", StringComparison.Ordinal) ||
+                lines[i].StartsWith("## ", StringComparison.Ordinal))
+            {
+                end = i;
+                break;
+            }
+        }
+
+        var slice = SourceCitationBrackets.Replace(string.Join("\n", lines[(idx + 1)..end]).Trim(), "$1");
+        return slice.Length == 0 ? string.Empty : MarkdownConverter.RenderBlock(slice);
+    }
+
     // A change-log list item that leads with an ISO date: "- 2026-07-06: <text>" (bullet may be - or *).
     private static readonly Regex ChangeLogDatedItem =
         new(@"^(?<bullet>\s*[-*]\s+)(?<date>\d{4}-\d{2}-\d{2})\s*:(?<rest>.*)$", RegexOptions.Compiled);

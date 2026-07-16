@@ -502,16 +502,19 @@ body {
   background: transparent;
 }
 
-/* ADR 0007 change-surface panel — footprint projection under the evidence strip. */
+/* ADR 0007 change-surface panel — footprint projection below Task Breakdown / Next Steps. */
+.chart-panel.change-surface-panel {
+  margin-bottom: 1.2rem;
+}
+
 .change-surface {
   width: 100%;
-  max-width: 42rem;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--warm-white);
-  font-size: 0.78rem;
-  line-height: 1.4;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.82rem;
+  line-height: 1.45;
   color: var(--ink-faded);
 }
 
@@ -520,9 +523,7 @@ body {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.35rem 0.5rem;
-  margin-bottom: 0.45rem;
-  padding-bottom: 0.35rem;
-  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.55rem;
 }
 
 .change-surface-label {
@@ -536,10 +537,11 @@ body {
 .change-surface-class {
   color: var(--ink);
   font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .change-surface-section {
-  margin-top: 0.35rem;
+  margin-top: 0.55rem;
 }
 
 .change-surface-section-label {
@@ -548,7 +550,31 @@ body {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ink-light);
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.2rem;
+}
+
+.change-surface-section-sublabel {
+  font-size: 0.72rem;
+  color: var(--ink-light);
+  margin: 0.45rem 0 0.15rem;
+}
+
+.change-surface-verify-manual {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+.change-surface-verify-manual p {
+  margin: 0 0 0.45rem;
+}
+
+.change-surface-verify-manual p:last-child {
+  margin-bottom: 0;
+}
+
+.change-surface-verify-manual code {
+  font-size: 0.78rem;
 }
 
 .change-surface-verify {
@@ -570,27 +596,19 @@ body {
 
 .change-surface-files {
   margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
 }
 
-.change-surface-file {
-  display: inline-block;
-  font-family: 'Courier New', monospace;
-  font-size: 0.72rem;
-  padding: 0.1rem 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: var(--parchment-dark);
-  color: var(--ink);
-}
-
-.change-surface-more {
+.change-surface-files a {
   color: var(--rust);
   text-decoration: none;
-  font-size: 0.72rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
 }
 
-.change-surface-more:hover,
-.change-surface-more:focus-visible {
+.change-surface-files a:hover,
+.change-surface-files a:focus-visible {
   text-decoration: underline;
 }
 

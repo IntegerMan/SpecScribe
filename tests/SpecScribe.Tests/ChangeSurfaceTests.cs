@@ -80,8 +80,28 @@ public class ChangeSurfaceTests
         Assert.Equal(1, surface.VerifyChecklist[0].Number);
         Assert.Contains("strip appears", surface.VerifyChecklist[0].PlainText, StringComparison.OrdinalIgnoreCase);
         Assert.Single(surface.ChangedFiles);
+        Assert.Equal("src/SpecScribe/EpicsParser.cs", surface.ChangedFiles[0].Path);
         Assert.NotNull(surface.ShipLine);
         Assert.Contains("review", surface.ShipLine!, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("2026-07-16", surface.ShipLine!);
     }
+
+    [Fact]
+    public void ExtractFileList_StripsNewAnnotationFromPath()
+    {
+        var raw = """
+            ## Dev Agent Record
+            ### File List
+            - src/SpecScribe/FollowUpRefs.cs (new)
+            """;
+        var files = ChangeSurface.ExtractFileList(raw);
+        Assert.Single(files);
+        Assert.Equal("src/SpecScribe/FollowUpRefs.cs", files[0]);
+        var entries = ChangeSurface.ExtractFileListEntries(raw);
+        Assert.Equal("FollowUpRefs.cs (new)", Path.GetFileName(entries[0].DisplayLabel));
+    }
+
+    [Fact]
+    public void NormalizeFileListPath_StripsParentheticalAnnotation()
+        => Assert.Equal("src/Foo.cs", ChangeSurface.NormalizeFileListPath("src/Foo.cs (new)"));
 }
