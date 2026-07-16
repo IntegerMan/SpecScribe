@@ -3702,6 +3702,19 @@ h1:has(> .status-legend) {
 .coverage-card .status-badge { margin: 0.15rem 0; }
 .coverage-note { margin-top: 0.6rem; }
 
+/* Story 9.1: each covering epic becomes a group — the epic header (coverage-card) followed by that epic's
+   stories as compact cards. Layout only; status color is routed through the shared --status-* tokens. */
+.coverage-group { margin: 0.3rem 0 0.9rem; }
+.coverage-story-cards { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0.5rem 0 0 1rem; }
+.coverage-story-card { flex: 1 1 260px; max-width: 380px; border-left: 3px solid var(--border); }
+.coverage-story-card.done { border-left-color: var(--status-done); }
+.coverage-story-card.review { border-left-color: var(--status-review); }
+.coverage-story-card.active { border-left-color: var(--status-active); }
+.coverage-story-card.ready { border-left-color: var(--status-ready); }
+.coverage-story-card.drafted { border-left-color: var(--status-drafted); }
+.coverage-story-card.pending { border-left-color: var(--status-pending); }
+.coverage-story-card.unrecognized { border-left-color: var(--status-unrecognized); }
+
 @media (max-width: 640px) {
   /* Journey menu collapses behind the toggle; key-views chips stay visible and wrap. */
   :root { --nav-offset: 5.5rem; }

@@ -347,7 +347,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 8.6 review: empty Backlog lane copy shortened to "No cards in backlog".
         // Regenerated for Story 8.7 review patches: Requirements panel header wraps Flow/Status-grid toggle +
         // View Requirements CTA in .req-panel-header-aside (title | controls, mirroring Now & Next).
-        const string expected = "1d3797a26ba6fbdc2afbebf1c7419e43058353254c39a1c3c9ba141006c6728e";
+        // Regenerated for Story 9.1: each requirement detail page (requirements/*.html) replaced its single
+        // primary-epic Coverage card with per-covering-epic GROUPS — each group is the covering-epic header
+        // (now emitted for EVERY covering epic, not just the primary) followed by that epic's stories as
+        // compact linked+badged cards; deferred vs unmapped empty states now read distinctly. specscribe.css
+        // gained the .coverage-group / .coverage-story-cards / .coverage-story-card.* layout rules (status
+        // color routed through the shared --status-* tokens). Every FR/NFR detail page shifts; the file set is
+        // unchanged. Deliberate, reviewed rendering change (AC #1). [Story 9.1; golden-diff-normalization-gotchas]
+        const string expected = "46b6c59a117aa746cffd66d1c03898baccccf96dab7972ff094209f2675110b4";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

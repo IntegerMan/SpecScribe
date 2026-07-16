@@ -2701,7 +2701,7 @@ public sealed class SiteGenerator
                 ? model.Epics.FirstOrDefault(e => e.Number == n)
                 : null;
             var outputRelative = $"requirements/{req.Slug}.html";
-            var html = RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav);
+            var html = RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav, model);
             WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative, skipRequirementId: req.Id));
         }
     }

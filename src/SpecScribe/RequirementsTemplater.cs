@@ -91,7 +91,7 @@ public static class RequirementsTemplater
         return sb.ToString();
     }
 
-    public static string RenderRequirement(RequirementInfo req, EpicInfo? coveringEpic, ProgressModel progress, SiteNav nav)
+    public static string RenderRequirement(RequirementInfo req, EpicInfo? coveringEpic, ProgressModel progress, SiteNav nav, EpicsModel epics)
     {
         var outputPath = $"requirements/{req.Slug}.html";
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -123,7 +123,20 @@ public static class RequirementsTemplater
 
         sb.Append($"<div class=\"story-lead\"><p>{req.TextHtml}</p></div>\n\n");
 
+        // Resolve every covering epic (not just the primary), in coverage order, skipping numbers with no
+        // matching epic — the same best-effort resolution as RequirementsParser.StoriesFor. This also fixes the
+        // pre-existing gap where a multi-epic requirement (e.g. "Epics 1 & 2") showed only the primary epic.
+        var byNumber = epics.Epics.ToDictionary(e => e.Number);
+        var coveringEpics = req.CoverageEpicNumbers
+            .Where(byNumber.ContainsKey)
+            .Select(n => byNumber[n])
+            .ToList();
+
         sb.Append("<div class=\"epic-card\">\n  <h3>Coverage</h3>\n");
+
+        // --- Branch A: deferred on purpose (kept structurally separate from the unmapped branch below so Story
+        //     9.3 can give the two DISTINCT visual treatment + link the deferred item to its deferral source;
+        //     9.1 distinguishes them in COPY only — do not merge these branches). [seam: Story 9.3] ---
         if (req.Deferred)
         {
             sb.Append("  <p class=\"pending-note\">Deferred — not yet assigned to an epic.</p>\n");
@@ -132,21 +145,47 @@ public static class RequirementsTemplater
                 sb.Append($"  <p class=\"epic-goal\">{PathUtil.Html(dn)}</p>\n");
             }
         }
-        else if (coveringEpic is not null)
+        // --- Branch B: covered by one or more epics — list every covering epic's stories, grouped by epic. ---
+        else if (coveringEpics.Count > 0)
         {
-            var epicProgress = progress.PerEpic.FirstOrDefault(p => p.Number == coveringEpic.Number);
-            sb.Append("  <div class=\"coverage-cards\">\n");
-            AppendCoverageCard(sb, coveringEpic, epicProgress, prefix);
-            sb.Append("  </div>\n");
+            // Honest framing: the FR Coverage Map is epic-level, so these are the stories in the covering
+            // epic(s), NOT a per-requirement-mapped subset. Grouping by epic makes that granularity visible.
+            sb.Append("  <p class=\"epic-goal\">Stories in the covering epic(s), grouped by epic — the coverage map is epic-level.</p>\n");
+
+            foreach (var epic in coveringEpics)
+            {
+                var epicProgress = progress.PerEpic.FirstOrDefault(p => p.Number == epic.Number);
+                sb.Append("  <div class=\"coverage-group\">\n");
+                sb.Append("    <div class=\"coverage-cards\">\n");
+                AppendCoverageCard(sb, epic, epicProgress, prefix);
+                sb.Append("    </div>\n");
+
+                if (epic.Stories.Count == 0)
+                {
+                    sb.Append("    <p class=\"pending-note\">No stories drafted in this epic yet.</p>\n");
+                }
+                else
+                {
+                    sb.Append("    <div class=\"coverage-story-cards\">\n");
+                    foreach (var story in epic.Stories)
+                    {
+                        AppendStoryCard(sb, story, prefix);
+                    }
+                    sb.Append("    </div>\n");
+                }
+                sb.Append("  </div>\n");
+            }
 
             if (req.CoverageNote is { Length: > 0 } note)
             {
                 sb.Append($"  <p class=\"epic-goal coverage-note\">{PathUtil.Html(note)}</p>\n");
             }
         }
+        // --- Branch C: not deferred and no covering epic — genuinely UNMAPPED. Distinct wording from the
+        //     deferred branch (AC #2); Story 9.3 adds the distinct visual treatment. [seam: Story 9.3] ---
         else
         {
-            sb.Append("  <p class=\"pending-note\">No covering epic recorded.</p>\n");
+            sb.Append("  <p class=\"pending-note\">Not yet mapped to any epic or story.</p>\n");
         }
         sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + SiteNav.RequirementsOutputPath)}\">&larr; All requirements</a>\n");
         sb.Append("</div>\n\n");
@@ -202,6 +241,34 @@ public static class RequirementsTemplater
         };
         sb.Append($"        <span class=\"epic-mosaic-sub\">{PathUtil.Html(tally)}</span>\n");
         sb.Append("      </div>\n    </a>\n");
+    }
+
+    /// <summary>One story rendered as a compact card under its covering-epic group: a small task-completion
+    /// ring, the story id + linked title, and a canonical status badge (color + icon + word). Reuses the
+    /// epic-mosaic card layout and the shared status vocabulary — every story always has a page (real artifact
+    /// or generated placeholder), so the title is never a dead-ended plain string.</summary>
+    private static void AppendStoryCard(StringBuilder sb, StoryInfo story, string prefix)
+    {
+        var statusClass = StatusStyles.ForStory(story);
+        var label = StatusStyles.StoryLabel(statusClass);
+        var href = prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id));
+        var donutAria = story.TasksTotal > 0
+            ? $"Story {story.Id} tasks: {story.TasksDone} of {story.TasksTotal} done"
+            : $"Story {story.Id}: no task plan yet";
+
+        sb.Append($"      <a class=\"epic-mosaic-card coverage-story-card {statusClass}\" href=\"{PathUtil.Html(href)}\">\n");
+        sb.Append("        <div class=\"epic-mosaic-donut\">\n");
+        sb.Append(Charts.Donut(new (string, int, string)[]
+        {
+            ("Done", story.TasksDone, "done"),
+            ("Remaining", Math.Max(0, story.TasksTotal - story.TasksDone), "pending"),
+        }, size: 64, ariaLabel: donutAria, showCenterText: false));
+        sb.Append("        </div>\n");
+        sb.Append("        <div class=\"epic-mosaic-label\">\n");
+        sb.Append($"          <span class=\"epic-mosaic-num\">Story {PathUtil.Html(story.Id)}</span>\n");
+        sb.Append($"          <span class=\"epic-mosaic-title\">{story.Title}</span>\n");
+        sb.Append($"          {StatusStyles.Badge(statusClass, label)}\n");
+        sb.Append("        </div>\n      </a>\n");
     }
 
     private static void AppendRequirementCard(StringBuilder sb, RequirementInfo req, string prefix)

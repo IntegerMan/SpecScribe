@@ -262,6 +262,73 @@ public class RequirementsParserTests
         Assert.Contains("req-flow-svg", html);
         Assert.Contains("No coverage", html);
     }
+
+    // ---- Story 9.1: requirement detail page lists its covering stories, grouped by epic ----
+
+    private static string RenderDetail(string reqId)
+    {
+        var (reqs, epics) = ParseMultiEpic();
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var req = reqs.ById[reqId];
+        var coveringEpic = req.CoverageEpicNumber is { } n ? epics.Epics.FirstOrDefault(e => e.Number == n) : null;
+        return RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav, epics);
+    }
+
+    [Fact]
+    public void RenderRequirement_MultiEpicCovered_ListsStoriesFromEveryCoveringEpic_LinkedAndBadged()
+    {
+        // FR2 spans Epics 1 & 2 — the regression this story also fixes: the old single-card Coverage body
+        // showed only the primary epic. Every covering epic's stories must appear, grouped, each linked to its
+        // page and carrying a canonical status badge.
+        var html = RenderDetail("FR2");
+
+        // Both covering epic group headers.
+        Assert.Contains("epics/epic-1.html", html);
+        Assert.Contains("epics/epic-2.html", html);
+
+        // Each covering epic's stories link to their (placeholder) story pages, from both epics.
+        Assert.Contains($"href=\"../{StoryEpicLinkifier.StoryPagePath("1.1")}\"", html);
+        Assert.Contains($"href=\"../{StoryEpicLinkifier.StoryPagePath("2.1")}\"", html);
+
+        // Rendered as grouped compact story cards, with a canonical status badge (drafted → "Drafted").
+        Assert.Contains("coverage-story-card", html);
+        Assert.Contains("status-badge drafted", html);
+        Assert.Contains(">Drafted<", html);
+
+        // Honest, epic-level framing — never phrased as a per-story mapping.
+        Assert.Contains("grouped by epic", html);
+    }
+
+    [Fact]
+    public void RenderRequirement_SingleEpicCovered_DoesNotLeakOtherEpicsStories()
+    {
+        // FR1 is covered solely by Epic 1 → only Epic 1's story appears; Epic 2's story must not leak in.
+        var html = RenderDetail("FR1");
+
+        Assert.Contains($"href=\"../{StoryEpicLinkifier.StoryPagePath("1.1")}\"", html);
+        Assert.DoesNotContain($"href=\"../{StoryEpicLinkifier.StoryPagePath("2.1")}\"", html);
+    }
+
+    [Fact]
+    public void RenderRequirement_DeferredVsUnmapped_RenderDistinctEmptyStates()
+    {
+        // AC #2: an uncovered requirement states it explicitly, and deferred-on-purpose reads distinctly from
+        // genuinely-unmapped (the copy-level distinction 9.1 makes; 9.3 adds the visual treatment).
+        var deferred = RenderDetail("FR3");
+        var unmapped = RenderDetail("FR4");
+
+        Assert.Contains("Deferred — not yet assigned to an epic.", deferred);
+        Assert.Contains("Not yet mapped to any epic or story.", unmapped);
+
+        // The two empty states are genuinely different, not the same note reused.
+        Assert.DoesNotContain("Not yet mapped to any epic or story.", deferred);
+        Assert.DoesNotContain("Deferred — not yet assigned to an epic.", unmapped);
+
+        // Neither uncovered requirement fabricates a story card.
+        Assert.DoesNotContain("coverage-story-card", deferred);
+        Assert.DoesNotContain("coverage-story-card", unmapped);
+    }
 }
 
 public class ProgressCalculatorTests : IDisposable

@@ -1,6 +1,10 @@
+---
+baseline_commit: 449211044872f896cda881495021fe985490286b
+---
+
 # Story 9.1: Requirement Pages Link to Their Covering Stories
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -48,31 +52,31 @@ Therefore the section's framing must be truthful: label it in a way that says **
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Thread `EpicsModel` into `RenderRequirement` (AC: #1)**
-  - [ ] Change `RequirementsTemplater.RenderRequirement` signature from `(RequirementInfo req, EpicInfo? coveringEpic, ProgressModel progress, SiteNav nav)` to add `EpicsModel epics` (keep `coveringEpic`/`progress` — the per-epic donut still needs `progress.PerEpic`). [Source: src/SpecScribe/RequirementsTemplater.cs:92]
-  - [ ] Update the sole caller `SiteGenerator.WriteRequirements` (which already has `model`) to pass it. [Source: src/SpecScribe/SiteGenerator.cs:850,865] — confirmed the only caller via grep.
+- [x] **Task 1 — Thread `EpicsModel` into `RenderRequirement` (AC: #1)**
+  - [x] Change `RequirementsTemplater.RenderRequirement` signature from `(RequirementInfo req, EpicInfo? coveringEpic, ProgressModel progress, SiteNav nav)` to add `EpicsModel epics` (keep `coveringEpic`/`progress` — the per-epic donut still needs `progress.PerEpic`). [Source: src/SpecScribe/RequirementsTemplater.cs:92]
+  - [x] Update the sole caller `SiteGenerator.WriteRequirements` (which already has `model`) to pass it. [Source: src/SpecScribe/SiteGenerator.cs:850,865] — confirmed the only caller via grep.
 
-- [ ] **Task 2 — Render covering stories grouped by epic (AC: #1)**
-  - [ ] In the Coverage section (`RequirementsTemplater.RenderRequirement`, currently src/SpecScribe/RequirementsTemplater.cs:123-149), replace the single primary-epic coverage card with **per-covering-epic groups**. Iterate `req.CoverageEpicNumbers` in order (not just the primary `CoverageEpicNumber`); resolve each to an `EpicInfo` from `epics.Epics` (skip numbers with no matching epic, mirroring `StoriesFor`'s best-effort resolution). This intentionally also fixes the pre-existing gap where a multi-epic requirement (e.g. FR2: "Epics 1 & 2") showed only Epic 1's coverage.
-  - [ ] For each epic group, render a linked epic header reusing the existing coverage-card data (status badge + `{done}/{total} tasks · {detailed}/{count} stories detailed` tally, from `progress.PerEpic.FirstOrDefault(p => p.Number == epic.Number)`). You may keep `AppendCoverageCard` as the group header, or factor a lighter header — either is fine; do not duplicate the donut logic, call the existing helper. [Source: src/SpecScribe/RequirementsTemplater.cs:160-202]
-  - [ ] Under each group header, render every `story` in `epic.Stories` as a compact card. Card contents:
-    - A small per-story donut. Reuse `Charts.MiniDonut(story.TasksDone, story.TasksTotal)` (src/SpecScribe/Charts.cs:101) or `Charts.Donut([("Done", story.TasksDone, "done"), ("Remaining", story.TasksTotal - story.TasksDone, "pending")], size: 64)` for stories with a task plan; render an empty ring for `TasksTotal == 0`.
+- [x] **Task 2 — Render covering stories grouped by epic (AC: #1)**
+  - [x] In the Coverage section (`RequirementsTemplater.RenderRequirement`, currently src/SpecScribe/RequirementsTemplater.cs:123-149), replace the single primary-epic coverage card with **per-covering-epic groups**. Iterate `req.CoverageEpicNumbers` in order (not just the primary `CoverageEpicNumber`); resolve each to an `EpicInfo` from `epics.Epics` (skip numbers with no matching epic, mirroring `StoriesFor`'s best-effort resolution). This intentionally also fixes the pre-existing gap where a multi-epic requirement (e.g. FR2: "Epics 1 & 2") showed only Epic 1's coverage.
+  - [x] For each epic group, render a linked epic header reusing the existing coverage-card data (status badge + `{done}/{total} tasks · {detailed}/{count} stories detailed` tally, from `progress.PerEpic.FirstOrDefault(p => p.Number == epic.Number)`). You may keep `AppendCoverageCard` as the group header, or factor a lighter header — either is fine; do not duplicate the donut logic, call the existing helper. [Source: src/SpecScribe/RequirementsTemplater.cs:160-202]
+  - [x] Under each group header, render every `story` in `epic.Stories` as a compact card. Card contents:
+    - A small per-story donut. Used `Charts.Donut([("Done", story.TasksDone, "done"), ("Remaining", story.TasksTotal - story.TasksDone, "pending")], size: 64, ariaLabel, showCenterText: false)` — Donut over MiniDonut so the ring carries an `ariaLabel` (a11y guardrail); `Math.Max(0, …)` guards the remaining segment; empty/no-plan stories degrade to an empty ring with a "no task plan yet" aria label.
     - Story id + title, linked to the story page: `story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id)`, prefixed with the page's relative `prefix`. **Every story always has a page** (real artifact page or generated placeholder) — never emit a dead-ended plain-text title. [Source: src/SpecScribe/EpicsTemplater.cs:407-416]
     - A canonical status badge via `StatusStyles.Badge(StatusStyles.ForStory(story), StatusStyles.StoryLabel(StatusStyles.ForStory(story)))`. Using `StoryLabel` gives the uniform canonical vocabulary ("Done" / "In review" / "In development" / "Ready for dev" / "Drafted") the AC's "canonical status" calls for; `Badge` already emits color + icon + word, so the badge is never color-only. [Source: src/SpecScribe/StatusStyles.cs:34-42,166-172]
-  - [ ] Reuse existing CSS classes (`epic-mosaic-card`, `coverage-cards`, `coverage-card`, `epic-mosaic-donut`, `epic-mosaic-label`, `status-badge`) — they already exist in the stylesheet. [Source: src/SpecScribe/assets/*.css:1755,1969,2347] If a small amount of new CSS is genuinely needed for the grouped layout, route colors through the existing `--status-*` tokens only (never a raw hex) — status color is a single-source system.
+  - [x] Reuse existing CSS classes (`epic-mosaic-card`, `coverage-cards`, `coverage-card`, `epic-mosaic-donut`, `epic-mosaic-label`, `status-badge`). Added a small layout-only block (`.coverage-group`, `.coverage-story-cards`, `.coverage-story-card.*`) whose status left-accent routes through the existing `--status-*` tokens only (no raw hex).
 
-- [ ] **Task 3 — Explicit, distinct empty states (AC: #2)**
-  - [ ] When a group's epic has zero stories (`epic.Stories.Count == 0`), render an explicit per-group note ("No stories drafted in this epic yet.") rather than an empty group.
-  - [ ] When `req.CoverageEpicNumbers` is empty (so `StoriesFor` yields nothing), state it explicitly and **distinguish deferred from unmapped now** — the data already supports it:
+- [x] **Task 3 — Explicit, distinct empty states (AC: #2)**
+  - [x] When a group's epic has zero stories (`epic.Stories.Count == 0`), render an explicit per-group note ("No stories drafted in this epic yet.") rather than an empty group.
+  - [x] When `req.CoverageEpicNumbers` is empty (so `StoriesFor` yields nothing), state it explicitly and **distinguish deferred from unmapped now** — the data already supports it:
     - `req.Deferred == true` → keep/extend the existing "Deferred — not yet assigned…" note, and append its `CoverageNote` when present. [Source: src/SpecScribe/RequirementsTemplater.cs:124-131]
-    - `req.Deferred == false` and no covering epics → distinct **unmapped** message (e.g. "Not yet mapped to any epic or story."). Do not reuse the deferred wording.
-  - [ ] Leave a seam for Story 9.3: 9.3 will give deferred vs unmapped **distinct visual treatment** and link deferred items to their deferral source. Keep the two branches structurally separate and comment the seam; do not attempt 9.3's visual/linking work here. [Source: _bmad-output/planning-artifacts/epics.md:1260-1278]
+    - `req.Deferred == false` and no covering epics → distinct **unmapped** message ("Not yet mapped to any epic or story."). Does not reuse the deferred wording.
+  - [x] Leave a seam for Story 9.3: kept the deferred (Branch A) and unmapped (Branch C) branches structurally separate with explicit `[seam: Story 9.3]` comments; no visual/linking work done here.
 
-- [ ] **Task 4 — Tests (AC: #1, #2)**
-  - [ ] Add tests exercising `RenderRequirement` HTML output. The existing `RequirementsAndProgressTests` already builds `RequirementsModel` + `EpicsModel` from `MultiEpicEpicsMd` and asserts `StoriesFor` for FR2 (→ 1.1, 2.1), FR3 (deferred, empty), FR4 (unmapped, empty). Reuse that fixture. [Source: tests/SpecScribe.Tests/RequirementsAndProgressTests.cs:140-193]
-  - [ ] Assert a covered requirement's page contains links to each covering story's page and its status badge, grouped under each covering epic (verify a **multi-epic** requirement like FR2 lists stories from *both* epics — the regression this story also fixes).
-  - [ ] Assert the deferred requirement (FR3) renders the deferred empty-state text and the unmapped requirement (FR4) renders the distinct unmapped text — and that they differ.
-  - [ ] Run the full suite; confirm no existing requirement/traceability test breaks on the signature change (`SiteGeneratorTraceabilityTests`, `RequirementsAndProgressTests`, `StylesheetTests`). `dotnet test` from repo root.
+- [x] **Task 4 — Tests (AC: #1, #2)**
+  - [x] Added tests exercising `RenderRequirement` HTML output, reusing the `MultiEpicEpicsMd` fixture via a `RenderDetail` helper.
+  - [x] Assert FR2 (multi-epic) lists stories from BOTH covering epics, each linked to its story page with a canonical status badge, grouped under each covering epic; added a single-epic guard (FR1) that Epic 2's story does not leak in.
+  - [x] Assert FR3 (deferred) and FR4 (unmapped) render distinct empty-state text and that neither reuses the other's wording, and neither fabricates a story card.
+  - [x] Ran the full suite (1152 tests): all pass, including `SiteGeneratorTraceabilityTests`, `RequirementsAndProgressTests`, `StylesheetTests`. Golden content fingerprint regenerated for the intended requirement-page rendering change.
 
 ## Dev Notes
 
@@ -139,8 +143,31 @@ Story 9.1's AC #2 references "when Story 9.3's states are available." Story 9.3 
 
 ### Agent Model Used
 
+Opus 4.8 (Cursor) — bmad-dev-story workflow.
+
 ### Debug Log References
+
+- Golden content-fingerprint test drifted as expected (requirement detail pages changed). A clean full-solution build established the authoritative new hash `46b6c59a…`; an earlier `c020608b…` value proved to be a stale partial-build (`--no-build` / single-project rebuild) artifact and was discarded. Determinism reconfirmed by a full clean run.
+- The dotnet test runner intermittently failed to write `.msCoverageSourceRootsMapping_SpecScribe.Tests` (stale file) and, in one run, reported "git CLI unavailable" for three git-history tests (`SiteGeneratorCodeInsightsTests`, `SiteGeneratorTimelineTests`); both were environmental (coverage-file cleanup + git-on-PATH), unrelated to this change, and pass with git available (final full run: 1152/1152 green).
 
 ### Completion Notes List
 
+- **Rendering-only story, as scoped.** Wired the existing `RequirementsParser.StoriesFor` data path into `RequirementsTemplater.RenderRequirement` — no new parser, status classifier, or FR→story resolver.
+- **AC #1:** The Coverage section now renders one group per covering epic (iterating `req.CoverageEpicNumbers`, not just the primary), each group being the existing `AppendCoverageCard` epic header followed by that epic's stories as compact linked cards (per-story task ring + id + linked title + canonical `StatusStyles.Badge`/`StoryLabel`). Honest, epic-level framing caption ("Stories in the covering epic(s), grouped by epic — the coverage map is epic-level"). This also fixed the pre-existing gap where a multi-epic requirement showed only its primary epic (verified on the real repo's FR2 → Epic 1 + Epic 2).
+- **AC #2:** Three structurally separate branches — deferred (Branch A), covered (Branch B), unmapped (Branch C) — with distinct copy for deferred ("Deferred — not yet assigned to an epic.") vs unmapped ("Not yet mapped to any epic or story."); a per-group note when a covering epic has no drafted stories. `[seam: Story 9.3]` comments mark where 9.3 adds distinct visual treatment + deferral-source links.
+- **Guardrails honored:** deterministic output (verified byte-stable golden); status color single-sourced through `--status-*` tokens (new CSS is layout + token-routed accents only, no raw hex); never color-only (uses `StatusStyles.Badge`); every story title links (real artifact or placeholder page); each new donut carries an `ariaLabel`; non-fatal resolution (missing epics skipped, `Math.Max(0, …)` guard on the remaining segment).
+- **Verification:** Generated the portal from this repo (`--source _bmad-output --output SpecScribeOutput`, 168 pages, 0 errors) and inspected `requirements/fr2.html` (two epic groups, linked+badged story cards) and unmapped NFR pages (distinct "Not yet mapped…" note, no fabricated cards). No deferred requirements exist in the real corpus, so the deferred branch is covered by the fixture-driven unit test.
+
 ### File List
+
+- `src/SpecScribe/RequirementsTemplater.cs` — modified (RenderRequirement signature + grouped coverage body + new `AppendStoryCard` helper)
+- `src/SpecScribe/SiteGenerator.cs` — modified (pass `model` to `RenderRequirement` in `WriteRequirements`)
+- `src/SpecScribe/assets/specscribe.css` — modified (layout-only `.coverage-group` / `.coverage-story-cards` / `.coverage-story-card.*` rules; status accents via `--status-*` tokens)
+- `tests/SpecScribe.Tests/RequirementsAndProgressTests.cs` — modified (3 new `RenderRequirement` HTML tests + `RenderDetail` helper)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — modified (golden content-fingerprint constant regenerated + Story 9.1 note)
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-07-16 | Story 9.1 implemented: requirement detail pages list their covering stories grouped by covering epic (linked, status-badged), fixing the multi-epic coverage gap; distinct deferred vs unmapped empty states with a Story 9.3 seam. Full suite 1152/1152 green; golden fingerprint regenerated. Status → review. |
