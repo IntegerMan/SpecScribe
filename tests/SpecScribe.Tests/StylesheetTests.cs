@@ -100,6 +100,7 @@ public class StylesheetTests
         var css = ReadStylesheet();
         Assert.Contains(".key-view-group", css);
         Assert.Contains(".key-view-panel", css);
+        Assert.Contains(".key-view-group.is-open", css);
         Assert.Contains(".tile-journey", css);
         Assert.Contains(".tile-journey-requirements", css);
     }

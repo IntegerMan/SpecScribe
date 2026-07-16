@@ -607,6 +607,9 @@ public class HtmlRenderAdapterTests
         Assert.Contains("key-view-group", keyViews);
         Assert.Contains("key-view-trigger", keyViews);
         Assert.Contains("Docs<span", keyViews);
+        Assert.Contains("aria-expanded=\"false\"", keyViews);
+        Assert.Contains("aria-controls=\"key-view-panel-docs\"", keyViews);
+        Assert.Contains("id=\"key-view-panel-docs\"", keyViews);
         // Related planning docs live under the Docs dropdown — not as five peer pills.
         Assert.DoesNotContain("class=\"quick-link-pill family-planning\" href=\"readme.html\"", keyViews);
         Assert.Contains("key-view-item", keyViews);
@@ -614,6 +617,48 @@ public class HtmlRenderAdapterTests
         Assert.Contains("PRD</a>", keyViews);
         Assert.Contains("Product Brief</a>", keyViews);
         Assert.Contains("href=\"epics.html\"", keyViews);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_JourneySegments_DoNotDuplicateStatTiles()
+    {
+        var view = DashboardWithRequirements(withEpics: true) with
+        {
+            StatTiles = new[]
+            {
+                new StatTile("1/2", "Functional reqs", null, "tip", "requirements.html"),
+                new StatTile("1/1", "Epics drafted", null, "tip", "epics.html"),
+                new StatTile("3", "Stories defined", null, "tip", "requirements.html"),
+                new StatTile("1/1", "Planned tasks done", null, "tip", "sprint.html"),
+                new StatTile("2", "Direct changes", null, "tip", "deferred.html"),
+                new StatTile("9", "Commits", null, "tip", "timeline.html"),
+            },
+            ProgressBars = new[] { new ProgressBarView("Implementation", 1, 2) },
+        };
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+        foreach (var label in view.StatTiles.Select(t => t.Label))
+        {
+            var needle = $"stat-label\">{label}</div>";
+            var first = body.IndexOf(needle, StringComparison.Ordinal);
+            Assert.True(first >= 0, $"missing tile {label}");
+            Assert.Equal(-1, body.IndexOf(needle, first + needle.Length, StringComparison.Ordinal));
+        }
+        Assert.Contains("aria-labelledby=\"tile-journey-requirements-label\"", body);
+        Assert.Contains("tile-journey-execution", body);
+        Assert.Contains("overall-progress-tile", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_OmitsOverallProgressWhenNoBars()
+    {
+        var view = DashboardWithRequirements(withEpics: true) with
+        {
+            ProgressBars = Array.Empty<ProgressBarView>(),
+            StatTiles = Array.Empty<StatTile>(),
+        };
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+        Assert.DoesNotContain("overall-progress-tile", body);
+        Assert.DoesNotContain("tile-journey-execution", body);
     }
 
     [Fact]

@@ -155,6 +155,11 @@
     var jt = e.target.closest(".js-tip");
     var seg = jt || (link ? link.querySelector(SEG) : e.target.closest(SEG));
     if (!seg) { hideTip(); lastTapped = null; return; }
+    // Primary dashboard drill cards keep one-tap navigation; hover/focus still show the tip.
+    if (link && link.classList.contains("stat-card-link")) {
+      lastTapped = null;
+      return;
+    }
     if (link) {
       if (lastTapped !== link) {
         // First tap on this link: show the tooltip instead of navigating.
@@ -173,6 +178,42 @@
       lastTapped = null;
     }
   }, { passive: false });
+
+  // ---- Key-view group toggles (white band Docs / Architecture / Work) -----------------------
+  // Desktop keeps hover/focus-within; click sets aria-expanded + .is-open for touch and AT. Narrow
+  // viewports force panels open via CSS (mirroring the dark-bar mobile treatment).
+  document.addEventListener("click", function (e) {
+    var trigger = e.target.closest ? e.target.closest(".key-view-trigger") : null;
+    if (trigger) {
+      e.preventDefault();
+      var group = trigger.closest(".key-view-group");
+      var open = trigger.getAttribute("aria-expanded") === "true";
+      document.querySelectorAll(".key-view-group.is-open").forEach(function (g) {
+        if (g === group) return;
+        g.classList.remove("is-open");
+        var t = g.querySelector(".key-view-trigger");
+        if (t) t.setAttribute("aria-expanded", "false");
+      });
+      if (group) group.classList.toggle("is-open", !open);
+      trigger.setAttribute("aria-expanded", open ? "false" : "true");
+      return;
+    }
+    if (!e.target.closest || !e.target.closest(".key-view-group")) {
+      document.querySelectorAll(".key-view-group.is-open").forEach(function (g) {
+        g.classList.remove("is-open");
+        var t = g.querySelector(".key-view-trigger");
+        if (t) t.setAttribute("aria-expanded", "false");
+      });
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    document.querySelectorAll(".key-view-group.is-open").forEach(function (g) {
+      g.classList.remove("is-open");
+      var t = g.querySelector(".key-view-trigger");
+      if (t) { t.setAttribute("aria-expanded", "false"); t.focus(); }
+    });
+  });
 
   // ---- Copy buttons on the Next Steps commands -------------------------------------------
   function copyText(text) {

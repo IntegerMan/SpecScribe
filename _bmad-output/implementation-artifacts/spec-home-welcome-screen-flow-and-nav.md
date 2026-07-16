@@ -2,7 +2,7 @@
 title: 'Home welcome screen flow and navigation'
 type: 'feature'
 created: '2026-07-16'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 context: []
 baseline_commit: '26e24c76ed07a7b835b3e0709129c95df3f5e319'
@@ -109,6 +109,47 @@ For the tooltip fix, prefer reusing `.js-tip` because `specscribe.js` already cr
 
 ### Completion Notes
 
-- Full `dotnet test` passed: 1169 passed, 0 failed, 0 skipped.
+- Full `dotnet test` passed after review patches: 1171 passed, 0 failed, 0 skipped.
 - `dotnet run --project src/SpecScribe -- generate` succeeded: 170 generated, 2 skipped.
 - Generated `SpecScribeOutput/index.html` contains `Work` in the dark nav, grouped key-view controls, `tile-journey` segments, and stat-card `.js-tip` markup; no home `View epics` / `View sprint` CTAs were found in the targeted home checks.
+- Review patches: one-tap touch for linked stats; key-view `aria-expanded`/`aria-controls` + click/mobile open path; claimed-label leftover bucketing; empty Overall Progress omit; journey `aria-labelledby`; panel right-edge align + button reset.
+
+## Suggested Review Order
+
+**Tooltips above sticky nav**
+
+- Stat cards opt into the body-level tip path instead of clipped CSS `::after`.
+  [`Charts.cs:15`](../../src/SpecScribe/Charts.cs#L15)
+
+- Linked dashboard stats keep one-tap navigation; native `title` is suppressed while the tip is active.
+  [`specscribe.js:159`](../../src/SpecScribe/assets/specscribe.js#L159)
+
+**Grouped navigation**
+
+- Dark-bar journey groups are Docs / Architecture / Work.
+  [`HtmlRenderAdapter.cs:224`](../../src/SpecScribe/HtmlRenderAdapter.cs#L224)
+
+- White key-view band collapses related docs into accessible grouped controls.
+  [`HtmlRenderAdapter.cs:153`](../../src/SpecScribe/HtmlRenderAdapter.cs#L153)
+
+- Click toggle + Escape close keep key-view menus usable on touch.
+  [`specscribe.js:186`](../../src/SpecScribe/assets/specscribe.js#L186)
+
+**Home journey tiles**
+
+- Tile band segments the application flow without changing counts.
+  [`HtmlRenderAdapter.Dashboard.cs:119`](../../src/SpecScribe/HtmlRenderAdapter.Dashboard.cs#L119)
+
+- Empty Overall Progress no longer forces a hollow Execution segment.
+  [`HtmlRenderAdapter.Dashboard.cs:204`](../../src/SpecScribe/HtmlRenderAdapter.Dashboard.cs#L204)
+
+- Restrained rails/labels and mobile-open key-view panels live here.
+  [`specscribe.css:353`](../../src/SpecScribe/assets/specscribe.css#L353)
+
+**Tests**
+
+- Nav/Work/Docs grouping, CTA removal, and journey uniqueness coverage.
+  [`HtmlRenderAdapterTests.cs:578`](../../tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs#L578)
+
+- Intentional golden fingerprint after home/nav/asset changes.
+  [`SiteGeneratorAdapterTests.cs:364`](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs#L364)

@@ -146,9 +146,10 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     }
 
     /// <summary>The white sub-header band: compact grouped wayfinding from <see cref="NavigationView.QuickLinks"/>
-    /// (Docs / Architecture / Work), reachable from every page. Multi-member groups become CSS-only dropdowns
-    /// (hover + focus-within + mobile toggle); single-member groups collapse to a flat pill. Omits the band
-    /// entirely when there are none. [home welcome key-views]</summary>
+    /// (Docs / Architecture / Work), reachable from every page. Multi-member groups become dropdowns (hover +
+    /// focus-within on desktop; always-open panels on narrow viewports; click toggle via specscribe.js);
+    /// single-member groups collapse to a flat pill. Omits the band entirely when there are none.
+    /// [home welcome key-views]</summary>
     private void AppendKeyViewsBand(StringBuilder sb, NavigationView nav, string prefix)
     {
         if (nav.QuickLinks.Count == 0) return;
@@ -171,9 +172,10 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
                 continue;
             }
 
+            var panelId = $"key-view-panel-{group.ToLowerInvariant()}";
             sb.Append($"      <div class=\"key-view-group {QuickLinkFamily(group)}\">\n");
-            sb.Append($"        <button class=\"quick-link-pill key-view-trigger\" type=\"button\" aria-haspopup=\"true\">{Icons.ForConcept(group)}{PathUtil.Html(group)}<span class=\"site-menu-caret\" aria-hidden=\"true\">&#9662;</span></button>\n");
-            sb.Append("        <div class=\"key-view-panel\">\n");
+            sb.Append($"        <button class=\"quick-link-pill key-view-trigger\" type=\"button\" aria-haspopup=\"true\" aria-expanded=\"false\" aria-controls=\"{panelId}\">{Icons.ForConcept(group)}{PathUtil.Html(group)}<span class=\"site-menu-caret\" aria-hidden=\"true\">&#9662;</span></button>\n");
+            sb.Append($"        <div class=\"key-view-panel\" id=\"{panelId}\">\n");
             foreach (var m in members)
             {
                 sb.Append($"          <a class=\"key-view-item\" href=\"{PathUtil.Html(prefix + m.Path)}\" data-tooltip=\"{PathUtil.Html(m.Desc)}\">{Icons.ForConcept(m.Label)}{PathUtil.Html(m.Title)}</a>\n");

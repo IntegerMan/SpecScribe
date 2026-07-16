@@ -350,16 +350,21 @@ body {
 .quick-link-pill.family-requirements { border-left-color: var(--rust-light); }
 .quick-link-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
-/* White-band grouped key views — same hover/focus-within dropdown pattern as the dark bar, pill-shaped. */
+/* White-band grouped key views — hover/focus-within + click `.is-open` (JS sets aria-expanded). */
 .key-view-group { position: relative; display: inline-flex; }
 .key-view-group.family-planning > .key-view-trigger { border-left-color: var(--gold-light); }
 .key-view-group.family-architecture > .key-view-trigger { border-left-color: var(--teal); }
 .key-view-group.family-epics > .key-view-trigger { border-left-color: var(--moss-light); }
 .key-view-group.family-requirements > .key-view-trigger { border-left-color: var(--rust-light); }
 .key-view-trigger {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
   cursor: pointer;
   font: inherit;
   font-size: 0.78rem;
+  color: inherit;
+  background: var(--cream);
 }
 .key-view-panel {
   position: absolute;
@@ -368,6 +373,7 @@ body {
   z-index: 220;
   display: none;
   min-width: 11rem;
+  max-width: min(18rem, calc(100vw - 2rem));
   flex-direction: column;
   padding: 0.3rem;
   background: var(--warm-white);
@@ -375,8 +381,13 @@ body {
   border-radius: 8px;
   box-shadow: 0 6px 18px var(--shadow);
 }
+.key-view-group:last-child > .key-view-panel {
+  left: auto;
+  right: 0;
+}
 .key-view-group:hover > .key-view-panel,
-.key-view-group:focus-within > .key-view-panel { display: flex; }
+.key-view-group:focus-within > .key-view-panel,
+.key-view-group.is-open > .key-view-panel { display: flex; }
 .key-view-item {
   display: flex;
   align-items: center;
@@ -3381,7 +3392,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   gap: 1rem;
   align-items: stretch;
   flex: 1 1 auto;
-  min-width: min(100%, 18rem);
+  min-width: min(100%, 12rem);
   padding: 0.35rem 0.35rem 0.35rem 0.65rem;
   border-left: 3px solid var(--border);
   box-sizing: border-box;
@@ -3918,6 +3929,22 @@ body:has(main.req-detail) .doc-header {
     background: transparent;
   }
   .site-nav-key-views .quick-link-pills { padding: 0.45rem 0.8rem; }
+  /* Key-view groups mirror the dark-bar mobile treatment: panels stay open and in-flow. */
+  .key-view-group { display: block; width: 100%; }
+  .key-view-trigger { width: 100%; justify-content: flex-start; }
+  .key-view-panel {
+    position: static;
+    display: flex;
+    left: auto;
+    right: auto;
+    min-width: 0;
+    max-width: none;
+    padding: 0.15rem 0 0.25rem 0.85rem;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }

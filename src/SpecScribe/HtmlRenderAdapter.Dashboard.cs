@@ -125,6 +125,17 @@ public sealed partial class HtmlRenderAdapter
         var executionTiles = view.StatTiles.Where(t => t.Label == "Planned tasks done").ToList();
         var insightTiles = view.StatTiles.Where(t => t.Label is "Commit" or "Commits").ToList();
         var reviewTiles = view.StatTiles.Where(t => t.Label == "Direct changes").ToList();
+        // One claimed set for leftover rendering — never maintain a second parallel label list.
+        var claimed = new HashSet<string>(StringComparer.Ordinal);
+        void Claim(IEnumerable<StatTile> tiles)
+        {
+            foreach (var tile in tiles) claimed.Add(tile.Label);
+        }
+        Claim(reqTiles);
+        Claim(epicStoryTiles);
+        Claim(executionTiles);
+        Claim(insightTiles);
+        Claim(reviewTiles);
 
         AppendJourneySegment(sb, "requirements", "Requirements", body =>
         {
@@ -132,7 +143,6 @@ public sealed partial class HtmlRenderAdapter
                 body.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
         });
 
-        var epicsHref = view.Epics is { Epics.Count: > 0 } ? SiteNav.EpicsOutputPath : null;
         AppendJourneySegment(sb, "epics", "Epics & Stories", body =>
         {
             foreach (var tile in epicStoryTiles)
@@ -160,13 +170,10 @@ public sealed partial class HtmlRenderAdapter
                 body.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
         });
 
-        // Any unexpected remaining tiles keep their place at the end so counts never disappear.
+        // Unexpected remaining tiles keep their place at the end so counts never disappear.
         foreach (var tile in view.StatTiles)
         {
-            if (IsRequirementsStat(tile)
-                || tile.Label is "Epics drafted" or "Stories defined" or "Planned tasks done" or "Direct changes"
-                    or "Commit" or "Commits")
-                continue;
+            if (claimed.Contains(tile.Label)) continue;
             sb.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
         }
 
@@ -183,34 +190,35 @@ public sealed partial class HtmlRenderAdapter
         var body = new StringBuilder();
         writeChildren(body);
         if (body.Length == 0) return;
-        sb.Append($"  <div class=\"tile-journey tile-journey-{key}\" aria-label=\"{PathUtil.Html(label)}\">\n");
-        sb.Append($"    <span class=\"tile-journey-label\">{PathUtil.Html(label)}</span>\n");
+        var labelId = $"tile-journey-{key}-label";
+        sb.Append($"  <div class=\"tile-journey tile-journey-{key}\" aria-labelledby=\"{labelId}\">\n");
+        sb.Append($"    <span id=\"{labelId}\" class=\"tile-journey-label\">{PathUtil.Html(label)}</span>\n");
         sb.Append(body);
         sb.Append("  </div>\n");
     }
 
     /// <summary>Compact Overall Progress tile — a single completion ring (Implementation when tracked, else
     /// Planning). The repetitive Planning/Implementation legend is omitted (the headline stats above already
-    /// carry those fractions). Drill-through lives on the surrounding execution/stat tiles, not a header CTA.</summary>
+    /// carry those fractions). Drill-through lives on the surrounding execution/stat tiles, not a header CTA.
+    /// Omitted entirely when there are no bars so an empty Execution rail never appears.</summary>
     private void AppendOverallProgressTile(StringBuilder sb, IReadOnlyList<ProgressBarView> bars)
     {
+        if (bars.Count == 0) return;
+
         sb.Append("<div class=\"tile-card overall-progress-tile\">\n");
         sb.Append("<div class=\"tile-card-header\"><h3>Overall Progress</h3></div>\n");
-        if (bars.Count > 0)
+        var ring = bars.Count > 1 && bars[1].Max > 0 ? bars[1] : bars[0];
+        var pct = ring.Max <= 0 ? 0 : (int)Math.Round(Math.Clamp((double)ring.Value / ring.Max * 100, 0, 100));
+        var segments = new List<(string Label, int Value, string CssClass)>
         {
-            var ring = bars.Count > 1 && bars[1].Max > 0 ? bars[1] : bars[0];
-            var pct = ring.Max <= 0 ? 0 : (int)Math.Round(Math.Clamp((double)ring.Value / ring.Max * 100, 0, 100));
-            var segments = new List<(string Label, int Value, string CssClass)>
-            {
-                ("Complete", ring.Value, "done"),
-                ("Remaining", Math.Max(0, ring.Max - ring.Value), "pending"),
-            };
+            ("Complete", ring.Value, "done"),
+            ("Remaining", Math.Max(0, ring.Max - ring.Value), "pending"),
+        };
 
-            // Ring carries progressbar semantics so assistive tech still gets the single completion value. [Story 1.4 AC #1]
-            sb.Append($"<div class=\"overall-progress-body\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Overall progress: {pct}%\">\n");
-            sb.Append(Charts.Donut(segments, size: 72, ariaLabel: $"Overall progress: {pct}%", centerText: $"{pct}%"));
-            sb.Append("</div>\n");
-        }
+        // Ring carries progressbar semantics so assistive tech still gets the single completion value. [Story 1.4 AC #1]
+        sb.Append($"<div class=\"overall-progress-body\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Overall progress: {pct}%\">\n");
+        sb.Append(Charts.Donut(segments, size: 72, ariaLabel: $"Overall progress: {pct}%", centerText: $"{pct}%"));
+        sb.Append("</div>\n");
         sb.Append("</div>\n");
     }
 
