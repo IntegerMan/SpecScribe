@@ -15,3 +15,4 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
 - [ADR 0004 — Preserve Cross-Surface Interaction Semantics and Host-Aware Theme Boundaries](0004-cross-surface-interaction-and-theme-contract.md) — **Accepted**
 - [ADR 0005 — VS Code Webview Runtime: Core↔Extension Seam and Packaging](0005-vs-code-webview-runtime-and-packaging.md) — **Accepted** (amended by ADR 0006)
 - [ADR 0006 — Delivery Architecture & Distribution: JSON + SPA + npx vs. C# Static-Site + Bundled-Binary](0006-delivery-architecture-and-distribution.md) — **Accepted** (amends ADR 0005; re-affirms C# core, adds npx + optional JSON/SPA adapter, defers the pure-TS pivot)
+- [ADR 0007 — A "Change Surface" Descriptor for Testing a Change and Understanding Its Footprint](0007-change-surface-descriptor-for-testing-and-footprint.md) — **Proposed** (a structured per-artifact block naming the observable surfaces, entry points, states, and invariants of a change)

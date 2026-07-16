@@ -359,10 +359,10 @@ public class EpicsParserTests
     // ---- Story 9.4 test evidence + change-log verification ------------------------------------------------
 
     [Theory]
-    [InlineData("586 tests green", "586 tests green")]
-    [InlineData("759 C# tests green", "759 tests green")]
-    [InlineData("429 tests pass", "429 tests passing")]
-    [InlineData("440 tests passing", "440 tests passing")]
+    [InlineData("586 tests green", "586 passing tests")]
+    [InlineData("759 C# tests green", "759 passing tests")]
+    [InlineData("429 tests pass", "429 passing tests")]
+    [InlineData("440 tests passing", "440 passing tests")]
     public void ExtractTestEvidence_NormalizesKnownShapes(string phrase, string expected)
     {
         var raw = $"""
@@ -385,7 +385,7 @@ public class EpicsParserTests
             ## Change Log
             - 2026-07-11 — **Implemented.** Mentions 999 tests green elsewhere.
             """;
-        Assert.Equal("12 tests green", EpicsParser.ExtractTestEvidence(raw));
+        Assert.Equal("12 passing tests", EpicsParser.ExtractTestEvidence(raw));
     }
 
     [Fact]
@@ -399,7 +399,7 @@ public class EpicsParserTests
             ## Change Log
             - 2026-07-11 — **Shipped with 88 tests passing.**
             """;
-        Assert.Equal("88 tests passing", EpicsParser.ExtractTestEvidence(raw));
+        Assert.Equal("88 passing tests", EpicsParser.ExtractTestEvidence(raw));
     }
 
     [Fact]
@@ -423,6 +423,7 @@ public class EpicsParserTests
         Assert.NotNull(result);
         Assert.Equal(new DateOnly(2026, 7, 11), result!.Value.Date);
         Assert.True(result.Value.IsVerification);
+        Assert.Contains("Code review passed", result.Value.Action);
     }
 
     [Fact]

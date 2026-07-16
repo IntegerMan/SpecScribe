@@ -85,9 +85,13 @@ public class StylesheetTests
         Assert.Contains(".evidence-strip", css);
         Assert.Contains(".evidence-pill", css);
         Assert.Contains(".evidence-pill.empty", css);
-        Assert.Contains(".evidence-link", css);
+        Assert.Contains(".evidence-pill.tests-pass", css);
+        Assert.Contains(".evidence-verify", css);
+        Assert.Contains(".evidence-latest", css);
         Assert.Contains("var(--ink-light)", css); // empty-state muted text reuses existing token
+        Assert.Contains("var(--moss)", css); // tests-pass reuses done/moss channel
         Assert.DoesNotContain("--status-evidence", css); // no 7th status token
+        Assert.DoesNotContain(".evidence-link", css); // replaced by labeled Dev record / Change log links
     }
 
     [Fact]
@@ -588,5 +592,34 @@ public class StylesheetTests
         // silently re-tune the deferred ACCENT — exactly the owner's no-accent-retune constraint. It must stay
         // a frozen literal at the pre-pass value.
         Assert.Equal("#7a6250", TokenValue(ReadStylesheet(), "--status-deferred"));
+    }
+
+    // ---- Story 9.5: AC resting card + collapsible Dev Notes ---------------------------------
+
+    [Fact]
+    public void Stylesheet_AcCriterionHasRestingCardFrameDistinctFromStrongerTarget()
+    {
+        var css = ReadStylesheet();
+        // Resting frame: border + parchment tint + gold left accent (no new --status-* token).
+        Assert.Contains(".ac-criterion", css);
+        Assert.Contains("border: 1px solid var(--border)", css);
+        Assert.Contains("border-left: 3px solid var(--gold)", css);
+        Assert.Contains("background: var(--parchment)", css);
+        // :target stays a distinct, stronger rule than resting.
+        Assert.Contains(".ac-criterion:target", css);
+        Assert.Contains("box-shadow: inset 5px 0 0 var(--gold)", css);
+        // Decision recorded in CSS: epic-card .ac-block stays frameless (denser card context).
+        Assert.Contains(".ac-block itself stays frameless", css);
+    }
+
+    [Fact]
+    public void Stylesheet_CollapsibleSectionReusesCaretGrammar()
+    {
+        var css = ReadStylesheet();
+        Assert.Contains(".collapsible-section > summary", css);
+        Assert.Contains(".collapsible-section > summary::before", css);
+        Assert.Contains("content: \"▸ \"", css);
+        Assert.Contains(".collapsible-section[open] > summary::before { content: \"▾ \"; }", css);
+        Assert.Contains(".collapsible-section > summary > h2", css);
     }
 }

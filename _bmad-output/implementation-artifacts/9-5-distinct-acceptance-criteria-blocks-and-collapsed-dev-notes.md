@@ -1,6 +1,10 @@
+---
+baseline_commit: 26316799413a72a9ef6061ecb4f8853fee219c63
+---
+
 # Story 9.5: Distinct Acceptance-Criteria Blocks and Collapsed Dev Notes
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

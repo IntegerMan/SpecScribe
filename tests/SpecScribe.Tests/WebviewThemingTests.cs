@@ -107,6 +107,9 @@ public class WebviewThemingTests
         Assert.DoesNotContain("--vscode-errorForeground", bridge);
         Assert.DoesNotContain("--vscode-editorError", bridge);
         Assert.DoesNotContain("--vscode-editorWarning", bridge);
+        // Story 9.5: resting AC tint companion (site parchment doesn't read on dark) beside the :target override.
+        Assert.Contains(".vscode-dark .ac-criterion,", bridge);
+        Assert.Contains(".vscode-dark .ac-criterion:target,", bridge);
     }
 
     // ----- Webview-only: the theme can never leak into the generated HTML surface (byte-parity guardrail) -------

@@ -415,4 +415,95 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         // Fixture story 1.1 has 0/1 tasks done → muted count badge, no donut inside it.
         Assert.Contains("task-badge none-done\">0/1 tasks", html);
     }
+
+    // ---- Story 9.5: AC resting class + Dev Notes collapse + TOC invariant --------------------
+
+    [Fact]
+    public void GenerateAll_StoryPageAcCriteriaCarryRestingClassAndAnchors()
+    {
+        GenerateSite();
+
+        var html = File.ReadAllText(DraftedStoryPage);
+        Assert.Contains("class=\"ac-criterion\"", html);
+        Assert.Contains("id=\"ac-1\"", html);
+        Assert.Contains("ac-panel", html);
+        Assert.Contains("id=\"sec-acceptance-criteria\"", html);
+    }
+
+    [Fact]
+    public void GenerateAll_DevNotesCollapsesByDefault_ContextAndTasksStayExpanded()
+    {
+        // Richer artifact: Dev Notes with H3 subsections + Context & Scope + Tasks. Overwrite the fixture
+        // for this test only so the shared Story11Md stays the NFR8 no-Dev-Notes baseline.
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-drafted-story.md"), """
+            # Story 1.1: Drafted Story
+
+            Status: ready-for-dev
+
+            ## Story
+
+            As a contributor, I want a drafted story. Sequence this after Story 1.2 (part of Epic 1).
+
+            ## Acceptance Criteria
+
+            1. **Given** deferred notes exist **When** the site is generated **Then** they render **And** Story 1.2 stays reachable.
+
+            ## Context & Scope
+
+            Framing for the contract.
+
+            ## Tasks / Subtasks
+
+            - [ ] Task 1: Do the thing (AC: #1)
+
+            ## Dev Notes
+
+            ### Project Structure Notes
+
+            Reuse map body.
+
+            ### References
+
+            - [Source: planning-artifacts/epics.md]
+            """);
+
+        GenerateSite();
+        var html = File.ReadAllText(DraftedStoryPage);
+
+        Assert.Contains("<details class=\"collapsible-section\"", html);
+        Assert.Contains("id=\"dev-notes-section\"", html);
+        // Collapsed by default — no open attribute on the collapsible-section details.
+        Assert.DoesNotContain("<details class=\"collapsible-section\" open", html);
+        Assert.DoesNotContain("<details open class=\"collapsible-section\"", html);
+        Assert.Contains("<summary><h2 id=\"dev-notes\">", html);
+        // References H3 under Dev Notes ends up inside the collapsed details (id stripped).
+        Assert.Contains("<h3>References</h3>", html);
+        Assert.DoesNotContain("id=\"references\"", html);
+        Assert.DoesNotContain("id=\"project-structure-notes\"", html);
+        // Context & Scope and Tasks stay expanded — their H2s are not inside a collapsible-section.
+        Assert.Contains("<h2 id=\"context-scope\">Context &amp; Scope</h2>", html);
+        Assert.Contains("<h2 id=\"tasks-subtasks\">Tasks / Subtasks</h2>", html);
+        Assert.DoesNotContain("id=\"context-scope-section\"", html);
+        Assert.DoesNotContain("id=\"tasks-subtasks-section\"", html);
+        // (AC: #1) in Tasks still deep-links to the AC panel.
+        Assert.Contains("href=\"#ac-1\"", html);
+
+        // TOC: Dev Notes live link present; buried subsection ids absent.
+        Assert.Contains("href=\"#dev-notes\"", html);
+        Assert.DoesNotContain("href=\"#project-structure-notes\"", html);
+        Assert.DoesNotContain("href=\"#references\"", html);
+        Assert.Contains("href=\"#context-scope\"", html);
+        Assert.Contains("href=\"#tasks-subtasks\"", html);
+    }
+
+    [Fact]
+    public void GenerateAll_NoDevNotes_EmitsNoCollapsibleSection()
+    {
+        // Story11Md has Tasks but no Dev Notes / References — NFR8 degrade-to-absent.
+        GenerateSite();
+
+        var html = File.ReadAllText(DraftedStoryPage);
+        Assert.DoesNotContain("collapsible-section", html);
+        Assert.Contains("<h2 id=\"tasks-subtasks\">", html);
+    }
 }

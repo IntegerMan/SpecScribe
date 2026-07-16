@@ -1956,6 +1956,11 @@ public sealed class SiteGenerator
         var criteriaByNumber = acceptanceCriteria.ToDictionary(ac => ac.Number, ac => ac.PlainText);
         remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
 
+        // Collapse Dev Notes / References last — after every flat-HTML transform — so the <details>
+        // insertion + buried-H3 id-strip is the final mutation. Shared fragment → HTML/webview/SPA stay
+        // byte-identical. No-match degrades to the unchanged remainder (NFR8). [Story 9.5]
+        remainderHtml = CollapsibleSections.WrapStoryRemainder(remainderHtml);
+
         // TasksDone/Total already filled by ProgressCalculator — one source of truth (Story 8.2). Tests +
         // verified date are best-effort free-text heuristics; no new authoring schema. [Story 9.4]
         var changelog = EpicsParser.ExtractChangeLogVerification(artifactRaw);
@@ -1964,7 +1969,8 @@ public sealed class SiteGenerator
             story.TasksTotal,
             EpicsParser.ExtractTestEvidence(artifactRaw),
             changelog?.Date,
-            changelog?.IsVerification ?? false);
+            changelog?.IsVerification ?? false,
+            changelog?.Action);
 
         return new StoryPageFragments(
             artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,

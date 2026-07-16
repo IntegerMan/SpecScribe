@@ -730,7 +730,8 @@ public class HtmlRenderAdapterTests
     private static StoryPageView StoryBodyView(
         StoryEvidence evidence,
         string? status = "done",
-        IReadOnlyList<DevAgentEntry>? devRecord = null) => new()
+        IReadOnlyList<DevAgentEntry>? devRecord = null,
+        string changeLogHtml = "") => new()
     {
         Id = "1.1",
         TitleHtml = "Evidence Strip",
@@ -749,22 +750,30 @@ public class HtmlRenderAdapterTests
         DevAgentRecord = devRecord ?? new[] { new DevAgentEntry("Completion Notes", "<p>notes</p>") },
         ReviewFindingsHtml = string.Empty,
         RemainderHtml = string.Empty,
-        ChangeLogHtml = string.Empty,
+        ChangeLogHtml = changeLogHtml,
     };
 
     [Fact]
     public void RenderStoryBody_EvidenceStrip_PopulatedPillsAndDevRecordLink()
     {
-        var evidence = new StoryEvidence(5, 5, "586 tests green", new DateOnly(2026, 7, 9), VerifiedIsReview: true);
-        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
+        var evidence = new StoryEvidence(5, 5, "586 passing tests", new DateOnly(2026, 7, 9), VerifiedIsReview: true,
+            LatestChangeSummary: "Code review passed; Status → done.");
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(
+            evidence,
+            changeLogHtml: "<ul><li>entry</li></ul>"));
 
         Assert.Contains("class=\"evidence-strip\"", html);
         Assert.Contains("&#10003; 5 tasks", html);
-        Assert.Contains("586 tests green", html);
+        Assert.Contains("586 passing tests", html);
+        Assert.Contains("evidence-pill tests-pass", html);
         Assert.Contains("verified 2026-07-09", html);
         Assert.Contains("href=\"#sec-dev-agent-record\"", html);
-        Assert.Contains("class=\"evidence-link\"", html);
+        Assert.Contains("href=\"#sec-change-log\"", html);
+        Assert.Contains("Dev record", html);
+        Assert.Contains("Change log", html);
+        Assert.Contains("Latest: Code review passed", html);
         Assert.Contains("id=\"sec-dev-agent-record\"", html);
+        Assert.DoesNotContain("class=\"evidence-link\"", html);
     }
 
     [Fact]
@@ -776,16 +785,19 @@ public class HtmlRenderAdapterTests
         Assert.Contains("evidence-pill empty", html);
         Assert.Contains("no test evidence recorded", html);
         Assert.Contains("class=\"evidence-strip\"", html); // strip still present
+        Assert.DoesNotContain("tests-pass", html);
     }
 
     [Fact]
     public void RenderStoryBody_EvidenceStrip_NonVerificationDateReadsUpdated()
     {
-        var evidence = new StoryEvidence(2, 4, "12 tests passing", new DateOnly(2026, 7, 8), VerifiedIsReview: false);
+        var evidence = new StoryEvidence(2, 4, "12 passing tests", new DateOnly(2026, 7, 8), VerifiedIsReview: false,
+            LatestChangeSummary: "Tweaked the CSS spacing.");
         var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
 
         Assert.Contains("updated 2026-07-08", html);
         Assert.DoesNotContain("verified 2026-07-08", html);
+        Assert.Contains("Latest: Tweaked the CSS spacing.", html);
     }
 
     [Fact]
@@ -800,13 +812,14 @@ public class HtmlRenderAdapterTests
         Assert.Contains("no test evidence recorded", html);
         Assert.Contains("no verification recorded", html);
         Assert.DoesNotContain("href=\"#sec-dev-agent-record\"", html);
-        Assert.DoesNotContain("class=\"evidence-link\"", html);
+        Assert.DoesNotContain("href=\"#sec-change-log\"", html);
+        Assert.DoesNotContain("Latest:", html);
     }
 
     [Fact]
     public void RenderStoryBody_EvidenceStrip_OmittedWhenNoStatusBadge()
     {
-        var evidence = new StoryEvidence(5, 5, "10 tests green", new DateOnly(2026, 7, 1), true);
+        var evidence = new StoryEvidence(5, 5, "10 passing tests", new DateOnly(2026, 7, 1), true);
         var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence, status: null));
 
         Assert.DoesNotContain("evidence-strip", html);

@@ -238,7 +238,17 @@
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
 }
 
-/* The :target AC-highlight paints a literal pale gold; use a translucent tuned-gold wash on dark instead. */
+/* Resting AC card uses site parchment (#f4ead5) which reads as a bright blotch on VS Code dark —
+   flatten to a translucent gold wash so the border + left accent still carry distinctness. [Story 9.5] */
+.vscode-dark .ac-criterion,
+.vscode-high-contrast .ac-criterion {
+  background: rgba(230, 181, 46, 0.08);
+  background: color-mix(in srgb, var(--gold-light) 8%, transparent);
+  border-color: var(--vscode-panel-border, var(--border));
+}
+
+/* The :target AC-highlight paints a literal pale gold; use a translucent tuned-gold wash on dark instead.
+   Kept stronger than the resting wash above so the jumped-to criterion stays unmistakable. */
 .vscode-dark .ac-criterion:target,
 .vscode-high-contrast .ac-criterion:target {
   background: rgba(230, 181, 46, 0.22); /* plain fallback for hosts without color-mix() support */

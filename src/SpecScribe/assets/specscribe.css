@@ -463,13 +463,20 @@ body {
 .kicker-row .story-kicker { margin-bottom: 0; }
 
 /* Story 9.4 — verification evidence strip under the status badge (paired sub-row of the header). */
+.evidence-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0.45rem;
+}
+
 .evidence-strip {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin: 0.15rem 0 0.35rem;
 }
 
 .evidence-strip .status-badge.evidence-pill,
@@ -481,6 +488,13 @@ body {
   letter-spacing: 0.02em;
 }
 
+/* Populated tests pill — moss/done channel so a green tally reads as "passing" without a 7th status token. */
+.status-badge.evidence-pill.tests-pass {
+  background: #e8f0e4;
+  color: var(--moss);
+  border-color: var(--moss-light);
+}
+
 /* Designed empty-state treatment (AC #2) — dashed/muted, kinship with .task-badge.none-done / .dev-agent-empty.
    Story 8.5 designed empty states may later supply a shared helper; keep this local until then. */
 .status-badge.evidence-pill.empty {
@@ -489,15 +503,34 @@ body {
   background: transparent;
 }
 
-.evidence-link {
+/* Visible verify path under the pills — Latest change cue + labeled deep links (not an opaque whole-strip link). */
+.evidence-verify {
+  margin: 0;
+  max-width: 42rem;
+  text-align: center;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--ink-faded);
+}
+
+.evidence-latest {
   display: block;
-  color: inherit;
+  margin-bottom: 0.2rem;
+  color: var(--ink);
+}
+
+.evidence-verify-links a {
+  color: var(--rust);
   text-decoration: none;
 }
 
-.evidence-link:hover .evidence-strip .status-badge,
-.evidence-link:focus-visible .evidence-strip .status-badge {
+.evidence-verify-links a:hover,
+.evidence-verify-links a:focus-visible {
   text-decoration: underline;
+}
+
+.evidence-verify-sep {
+  color: var(--ink-light);
 }
 
 .meta-pills {
@@ -2005,7 +2038,11 @@ a.ref-file-node:focus-visible {
 .gherkin-kw.kw-but { color: var(--ink-light); border-color: var(--border); background: transparent; }
 
 /* Acceptance Criteria panel — each criterion is independently anchored (id="ac-N") so the "(AC: #N)"
-   references scattered through the tasks below can deep-link straight to it. */
+   references scattered through the tasks below can deep-link straight to it.
+   Story 9.5: resting state is a bordered/tinted card with a thin gold left accent (reuses --border,
+   --parchment, --gold — no new --status-* token). Shared visual grammar with epic-card .ac-block stays
+   label+body+gold mono; .ac-block itself stays frameless on purpose (denser card-in-card context on the
+   epic page — extending the resting frame there would double-box every criterion). */
 .ac-panel .ac-criteria { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .ac-criterion {
@@ -2013,13 +2050,21 @@ a.ref-file-node:focus-visible {
   gap: 0.75rem;
   align-items: baseline;
   padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
   border-radius: 4px;
+  background: var(--parchment);
   /* Keep the highlighted criterion clear of the sticky nav when jumped to via a "#ac-N" link. */
   scroll-margin-top: 5rem;
 }
 
-/* When a "(AC: #N)" link jumps here, flag which criterion the reader landed on. */
-.ac-criterion:target { background: #f5ecd4; box-shadow: inset 3px 0 0 var(--gold); }
+/* :target must read stronger than resting — deeper tint + thicker gold inset bar so the jumped-to
+   criterion is unmistakable against the resting parchment cards around it. [Story 9.5] */
+.ac-criterion:target {
+  background: #f5ecd4;
+  border-left-color: var(--gold-light);
+  box-shadow: inset 5px 0 0 var(--gold);
+}
 
 .ac-anchor {
   flex: 0 0 auto;
@@ -2312,6 +2357,38 @@ a.ref-file-node:focus-visible {
 .dev-agent-details > summary::before { content: "▸ "; color: var(--gold); }
 .dev-agent-details[open] > summary::before { content: "▾ "; }
 .dev-agent-details[open] > summary { margin-bottom: 0.9rem; }
+
+/* Story 9.5 — remainder Dev Notes / References collapse. Same caret grammar as .dev-agent-details, but
+   the summary hosts a real <h2> (not an uppercase chrome label), so margins live on the summary and the
+   h2 drops its default under-rule so a collapsed section still reads like the heading it replaces.
+   Collapsed H3 ids are stripped by CollapsibleSections so TOC links never point into hidden content. */
+.collapsible-section > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  margin: 1.4rem 0 0.6rem;
+}
+.collapsible-section > summary::-webkit-details-marker { display: none; }
+.collapsible-section > summary::before {
+  content: "▸ ";
+  flex: none;
+  color: var(--gold);
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+.collapsible-section[open] > summary::before { content: "▾ "; }
+.collapsible-section[open] > summary { margin-bottom: 0.9rem; }
+.collapsible-section > summary > h2 {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  font-size: 1.3rem;
+  flex: 1;
+  min-width: 0;
+}
 
 /* Fixed layout + wrapping so long file paths / identifiers in the record wrap inside the content column
    instead of forcing the table wider than its grid track (which would spill horizontally off the page). */

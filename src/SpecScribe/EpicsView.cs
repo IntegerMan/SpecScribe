@@ -177,15 +177,16 @@ public sealed record EpicPageView
 }
 
 /// <summary>Compact verification facts for the story-page evidence strip — tasks (from
-/// <see cref="ProgressCalculator"/>), optional free-text test tally, and the top Change Log date with a
-/// verification vs. plain-edit label. Data only; honest-absence wording and pill markup live in the renderer.
-/// [Story 9.4]</summary>
+/// <see cref="ProgressCalculator"/>), optional free-text test tally, the top Change Log date with a
+/// verification vs. plain-edit label, and the top Change Log action text for the visible "Latest change"
+/// cue. Data only; honest-absence wording and pill markup live in the renderer. [Story 9.4]</summary>
 public sealed record StoryEvidence(
     int TasksDone,
     int TasksTotal,
     string? TestsSummary,
     DateOnly? VerifiedDate,
-    bool VerifiedIsReview);
+    bool VerifiedIsReview,
+    string? LatestChangeSummary = null);
 
 /// <summary>The host-neutral SECTION view model for a drafted STORY page body. Its identity/status/drill are
 /// data; the task-breakdown sunburst renders from <see cref="Tasks"/>; everything else the story page shows is

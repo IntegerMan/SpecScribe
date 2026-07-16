@@ -299,18 +299,19 @@ public sealed partial class HtmlRenderAdapter
         return $"<span class=\"status-badge task-badge\">{Charts.MiniDonut(tasksDone, tasksTotal)} {tasksDone}/{tasksTotal} tasks</span>";
     }
 
-    /// <summary>Compact Tasks / Tests / Verified pills under the status badge. Reuses <see cref="TaskBadge"/> for
-    /// the tasks pill; missing facts render designed empty-state pills (dashed/muted) rather than omitting the
-    /// strip. Kinship with Story 8.5 designed empty states — harmonize if a shared helper lands later.
-    /// [Story 9.4]</summary>
-    private static string EvidenceStrip(StoryEvidence e, bool linkToDevRecord)
+    /// <summary>Compact Tasks / Tests / Verified pills under the status badge, plus a visible "Latest change"
+    /// cue and explicit Dev-record / Change-log links so a reviewer knows where to verify. Reuses
+    /// <see cref="TaskBadge"/> for the tasks pill; missing facts render designed empty-state pills
+    /// (dashed/muted) rather than omitting the strip. Kinship with Story 8.5 designed empty states —
+    /// harmonize if a shared helper lands later. [Story 9.4]</summary>
+    private static string EvidenceStrip(StoryEvidence e, bool hasDevRecord, bool hasChangeLog)
     {
         var tasksPill = e.TasksTotal > 0
             ? TaskBadge(e.TasksDone, e.TasksTotal)
             : EmptyEvidencePill("no tasks recorded");
 
         var testsPill = e.TestsSummary is { Length: > 0 } summary
-            ? $"<span class=\"status-badge evidence-pill\">{Icons.ForConcept("Tests")}{PathUtil.Html(summary)}</span>"
+            ? $"<span class=\"status-badge evidence-pill tests-pass\">{Icons.ForConcept("Tests")}{PathUtil.Html(summary)}</span>"
             : EmptyEvidencePill("no test evidence recorded", Icons.ForConcept("Tests"));
 
         string verifiedPill;
@@ -326,13 +327,51 @@ public sealed partial class HtmlRenderAdapter
             verifiedPill = EmptyEvidencePill("no verification recorded", Icons.ForConcept("Verified"));
         }
 
-        var strip = $"  <div class=\"evidence-strip\">{tasksPill}{testsPill}{verifiedPill}</div>\n";
-        if (!linkToDevRecord) return strip;
-        return $"  <a class=\"evidence-link\" href=\"#sec-dev-agent-record\">{strip.TrimEnd()}</a>\n";
+        var sb = new StringBuilder();
+        sb.Append("  <div class=\"evidence-block\">\n");
+        sb.Append($"    <div class=\"evidence-strip\">{tasksPill}{testsPill}{verifiedPill}</div>\n");
+
+        // Visible verify path — pills alone don't tell a reviewer where to dig. Latest Change Log action
+        // (already authored free text) + labeled deep links. No new authoring schema. [Story 9.4 UX]
+        var hasLatest = e.LatestChangeSummary is { Length: > 0 };
+        if (hasLatest || hasDevRecord || hasChangeLog)
+        {
+            sb.Append("    <p class=\"evidence-verify\">\n");
+            if (hasLatest)
+            {
+                var latestSummary = TruncateEvidenceSummary(e.LatestChangeSummary!);
+                sb.Append($"      <span class=\"evidence-latest\">Latest: {PathUtil.Html(latestSummary)}</span>\n");
+            }
+            if (hasDevRecord || hasChangeLog)
+            {
+                sb.Append("      <span class=\"evidence-verify-links\">");
+                if (hasDevRecord)
+                    sb.Append("<a href=\"#sec-dev-agent-record\">Dev record</a>");
+                if (hasDevRecord && hasChangeLog)
+                    sb.Append("<span class=\"evidence-verify-sep\" aria-hidden=\"true\"> · </span>");
+                if (hasChangeLog)
+                    sb.Append("<a href=\"#sec-change-log\">Change log</a>");
+                sb.Append("</span>\n");
+            }
+            sb.Append("    </p>\n");
+        }
+
+        sb.Append("  </div>\n");
+        return sb.ToString();
     }
 
     private static string EmptyEvidencePill(string label, string icon = "")
         => $"<span class=\"status-badge evidence-pill empty\">{icon}{PathUtil.Html(label)}</span>";
+
+    /// <summary>Keeps the header cue scannable — Change Log actions can be long paragraphs.</summary>
+    private static string TruncateEvidenceSummary(string text, int maxChars = 140)
+    {
+        if (text.Length <= maxChars) return text;
+        var cut = text[..maxChars].TrimEnd();
+        var lastSpace = cut.LastIndexOf(' ');
+        if (lastSpace > maxChars / 2) cut = cut[..lastSpace];
+        return cut + "…";
+    }
 
     // ----- Story page ---------------------------------------------------------------------------------------
 
@@ -354,10 +393,13 @@ public sealed partial class HtmlRenderAdapter
         main.Append(view.RetroLinkHtml);
         main.Append("  </div>\n");
         // Own row under the kicker/status-badge line — same Status guard; empty-state pills for missing facts
-        // (AC #2). Link only when the Dev Agent Record section exists on the page. [Story 9.4]
+        // (AC #2). Explicit Dev-record / Change-log links when those sections exist. [Story 9.4]
         if (view.Status is { Length: > 0 })
         {
-            main.Append(EvidenceStrip(view.Evidence, view.DevAgentRecord.Count > 0));
+            main.Append(EvidenceStrip(
+                view.Evidence,
+                hasDevRecord: view.DevAgentRecord.Count > 0,
+                hasChangeLog: view.ChangeLogHtml.Length > 0));
         }
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");
         main.Append("</header>\n\n");

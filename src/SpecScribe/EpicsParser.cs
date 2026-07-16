@@ -131,8 +131,8 @@ public static class EpicsParser
 
     /// <summary>Best-effort free-text test tally from a story artifact. Prefers the first match inside
     /// <c>## Dev Agent Record</c>, then falls back to a whole-document scan. Returns a normalized
-    /// <c>"{n} tests {green|passing}"</c> phrase (<c>pass</c> collapsed to <c>passing</c>); null when absent.
-    /// Deterministic first-match order; never throws. [Story 9.4]</summary>
+    /// <c>"{n} passing tests"</c> phrase (author "green"/"pass"/"passing" all collapse to that reading);
+    /// null when absent. Deterministic first-match order; never throws. [Story 9.4]</summary>
     public static string? ExtractTestEvidence(string? raw)
     {
         if (raw is null) return null;
@@ -154,21 +154,15 @@ public static class EpicsParser
     {
         var m = TestEvidencePhrase.Match(text);
         if (!m.Success) return null;
-
-        var count = m.Groups[1].Value;
-        var word = m.Groups[2].Value.ToLowerInvariant() switch
-        {
-            "pass" => "passing",
-            var w => w, // keep author's "green" / "passing"
-        };
-        return $"{count} tests {word}";
+        return $"{m.Groups[1].Value} passing tests";
     }
 
     /// <summary>Top (newest-first) Change Log entry shaped <c>- YYYY-MM-dd — **action**</c>, with a flag for
-    /// whether the action text reads as verification/review/done. Returns null when the section or a matching
-    /// dated entry is absent; malformed dates degrade to null (never throws). Distinct from
-    /// <see cref="ExtractLatestChangeLogDate"/> (Story 8.8 max-date across table/list forms). [Story 9.4]</summary>
-    public static (DateOnly Date, bool IsVerification)? ExtractChangeLogVerification(string? raw)
+    /// whether the action text reads as verification/review/done and the raw action for the visible
+    /// "Latest change" cue. Returns null when the section or a matching dated entry is absent; malformed
+    /// dates degrade to null (never throws). Distinct from <see cref="ExtractLatestChangeLogDate"/>
+    /// (Story 8.8 max-date across table/list forms). [Story 9.4]</summary>
+    public static (DateOnly Date, bool IsVerification, string Action)? ExtractChangeLogVerification(string? raw)
     {
         if (raw is null) return null;
 
@@ -187,9 +181,9 @@ public static class EpicsParser
             {
                 return null; // malformed top dated shape → degrade, don't keep scanning
             }
-            var action = m.Groups["action"].Value;
+            var action = m.Groups["action"].Value.Trim();
             var isVerification = ChangeLogVerificationAction.IsMatch(action);
-            return (date, isVerification);
+            return (date, isVerification, action);
         }
         return null;
     }

@@ -370,7 +370,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 9.4: drafted story pages gained a verification evidence strip under the status
         // badge (tasks / tests / verified-or-updated pills + CSS). Fixture story pages with a Status line now
         // emit .evidence-strip; stylesheet gained .evidence-strip / .evidence-pill / .evidence-link. [Story 9.4]
-        const string expected = "8e8f63af862b45f872b2766b95e19bb8aa917f50adec344456b00fcaeb9f2847";
+        // Regenerated for Story 9.5: .ac-criterion resting card (border + parchment + gold left accent; :target
+        // stronger) + Dev Notes/References collapse via CollapsibleSections on story remainder HTML +
+        // .collapsible-section caret CSS + webview resting-tint companion. Fixture stories without Dev Notes
+        // keep remainder expanded (NFR8); CSS + any story with matching H2s shift content. Also absorbs the
+        // in-tree Story 9.4 UX polish (evidence-block / Latest-change cue / tests-pass pill wording). [Story 9.5]
+        const string expected = "212faebd3420f30dbccce188d949d1ebaa80b7277d8cd932b66a5d6951e3cb52";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
