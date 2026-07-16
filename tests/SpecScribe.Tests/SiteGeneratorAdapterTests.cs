@@ -375,7 +375,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // .collapsible-section caret CSS + webview resting-tint companion. Fixture stories without Dev Notes
         // keep remainder expanded (NFR8); CSS + any story with matching H2s shift content. Also absorbs the
         // in-tree Story 9.4 UX polish (evidence-block / Latest-change cue / tests-pass pill wording). [Story 9.5]
-        const string expected = "212faebd3420f30dbccce188d949d1ebaa80b7277d8cd932b66a5d6951e3cb52";
+        // Regenerated for Story 9.4 polish + ADR 0007: change-surface panel (classification, AC verify list,
+        // touched files, ship line), passing-tests pill, .change-surface CSS; removed Latest-change cue.
+        // Regenerated for Story 9.6: action-items.html groups by epic-retro + cross-link near-dupes + visible-text
+        // linkify; deferred-work.html becomes structured .deferred-item-card pages (overwrite at same path);
+        // specscribe.css gains .action-items-group / .action-item-cross / .deferred-* resolved treatment.
+        // Golden fixture has no open action_items and no deferred-work.md — delta is primarily shared CSS.
+        // [Story 9.6; golden-diff-normalization-gotchas]
+        const string expected = "cca91956db0578d20d4e9a9f12bf4f613c530ff92a71b60f54dae3c344a43e14";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -725,10 +725,22 @@ public class HtmlRenderAdapterTests
         Assert.Contains("href=\"sprint.html\"", body); // board cards / moreHref still navigate
     }
 
-    // ---- Story 9.4 verification evidence strip -------------------------------------------------------------
+    // ---- Story 9.4 verification evidence strip + ADR 0007 change surface ------------------------------------
+
+    private static StoryChangeSurface SampleSurface(
+        IReadOnlyList<string>? classifications = null,
+        IReadOnlyList<(int Number, string PlainText)>? checklist = null,
+        IReadOnlyList<string>? files = null,
+        string? shipLine = "review · 2026-07-09 — Code review passed") =>
+        new(
+            classifications ?? new[] { "visual", "rendered UI" },
+            checklist ?? new[] { (1, "a compact evidence strip appears near the status badge") },
+            files ?? new[] { "src/SpecScribe/EpicsParser.cs", "src/SpecScribe/assets/specscribe.css" },
+            shipLine);
 
     private static StoryPageView StoryBodyView(
         StoryEvidence evidence,
+        StoryChangeSurface? changeSurface = null,
         string? status = "done",
         IReadOnlyList<DevAgentEntry>? devRecord = null,
         string changeLogHtml = "") => new()
@@ -742,11 +754,15 @@ public class HtmlRenderAdapterTests
         }),
         Status = status,
         Evidence = evidence,
+        ChangeSurface = changeSurface ?? SampleSurface(),
         RetroLinkHtml = string.Empty,
         BlurbHtml = string.Empty,
         Tasks = Array.Empty<TaskItem>(),
         NextStepsHtml = string.Empty,
-        AcceptanceCriteria = Array.Empty<AcceptanceCriterion>(),
+        AcceptanceCriteria = new[]
+        {
+            new AcceptanceCriterion(1, "<p>criterion</p>", "a compact evidence strip appears near the status badge"),
+        },
         DevAgentRecord = devRecord ?? new[] { new DevAgentEntry("Completion Notes", "<p>notes</p>") },
         ReviewFindingsHtml = string.Empty,
         RemainderHtml = string.Empty,
@@ -754,25 +770,25 @@ public class HtmlRenderAdapterTests
     };
 
     [Fact]
-    public void RenderStoryBody_EvidenceStrip_PopulatedPillsAndDevRecordLink()
+    public void RenderStoryBody_EvidenceStrip_PopulatedPillsAndChangeSurfacePanel()
     {
-        var evidence = new StoryEvidence(5, 5, "586 passing tests", new DateOnly(2026, 7, 9), VerifiedIsReview: true,
-            LatestChangeSummary: "Code review passed; Status → done.");
-        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(
-            evidence,
-            changeLogHtml: "<ul><li>entry</li></ul>"));
+        var evidence = new StoryEvidence(5, 5, "586 passing tests", new DateOnly(2026, 7, 9), VerifiedIsReview: true);
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
 
         Assert.Contains("class=\"evidence-strip\"", html);
         Assert.Contains("&#10003; 5 tasks", html);
         Assert.Contains("586 passing tests", html);
         Assert.Contains("evidence-pill tests-pass", html);
         Assert.Contains("verified 2026-07-09", html);
-        Assert.Contains("href=\"#sec-dev-agent-record\"", html);
-        Assert.Contains("href=\"#sec-change-log\"", html);
-        Assert.Contains("Dev record", html);
-        Assert.Contains("Change log", html);
-        Assert.Contains("Latest: Code review passed", html);
-        Assert.Contains("id=\"sec-dev-agent-record\"", html);
+        Assert.Contains("class=\"change-surface\"", html);
+        Assert.Contains("id=\"sec-change-surface\"", html);
+        Assert.Contains("visual + rendered UI", html);
+        Assert.Contains("href=\"#ac-1\"", html);
+        Assert.Contains("AC #1", html);
+        Assert.Contains("EpicsParser.cs", html);
+        Assert.Contains("specscribe.css", html);
+        Assert.Contains("class=\"change-surface-ship\"", html);
+        Assert.DoesNotContain("Latest:", html);
         Assert.DoesNotContain("class=\"evidence-link\"", html);
     }
 
@@ -784,36 +800,51 @@ public class HtmlRenderAdapterTests
 
         Assert.Contains("evidence-pill empty", html);
         Assert.Contains("no test evidence recorded", html);
-        Assert.Contains("class=\"evidence-strip\"", html); // strip still present
+        Assert.Contains("class=\"evidence-strip\"", html);
         Assert.DoesNotContain("tests-pass", html);
     }
 
     [Fact]
     public void RenderStoryBody_EvidenceStrip_NonVerificationDateReadsUpdated()
     {
-        var evidence = new StoryEvidence(2, 4, "12 passing tests", new DateOnly(2026, 7, 8), VerifiedIsReview: false,
-            LatestChangeSummary: "Tweaked the CSS spacing.");
+        var evidence = new StoryEvidence(2, 4, "12 passing tests", new DateOnly(2026, 7, 8), VerifiedIsReview: false);
         var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
 
         Assert.Contains("updated 2026-07-08", html);
         Assert.DoesNotContain("verified 2026-07-08", html);
-        Assert.Contains("Latest: Tweaked the CSS spacing.", html);
     }
 
     [Fact]
-    public void RenderStoryBody_EvidenceStrip_NoDevRecordOmitsLink()
+    public void RenderStoryBody_ChangeSurface_HonestAbsenceWhenThin()
     {
         var evidence = new StoryEvidence(0, 0, null, null, false);
+        var surface = new StoryChangeSurface(
+            Array.Empty<string>(), Array.Empty<(int, string)>(), Array.Empty<string>(), null);
         var html = HtmlRenderAdapter.Shared.RenderStoryBody(
-            StoryBodyView(evidence, status: "ready-for-dev", devRecord: Array.Empty<DevAgentEntry>()));
+            StoryBodyView(evidence, surface, status: "ready-for-dev", devRecord: Array.Empty<DevAgentEntry>()));
 
         Assert.Contains("class=\"evidence-strip\"", html);
         Assert.Contains("no tasks recorded", html);
         Assert.Contains("no test evidence recorded", html);
         Assert.Contains("no verification recorded", html);
+        Assert.Contains("class=\"change-surface\"", html);
+        Assert.Contains("no file list recorded", html);
+        Assert.Contains("no acceptance criteria recorded", html);
         Assert.DoesNotContain("href=\"#sec-dev-agent-record\"", html);
-        Assert.DoesNotContain("href=\"#sec-change-log\"", html);
-        Assert.DoesNotContain("Latest:", html);
+    }
+
+    [Fact]
+    public void RenderStoryBody_ChangeSurface_CapsFilesWithMoreLink()
+    {
+        var files = Enumerable.Range(1, 10)
+            .Select(i => $"src/SpecScribe/File{i}.cs")
+            .ToList();
+        var surface = SampleSurface(files: files);
+        var evidence = new StoryEvidence(1, 1, "10 passing tests", null, false);
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence, surface));
+
+        Assert.Contains("+2 more", html);
+        Assert.Contains("href=\"#sec-dev-agent-record\"", html);
     }
 
     [Fact]
@@ -823,5 +854,6 @@ public class HtmlRenderAdapterTests
         var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence, status: null));
 
         Assert.DoesNotContain("evidence-strip", html);
+        Assert.DoesNotContain("change-surface", html);
     }
 }

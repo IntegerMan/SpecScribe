@@ -467,7 +467,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.5rem;
   margin: 0.15rem 0 0.45rem;
 }
 
@@ -495,42 +495,114 @@ body {
   border-color: var(--moss-light);
 }
 
-/* Designed empty-state treatment (AC #2) — dashed/muted, kinship with .task-badge.none-done / .dev-agent-empty.
-   Story 8.5 designed empty states may later supply a shared helper; keep this local until then. */
+/* Designed empty-state treatment (AC #2) — dashed/muted, kinship with .task-badge.none-done / .dev-agent-empty. */
 .status-badge.evidence-pill.empty {
   color: var(--ink-light);
   border-style: dashed;
   background: transparent;
 }
 
-/* Visible verify path under the pills — Latest change cue + labeled deep links (not an opaque whole-strip link). */
-.evidence-verify {
-  margin: 0;
+/* ADR 0007 change-surface panel — footprint projection under the evidence strip. */
+.change-surface {
+  width: 100%;
   max-width: 42rem;
-  text-align: center;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--warm-white);
   font-size: 0.78rem;
-  line-height: 1.35;
+  line-height: 1.4;
   color: var(--ink-faded);
 }
 
-.evidence-latest {
-  display: block;
-  margin-bottom: 0.2rem;
-  color: var(--ink);
+.change-surface-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  margin-bottom: 0.45rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.evidence-verify-links a {
+.change-surface-label {
+  font-family: 'Courier New', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+}
+
+.change-surface-class {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.change-surface-section {
+  margin-top: 0.35rem;
+}
+
+.change-surface-section-label {
+  font-family: 'Courier New', monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0.15rem;
+}
+
+.change-surface-verify {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.change-surface-verify a {
   color: var(--rust);
   text-decoration: none;
+  font-weight: 600;
 }
 
-.evidence-verify-links a:hover,
-.evidence-verify-links a:focus-visible {
+.change-surface-verify a:hover,
+.change-surface-verify a:focus-visible {
   text-decoration: underline;
 }
 
-.evidence-verify-sep {
+.change-surface-files {
+  margin: 0;
+}
+
+.change-surface-file {
+  display: inline-block;
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--parchment-dark);
+  color: var(--ink);
+}
+
+.change-surface-more {
+  color: var(--rust);
+  text-decoration: none;
+  font-size: 0.72rem;
+}
+
+.change-surface-more:hover,
+.change-surface-more:focus-visible {
+  text-decoration: underline;
+}
+
+.change-surface-ship {
+  margin: 0;
+  color: var(--ink);
+}
+
+.change-surface-empty {
+  margin: 0;
   color: var(--ink-light);
+  font-style: italic;
 }
 
 .meta-pills {
@@ -4948,6 +5020,45 @@ a.cmd-menu-toggle:hover { color: var(--rust); border-color: var(--gold-light); }
 .action-item-deferred { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; border-bottom: 1px dotted var(--border); }
 .action-item-deferred:hover { color: var(--rust); }
 .action-item-resolve { margin-top: 0.2rem; }
+.action-items-group {
+  font-size: 1.05rem; color: var(--rust); margin: 1.4rem 0 0.7rem;
+  border-bottom: 2px solid var(--parchment-deep); padding-bottom: 0.3rem;
+}
+.action-items-group a { color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+.action-items-group a:hover { color: var(--rust); }
+.action-item-cross { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; border-bottom: 1px dotted var(--border); }
+a.action-item-cross { color: var(--teal); border-bottom-color: var(--gold-light); }
+a.action-item-cross:hover { color: var(--rust); }
+
+/* Deferred-work structured cards — sibling grammar of .action-item-* (Story 9.6). */
+.deferred-work-wrap { max-width: 1040px; margin: 0 auto; }
+.deferred-group { margin-bottom: 1.8rem; }
+.deferred-group-title {
+  font-size: 1.05rem; color: var(--rust); margin: 0 0 0.7rem;
+  border-bottom: 2px solid var(--parchment-deep); padding-bottom: 0.3rem;
+}
+.deferred-group-title a { color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+.deferred-group-title a:hover { color: var(--rust); }
+.deferred-items-list { list-style: none; margin: 0; padding: 0; }
+.deferred-item-card {
+  background: var(--warm-white); border: 1px solid var(--border);
+  border-left: 3px solid var(--status-review); border-radius: 6px;
+  padding: 0.9rem 1.1rem; margin-bottom: 0.9rem;
+}
+.deferred-item-card.resolved {
+  border-left-color: var(--status-done);
+  opacity: 0.78;
+}
+.deferred-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem; }
+.deferred-resolved-mark {
+  font-size: 0.85rem; color: var(--ink-light); font-weight: 700;
+}
+.deferred-item-resolving { font-size: 0.78rem; color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+a.deferred-item-resolving:hover { color: var(--rust); }
+.deferred-item-body { color: var(--ink); font-size: 0.92rem; line-height: 1.5; }
+.deferred-item-body > :first-child { margin-top: 0; }
+.deferred-item-body > :last-child { margin-bottom: 0; }
+.deferred-work-fallback { max-width: 860px; margin: 0 auto; }
 
 /* Epic page: the retrospective affordance (link to the retro, or a "run it" suggestion when complete). */
 .epic-retro-affordance { margin-bottom: 1.2rem; }

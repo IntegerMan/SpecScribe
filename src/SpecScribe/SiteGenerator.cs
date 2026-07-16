@@ -362,6 +362,7 @@ public sealed class SiteGenerator
             WriteCodeMap(nav);
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
+            WriteDeferredWork(nav, workInventory);
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav, workInventory);
@@ -1892,7 +1893,7 @@ public sealed class SiteGenerator
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                     var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
@@ -1920,7 +1921,8 @@ public sealed class SiteGenerator
         IReadOnlyList<TaskItem> Tasks,
         string ReviewFindingsHtml,
         string ChangeLogHtml,
-        StoryEvidence Evidence);
+        StoryEvidence Evidence,
+        StoryChangeSurface ChangeSurface);
 
     /// <summary>Reads one drafted story's artifact and produces its page fragments (task list, blurb/remainder
     /// split, AC / dev-record / review / change-log sections), source-citation-linkified against
@@ -1969,12 +1971,13 @@ public sealed class SiteGenerator
             story.TasksTotal,
             EpicsParser.ExtractTestEvidence(artifactRaw),
             changelog?.Date,
-            changelog?.IsVerification ?? false,
-            changelog?.Action);
+            changelog?.IsVerification ?? false);
+
+        var changeSurface = ChangeSurface.Build(artifactRaw, story.Status, acceptanceCriteria);
 
         return new StoryPageFragments(
             artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml, evidence);
+            reviewFindingsHtml, changeLogHtml, evidence, changeSurface);
     }
 
     /// <summary>The artifact + reference maps the last epics render pass resolved, cached for
@@ -2058,7 +2061,7 @@ public sealed class SiteGenerator
                             var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
                             storyPage = EpicsTemplater.BuildStoryPage(
                                 epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
-                                f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, nav,
+                                f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
                                 _module.Commands, epicRetroPath, StoryPager(model, story));
                         }
                         surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
@@ -2302,7 +2305,7 @@ public sealed class SiteGenerator
                     AddSpaSurface(pages, familyPaths,
                         EpicsTemplater.BuildStoryPage(
                             epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
-                            f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, nav,
+                            f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
                             _module.Commands, epicRetroPath, StoryPager(model, story)),
                         skipStoryId: story.Id);
                 }
@@ -2629,20 +2632,61 @@ public sealed class SiteGenerator
 
     /// <summary>Writes the open-action-items page (<c>action-items.html</c>) when the sprint tracks open items —
     /// the target of the sprint page's flag button and the home retro callout. Each item links to its epic's
-    /// retro page and offers a quick-dev "Resolve with AI" command. [Story 2.3 polish #5]</summary>
+    /// retro page and offers a quick-dev "Resolve with AI" command. [Story 2.3 polish #5] [Story 9.6]</summary>
     private void WriteActionItems(SiteNav nav, WorkInventory? work = null)
     {
         var open = _sprint?.OpenActionItems;
         if (open is null || open.Count == 0) return;
         // Debt-related items link to the deferred-work backlog page when one exists (root-relative — this page
         // is at the site root). Reuses the caller's inventory when supplied instead of rebuilding it. [Story 2.3 review]
-        var deferredHref = (work ?? WorkInventory.Build(_docs.Values.ToList())).Deferred?.OutputPath;
+        var inventory = work ?? WorkInventory.Build(_docs.Values.ToList());
+        var deferredHref = inventory.Deferred?.OutputPath;
         // NOT reference-linkified: the "Resolve with AI" data-copy payload embeds the action text (which can
         // contain "Epic N"/"Story N.M" mentions); the linkifier would wrap those in <a> tags INSIDE the
-        // attribute value and corrupt the copyable command. [Story 2.3 polish #5]
-        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work ?? WorkInventory.Empty, _epicsModel);
-        var html = ActionItemsTemplater.RenderPage(open, EpicRetroMap, _module.Commands, nav, deferredHref, counts);
+        // attribute value and corrupt the copyable command. Visible text is linkified inside the templater
+        // only. [Story 2.3 polish #5; Story 9.6]
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel);
+        var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
+        var html = ActionItemsTemplater.RenderPage(
+            open, EpicRetroMap, _module.Commands, nav, deferredHref, counts, _epicsModel, hrefMap);
         WriteOutput(SiteNav.ActionItemsOutputPath, html);
+    }
+
+    /// <summary>Overwrites the deferred-work doc page with the structured card template when a
+    /// <c>deferred-work.md</c> exists. Keeps the doc in <c>_docs</c> (home callout + open count) and the
+    /// same output path (Story 10.1 Follow-ups nav). Last-write-wins on the SPA capture. [Story 9.6]</summary>
+    private void WriteDeferredWork(SiteNav nav, WorkInventory? work = null)
+    {
+        var deferred = (work ?? WorkInventory.Build(_docs.Values.ToList())).Deferred;
+        if (deferred is null) return;
+
+        var doc = _docs.Values.FirstOrDefault(d =>
+            string.Equals(
+                PathUtil.NormalizeSlashes(d.OutputRelativePath),
+                PathUtil.NormalizeSlashes(deferred.OutputPath),
+                StringComparison.OrdinalIgnoreCase));
+        if (doc is null) return;
+
+        var sourceFull = Path.Combine(
+            _options.SourceRoot,
+            doc.SourceRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        string? markdown = null;
+        try
+        {
+            if (File.Exists(sourceFull))
+                markdown = File.ReadAllText(sourceFull);
+        }
+        catch (IOException) { /* degrade to unstructured body */ }
+        catch (UnauthorizedAccessException) { }
+
+        var outputPath = PathUtil.NormalizeSlashes(deferred.OutputPath);
+        var prefix = PathUtil.RelativePrefix(outputPath);
+        var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
+        var model = DeferredWorkParser.Parse(markdown, hrefMap, prefix, doc.BodyHtml);
+        var html = DeferredWorkTemplater.RenderPage(model, nav, outputPath, doc.Title);
+        // Structured cards have no copyable command payload — ApplyReferenceLinks is safe here and
+        // catches inline "Story N.M"/"Epic N"/"FR-N" mentions the parser doesn't own.
+        WriteOutput(outputPath, ApplyReferenceLinks(html, outputPath));
     }
 
     /// <summary>Writes <c>diagnostics.html</c> — the whole-run report of the run's non-fatal notices plus the

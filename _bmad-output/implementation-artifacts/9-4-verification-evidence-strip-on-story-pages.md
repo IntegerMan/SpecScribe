@@ -188,11 +188,15 @@ Composer (Cursor agent)
 
 - Implemented the story-page verification evidence strip end-to-end: free-text extractors → `StoryEvidence` view datum → single `BuildStoryPageFragments` seam → shared `RenderStoryBody` pills under the status badge.
 - Tasks reuse `ProgressCalculator` tallies + `TaskBadge`; tests/verified inferred from Dev Agent Record / Change Log free text (no new authoring schema).
-- Honest-absence empty-state pills (`evidence-pill empty`) when facts are missing; strip links to `#sec-dev-agent-record` only when that section exists.
-- Full suite: 1202 passed. Golden fingerprint regenerated for deliberate story-page + CSS byte change. HTML/webview/SPA parity green with no new RenderParity exception.
+- Honest-absence empty-state pills (`evidence-pill empty`) when facts are missing.
+- **UX polish + ADR 0007:** tests pill reads `N passing tests` with green `.tests-pass` styling; removed thin Latest-change line; added change-surface panel (File List classification, AC verify checklist, touched files, ship line) projected from standard BMAD sections. ADR 0007 marked Accepted.
+- Story 9.4/ADR 0007 tests + golden fingerprint regenerated (`cca91956…`). HTML/webview/SPA parity green with no new RenderParity exception.
 
 ### File List
 
+- `docs/adrs/0007-change-surface-descriptor-for-testing-and-footprint.md`
+- `docs/adrs/README.md`
+- `src/SpecScribe/ChangeSurface.cs`
 - `src/SpecScribe/EpicsParser.cs`
 - `src/SpecScribe/EpicsView.cs`
 - `src/SpecScribe/EpicsViewBuilder.cs`
@@ -201,14 +205,15 @@ Composer (Cursor agent)
 - `src/SpecScribe/HtmlRenderAdapter.Epics.cs`
 - `src/SpecScribe/Icons.cs`
 - `src/SpecScribe/assets/specscribe.css`
+- `tests/SpecScribe.Tests/ChangeSurfaceTests.cs`
 - `tests/SpecScribe.Tests/EpicsParserTests.cs`
 - `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs`
 - `tests/SpecScribe.Tests/HtmlTemplaterTests.cs`
 - `tests/SpecScribe.Tests/StylesheetTests.cs`
 - `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
 - `_bmad-output/implementation-artifacts/9-4-verification-evidence-strip-on-story-pages.md`
-- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ## Change Log
 
 - 2026-07-16 — **Implemented (dev-story).** Verification evidence strip on drafted story pages: Tasks/Tests/Verified pills under the status badge, free-text extractors, empty-state treatment, golden fingerprint regenerated. Status → review.
+- 2026-07-16 — **Polish + ADR 0007.** Tests pill → `N passing tests` (green); change-surface panel under strip (classification, AC verify list, touched files, ship line); ADR 0007 Accepted. Golden fingerprint `cca91956…`.

@@ -299,12 +299,10 @@ public sealed partial class HtmlRenderAdapter
         return $"<span class=\"status-badge task-badge\">{Charts.MiniDonut(tasksDone, tasksTotal)} {tasksDone}/{tasksTotal} tasks</span>";
     }
 
-    /// <summary>Compact Tasks / Tests / Verified pills under the status badge, plus a visible "Latest change"
-    /// cue and explicit Dev-record / Change-log links so a reviewer knows where to verify. Reuses
+    /// <summary>Compact Tasks / Tests / Verified pills under the status badge. Reuses
     /// <see cref="TaskBadge"/> for the tasks pill; missing facts render designed empty-state pills
-    /// (dashed/muted) rather than omitting the strip. Kinship with Story 8.5 designed empty states —
-    /// harmonize if a shared helper lands later. [Story 9.4]</summary>
-    private static string EvidenceStrip(StoryEvidence e, bool hasDevRecord, bool hasChangeLog)
+    /// (dashed/muted) rather than omitting the strip. [Story 9.4]</summary>
+    private static string EvidenceStrip(StoryEvidence e)
     {
         var tasksPill = e.TasksTotal > 0
             ? TaskBadge(e.TasksDone, e.TasksTotal)
@@ -327,44 +325,88 @@ public sealed partial class HtmlRenderAdapter
             verifiedPill = EmptyEvidencePill("no verification recorded", Icons.ForConcept("Verified"));
         }
 
-        var sb = new StringBuilder();
-        sb.Append("  <div class=\"evidence-block\">\n");
-        sb.Append($"    <div class=\"evidence-strip\">{tasksPill}{testsPill}{verifiedPill}</div>\n");
-
-        // Visible verify path — pills alone don't tell a reviewer where to dig. Latest Change Log action
-        // (already authored free text) + labeled deep links. No new authoring schema. [Story 9.4 UX]
-        var hasLatest = e.LatestChangeSummary is { Length: > 0 };
-        if (hasLatest || hasDevRecord || hasChangeLog)
-        {
-            sb.Append("    <p class=\"evidence-verify\">\n");
-            if (hasLatest)
-            {
-                var latestSummary = TruncateEvidenceSummary(e.LatestChangeSummary!);
-                sb.Append($"      <span class=\"evidence-latest\">Latest: {PathUtil.Html(latestSummary)}</span>\n");
-            }
-            if (hasDevRecord || hasChangeLog)
-            {
-                sb.Append("      <span class=\"evidence-verify-links\">");
-                if (hasDevRecord)
-                    sb.Append("<a href=\"#sec-dev-agent-record\">Dev record</a>");
-                if (hasDevRecord && hasChangeLog)
-                    sb.Append("<span class=\"evidence-verify-sep\" aria-hidden=\"true\"> · </span>");
-                if (hasChangeLog)
-                    sb.Append("<a href=\"#sec-change-log\">Change log</a>");
-                sb.Append("</span>\n");
-            }
-            sb.Append("    </p>\n");
-        }
-
-        sb.Append("  </div>\n");
-        return sb.ToString();
+        return $"  <div class=\"evidence-strip\">{tasksPill}{testsPill}{verifiedPill}</div>\n";
     }
 
     private static string EmptyEvidencePill(string label, string icon = "")
         => $"<span class=\"status-badge evidence-pill empty\">{icon}{PathUtil.Html(label)}</span>";
 
-    /// <summary>Keeps the header cue scannable — Change Log actions can be long paragraphs.</summary>
-    private static string TruncateEvidenceSummary(string text, int maxChars = 140)
+    private const int ChangeSurfaceFileCap = 8;
+
+    /// <summary>Projects the ADR 0007 change footprint — classification, AC verify checklist, touched files,
+    /// ship line — so a reviewer knows what to confirm without opening Dev Agent Record. [Story 9.4]</summary>
+    private static string ChangeSurfacePanel(StoryChangeSurface surface, bool hasDevRecord)
+    {
+        var sb = new StringBuilder();
+        sb.Append("  <div class=\"change-surface\" id=\"sec-change-surface\">\n");
+
+        // Classification line
+        sb.Append("    <div class=\"change-surface-head\">");
+        sb.Append("<span class=\"change-surface-label\">Change surface</span>");
+        if (surface.Classifications.Count > 0)
+        {
+            sb.Append($"<span class=\"change-surface-class\">{PathUtil.Html(string.Join(" + ", surface.Classifications))}</span>");
+        }
+        else if (surface.ChangedFiles.Count == 0)
+        {
+            sb.Append("<span class=\"change-surface-empty\">no file list recorded</span>");
+        }
+        sb.Append("</div>\n");
+
+        // Verify checklist (ACs)
+        sb.Append("    <div class=\"change-surface-section\">\n");
+        sb.Append("      <div class=\"change-surface-section-label\">Verify</div>\n");
+        if (surface.VerifyChecklist.Count > 0)
+        {
+            sb.Append("      <ul class=\"change-surface-verify\">\n");
+            foreach (var (number, plainText) in surface.VerifyChecklist)
+            {
+                var summary = TruncatePlainText(plainText, 120);
+                sb.Append($"        <li><a href=\"#ac-{number}\">AC #{number}</a> — {PathUtil.Html(summary)}</li>\n");
+            }
+            sb.Append("      </ul>\n");
+        }
+        else
+        {
+            sb.Append("      <p class=\"change-surface-empty\">no acceptance criteria recorded</p>\n");
+        }
+        sb.Append("    </div>\n");
+
+        // Touched files
+        sb.Append("    <div class=\"change-surface-section\">\n");
+        sb.Append("      <div class=\"change-surface-section-label\">Touched</div>\n");
+        if (surface.ChangedFiles.Count > 0)
+        {
+            var display = surface.ChangedFiles.Take(ChangeSurfaceFileCap).ToList();
+            var chips = display.Select(f => $"<span class=\"change-surface-file\">{PathUtil.Html(Path.GetFileName(f))}</span>");
+            sb.Append($"      <p class=\"change-surface-files\">{string.Join(" ", chips)}");
+            var remaining = surface.ChangedFiles.Count - display.Count;
+            if (remaining > 0 && hasDevRecord)
+                sb.Append($" <a class=\"change-surface-more\" href=\"#sec-dev-agent-record\">+{remaining} more</a>");
+            else if (remaining > 0)
+                sb.Append($" <span class=\"change-surface-more\">+{remaining} more</span>");
+            sb.Append("</p>\n");
+        }
+        else
+        {
+            sb.Append("      <p class=\"change-surface-empty\">no file list recorded</p>\n");
+        }
+        sb.Append("    </div>\n");
+
+        // Ship line
+        sb.Append("    <div class=\"change-surface-section\">\n");
+        sb.Append("      <div class=\"change-surface-section-label\">Ship</div>\n");
+        if (surface.ShipLine is { Length: > 0 } ship)
+            sb.Append($"      <p class=\"change-surface-ship\">{PathUtil.Html(ship)}</p>\n");
+        else
+            sb.Append("      <p class=\"change-surface-empty\">no ship record</p>\n");
+        sb.Append("    </div>\n");
+
+        sb.Append("  </div>\n");
+        return sb.ToString();
+    }
+
+    private static string TruncatePlainText(string text, int maxChars)
     {
         if (text.Length <= maxChars) return text;
         var cut = text[..maxChars].TrimEnd();
@@ -392,14 +434,14 @@ public sealed partial class HtmlRenderAdapter
         main.Append(StatusStyles.LegendKey());
         main.Append(view.RetroLinkHtml);
         main.Append("  </div>\n");
-        // Own row under the kicker/status-badge line — same Status guard; empty-state pills for missing facts
-        // (AC #2). Explicit Dev-record / Change-log links when those sections exist. [Story 9.4]
+        // Evidence strip + ADR 0007 change-surface panel — same Status guard. [Story 9.4]
         if (view.Status is { Length: > 0 })
         {
-            main.Append(EvidenceStrip(
-                view.Evidence,
-                hasDevRecord: view.DevAgentRecord.Count > 0,
-                hasChangeLog: view.ChangeLogHtml.Length > 0));
+            main.Append("  <div class=\"evidence-block\">\n");
+            main.Append(EvidenceStrip(view.Evidence));
+            main.Append(ChangeSurfacePanel(view.ChangeSurface, view.DevAgentRecord.Count > 0));
+            main.Append("  </div>\n");
+            toc.Add(new Toc.Entry(2, "Change Surface", "sec-change-surface"));
         }
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");
         main.Append("</header>\n\n");

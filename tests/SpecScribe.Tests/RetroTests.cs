@@ -199,8 +199,9 @@ public class RetroTests : IDisposable
         // Owners are NOT shown — they're LLM-generated retro personas, not real assignees. [polish #7]
         Assert.DoesNotContain(">Dana</span>", html);
         Assert.DoesNotContain(">Amelia</span>", html);
-        // Each item links back to its epic's retro page…
-        Assert.Contains("href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\">From Epic 1 retrospective", html);
+        // Provenance lives on the group heading (Story 9.6) — linked to the epic's retro page.
+        Assert.Contains("class=\"action-items-group\"", html);
+        Assert.Contains("href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\">From the Epic 1 retrospective", html);
         // …and offers a "Resolve with AI" command composed with the action text.
         Assert.Contains("<span class=\"cmd-text\">Resolve with AI</span>", html);
         Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Route deferred tech debt\"", html);
@@ -232,6 +233,52 @@ public class RetroTests : IDisposable
         // No deferred href → no deferred link at all, even for the debt item.
         var noHref = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
         Assert.DoesNotContain("action-item-deferred", noHref);
+    }
+
+    [Fact]
+    public void ActionItems_RenderPage_VisibleTextLinked_PayloadUncorrupted()
+    {
+        var open = new[]
+        {
+            new SprintActionItem("Fix Story 1.1 heatmap debt before Epic 2", "open", 1, "Dana"),
+        };
+        var map = new Dictionary<int, string> { [1] = "implementation-artifacts/epic-1-retro.html" };
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var epics = new EpicsModel
+        {
+            OverviewHtml = "",
+            RequirementsInventoryHtml = "",
+            Epics =
+            [
+                new EpicInfo
+                {
+                    Number = 1,
+                    Title = "Foundation",
+                    GoalHtml = "",
+                    Status = EpicStatus.Drafted,
+                    Section = EpicSection.VerticalSlice,
+                    Stories =
+                    [
+                        new StoryInfo
+                        {
+                            Id = "1.1",
+                            EpicNumber = 1,
+                            Title = "Foundation",
+                            UserStoryHtml = "",
+                            AcBlocksHtml = Array.Empty<string>(),
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var html = ActionItemsTemplater.RenderPage(open, map, commands, nav, epicsModel: epics);
+
+        Assert.Contains("class=\"story-ref\"", html);
+        Assert.Contains(">Story 1.1</a>", html);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix Story 1.1 heatmap debt before Epic 2\"", html);
+        Assert.DoesNotContain("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix <a", html);
     }
 
     private static int CountOccurrences(string haystack, string needle)

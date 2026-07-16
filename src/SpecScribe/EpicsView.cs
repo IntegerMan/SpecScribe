@@ -177,16 +177,24 @@ public sealed record EpicPageView
 }
 
 /// <summary>Compact verification facts for the story-page evidence strip — tasks (from
-/// <see cref="ProgressCalculator"/>), optional free-text test tally, the top Change Log date with a
-/// verification vs. plain-edit label, and the top Change Log action text for the visible "Latest change"
-/// cue. Data only; honest-absence wording and pill markup live in the renderer. [Story 9.4]</summary>
+/// <see cref="ProgressCalculator"/>), optional free-text test tally, and the top Change Log date with a
+/// verification vs. plain-edit label. Data only; honest-absence wording and pill markup live in the renderer.
+/// [Story 9.4]</summary>
 public sealed record StoryEvidence(
     int TasksDone,
     int TasksTotal,
     string? TestsSummary,
     DateOnly? VerifiedDate,
-    bool VerifiedIsReview,
-    string? LatestChangeSummary = null);
+    bool VerifiedIsReview);
+
+/// <summary>Host-neutral projection of a story's testable change footprint — derived from standard BMAD
+/// sections only (File List, Acceptance Criteria, Status/Change Log). Data only; markup lives in the
+/// renderer. [ADR 0007; Story 9.4]</summary>
+public sealed record StoryChangeSurface(
+    IReadOnlyList<string> Classifications,
+    IReadOnlyList<(int Number, string PlainText)> VerifyChecklist,
+    IReadOnlyList<string> ChangedFiles,
+    string? ShipLine);
 
 /// <summary>The host-neutral SECTION view model for a drafted STORY page body. Its identity/status/drill are
 /// data; the task-breakdown sunburst renders from <see cref="Tasks"/>; everything else the story page shows is
@@ -212,6 +220,10 @@ public sealed record StoryPageView
     /// on every drafted story page; the renderer shows the strip only when <see cref="Status"/> is set.
     /// [Story 9.4]</summary>
     public required StoryEvidence Evidence { get; init; }
+
+    /// <summary>Change footprint projected from standard BMAD sections (File List, ACs, Status/Change Log).
+    /// The renderer shows the surface panel only when <see cref="Status"/> is set. [ADR 0007; Story 9.4]</summary>
+    public required StoryChangeSurface ChangeSurface { get; init; }
 
     /// <summary>The pre-rendered "Epic N retro →" kicker link HTML (named opaque fragment; empty when none).</summary>
     public required string RetroLinkHtml { get; init; }

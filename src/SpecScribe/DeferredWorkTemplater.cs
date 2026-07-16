@@ -1,0 +1,118 @@
+using System.Text;
+
+namespace SpecScribe;
+
+/// <summary>Renders the deferred-work page as structured provenance cards (sibling of action-items),
+/// or falls back to the plain markdown body when the note isn't in the Deferred-from shape. [Story 9.6]</summary>
+public static class DeferredWorkTemplater
+{
+    public static string RenderPage(
+        DeferredWorkModel model,
+        SiteNav nav,
+        string outputRelativePath,
+        string title = "Deferred Work")
+    {
+        var prefix = PathUtil.RelativePrefix(outputRelativePath);
+        var sb = new StringBuilder();
+        sb.Append(PathUtil.RenderHeadOpen(
+            $"{title} — {nav.SiteTitle}",
+            prefix + ForgeOptions.StylesheetName,
+            prefix + ForgeOptions.ScriptName,
+            $"Deferred work for {nav.SiteTitle}."));
+        sb.Append(nav.RenderNavBar(outputRelativePath));
+        sb.Append(SiteNav.RenderBreadcrumb(outputRelativePath, new (string, string?)[]
+        {
+            ("Home", prefix + "index.html"),
+            (title, null),
+        }));
+
+        sb.Append("<header class=\"doc-header\">\n");
+        sb.Append($"  <h1>{PathUtil.Html(title)}");
+        sb.Append(StatusStyles.LegendKey());
+        sb.Append("</h1>\n");
+        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; real-but-not-now</div>\n");
+        sb.Append("</header>\n\n");
+
+        sb.Append("<main id=\"main-content\">\n");
+
+        if (!model.IsStructured)
+        {
+            sb.Append("<article class=\"doc-body deferred-work-fallback\">\n");
+            sb.Append(model.PlainBodyHtml ?? string.Empty);
+            sb.Append("</article>\n");
+        }
+        else
+        {
+            sb.Append("<section class=\"deferred-work-wrap\">\n");
+            foreach (var group in model.Groups)
+            {
+                RenderGroup(sb, group);
+            }
+            sb.Append("</section>\n");
+        }
+
+        sb.Append("</main>\n\n");
+        sb.Append(PathUtil.RenderFooter(prefix));
+        sb.Append("</body>\n</html>\n");
+        return sb.ToString();
+    }
+
+    private static void RenderGroup(StringBuilder sb, DeferredWorkGroup group)
+    {
+        sb.Append("<section class=\"deferred-group\">\n");
+        sb.Append("  <h2 class=\"deferred-group-title\">");
+        sb.Append("Deferred from: ");
+        if (group.SourceStoryHref is { Length: > 0 } href)
+            sb.Append($"<a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(group.ProvenanceLabel)}</a>");
+        else
+            sb.Append(PathUtil.Html(group.ProvenanceLabel));
+        sb.Append("</h2>\n");
+
+        // Open items first so outstanding promises lead; resolved trail with distinct treatment.
+        var ordered = group.Items
+            .Select((item, index) => (item, index))
+            .OrderBy(t => t.item.Resolved ? 1 : 0)
+            .ThenBy(t => t.index)
+            .Select(t => t.item);
+
+        sb.Append("  <ul class=\"deferred-items-list\">\n");
+        foreach (var item in ordered)
+            RenderItem(sb, item);
+        sb.Append("  </ul>\n");
+        sb.Append("</section>\n");
+    }
+
+    private static void RenderItem(StringBuilder sb, DeferredWorkItem item)
+    {
+        var cardClass = item.Resolved ? "deferred-item-card resolved" : "deferred-item-card";
+        sb.Append($"    <li class=\"{cardClass}\">\n");
+
+        sb.Append("      <div class=\"deferred-item-meta\">\n");
+        if (item.Resolved)
+        {
+            // Resolved maps to the existing done vocabulary — shape + text, never color-only (UX-DR17).
+            sb.Append($"        {StatusStyles.Badge("done", "Resolved")}\n");
+            sb.Append("        <span class=\"deferred-resolved-mark\" aria-hidden=\"true\">✓</span>\n");
+        }
+        else
+        {
+            sb.Append($"        {StatusStyles.Badge(StatusStyles.ForSprint("open"), "Open")}\n");
+        }
+
+        if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
+        {
+            var label = rr.Contains('.') && !rr.Contains('-')
+                ? $"Story {rr}"
+                : rr;
+            sb.Append($"        <a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(rh)}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
+        }
+        else if (item.ResolvingRef is { Length: > 0 } rr2)
+        {
+            sb.Append($"        <span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(rr2)}</span>\n");
+        }
+        sb.Append("      </div>\n");
+
+        sb.Append($"      <div class=\"deferred-item-body\">{item.BodyHtml}</div>\n");
+        sb.Append("    </li>\n");
+    }
+}

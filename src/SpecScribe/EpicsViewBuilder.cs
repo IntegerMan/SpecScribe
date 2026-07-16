@@ -132,6 +132,7 @@ public static class EpicsViewBuilder
         string reviewFindingsHtml,
         string changeLogHtml,
         StoryEvidence evidence,
+        StoryChangeSurface changeSurface,
         CommandCatalog commands,
         string? epicRetroPath,
         EntityPager? pager = null)
@@ -147,6 +148,7 @@ public static class EpicsViewBuilder
             StatusStage = StatusStyles.ForStory(story),
             Status = story.Status is { Length: > 0 } s ? s : null,
             Evidence = evidence,
+            ChangeSurface = changeSurface,
             RetroLinkHtml = RenderStoryRetroLink(epic.Number, prefix, epicRetroPath),
             BlurbHtml = blurbHtml,
             Tasks = tasks,

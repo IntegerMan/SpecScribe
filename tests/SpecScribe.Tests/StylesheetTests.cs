@@ -86,12 +86,15 @@ public class StylesheetTests
         Assert.Contains(".evidence-pill", css);
         Assert.Contains(".evidence-pill.empty", css);
         Assert.Contains(".evidence-pill.tests-pass", css);
-        Assert.Contains(".evidence-verify", css);
-        Assert.Contains(".evidence-latest", css);
-        Assert.Contains("var(--ink-light)", css); // empty-state muted text reuses existing token
-        Assert.Contains("var(--moss)", css); // tests-pass reuses done/moss channel
-        Assert.DoesNotContain("--status-evidence", css); // no 7th status token
-        Assert.DoesNotContain(".evidence-link", css); // replaced by labeled Dev record / Change log links
+        Assert.Contains("var(--ink-light)", css);
+        Assert.Contains("var(--moss)", css);
+        Assert.DoesNotContain("--status-evidence", css);
+        // ADR 0007 change-surface panel
+        Assert.Contains(".change-surface", css);
+        Assert.Contains(".change-surface-verify", css);
+        Assert.Contains(".change-surface-file", css);
+        Assert.DoesNotContain(".evidence-latest", css);
+        Assert.DoesNotContain(".evidence-link", css);
     }
 
     [Fact]
@@ -621,5 +624,26 @@ public class StylesheetTests
         Assert.Contains("content: \"▸ \"", css);
         Assert.Contains(".collapsible-section[open] > summary::before { content: \"▾ \"; }", css);
         Assert.Contains(".collapsible-section > summary > h2", css);
+    }
+
+    // ---- Story 9.6: deferred-work cards + resolved treatment --------------------------------
+
+    [Fact]
+    public void Stylesheet_DeferredWorkCardsReuseActionItemGrammar_ResolvedNotColorOnly()
+    {
+        var css = ReadStylesheet();
+        Assert.Contains(".deferred-work-wrap", css);
+        Assert.Contains(".deferred-item-card", css);
+        Assert.Contains(".deferred-item-card.resolved", css);
+        Assert.Contains(".deferred-resolved-mark", css);
+        Assert.Contains("border-left: 3px solid var(--status-review)", css);
+        // Resolved treatment: done token + opacity + check glyph — never color-only (UX-DR17).
+        Assert.Contains(".deferred-item-card.resolved", css);
+        Assert.Contains("border-left-color: var(--status-done)", css);
+        Assert.Contains("opacity: 0.78", css);
+        Assert.Contains("deferred-resolved-mark", css);
+        // Group headings for action-items (Story 9.6 AC #2).
+        Assert.Contains(".action-items-group", css);
+        Assert.Contains(".action-item-cross", css);
     }
 }

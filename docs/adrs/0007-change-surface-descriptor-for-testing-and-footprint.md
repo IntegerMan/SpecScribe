@@ -1,195 +1,202 @@
-# ADR 0007: A "Change Surface" Descriptor for Testing a Change and Understanding Its Footprint
+# ADR 0007: Deriving a Change's Visible Surface by Reading Standard BMAD Story Sections
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-16
 **Deciders:** Matt Eland
 
 ## Context
 
-When a story or spec lands, the single most expensive question to answer after the fact is **"what
-does this change actually make visible, and how do I confirm it works?"** Today that answer is
-scattered. To reconstruct the footprint of a feature you must read the whole implementation
-artifact end-to-end — the ACs, the "Where this renders" prose, the Tasks, the Scope in/out list,
-the Reuse map, and (if the author included one) the trailing "Verify before marking review"
-paragraph. There is no single, predictable place that says *here is the observable surface this
-change adds, here is where to point your eyes, here is how to trigger each state.*
+We want a tool-supported way to answer, for any completed story, **"what does this change actually
+make visible, and how do I confirm it works?"** — so a reviewer or tester can see a feature's full
+footprint without reading the entire implementation artifact end-to-end.
 
-The information already exists — it is just unstructured and inconsistently present:
+Two hard constraints shape this decision:
 
-- Story 9.4 buries its testing walkthrough in a prose "Verify before marking review" paragraph and
-  its render location in a "Where this renders (read before touching)" section — rich, but you have
-  to read ~180 lines to extract "open `epics/story-6-9.html`, look for three pills under the status
-  badge, click to jump to the dev record, confirm parity in the webview + SPA."
-  [Source: `_bmad-output/implementation-artifacts/9-4-verification-evidence-strip-on-story-pages.md`]
-- Story 9.1 states its verification as one sentence naming concrete URLs (`requirements/fr2.html`
-  plus a deferred and an unmapped FR) and the exact things to confirm.
-  [Source: `_bmad-output/implementation-artifacts/9-1-requirement-pages-link-to-their-covering-stories.md`]
-- Story 6.9 spreads its surface across a VS Code tree view, a status-bar item, manifest
-  contributions, and an `extension/README.md` F5 checklist — a fundamentally different surface than
-  the HTML site, with an error/stale variant that "must be visible on both surfaces."
-  [Source: `_bmad-output/implementation-artifacts/6-9-native-project-outline-tree-view-and-status-bar.md`]
-- Story 8.3, by contrast, declares "**no new visible surface** … The ledger is plumbing" — an
-  equally important footprint fact stated only in passing inside the Scope section.
-  [Source: `_bmad-output/implementation-artifacts/8-3-single-source-of-truth-for-every-count.md`]
+1. **Do not modify the artifacts and do not invent a new authoring schema.** SpecScribe's ability to
+   render *many* spec-driven frameworks without dictating a house authoring style is a load-bearing
+   project value (the same guardrail Story 9.4 invoked when it refused to add a `verified:`
+   frontmatter field). So the "visible surface" must be *derived by reading sections that already
+   exist* in a normal story — never by adding a `change-surface:` block or asking authors to fill in
+   anything new.
+2. **Work against default BMAD, not just SpecScribe's own richly-authored stories.** This repo's
+   artifacts happen to carry generous custom prose ("Where this renders", "Verify before marking
+   review", "Reuse map", "Scope in/out"). A default BMAD story has **none of those guaranteed** — it
+   has only the canonical template sections. The derivation must lean on what the BMAD template
+   *always* produces, and treat the custom prose as a bonus when present.
 
-Across the corpus the *same facets* recur every time a reviewer or tester needs to understand a
-change, but each artifact expresses them in a different shape and location. The recurring facets
-are:
+The canonical BMAD story template (`bmad-create-story/template.md`) guarantees these sections:
+**Status**, **Story** (As a / I want / so that), **Acceptance Criteria**, **Tasks / Subtasks** (with
+`(AC: #)` references), **Dev Notes** (incl. **Project Structure Notes** and **References** with
+`[Source: …]` citations), and **Dev Agent Record** (**Agent Model Used**, **Debug Log References**,
+**Completion Notes List**, **File List**). A **Change Log** section is not in the base template but is
+present on nearly every story in practice. [Source: `.agents/skills/bmad-create-story/template.md`]
 
-| Facet | Example evidence in the artifacts |
-|---|---|
-| **Which delivery surfaces** it paints on (static HTML, VS Code webview, JSON+SPA, VS Code chrome, CLI) | 9.4: "propagates byte-identically to HTML + webview + SPA"; 6.9: tree view + status bar |
-| **Concrete entry points** — URLs, pages, commands, CLI flags | 9.1: `requirements/fr2.html`; 9.4: `epics/story-6-9.html`; 6.9: *SpecScribe: Open Status* |
-| **New vs. modified vs. retired** output pages | 7.6: `code-map.html` added, `structure.html` deleted; 8.3: none |
-| **Visible elements / selectors** — CSS classes, icons, badges, charts | 9.4: `.evidence-strip`, `.evidence-pill.empty`; new `Tests`/`Verified` icons |
-| **States & variants** — populated, honest-absence, error/stale, reduced-motion, no-JS, theme | 9.4 empty-state pills; 6.9 stale/error indicator; treemap reduced-motion |
-| **Trigger preconditions** — the data shape needed to make it appear | 9.4: "a done story whose Change Log has a dated entry"; 9.1 fixtures |
-| **Interactions** — click, hover, keyboard, context action, drill-down | 6.9 reveal-in-panel, context menu; 9.4 click-to-dev-record |
-| **Cross-cutting invariants** — render parity, determinism/golden fingerprint, a11y text-equivalent | 9.4 golden fingerprint regen; 7.8 sr-only `.ref-list` equivalent |
+The good news is that the visible-surface signal is *already there* — it is just spread across these
+standard sections and expressed in prose. The recurring facets a reviewer needs, and the standard
+section each is most reliably recoverable from:
 
-Because these facets are unstructured, three concrete costs recur: (1) reviewers re-derive the test
-plan by reading the whole story; (2) regressions on *secondary* surfaces (webview, SPA, sr-only
-fallback) slip because the surface list was never enumerated in one place; and (3) "this change is
-invisible plumbing" is indistinguishable at a glance from "this change forgot to describe its
-surface."
+| Facet the tester needs | Recoverable from (standard BMAD section) | Example evidence |
+|---|---|---|
+| **What files/footprint changed** | **Dev Agent Record → File List** | 9.4 File List: `EpicsParser.cs`, `HtmlRenderAdapter.Epics.cs`, `specscribe.css` … |
+| **Observable behaviors to confirm** | **Acceptance Criteria** (Given/When/Then) | 9.4 AC#1 "a compact evidence strip appears near the status badge" |
+| **Work breakdown → what was actually built** | **Tasks / Subtasks** (with `(AC: #)`) | 9.4 Task 4 "Render the pill strip in the story-page header" |
+| **User-facing intent / who it's for** | **Story** (role · action · benefit) | 9.4 "As a reviewer … judge a done claim in one glance" |
+| **Concrete code / requirement anchors** | **Dev Notes → References** `[Source: …]` | 9.4 `[Source: src/SpecScribe/HtmlRenderAdapter.Epics.cs:256-357]` |
+| **What shipped, and whether it's done** | **Status** + **Change Log** + **Completion Notes** | 9.4 "1202 passed … Status → review"; empty-state pills implemented |
+| **Structure/paths & conflicts** | **Dev Notes → Project Structure Notes** | 9.4 "Primary code: `EpicsParser.cs` … `assets/specscribe.css`" |
+
+Because this signal is unstructured prose, the recurring cost is that a reviewer must read the whole
+story to reconstruct a test plan, and regressions on *secondary* surfaces slip because nothing
+enumerates the footprint in one place. The opportunity: a tool can *read these standard sections and
+project the visible surface for the reviewer* — no artifact change, portable to any BMAD story.
 
 ## Decision
 
-Adopt a single, predictable **Change Surface** descriptor — a short structured section that every
-implementation artifact carries near its top (right after the ACs, before the Tasks), answering
-exactly one question: **"what does this change make observable, and how do I see each part of it?"**
+Build the "visible surface" view by **reading the standard BMAD story sections in a fixed priority
+order** and projecting them into a change-footprint the reviewer can act on. Nothing is added to the
+artifacts; the tool consumes only sections a default BMAD story already contains, degrading
+gracefully when a section is thin or absent.
 
-It is a *descriptor of the observable footprint*, not a second copy of the design. It contains only
-what a tester or a reviewer standing in front of the running product needs. Authoring it is cheap
-because the author already knows every field at implementation time; the value is consolidating
-them into one greppable, predictable block instead of scattering them across prose.
+### The reading order — backbone sections first
 
-### The eight fields of the Change Surface descriptor
+Read from most-reliable to least, so the footprint holds up even on a sparse story:
 
-1. **Surfaces touched** — a fixed checklist of SpecScribe's delivery surfaces, each marked
-   touched/untouched, so a `no new visible surface` change is *explicit* rather than inferred:
-   - [ ] Static HTML site
-   - [ ] VS Code webview
-   - [ ] JSON + SPA adapter
-   - [ ] VS Code chrome (tree view · status bar · commands · menus · settings)
-   - [ ] CLI (`generate` / `watch` flags, interactive settings)
-   - [ ] None — plumbing only (state why the output is byte-identical)
+1. **File List (Dev Agent Record) — the footprint backbone.** This is the single most reliable,
+   machine-friendly signal: the concrete set of files the change touched. It is a literal list of
+   paths, so it needs no NLP. From the paths alone you can classify the surface with generic,
+   framework-agnostic heuristics:
+   - style/asset paths (`*.css`, `*.scss`, `assets/…`) ⇒ a *visual* change,
+   - view/template/component/markup paths ⇒ a *rendered UI* change,
+   - test paths (`*Tests*`, `test/…`, `spec/…`) ⇒ where the executable proof lives,
+   - config/build/manifest paths ⇒ packaging/toolchain surface,
+   - everything else ⇒ logic/plumbing.
+   A File List that is **all tests + logic and no view/asset paths** is the portable signal for
+   "plumbing, no new visible surface" — recovering Story 8.3's fact *without* relying on its custom
+   prose. [Source: `.agents/skills/bmad-create-story/template.md` (File List)]
 
-2. **Entry points (where to look)** — the concrete, copy-pasteable places to point your eyes:
-   generated page paths (`epics/story-6-9.html`, `requirements/fr2.html`, `code-map.html`), VS Code
-   command titles (*SpecScribe: Open Status*), CLI invocations (`specscribe generate --source …`).
-   Prefer real pages from *this* repo's own `_bmad-output` so the tester can reproduce immediately.
+2. **Acceptance Criteria — the observable behaviors to confirm.** The Given/When/Then ACs are, by
+   construction, statements of externally observable outcomes ("*a compact evidence strip appears
+   near the status badge*"). They are the ready-made **test checklist**: each AC is one thing to
+   verify. This is guaranteed on every BMAD story and is the most direct "how do I confirm it works"
+   source.
 
-3. **Page inventory delta** — pages **added**, **modified**, and **retired/removed** by this change.
-   This is the "full footprint" line: it names the file-count and URL-shape impact (e.g. Story 7.6
-   added `code-map.html` and *deleted* `structure.html`; Story 8.3 added nothing).
+3. **Tasks / Subtasks — what was actually built, and the AC mapping.** Tasks name the concrete work
+   ("*Render the pill strip in the story-page header*") and carry `(AC: #)` back-references, giving a
+   task→AC coverage map. Completed (`[x]`) vs. open (`[ ]`) checkboxes also reveal how much of the
+   described surface actually shipped.
 
-4. **Visible elements & selectors** — the actual paintable artifacts, named by their stable
-   selectors so a tester can grep the generated HTML/CSS: new CSS classes (`.evidence-strip`,
-   `.evidence-pill.empty`), icons/glyphs, badges, charts, text strings, DOM anchors
-   (`#sec-dev-agent-record`). Include the *stylesheet* additions guarded by `StylesheetTests`.
+4. **Story statement — user-facing intent.** Role · action · benefit frames *who* the surface is for
+   and *why*, so the tester knows the persona and the value to sanity-check against.
 
-5. **States & variants** — every distinct visual state and how to force each one:
-   - populated / happy path,
-   - **honest-absence / empty state** (the designed empty treatment, e.g. "no test evidence recorded"),
-   - error / stale (e.g. the failed-refresh warning that "must be visible on both surfaces"),
-   - accessibility & motion fallbacks — `noscript`/no-JS view, reduced-motion, sr-only text
-     equivalent, theme (light/dark, VS Code high-contrast).
+5. **References (`[Source: …]`) — anchors into code and requirements.** The citations point at the
+   exact files/sections the change rests on, letting the tool cross-link the footprint to source
+   (and, in SpecScribe, to its own generated code pages) — again with zero authoring change.
 
-6. **Trigger preconditions** — the minimal data shape that makes each state appear (e.g. "a `done`
-   story whose `## Change Log` has a dated verify/review entry" ⇒ the *verified* pill; a story with
-   no dev record ⇒ the empty-state pill). Name the fixture or the real artifact that exhibits it.
+6. **Status + Change Log + Completion Notes — did it ship, and what does "done" mean here.** Status
+   gates whether the surface is real yet; the Change Log's newest dated entry and the Completion
+   Notes summarize what landed (test counts, "Status → review", etc.) — the same free text Story 9.4
+   already mines for its evidence strip, reused here for footprint provenance.
 
-7. **Interactions** — every user-triggerable behavior on the surface: clicks, hovers/tooltips,
-   keyboard navigation, drill-down/breadcrumb, context-menu actions, watch-mode live refresh — each
-   with its expected read-only result.
+7. **Project Structure Notes — paths, modules, and flagged variances** — a secondary confirmation of
+   where the change lives when the File List is terse.
 
-8. **Invariants to re-check** — the cross-cutting properties this surface must preserve, so testing
-   is not just "it renders" but "it renders *correctly everywhere*": render **parity** across HTML /
-   webview / SPA (or an explicit, justified exception), **determinism** / golden-fingerprint
-   regeneration, **accessibility** text-equivalent (NFR6/UX-DR16), never-color-only (UX-DR17), and
-   single-source-of-truth for any count.
+### What the tool projects
 
-### Worked example — Story 9.4's descriptor, extracted from its existing prose
+From those sections the tool assembles a compact **per-story surface view**:
 
-> **Surfaces touched:** ☑ Static HTML ☑ VS Code webview ☑ JSON+SPA · ☐ VS Code chrome ☐ CLI
-> (shared `RenderStoryBody`, so all three paint identically — no parity exception).
-> **Entry points:** open `epics/story-6-9.html` (a `done` story); open this story's own page for the
-> empty state.
-> **Page inventory delta:** none added/retired; every *drafted story page* is modified (⇒ golden
-> fingerprint regen expected).
-> **Visible elements:** `.evidence-strip`, three `.evidence-pill`s (Tasks/Tests/Verified),
-> `.evidence-pill.empty`, `.evidence-link`, new `Tests` & `Verified` icons; anchor target
-> `#sec-dev-agent-record`.
-> **States & variants:** all-three-present · tests-absent · no-changelog (⇒ "updated" not "verified")
-> · no-dev-record (no link) · no-status (strip omitted).
-> **Trigger preconditions:** Tasks from `ProgressCalculator`; Tests from `## Dev Agent Record` free
-> text; Verified date from the top `## Change Log` entry.
-> **Interactions:** click the strip → jumps to the Dev Agent Record.
-> **Invariants:** HTML/webview/SPA parity (no exception); deterministic first-match extraction;
-> icon+word so no state is color-only; golden fingerprint regenerated deliberately.
+- a **footprint classification** (visual / rendered-UI / plumbing / packaging) derived from File List
+  path heuristics;
+- the **AC checklist** as the ready-to-run verification list;
+- the **changed-files list**, linked to source where References/citations resolve;
+- a **"did it ship"** line from Status + the latest Change Log entry.
 
-Everything above is already stated in the artifact — the descriptor only relocates it into one
-predictable, testable block.
+### Portability first; custom prose is a bonus, never a dependency
+
+The backbone above uses only guaranteed BMAD sections, so it works on any default BMAD story. Where a
+project *does* author richer prose, the tool may **opportunistically enrich** the view — e.g. if a
+"Verify before marking review" paragraph or a "Where this renders" section is detected by heading,
+surface it verbatim as an extra hint. But detection is best-effort and its absence never degrades the
+backbone. The tool must never *require* SpecScribe-shaped prose to produce a useful surface view.
+
+### Worked example — reconstructing Story 9.4's surface from standard sections only
+
+Reading *only* the guaranteed sections of `9-4-verification-evidence-strip-on-story-pages.md`:
+
+- **File List** → `EpicsParser.cs`, `EpicsView.cs`, `EpicsViewBuilder.cs`, `EpicsTemplater.cs`,
+  `SiteGenerator.cs`, `HtmlRenderAdapter.Epics.cs`, `assets/specscribe.css`, plus test files. The
+  presence of a `*.css` asset **and** an `HtmlRenderAdapter`/templater view path classifies this as a
+  **visual + rendered-UI** change (not plumbing) — inferred purely from paths.
+- **Acceptance Criteria** → the verification checklist writes itself: (1) "a compact evidence strip
+  appears near the status badge and links to the dev record", (2) "missing evidence is visibly absent
+  … using the empty-state treatment."
+- **Tasks / Subtasks** → confirm what shipped and where: "Render the pill strip in the story-page
+  header", "Style the strip and its empty states" (`(AC: #1, #2)` mapping intact).
+- **Status + Change Log** → `review`; latest dated entry confirms it landed with tests green.
+
+That reproduces "a visual change to story pages; confirm the strip renders near the status badge and
+its empty state; the changed files center on the epics renderer + stylesheet" — **without reading a
+single line of the story's custom prose.** The bespoke "Where this renders" / "Verify before marking
+review" sections, when present, only sharpen the picture; they are never load-bearing.
 
 ## Options Considered
 
-### A. Structured "Change Surface" descriptor section — *chosen*
+### A. Read the standard BMAD backbone sections and project a surface view — *chosen*
 
-A fixed eight-field block in each implementation artifact. Cheap to author (the facts are known at
-implementation time), greppable, and it makes "no visible surface" an explicit, first-class answer.
-Low risk: it is a documentation convention, adds no code, and degrades gracefully (a partially
-filled descriptor is still more useful than scattered prose).
+Derive the footprint from File List + Acceptance Criteria + Tasks + Story + References + Status/Change
+Log — all guaranteed (or near-universal) in a default BMAD story. Zero artifact change, no new schema,
+portable to any BMAD-based repo. Degrades gracefully: even a story with only a File List and ACs
+yields a useful footprint. Best-effort enrichment from custom prose is layered on top but never
+required.
 
-### B. Keep the status quo — free-form "Verify before marking review" prose
+### B. Add a structured "Change Surface" block to each artifact
 
-Rejected. It is inconsistently present (roughly the Epic 9 stories have it; many earlier ones do
-not), lives at the *bottom* of long artifacts, and omits the surface *inventory* (added/retired
-pages, per-surface matrix) that the footprint question needs. It answers "how do I smoke-test the
-happy path" but not "what is the full observable footprint."
+Rejected. It would give the richest, most machine-readable surface — but it is exactly the
+**required authoring schema** the project value forbids, and it would only work on repos that adopt
+the block, breaking the "works on default BMAD" constraint. This is the same trade-off Story 9.4
+declined when it refused a `verified:` field; if a tagged surface record is ever wanted, that is its
+own future ADR weighing the authoring burden.
 
-### C. Make SpecScribe *render* a per-story "Change Surface" panel from a machine-readable block
+### C. Diff-based surface extraction (parse the git diff instead of the artifact)
 
-Attractive long-term — SpecScribe is exactly the tool that could surface this as a portal panel on
-each story page, alongside the Story 9.4 evidence strip. But it collides with a **non-negotiable
-project value: no new required authoring schema** (SpecScribe must support many spec-driven
-frameworks without dictating a house authoring style; see Story 9.4's guardrail). A machine-parsed
-`change-surface:` block would be exactly the mandated schema that value forbids. Deferred: adopt the
-prose convention now (Option A); only if a rendered panel is later wanted does its authoring-burden
-trade-off get weighed in a follow-up ADR — mirroring how Story 9.4 explicitly punted a tagged
-verification record to "an ADR weighing the authoring-burden trade-off."
+Rejected as the *primary* mechanism. A raw diff shows changed lines but not *intent* — it cannot tell
+you which change is user-visible vs. incidental, nor map to acceptance criteria. The **File List**
+already gives the portable footprint the diff would provide, tied to the story's own ACs. (A diff can
+still be a secondary cross-check to catch files the author omitted from the File List.)
 
-### D. A repo-level testing checklist decoupled from the artifact
+### D. Rely on SpecScribe's own rich prose ("Where this renders", "Verify before marking review")
 
-Rejected. A single shared checklist cannot name the concrete URLs, selectors, and preconditions that
-make a *specific* change testable; those are inherently per-change and belong with the change.
+Rejected as a dependency. These sections are excellent when present and *are* consumed
+opportunistically (Option A's enrichment layer), but they are SpecScribe-authored conventions absent
+from default BMAD stories. Building the core view on them would make the tool useless on the very
+repos it is meant to serve.
 
 ## Consequences
 
 **Positive**
 
-- A reviewer or tester gets the full observable footprint of any change from one predictable block —
-  no more reading the whole artifact to reconstruct a test plan.
-- Secondary surfaces (webview, SPA, `noscript` fallback, sr-only equivalent, VS Code chrome) are
-  *enumerated*, so regressions on the non-primary surface are less likely to slip.
-- "Invisible plumbing" changes are explicitly labeled (Surfaces touched → *None*), distinguishing a
-  deliberate no-op footprint from an under-described one.
-- The descriptor doubles as the acceptance smoke-test script and as onboarding context ("what does
-  this feature look like and where") without duplicating the design rationale.
+- A reviewer/tester gets a change's observable footprint and a ready-made AC checklist derived
+  automatically from sections every BMAD story already has — no reading the whole artifact.
+- **Portable by design:** works on default BMAD implementations, not just SpecScribe's own
+  richly-authored stories, satisfying the "support many frameworks" project value.
+- **No artifact change and no new authoring schema** — the same guardrail Story 9.4 honored.
+- "Invisible plumbing" is *detected* (File List = tests + logic, no view/asset paths) rather than
+  depending on the author having said so in prose — recovering facts like Story 8.3's without its
+  custom wording.
 
 **Negative / costs**
 
-- A small, recurring authoring cost per artifact, and a mild redundancy with the existing "Verify
-  before marking review" and "Where this renders" prose (those can be folded into the descriptor
-  over time rather than duplicated).
-- It is a convention, not an enforced schema, so its quality depends on author discipline; a stale
-  or thin descriptor is possible. This is an accepted trade-off in exchange for *not* mandating a
-  parsed authoring schema (Option C's rejected cost).
+- The derivation is heuristic: File-List path classification and prose enrichment are best-effort, so
+  the surface view is a strong hint, not a proof. A File List that omits a touched file, or unusual
+  path conventions, will under- or mis-classify. Acceptable because the ACs remain the authoritative
+  behavior checklist and the view is advisory.
+- Accuracy tracks artifact hygiene: a story with a thin File List or vague ACs yields a thin surface
+  view. The tool improves the *reading* of what exists; it cannot manufacture signal that was never
+  written.
 
 **Neutral**
 
-- No code change and no impact on the generated site or the six `--status-*` tokens; this ADR
-  governs artifact authoring only.
-- Consistent with ADR 0002's shared-render-core view: because most surface changes flow through one
-  shared renderer, the "Surfaces touched" matrix usually collapses to "all three, byte-identical,"
-  which the descriptor records once rather than the author re-deriving parity each time.
+- Governs a *reading/projection* capability, not artifact authoring; no change to the generated site
+  contract or the six `--status-*` tokens.
+- Consistent with ADR 0002's shared-render-core: once this surface view exists it can itself be
+  rendered host-neutrally across HTML / webview / SPA, like every other SpecScribe view.
+
