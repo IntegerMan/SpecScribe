@@ -3376,48 +3376,53 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 
 /* ====================== DASHBOARD TILE BAND ====================== */
-/* Homepage tiles share one flex-wrap panel (typically two dense rows). Journey identity is an accent rail
-   on each card plus a floating caption above the first card of a group — not separate full-width sections. */
+/* Homepage tiles pack as journey CLUSTERS (caption + tightly-gapped cards). Clusters wrap as units so
+   same-group cards stay together; row gap is roomier than in-group gap so captions can breathe. */
 .dashboard-tile-band {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  align-items: stretch;
-  padding-top: 1.45rem;
+  gap: 1.55rem 1.35rem;
+  align-items: flex-start;
+  padding-top: 0.35rem;
   margin-bottom: 1.5rem;
 }
-.dashboard-tile-band .stat-card,
-.dashboard-tile-band .tile-card {
+.tile-journey {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.tile-journey-label {
+  margin: 0;
+  padding: 0 0.1rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  text-align: left;
+  white-space: nowrap;
+}
+.tile-journey-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: stretch;
+}
+.tile-journey-cards > .stat-card,
+.tile-journey-cards > .tile-card {
   flex: 1 1 150px;
   min-width: 140px;
-  max-width: 220px;
+  max-width: 210px;
   margin-bottom: 0;
   box-sizing: border-box;
 }
 .journey-card.journey-requirements { border-left: 3px solid var(--rust-light); }
 .journey-card.journey-epics { border-left: 3px solid var(--moss-light); }
 .journey-card.journey-execution { border-left: 3px solid var(--teal); }
-.journey-card.journey-review { border-left: 3px solid var(--status-review); }
+.journey-card.journey-followup { border-left: 3px solid var(--status-review); }
 .journey-card.journey-insights { border-left: 3px solid var(--gold-light); }
-.journey-lead {
-  position: relative;
-  margin-top: 0.15rem;
-}
-.journey-lead .tile-journey-label {
-  position: absolute;
-  top: -1.15rem;
-  left: 0;
-  right: 0;
-  margin: 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faded);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
 
 /* Donut tiles match Stories Defined language: visual centered above, label centered below. */
 .tile-card {
@@ -3954,8 +3959,9 @@ body:has(main.req-detail) .doc-header {
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .dashboard-tile-band .stat-card,
-  .dashboard-tile-band .tile-card { max-width: none; flex-basis: calc(50% - 0.5rem); }
+  .tile-journey { flex: 1 1 100%; }
+  .tile-journey-cards > .stat-card,
+  .tile-journey-cards > .tile-card { max-width: none; flex-basis: calc(50% - 0.3rem); }
 }
 
 /* ====================== ON-BRAND TOOLTIPS (Story 1.5 C1/C2) ======================

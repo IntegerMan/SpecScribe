@@ -107,8 +107,9 @@ public static class DashboardViewBuilder
         tiles.Add(new(c.StoriesDefined.ToString(), "Stories defined", $"{c.StoriesWithArtifact} with a task plan",
             "Stories listed across every epic; the sub-line counts those with a BMad task checklist.", storiesHref));
         tiles.Add(c.TasksTotal > 0
-            ? new($"{c.TasksDone}/{c.TasksTotal}", "Planned tasks done", $"{c.StoriesWithArtifact}/{c.StoriesDefined} stories planned",
-                $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.", tasksHref)
+            ? new($"{c.TasksDone}/{c.TasksTotal}", "Planned tasks done",
+                Tooltip: $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.",
+                Href: tasksHref)
             : new("—", "Planned tasks done", "none tracked yet", Href: tasksHref));
         tiles.Add(p.Git is { } git
             ? new(git.TotalCommits.ToString(), Charts.Plural(git.TotalCommits, "Commit", "Commits"), CommitStatSub(git),

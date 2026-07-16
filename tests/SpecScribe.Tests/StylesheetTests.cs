@@ -102,8 +102,10 @@ public class StylesheetTests
         Assert.Contains(".key-view-panel", css);
         Assert.Contains(".key-view-group.is-open", css);
         Assert.Contains(".journey-card", css);
-        Assert.Contains(".journey-lead", css);
+        Assert.Contains(".tile-journey", css);
+        Assert.Contains(".tile-journey-cards", css);
         Assert.Contains(".journey-requirements", css);
+        Assert.Contains(".journey-followup", css);
         Assert.Contains(".tile-card-visual", css);
     }
 
