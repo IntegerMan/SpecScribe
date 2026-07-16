@@ -20,6 +20,9 @@ public class IconsTests
         => Assert.Equal(string.Empty, Icons.ForStatus("not-a-real-status"));
 
     [Theory]
+    [InlineData("Docs")]
+    [InlineData("Work")]
+    [InlineData("Delivery")]
     [InlineData("Home")]
     [InlineData("Readme")]
     [InlineData("PRD")]

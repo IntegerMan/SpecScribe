@@ -337,11 +337,15 @@ public class SiteGeneratorAdapterTests : IDisposable
         // relayout: a two-row header (project name + SpecScribe brand badge, and the Explore Key Views pills as a
         // sub-header menu), linked stat tiles, Overall Progress collapsed to a single completion ring + legend,
         // and white Deferred/Retro cards. Confirmed by inspecting the generated home page. [spec-declutter-home-dashboard]
-        // Regenerated: dark bar holds Home/Docs/Architecture/Delivery (icons; Code Map under Architecture);
-        // white bar restores key-views chips; dashboard unifies all 9 tiles in one flex-wrap band; Epic Status
-        // drops its side legend (hover titles only); Overall Progress is a compact ring without the repetitive
-        // Planning/Implementation legend; Retro → "Action Items" with an icon; Stories defined → Requirements.
-        // [journey-nav-key-views-unified-tiles]
+        // Regenerated: dark bar holds Home/Docs/Architecture/Work (icons; Code Map under Architecture);
+        // white bar groups related docs under a Docs dropdown (Architecture / Work peers); dashboard unifies
+        // tiles in journey-segmented flex-wrap band; Epic Status drops its side legend (hover titles only);
+        // Overall Progress is a compact ring without the repetitive Planning/Implementation legend;
+        // Retro → "Action Items" with an icon; Stories defined → Requirements; redundant View epics/sprint
+        // CTAs removed; first-row stat tooltips use body-level js-tip. [journey-nav-key-views-unified-tiles;
+        // home-welcome-screen-flow-and-nav]
+        // Regenerated after the home-welcome tooltip follow-up: specscribe.js temporarily suppresses native
+        // title tooltips while body-level data-tip/data-tip-html tooltips are active, avoiding duplicate tips.
         // Regenerated for Story 8.3 review patches: funnel reads ProjectCounts (byte-identical counts; hash
         // refresh after ledger wiring + OpenActionItems empty-entries fix).
         // Regenerated for Story 8.6 review: empty Backlog lane copy shortened to "No cards in backlog".
@@ -357,7 +361,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 9.2 UX follow-up: covering epics in the NFR/UX-DR coverage section moved from
         // header chips to a labeled "Delivered by" card list under each requirement description
         // (.nfr-uxdr-epics / .nfr-uxdr-epic-card). Fixture has no UX-DR inventory — delta is primarily CSS.
-        const string expected = "cc1794ec49da78494888cb9f030557b58ff3bd77130ee1e87fad87e9dab5c1a4";
+        const string expected = "a36e4baecc8255ba454cd003f5523cd3201855c53a4808a255a902628b86288b";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

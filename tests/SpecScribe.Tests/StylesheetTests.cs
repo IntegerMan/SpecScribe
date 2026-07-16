@@ -86,11 +86,22 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasOnBrandTooltipStyles()
     {
-        // CSS-only tooltip for HTML elements + the JS-positioned node for SVG segments. [Story 1.5 C1/C2]
+        // CSS-only tooltip for compact chrome + the JS-positioned body-level node for stats/SVG. [Story 1.5 C1/C2]
         var css = ReadStylesheet();
         Assert.Contains("[data-tooltip]", css);
         Assert.Contains("::after", css);
         Assert.Contains(".ss-tooltip", css);
+        Assert.Contains(".stat-card.js-tip:focus-visible", css);
+    }
+
+    [Fact]
+    public void Stylesheet_HasKeyViewGroupingAndJourneySegmentHooks()
+    {
+        var css = ReadStylesheet();
+        Assert.Contains(".key-view-group", css);
+        Assert.Contains(".key-view-panel", css);
+        Assert.Contains(".tile-journey", css);
+        Assert.Contains(".tile-journey-requirements", css);
     }
 
     [Fact]

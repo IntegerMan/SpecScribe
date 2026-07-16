@@ -166,7 +166,7 @@ body {
   backdrop-filter: blur(4px);
 }
 
-/* Tier 1 — the dark identity bar: brand, journey menu (Home / Docs / Architecture / Delivery), attribution. */
+/* Tier 1 — the dark identity bar: brand, journey menu (Home / Docs / Architecture / Work), attribution. */
 .site-nav-inner {
   display: flex;
   flex-wrap: wrap;
@@ -349,6 +349,49 @@ body {
 .quick-link-pill.family-epics { border-left-color: var(--moss-light); }
 .quick-link-pill.family-requirements { border-left-color: var(--rust-light); }
 .quick-link-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* White-band grouped key views — same hover/focus-within dropdown pattern as the dark bar, pill-shaped. */
+.key-view-group { position: relative; display: inline-flex; }
+.key-view-group.family-planning > .key-view-trigger { border-left-color: var(--gold-light); }
+.key-view-group.family-architecture > .key-view-trigger { border-left-color: var(--teal); }
+.key-view-group.family-epics > .key-view-trigger { border-left-color: var(--moss-light); }
+.key-view-group.family-requirements > .key-view-trigger { border-left-color: var(--rust-light); }
+.key-view-trigger {
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+.key-view-panel {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 220;
+  display: none;
+  min-width: 11rem;
+  flex-direction: column;
+  padding: 0.3rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px var(--shadow);
+}
+.key-view-group:hover > .key-view-panel,
+.key-view-group:focus-within > .key-view-panel { display: flex; }
+.key-view-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.38rem 0.55rem;
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+.key-view-item:hover { background: var(--cream); color: var(--rust); }
+.key-view-item:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.key-view-item .ss-icon,
+.key-view-trigger .ss-icon { width: 1em; height: 1em; flex: none; }
 
 /* ====================== PAGE HEADER ====================== */
 .doc-header {
@@ -3322,8 +3365,8 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 
 /* ====================== DASHBOARD TILE BAND ====================== */
-/* All nine homepage tiles (5 stats + Epic Status + Overall Progress + Deferred + Action Items) share one
-   flex-wrap panel. Top padding clears the white key-views sub-header. */
+/* Homepage tiles share one flex-wrap panel, visually segmented into journey groups
+   (requirements → epics/stories → execution → review → insights). Top padding clears the white key-views bar. */
 .dashboard-tile-band {
   display: flex;
   flex-wrap: wrap;
@@ -3332,9 +3375,33 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   padding-top: 1.25rem;
   margin-bottom: 1.5rem;
 }
-.dashboard-tile-band > .stat-card,
-.dashboard-tile-band > .tile-card,
-.dashboard-tile-band > .summary-card {
+.tile-journey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-width: min(100%, 18rem);
+  padding: 0.35rem 0.35rem 0.35rem 0.65rem;
+  border-left: 3px solid var(--border);
+  box-sizing: border-box;
+}
+.tile-journey-requirements { border-left-color: var(--rust-light); }
+.tile-journey-epics { border-left-color: var(--moss-light); }
+.tile-journey-execution { border-left-color: var(--teal); }
+.tile-journey-review { border-left-color: var(--status-review); }
+.tile-journey-insights { border-left-color: var(--gold-light); }
+.tile-journey-label {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+.dashboard-tile-band .stat-card,
+.dashboard-tile-band .tile-card,
+.dashboard-tile-band .summary-card {
   flex: 1 1 150px;
   min-width: 140px;
   max-width: 220px;
@@ -3854,17 +3921,17 @@ body:has(main.req-detail) .doc-header {
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .dashboard-tile-band > .stat-card,
-  .dashboard-tile-band > .tile-card,
-  .dashboard-tile-band > .summary-card { max-width: none; flex-basis: calc(50% - 0.5rem); }
+  .dashboard-tile-band .stat-card,
+  .dashboard-tile-band .tile-card,
+  .dashboard-tile-band .summary-card { max-width: none; flex-basis: calc(50% - 0.5rem); }
 }
 
 /* ====================== ON-BRAND TOOLTIPS (Story 1.5 C1/C2) ======================
    Two delivery paths, both on-brand (parchment card, gold hairline) and instant (no OS ~1s delay):
-   - HTML elements (stat cards, legend items) use a CSS-only `data-tooltip` + `::after`. No JS, focus-visible.
-   - SVG chart segments + heatmap cells are driven by specscribe.js, which reads each element's existing
-     <title> and positions the single `.ss-tooltip` node near the pointer/focus. The native <title> +
-     Story 1.4 aria-labels stay as the no-JS / screen-reader fallback, so nothing is JS-dependent. */
+   - Compact HTML chrome (nav pills, legend items, copy buttons) still use CSS-only `data-tooltip` + `::after`.
+   - First-row dashboard stat cards and SVG chart segments use the shared body-level `.ss-tooltip`
+     (`.js-tip` / `data-tip` or SVG `<title>`), which layers above sticky nav and clamps to the viewport.
+     Native `title` / Story 1.4 aria-labels stay as the no-JS / screen-reader fallback. */
 [data-tooltip] { position: relative; }
 [data-tooltip]:hover::after,
 [data-tooltip]:focus-visible::after {
@@ -3892,7 +3959,7 @@ body:has(main.req-detail) .doc-header {
 
 /* A stat card carrying a definition tooltip becomes keyboard-focusable (tabindex=0 in markup); show the
    same on-brand focus ring the other interactive surfaces use. */
-.stat-card[data-tooltip]:focus-visible,
+.stat-card.js-tip:focus-visible,
 .donut-legend [data-tooltip]:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 2px;

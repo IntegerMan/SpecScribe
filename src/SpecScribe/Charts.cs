@@ -8,9 +8,10 @@ namespace SpecScribe;
 /// (a hallmark of a project that's just getting started).</summary>
 public static class Charts
 {
-    /// <summary>A dashboard stat card. When <paramref name="tooltip"/> is supplied the card gains an on-brand
-    /// CSS definition tooltip (via <c>data-tooltip</c>) and becomes keyboard-focusable so it's reachable by
-    /// hover, focus and touch — used to define what a number actually counts (UX-DR4). [Story 1.5 C2]</summary>
+    /// <summary>A dashboard stat card. When <paramref name="tooltip"/> is supplied the card opts into the shared
+    /// body-level <c>js-tip</c>/<c>data-tip</c> path (never clipped under sticky nav) and becomes keyboard-focusable
+    /// so it's reachable by hover, focus and touch — used to define what a number actually counts (UX-DR4).
+    /// Native <c>title</c> remains as the no-JS fallback. [Story 1.5 C2; home welcome tooltips]</summary>
     public static string StatCard(string number, string label, string? sub = null, string? tooltip = null, string? href = null)
     {
         var subHtml = sub is { Length: > 0 } ? $"<div class=\"stat-sub\">{Html(sub)}</div>" : string.Empty;
@@ -20,11 +21,17 @@ public static class Charts
         // identical in both forms so the stat-tile parity/regression facts stay stable across the fork.
         if (href is { Length: > 0 })
         {
-            var linkTip = tooltip is { Length: > 0 } ? $" data-tooltip=\"{Html(tooltip)}\"" : string.Empty;
-            return $"<a class=\"stat-card stat-card-link\" href=\"{Html(href)}\"{linkTip}>{inner}</a>";
+            if (tooltip is { Length: > 0 })
+            {
+                return $"<a class=\"stat-card stat-card-link js-tip\" href=\"{Html(href)}\" data-tip=\"{Html(tooltip)}\" title=\"{Html(tooltip)}\">{inner}</a>";
+            }
+            return $"<a class=\"stat-card stat-card-link\" href=\"{Html(href)}\">{inner}</a>";
         }
-        var tipAttrs = tooltip is { Length: > 0 } ? $" data-tooltip=\"{Html(tooltip)}\" tabindex=\"0\"" : string.Empty;
-        return $"<div class=\"stat-card\"{tipAttrs}>{inner}</div>";
+        if (tooltip is { Length: > 0 })
+        {
+            return $"<div class=\"stat-card js-tip\" data-tip=\"{Html(tooltip)}\" title=\"{Html(tooltip)}\" tabindex=\"0\">{inner}</div>";
+        }
+        return $"<div class=\"stat-card\">{inner}</div>";
     }
 
     public static string ProgressBar(string label, int value, int max, string? rightLabel = null)

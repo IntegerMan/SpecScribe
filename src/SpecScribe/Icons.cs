@@ -39,9 +39,9 @@ public static class Icons
         return label.Trim() switch
         {
             "Home" => Svg("<path d=\"M2.5 8 8 3.3 13.5 8\"/><path d=\"M4 6.7V13h8V6.7\"/>"),
-            // Journey-group triggers on the dark nav bar (Docs / Delivery); Architecture reuses its own glyph below.
+            // Journey-group triggers on the dark nav bar (Docs / Work); Architecture reuses its own glyph below.
             "Docs" => Svg("<path d=\"M3 2.8h10v10.4H3Z\"/><path d=\"M5.2 5.6h5.6M5.2 8h5.6M5.2 10.4h3.4\"/>"),
-            "Delivery" => Svg("<path d=\"M2.7 5.5 8 3l5.3 2.5L8 8Z\"/><path d=\"M2.7 8.7 8 11.2l5.3-2.5\"/>"),
+            "Work" or "Delivery" => Svg("<path d=\"M2.7 5.5 8 3l5.3 2.5L8 8Z\"/><path d=\"M2.7 8.7 8 11.2l5.3-2.5\"/>"),
             "Readme" => Svg("<path d=\"M3 2.8h10v10.4H3Z\"/><path d=\"M5.2 5.6h5.6M5.2 8h5.6M5.2 10.4h3.4\"/>"),
             "PRD" => Svg("<path d=\"M4 2.5h6.2L12.5 4.8V13.5H4Z\"/><path d=\"M6 7h4M6 9.4h4M6 11.8h2.6\"/>"),
             "Product Brief" => Svg("<path d=\"M3.2 4.8h9.6v8.4H3.2Z\"/><path d=\"M5.6 4.8V3.2h4.8v1.6\"/><path d=\"M5.6 8h4.8\"/>"),

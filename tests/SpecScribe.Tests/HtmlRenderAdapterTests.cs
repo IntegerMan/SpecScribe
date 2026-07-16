@@ -572,4 +572,100 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("index-grid", body);
         Assert.DoesNotContain("index-section-title-row", body);
     }
+
+    // ----- Home welcome: Work label, Docs grouping, removed CTAs, journey segments --------------------------
+
+    [Fact]
+    public void RenderNav_ShowsWorkGroupInsteadOfDelivery()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView(SiteNav.HomeOutputPath));
+
+        Assert.Contains("site-menu-trigger", html);
+        Assert.Contains("Work<span", html);
+        Assert.DoesNotContain("Delivery<span", html);
+        Assert.Contains("href=\"epics.html\"", html);
+        Assert.Contains("href=\"sprint.html\"", html);
+        Assert.Contains("href=\"requirements.html\"", html);
+    }
+
+    [Fact]
+    public void RenderNav_GroupsPlanningDocsUnderDocsOnKeyViewsBand()
+    {
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/prds/prd-x/prd.md",
+            "planning-artifacts/briefs/brief-x/brief.md",
+            "planning-artifacts/ux-designs/ux-x/DESIGN.md",
+            "planning-artifacts/ux-designs/ux-x/EXPERIENCE.md",
+            "planning-artifacts/epics.md",
+        }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false, hasReadme: true);
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView(SiteNav.HomeOutputPath));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.Contains("key-view-group", keyViews);
+        Assert.Contains("key-view-trigger", keyViews);
+        Assert.Contains("Docs<span", keyViews);
+        // Related planning docs live under the Docs dropdown — not as five peer pills.
+        Assert.DoesNotContain("class=\"quick-link-pill family-planning\" href=\"readme.html\"", keyViews);
+        Assert.Contains("key-view-item", keyViews);
+        Assert.Contains("href=\"readme.html\"", keyViews);
+        Assert.Contains("PRD</a>", keyViews);
+        Assert.Contains("Product Brief</a>", keyViews);
+        Assert.Contains("href=\"epics.html\"", keyViews);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_OmitsRedundantViewEpicsAndSprintCtas()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: done
+              1-1-first-story: done
+            """);
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1, Title = "One", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "1.1", EpicNumber = 1, Title = "First",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                            Status = "done",
+                        },
+                    },
+                },
+            },
+        };
+        var view = DashboardViewBuilder.Build(
+            nav,
+            ProgressModel.Empty,
+            epics,
+            requirements: null,
+            CommandCatalog.Empty,
+            WorkInventory.Empty,
+            sprint,
+            coverage: null);
+
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        Assert.DoesNotContain("View epics", body);
+        Assert.DoesNotContain("View sprint", body);
+        Assert.DoesNotContain("View sprint board", body);
+        Assert.DoesNotContain("View Epics", body);
+        Assert.Contains("tile-journey-epics", body);
+        Assert.Contains("tile-journey-execution", body);
+        Assert.Contains("href=\"epics.html\"", body); // Epics drafted tile / sunburst still navigate
+        Assert.Contains("href=\"sprint.html\"", body); // board cards / moreHref still navigate
+    }
 }

@@ -31,6 +31,22 @@ public class ChartsTests
     };
 
     [Fact]
+    public void StatCard_WithTooltip_UsesBodyLevelJsTipPath()
+    {
+        var linked = Charts.StatCard("3", "Epics drafted", tooltip: "Epics with stories", href: "epics.html");
+        Assert.Contains("class=\"stat-card stat-card-link js-tip\"", linked);
+        Assert.Contains("data-tip=\"Epics with stories\"", linked);
+        Assert.Contains("title=\"Epics with stories\"", linked);
+        Assert.DoesNotContain("data-tooltip=", linked);
+
+        var staticCard = Charts.StatCard("—", "Commits", tooltip: "no git history");
+        Assert.Contains("class=\"stat-card js-tip\"", staticCard);
+        Assert.Contains("data-tip=\"no git history\"", staticCard);
+        Assert.Contains("tabindex=\"0\"", staticCard);
+        Assert.DoesNotContain("data-tooltip=", staticCard);
+    }
+
+    [Fact]
     public void Sunburst_SegmentLinksCarryAriaLabelsAndKeepTitles()
     {
         var story = Story("1.1", "Do the thing", "in progress", done: 2, total: 5);

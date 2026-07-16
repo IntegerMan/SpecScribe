@@ -39,12 +39,11 @@ public sealed partial class HtmlRenderAdapter
         AppendTileBand(sb, view, p);
 
         // Sunburst — the glance-at-structure scan path — then Now & Next / sprint board.
-        // [spec-sprint-epic-filter-and-home-layout]
+        // Segments already navigate; no redundant header CTA. [spec-sprint-epic-filter-and-home-layout; home welcome]
         if (view.Epics is { } epicsForSunburst)
         {
             sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
-            sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3>");
-            sb.Append("<a class=\"view-epic-link\" href=\"epics.html\">View Epics &amp; Stories &rarr;</a></div>\n");
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
             sb.Append(Charts.Sunburst(epicsForSunburst, commands: view.Commands));
             sb.Append("</div>\n\n");
         }
@@ -114,38 +113,89 @@ public sealed partial class HtmlRenderAdapter
     }
 
     /// <summary>The unified homepage tile band — headline stats + Epic Status + Overall Progress + Deferred +
-    /// Action Items, all siblings in one flex-wrap panel so they share sizing and wrap together. Top padding
-    /// clears the white key-views sub-header.</summary>
+    /// Action Items, grouped into lightweight journey segments (requirements → epics/stories → execution →
+    /// review/follow-ups → insights) so the first viewport reads as an application flow. Top padding clears
+    /// the white key-views sub-header.</summary>
     private void AppendTileBand(StringBuilder sb, DashboardView view, ProgressModel p)
     {
         sb.Append("<div class=\"dashboard-tile-band\">\n");
+
+        var reqTiles = view.StatTiles.Where(IsRequirementsStat).ToList();
+        var epicStoryTiles = view.StatTiles.Where(t => t.Label is "Epics drafted" or "Stories defined").ToList();
+        var executionTiles = view.StatTiles.Where(t => t.Label == "Planned tasks done").ToList();
+        var insightTiles = view.StatTiles.Where(t => t.Label is "Commit" or "Commits").ToList();
+        var reviewTiles = view.StatTiles.Where(t => t.Label == "Direct changes").ToList();
+
+        AppendJourneySegment(sb, "requirements", "Requirements", body =>
+        {
+            foreach (var tile in reqTiles)
+                body.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
+        });
+
+        var epicsHref = view.Epics is { Epics.Count: > 0 } ? SiteNav.EpicsOutputPath : null;
+        AppendJourneySegment(sb, "epics", "Epics & Stories", body =>
+        {
+            foreach (var tile in epicStoryTiles)
+                body.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
+            AppendEpicStatusTile(body, p, view.Epics);
+        });
+
+        AppendJourneySegment(sb, "execution", "Execution", body =>
+        {
+            foreach (var tile in executionTiles)
+                body.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
+            AppendOverallProgressTile(body, view.ProgressBars);
+        });
+
+        AppendJourneySegment(sb, "review", "Review & Follow-ups", body =>
+        {
+            foreach (var tile in reviewTiles)
+                body.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
+            AppendWorkSummaryCards(body, view.Work, view.OpenRetroActionItems, view.Counts);
+        });
+
+        AppendJourneySegment(sb, "insights", "Insights", body =>
+        {
+            foreach (var tile in insightTiles)
+                body.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
+        });
+
+        // Any unexpected remaining tiles keep their place at the end so counts never disappear.
         foreach (var tile in view.StatTiles)
         {
+            if (IsRequirementsStat(tile)
+                || tile.Label is "Epics drafted" or "Stories defined" or "Planned tasks done" or "Direct changes"
+                    or "Commit" or "Commits")
+                continue;
             sb.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
         }
 
-        var epicsHref = view.Epics is { Epics.Count: > 0 } ? SiteNav.EpicsOutputPath : null;
-        var progressHref = view.NowNext?.SprintBoard is not null ? SiteNav.SprintOutputPath : epicsHref;
-
-        AppendEpicStatusTile(sb, p, view.Epics, epicsHref);
-        AppendOverallProgressTile(sb, view.ProgressBars, progressHref);
-        AppendWorkSummaryCards(sb, view.Work, view.OpenRetroActionItems, view.Counts);
         sb.Append("</div>\n\n");
+    }
+
+    private static bool IsRequirementsStat(StatTile tile) =>
+        tile.Label is "Functional reqs" or "Non-functional" or "Design reqs";
+
+    /// <summary>Opens a journey segment wrapper when it will contain at least one child; skips empty groups so
+    /// the band never shows orphan labels. The label is a small visual cue, not a second nav.</summary>
+    private static void AppendJourneySegment(StringBuilder sb, string key, string label, Action<StringBuilder> writeChildren)
+    {
+        var body = new StringBuilder();
+        writeChildren(body);
+        if (body.Length == 0) return;
+        sb.Append($"  <div class=\"tile-journey tile-journey-{key}\" aria-label=\"{PathUtil.Html(label)}\">\n");
+        sb.Append($"    <span class=\"tile-journey-label\">{PathUtil.Html(label)}</span>\n");
+        sb.Append(body);
+        sb.Append("  </div>\n");
     }
 
     /// <summary>Compact Overall Progress tile — a single completion ring (Implementation when tracked, else
     /// Planning). The repetitive Planning/Implementation legend is omitted (the headline stats above already
-    /// carry those fractions). Clickthrough via a header "View →" link.</summary>
-    private void AppendOverallProgressTile(StringBuilder sb, IReadOnlyList<ProgressBarView> bars, string? viewHref = null)
+    /// carry those fractions). Drill-through lives on the surrounding execution/stat tiles, not a header CTA.</summary>
+    private void AppendOverallProgressTile(StringBuilder sb, IReadOnlyList<ProgressBarView> bars)
     {
         sb.Append("<div class=\"tile-card overall-progress-tile\">\n");
-        sb.Append("<div class=\"tile-card-header\"><h3>Overall Progress</h3>");
-        if (viewHref is { Length: > 0 })
-        {
-            var viewLabel = string.Equals(viewHref, SiteNav.SprintOutputPath, StringComparison.OrdinalIgnoreCase) ? "View sprint" : "View epics";
-            sb.Append($"<a class=\"view-epic-link\" href=\"{PathUtil.Html(viewHref)}\">{viewLabel} &rarr;</a>");
-        }
-        sb.Append("</div>\n");
+        sb.Append("<div class=\"tile-card-header\"><h3>Overall Progress</h3></div>\n");
         if (bars.Count > 0)
         {
             var ring = bars.Count > 1 && bars[1].Max > 0 ? bars[1] : bars[0];
@@ -166,16 +216,12 @@ public sealed partial class HtmlRenderAdapter
 
     /// <summary>Compact Epic Status donut tile. Segments come from the retro-gated
     /// <see cref="StatusStyles.ForEpicWithRetrospective"/> roll-up. The side legend is omitted — each slice's
-    /// <c>&lt;title&gt;</c> hover tip carries the count, and the center shows done/total.</summary>
-    private void AppendEpicStatusTile(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, string? viewHref = null)
+    /// <c>&lt;title&gt;</c> hover tip carries the count, and the center shows done/total. Drill-through lives on
+    /// the Epics drafted tile / sunburst segments, not a header CTA.</summary>
+    private void AppendEpicStatusTile(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel)
     {
         sb.Append("<div class=\"tile-card epic-status-tile\">\n");
-        sb.Append("<div class=\"tile-card-header\"><h3>Epic Status</h3>");
-        if (viewHref is { Length: > 0 })
-        {
-            sb.Append($"<a class=\"view-epic-link\" href=\"{PathUtil.Html(viewHref)}\">View epics &rarr;</a>");
-        }
-        sb.Append("</div>\n");
+        sb.Append("<div class=\"tile-card-header\"><h3>Epic Status</h3></div>\n");
 
         List<(string Label, int Value, string CssClass)> segments;
         string? centerText;
@@ -225,7 +271,6 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("  <div class=\"sprint-board-header-aside\">");
             sb.Append(SprintTemplater.EpicFilterHostMarkup);
             sb.Append(SprintTemplater.RenderProgressWheel(counts));
-            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.SprintOutputPath}\">View sprint board &rarr;</a>");
             sb.Append("</div>\n</div>\n");
             sb.Append(SprintTemplater.EpicFilterEmptyHintMarkup);
             sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath, wrapWithEpicFilter: false));
@@ -314,14 +359,17 @@ public sealed partial class HtmlRenderAdapter
         _ => label,
     };
 
-    /// <summary>Artifact-family accent class for a key-view chip (planning / architecture / epics / requirements).</summary>
+    /// <summary>Artifact-family accent class for a key-view chip or group trigger
+    /// (planning / architecture / epics / requirements).</summary>
     private static string QuickLinkFamily(string label)
     {
+        if (label.Equals("Work", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Epics", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Sprint", StringComparison.OrdinalIgnoreCase))
+            return "family-epics";
         if (label.Contains("Architecture", StringComparison.OrdinalIgnoreCase) || label.Contains("ADR", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Code Map", StringComparison.OrdinalIgnoreCase))
             return "family-architecture";
-        if (label.Equals("Epics", StringComparison.OrdinalIgnoreCase) || label.Equals("Sprint", StringComparison.OrdinalIgnoreCase))
-            return "family-epics";
         if (label.Contains("Requirement", StringComparison.OrdinalIgnoreCase))
             return "family-requirements";
         return "family-planning";

@@ -744,11 +744,12 @@ public class HtmlTemplaterTests
             commands: CommandCatalog.Empty, work: null, sprint: sprint);
 
         // AC #2: with sprint data, Now & Next BECOMES the sprint board (the tracked view), labeled with its
-        // source and carrying a CTA to the full sprint page — no separate "Sprint Status" panel. [Story 2.3]
+        // source — board cards / moreHref reach the full sprint page (no redundant header CTA). [Story 2.3; home welcome]
         Assert.Contains("chart-panel sprint-board-panel", html);
         Assert.Contains("Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span>", html);
         Assert.Contains("class=\"sprint-board\"", html);
         Assert.Contains("href=\"sprint.html\"", html);
+        Assert.DoesNotContain("View sprint board", html);
         Assert.Contains("sprint-filterable", html);
         Assert.Contains("sprint-epic-filter-host", html);
         Assert.Contains("data-epics=", html);
@@ -1211,7 +1212,7 @@ public class HtmlTemplaterTests
         // Story 9.2 UX: requirement kind tiles lead the dashboard band and click through to requirements.html.
         Assert.Contains("Functional reqs", html);
         Assert.Contains("Non-functional", html);
-        Assert.Contains("stat-card-link\" href=\"requirements.html\"", html);
+        Assert.Contains("stat-card-link js-tip\" href=\"requirements.html\"", html);
         // Functional tile appears before Epics drafted (leading the band).
         Assert.True(html.IndexOf("Functional reqs", StringComparison.Ordinal) <
                     html.IndexOf("Epics drafted", StringComparison.Ordinal));

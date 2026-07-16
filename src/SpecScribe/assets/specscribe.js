@@ -15,6 +15,7 @@
   var tip = null;
   var activeSeg = null;
   var activeTitle = null;
+  var activeNativeTitle = null;
   var activeText = null;
   var activeHtml = null; // when set, the tip renders this as innerHTML (rich card) instead of plain text
 
@@ -38,6 +39,8 @@
     if (dataHtml) {
       activeSeg = el;
       activeTitle = null;
+      activeNativeTitle = el.getAttribute("title");
+      if (activeNativeTitle) el.removeAttribute("title");
       activeText = null;
       activeHtml = dataHtml;
       return;
@@ -48,6 +51,8 @@
     if (dataTip) {
       activeSeg = el;
       activeTitle = null;
+      activeNativeTitle = el.getAttribute("title");
+      if (activeNativeTitle) el.removeAttribute("title");
       activeText = dataTip;
       activeHtml = null;
       return;
@@ -62,8 +67,10 @@
 
   function deactivate() {
     if (activeTitle && activeSeg) activeSeg.insertBefore(activeTitle, activeSeg.firstChild);
+    if (activeNativeTitle && activeSeg) activeSeg.setAttribute("title", activeNativeTitle);
     activeSeg = null;
     activeTitle = null;
+    activeNativeTitle = null;
     activeText = null;
     activeHtml = null;
   }
