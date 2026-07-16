@@ -1,6 +1,6 @@
 namespace SpecScribe;
 
-public enum RequirementKind { Functional, NonFunctional }
+public enum RequirementKind { Functional, NonFunctional, Design }
 
 /// <summary>Derived roll-up of a requirement's progress, sourced from the epic(s) that cover it. The buckets,
 /// least→most complete: Deferred; Planned (covered but no task plans yet, or no coverage at all); Ready (a
@@ -16,8 +16,8 @@ public enum RequirementKind { Functional, NonFunctional }
 /// every other requirement-status tier, just with a new label for a real epic-level state.</para></summary>
 public enum RequirementStatus { Deferred, Planned, Ready, Active, Done }
 
-/// <summary>One Functional or Non-Functional requirement parsed from epics.md's "## Requirements Inventory".
-/// Its <see cref="Status"/> is rolled up from the epic named in the FR Coverage Map.</summary>
+/// <summary>One Functional, Non-Functional, or UX Design requirement parsed from epics.md's
+/// "## Requirements Inventory". Its <see cref="Status"/> is rolled up from the epic(s) that cover it.</summary>
 public sealed class RequirementInfo
 {
     public required RequirementKind Kind { get; init; }
@@ -25,16 +25,21 @@ public sealed class RequirementInfo
     /// <summary>The numeric part, e.g. 25 for "FR25".</summary>
     public required int Number { get; init; }
 
-    /// <summary>"FR25" / "NFR7".</summary>
-    public string Id => (Kind == RequirementKind.Functional ? "FR" : "NFR") + Number;
+    /// <summary>"FR25" / "NFR7" / "UX-DR12".</summary>
+    public string Id => Kind switch
+    {
+        RequirementKind.Functional => "FR" + Number,
+        RequirementKind.Design => "UX-DR" + Number,
+        _ => "NFR" + Number,
+    };
 
-    /// <summary>"fr25" / "nfr7" — the output filename stem under requirements/.</summary>
+    /// <summary>"fr25" / "nfr7" / "ux-dr12" — the output filename stem under requirements/.</summary>
     public string Slug => Id.ToLowerInvariant();
 
     /// <summary>The requirement text, rendered as inline HTML (bold/code preserved).</summary>
     public required string TextHtml { get; init; }
 
-    /// <summary>The bold category header this FR sat under (e.g. "Core Loop & Time"); null for NFRs.</summary>
+    /// <summary>The bold category header this FR sat under (e.g. "Core Loop &amp; Time"); null for NFRs/UX-DRs.</summary>
     public string? Category { get; init; }
 
     /// <summary>Primary covering epic from the FR Coverage Map; null when deferred or unmapped. This is
@@ -66,18 +71,25 @@ public sealed class RequirementsModel
 {
     public required IReadOnlyList<RequirementInfo> Functional { get; init; }
     public required IReadOnlyList<RequirementInfo> NonFunctional { get; init; }
+    public required IReadOnlyList<RequirementInfo> Design { get; init; }
 
+    /// <summary>FR + NFR only — the historical scope of the requirements flow, status grid, and dashboard
+    /// panel. Do not fold Design into this; UX-DRs render in their own coverage section. [Story 9.2]</summary>
     public IEnumerable<RequirementInfo> All => Functional.Concat(NonFunctional);
+
+    /// <summary>FR + NFR + Design — detail-page generation and ById lookup. [Story 9.2]</summary>
+    public IEnumerable<RequirementInfo> Everything => Functional.Concat(NonFunctional).Concat(Design);
 
     private Dictionary<string, RequirementInfo>? _byId;
 
-    /// <summary>Case-insensitive lookup by id ("FR25") — powers <see cref="RequirementLinkifier"/>.</summary>
+    /// <summary>Case-insensitive lookup by id ("FR25" / "UX-DR12") — powers <see cref="RequirementLinkifier"/>.</summary>
     public IReadOnlyDictionary<string, RequirementInfo> ById =>
-        _byId ??= All.ToDictionary(r => r.Id, StringComparer.OrdinalIgnoreCase);
+        _byId ??= Everything.ToDictionary(r => r.Id, StringComparer.OrdinalIgnoreCase);
 
     public static readonly RequirementsModel Empty = new()
     {
         Functional = Array.Empty<RequirementInfo>(),
         NonFunctional = Array.Empty<RequirementInfo>(),
+        Design = Array.Empty<RequirementInfo>(),
     };
 }

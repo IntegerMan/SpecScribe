@@ -1203,7 +1203,7 @@ public class ChartsTests
     public void RequirementFlow_EmptyFunctional_ReturnsChartEmptyPlaceholder()
     {
         var epics = new EpicsModel { OverviewHtml = "", RequirementsInventoryHtml = "", Epics = Array.Empty<EpicInfo>() };
-        var reqs = new RequirementsModel { Functional = Array.Empty<RequirementInfo>(), NonFunctional = Array.Empty<RequirementInfo>() };
+        var reqs = new RequirementsModel { Functional = Array.Empty<RequirementInfo>(), NonFunctional = Array.Empty<RequirementInfo>(), Design = Array.Empty<RequirementInfo>() };
 
         var svg = Charts.RequirementFlow(reqs, epics);
         Assert.Contains("chart-empty", svg);
@@ -1217,6 +1217,7 @@ public class ChartsTests
         {
             Functional = new[] { Req(RequirementKind.Functional, 1, RequirementStatus.Deferred, deferred: true) },
             NonFunctional = Array.Empty<RequirementInfo>(),
+            Design = Array.Empty<RequirementInfo>(),
         };
 
         var svg = Charts.RequirementFlow(reqs, epics);

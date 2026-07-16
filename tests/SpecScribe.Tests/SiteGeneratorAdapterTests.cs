@@ -354,7 +354,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // gained the .coverage-group / .coverage-story-cards / .coverage-story-card.* layout rules (status
         // color routed through the shared --status-* tokens). Every FR/NFR detail page shifts; the file set is
         // unchanged. Deliberate, reviewed rendering change (AC #1). [Story 9.1; golden-diff-normalization-gotchas]
-        const string expected = "46b6c59a117aa746cffd66d1c03898baccccf96dab7972ff094209f2675110b4";
+        // Regenerated for Story 9.2: requirements index gains Design donut + NFR/UX-DR coverage section;
+        // detail mains carry .req-detail; CSS stretches req-index/req-detail to the 1100px dashboard column;
+        // dashboard tile band leads with Functional/Non-functional/Design req tiles when present. Fixture has
+        // no UX-DR inventory so Design pages are absent from inventory — delta is CSS + any FR/NFR pages that
+        // pick up shared markup/class changes. [Story 9.2; golden-diff-normalization-gotchas]
+        const string expected = "6ae98558a304120118db0013601848e736d775ebf88dd337e96962f78be3c93d";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

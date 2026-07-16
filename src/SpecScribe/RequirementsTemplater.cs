@@ -2,8 +2,8 @@ using System.Text;
 
 namespace SpecScribe;
 
-/// <summary>Renders the two requirements page types: the requirements index (all FRs &amp; NFRs, with
-/// FR/NFR progress donuts) and one detail page per requirement (definition, covering epic + its progress,
+/// <summary>Renders the two requirements page types: the requirements index (FRs, NFRs, and UX-DRs, with
+/// progress donuts) and one detail page per requirement (definition, covering epic + its progress,
 /// and derived status). Mirrors <see cref="EpicsTemplater"/>.</summary>
 public static class RequirementsTemplater
 {
@@ -16,16 +16,27 @@ public static class RequirementsTemplater
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Requirements", null) }));
 
+        var countParts = new List<string>
+        {
+            $"{model.Functional.Count} functional",
+            $"{model.NonFunctional.Count} non-functional",
+        };
+        if (model.Design.Count > 0)
+        {
+            countParts.Add($"{model.Design.Count} design");
+        }
+
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>Requirements");
         sb.Append(StatusStyles.LegendKey());
         sb.Append("</h1>\n");
-        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {model.Functional.Count} functional &middot; {model.NonFunctional.Count} non-functional</div>\n");
+        sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {string.Join(" &middot; ", countParts)}</div>\n");
         sb.Append("</header>\n\n");
 
         // Category groups in source order (LINQ GroupBy preserves first-seen key order), plus the NFRs
         // as one final group — the single ordered list that drives both the navigator and the sections
-        // below, so their anchors always line up.
+        // below, so their anchors always line up. UX-DRs live in the dedicated coverage section below,
+        // not in this FR-scoped navigator (keeps FR flow/grid byte-identical). [Story 9.2]
         var groups = model.Functional
             .GroupBy(r => r.Category ?? "Functional Requirements")
             .Select(g => (Label: g.Key, Items: (IReadOnlyList<RequirementInfo>)g.ToList()))
@@ -40,6 +51,11 @@ public static class RequirementsTemplater
         sb.Append("<section class=\"dashboard\">\n<div class=\"chart-row\">\n");
         AppendStatusDonut(sb, "Functional", model.Functional);
         AppendStatusDonut(sb, "Non-functional", model.NonFunctional);
+        // Design donut absent (not empty) when the project has no UX-DRs — NFR8 degrade-gracefully. [Story 9.2]
+        if (model.Design.Count > 0)
+        {
+            AppendStatusDonut(sb, "Design", model.Design);
+        }
         sb.Append("</div>\n</section>\n\n");
 
         // Requirements at a glance: every FR/NFR as a colorized status block (AC #1), then the Sankey-style flow
@@ -60,6 +76,10 @@ public static class RequirementsTemplater
             sb.Append(Charts.RequirementFlow(model, epics));
             sb.Append("</div>\n\n");
         }
+
+        // Non-functional & design coverage — additive section below the FR-scoped flow. Per-item verification
+        // treatment (not FR "delivered-by-story" semantics). [Story 9.2 Tasks 3–4]
+        AppendNfrUxDrCoverageSection(sb, model, epics);
 
         // Jump-to-group navigator: one clickable card per group, each a status pie chart, anchoring down
         // to its section below.
@@ -96,7 +116,12 @@ public static class RequirementsTemplater
         var outputPath = $"requirements/{req.Slug}.html";
         var prefix = PathUtil.RelativePrefix(outputPath);
         var statusClass = StatusStyles.ForRequirement(req);
-        var kindLabel = req.Kind == RequirementKind.Functional ? "Functional Requirement" : "Non-Functional Requirement";
+        var kindLabel = req.Kind switch
+        {
+            RequirementKind.Functional => "Functional Requirement",
+            RequirementKind.Design => "UX Design Requirement",
+            _ => "Non-Functional Requirement",
+        };
 
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen($"{req.Id} — {nav.SiteTitle}", prefix + ForgeOptions.StylesheetName, prefix + ForgeOptions.ScriptName));
@@ -109,7 +134,8 @@ public static class RequirementsTemplater
         }));
 
         // Single <main id="main-content"> landmark / skip-link target for the requirement detail page. [Story 1.4 AC #1]
-        sb.Append("<main id=\"main-content\">\n");
+        // req-detail stretches the page to the same 1100px column as the index. [Story 9.2 UX]
+        sb.Append("<main id=\"main-content\" class=\"req-detail\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <div class=\"story-kicker\">{PathUtil.Html(kindLabel)}</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(req.Id)}</h1>\n");
@@ -269,6 +295,101 @@ public static class RequirementsTemplater
         sb.Append($"          <span class=\"epic-mosaic-title\">{story.Title}</span>\n");
         sb.Append($"          {StatusStyles.Badge(statusClass, label)}\n");
         sb.Append("        </div>\n      </a>\n");
+    }
+
+    /// <summary>Dedicated "Non-functional &amp; design coverage" section — per-item verification treatment for
+    /// NFRs and UX-DRs. Section-local "Not yet mapped" presentation (not a RequirementStatus enum value — the
+    /// FR flow/grid iterate that enum and must not change). Story 9.3 will give Deferred vs Unmapped fully
+    /// distinct visual treatment; this seam leaves them shareable via the deferred/grey css class with
+    /// distinct words. [Story 9.2 Tasks 3–4]</summary>
+    private static void AppendNfrUxDrCoverageSection(StringBuilder sb, RequirementsModel model, EpicsModel epics)
+    {
+        var hasNfr = model.NonFunctional.Count > 0;
+        var hasDesign = model.Design.Count > 0;
+        if (!hasNfr && !hasDesign) return;
+
+        sb.Append("<div class=\"section-divider\">Non-functional &amp; design coverage</div>\n");
+        sb.Append("<div class=\"chart-panel nfr-uxdr-coverage\">\n");
+        // Section-level verification approach (AC #2) — a bare per-item badge is never the only signal.
+        sb.Append("<p class=\"epic-goal\">Cross-cutting obligations verified across the codebase by tests and architectural invariants, tracked here by the epics that deliver them. Coverage is epic-level — a badge reflects the delivering epic's roll-up, not a per-requirement claim.</p>\n");
+
+        if (hasNfr)
+        {
+            AppendCoverageSubGroup(sb, "Non-functional requirements", model.NonFunctional, epics);
+        }
+        if (hasDesign)
+        {
+            AppendCoverageSubGroup(sb, "UX design requirements", model.Design, epics);
+        }
+
+        sb.Append("</div>\n\n");
+    }
+
+    private static void AppendCoverageSubGroup(
+        StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs, EpicsModel epics)
+    {
+        sb.Append($"<h3 class=\"nfr-uxdr-subgroup-title\">{PathUtil.Html(label)}</h3>\n");
+        foreach (var req in reqs)
+        {
+            AppendCoverageRow(sb, req, epics, prefix: string.Empty);
+        }
+    }
+
+    /// <summary>One NFR/UX-DR coverage row: id → detail page, text, covering-epic chip(s), state badge.
+    /// Reuses req-card / req-epic / status-badge vocabulary. [Story 9.2 Task 4]</summary>
+    private static void AppendCoverageRow(StringBuilder sb, RequirementInfo req, EpicsModel epics, string prefix)
+    {
+        var href = $"{prefix}requirements/{req.Slug}.html";
+        var byNumber = epics.Epics.ToDictionary(e => e.Number);
+
+        // Section-local presentation — do not mutate RequirementStatus. [Story 9.2 Task 3]
+        string badgeHtml;
+        if (req.Deferred)
+        {
+            badgeHtml = StatusStyles.Badge("deferred", "Deferred");
+        }
+        else if (req.CoverageEpicNumbers.Count == 0)
+        {
+            // "Not yet mapped" reuses deferred/grey color; word must read "Not yet mapped", not "Deferred".
+            // Story 9.3 will give them fully distinct visual treatment — leave this seam clean.
+            badgeHtml = StatusStyles.Badge("deferred", "Not yet mapped");
+        }
+        else
+        {
+            badgeHtml = StatusStyles.Badge(StatusStyles.ForRequirement(req), StatusStyles.RequirementLabel(req.Status));
+        }
+
+        var rowClass = req.Deferred || req.CoverageEpicNumbers.Count == 0
+            ? "deferred"
+            : StatusStyles.ForRequirement(req);
+
+        sb.Append($"<div class=\"req-card nfr-uxdr-row {rowClass}\" id=\"cov-{PathUtil.Html(req.Slug)}\">\n");
+        sb.Append("  <div class=\"req-card-head\">\n");
+        sb.Append($"    <a class=\"req-id-link\" href=\"{PathUtil.Html(href)}\">{PathUtil.Html(req.Id)}</a>\n");
+        sb.Append($"    {badgeHtml}\n");
+
+        if (req.Deferred)
+        {
+            if (req.CoverageNote is { Length: > 0 } note)
+            {
+                sb.Append($"    <span class=\"req-epic deferred\">{PathUtil.Html(note)}</span>\n");
+            }
+        }
+        else if (req.CoverageEpicNumbers.Count == 0)
+        {
+            sb.Append("    <span class=\"req-epic deferred\">Not yet mapped to a delivering epic.</span>\n");
+        }
+        else
+        {
+            foreach (var n in req.CoverageEpicNumbers)
+            {
+                if (!byNumber.ContainsKey(n)) continue;
+                sb.Append($"    <a class=\"req-epic\" href=\"{PathUtil.Html(prefix)}epics/epic-{n}.html\">Epic {n}</a>\n");
+            }
+        }
+        sb.Append("  </div>\n");
+        sb.Append($"  <div class=\"req-text\">{req.TextHtml}</div>\n");
+        sb.Append("</div>\n\n");
     }
 
     private static void AppendRequirementCard(StringBuilder sb, RequirementInfo req, string prefix)

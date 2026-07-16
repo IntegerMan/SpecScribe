@@ -48,7 +48,7 @@ public static class DashboardViewBuilder
         return new DashboardView
         {
             SiteTitle = nav.SiteTitle,
-            StatTiles = BuildStatTiles(ledger, progress, work, epicsModel, sprint, hasTimeline),
+            StatTiles = BuildStatTiles(ledger, progress, work, epicsModel, sprint, hasTimeline, requirements),
             NowNext = BuildNowNext(epicsModel, sprint),
             Epics = epicsModel,
             Commands = commands,
@@ -68,34 +68,52 @@ public static class DashboardViewBuilder
 
     /// <summary>The headline stat-grid row, forks resolved. Count values come from the portal-wide ledger;
     /// the fifth "Direct changes" tile still gates on <paramref name="work"/>.IsEmpty (byte-load-bearing).
-    /// Git/commit tile stays on <paramref name="progress"/> (out of Story 8.3 scope). Each tile drills to the
-    /// most relevant standalone view when that page exists — epics/story tiles to Epics (or the Sprint board when
-    /// a sprint is tracked), the commit tile to the activity timeline, and Direct changes to the deferred-work
-    /// page — so the headline numbers double as navigation. [Story 6.2; Story 8.3]</summary>
+    /// Git/commit tile stays on <paramref name="progress"/> (out of Story 8.3 scope). Requirement tiles lead
+    /// the band when a requirements model exists so a Stakeholder entering to check FR/NFR/UX-DR progress
+    /// lands on a click-through to requirements.html first. Each other tile drills to the most relevant
+    /// standalone view when that page exists. [Story 6.2; Story 8.3; Story 9.2 UX]</summary>
     private static IReadOnlyList<StatTile> BuildStatTiles(
-        ProjectCounts c, ProgressModel p, WorkInventory work, EpicsModel? epicsModel, SprintStatus? sprint, bool hasTimeline)
+        ProjectCounts c, ProgressModel p, WorkInventory work, EpicsModel? epicsModel, SprintStatus? sprint,
+        bool hasTimeline, RequirementsModel? requirements)
     {
         var epicsHref = epicsModel is { Epics.Count: > 0 } ? SiteNav.EpicsOutputPath : null;
         // Stories defined → Requirements (traceability journey); tasks still prefer the sprint board when tracked.
         var storiesHref = epicsModel is { Epics.Count: > 0 } ? SiteNav.RequirementsOutputPath : null;
         var tasksHref = sprint is { IsEmpty: false } ? SiteNav.SprintOutputPath : epicsHref;
         var commitsHref = hasTimeline ? SiteNav.TimelineOutputPath : null;
+        var reqHref = SiteNav.RequirementsOutputPath;
 
-        var tiles = new List<StatTile>
+        var tiles = new List<StatTile>();
+
+        // Requirements lead the band — clickable entry points into the requirements journey. [Story 9.2 UX]
+        if (requirements is not null)
         {
-            new($"{c.EpicsDrafted}/{c.EpicsDefined}", "Epics drafted",
-                Tooltip: "Epics with at least one story drafted, out of all epics.", Href: epicsHref),
-            new(c.StoriesDefined.ToString(), "Stories defined", $"{c.StoriesWithArtifact} with a task plan",
-                "Stories listed across every epic; the sub-line counts those with a BMad task checklist.", storiesHref),
-            c.TasksTotal > 0
-                ? new($"{c.TasksDone}/{c.TasksTotal}", "Planned tasks done", $"{c.StoriesWithArtifact}/{c.StoriesDefined} stories planned",
-                    $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.", tasksHref)
-                : new("—", "Planned tasks done", "none tracked yet", Href: tasksHref),
-            p.Git is { } git
-                ? new(git.TotalCommits.ToString(), Charts.Plural(git.TotalCommits, "Commit", "Commits"), CommitStatSub(git),
-                    "Total commits in the repository; the sub-line shows active days and how recently work landed.", commitsHref)
-                : new("—", "Commits", "no git history"),
-        };
+            if (requirements.Functional.Count > 0)
+            {
+                tiles.Add(RequirementStatTile("Functional reqs", requirements.Functional, reqHref));
+            }
+            if (requirements.NonFunctional.Count > 0)
+            {
+                tiles.Add(RequirementStatTile("Non-functional", requirements.NonFunctional, reqHref));
+            }
+            if (requirements.Design.Count > 0)
+            {
+                tiles.Add(RequirementStatTile("Design reqs", requirements.Design, reqHref));
+            }
+        }
+
+        tiles.Add(new($"{c.EpicsDrafted}/{c.EpicsDefined}", "Epics drafted",
+            Tooltip: "Epics with at least one story drafted, out of all epics.", Href: epicsHref));
+        tiles.Add(new(c.StoriesDefined.ToString(), "Stories defined", $"{c.StoriesWithArtifact} with a task plan",
+            "Stories listed across every epic; the sub-line counts those with a BMad task checklist.", storiesHref));
+        tiles.Add(c.TasksTotal > 0
+            ? new($"{c.TasksDone}/{c.TasksTotal}", "Planned tasks done", $"{c.StoriesWithArtifact}/{c.StoriesDefined} stories planned",
+                $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.", tasksHref)
+            : new("—", "Planned tasks done", "none tracked yet", Href: tasksHref));
+        tiles.Add(p.Git is { } git
+            ? new(git.TotalCommits.ToString(), Charts.Plural(git.TotalCommits, "Commit", "Commits"), CommitStatSub(git),
+                "Total commits in the repository; the sub-line shows active days and how recently work landed.", commitsHref)
+            : new("—", "Commits", "no git history"));
 
         if (!work.IsEmpty)
         {
@@ -109,6 +127,20 @@ public static class DashboardViewBuilder
         }
 
         return tiles;
+    }
+
+    /// <summary>One clickable requirements-kind tile: done/total with an in-progress sub-line, drilling to
+    /// requirements.html. [Story 9.2 UX]</summary>
+    private static StatTile RequirementStatTile(string label, IReadOnlyList<RequirementInfo> reqs, string href)
+    {
+        var done = reqs.Count(r => r.Status == RequirementStatus.Done);
+        var active = reqs.Count(r => r.Status == RequirementStatus.Active);
+        var sub = active > 0
+            ? $"{active} partially implemented"
+            : $"{reqs.Count(r => r.Status == RequirementStatus.Ready)} ready · {reqs.Count(r => r.Status == RequirementStatus.Planned)} planned";
+        return new($"{done}/{reqs.Count}", label, sub,
+            $"{label}: {done} done of {reqs.Count}. Open the requirements view to refine coverage and follow the epic → story chain.",
+            href);
     }
 
     /// <summary>The commit stat's sub-line: active days plus a deterministic absolute-date recency signal.

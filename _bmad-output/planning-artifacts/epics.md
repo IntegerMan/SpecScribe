@@ -202,7 +202,7 @@ NFR10: Epic 17 - Pre-publication code hardening and security/privacy review for 
 
 ### Epic 1: High-Clarity BMad Portal Experience
 Deliver a polished, immediately useful portal for current BMad projects so maintainers and contributors can understand status, traceability, and progress at a glance.
-**FRs covered:** FR2, FR5, FR6, FR7
+**FRs covered:** FR2, FR5, FR6, FR7 · **UX-DRs:** UX-DR1, UX-DR2, UX-DR3, UX-DR4, UX-DR5, UX-DR6, UX-DR7, UX-DR8, UX-DR9, UX-DR10, UX-DR11, UX-DR12, UX-DR13, UX-DR16, UX-DR17, UX-DR18
 
 ### Epic 2: Complete and Faithful BMad Artifact Representation
 Surface and truthfully represent every BMad artifact class and work type — deferred and quick-dev work, specs, sprint status, planning documents, iconography, and authored comments — so the portal reflects the whole project rather than only epics and stories.
@@ -210,23 +210,23 @@ Surface and truthfully represent every BMad artifact class and work type — def
 
 ### Epic 3: Insight Surfaces
 Add richer analytical insight — git momentum, planning coverage and freshness, and purposeful dashboard polish — so users can understand project shape, gaps, and momentum quickly.
-**FRs covered:** FR9, FR10, FR11
+**FRs covered:** FR9, FR10, FR11 · **UX-DRs:** UX-DR20 · **NFRs:** NFR1
 
 ### Epic 4: Framework-Agnostic Adapter Foundation
 Establish the framework-neutral seam every other framework builds on: one shared adapter contract into the projection model, rendering decoupled from any single project's personal structure, and generation diagnostics — so per-framework coverage epics (11–15) attach without reworking the core templating pipeline. Per-framework coverage moved to its own spike-led epics on 2026-07-10.
-**FRs covered:** FR1
+**FRs covered:** FR1 · **NFRs:** NFR2, NFR4
 
 ### Epic 5: Reliable CLI Operations and Configuration
 Make generation and watch dependable and easy to configure, so the tool is trustworthy for daily use. Sequences late in the roadmap (immediately before the Epic 17 hardening pass) so the operational surface is finalized just before hardening and release. OSS onboarding/reference documentation moved to Epic 16 (2026-07-11).
-**FRs covered:** FR8, FR12
+**FRs covered:** FR8, FR12 · **UX-DRs:** UX-DR15 · **NFRs:** NFR5, NFR7
 
 ### Epic 6: VS Code Read-Only Companion Surface
 Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects.
-**FRs covered:** FR13
+**FRs covered:** FR13 · **UX-DRs:** UX-DR14 · **NFRs:** NFR6
 
 ### Epic 7: Code and Git Exploration
 Let users browse the project's code and history in-portal — turning source citations into navigable code pages and dates into activity timelines, with advanced code-and-git coverage as an opt-in depth.
-**FRs covered:** FR14, FR15, FR16, FR19
+**FRs covered:** FR14, FR15, FR16, FR19 · **UX-DRs:** UX-DR19
 
 ### Epic 8: Dashboard Command Center — Trustworthy Status at a Glance
 Give the Driver an accurate 30-second pulse and a friction-free path to the next unit of work: one canonical status vocabulary everywhere, counts that always agree, progress and workflow state paired, readiness self-explanatory, and state-aware next-step commands (one primary plus applicable unhappy-path actions). Optimizes the home dashboard for the daily journeys (1–2).

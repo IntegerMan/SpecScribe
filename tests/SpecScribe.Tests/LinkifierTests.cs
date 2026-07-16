@@ -10,6 +10,8 @@ public class RequirementLinkifierTests
             .Select(r => Info(r.Kind, r.Number)).ToList(),
         NonFunctional = reqs.Where(r => r.Kind == RequirementKind.NonFunctional)
             .Select(r => Info(r.Kind, r.Number)).ToList(),
+        Design = reqs.Where(r => r.Kind == RequirementKind.Design)
+            .Select(r => Info(r.Kind, r.Number)).ToList(),
     };
 
     private static RequirementInfo Info(RequirementKind kind, int number) => new()
@@ -86,6 +88,35 @@ public class RequirementLinkifierTests
         Assert.Contains("<a class=\"req-ref\" href=\"../requirements/fr6.html\">FR6</a>", html);
         Assert.Contains("FR99", html);
         Assert.DoesNotContain("fr99.html", html);
+    }
+
+    [Fact]
+    public void Linkify_TurnsKnownUxDrIntoLink()
+    {
+        var model = Requirements((RequirementKind.Design, 25));
+        var html = RequirementLinkifier.Linkify("<p>See UX-DR25 for the pattern.</p>", model, "");
+
+        Assert.Contains("<a class=\"req-ref\" href=\"requirements/ux-dr25.html\">UX-DR25</a>", html);
+    }
+
+    [Fact]
+    public void Linkify_LeavesUnknownUxDrAlone()
+    {
+        var model = Requirements((RequirementKind.Design, 1));
+        var html = RequirementLinkifier.Linkify("<p>UX-DR99 is not defined.</p>", model, "");
+
+        Assert.Equal("<p>UX-DR99 is not defined.</p>", html);
+    }
+
+    [Fact]
+    public void Linkify_NeverRewritesUxDrInsideExistingAnchors()
+    {
+        var model = Requirements((RequirementKind.Design, 1));
+        var input = "<a href=\"x.html\">UX-DR1</a> but UX-DR1 here";
+        var html = RequirementLinkifier.Linkify(input, model, "");
+
+        Assert.StartsWith("<a href=\"x.html\">UX-DR1</a>", html);
+        Assert.Contains("but <a class=\"req-ref\" href=\"requirements/ux-dr1.html\">UX-DR1</a>", html);
     }
 
     [Fact]

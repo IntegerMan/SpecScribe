@@ -3424,7 +3424,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .epic-ref:hover { color: var(--teal-deep); border-bottom-style: solid; }
 
 .req-card {
-  max-width: 860px;
+  max-width: 1100px;
   margin: 0 auto 0.7rem;
   background: var(--warm-white);
   border: 1px solid var(--border);
@@ -3432,6 +3432,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   border-radius: 6px;
   padding: 0.85rem 1.25rem;
   box-shadow: 0 2px 8px var(--shadow);
+  box-sizing: border-box;
 }
 .req-card.done { border-left-color: var(--status-done); }
 .req-card.active { border-left-color: var(--status-active); }
@@ -3658,28 +3659,70 @@ h1:has(> .status-legend) {
   align-items: center;
 }
 
-/* Requirements index: every section shares one flush 860px column so the dashboard, group navigator,
-   dividers, and cards all line up on the same left/right edges (the shared .dashboard/.section-divider
-   default to the wider 1100px used on the home page). */
+/* Requirements index: match the home dashboard column (1100px + 1.5rem gutters) so donuts, flow,
+   NFR/UX-DR coverage, group navigator, and cards share one stretched reading column with consistent
+   padding — the previous 860px flush lock made the page feel cramped vs the home journey. [Story 9.2 UX] */
+.req-index {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2.5rem;
+  box-sizing: border-box;
+}
 .req-index .dashboard,
 .req-index .section-divider,
 .req-index .chart-panel,
-.req-group-grid {
-  max-width: 860px;
+.req-group-grid,
+.req-index .req-card {
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.req-index .dashboard {
   padding-left: 0;
   padding-right: 0;
+  margin-left: 0;
+  margin-right: 0;
 }
-/* The status-tile grid + requirements-flow panels are centered chart-panels; keep them in the flush column
-   so the grid and Sankey align with every other section instead of stretching edge-to-edge (round-2 fix). */
-.req-index .chart-panel { margin-left: auto; margin-right: auto; }
+/* The status-tile grid + requirements-flow panels sit in the same stretched column as every other section. */
+.req-index .chart-panel { margin-left: 0; margin-right: 0; }
 /* Anchored group dividers clear the sticky nav when jumped to. */
 .req-index .section-divider[id] { scroll-margin-top: 4.5rem; }
 
 .req-group-grid {
-  margin: 0 auto 1.5rem;
+  margin: 0 0 1.5rem;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 0.8rem;
+}
+
+/* NFR/UX-DR coverage subgroup headings inside the dedicated coverage panel. [Story 9.2] */
+.nfr-uxdr-coverage .nfr-uxdr-subgroup-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin: 1rem 0 0.6rem;
+}
+.nfr-uxdr-coverage .nfr-uxdr-subgroup-title:first-of-type { margin-top: 0.4rem; }
+.nfr-uxdr-coverage .req-card { margin-left: 0; margin-right: 0; }
+
+/* Requirements detail pages share the same stretched column + gutters as the index. [Story 9.2 UX] */
+.req-detail {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2.5rem;
+  box-sizing: border-box;
+}
+.req-detail .epic-card,
+.req-detail .story-lead {
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+/* Header aligns with the stretched requirements column when either index or detail is present. */
+body:has(main.req-index) .doc-header,
+body:has(main.req-detail) .doc-header {
+  max-width: 1100px;
 }
 
 /* Group navigator card sizes its own donut/label like an epic-mosaic card, but its title should read as

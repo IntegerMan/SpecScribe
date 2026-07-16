@@ -105,22 +105,35 @@ public class RequirementsParserTests
         FR3: Deferred requirement
         FR4: Unmapped requirement
 
+        ### NonFunctional Requirements
+
+        NFR1: Covered via epic header
+        NFR2: Unmapped non-functional
+
+        ### UX Design Requirements
+
+        UX-DR1: Covered design requirement
+        UX-DR2: Unmapped design requirement
+
         ### FR Coverage Map
 
         FR1: Epic 1 - just the first
         FR2: Epics 1 & 2 - spans two epics
         FR3: Deferred - post slice
         FR4: covered somewhere but no epic number
+        NFR1: Epic 1 - also on the map
 
         ## Epic List
 
         ### Epic 1: Foundation
 
         Stand it up.
+        **FRs covered:** FR1 · **UX-DRs:** UX-DR1 · **NFRs:** NFR1
 
         ### Epic 2: Expansion
 
         Grow it.
+        **FRs covered:** FR2
 
         ## Epic 1: Foundation
 
@@ -261,6 +274,146 @@ public class RequirementsParserTests
         Assert.Contains("Requirements flow", html);
         Assert.Contains("req-flow-svg", html);
         Assert.Contains("No coverage", html);
+    }
+
+    // ---- Story 9.2: NFR / UX-DR first-class parsing, coverage, and rendering ----
+
+    [Fact]
+    public void Parse_UxDrs_IntoDesign_WithIdsAndSlugs_AllExcludesDesign()
+    {
+        var reqs = ParseMultiEpic().Reqs;
+
+        Assert.Equal(2, reqs.Design.Count);
+        Assert.Equal("UX-DR1", reqs.Design[0].Id);
+        Assert.Equal("ux-dr1", reqs.Design[0].Slug);
+        Assert.Equal("UX-DR2", reqs.Design[1].Id);
+        Assert.Equal("ux-dr2", reqs.Design[1].Slug);
+        Assert.Equal(RequirementKind.Design, reqs.Design[0].Kind);
+
+        // ById resolves UX-DRs; All stays FR+NFR only (FR flow/grid scope).
+        Assert.True(reqs.ById.ContainsKey("UX-DR1"));
+        Assert.Equal(6, reqs.All.Count()); // FR1–4 + NFR1–2
+        Assert.DoesNotContain(reqs.All, r => r.Kind == RequirementKind.Design);
+        Assert.Equal(6 + 2, reqs.Everything.Count()); // All + Design
+    }
+
+    [Fact]
+    public void Parse_NfrAndUxDr_CoverageFromEpicHeaderUnion_UnmappedStayEmpty()
+    {
+        var (reqs, epics) = ParseMultiEpic();
+
+        // NFR1 is on BOTH the FR Coverage Map (Epic 1) and the epic header — union de-dups to [1].
+        Assert.Equal(new[] { 1 }, reqs.ById["NFR1"].CoverageEpicNumbers);
+        Assert.Equal(1, reqs.ById["NFR1"].CoverageEpicNumber);
+
+        // UX-DR1 covered only via epic-header reverse index.
+        Assert.Equal(new[] { 1 }, reqs.ById["UX-DR1"].CoverageEpicNumbers);
+        Assert.Equal(new[] { "1.1" }, RequirementsParser.StoriesFor(reqs.ById["UX-DR1"], epics).Select(s => s.Id).ToList());
+
+        // Unmapped NFR/UX-DR — empty coverage, StoriesFor empty.
+        Assert.Empty(reqs.ById["NFR2"].CoverageEpicNumbers);
+        Assert.Empty(reqs.ById["UX-DR2"].CoverageEpicNumbers);
+        Assert.Empty(RequirementsParser.StoriesFor(reqs.ById["UX-DR2"], epics));
+    }
+
+    [Fact]
+    public void Parse_FrCoverageStaysMapOnly_HeaderFrTokensDoNotUnion()
+    {
+        // Epic 1's header lists FR1; Epic 2's lists FR2. FR2's map already has Epics 1 & 2.
+        // Header must NOT change FR coverage (FR output byte-identical guardrail).
+        var fr2 = ParseMultiEpic().Reqs.ById["FR2"];
+        Assert.Equal(new[] { 1, 2 }, fr2.CoverageEpicNumbers);
+        Assert.Equal(1, fr2.CoverageEpicNumber);
+    }
+
+    [Fact]
+    public void RenderIndex_NfrUxDrCoverageSection_ShowsMappedAndUnmappedTreatments()
+    {
+        var (reqs, epics) = ParseMultiEpic();
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+
+        Assert.Contains("Non-functional &amp; design coverage", html);
+        Assert.Contains("Non-functional requirements", html);
+        Assert.Contains("UX design requirements", html);
+        Assert.Contains("Design (", html); // Design donut
+        Assert.Contains("design</div>", html); // subtitle count includes design
+
+        // Covered UX-DR/NFR: linked epic chip.
+        Assert.Contains("href=\"epics/epic-1.html\">Epic 1</a>", html);
+
+        // Unmapped: "Not yet mapped" badge (icon+word via StatusStyles.Badge) — never a bare "Planned".
+        Assert.Contains(">Not yet mapped<", html);
+        Assert.Contains("Not yet mapped to a delivering epic.", html);
+        // The unmapped coverage row must not stamp Planned as its badge label.
+        Assert.Contains("id=\"cov-ux-dr2\"", html);
+        var covUxDr2 = html[html.IndexOf("id=\"cov-ux-dr2\"", StringComparison.Ordinal)..];
+        var end = covUxDr2.IndexOf("</div>\n\n", StringComparison.Ordinal);
+        var row = end >= 0 ? covUxDr2[..end] : covUxDr2;
+        Assert.Contains("Not yet mapped", row);
+        Assert.DoesNotContain(">Planned<", row);
+    }
+
+    [Fact]
+    public void RenderIndex_NoNfrOrDesign_OmitsCoverageSectionAndDesignDonut()
+    {
+        // NFR8 degrade-gracefully: absent sub-groups/donut, not empty/broken.
+        var md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            **Core**
+            FR1: Only functional
+
+            ### FR Coverage Map
+
+            FR1: Epic 1 - only
+
+            ## Epic List
+
+            ### Epic 1: Solo
+
+            Goal.
+
+            ## Epic 1: Solo
+
+            ### Story 1.1: A
+
+            As a user, I want a, so that b.
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse(md, epics, progress);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+
+        Assert.DoesNotContain("Non-functional &amp; design coverage", html);
+        Assert.DoesNotContain(">Design (", html);
+        Assert.DoesNotContain("design</div>", html);
+        Assert.Empty(reqs.Design);
+        Assert.Empty(reqs.NonFunctional);
+    }
+
+    [Fact]
+    public void RenderRequirement_UxDr_KickerAndBackLink()
+    {
+        var (reqs, epics) = ParseMultiEpic();
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var req = reqs.ById["UX-DR1"];
+        var covering = epics.Epics.First(e => e.Number == 1);
+
+        var html = RequirementsTemplater.RenderRequirement(req, covering, progress, nav, epics);
+
+        Assert.Contains("UX Design Requirement", html);
+        Assert.Contains("requirements.html", html);
+        Assert.Contains("req-detail", html);
     }
 
     // ---- Story 9.1: requirement detail page lists its covering stories, grouped by epic ----

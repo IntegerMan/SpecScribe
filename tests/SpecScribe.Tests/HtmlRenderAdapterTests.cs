@@ -393,7 +393,7 @@ public class HtmlRenderAdapterTests
         Work = WorkInventory.Empty,
         OpenRetroActionItems = 0,
         Counts = ProjectCounts.Empty,
-        Requirements = new RequirementsModel { Functional = new[] { Fr(1, 1) }, NonFunctional = Array.Empty<RequirementInfo>() },
+        Requirements = new RequirementsModel { Functional = new[] { Fr(1, 1) }, NonFunctional = Array.Empty<RequirementInfo>(), Design = Array.Empty<RequirementInfo>() },
         Epics = withEpics ? RequirementsEpics() : null,
     };
 

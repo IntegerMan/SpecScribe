@@ -9,13 +9,17 @@ namespace SpecScribe;
 /// - "### Functional Requirements" — bold category headers (**Core Loop &amp; Time**) followed by
 ///   "FR{n}: {definition}" lines.
 /// - "### NonFunctional Requirements" — "NFR{n}: {definition}" lines, no categories.
+/// - "### UX Design Requirements" — "UX-DR{n}: {definition}" lines, no categories. [Story 9.2]
 /// - "### FR Coverage Map" — one "FR{n}: Epic {N} - {note}", "FR{n}: Epics {N} &amp; {M} - {note}", or
 ///   "FR{n}: Deferred - {note}" line per requirement (NFRs listed the same way). ALL named epics are captured
 ///   (<see cref="RequirementInfo.CoverageEpicNumbers"/>); the first is the primary covering epic.
-/// Each requirement's <see cref="RequirementStatus"/> is rolled up from its primary covering epic's progress.</summary>
+/// - "## Epic List" header lines — a second coverage source for NFR/UX-DR via reverse index
+///   (<c>**NFRs:**</c> / <c>**UX-DRs:**</c> / <c>**NFRs covered:**</c> tokens). FR coverage stays map-only.
+/// Each requirement's <see cref="RequirementStatus"/> is rolled up from its covering epic(s)' progress.</summary>
 public static class RequirementsParser
 {
     private static readonly Regex DefLine = new(@"^(FR|NFR)(\d+):\s*(.+)$", RegexOptions.Compiled);
+    private static readonly Regex UxDrLine = new(@"^UX-DR(\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex CategoryLine = new(@"^\*\*(.+?)\*\*$", RegexOptions.Compiled);
     // Matches the leading "Epic 4" / "Epics 1 & 2" / "Epics 1, 2 and 3" coverage clause. Only confirms the
     // clause names epic(s) at all (plural "Epics" and multi-number lists are real in epics.md — FR2/FR5/FR7:
@@ -25,6 +29,10 @@ public static class RequirementsParser
     // a narrower digits/comma/ampersand-only capture group would silently drop numbers after the word "and".
     private static readonly Regex EpicClause = new(@"^Epics?\b", RegexOptions.Compiled);
     private static readonly Regex NumberRef = new(@"\d+", RegexOptions.Compiled);
+    private static readonly Regex ListEpicHeading = new(@"^### Epic (\d+):", RegexOptions.Compiled);
+    // FR\d+ / NFR\d+ / UX-DR\d+ tokens on epic-header coverage lines — ordered by appearance for deterministic
+    // CoverageEpicNumbers. [Story 9.2 Task 2]
+    private static readonly Regex ReqIdToken = new(@"\b(?:FR|NFR|UX-DR)(\d+)\b", RegexOptions.Compiled);
 
     private sealed record Coverage(IReadOnlyList<int> EpicNumbers, bool Deferred, string? Note);
 
@@ -36,15 +44,26 @@ public static class RequirementsParser
         var inventory = SliceSection(lines, "## Requirements Inventory", "## ");
         var frLines = SliceSection(inventory, "### Functional Requirements", "### ");
         var nfrLines = SliceSection(inventory, "### NonFunctional Requirements", "### ");
+        var uxDrLines = SliceSection(inventory, "### UX Design Requirements", "### ");
         var mapLines = SliceSection(inventory, "### FR Coverage Map", "### ");
 
-        var coverage = ParseCoverage(mapLines);
+        var mapCoverage = ParseCoverage(mapLines);
+        // Second source: epic-header reverse index. Scoped per kind in ResolveCoverage so FRs stay map-only.
+        var headerCoverage = ParseEpicHeaderCoverage(lines);
         var epicsByNumber = epics.Epics.ToDictionary(e => e.Number);
 
-        var functional = ParseDefs(frLines, RequirementKind.Functional, withCategories: true, coverage, epicsByNumber);
-        var nonFunctional = ParseDefs(nfrLines, RequirementKind.NonFunctional, withCategories: false, coverage, epicsByNumber);
+        var functional = ParseDefs(frLines, RequirementKind.Functional, withCategories: true,
+            mapCoverage, headerCoverage, epicsByNumber);
+        var nonFunctional = ParseDefs(nfrLines, RequirementKind.NonFunctional, withCategories: false,
+            mapCoverage, headerCoverage, epicsByNumber);
+        var design = ParseUxDrs(uxDrLines, mapCoverage, headerCoverage, epicsByNumber);
 
-        return new RequirementsModel { Functional = functional, NonFunctional = nonFunctional };
+        return new RequirementsModel
+        {
+            Functional = functional,
+            NonFunctional = nonFunctional,
+            Design = design,
+        };
     }
 
     /// <summary>Returns the lines under an exact heading, up to the next heading at the given level (or end).</summary>
@@ -99,11 +118,118 @@ public static class RequirementsParser
         return map;
     }
 
+    /// <summary>Builds requirement-id → covering epic numbers from "## Epic List" header lines. Captures every
+    /// FR/NFR/UX-DR token on each epic's meta line(s); callers scope which kinds union with the FR Coverage Map.
+    /// Deterministic: epics in source order, tokens in appearance order, de-duplicated. [Story 9.2 Task 2]</summary>
+    private static Dictionary<string, List<int>> ParseEpicHeaderCoverage(string[] lines)
+    {
+        var map = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+        var headingIdx = Array.FindIndex(lines, l => l.TrimEnd() == "## Epic List");
+        if (headingIdx < 0) return map;
+
+        var end = lines.Length;
+        for (var i = headingIdx + 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("## ", StringComparison.Ordinal)) { end = i; break; }
+        }
+
+        var entryStarts = new List<(int Index, int Number)>();
+        for (var i = headingIdx + 1; i < end; i++)
+        {
+            var m = ListEpicHeading.Match(lines[i].Trim());
+            if (m.Success)
+            {
+                entryStarts.Add((i, int.Parse(m.Groups[1].Value)));
+            }
+        }
+
+        for (var e = 0; e < entryStarts.Count; e++)
+        {
+            var (idx, epicNumber) = entryStarts[e];
+            var bodyEnd = e + 1 < entryStarts.Count ? entryStarts[e + 1].Index : end;
+
+            for (var i = idx + 1; i < bodyEnd; i++)
+            {
+                var line = lines[i].Trim();
+                if (line.Length == 0) continue;
+                // Only scan coverage meta lines (bold-labelled). Goal prose can mention FR ids casually —
+                // attributing those would over-claim. Labels vary: "FRs covered:", "NFRs:", "UX-DRs:",
+                // "NFRs covered:" (Epics 16/17).
+                if (!line.StartsWith("**", StringComparison.Ordinal)) continue;
+                if (!line.Contains("FR", StringComparison.Ordinal) &&
+                    !line.Contains("NFR", StringComparison.Ordinal) &&
+                    !line.Contains("UX-DR", StringComparison.Ordinal)) continue;
+
+                foreach (Match token in ReqIdToken.Matches(line))
+                {
+                    // Reconstruct the full id from the match (group 0 is FR25 / NFR8 / UX-DR21).
+                    var id = token.Value;
+                    if (!map.TryGetValue(id, out var list))
+                    {
+                        list = new List<int>();
+                        map[id] = list;
+                    }
+                    if (!list.Contains(epicNumber))
+                    {
+                        list.Add(epicNumber);
+                    }
+                }
+            }
+        }
+
+        return map;
+    }
+
+    /// <summary>Resolves covering epics for one requirement, scoped by kind so FR output stays byte-identical:
+    /// FR = map only; NFR = map ∪ header; UX-DR = header ∪ map (map has none today). [Story 9.2 Task 2]</summary>
+    private static Coverage ResolveCoverage(
+        string id,
+        RequirementKind kind,
+        IReadOnlyDictionary<string, Coverage> mapCoverage,
+        IReadOnlyDictionary<string, List<int>> headerCoverage)
+    {
+        mapCoverage.TryGetValue(id, out var map);
+        headerCoverage.TryGetValue(id, out var headerEpics);
+
+        var deferred = map?.Deferred ?? false;
+        var note = map?.Note;
+
+        IReadOnlyList<int> epicNumbers;
+        if (kind == RequirementKind.Functional)
+        {
+            // FR coverage source = FR Coverage Map ONLY — never union header FR tokens.
+            epicNumbers = map?.EpicNumbers ?? Array.Empty<int>();
+        }
+        else
+        {
+            // NFR/UX-DR: union map + header, map first (appearance order), then header, de-duplicated.
+            var merged = new List<int>();
+            if (map?.EpicNumbers is { Count: > 0 } fromMap)
+            {
+                foreach (var n in fromMap)
+                {
+                    if (!merged.Contains(n)) merged.Add(n);
+                }
+            }
+            if (headerEpics is { Count: > 0 })
+            {
+                foreach (var n in headerEpics)
+                {
+                    if (!merged.Contains(n)) merged.Add(n);
+                }
+            }
+            epicNumbers = merged;
+        }
+
+        return new Coverage(epicNumbers, deferred, note);
+    }
+
     private static List<RequirementInfo> ParseDefs(
         string[] lines,
         RequirementKind kind,
         bool withCategories,
-        IReadOnlyDictionary<string, Coverage> coverage,
+        IReadOnlyDictionary<string, Coverage> mapCoverage,
+        IReadOnlyDictionary<string, List<int>> headerCoverage,
         IReadOnlyDictionary<int, EpicInfo> epicsByNumber)
     {
         var result = new List<RequirementInfo>();
@@ -130,12 +256,12 @@ public static class RequirementsParser
 
             var number = int.Parse(def.Groups[2].Value);
             var id = def.Groups[1].Value + number;
-            coverage.TryGetValue(id, out var cov);
+            var cov = ResolveCoverage(id, kind, mapCoverage, headerCoverage);
 
-            var epicNumbers = cov?.EpicNumbers ?? Array.Empty<int>();
+            var epicNumbers = cov.EpicNumbers;
             // Primary = the first covering epic; keeps every existing consumer byte-for-byte unchanged.
             int? epicNumber = epicNumbers.Count > 0 ? epicNumbers[0] : null;
-            var deferred = cov?.Deferred ?? false;
+            var deferred = cov.Deferred;
             string? epicTitle = epicNumber is { } en && epicsByNumber.TryGetValue(en, out var e) ? e.Title : null;
 
             result.Add(new RequirementInfo
@@ -147,9 +273,52 @@ public static class RequirementsParser
                 CoverageEpicNumber = epicNumber,
                 CoverageEpicNumbers = epicNumbers,
                 CoverageEpicTitleHtml = epicTitle,
-                CoverageNote = cov?.Note,
+                CoverageNote = cov.Note,
                 Deferred = deferred,
                 Status = DeriveStatus(deferred, epicNumbers, epicsByNumber),
+            });
+        }
+
+        return result;
+    }
+
+    /// <summary>Parses "UX-DR{n}: …" definition lines (no categories). [Story 9.2 Task 1]</summary>
+    private static List<RequirementInfo> ParseUxDrs(
+        string[] lines,
+        IReadOnlyDictionary<string, Coverage> mapCoverage,
+        IReadOnlyDictionary<string, List<int>> headerCoverage,
+        IReadOnlyDictionary<int, EpicInfo> epicsByNumber)
+    {
+        var result = new List<RequirementInfo>();
+
+        foreach (var raw in lines)
+        {
+            var line = raw.Trim();
+            if (line.Length == 0) continue;
+
+            var def = UxDrLine.Match(line);
+            if (!def.Success) continue;
+
+            var number = int.Parse(def.Groups[1].Value);
+            var id = "UX-DR" + number;
+            var cov = ResolveCoverage(id, RequirementKind.Design, mapCoverage, headerCoverage);
+
+            var epicNumbers = cov.EpicNumbers;
+            int? epicNumber = epicNumbers.Count > 0 ? epicNumbers[0] : null;
+            string? epicTitle = epicNumber is { } en && epicsByNumber.TryGetValue(en, out var e) ? e.Title : null;
+
+            result.Add(new RequirementInfo
+            {
+                Kind = RequirementKind.Design,
+                Number = number,
+                TextHtml = MarkdownConverter.RenderInline(def.Groups[2].Value),
+                Category = null,
+                CoverageEpicNumber = epicNumber,
+                CoverageEpicNumbers = epicNumbers,
+                CoverageEpicTitleHtml = epicTitle,
+                CoverageNote = cov.Note,
+                Deferred = cov.Deferred,
+                Status = DeriveStatus(cov.Deferred, epicNumbers, epicsByNumber),
             });
         }
 

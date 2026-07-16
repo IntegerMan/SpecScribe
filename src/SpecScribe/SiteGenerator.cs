@@ -2695,7 +2695,8 @@ public sealed class SiteGenerator
         var requirementsDir = Path.Combine(_options.OutputRoot, "requirements");
         Directory.CreateDirectory(requirementsDir);
 
-        foreach (var req in requirements.All)
+        // Everything (FR+NFR+Design) so UX-DR detail pages generate alongside FR/NFR. [Story 9.2 Task 5]
+        foreach (var req in requirements.Everything)
         {
             var coveringEpic = req.CoverageEpicNumber is { } n
                 ? model.Epics.FirstOrDefault(e => e.Number == n)

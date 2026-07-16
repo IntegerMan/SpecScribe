@@ -1193,6 +1193,7 @@ public class HtmlTemplaterTests
             {
                 new RequirementInfo { Kind = RequirementKind.NonFunctional, Number = 1, TextHtml = "Be fast", Status = RequirementStatus.Planned, CoverageEpicNumbers = Array.Empty<int>() },
             },
+            Design = Array.Empty<RequirementInfo>(),
         };
 
         var html = HtmlTemplater.RenderIndex(
@@ -1206,5 +1207,13 @@ public class HtmlTemplaterTests
         Assert.Contains("req-flow-svg", html);
         Assert.Contains("href=\"requirements.html\"", html);
         Assert.DoesNotContain("req-donut-label", html);
+
+        // Story 9.2 UX: requirement kind tiles lead the dashboard band and click through to requirements.html.
+        Assert.Contains("Functional reqs", html);
+        Assert.Contains("Non-functional", html);
+        Assert.Contains("stat-card-link\" href=\"requirements.html\"", html);
+        // Functional tile appears before Epics drafted (leading the band).
+        Assert.True(html.IndexOf("Functional reqs", StringComparison.Ordinal) <
+                    html.IndexOf("Epics drafted", StringComparison.Ordinal));
     }
 }

@@ -259,12 +259,14 @@ public class StylesheetTests
     }
 
     [Fact]
-    public void Stylesheet_RequirementsPanelsShareTheFlushColumn()
+    public void Stylesheet_RequirementsPanelsShareTheStretchedColumn()
     {
-        // Round-2 width fix: the status-tile + flow chart-panels join the requirements page's flush 860px
-        // column so they align with every other section instead of stretching edge-to-edge.
+        // Requirements index matches the home dashboard column (1100px + gutters); chart-panels stretch
+        // with every other section rather than locking to a narrower flush column. [Story 9.2 UX]
         var css = ReadStylesheet();
+        Assert.Contains(".req-index", css);
         Assert.Contains(".req-index .chart-panel", css);
+        Assert.Contains("main.req-detail", css);
     }
 
     [Fact]

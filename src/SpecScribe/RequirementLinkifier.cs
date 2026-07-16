@@ -14,7 +14,9 @@ public static class RequirementLinkifier
         "(<a\\b[^>]*>.*?</a>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
-    private static readonly Regex RefPattern = new(@"\b(FR|NFR)(\d+)\b", RegexOptions.Compiled);
+    // UX-DR before FR|NFR so "UX-DR25" is not partially matched as a bare "DR25" — the alternation is
+    // left-first; FR/NFR remain word-boundary anchored. [Story 9.2 Task 5]
+    private static readonly Regex RefPattern = new(@"\b(FR|NFR|UX-DR)(\d+)\b", RegexOptions.Compiled);
 
     /// <param name="html">Already-rendered HTML to scan.</param>
     /// <param name="requirements">The known requirement set — only ids present here are linked.</param>
