@@ -533,8 +533,8 @@ public class HtmlRenderAdapterTests
         };
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkDashboard(work, openRetro: 0));
 
-        Assert.Contains("summary-card work-summary-card deferred", body);
-        Assert.Contains("Deferred Work", body);
+        Assert.Contains("work-summary-card deferred", body);
+        Assert.Contains("stat-label\">Deferred work</div>", body);
         Assert.DoesNotContain("work-summary-card retro", body);
         Assert.DoesNotContain("Retro Action Items", body);
         Assert.DoesNotContain("quick-dev-card", body);
@@ -546,8 +546,10 @@ public class HtmlRenderAdapterTests
         // I/O matrix: open retro action items, empty work inventory → the Retro summary card only.
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkDashboard(WorkInventory.Empty, openRetro: 4));
 
-        Assert.Contains("summary-card work-summary-card retro", body);
-        Assert.Contains("4 open items", body);
+        Assert.Contains("work-summary-card retro", body);
+        Assert.Contains("stat-number\">4</div>", body);
+        Assert.Contains("stat-label\">Action items</div>", body);
+        Assert.Contains("open items", body);
         Assert.DoesNotContain("work-summary-card deferred", body);
         Assert.DoesNotContain("quick-dev-card", body);
     }
@@ -643,9 +645,11 @@ public class HtmlRenderAdapterTests
             Assert.True(first >= 0, $"missing tile {label}");
             Assert.Equal(-1, body.IndexOf(needle, first + needle.Length, StringComparison.Ordinal));
         }
-        Assert.Contains("aria-labelledby=\"tile-journey-requirements-label\"", body);
-        Assert.Contains("tile-journey-execution", body);
+        Assert.Contains("journey-lead", body);
+        Assert.Contains("journey-execution", body);
         Assert.Contains("overall-progress-tile", body);
+        Assert.Contains("stat-label\">Overall progress</div>", body);
+        Assert.Contains("stat-label\">Epic status</div>", body);
     }
 
     [Fact]
@@ -658,7 +662,7 @@ public class HtmlRenderAdapterTests
         };
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
         Assert.DoesNotContain("overall-progress-tile", body);
-        Assert.DoesNotContain("tile-journey-execution", body);
+        Assert.DoesNotContain("journey-execution", body);
     }
 
     [Fact]
@@ -708,8 +712,8 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("View sprint", body);
         Assert.DoesNotContain("View sprint board", body);
         Assert.DoesNotContain("View Epics", body);
-        Assert.Contains("tile-journey-epics", body);
-        Assert.Contains("tile-journey-execution", body);
+        Assert.Contains("journey-epics", body);
+        Assert.Contains("journey-execution", body);
         Assert.Contains("href=\"epics.html\"", body); // Epics drafted tile / sunburst still navigate
         Assert.Contains("href=\"sprint.html\"", body); // board cards / moreHref still navigate
     }

@@ -11,11 +11,28 @@ public static class Charts
     /// <summary>A dashboard stat card. When <paramref name="tooltip"/> is supplied the card opts into the shared
     /// body-level <c>js-tip</c>/<c>data-tip</c> path (never clipped under sticky nav) and becomes keyboard-focusable
     /// so it's reachable by hover, focus and touch — used to define what a number actually counts (UX-DR4).
-    /// Native <c>title</c> remains as the no-JS fallback. [Story 1.5 C2; home welcome tooltips]</summary>
-    public static string StatCard(string number, string label, string? sub = null, string? tooltip = null, string? href = null)
+    /// Native <c>title</c> remains as the no-JS fallback. Optional <paramref name="extraClass"/> carries journey
+    /// accent classes; <paramref name="journeyLabel"/> marks the first card of a group with a floating caption.
+    /// [Story 1.5 C2; home welcome tooltips]</summary>
+    public static string StatCard(
+        string number,
+        string label,
+        string? sub = null,
+        string? tooltip = null,
+        string? href = null,
+        string? extraClass = null,
+        string? journeyLabel = null)
     {
+        var lead = journeyLabel is { Length: > 0 }
+            ? $"<span class=\"tile-journey-label\">{Html(journeyLabel)}</span>"
+            : string.Empty;
         var subHtml = sub is { Length: > 0 } ? $"<div class=\"stat-sub\">{Html(sub)}</div>" : string.Empty;
-        var inner = $"<div class=\"stat-number\">{Html(number)}</div><div class=\"stat-label\">{Html(label)}</div>{subHtml}";
+        var inner = $"{lead}<div class=\"stat-number\">{Html(number)}</div><div class=\"stat-label\">{Html(label)}</div>{subHtml}";
+        var cls = "stat-card"
+            + (href is { Length: > 0 } ? " stat-card-link" : string.Empty)
+            + (tooltip is { Length: > 0 } ? " js-tip" : string.Empty)
+            + (journeyLabel is { Length: > 0 } ? " journey-lead" : string.Empty)
+            + (extraClass is { Length: > 0 } ? " " + extraClass : string.Empty);
         // A tile with a drill target becomes a link (natively focusable — no tabindex needed); otherwise it stays a
         // static div, adding tabindex only when a tooltip makes keyboard focus meaningful. The inner markup is
         // identical in both forms so the stat-tile parity/regression facts stay stable across the fork.
@@ -23,15 +40,15 @@ public static class Charts
         {
             if (tooltip is { Length: > 0 })
             {
-                return $"<a class=\"stat-card stat-card-link js-tip\" href=\"{Html(href)}\" data-tip=\"{Html(tooltip)}\" title=\"{Html(tooltip)}\">{inner}</a>";
+                return $"<a class=\"{cls}\" href=\"{Html(href)}\" data-tip=\"{Html(tooltip)}\" title=\"{Html(tooltip)}\">{inner}</a>";
             }
-            return $"<a class=\"stat-card stat-card-link\" href=\"{Html(href)}\">{inner}</a>";
+            return $"<a class=\"{cls}\" href=\"{Html(href)}\">{inner}</a>";
         }
         if (tooltip is { Length: > 0 })
         {
-            return $"<div class=\"stat-card js-tip\" data-tip=\"{Html(tooltip)}\" title=\"{Html(tooltip)}\" tabindex=\"0\">{inner}</div>";
+            return $"<div class=\"{cls}\" data-tip=\"{Html(tooltip)}\" title=\"{Html(tooltip)}\" tabindex=\"0\">{inner}</div>";
         }
-        return $"<div class=\"stat-card\">{inner}</div>";
+        return $"<div class=\"{cls}\">{inner}</div>";
     }
 
     public static string ProgressBar(string label, int value, int max, string? rightLabel = null)

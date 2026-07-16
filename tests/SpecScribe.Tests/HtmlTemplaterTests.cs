@@ -295,6 +295,7 @@ public class HtmlTemplaterTests
             commands: CommandCatalog.Empty);
 
         Assert.Contains($"last commit {PortalDates.Day(day)}", html);
+        Assert.DoesNotContain("active days · last commit", html);
         Assert.DoesNotContain(" ago", html);
         Assert.DoesNotContain("d ago", html);
         Assert.DoesNotContain("yesterday", html);
@@ -717,7 +718,7 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
 
-        Assert.Contains("Epic Status", html);
+        Assert.Contains("Epic status", html);
         // Side legend removed — the donut slice's <title> hover tip carries the rollup count.
         Assert.Contains("<title>In development: 1</title>", html);
         Assert.DoesNotContain("Done (0)", html);
@@ -762,11 +763,12 @@ public class HtmlTemplaterTests
         var host = html.IndexOf("sprint-epic-filter-host", StringComparison.Ordinal);
         var board = html.IndexOf("class=\"sprint-board\"", StringComparison.Ordinal);
         Assert.True(host >= 0 && board > host, "home epic filter host must precede the sprint board");
-        // Open retro action items are surfaced as a compact summary card (beside deferred work) in the band.
-        Assert.Contains("summary-card work-summary-card retro", html);
-        Assert.Contains("Action Items", html);
+        // Open retro action items are surfaced as a compact StatCard (beside deferred work) in the band.
+        Assert.Contains("work-summary-card retro", html);
+        Assert.Contains("Action items", html);
         Assert.DoesNotContain("Retro Action Items", html);
-        Assert.Contains("1 open item", html);
+        Assert.Contains("stat-number\">1</div>", html);
+        Assert.Contains("open item", html);
     }
 
     [Fact]
@@ -866,10 +868,11 @@ public class HtmlTemplaterTests
         var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
             adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
 
-        // The Deferred summary card with its open-item count remains (now a compact card in the band).
-        Assert.Contains("summary-card work-summary-card deferred", html);
-        Assert.Contains("Deferred Work", html);
-        Assert.Contains("2 open items", html);
+        // The Deferred StatCard with its open-item count remains (now matching other band cards).
+        Assert.Contains("work-summary-card deferred", html);
+        Assert.Contains("Deferred work", html);
+        Assert.Contains("stat-number\">2</div>", html);
+        Assert.Contains("open items", html);
 
         // No quick-dev card grid and no generic index-card listings below the pulse panels.
         Assert.DoesNotContain("quick-dev-card", html);
@@ -1212,7 +1215,9 @@ public class HtmlTemplaterTests
         // Story 9.2 UX: requirement kind tiles lead the dashboard band and click through to requirements.html.
         Assert.Contains("Functional reqs", html);
         Assert.Contains("Non-functional", html);
-        Assert.Contains("stat-card-link js-tip\" href=\"requirements.html\"", html);
+        Assert.Contains("stat-card-link js-tip", html);
+        Assert.Contains("href=\"requirements.html\"", html);
+        Assert.Contains("journey-requirements", html);
         // Functional tile appears before Epics drafted (leading the band).
         Assert.True(html.IndexOf("Functional reqs", StringComparison.Ordinal) <
                     html.IndexOf("Epics drafted", StringComparison.Ordinal));

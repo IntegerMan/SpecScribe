@@ -112,7 +112,7 @@ public static class DashboardViewBuilder
             : new("—", "Planned tasks done", "none tracked yet", Href: tasksHref));
         tiles.Add(p.Git is { } git
             ? new(git.TotalCommits.ToString(), Charts.Plural(git.TotalCommits, "Commit", "Commits"), CommitStatSub(git),
-                "Total commits in the repository; the sub-line shows active days and how recently work landed.", commitsHref)
+                "Total commits in the repository; the sub-line shows how recently work landed.", commitsHref)
             : new("—", "Commits", "no git history"));
 
         if (!work.IsEmpty)
@@ -143,11 +143,11 @@ public static class DashboardViewBuilder
             href);
     }
 
-    /// <summary>The commit stat's sub-line: active days plus a deterministic absolute-date recency signal.
-    /// Uses <see cref="PortalDates.Day"/> (never <c>DateTime.Now</c>) so a from-scratch regen of the same
-    /// inputs is byte-identical. [Story 1.5 F3; Story 8.8]</summary>
+    /// <summary>The commit stat's sub-line: a deterministic absolute-date recency signal (active-day count
+    /// lives on the timeline/git pulse surfaces instead). Uses <see cref="PortalDates.Day"/> (never
+    /// <c>DateTime.Now</c>) so a from-scratch regen of the same inputs is byte-identical. [Story 1.5 F3; Story 8.8]</summary>
     private static string CommitStatSub(GitPulse git)
-        => $"{git.ActiveDays} active {Charts.Plural(git.ActiveDays, "day", "days")} · last commit {PortalDates.Day(git.LastCommitDate)}";
+        => $"last commit {PortalDates.Day(git.LastCommitDate)}";
 
     // ----- Overall Progress bars ----------------------------------------------------------------------------
 

@@ -298,7 +298,7 @@ public static class RenderParity
     // A stat tile renders either as a static <div> or, when it has a drill target, as an <a class="stat-card
     // stat-card-link"> — the inner number/label markup is identical in both forms, so match either wrapper.
     private static readonly Regex StatCardRegex = new(
-        "<(?:div|a) class=\"stat-card[^\"]*\"[^>]*><div class=\"stat-number\">(?<num>.*?)</div><div class=\"stat-label\">(?<label>.*?)</div>",
+        "<(?:div|a) class=\"stat-card[^\"]*\"[^>]*>(?:<span class=\"tile-journey-label\">.*?</span>)?<div class=\"stat-number\">(?<num>.*?)</div><div class=\"stat-label\">(?<label>.*?)</div>",
         RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex EpicChipRegex = new(
         "<a class=\"epic-chip (?<stage>[^\"]+)\" href=\"(?<href>[^\"]*)\"><span class=\"num\">(?<num>\\d+)</span>",

@@ -348,6 +348,8 @@ public class SiteGeneratorAdapterTests : IDisposable
         // title tooltips while body-level data-tip/data-tip-html tooltips are active, avoiding duplicate tips.
         // Regenerated after review patches: key-view aria-expanded/controls + panel ids; journey aria-labelledby;
         // empty overall-progress omitted; stat-card-link exempt from two-tap touch; key-view click toggle.
+        // Regenerated for dense two-row tile band: journey accents on cards, floating group captions, StatCard
+        // follow-ups, donut tiles with bottom labels, commits sub-line without active-day count.
         // Regenerated for Story 8.3 review patches: funnel reads ProjectCounts (byte-identical counts; hash
         // refresh after ledger wiring + OpenActionItems empty-entries fix).
         // Regenerated for Story 8.6 review: empty Backlog lane copy shortened to "No cards in backlog".
@@ -363,7 +365,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 9.2 UX follow-up: covering epics in the NFR/UX-DR coverage section moved from
         // header chips to a labeled "Delivered by" card list under each requirement description
         // (.nfr-uxdr-epics / .nfr-uxdr-epic-card). Fixture has no UX-DR inventory — delta is primarily CSS.
-        const string expected = "7742d48600a92044e0ac7421dbb2810c1112eda92bb8d65845acd1621bba48ef";
+        const string expected = "0bd166c4086c9fcad944c8e9acb674af1f925712234cc12b1a3589b112d2f2ff";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
