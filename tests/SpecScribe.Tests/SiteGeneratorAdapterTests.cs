@@ -367,7 +367,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 9.2 UX follow-up: covering epics in the NFR/UX-DR coverage section moved from
         // header chips to a labeled "Delivered by" card list under each requirement description
         // (.nfr-uxdr-epics / .nfr-uxdr-epic-card). Fixture has no UX-DR inventory — delta is primarily CSS.
-        const string expected = "41ab246800364e01dd1ebd8847d47e0cf1091c8663a49aef8652b61f1773c8cc";
+        // Regenerated for Story 9.4: drafted story pages gained a verification evidence strip under the status
+        // badge (tasks / tests / verified-or-updated pills + CSS). Fixture story pages with a Status line now
+        // emit .evidence-strip; stylesheet gained .evidence-strip / .evidence-pill / .evidence-link. [Story 9.4]
+        const string expected = "8e8f63af862b45f872b2766b95e19bb8aa917f50adec344456b00fcaeb9f2847";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

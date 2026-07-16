@@ -1,6 +1,10 @@
+---
+baseline_commit: 1a9e8dd6071caa69bf31d1e07810ed8f02bd7244
+---
+
 # Story 9.4: Verification Evidence Strip on Story Pages
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -60,44 +64,44 @@ Per the project rule to elicit visual intent for any new visual surface (Epic 3 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Parse test-evidence and the latest Change Log date from the raw artifact (AC: #1, #2)**
-  - [ ] Add two pure static extractors to `EpicsParser` (alongside the existing `ExtractStatus`/`ExtractDevAgentRecord`/`ExtractNamedSectionHtml`), operating on the raw artifact markdown:
+- [x] **Task 1 — Parse test-evidence and the latest Change Log date from the raw artifact (AC: #1, #2)**
+  - [x] Add two pure static extractors to `EpicsParser` (alongside the existing `ExtractStatus`/`ExtractDevAgentRecord`/`ExtractNamedSectionHtml`), operating on the raw artifact markdown:
     - `ExtractTestEvidence(string raw) → string?` — first match of `\b(\d[\d,]*)\s+(?:C#\s+)?tests?\s+(green|pass|passing)\b` (case-insensitive) scanning the **`## Dev Agent Record` section first** (Completion Notes is where the final tally is stated), falling back to a whole-document scan if the section has none. Return the matched phrase normalized to `"{n} tests {green|passing}"` (collapse `pass`→`passing` for consistent reading; keep the author's `green`/`passing` word otherwise). Return `null` when no match. **Deterministic**: always the first match in that fixed scan order — never iteration-order- or culture-dependent.
-    - `ExtractLatestChangeLogDate(string raw) → (DateOnly Date, bool IsVerification)?` — find the `## Change Log` section, take the **first** `- (\d{4}-\d{2}-\d{2}) — \*\*(?<action>[^*]+)\*\*` line (newest-first ordering means top = latest), parse the ISO date with `DateOnly.ParseExact(..., "yyyy-MM-dd", CultureInfo.InvariantCulture)`. `IsVerification` = the `action` text matches `\b(verif|review|tests? (green|pass)|Status → (done|review))\b` (case-insensitive). Return `null` when there's no `## Change Log` or no dated entry. Guard the date parse (a malformed date → treat as no date, never throw). [Source: src/SpecScribe/EpicsParser.cs:74-78,170-202,267]
-  - [ ] Keep both extractors **allocation-light and side-effect-free** (they run once per drafted story per generation pass). Compile the regexes as `static readonly` fields like the existing `StatusLine`/`DevAgentSubHeading` patterns in `EpicsParser`.
+    - `ExtractChangeLogVerification(string raw) → (DateOnly Date, bool IsVerification)?` — find the `## Change Log` section, take the **first** `- (\d{4}-\d{2}-\d{2}) — \*\*(?<action>[^*]+)\*\*` line (newest-first ordering means top = latest), parse the ISO date with invariant `TryParseExact`. `IsVerification` = the `action` text matches `\b(verif|review|tests? (green|pass)|Status → (done|review))\b` (case-insensitive). Return `null` when there's no `## Change Log` or no dated entry. Guard the date parse (a malformed date → treat as no date, never throw). Named `ExtractChangeLogVerification` because Story 8.8 already owns `ExtractLatestChangeLogDate` → `DateOnly?` (max date across table/list forms for recency). [Source: src/SpecScribe/EpicsParser.cs]
+  - [x] Keep both extractors **allocation-light and side-effect-free** (they run once per drafted story per generation pass). Compile the regexes as `static readonly` fields like the existing `StatusLine`/`DevAgentSubHeading` patterns in `EpicsParser`.
 
-- [ ] **Task 2 — Carry the evidence as a view-model datum (AC: #1, #2)**
-  - [ ] Add a small immutable record `StoryEvidence(int TasksDone, int TasksTotal, string? TestsSummary, DateOnly? VerifiedDate, bool VerifiedIsReview)` (new type in `EpicsView.cs` next to `StoryPageView`, or a nested record — match the file's existing record style). This is **data only**, no HTML — the honest-absence wording and pill markup are the renderer's job (keeps the view host-neutral, consistent with Story 6.1/6.2's data-vs-opaque split). [Source: src/SpecScribe/EpicsView.cs:162-210]
-  - [ ] Add `required StoryEvidence Evidence { get; init; }` to `StoryPageView` with an XML-doc summary. The strip is a story-page-only surface; the placeholder view (`StoryPlaceholderView`) gets nothing (a placeholder has no dev record — its "not yet drafted" state is already its honest empty state).
+- [x] **Task 2 — Carry the evidence as a view-model datum (AC: #1, #2)**
+  - [x] Add a small immutable record `StoryEvidence(int TasksDone, int TasksTotal, string? TestsSummary, DateOnly? VerifiedDate, bool VerifiedIsReview)` (new type in `EpicsView.cs` next to `StoryPageView`, or a nested record — match the file's existing record style). This is **data only**, no HTML — the honest-absence wording and pill markup are the renderer's job (keeps the view host-neutral, consistent with Story 6.1/6.2's data-vs-opaque split). [Source: src/SpecScribe/EpicsView.cs:162-210]
+  - [x] Add `required StoryEvidence Evidence { get; init; }` to `StoryPageView` with an XML-doc summary. The strip is a story-page-only surface; the placeholder view (`StoryPlaceholderView`) gets nothing (a placeholder has no dev record — its "not yet drafted" state is already its honest empty state).
 
-- [ ] **Task 3 — Thread the evidence through the ONE fragment seam both delivery paths share (AC: #1)**
-  - [ ] In `SiteGenerator.BuildStoryPageFragments`, after reading `artifactRaw`, build the `StoryEvidence`: `TasksDone`/`TasksTotal` from `story.TasksDone`/`story.TasksTotal` (already filled by `ProgressCalculator` before this runs — do not re-tally), `TestsSummary` from `EpicsParser.ExtractTestEvidence(artifactRaw)`, and `(VerifiedDate, VerifiedIsReview)` from `EpicsParser.ExtractLatestChangeLogDate(artifactRaw)`. Add it to the `StoryPageFragments` record and return it. [Source: src/SpecScribe/SiteGenerator.cs:711-758]
-  - [ ] Pass `f.Evidence` into `EpicsTemplater.RenderStory`/`BuildStoryPage` at **both** call sites — the HTML pass (src/SpecScribe/SiteGenerator.cs:692) and the webview/SPA pass (src/SpecScribe/SiteGenerator.cs:837-839). Because both route through `BuildStoryPageFragments`, extracting once here means HTML + webview + SPA all get identical evidence with no second code path.
-  - [ ] Extend `EpicsTemplater.RenderStory` and `BuildStoryPage` signatures with the `StoryEvidence` parameter and forward it to `EpicsViewBuilder.BuildStory`, which sets `StoryPageView.Evidence`. [Source: src/SpecScribe/EpicsTemplater.cs:102-152; src/SpecScribe/EpicsViewBuilder.cs:106-139]
+- [x] **Task 3 — Thread the evidence through the ONE fragment seam both delivery paths share (AC: #1)**
+  - [x] In `SiteGenerator.BuildStoryPageFragments`, after reading `artifactRaw`, build the `StoryEvidence`: `TasksDone`/`TasksTotal` from `story.TasksDone`/`story.TasksTotal` (already filled by `ProgressCalculator` before this runs — do not re-tally), `TestsSummary` from `EpicsParser.ExtractTestEvidence(artifactRaw)`, and `(VerifiedDate, VerifiedIsReview)` from `EpicsParser.ExtractChangeLogVerification(artifactRaw)`. Add it to the `StoryPageFragments` record and return it. [Source: src/SpecScribe/SiteGenerator.cs]
+  - [x] Pass `f.Evidence` into `EpicsTemplater.RenderStory`/`BuildStoryPage` at **both** call sites — the HTML pass and the webview/SPA passes. Because both route through `BuildStoryPageFragments`, extracting once here means HTML + webview + SPA all get identical evidence with no second code path.
+  - [x] Extend `EpicsTemplater.RenderStory` and `BuildStoryPage` signatures with the `StoryEvidence` parameter and forward it to `EpicsViewBuilder.BuildStory`, which sets `StoryPageView.Evidence`. [Source: src/SpecScribe/EpicsTemplater.cs; src/SpecScribe/EpicsViewBuilder.cs]
 
-- [ ] **Task 4 — Render the pill strip in the story-page header (AC: #1, #2)**
-  - [ ] In `HtmlRenderAdapter.RenderStoryBody`, after the existing `kicker-row` block (src/SpecScribe/HtmlRenderAdapter.Epics.cs:278-288), emit the evidence strip as its own row so it sits directly under the kicker/status-badge line. Wrap the three pills in `<div class="evidence-strip">…</div>`. Add a private helper `EvidenceStrip(StoryEvidence e, string devRecordAnchor)` next to `TaskBadge` (src/SpecScribe/HtmlRenderAdapter.Epics.cs:256-268) that builds the three pills:
-    - **Tasks pill** — reuse the exact look of the existing `TaskBadge(e.TasksDone, e.TasksTotal)` helper (or call it directly). When `TasksTotal == 0`, render the empty-state pill "no tasks recorded" instead (dashed/muted).
-    - **Tests pill** — `TestsSummary` present → `<span class="status-badge evidence-pill">{icon} {TestsSummary}</span>`; absent → the empty-state pill "no test evidence recorded" (`evidence-pill empty`, dashed border, muted text). Use `PathUtil.Html` on the summary.
-    - **Verified pill** — `VerifiedDate` present → `{icon} {(VerifiedIsReview ? "verified" : "updated")} {date:yyyy-MM-dd}` (format the `DateOnly` with the invariant `"yyyy-MM-dd"` so output stays deterministic and culture-independent); absent → empty-state pill "no verification recorded".
-  - [ ] **Link to the dev record (AC #1 "the strip links to the full dev-record section").** The Dev Agent Record renders as `<details id="sec-dev-agent-record">` (src/SpecScribe/HtmlRenderAdapter.Epics.cs:321-330). When `view.DevAgentRecord.Count > 0`, wrap the strip (or append a small trailing affordance) in an `<a href="#sec-dev-agent-record" class="evidence-link">` so the whole strip deep-links to the record. When there's **no** dev-record section on the page, render the strip **without** a link rather than a dangling anchor (graceful, never a broken in-page link). Note the record is a collapsed `<details>` — an anchor still scrolls to it; do not add JS to auto-expand (Story 9.5 owns dev-record collapse/expand behavior — coordinate, don't pre-empt).
-  - [ ] **Icons (UX-DR17, never color-only):** give each pill a distinct glyph. Tasks already has its checkmark/mini-donut via `TaskBadge`. For Tests and Verified, use existing glyphs from `Icons` if a suitable one exists (check `src/SpecScribe/Icons.cs`); otherwise inline two small SVG/entity glyphs consistent with the existing badge icon style (e.g. a check-in-circle for tests, a clock/calendar for verified). Keep them monochrome, `currentColor`, `em`-sized like the existing badge icons (src/SpecScribe/assets/specscribe.css:~1163). Do **not** introduce a new `--status-*` token — the six-token system is the single color source (memory `specscribe-status-token-system`); pills reuse existing badge colors / `--ink-light` for the muted empty state.
+- [x] **Task 4 — Render the pill strip in the story-page header (AC: #1, #2)**
+  - [x] In `HtmlRenderAdapter.RenderStoryBody`, after the existing `kicker-row` block, emit the evidence strip as its own row so it sits directly under the kicker/status-badge line. Wrap the three pills in `<div class="evidence-strip">…</div>`. Add a private helper `EvidenceStrip(StoryEvidence e, bool linkToDevRecord)` next to `TaskBadge` that builds the three pills:
+    - **Tasks pill** — reuse `TaskBadge(e.TasksDone, e.TasksTotal)` directly. When `TasksTotal == 0`, render the empty-state pill "no tasks recorded" instead (dashed/muted).
+    - **Tests pill** — `TestsSummary` present → `<span class="status-badge evidence-pill">{icon}{TestsSummary}</span>`; absent → the empty-state pill "no test evidence recorded" (`evidence-pill empty`, dashed border, muted text). Use `PathUtil.Html` on the summary.
+    - **Verified pill** — `VerifiedDate` present → `{icon}{(VerifiedIsReview ? "verified" : "updated")} {date:yyyy-MM-dd}` (invariant format); absent → empty-state pill "no verification recorded".
+  - [x] **Link to the dev record (AC #1).** When `view.DevAgentRecord.Count > 0`, wrap the strip in `<a href="#sec-dev-agent-record" class="evidence-link">`. When there's no dev-record section, render the strip without a link. No JS to auto-expand `<details>` (Story 9.5 owns that).
+  - [x] **Icons (UX-DR17):** Tasks via `TaskBadge`; Tests/Verified via new `Icons.ForConcept("Tests")` / `Icons.ForConcept("Verified")` glyphs. No new `--status-*` token.
 
-- [ ] **Task 5 — Style the strip and its empty states (AC: #1, #2)**
-  - [ ] Add CSS to `src/SpecScribe/assets/specscribe.css` (guarded by `StylesheetTests`): `.evidence-strip` (a centered `flex` row, `gap`, `flex-wrap`, small top margin — mirror `.kicker-row` at line 235 so it reads as a paired sub-row of the header). `.evidence-pill` extends the `.status-badge` look (they already share `.status-badge` base). `.evidence-pill.empty` = the **designed empty-state treatment**: dashed border + `--ink-light` muted text, mirroring the existing `.status-badge.task-badge.none-done` precedent (src/SpecScribe/assets/specscribe.css:1160) and `.dev-agent-empty` (line 1350). `.evidence-link` = inherit color, no underline until hover, so the strip doesn't read as a paragraph of links.
-  - [ ] Verify the strip wraps gracefully at narrow widths (it's `flex-wrap`) and does not disturb the centered header layout. Route all colors through existing tokens — no new custom property.
+- [x] **Task 5 — Style the strip and its empty states (AC: #1, #2)**
+  - [x] Add CSS to `src/SpecScribe/assets/specscribe.css` (guarded by `StylesheetTests`): `.evidence-strip`, `.evidence-pill`, `.evidence-pill.empty`, `.evidence-link`. Empty state = dashed border + `--ink-light` (kinship with `.task-badge.none-done` / `.dev-agent-empty`; Story 8.5 may later supply a shared helper).
+  - [x] Strip uses `flex-wrap`; colors route through existing tokens only.
 
-- [ ] **Task 6 — Honest absence, determinism, and degradation (AC: #2)**
-  - [ ] The strip renders **whenever the story page renders a status badge** (i.e. `view.Status` present — the same guard the header badge uses). Never omit the strip just because a sub-fact is missing: a missing fact shows its empty-state pill. A story with tasks but no tests and no change log shows `[✓ 5/5 tasks] [no test evidence recorded] [no verification recorded]`.
-  - [ ] **Determinism (NFR8 / CI byte-reproducibility):** a from-scratch regeneration must be byte-identical. Both extractors are first-match-in-fixed-order and culture-invariant; the date formats with the invariant `"yyyy-MM-dd"`. No timestamps, no `DateTime.Now`, no dictionary-iteration-order dependence.
-  - [ ] **Degrade, don't break (NFR2):** malformed date, weird test phrasing, missing sections → the corresponding pill falls to its empty state; never an exception, never a broken link.
+- [x] **Task 6 — Honest absence, determinism, and degradation (AC: #2)**
+  - [x] The strip renders whenever `view.Status` is present (same guard as the status badge). Missing facts show empty-state pills; strip is never omitted for a missing sub-fact.
+  - [x] **Determinism (NFR8):** first-match-in-fixed-order extractors; invariant-culture date parse/format; no clock reads.
+  - [x] **Degrade, don't break (NFR2):** malformed date / missing sections → empty-state pills; never throw; never a dangling `#sec-dev-agent-record` link.
 
-- [ ] **Task 7 — Tests + regenerate the golden fingerprint (AC: #1, #2)**
-  - [ ] `EpicsParser` unit tests: `ExtractTestEvidence` returns the normalized phrase for `green`/`pass`/`passing`/`C# tests` shapes and `null` when absent; picks the Dev-Agent-Record match over a later body match; is deterministic. `ExtractLatestChangeLogDate` returns the **top** (latest) entry's date, sets `IsVerification` true for review/verify/done phrasing and false for a plain edit entry, and returns `null` for no `## Change Log` / malformed date.
-  - [ ] `RenderStoryBody` rendering tests (pattern: `Assert.Contains`/`Assert.DoesNotContain` on the generated HTML, as in the existing story-body tests): a story with tasks+tests+changelog renders three populated pills and an `href="#sec-dev-agent-record"`; a story missing tests renders the "no test evidence recorded" empty-state pill (with `evidence-pill empty`) rather than omitting it; a story with a non-verification top change-log entry renders "updated {date}" not "verified {date}"; a story with no dev-record renders the strip **without** the dev-record link.
-  - [ ] `StylesheetTests`: assert the new `.evidence-strip`/`.evidence-pill`/`.evidence-pill.empty` selectors exist and reference only existing tokens (no new `--status-*`).
-  - [ ] **Regenerate the golden content fingerprint.** The strip changes bytes on every drafted story page, so `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens` will fail with the new hash. Confirm the diff is exactly the intended evidence-strip addition on story pages (and nothing else drifted), then update the `expected` constant at tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:213 to the reported value. Follow the normalization gotchas (memory `golden-diff-normalization-gotchas`) — the evidence strip's own values (task counts, test counts, dates from the fixture) are stable fixture-derived content, so no new normalization is needed **unless** a fixture story's evidence contains a volatile token; if it does, extend `FingerprintTree`'s normalization rather than removing the assertion. [Source: tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:198-229]
-  - [ ] Run the full suite from repo root (`dotnet test`). Watch `SiteGeneratorAdapterTests` (golden inventory + fingerprint), the webview/SPA parity tests (`SiteGeneratorWebviewTests`, `SiteGeneratorSpaTests`, `WebviewRenderAdapterTests`) — the strip must appear identically across all three adapters since it's in the shared `RenderStoryBody`, so parity must stay green with **no** new exception.
+- [x] **Task 7 — Tests + regenerate the golden fingerprint (AC: #1, #2)**
+  - [x] `EpicsParser` unit tests for `ExtractTestEvidence` and `ExtractChangeLogVerification`.
+  - [x] `RenderStoryBody` rendering tests: populated pills + link; empty-state for missing tests; "updated" vs "verified"; no link when no dev-record; strip omitted when no status.
+  - [x] `StylesheetTests`: `.evidence-strip` / `.evidence-pill` / `.evidence-pill.empty` / `.evidence-link`; no `--status-evidence`.
+  - [x] Regenerated golden content fingerprint to `8e8f63af862b45f872b2766b95e19bb8aa917f50adec344456b00fcaeb9f2847`.
+  - [x] Full suite green: `dotnet test` → 1202 passed (parity suites included; no new RenderParity exception).
 
 ## Dev Notes
 
@@ -174,8 +178,37 @@ Generate the portal against this repo's own `_bmad-output` (`SpecScribeOutput/`)
 
 ### Agent Model Used
 
+Composer (Cursor agent)
+
 ### Debug Log References
+
+- Story 8.8 already claimed `ExtractLatestChangeLogDate` → `DateOnly?` (max date for recency). Story 9.4's verification-aware top-entry extractor shipped as `ExtractChangeLogVerification` to avoid a return-type clash.
 
 ### Completion Notes List
 
+- Implemented the story-page verification evidence strip end-to-end: free-text extractors → `StoryEvidence` view datum → single `BuildStoryPageFragments` seam → shared `RenderStoryBody` pills under the status badge.
+- Tasks reuse `ProgressCalculator` tallies + `TaskBadge`; tests/verified inferred from Dev Agent Record / Change Log free text (no new authoring schema).
+- Honest-absence empty-state pills (`evidence-pill empty`) when facts are missing; strip links to `#sec-dev-agent-record` only when that section exists.
+- Full suite: 1202 passed. Golden fingerprint regenerated for deliberate story-page + CSS byte change. HTML/webview/SPA parity green with no new RenderParity exception.
+
 ### File List
+
+- `src/SpecScribe/EpicsParser.cs`
+- `src/SpecScribe/EpicsView.cs`
+- `src/SpecScribe/EpicsViewBuilder.cs`
+- `src/SpecScribe/EpicsTemplater.cs`
+- `src/SpecScribe/SiteGenerator.cs`
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs`
+- `src/SpecScribe/Icons.cs`
+- `src/SpecScribe/assets/specscribe.css`
+- `tests/SpecScribe.Tests/EpicsParserTests.cs`
+- `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs`
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs`
+- `tests/SpecScribe.Tests/StylesheetTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
+- `_bmad-output/implementation-artifacts/9-4-verification-evidence-strip-on-story-pages.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Change Log
+
+- 2026-07-16 — **Implemented (dev-story).** Verification evidence strip on drafted story pages: Tasks/Tests/Verified pills under the status badge, free-text extractors, empty-state treatment, golden fingerprint regenerated. Status → review.

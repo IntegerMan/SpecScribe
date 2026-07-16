@@ -131,6 +131,7 @@ public static class EpicsViewBuilder
         IReadOnlyList<TaskItem> tasks,
         string reviewFindingsHtml,
         string changeLogHtml,
+        StoryEvidence evidence,
         CommandCatalog commands,
         string? epicRetroPath,
         EntityPager? pager = null)
@@ -145,6 +146,7 @@ public static class EpicsViewBuilder
             TitleHtml = story.Title,
             StatusStage = StatusStyles.ForStory(story),
             Status = story.Status is { Length: > 0 } s ? s : null,
+            Evidence = evidence,
             RetroLinkHtml = RenderStoryRetroLink(epic.Number, prefix, epicRetroPath),
             BlurbHtml = blurbHtml,
             Tasks = tasks,

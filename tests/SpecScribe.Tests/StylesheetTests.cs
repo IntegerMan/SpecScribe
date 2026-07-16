@@ -81,6 +81,13 @@ public class StylesheetTests
         Assert.Contains(".sprint-lane-empty", css);
         // Story 8.8 generation-time recency marker on story cards
         Assert.Contains(".story-card-updated", css);
+        // Story 9.4 verification evidence strip on story pages
+        Assert.Contains(".evidence-strip", css);
+        Assert.Contains(".evidence-pill", css);
+        Assert.Contains(".evidence-pill.empty", css);
+        Assert.Contains(".evidence-link", css);
+        Assert.Contains("var(--ink-light)", css); // empty-state muted text reuses existing token
+        Assert.DoesNotContain("--status-evidence", css); // no 7th status token
     }
 
     [Fact]

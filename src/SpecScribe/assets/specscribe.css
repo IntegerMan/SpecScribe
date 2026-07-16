@@ -462,6 +462,44 @@ body {
 
 .kicker-row .story-kicker { margin-bottom: 0; }
 
+/* Story 9.4 — verification evidence strip under the status badge (paired sub-row of the header). */
+.evidence-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.15rem 0 0.35rem;
+}
+
+.evidence-strip .status-badge.evidence-pill,
+.evidence-strip .status-badge.task-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+/* Designed empty-state treatment (AC #2) — dashed/muted, kinship with .task-badge.none-done / .dev-agent-empty.
+   Story 8.5 designed empty states may later supply a shared helper; keep this local until then. */
+.status-badge.evidence-pill.empty {
+  color: var(--ink-light);
+  border-style: dashed;
+  background: transparent;
+}
+
+.evidence-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.evidence-link:hover .evidence-strip .status-badge,
+.evidence-link:focus-visible .evidence-strip .status-badge {
+  text-decoration: underline;
+}
+
 .meta-pills {
   margin-top: 1rem;
   display: flex;

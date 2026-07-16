@@ -1892,7 +1892,7 @@ public sealed class SiteGenerator
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                     var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
@@ -1919,13 +1919,14 @@ public sealed class SiteGenerator
         IReadOnlyList<(string Label, string ContentHtml)> DevAgentRecord,
         IReadOnlyList<TaskItem> Tasks,
         string ReviewFindingsHtml,
-        string ChangeLogHtml);
+        string ChangeLogHtml,
+        StoryEvidence Evidence);
 
     /// <summary>Reads one drafted story's artifact and produces its page fragments (task list, blurb/remainder
     /// split, AC / dev-record / review / change-log sections), source-citation-linkified against
     /// <paramref name="referenceMap"/> and with "(AC: #N)" plan references deep-linked. A verbatim re-homing of
     /// the fragment block from <see cref="RenderEpicsPages"/> — bytes unchanged (the golden regression is the
-    /// gate). [Story 4.1 fragments; re-homed Story 6.4]</summary>
+    /// gate). [Story 4.1 fragments; re-homed Story 6.4; evidence strip Story 9.4]</summary>
     private StoryPageFragments BuildStoryPageFragments(StoryInfo story, string artifactFullPath, Dictionary<string, string> referenceMap)
     {
         var artifactRelative = ToSourceRelative(artifactFullPath);
@@ -1955,9 +1956,19 @@ public sealed class SiteGenerator
         var criteriaByNumber = acceptanceCriteria.ToDictionary(ac => ac.Number, ac => ac.PlainText);
         remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
 
+        // TasksDone/Total already filled by ProgressCalculator — one source of truth (Story 8.2). Tests +
+        // verified date are best-effort free-text heuristics; no new authoring schema. [Story 9.4]
+        var changelog = EpicsParser.ExtractChangeLogVerification(artifactRaw);
+        var evidence = new StoryEvidence(
+            story.TasksDone,
+            story.TasksTotal,
+            EpicsParser.ExtractTestEvidence(artifactRaw),
+            changelog?.Date,
+            changelog?.IsVerification ?? false);
+
         return new StoryPageFragments(
             artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml);
+            reviewFindingsHtml, changeLogHtml, evidence);
     }
 
     /// <summary>The artifact + reference maps the last epics render pass resolved, cached for
@@ -2041,7 +2052,7 @@ public sealed class SiteGenerator
                             var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
                             storyPage = EpicsTemplater.BuildStoryPage(
                                 epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
-                                f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav,
+                                f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, nav,
                                 _module.Commands, epicRetroPath, StoryPager(model, story));
                         }
                         surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
@@ -2285,7 +2296,7 @@ public sealed class SiteGenerator
                     AddSpaSurface(pages, familyPaths,
                         EpicsTemplater.BuildStoryPage(
                             epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
-                            f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, nav,
+                            f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, nav,
                             _module.Commands, epicRetroPath, StoryPager(model, story)),
                         skipStoryId: story.Id);
                 }

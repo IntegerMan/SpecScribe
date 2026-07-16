@@ -176,6 +176,17 @@ public sealed record EpicPageView
     public EntityPager Pager { get; init; } = EntityPager.None;
 }
 
+/// <summary>Compact verification facts for the story-page evidence strip — tasks (from
+/// <see cref="ProgressCalculator"/>), optional free-text test tally, and the top Change Log date with a
+/// verification vs. plain-edit label. Data only; honest-absence wording and pill markup live in the renderer.
+/// [Story 9.4]</summary>
+public sealed record StoryEvidence(
+    int TasksDone,
+    int TasksTotal,
+    string? TestsSummary,
+    DateOnly? VerifiedDate,
+    bool VerifiedIsReview);
+
 /// <summary>The host-neutral SECTION view model for a drafted STORY page body. Its identity/status/drill are
 /// data; the task-breakdown sunburst renders from <see cref="Tasks"/>; everything else the story page shows is
 /// inherently Markdig-rendered prose carried as NAMED OPAQUE fragments (the deferred prose-decomposition seam) —
@@ -195,6 +206,11 @@ public sealed record StoryPageView
 
     /// <summary>The raw status word, or null (no badge).</summary>
     public string? Status { get; init; }
+
+    /// <summary>Verification evidence for the header strip (tasks / tests / verified-or-updated date). Present
+    /// on every drafted story page; the renderer shows the strip only when <see cref="Status"/> is set.
+    /// [Story 9.4]</summary>
+    public required StoryEvidence Evidence { get; init; }
 
     /// <summary>The pre-rendered "Epic N retro →" kicker link HTML (named opaque fragment; empty when none).</summary>
     public required string RetroLinkHtml { get; init; }

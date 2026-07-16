@@ -356,6 +356,115 @@ public class EpicsParserTests
         Assert.Equal(new DateOnly(2026, 7, 9), EpicsParser.ExtractLatestChangeLogDate(raw));
     }
 
+    // ---- Story 9.4 test evidence + change-log verification ------------------------------------------------
+
+    [Theory]
+    [InlineData("586 tests green", "586 tests green")]
+    [InlineData("759 C# tests green", "759 tests green")]
+    [InlineData("429 tests pass", "429 tests passing")]
+    [InlineData("440 tests passing", "440 tests passing")]
+    public void ExtractTestEvidence_NormalizesKnownShapes(string phrase, string expected)
+    {
+        var raw = $"""
+            # Story 1.1
+            ## Dev Agent Record
+            ### Completion Notes List
+            Suite {phrase} after the change.
+            """;
+        Assert.Equal(expected, EpicsParser.ExtractTestEvidence(raw));
+    }
+
+    [Fact]
+    public void ExtractTestEvidence_PrefersDevAgentRecordOverLaterBodyMatch()
+    {
+        var raw = """
+            # Story 1.1
+            ## Dev Agent Record
+            ### Completion Notes List
+            12 tests green in the final tally.
+            ## Change Log
+            - 2026-07-11 — **Implemented.** Mentions 999 tests green elsewhere.
+            """;
+        Assert.Equal("12 tests green", EpicsParser.ExtractTestEvidence(raw));
+    }
+
+    [Fact]
+    public void ExtractTestEvidence_FallsBackToWholeDocumentWhenDevRecordHasNone()
+    {
+        var raw = """
+            # Story 1.1
+            ## Dev Agent Record
+            ### Completion Notes List
+            No tallies here.
+            ## Change Log
+            - 2026-07-11 — **Shipped with 88 tests passing.**
+            """;
+        Assert.Equal("88 tests passing", EpicsParser.ExtractTestEvidence(raw));
+    }
+
+    [Fact]
+    public void ExtractTestEvidence_ReturnsNullWhenAbsent()
+        => Assert.Null(EpicsParser.ExtractTestEvidence("# Story 1.1\nNo tests mentioned.\n"));
+
+    [Fact]
+    public void ExtractTestEvidence_ReturnsNullOnNullRaw()
+        => Assert.Null(EpicsParser.ExtractTestEvidence(null));
+
+    [Fact]
+    public void ExtractChangeLogVerification_TakesTopEntryAndFlagsReview()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            - 2026-07-11 — **Code review passed; Status → done.**
+            - 2026-07-10 — **Implemented the strip.**
+            """;
+        var result = EpicsParser.ExtractChangeLogVerification(raw);
+        Assert.NotNull(result);
+        Assert.Equal(new DateOnly(2026, 7, 11), result!.Value.Date);
+        Assert.True(result.Value.IsVerification);
+    }
+
+    [Fact]
+    public void ExtractChangeLogVerification_PlainEditIsNotVerification()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            - 2026-07-09 — **Tweaked the CSS spacing.**
+            """;
+        var result = EpicsParser.ExtractChangeLogVerification(raw);
+        Assert.NotNull(result);
+        Assert.Equal(new DateOnly(2026, 7, 9), result!.Value.Date);
+        Assert.False(result.Value.IsVerification);
+    }
+
+    [Fact]
+    public void ExtractChangeLogVerification_ReturnsNullWhenSectionAbsent()
+        => Assert.Null(EpicsParser.ExtractChangeLogVerification("# Story 1.1\nNo change log.\n"));
+
+    [Fact]
+    public void ExtractChangeLogVerification_ReturnsNullOnMalformedDate()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            - 2026-13-99 — **Code review passed.**
+            """;
+        Assert.Null(EpicsParser.ExtractChangeLogVerification(raw));
+    }
+
+    [Fact]
+    public void ExtractChangeLogVerification_ReturnsNullWhenNoMatchingShape()
+    {
+        var raw = """
+            # Story 1.1
+            ## Change Log
+            - 2026-07-09: Colon form without bold action
+            """;
+        Assert.Null(EpicsParser.ExtractChangeLogVerification(raw));
+    }
+
     private const string SampleArtifact = """
         # Story 1.1: Scaffold
         Status: in progress

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace SpecScribe;
@@ -298,6 +299,41 @@ public sealed partial class HtmlRenderAdapter
         return $"<span class=\"status-badge task-badge\">{Charts.MiniDonut(tasksDone, tasksTotal)} {tasksDone}/{tasksTotal} tasks</span>";
     }
 
+    /// <summary>Compact Tasks / Tests / Verified pills under the status badge. Reuses <see cref="TaskBadge"/> for
+    /// the tasks pill; missing facts render designed empty-state pills (dashed/muted) rather than omitting the
+    /// strip. Kinship with Story 8.5 designed empty states — harmonize if a shared helper lands later.
+    /// [Story 9.4]</summary>
+    private static string EvidenceStrip(StoryEvidence e, bool linkToDevRecord)
+    {
+        var tasksPill = e.TasksTotal > 0
+            ? TaskBadge(e.TasksDone, e.TasksTotal)
+            : EmptyEvidencePill("no tasks recorded");
+
+        var testsPill = e.TestsSummary is { Length: > 0 } summary
+            ? $"<span class=\"status-badge evidence-pill\">{Icons.ForConcept("Tests")}{PathUtil.Html(summary)}</span>"
+            : EmptyEvidencePill("no test evidence recorded", Icons.ForConcept("Tests"));
+
+        string verifiedPill;
+        if (e.VerifiedDate is { } date)
+        {
+            var label = e.VerifiedIsReview ? "verified" : "updated";
+            var dateText = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            verifiedPill =
+                $"<span class=\"status-badge evidence-pill\">{Icons.ForConcept("Verified")}{PathUtil.Html($"{label} {dateText}")}</span>";
+        }
+        else
+        {
+            verifiedPill = EmptyEvidencePill("no verification recorded", Icons.ForConcept("Verified"));
+        }
+
+        var strip = $"  <div class=\"evidence-strip\">{tasksPill}{testsPill}{verifiedPill}</div>\n";
+        if (!linkToDevRecord) return strip;
+        return $"  <a class=\"evidence-link\" href=\"#sec-dev-agent-record\">{strip.TrimEnd()}</a>\n";
+    }
+
+    private static string EmptyEvidencePill(string label, string icon = "")
+        => $"<span class=\"status-badge evidence-pill empty\">{icon}{PathUtil.Html(label)}</span>";
+
     // ----- Story page ---------------------------------------------------------------------------------------
 
     /// <summary>Renders a drafted story page's <c>&lt;main&gt;…&lt;/main&gt;</c> body from its section view model. [Story 6.2]</summary>
@@ -317,6 +353,12 @@ public sealed partial class HtmlRenderAdapter
         main.Append(StatusStyles.LegendKey());
         main.Append(view.RetroLinkHtml);
         main.Append("  </div>\n");
+        // Own row under the kicker/status-badge line — same Status guard; empty-state pills for missing facts
+        // (AC #2). Link only when the Dev Agent Record section exists on the page. [Story 9.4]
+        if (view.Status is { Length: > 0 })
+        {
+            main.Append(EvidenceStrip(view.Evidence, view.DevAgentRecord.Count > 0));
+        }
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");
         main.Append("</header>\n\n");
 

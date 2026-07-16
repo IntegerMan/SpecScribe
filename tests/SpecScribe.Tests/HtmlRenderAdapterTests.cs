@@ -724,4 +724,91 @@ public class HtmlRenderAdapterTests
         Assert.Contains("href=\"epics.html\"", body); // Epics drafted tile / sunburst still navigate
         Assert.Contains("href=\"sprint.html\"", body); // board cards / moreHref still navigate
     }
+
+    // ---- Story 9.4 verification evidence strip -------------------------------------------------------------
+
+    private static StoryPageView StoryBodyView(
+        StoryEvidence evidence,
+        string? status = "done",
+        IReadOnlyList<DevAgentEntry>? devRecord = null) => new()
+    {
+        Id = "1.1",
+        TitleHtml = "Evidence Strip",
+        StatusStage = StatusStyles.ForStory(new StoryInfo
+        {
+            Id = "1.1", EpicNumber = 1, Title = "Evidence", UserStoryHtml = string.Empty,
+            AcBlocksHtml = Array.Empty<string>(), Status = status,
+        }),
+        Status = status,
+        Evidence = evidence,
+        RetroLinkHtml = string.Empty,
+        BlurbHtml = string.Empty,
+        Tasks = Array.Empty<TaskItem>(),
+        NextStepsHtml = string.Empty,
+        AcceptanceCriteria = Array.Empty<AcceptanceCriterion>(),
+        DevAgentRecord = devRecord ?? new[] { new DevAgentEntry("Completion Notes", "<p>notes</p>") },
+        ReviewFindingsHtml = string.Empty,
+        RemainderHtml = string.Empty,
+        ChangeLogHtml = string.Empty,
+    };
+
+    [Fact]
+    public void RenderStoryBody_EvidenceStrip_PopulatedPillsAndDevRecordLink()
+    {
+        var evidence = new StoryEvidence(5, 5, "586 tests green", new DateOnly(2026, 7, 9), VerifiedIsReview: true);
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
+
+        Assert.Contains("class=\"evidence-strip\"", html);
+        Assert.Contains("&#10003; 5 tasks", html);
+        Assert.Contains("586 tests green", html);
+        Assert.Contains("verified 2026-07-09", html);
+        Assert.Contains("href=\"#sec-dev-agent-record\"", html);
+        Assert.Contains("class=\"evidence-link\"", html);
+        Assert.Contains("id=\"sec-dev-agent-record\"", html);
+    }
+
+    [Fact]
+    public void RenderStoryBody_EvidenceStrip_MissingTestsShowsEmptyStatePill()
+    {
+        var evidence = new StoryEvidence(5, 5, null, new DateOnly(2026, 7, 9), VerifiedIsReview: true);
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
+
+        Assert.Contains("evidence-pill empty", html);
+        Assert.Contains("no test evidence recorded", html);
+        Assert.Contains("class=\"evidence-strip\"", html); // strip still present
+    }
+
+    [Fact]
+    public void RenderStoryBody_EvidenceStrip_NonVerificationDateReadsUpdated()
+    {
+        var evidence = new StoryEvidence(2, 4, "12 tests passing", new DateOnly(2026, 7, 8), VerifiedIsReview: false);
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
+
+        Assert.Contains("updated 2026-07-08", html);
+        Assert.DoesNotContain("verified 2026-07-08", html);
+    }
+
+    [Fact]
+    public void RenderStoryBody_EvidenceStrip_NoDevRecordOmitsLink()
+    {
+        var evidence = new StoryEvidence(0, 0, null, null, false);
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(
+            StoryBodyView(evidence, status: "ready-for-dev", devRecord: Array.Empty<DevAgentEntry>()));
+
+        Assert.Contains("class=\"evidence-strip\"", html);
+        Assert.Contains("no tasks recorded", html);
+        Assert.Contains("no test evidence recorded", html);
+        Assert.Contains("no verification recorded", html);
+        Assert.DoesNotContain("href=\"#sec-dev-agent-record\"", html);
+        Assert.DoesNotContain("class=\"evidence-link\"", html);
+    }
+
+    [Fact]
+    public void RenderStoryBody_EvidenceStrip_OmittedWhenNoStatusBadge()
+    {
+        var evidence = new StoryEvidence(5, 5, "10 tests green", new DateOnly(2026, 7, 1), true);
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence, status: null));
+
+        Assert.DoesNotContain("evidence-strip", html);
+    }
 }

@@ -110,13 +110,14 @@ public static class EpicsTemplater
         IReadOnlyList<TaskItem> tasks,
         string reviewFindingsHtml,
         string changeLogHtml,
+        StoryEvidence evidence,
         SiteNav nav,
         CommandCatalog commands,
         string? epicRetroPath = null,
         EntityPager? pager = null) =>
         HtmlRenderAdapter.Shared.Render(BuildStoryPage(
             epic, story, artifactSourceRelativePath, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord,
-            tasks, reviewFindingsHtml, changeLogHtml, nav, commands, epicRetroPath, pager)).Content;
+            tasks, reviewFindingsHtml, changeLogHtml, evidence, nav, commands, epicRetroPath, pager)).Content;
 
     /// <summary>Builds a drafted story page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why
     /// the build/render split exists. [Story 6.4]</summary>
@@ -131,6 +132,7 @@ public static class EpicsTemplater
         IReadOnlyList<TaskItem> tasks,
         string reviewFindingsHtml,
         string changeLogHtml,
+        StoryEvidence evidence,
         SiteNav nav,
         CommandCatalog commands,
         string? epicRetroPath = null,
@@ -151,7 +153,7 @@ public static class EpicsTemplater
 
         var view = EpicsViewBuilder.BuildStory(
             epic, story, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml, commands, epicRetroPath, pager);
+            reviewFindingsHtml, changeLogHtml, evidence, commands, epicRetroPath, pager);
         var body = HtmlRenderAdapter.Shared.RenderStoryBody(view);
 
         // A story is a drill leaf (no children); it drills up to its epic page. Its status stage is the story

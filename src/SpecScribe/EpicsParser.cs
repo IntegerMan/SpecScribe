@@ -112,6 +112,88 @@ public static class EpicsParser
         return max;
     }
 
+    // "586 tests green" / "759 C# tests green" / "429 tests pass" / "440 tests passing" — free-text tallies
+    // living in Dev Agent Record Completion Notes (and occasionally elsewhere). [Story 9.4]
+    private static readonly Regex TestEvidencePhrase = new(
+        @"\b(\d[\d,]*)\s+(?:C#\s+)?tests?\s+(green|pass|passing)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Newest-first Change Log row with an em/en dash and bold action: "- 2026-07-11 — **Code review passed…**".
+    // Distinct from Story 8.8's max-date scan — the evidence strip wants the TOP entry + whether its action
+    // reads as verification. [Story 9.4]
+    private static readonly Regex ChangeLogTopEntry = new(
+        @"^\s*[-*]\s+(\d{4}-\d{2}-\d{2})\s+[—–-]\s+\*\*(?<action>[^*]+)\*\*",
+        RegexOptions.Compiled);
+
+    private static readonly Regex ChangeLogVerificationAction = new(
+        @"\b(verif|review|tests? (green|pass)|Status\s*→\s*(done|review))\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Best-effort free-text test tally from a story artifact. Prefers the first match inside
+    /// <c>## Dev Agent Record</c>, then falls back to a whole-document scan. Returns a normalized
+    /// <c>"{n} tests {green|passing}"</c> phrase (<c>pass</c> collapsed to <c>passing</c>); null when absent.
+    /// Deterministic first-match order; never throws. [Story 9.4]</summary>
+    public static string? ExtractTestEvidence(string? raw)
+    {
+        if (raw is null) return null;
+
+        var normalized = raw.Replace("\r\n", "\n");
+        var lines = normalized.Split('\n');
+        var (start, end) = FindSection(lines, "## Dev Agent Record", 0, lines.Length);
+        if (start >= 0)
+        {
+            var section = string.Join("\n", lines[(start + 1)..end]);
+            var fromSection = MatchTestEvidence(section);
+            if (fromSection is not null) return fromSection;
+        }
+
+        return MatchTestEvidence(normalized);
+    }
+
+    private static string? MatchTestEvidence(string text)
+    {
+        var m = TestEvidencePhrase.Match(text);
+        if (!m.Success) return null;
+
+        var count = m.Groups[1].Value;
+        var word = m.Groups[2].Value.ToLowerInvariant() switch
+        {
+            "pass" => "passing",
+            var w => w, // keep author's "green" / "passing"
+        };
+        return $"{count} tests {word}";
+    }
+
+    /// <summary>Top (newest-first) Change Log entry shaped <c>- YYYY-MM-dd — **action**</c>, with a flag for
+    /// whether the action text reads as verification/review/done. Returns null when the section or a matching
+    /// dated entry is absent; malformed dates degrade to null (never throws). Distinct from
+    /// <see cref="ExtractLatestChangeLogDate"/> (Story 8.8 max-date across table/list forms). [Story 9.4]</summary>
+    public static (DateOnly Date, bool IsVerification)? ExtractChangeLogVerification(string? raw)
+    {
+        if (raw is null) return null;
+
+        var lines = raw.Replace("\r\n", "\n").Split('\n');
+        var (start, end) = FindSection(lines, "## Change Log", 0, lines.Length);
+        if (start < 0)
+            (start, end) = FindSection(lines, "### Change Log", 0, lines.Length);
+        if (start < 0) return null;
+
+        for (var i = start + 1; i < end; i++)
+        {
+            var m = ChangeLogTopEntry.Match(lines[i]);
+            if (!m.Success) continue;
+            if (!DateOnly.TryParseExact(m.Groups[1].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var date))
+            {
+                return null; // malformed top dated shape → degrade, don't keep scanning
+            }
+            var action = m.Groups["action"].Value;
+            var isVerification = ChangeLogVerificationAction.IsMatch(action);
+            return (date, isVerification);
+        }
+        return null;
+    }
+
     /// <summary>Splits a story implementation-artifact into its lead "## Story" blurb (the As-a/I-want/
     /// So-that narrative) and the rest of the plan, stopping before "## Dev Agent Record". Both the
     /// "## Acceptance Criteria" section (surfaced as its own anchored panel via
