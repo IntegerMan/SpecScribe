@@ -94,6 +94,8 @@ public class StylesheetTests
         Assert.Contains(".change-surface-verify", css);
         Assert.Contains(".change-surface-files", css);
         Assert.Contains(".change-surface-panel", css);
+        Assert.Contains(".change-surface-updated", css);
+        Assert.Contains(".change-surface-chip", css);
         Assert.Contains(".touch-file-sprint", css);
         Assert.Contains(".touch-file-story", css);
         Assert.DoesNotContain(".evidence-latest", css);

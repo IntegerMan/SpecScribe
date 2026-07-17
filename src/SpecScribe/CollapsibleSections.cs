@@ -90,9 +90,38 @@ public static partial class CollapsibleSections
         return sb.ToString();
     }
 
-    /// <summary>Convenience overload using <see cref="StoryRemainderSlugs"/>.</summary>
+    /// <summary>Convenience overload using <see cref="StoryRemainderSlugs"/>. After wrapping, moves every
+    /// collapsible block to the end of the remainder so Dev Notes / References sit just above Change Log
+    /// on the story page (Context &amp; Scope and Tasks stay above).</summary>
     public static string WrapStoryRemainder(string remainderHtml)
-        => WrapSections(remainderHtml, StoryRemainderSlugs);
+        => MoveCollapsibleSectionsToEnd(WrapSections(remainderHtml, StoryRemainderSlugs));
+
+    /// <summary>Pulls every <c>collapsible-section</c> details block out of document order and appends them
+    /// at the end — so collapsed working notes trail the expanded claim sections.</summary>
+    public static string MoveCollapsibleSectionsToEnd(string html)
+    {
+        if (string.IsNullOrEmpty(html) || !html.Contains("collapsible-section", StringComparison.Ordinal))
+            return html;
+
+        var pulled = new List<string>();
+        var remainder = CollapsibleDetails().Replace(html, m =>
+        {
+            pulled.Add(m.Value.TrimEnd() + "\n");
+            return string.Empty;
+        });
+        if (pulled.Count == 0) return html;
+
+        var sb = new StringBuilder(html.Length + 8);
+        sb.Append(remainder.TrimEnd());
+        if (sb.Length > 0) sb.Append('\n');
+        foreach (var block in pulled) sb.Append(block);
+        return sb.ToString();
+    }
+
+    [GeneratedRegex(
+        @"<details\s+class=""collapsible-section""[^>]*>.*?</details>\s*",
+        RegexOptions.Singleline)]
+    private static partial Regex CollapsibleDetails();
 
     private static string StripBuriedHeadingIds(string body)
     {

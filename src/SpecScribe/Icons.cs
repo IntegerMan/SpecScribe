@@ -56,7 +56,9 @@ public static class Icons
             "Requirements" => Svg("<path d=\"M4 2.8h8v10.4H4Z\"/><path d=\"m5.8 6 1.1 1.1 1.8-2.1\"/><path d=\"M5.8 9.8h4.4\"/>"),
             "ADRs" => Svg("<path d=\"M8 3v9.5\"/><path d=\"M8 4.2 4.6 4.2 3 7.3h3.6ZM8 4.2 11.4 4.2 13 7.3H9.4Z\"/><path d=\"M4.6 13h6.8\"/>"),
             "Spec" => Svg("<path d=\"M6 3.2 2.7 8l3.3 4.8\"/><path d=\"M10 3.2 13.3 8 10 12.8\"/>"),
-            "Sprint" => Svg("<path d=\"M3.5 3.6h9v9.8h-9Z\"/><path d=\"M3.5 6.4h9M5.8 2.4v2.4M10.2 2.4v2.4\"/>"),
+            "Sprint" or "Sprint Status" => Svg("<path d=\"M3.5 3.6h9v9.8h-9Z\"/><path d=\"M3.5 6.4h9M5.8 2.4v2.4M10.2 2.4v2.4\"/>"),
+            // Story artifact — bookmark card (paired with "Story" / story-chip labels). [change-surface Updated]
+            "Story" => Svg("<path d=\"M4 2.4h8v11.2L8 11.2 4 13.6Z\"/>"),
             "Overview" => Svg("<path d=\"M2.8 2.8h4.4v4.4H2.8Z\"/><path d=\"M8.8 2.8h4.4v4.4H8.8Z\"/><path d=\"M2.8 8.8h4.4v4.4H2.8Z\"/><path d=\"M8.8 8.8h4.4v4.4H8.8Z\"/>"),
             // A folder outline — the shared glyph for the code-map surface (nav item + dashboard quick link both
             // reuse this ONE key). Re-keyed from the retired Story 3.4 "Structure" surface. [Story 7.6]

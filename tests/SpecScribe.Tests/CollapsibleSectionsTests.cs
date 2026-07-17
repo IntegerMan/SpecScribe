@@ -86,6 +86,27 @@ public class CollapsibleSectionsTests
     }
 
     [Fact]
+    public void WrapStoryRemainder_MovesDevNotesAfterExpandedSections()
+    {
+        const string html = """
+            <h2 id="context-scope">Context &amp; Scope</h2>
+            <p>Keep me open.</p>
+            <h2 id="dev-notes">Dev Notes</h2>
+            <h3 id="reuse-map">Reuse map</h3>
+            <p>Buried.</p>
+            <h2 id="tasks-subtasks">Tasks / Subtasks</h2>
+            <p>Also open.</p>
+            """;
+
+        var wrapped = CollapsibleSections.WrapStoryRemainder(html);
+        var contextAt = wrapped.IndexOf("id=\"context-scope\"", StringComparison.Ordinal);
+        var tasksAt = wrapped.IndexOf("id=\"tasks-subtasks\"", StringComparison.Ordinal);
+        var notesAt = wrapped.IndexOf("id=\"dev-notes-section\"", StringComparison.Ordinal);
+        Assert.True(contextAt >= 0 && tasksAt > contextAt && notesAt > tasksAt,
+            "Dev Notes collapsible should trail Context and Tasks so it sits above Change Log.");
+    }
+
+    [Fact]
     public void WrapSections_EmptyOrNullish_Passthrough()
     {
         Assert.Equal(string.Empty, CollapsibleSections.WrapStoryRemainder(string.Empty));

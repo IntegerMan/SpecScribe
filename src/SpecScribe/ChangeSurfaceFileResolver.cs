@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace SpecScribe;
@@ -7,7 +8,13 @@ namespace SpecScribe;
 public sealed class ChangeSurfaceFileResolver
 {
     private static readonly Regex StoryArtifactName =
-        new(@"^(?<epic>\d+)-(?<story>\d+)-.+\.md$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        new(@"^(?<epic>\d+)-(?<story>\d+)-(?<slug>.+)\.md$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Same allowlist spirit as SiteGenerator.PrettyLabel — keep known acronyms shouty in story chip titles.
+    private static readonly HashSet<string> AcronymLabels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "PRD", "SPEC", "UX", "API", "FR", "NFR", "AC", "TOC", "DR", "UI", "SPA",
+    };
 
     private readonly string _storyPrefix;
     private readonly IReadOnlyDictionary<string, string> _referenceMap;
@@ -33,13 +40,13 @@ public sealed class ChangeSurfaceFileResolver
         if (BmadArtifactAdapter.IsSprintStatusFile(fileName))
         {
             return new ChangeSurfaceFile(
-                path, label, _storyPrefix + SiteNav.SprintOutputPath, ChangeSurfaceFileKind.Sprint);
+                path, "Sprint Status", _storyPrefix + SiteNav.SprintOutputPath, ChangeSurfaceFileKind.Sprint);
         }
 
-        if (TryParseStoryArtifactId(fileName, out var storyId))
+        if (TryParseStoryArtifact(fileName, out var storyId, out var storyLabel))
         {
             var href = LookupReference(path) ?? _storyPrefix + StoryEpicLinkifier.StoryPagePath(storyId);
-            return new ChangeSurfaceFile(path, label, href, ChangeSurfaceFileKind.StoryArtifact);
+            return new ChangeSurfaceFile(path, storyLabel, href, ChangeSurfaceFileKind.StoryArtifact);
         }
 
         var codeHref = _codePageHref(path);
@@ -77,6 +84,11 @@ public sealed class ChangeSurfaceFileResolver
         _ => "touch-file",
     };
 
+    /// <summary>Sprint board + story-artifact rows belong in the change-surface <c>Updated</c> chip row,
+    /// not the Touched file grid.</summary>
+    public static bool IsUpdatedArtifact(ChangeSurfaceFileKind kind)
+        => kind is ChangeSurfaceFileKind.Sprint or ChangeSurfaceFileKind.StoryArtifact;
+
     private string? LookupReference(string path)
     {
         var norm = PathUtil.NormalizeSlashes(path.Replace('\\', '/'));
@@ -96,13 +108,47 @@ public sealed class ChangeSurfaceFileResolver
         return null;
     }
 
-    private static bool TryParseStoryArtifactId(string fileName, out string storyId)
+    private static bool TryParseStoryArtifact(string fileName, out string storyId, out string storyLabel)
     {
         storyId = string.Empty;
+        storyLabel = string.Empty;
         var m = StoryArtifactName.Match(fileName);
         if (!m.Success) return false;
         storyId = $"{m.Groups["epic"].Value}.{m.Groups["story"].Value}";
+        storyLabel = PrettyStorySlug(m.Groups["slug"].Value);
+        if (storyLabel.Length == 0) storyLabel = $"Story {storyId}";
         return true;
+    }
+
+    /// <summary>Filename slug → chip title (<c>nfr-and-ux-dr-coverage-maps</c> →
+    /// <c>NFR and UX DR Coverage Maps</c>). Keeps known acronyms uppercase.</summary>
+    public static string PrettyStorySlug(string slug)
+    {
+        if (string.IsNullOrWhiteSpace(slug)) return string.Empty;
+        var ti = CultureInfo.InvariantCulture.TextInfo;
+        var words = slug.Split('-', '_', ' ')
+            .Where(w => w.Length > 0)
+            .Select(w =>
+            {
+                if (AcronymLabels.Contains(w)) return w.ToUpperInvariant();
+                if (string.Equals(w, "and", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "or", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "of", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "on", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "the", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "a", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "an", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "in", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "to", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(w, "for", StringComparison.OrdinalIgnoreCase))
+                {
+                    return w.ToLowerInvariant();
+                }
+                return ti.ToTitleCase(w.ToLowerInvariant());
+            });
+        var joined = string.Join(" ", words);
+        if (joined.Length == 0) return joined;
+        return char.ToUpperInvariant(joined[0]) + joined[1..];
     }
 }
 

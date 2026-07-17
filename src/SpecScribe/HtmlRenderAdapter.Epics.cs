@@ -383,13 +383,20 @@ public sealed partial class HtmlRenderAdapter
         }
         sb.Append("    </div>\n");
 
-        // Touched files — two-column bulleted list with typed links.
+        // Touched = source/code/other files. Sprint + story artifacts move to Updated chips below.
+        var touched = surface.ChangedFiles
+            .Where(f => !ChangeSurfaceFileResolver.IsUpdatedArtifact(f.Kind))
+            .ToList();
+        var updated = surface.ChangedFiles
+            .Where(f => ChangeSurfaceFileResolver.IsUpdatedArtifact(f.Kind))
+            .ToList();
+
         sb.Append("    <div class=\"change-surface-section\">\n");
         sb.Append("      <div class=\"change-surface-section-label\">Touched</div>\n");
-        if (surface.ChangedFiles.Count > 0)
+        if (touched.Count > 0)
         {
             sb.Append("      <ul class=\"change-surface-files\">\n");
-            foreach (var file in surface.ChangedFiles)
+            foreach (var file in touched)
             {
                 var css = ChangeSurfaceFileResolver.ChangeSurfaceFileKindCssClass(file.Kind);
                 if (file.Href is { Length: > 0 } href)
@@ -399,11 +406,42 @@ public sealed partial class HtmlRenderAdapter
             }
             sb.Append("      </ul>\n");
         }
+        else if (updated.Count > 0)
+        {
+            sb.Append("      <p class=\"change-surface-empty\">no source files listed</p>\n");
+        }
         else
         {
             sb.Append("      <p class=\"change-surface-empty\">no file list recorded</p>\n");
         }
         sb.Append("    </div>\n");
+
+        if (updated.Count > 0)
+        {
+            sb.Append("    <div class=\"change-surface-section\">\n");
+            sb.Append("      <div class=\"change-surface-section-label\">Updated</div>\n");
+            sb.Append("      <div class=\"change-surface-updated\">\n");
+            foreach (var file in updated)
+            {
+                var concept = file.Kind == ChangeSurfaceFileKind.Sprint ? "Sprint Status" : "Story";
+                var icon = Icons.ForConcept(concept);
+                var chipClass = file.Kind == ChangeSurfaceFileKind.Sprint
+                    ? "change-surface-chip change-surface-chip-sprint"
+                    : "change-surface-chip change-surface-chip-story";
+                if (file.Href is { Length: > 0 } href)
+                {
+                    sb.Append($"        <a class=\"{chipClass}\" href=\"{PathUtil.Html(href)}\">{icon}" +
+                              $"<span class=\"change-surface-chip-label\">{PathUtil.Html(file.Label)}</span></a>\n");
+                }
+                else
+                {
+                    sb.Append($"        <span class=\"{chipClass} is-static\">{icon}" +
+                              $"<span class=\"change-surface-chip-label\">{PathUtil.Html(file.Label)}</span></span>\n");
+                }
+            }
+            sb.Append("      </div>\n");
+            sb.Append("    </div>\n");
+        }
 
         sb.Append("  </div>\n");
         return sb.ToString();

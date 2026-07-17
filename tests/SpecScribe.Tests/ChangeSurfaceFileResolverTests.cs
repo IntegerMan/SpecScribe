@@ -18,6 +18,7 @@ public class ChangeSurfaceFileResolverTests
 
         Assert.Equal(ChangeSurfaceFileKind.Sprint, file.Kind);
         Assert.Equal("../sprint.html", file.Href);
+        Assert.Equal("Sprint Status", file.Label);
     }
 
     [Fact]
@@ -36,6 +37,15 @@ public class ChangeSurfaceFileResolverTests
 
         Assert.Equal(ChangeSurfaceFileKind.StoryArtifact, file.Kind);
         Assert.Equal("../epics/story-9-4.html", file.Href);
+        Assert.Equal("Verification Evidence Strip on Story Pages", file.Label);
+    }
+
+    [Fact]
+    public void PrettyStorySlug_PreservesAcronymsAndSmallWords()
+    {
+        Assert.Equal(
+            "NFR and UX DR Coverage Maps",
+            ChangeSurfaceFileResolver.PrettyStorySlug("nfr-and-ux-dr-coverage-maps"));
     }
 
     [Fact]

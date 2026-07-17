@@ -937,6 +937,42 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
+    public void RenderStoryBody_ChangeSurface_UpdatedChipsForSprintAndStory()
+    {
+        var files = new[]
+        {
+            new ChangeSurfaceFile("src/SpecScribe/Foo.cs", "Foo.cs", "code/src/SpecScribe/Foo.cs.html", ChangeSurfaceFileKind.Code),
+            new ChangeSurfaceFile(
+                "_bmad-output/implementation-artifacts/sprint-status.yaml",
+                "Sprint Status",
+                "../sprint.html",
+                ChangeSurfaceFileKind.Sprint),
+            new ChangeSurfaceFile(
+                "9-2-nfr-and-ux-dr-coverage-maps.md",
+                "NFR and UX DR Coverage Maps",
+                "../epics/story-9-2.html",
+                ChangeSurfaceFileKind.StoryArtifact),
+        };
+        var surface = SampleSurface(files: files);
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(
+            StoryBodyView(new StoryEvidence(1, 1, null, null, false), surface));
+
+        Assert.Contains("change-surface-section-label\">Updated</div>", html);
+        Assert.Contains("change-surface-chip-sprint", html);
+        Assert.Contains("change-surface-chip-story", html);
+        Assert.Contains(">Sprint Status</span>", html);
+        Assert.Contains(">NFR and UX DR Coverage Maps</span>", html);
+        Assert.Contains("href=\"../sprint.html\"", html);
+        Assert.Contains("href=\"../epics/story-9-2.html\"", html);
+        // Sprint/story must not remain in the Touched path grid.
+        Assert.DoesNotContain("touch-file-sprint", html);
+        Assert.DoesNotContain("touch-file-story", html);
+        Assert.Contains("Foo.cs", html);
+        Assert.Contains(Icons.ForConcept("Sprint Status"), html);
+        Assert.Contains(Icons.ForConcept("Story"), html);
+    }
+
+    [Fact]
     public void RenderStoryBody_EvidenceStrip_OmittedWhenNoStatusBadge()
     {
         var evidence = new StoryEvidence(5, 5, "10 passing tests", new DateOnly(2026, 7, 1), true);

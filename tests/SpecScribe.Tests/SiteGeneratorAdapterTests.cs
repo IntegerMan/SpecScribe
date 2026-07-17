@@ -393,7 +393,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // desktop retained), empty Non-functional donut gated, deferred∪header coverage skip, orphan epic
         // absence note, CoverageMapLine UX-DR ingest, RequirementStatTile Unmapped/Deferred sub-line.
         // [Story 9.2 review; golden-diff-normalization-gotchas]
-        const string expected = "24ca9e5a97079ffb7df08e83b6df221bfccd6b10e0b592854375f24300948698";
+        // Regenerated for change-surface Updated chips (sprint/story out of Touched) + Story/Sprint Status
+        // icons + Dev Notes collapsible moved to end of remainder. [change-surface UX]
+        const string expected = "8ee7fc22483c11b09edbdff3d2ccbb501459f2540ccd910085885e7d4f29a2b8";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
