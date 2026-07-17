@@ -1875,12 +1875,14 @@ public sealed class SiteGenerator
             // shares the same Defined/Tracked fields the final ledger will. Work inventory is rebuilt here so
             // the sunburst follow-up band can see deferred open counts without waiting for WriteIndex.
             // [Story 8.3; Story 9.7]
-            var workForFollowUps = WorkInventory.Build(_docs.Values.ToList());
+            // _docs isn't populated until the later pages loop, so build the follow-up work inventory
+            // (deferred entry + parsed model) directly from source here — otherwise this project sunburst
+            // would silently omit deferred items that index.html (rendered after _docs fills) shows, and
+            // full-gen would diverge from watch-mode RegenerateEpics. Read-only: no _docs mutation, no output.
+            var workForFollowUps = ResolveFollowUpWork(files);
+            var deferredModel = ResolveDeferredModel(workForFollowUps, files);
             var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
-            var followUps = FollowUpGeometry.From(
-                _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
-                epicsCounts,
-                workForFollowUps);
+            var followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
             File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps), "epics.html"));
 
             // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
@@ -2066,13 +2068,10 @@ public sealed class SiteGenerator
             var docs = _docs.Values.ToList();
             var work = WorkInventory.Build(docs);
             var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
-            var followUps = FollowUpGeometry.From(
-                _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
-                counts,
-                work);
+            var followUps = BuildFollowUpGeometry(work, counts);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts);
+                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -2321,13 +2320,10 @@ public sealed class SiteGenerator
         var docs = _docs.Values.ToList();
         var work = WorkInventory.Build(docs);
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
-        var followUps = FollowUpGeometry.From(
-            _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
-            counts,
-            work);
+        var followUps = BuildFollowUpGeometry(work, counts);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
@@ -2496,7 +2492,8 @@ public sealed class SiteGenerator
         var inventory = work ?? WorkInventory.Build(docs);
         // Incremental paths may call WriteIndex without going through GenerateAll's ledger build — rebuild then.
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts);
+        var followUps = BuildFollowUpGeometry(inventory, counts);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
@@ -2848,10 +2845,83 @@ public sealed class SiteGenerator
                 if (!deferredSlugs.TryGetValue(item, out var slug)) continue;
                 var outputRelative = FollowUpSlug.OutputPath(slug);
                 var html = FollowUpDetailTemplater.RenderDeferredPage(
-                    item, provenanceLabel, group.SourceStoryHref, slug, nav, listPath);
+                    item, provenanceLabel, group.SourceStoryHref, slug, nav, listPath, _module.Commands);
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
             }
         }
+    }
+
+    /// <summary>Ledger-backed follow-up geometry with per-item deferred attribution when the deferred-work
+    /// note parses as structured. [Story 9.7]</summary>
+    private FollowUpGeometry BuildFollowUpGeometry(WorkInventory work, ProjectCounts counts, string linkPrefix = "") =>
+        BuildFollowUpGeometry(work, counts, TryParseDeferredWork(work), linkPrefix);
+
+    private FollowUpGeometry BuildFollowUpGeometry(WorkInventory work, ProjectCounts counts, DeferredWorkModel? deferredModel, string linkPrefix = "") =>
+        FollowUpGeometry.From(
+            _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
+            counts,
+            work,
+            linkPrefix,
+            deferredModel,
+            _epicsModel);
+
+    /// <summary>Work inventory for the follow-up sunburst geometry. Uses the populated <see cref="_docs"/>
+    /// when available; otherwise (e.g. during <see cref="RenderEpicsPages"/>, before the pages loop fills
+    /// <see cref="_docs"/>) locates and converts <c>deferred-work.md</c> from source read-only so the
+    /// deferred open count is available. Quick-dev entries aren't needed for geometry.</summary>
+    private WorkInventory ResolveFollowUpWork(IReadOnlyList<string> files)
+    {
+        var fromDocs = WorkInventory.Build(_docs.Values.ToList());
+        if (fromDocs.Deferred is not null) return fromDocs;
+
+        if (TryConvertDeferredDoc(files) is not { } doc) return fromDocs;
+        return new WorkInventory
+        {
+            QuickDev = fromDocs.QuickDev,
+            Deferred = new DeferredWorkEntry(
+                doc.Title,
+                PathUtil.NormalizeSlashes(doc.OutputRelativePath),
+                WorkInventory.CountOpenItems(doc.BodyHtml)),
+        };
+    }
+
+    /// <summary>Parses the deferred-work note for the follow-up geometry, preferring the <see cref="_docs"/>
+    /// entry and falling back to a read-only source conversion when <see cref="_docs"/> isn't populated yet.</summary>
+    private DeferredWorkModel? ResolveDeferredModel(WorkInventory work, IReadOnlyList<string> files)
+    {
+        if (TryParseDeferredWork(work) is { } fromDocs) return fromDocs;
+        if (work.Deferred is null || TryConvertDeferredDoc(files) is not { } doc) return null;
+
+        var prefix = PathUtil.RelativePrefix(PathUtil.NormalizeSlashes(work.Deferred.OutputPath));
+        var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
+        return DeferredWorkParser.Parse(doc.Markdown, hrefMap, prefix, doc.BodyHtml);
+    }
+
+    /// <summary>Read-only conversion of the source <c>deferred-work.md</c> (no <see cref="_docs"/> mutation,
+    /// no output written), plus its raw markdown, for the follow-up geometry when the pages loop hasn't run.
+    /// Returns null when absent or unreadable (NFR2).</summary>
+    private (string Title, string OutputRelativePath, string BodyHtml, string Markdown)? TryConvertDeferredDoc(IReadOnlyList<string> files)
+    {
+        foreach (var file in files)
+        {
+            var relative = ToSourceRelative(file);
+            var norm = PathUtil.NormalizeSlashes(relative);
+            if (!BmadArtifactAdapter.IsUnderImplementationArtifacts(norm)) continue;
+            var slash = norm.LastIndexOf('/');
+            var fileName = slash >= 0 ? norm[(slash + 1)..] : norm;
+            if (!string.Equals(fileName, "deferred-work.md", StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                if (!File.Exists(file)) return null;
+                var outputRelative = PathUtil.ToOutputRelative(relative);
+                var doc = MarkdownConverter.Convert(file, relative, outputRelative);
+                return (doc.Title, outputRelative, doc.BodyHtml, File.ReadAllText(file));
+            }
+            catch (IOException) { return null; }
+            catch (UnauthorizedAccessException) { return null; }
+        }
+        return null;
     }
 
     /// <summary>Parses the deferred-work note when present; returns null when absent or unreadable.

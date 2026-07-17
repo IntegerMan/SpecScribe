@@ -245,6 +245,11 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.Contains("data-copy=", html);
         Assert.Contains("class=\"followup-detail\"", html);
+        Assert.Contains("class=\"chart-panel next-steps\"", html);
+        Assert.Contains("next-step-card-primary", html);
+        Assert.Contains("Recommended", html);
+        Assert.Contains("next-step-desc", html);
+        Assert.Contains("Copies a quick-dev prompt", html);
         foreach (Match m in Regex.Matches(html, "data-copy=\"([^\"]*)\""))
         {
             Assert.DoesNotContain("<a", m.Groups[1].Value);
@@ -385,5 +390,26 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.True(ActionItemsTemplater.AreNearDuplicates(a, b));
         Assert.False(ActionItemsTemplater.AreNearDuplicates(a, c));
         Assert.False(ActionItemsTemplater.AreNearDuplicates(b, c));
+    }
+
+    [Fact]
+    public void FindNearDuplicates_ValueEqualDistinctInstances_BothGetCrossLinks()
+    {
+        const string epic1Text =
+            "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog for review before Epic 3 planning";
+        const string epic2Text =
+            "Triage Epic 1's deferred heatmap tech debt (HeatLevel collapse on sparse history, unmapped ForEpic status classes, non-invariant heatmap date formatting) before starting Epic 3 Story 3.2 or 3.5 - carried unaddressed across two retrospectives now";
+
+        var a = new SprintActionItem(epic1Text, "open", 1, "Dana");
+        var a2 = new SprintActionItem(epic1Text, "open", 1, "Dana"); // value-equal, distinct instance
+        var b = new SprintActionItem(epic2Text, "open", 2, "Dana");
+
+        Assert.Equal(a, a2);
+        Assert.False(ReferenceEquals(a, a2));
+
+        var map = ActionItemsTemplater.FindNearDuplicates(new[] { a, a2, b });
+        Assert.True(map.ContainsKey(a));
+        Assert.True(map.ContainsKey(a2));
+        Assert.True(map.ContainsKey(b));
     }
 }

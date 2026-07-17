@@ -10,7 +10,7 @@ namespace SpecScribe;
 /// the active module doesn't expose is omitted rather than printed as a command that doesn't exist.</summary>
 public static class BmadCommands
 {
-    private sealed record Suggestion(string Command, string Description);
+    private sealed record Suggestion(string Command, string Description, string? DisplayLabel = null);
 
     /// <summary>A destination the command's "send elsewhere" menu can target. Cursor is the one IDE with a
     /// public "open with the prompt pre-filled" deeplink (it never auto-runs), so it gets a real link. Every
@@ -78,6 +78,27 @@ public static class BmadCommands
     public static string RenderProjectNextSteps(EpicsModel model, CommandCatalog commands) =>
         RenderPanel(ForProject(model, commands));
 
+    /// <summary>Next Steps panel for an action-item detail page — same card grammar as story pages
+    /// (Recommended primary + room for alternates). Long resolve prompts use a labeled badge so the
+    /// user sees what they're copying without dumping the full payload into the card. [Story 9.11]</summary>
+    public static string RenderActionItemNextSteps(SprintActionItem item, CommandCatalog commands)
+    {
+        if (FollowUpGeometry.IsDone(item))
+            return RenderFollowUpSettledPanel("This action item is marked done.");
+
+        return RenderPanel(ForActionItem(item, commands));
+    }
+
+    /// <summary>Next Steps panel for a deferred-work detail page. Resolved items get a settled panel;
+    /// open items offer quick-dev (and create-story when exposed). [Story 9.11]</summary>
+    public static string RenderDeferredItemNextSteps(DeferredWorkItem item, CommandCatalog commands)
+    {
+        if (item.Resolved)
+            return RenderFollowUpSettledPanel("This deferred item is already resolved.");
+
+        return RenderPanel(ForDeferredItem(item, commands));
+    }
+
     /// <summary>The heading + list on their own (no chart-panel wrapper), for callers that want to fold
     /// the Next Steps into a shared panel rather than give it a standalone one.</summary>
     public static string RenderEpicNextStepsInner(EpicInfo epic, CommandCatalog commands) =>
@@ -143,7 +164,10 @@ public static class BmadCommands
             var cardClass = isPrimary ? "next-step-card next-step-card-primary" : "next-step-card";
             sb.Append($"  <div class=\"{cardClass} {accent}\">\n");
             sb.Append($"    <span class=\"next-step-kicker\">{PathUtil.Html(KickerForCommand(s.Command, isPrimary))}</span>\n");
-            sb.Append($"    <div class=\"next-step-command\">{RenderCommandBadge(s.Command)}</div>\n");
+            var badge = s.DisplayLabel is { Length: > 0 } label
+                ? RenderLabeledCommand(label, s.Command)
+                : RenderCommandBadge(s.Command);
+            sb.Append($"    <div class=\"next-step-command\">{badge}</div>\n");
             sb.Append($"    <p class=\"next-step-desc\">{PathUtil.Html(s.Description)}</p>\n");
             sb.Append("  </div>\n");
         }
@@ -165,7 +189,8 @@ public static class BmadCommands
         if (slug.Contains("code-review", StringComparison.Ordinal) || slug.Contains("retrospective", StringComparison.Ordinal))
             return "review";
         if (slug.Contains("dev-story", StringComparison.Ordinal) || slug.Contains("sprint-status", StringComparison.Ordinal)
-            || slug.Contains("correct-course", StringComparison.Ordinal))
+            || slug.Contains("correct-course", StringComparison.Ordinal)
+            || slug.Contains("quick-dev", StringComparison.Ordinal))
             return "active";
         if (slug.Contains("create-story", StringComparison.Ordinal))
             return "drafted";
@@ -183,6 +208,7 @@ public static class BmadCommands
         if (slug.Contains("code-review", StringComparison.Ordinal) || slug.Contains("retrospective", StringComparison.Ordinal))
             return "Review";
         if (slug.Contains("dev-story", StringComparison.Ordinal)) return "Develop";
+        if (slug.Contains("quick-dev", StringComparison.Ordinal)) return "Implement";
         if (slug.Contains("create-story", StringComparison.Ordinal)) return "Draft";
         if (slug.Contains("sprint-status", StringComparison.Ordinal) || slug.Contains("sprint-planning", StringComparison.Ordinal))
             return "Plan";
@@ -543,5 +569,64 @@ public static class BmadCommands
         }
 
         return suggestions;
+    }
+
+    private static List<Suggestion> ForActionItem(SprintActionItem item, CommandCatalog commands)
+    {
+        var suggestions = new List<Suggestion>();
+        var quickDev = commands.Command("quick-dev");
+        if (quickDev is { Length: > 0 })
+        {
+            var epicNote = item.EpicNumber is { } e ? $" (Epic {e})" : string.Empty;
+            // RAW action text in the payload — never linkified (copy-payload corruption trap).
+            var prompt = $"{quickDev} Resolve this retrospective action item{epicNote}: {item.Action}";
+            suggestions.Add(new Suggestion(
+                prompt,
+                "Copies a quick-dev prompt with this action item's full text so AI can implement the fix.",
+                DisplayLabel: "Resolve with AI"));
+        }
+
+        Add(suggestions, commands.Command("create-story"),
+            "Draft a new story from this follow-up so the work can be planned and tracked in the sprint.");
+
+        Add(suggestions, commands.Command("sprint-status"),
+            "Open sprint planning to update status once this follow-up is underway or done.");
+
+        return suggestions;
+    }
+
+    private static List<Suggestion> ForDeferredItem(DeferredWorkItem item, CommandCatalog commands)
+    {
+        var suggestions = new List<Suggestion>();
+        var quickDev = commands.Command("quick-dev");
+        if (quickDev is { Length: > 0 })
+        {
+            var lead = FollowUpRow.SummarizeFromHtml(item.BodyHtml, maxChars: 200);
+            var body = string.IsNullOrWhiteSpace(lead)
+                ? PathUtil.StripHtmlTags(item.BodyHtml).Trim()
+                : lead;
+            var prompt = $"{quickDev} Address this deferred-work item: {body}";
+            suggestions.Add(new Suggestion(
+                prompt,
+                "Copies a quick-dev prompt with this deferred item's text so AI can pick up the parked work.",
+                DisplayLabel: "Address with AI"));
+        }
+
+        Add(suggestions, commands.Command("create-story"),
+            "Draft a story that owns this deferred promise so it stops living only in the backlog note.");
+
+        Add(suggestions, commands.Command("sprint-status"),
+            "Check sprint status to see whether a resolving story is already tracked.");
+
+        return suggestions;
+    }
+
+    private static string RenderFollowUpSettledPanel(string message)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel next-steps all-done\">\n<h3>Next Steps</h3>\n");
+        sb.Append($"<p class=\"all-done-complete\"><span class=\"all-done-icon\">{Icons.ForStatus("done")}</span>{PathUtil.Html(message)}</p>\n");
+        sb.Append("</div>\n\n");
+        return sb.ToString();
     }
 }

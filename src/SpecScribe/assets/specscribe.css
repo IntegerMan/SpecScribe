@@ -3784,8 +3784,9 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 
 /* ====================== DASHBOARD TILE BAND ====================== */
-/* Homepage tiles share one flex-wrap panel (typically two dense rows). Journey identity is an accent rail
-   on each card plus a floating caption above the first card of a group — not separate cluster wrappers. */
+/* Homepage tiles share one flex-wrap panel (typically two dense rows of ~5). Journey identity is an accent
+   rail on each card plus a floating caption above the first card of a group — not separate cluster wrappers,
+   which would stack groups into uneven columns. Work-stage visibility classes live on the cards themselves. */
 .dashboard-tile-band {
   display: flex;
   flex-wrap: wrap;
@@ -3796,7 +3797,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 .dashboard-tile-band .stat-card,
 .dashboard-tile-band .tile-card {
-  flex: 1 1 150px;
+  flex: 1 1 calc(20% - 0.8rem);
   min-width: 140px;
   max-width: 220px;
   margin-bottom: 0;
@@ -5480,7 +5481,8 @@ body:has(main.followup-detail) .doc-header {
   color: var(--teal-deep);
 }
 .followup-detail-cross { margin: 0.6rem 0; }
-.followup-detail-resolve { margin-top: 1rem; }
+/* Next Steps on follow-up detail reuses the story-page card panel (chart-panel.next-steps). */
+.followup-detail .next-steps { margin-top: 1.4rem; }
 .followup-detail-back {
   margin-top: 1.6rem;
   font-size: 0.92rem;

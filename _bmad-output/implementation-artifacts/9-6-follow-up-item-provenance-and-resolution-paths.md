@@ -4,7 +4,7 @@ baseline_commit: a39752ce2348534ac2229eca0b2a4d1f4fa855a8
 
 # Story 9.6: Follow-Up Item Provenance and Resolution Paths
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -123,12 +123,12 @@ Provenance, resolution criteria, and resolving links are **derived by best-effor
 ### Review Findings
 
 - [x] [Review][Decision] Accept 9.10/9.11 scan-first + detail-page overlay for 9.6 closeout? — **Accepted** (owner 2026-07-17): intentional later-story overlay; no restore of above-fold 9.6 card chrome.
-- [ ] [Review][Patch] Open item-level `source_spec` mislabeled as Resolving [DeferredWorkParser.cs:121-129][DeferredWorkTemplater.cs:105-108]
-- [ ] [Review][Patch] Over-broad resolved detection (`<del>` OR bare `RESOLVED`) [DeferredWorkParser.cs:113-114]
-- [ ] [Review][Patch] Structured parse drops note preamble / non-list prose [DeferredWorkParser.cs:78][DeferredWorkTemplater.cs:44-57]
-- [ ] [Review][Patch] Deferred-from headings with zero `-` items stay structured (empty groups / can overwrite plain body) [DeferredWorkParser.cs:78]
-- [ ] [Review][Patch] Non-Deferred `##` inside a section truncates remaining list items [DeferredWorkParser.cs:148-151]
-- [ ] [Review][Patch] Near-dupe map keyed on `SprintActionItem` value equality drops cross-links for identical rows [ActionItemsTemplater.cs:101-113]
+- [x] [Review][Patch] Open item-level `source_spec` mislabeled as Resolving [DeferredWorkParser.cs:121-129][DeferredWorkTemplater.cs:105-108] — fixed: only promote `source_spec` to Resolving* when Resolved
+- [x] [Review][Patch] Over-broad resolved detection (`<del>` OR bare `RESOLVED`) [DeferredWorkParser.cs:113-114] — fixed: bracketed `[RESOLVED` / `**[RESOLVED` only
+- [x] [Review][Patch] Structured parse drops note preamble / non-list prose [DeferredWorkParser.cs:78][DeferredWorkTemplater.cs:44-57] — fixed: `PreambleHtml` captured + rendered
+- [x] [Review][Patch] Deferred-from headings with zero `-` items stay structured (empty groups / can overwrite plain body) [DeferredWorkParser.cs:78] — fixed: all-empty → unstructured; skip empty groups
+- [x] [Review][Patch] Non-Deferred `##` inside a section truncates remaining list items [DeferredWorkParser.cs:148-151] — fixed: flush + continue
+- [x] [Review][Patch] Near-dupe map keyed on `SprintActionItem` value equality drops cross-links for identical rows [ActionItemsTemplater.cs:101-113] — fixed: `ReferenceEqualityComparer`
 - [x] [Review][Defer] Top-level list markers other than `-` / `-\t` ignored [DeferredWorkParser.cs:139] — deferred, pre-existing
 - [x] [Review][Defer] Path-prefixed `source_spec` can miss `StoryIdFromKey` / placeholder fallback [FollowUpRefs.cs:91-101] — deferred, pre-existing
 - [x] [Review][Defer] `ResolvingStoryIdFromText` only matches `RESOLVED in [Story] N.M` [FollowUpRefs.cs:105-111] — deferred, pre-existing
@@ -253,3 +253,4 @@ Composer (Auto)
 ## Change Log
 
 - 2026-07-16: Implemented Story 9.6 — follow-up provenance/resolution on action-items + deferred-work pages; status → review.
+- 2026-07-17: Code review — accepted 9.10/9.11 overlay; patched deferred-work parse/label edges + near-dupe reference keys; status → done.

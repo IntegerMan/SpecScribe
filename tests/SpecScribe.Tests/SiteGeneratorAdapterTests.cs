@@ -426,7 +426,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // specscribe.css gains main.followup-detail / .followup-detail-* rules. Golden fixture has no
         // open action_items and no deferred-work.md — delta is primarily shared CSS.
         // [Story 9.11; golden-diff-normalization-gotchas]
-        const string expected = "95786ceed35dd94fc8eea22bca25c75c0bc0751b9615ea20b6aa2211dbbcf091";
+        // Regenerated for sunburst deferred attribution: per-item deferred wedges under their epic via
+        // SourceStoryId; synthetic Follow-ups slice only for unattributed action + deferred items (no
+        // aggregate "N open items" wedge with mismatched sizing). Golden fixture still has no follow-ups.
+        // Regenerated for Story 9.11 Next Steps polish on follow-up detail pages (reuse story-page
+        // chart-panel.next-steps cards; .followup-detail .next-steps spacing).
+        const string expected = "73fb5912870288e29363496905be4e021679528c87d04a2640ba8c6f204a85d3";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

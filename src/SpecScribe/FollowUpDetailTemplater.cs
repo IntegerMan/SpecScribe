@@ -84,18 +84,13 @@ public static class FollowUpDetailTemplater
             sb.Append($"  <a class=\"action-item-deferred\" href=\"{PathUtil.Html(href)}\">In deferred-work backlog &rarr;</a>\n");
         }
 
-        var quickDev = commands.Command("quick-dev");
-        if (quickDev is { Length: > 0 })
-        {
-            var epicNote = item.EpicNumber is { } e3 ? $" (Epic {e3})" : string.Empty;
-            // RAW action text in data-copy — never linkified (copy-payload corruption trap).
-            var prompt = $"{quickDev} Resolve this retrospective action item{epicNote}: {item.Action}";
-            sb.Append("<div class=\"action-item-resolve followup-detail-resolve\">\n");
-            sb.Append($"{BmadCommands.RenderLabeledCommand("Resolve with AI", prompt)}\n");
-            sb.Append("</div>\n");
-        }
-
         sb.Append("</section>\n");
+
+        // Same Next Steps card panel as story pages — labeled resolve prompt + room for alternates.
+        var nextSteps = BmadCommands.RenderActionItemNextSteps(item, commands);
+        if (nextSteps.Length > 0)
+            sb.Append(nextSteps);
+
         AppendBackLink(sb, prefix + SiteNav.ActionItemsOutputPath, "All open action items");
         sb.Append("</main>\n\n");
         AppendShellClose(sb, prefix);
@@ -110,7 +105,8 @@ public static class FollowUpDetailTemplater
         string? sourceStoryHref,
         string slug,
         SiteNav nav,
-        string listOutputPath)
+        string listOutputPath,
+        CommandCatalog? commands = null)
     {
         var outputPath = FollowUpSlug.OutputPath(slug);
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -162,6 +158,11 @@ public static class FollowUpDetailTemplater
         }
 
         sb.Append("</section>\n");
+
+        var nextSteps = BmadCommands.RenderDeferredItemNextSteps(item, commands ?? CommandCatalog.Empty);
+        if (nextSteps.Length > 0)
+            sb.Append(nextSteps);
+
         var listHref = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(listOutputPath));
         AppendBackLink(sb, listHref, "All deferred work");
         sb.Append("</main>\n\n");

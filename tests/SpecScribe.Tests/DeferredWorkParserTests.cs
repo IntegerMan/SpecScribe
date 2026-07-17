@@ -105,4 +105,116 @@ public class DeferredWorkParserTests
         Assert.False(DeferredWorkParser.Parse("   ").IsStructured);
         Assert.False(DeferredWorkParser.Parse("### Not a deferred heading\n- x").IsStructured);
     }
+
+    [Fact]
+    public void Parse_OpenItemSourceSpec_DoesNotBecomeResolvingRef()
+    {
+        var md = """
+            ## Deferred from: code review of 7-3-activity-timeline-and-date-pages.md
+
+            - source_spec: `7-3-activity-timeline-and-date-pages.md`
+              summary: Watch-mode never refreshes the timeline.
+            """;
+
+        var model = DeferredWorkParser.Parse(md, HrefMap);
+        var item = Assert.Single(model.Groups[0].Items);
+        Assert.False(item.Resolved);
+        Assert.Null(item.ResolvingRef);
+        Assert.Null(item.ResolvingHref);
+    }
+
+    [Fact]
+    public void Parse_BareResolvedWordWithoutBrackets_IsNotResolved()
+    {
+        var md = """
+            ## Deferred from: review of 1-1-foundation.md
+
+            - Not RESOLVED yet — still outstanding.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        var item = Assert.Single(model.Groups[0].Items);
+        Assert.False(item.Resolved);
+    }
+
+    [Fact]
+    public void Parse_PreambleBeforeFirstDeferredFrom_IsPreserved()
+    {
+        var md = """
+            # Deferred Work
+
+            Real-but-not-now items surfaced during reviews.
+
+            ## Deferred from: review of 1-1-foundation.md
+
+            - Park this for later.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        Assert.True(model.IsStructured);
+        Assert.False(string.IsNullOrEmpty(model.PreambleHtml));
+        Assert.Contains("Real-but-not-now", model.PreambleHtml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Parse_DeferredFromHeadingsWithNoListItems_FallsBackToUnstructured()
+    {
+        var md = """
+            # Deferred Work
+
+            Intro prose that must not vanish.
+
+            ## Deferred from: review of 1-1-foundation.md
+
+            Just a note with no bullets.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        Assert.False(model.IsStructured);
+        Assert.False(string.IsNullOrEmpty(model.PlainBodyHtml));
+        Assert.Contains("Intro prose", model.PlainBodyHtml!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Parse_NonDeferredHeadingInsideSection_DoesNotDropLaterItems()
+    {
+        var md = """
+            ## Deferred from: review of 1-1-foundation.md
+
+            - First item stays.
+
+            ## Notes
+
+            - Second item must still parse.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        Assert.True(model.IsStructured);
+        Assert.Equal(2, model.Groups[0].Items.Count);
+    }
+
+    [Fact]
+    public void Templater_StructuredPreamble_RendersAboveGroups()
+    {
+        var model = new DeferredWorkModel(
+            true,
+            new[]
+            {
+                new DeferredWorkGroup(
+                    "review of 1-1-foundation.md",
+                    "1.1",
+                    "epics/story-1-1.html",
+                    new[] { new DeferredWorkItem("<p>Park this.</p>", false, null, null) }),
+            },
+            PreambleHtml: "<p>Real-but-not-now items.</p>");
+
+        var nav = SiteNav.Build(Array.Empty<string>(), "Test", hasAdrs: false);
+        var html = DeferredWorkTemplater.RenderPage(model, nav, "deferred-work.html");
+
+        Assert.Contains("deferred-work-preamble", html);
+        Assert.Contains("Real-but-not-now items.", html);
+        var preambleAt = html.IndexOf("deferred-work-preamble", StringComparison.Ordinal);
+        var groupAt = html.IndexOf("deferred-group", StringComparison.Ordinal);
+        Assert.True(preambleAt >= 0 && groupAt > preambleAt);
+    }
 }

@@ -165,8 +165,8 @@ public static class Charts
         var geometry = followUps ?? FollowUpGeometry.Empty;
         var hasFollowUps = geometry.HasAny;
         var unattributed = geometry.UnattributedActionItems;
-        var hasDeferred = geometry.DeferredOpenCount > 0 && geometry.DeferredHref is { Length: > 0 };
-        var orphanSlots = unattributed.Count + (hasDeferred ? 1 : 0);
+        var unattributedDeferred = geometry.UnattributedDeferredItems;
+        var orphanSlots = unattributed.Count + unattributedDeferred.Count;
 
         var c = size / 2.0;
         var epicInner = size * 0.16;
@@ -178,7 +178,7 @@ public static class Charts
 
         // Weight each epic by stories + attributed follow-ups so postponed work widens its slice.
         int EpicWeight(EpicInfo e) =>
-            Math.Max(1, e.Stories.Count + geometry.ForEpicNumber(e.Number).Count);
+            Math.Max(1, e.Stories.Count + geometry.ForEpicNumber(e.Number).Count + geometry.DeferredForEpicNumber(e.Number).Count);
 
         var totalWeight = epics.Sum(EpicWeight) + (orphanSlots > 0 ? Math.Max(1, orphanSlots) : 0);
         var anglePerUnit = 2 * Math.PI / totalWeight;
@@ -191,12 +191,14 @@ public static class Charts
         foreach (var epic in epics)
         {
             var epicFollowUps = geometry.ForEpicNumber(epic.Number);
+            var epicDeferred = geometry.DeferredForEpicNumber(epic.Number);
             var weight = EpicWeight(epic);
             var sweep = weight * anglePerUnit;
             var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
-            var followNote = epicFollowUps.Count > 0
-                ? $", {epicFollowUps.Count} {Plural(epicFollowUps.Count, "follow-up", "follow-ups")}"
+            var followUpCount = epicFollowUps.Count + epicDeferred.Count;
+            var followNote = followUpCount > 0
+                ? $", {followUpCount} {Plural(followUpCount, "follow-up", "follow-ups")}"
                 : string.Empty;
 
             var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{followNote}";
@@ -205,7 +207,7 @@ public static class Charts
             sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{Html(followNote)}</title></path>\n");
             sb.Append("  </a>\n");
 
-            var slotCount = epic.Stories.Count + epicFollowUps.Count;
+            var slotCount = epic.Stories.Count + epicFollowUps.Count + epicDeferred.Count;
             if (slotCount > 0)
             {
                 var slotSweep = sweep / slotCount;
@@ -220,25 +222,30 @@ public static class Charts
                     AppendActionItemSlot(sb, item, geometry.HrefFor(item), slotAngle, slotSweep, pad, c, storyInner, storyOuter);
                     slotAngle += slotSweep;
                 }
+                foreach (var slot in epicDeferred)
+                {
+                    AppendDeferredItemSlot(sb, slot, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                    slotAngle += slotSweep;
+                }
             }
 
             angle += sweep;
         }
 
-        // Unattributed action items + deferred aggregate: a synthetic epic-level "Follow-ups" slice so
-        // postponed work that isn't tied to an epic still sits in the same geometry (not an outer band).
+        // Unattributed action items + unattributed deferred items: a synthetic epic-level "Follow-ups" slice.
         if (orphanSlots > 0)
         {
             var orphanWeight = Math.Max(1, orphanSlots);
             var sweep = orphanWeight * anglePerUnit;
-            var openOrphans = unattributed.Count(a => !FollowUpGeometry.IsDone(a)) + (hasDeferred ? 1 : 0);
+            var openOrphans = unattributed.Count(a => !FollowUpGeometry.IsDone(a))
+                + unattributedDeferred.Count(s => !s.Item.Resolved);
             var orphanClass = openOrphans > 0 ? "followup-open" : "done";
-            var orphanHref = hasDeferred && geometry.DeferredHref is { } dh && unattributed.Count == 0
+            var orphanHref = unattributed.Count == 0 && unattributedDeferred.Count > 0 && geometry.DeferredHref is { } dh
                 ? dh
                 : geometry.ActionItemsHref;
             var orphanAria = openOrphans > 0
-                ? $"Follow-ups: {orphanSlots} {Plural(orphanSlots, "item", "items")} unattributed"
-                : $"Follow-ups: {orphanSlots} completed {Plural(orphanSlots, "item", "items")}";
+                ? $"Follow-ups: {orphanSlots} unattributed {Plural(orphanSlots, "item", "items")}"
+                : $"Follow-ups: {orphanSlots} completed unattributed {Plural(orphanSlots, "item", "items")}";
 
             sb.Append($"  <a href=\"{Html(orphanHref)}\" aria-label=\"{Html(orphanAria)}\">\n");
             sb.Append($"    <path class=\"sb-seg sb-{orphanClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, angle + pad, angle + sweep - pad)}\">");
@@ -251,10 +258,10 @@ public static class Charts
                 AppendActionItemSlot(sb, item, geometry.HrefFor(item), slotAngle, slotSweep, pad, c, storyInner, storyOuter);
                 slotAngle += slotSweep;
             }
-            if (hasDeferred)
+            foreach (var slot in unattributedDeferred)
             {
-                var label = $"Deferred work: {geometry.DeferredOpenCount} open {Plural(geometry.DeferredOpenCount, "item", "items")}";
-                AppendFollowUpSlot(sb, label, geometry.DeferredHref!, "followup-open", slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                AppendDeferredItemSlot(sb, slot, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                slotAngle += slotSweep;
             }
 
             angle += sweep;
@@ -373,6 +380,17 @@ public static class Charts
         AppendFollowUpSlot(sb, label, href, done ? "done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
     }
 
+    private static void AppendDeferredItemSlot(
+        StringBuilder sb, FollowUpDeferredSlot slot, double angle, double sweep, double pad,
+        double c, double storyInner, double storyOuter)
+    {
+        var resolved = slot.Item.Resolved;
+        var text = TruncateFollowUpText(
+            PathUtil.StripHtmlTags(FollowUpRow.SummarizeFromHtml(slot.Item.BodyHtml)));
+        var label = resolved ? $"Deferred item (resolved): {text}" : $"Deferred item: {text}";
+        AppendFollowUpSlot(sb, label, slot.DetailHref, resolved ? "done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
+    }
+
     private static void AppendFollowUpSlot(
         StringBuilder sb, string label, string href, string cssClass, double angle, double sweep, double pad,
         double c, double storyInner, double storyOuter)
@@ -422,7 +440,8 @@ public static class Charts
     {
         var geometry = (followUps ?? FollowUpGeometry.Empty).ForEpic(epic.Number);
         var epicFollowUps = geometry.ActionItems;
-        var slotCount = epic.Stories.Count + epicFollowUps.Count;
+        var epicDeferred = geometry.DeferredItems;
+        var slotCount = epic.Stories.Count + epicFollowUps.Count + epicDeferred.Count;
         if (slotCount == 0) return "<div class=\"chart-empty\">No stories drafted for this epic yet.</div>";
 
         var hasFollowUps = geometry.HasAny;
@@ -479,6 +498,12 @@ public static class Charts
         foreach (var item in epicFollowUps)
         {
             AppendActionItemSlot(sb, item, geometry.HrefFor(item), angle, anglePerSlot, pad, c, storyInner, storyOuter);
+            angle += anglePerSlot;
+        }
+
+        foreach (var slot in epicDeferred)
+        {
+            AppendDeferredItemSlot(sb, slot, angle, anglePerSlot, pad, c, storyInner, storyOuter);
             angle += anglePerSlot;
         }
 

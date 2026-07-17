@@ -354,37 +354,89 @@ public class ChartsTests
             new SprintActionItem("Unscoped cleanup", "open", EpicNumber: null, Owner: null),
             new SprintActionItem("Ship delivery follow-up", "done", EpicNumber: 2, Owner: "Amelia"),
         };
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Epic 1 deferred open item.
+            - Epic 1 second deferred item.
+
+            ## Deferred from: code review of 2-1-delivery.md (2026-07-15)
+
+            - Epic 2 deferred item.
+
+            ## Deferred from: cross-cutting backlog (2026-07-15)
+
+            - Unattributed deferred open item.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
         var work = new WorkInventory
         {
             QuickDev = Array.Empty<QuickDevEntry>(),
-            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 3),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 4),
         };
-        var counts = ProjectCounts.Empty with { DeferredOpenItems = 3, OpenActionItems = 2 };
-        var geometry = FollowUpGeometry.From(items, counts, work);
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 4, OpenActionItems = 2 };
+        var geometry = FollowUpGeometry.From(items, counts, work, deferredModel: deferredModel, epics: model);
 
         var svg = Charts.Sunburst(model, followUps: geometry);
 
         Assert.Equal(2, geometry.OpenActionItems.Count);
         Assert.Equal(counts.DeferredOpenItems, geometry.DeferredOpenCount);
+        Assert.Equal(4, geometry.DeferredItems.Count);
+        Assert.Single(geometry.UnattributedDeferredItems);
         // Open follow-ups are orange; completed action items reuse done green — never a 4th outer ring.
         Assert.Contains("class=\"sb-seg sb-followup-open\"", svg);
         Assert.Contains("aria-label=\"Action item: Fix the heatmap debt\"", svg);
         Assert.Contains("aria-label=\"Action item (done): Ship delivery follow-up\"", svg);
         Assert.Contains("aria-label=\"Action item: Unscoped cleanup\"", svg);
-        Assert.Contains("aria-label=\"Deferred work: 3 open items\"", svg);
-        Assert.Contains("aria-label=\"Follow-ups:", svg);
+        Assert.Contains("aria-label=\"Deferred item: Epic 1 deferred open item.\"", svg);
+        Assert.Contains("aria-label=\"Deferred item: Unattributed deferred open item.\"", svg);
+        // No aggregate deferred wedge with an inflated count label.
+        Assert.DoesNotContain("Deferred work: 4 open", svg);
+        Assert.DoesNotContain("Deferred work: 3 open", svg);
+        Assert.Contains("aria-label=\"Follow-ups: 2 unattributed items\"", svg);
         Assert.DoesNotContain("outermost: open follow-ups", svg);
         Assert.Contains("Open follow-up</span>", svg);
         Assert.Contains("stories &amp; follow-ups", svg);
         // Per-item detail hrefs (Story 9.11) on action wedges.
         Assert.Contains("href=\"follow-ups/action-", svg);
         Assert.Contains("href=\"follow-ups/action-fix-the-heatmap-debt", svg);
-        // Epic 1 aria mentions its follow-up so aggregation is visible on the epic wedge.
-        Assert.Contains("1 follow-up", svg);
+        Assert.Contains("href=\"follow-ups/deferred-", svg);
+        // Epic 1 aria mentions its follow-ups (action + two deferred).
+        Assert.Contains("3 follow-ups", svg);
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
         {
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
         }
+    }
+
+    [Fact]
+    public void Sunburst_FollowUps_NoUnattributedSlice_WhenAllDeferredAreEpicAttributed()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Do the thing", "in progress", 1, 2)) },
+        };
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Only epic-attributed deferred item.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 1),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        var svg = Charts.Sunburst(model, followUps: geometry);
+
+        Assert.Contains("aria-label=\"Deferred item: Only epic-attributed deferred item.\"", svg);
+        Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
     }
 
     [Fact]
@@ -425,18 +477,27 @@ public class ChartsTests
                 new SprintActionItem("Epic 1 only", "open", 1, "Dana"),
                 new SprintActionItem("Epic 2 only", "open", 2, "Amelia"),
             },
-            DeferredOpenCount: 2,
+            DeferredOpenCount: 1,
             DeferredHref: "deferred-work.html",
-            ActionItemsHref: SiteNav.ActionItemsOutputPath);
+            ActionItemsHref: SiteNav.ActionItemsOutputPath,
+            DeferredSlots: new[]
+            {
+                new FollowUpDeferredSlot(
+                    new DeferredWorkItem("<p>Epic 1 deferred</p>", false, null, null),
+                    "from 1.1",
+                    1,
+                    "follow-ups/deferred-epic-1.html"),
+            });
 
         var svg1 = Charts.EpicSunburst(epic1, _ => "epics/epic-1.html", followUps: geometry);
         var svg2 = Charts.EpicSunburst(epic2, _ => "epics/epic-2.html", followUps: geometry);
 
         Assert.Contains("aria-label=\"Action item: Epic 1 only\"", svg1);
+        Assert.Contains("aria-label=\"Deferred item: Epic 1 deferred\"", svg1);
         Assert.Contains("class=\"sb-seg sb-followup-open\"", svg1);
         Assert.Contains("href=\"follow-ups/action-", svg1);
         Assert.DoesNotContain("Epic 2 only", svg1);
-        Assert.DoesNotContain("Deferred work", svg1);
+        Assert.DoesNotContain("Deferred item: Epic 1 deferred", svg2);
         Assert.Contains("aria-label=\"Action item: Epic 2 only\"", svg2);
         Assert.DoesNotContain("Epic 1 only", svg2);
         Assert.DoesNotContain("outermost: open follow-ups", svg1);
@@ -453,7 +514,7 @@ public class ChartsTests
             if (end < 0) break;
             var label = svg[i..end];
             if (label.StartsWith("Action item", StringComparison.Ordinal)
-                || label.StartsWith("Deferred work:", StringComparison.Ordinal)
+                || label.StartsWith("Deferred item", StringComparison.Ordinal)
                 || label.StartsWith("Follow-ups:", StringComparison.Ordinal))
             {
                 labels.Add(label);

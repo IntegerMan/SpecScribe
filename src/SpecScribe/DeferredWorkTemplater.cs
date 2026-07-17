@@ -49,6 +49,12 @@ public static class DeferredWorkTemplater
             var detailSlugs = FollowUpSlug.AssignDeferredSlugs(pairs);
 
             sb.Append("<section class=\"deferred-work-wrap\">\n");
+            if (model.PreambleHtml is { Length: > 0 } preamble)
+            {
+                sb.Append("<div class=\"deferred-work-preamble doc-body\">\n");
+                sb.Append(preamble);
+                sb.Append("</div>\n");
+            }
             foreach (var group in model.Groups)
             {
                 RenderGroup(sb, group, prefix, detailSlugs);

@@ -643,6 +643,8 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("name=\"work-mode\"", body);
         Assert.Contains("wm-panel wm-show-overview", body);
         Assert.Contains("wm-show-track", body);
+        // Tiles carry visibility classes themselves — no journey wrappers that break flex-wrap.
+        Assert.DoesNotContain("<div class=\"wm-panel wm-show-overview wm-show-requirements", body);
     }
 
     [Fact]

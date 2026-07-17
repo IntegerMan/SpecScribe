@@ -97,8 +97,9 @@ public static class ActionItemsTemplater
     /// overlap is high. Prefer false negatives. Pure and deterministic. [Story 9.6]</summary>
     public static IReadOnlyDictionary<SprintActionItem, int> FindNearDuplicates(IReadOnlyList<SprintActionItem> openItems)
     {
-        // Maps each item to the counterpart epic number it cross-links to (first match wins for stability).
-        var result = new Dictionary<SprintActionItem, int>();
+        // Reference equality: value-equal records (same action/status/epic/owner) must not collide and
+        // silently drop a cross-link while both rows still render.
+        var result = new Dictionary<SprintActionItem, int>(ReferenceEqualityComparer.Instance);
         for (var i = 0; i < openItems.Count; i++)
         {
             var a = openItems[i];

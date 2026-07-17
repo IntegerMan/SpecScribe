@@ -8,7 +8,8 @@ namespace SpecScribe;
 public sealed record DeferredWorkModel(
     bool IsStructured,
     IReadOnlyList<DeferredWorkGroup> Groups,
-    string? PlainBodyHtml = null);
+    string? PlainBodyHtml = null,
+    string? PreambleHtml = null);
 
 /// <summary>One <c>## Deferred from:</c> section with optional source-story provenance. [Story 9.6]</summary>
 public sealed record DeferredWorkGroup(
@@ -33,8 +34,9 @@ public static class DeferredWorkParser
         @"^##\s+Deferred from:\s*(?<label>.+?)\s*$",
         RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
+    // Bracketed forms only — bare "RESOLVED" in prose must not flip status (e.g. "not RESOLVED yet").
     private static readonly Regex ResolvedMarker = new(
-        @"\[?\s*RESOLVED\b|\*\*\[RESOLVED",
+        @"\*\*\[\s*RESOLVED\b|\[\s*RESOLVED\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>Parses <paramref name="markdown"/> into a structured model. On any failure or when no
@@ -75,7 +77,17 @@ public static class DeferredWorkParser
                 groups.Add(new DeferredWorkGroup(label, sourceId, sourceHref, items));
             }
 
-            return new DeferredWorkModel(true, groups);
+            // Headings with no parseable list items → keep the plain body rather than empty groups.
+            var nonEmpty = groups.Where(g => g.Items.Count > 0).ToList();
+            if (nonEmpty.Count == 0)
+                return Unstructured(fallbackBodyHtml ?? MarkdownConverter.RenderBlock(markdown));
+
+            string? preambleHtml = null;
+            var preambleMd = markdown[..matches[0].Index].Trim();
+            if (preambleMd.Length > 0)
+                preambleHtml = MarkdownConverter.RenderBlock(preambleMd);
+
+            return new DeferredWorkModel(true, nonEmpty, PreambleHtml: preambleHtml);
         }
         catch
         {
@@ -118,8 +130,9 @@ public static class DeferredWorkParser
                 ? null
                 : FollowUpRefs.ResolveHref(resolvingRef, hrefMap, prefix);
 
-            // Item-level source_spec can also name a resolving/originating story when no RESOLVED marker.
-            if (resolvingHref is null)
+            // Item-level source_spec is origin metadata on open items (group provenance already covers it).
+            // Only promote it to Resolving* when the item is actually resolved and no RESOLVED-in id was found.
+            if (resolvingHref is null && resolved)
             {
                 var itemSpec = FollowUpRefs.SourceSpecFileFromText(md);
                 if (itemSpec is not null)
@@ -144,11 +157,11 @@ public static class DeferredWorkParser
             else if (current.Count > 0)
             {
                 // Continuation (nested bullets / prose) stays with the current item.
-                // Stop if we hit another ## heading (shouldn't happen — section already sliced).
+                // Non-Deferred ## inside a section must not drop later list items — flush and keep scanning.
                 if (line.StartsWith("## ", StringComparison.Ordinal))
                 {
                     Flush();
-                    break;
+                    continue;
                 }
                 current.Add(line);
             }

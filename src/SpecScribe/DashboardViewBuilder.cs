@@ -40,7 +40,8 @@ public static class DashboardViewBuilder
         SprintStatus? sprint,
         ArtifactCoverage? coverage,
         bool hasTimeline = false,
-        ProjectCounts? counts = null)
+        ProjectCounts? counts = null,
+        FollowUpGeometry? followUps = null)
     {
         // Production always passes the shared SiteGenerator ledger. Null → build an equivalent ephemeral
         // ledger from the same inputs so tests/stubs that omit counts keep correct Defined/Tracked numbers.
@@ -61,10 +62,11 @@ public static class DashboardViewBuilder
             OpenRetroActionItems = ledger.OpenActionItems,
             Counts = ledger,
             HasTimeline = hasTimeline,
-            FollowUps = FollowUpGeometry.From(
+            FollowUps = followUps ?? FollowUpGeometry.From(
                 sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
                 ledger,
-                work),
+                work,
+                epics: epicsModel),
             NextStepsHtml = epicsModel is { } epics
                 ? BmadCommands.RenderProjectNextSteps(epics, commands)
                 : string.Empty,

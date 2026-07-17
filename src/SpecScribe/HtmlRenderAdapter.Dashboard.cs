@@ -120,8 +120,9 @@ public sealed partial class HtmlRenderAdapter
     }
 
     /// <summary>The unified homepage tile band — headline stats + Epic Status + Overall Progress + Deferred +
-    /// Action Items as one flex-wrap row set (typically two dense rows). Journey accents ride on each card;
-    /// the first card of a group carries a floating group caption above it.</summary>
+    /// Action Items as one flex-wrap row set (typically two dense rows). Journey accents and work-stage
+    /// visibility classes ride on each card; the first card of a group carries a floating caption. No cluster
+    /// wrappers — wrappers would break the wrap into uneven columns. [Story 9.8]</summary>
     private void AppendTileBand(StringBuilder sb, DashboardView view, ProgressModel p)
     {
         sb.Append("<div class=\"dashboard-tile-band\">\n");
@@ -140,37 +141,24 @@ public sealed partial class HtmlRenderAdapter
         Claim(executionTiles);
         Claim(insightTiles);
 
-        // Requirements tiles — Overview + Requirements + Track (requirement counts).
-        sb.Append("<div class=\"wm-panel wm-show-overview wm-show-requirements wm-show-track\">\n");
-        AppendStatJourney(sb, "requirements", "Requirements", reqTiles);
-        sb.Append("</div>\n");
-
-        // Epics & Stories + Epic Status — Overview + Plan + Review + Track (status by epic).
-        sb.Append("<div class=\"wm-panel wm-show-overview wm-show-plan wm-show-review wm-show-track\">\n");
-        AppendEpicsJourney(sb, p, view.Epics, epicStoryTiles);
-        sb.Append("</div>\n");
-
-        // Execution + Overall Progress — Overview + Review + Track (high-level status).
-        sb.Append("<div class=\"wm-panel wm-show-overview wm-show-review wm-show-track\">\n");
-        AppendExecutionJourney(sb, view.ProgressBars, executionTiles);
-        sb.Append("</div>\n");
-
-        // Follow-ups — Overview + Review.
-        sb.Append("<div class=\"wm-panel wm-show-overview wm-show-review\">\n");
-        AppendFollowUpJourney(sb, view.Work, view.OpenRetroActionItems, view.Counts);
-        sb.Append("</div>\n");
-
-        // Insights (commits) — Overview + Develop.
-        sb.Append("<div class=\"wm-panel wm-show-overview wm-show-develop\">\n");
-        AppendStatJourney(sb, "insights", "Insights", insightTiles);
-        sb.Append("</div>\n");
+        // Visibility classes live ON each tile so flex-wrap still sees cards as peers.
+        AppendStatJourney(sb, "requirements", "Requirements", reqTiles,
+            "wm-panel wm-show-overview wm-show-requirements wm-show-track");
+        AppendEpicsJourney(sb, p, view.Epics, epicStoryTiles,
+            "wm-panel wm-show-overview wm-show-plan wm-show-review wm-show-track");
+        AppendExecutionJourney(sb, view.ProgressBars, executionTiles,
+            "wm-panel wm-show-overview wm-show-review wm-show-track");
+        AppendFollowUpJourney(sb, view.Work, view.OpenRetroActionItems, view.Counts,
+            "wm-panel wm-show-overview wm-show-review");
+        AppendStatJourney(sb, "insights", "Insights", insightTiles,
+            "wm-panel wm-show-overview wm-show-develop");
 
         foreach (var tile in view.StatTiles)
         {
             if (claimed.Contains(tile.Label)) continue;
-            sb.Append("<div class=\"wm-panel wm-show-overview\">\n");
-            sb.Append(Charts.StatCard(tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href));
-            sb.Append("</div>\n");
+            sb.Append(Charts.StatCard(
+                tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
+                extraClass: "wm-panel wm-show-overview"));
         }
 
         sb.Append("</div>\n\n");
@@ -179,48 +167,52 @@ public sealed partial class HtmlRenderAdapter
     private static bool IsRequirementsStat(StatTile tile) =>
         tile.Label is "Functional reqs" or "Non-functional" or "Design reqs";
 
-    private static void AppendStatJourney(StringBuilder sb, string key, string label, IReadOnlyList<StatTile> tiles)
+    private static void AppendStatJourney(
+        StringBuilder sb, string key, string label, IReadOnlyList<StatTile> tiles, string showClass)
     {
         for (var i = 0; i < tiles.Count; i++)
         {
             var tile = tiles[i];
             sb.Append(Charts.StatCard(
                 tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
-                extraClass: $"journey-card journey-{key}",
+                extraClass: $"journey-card journey-{key} {showClass}",
                 journeyLabel: i == 0 ? label : null));
         }
     }
 
-    private void AppendEpicsJourney(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, IReadOnlyList<StatTile> tiles)
+    private void AppendEpicsJourney(
+        StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, IReadOnlyList<StatTile> tiles, string showClass)
     {
         for (var i = 0; i < tiles.Count; i++)
         {
             var tile = tiles[i];
             sb.Append(Charts.StatCard(
                 tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
-                extraClass: "journey-card journey-epics",
+                extraClass: $"journey-card journey-epics {showClass}",
                 journeyLabel: i == 0 ? "Epics & Stories" : null));
         }
-        AppendEpicStatusTile(sb, p, epicsModel, lead: tiles.Count == 0);
+        AppendEpicStatusTile(sb, p, epicsModel, showClass, lead: tiles.Count == 0);
     }
 
-    private void AppendExecutionJourney(StringBuilder sb, IReadOnlyList<ProgressBarView> bars, IReadOnlyList<StatTile> tiles)
+    private void AppendExecutionJourney(
+        StringBuilder sb, IReadOnlyList<ProgressBarView> bars, IReadOnlyList<StatTile> tiles, string showClass)
     {
         for (var i = 0; i < tiles.Count; i++)
         {
             var tile = tiles[i];
             sb.Append(Charts.StatCard(
                 tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
-                extraClass: "journey-card journey-execution",
+                extraClass: $"journey-card journey-execution {showClass}",
                 journeyLabel: i == 0 ? "Execution" : null));
         }
-        AppendOverallProgressTile(sb, bars, lead: tiles.Count == 0);
+        AppendOverallProgressTile(sb, bars, showClass, lead: tiles.Count == 0);
     }
 
-    private void AppendFollowUpJourney(StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts)
+    private void AppendFollowUpJourney(
+        StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts, string showClass)
     {
         if (!HasFollowUpTiles(work, openRetro)) return;
-        AppendWorkSummaryCards(sb, work, openRetro, counts, lead: true);
+        AppendWorkSummaryCards(sb, work, openRetro, counts, showClass, lead: true);
     }
 
     private static bool HasFollowUpTiles(WorkInventory work, int openRetro) =>
@@ -228,13 +220,14 @@ public sealed partial class HtmlRenderAdapter
 
     /// <summary>Compact Overall Progress tile — donut centered above a Stories-Defined-style label.
     /// Omitted entirely when there are no bars so an empty Execution accent never appears alone.</summary>
-    private void AppendOverallProgressTile(StringBuilder sb, IReadOnlyList<ProgressBarView> bars, bool lead = false)
+    private void AppendOverallProgressTile(
+        StringBuilder sb, IReadOnlyList<ProgressBarView> bars, string showClass, bool lead = false)
     {
         if (bars.Count == 0) return;
 
         var leadAttr = lead ? " journey-lead" : string.Empty;
         var leadHtml = lead ? "<span class=\"tile-journey-label\">Execution</span>" : string.Empty;
-        sb.Append($"<div class=\"stat-card tile-card overall-progress-tile journey-card journey-execution{leadAttr}\">\n");
+        sb.Append($"<div class=\"stat-card tile-card overall-progress-tile journey-card journey-execution{leadAttr} {showClass}\">\n");
         sb.Append(leadHtml);
         var ring = bars.Count > 1 && bars[1].Max > 0 ? bars[1] : bars[0];
         var pct = ring.Max <= 0 ? 0 : (int)Math.Round(Math.Clamp((double)ring.Value / ring.Max * 100, 0, 100));
@@ -254,11 +247,12 @@ public sealed partial class HtmlRenderAdapter
 
     /// <summary>Compact Epic Status donut tile — donut centered above a Stories-Defined-style label.
     /// Segments come from the retro-gated <see cref="StatusStyles.ForEpicWithRetrospective"/> roll-up.</summary>
-    private void AppendEpicStatusTile(StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, bool lead = false)
+    private void AppendEpicStatusTile(
+        StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, string showClass, bool lead = false)
     {
         var leadAttr = lead ? " journey-lead" : string.Empty;
         var leadHtml = lead ? "<span class=\"tile-journey-label\">Epics &amp; Stories</span>" : string.Empty;
-        sb.Append($"<div class=\"stat-card tile-card epic-status-tile journey-card journey-epics{leadAttr}\">\n");
+        sb.Append($"<div class=\"stat-card tile-card epic-status-tile journey-card journey-epics{leadAttr} {showClass}\">\n");
         sb.Append(leadHtml);
 
         List<(string Label, int Value, string CssClass)> segments;
@@ -432,7 +426,8 @@ public sealed partial class HtmlRenderAdapter
 
     /// <summary>Deferred Work / Action Items follow-up tiles — same StatCard language as the rest of the band
     /// (large number + uppercase label + sub-line). Independently gated. Counts from the portal-wide ledger.</summary>
-    private void AppendWorkSummaryCards(StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts, bool lead = false)
+    private void AppendWorkSummaryCards(
+        StringBuilder sb, WorkInventory work, int openRetro, ProjectCounts counts, string showClass, bool lead = false)
     {
         var leadUsed = false;
         if (work.Deferred is { } deferred)
@@ -444,7 +439,7 @@ public sealed partial class HtmlRenderAdapter
                 $"open {Charts.Plural(count, "item", "items")}",
                 tooltip: $"{count} open deferred {Charts.Plural(count, "item", "items")} tracked outside the epic plan.",
                 href: deferred.OutputPath,
-                extraClass: "journey-card journey-followup work-summary-card deferred",
+                extraClass: $"journey-card journey-followup work-summary-card deferred {showClass}",
                 journeyLabel: lead && !leadUsed ? "Follow up" : null));
             leadUsed = true;
         }
@@ -457,7 +452,7 @@ public sealed partial class HtmlRenderAdapter
                 $"open {Charts.Plural(openRetro, "item", "items")}",
                 tooltip: $"{openRetro} open retro action {Charts.Plural(openRetro, "item", "items")}.",
                 href: SiteNav.ActionItemsOutputPath,
-                extraClass: "journey-card journey-followup work-summary-card retro",
+                extraClass: $"journey-card journey-followup work-summary-card retro {showClass}",
                 journeyLabel: lead && !leadUsed ? "Follow up" : null));
         }
     }

@@ -287,8 +287,10 @@ public class RetroTests : IDisposable
 
         var detail = FollowUpDetailTemplater.RenderActionPage(
             open[0], FollowUpSlug.AssignActionSlugs(open)[open[0]], nav, commands, map, epicsModel: epics);
+        Assert.Contains("class=\"chart-panel next-steps\"", detail);
         Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix Story 1.1 heatmap debt before Epic 2\"", detail);
         Assert.DoesNotContain("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix <a", detail);
+        Assert.Contains("Copies a quick-dev prompt", detail);
     }
 
     private static int CountOccurrences(string haystack, string needle)
