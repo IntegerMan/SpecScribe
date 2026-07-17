@@ -436,7 +436,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 9.9 review patches: Overall donut from ProjectCounts ledger; chip hrefs prefer
         // #at-a-glance when FR+NFR exist; Home panel gates on Everything; zero-count chips are non-links;
         // a.satisfaction-chip cursor only. [Story 9.9 code review; golden-diff-normalization-gotchas]
-        const string expected = "88534c283119f6a9a0ed46c5802135673f12bd5bfc0d6992fd6183a90d456e20";
+        // Regenerated for FollowUpRow summary: preference — deferred titles prefer authored summary:
+        // over source_spec: noise (FollowUpRow.cs code page also shifts).
+        const string expected = "87942ed2e8b9fd2d0e46b73e3ec8f41aefc83482c94b9f731e18b9bccca961be";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

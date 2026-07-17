@@ -1877,6 +1877,47 @@ So that I can deep-link to a single follow-up and read its full provenance and r
 **Then** they link to that item's detail URL (completing 9.7's "navigable into their detail/provenance surfaces" AC), and the counts and set of items shown remain the Story 8.3 ledger's
 **And** these surfaces degrade to absent when the underlying artifacts do not exist (NFR8).
 
+### Story 9.12: Unplanned and One-Off Work in Geometry and Sprint
+
+As a maintainer scanning remaining work,
+I want quick-dev / one-shot specs and other unattributable one-offs to appear as first-class unplanned work — both on the project sunburst and on the sprint board —
+So that parked direct work is visible beside the epic plan instead of vanishing into an opaque Follow-ups bucket or living only as a Home tile.
+
+**Acceptance Criteria:**
+
+1.
+**Given** open quick-dev (`route: one-shot`) specs and/or deferred items whose provenance cannot resolve to an epic
+**When** the project sunburst renders
+**Then** those items appear under a dedicated synthetic root slice (e.g. Unplanned / Direct work), separate from epic-attributed stories and from retro action items that do have an epic
+**And** when provenance or sprint timing can identify an epic, the item prefers that epic's story ring over the Unplanned root
+**And** counts remain ledger-agreed (Story 8.3); NFR8 omits the Unplanned slice when empty.
+
+2.
+**Given** the same unplanned / one-off set
+**When** the sprint board renders
+**Then** those items also appear in an unplanned / one-off lane (or equivalent board grouping) so the sprint view and the sunburst describe the same residual work
+**And** no new authoring schema is required — attribution derives from existing provenance, frontmatter, and sprint data.
+
+### Story 9.13: Generated Filtered Follow-Up Group Pages and Sunburst Click Destinations
+
+As a maintainer clicking a sunburst wedge,
+I want every click to land on either that item's detail page or a generated list page that contains only the relevant group,
+So that group wedges never dump me into the full deferred-work or action-items dump.
+
+**Acceptance Criteria:**
+
+1. **OWNER-LOCKED — generated filtered pages (not hash/query filters on the full list).**
+**Given** a follow-up group that appears in the sunburst (an epic's attributed follow-ups, the Unplanned / Direct root, unattributed action items, etc.)
+**When** the site generates
+**Then** a dedicated filtered list page is written for that group (e.g. under `follow-ups/…`, sibling to Story 9.11 detail pages), using the shared Story 9.10 row grammar
+**And** the page lists only that group's items; NFR8: no empty group pages.
+
+2.
+**Given** the project or epic sunburst
+**When** a leaf wedge is clicked (story, action item, deferred item, quick-dev item)
+**Then** it links to that item's detail page (Story 9.11 / story page / spec page)
+**And** when a group wedge is clicked (epic follow-up aggregate, Unplanned root, Follow-ups slice), it links to that group's generated filtered list page — never the unfiltered whole-site deferred-work or action-items index.
+
 ## Epic 10: Portal Legibility for Every Audience
 
 Make every surface navigable and correctly interpretable by first-time visitors, non-BMAD stakeholders, and tech leads: insight pages reachable from the nav, every chart self-explaining, vocabulary defined in place, and consistent dates, references, and TOC treatment. Serves the onboarding (5) and health-insight (6) journeys defined in docs/UserJourneys.md — the adoption deciders.
@@ -2020,7 +2061,7 @@ So that wedge density never becomes a wall of unreadable slices and I can still 
 **Given** a project sunburst whose story/follow-up ring has enough peers that individual wedges become hard to hit or read
 **When** it renders
 **Then** the chart offers a clear navigability path — for example progressive drill-down (project → epic → story/follow-up), a companion scannable list, focus/hover emphasis that survives keyboard, or an alternate density mode — rather than relying on ever-tinier SVG wedges alone
-**And** existing deep links (story pages, follow-up detail slugs) remain the destination of any wedge or list row that represents an item.
+**And** leaf and group click destinations remain the Story 9.13 contract (detail page vs generated filtered group page) — this story does not invent a parallel navigation scheme.
 
 2.
 **Given** an epic-scoped sunburst with a large attributed follow-up set

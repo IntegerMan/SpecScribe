@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SpecScribe;
 
@@ -6,12 +7,29 @@ namespace SpecScribe;
 /// Heavy per-item detail lives in a collapsed <c>&lt;details&gt;</c> until Story 9.11 detail URLs land. [Story 9.10]</summary>
 public static class FollowUpRow
 {
-    /// <summary>Derives a short plain-text lead from existing authored text — first sentence when
-    /// reasonable, otherwise truncated. No new authoring fields. [Story 9.10]</summary>
+    private static readonly Regex SummaryField = new(
+        @"^\s*summary:\s*(?<text>.+?)\s*$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+    private static readonly Regex MetadataLine = new(
+        @"^\s*(?:source_spec|evidence)\s*:.*$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+    /// <summary>Derives a short plain-text lead from existing authored text — prefers an authored
+    /// <c>summary:</c> field when present, otherwise the first non-metadata sentence. No new authoring
+    /// schema. [Story 9.10]</summary>
     public static string SummarizePlainText(string plainText, int maxChars = 120)
     {
         if (string.IsNullOrWhiteSpace(plainText)) return string.Empty;
-        var trimmed = plainText.Trim();
+
+        var summary = SummaryField.Match(plainText);
+        if (summary.Success)
+            return TruncatePlainText(summary.Groups["text"].Value.Trim(), maxChars);
+
+        var withoutMeta = MetadataLine.Replace(plainText, "");
+        var trimmed = withoutMeta.Trim();
+        if (trimmed.Length == 0) trimmed = plainText.Trim();
+
         var end = FindFirstSentenceEnd(trimmed);
         var lead = end > 0 ? trimmed[..end].Trim() : trimmed;
         return TruncatePlainText(lead, maxChars);

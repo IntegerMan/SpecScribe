@@ -2,6 +2,10 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 9-8-authoring-and-delivery-workflow-coherence.md (2026-07-17)
+
+- Accent/kicker slug heuristics (`AccentForCommand` / `KickerForCommand`) default unknown catalog slugs to accent `ready` and kicker "Also consider"; `sprint-status` painted `active`. Tolerable card polish; revisit if command accents become user-facing contract. [`BmadCommands.cs:195`]
+
 ## Deferred from: code review of 9-6-follow-up-item-provenance-and-resolution-paths.md (2026-07-17)
 
 - Top-level deferred bullets only recognized as column-0 `- ` / `-\t`; `*` / `+` / numbered lists never become items. Live notes use `-`; foreign frameworks may not. [`DeferredWorkParser.cs:139`]

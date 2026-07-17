@@ -137,6 +137,16 @@ Concrete silhouette rules:
   - [x] Golden fingerprint will move (home body) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Confirm three `Render*ParityTests` green.
   - [x] Run `dotnet test` from repo root.
 
+### Review Findings
+
+- [ ] [Review][Decision] Work-mode IA shipped as hide-tabs (#3), not locked silhouette #2 — Code uses `display:none` with stages Overview · Requirements · Plan · Develop · Review · Track; Overview default hides Journey 1 panels (Pipeline / Now & Next / Git Pulse lack `wm-show-overview`); Develop hides Project Next Steps (`wm-show-overview wm-show-review` only). Story/comments/tests still claim highlight-never-hide Gather/Draft. Choose: restore locked #2, or re-lock the shipped IA and rewrite AC/tests/docs.
+- [ ] [Review][Decision] Next Steps card polish vs 8.5 primary/alternates seam — `RenderInner` now shows up to 3 peer cards (`.next-steps-cards`) and only demotes after the 3rd; dropped `<ul class="next-steps-list">` list semantics. Spec locked extend of `.next-steps-primary` / `.next-steps-alternates`. Choose: keep card polish (update story), or restore 8.5 primary + Other actions.
+- [ ] [Review][Patch] Ready empty-lane create-story ignores ForProject epic filter [`SprintTemplater.cs:48`]
+- [ ] [Review][Patch] Coherence tests do not assert Ready-lane story id matches Home Next Steps create-story [`ModuleContextTests` / `SprintTemplaterTests`]
+- [ ] [Review][Patch] Next Steps work-mode classes injected via brittle `String.Replace` on exact `class="chart-panel next-steps"` [`HtmlRenderAdapter.Dashboard.cs:52`]
+- [ ] [Review][Patch] Null epics model still emits full work-mode stage set (NFR8 prefers Overview-only / omit empty stages) [`HtmlRenderAdapter.cs:197`]
+- [x] [Review][Defer] Accent/kicker slug heuristics default unknown commands to `ready` / "Also consider" [`BmadCommands.cs:195`] — deferred, pre-existing polish pattern in new card path
+
 ## Dev Notes
 
 ### Why this exists (product gap)
