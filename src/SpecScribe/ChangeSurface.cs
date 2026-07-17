@@ -92,6 +92,9 @@ public static class ChangeSurface
         return label.Length > 0 ? label : displayLabel;
     }
 
+    /// <summary>Display label for a File List row (filename, preserving annotations like <c>(new)</c>).</summary>
+    public static string FileListLabelPublic(string displayLabel) => FileListLabel(displayLabel);
+
     /// <summary>Classifies changed file paths into surface buckets per ADR 0007. Returns human-readable
     /// labels suitable for display (e.g. "visual", "rendered UI", "plumbing (no new visible surface)").</summary>
     public static IReadOnlyList<string> ClassifyPaths(IReadOnlyList<string> paths)
@@ -177,42 +180,22 @@ public static class ChangeSurface
     /// <summary>Builds the host-neutral change-surface view from standard BMAD artifact sections. [ADR 0007]</summary>
     public static StoryChangeSurface Build(
         string? rawArtifact,
-        string? status,
         IReadOnlyList<AcceptanceCriterion> acceptanceCriteria,
-        Func<string, string?>? resolveCodePageHref = null,
+        Func<FileListEntry, ChangeSurfaceFile>? resolveFile = null,
         string? verifyBeforeReviewHtml = null)
     {
         var entries = ExtractFileListEntries(rawArtifact);
         var classifications = ClassifyPaths(entries.Select(e => e.Path).ToList());
 
         var changedFiles = entries
-            .Select(e =>
-            {
-                var label = FileListLabel(e.DisplayLabel);
-                var href = resolveCodePageHref?.Invoke(e.Path);
-                return new ChangeSurfaceFile(e.Path, label, href);
-            })
+            .Select(e => resolveFile?.Invoke(e) ?? new ChangeSurfaceFile(
+                e.Path, FileListLabel(e.DisplayLabel), null, ChangeSurfaceFileKind.Other))
             .ToList();
 
         var checklist = acceptanceCriteria
             .Select(ac => (ac.Number, ac.PlainText))
             .ToList();
 
-        string? shipLine = null;
-        if (status is { Length: > 0 } s)
-        {
-            var changelog = EpicsParser.ExtractChangeLogVerification(rawArtifact);
-            if (changelog is { } cl)
-            {
-                var dateText = cl.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-                shipLine = $"{s} · {dateText} — {cl.Action}";
-            }
-            else
-            {
-                shipLine = s;
-            }
-        }
-
-        return new StoryChangeSurface(classifications, checklist, changedFiles, shipLine, verifyBeforeReviewHtml);
+        return new StoryChangeSurface(classifications, checklist, changedFiles, verifyBeforeReviewHtml);
     }
 }

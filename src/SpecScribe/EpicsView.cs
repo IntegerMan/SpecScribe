@@ -109,6 +109,10 @@ public sealed record EpicsIndexView
 
     /// <summary>The "Further Development" chip section (empty → omitted).</summary>
     public required IReadOnlyList<EpicChip> FurtherDevelopmentChips { get; init; }
+
+    /// <summary>Open follow-ups for the project sunburst's outermost band. Defaults to
+    /// <see cref="FollowUpGeometry.Empty"/> (no 4th ring). [Story 9.7]</summary>
+    public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
 }
 
 /// <summary>The host-neutral SECTION view model for a single EPIC page body. The header + progress bars + the
@@ -174,6 +178,10 @@ public sealed record EpicPageView
     /// <summary>The prev/next sibling pager (adjacent epics by number), rendered inline in the header. Defaults
     /// to <see cref="EntityPager.None"/> so non-generator constructions render no pager. [Prev/next navigation]</summary>
     public EntityPager Pager { get; init; } = EntityPager.None;
+
+    /// <summary>Open follow-ups scoped to this epic for the epic sunburst's outermost band. Defaults to
+    /// <see cref="FollowUpGeometry.Empty"/> (no 4th ring when this epic has none). [Story 9.7]</summary>
+    public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
 }
 
 /// <summary>Compact verification facts for the story-page evidence strip — tasks (from
@@ -187,8 +195,18 @@ public sealed record StoryEvidence(
     DateOnly? VerifiedDate,
     bool VerifiedIsReview);
 
-/// <summary>One file from the Dev Agent Record File List with an optional link to its code page.</summary>
-public sealed record ChangeSurfaceFile(string Path, string Label, string? Href);
+/// <summary>How a touched file should read in the change-surface panel.</summary>
+public enum ChangeSurfaceFileKind
+{
+    Code,
+    CodeNew,
+    Sprint,
+    StoryArtifact,
+    Other,
+}
+
+/// <summary>One file from the Dev Agent Record File List with an optional link and surface kind.</summary>
+public sealed record ChangeSurfaceFile(string Path, string Label, string? Href, ChangeSurfaceFileKind Kind);
 
 /// <summary>Host-neutral projection of a story's testable change footprint — derived from standard BMAD
 /// sections only (File List, Acceptance Criteria, Status/Change Log). Data only; markup lives in the
@@ -197,7 +215,6 @@ public sealed record StoryChangeSurface(
     IReadOnlyList<string> Classifications,
     IReadOnlyList<(int Number, string PlainText)> VerifyChecklist,
     IReadOnlyList<ChangeSurfaceFile> ChangedFiles,
-    string? ShipLine,
     string? VerifyBeforeReviewHtml);
 
 /// <summary>The host-neutral SECTION view model for a drafted STORY page body. Its identity/status/drill are

@@ -44,7 +44,7 @@ public sealed partial class HtmlRenderAdapter
         {
             sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
-            sb.Append(Charts.Sunburst(epicsForSunburst, commands: view.Commands));
+            sb.Append(Charts.Sunburst(epicsForSunburst, commands: view.Commands, followUps: view.FollowUps));
             sb.Append("</div>\n\n");
         }
 

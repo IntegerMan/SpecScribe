@@ -157,19 +157,25 @@ public static class Charts
     /// edge of the data. Every epic/story segment (and the placeholder) is a real link; colors come from
     /// <see cref="StatusStyles"/> via .sb-* CSS classes. When <paramref name="commands"/> exposes a
     /// create-story command, the placeholder tooltip names it. Pure SVG — no JS. [UXO E4]</summary>
-    public static string Sunburst(EpicsModel model, int size = 380, CommandCatalog? commands = null)
+    public static string Sunburst(EpicsModel model, int size = 380, CommandCatalog? commands = null, FollowUpGeometry? followUps = null)
     {
         var epics = model.Epics.OrderBy(e => e.Number).ToList();
         if (epics.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
 
+        var geometry = followUps ?? FollowUpGeometry.Empty;
+        var hasFollowUps = geometry.HasRing;
+
         var c = size / 2.0;
-        // Ring radii, proportional to the overall size.
-        var epicInner = size * 0.16;
-        var epicOuter = size * 0.28;
-        var storyInner = size * 0.285;
-        var storyOuter = size * 0.415;
-        var taskInner = size * 0.42;
-        var taskOuter = size * 0.465;
+        // Ring radii, proportional to the overall size. When open follow-ups exist, shrink the inner three
+        // slightly to make room for the outermost follow-up band (Story 9.7 locked silhouette).
+        var epicInner = size * (hasFollowUps ? 0.14 : 0.16);
+        var epicOuter = size * (hasFollowUps ? 0.25 : 0.28);
+        var storyInner = size * (hasFollowUps ? 0.255 : 0.285);
+        var storyOuter = size * (hasFollowUps ? 0.37 : 0.415);
+        var taskInner = size * (hasFollowUps ? 0.375 : 0.42);
+        var taskOuter = size * (hasFollowUps ? 0.42 : 0.465);
+        var followupInner = size * 0.425;
+        var followupOuter = size * 0.48;
 
         var totalWeight = epics.Sum(e => Math.Max(1, e.Stories.Count));
         var anglePerUnit = 2 * Math.PI / totalWeight;
@@ -242,16 +248,21 @@ public static class Charts
             angle += sweep;
         }
 
+        if (hasFollowUps)
+        {
+            AppendFollowUpRing(sb, geometry, c, followupInner, followupOuter, pad);
+        }
+
         // The chart is organized around its epics (inner ring), so the center headlines the epic count — the
         // story/task rings tell the finer-grained story. [spec-sunburst-epic-focus-and-ready-rollup]
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{epics.Count}</text>\n");
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(epics.Count, "epic", "epics")}</text>\n");
         sb.Append("</svg>\n");
 
-        sb.Append(SunburstLegend(
-            ("pending", "Pending"), ("drafted", "Drafted"), ("ready", "Ready for dev"),
-            ("active", "In development"), ("review", "In review"), ("done", "Done")));
-        sb.Append("<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
+        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasFollowUps, geometry)));
+        sb.Append(hasFollowUps
+            ? "<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories &middot; outer: task completion &middot; outermost: open follow-ups. Click any segment to open it.</div>\n\n"
+            : "<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
         return sb.ToString();
     }
 
@@ -311,6 +322,70 @@ public static class Charts
         sb.Append($"<title>{Html(title)}</title></path></a>\n");
     }
 
+    /// <summary>Outermost follow-up band: one wedge per open action item (epic-number ascending, file order
+    /// within epic, unattributed last) plus an optional deferred aggregate. Equal angular weight; dashed
+    /// <c>.sb-followup-*</c> classes — never story-stage fills, never "Story …" aria. [Story 9.7]</summary>
+    private static void AppendFollowUpRing(StringBuilder sb, FollowUpGeometry geometry, double c, double rInner, double rOuter, double pad)
+    {
+        var wedges = EnumerateFollowUpWedges(geometry).ToList();
+        if (wedges.Count == 0) return;
+
+        var sweep = 2 * Math.PI / wedges.Count;
+        var angle = -Math.PI / 2;
+        foreach (var wedge in wedges)
+        {
+            sb.Append($"  <a href=\"{Html(wedge.Href)}\" aria-label=\"{Html(wedge.Aria)}\">");
+            sb.Append($"<path class=\"sb-seg sb-{wedge.CssClass}\" d=\"{AnnularSector(c, rInner, rOuter, angle + pad, angle + sweep - pad)}\">");
+            sb.Append($"<title>{Html(wedge.Title)}</title></path></a>\n");
+            angle += sweep;
+        }
+    }
+
+    private static IEnumerable<(string Aria, string Title, string Href, string CssClass)> EnumerateFollowUpWedges(FollowUpGeometry geometry)
+    {
+        // Deterministic: epic number ascending, original list order within epic, unattributed (null epic) last.
+        var ordered = geometry.OpenActionItems
+            .Select((item, index) => (item, index))
+            .OrderBy(t => t.item.EpicNumber ?? int.MaxValue)
+            .ThenBy(t => t.index)
+            .Select(t => t.item);
+
+        foreach (var item in ordered)
+        {
+            var text = TruncateFollowUpText(PathUtil.StripHtmlTags(item.Action));
+            var label = $"Action item: {text}";
+            yield return (label, label, geometry.ActionItemsHref, "followup-action");
+        }
+
+        if (geometry.DeferredOpenCount > 0 && geometry.DeferredHref is { Length: > 0 } href)
+        {
+            var label = $"Deferred work: {geometry.DeferredOpenCount} open {Plural(geometry.DeferredOpenCount, "item", "items")}";
+            yield return (label, label, href, "followup-deferred");
+        }
+    }
+
+    private static (string Status, string Label)[] BuildSunburstLegendItems(bool hasFollowUps, FollowUpGeometry geometry)
+    {
+        var items = new List<(string, string)>
+        {
+            ("pending", "Pending"), ("drafted", "Drafted"), ("ready", "Ready for dev"),
+            ("active", "In development"), ("review", "In review"), ("done", "Done"),
+        };
+        if (!hasFollowUps) return items.ToArray();
+
+        if (geometry.OpenActionItems.Count > 0)
+            items.Add(("followup-action", "Action item"));
+        if (geometry.DeferredOpenCount > 0 && geometry.DeferredHref is { Length: > 0 })
+            items.Add(("followup-deferred", "Deferred work"));
+        return items.ToArray();
+    }
+
+    private static string TruncateFollowUpText(string text, int max = 80)
+    {
+        if (text.Length <= max) return text;
+        return text[..(max - 1)].TrimEnd() + "…";
+    }
+
     /// <summary>SVG path for an annular sector (donut slice) between two angles at two radii.</summary>
     private static string AnnularSector(double c, double rInner, double rOuter, double a0, double a1)
     {
@@ -332,15 +407,20 @@ public static class Charts
     /// page. Every segment is a real link: to the story's detail page when one exists, otherwise an
     /// in-page anchor down to its story card (supplied via <paramref name="hrefBuilder"/>). A story with no
     /// task plan yet gets the same faint dashed placeholder arc as the project sunburst. [UXO E4]</summary>
-    public static string EpicSunburst(EpicInfo epic, Func<StoryInfo, string> hrefBuilder, int size = 320, CommandCatalog? commands = null)
+    public static string EpicSunburst(EpicInfo epic, Func<StoryInfo, string> hrefBuilder, int size = 320, CommandCatalog? commands = null, FollowUpGeometry? followUps = null)
     {
         if (epic.Stories.Count == 0) return "<div class=\"chart-empty\">No stories drafted for this epic yet.</div>";
 
+        var geometry = (followUps ?? FollowUpGeometry.Empty).ForEpic(epic.Number);
+        var hasFollowUps = geometry.HasRing;
+
         var c = size / 2.0;
-        var storyInner = size * 0.16;
-        var storyOuter = size * 0.36;
-        var taskInner = size * 0.37;
-        var taskOuter = size * 0.46;
+        var storyInner = size * (hasFollowUps ? 0.14 : 0.16);
+        var storyOuter = size * (hasFollowUps ? 0.32 : 0.36);
+        var taskInner = size * (hasFollowUps ? 0.33 : 0.37);
+        var taskOuter = size * (hasFollowUps ? 0.41 : 0.46);
+        var followupInner = size * 0.415;
+        var followupOuter = size * 0.48;
 
         var count = epic.Stories.Count;
         var anglePerStory = 2 * Math.PI / count;
@@ -386,16 +466,21 @@ public static class Charts
             angle += anglePerStory;
         }
 
+        if (hasFollowUps)
+        {
+            AppendFollowUpRing(sb, geometry, c, followupInner, followupOuter, pad);
+        }
+
         // The inner ring is this epic's stories, so headline the story count (matching the project sunburst's
         // epic-count center) rather than a task fraction that duplicates the outer ring. [epic-sunburst story-count]
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{count}</text>\n");
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(count, "story", "stories")}</text>\n");
         sb.Append("</svg>\n");
 
-        sb.Append(SunburstLegend(
-            ("pending", "Pending"), ("drafted", "Drafted"), ("ready", "Ready for dev"),
-            ("active", "In development"), ("review", "In review"), ("done", "Done")));
-        sb.Append("<div class=\"sunburst-hint\">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
+        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasFollowUps, geometry)));
+        sb.Append(hasFollowUps
+            ? "<div class=\"sunburst-hint\">Inner ring: stories &middot; outer: task completion &middot; outermost: open follow-ups. Click any segment to open it.</div>\n\n"
+            : "<div class=\"sunburst-hint\">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
         return sb.ToString();
     }
 

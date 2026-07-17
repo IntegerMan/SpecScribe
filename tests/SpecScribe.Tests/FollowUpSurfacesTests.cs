@@ -267,6 +267,37 @@ public class FollowUpSurfacesTests : IDisposable
     }
 
     [Fact]
+    public void HomeAndEpicSunburst_ShowFollowUpGeometry_WhenOpenItemsExist()
+    {
+        // Story 9.7: open action items appear as outermost sunburst wedges on home + owning epic pages;
+        // an epic with none omits the ring. StatCards stay ledger-backed (unchanged path).
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), SprintWithDupes);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), StructuredDeferred);
+
+        Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        Assert.Contains("sb-followup-action", index);
+        Assert.Contains("sb-followup-deferred", index);
+        Assert.Contains("outermost: open follow-ups", index);
+        Assert.Contains($"href=\"{SiteNav.ActionItemsOutputPath}\"", index);
+        Assert.Contains("Action item</span>", index);
+        // StatCards still present (geometry does not replace them).
+        Assert.Contains("Action items", index);
+        Assert.Contains("Deferred work", index);
+
+        var epic1 = File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html"));
+        Assert.Contains("sb-followup-action", epic1);
+        Assert.Contains("href=\"../action-items.html\"", epic1);
+        Assert.Contains("Schedule retros promptly", epic1); // truncated title may shorten; aria carries text
+        Assert.DoesNotContain("sb-followup-deferred", epic1); // aggregate deferred not epic-attributed
+
+        // SprintWithDupes has open items on epic 1 and epic 2 — both should show the ring.
+        var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
+        Assert.Contains("sb-followup-action", epic2);
+    }
+
+    [Fact]
     public void NearDuplicate_CanonicalPairMatches_UnrelatedDoesNot()
     {
         var a = "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog for review before Epic 3 planning";

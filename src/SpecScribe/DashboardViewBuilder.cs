@@ -61,6 +61,10 @@ public static class DashboardViewBuilder
             OpenRetroActionItems = ledger.OpenActionItems,
             Counts = ledger,
             HasTimeline = hasTimeline,
+            FollowUps = FollowUpGeometry.From(
+                sprint?.OpenActionItems ?? Array.Empty<SprintActionItem>(),
+                ledger,
+                work),
         };
     }
 

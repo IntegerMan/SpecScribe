@@ -757,17 +757,15 @@ public class HtmlRenderAdapterTests
         IReadOnlyList<string>? classifications = null,
         IReadOnlyList<(int Number, string PlainText)>? checklist = null,
         IReadOnlyList<ChangeSurfaceFile>? files = null,
-        string? shipLine = "review · 2026-07-09 — Code review passed",
         string? verifyBeforeReviewHtml = null) =>
         new(
             classifications ?? new[] { "visual", "rendered UI" },
             checklist ?? new[] { (1, "a compact evidence strip appears near the status badge") },
             files ?? new[]
             {
-                new ChangeSurfaceFile("src/SpecScribe/EpicsParser.cs", "EpicsParser.cs", "code/src/SpecScribe/EpicsParser.cs.html"),
-                new ChangeSurfaceFile("src/SpecScribe/assets/specscribe.css", "specscribe.css", "code/src/SpecScribe/assets/specscribe.css.html"),
+                new ChangeSurfaceFile("src/SpecScribe/EpicsParser.cs", "EpicsParser.cs", "code/src/SpecScribe/EpicsParser.cs.html", ChangeSurfaceFileKind.Code),
+                new ChangeSurfaceFile("src/SpecScribe/assets/specscribe.css", "specscribe.css", "code/src/SpecScribe/assets/specscribe.css.html", ChangeSurfaceFileKind.Code),
             },
-            shipLine,
             verifyBeforeReviewHtml);
 
     private static StoryPageView StoryBodyView(
@@ -814,6 +812,8 @@ public class HtmlRenderAdapterTests
         Assert.Contains("verified 2026-07-09", html);
         Assert.Contains("class=\"change-surface\"", html);
         Assert.Contains("change-surface-panel", html);
+        Assert.Contains("change-surface-title", html);
+        Assert.Contains("open>", html);
         Assert.Contains("id=\"sec-change-surface\"", html);
         Assert.Contains("visual + rendered UI", html);
         Assert.Contains("href=\"#ac-1\"", html);
@@ -822,7 +822,8 @@ public class HtmlRenderAdapterTests
         Assert.Contains("EpicsParser.cs", html);
         Assert.Contains("specscribe.css", html);
         Assert.Contains("class=\"change-surface-files\"", html);
-        Assert.Contains("class=\"change-surface-ship\"", html);
+        Assert.Contains("touch-file-code", html);
+        Assert.DoesNotContain("change-surface-ship", html);
         Assert.DoesNotContain("Latest:", html);
         Assert.DoesNotContain("class=\"evidence-link\"", html);
         // Panel sits below charts, not in the header evidence block.
@@ -858,7 +859,7 @@ public class HtmlRenderAdapterTests
     {
         var evidence = new StoryEvidence(0, 0, null, null, false);
         var surface = new StoryChangeSurface(
-            Array.Empty<string>(), Array.Empty<(int, string)>(), Array.Empty<ChangeSurfaceFile>(), null, null);
+            Array.Empty<string>(), Array.Empty<(int, string)>(), Array.Empty<ChangeSurfaceFile>(), null);
         var html = HtmlRenderAdapter.Shared.RenderStoryBody(
             StoryBodyView(evidence, surface, status: "ready-for-dev", devRecord: Array.Empty<DevAgentEntry>()));
 
@@ -878,7 +879,7 @@ public class HtmlRenderAdapterTests
         var verifyHtml = "<p>Open <code>action-items.html</code> and confirm grouping.</p>";
         var files = new[]
         {
-            new ChangeSurfaceFile("src/SpecScribe/Foo.cs", "Foo.cs (new)", "code/src/SpecScribe/Foo.cs.html"),
+            new ChangeSurfaceFile("src/SpecScribe/Foo.cs", "Foo.cs (new)", "code/src/SpecScribe/Foo.cs.html", ChangeSurfaceFileKind.CodeNew),
         };
         var surface = SampleSurface(files: files, verifyBeforeReviewHtml: verifyHtml);
         var evidence = new StoryEvidence(1, 1, "10 passing tests", null, false);
@@ -887,6 +888,7 @@ public class HtmlRenderAdapterTests
         Assert.Contains("change-surface-verify-manual", html);
         Assert.Contains("action-items.html", html);
         Assert.Contains("Foo.cs (new)", html);
+        Assert.Contains("touch-file-new", html);
         Assert.Contains("href=\"code/src/SpecScribe/Foo.cs.html\"", html);
     }
 

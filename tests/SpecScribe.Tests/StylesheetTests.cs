@@ -94,6 +94,8 @@ public class StylesheetTests
         Assert.Contains(".change-surface-verify", css);
         Assert.Contains(".change-surface-files", css);
         Assert.Contains(".change-surface-panel", css);
+        Assert.Contains(".touch-file-sprint", css);
+        Assert.Contains(".touch-file-story", css);
         Assert.DoesNotContain(".evidence-latest", css);
         Assert.DoesNotContain(".evidence-link", css);
     }
@@ -382,6 +384,12 @@ public class StylesheetTests
         Assert.Contains(".sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done)", css);
         // The focusable legend entries keep the shared on-brand focus ring.
         Assert.Contains(".sunburst-legend .sb-legend-item:focus-visible", css);
+        // Story 9.7 follow-up band: dashed stroke + legend swatch (never color-only / never a stage fill).
+        Assert.Contains(".sb-followup-action", css);
+        Assert.Contains(".sb-followup-deferred", css);
+        Assert.Contains("stroke-dasharray", css);
+        Assert.Contains(".sb-followup-action-sw", css);
+        Assert.Contains(".sunburst-panel:has(.sb-followup-action-item:hover) .sb-seg:not(.sb-followup-action)", css);
     }
 
     [Fact]

@@ -1364,6 +1364,20 @@ public sealed class SiteGenerator
         foreach (var file in sourceFiles)
         {
             ScanArtifact(file, PathUtil.NormalizeSlashes(ToSourceRelative(file)));
+            ScanFileListPaths(file);
+        }
+
+        void ScanFileListPaths(string artifactFile)
+        {
+            string raw;
+            try { raw = MarkdownConverter.ReadAllTextShared(artifactFile); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
+
+            foreach (var path in ChangeSurface.ExtractFileList(raw))
+            {
+                if (CodeReferenceScanner.TryResolveRepoFile(path, repoFull, sourceFull, out var repoRel))
+                    referenced.Add(repoRel);
+            }
         }
 
         foreach (var file in EnumerateAdrFiles())
@@ -1857,10 +1871,16 @@ public sealed class SiteGenerator
             _epicsSourcePath = RepoRelative(epicsFullPath);
 
             // Counts ledger may not exist yet (built after workInventory in GenerateAll) — provisional Build
-            // shares the same Defined/Tracked fields the final ledger will (workInventory only affects
-            // deferred/direct, which this page does not show). [Story 8.3]
-            var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, WorkInventory.Empty, model);
-            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts), "epics.html"));
+            // shares the same Defined/Tracked fields the final ledger will. Work inventory is rebuilt here so
+            // the sunburst follow-up band can see deferred open counts without waiting for WriteIndex.
+            // [Story 8.3; Story 9.7]
+            var workForFollowUps = WorkInventory.Build(_docs.Values.ToList());
+            var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model);
+            var followUps = FollowUpGeometry.From(
+                _sprint?.OpenActionItems ?? Array.Empty<SprintActionItem>(),
+                epicsCounts,
+                workForFollowUps);
+            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps), "epics.html"));
 
             // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
             // undrafted story that got a placeholder and then vanished — can't leave a stale page behind,
@@ -1875,7 +1895,7 @@ public sealed class SiteGenerator
             foreach (var epic in model.Epics)
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic)), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
+                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
 
                 foreach (var story in epic.Stories)
                 {
@@ -1950,22 +1970,24 @@ public sealed class SiteGenerator
         acceptanceCriteria = acceptanceCriteria
             .Select(ac => ac with { Html = SourceLinkifier.Linkify(ac.Html, referenceMap, storyPrefix) })
             .ToList();
-        devAgentRecord = devAgentRecord
-            .Select(e =>
-            {
-                var html = SourceLinkifier.Linkify(e.ContentHtml, referenceMap, storyPrefix);
-                if (e.Label == "File List")
-                    html = FileListLinkifier.LinkifyHtml(html, CodePageHrefForStory);
-                return (e.Label, ContentHtml: html);
-            })
-            .ToList();
-
         string? CodePageHrefForStory(string repoRelativePath)
         {
             var norm = PathUtil.NormalizeSlashes(ChangeSurface.NormalizeFileListPath(repoRelativePath));
             if (!_codePages.TryGetValue(norm, out var page)) return null;
             return storyPrefix + page;
         }
+
+        var fileResolver = new ChangeSurfaceFileResolver(storyPrefix, referenceMap, CodePageHrefForStory);
+
+        devAgentRecord = devAgentRecord
+            .Select(e =>
+            {
+                var html = SourceLinkifier.Linkify(e.ContentHtml, referenceMap, storyPrefix);
+                if (e.Label == "File List")
+                    html = FileListLinkifier.LinkifyHtml(html, fileResolver.ResolveForDevRecord);
+                return (e.Label, ContentHtml: html);
+            })
+            .ToList();
 
         // Deep-link every "(AC: #N)" reference in the plan to its criterion panel above.
         var criteriaByNumber = acceptanceCriteria.ToDictionary(ac => ac.Number, ac => ac.PlainText);
@@ -1993,7 +2015,7 @@ public sealed class SiteGenerator
             verifyBeforeReviewHtml = null;
 
         var changeSurface = ChangeSurface.Build(
-            artifactRaw, story.Status, acceptanceCriteria, CodePageHrefForStory, verifyBeforeReviewHtml);
+            artifactRaw, acceptanceCriteria, fileResolver.Resolve, verifyBeforeReviewHtml);
 
         return new StoryPageFragments(
             artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
@@ -2043,6 +2065,10 @@ public sealed class SiteGenerator
             var docs = _docs.Values.ToList();
             var work = WorkInventory.Build(docs);
             var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel);
+            var followUps = FollowUpGeometry.From(
+                _sprint?.OpenActionItems ?? Array.Empty<SprintActionItem>(),
+                counts,
+                work);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
                 work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts);
@@ -2054,12 +2080,12 @@ public sealed class SiteGenerator
             if (_epicsModel is { } model && _progress is { } progress)
             {
                 var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts), _epicsSourcePath));
+                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts, followUps), _epicsSourcePath));
 
                 foreach (var epic in model.Epics)
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic));
+                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps);
                     surfaces.Add(WebviewSurfaceFor(epicPage, _epicsSourcePath, skipEpicNumber: epic.Number));
 
                     var outlineStories = new List<OutlineStory>();
@@ -2294,6 +2320,10 @@ public sealed class SiteGenerator
         var docs = _docs.Values.ToList();
         var work = WorkInventory.Build(docs);
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel);
+        var followUps = FollowUpGeometry.From(
+            _sprint?.OpenActionItems ?? Array.Empty<SprintActionItem>(),
+            counts,
+            work);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
             work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts);
@@ -2302,13 +2332,13 @@ public sealed class SiteGenerator
         if (_epicsModel is { } model && _progress is { } progress)
         {
             var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-            AddSpaSurface(pages, familyPaths, EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts));
+            AddSpaSurface(pages, familyPaths, EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts, followUps));
 
             foreach (var epic in model.Epics)
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
                 AddSpaSurface(pages, familyPaths,
-                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic)),
+                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps),
                     skipEpicNumber: epic.Number);
 
                 foreach (var story in epic.Stories)

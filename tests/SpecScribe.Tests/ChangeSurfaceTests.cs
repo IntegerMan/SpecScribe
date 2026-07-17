@@ -74,16 +74,14 @@ public class ChangeSurfaceTests
             - 2026-07-16 — **Implemented (dev-story).** Status → review.
             """;
         var acs = EpicsParser.ExtractAcceptanceCriteria(raw);
-        var surface = ChangeSurface.Build(raw, "review", acs);
+        var surface = ChangeSurface.Build(raw, acs);
 
         Assert.Single(surface.VerifyChecklist);
         Assert.Equal(1, surface.VerifyChecklist[0].Number);
         Assert.Contains("strip appears", surface.VerifyChecklist[0].PlainText, StringComparison.OrdinalIgnoreCase);
         Assert.Single(surface.ChangedFiles);
         Assert.Equal("src/SpecScribe/EpicsParser.cs", surface.ChangedFiles[0].Path);
-        Assert.NotNull(surface.ShipLine);
-        Assert.Contains("review", surface.ShipLine!, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("2026-07-16", surface.ShipLine!);
+        Assert.Equal(ChangeSurfaceFileKind.Other, surface.ChangedFiles[0].Kind);
     }
 
     [Fact]

@@ -502,9 +502,42 @@ body {
   background: transparent;
 }
 
-/* ADR 0007 change-surface panel — footprint projection below Task Breakdown / Next Steps. */
+/* ADR 0007 change-surface panel — collapsible chart-panel below Task Breakdown / Next Steps. */
 .chart-panel.change-surface-panel {
   margin-bottom: 1.2rem;
+}
+
+.change-surface-panel > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0;
+}
+
+.change-surface-panel > summary::-webkit-details-marker { display: none; }
+
+.change-surface-panel > summary::before {
+  content: "▸ ";
+  color: var(--gold);
+}
+
+.change-surface-panel[open] > summary::before { content: "▾ "; }
+
+.change-surface-panel[open] > summary { margin-bottom: 0.75rem; }
+
+.change-surface-title {
+  font-weight: 600;
+}
+
+.change-surface-panel .change-surface-class {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .change-surface {
@@ -598,29 +631,49 @@ body {
   margin: 0;
   padding-left: 1.1rem;
   list-style: disc;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 1.5rem;
+  row-gap: 0.15rem;
 }
 
-.change-surface-files a {
+.change-surface-files .touch-file a {
   color: var(--rust);
   text-decoration: none;
   font-family: 'Courier New', monospace;
   font-size: 0.78rem;
 }
 
-.change-surface-files a:hover,
-.change-surface-files a:focus-visible {
+.change-surface-files .touch-file a:hover,
+.change-surface-files .touch-file a:focus-visible {
   text-decoration: underline;
 }
 
-.change-surface-ship {
-  margin: 0;
-  color: var(--ink);
+.change-surface-files .touch-file-new a {
+  color: var(--moss);
+  font-weight: 600;
+}
+
+.change-surface-files .touch-file-sprint a {
+  color: var(--teal);
+  font-style: italic;
+  font-family: inherit;
+}
+
+.change-surface-files .touch-file-story a {
+  color: var(--rust);
+  font-weight: 600;
+  font-family: inherit;
 }
 
 .change-surface-empty {
   margin: 0;
   color: var(--ink-light);
   font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .change-surface-files { grid-template-columns: 1fr; }
 }
 
 .meta-pills {
@@ -2320,6 +2373,29 @@ a.ref-file-node:focus-visible {
 }
 .sunburst .sb-noplan:hover { fill: var(--parchment-dark); opacity: 1; stroke: var(--gold-light); stroke-width: 1.5; }
 
+/* Story 9.7: open follow-ups on the outermost sunburst ring. Dashed stroke kinship with .sb-noplan — never
+   a lifecycle-stage fill (not sb-pending/active/…). Shape + legend word labels disambiguate; color alone is
+   not the signal (UX-DR17). No new --status-* token. */
+.sb-followup-action,
+.sb-followup-deferred {
+  fill: var(--parchment-dark);
+  stroke: var(--ink-light);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 2.5;
+  opacity: 0.9;
+}
+.sb-followup-deferred {
+  fill: transparent;
+  stroke: var(--status-review);
+}
+.sunburst .sb-followup-action:hover,
+.sunburst .sb-followup-deferred:hover {
+  fill: var(--parchment-dark);
+  opacity: 1;
+  stroke: var(--gold-light);
+  stroke-width: 1.75;
+}
+
 .sunburst-center-num { font-size: 1.9rem; font-weight: bold; fill: var(--rust); font-family: 'Courier New', monospace; }
 .sunburst-center-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; fill: var(--ink-light); }
 
@@ -2340,6 +2416,14 @@ a.ref-file-node:focus-visible {
 .sunburst-legend .sb-active-sw { background: var(--status-active); }
 .sunburst-legend .sb-review-sw { background: var(--status-review); }
 .sunburst-legend .sb-done-sw { background: var(--status-done); }
+/* Follow-up legend swatches: dashed border (not a solid stage fill) so they never read as story status. */
+.sunburst-legend .sb-followup-action-sw,
+.sunburst-legend .sb-followup-deferred-sw {
+  background: transparent;
+  border: 1.5px dashed var(--ink-light);
+  box-sizing: border-box;
+}
+.sunburst-legend .sb-followup-deferred-sw { border-color: var(--status-review); }
 
 /* ---- Interactive-legend emphasis (Story 3.5 Task 3; the item Story 1.5 deferred here, UXO C3) ----
    Hovering OR keyboard-focusing a legend entry isolates its status: matching segments stay full, every other
@@ -2366,7 +2450,11 @@ a.ref-file-node:focus-visible {
 .sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(.sb-review),
 .sunburst-panel:has(.sb-review-item:focus-visible) .sb-seg:not(.sb-review),
 .sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done),
-.sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done) {
+.sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done),
+.sunburst-panel:has(.sb-followup-action-item:hover) .sb-seg:not(.sb-followup-action),
+.sunburst-panel:has(.sb-followup-action-item:focus-visible) .sb-seg:not(.sb-followup-action),
+.sunburst-panel:has(.sb-followup-deferred-item:hover) .sb-seg:not(.sb-followup-deferred),
+.sunburst-panel:has(.sb-followup-deferred-item:focus-visible) .sb-seg:not(.sb-followup-deferred) {
   opacity: 0.28;
 }
 

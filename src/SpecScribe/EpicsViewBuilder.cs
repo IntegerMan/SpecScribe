@@ -17,7 +17,7 @@ public static class EpicsViewBuilder
 
     // ----- Epics index --------------------------------------------------------------------------------------
 
-    public static EpicsIndexView BuildIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null)
+    public static EpicsIndexView BuildIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null)
     {
         // Production always passes the shared ledger. Null → build an equivalent ephemeral ledger from the
         // same inputs so tests/stubs that omit counts keep coherent subtitle + panel stats. [Story 8.3]
@@ -33,6 +33,7 @@ public static class EpicsViewBuilder
             Commands = commands,
             VerticalSliceChips = model.Epics.Where(e => e.Section == EpicSection.VerticalSlice).Select(BuildChip).ToList(),
             FurtherDevelopmentChips = model.Epics.Where(e => e.Section == EpicSection.FurtherDevelopment).Select(BuildChip).ToList(),
+            FollowUps = followUps ?? FollowUpGeometry.Empty,
         };
     }
 
@@ -41,7 +42,7 @@ public static class EpicsViewBuilder
 
     // ----- Epic page ----------------------------------------------------------------------------------------
 
-    public static EpicPageView BuildEpic(EpicInfo epic, EpicProgress progress, CommandCatalog commands, string? epicRetroPath, EntityPager? pager = null)
+    public static EpicPageView BuildEpic(EpicInfo epic, EpicProgress progress, CommandCatalog commands, string? epicRetroPath, EntityPager? pager = null, FollowUpGeometry? followUps = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var prefix = Prefix(outputPath);
@@ -60,6 +61,22 @@ public static class EpicsViewBuilder
         // a lone undrafted story keeps today's per-card create-story note (not clutter). [Story 8.6]
         var undrafted = epic.Stories.Where(s => s.ArtifactOutputPath is null).ToList();
         var consolidated = undrafted.Count >= 2;
+
+        // Epic pages live under epics/ — rewrite follow-up hrefs with the relative prefix. Filter to this
+        // epic so zero open follow-ups here omits the ring even when the project has others. [Story 9.7]
+        var projectFollowUps = followUps ?? FollowUpGeometry.Empty;
+        var scopedActions = projectFollowUps.OpenActionItems
+            .Where(a => a.EpicNumber == epic.Number)
+            .ToList();
+        // Deferred aggregate has no per-item epic attribution without re-parsing — omit on epic pages
+        // (safe default per Story 9.7). Action-item hrefs need the epics/ relative prefix.
+        var epicFollowUps = scopedActions.Count > 0
+            ? new FollowUpGeometry(
+                scopedActions,
+                DeferredOpenCount: 0,
+                DeferredHref: null,
+                ActionItemsHref: prefix + SiteNav.ActionItemsOutputPath)
+            : FollowUpGeometry.Empty;
 
         return new EpicPageView
         {
@@ -80,6 +97,7 @@ public static class EpicsViewBuilder
             Prefix = prefix,
             StoryCards = epic.Stories.Select(s => BuildStoryCard(s, prefix, commands, consolidated)).ToList(),
             Pager = pager ?? EntityPager.None,
+            FollowUps = epicFollowUps,
         };
     }
 

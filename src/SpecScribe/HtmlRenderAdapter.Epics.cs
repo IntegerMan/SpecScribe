@@ -30,7 +30,7 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("<section class=\"dashboard\">\n");
         AppendEpicsProgressPanel(sb, view.Progress, view.Counts);
         sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
-        sb.Append(Charts.Sunburst(model, commands: view.Commands));
+        sb.Append(Charts.Sunburst(model, commands: view.Commands, followUps: view.FollowUps));
         sb.Append("</div>\n");
         sb.Append("</section>\n\n");
 
@@ -194,7 +194,7 @@ public sealed partial class HtmlRenderAdapter
             main.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Story Breakdown</h3>\n");
             main.Append(Charts.EpicSunburst(view.Epic, story => story.ArtifactOutputPath is { } ap
                 ? view.Prefix + ap
-                : $"#{StoryAnchorId(story.Id)}", commands: view.Commands));
+                : $"#{StoryAnchorId(story.Id)}", commands: view.Commands, followUps: view.FollowUps));
             main.Append("</div>\n");
             main.Append("</div>\n</section>\n\n");
         }
@@ -334,31 +334,28 @@ public sealed partial class HtmlRenderAdapter
     private static string ChangeSurfaceChartPanel(StoryChangeSurface surface)
     {
         var sb = new StringBuilder();
-        sb.Append("<div class=\"chart-panel change-surface-panel\" id=\"sec-change-surface\">\n");
-        sb.Append("<h3>Change Surface</h3>\n");
+        sb.Append("<details class=\"chart-panel change-surface-panel\" id=\"sec-change-surface\" open>\n");
+        sb.Append("<summary><span class=\"change-surface-title\">Change Surface</span>");
+        if (surface.Classifications.Count > 0)
+        {
+            sb.Append($" <span class=\"change-surface-class\">{PathUtil.Html(string.Join(" + ", surface.Classifications))}</span>");
+        }
+        else if (surface.ChangedFiles.Count == 0)
+        {
+            sb.Append(" <span class=\"change-surface-empty\">no file list recorded</span>");
+        }
+        sb.Append("</summary>\n");
         sb.Append(ChangeSurfacePanelInner(surface));
-        sb.Append("</div>\n");
+        sb.Append("</details>\n");
         return sb.ToString();
     }
 
-    /// <summary>Projects the ADR 0007 change footprint — classification, verify guidance, touched files,
-    /// ship line — below Task Breakdown / Next Steps so reviewers see what to confirm. [Story 9.4]</summary>
+    /// <summary>Projects the ADR 0007 change footprint — verify guidance and touched files — below Task
+    /// Breakdown / Next Steps. [Story 9.4]</summary>
     private static string ChangeSurfacePanelInner(StoryChangeSurface surface)
     {
         var sb = new StringBuilder();
         sb.Append("  <div class=\"change-surface\">\n");
-
-        // Classification line
-        sb.Append("    <div class=\"change-surface-head\">");
-        if (surface.Classifications.Count > 0)
-        {
-            sb.Append($"<span class=\"change-surface-class\">{PathUtil.Html(string.Join(" + ", surface.Classifications))}</span>");
-        }
-        else if (surface.ChangedFiles.Count == 0)
-        {
-            sb.Append("<span class=\"change-surface-empty\">no file list recorded</span>");
-        }
-        sb.Append("</div>\n");
 
         // Verify — manual checklist first when authors include it; ACs secondary.
         sb.Append("    <div class=\"change-surface-section\">\n");
@@ -386,7 +383,7 @@ public sealed partial class HtmlRenderAdapter
         }
         sb.Append("    </div>\n");
 
-        // Touched files — bulleted list with links to code pages when available.
+        // Touched files — two-column bulleted list with typed links.
         sb.Append("    <div class=\"change-surface-section\">\n");
         sb.Append("      <div class=\"change-surface-section-label\">Touched</div>\n");
         if (surface.ChangedFiles.Count > 0)
@@ -394,10 +391,11 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("      <ul class=\"change-surface-files\">\n");
             foreach (var file in surface.ChangedFiles)
             {
+                var css = ChangeSurfaceFileResolver.ChangeSurfaceFileKindCssClass(file.Kind);
                 if (file.Href is { Length: > 0 } href)
-                    sb.Append($"        <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(file.Label)}</a></li>\n");
+                    sb.Append($"        <li class=\"{css}\"><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(file.Label)}</a></li>\n");
                 else
-                    sb.Append($"        <li>{PathUtil.Html(file.Label)}</li>\n");
+                    sb.Append($"        <li class=\"{css}\">{PathUtil.Html(file.Label)}</li>\n");
             }
             sb.Append("      </ul>\n");
         }
@@ -405,15 +403,6 @@ public sealed partial class HtmlRenderAdapter
         {
             sb.Append("      <p class=\"change-surface-empty\">no file list recorded</p>\n");
         }
-        sb.Append("    </div>\n");
-
-        // Ship line
-        sb.Append("    <div class=\"change-surface-section\">\n");
-        sb.Append("      <div class=\"change-surface-section-label\">Ship</div>\n");
-        if (surface.ShipLine is { Length: > 0 } ship)
-            sb.Append($"      <p class=\"change-surface-ship\">{PathUtil.Html(ship)}</p>\n");
-        else
-            sb.Append("      <p class=\"change-surface-empty\">no ship record</p>\n");
         sb.Append("    </div>\n");
 
         sb.Append("  </div>\n");

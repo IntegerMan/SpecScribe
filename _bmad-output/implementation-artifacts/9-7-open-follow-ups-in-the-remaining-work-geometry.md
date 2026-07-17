@@ -4,7 +4,7 @@ baseline_commit: 65756cde15c1405f1398ab2d0835a02aee2118f0
 
 # Story 9.7: Open Follow-Ups in the Remaining-Work Geometry
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -80,36 +80,36 @@ Concrete silhouette rules:
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Plumb follow-up inputs into sunburst callers without recounting (AC: #1, #3)**
-  - [ ] Introduce a small pure input type (e.g. `FollowUpGeometry` / params on `Charts.Sunburst`) carrying: open action items (`IReadOnlyList<SprintActionItem>` or a slim projection), deferred open count + href (from ledger + `WorkInventory.Deferred`), optional deferred per-item summaries. **Counts rendered must equal** `ProjectCounts.OpenActionItems` and `ProjectCounts.DeferredOpenItems` — assert in tests; never `OpenActionItems.Count` at a second parse site that could drift.
-  - [ ] Thread from `DashboardViewBuilder` / `DashboardView` (and epics-index path) using existing `_sprint.OpenActionItems`, `view.Counts`, `view.Work` — do not rebuild `WorkInventory` or re-parse `sprint-status.yaml` inside `Charts`.
-  - [ ] Update call sites: `HtmlRenderAdapter.Dashboard.cs` (~47), `HtmlRenderAdapter.Epics.cs` (~33 project sunburst, ~195 `EpicSunburst`). Keep `TaskSunburst` untouched.
-  - [ ] If `DashboardView` gains fields, keep serialization/parity green (`SectionViewModelSerializationTests` / existing dashboard JSON round-trips). Prefer optional/default-empty so zero-follow-up fixtures stay byte-stable aside from intentional geometry absence.
+- [x] **Task 1 — Plumb follow-up inputs into sunburst callers without recounting (AC: #1, #3)**
+  - [x] Introduce a small pure input type (e.g. `FollowUpGeometry` / params on `Charts.Sunburst`) carrying: open action items (`IReadOnlyList<SprintActionItem>` or a slim projection), deferred open count + href (from ledger + `WorkInventory.Deferred`), optional deferred per-item summaries. **Counts rendered must equal** `ProjectCounts.OpenActionItems` and `ProjectCounts.DeferredOpenItems` — assert in tests; never `OpenActionItems.Count` at a second parse site that could drift.
+  - [x] Thread from `DashboardViewBuilder` / `DashboardView` (and epics-index path) using existing `_sprint.OpenActionItems`, `view.Counts`, `view.Work` — do not rebuild `WorkInventory` or re-parse `sprint-status.yaml` inside `Charts`.
+  - [x] Update call sites: `HtmlRenderAdapter.Dashboard.cs` (~47), `HtmlRenderAdapter.Epics.cs` (~33 project sunburst, ~195 `EpicSunburst`). Keep `TaskSunburst` untouched.
+  - [x] If `DashboardView` gains fields, keep serialization/parity green (`SectionViewModelSerializationTests` / existing dashboard JSON round-trips). Prefer optional/default-empty so zero-follow-up fixtures stay byte-stable aside from intentional geometry absence.
 
-- [ ] **Task 2 — Project sunburst follow-up outer band (AC: #1, #2, #3)**
-  - [ ] Extend `Charts.Sunburst` to draw the 4th ring per locked silhouette when open follow-ups exist; omit entirely when both ledger fields are 0 / deferred surface absent.
-  - [ ] Reuse `AnnularSector`, `AppendNoPlanArc`-style dashed look (new class, don't overload `.sb-noplan` semantics), `SunburstLegend`, `Html`/`PathUtil.StripHtmlTags` helpers.
-  - [ ] Update center/hint/aria as needed so the chart still reads as epic-first; follow-ups are an **additional** outer signal, not a replacement for the epic count center.
-  - [ ] Deterministic angular order (epic number ascending, then file order within epic, unattributed last) — regeneration byte-identical.
+- [x] **Task 2 — Project sunburst follow-up outer band (AC: #1, #2, #3)**
+  - [x] Extend `Charts.Sunburst` to draw the 4th ring per locked silhouette when open follow-ups exist; omit entirely when both ledger fields are 0 / deferred surface absent.
+  - [x] Reuse `AnnularSector`, `AppendNoPlanArc`-style dashed look (new class, don't overload `.sb-noplan` semantics), `SunburstLegend`, `Html`/`PathUtil.StripHtmlTags` helpers.
+  - [x] Update center/hint/aria as needed so the chart still reads as epic-first; follow-ups are an **additional** outer signal, not a replacement for the epic count center.
+  - [x] Deterministic angular order (epic number ascending, then file order within epic, unattributed last) — regeneration byte-identical.
 
-- [ ] **Task 3 — Epic sunburst sibling (AC: #1, #3)**
-  - [ ] Extend `Charts.EpicSunburst` with the same follow-up ring filtered to the current epic. Same CSS classes / legend rules. Degrade to no ring when that epic has zero open follow-ups.
+- [x] **Task 3 — Epic sunburst sibling (AC: #1, #3)**
+  - [x] Extend `Charts.EpicSunburst` with the same follow-up ring filtered to the current epic. Same CSS classes / legend rules. Degrade to no ring when that epic has zero open follow-ups.
 
-- [ ] **Task 4 — CSS + legend (AC: #2)**
-  - [ ] Add `.sb-followup-*` rules in `src/SpecScribe/assets/specscribe.css` near the existing sunburst block (~2281–2399). Dashed stroke + legend swatch that is **not** a lifecycle stage swatch. Wire `:has()` legend emphasis if the existing sunburst legend pattern extends cleanly; if not, visible label+stroke at rest is enough (never color-only).
-  - [ ] Extend `StylesheetTests` for the new classes / non-color-only signal.
+- [x] **Task 4 — CSS + legend (AC: #2)**
+  - [x] Add `.sb-followup-*` rules in `src/SpecScribe/assets/specscribe.css` near the existing sunburst block (~2281–2399). Dashed stroke + legend swatch that is **not** a lifecycle stage swatch. Wire `:has()` legend emphasis if the existing sunburst legend pattern extends cleanly; if not, visible label+stroke at rest is enough (never color-only).
+  - [x] Extend `StylesheetTests` for the new classes / non-color-only signal.
 
-- [ ] **Task 5 — Guardrails: do not absorb 9.6; do not break StatCards (AC: #2)**
-  - [ ] Do **not** edit `ActionItemsTemplater` / `DeferredWorkTemplater` / `FollowUpRefs` / deferred parser for this story except optional **read-only** reuse of an already-built model if SiteGenerator caches one. Geometry links are normal SVG `<a href>` — no action-items copy-payload risk.
-  - [ ] Confirm `AppendWorkSummaryCards` still gates independently and still reads `counts.DeferredOpenItems` / `OpenRetroActionItems` (already ledger-backed).
+- [x] **Task 5 — Guardrails: do not absorb 9.6; do not break StatCards (AC: #2)**
+  - [x] Do **not** edit `ActionItemsTemplater` / `DeferredWorkTemplater` / `FollowUpRefs` / deferred parser for this story except optional **read-only** reuse of an already-built model if SiteGenerator caches one. Geometry links are normal SVG `<a href>` — no action-items copy-payload risk.
+  - [x] Confirm `AppendWorkSummaryCards` still gates independently and still reads `counts.DeferredOpenItems` / `OpenRetroActionItems` (already ledger-backed).
 
-- [ ] **Task 6 — Tests + golden (AC: #1, #2, #3)**
-  - [ ] `ChartsTests`: sunburst emits follow-up segments + distinct classes + correct hrefs when open items exist; **no** follow-up ring / no fake wedges when ledger is zero; aria text does not say "Story" for follow-up wedges; segment count matches ledger.
-  - [ ] `EpicSunburst_*`: epic-filtered follow-ups only.
-  - [ ] `HtmlRenderAdapterTests` or generation E2E: home sunburst contains follow-up geometry when fixtures have open retro items / deferred open count.
-  - [ ] `ProjectCountsTests` untouched unless a new assertion documents geometry-must-read-ledger (optional regression comment/test).
-  - [ ] Golden fingerprint will move (dashboard + epics index + epic pages with follow-ups) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Shared `BodyHtml` path → HTML/webview/SPA stay aligned; **no** new `HostRenderException`. Confirm three `Render*ParityTests` green.
-  - [ ] Run `dotnet test` from repo root.
+- [x] **Task 6 — Tests + golden (AC: #1, #2, #3)**
+  - [x] `ChartsTests`: sunburst emits follow-up segments + distinct classes + correct hrefs when open items exist; **no** follow-up ring / no fake wedges when ledger is zero; aria text does not say "Story" for follow-up wedges; segment count matches ledger.
+  - [x] `EpicSunburst_*`: epic-filtered follow-ups only.
+  - [x] `HtmlRenderAdapterTests` or generation E2E: home sunburst contains follow-up geometry when fixtures have open retro items / deferred open count.
+  - [x] `ProjectCountsTests` untouched unless a new assertion documents geometry-must-read-ledger (optional regression comment/test).
+  - [x] Golden fingerprint will move (dashboard + epics index + epic pages with follow-ups) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Shared `BodyHtml` path → HTML/webview/SPA stay aligned; **no** new `HostRenderException`. Confirm three `Render*ParityTests` green.
+  - [x] Run `dotnet test` from repo root.
 
 ## Dev Notes
 
@@ -216,13 +216,40 @@ Generate to `SpecScribeOutput/` (not `docs/live`). Open **home**: sunburst shows
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Composer (Auto)
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Added `FollowUpGeometry` ledger-backed input; threaded through `DashboardView` / `EpicsIndexView` / `EpicPageView` and HTML/webview/SPA SiteGenerator call sites without re-parsing yaml.
+- Project + epic sunbursts draw a 4th dashed follow-up ring (`.sb-followup-action` / `.sb-followup-deferred`) when open counts > 0; omit entirely when zero (NFR8). Aria never says "Story".
+- Epic sunburst filters to that epic's action items; deferred aggregate stays project-level only (no per-item attribution without re-parse).
+- StatCards / 9.6 templaters untouched. Golden regenerated (CSS-only delta on zero-follow-up fixture). `dotnet test`: 1245 passed.
+
 ### File List
+
+- src/SpecScribe/FollowUpGeometry.cs
+- src/SpecScribe/Charts.cs
+- src/SpecScribe/DashboardView.cs
+- src/SpecScribe/DashboardViewBuilder.cs
+- src/SpecScribe/EpicsView.cs
+- src/SpecScribe/EpicsViewBuilder.cs
+- src/SpecScribe/EpicsTemplater.cs
+- src/SpecScribe/HtmlRenderAdapter.Dashboard.cs
+- src/SpecScribe/HtmlRenderAdapter.Epics.cs
+- src/SpecScribe/SiteGenerator.cs
+- src/SpecScribe/assets/specscribe.css
+- tests/SpecScribe.Tests/ChartsTests.cs
+- tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
+- tests/SpecScribe.Tests/StylesheetTests.cs
+- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+- _bmad-output/implementation-artifacts/9-7-open-follow-ups-in-the-remaining-work-geometry.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+
+### Change Log
+
+- 2026-07-16: Implemented Story 9.7 — open follow-ups as outermost sunburst band (project + epic), ledger-agreed counts, dashed distinct treatment, tests + golden.
 
 ---
 

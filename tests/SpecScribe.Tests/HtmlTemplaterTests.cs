@@ -1104,7 +1104,7 @@ public class HtmlTemplaterTests
             string.Empty, string.Empty, Array.Empty<AcceptanceCriterion>(),
             Array.Empty<(string, string)>(), Array.Empty<TaskItem>(), string.Empty, string.Empty,
             new StoryEvidence(0, 0, null, null, false),
-            new StoryChangeSurface(Array.Empty<string>(), Array.Empty<(int, string)>(), Array.Empty<ChangeSurfaceFile>(), null, null),
+            new StoryChangeSurface(Array.Empty<string>(), Array.Empty<(int, string)>(), Array.Empty<ChangeSurfaceFile>(), null),
             nav, CommandCatalog.Empty, epicRetroPath: retroPath);
         Assert.Contains($"class=\"pill pill-link\" href=\"../{retroPath}\">Epic 1 retro &rarr;</a>", storyHtml);
 

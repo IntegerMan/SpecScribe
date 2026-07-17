@@ -104,4 +104,8 @@ public sealed record DashboardView
     /// panel renders the guarded "View activity timeline →" link. Defaults false — the generator sets it from
     /// its cached <c>_timelinePath</c>, so a link is never emitted to a page that wasn't produced. [Story 7.3]</summary>
     public bool HasTimeline { get; init; }
+
+    /// <summary>Open follow-ups for the project sunburst's outermost band. Defaults to
+    /// <see cref="FollowUpGeometry.Empty"/> (no 4th ring). Counts agree with <see cref="Counts"/>. [Story 9.7]</summary>
+    public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
 }
