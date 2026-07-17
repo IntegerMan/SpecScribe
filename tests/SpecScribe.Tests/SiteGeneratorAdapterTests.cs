@@ -440,7 +440,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // over source_spec: noise (FollowUpRow.cs code page also shifts).
         // Regenerated for epic-sunburst story wedges: always link to story pages (placeholder when
         // undrafted), never #story-N-M in-page card jumps. [epic sunburst navigation]
-        const string expected = "e8279c5c27e646b5a4dc928562cb886635501f0bfb83c57dc10eaf0591f4a4f5";
+        // Regenerated for Story 9.12: Unplanned sunburst root + sprint Unplanned lane (open quick-dev +
+        // unattributable deferred); Follow-ups orphan holds unattributed action items only; CSS .sb-unplanned.
+        // [Story 9.12; golden-diff-normalization-gotchas]
+        // spec-accent-kicker-slug-heuristics: C#/tests only — pending-kicker CSS color rule was rejected in review
+        // (contrast regression vs --ink-light); golden unchanged by that polish alone.
+        const string expected = "e17707ec60fa3d31a5701b7bb517cb5a0f73f72cfe6b9d77b87bdcb7ed07ede4";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

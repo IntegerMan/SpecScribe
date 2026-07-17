@@ -110,9 +110,12 @@ public sealed record EpicsIndexView
     /// <summary>The "Further Development" chip section (empty → omitted).</summary>
     public required IReadOnlyList<EpicChip> FurtherDevelopmentChips { get; init; }
 
-    /// <summary>Open follow-ups for the project sunburst's outermost band. Defaults to
-    /// <see cref="FollowUpGeometry.Empty"/> (no 4th ring). [Story 9.7]</summary>
+    /// <summary>Open follow-ups for the project sunburst's story-ring peers + Follow-ups orphan. Defaults to
+    /// <see cref="FollowUpGeometry.Empty"/>. [Story 9.7]</summary>
     public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
+
+    /// <summary>Unplanned / one-off work for the project sunburst Unplanned root. [Story 9.12]</summary>
+    public UnplannedWorkGeometry UnplannedWork { get; init; } = UnplannedWorkGeometry.Empty;
 }
 
 /// <summary>The host-neutral SECTION view model for a single EPIC page body. The header + progress bars + the
@@ -179,9 +182,13 @@ public sealed record EpicPageView
     /// to <see cref="EntityPager.None"/> so non-generator constructions render no pager. [Prev/next navigation]</summary>
     public EntityPager Pager { get; init; } = EntityPager.None;
 
-    /// <summary>Open follow-ups scoped to this epic for the epic sunburst's outermost band. Defaults to
-    /// <see cref="FollowUpGeometry.Empty"/> (no 4th ring when this epic has none). [Story 9.7]</summary>
+    /// <summary>Open follow-ups scoped to this epic for the epic sunburst's story-ring peers. Defaults to
+    /// <see cref="FollowUpGeometry.Empty"/> (no follow-up wedges when this epic has none). [Story 9.7]</summary>
     public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
+
+    /// <summary>Epic-attributed quick-dev only (project Unplanned root is never drawn on epic pages).
+    /// [Story 9.12]</summary>
+    public UnplannedWorkGeometry UnplannedWork { get; init; } = UnplannedWorkGeometry.Empty;
 }
 
 /// <summary>Compact verification facts for the story-page evidence strip — tasks (from

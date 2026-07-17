@@ -41,11 +41,17 @@ public static class DashboardViewBuilder
         ArtifactCoverage? coverage,
         bool hasTimeline = false,
         ProjectCounts? counts = null,
-        FollowUpGeometry? followUps = null)
+        FollowUpGeometry? followUps = null,
+        UnplannedWorkGeometry? unplanned = null)
     {
         // Production always passes the shared SiteGenerator ledger. Null → build an equivalent ephemeral
         // ledger from the same inputs so tests/stubs that omit counts keep correct Defined/Tracked numbers.
         var ledger = counts ?? ProjectCounts.Build(progress, sprint, work, epicsModel, requirements);
+        var geometry = followUps ?? FollowUpGeometry.From(
+            sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
+            ledger,
+            work,
+            epics: epicsModel);
         return new DashboardView
         {
             SiteTitle = nav.SiteTitle,
@@ -62,11 +68,8 @@ public static class DashboardViewBuilder
             OpenRetroActionItems = ledger.OpenActionItems,
             Counts = ledger,
             HasTimeline = hasTimeline,
-            FollowUps = followUps ?? FollowUpGeometry.From(
-                sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
-                ledger,
-                work,
-                epics: epicsModel),
+            FollowUps = geometry,
+            UnplannedWork = unplanned ?? UnplannedWorkGeometry.From(work, geometry, epicsModel),
             // Body fragment only — HtmlRenderAdapter wraps with work-mode panel classes. [Story 9.8]
             NextStepsHtml = epicsModel is { } epics
                 ? BmadCommands.RenderProjectNextStepsBody(epics, commands)

@@ -1,7 +1,8 @@
 namespace SpecScribe;
 
 /// <summary>One deferred-work item projected for sunburst geometry. Epic-attributed items render under
-/// their epic; unattributed items share the synthetic Follow-ups slice. [Story 9.7]</summary>
+/// their epic; unattributed items join the Unplanned root (Story 9.12) — not the Follow-ups orphan
+/// (which holds unattributed action items only). [Story 9.7; 9.12]</summary>
 public sealed record FollowUpDeferredSlot(
     DeferredWorkItem Item,
     string ProvenanceLabel,
@@ -10,8 +11,9 @@ public sealed record FollowUpDeferredSlot(
 
 /// <summary>Inputs for sunburst follow-up geometry (Story 9.7 / FR30). Counts for <em>open</em> items must
 /// agree with <see cref="ProjectCounts"/> — never re-parsed from yaml/markdown at the chart layer.
-/// Attributed items render as story-ring peers under their epic; unattributed action items and unattributed
-/// deferred items share a synthetic epic-level "Follow-ups" slice.</summary>
+/// Attributed items render as story-ring peers under their epic; unattributed action items share a synthetic
+/// epic-level "Follow-ups" slice. Unattributable deferred items move to <see cref="UnplannedWorkGeometry"/>
+/// (Story 9.12).</summary>
 public sealed record FollowUpGeometry(
     IReadOnlyList<SprintActionItem> ActionItems,
     int DeferredOpenCount,

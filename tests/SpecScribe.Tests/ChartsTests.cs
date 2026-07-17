@@ -376,13 +376,15 @@ public class ChartsTests
         };
         var counts = ProjectCounts.Empty with { DeferredOpenItems = 4, OpenActionItems = 2 };
         var geometry = FollowUpGeometry.From(items, counts, work, deferredModel: deferredModel, epics: model);
+        var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
 
         Assert.Equal(2, geometry.OpenActionItems.Count);
         Assert.Equal(counts.DeferredOpenItems, geometry.DeferredOpenCount);
         Assert.Equal(4, geometry.DeferredItems.Count);
         Assert.Single(geometry.UnattributedDeferredItems);
+        Assert.Single(unplanned.UnattributableDeferred);
         // Open follow-ups are orange; completed action items reuse done green — never a 4th outer ring.
         Assert.Contains("class=\"sb-seg sb-followup-open\"", svg);
         Assert.Contains("aria-label=\"Action item: Fix the heatmap debt\"", svg);
@@ -393,7 +395,9 @@ public class ChartsTests
         // No aggregate deferred wedge with an inflated count label.
         Assert.DoesNotContain("Deferred work: 4 open", svg);
         Assert.DoesNotContain("Deferred work: 3 open", svg);
-        Assert.Contains("aria-label=\"Follow-ups: 2 unattributed items\"", svg);
+        // Unattributed deferred moved to Unplanned; Follow-ups orphan holds action items only. [Story 9.12]
+        Assert.Contains("aria-label=\"Follow-ups: 1 unattributed item\"", svg);
+        Assert.Contains("aria-label=\"Unplanned:", svg);
         Assert.DoesNotContain("outermost: open follow-ups", svg);
         Assert.Contains("Open follow-up</span>", svg);
         Assert.Contains("stories &amp; follow-ups", svg);
@@ -603,6 +607,147 @@ public class ChartsTests
         Assert.DoesNotContain("href=\"follow-ups/deferred-epic-1.html\"", svgPrefixed);
     }
 
+    [Fact]
+    public void Sunburst_Unplanned_RootWithOpenQuickDevAndUnattributableDeferred()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Do the thing", "in progress", 1, 2)) },
+        };
+        var deferredMarkdown = """
+            ## Deferred from: cross-cutting backlog (2026-07-15)
+
+            - Parked direct deferred item.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = new[]
+            {
+                new QuickDevEntry("Fix the footer", "implementation-artifacts/spec-fix-footer.html", "ready", "chore"),
+                new QuickDevEntry("Done one-shot", "implementation-artifacts/spec-done.html", "done", "chore"),
+            },
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 1),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1, DirectChanges = 2 };
+        var geometry = FollowUpGeometry.From(
+            new[] { new SprintActionItem("Orphan action", "open", null, null) },
+            counts, work, deferredModel: deferredModel, epics: model);
+        var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
+
+        Assert.Equal(2, counts.DirectChanges);
+        Assert.Single(unplanned.UnplannedQuickDev); // done filtered out
+        Assert.Single(unplanned.UnattributableDeferred);
+        Assert.Equal(2, unplanned.UnplannedSet.Count);
+
+        var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
+
+        Assert.Contains("aria-label=\"Unplanned:", svg);
+        Assert.Contains("aria-label=\"Direct change: Fix the footer\"", svg);
+        Assert.Contains("href=\"implementation-artifacts/spec-fix-footer.html\"", svg);
+        Assert.Contains("aria-label=\"Deferred item: Parked direct deferred item.\"", svg);
+        Assert.Contains("Direct change</span>", svg);
+        Assert.Contains("Unplanned = direct / one-shot work", svg);
+        Assert.Contains("class=\"sb-seg sb-unplanned\"", svg);
+        Assert.DoesNotContain("Direct change: Done one-shot", svg);
+        // Follow-ups orphan still holds the unattributed action only.
+        Assert.Contains("aria-label=\"Follow-ups: 1 unattributed item\"", svg);
+        Assert.Contains("aria-label=\"Action item: Orphan action\"", svg);
+        foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
+            Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
+    }
+
+    [Fact]
+    public void Sunburst_Unplanned_OmittedWhenEmpty_AttributedQuickDevPrefersEpic()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Do the thing", "ready", 0, 1)) },
+        };
+        var workEmpty = new WorkInventory
+        {
+            QuickDev = new[] { new QuickDevEntry("Already shipped", "qd.html", "done", null) },
+            Deferred = null,
+        };
+        var geometryEmpty = FollowUpGeometry.Empty;
+        var unplannedEmpty = UnplannedWorkGeometry.From(workEmpty, geometryEmpty, model);
+        Assert.False(unplannedEmpty.HasUnplanned);
+
+        var omitted = Charts.Sunburst(model, followUps: geometryEmpty, unplanned: unplannedEmpty);
+        Assert.DoesNotContain("aria-label=\"Unplanned:", omitted);
+        Assert.DoesNotContain("sb-unplanned", omitted);
+        Assert.DoesNotContain("Direct change</span>", omitted);
+
+        var workAttributed = new WorkInventory
+        {
+            QuickDev = new[]
+            {
+                new QuickDevEntry("Story 1.1 hotfix", "implementation-artifacts/spec-hotfix.html", null, "bugfix"),
+            },
+            Deferred = null,
+        };
+        var unplannedAttributed = UnplannedWorkGeometry.From(workAttributed, FollowUpGeometry.Empty, model);
+        Assert.Empty(unplannedAttributed.UnplannedQuickDev);
+        Assert.Single(unplannedAttributed.ForEpic(1));
+
+        var svg = Charts.Sunburst(model, unplanned: unplannedAttributed);
+        Assert.DoesNotContain("aria-label=\"Unplanned:", svg);
+        Assert.Contains("aria-label=\"Direct change: Story 1.1 hotfix\"", svg);
+        Assert.Contains("1 direct change", svg);
+    }
+
+    [Fact]
+    public void UnplannedSet_MatchesSunburstAndSprintMembership()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("2.1", "Other", "ready", 0, 1, epicNumber: 2)) },
+        };
+        var deferredMarkdown = """
+            ## Deferred from: misc (2026-07-15)
+
+            - Unscoped park.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = new[] { new QuickDevEntry("One-off UI polish", "spec-polish.html", "in-progress", null) },
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), ProjectCounts.Empty with { DeferredOpenItems = 1 },
+            work, deferredModel: deferredModel, epics: model);
+        var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
+
+        var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
+        var sprint = SprintStatusParser.Parse("""
+            last_updated: "2026-07-17"
+            development_status:
+              epic-2: in-progress
+              2-1-other: ready-for-dev
+            """);
+        Assert.NotNull(sprint);
+        var board = SprintTemplater.RenderBoard(sprint, model, unplanned: unplanned);
+        var byEpic = SprintTemplater.RenderBoardByEpic(sprint, model, unplanned: unplanned);
+
+        foreach (var member in unplanned.UnplannedSet)
+        {
+            Assert.Contains($"href=\"{member.Href}\"", svg);
+            Assert.Contains($"href=\"{member.Href}\"", board);
+            Assert.Contains($"href=\"{member.Href}\"", byEpic);
+        }
+        Assert.Contains("sprint-lane unplanned", board);
+        Assert.Contains("sprint-epic-lane unplanned", byEpic);
+        Assert.Contains("Direct change", board);
+        Assert.DoesNotContain("Story One-off", board);
+    }
+
     private static string ExtractFollowUpAriaLabels(string svg)
     {
         var labels = new List<string>();
@@ -615,7 +760,9 @@ public class ChartsTests
             var label = svg[i..end];
             if (label.StartsWith("Action item", StringComparison.Ordinal)
                 || label.StartsWith("Deferred item", StringComparison.Ordinal)
-                || label.StartsWith("Follow-ups:", StringComparison.Ordinal))
+                || label.StartsWith("Follow-ups:", StringComparison.Ordinal)
+                || label.StartsWith("Direct change", StringComparison.Ordinal)
+                || label.StartsWith("Unplanned:", StringComparison.Ordinal))
             {
                 labels.Add(label);
             }

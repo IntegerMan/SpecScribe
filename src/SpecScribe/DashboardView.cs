@@ -105,9 +105,13 @@ public sealed record DashboardView
     /// its cached <c>_timelinePath</c>, so a link is never emitted to a page that wasn't produced. [Story 7.3]</summary>
     public bool HasTimeline { get; init; }
 
-    /// <summary>Open follow-ups for the project sunburst's outermost band. Defaults to
-    /// <see cref="FollowUpGeometry.Empty"/> (no 4th ring). Counts agree with <see cref="Counts"/>. [Story 9.7]</summary>
+    /// <summary>Open follow-ups for the project sunburst's story-ring peers + Follow-ups orphan. Defaults to
+    /// <see cref="FollowUpGeometry.Empty"/>. Counts agree with <see cref="Counts"/>. [Story 9.7]</summary>
     public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
+
+    /// <summary>Unplanned / one-off work for the sunburst Unplanned root and Now &amp; Next Unplanned lane.
+    /// Same membership set on both surfaces. [Story 9.12]</summary>
+    public UnplannedWorkGeometry UnplannedWork { get; init; } = UnplannedWorkGeometry.Empty;
 
     /// <summary>Pre-rendered project Next Steps <em>body</em> HTML
     /// (<see cref="BmadCommands.RenderProjectNextStepsBody"/>), or empty when the catalog yields no

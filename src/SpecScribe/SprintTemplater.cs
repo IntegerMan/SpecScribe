@@ -79,7 +79,7 @@ public static class SprintTemplater
         StoryStageCounts(ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty));
 
     public static string RenderIndex(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
-        IReadOnlyList<RetroModel>? retros = null, ProjectCounts? counts = null)
+        IReadOnlyList<RetroModel>? retros = null, ProjectCounts? counts = null, UnplannedWorkGeometry? unplanned = null)
     {
         var ledger = counts ?? ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty);
         var outputPath = SiteNav.SprintOutputPath;
@@ -125,7 +125,7 @@ public static class SprintTemplater
         sb.Append("</div>\n\n");
 
         // The toggle radios live in the control row above; the views sit here and toggle via CSS :has().
-        AppendBoardViews(sb, sprint, epics, prefix, commands);
+        AppendBoardViews(sb, sprint, epics, prefix, commands, unplanned);
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter());
@@ -173,13 +173,23 @@ public static class SprintTemplater
             || n.Equals("done", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>The Kanban board: lifecycle columns (Backlog → Done), then Retired, then Unrecognized. Story entries only —
-    /// epics/retrospectives are not cards. When <paramref name="capPerColumn"/> is set, the cap applies <em>after</em>
-    /// the default epic filter (active epics). Non-default and overflow cards stay in the DOM as <c>hidden</c> so the
-    /// progressive epic selector can reveal them. Core columns (Backlog → Done) render even when empty.
+    /// <summary>The Kanban board: lifecycle columns (Backlog → Done), then Retired, then Unrecognized, then
+    /// an Unplanned lane when <paramref name="unplanned"/> has members (Story 9.12). Story entries only for
+    /// lifecycle lanes — epics/retrospectives are not cards. When <paramref name="capPerColumn"/> is set, the
+    /// cap applies <em>after</em> the default epic filter (active epics). Non-default and overflow cards stay
+    /// in the DOM as <c>hidden</c> so the progressive epic selector can reveal them. Core columns (Backlog →
+    /// Done) render even when empty. Unplanned is never filtered away by epic multi-select.
     /// <paramref name="commands"/> enables Ready-lane InlineGuidance when an undrafted target is knowable.
-    /// [Story 2.3 redesign; spec-sprint-epic-filter-and-home-layout; Story 9.8]</summary>
-    public static string RenderBoard(SprintStatus sprint, EpicsModel? epics, int? capPerColumn = null, string? moreHref = null, string prefix = "", bool wrapWithEpicFilter = true, CommandCatalog? commands = null)
+    /// [Story 2.3 redesign; spec-sprint-epic-filter-and-home-layout; Story 9.8; Story 9.12]</summary>
+    public static string RenderBoard(
+        SprintStatus sprint,
+        EpicsModel? epics,
+        int? capPerColumn = null,
+        string? moreHref = null,
+        string prefix = "",
+        bool wrapWithEpicFilter = true,
+        CommandCatalog? commands = null,
+        UnplannedWorkGeometry? unplanned = null)
     {
         var defaultEpics = ActiveEpicNumbers(sprint);
         var grouped = GroupByEpic(sprint);
@@ -205,10 +215,14 @@ public static class SprintTemplater
             .Where(c => byColumn[c.CssClass].Count > 0 || c.CssClass is not ("retired" or "unrecognized"))
             .ToList();
 
+        var unplannedGeo = unplanned ?? UnplannedWorkGeometry.Empty;
+        var unplannedMembers = unplannedGeo.UnplannedSet;
+        var laneCount = visible.Count + (unplannedMembers.Count > 0 ? 1 : 0);
+
         var sb = new StringBuilder();
         if (wrapWithEpicFilter) AppendEpicFilterOpen(sb, sprint, epics, effectiveDefaults, capPerColumn);
 
-        sb.Append($"<div class=\"sprint-board\" style=\"--lane-count: {visible.Count}\">\n");
+        sb.Append($"<div class=\"sprint-board\" style=\"--lane-count: {laneCount}\">\n");
         foreach (var (cssClass, label) in visible)
         {
             var col = byColumn[cssClass];
@@ -253,6 +267,10 @@ public static class SprintTemplater
 
             sb.Append("    </div>\n  </section>\n");
         }
+
+        if (unplannedMembers.Count > 0)
+            AppendUnplannedLane(sb, unplannedMembers, prefix, capPerColumn, moreHref);
+
         sb.Append("</div>\n");
         if (wrapWithEpicFilter) AppendEpicFilterClose(sb);
         return sb.ToString();
@@ -264,8 +282,15 @@ public static class SprintTemplater
 
     /// <summary>The epic-grouped board view: one swimlane section per epic (file order) with the epic header
     /// (linked, tracked badge, retrospective note) and its stories as status-colored cards in a wrap row.
-    /// Non-default epics start <c>hidden</c> for the epic filter default. [Story 2.3 redesign; spec-sprint-epic-filter]</summary>
-    public static string RenderBoardByEpic(SprintStatus sprint, EpicsModel? epics, string prefix = "", bool wrapWithEpicFilter = true)
+    /// Non-default epics start <c>hidden</c> for the epic filter default. Trailing Unplanned / Direct work
+    /// swimlane when <paramref name="unplanned"/> is non-empty (always visible; not filtered by epic).
+    /// [Story 2.3 redesign; spec-sprint-epic-filter; Story 9.12]</summary>
+    public static string RenderBoardByEpic(
+        SprintStatus sprint,
+        EpicsModel? epics,
+        string prefix = "",
+        bool wrapWithEpicFilter = true,
+        UnplannedWorkGeometry? unplanned = null)
     {
         var (order, epicEntry, retroEntry, stories) = GroupByEpic(sprint);
         var defaultEpics = ActiveEpicNumbers(sprint);
@@ -314,6 +339,11 @@ public static class SprintTemplater
             }
             sb.Append("</section>\n\n");
         }
+
+        var unplannedMembers = (unplanned ?? UnplannedWorkGeometry.Empty).UnplannedSet;
+        if (unplannedMembers.Count > 0)
+            AppendUnplannedEpicSwimlane(sb, unplannedMembers, prefix);
+
         if (wrapWithEpicFilter) AppendEpicFilterClose(sb);
         return sb.ToString();
     }
@@ -334,7 +364,13 @@ public static class SprintTemplater
         return sb.ToString();
     }
 
-    private static void AppendBoardViews(StringBuilder sb, SprintStatus sprint, EpicsModel? epics, string prefix, CommandCatalog commands)
+    private static void AppendBoardViews(
+        StringBuilder sb,
+        SprintStatus sprint,
+        EpicsModel? epics,
+        string prefix,
+        CommandCatalog commands,
+        UnplannedWorkGeometry? unplanned = null)
     {
         // One filter drives both status and by-epic views (CSS :has() swaps which view is visible).
         var defaultEpics = ActiveEpicNumbers(sprint);
@@ -345,10 +381,10 @@ public static class SprintTemplater
         var effectiveDefaults = defaultEpics.Count > 0 ? defaultEpics : epicIdsWithStories;
         AppendEpicFilterOpen(sb, sprint, epics, effectiveDefaults, capPerColumn: null);
         sb.Append("<div class=\"board-view board-view-status\">\n");
-        sb.Append(RenderBoard(sprint, epics, prefix: prefix, wrapWithEpicFilter: false, commands: commands));
+        sb.Append(RenderBoard(sprint, epics, prefix: prefix, wrapWithEpicFilter: false, commands: commands, unplanned: unplanned));
         sb.Append("</div>\n");
         sb.Append("<div class=\"board-view board-view-epic\">\n");
-        sb.Append(RenderBoardByEpic(sprint, epics, prefix, wrapWithEpicFilter: false));
+        sb.Append(RenderBoardByEpic(sprint, epics, prefix, wrapWithEpicFilter: false, unplanned: unplanned));
         sb.Append("</div>\n");
         AppendEpicFilterClose(sb);
         sb.Append('\n');
@@ -502,6 +538,77 @@ public static class SprintTemplater
         }
 
         sb.Append($"      </{tag}>\n");
+    }
+
+    /// <summary>Trailing Unplanned lane on the by-status board — same membership as the sunburst Unplanned
+    /// root. Cards are never mislabeled as stories. [Story 9.12]</summary>
+    private static void AppendUnplannedLane(
+        StringBuilder sb,
+        IReadOnlyList<UnplannedMember> members,
+        string prefix,
+        int? capPerColumn,
+        string? moreHref)
+    {
+        var shown = capPerColumn is { } cap && members.Count > cap
+            ? members.Take(cap).ToList()
+            : members.ToList();
+        var overflow = capPerColumn is { } c && members.Count > c
+            ? members.Skip(c).ToList()
+            : new List<UnplannedMember>();
+        var tip = PathUtil.Html("Direct / one-shot work outside the epic plan — not tracked as stories.");
+        sb.Append($"  <section class=\"sprint-lane unplanned\" data-lane-label=\"Unplanned\" aria-label=\"{PathUtil.Html($"Unplanned: {members.Count} {Charts.Plural(members.Count, "item", "items")}")}\">\n");
+        sb.Append($"    <div class=\"sprint-lane-head js-tip\" data-tip=\"{tip}\" title=\"{tip}\" tabindex=\"0\"><span class=\"sprint-lane-label\">Unplanned</span><span class=\"sprint-lane-count\">{members.Count}</span></div>\n");
+        sb.Append("    <div class=\"sprint-cards\">\n");
+        foreach (var m in shown) AppendUnplannedCard(sb, m, prefix, hidden: false);
+        foreach (var m in overflow) AppendUnplannedCard(sb, m, prefix, hidden: true, capOverflow: true);
+        if (capPerColumn is { } capLimit && members.Count > capLimit && moreHref is { Length: > 0 })
+        {
+            var extra = members.Count - capLimit;
+            sb.Append($"      <a class=\"sprint-lane-more\" href=\"{PathUtil.Html(prefix + moreHref)}\">+{extra} more &rarr;</a>\n");
+        }
+        sb.Append("    </div>\n  </section>\n");
+    }
+
+    /// <summary>Trailing Unplanned / Direct work swimlane on the by-epic board. Always visible when non-empty
+    /// (not subject to epic multi-select). [Story 9.12]</summary>
+    private static void AppendUnplannedEpicSwimlane(
+        StringBuilder sb,
+        IReadOnlyList<UnplannedMember> members,
+        string prefix)
+    {
+        sb.Append("<section class=\"sprint-epic-lane unplanned\" data-unplanned=\"1\">\n");
+        sb.Append("  <div class=\"sprint-epic-head\">\n");
+        sb.Append("    <span class=\"sprint-epic-title\">Unplanned / Direct work</span>\n");
+        sb.Append("  </div>\n");
+        sb.Append("  <div class=\"sprint-cards-row\">\n");
+        foreach (var m in members) AppendUnplannedCard(sb, m, prefix, hidden: false);
+        sb.Append("  </div>\n");
+        sb.Append("</section>\n\n");
+    }
+
+    private static void AppendUnplannedCard(
+        StringBuilder sb,
+        UnplannedMember member,
+        string prefix,
+        bool hidden = false,
+        bool capOverflow = false)
+    {
+        var isDirect = string.Equals(member.Kind, "direct", StringComparison.Ordinal);
+        var kindLabel = isDirect ? "Direct change" : "Deferred item";
+        var cssClass = member.IsDone
+            ? "done"
+            : isDirect ? "unplanned" : StatusStyles.ForSprint(member.Status ?? "open");
+        var tip = PathUtil.Html($"{kindLabel}\n{member.Title}");
+        var hiddenAttr = hidden ? " hidden" : string.Empty;
+        var overflowAttr = capOverflow ? " data-cap-overflow=\"1\"" : string.Empty;
+        var href = PathUtil.Html(prefix + member.Href);
+
+        sb.Append($"      <a class=\"sprint-card js-tip unplanned-card {cssClass}\"{hiddenAttr}{overflowAttr} href=\"{href}\" data-tip=\"{tip}\">\n");
+        sb.Append("        <div class=\"sprint-card-head\">\n");
+        sb.Append($"          <span class=\"sprint-card-id\">{PathUtil.Html(kindLabel)}</span>\n");
+        sb.Append("        </div>\n");
+        sb.Append($"        <span class=\"sprint-card-title\">{PathUtil.Html(member.Title)}</span>\n");
+        sb.Append("      </a>\n");
     }
 
     /// <summary>The rich card tooltip text (plain, <c>\n</c>-separated for the js-tip node): epic name, story

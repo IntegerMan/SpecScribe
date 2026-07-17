@@ -4,7 +4,7 @@ baseline_commit: 8cc95353c91ec1b8ee61029a2b021676263dd6f5
 
 # Story 9.12: Unplanned and One-Off Work in Geometry and Sprint
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -89,40 +89,40 @@ Epic 9 extends FR30 from standalone follow-up pages into the Driver's primary re
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Shared unplanned-set projection (AC: #1, #2)**
-  - [ ] Introduce a pure helper (extend `FollowUpGeometry` or add `UnplannedWorkGeometry` / methods on `WorkInventory`) that, given `WorkInventory` + deferred slots + optional `EpicsModel`, returns:
+- [x] **Task 1 — Shared unplanned-set projection (AC: #1, #2)**
+  - [x] Introduce a pure helper (extend `FollowUpGeometry` or add `UnplannedWorkGeometry` / methods on `WorkInventory`) that, given `WorkInventory` + deferred slots + optional `EpicsModel`, returns:
     - epic-attributed quick-dev (for epic story-ring peers)
     - unplanned members (open unattributable quick-dev + unattributable deferred slots)
-  - [ ] Open-filter for quick-dev: status not done/resolved; null/empty → open.
-  - [ ] Attribution: deferred via existing epic resolution; quick-dev via best-effort text/filename only (reuse `FollowUpRefs` where possible).
-  - [ ] Assert member counts are consistent with ledger fields used for display (`DirectChanges` / `DeferredOpenItems` are authorities for *totals*; geometry may show the open subset — document and test the relationship; never invent a second parse of deferred markdown that can drift from `ProjectCounts.DeferredOpenItems`).
+  - [x] Open-filter for quick-dev: status not done/resolved; null/empty → open.
+  - [x] Attribution: deferred via existing epic resolution; quick-dev via best-effort text/filename only (reuse `FollowUpRefs` where possible).
+  - [x] Assert member counts are consistent with ledger fields used for display (`DirectChanges` / `DeferredOpenItems` are authorities for *totals*; geometry may show the open subset — document and test the relationship; never invent a second parse of deferred markdown that can drift from `ProjectCounts.DeferredOpenItems`).
 
-- [ ] **Task 2 — Project sunburst Unplanned root (AC: #1)**
-  - [ ] Extend `Charts.Sunburst` to render the Unplanned synthetic root when the set is non-empty; omit when empty.
-  - [ ] Move unattributable deferred wedges out of the Follow-ups orphan slice into Unplanned; keep unattributed action items on Follow-ups.
-  - [ ] Render open quick-dev leaf wedges under Unplanned (or under the preferred epic when attributed).
-  - [ ] Update legend + `sunburst-hint`; aria/titles never say "Story".
-  - [ ] Thread inputs from existing `DashboardView` / epics index call sites (`HtmlRenderAdapter.Dashboard.cs`, `HtmlRenderAdapter.Epics.cs`) — Charts stays pure.
+- [x] **Task 2 — Project sunburst Unplanned root (AC: #1)**
+  - [x] Extend `Charts.Sunburst` to render the Unplanned synthetic root when the set is non-empty; omit when empty.
+  - [x] Move unattributable deferred wedges out of the Follow-ups orphan slice into Unplanned; keep unattributed action items on Follow-ups.
+  - [x] Render open quick-dev leaf wedges under Unplanned (or under the preferred epic when attributed).
+  - [x] Update legend + `sunburst-hint`; aria/titles never say "Story".
+  - [x] Thread inputs from existing `DashboardView` / epics index call sites (`HtmlRenderAdapter.Dashboard.cs`, `HtmlRenderAdapter.Epics.cs`) — Charts stays pure.
 
-- [ ] **Task 3 — Sprint board Unplanned lane (AC: #2)**
-  - [ ] Extend `SprintTemplater.RenderBoard` with an Unplanned lane using the shared set; distinct card markup (not story cards mislabeled).
-  - [ ] Extend `RenderBoardByEpic` with a trailing Unplanned swimlane.
-  - [ ] Wire Home board (`HtmlRenderAdapter.Dashboard` Now & Next) so the same set appears; keep epic filter behavior coherent (Unplanned not filtered away by epic multi-select unless intentionally hidden when empty).
-  - [ ] CSS: `.sprint-lane.unplanned` / card classes near existing sprint-board rules; never color-only.
+- [x] **Task 3 — Sprint board Unplanned lane (AC: #2)**
+  - [x] Extend `SprintTemplater.RenderBoard` with an Unplanned lane using the shared set; distinct card markup (not story cards mislabeled).
+  - [x] Extend `RenderBoardByEpic` with a trailing Unplanned swimlane.
+  - [x] Wire Home board (`HtmlRenderAdapter.Dashboard` Now & Next) so the same set appears; keep epic filter behavior coherent (Unplanned not filtered away by epic multi-select unless intentionally hidden when empty).
+  - [x] CSS: `.sprint-lane.unplanned` / card classes near existing sprint-board rules; never color-only.
 
-- [ ] **Task 4 — Guardrails (AC: #1, #2)**
-  - [ ] Do **not** change `sprint-status.yaml` / `deferred-work.md` / quick-dev frontmatter schemas.
-  - [ ] Do **not** build 9.13 filtered group pages; keep group-root hrefs simple and documented.
-  - [ ] Do **not** fold DirectChanges into epic/story/task tallies (Story 2.1 / WorkInventory invariant).
-  - [ ] Leave 9.6/9.10/9.11 templaters alone except read-only reuse of deferred slots / detail hrefs.
-  - [ ] No JS for navigation (webview CSP; NFR5).
+- [x] **Task 4 — Guardrails (AC: #1, #2)**
+  - [x] Do **not** change `sprint-status.yaml` / `deferred-work.md` / quick-dev frontmatter schemas.
+  - [x] Do **not** build 9.13 filtered group pages; keep group-root hrefs simple and documented.
+  - [x] Do **not** fold DirectChanges into epic/story/task tallies (Story 2.1 / WorkInventory invariant).
+  - [x] Leave 9.6/9.10/9.11 templaters alone except read-only reuse of deferred slots / detail hrefs.
+  - [x] No JS for navigation (webview CSP; NFR5).
 
-- [ ] **Task 5 — Tests + golden (AC: #1, #2)**
-  - [ ] `ChartsTests`: Unplanned root present with open quick-dev + unattributable deferred; omitted when empty; attributed quick-dev/deferred prefer epic ring; Follow-ups orphan still holds unattributed action items only; aria never "Story" for direct/unplanned wedges.
-  - [ ] Sprint board tests (`HtmlTemplaterTests` / sprint tests): Unplanned lane/swimlane shows same membership; omitted when empty; cards href to spec/detail pages.
-  - [ ] Ledger agreement pins where counts are displayed.
-  - [ ] Golden fingerprint will move (home + sprint + epics index) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Confirm three `Render*ParityTests` green; no new `HostRenderException`.
-  - [ ] Run `dotnet test` from repo root.
+- [x] **Task 5 — Tests + golden (AC: #1, #2)**
+  - [x] `ChartsTests`: Unplanned root present with open quick-dev + unattributable deferred; omitted when empty; attributed quick-dev/deferred prefer epic ring; Follow-ups orphan still holds unattributed action items only; aria never "Story" for direct/unplanned wedges.
+  - [x] Sprint board tests (`HtmlTemplaterTests` / sprint tests): Unplanned lane/swimlane shows same membership; omitted when empty; cards href to spec/detail pages.
+  - [x] Ledger agreement pins where counts are displayed.
+  - [x] Golden fingerprint will move (home + sprint + epics index) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Confirm three `Render*ParityTests` green; no new `HostRenderException`.
+  - [x] Run `dotnet test` from repo root.
 
 ## Dev Notes
 
@@ -250,10 +250,41 @@ Generate to `SpecScribeOutput/`. Open **home** sunburst: open `route: one-shot` 
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Composer (Cursor agent router)
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Added `UnplannedWorkGeometry` as the shared pure membership helper: open quick-dev (not done/resolved) + `FollowUpGeometry.UnattributedDeferredItems`; epic attribution for quick-dev via title/filename/`FollowUpRefs`/optional deferred-spec cross-ref.
+- Project sunburst: synthetic **Unplanned** root (NFR8 omit when empty); Follow-ups orphan = unattributed action items only; attributed quick-dev as story-ring peers; legend + hint name Direct change / Unplanned.
+- Sprint by-status **Unplanned** lane + by-epic **Unplanned / Direct work** swimlane; distinct `unplanned-card` markup (never "Story …"); Home Now & Next and `WriteSprint` wired to the same set.
+- Group-root href temporary/swappable for 9.13; no new authoring schema; no filtered group pages; CSS uses `--sb-unplanned` (not a `--status-*` token).
+- `dotnet test`: 1332 passed. Golden fingerprint regenerated.
+
 ### File List
+
+- src/SpecScribe/UnplannedWorkGeometry.cs
+- src/SpecScribe/Charts.cs
+- src/SpecScribe/FollowUpGeometry.cs
+- src/SpecScribe/SprintTemplater.cs
+- src/SpecScribe/DashboardView.cs
+- src/SpecScribe/DashboardViewBuilder.cs
+- src/SpecScribe/EpicsView.cs
+- src/SpecScribe/EpicsViewBuilder.cs
+- src/SpecScribe/EpicsTemplater.cs
+- src/SpecScribe/HtmlTemplater.cs
+- src/SpecScribe/HtmlRenderAdapter.Dashboard.cs
+- src/SpecScribe/HtmlRenderAdapter.Epics.cs
+- src/SpecScribe/SiteGenerator.cs
+- src/SpecScribe/assets/specscribe.css
+- tests/SpecScribe.Tests/UnplannedWorkGeometryTests.cs
+- tests/SpecScribe.Tests/ChartsTests.cs
+- tests/SpecScribe.Tests/SprintTemplaterTests.cs
+- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+- _bmad-output/implementation-artifacts/9-12-unplanned-and-one-off-work-in-geometry-and-sprint.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+
+## Change Log
+
+- 2026-07-17: Story 9.12 — Unplanned sunburst root + sprint Unplanned lane from shared `UnplannedWorkGeometry`; Follow-ups orphan split; golden regen.

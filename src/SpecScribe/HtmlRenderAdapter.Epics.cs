@@ -30,7 +30,7 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("<section class=\"dashboard\">\n");
         AppendEpicsProgressPanel(sb, view.Progress, view.Counts);
         sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
-        sb.Append(Charts.Sunburst(model, commands: view.Commands, followUps: view.FollowUps));
+        sb.Append(Charts.Sunburst(model, commands: view.Commands, followUps: view.FollowUps, unplanned: view.UnplannedWork));
         sb.Append("</div>\n");
         sb.Append("</section>\n\n");
 
@@ -197,7 +197,7 @@ public sealed partial class HtmlRenderAdapter
             // fallback so a sunburst click always leaves the epic page for the story surface.
             main.Append(Charts.EpicSunburst(view.Epic, story =>
                 view.Prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id)),
-                commands: view.Commands, followUps: view.FollowUps));
+                commands: view.Commands, followUps: view.FollowUps, unplanned: view.UnplannedWork));
             main.Append("</div>\n");
             main.Append("</div>\n</section>\n\n");
         }

@@ -42,7 +42,7 @@ public sealed partial class HtmlRenderAdapter
         {
             sb.Append("<div class=\"chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
-            sb.Append(Charts.Sunburst(epicsForSunburst, commands: view.Commands, followUps: view.FollowUps));
+            sb.Append(Charts.Sunburst(epicsForSunburst, commands: view.Commands, followUps: view.FollowUps, unplanned: view.UnplannedWork));
             sb.Append("</div>\n\n");
         }
 
@@ -58,7 +58,7 @@ public sealed partial class HtmlRenderAdapter
         // Now & Next / sprint board — Develop.
         if (view.NowNext is { } nowNext)
         {
-            AppendNowAndNext(sb, nowNext, view.Epics, view.Counts, view.Commands);
+            AppendNowAndNext(sb, nowNext, view.Epics, view.Counts, view.Commands, view.UnplannedWork);
         }
 
         // Story Pipeline — Requirements.
@@ -283,7 +283,7 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</div>\n");
     }
     /// <summary>The "Now &amp; Next" panel — Develop work-stage. Re-homed from <c>HtmlTemplater.AppendNowAndNext</c>.</summary>
-    private void AppendNowAndNext(StringBuilder sb, DashboardNowNext nowNext, EpicsModel? epicsModel, ProjectCounts counts, CommandCatalog commands)
+    private void AppendNowAndNext(StringBuilder sb, DashboardNowNext nowNext, EpicsModel? epicsModel, ProjectCounts counts, CommandCatalog commands, UnplannedWorkGeometry? unplanned = null)
     {
         if (nowNext.SprintBoard is { } sprint && epicsModel is not null)
         {
@@ -298,7 +298,7 @@ public sealed partial class HtmlRenderAdapter
             sb.Append(SprintTemplater.RenderProgressWheel(counts));
             sb.Append("</div>\n</div>\n");
             sb.Append(SprintTemplater.EpicFilterEmptyHintMarkup);
-            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath, wrapWithEpicFilter: false, commands: commands));
+            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath, wrapWithEpicFilter: false, commands: commands, unplanned: unplanned));
             sb.Append(SprintTemplater.CloseEpicFilterable());
             sb.Append("</div>\n\n");
             return;

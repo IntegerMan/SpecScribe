@@ -2456,6 +2456,9 @@ a.ref-file-node:focus-visible {
    color-only (UX-DR17). Chart-local token, not a new lifecycle --status-*. */
 .sb-followup-open { fill: var(--sb-followup-open, #d97706); }
 .sunburst-legend .sb-followup-open-sw { background: var(--sb-followup-open, #d97706); }
+/* Unplanned / direct-change wedges — distinct from lifecycle status tokens (no --status-* reuse). [Story 9.12] */
+.sb-unplanned { fill: var(--sb-unplanned, #0e7490); }
+.sunburst-legend .sb-unplanned-sw { background: var(--sb-unplanned, #0e7490); }
 
 .sunburst-center-num { font-size: 1.9rem; font-weight: bold; fill: var(--rust); font-family: 'Courier New', monospace; }
 .sunburst-center-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; fill: var(--ink-light); }
@@ -2505,7 +2508,9 @@ a.ref-file-node:focus-visible {
 .sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done),
 .sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done),
 .sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open),
-.sunburst-panel:has(.sb-followup-open-item:focus-visible) .sb-seg:not(.sb-followup-open) {
+.sunburst-panel:has(.sb-followup-open-item:focus-visible) .sb-seg:not(.sb-followup-open),
+.sunburst-panel:has(.sb-unplanned-item:hover) .sb-seg:not(.sb-unplanned),
+.sunburst-panel:has(.sb-unplanned-item:focus-visible) .sb-seg:not(.sb-unplanned) {
   opacity: 0.28;
 }
 
@@ -5289,6 +5294,10 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
 .sprint-lane.review .sprint-lane-head { border-bottom-color: var(--status-review); }
 .sprint-lane.done .sprint-lane-head { border-bottom-color: var(--status-done); }
 .sprint-lane.retired .sprint-lane-head { border-bottom-color: var(--status-deferred); }
+.sprint-lane.unplanned .sprint-lane-head { border-bottom-color: var(--sb-unplanned, #0e7490); }
+.sprint-card.unplanned { border-left-color: var(--sb-unplanned, #0e7490); }
+.sprint-card.unplanned-card .sprint-card-id { color: var(--sb-unplanned, #0e7490); }
+.sprint-epic-lane.unplanned .sprint-epic-title { color: var(--ink); font-style: italic; }
 
 .sprint-cards { display: flex; flex-direction: column; gap: 0.45rem; }
 .sprint-lane-more {

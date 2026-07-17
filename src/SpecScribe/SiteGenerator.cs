@@ -1883,7 +1883,8 @@ public sealed class SiteGenerator
             var deferredModel = ResolveDeferredModel(workForFollowUps, files);
             var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
             var followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
-            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps), "epics.html"));
+            var unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model);
+            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps, unplanned), "epics.html"));
 
             // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
             // undrafted story that got a placeholder and then vanished — can't leave a stale page behind,
@@ -1898,7 +1899,7 @@ public sealed class SiteGenerator
             foreach (var epic in model.Epics)
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
+                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
 
                 foreach (var story in epic.Stories)
                 {
@@ -2069,9 +2070,10 @@ public sealed class SiteGenerator
             var work = WorkInventory.Build(docs);
             var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
             var followUps = BuildFollowUpGeometry(work, counts);
+            var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps);
+                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -2080,12 +2082,12 @@ public sealed class SiteGenerator
             if (_epicsModel is { } model && _progress is { } progress)
             {
                 var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts, followUps), _epicsSourcePath));
+                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts, followUps, unplanned), _epicsSourcePath));
 
                 foreach (var epic in model.Epics)
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps);
+                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned);
                     surfaces.Add(WebviewSurfaceFor(epicPage, _epicsSourcePath, skipEpicNumber: epic.Number));
 
                     var outlineStories = new List<OutlineStory>();
@@ -2321,21 +2323,22 @@ public sealed class SiteGenerator
         var work = WorkInventory.Build(docs);
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(work, counts);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
         {
             var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-            AddSpaSurface(pages, familyPaths, EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts, followUps));
+            AddSpaSurface(pages, familyPaths, EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts, followUps, unplanned));
 
             foreach (var epic in model.Epics)
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
                 AddSpaSurface(pages, familyPaths,
-                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps),
+                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned),
                     skipEpicNumber: epic.Number);
 
                 foreach (var story in epic.Stories)
@@ -2493,7 +2496,8 @@ public sealed class SiteGenerator
         // Incremental paths may call WriteIndex without going through GenerateAll's ledger build — rebuild then.
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(inventory, counts);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps);
+        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
@@ -2622,8 +2626,11 @@ public sealed class SiteGenerator
     private void WriteSprint(SiteNav nav)
     {
         if (_sprint is null) return;
-        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, WorkInventory.Empty, _epicsModel, _requirements);
-        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, counts);
+        var work = WorkInventory.Build(_docs.Values.ToList());
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
+        var followUps = BuildFollowUpGeometry(work, counts);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
+        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, counts, unplanned);
         WriteOutput(SiteNav.SprintOutputPath, ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
 
@@ -2865,24 +2872,61 @@ public sealed class SiteGenerator
             deferredModel,
             _epicsModel);
 
-    /// <summary>Work inventory for the follow-up sunburst geometry. Uses the populated <see cref="_docs"/>
-    /// when available; otherwise (e.g. during <see cref="RenderEpicsPages"/>, before the pages loop fills
-    /// <see cref="_docs"/>) locates and converts <c>deferred-work.md</c> from source read-only so the
-    /// deferred open count is available. Quick-dev entries aren't needed for geometry.</summary>
+    /// <summary>Work inventory for follow-up + unplanned sunburst geometry. Uses the populated
+    /// <see cref="_docs"/> when available; otherwise (e.g. during <see cref="RenderEpicsPages"/>, before the
+    /// pages loop fills <see cref="_docs"/>) locates and converts <c>deferred-work.md</c> and open
+    /// <c>route: one-shot</c> specs from source read-only so both deferred and quick-dev are available.</summary>
     private WorkInventory ResolveFollowUpWork(IReadOnlyList<string> files)
     {
         var fromDocs = WorkInventory.Build(_docs.Values.ToList());
-        if (fromDocs.Deferred is not null) return fromDocs;
-
-        if (TryConvertDeferredDoc(files) is not { } doc) return fromDocs;
-        return new WorkInventory
+        var deferred = fromDocs.Deferred;
+        if (deferred is null && TryConvertDeferredDoc(files) is { } doc)
         {
-            QuickDev = fromDocs.QuickDev,
-            Deferred = new DeferredWorkEntry(
+            deferred = new DeferredWorkEntry(
                 doc.Title,
                 PathUtil.NormalizeSlashes(doc.OutputRelativePath),
-                WorkInventory.CountOpenItems(doc.BodyHtml)),
+                WorkInventory.CountOpenItems(doc.BodyHtml));
+        }
+
+        var quickDev = fromDocs.QuickDev.Count > 0
+            ? fromDocs.QuickDev
+            : ConvertQuickDevFromSource(files);
+
+        return new WorkInventory
+        {
+            QuickDev = quickDev,
+            Deferred = deferred,
         };
+    }
+
+    /// <summary>Read-only conversion of <c>spec-*.md</c> one-shots when <see cref="_docs"/> is not yet
+    /// populated — keeps epics.html Unplanned wedges aligned with index.html. [Story 9.12]</summary>
+    private IReadOnlyList<QuickDevEntry> ConvertQuickDevFromSource(IReadOnlyList<string> files)
+    {
+        var list = new List<QuickDevEntry>();
+        foreach (var file in files)
+        {
+            var relative = ToSourceRelative(file);
+            var norm = PathUtil.NormalizeSlashes(relative);
+            if (!BmadArtifactAdapter.IsUnderImplementationArtifacts(norm)) continue;
+            var slash = norm.LastIndexOf('/');
+            var fileName = slash >= 0 ? norm[(slash + 1)..] : norm;
+            if (!fileName.StartsWith("spec-", StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                if (!File.Exists(file)) continue;
+                var outputRelative = PathUtil.ToOutputRelative(relative);
+                var doc = MarkdownConverter.Convert(file, relative, outputRelative);
+                if (!string.Equals(doc.Frontmatter.Route?.Trim(), "one-shot", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                list.Add(new QuickDevEntry(doc.Title, PathUtil.NormalizeSlashes(outputRelative), doc.Frontmatter.Status, doc.Frontmatter.Type));
+            }
+            catch (IOException) { /* NFR2 */ }
+            catch (UnauthorizedAccessException) { /* NFR2 */ }
+        }
+
+        return list.OrderBy(q => q.Title, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>Parses the deferred-work note for the follow-up geometry, preferring the <see cref="_docs"/>

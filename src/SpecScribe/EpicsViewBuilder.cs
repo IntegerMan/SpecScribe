@@ -17,11 +17,19 @@ public static class EpicsViewBuilder
 
     // ----- Epics index --------------------------------------------------------------------------------------
 
-    public static EpicsIndexView BuildIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null)
+    public static EpicsIndexView BuildIndex(
+        EpicsModel model,
+        ProgressModel progress,
+        SiteNav nav,
+        CommandCatalog commands,
+        ProjectCounts? counts = null,
+        FollowUpGeometry? followUps = null,
+        UnplannedWorkGeometry? unplanned = null)
     {
         // Production always passes the shared ledger. Null → build an equivalent ephemeral ledger from the
         // same inputs so tests/stubs that omit counts keep coherent subtitle + panel stats. [Story 8.3]
         var ledger = counts ?? ProjectCounts.Build(progress, null, WorkInventory.Empty, model);
+        var geometry = followUps ?? FollowUpGeometry.Empty;
         return new()
         {
             SiteTitle = nav.SiteTitle,
@@ -33,7 +41,8 @@ public static class EpicsViewBuilder
             Commands = commands,
             VerticalSliceChips = model.Epics.Where(e => e.Section == EpicSection.VerticalSlice).Select(BuildChip).ToList(),
             FurtherDevelopmentChips = model.Epics.Where(e => e.Section == EpicSection.FurtherDevelopment).Select(BuildChip).ToList(),
-            FollowUps = followUps ?? FollowUpGeometry.Empty,
+            FollowUps = geometry,
+            UnplannedWork = unplanned ?? UnplannedWorkGeometry.Empty,
         };
     }
 
@@ -42,7 +51,14 @@ public static class EpicsViewBuilder
 
     // ----- Epic page ----------------------------------------------------------------------------------------
 
-    public static EpicPageView BuildEpic(EpicInfo epic, EpicProgress progress, CommandCatalog commands, string? epicRetroPath, EntityPager? pager = null, FollowUpGeometry? followUps = null)
+    public static EpicPageView BuildEpic(
+        EpicInfo epic,
+        EpicProgress progress,
+        CommandCatalog commands,
+        string? epicRetroPath,
+        EntityPager? pager = null,
+        FollowUpGeometry? followUps = null,
+        UnplannedWorkGeometry? unplanned = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var prefix = Prefix(outputPath);
@@ -86,6 +102,15 @@ public static class EpicsViewBuilder
                 DeferredSlots: scopedDeferred)
             : FollowUpGeometry.Empty;
 
+        // Epic-attributed quick-dev only — never the project Unplanned root. [Story 9.12]
+        var projectUnplanned = unplanned ?? UnplannedWorkGeometry.Empty;
+        var epicQuickDev = projectUnplanned.ForEpic(epic.Number)
+            .Select(s => s with { Href = FollowUpGeometry.ApplyLinkPrefix(prefix, s.Href) })
+            .ToList();
+        var epicUnplanned = epicQuickDev.Count > 0
+            ? new UnplannedWorkGeometry(epicQuickDev, Array.Empty<FollowUpDeferredSlot>())
+            : UnplannedWorkGeometry.Empty;
+
         return new EpicPageView
         {
             Number = epic.Number,
@@ -106,6 +131,7 @@ public static class EpicsViewBuilder
             StoryCards = epic.Stories.Select(s => BuildStoryCard(s, prefix, commands, consolidated)).ToList(),
             Pager = pager ?? EntityPager.None,
             FollowUps = epicFollowUps,
+            UnplannedWork = epicUnplanned,
         };
     }
 

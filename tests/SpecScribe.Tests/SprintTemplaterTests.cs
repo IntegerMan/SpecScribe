@@ -660,4 +660,51 @@ public class SprintTemplaterTests
         }
         return count;
     }
+
+    [Fact]
+    public void RenderBoard_UnplannedLane_ShowsSameMembershipAndOmitsWhenEmpty()
+    {
+        var epics = SampleEpics();
+        var sprint = Sample();
+        var empty = SprintTemplater.RenderBoard(sprint, epics);
+        Assert.DoesNotContain("sprint-lane unplanned", empty);
+
+        var work = new WorkInventory
+        {
+            QuickDev = new[]
+            {
+                new QuickDevEntry("Fix footer", "implementation-artifacts/spec-fix-footer.html", "ready", "chore"),
+            },
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var deferredMarkdown = """
+            ## Deferred from: misc (2026-07-15)
+
+            - Parked item.
+            """;
+        var followUps = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(),
+            ProjectCounts.Empty with { DeferredOpenItems = 1 },
+            work,
+            deferredModel: DeferredWorkParser.Parse(deferredMarkdown),
+            epics: epics);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, epics);
+
+        var board = SprintTemplater.RenderBoard(sprint, epics, unplanned: unplanned);
+        Assert.Contains("sprint-lane unplanned", board);
+        Assert.Contains("aria-label=\"Unplanned: 2 items\"", board);
+        Assert.Contains("href=\"implementation-artifacts/spec-fix-footer.html\"", board);
+        Assert.Contains("sprint-card-id\">Direct change</span>", board);
+        Assert.Contains("sprint-card-id\">Deferred item</span>", board);
+        Assert.DoesNotContain("Story Fix footer", board);
+
+        var byEpic = SprintTemplater.RenderBoardByEpic(sprint, epics, unplanned: unplanned);
+        Assert.Contains("sprint-epic-lane unplanned", byEpic);
+        Assert.Contains("Unplanned / Direct work", byEpic);
+        Assert.Contains("href=\"implementation-artifacts/spec-fix-footer.html\"", byEpic);
+
+        // Empty unplanned → no lane.
+        Assert.DoesNotContain("sprint-lane unplanned",
+            SprintTemplater.RenderBoard(sprint, epics, unplanned: UnplannedWorkGeometry.Empty));
+    }
 }

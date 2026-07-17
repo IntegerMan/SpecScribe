@@ -157,16 +157,24 @@ public static class Charts
     /// edge of the data. Every epic/story segment (and the placeholder) is a real link; colors come from
     /// <see cref="StatusStyles"/> via .sb-* CSS classes. When <paramref name="commands"/> exposes a
     /// create-story command, the placeholder tooltip names it. Pure SVG — no JS. [UXO E4]</summary>
-    public static string Sunburst(EpicsModel model, int size = 380, CommandCatalog? commands = null, FollowUpGeometry? followUps = null)
+    public static string Sunburst(
+        EpicsModel model,
+        int size = 380,
+        CommandCatalog? commands = null,
+        FollowUpGeometry? followUps = null,
+        UnplannedWorkGeometry? unplanned = null)
     {
         var epics = model.Epics.OrderBy(e => e.Number).ToList();
         if (epics.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
 
         var geometry = followUps ?? FollowUpGeometry.Empty;
+        var unplannedGeo = unplanned ?? UnplannedWorkGeometry.Empty;
         var hasFollowUps = geometry.HasAny;
+        var hasUnplanned = unplannedGeo.HasUnplanned;
+        // Follow-ups orphan = unattributed action items only (unattributable deferred → Unplanned). [Story 9.12]
         var unattributed = geometry.UnattributedActionItems;
-        var unattributedDeferred = geometry.UnattributedDeferredItems;
-        var orphanSlots = unattributed.Count + unattributedDeferred.Count;
+        var orphanSlots = unattributed.Count;
+        var unplannedSlots = unplannedGeo.UnplannedMemberCount;
 
         var c = size / 2.0;
         var epicInner = size * 0.16;
@@ -176,11 +184,16 @@ public static class Charts
         var taskInner = size * 0.42;
         var taskOuter = size * 0.465;
 
-        // Weight each epic by stories + attributed follow-ups so postponed work widens its slice.
+        // Weight each epic by stories + attributed follow-ups + attributed quick-dev so postponed work widens its slice.
         int EpicWeight(EpicInfo e) =>
-            Math.Max(1, e.Stories.Count + geometry.ForEpicNumber(e.Number).Count + geometry.DeferredForEpicNumber(e.Number).Count);
+            Math.Max(1, e.Stories.Count
+                + geometry.ForEpicNumber(e.Number).Count
+                + geometry.DeferredForEpicNumber(e.Number).Count
+                + unplannedGeo.ForEpic(e.Number).Count);
 
-        var totalWeight = epics.Sum(EpicWeight) + (orphanSlots > 0 ? Math.Max(1, orphanSlots) : 0);
+        var totalWeight = epics.Sum(EpicWeight)
+            + (orphanSlots > 0 ? Math.Max(1, orphanSlots) : 0)
+            + (unplannedSlots > 0 ? Math.Max(1, unplannedSlots) : 0);
         var anglePerUnit = 2 * Math.PI / totalWeight;
         const double pad = 0.006;
 
@@ -192,22 +205,27 @@ public static class Charts
         {
             var epicFollowUps = geometry.ForEpicNumber(epic.Number);
             var epicDeferred = geometry.DeferredForEpicNumber(epic.Number);
+            var epicQuickDev = unplannedGeo.ForEpic(epic.Number);
             var weight = EpicWeight(epic);
             var sweep = weight * anglePerUnit;
             var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
             var followUpCount = epicFollowUps.Count + epicDeferred.Count;
+            var directCount = epicQuickDev.Count;
             var followNote = followUpCount > 0
                 ? $", {followUpCount} {Plural(followUpCount, "follow-up", "follow-ups")}"
                 : string.Empty;
+            var directNote = directCount > 0
+                ? $", {directCount} {Plural(directCount, "direct change", "direct changes")}"
+                : string.Empty;
 
-            var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{followNote}";
+            var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{followNote}{directNote}";
             sb.Append($"  <a href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(epicAria)}\">\n");
             sb.Append($"    <path class=\"sb-seg sb-{epicClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, angle + pad, angle + sweep - pad)}\">");
-            sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{Html(followNote)}</title></path>\n");
+            sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{Html(followNote)}{Html(directNote)}</title></path>\n");
             sb.Append("  </a>\n");
 
-            var slotCount = epic.Stories.Count + epicFollowUps.Count + epicDeferred.Count;
+            var slotCount = epic.Stories.Count + epicFollowUps.Count + epicDeferred.Count + epicQuickDev.Count;
             if (slotCount > 0)
             {
                 var slotSweep = sweep / slotCount;
@@ -227,22 +245,24 @@ public static class Charts
                     AppendDeferredItemSlot(sb, slot, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
                     slotAngle += slotSweep;
                 }
+                foreach (var qd in epicQuickDev)
+                {
+                    AppendQuickDevSlot(sb, qd, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                    slotAngle += slotSweep;
+                }
             }
 
             angle += sweep;
         }
 
-        // Unattributed action items + unattributed deferred items: a synthetic epic-level "Follow-ups" slice.
+        // Unattributed action items only: synthetic epic-level "Follow-ups" slice. [Story 9.12]
         if (orphanSlots > 0)
         {
             var orphanWeight = Math.Max(1, orphanSlots);
             var sweep = orphanWeight * anglePerUnit;
-            var openOrphans = unattributed.Count(a => !FollowUpGeometry.IsDone(a))
-                + unattributedDeferred.Count(s => !s.Item.Resolved);
+            var openOrphans = unattributed.Count(a => !FollowUpGeometry.IsDone(a));
             var orphanClass = openOrphans > 0 ? "followup-open" : "done";
-            var orphanHref = unattributed.Count == 0 && unattributedDeferred.Count > 0 && geometry.DeferredHref is { } dh
-                ? dh
-                : geometry.ActionItemsHref;
+            var orphanHref = geometry.ActionItemsHref;
             var orphanAria = openOrphans > 0
                 ? $"Follow-ups: {orphanSlots} unattributed {Plural(orphanSlots, "item", "items")}"
                 : $"Follow-ups: {orphanSlots} completed unattributed {Plural(orphanSlots, "item", "items")}";
@@ -258,7 +278,35 @@ public static class Charts
                 AppendActionItemSlot(sb, item, geometry.HrefFor(item), slotAngle, slotSweep, pad, c, storyInner, storyOuter);
                 slotAngle += slotSweep;
             }
-            foreach (var slot in unattributedDeferred)
+
+            angle += sweep;
+        }
+
+        // Unplanned / Direct work: open unattributable quick-dev + unattributable deferred. [Story 9.12]
+        if (unplannedSlots > 0)
+        {
+            var unplannedWeight = Math.Max(1, unplannedSlots);
+            var sweep = unplannedWeight * anglePerUnit;
+            var openUnplanned = unplannedGeo.UnplannedQuickDev.Count
+                + unplannedGeo.UnattributableDeferred.Count(s => !s.Item.Resolved);
+            var rootClass = openUnplanned > 0 ? "unplanned" : "done";
+            var rootHref = unplannedGeo.GroupRootHref ?? "#";
+            var rootAria = openUnplanned > 0
+                ? $"Unplanned: {unplannedSlots} direct / one-off {Plural(unplannedSlots, "item", "items")}"
+                : $"Unplanned: {unplannedSlots} completed direct / one-off {Plural(unplannedSlots, "item", "items")}";
+
+            sb.Append($"  <a href=\"{Html(rootHref)}\" aria-label=\"{Html(rootAria)}\">\n");
+            sb.Append($"    <path class=\"sb-seg sb-{rootClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, angle + pad, angle + sweep - pad)}\">");
+            sb.Append($"<title>Unplanned / Direct work: {Html(rootAria)}</title></path>\n  </a>\n");
+
+            var slotSweep = sweep / unplannedSlots;
+            var slotAngle = angle;
+            foreach (var qd in unplannedGeo.UnplannedQuickDev)
+            {
+                AppendQuickDevSlot(sb, qd, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                slotAngle += slotSweep;
+            }
+            foreach (var slot in unplannedGeo.UnattributableDeferred)
             {
                 AppendDeferredItemSlot(sb, slot, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
                 slotAngle += slotSweep;
@@ -271,11 +319,28 @@ public static class Charts
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(epics.Count, "epic", "epics")}</text>\n");
         sb.Append("</svg>\n");
 
-        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasFollowUps)));
-        sb.Append(hasFollowUps
-            ? "<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories &amp; follow-ups &middot; outer: task completion. Orange = open follow-up; green = done. Unattributed items share a Follow-ups slice.</div>\n\n"
-            : "<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
+        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasFollowUps, hasUnplanned)));
+        sb.Append(BuildSunburstHint(hasFollowUps, hasUnplanned));
         return sb.ToString();
+    }
+
+    private static string BuildSunburstHint(bool hasFollowUps, bool hasUnplanned)
+    {
+        if (!hasFollowUps && !hasUnplanned)
+            return "<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n";
+
+        var parts = new List<string>
+        {
+            "Inner ring: epics &middot; middle: stories",
+        };
+        if (hasFollowUps) parts[0] += " &amp; follow-ups";
+        if (hasUnplanned) parts[0] += " &amp; direct work";
+        parts[0] += " &middot; outer: task completion.";
+        if (hasFollowUps)
+            parts.Add("Orange = open follow-up; green = done. Unattributed action items share a Follow-ups slice.");
+        if (hasUnplanned)
+            parts.Add("Unplanned = direct / one-shot work outside the epic plan.");
+        return $"<div class=\"sunburst-hint\">{string.Join(" ", parts)}</div>\n\n";
     }
 
     /// <summary>The shared sunburst legend — one focusable entry per status, each carrying a status class
@@ -391,6 +456,16 @@ public static class Charts
         AppendFollowUpSlot(sb, label, slot.DetailHref, resolved ? "done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
     }
 
+    private static void AppendQuickDevSlot(
+        StringBuilder sb, UnplannedQuickDevSlot slot, double angle, double sweep, double pad,
+        double c, double storyInner, double storyOuter)
+    {
+        var title = TruncateFollowUpText(PathUtil.StripHtmlTags(slot.Entry.Title));
+        var open = UnplannedWorkGeometry.IsOpenQuickDev(slot.Entry.Status);
+        var label = open ? $"Direct change: {title}" : $"Direct change (done): {title}";
+        AppendFollowUpSlot(sb, label, slot.Href, open ? "unplanned" : "done", angle, sweep, pad, c, storyInner, storyOuter);
+    }
+
     private static void AppendFollowUpSlot(
         StringBuilder sb, string label, string href, string cssClass, double angle, double sweep, double pad,
         double c, double storyInner, double storyOuter)
@@ -400,7 +475,7 @@ public static class Charts
         sb.Append($"<title>{Html(label)}</title></path></a>\n");
     }
 
-    private static (string Status, string Label)[] BuildSunburstLegendItems(bool hasFollowUps)
+    private static (string Status, string Label)[] BuildSunburstLegendItems(bool hasFollowUps, bool hasUnplanned = false)
     {
         var items = new List<(string, string)>
         {
@@ -409,6 +484,8 @@ public static class Charts
         };
         if (hasFollowUps)
             items.Add(("followup-open", "Open follow-up"));
+        if (hasUnplanned)
+            items.Add(("unplanned", "Direct change"));
         return items.ToArray();
     }
 
@@ -434,17 +511,26 @@ public static class Charts
     }
 
     /// <summary>An epic-scoped sunburst: inner ring = this epic's stories (equal weight, colored by
-    /// status) plus attributed follow-ups (orange open / green done), outer ring = task done/remaining
-    /// per story where a task plan exists. [UXO E4; Story 9.7]</summary>
-    public static string EpicSunburst(EpicInfo epic, Func<StoryInfo, string> hrefBuilder, int size = 320, CommandCatalog? commands = null, FollowUpGeometry? followUps = null)
+    /// status) plus attributed follow-ups (orange open / green done) and attributed direct changes,
+    /// outer ring = task done/remaining per story where a task plan exists. Does <em>not</em> draw the
+    /// project-level Unplanned root. [UXO E4; Story 9.7; 9.12]</summary>
+    public static string EpicSunburst(
+        EpicInfo epic,
+        Func<StoryInfo, string> hrefBuilder,
+        int size = 320,
+        CommandCatalog? commands = null,
+        FollowUpGeometry? followUps = null,
+        UnplannedWorkGeometry? unplanned = null)
     {
         var geometry = (followUps ?? FollowUpGeometry.Empty).ForEpic(epic.Number);
         var epicFollowUps = geometry.ActionItems;
         var epicDeferred = geometry.DeferredItems;
-        var slotCount = epic.Stories.Count + epicFollowUps.Count + epicDeferred.Count;
+        var epicQuickDev = (unplanned ?? UnplannedWorkGeometry.Empty).ForEpic(epic.Number);
+        var slotCount = epic.Stories.Count + epicFollowUps.Count + epicDeferred.Count + epicQuickDev.Count;
         if (slotCount == 0) return "<div class=\"chart-empty\">No stories drafted for this epic yet.</div>";
 
         var hasFollowUps = geometry.HasAny;
+        var hasDirect = epicQuickDev.Count > 0;
         var c = size / 2.0;
         var storyInner = size * 0.16;
         var storyOuter = size * 0.36;
@@ -507,15 +593,32 @@ public static class Charts
             angle += anglePerSlot;
         }
 
+        foreach (var qd in epicQuickDev)
+        {
+            AppendQuickDevSlot(sb, qd, angle, anglePerSlot, pad, c, storyInner, storyOuter);
+            angle += anglePerSlot;
+        }
+
         var storyCount = epic.Stories.Count;
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{storyCount}</text>\n");
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(storyCount, "story", "stories")}</text>\n");
         sb.Append("</svg>\n");
 
-        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasFollowUps)));
-        sb.Append(hasFollowUps
-            ? "<div class=\"sunburst-hint\">Inner ring: stories &amp; follow-ups &middot; outer: task completion. Orange = open follow-up; green = done.</div>\n\n"
-            : "<div class=\"sunburst-hint\">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
+        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasFollowUps, hasDirect)));
+        if (hasFollowUps || hasDirect)
+        {
+            var hint = "Inner ring: stories";
+            if (hasFollowUps) hint += " &amp; follow-ups";
+            if (hasDirect) hint += " &amp; direct work";
+            hint += " &middot; outer: task completion.";
+            if (hasFollowUps) hint += " Orange = open follow-up; green = done.";
+            if (hasDirect) hint += " Direct changes are one-shot work attributed to this epic.";
+            sb.Append($"<div class=\"sunburst-hint\">{hint}</div>\n\n");
+        }
+        else
+        {
+            sb.Append("<div class=\"sunburst-hint\">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
+        }
         return sb.ToString();
     }
 

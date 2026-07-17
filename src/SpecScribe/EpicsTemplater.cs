@@ -9,19 +9,19 @@ namespace SpecScribe;
 /// (the golden regression is the gate). [Story 6.1; Story 6.2]</para></summary>
 public static class EpicsTemplater
 {
-    public static string RenderIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildIndexPage(model, progress, nav, commands, counts, followUps)).Content;
+    public static string RenderIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildIndexPage(model, progress, nav, commands, counts, followUps, unplanned)).Content;
 
     /// <summary>Builds the epics-index <see cref="PageView"/> without committing to a surface — the mechanical
     /// split of <see cref="RenderIndex"/> (bytes unchanged: it now just feeds this through the HTML adapter) that
     /// lets the webview surface render the SAME page model through <see cref="WebviewRenderAdapter"/> instead of
     /// duplicating the view/PageView assembly. Same split as the other <c>Build*Page</c> methods here. [Story 6.4]</summary>
-    public static PageView BuildIndexPage(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null)
+    public static PageView BuildIndexPage(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
     {
         const string outputPath = SiteNav.EpicsOutputPath;
         var breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Epics", null) });
 
-        var view = EpicsViewBuilder.BuildIndex(model, progress, nav, commands, counts, followUps);
+        var view = EpicsViewBuilder.BuildIndex(model, progress, nav, commands, counts, followUps, unplanned);
         var body = HtmlRenderAdapter.Shared.RenderEpicsIndexBody(view);
 
         // The epics index drills down to each epic page; its parent is Home (from the breadcrumb). The roadmap
@@ -50,12 +50,12 @@ public static class EpicsTemplater
         return page;
     }
 
-    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildEpicPage(epic, progress, nav, commands, epicRetroPath, pager, followUps)).Content;
+    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildEpicPage(epic, progress, nav, commands, epicRetroPath, pager, followUps, unplanned)).Content;
 
     /// <summary>Builds an epic page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why the
     /// build/render split exists. [Story 6.4]</summary>
-    public static PageView BuildEpicPage(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null)
+    public static PageView BuildEpicPage(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
@@ -67,7 +67,7 @@ public static class EpicsTemplater
             (EpicCrumbLabel(epic), null),
         });
 
-        var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath, pager, followUps);
+        var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath, pager, followUps, unplanned);
         var body = HtmlRenderAdapter.Shared.RenderEpicBody(view);
 
         // An epic drills up to the epics index and down to each of its story pages (drafted → the story's
