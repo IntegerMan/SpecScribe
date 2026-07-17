@@ -1890,7 +1890,7 @@ public sealed class SiteGenerator
             if (Directory.Exists(epicsDir)) Directory.Delete(epicsDir, recursive: true);
             Directory.CreateDirectory(epicsDir);
 
-            WriteRequirements(requirements, model, progress, nav);
+            WriteRequirements(requirements, model, progress, nav, workForFollowUps);
 
             foreach (var epic in model.Epics)
             {
@@ -2798,7 +2798,8 @@ public sealed class SiteGenerator
 
     /// <summary>Writes requirements.html plus one detail page per FR/NFR. Each page is linkified against the
     /// requirement set (the detail page skips its own id so it never self-links).</summary>
-    private void WriteRequirements(RequirementsModel requirements, EpicsModel model, ProgressModel progress, SiteNav nav)
+    private void WriteRequirements(
+        RequirementsModel requirements, EpicsModel model, ProgressModel progress, SiteNav nav, WorkInventory? work = null)
     {
         WriteOutput("requirements.html",
             ApplyReferenceLinks(RequirementsTemplater.RenderIndex(requirements, model, progress, nav), "requirements.html"));
@@ -2807,9 +2808,11 @@ public sealed class SiteGenerator
         Directory.CreateDirectory(requirementsDir);
 
         // Deferral-source inputs for a deferred requirement's best-effort link (AC #2): the SAME epic→retro map
-        // and deferred-work-page href WriteActionItems already resolves — threaded in, not re-derived. Both are
-        // output-root-relative; RenderRequirement prefixes them to the detail page's depth. [Story 9.3 Task 5]
-        var deferredWorkHref = WorkInventory.Build(_docs.Values.ToList()).Deferred?.OutputPath;
+        // (EpicRetroMap) and deferred-work-page href already resolved for WriteActionItems / follow-up geometry —
+        // prefer a caller-supplied WorkInventory (GenerateAll / RegenerateEpics) and only Build when absent
+        // (same optional-work pattern as WriteActionItems). Both hrefs are output-root-relative; RenderRequirement
+        // prefixes them to the detail page's depth. [Story 9.3 Task 5; review]
+        var deferredWorkHref = (work ?? WorkInventory.Build(_docs.Values.ToList())).Deferred?.OutputPath;
 
         // Everything (FR+NFR+Design) so UX-DR detail pages generate alongside FR/NFR. [Story 9.2 Task 5]
         foreach (var req in requirements.Everything)

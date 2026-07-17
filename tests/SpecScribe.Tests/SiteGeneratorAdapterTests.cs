@@ -395,7 +395,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // [Story 9.2 review; golden-diff-normalization-gotchas]
         // Regenerated for change-surface Updated chips (sprint/story out of Touched) + Story/Sprint Status
         // icons + Dev Notes collapsible moved to end of remainder. [change-surface UX]
-        const string expected = "8ee7fc22483c11b09edbdff3d2ccbb501459f2540ccd910085885e7d4f29a2b8";
+        // Regenerated for Story 9.8: Home gains work-mode focus strip + Project Next Steps (wired
+        // RenderProjectNextSteps) before Now & Next; Ready empty-lane InlineGuidance when undrafted;
+        // specscribe.css gains .work-mode-strip / wm-focus-* :has() emphasis (never display:none).
+        // [Story 9.8; golden-diff-normalization-gotchas]
+        const string expected = "259ed07b523c1842c3a323909e00453faa4363a2aa1b844fc495facad0709963";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

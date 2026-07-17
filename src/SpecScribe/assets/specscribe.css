@@ -5164,6 +5164,52 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 .req-panel:has(#rv-grid:checked) .req-view-flow { display: none; }
 .req-panel:has(#rv-grid:checked) .req-view-grid { display: block; }
 
+/* Home work-stage focus strip (Story 9.8 silhouette #2): Overview default; Gather/Draft/Develop/Review
+   highlight stage panels via :has() — dim siblings, never display:none / remove from a11y tree.
+   Word labels identify stages (never color-only). Unique wm-* radios; reuses board-tabs chrome. */
+.work-mode-strip { display: block; margin: 0 0 1rem; }
+.work-mode-strip .board-tabbar { display: inline-flex; flex-wrap: wrap; }
+#wm-overview:checked ~ .board-tabbar label[for="wm-overview"],
+#wm-gather:checked ~ .board-tabbar label[for="wm-gather"],
+#wm-draft:checked ~ .board-tabbar label[for="wm-draft"],
+#wm-develop:checked ~ .board-tabbar label[for="wm-develop"],
+#wm-review:checked ~ .board-tabbar label[for="wm-review"] {
+  background: var(--warm-white);
+  color: var(--ink);
+  box-shadow: 0 1px 3px var(--shadow);
+  font-weight: 600;
+}
+#wm-overview:focus-visible ~ .board-tabbar label[for="wm-overview"],
+#wm-gather:focus-visible ~ .board-tabbar label[for="wm-gather"],
+#wm-draft:focus-visible ~ .board-tabbar label[for="wm-draft"],
+#wm-develop:focus-visible ~ .board-tabbar label[for="wm-develop"],
+#wm-review:focus-visible ~ .board-tabbar label[for="wm-review"] {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+/* Non-Overview stages: de-emphasize non-focus panels/tiles; emphasize focus targets with border weight. */
+.dashboard:has(#wm-gather:checked) .chart-panel:not(.wm-focus-gather),
+.dashboard:has(#wm-gather:checked) .dashboard-tile-band > :not(.wm-focus-gather),
+.dashboard:has(#wm-draft:checked) .chart-panel:not(.wm-focus-draft),
+.dashboard:has(#wm-draft:checked) .dashboard-tile-band > :not(.wm-focus-draft),
+.dashboard:has(#wm-develop:checked) .chart-panel:not(.wm-focus-develop),
+.dashboard:has(#wm-develop:checked) .dashboard-tile-band > :not(.wm-focus-develop),
+.dashboard:has(#wm-review:checked) .chart-panel:not(.wm-focus-review),
+.dashboard:has(#wm-review:checked) .dashboard-tile-band > :not(.wm-focus-review) {
+  opacity: 0.48;
+}
+.dashboard:has(#wm-gather:checked) .wm-focus-gather,
+.dashboard:has(#wm-draft:checked) .wm-focus-draft,
+.dashboard:has(#wm-develop:checked) .wm-focus-develop,
+.dashboard:has(#wm-review:checked) .wm-focus-review {
+  opacity: 1;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--gold);
+  scroll-margin-top: 1rem;
+}
+
 /* Retros link + open-items flag buttons in the control row. Retros reuses the .cmd-menu-toggle chrome as an
    <a>; the flag is a small review-tinted pill with a ⚑ glyph. */
 a.cmd-menu-toggle { text-decoration: none; display: inline-block; }

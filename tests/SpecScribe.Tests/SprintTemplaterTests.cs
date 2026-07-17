@@ -238,6 +238,58 @@ public class SprintTemplaterTests
     }
 
     [Fact]
+    public void RenderBoard_EmptyReadyLane_CarriesCreateStoryBadge_WhenUndraftedAndCatalogAllow()
+    {
+        // Story 9.8: Ready empty copy that implies drafting gets InlineGuidance when target + catalog exist.
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: in-progress
+            """)!;
+        var epics = EpicsWith(Epic(1, "E",
+            Story("1.1", 1, "A", "epics/story-1-1.html"),
+            Story("1.2", 1, "B", artifactOutputPath: null)));
+        var catalog = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+        });
+
+        var board = SprintTemplater.RenderBoard(sprint, epics, commands: catalog);
+
+        Assert.Contains("sprint-lane-empty", board);
+        Assert.Contains("/bmad-create-story 1.2", board);
+        Assert.Contains("draft the next story with", board);
+        Assert.Contains("cmd-badge", board);
+    }
+
+    [Fact]
+    public void RenderBoard_EmptyReadyLane_KeepsDesignedCopy_WhenNoUndraftedOrNoCommand()
+    {
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: in-progress
+            """)!;
+        var planned = EpicsWith(Epic(1, "E", Story("1.1", 1, "A", "epics/story-1-1.html")));
+        var catalog = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+        });
+
+        // All stories drafted → designed 8.6 copy, no badge.
+        Assert.Contains(
+            "class=\"sprint-lane-empty\">Nothing ready to pick up — draft or refine the next story.",
+            SprintTemplater.RenderBoard(sprint, planned, commands: catalog));
+
+        // Undrafted exists but catalog lacks create-story → degrade to designed copy (NFR8).
+        var undrafted = EpicsWith(Epic(1, "E",
+            Story("1.1", 1, "A", "epics/story-1-1.html"),
+            Story("1.2", 1, "B", artifactOutputPath: null)));
+        Assert.Contains(
+            "class=\"sprint-lane-empty\">Nothing ready to pick up — draft or refine the next story.",
+            SprintTemplater.RenderBoard(sprint, undrafted, commands: CommandCatalog.Empty));
+        Assert.DoesNotContain("cmd-badge", SprintTemplater.RenderBoard(sprint, undrafted, commands: CommandCatalog.Empty));
+    }
+
+    [Fact]
     public void RenderIndex_HasRetrosLinkAndOpenItemsFlagButtonNotAModal()
     {
         var withOpen = SprintStatusParser.Parse("""

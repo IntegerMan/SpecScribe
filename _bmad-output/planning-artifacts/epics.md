@@ -1619,6 +1619,11 @@ Complete the requirement → epic → story chain so a Stakeholder can click fro
      sunburst / remaining-work geometry (not absorbed into 9.6). 9.8–9.9 are journey-shaped holistic passes
      for authoring/delivery workflow and requirement-satisfaction status. epics.md + sprint-status.yaml
      updated together (Epic 6 process rule). -->
+<!-- 2026-07-16 (correct-course, follow-up density + deep-link opportunity surfaced by 9.6/9.7): Stories 9.10–9.11
+     appended. 9.10 makes the dense action-items / deferred-work LIST pages scannable; 9.11 adds a per-item DETAIL
+     page (shared template, stable human-readable slug URLs) so 9.7's sunburst wedges + 9.10's list cards deep-link
+     into a single item. Extends FR30; does not absorb 9.6 (provenance/resolution owner). epics.md + sprint-status.yaml
+     updated together (Epic 6 process rule). -->
 
 ### Story 9.1: Requirement Pages Link to Their Covering Stories
 
@@ -1820,6 +1825,57 @@ So that I can judge whether requirements are satisfied without assembling the pi
 **When** scope is planned at create-story
 **Then** it does not absorb 9.1–9.3's page-level deliverables; it composes and closes journey-level gaps those stories leave
 **And** empty/absent framework coverage degrades per NFR8.
+
+### Story 9.10: Scannable Follow-Up List Pages
+
+As a maintainer scanning what's left,
+I want the Action Items and Deferred Work list pages to read as a fast, uniform overview instead of a dense wall of detail,
+So that I can see everything outstanding at a glance and drill into the one item I care about.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the Action Items and Deferred Work pages carry provenance, resolution links, cross-links, and (for action items) a Resolve-with-AI command per item today (Story 9.6)
+**When** the list page renders
+**Then** each entry is compressed to a scan-first row — a short title/summary, its status, its source (epic/retro or deferral source), and one primary link — with the heavy per-item detail moved off the index (to the Story 9.11 detail page, or behind a per-row disclosure when 9.11 has not landed)
+**And** the two pages share one list grammar so they read as siblings.
+
+2.
+**Given** many items exist across several sources
+**When** the page renders
+**Then** items stay grouped and ordered as Story 9.6 established (by source retro / deferral source, age within) and the grouping is legible at a glance without expanding anything
+**And** counts continue to agree with the Story 8.3 `ProjectCounts` ledger — no parallel recount.
+
+3.
+**Given** a framework with no retros or no deferred-work note
+**When** the portal generates
+**Then** the pages degrade to absent rather than empty-but-present (NFR8), exactly as today.
+
+### Story 9.11: Follow-Up Detail Pages and Deep Links
+
+As a maintainer following a link from the sunburst or a list row,
+I want each action item and deferred-work item to have its own stable page,
+So that I can deep-link to a single follow-up and read its full provenance and resolution context in one place.
+
+**Acceptance Criteria:**
+
+1.
+**Given** an action item or a deferred-work item
+**When** the portal generates
+**Then** that item has its own detail page (or a stable per-item anchor) carrying its full provenance, resolution criteria, resolving-story/spec links, and cross-links — the detail that Story 9.10 moved off the list index
+**And** action-item and deferred-item detail pages share one template, differing only in grouping / where-it-came-from framing.
+
+2.
+**Given** an item's detail page URL
+**When** the same project regenerates (with the item unchanged)
+**Then** the URL is a stable, human-readable slug derived from the item's existing text/source — not a positional index — so bookmarks and deep links survive reordering and regeneration
+**And** no new authoring schema is introduced (slugs are derived by best-effort heuristic over text already authored, per the load-bearing Epic 9 principle).
+
+3.
+**Given** the Story 9.7 sunburst follow-up geometry and the Story 9.10 list rows
+**When** an item is clicked
+**Then** they link to that item's detail URL (completing 9.7's "navigable into their detail/provenance surfaces" AC), and the counts and set of items shown remain the Story 8.3 ledger's
+**And** these surfaces degrade to absent when the underlying artifacts do not exist (NFR8).
 
 ## Epic 10: Portal Legibility for Every Audience
 

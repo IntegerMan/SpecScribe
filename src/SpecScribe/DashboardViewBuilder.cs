@@ -65,6 +65,9 @@ public static class DashboardViewBuilder
                 sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
                 ledger,
                 work),
+            NextStepsHtml = epicsModel is { } epics
+                ? BmadCommands.RenderProjectNextSteps(epics, commands)
+                : string.Empty,
         };
     }
 

@@ -38,6 +38,26 @@ public static class SprintTemplater
         _ => "Nothing here yet.",
     };
 
+    /// <summary>Empty-lane HTML: Ready (and any lane whose copy already implies drafting) carries an
+    /// <see cref="BmadCommands.InlineGuidance"/> create-story badge when an undrafted target + catalog
+    /// allow; otherwise the designed 8.6 plain copy (HTML-escaped). Never a wrong badge. [Story 9.8]</summary>
+    private static string EmptyLaneHtml(string cssClass, EpicsModel? epics, CommandCatalog? commands)
+    {
+        if (cssClass == "ready" && commands is not null && epics is not null)
+        {
+            var next = epics.Epics.SelectMany(e => e.Stories).FirstOrDefault(s => s.ArtifactOutputPath is null);
+            if (next is not null)
+            {
+                return BmadCommands.InlineGuidance(
+                    commands.Command("create-story", next.Id),
+                    "Nothing ready to pick up — draft the next story with",
+                    PathUtil.Html(EmptyLaneCopy("ready")));
+            }
+        }
+
+        return PathUtil.Html(EmptyLaneCopy(cssClass));
+    }
+
     /// <summary>Per-stage story counts from the portal-wide ledger (tracked tally). Shared by the page summary
     /// and the dashboard widget — one computation in <see cref="ProjectCounts.Build"/>, consumed everywhere.
     /// [Story 2.3; Story 8.3]</summary>
@@ -97,7 +117,7 @@ public static class SprintTemplater
         sb.Append("</div>\n\n");
 
         // The toggle radios live in the control row above; the views sit here and toggle via CSS :has().
-        AppendBoardViews(sb, sprint, epics, prefix);
+        AppendBoardViews(sb, sprint, epics, prefix, commands);
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter());
@@ -149,8 +169,9 @@ public static class SprintTemplater
     /// epics/retrospectives are not cards. When <paramref name="capPerColumn"/> is set, the cap applies <em>after</em>
     /// the default epic filter (active epics). Non-default and overflow cards stay in the DOM as <c>hidden</c> so the
     /// progressive epic selector can reveal them. Core columns (Backlog → Done) render even when empty.
-    /// [Story 2.3 redesign; spec-sprint-epic-filter-and-home-layout]</summary>
-    public static string RenderBoard(SprintStatus sprint, EpicsModel? epics, int? capPerColumn = null, string? moreHref = null, string prefix = "", bool wrapWithEpicFilter = true)
+    /// <paramref name="commands"/> enables Ready-lane InlineGuidance when an undrafted target is knowable.
+    /// [Story 2.3 redesign; spec-sprint-epic-filter-and-home-layout; Story 9.8]</summary>
+    public static string RenderBoard(SprintStatus sprint, EpicsModel? epics, int? capPerColumn = null, string? moreHref = null, string prefix = "", bool wrapWithEpicFilter = true, CommandCatalog? commands = null)
     {
         var defaultEpics = ActiveEpicNumbers(sprint);
         var grouped = GroupByEpic(sprint);
@@ -201,7 +222,7 @@ public static class SprintTemplater
 
             if (col.Count == 0)
             {
-                sb.Append($"      <div class=\"sprint-lane-empty\">{PathUtil.Html(EmptyLaneCopy(cssClass))}</div>\n");
+                sb.Append($"      <div class=\"sprint-lane-empty\">{EmptyLaneHtml(cssClass, epics, commands)}</div>\n");
             }
             else if (matching.Count == 0)
             {
@@ -305,7 +326,7 @@ public static class SprintTemplater
         return sb.ToString();
     }
 
-    private static void AppendBoardViews(StringBuilder sb, SprintStatus sprint, EpicsModel? epics, string prefix)
+    private static void AppendBoardViews(StringBuilder sb, SprintStatus sprint, EpicsModel? epics, string prefix, CommandCatalog commands)
     {
         // One filter drives both status and by-epic views (CSS :has() swaps which view is visible).
         var defaultEpics = ActiveEpicNumbers(sprint);
@@ -316,7 +337,7 @@ public static class SprintTemplater
         var effectiveDefaults = defaultEpics.Count > 0 ? defaultEpics : epicIdsWithStories;
         AppendEpicFilterOpen(sb, sprint, epics, effectiveDefaults, capPerColumn: null);
         sb.Append("<div class=\"board-view board-view-status\">\n");
-        sb.Append(RenderBoard(sprint, epics, prefix: prefix, wrapWithEpicFilter: false));
+        sb.Append(RenderBoard(sprint, epics, prefix: prefix, wrapWithEpicFilter: false, commands: commands));
         sb.Append("</div>\n");
         sb.Append("<div class=\"board-view board-view-epic\">\n");
         sb.Append(RenderBoardByEpic(sprint, epics, prefix, wrapWithEpicFilter: false));

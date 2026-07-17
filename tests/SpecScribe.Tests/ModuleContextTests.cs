@@ -421,4 +421,63 @@ public class BmadCommandsTests
         Assert.DoesNotContain("code-review", html);
         Assert.DoesNotContain("awaiting code review", html);
     }
+
+    // ---- Story 9.8 coherence: Home × epic × empty Ready primary affordance matrix -------------------
+    // Surface × lifecycle × primary × destination (regression pin for Driver Journey 2):
+    // | Home Next Steps | mid-epic undrafted (done + undrafted) | create-story {id} | story draft |
+    // | Epic Up Next + Next Steps | same mid-epic | create-story {id} primary (not buried) | story draft |
+    // | Epic active with front line | in-progress + undrafted | sprint-status primary; create-story alt | status / draft |
+    // | Empty Ready lane | undrafted + catalog | InlineGuidance create-story badge | draft |
+    // | Empty Ready lane | no undrafted / no catalog | designed copy only (8.6) | — |
+
+    [Fact]
+    public void RenderProjectNextSteps_MidEpicUndrafted_SuggestsCreateStory_AlignedWithForEpic()
+    {
+        // Epic is visually "active" (a done story) with a later undrafted story — Home must recommend
+        // create-story for that id the same way ForEpic(active) does. [Story 9.8]
+        var done = Story("1.1", "done");
+        done.ArtifactOutputPath = "epics/story-1-1.html";
+        var undrafted = Story("1.2", null);
+
+        var projectHtml = BmadCommands.RenderProjectNextSteps(Project(done, undrafted), BmmCatalog);
+        Assert.Contains("/bmad-create-story 1.2", projectHtml);
+
+        var epicCatalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+            ["sprint-status"] = "/bmad-sprint-status",
+            ["dev-story"] = "/bmad-dev-story",
+        });
+        var epicHtml = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: false, done, undrafted), epicCatalog);
+        Assert.Contains("/bmad-create-story 1.2", epicHtml);
+        // Up Next would spotlight the undrafted story — create-story is the primary, not buried under sprint-status.
+        Assert.True(
+            epicHtml.IndexOf("/bmad-create-story 1.2", StringComparison.Ordinal)
+            < epicHtml.IndexOf("/bmad-sprint-status", StringComparison.Ordinal),
+            "create-story must be primary when Up Next target is undrafted");
+        Assert.Equal(1, CountClass(epicHtml, "next-steps-primary"));
+    }
+
+    [Fact]
+    public void RenderEpicNextSteps_ActiveWithFrontLine_KeepsSprintStatusPrimary_CreateStoryAlternate()
+    {
+        var active = Story("1.1", "in-progress");
+        active.ArtifactOutputPath = "epics/story-1-1.html";
+        var undrafted = Story("1.2", null);
+        var catalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+            ["sprint-status"] = "/bmad-sprint-status",
+        });
+
+        var html = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: false, active, undrafted), catalog);
+
+        Assert.Contains("/bmad-sprint-status", html);
+        Assert.Contains("/bmad-create-story 1.2", html);
+        Assert.True(
+            html.IndexOf("/bmad-sprint-status", StringComparison.Ordinal)
+            < html.IndexOf("/bmad-create-story 1.2", StringComparison.Ordinal),
+            "with an in-progress front line, sprint-status stays primary");
+        Assert.Contains("Other actions", html);
+    }
 }

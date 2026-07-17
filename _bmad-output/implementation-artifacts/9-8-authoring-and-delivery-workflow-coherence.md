@@ -4,7 +4,7 @@ baseline_commit: 525328146cbb248b660afdbcc6ea3d7204c29eb7
 
 # Story 9.8: Authoring and Delivery Workflow Coherence
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -102,40 +102,40 @@ Concrete silhouette rules:
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Audit matrix + close documented contradictions (AC: #1, #2)**
-  - [ ] Produce a short in-story or test-comment matrix: surface × lifecycle state × primary affordance × destination for Home / epic / story / empty Ready lane. Use it to drive fixes; keep the matrix in Dev Notes or a focused test so regressions are visible.
-  - [ ] Confirm and fix: Home missing project Next Steps; Ready empty lane copy without command; `ForProject` create-story only under `EpicStatus.Drafted` while `ForEpic(active)` still offers create-story for next undrafted — **align Home with epic** so mid-epic undrafted work is recommended from Home too (extend `ForProject`, do not weaken `ForEpic`).
-  - [ ] Audit epic Up Next card vs epic Next Steps primary: if Up Next spotlights an undrafted story while primary is only `sprint-status`, ensure create-story is not buried when that undrafted story is the coherent next draft (prefer promoting create-story when the Up Next target is undrafted — extend 8.5, don't fork a second epic command picker).
+- [x] **Task 1 — Audit matrix + close documented contradictions (AC: #1, #2)**
+  - [x] Produce a short in-story or test-comment matrix: surface × lifecycle state × primary affordance × destination for Home / epic / story / empty Ready lane. Use it to drive fixes; keep the matrix in Dev Notes or a focused test so regressions are visible.
+  - [x] Confirm and fix: Home missing project Next Steps; Ready empty lane copy without command; `ForProject` create-story only under `EpicStatus.Drafted` while `ForEpic(active)` still offers create-story for next undrafted — **align Home with epic** so mid-epic undrafted work is recommended from Home too (extend `ForProject`, do not weaken `ForEpic`).
+  - [x] Audit epic Up Next card vs epic Next Steps primary: if Up Next spotlights an undrafted story while primary is only `sprint-status`, ensure create-story is not buried when that undrafted story is the coherent next draft (prefer promoting create-story when the Up Next target is undrafted — extend 8.5, don't fork a second epic command picker).
 
-- [ ] **Task 2 — Wire `RenderProjectNextSteps` into Home (AC: #1, #2)**
-  - [ ] Thread via `DashboardView` / `DashboardViewBuilder` (opaque HTML fragment **or** structured suggestions if you can stay host-neutral — prefer matching how epic/story already carry `NextStepsHtml` on `EpicsView` for consistency).
-  - [ ] Call from `HtmlRenderAdapter.Dashboard.cs` next to Now & Next per locked placement.
-  - [ ] Omit panel when catalog yields zero suggestions or epics model is null (byte-load-bearing conditional).
-  - [ ] Keep HTML/webview/SPA on shared `RenderDashboardBody` — no host fork.
+- [x] **Task 2 — Wire `RenderProjectNextSteps` into Home (AC: #1, #2)**
+  - [x] Thread via `DashboardView` / `DashboardViewBuilder` (opaque HTML fragment **or** structured suggestions if you can stay host-neutral — prefer matching how epic/story already carry `NextStepsHtml` on `EpicsView` for consistency).
+  - [x] Call from `HtmlRenderAdapter.Dashboard.cs` next to Now & Next per locked placement.
+  - [x] Omit panel when catalog yields zero suggestions or epics model is null (byte-load-bearing conditional).
+  - [x] Keep HTML/webview/SPA on shared `RenderDashboardBody` — no host fork.
 
-- [ ] **Task 3 — Work-stage focus strip on Home (AC: #2, #3)**
-  - [ ] Implement silhouette #2 exactly: Overview default; Gather / Draft / Develop / Review highlight maps above; pure-CSS radios + `:has()`; no section hiding.
-  - [ ] CSS in `assets/specscribe.css` near existing `.board-tabs` / dashboard panel rules. Reuse journey accents where they already mark tile groups — do not invent a second color system.
-  - [ ] `StylesheetTests`: assert new classes / non-color-only stage labels exist.
-  - [ ] Dashboard tests: default Overview shows full stack; selecting Draft emphasizes pipeline + next-steps create-story path without removing Now & Next from DOM.
+- [x] **Task 3 — Work-stage focus strip on Home (AC: #2, #3)**
+  - [x] Implement silhouette #2 exactly: Overview default; Gather / Draft / Develop / Review highlight maps above; pure-CSS radios + `:has()`; no section hiding.
+  - [x] CSS in `assets/specscribe.css` near existing `.board-tabs` / dashboard panel rules. Reuse journey accents where they already mark tile groups — do not invent a second color system.
+  - [x] `StylesheetTests`: assert new classes / non-color-only stage labels exist.
+  - [x] Dashboard tests: default Overview shows full stack; selecting Draft emphasizes pipeline + next-steps create-story path without removing Now & Next from DOM.
 
-- [ ] **Task 4 — Empty-state command continuity (AC: #1, #2)**
-  - [ ] Extend `SprintTemplater` empty Ready (and any other lane whose copy already implies drafting) to use `BmadCommands.InlineGuidance` + catalog when an undrafted target is knowable from the board's epics model. When no command/target, keep designed copy (8.6) — never a wrong badge.
-  - [ ] Do not regress `.sprint-lane-empty` / `.epic-undrafted-banner` styling.
+- [x] **Task 4 — Empty-state command continuity (AC: #1, #2)**
+  - [x] Extend `SprintTemplater` empty Ready (and any other lane whose copy already implies drafting) to use `BmadCommands.InlineGuidance` + catalog when an undrafted target is knowable from the board's epics model. When no command/target, keep designed copy (8.6) — never a wrong badge.
+  - [x] Do not regress `.sprint-lane-empty` / `.epic-undrafted-banner` styling.
 
-- [ ] **Task 5 — Guardrails (AC: #1)**
-  - [ ] Do **not** reimplement `ForStory` matrices; only fix project/epic alignment holes.
-  - [ ] Do **not** start 9.9 satisfaction chrome or re-open 9.1–9.3 page deliverables.
-  - [ ] Do **not** put create-story commands inside Story Pipeline wedges (funnel stays status geometry; commands live in Next Steps / empty states / undrafted banner).
-  - [ ] Sunburst create-story tooltips on no-plan arcs may stay; optional one-line cross-reference from Draft stage emphasis is fine.
+- [x] **Task 5 — Guardrails (AC: #1)**
+  - [x] Do **not** reimplement `ForStory` matrices; only fix project/epic alignment holes.
+  - [x] Do **not** start 9.9 satisfaction chrome or re-open 9.1–9.3 page deliverables.
+  - [x] Do **not** put create-story commands inside Story Pipeline wedges (funnel stays status geometry; commands live in Next Steps / empty states / undrafted banner).
+  - [x] Sunburst create-story tooltips on no-plan arcs may stay; optional one-line cross-reference from Draft stage emphasis is fine.
 
-- [ ] **Task 6 — Tests + golden (AC: #1, #2, #3)**
-  - [ ] Extend `ModuleContextTests` / new dashboard tests: Home HTML contains project Next Steps when fixtures have review/ready/undrafted work; absent when catalog empty.
-  - [ ] `ForProject` mid-epic undrafted: create-story appears (aligned with `ForEpic`).
-  - [ ] Empty Ready lane: command badge present when undrafted target + catalog allow; absent otherwise.
-  - [ ] Focus strip markup present; Overview radio checked by default; emphasis classes exist; no `display:none` on sibling panels for non-Overview stages.
-  - [ ] Golden fingerprint will move (home body) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Confirm three `Render*ParityTests` green.
-  - [ ] Run `dotnet test` from repo root.
+- [x] **Task 6 — Tests + golden (AC: #1, #2, #3)**
+  - [x] Extend `ModuleContextTests` / new dashboard tests: Home HTML contains project Next Steps when fixtures have review/ready/undrafted work; absent when catalog empty.
+  - [x] `ForProject` mid-epic undrafted: create-story appears (aligned with `ForEpic`).
+  - [x] Empty Ready lane: command badge present when undrafted target + catalog allow; absent otherwise.
+  - [x] Focus strip markup present; Overview radio checked by default; emphasis classes exist; no `display:none` on sibling panels for non-Overview stages.
+  - [x] Golden fingerprint will move (home body) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Confirm three `Render*ParityTests` green.
+  - [x] Run `dotnet test` from repo root.
 
 ## Dev Notes
 
@@ -247,8 +247,29 @@ Composer (Auto)
 
 ### Completion Notes List
 
+- Wired orphaned `BmadCommands.RenderProjectNextSteps` into Home via `DashboardView.NextStepsHtml` (built in `DashboardViewBuilder`, rendered before Now & Next on shared `RenderDashboardBody`).
+- Aligned `ForProject` undrafted scan with drafted/ready/active epics; promoted `ForEpic(active)` create-story to primary when Up Next would spotlight undrafted (no front line).
+- Added silhouette #2 work-stage focus strip (Overview · Gather · Draft · Develop · Review) — pure-CSS `wm-*` radios + `:has()` opacity/border emphasis; never hides panels.
+- Extended Ready empty lane with `InlineGuidance` create-story badge when undrafted + catalog allow (NFR8 degrade otherwise).
+- Coherence matrix pinned as test comments in `BmadCommandsTests`; golden fingerprint regenerated; **1263** tests green.
+
 ### File List
+
+- src/SpecScribe/BmadCommands.cs
+- src/SpecScribe/DashboardView.cs
+- src/SpecScribe/DashboardViewBuilder.cs
+- src/SpecScribe/HtmlRenderAdapter.Dashboard.cs
+- src/SpecScribe/SprintTemplater.cs
+- src/SpecScribe/assets/specscribe.css
+- tests/SpecScribe.Tests/ModuleContextTests.cs
+- tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs
+- tests/SpecScribe.Tests/SprintTemplaterTests.cs
+- tests/SpecScribe.Tests/StylesheetTests.cs
+- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+- _bmad-output/implementation-artifacts/9-8-authoring-and-delivery-workflow-coherence.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
 
 ## Change Log
 
 - 2026-07-16: create-story — ready-for-dev; owner locked silhouette #2 (thin work-stage focus strip + Overview default); documented orphaned `RenderProjectNextSteps` as primary gap.
+- 2026-07-16: implemented — Home Next Steps + work-mode strip + ForProject/ForEpic alignment + Ready-lane InlineGuidance; status → review.

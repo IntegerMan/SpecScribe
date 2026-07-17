@@ -385,12 +385,26 @@ public static class BmadCommands
 
         if (epicClass == "active")
         {
+            // Even mid-epic, the next story without a plan is worth drafting so it's ready when the
+            // current front line closes. When Up Next would spotlight that undrafted story (no active /
+            // review / ready front line — only done work + undrafted remaining), promote create-story
+            // to primary so the epic page doesn't bury the coherent next draft under sprint-status.
+            // [Story 8.5; Story 9.8]
+            var nextToDetail = epic.Stories.FirstOrDefault(s => s.ArtifactOutputPath is null);
+            var hasFrontLine = epic.Stories.Any(s => StatusStyles.ForStory(s) is "active" or "review" or "ready");
+
+            if (!hasFrontLine && nextToDetail is not null)
+            {
+                Add(suggestions, commands.Command("create-story", nextToDetail.Id),
+                    "Drafts the next story in this epic that doesn't have an implementation plan yet.");
+                Add(suggestions, commands.Command("sprint-status"),
+                    "Surfaces this epic's current risks and the recommended next action.");
+                return suggestions;
+            }
+
             Add(suggestions, commands.Command("sprint-status"),
                 "Surfaces this epic's current risks and the recommended next action — see the in-development story's own page for its specific dev command.");
 
-            // Even mid-epic, the next story without a plan is worth drafting so it's ready when the
-            // current front line closes.
-            var nextToDetail = epic.Stories.FirstOrDefault(s => s.ArtifactOutputPath is null);
             if (nextToDetail is not null)
             {
                 Add(suggestions, commands.Command("create-story", nextToDetail.Id),
@@ -450,9 +464,16 @@ public static class BmadCommands
                 $"Story {actionable.Id} is the current front line — implement it per its plan.");
         }
 
-        // The next story that still needs an implementation plan drawn up, in a drafted epic.
+        // The next story that still needs an implementation plan — in any drafted/ready/active epic
+        // (same undrafted scan ForEpic uses mid-flight). EpicStatus.Drafted covers all non-pending
+        // epics with stories; StatusStyles narrows so Home and epic pages recommend the same next draft.
+        // [Story 9.8]
         var epicNeedingStory = model.Epics.FirstOrDefault(e =>
-            e.Status == EpicStatus.Drafted && e.Stories.Any(s => s.ArtifactOutputPath is null));
+        {
+            var cls = StatusStyles.ForEpicWithRetrospective(e);
+            return (cls is "drafted" or "ready" or "active")
+                && e.Stories.Any(s => s.ArtifactOutputPath is null);
+        });
         if (epicNeedingStory is not null)
         {
             var nextStory = epicNeedingStory.Stories.First(s => s.ArtifactOutputPath is null);

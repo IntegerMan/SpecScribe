@@ -15,13 +15,17 @@ public static class DeferralHeuristics
 {
     // Whole-word match, not a bare substring: a raw Contains("deferred") would also fire on an unrelated word
     // that happens to embed it (e.g. "nondeferred"). Still a simple keyword heuristic for a cosmetic link, not
-    // full free-text classification — phrasing like "pay down the hack" won't match. [Story 2.3 review]
+    // full free-text classification — phrasing like "pay down the hack" won't match. Exact Story 2.3 pattern —
+    // do not broaden (e.g. bare "defer") without an intentional ActionItemsTemplater behavior change.
+    // [Story 2.3 review; Story 9.3 review]
     private static readonly Regex DebtWords =
-        new(@"\b(deferred|defer|tech(nical)?\s+debt)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        new(@"\b(deferred|tech(nical)?\s+debt)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // A single "Epic N" mention — enough to resolve a retro link, deliberately NOT a generalized reference
-    // parser. "Epics 1 & 2" (no space after "Epic") does not match, by design. [Story 9.3 Task 5]
-    private static readonly Regex EpicMentionRe = new(@"\bEpic\s+(\d+)\b", RegexOptions.Compiled);
+    // parser. "Epics 1 & 2" does not match (trailing "s" on "Epics" breaks Epic\s+), by design. Case-insensitive
+    // so a note like "deferred from epic 1" still resolves. [Story 9.3 Task 5; review]
+    private static readonly Regex EpicMentionRe =
+        new(@"\bEpic\s+(\d+)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>True when text is about deferred work / tech debt — the signal for surfacing a link to the
     /// deferred-work backlog page beside it.</summary>

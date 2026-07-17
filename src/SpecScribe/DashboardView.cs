@@ -108,4 +108,9 @@ public sealed record DashboardView
     /// <summary>Open follow-ups for the project sunburst's outermost band. Defaults to
     /// <see cref="FollowUpGeometry.Empty"/> (no 4th ring). Counts agree with <see cref="Counts"/>. [Story 9.7]</summary>
     public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
+
+    /// <summary>Pre-rendered project Next Steps HTML (<see cref="BmadCommands.RenderProjectNextSteps"/>), or
+    /// empty when the catalog yields no suggestions / epics are absent. Named opaque fragment matching
+    /// <see cref="EpicsView.NextStepsHtml"/>. [Story 9.8]</summary>
+    public string NextStepsHtml { get; init; } = string.Empty;
 }

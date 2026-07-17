@@ -34,28 +34,45 @@ public sealed partial class HtmlRenderAdapter
 
         sb.Append("<section class=\"dashboard\">\n");
 
+        // Work-stage focus strip (silhouette #2): Overview default; non-Overview stages highlight panels
+        // via pure-CSS :has() — never hide. Omitted when there is no epics model (nothing to stage). [Story 9.8]
+        if (view.Epics is not null)
+        {
+            sb.Append(RenderWorkModeStrip());
+        }
+
         // One flex-wrap tile band: the five headline stats plus Epic Status / Overall Progress / Deferred /
         // Action Items — all siblings with shared sizing, with top padding clearing the white key-views bar.
         AppendTileBand(sb, view, p);
 
-        // Sunburst — the glance-at-structure scan path — then Now & Next / sprint board.
+        // Sunburst — the glance-at-structure scan path — then Project Next Steps, then Now & Next.
         // Segments already navigate; no redundant header CTA. [spec-sprint-epic-filter-and-home-layout; home welcome]
         if (view.Epics is { } epicsForSunburst)
         {
-            sb.Append("<div class=\"chart-panel sunburst-panel\">\n");
+            sb.Append("<div class=\"chart-panel sunburst-panel wm-focus-develop\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
             sb.Append(Charts.Sunburst(epicsForSunburst, commands: view.Commands, followUps: view.FollowUps));
             sb.Append("</div>\n\n");
         }
 
+        // Project Next Steps — Journey 2 entry; placed before Now & Next so Drivers see the command then the board.
+        // Omitted when the catalog yields zero suggestions (RenderPanel returns empty). [Story 9.8]
+        if (view.NextStepsHtml.Length > 0)
+        {
+            sb.Append(view.NextStepsHtml.Replace(
+                "class=\"chart-panel next-steps\"",
+                "class=\"chart-panel next-steps wm-focus-draft wm-focus-develop wm-focus-review\"",
+                StringComparison.Ordinal));
+        }
+
         // Now & Next: sprint board when tracked, else the derived cards; omitted entirely when the view is null.
         if (view.NowNext is { } nowNext)
         {
-            AppendNowAndNext(sb, nowNext, view.Epics, view.Counts);
+            AppendNowAndNext(sb, nowNext, view.Epics, view.Counts, view.Commands);
         }
 
         // Story Pipeline funnel — reads the portal-wide ledger (drafted total == StoriesDefined). [Story 8.3]
-        sb.Append("<div class=\"chart-panel funnel-panel\">\n<h3>Story Pipeline</h3>\n");
+        sb.Append("<div class=\"chart-panel funnel-panel wm-focus-draft\">\n<h3>Story Pipeline</h3>\n");
         sb.Append(Charts.RefinementFunnel(view.Counts));
         sb.Append("</div>\n\n");
 
@@ -92,7 +109,7 @@ public sealed partial class HtmlRenderAdapter
         if (view.Coverage is { IsEmpty: false } coverage)
         {
             var coverageToday = DateOnly.FromDateTime(DateTime.Now);
-            sb.Append("<div class=\"chart-panel coverage-panel\">\n");
+            sb.Append("<div class=\"chart-panel coverage-panel wm-focus-gather\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Planning Artifacts</h3>");
             sb.Append(Charts.CoverageMeter(coverage, coverageToday));
             sb.Append("</div>\n");
@@ -136,7 +153,7 @@ public sealed partial class HtmlRenderAdapter
 
         // Flat flex-wrap band (typically two dense rows). Journey identity = accent rail + floating caption
         // on the first card of each group — not cluster wrappers that wrap cards into extra rows.
-        AppendStatJourney(sb, "requirements", "Requirements", reqTiles);
+        AppendStatJourney(sb, "requirements", "Requirements", reqTiles, "wm-focus-gather");
         AppendEpicsJourney(sb, p, view.Epics, epicStoryTiles);
         AppendExecutionJourney(sb, view.ProgressBars, executionTiles);
         AppendFollowUpJourney(sb, view.Work, view.OpenRetroActionItems, view.Counts);
@@ -155,14 +172,15 @@ public sealed partial class HtmlRenderAdapter
     private static bool IsRequirementsStat(StatTile tile) =>
         tile.Label is "Functional reqs" or "Non-functional" or "Design reqs";
 
-    private static void AppendStatJourney(StringBuilder sb, string key, string label, IReadOnlyList<StatTile> tiles)
+    private static void AppendStatJourney(StringBuilder sb, string key, string label, IReadOnlyList<StatTile> tiles, string? focusClass = null)
     {
+        var focus = focusClass is { Length: > 0 } ? $" {focusClass}" : string.Empty;
         for (var i = 0; i < tiles.Count; i++)
         {
             var tile = tiles[i];
             sb.Append(Charts.StatCard(
                 tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
-                extraClass: $"journey-card journey-{key}",
+                extraClass: $"journey-card journey-{key}{focus}",
                 journeyLabel: i == 0 ? label : null));
         }
     }
@@ -187,7 +205,7 @@ public sealed partial class HtmlRenderAdapter
             var tile = tiles[i];
             sb.Append(Charts.StatCard(
                 tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
-                extraClass: "journey-card journey-execution",
+                extraClass: "journey-card journey-execution wm-focus-develop",
                 journeyLabel: i == 0 ? "Execution" : null));
         }
         AppendOverallProgressTile(sb, bars, lead: tiles.Count == 0);
@@ -204,7 +222,7 @@ public sealed partial class HtmlRenderAdapter
 
         var leadAttr = lead ? " journey-lead" : string.Empty;
         var leadHtml = lead ? "<span class=\"tile-journey-label\">Execution</span>" : string.Empty;
-        sb.Append($"<div class=\"stat-card tile-card overall-progress-tile journey-card journey-execution{leadAttr}\">\n");
+        sb.Append($"<div class=\"stat-card tile-card overall-progress-tile journey-card journey-execution wm-focus-develop{leadAttr}\">\n");
         sb.Append(leadHtml);
         var ring = bars.Count > 1 && bars[1].Max > 0 ? bars[1] : bars[0];
         var pct = ring.Max <= 0 ? 0 : (int)Math.Round(Math.Clamp((double)ring.Value / ring.Max * 100, 0, 100));
@@ -266,13 +284,13 @@ public sealed partial class HtmlRenderAdapter
     /// <summary>The "Now &amp; Next" panel. Re-homed from <c>HtmlTemplater.AppendNowAndNext</c>: the sprint-board
     /// branch renders from the tracked <see cref="SprintStatus"/> + the dashboard's epics model; the derived
     /// branch renders the pre-computed cards.</summary>
-    private void AppendNowAndNext(StringBuilder sb, DashboardNowNext nowNext, EpicsModel? epicsModel, ProjectCounts counts)
+    private void AppendNowAndNext(StringBuilder sb, DashboardNowNext nowNext, EpicsModel? epicsModel, ProjectCounts counts, CommandCatalog commands)
     {
         if (nowNext.SprintBoard is { } sprint && epicsModel is not null)
         {
             // One filterable root wraps header + board so the epic dropdown can sit in the header aside
             // (less vertical chrome than a row above the lanes). [spec-sprint-epic-filter-and-home-layout]
-            sb.Append("<div class=\"chart-panel sprint-board-panel\">\n");
+            sb.Append("<div class=\"chart-panel sprint-board-panel wm-focus-draft wm-focus-develop wm-focus-review\">\n");
             sb.Append(SprintTemplater.OpenEpicFilterable(sprint, epicsModel, capPerColumn: 3));
             sb.Append("<div class=\"chart-panel-header-row sprint-board-header\">\n");
             sb.Append("  <h3>Now &amp; Next <span class=\"panel-source-inline\">from sprint-status.yaml</span>");
@@ -283,13 +301,13 @@ public sealed partial class HtmlRenderAdapter
             sb.Append(SprintTemplater.RenderProgressWheel(counts));
             sb.Append("</div>\n</div>\n");
             sb.Append(SprintTemplater.EpicFilterEmptyHintMarkup);
-            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath, wrapWithEpicFilter: false));
+            sb.Append(SprintTemplater.RenderBoard(sprint, epicsModel, capPerColumn: 3, moreHref: SiteNav.SprintOutputPath, wrapWithEpicFilter: false, commands: commands));
             sb.Append(SprintTemplater.CloseEpicFilterable());
             sb.Append("</div>\n\n");
             return;
         }
 
-        sb.Append("<div class=\"chart-panel\">\n<h3>Now &amp; Next");
+        sb.Append("<div class=\"chart-panel wm-focus-draft wm-focus-develop wm-focus-review\">\n<h3>Now &amp; Next");
         sb.Append(StatusStyles.LegendKey());
         sb.Append("</h3>\n<div class=\"now-next\">\n");
         foreach (var card in nowNext.Cards)
@@ -309,7 +327,7 @@ public sealed partial class HtmlRenderAdapter
 
         var grid = Charts.RequirementStatusGrid(requirements.All.ToList(), prefix: string.Empty);
 
-        sb.Append("<div class=\"chart-panel req-panel\">\n");
+        sb.Append("<div class=\"chart-panel req-panel wm-focus-gather\">\n");
         if (epicsModel is not null)
         {
             // Two renderings of one dataset are consolidated behind a panel-scoped clone of the sprint
@@ -342,6 +360,28 @@ public sealed partial class HtmlRenderAdapter
             sb.Append(grid);
         }
         sb.Append("</div>\n\n");
+    }
+
+    /// <summary>Driver work-stage focus strip on Home — pure-CSS radios + <c>:has()</c> (Story 8.7 board-tabs
+    /// grammar). Overview is default; non-Overview stages highlight panels without hiding them. Unique
+    /// <c>wm-*</c> ids/name so they never collide with <c>req-view</c> or sprint radios. [Story 9.8]</summary>
+    private static string RenderWorkModeStrip()
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"work-mode-strip board-tabs\" role=\"group\" aria-label=\"Work stage focus\">");
+        sb.Append("<input type=\"radio\" id=\"wm-overview\" name=\"work-mode\" class=\"board-tab-radio\" checked>");
+        sb.Append("<input type=\"radio\" id=\"wm-gather\" name=\"work-mode\" class=\"board-tab-radio\">");
+        sb.Append("<input type=\"radio\" id=\"wm-draft\" name=\"work-mode\" class=\"board-tab-radio\">");
+        sb.Append("<input type=\"radio\" id=\"wm-develop\" name=\"work-mode\" class=\"board-tab-radio\">");
+        sb.Append("<input type=\"radio\" id=\"wm-review\" name=\"work-mode\" class=\"board-tab-radio\">");
+        sb.Append("<div class=\"board-tabbar\">");
+        sb.Append("<label for=\"wm-overview\" class=\"board-tab\">Overview</label>");
+        sb.Append("<label for=\"wm-gather\" class=\"board-tab\">Gather</label>");
+        sb.Append("<label for=\"wm-draft\" class=\"board-tab\">Draft</label>");
+        sb.Append("<label for=\"wm-develop\" class=\"board-tab\">Develop</label>");
+        sb.Append("<label for=\"wm-review\" class=\"board-tab\">Review</label>");
+        sb.Append("</div></div>\n");
+        return sb.ToString();
     }
 
     /// <summary>The pure-CSS view toggle for the requirements panel: a panel-scoped clone of
@@ -399,7 +439,7 @@ public sealed partial class HtmlRenderAdapter
                 $"open {Charts.Plural(count, "item", "items")}",
                 tooltip: $"{count} open deferred {Charts.Plural(count, "item", "items")} tracked outside the epic plan.",
                 href: deferred.OutputPath,
-                extraClass: "journey-card journey-followup work-summary-card deferred",
+                extraClass: "journey-card journey-followup work-summary-card deferred wm-focus-review",
                 journeyLabel: lead && !leadUsed ? "Follow up" : null));
             leadUsed = true;
         }
@@ -412,7 +452,7 @@ public sealed partial class HtmlRenderAdapter
                 $"open {Charts.Plural(openRetro, "item", "items")}",
                 tooltip: $"{openRetro} open retro action {Charts.Plural(openRetro, "item", "items")}.",
                 href: SiteNav.ActionItemsOutputPath,
-                extraClass: "journey-card journey-followup work-summary-card retro",
+                extraClass: "journey-card journey-followup work-summary-card retro wm-focus-review",
                 journeyLabel: lead && !leadUsed ? "Follow up" : null));
         }
     }

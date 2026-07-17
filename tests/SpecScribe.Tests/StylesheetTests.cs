@@ -273,6 +273,7 @@ public class StylesheetTests
         Assert.Contains(".req-flow-state.pending { fill: var(--status-pending); }", css);
         // Unmapped reuses the pending/tan token for fill (owner decision #1: no 7th --status-* token). [Story 9.3]
         Assert.Contains(".req-flow-state.unmapped { fill: var(--status-pending); }", css);
+        Assert.Contains(".req-flow-ribbon.unmapped { fill: var(--status-pending);", css);
         Assert.Contains(".req-flow-state.deferred { fill: var(--status-deferred); }", css);
         // Structural nodes are NOT status tokens — they use the neutral parchment chrome.
         Assert.Contains(".req-flow-epic { fill: var(--parchment-dark)", css);
@@ -293,6 +294,24 @@ public class StylesheetTests
         Assert.Contains("#rv-flow:focus-visible ~ .board-tabbar label[for=\"rv-flow\"]", css);
         Assert.Contains("#rv-grid:focus-visible ~ .board-tabbar label[for=\"rv-grid\"]", css);
         Assert.Contains(".req-panel-header-aside", css);
+    }
+
+    [Fact]
+    public void Stylesheet_HasWorkModeFocusStripRules()
+    {
+        // Story 9.8: Home work-stage strip — word labels, :has() emphasis, never display:none on siblings.
+        var css = ReadStylesheet();
+        Assert.Contains(".work-mode-strip", css);
+        Assert.Contains("#wm-overview:checked ~ .board-tabbar label[for=\"wm-overview\"]", css);
+        Assert.Contains("#wm-gather:checked ~ .board-tabbar label[for=\"wm-gather\"]", css);
+        Assert.Contains("#wm-draft:checked ~ .board-tabbar label[for=\"wm-draft\"]", css);
+        Assert.Contains("#wm-develop:checked ~ .board-tabbar label[for=\"wm-develop\"]", css);
+        Assert.Contains("#wm-review:checked ~ .board-tabbar label[for=\"wm-review\"]", css);
+        Assert.Contains(".dashboard:has(#wm-draft:checked) .wm-focus-draft", css);
+        Assert.Contains(".dashboard:has(#wm-gather:checked) .chart-panel:not(.wm-focus-gather)", css);
+        // Guardrail: stage emphasis dims via opacity — must not hide sibling panels.
+        Assert.DoesNotContain(".dashboard:has(#wm-draft:checked) .chart-panel:not(.wm-focus-draft) { display: none", css);
+        Assert.DoesNotContain(".dashboard:has(#wm-develop:checked) .chart-panel:not(.wm-focus-develop) { display: none", css);
     }
 
     [Fact]

@@ -4,7 +4,7 @@ baseline_commit: dd11922936aedd504b5d3b2066fa28c5499187c5
 
 # Story 9.3: Deferred-on-Purpose vs Unmapped Coverage States
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -57,7 +57,7 @@ The owner flagged this explicitly during create-story: **SpecScribe's ability to
 
 - [x] **Task 1 — Add the `Unmapped` status tier to the core model (AC: #1)**
   - [x] Add `RequirementStatus.Unmapped` to the enum, positioned between `Deferred` and `Planned` in the doc-comment's least→most-complete ordering (it is a lesser signal than "Planned" — nothing is even queued). Update the enum's XML doc to describe the new tier. [Source: src/SpecScribe/RequirementsModel.cs:17]
-  - [x] In `RequirementsParser.DeriveStatus` (src/SpecScribe/RequirementsParser.cs:185-206), change the `classes.Count == 0` fallback (line 196) to distinguish: `!deferred && epicNumbers.Count == 0` → `RequirementStatus.Unmapped`; keep `Planned` for the case where `epicNumbers` is non-empty but every covering epic classifies as `pending`/`drafted` (i.e., real coverage exists, nothing has started). Concretely: the current early `if (deferred) return Deferred;` stays; then `if (epicNumbers.Count == 0) return RequirementStatus.Unmapped;`; the existing `classes.Count == 0` branch becomes unreachable dead code once `epicNumbers.Count == 0` is handled earlier — remove it rather than leaving both checks.
+  - [x] In `RequirementsParser.DeriveStatus` (src/SpecScribe/RequirementsParser.cs:185-206), change the `classes.Count == 0` fallback (line 196) to distinguish: `!deferred && epicNumbers.Count == 0` → `RequirementStatus.Unmapped`; keep `Planned` for the case where `epicNumbers` is non-empty but every covering epic classifies as `pending`/`drafted` (i.e., real coverage exists, nothing has started). Concretely: the current early `if (deferred) return Deferred;` stays; then `if (epicNumbers.Count == 0) return RequirementStatus.Unmapped;`. **Keep** the subsequent `classes.Count == 0 → Planned` arm for the phantom/typo'd epic-number shape (named in the map but absent from the model) — without it, `classes.All(c => c == "done")` is vacuously true on an empty list and would over-claim Done. (Original create-story text called this arm unreachable after the empty-epicNumbers check; that was wrong for the phantom-epic input. Pinned by `DeriveStatus_NamedEpicThatDoesNotExist_StaysPlannedNotUnmappedNorDone`.)
   - [x] **This is a real behavior change, not additive-only.** `RequirementsParserTests.DeriveStatus_PartiallyImplemented_WhenACoveringEpicHasAnInProgressStory` currently asserts `Assert.Equal(RequirementStatus.Planned, reqs.ById["FR4"].Status)` for the unmapped FR4 fixture — this assertion must become `RequirementStatus.Unmapped`. Grep the whole test suite for `RequirementStatus.Planned` assertions on requirements known to be unmapped (FR4 in `MultiEpicEpicsMd`) before touching anything, so none are missed. [Source: tests/SpecScribe.Tests/RequirementsAndProgressTests.cs:215]
 
 - [x] **Task 2 — Route the new tier through `StatusStyles` (AC: #1)**
@@ -200,13 +200,28 @@ Claude Opus 4.8 (Cursor agent)
 - src/SpecScribe/ActionItemsTemplater.cs
 - src/SpecScribe/DeferralHeuristics.cs (new)
 - src/SpecScribe/SiteGenerator.cs
+- src/SpecScribe/HtmlRenderAdapter.Dashboard.cs (same commit: home tile-journey → journey-lead companion tweak)
 - src/SpecScribe/assets/specscribe.css
 - tests/SpecScribe.Tests/RequirementsAndProgressTests.cs
 - tests/SpecScribe.Tests/StatusStylesTests.cs
 - tests/SpecScribe.Tests/ChartsTests.cs
 - tests/SpecScribe.Tests/StylesheetTests.cs
+- tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs (companion to Dashboard tweak)
+- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs (golden fingerprint regen)
 - _bmad-output/implementation-artifacts/sprint-status.yaml
 
 ### Change Log
 
 - 2026-07-16: Implemented Story 9.3 — Unmapped vs Deferred vs Planned as distinct coverage states (enum + StatusStyles + Sankey/aria twin + donuts/cards/detail page + best-effort deferral-source links; retired 9.2 section-local seam). 1184 tests green.
+- 2026-07-16: Code review — patches applied (exact DebtWords restore, EpicMention IgnoreCase + comment fix, thread WorkInventory into WriteRequirements, ribbon CSS assert, Task 1 / File List / sprint-status hygiene).
+
+### Review Findings
+
+- [x] [Review][Patch] Restore DebtWords to Story 2.3's exact pattern (drop bare `defer`) — promotion to `DeferralHeuristics` silently broadened `\b(deferred|tech(nical)?\s+debt)\b` to also match standalone `defer`, changing ActionItemsTemplater deferred-work link behavior under a "reuse, do not fork" move [`DeferralHeuristics.cs:19`]
+- [x] [Review][Patch] Make `EpicMention` case-insensitive — `DebtWords` uses `IgnoreCase` but `EpicMentionRe` does not, so "deferred from epic 1" resolves the backlog link and silently skips the retro link [`DeferralHeuristics.cs:24`]
+- [x] [Review][Patch] Fix misleading `EpicMention` comment — "Epics 1 & 2" fails because of the trailing `s` on `Epics`, not "no space after Epic" [`DeferralHeuristics.cs:22`]
+- [x] [Review][Patch] Stop re-deriving WorkInventory in `WriteRequirements` (or fix the lying comment) — comment claims the SAME href WriteActionItems resolves is "threaded in, not re-derived", but the body calls `WorkInventory.Build` again; on the epics regen path `workForFollowUps` is already built a few lines above [`SiteGenerator.cs:2809`]
+- [x] [Review][Patch] Assert `.req-flow-ribbon.unmapped` in StylesheetTests — node fill is pinned; the sibling ribbon rule added beside it is not [`StylesheetTests.cs:275`]
+- [x] [Review][Patch] Trim stale sprint-status create-story tail — implementation note still ends with "Coordinates with 9.1 … and 9.2 … both still ready-for-dev" while both are `review` [`sprint-status.yaml`]
+- [x] [Review][Patch] Reconcile Task 1 checklist with shipped code — checked task says remove `classes.Count == 0` as unreachable; Debug Log correctly kept it for phantom-epic Planned (and a parser test pins it) [`9-3-…md` Task 1]
+- [x] [Review][Patch] Complete story File List — implementing commit also touched `HtmlRenderAdapter.Dashboard.cs`, `HtmlRenderAdapterTests.cs`, and regenerated `SiteGeneratorAdapterTests.cs` golden fingerprint; omit or list them explicitly [`File List`]

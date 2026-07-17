@@ -523,6 +523,100 @@ public class HtmlRenderAdapterTests
         Assert.Equal(a, b);
     }
 
+    // ---- Story 9.8: Home Next Steps + work-stage focus strip ----------------------------------------------
+
+    private static CommandCatalog ProjectWorkflowCatalog() => new("BMad Method", new Dictionary<string, string>
+    {
+        ["create-story"] = "/bmad-create-story",
+        ["dev-story"] = "/bmad-dev-story",
+        ["code-review"] = "/bmad-code-review",
+        ["sprint-status"] = "/bmad-sprint-status",
+        ["create-epics-and-stories"] = "/bmad-create-epics-and-stories",
+    });
+
+    private static DashboardView WorkflowDashboard(EpicsModel? epics, CommandCatalog? commands = null)
+    {
+        var catalog = commands ?? ProjectWorkflowCatalog();
+        return DashboardViewBuilder.Build(
+            Nav(),
+            ProgressModel.Empty,
+            epics,
+            requirements: null,
+            catalog,
+            WorkInventory.Empty,
+            sprint: null,
+            coverage: null);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_WiresProjectNextSteps_BeforeNowAndNext()
+    {
+        var ready = Drafted("1.1", "A");
+        ready.Status = "ready-for-dev";
+        var undrafted = Undrafted("1.2", "B");
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { EpicWith(ready, undrafted) },
+        };
+
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkflowDashboard(epics));
+
+        Assert.Contains("class=\"chart-panel next-steps", body);
+        Assert.Contains("/bmad-dev-story 1.1", body);
+        Assert.Contains("/bmad-create-story 1.2", body);
+        var nextSteps = body.IndexOf("class=\"chart-panel next-steps", StringComparison.Ordinal);
+        var nowNext = body.IndexOf("Now &amp; Next", StringComparison.Ordinal);
+        Assert.True(nextSteps >= 0 && nowNext >= 0 && nextSteps < nowNext,
+            "Project Next Steps must render before Now & Next");
+    }
+
+    [Fact]
+    public void RenderDashboardBody_OmitsProjectNextSteps_WhenCatalogEmpty()
+    {
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { EpicWith(Drafted("1.1", "A")) },
+        };
+
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkflowDashboard(epics, CommandCatalog.Empty));
+
+        Assert.DoesNotContain("class=\"chart-panel next-steps", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_OmitsWorkModeStrip_WhenNoEpics()
+    {
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkflowDashboard(epics: null));
+        Assert.DoesNotContain("work-mode-strip", body);
+        Assert.DoesNotContain("id=\"wm-overview\"", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_WorkModeStrip_OverviewDefault_NoPanelRemoval()
+    {
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { EpicWith(Drafted("1.1", "A"), Undrafted("1.2", "B")) },
+        };
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkflowDashboard(epics));
+
+        Assert.Contains("class=\"work-mode-strip board-tabs\"", body);
+        Assert.Contains("<input type=\"radio\" id=\"wm-overview\" name=\"work-mode\" class=\"board-tab-radio\" checked>", body);
+        Assert.Contains("<label for=\"wm-draft\" class=\"board-tab\">Draft</label>", body);
+        Assert.Contains("funnel-panel wm-focus-draft", body);
+        Assert.Contains("sunburst-panel wm-focus-develop", body);
+        // Full stack stays in the DOM (Overview + every stage) — no display:none on sibling panels.
+        Assert.Contains("Now &amp; Next", body);
+        Assert.Contains("Story Pipeline", body);
+        Assert.DoesNotContain("display:none", body);
+    }
+
     [Fact]
     public void RenderEpicsIndexBody_SubtitleNoLongerRestatesTheStatGridCounts()
     {
