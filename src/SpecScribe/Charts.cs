@@ -1784,6 +1784,92 @@ public static class Charts
         };
     }
 
+    /// <summary>Proportional stacked bar over the six canonical requirement-status tiers. Segment colors
+    /// route through <c>--status-*</c> via CssClass (Unmapped and Planned both <c>pending</c>). Zero-count
+    /// segments are omitted; empty satisfaction renders nothing (NFR8). Aria-label is the accessible twin.
+    /// Reuses <c>.req-stacked-bar</c> token-routed segments. [Story 9.9]</summary>
+    public static string RequirementSatisfactionBar(ProjectCounts.RequirementSatisfaction sat)
+    {
+        if (sat.Total <= 0) return string.Empty;
+
+        var parts = new List<string>();
+        foreach (var tier in sat.Tiers)
+        {
+            if (tier.Count <= 0) continue;
+            parts.Add($"{tier.Label}: {tier.Count}");
+        }
+        var aria = Html($"Requirement satisfaction: {string.Join(", ", parts)}");
+
+        var sb = new StringBuilder();
+        sb.Append($"<div class=\"req-stacked-bar satisfaction-bar\" role=\"img\" aria-label=\"{aria}\">\n");
+        foreach (var tier in sat.Tiers)
+        {
+            if (tier.Count <= 0) continue;
+            var pct = (double)tier.Count / sat.Total * 100;
+            // Floor tiny segments so a single requirement still shows a visible sliver.
+            var width = Math.Max(pct, sat.Total > 40 ? 0.5 : 1.5);
+            var title = Html($"{tier.Label}: {tier.Count}");
+            // Unmapped keeps pending color but a distinct tip word so it never reads as Planned. [Story 9.9]
+            var segClass = tier.Label == StatusStyles.RequirementLabel(RequirementStatus.Unmapped)
+                ? "pending unmapped"
+                : tier.CssClass;
+            sb.Append($"  <span class=\"seg {segClass}\" style=\"width:{F(width)}%\" title=\"{title}\"></span>\n");
+        }
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Four-reading satisfaction chips (Satisfied · In flight · Deferred on purpose · Unmapped).
+    /// Each chip pairs color + icon + word (never color-only). Optional hrefs deep-link to on-page detail.
+    /// In-flight tooltip expands Active/Ready/Planned. [Story 9.9]</summary>
+    public static string RequirementSatisfactionChips(
+        ProjectCounts.RequirementSatisfaction sat,
+        string? satisfiedHref = null,
+        string? inFlightHref = null,
+        string? deferredHref = null,
+        string? unmappedHref = null,
+        string? linkPrefix = null)
+    {
+        if (sat.Total <= 0) return string.Empty;
+
+        var prefix = linkPrefix ?? string.Empty;
+        string? Href(string? h) => h is { Length: > 0 } ? prefix + h : null;
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"satisfaction-chips\">\n");
+        AppendSatisfactionChip(sb, "Satisfied", sat.Satisfied, "done", "done",
+            StatusStyles.StageMeaning("done"), Href(satisfiedHref));
+        var inFlightTip =
+            $"{sat.Active} partially implemented · {sat.Ready} ready for dev · {sat.Planned} planned";
+        AppendSatisfactionChip(sb, "In flight", sat.InFlight, "active", "active", inFlightTip, Href(inFlightHref));
+        AppendSatisfactionChip(sb, "Deferred on purpose", sat.Deferred, "deferred", "deferred",
+            StatusStyles.StageMeaning("deferred"), Href(deferredHref));
+        AppendSatisfactionChip(sb, "Unmapped", sat.Unmapped, "pending", "unmapped",
+            StatusStyles.StageMeaning("unmapped"), Href(unmappedHref),
+            displayWord: StatusStyles.RequirementLabel(RequirementStatus.Unmapped));
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    private static void AppendSatisfactionChip(
+        StringBuilder sb, string reading, int count, string cssClass, string iconClass,
+        string tip, string? href, string? displayWord = null)
+    {
+        var word = displayWord ?? reading;
+        var tipEsc = Html(tip);
+        var label = $"{Icons.ForStatus(iconClass)}<span class=\"satisfaction-chip-word\">{Html(word)}</span>" +
+                    $"<span class=\"satisfaction-chip-count\">{count}</span>";
+        var cls = $"satisfaction-chip status-badge {cssClass} js-tip";
+        if (href is { Length: > 0 })
+        {
+            sb.Append($"  <a class=\"{cls}\" href=\"{Html(href)}\" data-tip=\"{tipEsc}\" title=\"{tipEsc}\">{label}</a>\n");
+        }
+        else
+        {
+            sb.Append($"  <span class=\"{cls}\" data-tip=\"{tipEsc}\" title=\"{tipEsc}\">{label}</span>\n");
+        }
+    }
+
     /// <summary>The FR/NFR status-tile grid (Story 3.7 AC #1): one small square tile per requirement in source
     /// order that wraps to the next line, each an <c>&lt;a&gt;</c> to its detail page. Three redundant channels
     /// so status is never color-only (UX-DR17): the fill is the status color (via the shared

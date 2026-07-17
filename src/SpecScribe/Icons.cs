@@ -71,6 +71,7 @@ public static class Icons
             // Checklist glyph for open retrospective action items on the home tile band.
             "Action Items" => Svg("<path d=\"M4 2.8h8v10.4H4Z\"/><path d=\"m5.8 6 1.1 1.1 1.8-2.1\"/><path d=\"M5.8 9.8h4.4\"/>"),
             // Evidence-strip pills on drafted story pages (icon + word, never color-only). [Story 9.4]
+            "Tasks" => Svg("<path d=\"M4 2.8h8v10.4H4Z\"/><path d=\"m5.8 6 1.1 1.1 1.8-2.1\"/><path d=\"M5.8 9.8h4.4\"/>"),
             "Tests" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.2 8.2 7.1 10.1 11 5.8\"/>"),
             "Verified" => Svg("<path d=\"M3.5 3.6h9v9.8h-9Z\"/><path d=\"M3.5 6.4h9M5.8 2.4v2.4M10.2 2.4v2.4\"/>"),
             _ => string.Empty,

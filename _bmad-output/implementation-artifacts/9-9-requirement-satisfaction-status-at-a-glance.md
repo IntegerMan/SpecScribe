@@ -4,7 +4,7 @@ baseline_commit: 8d9aac44fe721e35315cef0881cb04ba64b2ded9
 
 # Story 9.9: Requirement Satisfaction Status at a Glance
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -83,44 +83,44 @@ The four readings are a **semantic grouping over the six canonical `RequirementS
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Extend the `ProjectCounts` ledger with requirement-satisfaction buckets (AC: #1, #2, #3, counts-source decision)**
-  - [ ] Add a satisfaction shape to `ProjectCounts` (e.g. a `RequirementSatisfaction` nested record or an `IReadOnlyList<StageCount>`), computed over `RequirementsModel.Everything` (FR+NFR+UX-DR). Carry **both** the six canonical tier counts (Done/Active/Ready/Planned/Unmapped/Deferred — sums to the requirement total) **and** the four-reading rollups (Satisfied/InFlight/Deferred/Unmapped) so both the bar (tiers) and the chips (readings) read from one source. Route every tier→css-class through `StatusStyles.ForRequirement`, not a local map. [Source: src/SpecScribe/ProjectCounts.cs:12–48]
-  - [ ] Thread `RequirementsModel` into `ProjectCounts.Build` as an **optional** param (`RequirementsModel? requirements = null`), mirroring the existing optional `EpicsModel? epics = null`. When null/empty → empty satisfaction buckets, no throw (NFR8 graceful degradation). Keep `Build` pure and deterministic. [Source: src/SpecScribe/ProjectCounts.cs:86–141]
-  - [ ] Update `ProjectCounts.Empty` and the `SiteGenerator` build site (`_counts`, ~src/SpecScribe/SiteGenerator.cs:346) to pass the parsed requirements model. **Confirm ordering:** requirements must be parsed before `ProjectCounts.Build` is called; if the current phase order builds counts before requirements, either reorder (safe — `Build` is pure) or compute the satisfaction buckets in the same pass. Do not double-parse requirements.
-  - [ ] **Retire the local recount:** change `DashboardViewBuilder.RequirementStatSubLine` (and its callers `RequirementStatTile`) to read the per-kind/overall satisfaction buckets from `ProjectCounts` instead of re-`Count`ing `RequirementStatus` values. If per-kind (Functional/NonFunctional/Design) tallies are needed for the existing tiles, add them to the ledger too (keep the six-tier shape per kind). Where `RequirementsTemplater.StatusCounts`/`StatusSegments` can read the ledger without contorting the donut rendering, do so; if the per-kind donut path is cleaner keeping its local count, leave it but document why (avoid a half-migration that leaves two authorities for the same number). [Source: src/SpecScribe/DashboardViewBuilder.cs:143–169; src/SpecScribe/RequirementsTemplater.cs:520–542]
+- [x] **Task 1 — Extend the `ProjectCounts` ledger with requirement-satisfaction buckets (AC: #1, #2, #3, counts-source decision)**
+  - [x] Add a satisfaction shape to `ProjectCounts` (e.g. a `RequirementSatisfaction` nested record or an `IReadOnlyList<StageCount>`), computed over `RequirementsModel.Everything` (FR+NFR+UX-DR). Carry **both** the six canonical tier counts (Done/Active/Ready/Planned/Unmapped/Deferred — sums to the requirement total) **and** the four-reading rollups (Satisfied/InFlight/Deferred/Unmapped) so both the bar (tiers) and the chips (readings) read from one source. Route every tier→css-class through `StatusStyles.ForRequirement`, not a local map. [Source: src/SpecScribe/ProjectCounts.cs:12–48]
+  - [x] Thread `RequirementsModel` into `ProjectCounts.Build` as an **optional** param (`RequirementsModel? requirements = null`), mirroring the existing optional `EpicsModel? epics = null`. When null/empty → empty satisfaction buckets, no throw (NFR8 graceful degradation). Keep `Build` pure and deterministic. [Source: src/SpecScribe/ProjectCounts.cs:86–141]
+  - [x] Update `ProjectCounts.Empty` and the `SiteGenerator` build site (`_counts`, ~src/SpecScribe/SiteGenerator.cs:346) to pass the parsed requirements model. **Confirm ordering:** requirements must be parsed before `ProjectCounts.Build` is called; if the current phase order builds counts before requirements, either reorder (safe — `Build` is pure) or compute the satisfaction buckets in the same pass. Do not double-parse requirements.
+  - [x] **Retire the local recount:** change `DashboardViewBuilder.RequirementStatSubLine` (and its callers `RequirementStatTile`) to read the per-kind/overall satisfaction buckets from `ProjectCounts` instead of re-`Count`ing `RequirementStatus` values. If per-kind (Functional/NonFunctional/Design) tallies are needed for the existing tiles, add them to the ledger too (keep the six-tier shape per kind). Where `RequirementsTemplater.StatusCounts`/`StatusSegments` can read the ledger without contorting the donut rendering, do so; if the per-kind donut path is cleaner keeping its local count, leave it but document why (avoid a half-migration that leaves two authorities for the same number). [Source: src/SpecScribe/DashboardViewBuilder.cs:143–169; src/SpecScribe/RequirementsTemplater.cs:520–542]
 
-- [ ] **Task 2 — "Satisfaction at a glance" band on `requirements.html` (AC: #1, #2, #3)**
-  - [ ] In `RequirementsTemplater.RenderIndex`, insert the new band **after the `<header>` (line 37) and before the donut-row `<section class="dashboard">` (line 54)**, under a `<div class="section-divider">Satisfaction at a glance</div>` inside the existing `<main id="main-content">` (do not add a second `<main>`). Give it an `id` anchor (e.g. `id="satisfaction"`) so Home's rollup can deep-link to it. [Source: src/SpecScribe/RequirementsTemplater.cs:32–65; memory `story-1-4-a11y-seams-for-1-5`]
-  - [ ] Render the **proportional stacked bar** over `model.Everything` using the six canonical tiers as segments — each segment's color via `StatusStyles.ForRequirement` / `--status-*`, width proportional to count, with an `aria-label` describing the full breakdown (accessibility text-twin, never diagram-only — Story 1.4/9.3 pattern). Reuse an existing bar/segment primitive if one fits (`Charts` bar/donut helpers, `.status-*` classes); if a small new bar helper is needed, keep colors token-routed and add it beside the existing `Charts` requirement helpers.
-  - [ ] Render the **four count chips** (Satisfied · In flight · Deferred on purpose · Unmapped) reading counts from the `ProjectCounts` satisfaction buckets (Task 1). Each chip pairs color + icon + word (reuse `StatusStyles.Badge`/`RequirementBadge` shape — the Unmapped chip must use the `"unmapped"` icon + "Not yet mapped", the In-flight chip a neutral/active treatment with a tooltip enumerating Active/Ready/Planned). **Never color-only.**
-  - [ ] Chips/segments link to the relevant existing on-page detail (the "Requirements at a glance" grid section anchor and/or the coverage section) so the scan is a jumping-off point, never a dead end. Do **not** fabricate a per-state filtered page.
-  - [ ] **NFR8:** when `model.Everything` is empty (no requirements at all), omit the band entirely (absent, not an empty bar). When a kind is empty, it simply contributes zero — the band still renders for the kinds present.
-  - [ ] **Keep the existing FR+NFR donut row, "Requirements at a glance" grid, and flow Sankey byte-identical** (9.2's byte-identical guardrail). The new band is an **additive orienting summary above them** — it must not re-render or replace the grid/flow (Story 8.7 "one primary view per dataset": the band answers the *four-reading holistic* question incl. Design; the grid/flow remain the FR+NFR per-requirement detail).
+- [x] **Task 2 — "Satisfaction at a glance" band on `requirements.html` (AC: #1, #2, #3)**
+  - [x] In `RequirementsTemplater.RenderIndex`, insert the new band **after the `<header>` (line 37) and before the donut-row `<section class="dashboard">` (line 54)**, under a `<div class="section-divider">Satisfaction at a glance</div>` inside the existing `<main id="main-content">` (do not add a second `<main>`). Give it an `id` anchor (e.g. `id="satisfaction"`) so Home's rollup can deep-link to it. [Source: src/SpecScribe/RequirementsTemplater.cs:32–65; memory `story-1-4-a11y-seams-for-1-5`]
+  - [x] Render the **proportional stacked bar** over `model.Everything` using the six canonical tiers as segments — each segment's color via `StatusStyles.ForRequirement` / `--status-*`, width proportional to count, with an `aria-label` describing the full breakdown (accessibility text-twin, never diagram-only — Story 1.4/9.3 pattern). Reuse an existing bar/segment primitive if one fits (`Charts` bar/donut helpers, `.status-*` classes); if a small new bar helper is needed, keep colors token-routed and add it beside the existing `Charts` requirement helpers.
+  - [x] Render the **four count chips** (Satisfied · In flight · Deferred on purpose · Unmapped) reading counts from the `ProjectCounts` satisfaction buckets (Task 1). Each chip pairs color + icon + word (reuse `StatusStyles.Badge`/`RequirementBadge` shape — the Unmapped chip must use the `"unmapped"` icon + "Not yet mapped", the In-flight chip a neutral/active treatment with a tooltip enumerating Active/Ready/Planned). **Never color-only.**
+  - [x] Chips/segments link to the relevant existing on-page detail (the "Requirements at a glance" grid section anchor and/or the coverage section) so the scan is a jumping-off point, never a dead end. Do **not** fabricate a per-state filtered page.
+  - [x] **NFR8:** when `model.Everything` is empty (no requirements at all), omit the band entirely (absent, not an empty bar). When a kind is empty, it simply contributes zero — the band still renders for the kinds present.
+  - [x] **Keep the existing FR+NFR donut row, "Requirements at a glance" grid, and flow Sankey byte-identical** (9.2's byte-identical guardrail). The new band is an **additive orienting summary above them** — it must not re-render or replace the grid/flow (Story 8.7 "one primary view per dataset": the band answers the *four-reading holistic* question incl. Design; the grid/flow remain the FR+NFR per-requirement detail).
 
-- [ ] **Task 3 — Compact satisfaction rollup on Home (AC: #1, #3)**
-  - [ ] Add a compact four-reading rollup to Home that reads the same `ProjectCounts` satisfaction buckets and **links to `requirements.html#satisfaction`**. Prefer extending the existing Requirements panel (`HtmlRenderAdapter.Dashboard.cs` `AppendRequirementsPanel`, ~:306–345) or the requirements tile band (`DashboardViewBuilder`, :96–110) rather than inventing a new Home panel — keep Home churn minimal (recent commits deliberately shaped Home layout; treat it as intentional). [Source: src/SpecScribe/HtmlRenderAdapter.Dashboard.cs; src/SpecScribe/DashboardViewBuilder.cs:92–110]
-  - [ ] The rollup must stay on the **shared `RenderDashboardBody` path** (HTML + webview + SPA byte-aligned — no host fork, no new `HostRenderException`).
-  - [ ] **NFR8:** omit the rollup when there are no requirements or no epics model (mirror the existing `requirements is not null` / `requirements.All`-count guards).
+- [x] **Task 3 — Compact satisfaction rollup on Home (AC: #1, #3)**
+  - [x] Add a compact four-reading rollup to Home that reads the same `ProjectCounts` satisfaction buckets and **links to `requirements.html#satisfaction`**. Prefer extending the existing Requirements panel (`HtmlRenderAdapter.Dashboard.cs` `AppendRequirementsPanel`, ~:306–345) or the requirements tile band (`DashboardViewBuilder`, :96–110) rather than inventing a new Home panel — keep Home churn minimal (recent commits deliberately shaped Home layout; treat it as intentional). [Source: src/SpecScribe/HtmlRenderAdapter.Dashboard.cs; src/SpecScribe/DashboardViewBuilder.cs:92–110]
+  - [x] The rollup must stay on the **shared `RenderDashboardBody` path** (HTML + webview + SPA byte-aligned — no host fork, no new `HostRenderException`).
+  - [x] **NFR8:** omit the rollup when there are no requirements or no epics model (mirror the existing `requirements is not null` / `requirements.All`-count guards).
 
-- [ ] **Task 4 — Close the legend gap: add "Not yet mapped" to the portal-wide legend (AC: #1, #2, decision #4)**
-  - [ ] Add the `Unmapped`/"Not yet mapped" row to `StatusStyles.LegendStages` / `LegendKey()` (`StatusStyles.cs:246–247,272–304`). The row's **swatch reuses `--status-pending`** (tan, per 9.3's owner decision — no 7th token) but the **icon is `Icons.ForStatus("unmapped")` and the word is "Not yet mapped"**, so it is distinct from "Planned" by icon + word (never color-only). Its meaning already exists in `StageMeaning("unmapped")` (`:237`) — source the row's text from there, do not duplicate a second meaning string.
-  - [ ] This closes the gap where the vocabulary this scan foregrounds was absent from the key. Verify the legend renders the row on every page that already shows `LegendKey()` (requirements index/detail, dashboard, epics, sprint, follow-ups) with no layout regression.
-  - [ ] Heed the 8.2 review-deferred drift note ("LegendKey stage words are a second table beside `*Label` helpers"): route the new row through the existing `StageMeaning`/`Icons` seams; do not open a third vocabulary table.
+- [x] **Task 4 — Close the legend gap: add "Not yet mapped" to the portal-wide legend (AC: #1, #2, decision #4)**
+  - [x] Add the `Unmapped`/"Not yet mapped" row to `StatusStyles.LegendStages` / `LegendKey()` (`StatusStyles.cs:246–247,272–304`). The row's **swatch reuses `--status-pending`** (tan, per 9.3's owner decision — no 7th token) but the **icon is `Icons.ForStatus("unmapped")` and the word is "Not yet mapped"**, so it is distinct from "Planned" by icon + word (never color-only). Its meaning already exists in `StageMeaning("unmapped")` (`:237`) — source the row's text from there, do not duplicate a second meaning string.
+  - [x] This closes the gap where the vocabulary this scan foregrounds was absent from the key. Verify the legend renders the row on every page that already shows `LegendKey()` (requirements index/detail, dashboard, epics, sprint, follow-ups) with no layout regression.
+  - [x] Heed the 8.2 review-deferred drift note ("LegendKey stage words are a second table beside `*Label` helpers"): route the new row through the existing `StageMeaning`/`Icons` seams; do not open a third vocabulary table.
 
-- [ ] **Task 5 — Guardrails / do-not (AC: #3)**
-  - [ ] Do **not** re-implement 9.1's covering-story lists, 9.2's NFR/UX-DR coverage section, or 9.3's `Unmapped` tier / Sankey `FlowStateKey` split — **compose** them. The band reads `RequirementStatus` (already rolled up by `DeriveStatus`) and `StatusStyles`; it introduces no new classifier or roll-up.
-  - [ ] Do **not** add a 7th `--status-*` token, a new status word, or a section-local color map. Do **not** add any new authoring schema in `epics.md`.
-  - [ ] Do **not** build a per-state filtered requirements page (new surface — out of scope; chips anchor to existing detail).
-  - [ ] Do **not** push UX-DR/Design into the existing FR+NFR flow/grid (keeps them byte-identical) — Design enters only via the new band and the existing 9.2 coverage section.
-  - [ ] Do **not** fork the shared body path or add JS (charts are pure SVG + links; webview has no `specscribe.js` — any tooltip is progressive-enhancement, the always-visible chip word/icon + legend row is the accessible channel).
+- [x] **Task 5 — Guardrails / do-not (AC: #3)**
+  - [x] Do **not** re-implement 9.1's covering-story lists, 9.2's NFR/UX-DR coverage section, or 9.3's `Unmapped` tier / Sankey `FlowStateKey` split — **compose** them. The band reads `RequirementStatus` (already rolled up by `DeriveStatus`) and `StatusStyles`; it introduces no new classifier or roll-up.
+  - [x] Do **not** add a 7th `--status-*` token, a new status word, or a section-local color map. Do **not** add any new authoring schema in `epics.md`.
+  - [x] Do **not** build a per-state filtered requirements page (new surface — out of scope; chips anchor to existing detail).
+  - [x] Do **not** push UX-DR/Design into the existing FR+NFR flow/grid (keeps them byte-identical) — Design enters only via the new band and the existing 9.2 coverage section.
+  - [x] Do **not** fork the shared body path or add JS (charts are pure SVG + links; webview has no `specscribe.js` — any tooltip is progressive-enhancement, the always-visible chip word/icon + legend row is the accessible channel).
 
-- [ ] **Task 6 — Tests + golden (AC: #1, #2, #3)**
-  - [ ] `ProjectCountsTests`: satisfaction buckets sum correctly over a fixture with Done/Active/Ready/Planned/Unmapped/Deferred requirements across FR+NFR+UX-DR; the four-reading rollups equal the expected tier sums (In flight = Active+Ready+Planned); empty `RequirementsModel` → empty buckets, no throw (NFR8); determinism (two builds identical).
-  - [ ] `RequirementsAndProgressTests` / `HtmlRenderAdapterTests`: `RenderIndex` HTML contains the "Satisfaction at a glance" band with the four chips and a stacked bar whose segment classes route through `--status-*`; the band spans Design (a UX-DR-bearing fixture shows UX-DRs counted); the Unmapped chip reads "Not yet mapped" with the unmapped icon (not "Planned"); the In-flight chip's tooltip/sub-line enumerates the lifecycle; band absent when `Everything` is empty (NFR8). Assert the existing FR+NFR grid/flow/donut markup is unchanged (byte-identical guard where practical).
-  - [ ] Dashboard tests: Home rollup renders the four readings from the ledger and links to `requirements.html#satisfaction`; absent when no requirements/epics; present on all three adapters (parity).
-  - [ ] `StatusStylesTests` / `StylesheetTests`: `LegendKey()` now includes a "Not yet mapped" row (pending swatch + unmapped icon + word); assert any new band/bar CSS classes exist and route color through tokens.
-  - [ ] Golden fingerprint **will move** (requirements.html + Home body) → regenerate the constant in `SiteGeneratorAdapterTests` (test `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`, ~:207; constant ~:398) per `golden-diff-normalization-gotchas`, from a clean full build (a `--no-build`/partial build produces a stale hash — see 9.1's debug log). Confirm the three parity suites green: `RenderParityTests`, `RenderSectionParityTests`, `RenderSpaParityTests`.
-  - [ ] Run the full suite from repo root: `dotnet test`.
+- [x] **Task 6 — Tests + golden (AC: #1, #2, #3)**
+  - [x] `ProjectCountsTests`: satisfaction buckets sum correctly over a fixture with Done/Active/Ready/Planned/Unmapped/Deferred requirements across FR+NFR+UX-DR; the four-reading rollups equal the expected tier sums (In flight = Active+Ready+Planned); empty `RequirementsModel` → empty buckets, no throw (NFR8); determinism (two builds identical).
+  - [x] `RequirementsAndProgressTests` / `HtmlRenderAdapterTests`: `RenderIndex` HTML contains the "Satisfaction at a glance" band with the four chips and a stacked bar whose segment classes route through `--status-*`; the band spans Design (a UX-DR-bearing fixture shows UX-DRs counted); the Unmapped chip reads "Not yet mapped" with the unmapped icon (not "Planned"); the In-flight chip's tooltip/sub-line enumerates the lifecycle; band absent when `Everything` is empty (NFR8). Assert the existing FR+NFR grid/flow/donut markup is unchanged (byte-identical guard where practical).
+  - [x] Dashboard tests: Home rollup renders the four readings from the ledger and links to `requirements.html#satisfaction`; absent when no requirements/epics; present on all three adapters (parity).
+  - [x] `StatusStylesTests` / `StylesheetTests`: `LegendKey()` now includes a "Not yet mapped" row (pending swatch + unmapped icon + word); assert any new band/bar CSS classes exist and route color through tokens.
+  - [x] Golden fingerprint **will move** (requirements.html + Home body) → regenerate the constant in `SiteGeneratorAdapterTests` (test `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`, ~:207; constant ~:398) per `golden-diff-normalization-gotchas`, from a clean full build (a `--no-build`/partial build produces a stale hash — see 9.1's debug log). Confirm the three parity suites green: `RenderParityTests`, `RenderSectionParityTests`, `RenderSpaParityTests`.
+  - [x] Run the full suite from repo root: `dotnet test`.
 
 ## Dev Notes
 
@@ -216,14 +216,44 @@ Generate the portal against this repo's own `_bmad-output` (`SpecScribeOutput/`)
 
 ### Agent Model Used
 
+Composer (Cursor agent)
+
 ### Debug Log References
+
+- Requirements pages write during epics phase before the shared `_counts` ledger is built; `RenderIndex` falls back to an ephemeral `ProjectCounts.Build(..., requirements)` so satisfaction numbers stay correct without reordering phases.
+- Per-kind donut `StatusCounts` kept local (documented) — threading the ledger through every donut/group card would contort rendering with no shared-number benefit; overall satisfaction + Home tiles read the ledger.
+- Full suite: 1270 passed. One earlier flake on timeline/git-insights tests re-ran green (unrelated to this change).
 
 ### Completion Notes List
 
+- Extended `ProjectCounts` with `RequirementSatisfaction` (six tiers + four readings) over `Everything` and per-kind tallies; `Build` takes optional `RequirementsModel`.
+- Retired `RequirementStatSubLine` local recount — Home tiles read ledger buckets.
+- Added hub "Satisfaction at a glance" band (`#satisfaction`) with stacked bar + four chips; Home rollup links to it.
+- Added "Not yet mapped" to `LegendKey` (pending swatch + unmapped icon/word via `StageMeaning`/`Icons`).
+- No 7th status token, no new classifier, no JS, FR+NFR grid/flow unchanged; golden fingerprint regenerated; three parity suites green.
+
 ### File List
+
+- src/SpecScribe/ProjectCounts.cs
+- src/SpecScribe/SiteGenerator.cs
+- src/SpecScribe/DashboardViewBuilder.cs
+- src/SpecScribe/RequirementsTemplater.cs
+- src/SpecScribe/HtmlRenderAdapter.Dashboard.cs
+- src/SpecScribe/Charts.cs
+- src/SpecScribe/StatusStyles.cs
+- src/SpecScribe/assets/specscribe.css
+- tests/SpecScribe.Tests/ProjectCountsTests.cs
+- tests/SpecScribe.Tests/RequirementsAndProgressTests.cs
+- tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs
+- tests/SpecScribe.Tests/StatusStylesTests.cs
+- tests/SpecScribe.Tests/StylesheetTests.cs
+- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/9-9-requirement-satisfaction-status-at-a-glance.md
 
 ## Change Log
 
 | Date | Change |
 |------|--------|
 | 2026-07-16 | create-story — ready-for-dev. Owner locked: (1) requirements-hub-owned "Satisfaction at a glance" band spanning FR+NFR+UX-DR + compact Home rollup; (2) four-reading summary (Satisfied · In flight · Deferred on purpose · Unmapped) as one proportional stacked bar + count chips over the six canonical tiers (no parallel colors/words); (3) extend `ProjectCounts` ledger + retire local recount; (4) close the legend gap (add "Not yet mapped" row) and include UX-DR/Design in the holistic reading. Composes 9.1–9.3 + 8.2/8.3; absorbs none. |
+| 2026-07-16 | Implemented — satisfaction ledger + hub band + Home rollup + legend Unmapped row; status → review. |

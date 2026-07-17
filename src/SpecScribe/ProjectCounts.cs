@@ -8,12 +8,76 @@ namespace SpecScribe;
 /// and <see cref="WorkInventory"/>; never re-counted at a render site. Named fields keep the plan-of-record
 /// (<see cref="StoriesDefined"/>/<see cref="EpicsDefined"/>) distinct from the tracking ledger
 /// (<see cref="StoriesTracked"/>/<see cref="EpicsTracked"/>) so a legitimate Defined≠Tracked difference is
-/// signal, not a silent clash. Pure data — no I/O, no rendering. [Story 8.3; FR21]</summary>
+/// signal, not a silent clash. Pure data — no I/O, no rendering. [Story 8.3; FR21]
+/// <para>Requirement-satisfaction buckets (Story 9.9) are computed over <see cref="RequirementsModel.Everything"/>
+/// so Home and the requirements hub share one source for Satisfied / In flight / Deferred / Unmapped.</para></summary>
 public sealed record ProjectCounts
 {
     /// <summary>Tracked-stage row shape shared with the sprint wheel / page summary
     /// (<see cref="SprintTemplater.StoryStageCounts"/>). Label + count + status css class.</summary>
     public readonly record struct StageCount(string Label, int Count, string CssClass);
+
+    /// <summary>Requirement-satisfaction tallies over one requirement set — six canonical
+    /// <see cref="RequirementStatus"/> tiers plus the four-reading rollups (Satisfied / In flight /
+    /// Deferred on purpose / Unmapped). Colors/words route through <see cref="StatusStyles"/>; the four
+    /// readings are labels on brackets, not a parallel vocabulary. [Story 9.9]</summary>
+    public sealed record RequirementSatisfaction
+    {
+        public required int Done { get; init; }
+        public required int Active { get; init; }
+        public required int Ready { get; init; }
+        public required int Planned { get; init; }
+        public required int Unmapped { get; init; }
+        public required int Deferred { get; init; }
+
+        public int Total => Done + Active + Ready + Planned + Unmapped + Deferred;
+        public int Satisfied => Done;
+        public int InFlight => Active + Ready + Planned;
+
+        /// <summary>Six canonical tiers in Done→…→Deferred order — stacked-bar segments. CssClass from
+        /// <see cref="StatusStyles.ForRequirement"/> (Unmapped→pending); Label from
+        /// <see cref="StatusStyles.RequirementLabel"/>.</summary>
+        public IReadOnlyList<StageCount> Tiers => new[]
+        {
+            new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Done), Done, "done"),
+            new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Active), Active, "active"),
+            new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Ready), Ready, "ready"),
+            new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Planned), Planned, "pending"),
+            new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Unmapped), Unmapped, "pending"),
+            new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Deferred), Deferred, "deferred"),
+        };
+
+        /// <summary>Four-reading chip rollups. In-flight CssClass is <c>active</c> (honest lifecycle expands
+        /// in the chip tooltip); Unmapped keeps pending color + distinct word. [Story 9.9]</summary>
+        public IReadOnlyList<StageCount> Readings => new[]
+        {
+            new StageCount("Satisfied", Satisfied, "done"),
+            new StageCount("In flight", InFlight, "active"),
+            new StageCount("Deferred on purpose", Deferred, "deferred"),
+            new StageCount("Unmapped", Unmapped, "pending"),
+        };
+
+        public static readonly RequirementSatisfaction Empty = new()
+        {
+            Done = 0, Active = 0, Ready = 0, Planned = 0, Unmapped = 0, Deferred = 0,
+        };
+
+        public static RequirementSatisfaction From(IEnumerable<RequirementInfo>? reqs)
+        {
+            if (reqs is null) return Empty;
+            var list = reqs as IReadOnlyList<RequirementInfo> ?? reqs.ToList();
+            if (list.Count == 0) return Empty;
+            return new RequirementSatisfaction
+            {
+                Done = list.Count(r => r.Status == RequirementStatus.Done),
+                Active = list.Count(r => r.Status == RequirementStatus.Active),
+                Ready = list.Count(r => r.Status == RequirementStatus.Ready),
+                Planned = list.Count(r => r.Status == RequirementStatus.Planned),
+                Unmapped = list.Count(r => r.Status == RequirementStatus.Unmapped),
+                Deferred = list.Count(r => r.Status == RequirementStatus.Deferred),
+            };
+        }
+    }
 
     public required int EpicsDefined { get; init; }
     public required int EpicsDrafted { get; init; }
@@ -44,6 +108,15 @@ public sealed record ProjectCounts
     /// <summary>Story ids (or raw keys) present in sprint-status.yaml with no matching epics.md story (sorted).</summary>
     public required IReadOnlyList<string> OrphanTrackedRows { get; init; }
 
+    /// <summary>Satisfaction over <see cref="RequirementsModel.Everything"/> (FR+NFR+UX-DR). Empty when
+    /// requirements were not supplied to <see cref="Build"/>. [Story 9.9]</summary>
+    public required RequirementSatisfaction RequirementsOverall { get; init; }
+
+    /// <summary>Per-kind satisfaction for Home requirement tiles — same six-tier shape. [Story 9.9]</summary>
+    public required RequirementSatisfaction RequirementsFunctional { get; init; }
+    public required RequirementSatisfaction RequirementsNonFunctional { get; init; }
+    public required RequirementSatisfaction RequirementsDesign { get; init; }
+
     /// <summary>True when either reconciliation list is non-empty — emit exactly one non-fatal notice.</summary>
     public bool HasDivergence => UntrackedDefinedStories.Count > 0 || OrphanTrackedRows.Count > 0;
 
@@ -65,6 +138,10 @@ public sealed record ProjectCounts
         OpenActionItems = 0,
         UntrackedDefinedStories = Array.Empty<string>(),
         OrphanTrackedRows = Array.Empty<string>(),
+        RequirementsOverall = RequirementSatisfaction.Empty,
+        RequirementsFunctional = RequirementSatisfaction.Empty,
+        RequirementsNonFunctional = RequirementSatisfaction.Empty,
+        RequirementsDesign = RequirementSatisfaction.Empty,
     };
 
     /// <summary>Lifecycle display order for tracked (sprint yaml) tallies — mirrors
@@ -82,12 +159,15 @@ public sealed record ProjectCounts
 
     /// <summary>Builds the portal-wide count ledger. <paramref name="epics"/> supplies story ids for
     /// epics.md↔yaml reconciliation (when null or sprint empty, reconciliation lists stay empty and no
-    /// divergence is reported — graceful degradation). Pure and deterministic. [Story 8.3]</summary>
+    /// divergence is reported — graceful degradation). <paramref name="requirements"/> supplies
+    /// satisfaction buckets over Everything (null/empty → empty buckets, no throw — NFR8). Pure and
+    /// deterministic. [Story 8.3; Story 9.9]</summary>
     public static ProjectCounts Build(
         ProgressModel progress,
         SprintStatus? sprint,
         WorkInventory work,
-        EpicsModel? epics = null)
+        EpicsModel? epics = null,
+        RequirementsModel? requirements = null)
     {
         progress ??= ProgressModel.Empty;
         work ??= WorkInventory.Empty;
@@ -119,6 +199,16 @@ public sealed record ProjectCounts
             ? Reconcile(epics, storyEntries)
             : (Array.Empty<string>() as IReadOnlyList<string>, Array.Empty<string>() as IReadOnlyList<string>);
 
+        var overall = RequirementSatisfaction.From(requirements?.Everything);
+        var functional = RequirementSatisfaction.From(requirements?.Functional);
+        var nonFunctional = RequirementSatisfaction.From(requirements?.NonFunctional);
+        var design = RequirementSatisfaction.From(requirements?.Design);
+        if (overall.Total > 0)
+        {
+            Debug.Assert(overall.Total == functional.Total + nonFunctional.Total + design.Total,
+                "Overall satisfaction must equal the sum of per-kind tallies");
+        }
+
         return new ProjectCounts
         {
             EpicsDefined = progress.EpicsTotal,
@@ -137,6 +227,10 @@ public sealed record ProjectCounts
             OpenActionItems = sprint?.OpenActionItems.Count ?? 0,
             UntrackedDefinedStories = untracked,
             OrphanTrackedRows = orphans,
+            RequirementsOverall = overall,
+            RequirementsFunctional = functional,
+            RequirementsNonFunctional = nonFunctional,
+            RequirementsDesign = design,
         };
     }
 

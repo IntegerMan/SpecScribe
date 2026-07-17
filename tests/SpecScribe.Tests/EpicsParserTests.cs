@@ -389,7 +389,7 @@ public class EpicsParserTests
     }
 
     [Fact]
-    public void ExtractTestEvidence_FallsBackToWholeDocumentWhenDevRecordHasNone()
+    public void ExtractTestEvidence_FallsBackToChangeLogWhenDevRecordHasNone()
     {
         var raw = """
             # Story 1.1
@@ -400,6 +400,36 @@ public class EpicsParserTests
             - 2026-07-11 — **Shipped with 88 tests passing.**
             """;
         Assert.Equal("88 passing tests", EpicsParser.ExtractTestEvidence(raw));
+    }
+
+    [Fact]
+    public void ExtractTestEvidence_DoesNotReadExamplesFromDevNotes()
+    {
+        var raw = """
+            # Story 1.1
+            ## Acceptance Criteria
+            Then an example like 586 tests green appears in prose.
+
+            ## Dev Notes
+            This story explains that other stories might say 759 tests green.
+
+            ## Dev Agent Record
+            ### Completion Notes List
+            No final test tally was recorded.
+            """;
+        Assert.Null(EpicsParser.ExtractTestEvidence(raw));
+    }
+
+    [Fact]
+    public void ExtractTestEvidence_RecognizesH3DevAgentRecord()
+    {
+        var raw = """
+            # Story 1.1
+            ### Dev Agent Record
+            ### Completion Notes List
+            42 tests green.
+            """;
+        Assert.Equal("42 passing tests", EpicsParser.ExtractTestEvidence(raw));
     }
 
     [Fact]
@@ -440,19 +470,55 @@ public class EpicsParserTests
         Assert.False(result.Value.IsVerification);
     }
 
+    [Theory]
+    [InlineData("Verified generated output.", true)]
+    [InlineData("Reviewed and passed.", true)]
+    [InlineData("Needs another review pass before closing.", false)]
+    public void ExtractChangeLogVerification_ClassifiesVerificationLanguagePrecisely(string action, bool expected)
+    {
+        var raw = $"""
+            # Story 1.1
+            ## Change Log
+            - 2026-07-09 — **{action}**
+            """;
+        var result = EpicsParser.ExtractChangeLogVerification(raw);
+        Assert.NotNull(result);
+        Assert.Equal(expected, result!.Value.IsVerification);
+    }
+
+    [Theory]
+    [InlineData("- 2026-07-09: Code review passed.")]
+    [InlineData("- 2026-07-09 — Code review passed.")]
+    [InlineData("| 2026-07-09 | Code review passed. |")]
+    public void ExtractChangeLogVerification_AcceptsCommonDatedRows(string row)
+    {
+        var raw = $"""
+            # Story 1.1
+            ## Change Log
+            {row}
+            """;
+        var result = EpicsParser.ExtractChangeLogVerification(raw);
+        Assert.NotNull(result);
+        Assert.Equal(new DateOnly(2026, 7, 9), result!.Value.Date);
+        Assert.True(result.Value.IsVerification);
+    }
+
     [Fact]
     public void ExtractChangeLogVerification_ReturnsNullWhenSectionAbsent()
         => Assert.Null(EpicsParser.ExtractChangeLogVerification("# Story 1.1\nNo change log.\n"));
 
     [Fact]
-    public void ExtractChangeLogVerification_ReturnsNullOnMalformedDate()
+    public void ExtractChangeLogVerification_SkipsMalformedDate()
     {
         var raw = """
             # Story 1.1
             ## Change Log
             - 2026-13-99 — **Code review passed.**
+            - 2026-07-09 — **Verified generated output.**
             """;
-        Assert.Null(EpicsParser.ExtractChangeLogVerification(raw));
+        var result = EpicsParser.ExtractChangeLogVerification(raw);
+        Assert.NotNull(result);
+        Assert.Equal(new DateOnly(2026, 7, 9), result!.Value.Date);
     }
 
     [Fact]
@@ -461,7 +527,7 @@ public class EpicsParserTests
         var raw = """
             # Story 1.1
             ## Change Log
-            - 2026-07-09: Colon form without bold action
+            - No dated entry here
             """;
         Assert.Null(EpicsParser.ExtractChangeLogVerification(raw));
     }

@@ -122,6 +122,47 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         return gen;
     }
 
+    [Fact]
+    public void GenerateAll_ThreadsStoryEvidenceFromArtifactIntoRenderedPage()
+    {
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-drafted-story.md"), """
+            # Story 1.1: Drafted Story
+
+            Status: review
+
+            ## Story
+
+            As a contributor, I want a drafted story.
+
+            ## Acceptance Criteria
+
+            1. **Given** evidence exists **When** the page renders **Then** the strip summarizes it.
+
+            ## Tasks / Subtasks
+
+            - [x] Task 1: Build the evidence strip
+
+            ## Dev Agent Record
+
+            ### Completion Notes List
+
+            42 tests green.
+
+            ## Change Log
+
+            - 2026-07-16: Verified the story page evidence strip.
+            """);
+
+        GenerateSite();
+
+        var html = File.ReadAllText(DraftedStoryPage);
+        Assert.Contains("class=\"evidence-strip\"", html);
+        Assert.Contains("&#10003; 1 task", html);
+        Assert.Contains("42 passing tests", html);
+        Assert.Contains("verified 2026-07-16", html);
+        Assert.Contains("href=\"#sec-dev-agent-record\"", html);
+    }
+
     // ---- Placeholder pages for undrafted stories ----
 
     [Fact]

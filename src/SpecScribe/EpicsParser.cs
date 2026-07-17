@@ -116,18 +116,19 @@ public static class EpicsParser
     // living in Dev Agent Record Completion Notes (and occasionally elsewhere). [Story 9.4]
     private static readonly Regex TestEvidencePhrase = new(
         @"\b(\d[\d,]*)\s+(?:C#\s+)?tests?\s+(green|pass|passing)\b",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-    // Newest-first Change Log row with an em/en dash and bold action: "- 2026-07-11 — **Code review passed…**".
-    // Distinct from Story 8.8's max-date scan — the evidence strip wants the TOP entry + whether its action
-    // reads as verification. [Story 9.4]
+    // Newest-first Change Log row in list/table form with bold or plain action:
+    // "- 2026-07-11 — **Code review passed…**", "- 2026-07-11: Code review passed…",
+    // or "| 2026-07-11 | Code review passed… |". Distinct from Story 8.8's max-date scan — the evidence
+    // strip wants the first parseable entry + whether its action reads as verification. [Story 9.4]
     private static readonly Regex ChangeLogTopEntry = new(
-        @"^\s*[-*]\s+(\d{4}-\d{2}-\d{2})\s+[—–-]\s+\*\*(?<action>[^*]+)\*\*",
+        @"^\s*(?:[-*]\s+|\|\s*)(?<date>\d{4}-\d{2}-\d{2})\b(?:\s*\|\s*|\s+[—–-]\s+|\s*:\s*)(?:\*\*(?<bold>[^*]+)\*\*|(?<plain>.*?))(?:\s*\|)?\s*$",
         RegexOptions.Compiled);
 
     private static readonly Regex ChangeLogVerificationAction = new(
-        @"\b(verif|review|tests? (green|pass)|Status\s*→\s*(done|review))\b",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        @"\b(verif(?:y|ied|ication|ications?)|reviewed|review\s+(?:passed|complete(?:d)?|done)|tests?\s+(?:green|pass(?:ed|ing)?)|Status\s*(?:→|->)\s*(?:done|review))\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>Best-effort free-text test tally from a story artifact. Prefers the first match inside
     /// <c>## Dev Agent Record</c>, then falls back to a whole-document scan. Returns a normalized
@@ -139,15 +140,17 @@ public static class EpicsParser
 
         var normalized = raw.Replace("\r\n", "\n");
         var lines = normalized.Split('\n');
-        var (start, end) = FindSection(lines, "## Dev Agent Record", 0, lines.Length);
-        if (start >= 0)
-        {
-            var section = string.Join("\n", lines[(start + 1)..end]);
-            var fromSection = MatchTestEvidence(section);
-            if (fromSection is not null) return fromSection;
-        }
+        return MatchTestEvidenceInSection(lines, "## Dev Agent Record")
+               ?? MatchTestEvidenceInSection(lines, "### Dev Agent Record")
+               ?? MatchTestEvidenceInSection(lines, "## Change Log")
+               ?? MatchTestEvidenceInSection(lines, "### Change Log");
+    }
 
-        return MatchTestEvidence(normalized);
+    private static string? MatchTestEvidenceInSection(string[] lines, string exactHeading)
+    {
+        var (start, end) = FindSection(lines, exactHeading, 0, lines.Length);
+        if (start < 0) return null;
+        return MatchTestEvidence(string.Join("\n", lines[(start + 1)..end]));
     }
 
     private static string? MatchTestEvidence(string text)
@@ -176,12 +179,16 @@ public static class EpicsParser
         {
             var m = ChangeLogTopEntry.Match(lines[i]);
             if (!m.Success) continue;
-            if (!DateOnly.TryParseExact(m.Groups[1].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+            if (!DateOnly.TryParseExact(m.Groups["date"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
                     DateTimeStyles.None, out var date))
             {
-                return null; // malformed top dated shape → degrade, don't keep scanning
+                continue; // malformed row → skip to a later parseable row
             }
-            var action = m.Groups["action"].Value.Trim();
+            var action = (m.Groups["bold"].Success ? m.Groups["bold"].Value : m.Groups["plain"].Value)
+                .Trim()
+                .Trim('|')
+                .Trim();
+            if (action.Length == 0) continue;
             var isVerification = ChangeLogVerificationAction.IsMatch(action);
             return (date, isVerification, action);
         }

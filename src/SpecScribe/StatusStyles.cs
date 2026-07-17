@@ -244,7 +244,7 @@ public static class StatusStyles
     /// (pending → … → done), then deferred, retired, and unrecognized. Always complete — never zero-suppressed.
     /// [Story 8.2] <para>// 10.3: vocabulary-explanation seam — extend, don't duplicate</para></summary>
     public static readonly IReadOnlyList<string> LegendStages =
-        new[] { "pending", "drafted", "ready", "active", "review", "done", "deferred", "retired", "unrecognized" };
+        new[] { "pending", "drafted", "ready", "active", "review", "done", "deferred", "unmapped", "retired", "unrecognized" };
 
     /// <summary>Renders a complete <c>.status-badge</c> span with its icon prepended before the text — the one
     /// place icon+text pairing is defined, so every badge site calls this instead of hand-inlining the icon
@@ -288,13 +288,17 @@ public static class StatusStyles
                 "review" => "In review",
                 "done" => "Done",
                 "deferred" => "Deferred",
+                // Requirement-facing word from RequirementLabel — StageMeaning/Icons own the rest. [Story 9.9]
+                "unmapped" => "Not yet mapped",
                 "retired" => "Retired",
                 "unrecognized" => "Unrecognized",
                 _ => StoryLabel(stage),
             };
             var meaning = PathUtil.Html(StageMeaning(stage));
+            // Unmapped reuses the pending/tan swatch (no 7th token) while icon + word stay distinct. [Story 9.9]
+            var swatchClass = stage == "unmapped" ? "pending" : stage;
             sb.Append("      <li class=\"status-legend-key-row\">\n");
-            sb.Append($"        <span class=\"status-legend-key-swatch {stage}\" aria-hidden=\"true\"></span>\n");
+            sb.Append($"        <span class=\"status-legend-key-swatch {swatchClass}\" aria-hidden=\"true\"></span>\n");
             sb.Append($"        <span class=\"status-legend-key-label\">{Icon(stage)}{PathUtil.Html(word)}</span>\n");
             sb.Append($"        <span class=\"status-legend-key-meaning\">{meaning}</span>\n");
             sb.Append("      </li>\n");

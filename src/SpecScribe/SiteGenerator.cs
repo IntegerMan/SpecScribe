@@ -343,7 +343,7 @@ public sealed class SiteGenerator
             var workInventory = WorkInventory.Build(_docs.Values.ToList());
             // Story 8.3: one portal-wide count ledger. Divergence → exactly one Unsupported AdapterDiagnostic
             // (same channel as Story 8.2 / 4.1).
-            _counts = ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, workInventory, _epicsModel);
+            _counts = ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, workInventory, _epicsModel, _requirements);
             if (_counts.HasDivergence)
             {
                 events.AddRange(MapDiagnostics(new[]
@@ -1875,7 +1875,7 @@ public sealed class SiteGenerator
             // the sunburst follow-up band can see deferred open counts without waiting for WriteIndex.
             // [Story 8.3; Story 9.7]
             var workForFollowUps = WorkInventory.Build(_docs.Values.ToList());
-            var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model);
+            var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
             var followUps = FollowUpGeometry.From(
                 _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
                 epicsCounts,
@@ -2064,7 +2064,7 @@ public sealed class SiteGenerator
             // disagree with the generated index.html.
             var docs = _docs.Values.ToList();
             var work = WorkInventory.Build(docs);
-            var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel);
+            var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
             var followUps = FollowUpGeometry.From(
                 _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
                 counts,
@@ -2319,7 +2319,7 @@ public sealed class SiteGenerator
         // rule, fragment pipeline).
         var docs = _docs.Values.ToList();
         var work = WorkInventory.Build(docs);
-        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel);
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
         var followUps = FollowUpGeometry.From(
             _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
             counts,
@@ -2494,7 +2494,7 @@ public sealed class SiteGenerator
         var docs = _docs.Values.ToList();
         var inventory = work ?? WorkInventory.Build(docs);
         // Incremental paths may call WriteIndex without going through GenerateAll's ledger build — rebuild then.
-        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel);
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
@@ -2624,7 +2624,7 @@ public sealed class SiteGenerator
     private void WriteSprint(SiteNav nav)
     {
         if (_sprint is null) return;
-        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, WorkInventory.Empty, _epicsModel);
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, WorkInventory.Empty, _epicsModel, _requirements);
         var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, counts);
         WriteOutput(SiteNav.SprintOutputPath, ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
@@ -2695,7 +2695,7 @@ public sealed class SiteGenerator
         // contain "Epic N"/"Story N.M" mentions); the linkifier would wrap those in <a> tags INSIDE the
         // attribute value and corrupt the copyable command. Visible text is linkified inside the templater
         // only. [Story 2.3 polish #5; Story 9.6]
-        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel);
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
         var html = ActionItemsTemplater.RenderPage(
             open, EpicRetroMap, _module.Commands, nav, deferredHref, counts, _epicsModel, hrefMap);
@@ -2802,7 +2802,7 @@ public sealed class SiteGenerator
         RequirementsModel requirements, EpicsModel model, ProgressModel progress, SiteNav nav, WorkInventory? work = null)
     {
         WriteOutput("requirements.html",
-            ApplyReferenceLinks(RequirementsTemplater.RenderIndex(requirements, model, progress, nav), "requirements.html"));
+            ApplyReferenceLinks(RequirementsTemplater.RenderIndex(requirements, model, progress, nav, _counts), "requirements.html"));
 
         var requirementsDir = Path.Combine(_options.OutputRoot, "requirements");
         Directory.CreateDirectory(requirementsDir);

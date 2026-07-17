@@ -320,6 +320,80 @@ public class RequirementsParserTests
     }
 
     [Fact]
+    public void RenderIndex_SatisfactionBand_ShowsFourReadingsOverEverything()
+    {
+        var (reqs, epics) = ParseMultiEpic();
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var counts = ProjectCounts.Build(progress, null, WorkInventory.Empty, epics, reqs);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav, counts);
+
+        Assert.Contains("id=\"satisfaction\"", html);
+        Assert.Contains("Satisfaction at a glance", html);
+        Assert.Contains("satisfaction-band", html);
+        Assert.Contains("satisfaction-bar", html);
+        Assert.Contains("satisfaction-chips", html);
+        Assert.Contains("Satisfied", html);
+        Assert.Contains("In flight", html);
+        Assert.Contains("Deferred on purpose", html);
+        Assert.Contains("Not yet mapped", html);
+        Assert.Contains(Icons.ForStatus("unmapped"), html);
+        // In-flight tooltip enumerates the lifecycle (Active/Ready/Planned).
+        Assert.Contains("partially implemented", html);
+        Assert.Contains("ready for dev", html);
+        // Design (UX-DR) is in the ledger totals — Everything has 8 reqs (4 planned + 3 unmapped + 1 deferred).
+        Assert.Equal(8, counts.RequirementsOverall.Total);
+        Assert.Equal(2, counts.RequirementsDesign.Total);
+        Assert.Contains("seg pending", html); // Planned / Unmapped tiers
+        // Existing FR+NFR surfaces still present (additive band, not a replacement).
+        Assert.Contains("Requirements at a glance", html);
+        Assert.Contains("id=\"at-a-glance\"", html);
+        Assert.Contains("Requirements flow", html);
+        Assert.Contains("req-status-grid", html);
+        Assert.Contains("req-flow-svg", html);
+    }
+
+    [Fact]
+    public void RenderIndex_EmptyEverything_OmitsSatisfactionBand()
+    {
+        var epics = EpicsParser.Parse("""
+            # Epics
+            ## Requirements Inventory
+            ### Functional Requirements
+            **Core**
+            ## FR Coverage Map
+            ## Epic List
+            ### Epic 1: Alone
+            Goal.
+            ## Epic 1: Alone
+            ### Story 1.1: A
+            As a user, I want x, so that y.
+            """);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse("""
+            # Epics
+            ## Requirements Inventory
+            ### Functional Requirements
+            **Core**
+            ## FR Coverage Map
+            ## Epic List
+            ### Epic 1: Alone
+            Goal.
+            ## Epic 1: Alone
+            ### Story 1.1: A
+            As a user, I want x, so that y.
+            """, epics, progress);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+
+        Assert.DoesNotContain("Satisfaction at a glance", html);
+        Assert.DoesNotContain("id=\"satisfaction\"", html);
+        Assert.DoesNotContain("satisfaction-band", html);
+    }
+
+    [Fact]
     public void RenderIndex_PopulatedProject_ContainsStatusGridAndFlowPanel()
     {
         var (reqs, epics) = ParseMultiEpic();

@@ -302,11 +302,11 @@ public sealed partial class HtmlRenderAdapter
     /// <summary>Compact Tasks / Tests / Verified pills under the status badge. Reuses
     /// <see cref="TaskBadge"/> for the tasks pill; missing facts render designed empty-state pills
     /// (dashed/muted) rather than omitting the strip. [Story 9.4]</summary>
-    private static string EvidenceStrip(StoryEvidence e)
+    private static string EvidenceStrip(StoryEvidence e, bool linkToDevRecord)
     {
         var tasksPill = e.TasksTotal > 0
             ? TaskBadge(e.TasksDone, e.TasksTotal)
-            : EmptyEvidencePill("no tasks recorded");
+            : EmptyEvidencePill("no tasks recorded", Icons.ForConcept("Tasks"));
 
         var testsPill = e.TestsSummary is { Length: > 0 } summary
             ? $"<span class=\"status-badge evidence-pill tests-pass\">{Icons.ForConcept("Tests")}{PathUtil.Html(summary)}</span>"
@@ -325,7 +325,11 @@ public sealed partial class HtmlRenderAdapter
             verifiedPill = EmptyEvidencePill("no verification recorded", Icons.ForConcept("Verified"));
         }
 
-        return $"  <div class=\"evidence-strip\">{tasksPill}{testsPill}{verifiedPill}</div>\n";
+        var devRecordLink = linkToDevRecord
+            ? "<a class=\"evidence-dev-record-link\" href=\"#sec-dev-agent-record\" " +
+              "aria-label=\"Jump to Dev Agent Record for full verification evidence\">Dev record</a>"
+            : string.Empty;
+        return $"  <div class=\"evidence-strip\">{tasksPill}{testsPill}{verifiedPill}{devRecordLink}</div>\n";
     }
 
     private static string EmptyEvidencePill(string label, string icon = "")
@@ -479,7 +483,7 @@ public sealed partial class HtmlRenderAdapter
         if (view.Status is { Length: > 0 })
         {
             main.Append("  <div class=\"evidence-block\">\n");
-            main.Append(EvidenceStrip(view.Evidence));
+            main.Append(EvidenceStrip(view.Evidence, view.DevAgentRecord.Count > 0));
             main.Append("  </div>\n");
         }
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");

@@ -44,7 +44,7 @@ public static class DashboardViewBuilder
     {
         // Production always passes the shared SiteGenerator ledger. Null → build an equivalent ephemeral
         // ledger from the same inputs so tests/stubs that omit counts keep correct Defined/Tracked numbers.
-        var ledger = counts ?? ProjectCounts.Build(progress, sprint, work, epicsModel);
+        var ledger = counts ?? ProjectCounts.Build(progress, sprint, work, epicsModel, requirements);
         return new DashboardView
         {
             SiteTitle = nav.SiteTitle,
@@ -97,15 +97,15 @@ public static class DashboardViewBuilder
         {
             if (requirements.Functional.Count > 0)
             {
-                tiles.Add(RequirementStatTile("Functional reqs", requirements.Functional, reqHref));
+                tiles.Add(RequirementStatTile("Functional reqs", c.RequirementsFunctional, reqHref));
             }
             if (requirements.NonFunctional.Count > 0)
             {
-                tiles.Add(RequirementStatTile("Non-functional", requirements.NonFunctional, reqHref));
+                tiles.Add(RequirementStatTile("Non-functional", c.RequirementsNonFunctional, reqHref));
             }
             if (requirements.Design.Count > 0)
             {
-                tiles.Add(RequirementStatTile("Design reqs", requirements.Design, reqHref));
+                tiles.Add(RequirementStatTile("Design reqs", c.RequirementsDesign, reqHref));
             }
         }
 
@@ -138,34 +138,28 @@ public static class DashboardViewBuilder
     }
 
     /// <summary>One clickable requirements-kind tile: done/total with an in-progress sub-line, drilling to
-    /// requirements.html. Sub-line prefers Active, then enumerates non-zero Ready/Planned/Unmapped/Deferred
-    /// so unmapped coverage is never mislabelled as "planned". [Story 9.2 UX; review patch]</summary>
-    private static StatTile RequirementStatTile(string label, IReadOnlyList<RequirementInfo> reqs, string href)
+    /// requirements.html. Counts come from the portal-wide ledger (no local recount). Sub-line prefers Active,
+    /// then enumerates non-zero Ready/Planned/Unmapped/Deferred so unmapped coverage is never mislabelled as
+    /// "planned". [Story 9.2 UX; Story 9.9]</summary>
+    private static StatTile RequirementStatTile(string label, ProjectCounts.RequirementSatisfaction sat, string href)
     {
-        var done = reqs.Count(r => r.Status == RequirementStatus.Done);
-        var active = reqs.Count(r => r.Status == RequirementStatus.Active);
-        var sub = active > 0
-            ? $"{active} partially implemented"
-            : RequirementStatSubLine(reqs, done);
-        return new($"{done}/{reqs.Count}", label, sub,
-            $"{label}: {done} done of {reqs.Count}. Open the requirements view to refine coverage and follow the epic → story chain.",
+        var sub = sat.Active > 0
+            ? $"{sat.Active} partially implemented"
+            : RequirementStatSubLine(sat);
+        return new($"{sat.Done}/{sat.Total}", label, sub,
+            $"{label}: {sat.Done} done of {sat.Total}. Open the requirements view to refine coverage and follow the epic → story chain.",
             href);
     }
 
-    private static string RequirementStatSubLine(IReadOnlyList<RequirementInfo> reqs, int done)
+    private static string RequirementStatSubLine(ProjectCounts.RequirementSatisfaction sat)
     {
-        var ready = reqs.Count(r => r.Status == RequirementStatus.Ready);
-        var planned = reqs.Count(r => r.Status == RequirementStatus.Planned);
-        var unmapped = reqs.Count(r => r.Status == RequirementStatus.Unmapped);
-        var deferred = reqs.Count(r => r.Status == RequirementStatus.Deferred);
-
         var parts = new List<string>();
-        if (ready > 0) parts.Add($"{ready} ready");
-        if (planned > 0) parts.Add($"{planned} planned");
-        if (unmapped > 0) parts.Add($"{unmapped} not yet mapped");
-        if (deferred > 0) parts.Add($"{deferred} deferred");
+        if (sat.Ready > 0) parts.Add($"{sat.Ready} ready");
+        if (sat.Planned > 0) parts.Add($"{sat.Planned} planned");
+        if (sat.Unmapped > 0) parts.Add($"{sat.Unmapped} not yet mapped");
+        if (sat.Deferred > 0) parts.Add($"{sat.Deferred} deferred");
         if (parts.Count > 0) return string.Join(" · ", parts);
-        return done == reqs.Count && reqs.Count > 0 ? "all done" : "0 ready · 0 planned";
+        return sat.Done == sat.Total && sat.Total > 0 ? "all done" : "0 ready · 0 planned";
     }
 
     /// <summary>The commit stat's sub-line: a deterministic absolute-date recency signal (active-day count

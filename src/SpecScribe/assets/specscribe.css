@@ -502,6 +502,19 @@ body {
   background: transparent;
 }
 
+.evidence-dev-record-link {
+  color: var(--ink-light);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.evidence-dev-record-link:hover,
+.evidence-dev-record-link:focus-visible {
+  color: var(--moss);
+}
+
 /* ADR 0007 change-surface panel — collapsible chart-panel below Task Breakdown / Next Steps. */
 .chart-panel.change-surface-panel {
   margin-bottom: 1.2rem;
@@ -3911,9 +3924,12 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 .req-stacked-bar .seg { height: 100%; }
 .req-stacked-bar .seg.done { background: var(--status-done); }
+.req-stacked-bar .seg.active { background: var(--status-active); }
 .req-stacked-bar .seg.ready { background: var(--status-ready); }
 .req-stacked-bar .seg.pending { background: var(--status-pending); }
 .req-stacked-bar .seg.deferred { background: var(--status-deferred); }
+/* Unmapped reuses pending/tan (no 7th token) — distinct via chip icon+word, not bar color. [Story 9.9] */
+.req-stacked-bar .seg.unmapped { background: var(--status-pending); }
 
 .req-stacked-legend {
   display: flex;
@@ -3924,9 +3940,57 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 .req-stacked-legend .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.4rem; }
 .req-stacked-legend .swatch.done { background: var(--status-done); }
+.req-stacked-legend .swatch.active { background: var(--status-active); }
 .req-stacked-legend .swatch.ready { background: var(--status-ready); }
 .req-stacked-legend .swatch.pending { background: var(--status-pending); }
 .req-stacked-legend .swatch.deferred { background: var(--status-deferred); }
+
+/* Satisfaction at a glance (Story 9.9) — hub band + Home rollup. Token-routed only. */
+.satisfaction-band {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.satisfaction-bar {
+  height: 0.85rem;
+}
+.satisfaction-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
+  align-items: center;
+}
+.satisfaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+a.satisfaction-chip:hover { filter: brightness(0.97); }
+.satisfaction-chip-word { font-weight: 600; }
+.satisfaction-chip-count {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  margin-left: 0.15rem;
+}
+.satisfaction-rollup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  margin: 0.35rem 0 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+}
+.satisfaction-rollup-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faded);
+  font-weight: 700;
+}
 
 /* The one genuinely new status color: grey for requirements shelved for later. */
 .status-badge.deferred { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }

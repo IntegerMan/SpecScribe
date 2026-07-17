@@ -271,12 +271,17 @@ public class StatusStylesTests
         Assert.DoesNotContain("status-legend-key-text", html); // single-column row, not stacked footer cells
         foreach (var stage in StatusStyles.LegendStages)
         {
-            Assert.Contains($"status-legend-key-swatch {stage}", html);
+            // Unmapped reuses the pending/tan swatch (no 7th token) while icon + meaning stay on "unmapped". [Story 9.9]
+            var swatchClass = stage == "unmapped" ? "pending" : stage;
+            Assert.Contains($"status-legend-key-swatch {swatchClass}", html);
             Assert.Contains(StatusStyles.StageMeaning(stage), html);
         }
         // Static reference key — no zero-suppression (all legend stages present).
         Assert.Equal(StatusStyles.LegendStages.Count, System.Text.RegularExpressions.Regex.Matches(html, "status-legend-key-row").Count);
         Assert.Contains("retired", StatusStyles.LegendStages);
+        Assert.Contains("unmapped", StatusStyles.LegendStages);
+        Assert.Contains("Not yet mapped", html);
+        Assert.Contains(Icons.ForStatus("unmapped"), html);
     }
 
     [Fact]

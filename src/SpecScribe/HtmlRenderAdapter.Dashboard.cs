@@ -117,7 +117,7 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("</div>\n\n");
         }
 
-        AppendRequirementsPanel(sb, view.Requirements, view.Epics);
+        AppendRequirementsPanel(sb, view.Requirements, view.Epics, view.Counts);
 
         if (p.PerEpic.Count > 0)
         {
@@ -321,7 +321,8 @@ public sealed partial class HtmlRenderAdapter
     }
 
     /// <summary>The dashboard requirements panel. Re-homed from <c>HtmlTemplater.AppendRequirementsPanel</c>.</summary>
-    private void AppendRequirementsPanel(StringBuilder sb, RequirementsModel? requirements, EpicsModel? epicsModel)
+    private void AppendRequirementsPanel(StringBuilder sb, RequirementsModel? requirements, EpicsModel? epicsModel,
+        ProjectCounts counts)
     {
         if (requirements is null || !requirements.All.Any()) return;
 
@@ -344,6 +345,8 @@ public sealed partial class HtmlRenderAdapter
             sb.Append(RenderRequirementsTabs());
             sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a>");
             sb.Append("</div>\n</div>\n");
+            // Compact four-reading rollup → hub band. Same ledger as requirements.html. [Story 9.9]
+            AppendSatisfactionRollup(sb, counts.RequirementsOverall);
             sb.Append("<div class=\"req-view req-view-flow\">");
             sb.Append(Charts.RequirementFlow(requirements, epicsModel));
             sb.Append("</div>\n");
@@ -357,9 +360,28 @@ public sealed partial class HtmlRenderAdapter
             sb.Append(StatusStyles.LegendKey());
             sb.Append("</h3>");
             sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
+            AppendSatisfactionRollup(sb, counts.RequirementsOverall);
             sb.Append(grid);
         }
+
         sb.Append("</div>\n\n");
+    }
+
+    /// <summary>Compact Home satisfaction rollup — four chips linking to <c>requirements.html#satisfaction</c>.
+    /// Omitted when the ledger has no requirements (NFR8). [Story 9.9]</summary>
+    private static void AppendSatisfactionRollup(StringBuilder sb, ProjectCounts.RequirementSatisfaction sat)
+    {
+        if (sat.Total <= 0) return;
+
+        sb.Append("<div class=\"satisfaction-rollup\">\n");
+        sb.Append("<div class=\"satisfaction-rollup-label\">Satisfaction</div>\n");
+        sb.Append(Charts.RequirementSatisfactionChips(
+            sat,
+            satisfiedHref: "requirements.html#satisfaction",
+            inFlightHref: "requirements.html#satisfaction",
+            deferredHref: "requirements.html#satisfaction",
+            unmappedHref: "requirements.html#satisfaction"));
+        sb.Append("</div>\n");
     }
 
     /// <summary>Driver work-stage focus strip on Home — pure-CSS radios + <c>:has()</c> (Story 8.7 board-tabs

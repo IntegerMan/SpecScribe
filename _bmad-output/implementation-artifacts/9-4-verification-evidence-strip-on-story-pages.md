@@ -4,7 +4,7 @@ baseline_commit: 1a9e8dd6071caa69bf31d1e07810ed8f02bd7244
 
 # Story 9.4: Verification Evidence Strip on Story Pages
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -66,8 +66,8 @@ Per the project rule to elicit visual intent for any new visual surface (Epic 3 
 
 - [x] **Task 1 — Parse test-evidence and the latest Change Log date from the raw artifact (AC: #1, #2)**
   - [x] Add two pure static extractors to `EpicsParser` (alongside the existing `ExtractStatus`/`ExtractDevAgentRecord`/`ExtractNamedSectionHtml`), operating on the raw artifact markdown:
-    - `ExtractTestEvidence(string raw) → string?` — first match of `\b(\d[\d,]*)\s+(?:C#\s+)?tests?\s+(green|pass|passing)\b` (case-insensitive) scanning the **`## Dev Agent Record` section first** (Completion Notes is where the final tally is stated), falling back to a whole-document scan if the section has none. Return the matched phrase normalized to `"{n} tests {green|passing}"` (collapse `pass`→`passing` for consistent reading; keep the author's `green`/`passing` word otherwise). Return `null` when no match. **Deterministic**: always the first match in that fixed scan order — never iteration-order- or culture-dependent.
-    - `ExtractChangeLogVerification(string raw) → (DateOnly Date, bool IsVerification)?` — find the `## Change Log` section, take the **first** `- (\d{4}-\d{2}-\d{2}) — \*\*(?<action>[^*]+)\*\*` line (newest-first ordering means top = latest), parse the ISO date with invariant `TryParseExact`. `IsVerification` = the `action` text matches `\b(verif|review|tests? (green|pass)|Status → (done|review))\b` (case-insensitive). Return `null` when there's no `## Change Log` or no dated entry. Guard the date parse (a malformed date → treat as no date, never throw). Named `ExtractChangeLogVerification` because Story 8.8 already owns `ExtractLatestChangeLogDate` → `DateOnly?` (max date across table/list forms for recency). [Source: src/SpecScribe/EpicsParser.cs]
+    - `ExtractTestEvidence(string raw) → string?` — first match of `\b(\d[\d,]*)\s+(?:C#\s+)?tests?\s+(green|pass|passing)\b` (case-insensitive, culture-invariant) scanning the **`##`/`### Dev Agent Record` section first** (Completion Notes is where the final tally is stated), then the `##`/`### Change Log` section as a bounded fallback. Return the matched phrase normalized to `"{n} passing tests"`. Return `null` when no match. **Deterministic**: always the first match in that fixed scan order — never iteration-order-, culture-, or example-prose-dependent.
+    - `ExtractChangeLogVerification(string raw) → (DateOnly Date, bool IsVerification)?` — find the `##`/`### Change Log` section, take the first parseable dated list/table row (`- YYYY-MM-DD — **action**`, `- YYYY-MM-DD: action`, `| YYYY-MM-DD | action |`), parse the ISO date with invariant `TryParseExact`, and skip malformed rows rather than aborting the scan. `IsVerification` matches precise verify/review-complete/done/tests-green language. Named `ExtractChangeLogVerification` because Story 8.8 already owns `ExtractLatestChangeLogDate` → `DateOnly?` (max date across table/list forms for recency). [Source: src/SpecScribe/EpicsParser.cs]
   - [x] Keep both extractors **allocation-light and side-effect-free** (they run once per drafted story per generation pass). Compile the regexes as `static readonly` fields like the existing `StatusLine`/`DevAgentSubHeading` patterns in `EpicsParser`.
 
 - [x] **Task 2 — Carry the evidence as a view-model datum (AC: #1, #2)**
@@ -84,11 +84,11 @@ Per the project rule to elicit visual intent for any new visual surface (Epic 3 
     - **Tasks pill** — reuse `TaskBadge(e.TasksDone, e.TasksTotal)` directly. When `TasksTotal == 0`, render the empty-state pill "no tasks recorded" instead (dashed/muted).
     - **Tests pill** — `TestsSummary` present → `<span class="status-badge evidence-pill">{icon}{TestsSummary}</span>`; absent → the empty-state pill "no test evidence recorded" (`evidence-pill empty`, dashed border, muted text). Use `PathUtil.Html` on the summary.
     - **Verified pill** — `VerifiedDate` present → `{icon}{(VerifiedIsReview ? "verified" : "updated")} {date:yyyy-MM-dd}` (invariant format); absent → empty-state pill "no verification recorded".
-  - [x] **Link to the dev record (AC #1).** When `view.DevAgentRecord.Count > 0`, wrap the strip in `<a href="#sec-dev-agent-record" class="evidence-link">`. When there's no dev-record section, render the strip without a link. No JS to auto-expand `<details>` (Story 9.5 owns that).
-  - [x] **Icons (UX-DR17):** Tasks via `TaskBadge`; Tests/Verified via new `Icons.ForConcept("Tests")` / `Icons.ForConcept("Verified")` glyphs. No new `--status-*` token.
+  - [x] **Link to the dev record (AC #1).** When `view.DevAgentRecord.Count > 0`, append an explicit `<a href="#sec-dev-agent-record" class="evidence-dev-record-link">Dev record</a>` jump with an `aria-label`. When there's no dev-record section, render the strip without a link. No JS to auto-expand `<details>` (Story 9.5 owns that).
+  - [x] **Icons (UX-DR17):** Tasks empty-state via `Icons.ForConcept("Tasks")`; Tests/Verified via `Icons.ForConcept("Tests")` / `Icons.ForConcept("Verified")` glyphs. No new `--status-*` token.
 
 - [x] **Task 5 — Style the strip and its empty states (AC: #1, #2)**
-  - [x] Add CSS to `src/SpecScribe/assets/specscribe.css` (guarded by `StylesheetTests`): `.evidence-strip`, `.evidence-pill`, `.evidence-pill.empty`, `.evidence-link`. Empty state = dashed border + `--ink-light` (kinship with `.task-badge.none-done` / `.dev-agent-empty`; Story 8.5 may later supply a shared helper).
+  - [x] Add CSS to `src/SpecScribe/assets/specscribe.css` (guarded by `StylesheetTests`): `.evidence-strip`, `.evidence-pill`, `.evidence-pill.empty`, `.evidence-dev-record-link`. Empty state = dashed border + `--ink-light` (kinship with `.task-badge.none-done` / `.dev-agent-empty`; Story 8.5 may later supply a shared helper).
   - [x] Strip uses `flex-wrap`; colors route through existing tokens only.
 
 - [x] **Task 6 — Honest absence, determinism, and degradation (AC: #2)**
@@ -99,9 +99,22 @@ Per the project rule to elicit visual intent for any new visual surface (Epic 3 
 - [x] **Task 7 — Tests + regenerate the golden fingerprint (AC: #1, #2)**
   - [x] `EpicsParser` unit tests for `ExtractTestEvidence` and `ExtractChangeLogVerification`.
   - [x] `RenderStoryBody` rendering tests: populated pills + link; empty-state for missing tests; "updated" vs "verified"; no link when no dev-record; strip omitted when no status.
-  - [x] `StylesheetTests`: `.evidence-strip` / `.evidence-pill` / `.evidence-pill.empty` / `.evidence-link`; no `--status-evidence`.
+  - [x] `StylesheetTests`: `.evidence-strip` / `.evidence-pill` / `.evidence-pill.empty` / `.evidence-dev-record-link`; no `--status-evidence`; empty-state selector uses `--ink-light`.
   - [x] Regenerated golden content fingerprint to `8e8f63af862b45f872b2766b95e19bb8aa917f50adec344456b00fcaeb9f2847`.
   - [x] Full suite green: `dotnet test` → 1202 passed (parity suites included; no new RenderParity exception).
+
+### Review Findings
+
+- [x] [Review][Patch] Test-evidence fallback can fabricate a passing-tests pill from example prose [src/SpecScribe/EpicsParser.cs:136]
+- [x] [Review][Patch] Verification-action regex misses normal words like "Verified" and "Reviewed" [src/SpecScribe/EpicsParser.cs:128]
+- [x] [Review][Patch] Change-log verification only accepts bold list rows and ignores other dated rows the page can render [src/SpecScribe/EpicsParser.cs:124]
+- [x] [Review][Patch] Case-insensitive evidence regexes are not culture-invariant [src/SpecScribe/EpicsParser.cs:117]
+- [x] [Review][Patch] Artifact-to-renderer wiring lacks an end-to-end regression test [tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs:686]
+- [x] [Review][Patch] Empty tasks evidence pill lacks the icon channel used by the other empty pills [src/SpecScribe/HtmlRenderAdapter.Epics.cs:307]
+- [x] [Review][Patch] Evidence strip's dev-record link has weak accessibility/affordance semantics [src/SpecScribe/HtmlRenderAdapter.Epics.cs:351]
+- [x] [Review][Patch] Malformed top change-log date aborts instead of continuing to later valid entries [src/SpecScribe/EpicsParser.cs:179]
+- [x] [Review][Patch] Test-evidence section preference misses H3 Dev Agent Record headings [src/SpecScribe/EpicsParser.cs:142]
+- [x] [Review][Patch] Stylesheet token test does not prove the evidence empty selector uses `--ink-light` [tests/SpecScribe.Tests/StylesheetTests.cs:90]
 
 ## Dev Notes
 
@@ -191,6 +204,7 @@ Composer (Cursor agent)
 - Honest-absence empty-state pills (`evidence-pill empty`) when facts are missing.
 - **UX polish + ADR 0007:** tests pill reads `N passing tests` with green `.tests-pass` styling; removed thin Latest-change line; added change-surface panel (File List classification, AC verify checklist, touched files, ship line) projected from standard BMAD sections. ADR 0007 marked Accepted.
 - Story 9.4/ADR 0007 tests + golden fingerprint regenerated (`cca91956…`). HTML/webview/SPA parity green with no new RenderParity exception.
+- Code-review patches applied: bounded test-evidence fallback, culture-invariant regexes, broader Change Log row parsing, precise verification wording, malformed-row skip, H3 Dev Agent Record support, explicit accessible Dev Agent Record link, tasks empty-state icon, and end-to-end story evidence regression coverage. Focused tests green: 160 passed.
 
 ### File List
 
@@ -210,6 +224,7 @@ Composer (Cursor agent)
 - `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs`
 - `tests/SpecScribe.Tests/HtmlTemplaterTests.cs`
 - `tests/SpecScribe.Tests/StylesheetTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorStoryEpicPagesTests.cs`
 - `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
 - `_bmad-output/implementation-artifacts/9-4-verification-evidence-strip-on-story-pages.md`
 
@@ -217,3 +232,4 @@ Composer (Cursor agent)
 
 - 2026-07-16 — **Implemented (dev-story).** Verification evidence strip on drafted story pages: Tasks/Tests/Verified pills under the status badge, free-text extractors, empty-state treatment, golden fingerprint regenerated. Status → review.
 - 2026-07-16 — **Polish + ADR 0007.** Tests pill → `N passing tests` (green); change-surface panel under strip (classification, AC verify list, touched files, ship line); ADR 0007 Accepted. Golden fingerprint `cca91956…`.
+- 2026-07-17 — **Code review patches applied; Status → done.** Parser/link/a11y/test-hardening findings resolved; focused suite 160/160 green.

@@ -7,9 +7,13 @@ namespace SpecScribe;
 /// and derived status). Mirrors <see cref="EpicsTemplater"/>.</summary>
 public static class RequirementsTemplater
 {
-    public static string RenderIndex(RequirementsModel model, EpicsModel epics, ProgressModel progress, SiteNav nav)
+    public static string RenderIndex(RequirementsModel model, EpicsModel epics, ProgressModel progress, SiteNav nav,
+        ProjectCounts? counts = null)
     {
         var outputPath = SiteNav.RequirementsOutputPath;
+        // Prefer the shared ledger; fall back to an ephemeral Build so unit tests that omit counts stay correct.
+        var sat = (counts ?? ProjectCounts.Build(progress, sprint: null, WorkInventory.Empty, epics, model))
+            .RequirementsOverall;
 
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen($"Requirements — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName, PathUtil.RelativePrefix(outputPath) + ForgeOptions.ScriptName));
@@ -51,6 +55,10 @@ public static class RequirementsTemplater
 
         sb.Append("<main id=\"main-content\" class=\"req-index\">\n\n");
 
+        // Holistic four-reading summary over Everything (FR+NFR+UX-DR) — additive above the donut row.
+        // Absent when no requirements (NFR8). Does not re-render or replace the FR+NFR grid/flow. [Story 9.9]
+        AppendSatisfactionBand(sb, sat, model);
+
         sb.Append("<section class=\"dashboard\">\n<div class=\"chart-row\">\n");
         AppendStatusDonut(sb, "Functional", model.Functional);
         // Non-functional / Design donuts absent (not empty) when the project has none — NFR8. [Story 9.2]
@@ -70,7 +78,7 @@ public static class RequirementsTemplater
         var allReqs = model.Functional.Concat(model.NonFunctional).ToList();
         if (allReqs.Count > 0)
         {
-            sb.Append("<div class=\"section-divider\">Requirements at a glance</div>\n");
+            sb.Append("<div class=\"section-divider\" id=\"at-a-glance\">Requirements at a glance</div>\n");
             sb.Append("<div class=\"chart-panel\">\n");
             sb.Append(Charts.RequirementStatusGrid(allReqs, prefix: string.Empty));
             sb.Append("</div>\n\n");
@@ -115,6 +123,30 @@ public static class RequirementsTemplater
         sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
+    }
+
+    /// <summary>Four-reading "Satisfaction at a glance" band over <see cref="RequirementsModel.Everything"/>.
+    /// Stacked bar = six canonical tiers; chips = Satisfied / In flight / Deferred / Unmapped. [Story 9.9]</summary>
+    private static void AppendSatisfactionBand(
+        StringBuilder sb, ProjectCounts.RequirementSatisfaction sat, RequirementsModel model)
+    {
+        if (sat.Total <= 0) return;
+
+        // Chip targets: FR/NFR detail → at-a-glance; deferred/unmapped → coverage when that section exists.
+        var hasCoverage = model.NonFunctional.Count > 0 || model.Design.Count > 0;
+        var glanceHref = model.All.Any() ? "#at-a-glance" : null;
+        var coverageHref = hasCoverage ? "#nfr-uxdr-coverage" : glanceHref;
+
+        sb.Append("<div class=\"section-divider\" id=\"satisfaction\">Satisfaction at a glance</div>\n");
+        sb.Append("<section class=\"satisfaction-band chart-panel\" aria-label=\"Requirement satisfaction summary\">\n");
+        sb.Append(Charts.RequirementSatisfactionBar(sat));
+        sb.Append(Charts.RequirementSatisfactionChips(
+            sat,
+            satisfiedHref: glanceHref,
+            inFlightHref: glanceHref,
+            deferredHref: coverageHref,
+            unmappedHref: coverageHref));
+        sb.Append("</section>\n\n");
     }
 
     public static string RenderRequirement(RequirementInfo req, ProgressModel progress, SiteNav nav, EpicsModel epics,
@@ -362,7 +394,7 @@ public static class RequirementsTemplater
         var hasDesign = model.Design.Count > 0;
         if (!hasNfr && !hasDesign) return;
 
-        sb.Append("<div class=\"section-divider\">Non-functional &amp; design coverage</div>\n");
+        sb.Append("<div class=\"section-divider\" id=\"nfr-uxdr-coverage\">Non-functional &amp; design coverage</div>\n");
         sb.Append("<div class=\"chart-panel nfr-uxdr-coverage\">\n");
         // Section-level verification approach (AC #2) — a bare per-item badge is never the only signal.
         sb.Append("<p class=\"epic-goal\">Cross-cutting obligations verified across the codebase by tests and architectural invariants, tracked here by the epics that deliver them. Coverage is epic-level — a badge reflects the delivering epic's roll-up, not a per-requirement claim.</p>\n");
@@ -518,6 +550,10 @@ public static class RequirementsTemplater
     }
 
     private static (int Done, int Active, int Ready, int Planned, int Unmapped, int Deferred) StatusCounts(IReadOnlyList<RequirementInfo> reqs) => (
+        // Per-kind donut path keeps a local count: threading ProjectCounts through every AppendStatusDonut/
+        // AppendGroupCard call would contort the render for no shared-number benefit (donuts are already
+        // scoped to the list they render). Overall satisfaction reads the ledger (AppendSatisfactionBand).
+        // [Story 9.9 — documented half-migration]
         reqs.Count(r => r.Status == RequirementStatus.Done),
         reqs.Count(r => r.Status == RequirementStatus.Active),
         reqs.Count(r => r.Status == RequirementStatus.Ready),

@@ -190,6 +190,19 @@ public class ProjectCountsTests
         Assert.Empty(e.UntrackedDefinedStories);
         Assert.Empty(e.OrphanTrackedRows);
         Assert.False(e.HasDivergence);
+        Assert.Equal(0, e.RequirementsOverall.Total);
+        Assert.Equal(0, e.RequirementsFunctional.Total);
+    }
+
+    [Fact]
+    public void Build_NullRequirements_YieldsEmptySatisfaction_NoThrow()
+    {
+        var counts = ProjectCounts.Build(ProgressModel.Empty, sprint: null, WorkInventory.Empty);
+
+        Assert.Equal(0, counts.RequirementsOverall.Total);
+        Assert.Equal(0, counts.RequirementsOverall.Satisfied);
+        Assert.Equal(0, counts.RequirementsOverall.InFlight);
+        Assert.Equal(0, counts.RequirementsOverall.Tiers.Count(t => t.Count > 0));
     }
 
     [Fact]
@@ -251,4 +264,89 @@ public class ProjectCountsTests
         Assert.Contains("9.9", msg);
         Assert.StartsWith("Count divergence between epics.md and sprint-status.yaml:", msg);
     }
+
+    [Fact]
+    public void Build_RequirementSatisfaction_SumsTiersAndFourReadings_AcrossEverything()
+    {
+        var requirements = new RequirementsModel
+        {
+            Functional = new[]
+            {
+                Req(RequirementKind.Functional, 1, RequirementStatus.Done),
+                Req(RequirementKind.Functional, 2, RequirementStatus.Active),
+                Req(RequirementKind.Functional, 3, RequirementStatus.Ready),
+                Req(RequirementKind.Functional, 4, RequirementStatus.Planned),
+                Req(RequirementKind.Functional, 5, RequirementStatus.Unmapped),
+                Req(RequirementKind.Functional, 6, RequirementStatus.Deferred),
+            },
+            NonFunctional = new[]
+            {
+                Req(RequirementKind.NonFunctional, 1, RequirementStatus.Done),
+                Req(RequirementKind.NonFunctional, 2, RequirementStatus.Unmapped),
+            },
+            Design = new[]
+            {
+                Req(RequirementKind.Design, 1, RequirementStatus.Active),
+                Req(RequirementKind.Design, 2, RequirementStatus.Planned),
+            },
+        };
+
+        var counts = ProjectCounts.Build(
+            ProgressModel.Empty, sprint: null, WorkInventory.Empty, epics: null, requirements);
+
+        var o = counts.RequirementsOverall;
+        Assert.Equal(10, o.Total);
+        Assert.Equal(2, o.Done);
+        Assert.Equal(2, o.Active);
+        Assert.Equal(1, o.Ready);
+        Assert.Equal(2, o.Planned);
+        Assert.Equal(2, o.Unmapped);
+        Assert.Equal(1, o.Deferred);
+        Assert.Equal(2, o.Satisfied);
+        Assert.Equal(5, o.InFlight); // Active+Ready+Planned
+        Assert.Equal(o.Done + o.Active + o.Ready + o.Planned + o.Unmapped + o.Deferred, o.Total);
+        Assert.Equal(6, counts.RequirementsFunctional.Total);
+        Assert.Equal(2, counts.RequirementsNonFunctional.Total);
+        Assert.Equal(2, counts.RequirementsDesign.Total);
+        Assert.Equal(
+            counts.RequirementsFunctional.Total + counts.RequirementsNonFunctional.Total + counts.RequirementsDesign.Total,
+            o.Total);
+
+        // Tier CssClass routes through ForRequirement vocabulary (Unmapped → pending).
+        Assert.Equal("pending", o.Tiers.Single(t => t.Label == "Not yet mapped").CssClass);
+        Assert.Equal("pending", o.Tiers.Single(t => t.Label == "Planned").CssClass);
+        Assert.Equal("done", o.Tiers.Single(t => t.Label == "Done").CssClass);
+    }
+
+    [Fact]
+    public void Build_RequirementSatisfaction_IsDeterministic()
+    {
+        var requirements = new RequirementsModel
+        {
+            Functional = new[] { Req(RequirementKind.Functional, 1, RequirementStatus.Done) },
+            NonFunctional = Array.Empty<RequirementInfo>(),
+            Design = new[] { Req(RequirementKind.Design, 1, RequirementStatus.Unmapped) },
+        };
+
+        var a = ProjectCounts.Build(ProgressModel.Empty, null, WorkInventory.Empty, null, requirements);
+        var b = ProjectCounts.Build(ProgressModel.Empty, null, WorkInventory.Empty, null, requirements);
+
+        Assert.Equal(a.RequirementsOverall.Total, b.RequirementsOverall.Total);
+        Assert.Equal(a.RequirementsOverall.InFlight, b.RequirementsOverall.InFlight);
+        Assert.Equal(a.RequirementsOverall.Tiers, b.RequirementsOverall.Tiers);
+        Assert.Equal(a.RequirementsOverall.Readings, b.RequirementsOverall.Readings);
+    }
+
+    private static RequirementInfo Req(RequirementKind kind, int number, RequirementStatus status) => new()
+    {
+        Kind = kind,
+        Number = number,
+        TextHtml = kind + " " + number,
+        CoverageEpicNumbers = status is RequirementStatus.Unmapped or RequirementStatus.Deferred
+            ? Array.Empty<int>()
+            : new[] { 1 },
+        CoverageEpicNumber = status is RequirementStatus.Unmapped or RequirementStatus.Deferred ? null : 1,
+        Deferred = status == RequirementStatus.Deferred,
+        Status = status,
+    };
 }

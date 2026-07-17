@@ -369,7 +369,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // (.nfr-uxdr-epics / .nfr-uxdr-epic-card). Fixture has no UX-DR inventory — delta is primarily CSS.
         // Regenerated for Story 9.4: drafted story pages gained a verification evidence strip under the status
         // badge (tasks / tests / verified-or-updated pills + CSS). Fixture story pages with a Status line now
-        // emit .evidence-strip; stylesheet gained .evidence-strip / .evidence-pill / .evidence-link. [Story 9.4]
+        // emit .evidence-strip; stylesheet gained .evidence-strip / .evidence-pill / evidence link styles. [Story 9.4]
         // Regenerated for Story 9.5: .ac-criterion resting card (border + parchment + gold left accent; :target
         // stronger) + Dev Notes/References collapse via CollapsibleSections on story remainder HTML +
         // .collapsible-section caret CSS + webview resting-tint companion. Fixture stories without Dev Notes
@@ -399,7 +399,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // RenderProjectNextSteps) before Now & Next; Ready empty-lane InlineGuidance when undrafted;
         // specscribe.css gains .work-mode-strip / wm-focus-* :has() emphasis (never display:none).
         // [Story 9.8; golden-diff-normalization-gotchas]
-        const string expected = "259ed07b523c1842c3a323909e00453faa4363a2aa1b844fc495facad0709963";
+        // Regenerated for Story 9.9: requirements.html "Satisfaction at a glance" band (stacked bar + four
+        // chips over Everything); Home satisfaction rollup → #satisfaction; LegendKey gains "Not yet mapped";
+        // ProjectCounts satisfaction buckets; specscribe.css satisfaction-* / .seg.active. [Story 9.9]
+        const string expected = "51ddd23daa7a0f1873768b1740f2bdd61953f355e801356e94433786fead11de";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

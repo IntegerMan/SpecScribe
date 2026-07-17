@@ -67,6 +67,12 @@ public class StylesheetTests
         Assert.Contains("grid-template-columns: repeat(var(--lane-count, 5), minmax(11.5rem, 1fr))", css);
         Assert.Contains(".sprint-lane-label", css);
         Assert.Contains("white-space: nowrap", css); // lane labels stay single-line with the count badge
+        // Story 9.9 satisfaction band / stacked bar — token-routed only
+        Assert.Contains(".satisfaction-band", css);
+        Assert.Contains(".satisfaction-chips", css);
+        Assert.Contains(".satisfaction-rollup", css);
+        Assert.Contains(".req-stacked-bar .seg.active", css);
+        Assert.Contains(".req-stacked-bar .seg.unmapped { background: var(--status-pending); }", css);
         // Story 8.4 paired progress + readiness surfaces
         Assert.Contains(".story-status-pair", css);
         Assert.Contains(".sprint-card.no-plan", css);
@@ -86,7 +92,10 @@ public class StylesheetTests
         Assert.Contains(".evidence-pill", css);
         Assert.Contains(".evidence-pill.empty", css);
         Assert.Contains(".evidence-pill.tests-pass", css);
-        Assert.Contains("var(--ink-light)", css);
+        Assert.Matches(
+            new Regex(@"\.status-badge\.evidence-pill\.empty\s*\{[^}]*color:\s*var\(--ink-light\)", RegexOptions.Singleline),
+            css);
+        Assert.Contains(".evidence-dev-record-link", css);
         Assert.Contains("var(--moss)", css);
         Assert.DoesNotContain("--status-evidence", css);
         // ADR 0007 change-surface panel

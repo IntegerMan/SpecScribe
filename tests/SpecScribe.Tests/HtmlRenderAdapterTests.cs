@@ -445,6 +445,54 @@ public class HtmlRenderAdapterTests
         Assert.Equal("1 not yet mapped", design.Sub);
     }
 
+    [Fact]
+    public void RenderDashboardBody_SatisfactionRollup_LinksToHubAnchor()
+    {
+        var requirements = new RequirementsModel
+        {
+            Functional = new[] { Req(RequirementKind.Functional, 1, RequirementStatus.Done) },
+            NonFunctional = new[] { Req(RequirementKind.NonFunctional, 1, RequirementStatus.Unmapped) },
+            Design = new[] { Req(RequirementKind.Design, 1, RequirementStatus.Planned) },
+        };
+        var view = DashboardViewBuilder.Build(
+            Nav(),
+            ProgressModel.Empty,
+            RequirementsEpics(),
+            requirements,
+            CommandCatalog.Empty,
+            WorkInventory.Empty,
+            sprint: null,
+            coverage: null);
+
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        Assert.Contains("satisfaction-rollup", body);
+        Assert.Contains("requirements.html#satisfaction", body);
+        Assert.Contains("Satisfied", body);
+        Assert.Contains("In flight", body);
+        Assert.Contains("Not yet mapped", body);
+        Assert.Contains(Icons.ForStatus("unmapped"), body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_NoRequirements_OmitsSatisfactionRollup()
+    {
+        var view = DashboardViewBuilder.Build(
+            Nav(),
+            ProgressModel.Empty,
+            epicsModel: null,
+            requirements: null,
+            CommandCatalog.Empty,
+            WorkInventory.Empty,
+            sprint: null,
+            coverage: null);
+
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        Assert.DoesNotContain("satisfaction-rollup", body);
+        Assert.DoesNotContain("requirements.html#satisfaction", body);
+    }
+
     private static EpicsModel RequirementsEpics() => new()
     {
         OverviewHtml = string.Empty,
@@ -948,6 +996,9 @@ public class HtmlRenderAdapterTests
         Assert.Contains("586 passing tests", html);
         Assert.Contains("evidence-pill tests-pass", html);
         Assert.Contains("verified 2026-07-09", html);
+        Assert.Contains("class=\"evidence-dev-record-link\"", html);
+        Assert.Contains("href=\"#sec-dev-agent-record\"", html);
+        Assert.Contains("aria-label=\"Jump to Dev Agent Record for full verification evidence\"", html);
         Assert.Contains("class=\"change-surface\"", html);
         Assert.Contains("change-surface-panel", html);
         Assert.Contains("change-surface-title", html);
@@ -1003,12 +1054,14 @@ public class HtmlRenderAdapterTests
 
         Assert.Contains("class=\"evidence-strip\"", html);
         Assert.Contains("no tasks recorded", html);
+        Assert.Contains(Icons.ForConcept("Tasks"), html);
         Assert.Contains("no test evidence recorded", html);
         Assert.Contains("no verification recorded", html);
         Assert.Contains("class=\"change-surface\"", html);
         Assert.Contains("no file list recorded", html);
         Assert.Contains("no verification guidance recorded", html);
         Assert.DoesNotContain("href=\"#sec-dev-agent-record\"", html);
+        Assert.DoesNotContain("evidence-dev-record-link", html);
     }
 
     [Fact]
