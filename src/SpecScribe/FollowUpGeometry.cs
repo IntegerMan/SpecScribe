@@ -1,11 +1,11 @@
 namespace SpecScribe;
 
-/// <summary>Inputs for the sunburst follow-up outer band (Story 9.7 / FR30 geometry). Counts must agree with
-/// <see cref="ProjectCounts"/> — never re-parsed from yaml/markdown at the chart layer. Detail/provenance
-/// pages remain Story 9.6's domain; this type only carries what the remaining-work geometry needs to count
-/// and link.</summary>
+/// <summary>Inputs for sunburst follow-up geometry (Story 9.7 / FR30). Counts for <em>open</em> items must
+/// agree with <see cref="ProjectCounts"/> — never re-parsed from yaml/markdown at the chart layer.
+/// Detail/provenance pages remain Story 9.6's domain. Attributed items render as story-ring peers under their
+/// epic; unattributed items + deferred aggregate share a synthetic epic-level "Follow-ups" slice.</summary>
 public sealed record FollowUpGeometry(
-    IReadOnlyList<SprintActionItem> OpenActionItems,
+    IReadOnlyList<SprintActionItem> ActionItems,
     int DeferredOpenCount,
     string? DeferredHref,
     string ActionItemsHref)
@@ -16,22 +16,24 @@ public sealed record FollowUpGeometry(
         null,
         SiteNav.ActionItemsOutputPath);
 
-    /// <summary>True when the 4th ring should render — open action items and/or a deferred surface with a
-    /// positive ledger count (NFR8: omit entirely when neither is present).</summary>
-    public bool HasRing =>
-        OpenActionItems.Count > 0
+    public static bool IsDone(SprintActionItem item) =>
+        item.Status.Equals("done", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Open / in-progress action items — the set whose count must match
+    /// <see cref="ProjectCounts.OpenActionItems"/>.</summary>
+    public IReadOnlyList<SprintActionItem> OpenActionItems =>
+        ActionItems.Where(a => !IsDone(a)).ToList();
+
+    /// <summary>True when any follow-up wedge should render (open or done action items, or deferred surface).</summary>
+    public bool HasAny =>
+        ActionItems.Count > 0
         || (DeferredOpenCount > 0 && DeferredHref is { Length: > 0 });
 
-    /// <summary>Wedge count on the follow-up ring (one per open action item + optional deferred aggregate).</summary>
-    public int WedgeCount =>
-        OpenActionItems.Count + (DeferredOpenCount > 0 && DeferredHref is { Length: > 0 } ? 1 : 0);
-
-    /// <summary>Builds geometry from the portal ledger + already-projected inventory. Open items must be the
-    /// same list that produced <see cref="ProjectCounts.OpenActionItems"/> (typically
-    /// <see cref="SprintStatus.OpenActionItems"/>). Deferred wedges require both a positive ledger count and a
-    /// deferred surface href — never invent a link when the note is absent.</summary>
+    /// <summary>Builds geometry from the portal ledger + already-projected inventory.
+    /// <paramref name="actionItems"/> is the full sprint list (open + done) so completed follow-ups can
+    /// render green; open tallies still come from <paramref name="counts"/>.</summary>
     public static FollowUpGeometry From(
-        IReadOnlyList<SprintActionItem> openActionItems,
+        IReadOnlyList<SprintActionItem> actionItems,
         ProjectCounts counts,
         WorkInventory work,
         string linkPrefix = "")
@@ -41,19 +43,24 @@ public sealed record FollowUpGeometry(
             : null;
 
         return new FollowUpGeometry(
-            openActionItems,
+            actionItems,
             counts.DeferredOpenItems,
             deferredHref,
             linkPrefix + SiteNav.ActionItemsOutputPath);
     }
 
-    /// <summary>Epic-scoped geometry: only this epic's open action items. Deferred aggregate is omitted here
-    /// (no per-item epic attribution without re-parsing — safe default per Story 9.7). Zero for the epic →
-    /// <see cref="HasRing"/> is false even when the project has other follow-ups.</summary>
+    /// <summary>Epic-scoped geometry: this epic's action items only. Deferred aggregate stays on the project
+    /// sunburst's unattributed slice (no per-item epic attribution without re-parsing).</summary>
     public FollowUpGeometry ForEpic(int epicNumber) =>
         new(
-            OpenActionItems.Where(a => a.EpicNumber == epicNumber).ToList(),
+            ActionItems.Where(a => a.EpicNumber == epicNumber).ToList(),
             DeferredOpenCount: 0,
             DeferredHref: null,
             ActionItemsHref);
+
+    public IReadOnlyList<SprintActionItem> ForEpicNumber(int epicNumber) =>
+        ActionItems.Where(a => a.EpicNumber == epicNumber).ToList();
+
+    public IReadOnlyList<SprintActionItem> UnattributedActionItems =>
+        ActionItems.Where(a => a.EpicNumber is null).ToList();
 }

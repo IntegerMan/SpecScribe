@@ -65,7 +65,7 @@ public static class EpicsViewBuilder
         // Epic pages live under epics/ — rewrite follow-up hrefs with the relative prefix. Filter to this
         // epic so zero open follow-ups here omits the ring even when the project has others. [Story 9.7]
         var projectFollowUps = followUps ?? FollowUpGeometry.Empty;
-        var scopedActions = projectFollowUps.OpenActionItems
+        var scopedActions = projectFollowUps.ActionItems
             .Where(a => a.EpicNumber == epic.Number)
             .ToList();
         // Deferred aggregate has no per-item epic attribution without re-parsing — omit on epic pages

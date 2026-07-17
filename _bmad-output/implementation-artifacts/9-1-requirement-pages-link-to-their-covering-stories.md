@@ -4,7 +4,7 @@ baseline_commit: 449211044872f896cda881495021fe985490286b
 
 # Story 9.1: Requirement Pages Link to Their Covering Stories
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -77,6 +77,13 @@ Therefore the section's framing must be truthful: label it in a way that says **
   - [x] Assert FR2 (multi-epic) lists stories from BOTH covering epics, each linked to its story page with a canonical status badge, grouped under each covering epic; added a single-epic guard (FR1) that Epic 2's story does not leak in.
   - [x] Assert FR3 (deferred) and FR4 (unmapped) render distinct empty-state text and that neither reuses the other's wording, and neither fabricates a story card.
   - [x] Ran the full suite (1152 tests): all pass, including `SiteGeneratorTraceabilityTests`, `RequirementsAndProgressTests`, `StylesheetTests`. Golden content fingerprint regenerated for the intended requirement-page rendering change.
+
+### Review Findings
+
+- [x] [Review][Patch] Phantom covering epics are labeled "Not yet mapped" while status stays Planned — Branch C keys off `coveringEpics.Count == 0` (resolved epics only), so a map line that names only missing epics (e.g. `Epic 99`) gets unmapped copy even though `CoverageEpicNumbers` is non-empty and `DeriveStatus` correctly returns Planned; also drops any `CoverageNote`. Gate unmapped copy on `CoverageEpicNumbers.Count == 0`; add a distinct "named but not found" empty state (and coverage-note passthrough) for the phantom shape; add a render test. [src/SpecScribe/RequirementsTemplater.cs:176-216]
+- [x] [Review][Patch] Dead `coveringEpic` parameter — `RenderRequirement` still accepts `EpicInfo? coveringEpic` and `SiteGenerator` still resolves/passes it, but the body never reads it after the multi-epic rewrite. Remove the parameter and the call-site lookup. [src/SpecScribe/RequirementsTemplater.cs:114]
+- [x] [Review][Patch] Zero-stories empty-state branch is untested — Task 3's "No stories drafted in this epic yet." path has no HTML assertion. [tests/SpecScribe.Tests/RequirementsAndProgressTests.cs]
+- [x] [Review][Defer] `epics.Epics.ToDictionary(e => e.Number)` can throw on duplicate epic numbers — deferred, pre-existing (same pattern as `StoriesFor` / `DeriveStatus`) [src/SpecScribe/RequirementsTemplater.cs:155]
 
 ## Dev Notes
 
@@ -171,3 +178,4 @@ Opus 4.8 (Cursor) — bmad-dev-story workflow.
 | Date | Change |
 |------|--------|
 | 2026-07-16 | Story 9.1 implemented: requirement detail pages list their covering stories grouped by covering epic (linked, status-badged), fixing the multi-epic coverage gap; distinct deferred vs unmapped empty states with a Story 9.3 seam. Full suite 1152/1152 green; golden fingerprint regenerated. Status → review. |
+| 2026-07-16 | Code review patches: gate Unmapped copy on empty `CoverageEpicNumbers` (named-but-missing epics get distinct copy + note passthrough); remove dead `coveringEpic` parameter; add zero-stories + phantom-epic render tests. Status → done. |

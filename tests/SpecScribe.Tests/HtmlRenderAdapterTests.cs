@@ -401,6 +401,50 @@ public class HtmlRenderAdapterTests
         Status = RequirementStatus.Active,
     };
 
+    private static RequirementInfo Req(RequirementKind kind, int number, RequirementStatus status) => new()
+    {
+        Kind = kind,
+        Number = number,
+        TextHtml = kind + " " + number,
+        CoverageEpicNumbers = status is RequirementStatus.Unmapped or RequirementStatus.Deferred
+            ? Array.Empty<int>()
+            : new[] { 1 },
+        CoverageEpicNumber = status is RequirementStatus.Unmapped or RequirementStatus.Deferred ? null : 1,
+        Deferred = status == RequirementStatus.Deferred,
+        Status = status,
+    };
+
+    [Fact]
+    public void Build_RequirementStatTiles_SubLineDistinguishesUnmappedAndDeferred()
+    {
+        var requirements = new RequirementsModel
+        {
+            Functional = new[] { Req(RequirementKind.Functional, 1, RequirementStatus.Done) },
+            NonFunctional = new[]
+            {
+                Req(RequirementKind.NonFunctional, 1, RequirementStatus.Unmapped),
+                Req(RequirementKind.NonFunctional, 2, RequirementStatus.Deferred),
+            },
+            Design = new[] { Req(RequirementKind.Design, 1, RequirementStatus.Unmapped) },
+        };
+        var view = DashboardViewBuilder.Build(
+            Nav(),
+            ProgressModel.Empty,
+            epicsModel: null,
+            requirements,
+            CommandCatalog.Empty,
+            WorkInventory.Empty,
+            sprint: null,
+            coverage: null);
+
+        var nfr = Assert.Single(view.StatTiles, t => t.Label == "Non-functional");
+        Assert.Equal("1 not yet mapped · 1 deferred", nfr.Sub);
+        Assert.DoesNotContain("planned", nfr.Sub, StringComparison.Ordinal);
+
+        var design = Assert.Single(view.StatTiles, t => t.Label == "Design reqs");
+        Assert.Equal("1 not yet mapped", design.Sub);
+    }
+
     private static EpicsModel RequirementsEpics() => new()
     {
         OverviewHtml = string.Empty,

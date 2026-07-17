@@ -1877,7 +1877,7 @@ public sealed class SiteGenerator
             var workForFollowUps = WorkInventory.Build(_docs.Values.ToList());
             var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model);
             var followUps = FollowUpGeometry.From(
-                _sprint?.OpenActionItems ?? Array.Empty<SprintActionItem>(),
+                _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
                 epicsCounts,
                 workForFollowUps);
             File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps), "epics.html"));
@@ -2066,7 +2066,7 @@ public sealed class SiteGenerator
             var work = WorkInventory.Build(docs);
             var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel);
             var followUps = FollowUpGeometry.From(
-                _sprint?.OpenActionItems ?? Array.Empty<SprintActionItem>(),
+                _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
                 counts,
                 work);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
@@ -2321,7 +2321,7 @@ public sealed class SiteGenerator
         var work = WorkInventory.Build(docs);
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel);
         var followUps = FollowUpGeometry.From(
-            _sprint?.OpenActionItems ?? Array.Empty<SprintActionItem>(),
+            _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
             counts,
             work);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
@@ -2814,11 +2814,8 @@ public sealed class SiteGenerator
         // Everything (FR+NFR+Design) so UX-DR detail pages generate alongside FR/NFR. [Story 9.2 Task 5]
         foreach (var req in requirements.Everything)
         {
-            var coveringEpic = req.CoverageEpicNumber is { } n
-                ? model.Epics.FirstOrDefault(e => e.Number == n)
-                : null;
             var outputRelative = $"requirements/{req.Slug}.html";
-            var html = RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav, model, EpicRetroMap, deferredWorkHref);
+            var html = RequirementsTemplater.RenderRequirement(req, progress, nav, model, EpicRetroMap, deferredWorkHref);
             WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative, skipRequirementId: req.Id));
         }
     }

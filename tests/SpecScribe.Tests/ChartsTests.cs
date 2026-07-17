@@ -328,7 +328,7 @@ public class ChartsTests
     }
 
     [Fact]
-    public void Sunburst_FollowUpRing_EmitsDistinctSegmentsMatchingLedger()
+    public void Sunburst_FollowUps_SitInStoryRingUnderEpic_WithUnattributedSlice()
     {
         var model = new EpicsModel
         {
@@ -348,54 +348,44 @@ public class ChartsTests
                 },
             },
         };
-        var open = new[]
+        var items = new[]
         {
             new SprintActionItem("Fix the heatmap debt", "open", EpicNumber: 1, Owner: "Dana"),
             new SprintActionItem("Unscoped cleanup", "open", EpicNumber: null, Owner: null),
-            new SprintActionItem("Ship delivery follow-up", "open", EpicNumber: 2, Owner: "Amelia"),
+            new SprintActionItem("Ship delivery follow-up", "done", EpicNumber: 2, Owner: "Amelia"),
         };
         var work = new WorkInventory
         {
             QuickDev = Array.Empty<QuickDevEntry>(),
             Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 3),
         };
-        var counts = ProjectCounts.Empty with { DeferredOpenItems = 3, OpenActionItems = 3 };
-        var geometry = FollowUpGeometry.From(open, counts, work);
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 3, OpenActionItems = 2 };
+        var geometry = FollowUpGeometry.From(items, counts, work);
 
         var svg = Charts.Sunburst(model, followUps: geometry);
 
-        Assert.Equal(3, counts.OpenActionItems);
-        Assert.Equal(3, geometry.OpenActionItems.Count);
+        Assert.Equal(2, geometry.OpenActionItems.Count);
         Assert.Equal(counts.DeferredOpenItems, geometry.DeferredOpenCount);
-        Assert.Equal(4, geometry.WedgeCount); // 3 actions + 1 deferred aggregate
-        Assert.Contains("class=\"sb-seg sb-followup-action\"", svg);
-        Assert.Contains("class=\"sb-seg sb-followup-deferred\"", svg);
-        Assert.Equal(3, CountOccurrences(svg, "class=\"sb-seg sb-followup-action\""));
-        Assert.Equal(1, CountOccurrences(svg, "class=\"sb-seg sb-followup-deferred\""));
-        Assert.Contains($"href=\"{SiteNav.ActionItemsOutputPath}\"", svg);
-        Assert.Contains("href=\"deferred-work.html\"", svg);
+        // Open follow-ups are orange; completed action items reuse done green — never a 4th outer ring.
+        Assert.Contains("class=\"sb-seg sb-followup-open\"", svg);
         Assert.Contains("aria-label=\"Action item: Fix the heatmap debt\"", svg);
+        Assert.Contains("aria-label=\"Action item (done): Ship delivery follow-up\"", svg);
+        Assert.Contains("aria-label=\"Action item: Unscoped cleanup\"", svg);
         Assert.Contains("aria-label=\"Deferred work: 3 open items\"", svg);
-        // Follow-up wedges must never be labeled as stories (AC #2).
-        foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|'))
+        Assert.Contains("aria-label=\"Follow-ups:", svg);
+        Assert.DoesNotContain("outermost: open follow-ups", svg);
+        Assert.Contains("Open follow-up</span>", svg);
+        Assert.Contains("stories &amp; follow-ups", svg);
+        // Epic 1 aria mentions its follow-up so aggregation is visible on the epic wedge.
+        Assert.Contains("1 follow-up", svg);
+        foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
         {
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
-            Assert.True(
-                label.StartsWith("Action item:", StringComparison.Ordinal)
-                || label.StartsWith("Deferred work:", StringComparison.Ordinal),
-                label);
         }
-        Assert.Contains("Action item</span>", svg);
-        Assert.Contains("Deferred work</span>", svg);
-        Assert.Contains("outermost: open follow-ups", svg);
-        // Deterministic order: epic 1, epic 2, unattributed, then deferred.
-        Assert.Equal(
-            "Action item: Fix the heatmap debt|Action item: Ship delivery follow-up|Action item: Unscoped cleanup|Deferred work: 3 open items",
-            ExtractFollowUpAriaLabels(svg));
     }
 
     [Fact]
-    public void Sunburst_FollowUpRing_OmittedWhenLedgerIsZero()
+    public void Sunburst_FollowUps_OmittedWhenLedgerIsZero()
     {
         var model = new EpicsModel
         {
@@ -409,13 +399,12 @@ public class ChartsTests
 
         Assert.DoesNotContain("sb-followup", without);
         Assert.DoesNotContain("sb-followup", withEmpty);
-        Assert.DoesNotContain("outermost: open follow-ups", without);
-        Assert.DoesNotContain("Action item</span>", without);
+        Assert.DoesNotContain("Open follow-up</span>", without);
         Assert.Equal(without, withEmpty);
     }
 
     [Fact]
-    public void EpicSunburst_FollowUpRing_FiltersToCurrentEpicOnly()
+    public void EpicSunburst_FollowUps_AreStoryRingPeers_FilteredToEpic()
     {
         var epic1 = Epic(Story("1.1", "One", "ready", 0, 1));
         var epic2 = new EpicInfo
@@ -441,10 +430,12 @@ public class ChartsTests
         var svg2 = Charts.EpicSunburst(epic2, _ => "epics/epic-2.html", followUps: geometry);
 
         Assert.Contains("aria-label=\"Action item: Epic 1 only\"", svg1);
+        Assert.Contains("class=\"sb-seg sb-followup-open\"", svg1);
         Assert.DoesNotContain("Epic 2 only", svg1);
-        Assert.DoesNotContain("sb-followup-deferred", svg1); // aggregate deferred not attributed per epic
+        Assert.DoesNotContain("Deferred work", svg1);
         Assert.Contains("aria-label=\"Action item: Epic 2 only\"", svg2);
         Assert.DoesNotContain("Epic 1 only", svg2);
+        Assert.DoesNotContain("outermost: open follow-ups", svg1);
     }
 
     private static string ExtractFollowUpAriaLabels(string svg)
@@ -457,8 +448,9 @@ public class ChartsTests
             var end = svg.IndexOf('"', i);
             if (end < 0) break;
             var label = svg[i..end];
-            if (label.StartsWith("Action item:", StringComparison.Ordinal)
-                || label.StartsWith("Deferred work:", StringComparison.Ordinal))
+            if (label.StartsWith("Action item", StringComparison.Ordinal)
+                || label.StartsWith("Deferred work:", StringComparison.Ordinal)
+                || label.StartsWith("Follow-ups:", StringComparison.Ordinal))
             {
                 labels.Add(label);
             }

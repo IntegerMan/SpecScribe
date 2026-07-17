@@ -277,24 +277,22 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
-        Assert.Contains("sb-followup-action", index);
-        Assert.Contains("sb-followup-deferred", index);
-        Assert.Contains("outermost: open follow-ups", index);
+        Assert.Contains("sb-followup-open", index);
+        Assert.Contains("stories &amp; follow-ups", index);
+        Assert.DoesNotContain("outermost: open follow-ups", index);
         Assert.Contains($"href=\"{SiteNav.ActionItemsOutputPath}\"", index);
-        Assert.Contains("Action item</span>", index);
+        Assert.Contains("Open follow-up</span>", index);
         // StatCards still present (geometry does not replace them).
         Assert.Contains("Action items", index);
         Assert.Contains("Deferred work", index);
 
         var epic1 = File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html"));
-        Assert.Contains("sb-followup-action", epic1);
+        Assert.Contains("sb-followup-open", epic1);
         Assert.Contains("href=\"../action-items.html\"", epic1);
-        Assert.Contains("Schedule retros promptly", epic1); // truncated title may shorten; aria carries text
-        Assert.DoesNotContain("sb-followup-deferred", epic1); // aggregate deferred not epic-attributed
+        Assert.Contains("Schedule retros promptly", epic1);
 
-        // SprintWithDupes has open items on epic 1 and epic 2 — both should show the ring.
         var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
-        Assert.Contains("sb-followup-action", epic2);
+        Assert.Contains("sb-followup-open", epic2);
     }
 
     [Fact]

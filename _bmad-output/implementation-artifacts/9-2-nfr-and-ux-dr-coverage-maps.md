@@ -4,7 +4,7 @@ baseline_commit: 4103a787f05f7778af06063655eb77b176a10fde
 
 # Story 9.2: NFR and UX-DR Coverage Maps
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -211,6 +211,26 @@ Composer (Cursor agent router)
 - `_bmad-output/implementation-artifacts/9-2-nfr-and-ux-dr-coverage-maps.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
+### Review Findings
+
+- [x] [Review][Defer] Epic 1 header back-fill may over-claim UX-DR delivery — deferred, owner deferred confirmation during 9.2 review (mappings left as-is)
+- [x] [Review][Decision→Patch] Owner UX beyond ACs — keep 1100px max-width for full desktop; add tablet/mobile responsive support for requirements (and related) layouts so the wider column does not break smaller viewports
+
+- [x] [Review][Patch] Requirements/dashboard layouts: keep 1100px on desktop; add tablet + mobile breakpoints so the 9.2 column stretch remains usable on smaller screens [`specscribe.css`]
+- [x] [Review][Patch] Dashboard `RequirementStatTile` sub-line ignores `Unmapped` (and `Deferred`) — still counts only Ready/Planned, so unmapped NFR/UX-DRs read as “planned” on the home tiles this story introduced [`DashboardViewBuilder.cs:139`]
+- [x] [Review][Patch] Deferred map entry still unions header covering epics — `ResolveCoverage` keeps header epics when `deferred` is true, so `StoriesFor`/detail can list delivery while the badge says Deferred [`RequirementsParser.cs:185`]
+- [x] [Review][Patch] FR Coverage Map never ingests UX-DR lines — `ParseCoverage`/`DefLine` only match `FR|NFR`, so a map-only UX-DR cannot participate in the Task 2 header∪map union [`RequirementsParser.cs:21`]
+- [x] [Review][Patch] Orphan covering epic numbers yield an empty “Delivered by” list — numbers present but missing from `EpicsModel` skip every card; row shows Planned (9.3 intentional) with neither epics nor an honest absence note [`RequirementsTemplater.cs:417`]
+- [x] [Review][Patch] Empty Non-functional donut still always emitted — Task 4 NFR8 asked to omit the donut when `NonFunctional` is empty (Design was gated; Non-functional was not) [`RequirementsTemplater.cs:53`]
+- [x] [Review][Patch] Linkifier comment claims UX-DR is ordered before FR|NFR, but the regex is `\b(FR|NFR|UX-DR)` [`RequirementLinkifier.cs:17`]
+
+- [x] [Review][Defer] `ParseUxDrs` near-copy of `ParseDefs` [`RequirementsParser.cs:286`] — deferred, pre-existing style debt from this story’s split path
+- [x] [Review][Defer] `AppendCoverageRow` rebuilds `epics.Epics.ToDictionary` per requirement [`RequirementsTemplater.cs:380`] — deferred, pre-existing micro-alloc pattern
+- [x] [Review][Defer] `RequirementInfo.Id` defaults unknown kinds to `"NFR" + Number` [`RequirementsModel.cs`] — deferred, pre-existing fail-open pattern
+- [x] [Review][Defer] No FR donut/flow/grid HTML byte-identical regression assertion beyond coverage-epic-number checks — deferred; FR `DeriveStatus` source stayed map-only by construction, and 9.3 intentionally changed those surfaces afterward
+
 ### Change Log
 
 - 2026-07-16: Story 9.2 — NFR/UX-DR coverage maps + dashboard requirements tiles + requirements page stretch/padding UX.
+- 2026-07-16: Code review findings appended (decision/patch/defer).
+- 2026-07-16: Code review patches applied — responsive requirements column, honest dashboard tile sub-lines, deferred∪header skip, UX-DR map ingest, orphan epic note, empty NFR donut gate, linkifier comment.

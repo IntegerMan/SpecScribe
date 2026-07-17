@@ -2373,28 +2373,11 @@ a.ref-file-node:focus-visible {
 }
 .sunburst .sb-noplan:hover { fill: var(--parchment-dark); opacity: 1; stroke: var(--gold-light); stroke-width: 1.5; }
 
-/* Story 9.7: open follow-ups on the outermost sunburst ring. Dashed stroke kinship with .sb-noplan — never
-   a lifecycle-stage fill (not sb-pending/active/…). Shape + legend word labels disambiguate; color alone is
-   not the signal (UX-DR17). No new --status-* token. */
-.sb-followup-action,
-.sb-followup-deferred {
-  fill: var(--parchment-dark);
-  stroke: var(--ink-light);
-  stroke-width: 1.25;
-  stroke-dasharray: 3 2.5;
-  opacity: 0.9;
-}
-.sb-followup-deferred {
-  fill: transparent;
-  stroke: var(--status-review);
-}
-.sunburst .sb-followup-action:hover,
-.sunburst .sb-followup-deferred:hover {
-  fill: var(--parchment-dark);
-  opacity: 1;
-  stroke: var(--gold-light);
-  stroke-width: 1.75;
-}
+/* Story 9.7: follow-ups sit in the story ring (and unattributed ones under a Follow-ups epic slice).
+   Orange = open/postponed; green reuses .sb-done when completed. Word labels in aria/legend — never
+   color-only (UX-DR17). Chart-local token, not a new lifecycle --status-*. */
+.sb-followup-open { fill: var(--sb-followup-open, #d97706); }
+.sunburst-legend .sb-followup-open-sw { background: var(--sb-followup-open, #d97706); }
 
 .sunburst-center-num { font-size: 1.9rem; font-weight: bold; fill: var(--rust); font-family: 'Courier New', monospace; }
 .sunburst-center-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; fill: var(--ink-light); }
@@ -2416,14 +2399,6 @@ a.ref-file-node:focus-visible {
 .sunburst-legend .sb-active-sw { background: var(--status-active); }
 .sunburst-legend .sb-review-sw { background: var(--status-review); }
 .sunburst-legend .sb-done-sw { background: var(--status-done); }
-/* Follow-up legend swatches: dashed border (not a solid stage fill) so they never read as story status. */
-.sunburst-legend .sb-followup-action-sw,
-.sunburst-legend .sb-followup-deferred-sw {
-  background: transparent;
-  border: 1.5px dashed var(--ink-light);
-  box-sizing: border-box;
-}
-.sunburst-legend .sb-followup-deferred-sw { border-color: var(--status-review); }
 
 /* ---- Interactive-legend emphasis (Story 3.5 Task 3; the item Story 1.5 deferred here, UXO C3) ----
    Hovering OR keyboard-focusing a legend entry isolates its status: matching segments stay full, every other
@@ -2451,10 +2426,8 @@ a.ref-file-node:focus-visible {
 .sunburst-panel:has(.sb-review-item:focus-visible) .sb-seg:not(.sb-review),
 .sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done),
 .sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done),
-.sunburst-panel:has(.sb-followup-action-item:hover) .sb-seg:not(.sb-followup-action),
-.sunburst-panel:has(.sb-followup-action-item:focus-visible) .sb-seg:not(.sb-followup-action),
-.sunburst-panel:has(.sb-followup-deferred-item:hover) .sb-seg:not(.sb-followup-deferred),
-.sunburst-panel:has(.sb-followup-deferred-item:focus-visible) .sb-seg:not(.sb-followup-deferred) {
+.sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open),
+.sunburst-panel:has(.sb-followup-open-item:focus-visible) .sb-seg:not(.sb-followup-open) {
   opacity: 0.28;
 }
 
@@ -4182,6 +4155,43 @@ body:has(main.req-detail) .doc-header {
   max-width: 1100px;
 }
 
+/* Tablet: keep the 1100px desktop column on large screens; below that, full-bleed with tighter gutters
+   so requirements index/detail stay usable. [Story 9.2 review — responsive follow-up] */
+@media (max-width: 900px) {
+  .req-index,
+  .req-detail,
+  body:has(main.req-index) .doc-header,
+  body:has(main.req-detail) .doc-header {
+    max-width: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .req-index .chart-row {
+    grid-template-columns: 1fr;
+  }
+  .nfr-uxdr-epic-card {
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .req-index,
+  .req-detail,
+  body:has(main.req-index) .doc-header,
+  body:has(main.req-detail) .doc-header {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .req-group-grid {
+    grid-template-columns: 1fr;
+  }
+  .nfr-uxdr-epic-list {
+    flex-direction: column;
+  }
+}
+
 /* Group navigator card sizes its own donut/label like an epic-mosaic card, but its title should read as
    a normal-case group name, not an epic title. */
 .req-group-card .epic-mosaic-title { text-transform: none; }
@@ -4261,8 +4271,9 @@ body:has(main.req-detail) .doc-header {
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Mobile: one tile per row so requirement-kind + journey tiles stay readable. [Story 9.2 review] */
   .dashboard-tile-band .stat-card,
-  .dashboard-tile-band .tile-card { max-width: none; flex-basis: calc(50% - 0.5rem); }
+  .dashboard-tile-band .tile-card { max-width: none; flex-basis: 100%; }
 }
 
 /* ====================== ON-BRAND TOOLTIPS (Story 1.5 C1/C2) ======================

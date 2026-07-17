@@ -62,7 +62,7 @@ public static class DashboardViewBuilder
             Counts = ledger,
             HasTimeline = hasTimeline,
             FollowUps = FollowUpGeometry.From(
-                sprint?.OpenActionItems ?? Array.Empty<SprintActionItem>(),
+                sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
                 ledger,
                 work),
         };
@@ -135,17 +135,34 @@ public static class DashboardViewBuilder
     }
 
     /// <summary>One clickable requirements-kind tile: done/total with an in-progress sub-line, drilling to
-    /// requirements.html. [Story 9.2 UX]</summary>
+    /// requirements.html. Sub-line prefers Active, then enumerates non-zero Ready/Planned/Unmapped/Deferred
+    /// so unmapped coverage is never mislabelled as "planned". [Story 9.2 UX; review patch]</summary>
     private static StatTile RequirementStatTile(string label, IReadOnlyList<RequirementInfo> reqs, string href)
     {
         var done = reqs.Count(r => r.Status == RequirementStatus.Done);
         var active = reqs.Count(r => r.Status == RequirementStatus.Active);
         var sub = active > 0
             ? $"{active} partially implemented"
-            : $"{reqs.Count(r => r.Status == RequirementStatus.Ready)} ready · {reqs.Count(r => r.Status == RequirementStatus.Planned)} planned";
+            : RequirementStatSubLine(reqs, done);
         return new($"{done}/{reqs.Count}", label, sub,
             $"{label}: {done} done of {reqs.Count}. Open the requirements view to refine coverage and follow the epic → story chain.",
             href);
+    }
+
+    private static string RequirementStatSubLine(IReadOnlyList<RequirementInfo> reqs, int done)
+    {
+        var ready = reqs.Count(r => r.Status == RequirementStatus.Ready);
+        var planned = reqs.Count(r => r.Status == RequirementStatus.Planned);
+        var unmapped = reqs.Count(r => r.Status == RequirementStatus.Unmapped);
+        var deferred = reqs.Count(r => r.Status == RequirementStatus.Deferred);
+
+        var parts = new List<string>();
+        if (ready > 0) parts.Add($"{ready} ready");
+        if (planned > 0) parts.Add($"{planned} planned");
+        if (unmapped > 0) parts.Add($"{unmapped} not yet mapped");
+        if (deferred > 0) parts.Add($"{deferred} deferred");
+        if (parts.Count > 0) return string.Join(" · ", parts);
+        return done == reqs.Count && reqs.Count > 0 ? "all done" : "0 ready · 0 planned";
     }
 
     /// <summary>The commit stat's sub-line: a deterministic absolute-date recency signal (active-day count

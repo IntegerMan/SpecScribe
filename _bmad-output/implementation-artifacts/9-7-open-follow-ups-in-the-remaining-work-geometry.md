@@ -223,9 +223,9 @@ Composer (Auto)
 ### Completion Notes List
 
 - Added `FollowUpGeometry` ledger-backed input; threaded through `DashboardView` / `EpicsIndexView` / `EpicPageView` and HTML/webview/SPA SiteGenerator call sites without re-parsing yaml.
-- Project + epic sunbursts draw a 4th dashed follow-up ring (`.sb-followup-action` / `.sb-followup-deferred`) when open counts > 0; omit entirely when zero (NFR8). Aria never says "Story".
-- Epic sunburst filters to that epic's action items; deferred aggregate stays project-level only (no per-item attribution without re-parse).
-- StatCards / 9.6 templaters untouched. Golden regenerated (CSS-only delta on zero-follow-up fixture). `dotnet test`: 1245 passed.
+- Follow-ups render as **story-ring peers under their epic** (orange open / green done), not an outer band. Unattributed action items + deferred aggregate share a synthetic **Follow-ups** epic-level slice. Aria never says "Story".
+- Epic sunburst filters to that epic's action items; deferred aggregate stays on the project unattributed slice.
+- StatCards / 9.6 templaters untouched. Golden regenerated. `dotnet test` green after redesign.
 
 ### File List
 
@@ -250,6 +250,7 @@ Composer (Auto)
 ### Change Log
 
 - 2026-07-16: Implemented Story 9.7 — open follow-ups as outermost sunburst band (project + epic), ledger-agreed counts, dashed distinct treatment, tests + golden.
+- 2026-07-16: Redesign per owner feedback — follow-ups as story-ring peers under epics (orange/green) + unattributed Follow-ups epic slice; removed outer band.
 
 ---
 

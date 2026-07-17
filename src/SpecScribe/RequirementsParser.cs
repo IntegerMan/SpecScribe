@@ -20,6 +20,8 @@ public static class RequirementsParser
 {
     private static readonly Regex DefLine = new(@"^(FR|NFR)(\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex UxDrLine = new(@"^UX-DR(\d+):\s*(.+)$", RegexOptions.Compiled);
+    // FR Coverage Map lines may name FR, NFR, or UX-DR (Task 2 header∪map union for Design). [Story 9.2 review]
+    private static readonly Regex CoverageMapLine = new(@"^(FR|NFR|UX-DR)(\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex CategoryLine = new(@"^\*\*(.+?)\*\*$", RegexOptions.Compiled);
     // Matches the leading "Epic 4" / "Epics 1 & 2" / "Epics 1, 2 and 3" coverage clause. Only confirms the
     // clause names epic(s) at all (plural "Epics" and multi-number lists are real in epics.md — FR2/FR5/FR7:
@@ -87,7 +89,7 @@ public static class RequirementsParser
         foreach (var raw in lines)
         {
             var line = raw.Trim();
-            var m = DefLine.Match(line);
+            var m = CoverageMapLine.Match(line);
             if (!m.Success) continue;
 
             var id = m.Groups[1].Value + m.Groups[2].Value;
@@ -194,8 +196,14 @@ public static class RequirementsParser
         var deferred = map?.Deferred ?? false;
         var note = map?.Note;
 
+        // Deferred is a deliberate shelve — never union header epics onto it (would make StoriesFor/detail
+        // list delivery while the badge says Deferred). [Story 9.2 review]
         IReadOnlyList<int> epicNumbers;
-        if (kind == RequirementKind.Functional)
+        if (deferred)
+        {
+            epicNumbers = Array.Empty<int>();
+        }
+        else if (kind == RequirementKind.Functional)
         {
             // FR coverage source = FR Coverage Map ONLY — never union header FR tokens.
             epicNumbers = map?.EpicNumbers ?? Array.Empty<int>();

@@ -298,12 +298,16 @@ public class StylesheetTests
     {
         // Requirements index matches the home dashboard column (1100px + gutters); chart-panels stretch
         // with every other section rather than locking to a narrower flush column. [Story 9.2 UX]
+        // Tablet/mobile media queries keep the desktop max-width while degrading gutters/stacking. [review]
         var css = ReadStylesheet();
         Assert.Contains(".req-index", css);
         Assert.Contains(".req-index .chart-panel", css);
         Assert.Contains("main.req-detail", css);
         Assert.Contains(".nfr-uxdr-epic-list", css);
         Assert.Contains(".nfr-uxdr-epic-card", css);
+        Assert.Contains("@media (max-width: 900px)", css);
+        Assert.Contains(".req-index .chart-row", css);
+        Assert.Contains("flex-basis: 100%", css);
     }
 
     [Fact]
@@ -384,12 +388,10 @@ public class StylesheetTests
         Assert.Contains(".sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done)", css);
         // The focusable legend entries keep the shared on-brand focus ring.
         Assert.Contains(".sunburst-legend .sb-legend-item:focus-visible", css);
-        // Story 9.7 follow-up band: dashed stroke + legend swatch (never color-only / never a stage fill).
-        Assert.Contains(".sb-followup-action", css);
-        Assert.Contains(".sb-followup-deferred", css);
-        Assert.Contains("stroke-dasharray", css);
-        Assert.Contains(".sb-followup-action-sw", css);
-        Assert.Contains(".sunburst-panel:has(.sb-followup-action-item:hover) .sb-seg:not(.sb-followup-action)", css);
+        // Story 9.7 follow-ups: orange open fill + legend swatch (word label; never color-only).
+        Assert.Contains(".sb-followup-open", css);
+        Assert.Contains(".sb-followup-open-sw", css);
+        Assert.Contains(".sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open)", css);
     }
 
     [Fact]

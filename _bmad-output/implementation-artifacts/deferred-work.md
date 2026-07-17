@@ -2,6 +2,10 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 9-1-requirement-pages-link-to-their-covering-stories.md (2026-07-16)
+
+- `epics.Epics.ToDictionary(e => e.Number)` in `RenderRequirement` can throw on duplicate epic numbers and abort requirement-page generation — same pre-existing pattern as `StoriesFor` / parser `DeriveStatus`; revisit if epic-list de-dupe is added. [`RequirementsTemplater.cs:155`]
+
 ## Deferred from: code review of 8-8-generation-time-recency-signals.md (2026-07-15)
 
 - Path map for story git dates uses `StringComparer.Ordinal`, matching the git layer's Ordinal path keys — case-only mismatches between git and `ArtifactSourcePath` on Windows silently miss the git date. Low likelihood; revisit if IgnoreCase is adopted git-wide. [`ProgressCalculator.cs`]
@@ -481,6 +485,24 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-declutter-home-dashboard.md`
   summary: Both delivery/webview spikes (`spike/delivery/exporter/Program.cs:56`, `spike/vscode/renderer/Program.cs:54`) call `SiteNav.Build(..., hasStructure: ...)`, but `SiteNav.Build` no longer has a `hasStructure` parameter (replaced by `hasCodeMap` in an earlier story) — the spikes were already non-compiling against the current signature before this change. Not caused by the declutter; surfaced when re-checking spike compilation.
   evidence: Edge Case Hunter. Pre-existing; baseline `SiteNav.Build` call already used the stale `hasStructure` arg.
+
+## Deferred from: code review of 9-2-nfr-and-ux-dr-coverage-maps.md (2026-07-16)
+
+- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  summary: Epic 1 header back-fill tags UX-DR1–13 and 16–18 as delivered by Epic 1 — owner deferred confirmation/trim; mappings left as-is. Reason: deferred by owner during 9.2 review.
+  evidence: Blind Hunter + Acceptance Auditor (over-claim risk vs under-claiming guardrail).
+- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  summary: `ParseUxDrs` is a near-copy of `ParseDefs` (coverage resolve, epic title lookup, `RequirementInfo` construction, `DeriveStatus`); kind-specific regex alone did not require a second path, so future coverage/status fixes can drift between FR/NFR and UX-DR.
+  evidence: Blind Hunter. [`RequirementsParser.cs`](../../src/SpecScribe/RequirementsParser.cs)
+- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  summary: `AppendCoverageRow` rebuilds `epics.Epics.ToDictionary` on every NFR/UX-DR row — needless repeated allocation on the requirements index.
+  evidence: Blind Hunter. [`RequirementsTemplater.cs`](../../src/SpecScribe/RequirementsTemplater.cs)
+- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  summary: `RequirementInfo.Id`’s switch defaults unknown `RequirementKind` values to `"NFR" + Number` instead of failing closed.
+  evidence: Blind Hunter. Pre-existing fail-open pattern; Design was added as an explicit arm.
+- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  summary: Task 7 asked to prove FR flow/grid/donut HTML stayed byte-identical; tests only locked FR coverage epic numbers / updated golden fingerprints rather than an explicit FR HTML baseline assertion. Superseded in practice by Story 9.3’s intentional Unmapped-tier changes to those surfaces.
+  evidence: Acceptance Auditor + Blind Hunter.
 
 ## Deferred from: code review of spec-undrafted-create-story-panel-above-ac (2026-07-16)
 

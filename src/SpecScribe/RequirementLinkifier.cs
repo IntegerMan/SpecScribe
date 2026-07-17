@@ -14,8 +14,8 @@ public static class RequirementLinkifier
         "(<a\\b[^>]*>.*?</a>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
-    // UX-DR before FR|NFR so "UX-DR25" is not partially matched as a bare "DR25" — the alternation is
-    // left-first; FR/NFR remain word-boundary anchored. [Story 9.2 Task 5]
+    // Whole-token match for FR / NFR / UX-DR ids (word-boundary anchored). UX-DR is a single alternation
+    // arm, so it cannot be partially matched as a bare "DR{n}". [Story 9.2 Task 5]
     private static readonly Regex RefPattern = new(@"\b(FR|NFR|UX-DR)(\d+)\b", RegexOptions.Compiled);
 
     /// <param name="html">Already-rendered HTML to scan.</param>

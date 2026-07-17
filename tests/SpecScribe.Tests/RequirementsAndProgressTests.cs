@@ -379,6 +379,151 @@ public class RequirementsParserTests
     }
 
     [Fact]
+    public void Parse_UxDrLineInFrCoverageMap_UnionsWithHeader()
+    {
+        // Task 2: UX-DR coverage = header ∪ map — map lines must be ingestible. [Story 9.2 review]
+        var md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            FR1: Only
+
+            ### UX Design Requirements
+
+            UX-DR1: Map-only coverage
+            UX-DR2: Header-only coverage
+
+            ### FR Coverage Map
+
+            FR1: Epic 1 - only
+            UX-DR1: Epic 2 - from the map
+
+            ## Epic List
+
+            ### Epic 1: Foundation
+
+            Goal.
+            **UX-DRs:** UX-DR2
+
+            ### Epic 2: Expansion
+
+            Goal.
+
+            ## Epic 1: Foundation
+
+            ### Story 1.1: A
+
+            As a user, I want a, so that b.
+
+            ## Epic 2: Expansion
+
+            ### Story 2.1: B
+
+            As a user, I want b, so that c.
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse(md, epics, progress);
+
+        Assert.Equal(new[] { 2 }, reqs.ById["UX-DR1"].CoverageEpicNumbers);
+        Assert.Equal(new[] { 1 }, reqs.ById["UX-DR2"].CoverageEpicNumbers);
+    }
+
+    [Fact]
+    public void Parse_DeferredNfr_DoesNotUnionHeaderEpics()
+    {
+        // Deferred map entry must not pick up header covering epics. [Story 9.2 review]
+        var md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            FR1: Only
+
+            ### NonFunctional Requirements
+
+            NFR1: Deferred but casually tagged in a header
+
+            ### FR Coverage Map
+
+            FR1: Epic 1 - only
+            NFR1: Deferred - shelved on purpose
+
+            ## Epic List
+
+            ### Epic 1: Foundation
+
+            Goal.
+            **NFRs:** NFR1
+
+            ## Epic 1: Foundation
+
+            ### Story 1.1: A
+
+            As a user, I want a, so that b.
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse(md, epics, progress);
+
+        Assert.True(reqs.ById["NFR1"].Deferred);
+        Assert.Equal(RequirementStatus.Deferred, reqs.ById["NFR1"].Status);
+        Assert.Empty(reqs.ById["NFR1"].CoverageEpicNumbers);
+        Assert.Empty(RequirementsParser.StoriesFor(reqs.ById["NFR1"], epics));
+    }
+
+    [Fact]
+    public void RenderIndex_OrphanCoveringEpic_ShowsHonestAbsenceNote()
+    {
+        var md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            FR1: Only
+
+            ### NonFunctional Requirements
+
+            NFR1: Named epic that does not exist
+
+            ### FR Coverage Map
+
+            FR1: Epic 1 - only
+            NFR1: Epic 99 - ghost
+
+            ## Epic List
+
+            ### Epic 1: Foundation
+
+            Goal.
+
+            ## Epic 1: Foundation
+
+            ### Story 1.1: A
+
+            As a user, I want a, so that b.
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse(md, epics, progress);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        Assert.Equal(new[] { 99 }, reqs.ById["NFR1"].CoverageEpicNumbers);
+        Assert.Equal(RequirementStatus.Planned, reqs.ById["NFR1"].Status);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        Assert.Contains("Covering epic not found in the epic list.", html);
+        Assert.DoesNotContain("nfr-uxdr-epic-list", html);
+    }
+
+    [Fact]
     public void Parse_FrCoverageStaysMapOnly_HeaderFrTokensDoNotUnion()
     {
         // Epic 1's header lists FR1; Epic 2's lists FR2. FR2's map already has Epics 1 & 2.
@@ -461,6 +606,8 @@ public class RequirementsParserTests
 
         Assert.DoesNotContain("Non-functional &amp; design coverage", html);
         Assert.DoesNotContain(">Design (", html);
+        Assert.DoesNotContain(">Non-functional (", html);
+        Assert.DoesNotContain(" non-functional", html);
         Assert.DoesNotContain("design</div>", html);
         Assert.Empty(reqs.Design);
         Assert.Empty(reqs.NonFunctional);
@@ -473,9 +620,8 @@ public class RequirementsParserTests
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var req = reqs.ById["UX-DR1"];
-        var covering = epics.Epics.First(e => e.Number == 1);
 
-        var html = RequirementsTemplater.RenderRequirement(req, covering, progress, nav, epics);
+        var html = RequirementsTemplater.RenderRequirement(req, progress, nav, epics);
 
         Assert.Contains("UX Design Requirement", html);
         Assert.Contains("requirements.html", html);
@@ -489,9 +635,7 @@ public class RequirementsParserTests
         var (reqs, epics) = ParseMultiEpic();
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
-        var req = reqs.ById[reqId];
-        var coveringEpic = req.CoverageEpicNumber is { } n ? epics.Epics.FirstOrDefault(e => e.Number == n) : null;
-        return RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav, epics);
+        return RequirementsTemplater.RenderRequirement(reqs.ById[reqId], progress, nav, epics);
     }
 
     [Fact]
@@ -549,6 +693,89 @@ public class RequirementsParserTests
         Assert.DoesNotContain("coverage-story-card", unmapped);
     }
 
+    [Fact]
+    public void RenderRequirement_NamedButMissingEpic_DoesNotClaimUnmapped()
+    {
+        // Coverage map names Epic 99 (absent from the model). DeriveStatus stays Planned; the Coverage body
+        // must NOT reuse the Unmapped "Not yet mapped" copy — that contradicted the header badge. [9.1 review]
+        var md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            **Core**
+            FR1: Names a phantom epic
+
+            ### FR Coverage Map
+
+            FR1: Epic 99 - typo'd or since-removed epic number
+
+            ## Epic List
+
+            ### Epic 1: Real
+
+            Goal.
+
+            ## Epic 1: Real
+
+            ### Story 1.1: A
+
+            As a user, I want a, so that b.
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse(md, epics, progress);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderRequirement(reqs.ById["FR1"], progress, nav, epics);
+
+        Assert.Contains("Covering epic(s) named in the map were not found in the epic list.", html);
+        Assert.Contains("since-removed epic number", html);
+        Assert.DoesNotContain("Not yet mapped to any epic or story.", html);
+        Assert.DoesNotContain("coverage-story-card", html);
+        Assert.Contains(">Planned<", html);
+    }
+
+    [Fact]
+    public void RenderRequirement_CoveringEpicWithNoStories_StatesEmptyExplicitly()
+    {
+        // Task 3: a covering epic with zero drafted stories gets an explicit per-group note, not a blank group.
+        var md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            **Core**
+            FR1: Covered by an empty epic
+
+            ### FR Coverage Map
+
+            FR1: Epic 1 - empty shell
+
+            ## Epic List
+
+            ### Epic 1: Empty Shell
+
+            Listed but no stories drafted yet.
+
+            ## Epic 1: Empty Shell
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse(md, epics, progress);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderRequirement(reqs.ById["FR1"], progress, nav, epics);
+
+        Assert.Contains("No stories drafted in this epic yet.", html);
+        Assert.DoesNotContain("coverage-story-card", html);
+        Assert.Contains("epics/epic-1.html", html);
+    }
+
     // ---- Story 9.3: distinct visual treatment + deferral-source linking ----
 
     [Fact]
@@ -593,9 +820,7 @@ public class RequirementsParserTests
         var (reqs, epics) = ParseMultiEpic();
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
-        var req = reqs.ById[reqId];
-        var coveringEpic = req.CoverageEpicNumber is { } n ? epics.Epics.FirstOrDefault(e => e.Number == n) : null;
-        return RequirementsTemplater.RenderRequirement(req, coveringEpic, progress, nav, epics, retroMap, deferredWorkHref);
+        return RequirementsTemplater.RenderRequirement(reqs.ById[reqId], progress, nav, epics, retroMap, deferredWorkHref);
     }
 
     [Fact]

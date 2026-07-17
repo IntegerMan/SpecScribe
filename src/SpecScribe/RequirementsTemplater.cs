@@ -19,8 +19,11 @@ public static class RequirementsTemplater
         var countParts = new List<string>
         {
             $"{model.Functional.Count} functional",
-            $"{model.NonFunctional.Count} non-functional",
         };
+        if (model.NonFunctional.Count > 0)
+        {
+            countParts.Add($"{model.NonFunctional.Count} non-functional");
+        }
         if (model.Design.Count > 0)
         {
             countParts.Add($"{model.Design.Count} design");
@@ -50,8 +53,11 @@ public static class RequirementsTemplater
 
         sb.Append("<section class=\"dashboard\">\n<div class=\"chart-row\">\n");
         AppendStatusDonut(sb, "Functional", model.Functional);
-        AppendStatusDonut(sb, "Non-functional", model.NonFunctional);
-        // Design donut absent (not empty) when the project has no UX-DRs — NFR8 degrade-gracefully. [Story 9.2]
+        // Non-functional / Design donuts absent (not empty) when the project has none — NFR8. [Story 9.2]
+        if (model.NonFunctional.Count > 0)
+        {
+            AppendStatusDonut(sb, "Non-functional", model.NonFunctional);
+        }
         if (model.Design.Count > 0)
         {
             AppendStatusDonut(sb, "Design", model.Design);
@@ -111,7 +117,7 @@ public static class RequirementsTemplater
         return sb.ToString();
     }
 
-    public static string RenderRequirement(RequirementInfo req, EpicInfo? coveringEpic, ProgressModel progress, SiteNav nav, EpicsModel epics,
+    public static string RenderRequirement(RequirementInfo req, ProgressModel progress, SiteNav nav, EpicsModel epics,
         IReadOnlyDictionary<int, string>? epicRetroMap = null, string? deferredWorkHref = null)
     {
         var outputPath = $"requirements/{req.Slug}.html";
@@ -172,7 +178,7 @@ public static class RequirementsTemplater
             }
             AppendDeferralSourceLinks(sb, req, epicRetroMap, deferredWorkHref, prefix);
         }
-        // --- Branch B: covered by one or more epics — list every covering epic's stories, grouped by epic. ---
+        // --- Branch B: covered by one or more resolvable epics — list every covering epic's stories, grouped by epic. ---
         else if (coveringEpics.Count > 0)
         {
             // Honest framing: the FR Coverage Map is epic-level, so these are the stories in the covering
@@ -208,11 +214,22 @@ public static class RequirementsTemplater
                 sb.Append($"  <p class=\"epic-goal coverage-note\">{PathUtil.Html(note)}</p>\n");
             }
         }
-        // --- Branch C: not deferred and no covering epic — genuinely UNMAPPED. Distinct wording from the
-        //     deferred branch (AC #2); Story 9.3 adds the distinct visual treatment. [seam: Story 9.3] ---
-        else
+        // --- Branch C: not deferred and no covering epic NAMED — genuinely UNMAPPED. Gate on
+        //     CoverageEpicNumbers.Count (author intent), not on resolved coveringEpics — a map line that names
+        //     only missing epics is Planned (DeriveStatus), not Unmapped. [Story 9.1 review patch] ---
+        else if (req.CoverageEpicNumbers.Count == 0)
         {
             sb.Append($"  <p class=\"pending-note\">{StatusStyles.RequirementBadge(req)} Not yet mapped to any epic or story.</p>\n");
+        }
+        // --- Branch D: coverage map named epic number(s) but none resolve in the model (typo / removed epic).
+        //     Distinct from Unmapped — author intent to map exists; status stays Planned. ---
+        else
+        {
+            sb.Append($"  <p class=\"pending-note\">{StatusStyles.RequirementBadge(req)} Covering epic(s) named in the map were not found in the epic list.</p>\n");
+            if (req.CoverageNote is { Length: > 0 } phantomNote)
+            {
+                sb.Append($"  <p class=\"epic-goal coverage-note\">{PathUtil.Html(phantomNote)}</p>\n");
+            }
         }
         sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(prefix + SiteNav.RequirementsOutputPath)}\">&larr; All requirements</a>\n");
         sb.Append("</div>\n\n");
@@ -412,20 +429,32 @@ public static class RequirementsTemplater
         }
         else
         {
-            sb.Append("    <div class=\"nfr-uxdr-epics-label\">Delivered by</div>\n");
-            sb.Append("    <ul class=\"nfr-uxdr-epic-list\">\n");
-            foreach (var n in req.CoverageEpicNumbers)
+            var resolved = req.CoverageEpicNumbers
+                .Where(byNumber.ContainsKey)
+                .Select(n => byNumber[n])
+                .ToList();
+            if (resolved.Count == 0)
             {
-                if (!byNumber.TryGetValue(n, out var epic)) continue;
-                var epicHref = $"{prefix}epics/epic-{n}.html";
-                var statusClass = StatusStyles.ForEpic(epic);
-                sb.Append($"      <li><a class=\"nfr-uxdr-epic-card {statusClass}\" href=\"{PathUtil.Html(epicHref)}\">");
-                sb.Append($"<span class=\"nfr-uxdr-epic-num\">Epic {n}</span>");
-                sb.Append($"<span class=\"nfr-uxdr-epic-title\">{epic.Title}</span>");
-                sb.Append($"{StatusStyles.Badge(statusClass, StatusStyles.EpicLabel(statusClass))}");
-                sb.Append("</a></li>\n");
+                // Named covering epic(s) but none resolve — avoid an empty "Delivered by" list.
+                // Status stays Planned (author intent to map; Story 9.3). [Story 9.2 review]
+                sb.Append("    <p class=\"nfr-uxdr-epics-note\">Covering epic not found in the epic list.</p>\n");
             }
-            sb.Append("    </ul>\n");
+            else
+            {
+                sb.Append("    <div class=\"nfr-uxdr-epics-label\">Delivered by</div>\n");
+                sb.Append("    <ul class=\"nfr-uxdr-epic-list\">\n");
+                foreach (var epic in resolved)
+                {
+                    var epicHref = $"{prefix}epics/epic-{epic.Number}.html";
+                    var statusClass = StatusStyles.ForEpic(epic);
+                    sb.Append($"      <li><a class=\"nfr-uxdr-epic-card {statusClass}\" href=\"{PathUtil.Html(epicHref)}\">");
+                    sb.Append($"<span class=\"nfr-uxdr-epic-num\">Epic {epic.Number}</span>");
+                    sb.Append($"<span class=\"nfr-uxdr-epic-title\">{epic.Title}</span>");
+                    sb.Append($"{StatusStyles.Badge(statusClass, StatusStyles.EpicLabel(statusClass))}");
+                    sb.Append("</a></li>\n");
+                }
+                sb.Append("    </ul>\n");
+            }
         }
         sb.Append("  </div>\n");
         sb.Append("</div>\n\n");
