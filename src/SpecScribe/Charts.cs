@@ -1784,39 +1784,66 @@ public static class Charts
         };
     }
 
-    /// <summary>Proportional stacked bar over the six canonical requirement-status tiers. Segment colors
-    /// route through <c>--status-*</c> via CssClass (Unmapped and Planned both <c>pending</c>). Zero-count
-    /// segments are omitted; empty satisfaction renders nothing (NFR8). Aria-label is the accessible twin.
-    /// Reuses <c>.req-stacked-bar</c> token-routed segments. [Story 9.9]</summary>
+    /// <summary>Proportional bar over the four readings (Satisfied · In flight · Deferred · Unmapped), each
+    /// reading a visually separated bracket whose width is proportional to its count. The <b>In flight</b>
+    /// bracket sub-divides into its three real tier colors (Partially implemented / Ready / Planned) so the
+    /// bar's colors match the Sankey and the six-tier donuts, and Planned is visibly part of In flight rather
+    /// than an orphan segment. Colors route through <c>--status-*</c> via the tier css class (Unmapped and
+    /// Planned both <c>pending</c>). Zero-count readings are omitted; empty satisfaction renders nothing
+    /// (NFR8). Aria-label is the accessible text twin. Bracket order matches the chip order below it. [Story 9.9]</summary>
     public static string RequirementSatisfactionBar(ProjectCounts.RequirementSatisfaction sat)
     {
         if (sat.Total <= 0) return string.Empty;
 
-        var parts = new List<string>();
-        foreach (var tier in sat.Tiers)
-        {
-            if (tier.Count <= 0) continue;
-            parts.Add($"{tier.Label}: {tier.Count}");
-        }
-        var aria = Html($"Requirement satisfaction: {string.Join(", ", parts)}");
+        var aria = Html(
+            $"Requirement satisfaction across {sat.Total} requirements: " +
+            $"{sat.Satisfied} satisfied, " +
+            $"{sat.InFlight} in flight ({sat.Active} partially implemented, {sat.Ready} ready for dev, {sat.Planned} planned), " +
+            $"{sat.Deferred} deferred on purpose, {sat.Unmapped} not yet mapped");
 
         var sb = new StringBuilder();
-        sb.Append($"<div class=\"req-stacked-bar satisfaction-bar\" role=\"img\" aria-label=\"{aria}\">\n");
-        foreach (var tier in sat.Tiers)
+        sb.Append($"<div class=\"satisfaction-bar\" role=\"img\" aria-label=\"{aria}\">\n");
+
+        AppendSatisfactionBracket(sb, "satisfied", sat.Satisfied, new[]
         {
-            if (tier.Count <= 0) continue;
-            var pct = (double)tier.Count / sat.Total * 100;
-            // Floor tiny segments so a single requirement still shows a visible sliver.
-            var width = Math.Max(pct, sat.Total > 40 ? 0.5 : 1.5);
-            var title = Html($"{tier.Label}: {tier.Count}");
-            // Unmapped keeps pending color but a distinct tip word so it never reads as Planned. [Story 9.9]
-            var segClass = tier.Label == StatusStyles.RequirementLabel(RequirementStatus.Unmapped)
-                ? "pending unmapped"
-                : tier.CssClass;
-            sb.Append($"  <span class=\"seg {segClass}\" style=\"width:{F(width)}%\" title=\"{title}\"></span>\n");
-        }
+            ("done", sat.Done, "Done"),
+        });
+        // In flight keeps its three real tier colors so the bracket reads as the Sankey does — Planned (tan)
+        // sits inside In flight rather than reading as a separate, unexplained bar segment. [Story 9.9 coherence]
+        AppendSatisfactionBracket(sb, "in-flight", sat.InFlight, new[]
+        {
+            ("active", sat.Active, "Partially implemented"),
+            ("ready", sat.Ready, "Ready for dev"),
+            ("pending", sat.Planned, "Planned"),
+        });
+        AppendSatisfactionBracket(sb, "deferred", sat.Deferred, new[]
+        {
+            ("deferred", sat.Deferred, "Deferred"),
+        });
+        // Unmapped shares the tan pending token but carries a distinct css hook (+word/icon on its chip). [Story 9.9]
+        AppendSatisfactionBracket(sb, "unmapped", sat.Unmapped, new[]
+        {
+            ("pending unmapped", sat.Unmapped, "Not yet mapped"),
+        });
+
         sb.Append("</div>\n");
         return sb.ToString();
+    }
+
+    private static void AppendSatisfactionBracket(
+        StringBuilder sb, string readingClass, int readingCount, (string SegClass, int Count, string Label)[] tiers)
+    {
+        if (readingCount <= 0) return;
+        // flex-grow carries the proportion; the outer gap + a CSS min-width keep tiny readings visible without
+        // distorting the larger ones (deterministic — integer grows, no per-visitor state). [Story 9.9]
+        sb.Append($"  <span class=\"satisfaction-bracket {readingClass}\" style=\"flex-grow:{readingCount}\">\n");
+        foreach (var (segClass, count, label) in tiers)
+        {
+            if (count <= 0) continue;
+            var title = Html($"{label}: {count}");
+            sb.Append($"    <span class=\"seg {segClass}\" style=\"flex-grow:{count}\" title=\"{title}\"></span>\n");
+        }
+        sb.Append("  </span>\n");
     }
 
     /// <summary>Four-reading satisfaction chips (Satisfied · In flight · Deferred on purpose · Unmapped).

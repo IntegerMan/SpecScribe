@@ -55,7 +55,7 @@ public static class ActionItemsTemplater
         foreach (var group in groups)
         {
             sb.Append(RenderGroupHeading(group.EpicNumber, epicRetroMap));
-            sb.Append("<ul class=\"action-items-list\">\n");
+            sb.Append("<ul class=\"followup-rows-list action-items-list\">\n");
             foreach (var item in group.Items)
             {
                 RenderCard(sb, item, epicRetroMap, deferredWorkHref, quickDev, epicsModel, hrefMap, prefix, crossLinks);
@@ -140,46 +140,47 @@ public static class ActionItemsTemplater
         string prefix,
         IReadOnlyDictionary<SprintActionItem, int> crossLinks)
     {
-        var linkedText = FollowUpRefs.LinkifyVisibleText(item.Action, epicsModel, hrefMap, prefix);
+        var summaryPlain = FollowUpRow.SummarizePlainText(item.Action);
+        var summaryHtml = FollowUpRefs.LinkifyVisibleText(summaryPlain, epicsModel, hrefMap, prefix);
+        var sourceChip = item.EpicNumber is { } en ? $"Epic {en}" : "Unattributed";
 
-        sb.Append("  <li class=\"action-item-card\">\n");
-        sb.Append($"    <div class=\"action-item-text\">{linkedText}</div>\n");
+        var detail = new StringBuilder();
+        detail.Append($"<div class=\"followup-detail-fulltext\">{FollowUpRefs.LinkifyVisibleText(item.Action, epicsModel, hrefMap, prefix)}</div>\n");
 
-        sb.Append("    <div class=\"action-item-meta\">\n");
-        if (item.EpicNumber is { } en)
-            sb.Append($"      <span class=\"pill\">Epic {en}</span>\n");
-        sb.Append($"      {StatusStyles.Badge(StatusStyles.ForSprint(item.Status), StatusStyles.SprintLabel(item.Status))}\n");
-
-        // Cross-retro near-duplicate note (group header already carries primary provenance).
         if (crossLinks.TryGetValue(item, out var otherEpic))
         {
             if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
             {
-                sb.Append($"      <a class=\"action-item-cross\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(otherRetro))}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
+                detail.Append($"<a class=\"action-item-cross\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(otherRetro))}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
             }
             else
             {
-                sb.Append($"      <span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
+                detail.Append($"<span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
             }
         }
 
         if (deferredWorkHref is { Length: > 0 } dw && DeferralHeuristics.IsDebtRelated(item.Action))
         {
-            sb.Append($"      <a class=\"action-item-deferred\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(dw))}\">In deferred-work backlog &rarr;</a>\n");
+            detail.Append($"<a class=\"action-item-deferred\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(dw))}\">In deferred-work backlog &rarr;</a>\n");
         }
-        sb.Append("    </div>\n");
 
         if (quickDev is { Length: > 0 })
         {
             var epicNote = item.EpicNumber is { } e3 ? $" (Epic {e3})" : string.Empty;
             // Payload uses RAW action text — never the linkified fragment (copy-payload corruption trap).
             var prompt = $"{quickDev} Resolve this retrospective action item{epicNote}: {item.Action}";
-            sb.Append("    <div class=\"action-item-resolve\">\n");
-            sb.Append($"      {BmadCommands.RenderLabeledCommand("Resolve with AI", prompt)}\n");
-            sb.Append("    </div>\n");
+            detail.Append("<div class=\"action-item-resolve\">\n");
+            detail.Append($"{BmadCommands.RenderLabeledCommand("Resolve with AI", prompt)}\n");
+            detail.Append("</div>\n");
         }
 
-        sb.Append("  </li>\n");
+        FollowUpRow.Render(
+            sb,
+            summaryHtml,
+            StatusStyles.ForSprint(item.Status),
+            StatusStyles.SprintLabel(item.Status),
+            PathUtil.Html(sourceChip),
+            detail.ToString());
     }
 
     private static string RenderGroupHeading(int? epicNumber, IReadOnlyDictionary<int, string>? epicRetroMap)

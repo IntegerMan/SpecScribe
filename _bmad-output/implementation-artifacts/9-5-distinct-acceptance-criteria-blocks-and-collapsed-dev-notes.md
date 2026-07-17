@@ -4,7 +4,7 @@ baseline_commit: 26316799413a72a9ef6061ecb4f8853fee219c63
 
 # Story 9.5: Distinct Acceptance-Criteria Blocks and Collapsed Dev Notes
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -194,3 +194,14 @@ Composer (Cursor agent)
 ## Change Log
 
 - 2026-07-16: Implemented Story 9.5 — distinct AC resting cards + collapsed Dev Notes/References with TOC invariant; suite green (1213).
+- 2026-07-16: Code review — kept reorder UX; patched webview gold accent, balanced nested-details move, id-less H2 section ends.
+
+### Review Findings
+
+- [x] [Review][Decision] Collapse helper reorders authored sections — resolved: **keep reorder** (collapsed Dev Notes/References trail Context/Tasks by design; nested-`</details>` hardening stays as a patch).
+- [x] [Review][Patch] Webview dark/HC `border-color` wipes resting gold left accent on `.ac-criterion` [src/SpecScribe/assets/specscribe-webview-theme.css:247] — **Fixed:** reassert `border-left-color: var(--gold)` after `border-color`; `:target` uses `var(--gold-light)`.
+- [x] [Review][Patch] `MoveCollapsibleSectionsToEnd` non-greedy `.*?</details>` truncates when Dev Notes body contains nested `<details>` [src/SpecScribe/CollapsibleSections.cs:121-124] — **Fixed:** balanced `<details>` depth scan.
+- [x] [Review][Patch] Section end only considers next H2 *with* `id=` — an id-less `<h2>` is swallowed into the collapsed block [src/SpecScribe/CollapsibleSections.cs:59] — **Fixed:** section ends at next `<h2\b` regardless of id.
+- [x] [Review][Defer] Markdig duplicate-slug forms (`references-1`) never match `StoryRemainderSlugs` — deferred, rare authoring edge [src/SpecScribe/CollapsibleSections.cs:14-15]
+- [x] [Review][Defer] Adjacent 9.4: `ExtractChangeLogVerification` skips malformed dates instead of nulling — deferred to 9.4 review [src/SpecScribe/EpicsParser.cs:182-186]
+- [x] [Review][Defer] Adjacent 9.4: `ExtractTestEvidence` accepts `### Dev Agent Record` but file-list extractors may not — deferred to 9.4 review [src/SpecScribe/EpicsParser.cs:143-146]

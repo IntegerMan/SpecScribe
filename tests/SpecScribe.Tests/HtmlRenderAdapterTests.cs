@@ -636,15 +636,15 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
-    public void RenderDashboardBody_OmitsWorkModeStrip_WhenNoEpics()
+    public void RenderDashboardBody_OmitsInlineWorkModeStrip_LandmarksAreScrollTargets()
     {
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkflowDashboard(epics: null));
         Assert.DoesNotContain("work-mode-strip", body);
-        Assert.DoesNotContain("id=\"wm-overview\"", body);
+        Assert.DoesNotContain("name=\"work-mode\"", body);
     }
 
     [Fact]
-    public void RenderDashboardBody_WorkModeStrip_OverviewDefault_NoPanelRemoval()
+    public void RenderDashboardBody_WorkModeLandmarks_PresentWithoutDimmingMarkup()
     {
         var epics = new EpicsModel
         {
@@ -654,12 +654,14 @@ public class HtmlRenderAdapterTests
         };
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkflowDashboard(epics));
 
-        Assert.Contains("class=\"work-mode-strip board-tabs\"", body);
-        Assert.Contains("<input type=\"radio\" id=\"wm-overview\" name=\"work-mode\" class=\"board-tab-radio\" checked>", body);
-        Assert.Contains("<label for=\"wm-draft\" class=\"board-tab\">Draft</label>", body);
-        Assert.Contains("funnel-panel wm-focus-draft", body);
-        Assert.Contains("sunburst-panel wm-focus-develop", body);
-        // Full stack stays in the DOM (Overview + every stage) — no display:none on sibling panels.
+        Assert.Contains("id=\"wm-overview\"", body);
+        Assert.Contains("id=\"wm-develop\"", body);
+        Assert.Contains("id=\"wm-draft\"", body);
+        Assert.Contains("id=\"wm-review\"", body);
+        Assert.Contains("dashboard-stage-anchor", body);
+        // Full stack stays in the DOM — no radio strip, no display:none stage switch.
+        Assert.DoesNotContain("work-mode-strip", body);
+        Assert.DoesNotContain("name=\"work-mode\"", body);
         Assert.Contains("Now &amp; Next", body);
         Assert.Contains("Story Pipeline", body);
         Assert.DoesNotContain("display:none", body);
@@ -804,7 +806,32 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
-    public void RenderNav_GroupsPlanningDocsUnderDocsOnKeyViewsBand()
+    public void RenderNav_OnHome_ShowsWorkModeJumpStrip_InsteadOfKeyViewPills()
+    {
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/prds/prd-x/prd.md",
+            "planning-artifacts/epics.md",
+        }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false, hasReadme: true);
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView(SiteNav.HomeOutputPath));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.Contains("work-mode-jumps", keyViews);
+        Assert.Contains("href=\"#wm-overview\"", keyViews);
+        Assert.Contains("href=\"#wm-gather\"", keyViews);
+        Assert.Contains("href=\"#wm-draft\"", keyViews);
+        Assert.Contains("href=\"#wm-develop\"", keyViews);
+        Assert.Contains("href=\"#wm-review\"", keyViews);
+        Assert.DoesNotContain("key-view-group", keyViews);
+        Assert.DoesNotContain("Docs<span", keyViews);
+        // Dark bar still carries the journey menus (with family color classes).
+        Assert.Contains("site-menu-group family-planning", html);
+        Assert.Contains("site-menu-group family-epics", html);
+    }
+
+    [Fact]
+    public void RenderNav_OffHome_GroupsPlanningDocsUnderDocsOnKeyViewsBand()
     {
         var nav = SiteNav.Build(new[]
         {
@@ -815,7 +842,7 @@ public class HtmlRenderAdapterTests
             "planning-artifacts/epics.md",
         }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false, hasReadme: true);
 
-        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView(SiteNav.HomeOutputPath));
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView(SiteNav.EpicsOutputPath));
         var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
 
         Assert.Contains("key-view-group", keyViews);
@@ -831,6 +858,7 @@ public class HtmlRenderAdapterTests
         Assert.Contains("PRD</a>", keyViews);
         Assert.Contains("Product Brief</a>", keyViews);
         Assert.Contains("href=\"epics.html\"", keyViews);
+        Assert.DoesNotContain("work-mode-jumps", keyViews);
     }
 
     [Fact]

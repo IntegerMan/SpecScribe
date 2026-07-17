@@ -402,7 +402,24 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 9.9: requirements.html "Satisfaction at a glance" band (stacked bar + four
         // chips over Everything); Home satisfaction rollup → #satisfaction; LegendKey gains "Not yet mapped";
         // ProjectCounts satisfaction buckets; specscribe.css satisfaction-* / .seg.active. [Story 9.9]
-        const string expected = "51ddd23daa7a0f1873768b1740f2bdd61953f355e801356e94433786fead11de";
+        // Regenerated for Story 9.10: action-items + deferred-work list pages compress to shared
+        // .followup-row scan-first grammar; heavy detail in per-row <details>; specscribe.css gains
+        // .followup-row* rules and retires .action-item-card / .deferred-item-card item rules. Golden
+        // fixture has no open action_items and no deferred-work.md — delta is primarily shared CSS.
+        // [Story 9.10; golden-diff-normalization-gotchas]
+        // Regenerated for Story 9.8 next-steps card row: horizontal command cards with kickers/accent rails.
+        // [Story 9.8 polish; golden-diff-normalization-gotchas]
+        // Regenerated for Story 9.8 work-mode jump strip: Home white bar hosts Overview/Gather/Draft/Develop/Review
+        // scroll links; dimming radios removed; dark-bar Docs/Architecture/Work gain family color tints.
+        // [Story 9.8 scroll strip; golden-diff-normalization-gotchas]
+        // Regenerated for Story 9.9 coherence pass: the satisfaction bar is now four proportional brackets
+        // (Satisfied · In flight · Deferred · Unmapped) whose In-flight bracket keeps its real Partially/Ready/
+        // Planned tier colors (so the bar matches the Sankey + donuts and Planned isn't an orphan segment); the
+        // hub band gains a .satisfaction-note rollup caption; the requirements donut row leads with an "Overall"
+        // six-tier donut (2×2 with the kinds); the Home rollup gains the same bracketed bar above its chips;
+        // specscribe.css swaps the flat .satisfaction-bar for .satisfaction-bracket* + .satisfaction-note rules.
+        // [Story 9.9 UI coherence; golden-diff-normalization-gotchas]
+        const string expected = "6a1660671d2d2a4c4fca249d8ce438c4d99f8cfe708900187973c4402a99f5e1";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

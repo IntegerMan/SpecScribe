@@ -4,7 +4,7 @@ baseline_commit: 8d9aac44fe721e35315cef0881cb04ba64b2ded9
 
 # Story 9.10: Scannable Follow-Up List Pages
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -65,35 +65,35 @@ Concrete silhouette rules:
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Shared scan-first row grammar (AC: #1)**
-  - [ ] Add a single shared row/summary renderer both templaters call (e.g. a small `FollowUpRow` helper or a shared method) producing: short-summary + status badge + source chip + one primary link + collapsed `<details>` for heavy detail. Keep it a pure string builder (match existing `StringBuilder` style; no new render-adapter path).
-  - [ ] Derive the short summary from existing text only (first sentence / truncated action text or deferred lead) — **no new authoring field**. Reuse `PathUtil.StripHtmlTags` + truncation helpers already in the codebase.
-  - [ ] Both pages emit the same `.followup-row` markup so they read as siblings; only source-label text and status vocabulary differ.
+- [x] **Task 1 — Shared scan-first row grammar (AC: #1)**
+  - [x] Add a single shared row/summary renderer both templaters call (e.g. a small `FollowUpRow` helper or a shared method) producing: short-summary + status badge + source chip + one primary link + collapsed `<details>` for heavy detail. Keep it a pure string builder (match existing `StringBuilder` style; no new render-adapter path).
+  - [x] Derive the short summary from existing text only (first sentence / truncated action text or deferred lead) — **no new authoring field**. Reuse `PathUtil.StripHtmlTags` + truncation helpers already in the codebase.
+  - [x] Both pages emit the same `.followup-row` markup so they read as siblings; only source-label text and status vocabulary differ.
 
-- [ ] **Task 2 — Action Items page compression (AC: #1, #2, #3)**
-  - [ ] Rework `ActionItemsTemplater.RenderCard` (`ActionItemsTemplater.cs` ~132–183) to the scan-first row. Move Resolve-with-AI `data-copy` command + cross-retro link into the collapsed `<details>` (or, when 9.11 URL is available, link to it as the primary link — coordinate with 9.11, keep additive).
-  - [ ] **Keep grouping/order exactly** (`GroupByEpic`, epic-asc, Unattributed trailing, file-order within). Keep `FindNearDuplicates` cross-link but relocate it into the disclosure.
-  - [ ] Preserve the copy-payload boundary: visible summary linkify inside templater only; page stays out of site-level `ApplyReferenceLinks`; `data-copy` still carries **raw** action text.
+- [x] **Task 2 — Action Items page compression (AC: #1, #2, #3)**
+  - [x] Rework `ActionItemsTemplater.RenderCard` (`ActionItemsTemplater.cs` ~132–183) to the scan-first row. Move Resolve-with-AI `data-copy` command + cross-retro link into the collapsed `<details>` (or, when 9.11 URL is available, link to it as the primary link — coordinate with 9.11, keep additive).
+  - [x] **Keep grouping/order exactly** (`GroupByEpic`, epic-asc, Unattributed trailing, file-order within). Keep `FindNearDuplicates` cross-link but relocate it into the disclosure.
+  - [x] Preserve the copy-payload boundary: visible summary linkify inside templater only; page stays out of site-level `ApplyReferenceLinks`; `data-copy` still carries **raw** action text.
 
-- [ ] **Task 3 — Deferred Work page compression (AC: #1, #2, #3)**
-  - [ ] Rework `DeferredWorkTemplater.RenderItem` (`DeferredWorkTemplater.cs` ~85–117) to the same scan-first row: short summary + Open/Resolved badge + `## Deferred from:` source chip + one primary link; full `BodyHtml` + resolving criteria into the collapsed `<details>` (or 9.11 link).
-  - [ ] Keep group-by-provenance + open-first ordering (`DeferredWorkParser` model unchanged). Keep the unstructured-fallback path intact.
-  - [ ] Deferred page keeps its post-write `ApplyReferenceLinks` (`SiteGenerator.WriteDeferredWork` ~2737) — safe, no copy payload.
+- [x] **Task 3 — Deferred Work page compression (AC: #1, #2, #3)**
+  - [x] Rework `DeferredWorkTemplater.RenderItem` (`DeferredWorkTemplater.cs` ~85–117) to the same scan-first row: short summary + Open/Resolved badge + `## Deferred from:` source chip + one primary link; full `BodyHtml` + resolving criteria into the collapsed `<details>` (or 9.11 link).
+  - [x] Keep group-by-provenance + open-first ordering (`DeferredWorkParser` model unchanged). Keep the unstructured-fallback path intact.
+  - [x] Deferred page keeps its post-write `ApplyReferenceLinks` (`SiteGenerator.WriteDeferredWork` ~2737) — safe, no copy payload.
 
-- [ ] **Task 4 — Shared CSS for the row grammar (AC: #1)**
-  - [ ] Add `.followup-row` + `.followup-row-detail` rules in `src/SpecScribe/assets/specscribe.css` near the existing `.action-item-card` / `.deferred-item-card` block. Reuse `.dev-agent-details` caret for the disclosure. Retire/alias the old card-specific rules only if fully replaced; keep resolved-state visual.
-  - [ ] Extend `StylesheetTests` for the new shared classes; assert non-color-only status signalling survives.
+- [x] **Task 4 — Shared CSS for the row grammar (AC: #1)**
+  - [x] Add `.followup-row` + `.followup-row-detail` rules in `src/SpecScribe/assets/specscribe.css` near the existing `.action-item-card` / `.deferred-item-card` block. Reuse `.dev-agent-details` caret for the disclosure. Retire/alias the old card-specific rules only if fully replaced; keep resolved-state visual.
+  - [x] Extend `StylesheetTests` for the new shared classes; assert non-color-only status signalling survives.
 
-- [ ] **Task 5 — Guardrails: ledger counts + no schema/scope creep (AC: #2, #3)**
-  - [ ] Counts shown (header/summary counts if any) must read `ProjectCounts` (`OpenActionItems`, `DeferredOpenItems`) — no re-tally at a second parse site. Confirm `AppendWorkSummaryCards` home tiles still agree.
-  - [ ] Do **not** change `sprint-status.yaml` / `deferred-work.md` schemas, `SprintActionItem`, `DeferredWorkParser` model, or the sunburst (9.7). Do **not** build the detail page or slugs (9.11).
-  - [ ] NFR8 degrade unchanged: `WriteActionItems` early-returns with no open items; `WriteDeferredWork` early-returns with no deferred doc. Empty groups never render.
+- [x] **Task 5 — Guardrails: ledger counts + no schema/scope creep (AC: #2, #3)**
+  - [x] Counts shown (header/summary counts if any) must read `ProjectCounts` (`OpenActionItems`, `DeferredOpenItems`) — no re-tally at a second parse site. Confirm `AppendWorkSummaryCards` home tiles still agree.
+  - [x] Do **not** change `sprint-status.yaml` / `deferred-work.md` schemas, `SprintActionItem`, `DeferredWorkParser` model, or the sunburst (9.7). Do **not** build the detail page or slugs (9.11).
+  - [x] NFR8 degrade unchanged: `WriteActionItems` early-returns with no open items; `WriteDeferredWork` early-returns with no deferred doc. Empty groups never render.
 
-- [ ] **Task 6 — Tests + golden (AC: #1, #2, #3)**
-  - [ ] `FollowUpSurfacesTests`: assert scan-first row shape on both pages (short summary present, heavy detail inside `<details>` / not above the fold), shared `.followup-row` class on both, grouping/order preserved, Resolve-with-AI `data-copy` still carries raw (un-linkified) action text.
-  - [ ] Keep the existing degrade tests green (`Degrade_NoActionItems_*`, `Degrade_NoDeferredWork_*`).
-  - [ ] Golden fingerprint moves (both page bodies change) → regen `SiteGeneratorAdapterTests.cs` expected hash (currently line ~398) per `golden-diff-normalization-gotchas`. These pages ride `WriteOutput` → SPA/webview capture, so no new `HostRenderException`; confirm SPA/webview capture still slices them (they emit `main#main-content`).
-  - [ ] Run `dotnet test` from repo root.
+- [x] **Task 6 — Tests + golden (AC: #1, #2, #3)**
+  - [x] `FollowUpSurfacesTests`: assert scan-first row shape on both pages (short summary present, heavy detail inside `<details>` / not above the fold), shared `.followup-row` class on both, grouping/order preserved, Resolve-with-AI `data-copy` still carries raw (un-linkified) action text.
+  - [x] Keep the existing degrade tests green (`Degrade_NoActionItems_*`, `Degrade_NoDeferredWork_*`).
+  - [x] Golden fingerprint moves (both page bodies change) → regen `SiteGeneratorAdapterTests.cs` expected hash (currently line ~398) per `golden-diff-normalization-gotchas`. These pages ride `WriteOutput` → SPA/webview capture, so no new `HostRenderException`; confirm SPA/webview capture still slices them (they emit `main#main-content`).
+  - [x] Run `dotnet test` from repo root.
 
 ## Dev Notes
 
@@ -190,8 +190,35 @@ Generate to `SpecScribeOutput/`. Open `action-items.html`: each item is a one-li
 
 ### Agent Model Used
 
+Composer
+
 ### Debug Log References
+
+### Implementation Plan
+
+- Introduced `FollowUpRow.cs` as the shared scan-first row renderer: `SummarizePlainText`/`SummarizeFromHtml` derive short leads from existing text; `Render` emits `.followup-row` with scan line (summary + badge + source chip) and a native `<details>` disclosure for heavy detail (or optional `detailHref` seam for Story 9.11).
+- Reworked `ActionItemsTemplater.RenderCard` to call `FollowUpRow.Render`; cross-retro links, deferred-work link, full linkified text, and Resolve-with-AI `data-copy` moved into disclosure; copy-payload boundary preserved.
+- Reworked `DeferredWorkTemplater.RenderItem` to call `FollowUpRow.Render` with provenance source chip; full `BodyHtml`, resolving link, and resolved mark moved into disclosure.
+- Replaced `.action-item-card`/`.deferred-item-card` item CSS with shared `.followup-row*` rules reusing dev-agent caret grammar; retained group headings and resolved-state treatment.
+- Updated `FollowUpSurfacesTests` and `StylesheetTests`; regenerated golden fingerprint in `SiteGeneratorAdapterTests.cs`.
 
 ### Completion Notes List
 
+- ✅ Story 9.10 complete: both follow-up list pages now use shared `.followup-row` scan-first grammar with heavy detail behind per-row `<details>` disclosures.
+- ✅ Grouping/order unchanged (epic-retro asc + deferral provenance); `ProjectCounts` ledger untouched; NFR8 degrade paths green.
+- ✅ Copy-payload trap preserved: `data-copy` attributes carry raw un-linkified action text.
+- ✅ 1279 tests pass (full suite); golden fingerprint regenerated for shared CSS delta.
+
 ### File List
+
+- src/SpecScribe/FollowUpRow.cs (new)
+- src/SpecScribe/ActionItemsTemplater.cs
+- src/SpecScribe/DeferredWorkTemplater.cs
+- src/SpecScribe/assets/specscribe.css
+- tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
+- tests/SpecScribe.Tests/StylesheetTests.cs
+- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+
+### Change Log
+
+- 2026-07-16: Story 9.10 — compress action-items and deferred-work list pages to shared scan-first `.followup-row` grammar; heavy detail in per-row `<details>`; golden fingerprint regen.

@@ -245,6 +245,8 @@
   background: rgba(230, 181, 46, 0.08);
   background: color-mix(in srgb, var(--gold-light) 8%, transparent);
   border-color: var(--vscode-panel-border, var(--border));
+  /* border-color resets all four sides — reassert the resting gold left accent (UX-DR17). */
+  border-left-color: var(--gold);
 }
 
 /* The :target AC-highlight paints a literal pale gold; use a translucent tuned-gold wash on dark instead.
@@ -253,6 +255,7 @@
 .vscode-high-contrast .ac-criterion:target {
   background: rgba(230, 181, 46, 0.22); /* plain fallback for hosts without color-mix() support */
   background: color-mix(in srgb, var(--gold-light) 22%, transparent);
+  border-left-color: var(--gold-light);
 }
 
 /* ============================================================================================================

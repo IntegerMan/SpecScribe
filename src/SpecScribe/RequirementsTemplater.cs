@@ -60,6 +60,14 @@ public static class RequirementsTemplater
         AppendSatisfactionBand(sb, sat, model);
 
         sb.Append("<section class=\"dashboard\">\n<div class=\"chart-row\">\n");
+        // Overall six-tier donut over Everything leads the row: it speaks the SAME six-tier vocabulary as the
+        // Sankey and the per-kind donuts (the four-reading band above is the exec rollup), and it fills the
+        // grid's fourth cell so Functional/Non-functional/Design round out to a 2×2 on desktop. [Story 9.9]
+        var everything = model.Everything.ToList();
+        if (everything.Count > 0 && (model.NonFunctional.Count > 0 || model.Design.Count > 0))
+        {
+            AppendStatusDonut(sb, "Overall", everything);
+        }
         AppendStatusDonut(sb, "Functional", model.Functional);
         // Non-functional / Design donuts absent (not empty) when the project has none — NFR8. [Story 9.2]
         if (model.NonFunctional.Count > 0)
@@ -146,6 +154,11 @@ public static class RequirementsTemplater
             inFlightHref: glanceHref,
             deferredHref: coverageHref,
             unmappedHref: coverageHref));
+        // Names the rollup so the four readings read as a grouping of the six canonical tiers (which the bar's
+        // In-flight bracket and the Overall donut below both show in full), not a parallel vocabulary. [Story 9.9]
+        sb.Append("<p class=\"satisfaction-note\">A rollup of the six status tiers over all "
+            + $"{sat.Total} requirements — <strong>In flight</strong> groups partially implemented, ready for dev, and planned. "
+            + "The donuts and flow below break the same requirements down tier by tier.</p>\n");
         sb.Append("</section>\n\n");
     }
 

@@ -75,44 +75,49 @@ public static class DeferredWorkTemplater
             .ThenBy(t => t.index)
             .Select(t => t.item);
 
-        sb.Append("  <ul class=\"deferred-items-list\">\n");
+        sb.Append("  <ul class=\"followup-rows-list deferred-items-list\">\n");
         foreach (var item in ordered)
-            RenderItem(sb, item);
+            RenderItem(sb, item, group.ProvenanceLabel);
         sb.Append("  </ul>\n");
         sb.Append("</section>\n");
     }
 
-    private static void RenderItem(StringBuilder sb, DeferredWorkItem item)
+    private static void RenderItem(StringBuilder sb, DeferredWorkItem item, string provenanceLabel)
     {
-        var cardClass = item.Resolved ? "deferred-item-card resolved" : "deferred-item-card";
-        sb.Append($"    <li class=\"{cardClass}\">\n");
+        var summaryPlain = FollowUpRow.SummarizeFromHtml(item.BodyHtml);
+        var summaryHtml = PathUtil.Html(summaryPlain);
 
-        sb.Append("      <div class=\"deferred-item-meta\">\n");
-        if (item.Resolved)
-        {
-            // Resolved maps to the existing done vocabulary — shape + text, never color-only (UX-DR17).
-            sb.Append($"        {StatusStyles.Badge("done", "Resolved")}\n");
-            sb.Append("        <span class=\"deferred-resolved-mark\" aria-hidden=\"true\">✓</span>\n");
-        }
-        else
-        {
-            sb.Append($"        {StatusStyles.Badge(StatusStyles.ForSprint("open"), "Open")}\n");
-        }
+        var detail = new StringBuilder();
+        detail.Append($"<div class=\"deferred-item-body\">{item.BodyHtml}</div>\n");
 
         if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
         {
             var label = rr.Contains('.') && !rr.Contains('-')
                 ? $"Story {rr}"
                 : rr;
-            sb.Append($"        <a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(rh)}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
+            detail.Append($"<a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(rh)}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
         }
         else if (item.ResolvingRef is { Length: > 0 } rr2)
         {
-            sb.Append($"        <span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(rr2)}</span>\n");
+            detail.Append($"<span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(rr2)}</span>\n");
         }
-        sb.Append("      </div>\n");
 
-        sb.Append($"      <div class=\"deferred-item-body\">{item.BodyHtml}</div>\n");
-        sb.Append("    </li>\n");
+        if (item.Resolved)
+        {
+            detail.Append("<span class=\"deferred-resolved-mark\" aria-hidden=\"true\">✓</span>\n");
+        }
+
+        var (statusToken, statusLabel) = item.Resolved
+            ? ("done", "Resolved")
+            : (StatusStyles.ForSprint("open"), "Open");
+
+        FollowUpRow.Render(
+            sb,
+            summaryHtml,
+            statusToken,
+            statusLabel,
+            PathUtil.Html(provenanceLabel),
+            detail.ToString(),
+            resolved: item.Resolved);
     }
 }

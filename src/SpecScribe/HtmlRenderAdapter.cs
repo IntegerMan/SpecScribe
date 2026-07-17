@@ -96,7 +96,7 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
             + $"<path fill-rule=\"evenodd\" d=\"{NibPathData}\"/></svg>"
             + "<span class=\"specscribe-badge-text\">SpecScribe</span></span></a>\n");
         sb.Append("  </div>\n");
-        AppendKeyViewsBand(sb, nav, prefix);
+        AppendKeyViewsBand(sb, nav, prefix, current);
         sb.Append("</nav>\n");
         return sb.ToString();
     }
@@ -134,7 +134,8 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
 
             var hasActive = members.Any(e => string.Equals(PathUtil.NormalizeSlashes(e.Path), current, StringComparison.OrdinalIgnoreCase));
             var groupCls = hasActive ? "site-menu-group has-active" : "site-menu-group";
-            sb.Append($"      <div class=\"{groupCls}\">\n");
+            var family = QuickLinkFamily(group);
+            sb.Append($"      <div class=\"{groupCls} {family}\">\n");
             sb.Append($"        <button class=\"site-menu-trigger\" type=\"button\" aria-haspopup=\"true\">{Icons.ForConcept(group)}{PathUtil.Html(group)}<span class=\"site-menu-caret\" aria-hidden=\"true\">&#9662;</span></button>\n");
             sb.Append("        <div class=\"site-menu-panel\">\n");
             foreach (var e in members)
@@ -145,13 +146,19 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         }
     }
 
-    /// <summary>The white sub-header band: compact grouped wayfinding from <see cref="NavigationView.QuickLinks"/>
-    /// (Docs / Architecture / Work), reachable from every page. Multi-member groups become dropdowns (hover +
-    /// focus-within on desktop; always-open panels on narrow viewports; click toggle via specscribe.js);
-    /// single-member groups collapse to a flat pill. Omits the band entirely when there are none.
-    /// [home welcome key-views]</summary>
-    private void AppendKeyViewsBand(StringBuilder sb, NavigationView nav, string prefix)
+    /// <summary>The white sub-header band. On Home it is the Driver work-stage jump strip (Overview · Gather ·
+    /// Draft · Develop · Review) — in-page anchors that scroll to stage landmarks without dimming the rest of
+    /// the dashboard. On every other page it keeps the Docs / Architecture / Work key-views chips. Omits the
+    /// band when there is nothing to show. [home welcome key-views; Story 9.8 scroll strip]</summary>
+    private void AppendKeyViewsBand(StringBuilder sb, NavigationView nav, string prefix, string current)
     {
+        var onHome = string.Equals(current, SiteNav.HomeOutputPath, StringComparison.OrdinalIgnoreCase);
+        if (onHome)
+        {
+            AppendWorkModeJumpStrip(sb);
+            return;
+        }
+
         if (nav.QuickLinks.Count == 0) return;
 
         var entries = nav.QuickLinks
@@ -182,6 +189,20 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
             }
             sb.Append("        </div>\n      </div>\n");
         }
+        sb.Append("    </div>\n  </div>\n");
+    }
+
+    /// <summary>Home-only white-bar strip: word-labeled stage jumps into dashboard landmarks. Pure links —
+    /// no radios, no section hiding. Active pill follows <c>:target</c> via CSS. [Story 9.8]</summary>
+    private static void AppendWorkModeJumpStrip(StringBuilder sb)
+    {
+        sb.Append("  <div class=\"site-nav-key-views work-mode-jumps\" aria-label=\"Work stage\">\n");
+        sb.Append("    <div class=\"work-mode-pills\" role=\"navigation\">\n");
+        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-overview\">Overview</a>\n");
+        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-gather\">Gather</a>\n");
+        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-draft\">Draft</a>\n");
+        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-develop\">Develop</a>\n");
+        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-review\">Review</a>\n");
         sb.Append("    </div>\n  </div>\n");
     }
 

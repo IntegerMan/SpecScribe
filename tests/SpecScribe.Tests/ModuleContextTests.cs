@@ -141,6 +141,12 @@ public class BmadCommandsTests
     private static int CountClass(string html, string cssClass) =>
         html.Split($"class=\"{cssClass}\"", StringSplitOptions.None).Length - 1;
 
+    private static int CountNextStepCards(string html) =>
+        html.Split("class=\"next-step-card ", StringSplitOptions.None).Length - 1;
+
+    private static int CountNextStepPrimary(string html) =>
+        html.Split("next-step-card-primary", StringSplitOptions.None).Length - 1;
+
     [Fact]
     public void RenderNextSteps_UsesDetectedModuleCommands()
     {
@@ -152,7 +158,8 @@ public class BmadCommandsTests
         Assert.Contains("Next Steps", html);
         Assert.DoesNotContain("(BMad Method)", html);
         Assert.DoesNotContain("/gds-", html);
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
+        Assert.Equal(1, CountNextStepPrimary(html));
+        Assert.Contains("next-steps-cards", html);
         Assert.DoesNotContain("Other actions", html);
     }
 
@@ -183,11 +190,11 @@ public class BmadCommandsTests
         Assert.DoesNotContain("/bmad-create-story", html);
         Assert.DoesNotContain("/bmad-retrospective", html);
         Assert.Contains("/bmad-correct-course", html);
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
-        Assert.Contains("Other actions", html);
-        Assert.True(html.IndexOf("next-steps-primary", StringComparison.Ordinal)
+        Assert.Equal(1, CountNextStepPrimary(html));
+        Assert.DoesNotContain("Other actions", html);
+        Assert.True(html.IndexOf("next-step-card-primary", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-code-review 2.1", StringComparison.Ordinal));
-        Assert.True(html.IndexOf("Other actions", StringComparison.Ordinal)
+        Assert.True(html.IndexOf("/bmad-code-review 2.1", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-correct-course", StringComparison.Ordinal));
     }
 
@@ -199,15 +206,14 @@ public class BmadCommandsTests
         Assert.Contains("/bmad-dev-story 1.2", html);
         Assert.Contains("/bmad-code-review 1.2", html);
         Assert.Contains("/bmad-correct-course", html);
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
-        Assert.Contains("next-steps-alt", html);
+        Assert.Equal(1, CountNextStepPrimary(html));
+        Assert.Equal(3, CountNextStepCards(html));
+        Assert.DoesNotContain("Other actions", html);
         Assert.True(html.IndexOf("/bmad-dev-story 1.2", StringComparison.Ordinal)
-                    < html.IndexOf("Other actions", StringComparison.Ordinal));
-        Assert.True(html.IndexOf("Other actions", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-code-review 1.2", StringComparison.Ordinal));
         Assert.True(html.IndexOf("/bmad-code-review 1.2", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-correct-course", StringComparison.Ordinal));
-        Assert.Contains("next-steps-desc", html);
+        Assert.Contains("next-step-desc", html);
     }
 
     [Fact]
@@ -222,11 +228,11 @@ public class BmadCommandsTests
         var html = BmadCommands.RenderNextSteps(Story("1.2", "in-progress"), catalog);
 
         Assert.DoesNotContain("/bmad-dev-story", html);
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
+        Assert.Equal(1, CountNextStepPrimary(html));
         Assert.Contains("/bmad-code-review 1.2", html);
-        Assert.True(html.IndexOf("next-steps-primary", StringComparison.Ordinal)
+        Assert.True(html.IndexOf("next-step-card-primary", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-code-review 1.2", StringComparison.Ordinal));
-        Assert.Contains("Other actions", html);
+        Assert.DoesNotContain("Other actions", html);
         Assert.Contains("/bmad-correct-course", html);
     }
 
@@ -237,7 +243,7 @@ public class BmadCommandsTests
         var html = BmadCommands.RenderNextSteps(Story("3.2", null), BmmCatalog);
 
         Assert.Contains("/bmad-create-story 3.2", html);
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
+        Assert.Equal(1, CountNextStepPrimary(html));
         Assert.DoesNotContain("check-implementation-readiness", html);
     }
 
@@ -248,11 +254,10 @@ public class BmadCommandsTests
 
         Assert.Contains("/bmad-create-story 3.1", html);
         Assert.Contains("/bmad-check-implementation-readiness", html);
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
+        Assert.Equal(1, CountNextStepPrimary(html));
         Assert.True(html.IndexOf("/bmad-create-story 3.1", StringComparison.Ordinal)
-                    < html.IndexOf("Other actions", StringComparison.Ordinal));
-        Assert.True(html.IndexOf("Other actions", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-check-implementation-readiness", StringComparison.Ordinal));
+        Assert.DoesNotContain("Other actions", html);
     }
 
     [Fact]
@@ -266,7 +271,7 @@ public class BmadCommandsTests
         Assert.Contains("ss-icon", without);
         Assert.DoesNotContain("/bmad-code-review", without);
         Assert.DoesNotContain("Other actions", without);
-        Assert.DoesNotContain("next-steps-primary", without);
+        Assert.DoesNotContain("next-step-card-primary", without);
 
         // With correct-course: celebration + one muted escape hatch, never a primary / never code-review.
         var with = BmadCommands.RenderNextSteps(Story("2.1", "done"), BmmCatalog);
@@ -276,7 +281,7 @@ public class BmadCommandsTests
         Assert.Contains("Other actions", with);
         Assert.Contains("/bmad-correct-course", with);
         Assert.Contains("Re-open this story if it needs rework.", with);
-        Assert.DoesNotContain("next-steps-primary", with);
+        Assert.DoesNotContain("next-step-card-primary", with);
         Assert.DoesNotContain("/bmad-code-review", with);
         Assert.Contains("next-steps-desc", with);
     }
@@ -289,7 +294,8 @@ public class BmadCommandsTests
         Assert.Contains("/bmad-dev-story 1.2", html);
         Assert.Contains("/bmad-code-review 1.2", html);
         Assert.DoesNotContain("correct-course", html);
-        Assert.Contains("Other actions", html); // code-review still demoted
+        Assert.DoesNotContain("Other actions", html);
+        Assert.Equal(2, CountNextStepCards(html));
     }
 
     [Fact]
@@ -323,7 +329,8 @@ public class BmadCommandsTests
         var html = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: false, Story("1.1", "done"), Story("1.2", "done")), catalog);
 
         Assert.Contains("/bmad-retrospective 1", html);
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
+        Assert.Equal(1, CountNextStepPrimary(html));
+        Assert.Contains("next-steps-cards", html);
         Assert.DoesNotContain("Other actions", html);
     }
 
@@ -373,7 +380,7 @@ public class BmadCommandsTests
         // (It may still be named as the next story to draft, since this fixture leaves its plan path unset.)
         Assert.DoesNotContain("dev-story 1.3", html);
         Assert.DoesNotContain("code-review 1.3", html);
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
+        Assert.Equal(1, CountNextStepPrimary(html));
     }
 
     [Fact]
@@ -394,8 +401,10 @@ public class BmadCommandsTests
         Assert.True(html.IndexOf("awaiting code review", StringComparison.Ordinal)
                     < html.IndexOf("/bmad-dev-story", StringComparison.Ordinal),
             "review prompt should render before the front-line dev-story prompt");
-        Assert.Equal(1, CountClass(html, "next-steps-primary"));
-        Assert.Contains("Other actions", html);
+        Assert.Equal(1, CountNextStepPrimary(html));
+        Assert.DoesNotContain("Other actions", html);
+        Assert.True(html.IndexOf("awaiting code review", StringComparison.Ordinal)
+                    < html.IndexOf("/bmad-dev-story", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -455,7 +464,7 @@ public class BmadCommandsTests
             epicHtml.IndexOf("/bmad-create-story 1.2", StringComparison.Ordinal)
             < epicHtml.IndexOf("/bmad-sprint-status", StringComparison.Ordinal),
             "create-story must be primary when Up Next target is undrafted");
-        Assert.Equal(1, CountClass(epicHtml, "next-steps-primary"));
+        Assert.Equal(1, CountNextStepPrimary(epicHtml));
     }
 
     [Fact]
@@ -478,6 +487,7 @@ public class BmadCommandsTests
             html.IndexOf("/bmad-sprint-status", StringComparison.Ordinal)
             < html.IndexOf("/bmad-create-story 1.2", StringComparison.Ordinal),
             "with an in-progress front line, sprint-status stays primary");
-        Assert.Contains("Other actions", html);
+        Assert.DoesNotContain("Other actions", html);
+        Assert.Equal(2, CountNextStepCards(html));
     }
 }

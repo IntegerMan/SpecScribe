@@ -128,4 +128,59 @@ public class CollapsibleSectionsTests
         Assert.Contains("<summary><h2 id=\"dev-notes\"><em>Dev</em> Notes</h2></summary>", wrapped);
         Assert.DoesNotContain("id=\"reuse-map\"", wrapped);
     }
+
+    [Fact]
+    public void WrapSections_IdLessFollowingH2_EndsSectionWithoutSwallowingIt()
+    {
+        const string html = """
+            <h2 id="dev-notes">Dev Notes</h2>
+            <p>notes body</p>
+            <h2>Undrafted aside</h2>
+            <p>must stay expanded</p>
+            <h2 id="tasks-subtasks">Tasks / Subtasks</h2>
+            <p>tasks</p>
+            """;
+
+        var wrapped = CollapsibleSections.WrapStoryRemainder(html);
+
+        Assert.Contains("id=\"dev-notes-section\"", wrapped);
+        Assert.Contains("<h2>Undrafted aside</h2>", wrapped);
+        Assert.DoesNotContain("Undrafted aside</h2></summary>", wrapped);
+        // Id-less H2 must remain outside the collapsed block (before the moved details at end).
+        var asideAt = wrapped.IndexOf("<h2>Undrafted aside</h2>", StringComparison.Ordinal);
+        var detailsAt = wrapped.IndexOf("id=\"dev-notes-section\"", StringComparison.Ordinal);
+        Assert.True(asideAt >= 0 && detailsAt > asideAt);
+        Assert.Contains("must stay expanded", wrapped[..detailsAt]);
+    }
+
+    [Fact]
+    public void MoveCollapsibleSectionsToEnd_PreservesNestedDetailsInsideBody()
+    {
+        const string html = """
+            <h2 id="context-scope">Context</h2>
+            <p>open</p>
+            <h2 id="dev-notes">Dev Notes</h2>
+            <p>before</p>
+            <details class="author-note"><summary>Inner</summary><p>nested body</p></details>
+            <p>after</p>
+            <h2 id="tasks-subtasks">Tasks</h2>
+            <p>tasks</p>
+            """;
+
+        var wrapped = CollapsibleSections.WrapStoryRemainder(html);
+
+        Assert.Contains("id=\"dev-notes-section\"", wrapped);
+        Assert.Contains("<details class=\"author-note\"><summary>Inner</summary><p>nested body</p></details>", wrapped);
+        // Outer collapsible must enclose the nested block intact (balanced close after nested close).
+        var outerOpen = wrapped.IndexOf("<details class=\"collapsible-section\" id=\"dev-notes-section\">", StringComparison.Ordinal);
+        Assert.True(outerOpen >= 0);
+        var nestedOpen = wrapped.IndexOf("<details class=\"author-note\">", outerOpen, StringComparison.Ordinal);
+        Assert.True(nestedOpen > outerOpen);
+        var nestedClose = wrapped.IndexOf("</details>", nestedOpen, StringComparison.Ordinal);
+        var outerClose = wrapped.IndexOf("</details>", nestedClose + "</details>".Length, StringComparison.Ordinal);
+        Assert.True(nestedClose >= 0 && outerClose > nestedClose);
+        Assert.Contains("<p>after</p>", wrapped[outerOpen..outerClose]);
+        // No stray dangling close left in the expanded Tasks region.
+        Assert.Contains("<h2 id=\"tasks-subtasks\">Tasks</h2>", wrapped[..outerOpen]);
+    }
 }

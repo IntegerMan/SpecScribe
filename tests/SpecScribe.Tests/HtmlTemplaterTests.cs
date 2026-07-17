@@ -697,7 +697,8 @@ public class HtmlTemplaterTests
         Assert.True(menu >= 0 && keyViews >= 0 && band >= 0 && glance >= 0, "menu, key-views, tile band, and glance should render");
         Assert.True(menu < keyViews && keyViews < band && band < glance,
             "journey menu precedes key-views, which precedes the tile band, which precedes Project at a Glance");
-        Assert.Contains("quick-link-pill", html);
+        Assert.Contains("work-mode-pill", html);
+        Assert.Contains("href=\"#wm-overview\"", html);
         Assert.DoesNotContain("dashboard-header", html);
         Assert.DoesNotContain("<h3>Explore Key Views</h3>", html);
     }

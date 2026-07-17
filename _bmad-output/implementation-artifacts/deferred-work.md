@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 9-5-distinct-acceptance-criteria-blocks-and-collapsed-dev-notes.md (2026-07-16)
+
+- Markdig duplicate-slug forms (`references-1`) never match exact `StoryRemainderSlugs` (`dev-notes`/`references`) — second same-titled H2 stays expanded. Rare; revisit if foreign-framework artifacts collide. [`CollapsibleSections.cs:14-15`]
+- Adjacent 9.4 polish in the same working tree: `ExtractChangeLogVerification` continues past malformed dated rows instead of returning null on the first dated-shape match. Revisit in 9.4 review. [`EpicsParser.cs:182-186`]
+- Adjacent 9.4 polish: `ExtractTestEvidence` falls back to `### Dev Agent Record` while sibling file-list / change-surface extractors may not — asymmetric empty surfaces. Revisit in 9.4 review. [`EpicsParser.cs:143-146`]
+
 ## Deferred from: code review of 9-1-requirement-pages-link-to-their-covering-stories.md (2026-07-16)
 
 - `epics.Epics.ToDictionary(e => e.Number)` in `RenderRequirement` can throw on duplicate epic numbers and abort requirement-page generation — same pre-existing pattern as `StoriesFor` / parser `DeriveStatus`; revisit if epic-list de-dupe is added. [`RequirementsTemplater.cs:155`]

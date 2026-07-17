@@ -108,8 +108,11 @@ public class WebviewThemingTests
         Assert.DoesNotContain("--vscode-editorError", bridge);
         Assert.DoesNotContain("--vscode-editorWarning", bridge);
         // Story 9.5: resting AC tint companion (site parchment doesn't read on dark) beside the :target override.
+        // border-color must not wipe the gold left accent — reassert border-left-color after it.
         Assert.Contains(".vscode-dark .ac-criterion,", bridge);
         Assert.Contains(".vscode-dark .ac-criterion:target,", bridge);
+        Assert.Contains("border-left-color: var(--gold)", bridge);
+        Assert.Contains("border-left-color: var(--gold-light)", bridge);
     }
 
     // ----- Webview-only: the theme can never leak into the generated HTML surface (byte-parity guardrail) -------

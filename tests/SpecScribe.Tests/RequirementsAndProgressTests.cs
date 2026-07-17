@@ -339,19 +339,72 @@ public class RequirementsParserTests
         Assert.Contains("Deferred on purpose", html);
         Assert.Contains("Not yet mapped", html);
         Assert.Contains(Icons.ForStatus("unmapped"), html);
-        // In-flight tooltip enumerates the lifecycle (Active/Ready/Planned).
+        // The bar is bracketed by reading; In flight keeps its real tier sub-colors so Planned isn't an orphan.
+        // (This fixture has 0 Done, so the Satisfied bracket is correctly omitted — a zero reading shows no bracket.)
+        Assert.Contains("satisfaction-bracket in-flight", html);
+        Assert.DoesNotContain("satisfaction-bracket satisfied", html);
+        // In-flight tooltip / bar aria enumerates the lifecycle (Active/Ready/Planned).
         Assert.Contains("partially implemented", html);
         Assert.Contains("ready for dev", html);
+        // The rollup is explicitly labeled as a grouping of the six tiers.
+        Assert.Contains("satisfaction-note", html);
         // Design (UX-DR) is in the ledger totals — Everything has 8 reqs (4 planned + 3 unmapped + 1 deferred).
         Assert.Equal(8, counts.RequirementsOverall.Total);
         Assert.Equal(2, counts.RequirementsDesign.Total);
         Assert.Contains("seg pending", html); // Planned / Unmapped tiers
+        // Overall six-tier donut leads the row (same vocabulary as the Sankey), rounding the kinds to a 2×2.
+        Assert.Contains("Overall (8)", html);
+        Assert.Contains("Functional (4)", html);
         // Existing FR+NFR surfaces still present (additive band, not a replacement).
         Assert.Contains("Requirements at a glance", html);
         Assert.Contains("id=\"at-a-glance\"", html);
         Assert.Contains("Requirements flow", html);
         Assert.Contains("req-status-grid", html);
         Assert.Contains("req-flow-svg", html);
+    }
+
+    [Fact]
+    public void RenderIndex_NoNfrOrDesign_OmitsOverallDonut()
+    {
+        // FR-only project: the Overall donut would just duplicate the Functional donut, so it's omitted —
+        // the row stays the single Functional donut. [Story 9.9]
+        var epics = EpicsParser.Parse("""
+            # Epics
+            ## Requirements Inventory
+            ### Functional Requirements
+            **Core**
+            FR1: A functional requirement
+            ## FR Coverage Map
+            FR1: Epic 1 - covered
+            ## Epic List
+            ### Epic 1: Alone
+            Goal.
+            ## Epic 1: Alone
+            ### Story 1.1: A
+            As a user, I want x, so that y.
+            """);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse("""
+            # Epics
+            ## Requirements Inventory
+            ### Functional Requirements
+            **Core**
+            FR1: A functional requirement
+            ## FR Coverage Map
+            FR1: Epic 1 - covered
+            ## Epic List
+            ### Epic 1: Alone
+            Goal.
+            ## Epic 1: Alone
+            ### Story 1.1: A
+            As a user, I want x, so that y.
+            """, epics, progress);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+
+        Assert.DoesNotContain("Overall (", html);
+        Assert.Contains("Functional (1)", html);
     }
 
     [Fact]

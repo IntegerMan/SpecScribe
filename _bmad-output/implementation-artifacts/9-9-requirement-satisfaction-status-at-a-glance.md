@@ -231,6 +231,7 @@ Composer (Cursor agent)
 - Added hub "Satisfaction at a glance" band (`#satisfaction`) with stacked bar + four chips; Home rollup links to it.
 - Added "Not yet mapped" to `LegendKey` (pending swatch + unmapped icon/word via `StageMeaning`/`Icons`).
 - No 7th status token, no new classifier, no JS, FR+NFR grid/flow unchanged; golden fingerprint regenerated; three parity suites green.
+- Coherence pass (post-review feedback): reworked the flat six-tier stacked bar into four proportional **reading brackets** (Satisfied · In flight · Deferred · Unmapped, gap-separated, chip order) whose **In-flight bracket keeps its real Partially/Ready/Planned tier colors** — the bar now matches the Sankey + donuts and Planned is no longer an orphan segment. Added a `.satisfaction-note` caption naming the band a rollup of the six tiers. Added an **Overall** six-tier donut leading the requirements donut row (2×2 with the kinds; same vocabulary as the Sankey). Home rollup gained the same bracketed bar above its chips so it bridges to the Sankey directly below. Golden fingerprint regenerated; full suite 1283 green; verified visually.
 
 ### File List
 
@@ -257,3 +258,4 @@ Composer (Cursor agent)
 |------|--------|
 | 2026-07-16 | create-story — ready-for-dev. Owner locked: (1) requirements-hub-owned "Satisfaction at a glance" band spanning FR+NFR+UX-DR + compact Home rollup; (2) four-reading summary (Satisfied · In flight · Deferred on purpose · Unmapped) as one proportional stacked bar + count chips over the six canonical tiers (no parallel colors/words); (3) extend `ProjectCounts` ledger + retire local recount; (4) close the legend gap (add "Not yet mapped" row) and include UX-DR/Design in the holistic reading. Composes 9.1–9.3 + 8.2/8.3; absorbs none. |
 | 2026-07-16 | Implemented — satisfaction ledger + hub band + Home rollup + legend Unmapped row; status → review. |
+| 2026-07-16 | UI coherence pass — bracketed four-reading bar (In-flight keeps real tier colors), rollup caption, Overall 2×2 donut, Home rollup bar bridges the Sankey; golden regenerated; 1283 green. |

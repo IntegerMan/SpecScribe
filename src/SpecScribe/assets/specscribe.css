@@ -276,6 +276,16 @@ body {
 .site-menu-trigger:hover,
 .site-menu-link.active,
 .site-menu-group.has-active > .site-menu-trigger { color: #f5c842; border-bottom-color: currentColor; }
+/* Journey family tints on the dark bar — carry the color that used to live only on the white chips. */
+.site-menu-group.family-planning > .site-menu-trigger { color: #e8c56a; }
+.site-menu-group.family-architecture > .site-menu-trigger { color: #7eb8b0; }
+.site-menu-group.family-epics > .site-menu-trigger { color: #8fbc8f; }
+.site-menu-group.family-planning > .site-menu-trigger:hover,
+.site-menu-group.family-planning.has-active > .site-menu-trigger { color: #f5c842; border-bottom-color: var(--gold-light); }
+.site-menu-group.family-architecture > .site-menu-trigger:hover,
+.site-menu-group.family-architecture.has-active > .site-menu-trigger { color: #a8d4ce; border-bottom-color: var(--teal); }
+.site-menu-group.family-epics > .site-menu-trigger:hover,
+.site-menu-group.family-epics.has-active > .site-menu-trigger { color: #b5d4b5; border-bottom-color: var(--moss-light); }
 .site-menu-link:focus-visible,
 .site-menu-trigger:focus-visible { outline: 2px solid var(--gold-light); outline-offset: -2px; }
 .site-menu-link .ss-icon,
@@ -2528,13 +2538,73 @@ a.ref-file-node:focus-visible {
 .sunburst-hint { margin-top: 0.4rem; font-size: 0.78rem; color: var(--ink-light); font-style: normal; }
 
 /* ====================== NEXT STEPS (BMad commands) ====================== */
+/* Card row (Story 9.8): up to three horizontal command cards — same lift/accent grammar as Now & Next. */
+.next-steps-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+  margin-top: 0.15rem;
+}
+.next-step-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.next-step-card:hover {
+  box-shadow: 0 3px 10px var(--shadow);
+  border-color: var(--rust-light);
+  transform: translateY(-1px);
+}
+.next-step-card-primary {
+  background: linear-gradient(180deg, #e4efec, var(--cream));
+  border-left-width: 4px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+.next-step-card.review { border-left-color: var(--status-review); }
+.next-step-card.active { border-left-color: var(--status-active); }
+.next-step-card.ready { border-left-color: var(--status-ready); }
+.next-step-card.drafted { border-left-color: var(--status-drafted); }
+.next-step-card.pending { border-left-color: var(--status-pending); }
+.next-step-kicker {
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  font-weight: 600;
+}
+.next-step-card-primary .next-step-kicker { color: var(--teal); }
+.next-step-card.review .next-step-kicker { color: var(--teal-deep); }
+.next-step-card.active .next-step-kicker { color: var(--teal); }
+.next-step-card.ready .next-step-kicker { color: var(--gold); }
+.next-step-card.drafted .next-step-kicker { color: var(--gold); }
+.next-step-command { min-width: 0; }
+.next-step-command .cmd-badge { max-width: 100%; }
+.next-step-command .cmd-text { white-space: normal; word-break: break-word; }
+.next-step-desc {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-light);
+  line-height: 1.45;
+  flex: 1;
+}
+@media (max-width: 960px) {
+  .next-steps-cards { grid-template-columns: 1fr; }
+}
+
 .next-steps-list { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
 
 /* The command <code> (.cmd-text) carries no pill of its own — the surrounding .cmd-badge is the pill. */
 
 .next-steps-desc { display: block; margin-top: 0.25rem; font-size: 0.78rem; color: var(--ink-light); line-height: 1.5; }
 
-/* Hero primary: the one recommended command per state. Accent border mirrors .next-steps.all-done. [Story 8.5] */
+/* Legacy list primary (overflow / done hatch) — card primary uses .next-step-card-primary. [Story 8.5] */
 .next-steps-primary {
   border-left: 3px solid var(--status-active);
   padding-left: 0.65rem;
@@ -3928,8 +3998,6 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .req-stacked-bar .seg.ready { background: var(--status-ready); }
 .req-stacked-bar .seg.pending { background: var(--status-pending); }
 .req-stacked-bar .seg.deferred { background: var(--status-deferred); }
-/* Unmapped reuses pending/tan (no 7th token) — distinct via chip icon+word, not bar color. [Story 9.9] */
-.req-stacked-bar .seg.unmapped { background: var(--status-pending); }
 
 .req-stacked-legend {
   display: flex;
@@ -3945,16 +4013,45 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .req-stacked-legend .swatch.pending { background: var(--status-pending); }
 .req-stacked-legend .swatch.deferred { background: var(--status-deferred); }
 
-/* Satisfaction at a glance (Story 9.9) — hub band + Home rollup. Token-routed only. */
+/* Satisfaction at a glance (Story 9.9) — hub band + Home rollup. Token-routed only.
+   The bar is four proportional brackets (Satisfied · In flight · Deferred · Unmapped) separated by a gap;
+   the In-flight bracket sub-divides into its real Partially/Ready/Planned tier colors so the bar matches the
+   Sankey + donuts and Planned is never an orphan segment. */
 .satisfaction-band {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.7rem;
   margin-bottom: 1.25rem;
 }
 .satisfaction-bar {
-  height: 0.85rem;
+  display: flex;
+  gap: 4px;
+  height: 0.75rem;
 }
+.satisfaction-bracket {
+  display: flex;
+  flex-basis: 0;
+  min-width: 6px;
+  height: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--parchment-dark);
+}
+.satisfaction-bracket .seg { height: 100%; flex-basis: 0; }
+.satisfaction-bracket .seg.done { background: var(--status-done); }
+.satisfaction-bracket .seg.active { background: var(--status-active); }
+.satisfaction-bracket .seg.ready { background: var(--status-ready); }
+.satisfaction-bracket .seg.pending { background: var(--status-pending); }
+.satisfaction-bracket .seg.deferred { background: var(--status-deferred); }
+/* Unmapped reuses pending/tan (no 7th token) — kept distinct by its chip icon+word, not by bar color. */
+.satisfaction-bracket .seg.unmapped { background: var(--status-pending); }
+.satisfaction-note {
+  font-size: 0.78rem;
+  color: var(--ink-light);
+  font-style: italic;
+  margin: 0;
+}
+.satisfaction-note strong { font-style: normal; color: var(--ink-faded); }
 .satisfaction-chips {
   display: flex;
   flex-wrap: wrap;
@@ -3977,13 +4074,15 @@ a.satisfaction-chip:hover { filter: brightness(0.97); }
 }
 .satisfaction-rollup {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem 0.85rem;
-  margin: 0.35rem 0 0.75rem;
-  padding: 0.45rem 0.55rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.85rem;
+  padding: 0.55rem 0.6rem 0.75rem;
   border-bottom: 1px solid var(--border);
 }
+.satisfaction-rollup .satisfaction-bar { width: 100%; }
+.satisfaction-rollup .satisfaction-chips { gap: 0.4rem 0.6rem; }
 .satisfaction-rollup-label {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -5228,50 +5327,65 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 .req-panel:has(#rv-grid:checked) .req-view-flow { display: none; }
 .req-panel:has(#rv-grid:checked) .req-view-grid { display: block; }
 
-/* Home work-stage focus strip (Story 9.8 silhouette #2): Overview default; Gather/Draft/Develop/Review
-   highlight stage panels via :has() — dim siblings, never display:none / remove from a11y tree.
-   Word labels identify stages (never color-only). Unique wm-* radios; reuses board-tabs chrome. */
-.work-mode-strip { display: block; margin: 0 0 1rem; }
-.work-mode-strip .board-tabbar { display: inline-flex; flex-wrap: wrap; }
-#wm-overview:checked ~ .board-tabbar label[for="wm-overview"],
-#wm-gather:checked ~ .board-tabbar label[for="wm-gather"],
-#wm-draft:checked ~ .board-tabbar label[for="wm-draft"],
-#wm-develop:checked ~ .board-tabbar label[for="wm-develop"],
-#wm-review:checked ~ .board-tabbar label[for="wm-review"] {
-  background: var(--warm-white);
-  color: var(--ink);
-  box-shadow: 0 1px 3px var(--shadow);
+/* Home work-stage jump strip (Story 9.8): lives in the white key-views band; scrolls to dashboard
+   landmarks. Word labels; active state via :target — never dims or hides sibling content. */
+.work-mode-jumps .work-mode-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.55rem 1.5rem;
+  box-sizing: border-box;
+}
+.work-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 0.78rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-faded);
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.28rem 0.95rem;
+  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s, background 0.15s;
 }
-#wm-overview:focus-visible ~ .board-tabbar label[for="wm-overview"],
-#wm-gather:focus-visible ~ .board-tabbar label[for="wm-gather"],
-#wm-draft:focus-visible ~ .board-tabbar label[for="wm-draft"],
-#wm-develop:focus-visible ~ .board-tabbar label[for="wm-develop"],
-#wm-review:focus-visible ~ .board-tabbar label[for="wm-review"] {
-  outline: 2px solid var(--teal);
-  outline-offset: 2px;
+.work-mode-pill:hover {
+  color: var(--ink);
+  border-color: var(--gold-light);
+  box-shadow: 0 2px 8px var(--shadow);
 }
-
-/* Non-Overview stages: de-emphasize non-focus panels/tiles; emphasize focus targets with border weight. */
-.dashboard:has(#wm-gather:checked) .chart-panel:not(.wm-focus-gather),
-.dashboard:has(#wm-gather:checked) .dashboard-tile-band > :not(.wm-focus-gather),
-.dashboard:has(#wm-draft:checked) .chart-panel:not(.wm-focus-draft),
-.dashboard:has(#wm-draft:checked) .dashboard-tile-band > :not(.wm-focus-draft),
-.dashboard:has(#wm-develop:checked) .chart-panel:not(.wm-focus-develop),
-.dashboard:has(#wm-develop:checked) .dashboard-tile-band > :not(.wm-focus-develop),
-.dashboard:has(#wm-review:checked) .chart-panel:not(.wm-focus-review),
-.dashboard:has(#wm-review:checked) .dashboard-tile-band > :not(.wm-focus-review) {
-  opacity: 0.48;
+.work-mode-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+/* Active pill tracks the in-page :target landmark; Overview is the resting default. */
+body:not(:has(#wm-gather:target)):not(:has(#wm-draft:target)):not(:has(#wm-develop:target)):not(:has(#wm-review:target))
+  .work-mode-pill[href="#wm-overview"],
+body:has(#wm-gather:target) .work-mode-pill[href="#wm-gather"],
+body:has(#wm-draft:target) .work-mode-pill[href="#wm-draft"],
+body:has(#wm-develop:target) .work-mode-pill[href="#wm-develop"],
+body:has(#wm-review:target) .work-mode-pill[href="#wm-review"] {
+  color: var(--ink);
+  background: var(--warm-white);
+  border-color: var(--gold);
+  box-shadow: 0 1px 4px var(--shadow);
 }
-.dashboard:has(#wm-gather:checked) .wm-focus-gather,
-.dashboard:has(#wm-draft:checked) .wm-focus-draft,
-.dashboard:has(#wm-develop:checked) .wm-focus-develop,
-.dashboard:has(#wm-review:checked) .wm-focus-review {
-  opacity: 1;
-  border-left-width: 4px;
-  border-left-style: solid;
-  border-left-color: var(--gold);
-  scroll-margin-top: 1rem;
+.dashboard-stage-anchor {
+  scroll-margin-top: calc(var(--nav-offset) + 0.75rem);
+}
+.dashboard-stage-anchor:target {
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+.dashboard-stage-anchor.stage-sentinel {
+  flex: 0 0 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  box-shadow: none;
 }
 
 /* Retros link + open-items flag buttons in the control row. Retros reuses the .cmd-menu-toggle chrome as an
@@ -5286,34 +5400,75 @@ a.cmd-menu-toggle:hover { color: var(--rust); border-color: var(--gold-light); }
 }
 .sprint-flag:hover { color: var(--rust); border-color: var(--gold-light); }
 
-/* Open action items page: a touch wider than the 860 doc column so item text + its links breathe. */
-.action-items-wrap { max-width: 1040px; margin: 0 auto; }
-/* One card per item with its resolve command + retro/deferred links. */
-.action-items-list { list-style: none; margin: 0; padding: 0; }
-.action-item-card {
+/* Open action items + deferred-work: scan-first follow-up rows (Story 9.10). */
+.action-items-wrap,
+.deferred-work-wrap { max-width: 1040px; margin: 0 auto; }
+.followup-rows-list,
+.action-items-list,
+.deferred-items-list { list-style: none; margin: 0; padding: 0; }
+
+.followup-row {
   background: var(--warm-white); border: 1px solid var(--border);
   border-left: 3px solid var(--status-review); border-radius: 6px;
-  padding: 0.9rem 1.1rem; margin-bottom: 0.9rem;
+  padding: 0.65rem 1rem; margin-bottom: 0.65rem;
 }
-.action-item-text { color: var(--ink); font-size: 0.92rem; line-height: 1.5; margin-bottom: 0.5rem; }
-.action-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
-.action-item-retro { font-size: 0.78rem; color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
-.action-item-retro:hover { color: var(--rust); }
-.action-item-deferred { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; border-bottom: 1px dotted var(--border); }
-.action-item-deferred:hover { color: var(--rust); }
-.action-item-resolve { margin-top: 0.2rem; }
+.followup-row.resolved {
+  border-left-color: var(--status-done);
+  opacity: 0.78;
+}
+.followup-row-scan {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 0.65rem;
+}
+.followup-row-summary {
+  flex: 1 1 12rem; min-width: 0;
+  color: var(--ink); font-size: 0.92rem; line-height: 1.45;
+}
+.followup-row-source { flex-shrink: 0; }
+.followup-row-primary {
+  flex-shrink: 0; font-size: 0.78rem; color: var(--teal);
+  text-decoration: none; border-bottom: 1px dotted var(--gold-light);
+  cursor: pointer; list-style: none;
+}
+a.followup-row-primary:hover { color: var(--rust); }
+
+/* Per-row disclosure — pure CSS, reuses dev-agent caret grammar (NFR5). */
+.followup-row-detail { margin-top: 0; }
+.followup-row-detail--primary { margin-left: auto; }
+.followup-row-detail > summary,
+.followup-row-detail--primary > summary {
+  cursor: pointer; list-style: none; font-size: 0.78rem;
+  color: var(--teal); border-bottom: 1px dotted var(--gold-light);
+}
+.followup-row-detail > summary::-webkit-details-marker,
+.followup-row-detail--primary > summary::-webkit-details-marker { display: none; }
+.followup-row-detail > summary::before,
+.followup-row-detail--primary > summary::before { content: "▸ "; color: var(--gold); }
+.followup-row-detail[open] > summary::before,
+.followup-row-detail--primary[open] > summary::before { content: "▾ "; }
+.followup-row-detail[open] > summary,
+.followup-row-detail--primary[open] > summary { margin-bottom: 0.55rem; color: var(--ink-light); border-bottom: none; }
+.followup-row-detail-body {
+  padding-top: 0.35rem; border-top: 1px solid var(--parchment-dark);
+  color: var(--ink); font-size: 0.9rem; line-height: 1.5;
+}
+.followup-row-detail-body > :first-child { margin-top: 0; }
+.followup-row-detail-body > :last-child { margin-bottom: 0; }
+.followup-detail-fulltext { margin-bottom: 0.5rem; }
+
 .action-items-group {
   font-size: 1.05rem; color: var(--rust); margin: 1.4rem 0 0.7rem;
   border-bottom: 2px solid var(--parchment-deep); padding-bottom: 0.3rem;
 }
 .action-items-group a { color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
 .action-items-group a:hover { color: var(--rust); }
-.action-item-cross { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; border-bottom: 1px dotted var(--border); }
+.action-item-cross { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; border-bottom: 1px dotted var(--border); display: inline-block; margin-top: 0.35rem; }
 a.action-item-cross { color: var(--teal); border-bottom-color: var(--gold-light); }
 a.action-item-cross:hover { color: var(--rust); }
+.action-item-deferred { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; border-bottom: 1px dotted var(--border); display: inline-block; margin-top: 0.35rem; margin-left: 0.5rem; }
+.action-item-deferred:hover { color: var(--rust); }
+.action-item-resolve { margin-top: 0.5rem; }
 
-/* Deferred-work structured cards — sibling grammar of .action-item-* (Story 9.6). */
-.deferred-work-wrap { max-width: 1040px; margin: 0 auto; }
+/* Deferred-work structured groups — sibling of action-items (Story 9.6). */
 .deferred-group { margin-bottom: 1.8rem; }
 .deferred-group-title {
   font-size: 1.05rem; color: var(--rust); margin: 0 0 0.7rem;
@@ -5321,21 +5476,11 @@ a.action-item-cross:hover { color: var(--rust); }
 }
 .deferred-group-title a { color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
 .deferred-group-title a:hover { color: var(--rust); }
-.deferred-items-list { list-style: none; margin: 0; padding: 0; }
-.deferred-item-card {
-  background: var(--warm-white); border: 1px solid var(--border);
-  border-left: 3px solid var(--status-review); border-radius: 6px;
-  padding: 0.9rem 1.1rem; margin-bottom: 0.9rem;
-}
-.deferred-item-card.resolved {
-  border-left-color: var(--status-done);
-  opacity: 0.78;
-}
-.deferred-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem; }
 .deferred-resolved-mark {
   font-size: 0.85rem; color: var(--ink-light); font-weight: 700;
+  display: inline-block; margin-top: 0.35rem;
 }
-.deferred-item-resolving { font-size: 0.78rem; color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
+.deferred-item-resolving { font-size: 0.78rem; color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); display: inline-block; margin-top: 0.35rem; }
 a.deferred-item-resolving:hover { color: var(--rust); }
 .deferred-item-body { color: var(--ink); font-size: 0.92rem; line-height: 1.5; }
 .deferred-item-body > :first-child { margin-top: 0; }

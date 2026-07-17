@@ -153,25 +153,36 @@ public class FollowUpSurfacesTests : IDisposable
 
         var html = File.ReadAllText(Path.Combine(Site, "action-items.html"));
 
+        // Scan-first row grammar (Story 9.10): shared .followup-row, heavy detail in <details>.
+        Assert.Contains("class=\"followup-row\"", html);
+        Assert.Contains("followup-row-summary", html);
+        Assert.Contains("followup-row-detail", html);
+
         // Groups ordered by epic ascending.
         var epic1 = html.IndexOf("From the Epic 1 retrospective", StringComparison.Ordinal);
         var epic2 = html.IndexOf("From the Epic 2 retrospective", StringComparison.Ordinal);
         Assert.True(epic1 >= 0 && epic2 > epic1, "Epic 1 group must precede Epic 2");
 
-        // Canonical pair cross-links; unrelated "Schedule retros" does not.
+        // Canonical pair cross-links live inside disclosure; unrelated "Schedule retros" does not.
         Assert.Contains("also raised in Epic 2 retrospective", html);
         Assert.Contains("also raised in Epic 1 retrospective", html);
         var scheduleIdx = html.IndexOf("Schedule retros promptly", StringComparison.Ordinal);
-        var scheduleCardEnd = html.IndexOf("</li>", scheduleIdx, StringComparison.Ordinal);
-        var scheduleCard = html[scheduleIdx..scheduleCardEnd];
-        Assert.DoesNotContain("also raised", scheduleCard);
+        var scheduleRowStart = html.LastIndexOf("class=\"followup-row\"", scheduleIdx, StringComparison.Ordinal);
+        var scheduleRowEnd = html.IndexOf("</li>", scheduleIdx, StringComparison.Ordinal);
+        var scheduleRow = html[scheduleRowStart..scheduleRowEnd];
+        Assert.DoesNotContain("also raised", scheduleRow);
+        Assert.Contains("followup-row-detail", scheduleRow);
 
-        // Visible text linkifies Story N.M that exists in the plan.
+        // Full action text + cross-links are behind disclosure, not in the scan line.
+        var scanLineEnd = html.IndexOf("followup-row-detail", StringComparison.Ordinal);
+        var aboveFold = html[..scanLineEnd];
+        Assert.DoesNotContain("also raised in Epic", aboveFold);
+
+        // Visible text linkifies Story N.M that exists in the plan (inside disclosure body).
         Assert.Contains("class=\"story-ref\"", html);
         Assert.Contains(">Story 2.1</a>", html);
 
-        // Payload integrity is unit-tested on the templater (GenerateAll's module may omit quick-dev).
-        // Cross-check: no <a> leaked into any data-copy attribute that does exist.
+        // Payload integrity: no <a> leaked into any data-copy attribute.
         foreach (Match m in Regex.Matches(html, "data-copy=\"([^\"]*)\""))
             Assert.DoesNotContain("<a", m.Groups[1].Value);
     }
@@ -194,12 +205,19 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.True(File.Exists(deferredPath));
         var html = File.ReadAllText(deferredPath);
 
-        Assert.Contains("class=\"deferred-item-card\"", html);
-        Assert.Contains("class=\"deferred-item-card resolved\"", html);
+        Assert.Contains("class=\"followup-row\"", html);
+        Assert.Contains("class=\"followup-row resolved\"", html);
         Assert.Contains(">Resolved</span>", html);
         Assert.Contains("deferred-resolved-mark", html);
+        Assert.Contains("followup-row-detail", html);
         Assert.Contains("href=\"../epics/story-1-1.html\"", html);
         Assert.Contains("Resolving:", html);
+
+        // Full body and resolving link live inside disclosure, not the scan line.
+        var firstDetail = html.IndexOf("followup-row-detail", StringComparison.Ordinal);
+        Assert.Contains("Open casing mismatch", html[(firstDetail)..]);
+        var scanPrefix = html[..firstDetail];
+        Assert.DoesNotContain("Resolving:", scanPrefix);
 
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
         Assert.Contains("deferred-work.html", index);
@@ -230,7 +248,7 @@ public class FollowUpSurfacesTests : IDisposable
 
         var html = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
         Assert.Contains("deferred-work-fallback", html);
-        Assert.DoesNotContain("deferred-item-card", html);
+        Assert.DoesNotContain("followup-row", html);
         Assert.Contains("Parked item A", html);
     }
 

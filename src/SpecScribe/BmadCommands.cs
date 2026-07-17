@@ -123,36 +123,82 @@ public static class BmadCommands
             : $"<div class=\"chart-panel next-steps\">\n{inner}</div>\n\n";
     }
 
-    /// <summary>Shared panel body: <c>suggestions[0]</c> is the emphasized primary; any further survivors
-    /// render under a labeled, demoted "Other actions" group. Primacy is decided here at render time —
-    /// not at <see cref="Add"/> — so a null-dropped intended primary correctly promotes the next survivor.
-    /// [Story 8.5]</summary>
+    /// <summary>Shared panel body: up to three horizontal command cards (first emphasized as primary); any
+    /// further survivors render under a labeled "Other actions" group. Primacy is decided here at render
+    /// time — not at <see cref="Add"/> — so a null-dropped intended primary correctly promotes the next
+    /// survivor. [Story 8.5; Story 9.8 card polish]</summary>
     private static string RenderInner(List<Suggestion> suggestions)
     {
         if (suggestions.Count == 0) return string.Empty;
 
         var sb = new StringBuilder();
-        sb.Append("<h3>Next Steps</h3>\n<ul class=\"next-steps-list\">\n");
-        var primary = suggestions[0];
-        sb.Append("  <li class=\"next-steps-primary\">" +
-                  RenderCommandBadge(primary.Command) +
-                  $"<span class=\"next-steps-desc\">{PathUtil.Html(primary.Description)}</span></li>\n");
-        sb.Append("</ul>\n");
+        sb.Append("<h3>Next Steps</h3>\n<div class=\"next-steps-cards\">\n");
 
-        if (suggestions.Count > 1)
+        var cardCount = Math.Min(suggestions.Count, 3);
+        for (var i = 0; i < cardCount; i++)
         {
-            sb.Append(RenderAlternatesGroup(suggestions.Skip(1)));
+            var s = suggestions[i];
+            var isPrimary = i == 0;
+            var accent = AccentForCommand(s.Command);
+            var cardClass = isPrimary ? "next-step-card next-step-card-primary" : "next-step-card";
+            sb.Append($"  <div class=\"{cardClass} {accent}\">\n");
+            sb.Append($"    <span class=\"next-step-kicker\">{PathUtil.Html(KickerForCommand(s.Command, isPrimary))}</span>\n");
+            sb.Append($"    <div class=\"next-step-command\">{RenderCommandBadge(s.Command)}</div>\n");
+            sb.Append($"    <p class=\"next-step-desc\">{PathUtil.Html(s.Description)}</p>\n");
+            sb.Append("  </div>\n");
+        }
+
+        sb.Append("</div>\n");
+
+        if (suggestions.Count > 3)
+        {
+            sb.Append(RenderAlternatesGroup(suggestions.Skip(3)));
         }
 
         return sb.ToString();
     }
+
+    /// <summary>Status accent for a next-step card's left rail — derived from the command slug, not color-only.</summary>
+    private static string AccentForCommand(string command)
+    {
+        var slug = CommandSlug(command);
+        if (slug.Contains("code-review", StringComparison.Ordinal) || slug.Contains("retrospective", StringComparison.Ordinal))
+            return "review";
+        if (slug.Contains("dev-story", StringComparison.Ordinal) || slug.Contains("sprint-status", StringComparison.Ordinal)
+            || slug.Contains("correct-course", StringComparison.Ordinal))
+            return "active";
+        if (slug.Contains("create-story", StringComparison.Ordinal))
+            return "drafted";
+        if (slug.Contains("create-epics", StringComparison.Ordinal) || slug.Contains("sprint-planning", StringComparison.Ordinal))
+            return "ready";
+        if (slug.Contains("check-implementation", StringComparison.Ordinal))
+            return "pending";
+        return "ready";
+    }
+
+    private static string KickerForCommand(string command, bool isPrimary)
+    {
+        if (isPrimary) return "Recommended";
+        var slug = CommandSlug(command);
+        if (slug.Contains("code-review", StringComparison.Ordinal) || slug.Contains("retrospective", StringComparison.Ordinal))
+            return "Review";
+        if (slug.Contains("dev-story", StringComparison.Ordinal)) return "Develop";
+        if (slug.Contains("create-story", StringComparison.Ordinal)) return "Draft";
+        if (slug.Contains("sprint-status", StringComparison.Ordinal) || slug.Contains("sprint-planning", StringComparison.Ordinal))
+            return "Plan";
+        if (slug.Contains("create-epics", StringComparison.Ordinal)) return "Break down";
+        if (slug.Contains("correct-course", StringComparison.Ordinal)) return "Recover";
+        return "Also consider";
+    }
+
+    private static string CommandSlug(string command) => command.Split(' ')[0];
 
     private static string RenderAlternatesGroup(IEnumerable<Suggestion> alternates)
     {
         var sb = new StringBuilder();
         sb.Append("<div class=\"next-steps-alternates\">\n");
         sb.Append("<p class=\"next-steps-alternates-label\">Other actions</p>\n");
-        sb.Append("<ul class=\"next-steps-list\">\n");
+        sb.Append("<ul class=\"next-steps-list next-steps-overflow\">\n");
         foreach (var s in alternates)
         {
             sb.Append("  <li class=\"next-steps-alt\">" +

@@ -67,18 +67,21 @@ public class StylesheetTests
         Assert.Contains("grid-template-columns: repeat(var(--lane-count, 5), minmax(11.5rem, 1fr))", css);
         Assert.Contains(".sprint-lane-label", css);
         Assert.Contains("white-space: nowrap", css); // lane labels stay single-line with the count badge
-        // Story 9.9 satisfaction band / stacked bar — token-routed only
+        // Story 9.9 satisfaction band / bracketed bar — token-routed only
         Assert.Contains(".satisfaction-band", css);
         Assert.Contains(".satisfaction-chips", css);
         Assert.Contains(".satisfaction-rollup", css);
-        Assert.Contains(".req-stacked-bar .seg.active", css);
-        Assert.Contains(".req-stacked-bar .seg.unmapped { background: var(--status-pending); }", css);
+        Assert.Contains(".satisfaction-note", css);
+        Assert.Contains(".satisfaction-bracket .seg.active { background: var(--status-active); }", css);
+        Assert.Contains(".satisfaction-bracket .seg.unmapped { background: var(--status-pending); }", css);
         // Story 8.4 paired progress + readiness surfaces
         Assert.Contains(".story-status-pair", css);
         Assert.Contains(".sprint-card.no-plan", css);
         Assert.Contains(".sprint-lane-head.js-tip", css);
         Assert.Contains(".epic-mosaic-delivery", css);
-        // Story 8.5 primary / demoted-alternates next-steps hierarchy
+        // Story 8.5 primary / demoted-alternates next-steps hierarchy; Story 9.8 horizontal cards
+        Assert.Contains(".next-steps-cards", css);
+        Assert.Contains(".next-step-card-primary", css);
         Assert.Contains(".next-steps-primary", css);
         Assert.Contains(".next-steps-alternates", css);
         Assert.Contains(".next-steps-alt", css);
@@ -306,21 +309,18 @@ public class StylesheetTests
     }
 
     [Fact]
-    public void Stylesheet_HasWorkModeFocusStripRules()
+    public void Stylesheet_HasWorkModeJumpStripRules()
     {
-        // Story 9.8: Home work-stage strip — word labels, :has() emphasis, never display:none on siblings.
+        // Story 9.8: Home work-stage strip in the white bar — scroll jumps, never display:none / opacity dim.
         var css = ReadStylesheet();
-        Assert.Contains(".work-mode-strip", css);
-        Assert.Contains("#wm-overview:checked ~ .board-tabbar label[for=\"wm-overview\"]", css);
-        Assert.Contains("#wm-gather:checked ~ .board-tabbar label[for=\"wm-gather\"]", css);
-        Assert.Contains("#wm-draft:checked ~ .board-tabbar label[for=\"wm-draft\"]", css);
-        Assert.Contains("#wm-develop:checked ~ .board-tabbar label[for=\"wm-develop\"]", css);
-        Assert.Contains("#wm-review:checked ~ .board-tabbar label[for=\"wm-review\"]", css);
-        Assert.Contains(".dashboard:has(#wm-draft:checked) .wm-focus-draft", css);
-        Assert.Contains(".dashboard:has(#wm-gather:checked) .chart-panel:not(.wm-focus-gather)", css);
-        // Guardrail: stage emphasis dims via opacity — must not hide sibling panels.
-        Assert.DoesNotContain(".dashboard:has(#wm-draft:checked) .chart-panel:not(.wm-focus-draft) { display: none", css);
-        Assert.DoesNotContain(".dashboard:has(#wm-develop:checked) .chart-panel:not(.wm-focus-develop) { display: none", css);
+        Assert.Contains(".work-mode-jumps", css);
+        Assert.Contains(".work-mode-pill", css);
+        Assert.Contains(".dashboard-stage-anchor", css);
+        Assert.Contains("scroll-margin-top", css);
+        Assert.Contains("body:has(#wm-draft:target) .work-mode-pill[href=\"#wm-draft\"]", css);
+        Assert.DoesNotContain(".work-mode-strip", css);
+        Assert.DoesNotContain(".dashboard:has(#wm-draft:checked)", css);
+        Assert.DoesNotContain("opacity: 0.48", css);
     }
 
     [Fact]
@@ -667,24 +667,26 @@ public class StylesheetTests
         Assert.Contains(".collapsible-section > summary > h2", css);
     }
 
-    // ---- Story 9.6: deferred-work cards + resolved treatment --------------------------------
+    // ---- Story 9.10: shared followup-row scan-first grammar --------------------------------
 
     [Fact]
-    public void Stylesheet_DeferredWorkCardsReuseActionItemGrammar_ResolvedNotColorOnly()
+    public void Stylesheet_FollowUpRows_SharedGrammar_ResolvedNotColorOnly()
     {
         var css = ReadStylesheet();
-        Assert.Contains(".deferred-work-wrap", css);
-        Assert.Contains(".deferred-item-card", css);
-        Assert.Contains(".deferred-item-card.resolved", css);
-        Assert.Contains(".deferred-resolved-mark", css);
+        Assert.Contains(".followup-row", css);
+        Assert.Contains(".followup-row.resolved", css);
+        Assert.Contains(".followup-row-scan", css);
+        Assert.Contains(".followup-row-detail", css);
+        Assert.Contains(".followup-row-detail > summary::before", css);
+        Assert.Contains("content: \"▸ \"", css);
         Assert.Contains("border-left: 3px solid var(--status-review)", css);
         // Resolved treatment: done token + opacity + check glyph — never color-only (UX-DR17).
-        Assert.Contains(".deferred-item-card.resolved", css);
         Assert.Contains("border-left-color: var(--status-done)", css);
         Assert.Contains("opacity: 0.78", css);
         Assert.Contains("deferred-resolved-mark", css);
         // Group headings for action-items (Story 9.6 AC #2).
         Assert.Contains(".action-items-group", css);
         Assert.Contains(".action-item-cross", css);
+        Assert.Contains(".deferred-work-wrap", css);
     }
 }
