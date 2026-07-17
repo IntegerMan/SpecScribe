@@ -40,14 +40,22 @@ public static class SprintTemplater
 
     /// <summary>Empty-lane HTML: Ready (and any lane whose copy already implies drafting) carries an
     /// <see cref="BmadCommands.InlineGuidance"/> create-story badge when an undrafted target + catalog
-    /// allow; otherwise the designed 8.6 plain copy (HTML-escaped). Never a wrong badge. [Story 9.8]</summary>
+    /// allow; otherwise the designed 8.6 plain copy (HTML-escaped). Target selection matches
+    /// <see cref="BmadCommands"/> ForProject (drafted/ready/active epics only) so Home and the board
+    /// never disagree on the next draft id. Never a wrong badge. [Story 9.8]</summary>
     private static string EmptyLaneHtml(string cssClass, EpicsModel? epics, CommandCatalog? commands)
     {
         if (cssClass == "ready" && commands is not null && epics is not null)
         {
-            var next = epics.Epics.SelectMany(e => e.Stories).FirstOrDefault(s => s.ArtifactOutputPath is null);
-            if (next is not null)
+            var epicNeedingStory = epics.Epics.FirstOrDefault(e =>
             {
+                var cls = StatusStyles.ForEpicWithRetrospective(e);
+                return (cls is "drafted" or "ready" or "active")
+                    && e.Stories.Any(s => s.ArtifactOutputPath is null);
+            });
+            if (epicNeedingStory is not null)
+            {
+                var next = epicNeedingStory.Stories.First(s => s.ArtifactOutputPath is null);
                 return BmadCommands.InlineGuidance(
                     commands.Command("create-story", next.Id),
                     "Nothing ready to pick up — draft the next story with",

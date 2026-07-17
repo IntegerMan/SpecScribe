@@ -146,16 +146,16 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         }
     }
 
-    /// <summary>The white sub-header band. On Home it is the Driver work-stage jump strip (Overview · Gather ·
-    /// Draft · Develop · Review) — in-page anchors that scroll to stage landmarks without dimming the rest of
-    /// the dashboard. On every other page it keeps the Docs / Architecture / Work key-views chips. Omits the
-    /// band when there is nothing to show. [home welcome key-views; Story 9.8 scroll strip]</summary>
+    /// <summary>The white sub-header band. On Home it is the Driver work-stage toggle strip
+    /// (Overview · Requirements · Plan · Develop · Review · Track) — pure-CSS radios that show/hide
+    /// stage-tagged dashboard panels. On every other page it keeps the Docs / Architecture / Work
+    /// key-views chips. Omits the band when there is nothing to show. [home welcome key-views; Story 9.8]</summary>
     private void AppendKeyViewsBand(StringBuilder sb, NavigationView nav, string prefix, string current)
     {
         var onHome = string.Equals(current, SiteNav.HomeOutputPath, StringComparison.OrdinalIgnoreCase);
         if (onHome)
         {
-            AppendWorkModeJumpStrip(sb);
+            AppendWorkModeJumpStrip(sb, nav.FullHomeWorkModeStrip);
             return;
         }
 
@@ -193,23 +193,30 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     }
 
     /// <summary>Home-only white-bar work-stage strip: pure-CSS radios + labels (icons + words) that toggle
-    /// which dashboard panels are visible. Overview is the default. [Story 9.8]</summary>
-    private static void AppendWorkModeJumpStrip(StringBuilder sb)
+    /// which dashboard panels are visible via <c>display:none</c>. Overview is the default. When
+    /// <paramref name="fullStages"/> is false (no epics model), only Overview is emitted. [Story 9.8]</summary>
+    private static void AppendWorkModeJumpStrip(StringBuilder sb, bool fullStages)
     {
         sb.Append("  <div class=\"site-nav-key-views work-mode-jumps\" aria-label=\"Work stage\">\n");
         sb.Append("    <div class=\"work-mode-pills board-tabs\" role=\"group\">\n");
         sb.Append("      <input type=\"radio\" id=\"wm-overview\" name=\"work-mode\" class=\"board-tab-radio\" checked>\n");
-        sb.Append("      <input type=\"radio\" id=\"wm-requirements\" name=\"work-mode\" class=\"board-tab-radio\">\n");
-        sb.Append("      <input type=\"radio\" id=\"wm-plan\" name=\"work-mode\" class=\"board-tab-radio\">\n");
-        sb.Append("      <input type=\"radio\" id=\"wm-develop\" name=\"work-mode\" class=\"board-tab-radio\">\n");
-        sb.Append("      <input type=\"radio\" id=\"wm-review\" name=\"work-mode\" class=\"board-tab-radio\">\n");
-        sb.Append("      <input type=\"radio\" id=\"wm-track\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+        if (fullStages)
+        {
+            sb.Append("      <input type=\"radio\" id=\"wm-requirements\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+            sb.Append("      <input type=\"radio\" id=\"wm-plan\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+            sb.Append("      <input type=\"radio\" id=\"wm-develop\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+            sb.Append("      <input type=\"radio\" id=\"wm-review\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+            sb.Append("      <input type=\"radio\" id=\"wm-track\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+        }
         sb.Append($"      <label for=\"wm-overview\" class=\"work-mode-pill\">{Icons.ForConcept("Overview")}Overview</label>\n");
-        sb.Append($"      <label for=\"wm-requirements\" class=\"work-mode-pill\">{Icons.ForConcept("Requirements")}Requirements</label>\n");
-        sb.Append($"      <label for=\"wm-plan\" class=\"work-mode-pill\">{Icons.ForConcept("Plan")}Plan</label>\n");
-        sb.Append($"      <label for=\"wm-develop\" class=\"work-mode-pill\">{Icons.ForConcept("Develop")}Develop</label>\n");
-        sb.Append($"      <label for=\"wm-review\" class=\"work-mode-pill\">{Icons.ForConcept("Review")}Review</label>\n");
-        sb.Append($"      <label for=\"wm-track\" class=\"work-mode-pill\">{Icons.ForConcept("Track")}Track</label>\n");
+        if (fullStages)
+        {
+            sb.Append($"      <label for=\"wm-requirements\" class=\"work-mode-pill\">{Icons.ForConcept("Requirements")}Requirements</label>\n");
+            sb.Append($"      <label for=\"wm-plan\" class=\"work-mode-pill\">{Icons.ForConcept("Plan")}Plan</label>\n");
+            sb.Append($"      <label for=\"wm-develop\" class=\"work-mode-pill\">{Icons.ForConcept("Develop")}Develop</label>\n");
+            sb.Append($"      <label for=\"wm-review\" class=\"work-mode-pill\">{Icons.ForConcept("Review")}Review</label>\n");
+            sb.Append($"      <label for=\"wm-track\" class=\"work-mode-pill\">{Icons.ForConcept("Track")}Track</label>\n");
+        }
         sb.Append("    </div>\n  </div>\n");
     }
 

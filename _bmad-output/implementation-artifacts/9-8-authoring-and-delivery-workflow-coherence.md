@@ -4,7 +4,7 @@ baseline_commit: 525328146cbb248b660afdbcc6ea3d7204c29eb7
 
 # Story 9.8: Authoring and Delivery Workflow Coherence
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -37,7 +37,7 @@ so that the tool actively guides daily journeys rather than only reflecting comp
 
 Epic 9 completes traceability and review follow-through. Stories **8.5** and **8.6** shipped the next-step hierarchy and designed empty states, but the Driver's daily path (User Journeys 1–2) still has dead ends and contradictory "what's next" signals. Epic 8 retro seated this story as a **holistic coherence pass** — not a new command system and not Story 9.9's satisfaction scan.
 
-**This story closes Journey 2 guidance continuity** across Home → epic → story, and adds a thin Home focus strip so Drivers can hyper-focus without abandoning Journey 1's full pulse.
+**This story closes Journey 2 guidance continuity** across Home → epic → story, and adds a Home work-stage toggle strip so Drivers can hyper-focus one stage at a time while Overview remains the curated default entry.
 
 ### Critical gap already confirmed (must close)
 
@@ -47,7 +47,7 @@ Epic 9 completes traceability and review follow-through. Stories **8.5** and **8
 
 | Surface | Role | Change |
 |---------|------|--------|
-| **Home dashboard** | Journey 1 pulse + Journey 2 entry | Wire project Next Steps; add work-stage focus strip (silhouette #2); align empty/next guidance with Now & Next |
+| **Home dashboard** | Journey 1 pulse + Journey 2 entry | Wire project Next Steps; add work-stage toggle strip (re-locked hide-tabs IA); align empty/next guidance with Now & Next |
 | **`BmadCommands.ForProject` / `ForEpic`** | State → primary command | Align create-story gating so Home and epic pages recommend the same next draft when undrafted work exists mid-epic |
 | **Sprint empty lanes** (`SprintTemplater`) | Designed empty states (8.6) | Ready (and related) empty copy that says "draft or refine" should carry a real command badge when catalog + undrafted target exist — extend `InlineGuidance`, do not invent a second empty-state renderer |
 | **Epic Up Next / Next Steps / undrafted banner** | Already shipped 8.5/8.6 | Audit for contradictory primaries; fix only where Home/epic disagree on the same undrafted target |
@@ -57,7 +57,7 @@ Epic 9 completes traceability and review follow-through. Stories **8.5** and **8
 
 | Surface | Why out |
 |---------|---------|
-| **Full tabbed Home that hides sections by mode** | Owner considered and rejected for 9.8 (silhouette #3). Defer to a later IA story if still wanted |
+| **Highlight-never-hide strip (create-story silhouette #2)** | Superseded at review (owner 1B) by the shipped hide-tabs IA documented below |
 | **Requirement satisfaction at a glance** | Story **9.9** |
 | **FR/NFR detail covering-story lists, Unmapped tier, coverage maps** | Stories **9.1–9.3** |
 | **Follow-up page chrome / sunburst 4th ring** | Stories **9.6 / 9.7** |
@@ -66,38 +66,37 @@ Epic 9 completes traceability and review follow-through. Stories **8.5** and **8
 | **Parallel next-step / empty-state system** | AC #1 — extend 8.5/8.6 only |
 | **Webview `stageCommand` / Open-in-Terminal** | Still deferred (8.5 note / R4.3); do not reopen unless a coherence fix requires it |
 
-### Owner-selected design direction (locked at create-story)
+### Owner-selected design direction
 
-Elicited 2026-07-16. Three named directions were considered:
+Elicited 2026-07-16; **re-locked at code review 2026-07-17 (owner 1B / 2A).** Three named directions were considered at create-story:
 
 1. **Coherence pass only** — wire/align next-steps and empty states; no new Home chrome.
-2. **Thin focused strip + full Overview** — pure-CSS work-stage strip that **highlights** the stage-relevant panels and promotes the matching primary command; Overview remains default; **nothing is hidden**.
-3. **Full tabbed work-mode Home** — mode tabs replace the stack with hyper-focused views (hides panels). Strongest focus; breaks Journey 1 unless Overview is mandatory; high parity/golden/8.7 risk.
+2. **Thin focused strip + full Overview** — highlight stage panels; never hide (create-story lock; superseded).
+3. **Full tabbed work-mode Home** — mode radios show/hide stage-tagged panels (`display:none`).
 
-**Locked choice: #2 Thin focused strip + full Overview.**
+**Locked choice (review): #3 hide-tabs work-mode strip** + **Next Steps 3-card polish**.
 
 Concrete silhouette rules:
 
-- **Stages (labels locked):** `Overview` (default) · `Gather` · `Draft` · `Develop` · `Review`.
-- **Chrome grammar:** Reuse `.board-tabs` / radio + `:has()` patterns from Story 8.7 (`RenderRequirementsTabs`) and sprint board tabs — **pure CSS, zero JS** (webview CSP / NFR5). Unique radio `name`/`id` prefix (e.g. `wm-overview`, `wm-gather`, …) so it never collides with `req-view` or sprint radios.
-- **Overview default:** Full existing section stack remains visible and scannable (Journey 1 wins). Selecting Overview clears stage emphasis.
-- **Non-Overview stages highlight, never hide:**
-  - Add a stage class on a dashboard wrapper (e.g. `.dashboard[data-work-mode]` or `.dashboard.wm-gather`) driven by `:has(#wm-gather:checked)`.
-  - Emphasize the stage's primary panel(s) (border/accent/scroll-anchor treatment using existing tokens — parchment/`--gold`/`journey-*` accents). Dim or de-emphasize non-focus panels **without** `display:none` / removing them from the DOM / accessibility tree.
-  - Optional: `scroll-margin` + in-page hash/fragment on the strip label is allowed if it stays CSS-only and does not break golden stability across hosts.
-- **Stage → panel map (locked):**
+- **Stages (labels locked):** `Overview` (default) · `Requirements` · `Plan` · `Develop` · `Review` · `Track`.
+- **Chrome grammar:** Reuse `.board-tabs` / radio + `:has()` patterns from Story 8.7 — **pure CSS, zero JS** (webview CSP / NFR5). Radios live in the Home white bar (`.work-mode-jumps`); unique `wm-*` ids.
+- **Overview default:** Checked by default. Shows panels tagged `wm-show-overview` (curated pulse — not the entire dashboard stack).
+- **Non-Overview stages hide non-matching panels** via `body:has(#wm-*:checked) .dashboard .wm-panel:not(.wm-show-*) { display: none; }`. Panels carry `wm-panel wm-show-*` tags; never invent a second command matrix.
+- **Stage → panel map (locked to shipped tags):**
 
-  | Stage | Emphasize | Promote command from |
-  |-------|-----------|----------------------|
-  | **Overview** | (none — full pulse) | Project Next Steps primary (still visible) |
-  | **Gather** | Requirements panel + Planning Artifacts (when present) + Requirements journey tiles | First applicable planning command from catalog if already surfaced nearby; do **not** invent req→create-story deep links into FR pages (9.1–9.3 / 9.9 territory). Soft handoff: Requirements CTA + project next-steps when pending epic exists |
-  | **Draft** | Story Pipeline + undrafted / "next to draft" Now & Next signals | `create-story {id}` (or `create-epics-and-stories` / `sprint-planning` per `ForProject`/`ForEpic`) |
-  | **Develop** | Now & Next (active / ready) + Project at a Glance sunburst + Overall Progress tiles | `dev-story {id}` |
-  | **Review** | Now & Next review lane + Follow-up StatCards (when present) | `code-review` (and demoted `correct-course` where 8.5 already does) |
+  | Stage | Visible panels (representative) | Promote command from |
+  |-------|----------------------------------|----------------------|
+  | **Overview** | Sunburst, Next Steps, curated tiles / satisfaction / follow-up tiles tagged overview | Project Next Steps primary |
+  | **Requirements** | Story Pipeline, Planning Artifacts, Requirements panel + req tiles | Soft handoff via Requirements CTA + Next Steps when still on Overview/Review |
+  | **Plan** | Progress by Epic + plan-tagged tiles | `create-story` / planning commands when shown on Overview Next Steps |
+  | **Develop** | Now & Next, Git Pulse, develop-tagged tiles | `dev-story` (via Now & Next / board — Next Steps panel is Overview/Review only) |
+  | **Review** | Next Steps, review-tagged follow-up / satisfaction tiles | `code-review` |
+  | **Track** | Sunburst, Progress by Epic, track-tagged tiles | Status geometry |
 
-- **Project Next Steps placement (locked):** A visible **Next Steps** panel on Home, fed by `BmadCommands.RenderProjectNextSteps` (or the same `RenderInner` fragment stored on `DashboardView`), placed **immediately above or beside Now & Next** — not buried under Git Pulse. Prefer: after sunburst, **before** Now & Next, so Journey 2 sees command then board. If that feels tall, a compact header-aside on the Now & Next panel (command primary + "Other actions") is acceptable **only if** it still uses `RenderInner` / primary+alternates CSS from 8.5 (`.next-steps-primary` / `.next-steps-alternates`).
-- **Never color-only** for stage identity: strip labels are words; emphasis uses border/weight/opacity, not hue alone.
-- **NFR8:** If `Commands` lacks a step, degrade that suggestion to absent (existing `Add` discipline). If epics model is null, omit Next Steps and omit stages that have nothing to emphasize (or keep Overview-only strip — prefer omit empty stages rather than empty emphasized panels).
+- **Project Next Steps placement (locked):** After sunburst, **before** Now & Next. Body from `RenderProjectNextStepsBody` / `RenderInner`; adapter wraps with `wm-panel wm-show-overview wm-show-review`.
+- **Next Steps card polish (owner 2A):** Up to **three peer cards** (`.next-steps-cards` / `.next-step-card`; first is `.next-step-card-primary`). Further survivors under “Other actions”. Extends 8.5 seam; does **not** require the old single-primary + list-only `.next-steps-primary` layout.
+- **Never color-only** for stage identity: strip labels are words; active pill uses weight/border, not hue alone.
+- **NFR8:** If `Commands` lacks a step, degrade that suggestion to absent. If epics model is null, omit Next Steps and emit **Overview-only** work-mode strip (`FullHomeWorkModeStrip = false`).
 - **Do not** absorb Stakeholder/Reviewer persona switching — stages are **Driver work modes**, not audience modes.
 
 ## Tasks / Subtasks
@@ -113,38 +112,38 @@ Concrete silhouette rules:
   - [x] Omit panel when catalog yields zero suggestions or epics model is null (byte-load-bearing conditional).
   - [x] Keep HTML/webview/SPA on shared `RenderDashboardBody` — no host fork.
 
-- [x] **Task 3 — Work-stage focus strip on Home (AC: #2, #3)**
-  - [x] Implement silhouette #2 exactly: Overview default; Gather / Draft / Develop / Review highlight maps above; pure-CSS radios + `:has()`; no section hiding.
+- [x] **Task 3 — Work-stage toggle strip on Home (AC: #2, #3)**
+  - [x] Implement hide-tabs IA: Overview default; Requirements / Plan / Develop / Review / Track; pure-CSS radios + `:has()` + `display:none` on non-matching `.wm-panel`.
   - [x] CSS in `assets/specscribe.css` near existing `.board-tabs` / dashboard panel rules. Reuse journey accents where they already mark tile groups — do not invent a second color system.
-  - [x] `StylesheetTests`: assert new classes / non-color-only stage labels exist.
-  - [x] Dashboard tests: default Overview shows full stack; selecting Draft emphasizes pipeline + next-steps create-story path without removing Now & Next from DOM.
+  - [x] `StylesheetTests`: assert work-mode jump + visibility toggle rules exist.
+  - [x] Dashboard tests: panels tagged `wm-show-*`; radios live in nav white bar (not inline in body); null epics → Overview-only strip.
 
 - [x] **Task 4 — Empty-state command continuity (AC: #1, #2)**
-  - [x] Extend `SprintTemplater` empty Ready (and any other lane whose copy already implies drafting) to use `BmadCommands.InlineGuidance` + catalog when an undrafted target is knowable from the board's epics model. When no command/target, keep designed copy (8.6) — never a wrong badge.
+  - [x] Extend `SprintTemplater` empty Ready (and any other lane whose copy already implies drafting) to use `BmadCommands.InlineGuidance` + catalog when an undrafted target is knowable from the board's epics model (same drafted/ready/active epic filter as `ForProject`). When no command/target, keep designed copy (8.6) — never a wrong badge.
   - [x] Do not regress `.sprint-lane-empty` / `.epic-undrafted-banner` styling.
 
 - [x] **Task 5 — Guardrails (AC: #1)**
   - [x] Do **not** reimplement `ForStory` matrices; only fix project/epic alignment holes.
   - [x] Do **not** start 9.9 satisfaction chrome or re-open 9.1–9.3 page deliverables.
   - [x] Do **not** put create-story commands inside Story Pipeline wedges (funnel stays status geometry; commands live in Next Steps / empty states / undrafted banner).
-  - [x] Sunburst create-story tooltips on no-plan arcs may stay; optional one-line cross-reference from Draft stage emphasis is fine.
+  - [x] Sunburst create-story tooltips on no-plan arcs may stay; optional one-line cross-reference from Plan/Requirements stage emphasis is fine.
 
 - [x] **Task 6 — Tests + golden (AC: #1, #2, #3)**
   - [x] Extend `ModuleContextTests` / new dashboard tests: Home HTML contains project Next Steps when fixtures have review/ready/undrafted work; absent when catalog empty.
   - [x] `ForProject` mid-epic undrafted: create-story appears (aligned with `ForEpic`).
-  - [x] Empty Ready lane: command badge present when undrafted target + catalog allow; absent otherwise.
-  - [x] Focus strip markup present; Overview radio checked by default; emphasis classes exist; no `display:none` on sibling panels for non-Overview stages.
+  - [x] Empty Ready lane: command badge present when undrafted target + catalog allow; absent otherwise; same story id as Home Next Steps; pending-epic undrafted does not badge create-story.
+  - [x] Focus strip markup present; Overview radio checked by default; `wm-show-*` tags + `display:none` stage filters; null epics Overview-only.
   - [x] Golden fingerprint will move (home body) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Confirm three `Render*ParityTests` green.
   - [x] Run `dotnet test` from repo root.
 
 ### Review Findings
 
-- [ ] [Review][Decision] Work-mode IA shipped as hide-tabs (#3), not locked silhouette #2 — Code uses `display:none` with stages Overview · Requirements · Plan · Develop · Review · Track; Overview default hides Journey 1 panels (Pipeline / Now & Next / Git Pulse lack `wm-show-overview`); Develop hides Project Next Steps (`wm-show-overview wm-show-review` only). Story/comments/tests still claim highlight-never-hide Gather/Draft. Choose: restore locked #2, or re-lock the shipped IA and rewrite AC/tests/docs.
-- [ ] [Review][Decision] Next Steps card polish vs 8.5 primary/alternates seam — `RenderInner` now shows up to 3 peer cards (`.next-steps-cards`) and only demotes after the 3rd; dropped `<ul class="next-steps-list">` list semantics. Spec locked extend of `.next-steps-primary` / `.next-steps-alternates`. Choose: keep card polish (update story), or restore 8.5 primary + Other actions.
-- [ ] [Review][Patch] Ready empty-lane create-story ignores ForProject epic filter [`SprintTemplater.cs:48`]
-- [ ] [Review][Patch] Coherence tests do not assert Ready-lane story id matches Home Next Steps create-story [`ModuleContextTests` / `SprintTemplaterTests`]
-- [ ] [Review][Patch] Next Steps work-mode classes injected via brittle `String.Replace` on exact `class="chart-panel next-steps"` [`HtmlRenderAdapter.Dashboard.cs:52`]
-- [ ] [Review][Patch] Null epics model still emits full work-mode stage set (NFR8 prefers Overview-only / omit empty stages) [`HtmlRenderAdapter.cs:197`]
+- [x] [Review][Patch] Re-lock work-mode IA to shipped hide-tabs (owner 1B) — rewrite story AC/silhouette/Dev Notes/comments/tests away from #2 Gather·Draft·never-hide; document Overview · Requirements · Plan · Develop · Review · Track + `display:none` stage filters + current panel map (incl. Next Steps Overview/Review only)
+- [x] [Review][Patch] Document Next Steps 3-card polish as intentional (owner 2A) — update story to lock `.next-steps-cards` / peer cards (up to 3) + overflow “Other actions”; drop requirement to preserve 8.5 `.next-steps-primary` list-only seam
+- [x] [Review][Patch] Ready empty-lane create-story ignores ForProject epic filter [`SprintTemplater.cs:48`]
+- [x] [Review][Patch] Coherence tests do not assert Ready-lane story id matches Home Next Steps create-story [`ModuleContextTests` / `SprintTemplaterTests`]
+- [x] [Review][Patch] Next Steps work-mode classes injected via brittle `String.Replace` on exact `class="chart-panel next-steps"` [`HtmlRenderAdapter.Dashboard.cs:52`]
+- [x] [Review][Patch] Null epics model still emits full work-mode stage set (NFR8 prefers Overview-only / omit empty stages) [`HtmlRenderAdapter.cs:197`]
 - [x] [Review][Defer] Accent/kicker slug heuristics default unknown commands to `ready` / "Also consider" [`BmadCommands.cs:195`] — deferred, pre-existing polish pattern in new card path
 
 ## Dev Notes
@@ -198,7 +197,7 @@ Home section order today: tile band → sunburst → Now & Next → Story Pipeli
 
 - **Extend 8.5/8.6 — never fork.** One primary per state; designed empties; adapter-supplied commands.
 - **NFR8 degrade-to-absent** for missing catalog steps and unsupported framework workflows.
-- **Journey 1 wins design conflicts** — Overview default; no hiding Home pulse panels.
+- **Overview default is curated** — hide-tabs IA shows `wm-show-overview` panels; other stages swap visibility via `display:none`.
 - **Story 8.7 kinship** — focus strip is a *stage lens*, not a second rendering of the same dataset. Do not re-duplicate Requirements Flow vs Status grid.
 - **Shared BodyHtml path** — HTML + webview + SPA stay byte-aligned; no new `HostRenderException`.
 - **No new `--status-*` token**; no new authoring schema.
@@ -257,29 +256,36 @@ Composer (Auto)
 
 ### Completion Notes List
 
-- Wired orphaned `BmadCommands.RenderProjectNextSteps` into Home via `DashboardView.NextStepsHtml` (built in `DashboardViewBuilder`, rendered before Now & Next on shared `RenderDashboardBody`).
-- Aligned `ForProject` undrafted scan with drafted/ready/active epics; promoted `ForEpic(active)` create-story to primary when Up Next would spotlight undrafted (no front line).
-- Added silhouette #2 work-stage focus strip (Overview · Gather · Draft · Develop · Review) — pure-CSS `wm-*` radios + `:has()` opacity/border emphasis; never hides panels.
+- Wired orphaned `BmadCommands.RenderProjectNextSteps` into Home via `DashboardView.NextStepsHtml` body fragment (`RenderProjectNextStepsBody`, built in `DashboardViewBuilder`, wrapped before Now & Next on shared `RenderDashboardBody`).
+- Aligned `ForProject` undrafted scan with drafted/ready/active epics; promoted `ForEpic(active)` create-story to primary when Up Next would spotlight undrafted (no front line); Ready empty lane uses the same epic filter.
+- Added hide-tabs work-stage strip (Overview · Requirements · Plan · Develop · Review · Track) — pure-CSS `wm-*` radios + `:has()` `display:none` filters; null epics → Overview-only.
+- Next Steps card polish: up to three peer cards + overflow “Other actions”.
 - Extended Ready empty lane with `InlineGuidance` create-story badge when undrafted + catalog allow (NFR8 degrade otherwise).
-- Coherence matrix pinned as test comments in `BmadCommandsTests`; golden fingerprint regenerated; **1263** tests green.
+- Coherence matrix pinned as test comments; Ready↔Home create-story id pinned in tests; golden fingerprint regenerated.
 
 ### File List
 
 - src/SpecScribe/BmadCommands.cs
 - src/SpecScribe/DashboardView.cs
 - src/SpecScribe/DashboardViewBuilder.cs
+- src/SpecScribe/HtmlRenderAdapter.cs
 - src/SpecScribe/HtmlRenderAdapter.Dashboard.cs
+- src/SpecScribe/HtmlTemplater.cs
+- src/SpecScribe/NavigationView.cs
 - src/SpecScribe/SprintTemplater.cs
 - src/SpecScribe/assets/specscribe.css
 - tests/SpecScribe.Tests/ModuleContextTests.cs
 - tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs
+- tests/SpecScribe.Tests/HtmlTemplaterTests.cs
 - tests/SpecScribe.Tests/SprintTemplaterTests.cs
 - tests/SpecScribe.Tests/StylesheetTests.cs
 - tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
 - _bmad-output/implementation-artifacts/9-8-authoring-and-delivery-workflow-coherence.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/deferred-work.md
 
 ## Change Log
 
 - 2026-07-16: create-story — ready-for-dev; owner locked silhouette #2 (thin work-stage focus strip + Overview default); documented orphaned `RenderProjectNextSteps` as primary gap.
 - 2026-07-16: implemented — Home Next Steps + work-mode strip + ForProject/ForEpic alignment + Ready-lane InlineGuidance; status → review.
+- 2026-07-17: code review — owner re-locked hide-tabs IA (#3) + Next Steps 3-card polish; patched Ready-lane ForProject filter, body-wrap Next Steps classes, Overview-only strip when epics null; story + tests aligned.

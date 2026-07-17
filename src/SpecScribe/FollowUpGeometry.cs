@@ -87,16 +87,37 @@ public sealed record FollowUpGeometry(
     }
 
     /// <summary>Epic-scoped geometry: this epic's action items and epic-attributed deferred items only.
-    /// Preserves the project-wide slug map so detail URLs stay stable under epic filtering.</summary>
-    public FollowUpGeometry ForEpic(int epicNumber) =>
-        new(
+    /// Preserves the project-wide slug map so detail URLs stay stable under epic filtering.
+    /// Re-prefixes deferred <see cref="FollowUpDeferredSlot.DetailHref"/> values to match
+    /// <see cref="LinkPrefix"/> (epic pages live under <c>epics/</c> — without this, wedges 404 at
+    /// <c>epics/follow-ups/…</c>). [Story 9.11]</summary>
+    public FollowUpGeometry ForEpic(int epicNumber)
+    {
+        var prefix = LinkPrefix;
+        return new(
             ActionItems.Where(a => a.EpicNumber == epicNumber).ToList(),
             DeferredOpenCount: 0,
             DeferredHref: null,
             ActionItemsHref,
             ActionDetailSlugs ?? FollowUpSlug.AssignActionSlugs(ActionItems),
-            DeferredItems.Where(s => s.EpicNumber == epicNumber).ToList());
+            DeferredItems
+                .Where(s => s.EpicNumber == epicNumber)
+                .Select(s => s with { DetailHref = ApplyLinkPrefix(prefix, s.DetailHref) })
+                .ToList());
+    }
 
+    /// <summary>Rewrites an output-root-relative (or already-prefixed) href for the current page depth.
+    /// Strips leading <c>../</c> segments first so re-scoping is idempotent.</summary>
+    public static string ApplyLinkPrefix(string linkPrefix, string href)
+    {
+        if (string.IsNullOrEmpty(href)) return href;
+        var root = PathUtil.NormalizeSlashes(href);
+        while (root.StartsWith("../", StringComparison.Ordinal))
+            root = root[3..];
+        if (root.StartsWith("./", StringComparison.Ordinal))
+            root = root[2..];
+        return linkPrefix + root;
+    }
     public IReadOnlyList<SprintActionItem> ForEpicNumber(int epicNumber) =>
         ActionItems.Where(a => a.EpicNumber == epicNumber).ToList();
 

@@ -290,6 +290,66 @@ public class SprintTemplaterTests
     }
 
     [Fact]
+    public void RenderBoard_EmptyReadyLane_IgnoresPendingEpicUndrafted_MatchesForProject()
+    {
+        // Pending epic undrafted must not badge create-story — ForProject recommends create-epics instead.
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: in-progress
+            """)!;
+        var pending = new EpicInfo
+        {
+            Number = 2,
+            Title = "Pending",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Pending,
+            Section = EpicSection.VerticalSlice,
+            Stories = new[] { Story("2.1", 2, "Next", artifactOutputPath: null) },
+        };
+        var epics = EpicsWith(
+            Epic(1, "E", Story("1.1", 1, "A", "epics/story-1-1.html")),
+            pending);
+        var catalog = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+            ["create-epics-and-stories"] = "/bmad-create-epics-and-stories",
+        });
+
+        var board = SprintTemplater.RenderBoard(sprint, epics, commands: catalog);
+        Assert.DoesNotContain("/bmad-create-story 2.1", board);
+        Assert.Contains(
+            "class=\"sprint-lane-empty\">Nothing ready to pick up — draft or refine the next story.",
+            board);
+
+        var home = BmadCommands.RenderProjectNextSteps(epics, catalog);
+        Assert.DoesNotContain("/bmad-create-story 2.1", home);
+        Assert.Contains("/bmad-create-epics-and-stories", home);
+    }
+
+    [Fact]
+    public void RenderBoard_EmptyReadyLane_CreateStoryId_MatchesHomeNextSteps()
+    {
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: in-progress
+            """)!;
+        var done = Story("1.1", 1, "A", "epics/story-1-1.html");
+        done.Status = "done";
+        var undrafted = Story("1.2", 1, "B", artifactOutputPath: null);
+        var epics = EpicsWith(Epic(1, "E", done, undrafted));
+        var catalog = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+            ["dev-story"] = "/bmad-dev-story",
+        });
+
+        var board = SprintTemplater.RenderBoard(sprint, epics, commands: catalog);
+        var home = BmadCommands.RenderProjectNextSteps(epics, catalog);
+        Assert.Contains("/bmad-create-story 1.2", board);
+        Assert.Contains("/bmad-create-story 1.2", home);
+    }
+
+    [Fact]
     public void RenderIndex_HasRetrosLinkAndOpenItemsFlagButtonNotAModal()
     {
         var withOpen = SprintStatusParser.Parse("""

@@ -348,6 +348,27 @@ public class HtmlRenderAdapterTests
     });
 
     [Fact]
+    public void BuildEpic_SunburstStoryWedges_LinkToStoryPagesNotInPageAnchors()
+    {
+        // Epic sunburst used to fall back to #story-N-M (scroll to the card on this page) when
+        // ArtifactOutputPath was null. Placeholder pages exist at StoryPagePath for every undrafted
+        // story — clicks must leave the epic page for the story surface, matching story-card TitleHref.
+        var epic = EpicWith(Drafted("1.1", "A"), Undrafted("1.2", "B"));
+        var view = EpicsViewBuilder.BuildEpic(epic, ProgressFor(epic), CreateStoryCatalog(), epicRetroPath: null);
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(view);
+
+        var sunburstStart = html.IndexOf("aria-label=\"Epic story breakdown\"", StringComparison.Ordinal);
+        Assert.True(sunburstStart >= 0);
+        var sunburstEnd = html.IndexOf("</svg>", sunburstStart, StringComparison.Ordinal);
+        Assert.True(sunburstEnd > sunburstStart);
+        var sunburst = html[sunburstStart..sunburstEnd];
+
+        Assert.Contains("href=\"../epics/story-1-1.html\"", sunburst);
+        Assert.Contains("href=\"../epics/story-1-2.html\"", sunburst);
+        Assert.DoesNotContain("href=\"#story-", sunburst);
+    }
+
+    [Fact]
     public void BuildEpic_TwoPlusUndrafted_EmitsOneBannerWithNextCreateStoryCommand()
     {
         var epic = EpicWith(Drafted("1.1", "A"), Undrafted("1.2", "B"), Undrafted("1.3", "C"));

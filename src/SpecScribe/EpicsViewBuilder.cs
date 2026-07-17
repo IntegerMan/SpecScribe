@@ -70,7 +70,11 @@ public static class EpicsViewBuilder
             .ToList();
         var scopedDeferred = projectFollowUps.DeferredItems
             .Where(s => s.EpicNumber == epic.Number)
+            .Select(s => s with { DetailHref = FollowUpGeometry.ApplyLinkPrefix(prefix, s.DetailHref) })
             .ToList();
+        // Deferred aggregate has no unattributed path here — only this epic's items. Action-item hrefs
+        // and deferred detail hrefs need the epics/ relative prefix so wedges don't 404 at
+        // epics/follow-ups/…. Preserve project-wide ActionDetailSlugs for stable URLs (Story 9.11).
         var epicFollowUps = scopedActions.Count > 0 || scopedDeferred.Count > 0
             ? new FollowUpGeometry(
                 scopedActions,
@@ -298,7 +302,7 @@ public static class EpicsViewBuilder
                 ? StatusStyles.ForStory(active) == "review" ? ("review", "In review") : ("active", "In development")
             : ready is not null ? ("ready", "Ready for dev")
             : ("drafted", "Not yet drafted");
-        var href = target.ArtifactOutputPath is { } ap ? prefix + ap : $"#{StoryAnchorId(target.Id)}";
+        var href = prefix + (target.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(target.Id));
 
         sb.Append($"  <a class=\"now-next-card {cssClass}\" href=\"{PathUtil.Html(href)}\">\n");
         sb.Append($"    <span class=\"now-next-kicker\">{PathUtil.Html(kicker)}</span>\n");

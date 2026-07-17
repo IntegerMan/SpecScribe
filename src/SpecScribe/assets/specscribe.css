@@ -5379,7 +5379,7 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 .req-panel:has(#rv-grid:checked) .req-view-grid { display: block; }
 
 /* Home work-stage toggle strip (Story 9.8): radios in the white key-views band; labels toggle which
-   dashboard panels are visible via body:has() — never opacity dimming or scroll jumps. */
+   dashboard panels are visible via body:has() + display:none on non-matching .wm-panel. */
 .work-mode-jumps .work-mode-pills {
   display: flex;
   flex-wrap: wrap;

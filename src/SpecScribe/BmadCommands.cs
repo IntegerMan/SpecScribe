@@ -86,6 +86,11 @@ public static class BmadCommands
     public static string RenderProjectNextSteps(EpicsModel model, CommandCatalog commands) =>
         RenderPanel(ForProject(model, commands));
 
+    /// <summary>Project Next Steps panel <em>body</em> only (heading + cards) — Home wraps this with
+    /// work-mode panel classes so stage filters never depend on mutating a fixed class string. [Story 9.8]</summary>
+    public static string RenderProjectNextStepsBody(EpicsModel model, CommandCatalog commands) =>
+        RenderInner(ForProject(model, commands));
+
     /// <summary>Next Steps panel for an action-item detail page — same card grammar as story pages
     /// (Recommended primary + room for alternates). Long resolve prompts use a labeled badge so the
     /// user sees what they're copying without dumping the full payload into the card. [Story 9.11]</summary>

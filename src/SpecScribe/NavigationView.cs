@@ -36,4 +36,10 @@ public sealed record NavigationView
     /// <see cref="PageView.OutputRelativePath"/>); it is "which nav entry is current", kept on the nav view so a
     /// surface can render the bar from this one value.</summary>
     public required string ActiveOutputRelativePath { get; init; }
+
+    /// <summary>When true (Home with an epics model), the work-mode strip offers the full stage set
+    /// (Overview · Requirements · Plan · Develop · Review · Track). When false on Home (no epics model),
+    /// only Overview is emitted — NFR8 degrade for stages with nothing to emphasize. Ignored off Home.
+    /// Defaults true so existing <see cref="SiteNav.ToNavigationView"/> call sites stay unchanged. [Story 9.8]</summary>
+    public bool FullHomeWorkModeStrip { get; init; } = true;
 }

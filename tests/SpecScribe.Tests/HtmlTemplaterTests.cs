@@ -705,6 +705,28 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderIndex_NullEpics_WorkModeStripIsOverviewOnly()
+    {
+        var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe", hasAdrs: false);
+
+        var html = HtmlTemplater.RenderIndex(
+            docs: Array.Empty<DocModel>(),
+            nav: nav,
+            progress: ProgressModel.Empty,
+            epicsModel: null,
+            requirements: null,
+            adrs: Array.Empty<AdrEntry>(),
+            commands: CommandCatalog.Empty);
+
+        Assert.Contains("id=\"wm-overview\"", html);
+        Assert.DoesNotContain("id=\"wm-track\"", html);
+        Assert.DoesNotContain("id=\"wm-requirements\"", html);
+        Assert.DoesNotContain("id=\"wm-plan\"", html);
+        Assert.DoesNotContain("id=\"wm-develop\"", html);
+        Assert.DoesNotContain("id=\"wm-review\"", html);
+    }
+
+    [Fact]
     public void RenderIndex_EpicStatusDonutReflectsStoryRollup()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

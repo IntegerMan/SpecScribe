@@ -436,7 +436,8 @@ public class BmadCommandsTests
     // | Home Next Steps | mid-epic undrafted (done + undrafted) | create-story {id} | story draft |
     // | Epic Up Next + Next Steps | same mid-epic | create-story {id} primary (not buried) | story draft |
     // | Epic active with front line | in-progress + undrafted | sprint-status primary; create-story alt | status / draft |
-    // | Empty Ready lane | undrafted + catalog | InlineGuidance create-story badge | draft |
+    // | Empty Ready lane | undrafted + catalog | InlineGuidance create-story {same id as Home} | draft |
+    // | Empty Ready lane | pending-epic undrafted only | designed copy (no create-story badge) | — |
     // | Empty Ready lane | no undrafted / no catalog | designed copy only (8.6) | — |
 
     [Fact]

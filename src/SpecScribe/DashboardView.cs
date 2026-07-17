@@ -109,8 +109,9 @@ public sealed record DashboardView
     /// <see cref="FollowUpGeometry.Empty"/> (no 4th ring). Counts agree with <see cref="Counts"/>. [Story 9.7]</summary>
     public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
 
-    /// <summary>Pre-rendered project Next Steps HTML (<see cref="BmadCommands.RenderProjectNextSteps"/>), or
-    /// empty when the catalog yields no suggestions / epics are absent. Named opaque fragment matching
-    /// <see cref="EpicsView.NextStepsHtml"/>. [Story 9.8]</summary>
+    /// <summary>Pre-rendered project Next Steps <em>body</em> HTML
+    /// (<see cref="BmadCommands.RenderProjectNextStepsBody"/>), or empty when the catalog yields no
+    /// suggestions / epics are absent. The dashboard adapter wraps this in the panel shell + work-mode
+    /// classes. Named opaque fragment matching <see cref="EpicsView.NextStepsHtml"/>'s role. [Story 9.8]</summary>
     public string NextStepsHtml { get; init; } = string.Empty;
 }

@@ -395,9 +395,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // [Story 9.2 review; golden-diff-normalization-gotchas]
         // Regenerated for change-surface Updated chips (sprint/story out of Touched) + Story/Sprint Status
         // icons + Dev Notes collapsible moved to end of remainder. [change-surface UX]
-        // Regenerated for Story 9.8: Home gains work-mode focus strip + Project Next Steps (wired
+        // Regenerated for Story 9.8: Home gains work-mode toggle strip + Project Next Steps (wired
         // RenderProjectNextSteps) before Now & Next; Ready empty-lane InlineGuidance when undrafted;
-        // specscribe.css gains .work-mode-strip / wm-focus-* :has() emphasis (never display:none).
+        // specscribe.css stage filters use display:none on non-matching .wm-panel (hide-tabs IA).
         // [Story 9.8; golden-diff-normalization-gotchas]
         // Regenerated for Story 9.9: requirements.html "Satisfaction at a glance" band (stacked bar + four
         // chips over Everything); Home satisfaction rollup → #satisfaction; LegendKey gains "Not yet mapped";
@@ -409,9 +409,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // [Story 9.10; golden-diff-normalization-gotchas]
         // Regenerated for Story 9.8 next-steps card row: horizontal command cards with kickers/accent rails.
         // [Story 9.8 polish; golden-diff-normalization-gotchas]
-        // Regenerated for Story 9.8 work-mode jump strip: Home white bar hosts Overview/Gather/Draft/Develop/Review
-        // scroll links; dimming radios removed; dark-bar Docs/Architecture/Work gain family color tints.
-        // [Story 9.8 scroll strip; golden-diff-normalization-gotchas]
+        // Regenerated for Story 9.8 work-mode jump strip: Home white bar hosts
+        // Overview/Requirements/Plan/Develop/Review/Track radio toggles (hide non-matching panels).
+        // [Story 9.8 work-mode strip; golden-diff-normalization-gotchas]
         // Regenerated for Story 9.9 coherence pass: the satisfaction bar is now four proportional brackets
         // (Satisfied · In flight · Deferred · Unmapped) whose In-flight bracket keeps its real Partially/Ready/
         // Planned tier colors (so the bar matches the Sankey + donuts and Planned isn't an orphan segment); the
@@ -438,7 +438,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // a.satisfaction-chip cursor only. [Story 9.9 code review; golden-diff-normalization-gotchas]
         // Regenerated for FollowUpRow summary: preference — deferred titles prefer authored summary:
         // over source_spec: noise (FollowUpRow.cs code page also shifts).
-        const string expected = "87942ed2e8b9fd2d0e46b73e3ec8f41aefc83482c94b9f731e18b9bccca961be";
+        // Regenerated for epic-sunburst story wedges: always link to story pages (placeholder when
+        // undrafted), never #story-N-M in-page card jumps. [epic sunburst navigation]
+        const string expected = "e8279c5c27e646b5a4dc928562cb886635501f0bfb83c57dc10eaf0591f4a4f5";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

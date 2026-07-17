@@ -192,9 +192,12 @@ public sealed partial class HtmlRenderAdapter
             main.Append("</div>\n\n");
 
             main.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Story Breakdown</h3>\n");
-            main.Append(Charts.EpicSunburst(view.Epic, story => story.ArtifactOutputPath is { } ap
-                ? view.Prefix + ap
-                : $"#{StoryAnchorId(story.Id)}", commands: view.Commands, followUps: view.FollowUps));
+            // Always the story's own page (drafted detail or undrafted placeholder) — never an in-page
+            // #story-N-M card jump. Matches story-card TitleHref and the project sunburst's StoryPagePath
+            // fallback so a sunburst click always leaves the epic page for the story surface.
+            main.Append(Charts.EpicSunburst(view.Epic, story =>
+                view.Prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id)),
+                commands: view.Commands, followUps: view.FollowUps));
             main.Append("</div>\n");
             main.Append("</div>\n</section>\n\n");
         }
@@ -613,8 +616,4 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</main>\n\n");
         return sb.ToString();
     }
-
-    /// <summary>The in-page anchor id for a story card (epic-sunburst jump target). Mirrors
-    /// <c>EpicsViewBuilder.StoryAnchorId</c>.</summary>
-    private static string StoryAnchorId(string storyId) => $"story-{storyId.Replace('.', '-')}";
 }

@@ -67,8 +67,9 @@ public static class DashboardViewBuilder
                 ledger,
                 work,
                 epics: epicsModel),
+            // Body fragment only — HtmlRenderAdapter wraps with work-mode panel classes. [Story 9.8]
             NextStepsHtml = epicsModel is { } epics
-                ? BmadCommands.RenderProjectNextSteps(epics, commands)
+                ? BmadCommands.RenderProjectNextStepsBody(epics, commands)
                 : string.Empty,
         };
     }

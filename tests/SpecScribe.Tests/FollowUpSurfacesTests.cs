@@ -380,9 +380,14 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("sb-followup-open", epic1);
         Assert.Contains("href=\"../follow-ups/action-", epic1);
         Assert.Contains("Schedule retros promptly", epic1);
+        // Deferred wedges must also climb out of epics/ — not epics/follow-ups/… (404).
+        Assert.Contains("href=\"../follow-ups/deferred-", epic1);
+        Assert.DoesNotContain("href=\"follow-ups/deferred-", epic1);
+        Assert.DoesNotContain("href=\"follow-ups/action-", epic1);
 
         var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
         Assert.Contains("sb-followup-open", epic2);
+        Assert.Contains("href=\"../follow-ups/", epic2);
     }
 
     [Fact]

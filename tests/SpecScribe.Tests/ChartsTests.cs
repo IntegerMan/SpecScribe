@@ -583,11 +583,24 @@ public class ChartsTests
         Assert.Contains("aria-label=\"Deferred item: Epic 1 deferred\"", svg1);
         Assert.Contains("class=\"sb-seg sb-followup-open\"", svg1);
         Assert.Contains("href=\"follow-ups/action-", svg1);
+        Assert.Contains("href=\"follow-ups/deferred-epic-1.html\"", svg1);
         Assert.DoesNotContain("Epic 2 only", svg1);
         Assert.DoesNotContain("Deferred item: Epic 1 deferred", svg2);
         Assert.Contains("aria-label=\"Action item: Epic 2 only\"", svg2);
         Assert.DoesNotContain("Epic 1 only", svg2);
         Assert.DoesNotContain("outermost: open follow-ups", svg1);
+
+        // When ActionItemsHref carries an epics/ depth prefix, deferred DetailHref must too.
+        var prefixed = new FollowUpGeometry(
+            geometry.ActionItems,
+            geometry.DeferredOpenCount,
+            DeferredHref: "../deferred-work.html",
+            ActionItemsHref: "../" + SiteNav.ActionItemsOutputPath,
+            DeferredSlots: geometry.DeferredItems);
+        var svgPrefixed = Charts.EpicSunburst(epic1, _ => "epics/epic-1.html", followUps: prefixed);
+        Assert.Contains("href=\"../follow-ups/action-", svgPrefixed);
+        Assert.Contains("href=\"../follow-ups/deferred-epic-1.html\"", svgPrefixed);
+        Assert.DoesNotContain("href=\"follow-ups/deferred-epic-1.html\"", svgPrefixed);
     }
 
     private static string ExtractFollowUpAriaLabels(string svg)

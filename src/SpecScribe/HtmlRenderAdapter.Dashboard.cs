@@ -46,13 +46,13 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("</div>\n\n");
         }
 
-        // Project Next Steps — Overview + Review.
+        // Project Next Steps — Overview + Review (body from DashboardView; wrap here so wm-* classes
+        // are composed, not string-replaced onto RenderPanel markup). [Story 9.8]
         if (view.NextStepsHtml.Length > 0)
         {
-            sb.Append(view.NextStepsHtml.Replace(
-                "class=\"chart-panel next-steps\"",
-                "class=\"chart-panel next-steps wm-panel wm-show-overview wm-show-review\"",
-                StringComparison.Ordinal));
+            sb.Append("<div class=\"chart-panel next-steps wm-panel wm-show-overview wm-show-review\">\n");
+            sb.Append(view.NextStepsHtml);
+            sb.Append("</div>\n\n");
         }
 
         // Now & Next / sprint board — Develop.
