@@ -99,7 +99,8 @@ public sealed record UnplannedWorkGeometry(
         WorkInventory work,
         FollowUpGeometry followUps,
         EpicsModel? epics = null,
-        string linkPrefix = "")
+        string linkPrefix = "",
+        IReadOnlyList<RetroModel>? retros = null)
     {
         var unattributedDeferred = followUps.UnattributedDeferredItems
             .Select(s => s with { DetailHref = FollowUpGeometry.ApplyLinkPrefix(linkPrefix, s.DetailHref) })
@@ -117,7 +118,7 @@ public sealed record UnplannedWorkGeometry(
             .Where(q => IsOpenQuickDev(q.Status) || residualSourceKeys.Contains(FollowUpGeometry.NormalizeSourceKey(Path.GetFileNameWithoutExtension(q.OutputPath))))
             .Select(q =>
             {
-                var epic = ResolveQuickDevEpic(q, epics, followUps);
+                var epic = ResolveQuickDevEpic(q, epics, followUps, retros);
                 var href = FollowUpGeometry.ApplyLinkPrefix(linkPrefix, q.OutputPath);
                 return new UnplannedQuickDevSlot(q, epic, href);
             })
@@ -136,12 +137,15 @@ public sealed record UnplannedWorkGeometry(
         @"\(([^)]+)\)", RegexOptions.Compiled);
 
     /// <summary>Best-effort epic attribution: text heuristics first (title, filename, deferred cue that
-    /// names this <c>spec-*</c>); then unique timing from authored frontmatter date vs deferred
-    /// story-review dates under one epic. Multi-epic ties → null (leave Unplanned). No new schema.</summary>
+    /// names this <c>spec-*</c>); then unique timing from authored frontmatter date vs retro
+    /// <see cref="RetroModel.DateText"/> and/or story <see cref="StoryInfo.LastUpdatedDate"/> under one
+    /// epic; then fallback to deferred review dates. Multi-epic ties → null (leave Unplanned). No new
+    /// schema. [spec-sunburst-remaining-work-hierarchy]</summary>
     public static int? ResolveQuickDevEpic(
         QuickDevEntry entry,
         EpicsModel? epics,
-        FollowUpGeometry? followUps = null)
+        FollowUpGeometry? followUps = null,
+        IReadOnlyList<RetroModel>? retros = null)
     {
         if (epics is null) return null;
 
@@ -188,9 +192,17 @@ public sealed record UnplannedWorkGeometry(
             if (cueHits.Count > 1) return null;
         }
 
+        // Date-based attribution: unique-day match AuthoredDate to retro DateText or story LastUpdatedDate
+        // under exactly one epic. [spec-sunburst-remaining-work-hierarchy]
+        if (entry.AuthoredDate is { } authored)
+        {
+            var dateHit = ResolveEpicByDateMatch(authored, epics, retros);
+            if (dateHit is not null) return dateHit;
+        }
+
         // Last: unique same-day timing vs story-keyed deferred reviews — only when this quick-dev
         // already has residual deferred naming it (avoids same-day coincidence false parents).
-        if (entry.AuthoredDate is { } authored && followUps is not null)
+        if (entry.AuthoredDate is { } authored2 && followUps is not null)
         {
             var stem = Path.GetFileNameWithoutExtension(entry.OutputPath);
             var named = followUps.DeferredItems.Any(s =>
@@ -200,10 +212,55 @@ public sealed record UnplannedWorkGeometry(
                     FollowUpGeometry.NormalizeSourceKey(stem),
                     StringComparison.OrdinalIgnoreCase));
             if (named)
-                return ResolveEpicByTiming(authored, followUps, epicNumbers);
+                return ResolveEpicByTiming(authored2, followUps, epicNumbers);
         }
 
         return null;
+    }
+
+    /// <summary>Cascaded unique-day match (Design Notes resolve order):
+    /// 1) unique <paramref name="authored"/> vs epic <see cref="RetroModel.DateText"/>;
+    /// 2) else unique vs story <see cref="StoryInfo.LastUpdatedDate"/> owned by one epic;
+    /// else null. Retro ties abort without falling through. Unknown retro epic numbers ignored.
+    /// [spec-sunburst-remaining-work-hierarchy]</summary>
+    private static int? ResolveEpicByDateMatch(
+        DateOnly authored,
+        EpicsModel epics,
+        IReadOnlyList<RetroModel>? retros)
+    {
+        var epicNumbers = new HashSet<int>(epics.Epics.Select(e => e.Number));
+
+        // Tier 1 — retro DateText (unique only; ties → null, no fallthrough).
+        if (retros is { Count: > 0 })
+        {
+            var retroHits = new HashSet<int>();
+            foreach (var retro in retros)
+            {
+                if (!epicNumbers.Contains(retro.EpicNumber)) continue;
+                if (retro.DateText is not { Length: > 0 } dt) continue;
+                if (!PortalDates.TryParseDay(dt, out var retroDay)) continue;
+                if (retroDay == authored)
+                    retroHits.Add(retro.EpicNumber);
+            }
+            if (retroHits.Count == 1) return retroHits.First();
+            if (retroHits.Count > 1) return null;
+        }
+
+        // Tier 2 — story LastUpdatedDate under exactly one epic.
+        var storyHits = new HashSet<int>();
+        foreach (var epic in epics.Epics)
+        {
+            foreach (var story in epic.Stories)
+            {
+                if (story.LastUpdatedDate == authored)
+                {
+                    storyHits.Add(epic.Number);
+                    break;
+                }
+            }
+        }
+
+        return storyHits.Count == 1 ? storyHits.First() : null;
     }
 
     /// <summary>When the quick-dev's authored day uniquely matches deferred story-review dates under

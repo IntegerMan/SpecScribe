@@ -1888,7 +1888,7 @@ public sealed class SiteGenerator
             var deferredModel = ResolveDeferredModel(workForFollowUps, files);
             var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
             var followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
-            var unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model);
+            var unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model, retros: _retros);
             File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps, unplanned), "epics.html"));
 
             // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
@@ -2075,7 +2075,7 @@ public sealed class SiteGenerator
             var work = WorkInventory.Build(docs);
             var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
             var followUps = BuildFollowUpGeometry(work, counts);
-            var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
+            var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
                 work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned);
@@ -2328,7 +2328,7 @@ public sealed class SiteGenerator
         var work = WorkInventory.Build(docs);
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(work, counts);
-        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
             work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned);
@@ -2501,7 +2501,7 @@ public sealed class SiteGenerator
         // Incremental paths may call WriteIndex without going through GenerateAll's ledger build — rebuild then.
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(inventory, counts);
-        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel);
+        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
         var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
@@ -2634,7 +2634,7 @@ public sealed class SiteGenerator
         var work = WorkInventory.Build(_docs.Values.ToList());
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(work, counts);
-        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
         var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, counts, unplanned);
         WriteOutput(SiteNav.SprintOutputPath, ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
@@ -2817,7 +2817,7 @@ public sealed class SiteGenerator
             _progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var deferredModel = TryParseDeferredWork(inventory);
         var followUps = BuildFollowUpGeometry(inventory, counts, deferredModel);
-        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel);
+        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
         var groups = FollowUpGroupPages.Enumerate(followUps, unplanned, _epicsModel);
         if (groups.Count == 0) return;
 
@@ -2841,11 +2841,11 @@ public sealed class SiteGenerator
             _progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
         var deferredModel = TryParseDeferredWork(work);
         var followUps = BuildFollowUpGeometry(work, counts, deferredModel);
-        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
 
         foreach (var doc in _docs.Values)
         {
-            var chrome = BuildQuickDevChrome(doc, followUps, unplanned, _epicsModel);
+            var chrome = BuildQuickDevChrome(doc, followUps, unplanned, _epicsModel, _retros);
             if (chrome is null) continue;
             var outputRelative = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
             WriteOutput(outputRelative, ApplyReferenceLinks(
@@ -2858,7 +2858,8 @@ public sealed class SiteGenerator
         DocModel doc,
         FollowUpGeometry followUps,
         UnplannedWorkGeometry unplanned,
-        EpicsModel? epics)
+        EpicsModel? epics,
+        IReadOnlyList<RetroModel>? retros = null)
     {
         var norm = PathUtil.NormalizeSlashes(doc.SourceRelativePath);
         if (!BmadArtifactAdapter.IsUnderImplementationArtifacts(norm)) return null;
@@ -2875,7 +2876,7 @@ public sealed class SiteGenerator
 
         var entry = new QuickDevEntry(
             doc.Title, output, doc.Frontmatter.Status, doc.Frontmatter.Type, doc.Frontmatter.AuthoredDay());
-        var epicNum = UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, followUps);
+        var epicNum = UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, followUps, retros);
 
         var deferredListHref = followUps.DeferredHref is { Length: > 0 } dh
             ? FollowUpGeometry.ApplyLinkPrefix(prefix, dh)

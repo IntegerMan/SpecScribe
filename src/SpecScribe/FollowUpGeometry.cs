@@ -12,7 +12,10 @@ public sealed record FollowUpDeferredSlot(
     /// to the parent quick-dev / story it stemmed from. [Story 9.12]</summary>
     string? SourceKey = null,
     /// <summary>Href to the provenance source page when resolvable (story page or quick-dev spec).</summary>
-    string? SourceHref = null);
+    string? SourceHref = null,
+    /// <summary>Story id (<c>N.M</c>) when this deferred item stems from a story code review — used to
+    /// nest the item under its parent story in the sunburst outer ring. [spec-sunburst-remaining-work-hierarchy]</summary>
+    string? SourceStoryId = null);
 
 /// <summary>Inputs for sunburst follow-up geometry (Story 9.7 / FR30). Counts for <em>open</em> items must
 /// agree with <see cref="ProjectCounts"/> — never re-parsed from yaml/markdown at the chart layer.
@@ -139,6 +142,23 @@ public sealed record FollowUpGeometry(
     public IReadOnlyList<FollowUpDeferredSlot> DeferredForEpicNumber(int epicNumber) =>
         DeferredItems.Where(s => s.EpicNumber == epicNumber).ToList();
 
+    /// <summary>Story-child deferred: items whose <see cref="FollowUpDeferredSlot.SourceStoryId"/> resolves to
+    /// a known story in the given epic. These render in the sunburst outer ring under their parent story's
+    /// sweep. [spec-sunburst-remaining-work-hierarchy]</summary>
+    public IReadOnlyList<FollowUpDeferredSlot> StoryChildDeferred(int epicNumber, string storyId) =>
+        DeferredItems.Where(s => s.EpicNumber == epicNumber
+            && !string.IsNullOrEmpty(s.SourceStoryId)
+            && string.Equals(s.SourceStoryId, storyId, StringComparison.Ordinal)).ToList();
+
+    /// <summary>Epic-level deferred: items attributed to the epic but NOT parented to any known story —
+    /// these remain middle-ring peers of stories. [spec-sunburst-remaining-work-hierarchy]</summary>
+    public IReadOnlyList<FollowUpDeferredSlot> EpicLevelDeferred(int epicNumber, IEnumerable<string> knownStoryIds)
+    {
+        var storySet = new HashSet<string>(knownStoryIds, StringComparer.Ordinal);
+        return DeferredItems.Where(s => s.EpicNumber == epicNumber
+            && (string.IsNullOrEmpty(s.SourceStoryId) || !storySet.Contains(s.SourceStoryId))).ToList();
+    }
+
     public IReadOnlyList<SprintActionItem> UnattributedActionItems =>
         ActionItems.Where(a => a.EpicNumber is null).ToList();
 
@@ -214,16 +234,17 @@ public sealed record FollowUpGeometry(
             return pairs.Select(p =>
             {
                 var sourceKey = p.Group.SourceKey;
-                var epic = ResolveEpicNumber(epics, p.Group.SourceStoryId)
+                var sourceStoryId = p.Group.SourceStoryId
+                    ?? (sourceKey is not null ? FollowUpRefs.StoryIdFromKey(sourceKey) : null);
+                var epic = ResolveEpicNumber(epics, sourceStoryId)
                     ?? ResolveEpicFromSourceKey(epics, work, sourceKey);
-                // listHref is already link-prefixed when non-null — ApplyLinkPrefix is idempotent.
                 var href = slugs.TryGetValue(p.Item, out var slug)
                     ? linkPrefix + FollowUpSlug.OutputPath(slug)
                     : ApplyLinkPrefix(linkPrefix, listHref);
                 var sourceHref = p.Group.SourceStoryHref is { Length: > 0 } sh
                     ? FollowUpGeometry.ApplyLinkPrefix(linkPrefix, sh)
                     : ResolveSourceHref(work, sourceKey, linkPrefix);
-                return new FollowUpDeferredSlot(p.Item, p.ProvenanceLabel, epic, href, sourceKey, sourceHref);
+                return new FollowUpDeferredSlot(p.Item, p.ProvenanceLabel, epic, href, sourceKey, sourceHref, sourceStoryId);
             }).ToList();
         }
 

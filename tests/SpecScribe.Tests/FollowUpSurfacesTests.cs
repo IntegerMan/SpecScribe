@@ -436,7 +436,7 @@ public class FollowUpSurfacesTests : IDisposable
 
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
         Assert.Contains("sb-followup-open", index);
-        Assert.Contains("stories &amp; follow-ups", index);
+        Assert.Contains("stories (sized by tasks) &amp; follow-ups", index);
         Assert.DoesNotContain("outermost: open follow-ups", index);
         Assert.Contains("href=\"follow-ups/action-", index);
         Assert.Contains("Open follow-up</span>", index);

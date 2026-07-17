@@ -454,7 +454,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for follow-up list column polish: .followup-group-wrap gains the shared 1040px
         // content column (+ header alignment) so group pages no longer stretch edge-to-edge; row meta
         // clustered in .followup-row-meta. [follow-up list UX]
-        const string expected = "691ae3dccc71529559b5fc889f51c8731778d98b0921685b7e4b000b40d4cb43";
+        // Regenerated for spec-sunburst-remaining-work-hierarchy: removed task/noplan outer wedges from
+        // project + epic sunbursts; weight story middle wedges by max(1, TasksTotal); nest story-child
+        // deferred under parent stories (outer ring); date-based quick-dev epic attribution via retro
+        // DateText and story LastUpdatedDate; review patches (hint gating, dead commands param, cascade).
+        // [spec-sunburst-remaining-work-hierarchy]
+        const string expected = "cbce3ae61c190777b7ea71212e6bfae88e03ab7e3d17f0a99fa5ae892605672c";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

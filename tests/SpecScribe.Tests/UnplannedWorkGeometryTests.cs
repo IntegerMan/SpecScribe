@@ -438,4 +438,230 @@ public class UnplannedWorkGeometryTests
         Assert.Equal(new DateOnly(2026, 7, 5), new Frontmatter { Created = "2026-07-05T00:00:00Z" }.AuthoredDay());
         Assert.Null(Frontmatter.Empty.AuthoredDay());
     }
+
+    [Fact]
+    public void ResolveQuickDevEpic_DateMatch_RetroDateText_UniqueSingleEpic()
+    {
+        // AuthoredDate uniquely matches one epic's retro DateText → attribute to that epic.
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1, Title = "One", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = Array.Empty<StoryInfo>(),
+                },
+                new EpicInfo
+                {
+                    Number = 2, Title = "Two", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = Array.Empty<StoryInfo>(),
+                },
+            },
+        };
+        var retros = new[]
+        {
+            new RetroModel
+            {
+                EpicNumber = 1, Title = "Retro", DateText = "2026-07-10",
+                Participants = Array.Empty<string>(), BodyHtml = string.Empty,
+                SourceRelativePath = "x.md", OutputRelativePath = "x.html",
+            },
+        };
+
+        var entry = new QuickDevEntry("No text cue", "spec-mystery.html", "ready", null, new DateOnly(2026, 7, 10));
+        Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: retros));
+    }
+
+    [Fact]
+    public void ResolveQuickDevEpic_DateMatch_StoryLastUpdatedDate_UniqueSingleEpic()
+    {
+        // AuthoredDate uniquely matches one story's LastUpdatedDate under one epic → attribute.
+        var story = new StoryInfo
+        {
+            Id = "2.1", EpicNumber = 2, Title = "Ship",
+            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+            LastUpdatedDate = new DateOnly(2026, 7, 12),
+        };
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1, Title = "One", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = Array.Empty<StoryInfo>(),
+                },
+                new EpicInfo
+                {
+                    Number = 2, Title = "Two", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[] { story },
+                },
+            },
+        };
+
+        var entry = new QuickDevEntry("No text cue", "spec-other.html", "ready", null, new DateOnly(2026, 7, 12));
+        Assert.Equal(2, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: null));
+    }
+
+    [Fact]
+    public void ResolveQuickDevEpic_DateMatch_MultiEpicTie_StaysNull()
+    {
+        // Ambiguous multi-epic date tie → null (never guess). [spec-sunburst-remaining-work-hierarchy]
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1, Title = "One", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "1.1", EpicNumber = 1, Title = "A",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                            LastUpdatedDate = new DateOnly(2026, 7, 10),
+                        },
+                    },
+                },
+                new EpicInfo
+                {
+                    Number = 2, Title = "Two", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "2.1", EpicNumber = 2, Title = "B",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                            LastUpdatedDate = new DateOnly(2026, 7, 10),
+                        },
+                    },
+                },
+            },
+        };
+
+        var entry = new QuickDevEntry("No text cue", "spec-orphan.html", "ready", null, new DateOnly(2026, 7, 10));
+        Assert.Null(UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: null));
+    }
+
+    [Fact]
+    public void ResolveQuickDevEpic_TextCues_TakePrecedence_OverDateMatch()
+    {
+        // Text/filename/story-mention cues preferred over date heuristics.
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1, Title = "One", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "1.1", EpicNumber = 1, Title = "A",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                            LastUpdatedDate = new DateOnly(2026, 7, 10),
+                        },
+                    },
+                },
+                new EpicInfo
+                {
+                    Number = 2, Title = "Two", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "2.1", EpicNumber = 2, Title = "B",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                        },
+                    },
+                },
+            },
+        };
+        var retros = new[]
+        {
+            new RetroModel
+            {
+                EpicNumber = 2, Title = "Retro 2", DateText = "2026-07-10",
+                Participants = Array.Empty<string>(), BodyHtml = string.Empty,
+                SourceRelativePath = "x.md", OutputRelativePath = "x.html",
+            },
+        };
+
+        // Title names "Epic 1" explicitly — text cue wins over date match to epic 2's retro.
+        var entry = new QuickDevEntry("Epic 1 cleanup", "spec-cleanup.html", "ready", null, new DateOnly(2026, 7, 10));
+        Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: retros));
+    }
+
+    [Fact]
+    public void ResolveQuickDevEpic_DateMatch_RetroTierWins_OverCoincidentalStoryDate()
+    {
+        // Cascaded resolve: unique retro DateText on epic 1 must win even when epic 2 has a
+        // coincidental story LastUpdatedDate on the same day. [spec-sunburst-remaining-work-hierarchy]
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1, Title = "One", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "1.1", EpicNumber = 1, Title = "A",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                        },
+                    },
+                },
+                new EpicInfo
+                {
+                    Number = 2, Title = "Two", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "2.1", EpicNumber = 2, Title = "B",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                            LastUpdatedDate = new DateOnly(2026, 7, 10),
+                        },
+                    },
+                },
+            },
+        };
+        var retros = new[]
+        {
+            new RetroModel
+            {
+                EpicNumber = 1, Title = "Retro 1", DateText = "2026-07-10",
+                Participants = Array.Empty<string>(), BodyHtml = string.Empty,
+                SourceRelativePath = "r.md", OutputRelativePath = "r.html",
+            },
+        };
+
+        var entry = new QuickDevEntry("No text cue", "spec-mystery.html", "ready", null, new DateOnly(2026, 7, 10));
+        Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: retros));
+    }
 }

@@ -61,10 +61,11 @@ public class ChartsTests
 
         // Epic + story segment <a>s carry a descriptive aria-label (keyboard/SR name)...
         Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story\"", svg);
-        Assert.Contains("aria-label=\"Story 1.1: Do the thing — in progress\"", svg);
-        // ...the task ring links are named too...
-        Assert.Contains("aria-label=\"Story 1.1: 2 of 5 tasks done\"", svg);
-        Assert.Contains("aria-label=\"Story 1.1: 3 tasks remaining\"", svg);
+        // Story now includes task count in the aria-label (no separate task ring).
+        Assert.Contains("aria-label=\"Story 1.1: Do the thing — in progress, 2/5 tasks\"", svg);
+        // No task ring arcs — removed per spec-sunburst-remaining-work-hierarchy.
+        Assert.DoesNotContain("tasks done\"", svg);
+        Assert.DoesNotContain("tasks remaining\"", svg);
         // ...and the pointer-only <title> tooltips are still present (both paths retained).
         Assert.Contains("<title>Epic 1: First Epic", svg);
         Assert.Contains("<title>Story 1.1: Do the thing", svg);
@@ -258,11 +259,10 @@ public class ChartsTests
 
         var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
 
-        Assert.Contains("aria-label=\"Story 1.1: A story — done\"", svg);
-        Assert.Contains("aria-label=\"Story 1.1: 3 of 3 tasks done\"", svg);
-        Assert.Contains("role=\"img\"", svg); // whole-chart name retained
-        // Center headlines the epic's story count (singular here), never a task fraction, even when tasks
-        // exist — the outer ring already conveys task completion. [epic-sunburst story-count]
+        // Story aria now includes task count (no separate task ring).
+        Assert.Contains("aria-label=\"Story 1.1: A story — done, 3/3 tasks\"", svg);
+        Assert.DoesNotContain("tasks done\"", svg);
+        Assert.Contains("role=\"img\"", svg);
         Assert.Contains(">1</text>", svg);
         Assert.Contains(">story</text>", svg);
         Assert.DoesNotContain(">tasks</text>", svg);
@@ -275,10 +275,10 @@ public class ChartsTests
     });
 
     [Fact]
-    public void Sunburst_UnplannedStoryGetsDashedPlaceholderArcWithCreateStoryCta()
+    public void Sunburst_TaskWeighting_LargerStoryTakesMoreAngularSpace()
     {
-        // A story with a plan and one without: only the unplanned one gets the dashed placeholder arc, and
-        // its tooltip names the module's create-story command for that id. [Story 2.1 UXO E4]
+        // Story with TasksTotal=5 should take more space than one with TasksTotal=0 (weighted by max(1, TasksTotal)).
+        // No task fringe or noplan arcs rendered — spec-sunburst-remaining-work-hierarchy.
         var model = new EpicsModel
         {
             OverviewHtml = string.Empty,
@@ -286,18 +286,19 @@ public class ChartsTests
             Epics = new[] { Epic(Story("1.1", "Planned", "in progress", 2, 5), Story("1.2", "Unplanned", "ready", 0, 0)) },
         };
 
-        var svg = Charts.Sunburst(model, commands: Catalog());
+        var svg = Charts.Sunburst(model);
 
-        // The placeholder arc exists, is a real link, and carries the call-to-action tooltip + aria fallback.
-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
-        Assert.Contains("<title>Story 1.2: no task plan yet — run /bmad-create-story 1.2</title>", svg);
-        Assert.Contains("aria-label=\"Story 1.2: no task plan yet\"", svg);
-        // The planned story keeps its real task ring, not a placeholder.
-        Assert.Contains("aria-label=\"Story 1.1: 2 of 5 tasks done\"", svg);
+        // No task fringe (no sb-noplan, no sb-done/sb-pending task arcs).
+        Assert.DoesNotContain("class=\"sb-seg sb-noplan\"", svg);
+        Assert.DoesNotContain("tasks done\"", svg);
+        Assert.DoesNotContain("tasks remaining\"", svg);
+        // Both stories render in the middle ring with task counts in their aria-labels.
+        Assert.Contains("aria-label=\"Story 1.1: Planned — in progress, 2/5 tasks\"", svg);
+        Assert.Contains("aria-label=\"Story 1.2: Unplanned — ready\"", svg);
     }
 
     [Fact]
-    public void Sunburst_PlaceholderOmitsCommandWhenModuleLacksIt()
+    public void Sunburst_NoTaskFringe_EmptyTaskStory()
     {
         var model = new EpicsModel
         {
@@ -306,24 +307,22 @@ public class ChartsTests
             Epics = new[] { Epic(Story("1.1", "Unplanned", "ready", 0, 0)) },
         };
 
-        // No catalog → no command is invented; the placeholder still reads as a next action, just unnamed.
         var svg = Charts.Sunburst(model);
 
-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
-        Assert.Contains("<title>Story 1.1: no task plan yet</title>", svg);
-        Assert.DoesNotContain("run /", svg);
+        // No noplan arc, no task fringe — spec-sunburst-remaining-work-hierarchy.
+        Assert.DoesNotContain("class=\"sb-seg sb-noplan\"", svg);
+        Assert.DoesNotContain("no task plan yet", svg);
     }
 
     [Fact]
-    public void EpicSunburst_UnplannedStoryGetsDashedPlaceholderArc()
+    public void EpicSunburst_NoTaskFringe_EmptyTaskStory()
     {
         var epic = Epic(Story("1.1", "Unplanned", "ready", 0, 0));
 
-        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", commands: Catalog());
+        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
 
-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
-        Assert.Contains("<title>Story 1.1: no task plan yet — run /bmad-create-story 1.1</title>", svg);
-        // The story segment itself stays a real link (the placeholder doesn't replace navigation).
+        Assert.DoesNotContain("class=\"sb-seg sb-noplan\"", svg);
+        Assert.DoesNotContain("no task plan yet", svg);
         Assert.Contains("aria-label=\"Story 1.1: Unplanned — ready\"", svg);
     }
 
@@ -400,13 +399,13 @@ public class ChartsTests
         Assert.Contains("aria-label=\"Unplanned:", svg);
         Assert.DoesNotContain("outermost: open follow-ups", svg);
         Assert.Contains("Open follow-up</span>", svg);
-        Assert.Contains("stories &amp; follow-ups", svg);
+        Assert.Contains("stories (sized by tasks) &amp; follow-ups", svg);
         // Per-item detail hrefs (Story 9.11) on action wedges.
         Assert.Contains("href=\"follow-ups/action-", svg);
         Assert.Contains("href=\"follow-ups/action-fix-the-heatmap-debt", svg);
         Assert.Contains("href=\"follow-ups/deferred-", svg);
-        // Epic 1 aria mentions its follow-ups (action + two deferred).
-        Assert.Contains("3 follow-ups", svg);
+        // Epic 1 aria mentions its follow-ups (action items only; story-child deferred are in the outer ring).
+        Assert.Contains("1 follow-up", svg);
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
         {
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
@@ -485,7 +484,7 @@ public class ChartsTests
         Assert.Single(geometry.DeferredForEpicNumber(3));
 
         var svg = Charts.Sunburst(model, followUps: geometry);
-        Assert.Contains("1 follow-up", svg);
+        // Story-child deferred renders in the outer ring under story 3.8, not as an epic peer.
         Assert.Contains("Deferred item: Commit body containing a literal 0x1F", svg);
         Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
     }
@@ -1996,5 +1995,187 @@ public class ChartsTests
             index += needle.Length;
         }
         return count;
+    }
+
+    [Fact]
+    public void Sunburst_NoTaskArcs_TaskWeightedStories()
+    {
+        // I/O matrix: Story with TasksTotal=12 beside TasksTotal=0 peer — larger story takes ~12x angular
+        // weight vs max(1,0)=1 for empty; no task fringe renders. [spec-sunburst-remaining-work-hierarchy]
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Big story", "active", 6, 12), Story("1.2", "Small story", "ready", 0, 0)) },
+        };
+
+        var svg = Charts.Sunburst(model);
+
+        Assert.DoesNotContain("sb-noplan", svg);
+        Assert.DoesNotContain("tasks done", svg);
+        Assert.DoesNotContain("tasks remaining", svg);
+        Assert.Contains("aria-label=\"Story 1.1: Big story — active, 6/12 tasks\"", svg);
+        Assert.Contains("aria-label=\"Story 1.2: Small story — ready\"", svg);
+    }
+
+    [Fact]
+    public void Sunburst_StoryChildDeferred_NestsUnderParentStory()
+    {
+        // I/O matrix: deferred with SourceStoryId → story renders as outer-ring child under that story's sweep.
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Do the thing", "active", 2, 4)) },
+        };
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Story-child deferred item from code review.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        Assert.Equal("1.1", geometry.StoryChildDeferred(1, "1.1")[0].SourceStoryId);
+
+        var svg = Charts.Sunburst(model, followUps: geometry);
+
+        Assert.Contains("Deferred item: Story-child deferred item from code review.", svg);
+        // Story-child deferred is not counted as an epic follow-up in the epic's aria note.
+        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story\"", svg);
+    }
+
+    [Fact]
+    public void Sunburst_RetroActionItems_AsEpicMiddlePeers()
+    {
+        // I/O matrix: retro action item with epic:N appears as epic-level middle child, not under a story.
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Do the thing", "active", 1, 2)) },
+        };
+        var items = new[]
+        {
+            new SprintActionItem("Retro action", "open", EpicNumber: 1, Owner: "Alice"),
+        };
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = null,
+        };
+        var counts = ProjectCounts.Empty with { OpenActionItems = 1 };
+        var geometry = FollowUpGeometry.From(items, counts, work, epics: model);
+
+        var svg = Charts.Sunburst(model, followUps: geometry);
+
+        Assert.Contains("aria-label=\"Action item: Retro action\"", svg);
+        Assert.Contains("1 follow-up", svg);
+    }
+
+    [Fact]
+    public void EpicSunburst_StoryChildDeferred_InOuterRing()
+    {
+        // Same nesting rules apply on the epic detail sunburst. [spec-sunburst-remaining-work-hierarchy]
+        var epic = Epic(Story("1.1", "Story A", "active", 2, 4));
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Story-child deferred for epic sunburst.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { epic },
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", followUps: geometry);
+
+        Assert.Contains("Deferred item: Story-child deferred for epic sunburst.", svg);
+        Assert.DoesNotContain("sb-noplan", svg);
+        Assert.DoesNotContain("tasks done", svg);
+        Assert.Contains("sized by tasks", svg);
+    }
+
+    [Fact]
+    public void Sunburst_EmptyDeferredChildren_NoOuterFringe()
+    {
+        // NFR8: when a story has no nested deferred, no outer fringe on that sweep.
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Clean story", "done", 3, 3)) },
+        };
+
+        var svg = Charts.Sunburst(model);
+
+        Assert.DoesNotContain("sb-followup-open", svg);
+        Assert.DoesNotContain("Deferred item", svg);
+        // Hint must not claim an outer ring when none exists.
+        Assert.DoesNotContain("outer: story-child deferred", svg);
+    }
+
+    [Fact]
+    public void EpicSunburst_TaskWeighting_LargerStoryTakesMoreAngularSpace()
+    {
+        // Same hierarchy rules as project sunburst — weight by max(1, TasksTotal).
+        var epic = Epic(
+            Story("1.1", "Big", "active", 6, 12),
+            Story("1.2", "Tiny", "ready", 0, 0));
+
+        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+
+        Assert.DoesNotContain("class=\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("aria-label=\"Story 1.1: Big — active, 6/12 tasks\"", svg);
+        Assert.Contains("aria-label=\"Story 1.2: Tiny — ready\"", svg);
+        Assert.Contains("sized by tasks", svg);
+    }
+
+    [Fact]
+    public void FollowUpGeometry_UnknownSourceStoryId_FallsToEpicLevel()
+    {
+        // Bad / unknown SourceStoryId → epic-level peer, not a vanishing story child.
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Known", "active", 1, 2)) },
+        };
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-99-ghost.md (2026-07-15)
+
+            - Ghost parent deferred item.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        var knownIds = model.Epics[0].Stories.Select(s => s.Id);
+        Assert.Empty(geometry.StoryChildDeferred(1, "1.1"));
+        Assert.Single(geometry.EpicLevelDeferred(1, knownIds));
     }
 }
