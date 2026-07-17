@@ -16,7 +16,8 @@ public static class ActionItemsTemplater
         string? deferredWorkHref = null,
         ProjectCounts? counts = null,
         EpicsModel? epicsModel = null,
-        IReadOnlyDictionary<string, string>? hrefMap = null)
+        IReadOnlyDictionary<string, string>? hrefMap = null,
+        IReadOnlyList<SprintActionItem>? allActionItemsForSlugs = null)
     {
         var outputPath = SiteNav.ActionItemsOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -29,6 +30,8 @@ public static class ActionItemsTemplater
 
         var groups = GroupByEpic(openItems);
         var crossLinks = FindNearDuplicates(openItems);
+        // Slugs over the full sprint list (open + done) so list/detail/sunburst URLs agree (Story 9.11).
+        var detailSlugs = FollowUpSlug.AssignActionSlugs(allActionItemsForSlugs ?? openItems);
 
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
@@ -58,7 +61,7 @@ public static class ActionItemsTemplater
             sb.Append("<ul class=\"followup-rows-list action-items-list\">\n");
             foreach (var item in group.Items)
             {
-                RenderCard(sb, item, epicRetroMap, deferredWorkHref, quickDev, epicsModel, hrefMap, prefix, crossLinks);
+                RenderCard(sb, item, deferredWorkHref, quickDev, epicsModel, hrefMap, prefix, crossLinks, detailSlugs);
             }
             sb.Append("</ul>\n");
         }
@@ -132,46 +135,34 @@ public static class ActionItemsTemplater
     private static void RenderCard(
         StringBuilder sb,
         SprintActionItem item,
-        IReadOnlyDictionary<int, string>? epicRetroMap,
         string? deferredWorkHref,
         string? quickDev,
         EpicsModel? epicsModel,
         IReadOnlyDictionary<string, string>? hrefMap,
         string prefix,
-        IReadOnlyDictionary<SprintActionItem, int> crossLinks)
+        IReadOnlyDictionary<SprintActionItem, int> crossLinks,
+        IReadOnlyDictionary<SprintActionItem, string> detailSlugs)
     {
         var summaryPlain = FollowUpRow.SummarizePlainText(item.Action);
         var summaryHtml = FollowUpRefs.LinkifyVisibleText(summaryPlain, epicsModel, hrefMap, prefix);
         var sourceChip = item.EpicNumber is { } en ? $"Epic {en}" : "Unattributed";
+        var detailHref = detailSlugs.TryGetValue(item, out var slug)
+            ? prefix + FollowUpSlug.OutputPath(slug)
+            : null;
 
+        // Teaser disclosure: full provenance/resolve lives on the detail page (Story 9.11).
         var detail = new StringBuilder();
-        detail.Append($"<div class=\"followup-detail-fulltext\">{FollowUpRefs.LinkifyVisibleText(item.Action, epicsModel, hrefMap, prefix)}</div>\n");
-
         if (crossLinks.TryGetValue(item, out var otherEpic))
         {
-            if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
-            {
-                detail.Append($"<a class=\"action-item-cross\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(otherRetro))}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
-            }
-            else
-            {
-                detail.Append($"<span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
-            }
+            detail.Append($"<span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
         }
-
-        if (deferredWorkHref is { Length: > 0 } dw && DeferralHeuristics.IsDebtRelated(item.Action))
+        if (deferredWorkHref is { Length: > 0 } && DeferralHeuristics.IsDebtRelated(item.Action))
         {
-            detail.Append($"<a class=\"action-item-deferred\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(dw))}\">In deferred-work backlog &rarr;</a>\n");
+            detail.Append("<span class=\"action-item-deferred\">Also in deferred-work backlog</span>\n");
         }
-
         if (quickDev is { Length: > 0 })
         {
-            var epicNote = item.EpicNumber is { } e3 ? $" (Epic {e3})" : string.Empty;
-            // Payload uses RAW action text — never the linkified fragment (copy-payload corruption trap).
-            var prompt = $"{quickDev} Resolve this retrospective action item{epicNote}: {item.Action}";
-            detail.Append("<div class=\"action-item-resolve\">\n");
-            detail.Append($"{BmadCommands.RenderLabeledCommand("Resolve with AI", prompt)}\n");
-            detail.Append("</div>\n");
+            detail.Append("<span class=\"action-item-resolve-hint\">Resolve with AI on the detail page</span>\n");
         }
 
         FollowUpRow.Render(
@@ -180,7 +171,8 @@ public static class ActionItemsTemplater
             StatusStyles.ForSprint(item.Status),
             StatusStyles.SprintLabel(item.Status),
             PathUtil.Html(sourceChip),
-            detail.ToString());
+            detail.ToString(),
+            detailHref: detailHref);
     }
 
     private static string RenderGroupHeading(int? epicNumber, IReadOnlyDictionary<int, string>? epicRetroMap)

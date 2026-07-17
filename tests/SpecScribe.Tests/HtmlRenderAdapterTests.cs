@@ -636,15 +636,17 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
-    public void RenderDashboardBody_OmitsInlineWorkModeStrip_LandmarksAreScrollTargets()
+    public void RenderDashboardBody_OmitsInlineWorkModeStrip_PanelsTaggedForVisibility()
     {
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkflowDashboard(epics: null));
         Assert.DoesNotContain("work-mode-strip", body);
         Assert.DoesNotContain("name=\"work-mode\"", body);
+        Assert.Contains("wm-panel wm-show-overview", body);
+        Assert.Contains("wm-show-track", body);
     }
 
     [Fact]
-    public void RenderDashboardBody_WorkModeLandmarks_PresentWithoutDimmingMarkup()
+    public void RenderDashboardBody_WorkModePanels_TaggedWithoutInlineRadios()
     {
         var epics = new EpicsModel
         {
@@ -654,17 +656,15 @@ public class HtmlRenderAdapterTests
         };
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(WorkflowDashboard(epics));
 
-        Assert.Contains("id=\"wm-overview\"", body);
-        Assert.Contains("id=\"wm-develop\"", body);
-        Assert.Contains("id=\"wm-draft\"", body);
-        Assert.Contains("id=\"wm-review\"", body);
-        Assert.Contains("dashboard-stage-anchor", body);
-        // Full stack stays in the DOM — no radio strip, no display:none stage switch.
+        Assert.Contains("wm-show-develop", body);
+        Assert.Contains("wm-show-requirements", body);
+        Assert.Contains("wm-show-plan", body);
+        Assert.Contains("wm-show-review", body);
+        Assert.Contains("wm-show-track", body);
         Assert.DoesNotContain("work-mode-strip", body);
         Assert.DoesNotContain("name=\"work-mode\"", body);
         Assert.Contains("Now &amp; Next", body);
         Assert.Contains("Story Pipeline", body);
-        Assert.DoesNotContain("display:none", body);
     }
 
     [Fact]
@@ -806,7 +806,7 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
-    public void RenderNav_OnHome_ShowsWorkModeJumpStrip_InsteadOfKeyViewPills()
+    public void RenderNav_OnHome_ShowsWorkModeToggleStrip_InsteadOfKeyViewPills()
     {
         var nav = SiteNav.Build(new[]
         {
@@ -818,11 +818,13 @@ public class HtmlRenderAdapterTests
         var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
 
         Assert.Contains("work-mode-jumps", keyViews);
-        Assert.Contains("href=\"#wm-overview\"", keyViews);
-        Assert.Contains("href=\"#wm-gather\"", keyViews);
-        Assert.Contains("href=\"#wm-draft\"", keyViews);
-        Assert.Contains("href=\"#wm-develop\"", keyViews);
-        Assert.Contains("href=\"#wm-review\"", keyViews);
+        Assert.Contains("id=\"wm-overview\"", keyViews);
+        Assert.Contains("id=\"wm-requirements\"", keyViews);
+        Assert.Contains("id=\"wm-plan\"", keyViews);
+        Assert.Contains("id=\"wm-develop\"", keyViews);
+        Assert.Contains("id=\"wm-review\"", keyViews);
+        Assert.Contains("id=\"wm-track\"", keyViews);
+        Assert.Contains("work-mode-pill", keyViews);
         Assert.DoesNotContain("key-view-group", keyViews);
         Assert.DoesNotContain("Docs<span", keyViews);
         // Dark bar still carries the journey menus (with family color classes).

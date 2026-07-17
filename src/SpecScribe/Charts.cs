@@ -217,7 +217,7 @@ public static class Charts
                 }
                 foreach (var item in epicFollowUps)
                 {
-                    AppendActionItemSlot(sb, item, geometry.ActionItemsHref, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                    AppendActionItemSlot(sb, item, geometry.HrefFor(item), slotAngle, slotSweep, pad, c, storyInner, storyOuter);
                     slotAngle += slotSweep;
                 }
             }
@@ -248,7 +248,7 @@ public static class Charts
             var slotAngle = angle;
             foreach (var item in unattributed)
             {
-                AppendActionItemSlot(sb, item, geometry.ActionItemsHref, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                AppendActionItemSlot(sb, item, geometry.HrefFor(item), slotAngle, slotSweep, pad, c, storyInner, storyOuter);
                 slotAngle += slotSweep;
             }
             if (hasDeferred)
@@ -478,7 +478,7 @@ public static class Charts
 
         foreach (var item in epicFollowUps)
         {
-            AppendActionItemSlot(sb, item, geometry.ActionItemsHref, angle, anglePerSlot, pad, c, storyInner, storyOuter);
+            AppendActionItemSlot(sb, item, geometry.HrefFor(item), angle, anglePerSlot, pad, c, storyInner, storyOuter);
             angle += anglePerSlot;
         }
 

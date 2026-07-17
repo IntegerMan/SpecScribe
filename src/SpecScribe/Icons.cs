@@ -60,6 +60,11 @@ public static class Icons
             // Story artifact — bookmark card (paired with "Story" / story-chip labels). [change-surface Updated]
             "Story" => Svg("<path d=\"M4 2.4h8v11.2L8 11.2 4 13.6Z\"/>"),
             "Overview" => Svg("<path d=\"M2.8 2.8h4.4v4.4H2.8Z\"/><path d=\"M8.8 2.8h4.4v4.4H8.8Z\"/><path d=\"M2.8 8.8h4.4v4.4H2.8Z\"/><path d=\"M8.8 8.8h4.4v4.4H8.8Z\"/>"),
+            // Home work-stage pills (white bar). [Story 9.8]
+            "Plan" => Svg("<path d=\"M3.5 3.6h9v9.8h-9Z\"/><path d=\"M3.5 6.4h9M5.8 2.4v2.4M10.2 2.4v2.4\"/><path d=\"M5.8 8.6h4.4M5.8 10.8h2.8\"/>"),
+            "Develop" => Svg("<path d=\"M5 3.5 12 8 5 12.5Z\"/>", solid: true),
+            "Review" => Svg("<circle cx=\"6.8\" cy=\"6.8\" r=\"4.3\"/><path d=\"M10 10 13.5 13.5\"/>"),
+            "Track" => Svg("<path d=\"M2.8 11.2V8.4l2.4-4 2.4 2.4 2.4-3.2 2.4 4.8v3.2\"/><path d=\"M2.8 11.2h10.4\"/>"),
             // A folder outline — the shared glyph for the code-map surface (nav item + dashboard quick link both
             // reuse this ONE key). Re-keyed from the retired Story 3.4 "Structure" surface. [Story 7.6]
             "Code Map" => Svg("<path d=\"M2.5 4.2H6l1.2 1.4h6.3v6.9a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1Z\"/>"),

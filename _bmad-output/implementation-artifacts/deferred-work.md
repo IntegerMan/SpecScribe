@@ -2,6 +2,14 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 9-6-follow-up-item-provenance-and-resolution-paths.md (2026-07-17)
+
+- Top-level deferred bullets only recognized as column-0 `- ` / `-\t`; `*` / `+` / numbered lists never become items. Live notes use `-`; foreign frameworks may not. [`DeferredWorkParser.cs:139`]
+- Path-prefixed `source_spec` tokens can fail `StoryIdFromKey` (and skip placeholder href) when the href map misses; map lookup by filename stem usually still works. [`FollowUpRefs.cs:91-101`]
+- `ResolvingStoryIdFromText` only accepts `RESOLVED in [Story] N.M` — other closure phrasings leave `Resolved` true without a resolving link. Intentional best-effort heuristic. [`FollowUpRefs.cs:105-111`]
+- Near-dupe cross-link keeps only the first counterpart epic (“first match wins for stability”); multi-epic repeats understate provenance. [`ActionItemsTemplater.cs:100`]
+- Resolving chip label heuristic (`Contains('.') && !Contains('-')`) can emit `Story readme.md` for hyphen-free filenames. Rare. [`DeferredWorkTemplater.cs:108`]
+
 ## Deferred from: code review of 9-5-distinct-acceptance-criteria-blocks-and-collapsed-dev-notes.md (2026-07-16)
 
 - Markdig duplicate-slug forms (`references-1`) never match exact `StoryRemainderSlugs` (`dev-notes`/`references`) — second same-titled H2 stays expanded. Rare; revisit if foreign-framework artifacts collide. [`CollapsibleSections.cs:14-15`]

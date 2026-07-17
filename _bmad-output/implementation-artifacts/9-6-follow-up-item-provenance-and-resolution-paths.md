@@ -120,6 +120,21 @@ Provenance, resolution criteria, and resolving links are **derived by best-effor
   - [x] `tests/SpecScribe.Tests/StylesheetTests.cs` — assert the new `.deferred-*` card + resolved rules exist and that the resolved treatment is not color-only (a shape/text signal is present).
   - [x] Run the full suite from repo root (`dotnet test`). Watch the action-items/deferred-work site-generator tests, `StylesheetTests`, the golden fingerprint test, and the three `Render*ParityTests`.
 
+### Review Findings
+
+- [x] [Review][Decision] Accept 9.10/9.11 scan-first + detail-page overlay for 9.6 closeout? — **Accepted** (owner 2026-07-17): intentional later-story overlay; no restore of above-fold 9.6 card chrome.
+- [ ] [Review][Patch] Open item-level `source_spec` mislabeled as Resolving [DeferredWorkParser.cs:121-129][DeferredWorkTemplater.cs:105-108]
+- [ ] [Review][Patch] Over-broad resolved detection (`<del>` OR bare `RESOLVED`) [DeferredWorkParser.cs:113-114]
+- [ ] [Review][Patch] Structured parse drops note preamble / non-list prose [DeferredWorkParser.cs:78][DeferredWorkTemplater.cs:44-57]
+- [ ] [Review][Patch] Deferred-from headings with zero `-` items stay structured (empty groups / can overwrite plain body) [DeferredWorkParser.cs:78]
+- [ ] [Review][Patch] Non-Deferred `##` inside a section truncates remaining list items [DeferredWorkParser.cs:148-151]
+- [ ] [Review][Patch] Near-dupe map keyed on `SprintActionItem` value equality drops cross-links for identical rows [ActionItemsTemplater.cs:101-113]
+- [x] [Review][Defer] Top-level list markers other than `-` / `-\t` ignored [DeferredWorkParser.cs:139] — deferred, pre-existing
+- [x] [Review][Defer] Path-prefixed `source_spec` can miss `StoryIdFromKey` / placeholder fallback [FollowUpRefs.cs:91-101] — deferred, pre-existing
+- [x] [Review][Defer] `ResolvingStoryIdFromText` only matches `RESOLVED in [Story] N.M` [FollowUpRefs.cs:105-111] — deferred, pre-existing
+- [x] [Review][Defer] Cross-link stores only first counterpart epic [ActionItemsTemplater.cs:100] — deferred, pre-existing
+- [x] [Review][Defer] Hyphen-free `*.md` ResolvingRef mislabeled `Story {ref}` [DeferredWorkTemplater.cs:108] — deferred, pre-existing
+
 ## Dev Notes
 
 ### Reuse map (do NOT reinvent)

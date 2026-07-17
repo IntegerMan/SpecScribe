@@ -309,17 +309,16 @@ public class StylesheetTests
     }
 
     [Fact]
-    public void Stylesheet_HasWorkModeJumpStripRules()
+    public void Stylesheet_HasWorkModeToggleStripRules()
     {
-        // Story 9.8: Home work-stage strip in the white bar — scroll jumps, never display:none / opacity dim.
+        // Story 9.8: Home work-stage strip in the white bar — radio toggles panel visibility.
         var css = ReadStylesheet();
         Assert.Contains(".work-mode-jumps", css);
         Assert.Contains(".work-mode-pill", css);
-        Assert.Contains(".dashboard-stage-anchor", css);
-        Assert.Contains("scroll-margin-top", css);
-        Assert.Contains("body:has(#wm-draft:target) .work-mode-pill[href=\"#wm-draft\"]", css);
+        Assert.Contains("#wm-track:checked ~ label[for=\"wm-track\"]", css);
+        Assert.Contains("body:has(#wm-track:checked) .dashboard .wm-panel:not(.wm-show-track)", css);
         Assert.DoesNotContain(".work-mode-strip", css);
-        Assert.DoesNotContain(".dashboard:has(#wm-draft:checked)", css);
+        Assert.DoesNotContain(".dashboard-stage-anchor", css);
         Assert.DoesNotContain("opacity: 0.48", css);
     }
 
@@ -688,5 +687,18 @@ public class StylesheetTests
         Assert.Contains(".action-items-group", css);
         Assert.Contains(".action-item-cross", css);
         Assert.Contains(".deferred-work-wrap", css);
+    }
+
+    // ---- Story 9.11: follow-up detail page --------------------------------
+
+    [Fact]
+    public void Stylesheet_FollowUpDetail_ReusesDetailVocabulary()
+    {
+        var css = ReadStylesheet();
+        Assert.Contains("main.followup-detail", css);
+        Assert.Contains(".followup-detail", css);
+        Assert.Contains(".followup-detail-provenance", css);
+        Assert.Contains(".followup-detail-back", css);
+        Assert.Contains("body:has(main.followup-detail)", css);
     }
 }

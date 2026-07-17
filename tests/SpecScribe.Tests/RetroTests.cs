@@ -180,7 +180,7 @@ public class RetroTests : IDisposable
     }
 
     [Fact]
-    public void ActionItems_RenderPage_ShowsItemsRetroLinkAndResolveCommand()
+    public void ActionItems_RenderPage_ShowsItemsRetroLinkAndDetailHref()
     {
         var open = new[]
         {
@@ -202,18 +202,20 @@ public class RetroTests : IDisposable
         // Provenance lives on the group heading (Story 9.6) — linked to the epic's retro page.
         Assert.Contains("class=\"action-items-group\"", html);
         Assert.Contains("href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\">From the Epic 1 retrospective", html);
-        // …and offers a "Resolve with AI" command composed with the action text.
-        Assert.Contains("<span class=\"cmd-text\">Resolve with AI</span>", html);
-        Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Route deferred tech debt\"", html);
+        // Story 9.11: Resolve-with-AI moved to the detail page; list rows deep-link there.
+        Assert.Contains("href=\"follow-ups/action-", html);
+        Assert.Contains("class=\"followup-row-primary\"", html);
+        Assert.Contains("Resolve with AI on the detail page", html);
+        Assert.DoesNotContain("<span class=\"cmd-text\">Resolve with AI</span>", html);
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
 
-        // No quick-dev command exposed → no resolve button (graceful).
+        // No quick-dev command exposed → no resolve teaser (graceful).
         var noCmd = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
         Assert.DoesNotContain("Resolve with AI", noCmd);
     }
 
     [Fact]
-    public void ActionItems_RenderPage_WideWrapperAndDeferredLinkOnlyForDebtItems()
+    public void ActionItems_RenderPage_WideWrapperAndDeferredTeaserOnlyForDebtItems()
     {
         var open = new[]
         {
@@ -227,16 +229,17 @@ public class RetroTests : IDisposable
 
         // Wider layout wrapper (not the 860 doc column).
         Assert.Contains("class=\"action-items-wrap\"", html);
-        // The deferred link appears exactly once — only on the debt-related item.
-        Assert.Equal(1, CountOccurrences(html, "class=\"action-item-deferred\" href=\"deferred-work.html\">In deferred-work backlog"));
+        // Story 9.11: list shows a deferred teaser; the live backlog link lives on the detail page.
+        Assert.Equal(1, CountOccurrences(html, "class=\"action-item-deferred\">Also in deferred-work backlog"));
+        Assert.Contains("href=\"follow-ups/action-", html);
 
-        // No deferred href → no deferred link at all, even for the debt item.
+        // No deferred href → no deferred teaser at all, even for the debt item.
         var noHref = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
         Assert.DoesNotContain("action-item-deferred", noHref);
     }
 
     [Fact]
-    public void ActionItems_RenderPage_VisibleTextLinked_PayloadUncorrupted()
+    public void ActionItems_RenderPage_SummaryLinkifies_ResolveLivesOnDetail()
     {
         var open = new[]
         {
@@ -275,10 +278,17 @@ public class RetroTests : IDisposable
 
         var html = ActionItemsTemplater.RenderPage(open, map, commands, nav, epicsModel: epics);
 
+        // Summary line still linkifies Story N.M mentions.
         Assert.Contains("class=\"story-ref\"", html);
         Assert.Contains(">Story 1.1</a>", html);
-        Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix Story 1.1 heatmap debt before Epic 2\"", html);
-        Assert.DoesNotContain("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix <a", html);
+        Assert.Contains("href=\"follow-ups/action-", html);
+        // Resolve payload is on the detail page, not the list (Story 9.11).
+        Assert.DoesNotContain("data-copy=", html);
+
+        var detail = FollowUpDetailTemplater.RenderActionPage(
+            open[0], FollowUpSlug.AssignActionSlugs(open)[open[0]], nav, commands, map, epicsModel: epics);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix Story 1.1 heatmap debt before Epic 2\"", detail);
+        Assert.DoesNotContain("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix <a", detail);
     }
 
     private static int CountOccurrences(string haystack, string needle)

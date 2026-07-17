@@ -153,17 +153,18 @@ public class FollowUpSurfacesTests : IDisposable
 
         var html = File.ReadAllText(Path.Combine(Site, "action-items.html"));
 
-        // Scan-first row grammar (Story 9.10): shared .followup-row, heavy detail in <details>.
+        // Scan-first row grammar (Story 9.10) + primary link to detail page (Story 9.11).
         Assert.Contains("class=\"followup-row\"", html);
         Assert.Contains("followup-row-summary", html);
-        Assert.Contains("followup-row-detail", html);
+        Assert.Contains("followup-row-primary", html);
+        Assert.Contains("href=\"follow-ups/action-", html);
 
         // Groups ordered by epic ascending.
         var epic1 = html.IndexOf("From the Epic 1 retrospective", StringComparison.Ordinal);
         var epic2 = html.IndexOf("From the Epic 2 retrospective", StringComparison.Ordinal);
         Assert.True(epic1 >= 0 && epic2 > epic1, "Epic 1 group must precede Epic 2");
 
-        // Canonical pair cross-links live inside disclosure; unrelated "Schedule retros" does not.
+        // Cross-link teaser on list; full linked cross-ref lives on the detail page.
         Assert.Contains("also raised in Epic 2 retrospective", html);
         Assert.Contains("also raised in Epic 1 retrospective", html);
         var scheduleIdx = html.IndexOf("Schedule retros promptly", StringComparison.Ordinal);
@@ -171,20 +172,85 @@ public class FollowUpSurfacesTests : IDisposable
         var scheduleRowEnd = html.IndexOf("</li>", scheduleIdx, StringComparison.Ordinal);
         var scheduleRow = html[scheduleRowStart..scheduleRowEnd];
         Assert.DoesNotContain("also raised", scheduleRow);
-        Assert.Contains("followup-row-detail", scheduleRow);
 
-        // Full action text + cross-links are behind disclosure, not in the scan line.
-        var scanLineEnd = html.IndexOf("followup-row-detail", StringComparison.Ordinal);
-        var aboveFold = html[..scanLineEnd];
-        Assert.DoesNotContain("also raised in Epic", aboveFold);
+        // List page no longer embeds Resolve-with-AI (moved to detail).
+        Assert.DoesNotContain("data-copy=", html);
+    }
 
-        // Visible text linkifies Story N.M that exists in the plan (inside disclosure body).
-        Assert.Contains("class=\"story-ref\"", html);
-        Assert.Contains(">Story 2.1</a>", html);
+    [Fact]
+    public void FollowUpDetailPages_ExistPerItem_SharedTemplate_RawDataCopy()
+    {
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), SprintWithDupes);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), StructuredDeferred);
 
-        // Payload integrity: no <a> leaked into any data-copy attribute.
+        Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var followUpsDir = Path.Combine(Site, "follow-ups");
+        Assert.True(Directory.Exists(followUpsDir));
+        var actionPages = Directory.GetFiles(followUpsDir, "action-*.html");
+        var deferredPages = Directory.GetFiles(followUpsDir, "deferred-*.html");
+        Assert.Equal(3, actionPages.Length);
+        Assert.Equal(2, deferredPages.Length);
+
+        var schedulePage = actionPages
+            .Select(p => (Path: p, Html: File.ReadAllText(p)))
+            .First(t => t.Html.Contains("Schedule retros promptly", StringComparison.Ordinal));
+        Assert.Contains("main id=\"main-content\" class=\"followup-detail\"", schedulePage.Html);
+        Assert.Contains("Where it came from", schedulePage.Html);
+        Assert.Contains("From the Epic 1 retrospective", schedulePage.Html);
+        Assert.Contains("story-kicker\">Action item", schedulePage.Html);
+
+        // Cross-link pair on detail pages.
+        var debtPages = actionPages
+            .Select(File.ReadAllText)
+            .Where(h => h.Contains("heatmap", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        Assert.True(debtPages.Count >= 2);
+        Assert.Contains(debtPages, h => h.Contains("also raised in Epic 2 retrospective"));
+        Assert.Contains(debtPages, h => h.Contains("also raised in Epic 1 retrospective"));
+
+        var deferredHtml = File.ReadAllText(deferredPages.First(p => File.ReadAllText(p).Contains("Open casing mismatch")));
+        Assert.Contains("main id=\"main-content\" class=\"followup-detail\"", deferredHtml);
+        Assert.Contains("story-kicker\">Deferred work", deferredHtml);
+        Assert.Contains("Where it came from", deferredHtml);
+        Assert.Contains("Deferred from:", deferredHtml);
+
+        // Slug stability under regeneration.
+        var names1 = Directory.GetFiles(followUpsDir).Select(Path.GetFileName).OrderBy(n => n).ToArray();
+        Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        var names2 = Directory.GetFiles(followUpsDir).Select(Path.GetFileName).OrderBy(n => n).ToArray();
+        Assert.Equal(names1, names2);
+    }
+
+    [Fact]
+    public void FollowUpDetailTemplater_ActionPage_RawDataCopy_NoLinkifyInAttribute()
+    {
+        // Unit-level: e2e fixtures often have an empty CommandCatalog (no module-help), so pin
+        // Resolve-with-AI copy-payload discipline here with an explicit catalog.
+        var item = new SprintActionItem(
+            "Route Epic 1 debt before Story 2.1 planning",
+            "open", 1, "Dana");
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["quick-dev"] = "/bmad-quick-dev",
+        });
+        var nav = new SiteNav
+        {
+            SiteTitle = "SpecScribe",
+            Items = Array.Empty<(string, string)>(),
+            QuickLinks = Array.Empty<(string, string, string)>(),
+        };
+        var html = FollowUpDetailTemplater.RenderActionPage(
+            item, "action-route-epic-1-debt", nav, commands);
+
+        Assert.Contains("data-copy=", html);
+        Assert.Contains("class=\"followup-detail\"", html);
         foreach (Match m in Regex.Matches(html, "data-copy=\"([^\"]*)\""))
+        {
             Assert.DoesNotContain("<a", m.Groups[1].Value);
+            Assert.Contains("Route Epic 1 debt before Story 2.1 planning", m.Groups[1].Value);
+            Assert.Contains("/bmad-quick-dev", m.Groups[1].Value);
+        }
     }
 
     [Fact]
@@ -209,15 +275,11 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("class=\"followup-row resolved\"", html);
         Assert.Contains(">Resolved</span>", html);
         Assert.Contains("deferred-resolved-mark", html);
-        Assert.Contains("followup-row-detail", html);
-        Assert.Contains("href=\"../epics/story-1-1.html\"", html);
-        Assert.Contains("Resolving:", html);
+        Assert.Contains("followup-row-primary", html);
+        Assert.Contains("href=\"../follow-ups/deferred-", html);
 
-        // Full body and resolving link live inside disclosure, not the scan line.
-        var firstDetail = html.IndexOf("followup-row-detail", StringComparison.Ordinal);
-        Assert.Contains("Open casing mismatch", html[(firstDetail)..]);
-        var scanPrefix = html[..firstDetail];
-        Assert.DoesNotContain("Resolving:", scanPrefix);
+        // Provenance source link still on the group heading.
+        Assert.Contains("href=\"../epics/story-1-1.html\"", html);
 
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
         Assert.Contains("deferred-work.html", index);
@@ -265,6 +327,7 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
         Assert.False(File.Exists(Path.Combine(Site, "action-items.html")));
+        Assert.False(Directory.Exists(Path.Combine(Site, "follow-ups")));
     }
 
     [Fact]
@@ -287,8 +350,7 @@ public class FollowUpSurfacesTests : IDisposable
     [Fact]
     public void HomeAndEpicSunburst_ShowFollowUpGeometry_WhenOpenItemsExist()
     {
-        // Story 9.7: open action items appear as outermost sunburst wedges on home + owning epic pages;
-        // an epic with none omits the ring. StatCards stay ledger-backed (unchanged path).
+        // Story 9.7 + 9.11: open action items appear as story-ring peers; wedges deep-link to per-item detail.
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), SprintWithDupes);
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), StructuredDeferred);
 
@@ -298,7 +360,7 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("sb-followup-open", index);
         Assert.Contains("stories &amp; follow-ups", index);
         Assert.DoesNotContain("outermost: open follow-ups", index);
-        Assert.Contains($"href=\"{SiteNav.ActionItemsOutputPath}\"", index);
+        Assert.Contains("href=\"follow-ups/action-", index);
         Assert.Contains("Open follow-up</span>", index);
         // StatCards still present (geometry does not replace them).
         Assert.Contains("Action items", index);
@@ -306,7 +368,7 @@ public class FollowUpSurfacesTests : IDisposable
 
         var epic1 = File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html"));
         Assert.Contains("sb-followup-open", epic1);
-        Assert.Contains("href=\"../action-items.html\"", epic1);
+        Assert.Contains("href=\"../follow-ups/action-", epic1);
         Assert.Contains("Schedule retros promptly", epic1);
 
         var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));

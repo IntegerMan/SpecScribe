@@ -419,7 +419,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // six-tier donut (2×2 with the kinds); the Home rollup gains the same bracketed bar above its chips;
         // specscribe.css swaps the flat .satisfaction-bar for .satisfaction-bracket* + .satisfaction-note rules.
         // [Story 9.9 UI coherence; golden-diff-normalization-gotchas]
-        const string expected = "6a1660671d2d2a4c4fca249d8ce438c4d99f8cfe708900187973c4402a99f5e1";
+        // Regenerated for Story 9.8 work-stage toggle strip: Track stage + radio visibility toggles
+        // (Overview/Requirements/Plan/Develop/Review/Track); wm-show-track panels for status views.
+        // [Story 9.8 Track stage; golden-diff-normalization-gotchas]
+        // Regenerated for Story 9.11: follow-ups/{slug}.html detail pages + sunburst/list per-item hrefs;
+        // specscribe.css gains main.followup-detail / .followup-detail-* rules. Golden fixture has no
+        // open action_items and no deferred-work.md — delta is primarily shared CSS.
+        // [Story 9.11; golden-diff-normalization-gotchas]
+        const string expected = "95786ceed35dd94fc8eea22bca25c75c0bc0751b9615ea20b6aa2211dbbcf091";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

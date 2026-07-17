@@ -376,6 +376,9 @@ public class ChartsTests
         Assert.DoesNotContain("outermost: open follow-ups", svg);
         Assert.Contains("Open follow-up</span>", svg);
         Assert.Contains("stories &amp; follow-ups", svg);
+        // Per-item detail hrefs (Story 9.11) on action wedges.
+        Assert.Contains("href=\"follow-ups/action-", svg);
+        Assert.Contains("href=\"follow-ups/action-fix-the-heatmap-debt", svg);
         // Epic 1 aria mentions its follow-up so aggregation is visible on the epic wedge.
         Assert.Contains("1 follow-up", svg);
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
@@ -431,6 +434,7 @@ public class ChartsTests
 
         Assert.Contains("aria-label=\"Action item: Epic 1 only\"", svg1);
         Assert.Contains("class=\"sb-seg sb-followup-open\"", svg1);
+        Assert.Contains("href=\"follow-ups/action-", svg1);
         Assert.DoesNotContain("Epic 2 only", svg1);
         Assert.DoesNotContain("Deferred work", svg1);
         Assert.Contains("aria-label=\"Action item: Epic 2 only\"", svg2);

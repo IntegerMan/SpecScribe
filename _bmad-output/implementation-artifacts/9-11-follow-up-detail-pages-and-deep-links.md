@@ -4,7 +4,7 @@ baseline_commit: 8d9aac44fe721e35315cef0881cb04ba64b2ded9
 
 # Story 9.11: Follow-Up Detail Pages and Deep Links
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -61,37 +61,37 @@ This is the second half of the follow-up density fix. Story **9.6** put provenan
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Stable follow-up slug helper (AC: #2)**
-  - [ ] Add a pure slug function (e.g. `FollowUpSlug.For(SprintActionItem)` / `.For(deferred item)`) producing `action-{kebab}` / `deferred-{kebab}` from existing text, with content-hash disambiguation on collision only. Mirror `RequirementInfo.Slug` / `CodeFileTemplater.Slugify` conventions already in the repo.
-  - [ ] Unit-test determinism: same text → same slug; reordering the collection does not change any item's slug; two near-identical texts get distinct stable slugs; slug is filesystem/URL-safe.
+- [x] **Task 1 — Stable follow-up slug helper (AC: #2)**
+  - [x] Add a pure slug function (e.g. `FollowUpSlug.For(SprintActionItem)` / `.For(deferred item)`) producing `action-{kebab}` / `deferred-{kebab}` from existing text, with content-hash disambiguation on collision only. Mirror `RequirementInfo.Slug` / `CodeFileTemplater.Slugify` conventions already in the repo.
+  - [x] Unit-test determinism: same text → same slug; reordering the collection does not change any item's slug; two near-identical texts get distinct stable slugs; slug is filesystem/URL-safe.
 
-- [ ] **Task 2 — Shared follow-up detail template (AC: #1)**
-  - [ ] New `FollowUpDetailTemplater.RenderPage(...)` producing the shared `<main class="followup-detail">` page for both kinds; the only per-kind branch is provenance framing (retro-epic vs deferral-source) + status vocabulary. Reuse `RequirementsTemplater.RenderRequirement` structure (head/nav/breadcrumb/main) as the shape precedent.
-  - [ ] Carry the heavy detail 9.10 relocated: full body/summary, status badge, provenance, resolution criteria, resolving-story/spec links, cross-links; action items also carry the Resolve-with-AI command via `BmadCommands.RenderLabeledCommand` with **raw** action text in `data-copy`.
+- [x] **Task 2 — Shared follow-up detail template (AC: #1)**
+  - [x] New `FollowUpDetailTemplater.RenderPage(...)` producing the shared `<main class="followup-detail">` page for both kinds; the only per-kind branch is provenance framing (retro-epic vs deferral-source) + status vocabulary. Reuse `RequirementsTemplater.RenderRequirement` structure (head/nav/breadcrumb/main) as the shape precedent.
+  - [x] Carry the heavy detail 9.10 relocated: full body/summary, status badge, provenance, resolution criteria, resolving-story/spec links, cross-links; action items also carry the Resolve-with-AI command via `BmadCommands.RenderLabeledCommand` with **raw** action text in `data-copy`.
 
-- [ ] **Task 3 — Generate the per-item page set (AC: #1, #3)**
-  - [ ] Add `WriteFollowUpDetails` in `SiteGenerator.cs` mirroring `WriteRequirements` (`~2799–2820`): `Directory.CreateDirectory` the `follow-ups/` folder, loop items, `WriteOutput($"follow-ups/{slug}.html", ...)`. Call it from `GenerateAll` beside `WriteActionItems`/`WriteDeferredWork` (`~364–365`).
-  - [ ] **Copy-payload discipline:** if a detail page embeds the Resolve command, do not run *that page* through site-level `ApplyReferenceLinks` in a way that corrupts the `data-copy`; linkify visible text inside the templater (reuse `FollowUpRefs.LinkifyVisibleText`), matching the action-items page precedent. Deferred-only detail pages can be linkified safely.
-  - [ ] Gate on existence (NFR8): no open/known items → no folder, no pages.
+- [x] **Task 3 — Generate the per-item page set (AC: #1, #3)**
+  - [x] Add `WriteFollowUpDetails` in `SiteGenerator.cs` mirroring `WriteRequirements` (`~2799–2820`): `Directory.CreateDirectory` the `follow-ups/` folder, loop items, `WriteOutput($"follow-ups/{slug}.html", ...)`. Call it from `GenerateAll` beside `WriteActionItems`/`WriteDeferredWork` (`~364–365`).
+  - [x] **Copy-payload discipline:** if a detail page embeds the Resolve command, do not run *that page* through site-level `ApplyReferenceLinks` in a way that corrupts the `data-copy`; linkify visible text inside the templater (reuse `FollowUpRefs.LinkifyVisibleText`), matching the action-items page precedent. Deferred-only detail pages can be linkified safely.
+  - [x] Gate on existence (NFR8): no open/known items → no folder, no pages.
 
-- [ ] **Task 4 — Deep-link the sunburst wedges (AC: #3)**
-  - [ ] Thread a per-item detail href into `Charts.AppendActionItemSlot` (replace the shared `geometry.ActionItemsHref` for attributed + unattributed action wedges). Add a resolver on `FollowUpGeometry` (item → detail href via the slug helper) so `Charts` stays a pure renderer and counts stay ledger-agreed.
-  - [ ] Deferred aggregate wedge: link per-item when the parsed deferred model is available; otherwise keep the page-level `DeferredHref` (acceptable). Never re-count.
-  - [ ] `EpicSunburst` follow-up peers get the same per-item hrefs.
+- [x] **Task 4 — Deep-link the sunburst wedges (AC: #3)**
+  - [x] Thread a per-item detail href into `Charts.AppendActionItemSlot` (replace the shared `geometry.ActionItemsHref` for attributed + unattributed action wedges). Add a resolver on `FollowUpGeometry` (item → detail href via the slug helper) so `Charts` stays a pure renderer and counts stay ledger-agreed.
+  - [x] Deferred aggregate wedge: link per-item when the parsed deferred model is available; otherwise keep the page-level `DeferredHref` (acceptable). Never re-count.
+  - [x] `EpicSunburst` follow-up peers get the same per-item hrefs.
 
-- [ ] **Task 5 — Deep-link the list rows (AC: #1, #3) — coordinate with 9.10**
-  - [ ] In `ActionItemsTemplater` / `DeferredWorkTemplater`, make each 9.10 row's single primary link the item's detail URL; the row disclosure can shrink to a teaser since full detail now lives on the page. Keep additive so it works whether 9.10 landed first or this story does.
+- [x] **Task 5 — Deep-link the list rows (AC: #1, #3) — coordinate with 9.10**
+  - [x] In `ActionItemsTemplater` / `DeferredWorkTemplater`, make each 9.10 row's single primary link the item's detail URL; the row disclosure can shrink to a teaser since full detail now lives on the page. Keep additive so it works whether 9.10 landed first or this story does.
 
-- [ ] **Task 6 — CSS for detail page (AC: #1)**
-  - [ ] Add `.followup-detail` rules in `assets/specscribe.css` reusing requirement-detail / story-detail vocabulary. No new `--status-*` token; reuse `StatusStyles`. Extend `StylesheetTests`.
+- [x] **Task 6 — CSS for detail page (AC: #1)**
+  - [x] Add `.followup-detail` rules in `assets/specscribe.css` reusing requirement-detail / story-detail vocabulary. No new `--status-*` token; reuse `StatusStyles`. Extend `StylesheetTests`.
 
-- [ ] **Task 7 — Tests + golden (AC: #1, #2, #3)**
-  - [ ] Slug determinism/stability tests (Task 1) — the AC #2 teeth.
-  - [ ] `FollowUpSurfacesTests`: a detail page exists per item; shared template shape across both kinds; provenance framing differs by kind; resolving links/cross-links present on detail (not the compressed row); action-item detail `data-copy` carries raw action text.
-  - [ ] `ChartsTests`: sunburst action wedges now carry **per-item** detail hrefs (not the shared `action-items.html`); update `Sunburst_FollowUps_*` and `EpicSunburst_FollowUps_*` (`ChartsTests.cs` ~331–439) and `FollowUpSurfacesTests.HomeAndEpicSunburst_*` (~270–296, which currently asserts `href="action-items.html"`).
-  - [ ] NFR8 degrade tests: no items → no `follow-ups/` pages, no per-item wedge/list links.
-  - [ ] Golden fingerprint moves (new pages + changed wedge/list hrefs) → regen `SiteGeneratorAdapterTests.cs` expected hash (~line 398) per `golden-diff-normalization-gotchas`. Pages ride `WriteOutput` → SPA/webview capture; confirm they emit `main#main-content` and are sliced; no new `HostRenderException`.
-  - [ ] Run `dotnet test` from repo root.
+- [x] **Task 7 — Tests + golden (AC: #1, #2, #3)**
+  - [x] Slug determinism/stability tests (Task 1) — the AC #2 teeth.
+  - [x] `FollowUpSurfacesTests`: a detail page exists per item; shared template shape across both kinds; provenance framing differs by kind; resolving links/cross-links present on detail (not the compressed row); action-item detail `data-copy` carries raw action text.
+  - [x] `ChartsTests`: sunburst action wedges now carry **per-item** detail hrefs (not the shared `action-items.html`); update `Sunburst_FollowUps_*` and `EpicSunburst_FollowUps_*` (`ChartsTests.cs` ~331–439) and `FollowUpSurfacesTests.HomeAndEpicSunburst_*` (~270–296, which currently assert `href="action-items.html"`).
+  - [x] NFR8 degrade tests: no items → no `follow-ups/` pages, no per-item wedge/list links.
+  - [x] Golden fingerprint moves (new pages + changed wedge/list hrefs) → regen `SiteGeneratorAdapterTests.cs` expected hash (~line 398) per `golden-diff-normalization-gotchas`. Pages ride `WriteOutput` → SPA/webview capture; confirm they emit `main#main-content` and are sliced; no new `HostRenderException`.
+  - [x] Run `dotnet test` from repo root.
 
 ## Dev Notes
 
@@ -197,8 +197,42 @@ Generate to `SpecScribeOutput/`. Confirm `follow-ups/action-{...}.html` and `fol
 
 ### Agent Model Used
 
+Composer (Auto)
+
 ### Debug Log References
+
+- Slug assignment must use the full sprint action-item list (open + done) so list/detail/sunburst URLs agree under collision.
+- E2E fixtures often lack `module-help` / `quick-dev`; copy-payload discipline pinned via unit templater test with an explicit `CommandCatalog`.
+- Deferred aggregate sunburst wedge kept at page-level `DeferredHref` (owner-acceptable); action wedges are per-item.
 
 ### Completion Notes List
 
+- Implemented `FollowUpSlug` (kebab + kind prefix + SHA-256 collision suffix) and `FollowUpDetailTemplater` (shared `main.followup-detail`, per-kind provenance framing).
+- `WriteFollowUpDetails` mirrors `WriteRequirements` via `WriteOutput` → `follow-ups/{slug}.html`; action pages skip `ApplyReferenceLinks`; deferred pages linkify safely.
+- `FollowUpGeometry.HrefFor` + `ActionDetailSlugs` map; Charts/EpicSunburst use per-item detail hrefs; list rows pass `detailHref` into `FollowUpRow`.
+- NFR8: no items → no `follow-ups/` folder. Full suite green: **1294** tests passed.
+- Golden fingerprint regenerated to `95786ceed35dd94fc8eea22bca25c75c0bc0751b9615ea20b6aa2211dbbcf091`.
+
 ### File List
+
+- `src/SpecScribe/FollowUpSlug.cs` (new)
+- `src/SpecScribe/FollowUpDetailTemplater.cs` (new)
+- `src/SpecScribe/FollowUpGeometry.cs`
+- `src/SpecScribe/SiteGenerator.cs`
+- `src/SpecScribe/Charts.cs`
+- `src/SpecScribe/EpicsViewBuilder.cs`
+- `src/SpecScribe/ActionItemsTemplater.cs`
+- `src/SpecScribe/DeferredWorkTemplater.cs`
+- `src/SpecScribe/assets/specscribe.css`
+- `tests/SpecScribe.Tests/FollowUpSlugTests.cs` (new)
+- `tests/SpecScribe.Tests/FollowUpSurfacesTests.cs`
+- `tests/SpecScribe.Tests/ChartsTests.cs`
+- `tests/SpecScribe.Tests/RetroTests.cs`
+- `tests/SpecScribe.Tests/StylesheetTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`
+- `_bmad-output/implementation-artifacts/9-11-follow-up-detail-pages-and-deep-links.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Change Log
+
+- 2026-07-17: Story 9.11 implemented — per-item `follow-ups/{slug}.html` detail pages, stable content-hash slugs, sunburst + list deep links, Resolve-with-AI on detail with raw `data-copy`; status → review.

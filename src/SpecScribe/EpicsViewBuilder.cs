@@ -70,12 +70,15 @@ public static class EpicsViewBuilder
             .ToList();
         // Deferred aggregate has no per-item epic attribution without re-parsing — omit on epic pages
         // (safe default per Story 9.7). Action-item hrefs need the epics/ relative prefix.
+        // Preserve project-wide ActionDetailSlugs so per-item detail URLs stay stable (Story 9.11).
         var epicFollowUps = scopedActions.Count > 0
             ? new FollowUpGeometry(
                 scopedActions,
                 DeferredOpenCount: 0,
                 DeferredHref: null,
-                ActionItemsHref: prefix + SiteNav.ActionItemsOutputPath)
+                ActionItemsHref: prefix + SiteNav.ActionItemsOutputPath,
+                ActionDetailSlugs: projectFollowUps.ActionDetailSlugs
+                    ?? FollowUpSlug.AssignActionSlugs(projectFollowUps.ActionItems))
             : FollowUpGeometry.Empty;
 
         return new EpicPageView

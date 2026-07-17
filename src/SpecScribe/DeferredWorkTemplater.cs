@@ -43,10 +43,15 @@ public static class DeferredWorkTemplater
         }
         else
         {
+            var pairs = model.Groups
+                .SelectMany(g => g.Items.Select(i => (Item: i, ProvenanceLabel: g.ProvenanceLabel)))
+                .ToList();
+            var detailSlugs = FollowUpSlug.AssignDeferredSlugs(pairs);
+
             sb.Append("<section class=\"deferred-work-wrap\">\n");
             foreach (var group in model.Groups)
             {
-                RenderGroup(sb, group);
+                RenderGroup(sb, group, prefix, detailSlugs);
             }
             sb.Append("</section>\n");
         }
@@ -57,7 +62,7 @@ public static class DeferredWorkTemplater
         return sb.ToString();
     }
 
-    private static void RenderGroup(StringBuilder sb, DeferredWorkGroup group)
+    private static void RenderGroup(StringBuilder sb, DeferredWorkGroup group, string prefix, IReadOnlyDictionary<DeferredWorkItem, string> detailSlugs)
     {
         sb.Append("<section class=\"deferred-group\">\n");
         sb.Append("  <h2 class=\"deferred-group-title\">");
@@ -77,31 +82,31 @@ public static class DeferredWorkTemplater
 
         sb.Append("  <ul class=\"followup-rows-list deferred-items-list\">\n");
         foreach (var item in ordered)
-            RenderItem(sb, item, group.ProvenanceLabel);
+            RenderItem(sb, item, group.ProvenanceLabel, prefix, detailSlugs);
         sb.Append("  </ul>\n");
         sb.Append("</section>\n");
     }
 
-    private static void RenderItem(StringBuilder sb, DeferredWorkItem item, string provenanceLabel)
+    private static void RenderItem(
+        StringBuilder sb,
+        DeferredWorkItem item,
+        string provenanceLabel,
+        string prefix,
+        IReadOnlyDictionary<DeferredWorkItem, string> detailSlugs)
     {
         var summaryPlain = FollowUpRow.SummarizeFromHtml(item.BodyHtml);
         var summaryHtml = PathUtil.Html(summaryPlain);
+        var detailHref = detailSlugs.TryGetValue(item, out var slug)
+            ? prefix + FollowUpSlug.OutputPath(slug)
+            : null;
 
+        // Teaser: resolving links and full body live on the detail page (Story 9.11).
         var detail = new StringBuilder();
-        detail.Append($"<div class=\"deferred-item-body\">{item.BodyHtml}</div>\n");
-
-        if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
+        if (item.ResolvingRef is { Length: > 0 } rr)
         {
-            var label = rr.Contains('.') && !rr.Contains('-')
-                ? $"Story {rr}"
-                : rr;
-            detail.Append($"<a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(rh)}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
+            var label = rr.Contains('.') && !rr.Contains('-') ? $"Story {rr}" : rr;
+            detail.Append($"<span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(label)}</span>\n");
         }
-        else if (item.ResolvingRef is { Length: > 0 } rr2)
-        {
-            detail.Append($"<span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(rr2)}</span>\n");
-        }
-
         if (item.Resolved)
         {
             detail.Append("<span class=\"deferred-resolved-mark\" aria-hidden=\"true\">✓</span>\n");
@@ -118,6 +123,7 @@ public static class DeferredWorkTemplater
             statusLabel,
             PathUtil.Html(provenanceLabel),
             detail.ToString(),
-            resolved: item.Resolved);
+            resolved: item.Resolved,
+            detailHref: detailHref);
     }
 }

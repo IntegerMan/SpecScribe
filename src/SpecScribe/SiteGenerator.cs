@@ -363,6 +363,7 @@ public sealed class SiteGenerator
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
             WriteDeferredWork(nav, workInventory);
+            WriteFollowUpDetails(nav, workInventory);
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav, workInventory);
@@ -2698,7 +2699,8 @@ public sealed class SiteGenerator
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
         var html = ActionItemsTemplater.RenderPage(
-            open, EpicRetroMap, _module.Commands, nav, deferredHref, counts, _epicsModel, hrefMap);
+            open, EpicRetroMap, _module.Commands, nav, deferredHref, counts, _epicsModel, hrefMap,
+            allActionItemsForSlugs: _sprint?.ActionItems);
         WriteOutput(SiteNav.ActionItemsOutputPath, html);
     }
 
@@ -2794,6 +2796,94 @@ public sealed class SiteGenerator
         {
             return new GenerationEvent(GenerationOutcome.Error, "README.md", sw.Elapsed, ex.Message);
         }
+    }
+
+    /// <summary>Writes one detail page per action item and deferred-work item under
+    /// <c>follow-ups/{slug}.html</c>, mirroring <see cref="WriteRequirements"/>. Rides
+    /// <see cref="WriteOutput"/> so SPA/webview capture picks them up. Action-item pages are NOT
+    /// run through <see cref="ApplyReferenceLinks"/> (copy-payload trap); deferred pages are.
+    /// NFR8: no items → no folder. [Story 9.11]</summary>
+    private void WriteFollowUpDetails(SiteNav nav, WorkInventory? work = null)
+    {
+        var actionItems = _sprint?.ActionItems ?? Array.Empty<SprintActionItem>();
+        var inventory = work ?? WorkInventory.Build(_docs.Values.ToList());
+        var deferredModel = TryParseDeferredWork(inventory);
+        var deferredPairs = deferredModel is { IsStructured: true }
+            ? deferredModel.Groups
+                .SelectMany(g => g.Items.Select(i => (Item: i, ProvenanceLabel: g.ProvenanceLabel, Group: g)))
+                .ToList()
+            : new List<(DeferredWorkItem Item, string ProvenanceLabel, DeferredWorkGroup Group)>();
+
+        if (actionItems.Count == 0 && deferredPairs.Count == 0) return;
+
+        var followUpsDir = Path.Combine(_options.OutputRoot, FollowUpSlug.Folder);
+        Directory.CreateDirectory(followUpsDir);
+
+        var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
+        var deferredHref = inventory.Deferred?.OutputPath;
+        var crossLinks = actionItems.Count > 0
+            ? ActionItemsTemplater.FindNearDuplicates(actionItems)
+            : new Dictionary<SprintActionItem, int>();
+        var actionSlugs = FollowUpSlug.AssignActionSlugs(actionItems);
+
+        foreach (var item in actionItems)
+        {
+            if (!actionSlugs.TryGetValue(item, out var slug)) continue;
+            var outputRelative = FollowUpSlug.OutputPath(slug);
+            var html = FollowUpDetailTemplater.RenderActionPage(
+                item, slug, nav, _module.Commands, EpicRetroMap, deferredHref,
+                _epicsModel, hrefMap, crossLinks);
+            // No ApplyReferenceLinks — Resolve-with-AI data-copy must stay raw.
+            WriteOutput(outputRelative, html);
+        }
+
+        if (deferredPairs.Count > 0 && deferredModel is not null)
+        {
+            var deferredSlugs = FollowUpSlug.AssignDeferredSlugs(
+                deferredPairs.Select(p => (p.Item, p.ProvenanceLabel)).ToList());
+            var listPath = inventory.Deferred?.OutputPath ?? "deferred-work.html";
+
+            foreach (var (item, provenanceLabel, group) in deferredPairs)
+            {
+                if (!deferredSlugs.TryGetValue(item, out var slug)) continue;
+                var outputRelative = FollowUpSlug.OutputPath(slug);
+                var html = FollowUpDetailTemplater.RenderDeferredPage(
+                    item, provenanceLabel, group.SourceStoryHref, slug, nav, listPath);
+                WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
+            }
+        }
+    }
+
+    /// <summary>Parses the deferred-work note when present; returns null when absent or unreadable.
+    /// Shared by <see cref="WriteDeferredWork"/> and <see cref="WriteFollowUpDetails"/>. [Story 9.11]</summary>
+    private DeferredWorkModel? TryParseDeferredWork(WorkInventory inventory)
+    {
+        var deferred = inventory.Deferred;
+        if (deferred is null) return null;
+
+        var doc = _docs.Values.FirstOrDefault(d =>
+            string.Equals(
+                PathUtil.NormalizeSlashes(d.OutputRelativePath),
+                PathUtil.NormalizeSlashes(deferred.OutputPath),
+                StringComparison.OrdinalIgnoreCase));
+        if (doc is null) return null;
+
+        var sourceFull = Path.Combine(
+            _options.SourceRoot,
+            doc.SourceRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        string? markdown = null;
+        try
+        {
+            if (File.Exists(sourceFull))
+                markdown = File.ReadAllText(sourceFull);
+        }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+
+        var outputPath = PathUtil.NormalizeSlashes(deferred.OutputPath);
+        var prefix = PathUtil.RelativePrefix(outputPath);
+        var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
+        return DeferredWorkParser.Parse(markdown, hrefMap, prefix, doc.BodyHtml);
     }
 
     /// <summary>Writes requirements.html plus one detail page per FR/NFR. Each page is linkified against the

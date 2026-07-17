@@ -192,17 +192,24 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         sb.Append("    </div>\n  </div>\n");
     }
 
-    /// <summary>Home-only white-bar strip: word-labeled stage jumps into dashboard landmarks. Pure links —
-    /// no radios, no section hiding. Active pill follows <c>:target</c> via CSS. [Story 9.8]</summary>
+    /// <summary>Home-only white-bar work-stage strip: pure-CSS radios + labels (icons + words) that toggle
+    /// which dashboard panels are visible. Overview is the default. [Story 9.8]</summary>
     private static void AppendWorkModeJumpStrip(StringBuilder sb)
     {
         sb.Append("  <div class=\"site-nav-key-views work-mode-jumps\" aria-label=\"Work stage\">\n");
-        sb.Append("    <div class=\"work-mode-pills\" role=\"navigation\">\n");
-        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-overview\">Overview</a>\n");
-        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-gather\">Gather</a>\n");
-        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-draft\">Draft</a>\n");
-        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-develop\">Develop</a>\n");
-        sb.Append("      <a class=\"work-mode-pill\" href=\"#wm-review\">Review</a>\n");
+        sb.Append("    <div class=\"work-mode-pills board-tabs\" role=\"group\">\n");
+        sb.Append("      <input type=\"radio\" id=\"wm-overview\" name=\"work-mode\" class=\"board-tab-radio\" checked>\n");
+        sb.Append("      <input type=\"radio\" id=\"wm-requirements\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+        sb.Append("      <input type=\"radio\" id=\"wm-plan\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+        sb.Append("      <input type=\"radio\" id=\"wm-develop\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+        sb.Append("      <input type=\"radio\" id=\"wm-review\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+        sb.Append("      <input type=\"radio\" id=\"wm-track\" name=\"work-mode\" class=\"board-tab-radio\">\n");
+        sb.Append($"      <label for=\"wm-overview\" class=\"work-mode-pill\">{Icons.ForConcept("Overview")}Overview</label>\n");
+        sb.Append($"      <label for=\"wm-requirements\" class=\"work-mode-pill\">{Icons.ForConcept("Requirements")}Requirements</label>\n");
+        sb.Append($"      <label for=\"wm-plan\" class=\"work-mode-pill\">{Icons.ForConcept("Plan")}Plan</label>\n");
+        sb.Append($"      <label for=\"wm-develop\" class=\"work-mode-pill\">{Icons.ForConcept("Develop")}Develop</label>\n");
+        sb.Append($"      <label for=\"wm-review\" class=\"work-mode-pill\">{Icons.ForConcept("Review")}Review</label>\n");
+        sb.Append($"      <label for=\"wm-track\" class=\"work-mode-pill\">{Icons.ForConcept("Track")}Track</label>\n");
         sb.Append("    </div>\n  </div>\n");
     }
 

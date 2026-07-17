@@ -277,11 +277,11 @@ body {
 .site-menu-link.active,
 .site-menu-group.has-active > .site-menu-trigger { color: #f5c842; border-bottom-color: currentColor; }
 /* Journey family tints on the dark bar — carry the color that used to live only on the white chips. */
-.site-menu-group.family-planning > .site-menu-trigger { color: #e8c56a; }
+.site-menu-group.family-planning > .site-menu-trigger { color: #f3e09a; }
 .site-menu-group.family-architecture > .site-menu-trigger { color: #7eb8b0; }
 .site-menu-group.family-epics > .site-menu-trigger { color: #8fbc8f; }
 .site-menu-group.family-planning > .site-menu-trigger:hover,
-.site-menu-group.family-planning.has-active > .site-menu-trigger { color: #f5c842; border-bottom-color: var(--gold-light); }
+.site-menu-group.family-planning.has-active > .site-menu-trigger { color: #f8ebc0; border-bottom-color: #f3e09a; }
 .site-menu-group.family-architecture > .site-menu-trigger:hover,
 .site-menu-group.family-architecture.has-active > .site-menu-trigger { color: #a8d4ce; border-bottom-color: var(--teal); }
 .site-menu-group.family-epics > .site-menu-trigger:hover,
@@ -5327,8 +5327,8 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 .req-panel:has(#rv-grid:checked) .req-view-flow { display: none; }
 .req-panel:has(#rv-grid:checked) .req-view-grid { display: block; }
 
-/* Home work-stage jump strip (Story 9.8): lives in the white key-views band; scrolls to dashboard
-   landmarks. Word labels; active state via :target — never dims or hides sibling content. */
+/* Home work-stage toggle strip (Story 9.8): radios in the white key-views band; labels toggle which
+   dashboard panels are visible via body:has() — never opacity dimming or scroll jumps. */
 .work-mode-jumps .work-mode-pills {
   display: flex;
   flex-wrap: wrap;
@@ -5342,7 +5342,7 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
 .work-mode-pill {
   display: inline-flex;
   align-items: center;
-  text-decoration: none;
+  gap: 0.35rem;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -5351,6 +5351,8 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.28rem 0.95rem;
+  cursor: pointer;
+  user-select: none;
   transition: border-color 0.15s, box-shadow 0.15s, color 0.15s, background 0.15s;
 }
 .work-mode-pill:hover {
@@ -5358,35 +5360,34 @@ a.sprint-epic-title:hover { color: var(--rust); border-bottom-style: solid; }
   border-color: var(--gold-light);
   box-shadow: 0 2px 8px var(--shadow);
 }
-.work-mode-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-/* Active pill tracks the in-page :target landmark; Overview is the resting default. */
-body:not(:has(#wm-gather:target)):not(:has(#wm-draft:target)):not(:has(#wm-develop:target)):not(:has(#wm-review:target))
-  .work-mode-pill[href="#wm-overview"],
-body:has(#wm-gather:target) .work-mode-pill[href="#wm-gather"],
-body:has(#wm-draft:target) .work-mode-pill[href="#wm-draft"],
-body:has(#wm-develop:target) .work-mode-pill[href="#wm-develop"],
-body:has(#wm-review:target) .work-mode-pill[href="#wm-review"] {
+#wm-overview:checked ~ label[for="wm-overview"],
+#wm-requirements:checked ~ label[for="wm-requirements"],
+#wm-plan:checked ~ label[for="wm-plan"],
+#wm-develop:checked ~ label[for="wm-develop"],
+#wm-review:checked ~ label[for="wm-review"],
+#wm-track:checked ~ label[for="wm-track"] {
   color: var(--ink);
   background: var(--warm-white);
   border-color: var(--gold);
   box-shadow: 0 1px 4px var(--shadow);
 }
-.dashboard-stage-anchor {
-  scroll-margin-top: calc(var(--nav-offset) + 0.75rem);
+#wm-overview:focus-visible ~ label[for="wm-overview"],
+#wm-requirements:focus-visible ~ label[for="wm-requirements"],
+#wm-plan:focus-visible ~ label[for="wm-plan"],
+#wm-develop:focus-visible ~ label[for="wm-develop"],
+#wm-review:focus-visible ~ label[for="wm-review"],
+#wm-track:focus-visible ~ label[for="wm-track"] {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
 }
-.dashboard-stage-anchor:target {
-  box-shadow: inset 3px 0 0 var(--gold);
-}
-.dashboard-stage-anchor.stage-sentinel {
-  flex: 0 0 0;
-  width: 0;
-  height: 0;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  box-shadow: none;
-}
+
+/* Dashboard panel visibility per selected work stage. */
+body:has(#wm-overview:checked) .dashboard .wm-panel:not(.wm-show-overview) { display: none; }
+body:has(#wm-requirements:checked) .dashboard .wm-panel:not(.wm-show-requirements) { display: none; }
+body:has(#wm-plan:checked) .dashboard .wm-panel:not(.wm-show-plan) { display: none; }
+body:has(#wm-develop:checked) .dashboard .wm-panel:not(.wm-show-develop) { display: none; }
+body:has(#wm-review:checked) .dashboard .wm-panel:not(.wm-show-review) { display: none; }
+body:has(#wm-track:checked) .dashboard .wm-panel:not(.wm-show-track) { display: none; }
 
 /* Retros link + open-items flag buttons in the control row. Retros reuses the .cmd-menu-toggle chrome as an
    <a>; the flag is a small review-tinted pill with a ⚑ glyph. */
@@ -5454,6 +5455,48 @@ a.followup-row-primary:hover { color: var(--rust); }
 .followup-row-detail-body > :first-child { margin-top: 0; }
 .followup-row-detail-body > :last-child { margin-bottom: 0; }
 .followup-detail-fulltext { margin-bottom: 0.5rem; }
+
+/* Follow-up detail pages — shared template for action + deferred items (Story 9.11). */
+main.followup-detail,
+.followup-detail {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.25rem 2.5rem;
+}
+body:has(main.followup-detail) .doc-header {
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+.followup-detail-body { margin-top: 0.5rem; }
+.followup-detail-provenance {
+  margin: 1.2rem 0;
+}
+.followup-detail-provenance h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+  color: var(--teal-deep);
+}
+.followup-detail-cross { margin: 0.6rem 0; }
+.followup-detail-resolve { margin-top: 1rem; }
+.followup-detail-back {
+  margin-top: 1.6rem;
+  font-size: 0.92rem;
+}
+.followup-detail-back a {
+  color: var(--teal);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--gold-light);
+}
+.followup-detail-back a:hover { color: var(--rust); }
+.action-item-resolve-hint {
+  font-size: 0.78rem;
+  color: var(--ink-light);
+  display: inline-block;
+  margin-top: 0.35rem;
+}
 
 .action-items-group {
   font-size: 1.05rem; color: var(--rust); margin: 1.4rem 0 0.7rem;
