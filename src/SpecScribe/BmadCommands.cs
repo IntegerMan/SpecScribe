@@ -196,8 +196,9 @@ public static class BmadCommands
         return sb.ToString();
     }
 
-    /// <summary>Status accent for a next-step card's left rail — derived from the command slug, not color-only.</summary>
-    private static string AccentForCommand(string command)
+    /// <summary>Status accent for a next-step card's left rail — derived from the command slug, not color-only.
+    /// Unknown slugs fail closed to <c>pending</c> (not <c>ready</c>). [Story 9.8 polish]</summary>
+    internal static string AccentForCommand(string command)
     {
         var slug = CommandSlug(command);
         if (slug.Contains("code-review", StringComparison.Ordinal) || slug.Contains("retrospective", StringComparison.Ordinal))
@@ -212,10 +213,12 @@ public static class BmadCommands
             return "ready";
         if (slug.Contains("check-implementation", StringComparison.Ordinal))
             return "pending";
-        return "ready";
+        return "pending";
     }
 
-    private static string KickerForCommand(string command, bool isPrimary)
+    /// <summary>Non-primary card kicker from the command slug. Unknown slugs fail closed to
+    /// <c>Also consider</c>. Primary cards always use <c>Recommended</c> at the call site. [Story 9.8 polish]</summary>
+    internal static string KickerForCommand(string command, bool isPrimary)
     {
         if (isPrimary) return "Recommended";
         var slug = CommandSlug(command);
@@ -228,6 +231,7 @@ public static class BmadCommands
             return "Plan";
         if (slug.Contains("create-epics", StringComparison.Ordinal)) return "Break down";
         if (slug.Contains("correct-course", StringComparison.Ordinal)) return "Recover";
+        if (slug.Contains("check-implementation", StringComparison.Ordinal)) return "Validate";
         return "Also consider";
     }
 

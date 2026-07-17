@@ -4,7 +4,16 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-8-authoring-and-delivery-workflow-coherence.md (2026-07-17)
 
-- Accent/kicker slug heuristics (`AccentForCommand` / `KickerForCommand`) default unknown catalog slugs to accent `ready` and kicker "Also consider"; `sprint-status` painted `active`. Tolerable card polish; revisit if command accents become user-facing contract. [`BmadCommands.cs:195`]
+- ~~Accent/kicker slug heuristics (`AccentForCommand` / `KickerForCommand`) default unknown catalog slugs to accent `ready` and kicker "Also consider"; `sprint-status` painted `active`.~~ **RESOLVED 2026-07-17** (`spec-accent-kicker-slug-heuristics`): unknown slugs fail closed to accent `pending` + kicker "Also consider"; known families covered by unit tests; `sprint-status` accent stays `active`. [`BmadCommands.cs`]
+
+## Deferred from: code review of spec-accent-kicker-slug-heuristics.md (2026-07-17)
+
+- source_spec: `spec-accent-kicker-slug-heuristics.md`
+  summary: Accent/kicker known-family coverage is a hand-maintained theory table, not derived from `For*` `Command(...)` call sites.
+  evidence: Blind Hunter — a newly suggested step can ship fail-closed with no test failure until the table is extended.
+- source_spec: `spec-accent-kicker-slug-heuristics.md`
+  summary: `CommandSlug`/`Contains` use Ordinal matching (and `Split` without trim); mixed-case or leading-space catalog values miss known maps and fail-close.
+  evidence: Blind Hunter + Edge Case Hunter — pre-existing heuristic shape; live `module-help.csv` skills are normally lowercase.
 
 ## Deferred from: code review of 9-6-follow-up-item-provenance-and-resolution-paths.md (2026-07-17)
 

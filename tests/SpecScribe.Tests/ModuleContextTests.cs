@@ -491,4 +491,70 @@ public class BmadCommandsTests
         Assert.DoesNotContain("Other actions", html);
         Assert.Equal(2, CountNextStepCards(html));
     }
+
+    /// <summary>Known slug families BmadCommands suggests must map explicitly (fail closed for unknowns).</summary>
+    public static TheoryData<string, string, string> KnownCommandAccentKicker => new()
+    {
+        { "/bmad-dev-story 1.2", "active", "Develop" },
+        { "/bmad-sprint-status", "active", "Plan" },
+        { "/bmad-correct-course", "active", "Recover" },
+        { "/bmad-quick-dev", "active", "Implement" },
+        { "/bmad-code-review 1.2", "review", "Review" },
+        { "/bmad-retrospective 3", "review", "Review" },
+        { "/bmad-create-story 1.2", "drafted", "Draft" },
+        { "/bmad-create-epics-and-stories", "ready", "Break down" },
+        { "/bmad-sprint-planning", "ready", "Plan" },
+        { "/bmad-check-implementation-readiness", "pending", "Validate" },
+    };
+
+    [Theory]
+    [MemberData(nameof(KnownCommandAccentKicker))]
+    public void AccentAndKicker_KnownSlugFamilies_AreExplicit(string command, string accent, string kicker)
+    {
+        Assert.Equal(accent, BmadCommands.AccentForCommand(command));
+        Assert.Equal(kicker, BmadCommands.KickerForCommand(command, isPrimary: false));
+    }
+
+    [Fact]
+    public void AccentAndKicker_UnknownSlug_FailsClosedToPendingAlsoConsider()
+    {
+        const string unknown = "/bmad-totally-new-skill";
+        Assert.Equal("pending", BmadCommands.AccentForCommand(unknown));
+        Assert.Equal("Also consider", BmadCommands.KickerForCommand(unknown, isPrimary: false));
+        Assert.Equal("Recommended", BmadCommands.KickerForCommand(unknown, isPrimary: true));
+    }
+
+    [Fact]
+    public void AccentAndKicker_SprintStatus_StaysActiveWithPlanKicker()
+    {
+        Assert.Equal("active", BmadCommands.AccentForCommand("/bmad-sprint-status"));
+        Assert.Equal("Plan", BmadCommands.KickerForCommand("/bmad-sprint-status", isPrimary: false));
+    }
+
+    [Fact]
+    public void RenderNextSteps_CheckImplementationAlternate_UsesPendingAccentAndValidateKicker()
+    {
+        // Undrafted first story: create-story primary, check-implementation-readiness as non-primary.
+        var catalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+            ["check-implementation-readiness"] = "/bmad-check-implementation-readiness",
+        });
+        var html = BmadCommands.RenderNextSteps(Story("1.1", null), catalog);
+
+        Assert.Contains("next-step-card next-step-card-primary drafted", html);
+        Assert.Contains(">Recommended</span>", html);
+        Assert.Contains("next-step-card pending", html);
+        Assert.Contains(">Validate</span>", html);
+        Assert.DoesNotContain(">Also consider</span>", html);
+        // Primary create-story before Validate alternate.
+        Assert.True(
+            html.IndexOf("next-step-card-primary", StringComparison.Ordinal)
+            < html.IndexOf(">Validate</span>", StringComparison.Ordinal));
+        Assert.True(
+            html.IndexOf("next-step-card pending", StringComparison.Ordinal)
+            < html.IndexOf(">Validate</span>", StringComparison.Ordinal)
+            && html.IndexOf("next-step-card pending", StringComparison.Ordinal)
+               > html.IndexOf("next-step-card-primary", StringComparison.Ordinal));
+    }
 }

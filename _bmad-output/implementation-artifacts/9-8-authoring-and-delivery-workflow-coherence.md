@@ -144,7 +144,7 @@ Concrete silhouette rules:
 - [x] [Review][Patch] Coherence tests do not assert Ready-lane story id matches Home Next Steps create-story [`ModuleContextTests` / `SprintTemplaterTests`]
 - [x] [Review][Patch] Next Steps work-mode classes injected via brittle `String.Replace` on exact `class="chart-panel next-steps"` [`HtmlRenderAdapter.Dashboard.cs:52`]
 - [x] [Review][Patch] Null epics model still emits full work-mode stage set (NFR8 prefers Overview-only / omit empty stages) [`HtmlRenderAdapter.cs:197`]
-- [x] [Review][Defer] Accent/kicker slug heuristics default unknown commands to `ready` / "Also consider" [`BmadCommands.cs:195`] — deferred, pre-existing polish pattern in new card path
+- [x] [Review][Resolved] Accent/kicker slug heuristics default unknown commands to `ready` / "Also consider" [`BmadCommands.cs:195`] — **RESOLVED 2026-07-17** via `spec-accent-kicker-slug-heuristics` (fail-closed `pending` + coverage; `sprint-status` stays `active`)
 
 ## Dev Notes
 
