@@ -390,8 +390,8 @@ public class ChartsTests
         Assert.Contains("aria-label=\"Action item: Fix the heatmap debt\"", svg);
         Assert.Contains("aria-label=\"Action item (done): Ship delivery follow-up\"", svg);
         Assert.Contains("aria-label=\"Action item: Unscoped cleanup\"", svg);
-        Assert.Contains("aria-label=\"Deferred item: Epic 1 deferred open item.\"", svg);
-        Assert.Contains("aria-label=\"Deferred item: Unattributed deferred open item.\"", svg);
+        Assert.Contains("Deferred item: Epic 1 deferred open item.", svg);
+        Assert.Contains("Deferred item: Unattributed deferred open item.", svg);
         // No aggregate deferred wedge with an inflated count label.
         Assert.DoesNotContain("Deferred work: 4 open", svg);
         Assert.DoesNotContain("Deferred work: 3 open", svg);
@@ -439,7 +439,7 @@ public class ChartsTests
 
         var svg = Charts.Sunburst(model, followUps: geometry);
 
-        Assert.Contains("aria-label=\"Deferred item: Only epic-attributed deferred item.\"", svg);
+        Assert.Contains("Deferred item: Only epic-attributed deferred item.", svg);
         Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
     }
 
@@ -654,6 +654,10 @@ public class ChartsTests
         Assert.DoesNotContain("Direct change: Done one-shot", svg);
         // Follow-ups orphan still holds the unattributed action only.
         Assert.Contains("aria-label=\"Follow-ups: 1 unattributed item\"", svg);
+        Assert.Contains($"href=\"{FollowUpGroupPages.FollowUpsPath}\"", svg);
+        Assert.Contains($"href=\"{FollowUpGroupPages.UnplannedPath}\"", svg);
+        Assert.DoesNotContain($"href=\"{SiteNav.ActionItemsOutputPath}\"", svg);
+        Assert.DoesNotContain("href=\"deferred-work.html\"", svg);
         Assert.Contains("aria-label=\"Action item: Orphan action\"", svg);
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);

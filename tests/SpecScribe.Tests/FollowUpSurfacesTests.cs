@@ -391,6 +391,75 @@ public class FollowUpSurfacesTests : IDisposable
     }
 
     [Fact]
+    public void FollowUpGroupPages_EmittedForNonEmptyGroups_OnlyThatGroupsItems()
+    {
+        // Unattributed action → Follow-ups group; epic-attributed → epic group; no Unplanned members.
+        const string sprint = """
+            last_updated: 2026-07-16T12:00:00-04:00
+            development_status:
+              epic-1: done
+              1-1-foundation: done
+              1-2-undrafted: backlog
+              epic-1-retrospective: done
+              epic-2: in-progress
+              2-1-delivery: in-progress
+              epic-2-retrospective: done
+            action_items:
+              - epic: 1
+                action: "Schedule retros promptly"
+                owner: Amelia
+                status: open
+              - action: "Unscoped cleanup orphan"
+                status: open
+            """;
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), sprint);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), StructuredDeferred);
+
+        Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var followUpsDir = Path.Combine(Site, "follow-ups");
+        var followUpsGroup = Path.Combine(followUpsDir, "group-follow-ups.html");
+        var epic1Group = Path.Combine(followUpsDir, "group-epic-1.html");
+        var epic2Group = Path.Combine(followUpsDir, "group-epic-2.html");
+        var unplannedGroup = Path.Combine(followUpsDir, "group-unplanned.html");
+
+        Assert.True(File.Exists(followUpsGroup));
+        Assert.True(File.Exists(epic1Group));
+        // Epic 2 has only a resolved deferred item → still a deferred member → page exists.
+        Assert.True(File.Exists(epic2Group));
+        // Unattributable deferred from StructuredDeferred? Groups are attributed via story ids 1.1 / 2.1.
+        // No unattributable deferred → no Unplanned page unless quick-dev exists.
+        Assert.False(File.Exists(unplannedGroup));
+
+        var orphanHtml = File.ReadAllText(followUpsGroup);
+        Assert.Contains("Unscoped cleanup orphan", orphanHtml);
+        Assert.DoesNotContain("Schedule retros promptly", orphanHtml);
+        Assert.Contains("followup-rows-list", orphanHtml);
+        Assert.DoesNotContain("data-copy=", orphanHtml);
+        Assert.DoesNotContain("?filter=", orphanHtml);
+        Assert.DoesNotContain("#group=", orphanHtml);
+
+        var epic1Html = File.ReadAllText(epic1Group);
+        Assert.Contains("Schedule retros promptly", epic1Html);
+        Assert.Contains("Open casing mismatch", epic1Html);
+        Assert.DoesNotContain("Unscoped cleanup orphan", epic1Html);
+
+        // Index sunburst: Follow-ups orphan → filtered group page; epic arc stays epic page; leaves stay details.
+        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        Assert.Contains("href=\"follow-ups/group-follow-ups.html\"", index);
+        Assert.Contains("href=\"epics/epic-1.html\"", index);
+        Assert.Contains("href=\"follow-ups/action-", index);
+        // Orphan root must not dump into the whole-site action-items index.
+        var orphanIdx = index.IndexOf("aria-label=\"Follow-ups:", StringComparison.Ordinal);
+        Assert.True(orphanIdx >= 0);
+        var orphanAnchorStart = index.LastIndexOf("<a ", orphanIdx, StringComparison.Ordinal);
+        var orphanAnchorEnd = index.IndexOf("</a>", orphanIdx, StringComparison.Ordinal);
+        var orphanAnchor = index[orphanAnchorStart..orphanAnchorEnd];
+        Assert.Contains("href=\"follow-ups/group-follow-ups.html\"", orphanAnchor);
+        Assert.DoesNotContain("href=\"action-items.html\"", orphanAnchor);
+    }
+
+    [Fact]
     public void NearDuplicate_CanonicalPairMatches_UnrelatedDoesNot()
     {
         var a = "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog for review before Epic 3 planning";

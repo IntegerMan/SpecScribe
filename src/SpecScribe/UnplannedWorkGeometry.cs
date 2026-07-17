@@ -17,7 +17,9 @@ public sealed record UnplannedMember(
     string Title,
     string Href,
     string? Status,
-    bool IsDone);
+    bool IsDone,
+    string? SourceKey = null,
+    string? SourceHref = null);
 
 /// <summary>Projection of unplanned / one-off work for the project sunburst and sprint board.
 /// Membership = open unattributable quick-dev + unattributable deferred slots (from
@@ -28,7 +30,8 @@ public sealed record UnplannedMember(
 public sealed record UnplannedWorkGeometry(
     IReadOnlyList<UnplannedQuickDevSlot> QuickDevSlots,
     IReadOnlyList<FollowUpDeferredSlot> UnattributableDeferred,
-    string? DeferredListHref = null)
+    string? DeferredListHref = null,
+    string LinkPrefix = "")
 {
     private static readonly Regex StoryMention = new(
         @"\bStory\s+(\d+)\.(\d+)\b(?!\.\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -67,31 +70,17 @@ public sealed record UnplannedWorkGeometry(
                 PathUtil.StripHtmlTags(FollowUpRow.SummarizeFromHtml(d.Item.BodyHtml)),
                 d.DetailHref,
                 d.Item.Resolved ? "done" : "open",
-                d.Item.Resolved)))
+                d.Item.Resolved,
+                SourceKey: d.SourceKey,
+                SourceHref: d.SourceHref)))
             .ToList();
 
-    /// <summary>Temporary group-root href until Story 9.13 filtered group pages. Prefer the deferred list
-    /// when only deferred members exist; otherwise first quick-dev page, else first deferred detail.
-    /// Swappable seam — do not invent filtered pages here.</summary>
-    public string? GroupRootHref
-    {
-        get
-        {
-            if (!HasUnplanned) return null;
-            var qd = UnplannedQuickDev;
-            var def = UnattributableDeferred;
-            if (qd.Count == 0 && DeferredListHref is { Length: > 0 })
-                return DeferredListHref;
-            if (qd.Count == 0 && def.Count > 0)
-                return def[0].DetailHref;
-            if (def.Count == 0 && qd.Count > 0)
-                return qd[0].Href;
-            // Mixed: prefer deferred list when available, else first quick-dev.
-            if (DeferredListHref is { Length: > 0 })
-                return DeferredListHref;
-            return qd[0].Href;
-        }
-    }
+    /// <summary>Stable filtered Unplanned group page (<c>follow-ups/group-unplanned.html</c>).
+    /// Prefixed for epic-depth pages via <see cref="LinkPrefix"/>. Null when the set is empty (NFR8). [Story 9.13]</summary>
+    public string? GroupRootHref =>
+        HasUnplanned
+            ? FollowUpGeometry.ApplyLinkPrefix(LinkPrefix, FollowUpGroupPages.UnplannedPath)
+            : null;
 
     /// <summary>Null/empty status counts as open (remaining work). Done/resolved (case-insensitive) are closed.</summary>
     public static bool IsOpenQuickDev(string? status)
@@ -103,15 +92,29 @@ public sealed record UnplannedWorkGeometry(
     }
 
     /// <summary>Builds unplanned geometry from inventory + already-projected follow-up slots.
-    /// Reuses <see cref="FollowUpGeometry.UnattributedDeferredItems"/> — never re-parses deferred markdown.</summary>
+    /// Reuses <see cref="FollowUpGeometry.UnattributedDeferredItems"/> — never re-parses deferred markdown.
+    /// Done quick-dev that still have open deferred from their code review are re-surfaced as parents so
+    /// residual work stays attached to the item it stemmed from. [Story 9.12]</summary>
     public static UnplannedWorkGeometry From(
         WorkInventory work,
         FollowUpGeometry followUps,
         EpicsModel? epics = null,
         string linkPrefix = "")
     {
+        var unattributedDeferred = followUps.UnattributedDeferredItems
+            .Select(s => s with { DetailHref = FollowUpGeometry.ApplyLinkPrefix(linkPrefix, s.DetailHref) })
+            .ToList();
+
+        var residualSourceKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var slot in unattributedDeferred)
+        {
+            if (slot.Item.Resolved) continue;
+            if (slot.SourceKey is { Length: > 0 } key)
+                residualSourceKeys.Add(NormalizeSourceKey(key));
+        }
+
         var quickDev = work.QuickDev
-            .Where(q => IsOpenQuickDev(q.Status))
+            .Where(q => IsOpenQuickDev(q.Status) || residualSourceKeys.Contains(NormalizeSourceKey(Path.GetFileNameWithoutExtension(q.OutputPath))))
             .Select(q =>
             {
                 var epic = ResolveQuickDevEpic(q, epics, followUps);
@@ -120,15 +123,21 @@ public sealed record UnplannedWorkGeometry(
             })
             .ToList();
 
-        var deferred = followUps.UnattributedDeferredItems
-            .Select(s => s with { DetailHref = FollowUpGeometry.ApplyLinkPrefix(linkPrefix, s.DetailHref) })
+        // Deferred that inherit an epic via parent quick-dev are already attributed in FollowUpGeometry.
+        // Remaining unattributable deferred stay here — including children of unplanned quick-dev parents.
+        var deferred = unattributedDeferred
+            .Where(s => s.EpicNumber is null)
             .ToList();
 
-        var deferredList = followUps.DeferredHref is { Length: > 0 } dh
-            ? FollowUpGeometry.ApplyLinkPrefix(linkPrefix, dh)
-            : null;
+        return new UnplannedWorkGeometry(quickDev, deferred, DeferredListHref: null, linkPrefix);
+    }
 
-        return new UnplannedWorkGeometry(quickDev, deferred, deferredList);
+    private static string NormalizeSourceKey(string key)
+    {
+        var bare = key.Trim().Trim('`');
+        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
+        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+        return bare;
     }
 
     /// <summary>Best-effort epic attribution from existing text only — title, filename stem, optional

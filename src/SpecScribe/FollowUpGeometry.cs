@@ -1,13 +1,18 @@
 namespace SpecScribe;
 
 /// <summary>One deferred-work item projected for sunburst geometry. Epic-attributed items render under
-/// their epic; unattributed items join the Unplanned root (Story 9.12) — not the Follow-ups orphan
-/// (which holds unattributed action items only). [Story 9.7; 9.12]</summary>
+/// their epic; items that still have no epic (and no parent quick-dev to inherit from) join the Unplanned
+/// root (Story 9.12). Unattributed action items stay on the Follow-ups orphan. [Story 9.7; 9.12]</summary>
 public sealed record FollowUpDeferredSlot(
     DeferredWorkItem Item,
     string ProvenanceLabel,
     int? EpicNumber,
-    string DetailHref);
+    string DetailHref,
+    /// <summary>Provenance key (<c>spec-*</c> or <c>N-M-slug</c>) when known — used to attach deferred
+    /// to the parent quick-dev / story it stemmed from. [Story 9.12]</summary>
+    string? SourceKey = null,
+    /// <summary>Href to the provenance source page when resolvable (story page or quick-dev spec).</summary>
+    string? SourceHref = null);
 
 /// <summary>Inputs for sunburst follow-up geometry (Story 9.7 / FR30). Counts for <em>open</em> items must
 /// agree with <see cref="ProjectCounts"/> — never re-parsed from yaml/markdown at the chart layer.
@@ -59,6 +64,11 @@ public sealed record FollowUpGeometry(
             return LinkPrefix + FollowUpSlug.OutputPath(slug);
         return ActionItemsHref;
     }
+
+    /// <summary>Filtered Follow-ups orphan group page (<c>follow-ups/group-follow-ups.html</c>).
+    /// Prefixed for epic-depth pages. [Story 9.13]</summary>
+    public string FollowUpsGroupHref =>
+        LinkPrefix + FollowUpGroupPages.FollowUpsPath;
 
     /// <summary>Builds geometry from the portal ledger + already-projected inventory.
     /// <paramref name="actionItems"/> is the full sprint list (open + done) so completed follow-ups can
@@ -153,11 +163,16 @@ public sealed record FollowUpGeometry(
 
             return pairs.Select(p =>
             {
-                var epic = ResolveEpicNumber(epics, p.Group.SourceStoryId);
+                var sourceKey = p.Group.SourceKey;
+                var epic = ResolveEpicNumber(epics, p.Group.SourceStoryId)
+                    ?? ResolveEpicFromSourceKey(epics, work, sourceKey);
                 var href = slugs.TryGetValue(p.Item, out var slug)
                     ? linkPrefix + FollowUpSlug.OutputPath(slug)
                     : linkPrefix + listHref;
-                return new FollowUpDeferredSlot(p.Item, p.ProvenanceLabel, epic, href);
+                var sourceHref = p.Group.SourceStoryHref is { Length: > 0 } sh
+                    ? FollowUpGeometry.ApplyLinkPrefix(linkPrefix, sh)
+                    : ResolveSourceHref(work, sourceKey, linkPrefix);
+                return new FollowUpDeferredSlot(p.Item, p.ProvenanceLabel, epic, href, sourceKey, sourceHref);
             }).ToList();
         }
 
@@ -171,6 +186,50 @@ public sealed record FollowUpGeometry(
                 return new FollowUpDeferredSlot(item, "Deferred work", null, linkPrefix + listHref);
             })
             .ToList();
+    }
+
+    /// <summary>When the deferred heading names a story key or a quick-dev <c>spec-*</c>, attribute to that
+    /// epic (story → epic directly; quick-dev → inherit the quick-dev's best-effort epic). Code-review
+    /// deferred must not fall into Unplanned as orphans of their parent work. [Story 9.12]</summary>
+    private static int? ResolveEpicFromSourceKey(EpicsModel? epics, WorkInventory work, string? sourceKey)
+    {
+        if (epics is null || string.IsNullOrWhiteSpace(sourceKey)) return null;
+
+        var storyId = FollowUpRefs.StoryIdFromKey(sourceKey);
+        var fromStory = ResolveEpicNumber(epics, storyId);
+        if (fromStory is not null) return fromStory;
+
+        var quickDev = FindQuickDev(work, sourceKey);
+        if (quickDev is null) return null;
+        return UnplannedWorkGeometry.ResolveQuickDevEpic(quickDev, epics);
+    }
+
+    /// <summary>Matches a provenance key to a <see cref="QuickDevEntry"/> by output stem or filename.</summary>
+    public static QuickDevEntry? FindQuickDev(WorkInventory work, string? sourceKey)
+    {
+        if (string.IsNullOrWhiteSpace(sourceKey)) return null;
+        var bare = sourceKey.Trim().Trim('`');
+        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
+        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+
+        foreach (var q in work.QuickDev)
+        {
+            var stem = Path.GetFileNameWithoutExtension(q.OutputPath);
+            var file = Path.GetFileName(q.OutputPath);
+            if (string.Equals(stem, bare, StringComparison.OrdinalIgnoreCase)) return q;
+            if (string.Equals(file, bare, StringComparison.OrdinalIgnoreCase)) return q;
+            if (string.Equals(file, bare + ".html", StringComparison.OrdinalIgnoreCase)) return q;
+            if (string.Equals(stem + ".md", bare + ".md", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(stem, bare, StringComparison.OrdinalIgnoreCase))
+                return q;
+        }
+        return null;
+    }
+
+    private static string? ResolveSourceHref(WorkInventory work, string? sourceKey, string linkPrefix)
+    {
+        var qd = FindQuickDev(work, sourceKey);
+        return qd is null ? null : FollowUpGeometry.ApplyLinkPrefix(linkPrefix, qd.OutputPath);
     }
 
     private static int? ResolveEpicNumber(EpicsModel? epics, string? storyId)

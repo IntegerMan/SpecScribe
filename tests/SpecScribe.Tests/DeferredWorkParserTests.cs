@@ -16,6 +16,21 @@ public class DeferredWorkParserTests
         };
 
     [Fact]
+    public void Parse_SpecHeading_PreservesSourceKeyWithoutStoryId()
+    {
+        var md = """
+            ## Deferred from: code review of spec-home-next-steps-label-and-code-review (2026-07-06)
+
+            - source_spec: `spec-home-next-steps-label-and-code-review.md`
+            - Residual from the one-shot review.
+            """;
+        var model = DeferredWorkParser.Parse(md);
+        var group = Assert.Single(model.Groups);
+        Assert.Null(group.SourceStoryId);
+        Assert.Equal("spec-home-next-steps-label-and-code-review", group.SourceKey);
+    }
+
+    [Fact]
     public void Parse_StoryHyphenHeading_ResolvesSourceStoryId()
     {
         var md = """

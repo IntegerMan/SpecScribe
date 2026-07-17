@@ -262,7 +262,7 @@ public static class Charts
             var sweep = orphanWeight * anglePerUnit;
             var openOrphans = unattributed.Count(a => !FollowUpGeometry.IsDone(a));
             var orphanClass = openOrphans > 0 ? "followup-open" : "done";
-            var orphanHref = geometry.ActionItemsHref;
+            var orphanHref = geometry.FollowUpsGroupHref;
             var orphanAria = openOrphans > 0
                 ? $"Follow-ups: {orphanSlots} unattributed {Plural(orphanSlots, "item", "items")}"
                 : $"Follow-ups: {orphanSlots} completed unattributed {Plural(orphanSlots, "item", "items")}";
@@ -452,8 +452,28 @@ public static class Charts
         var resolved = slot.Item.Resolved;
         var text = TruncateFollowUpText(
             PathUtil.StripHtmlTags(FollowUpRow.SummarizeFromHtml(slot.Item.BodyHtml)));
-        var label = resolved ? $"Deferred item (resolved): {text}" : $"Deferred item: {text}";
+        var from = DeferredSourceSuffix(slot);
+        var label = resolved
+            ? $"Deferred item (resolved): {text}{from}"
+            : $"Deferred item: {text}{from}";
         AppendFollowUpSlot(sb, label, slot.DetailHref, resolved ? "done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
+    }
+
+    /// <summary>Names the story or quick-dev this deferred item stemmed from (code-review provenance),
+    /// so residual work stays readable as a child of its source — never a free-floating "Story". [Story 9.12]</summary>
+    private static string DeferredSourceSuffix(FollowUpDeferredSlot slot)
+    {
+        if (string.IsNullOrWhiteSpace(slot.SourceKey)) return string.Empty;
+        var key = slot.SourceKey.Trim().Trim('`');
+        if (key.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) key = key[..^3];
+        if (key.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) key = key[..^5];
+
+        var storyId = FollowUpRefs.StoryIdFromKey(key);
+        if (storyId is not null)
+            return $" (from Story {storyId})";
+        if (key.StartsWith("spec-", StringComparison.OrdinalIgnoreCase))
+            return $" (from Direct change: {key})";
+        return $" (from {key})";
     }
 
     private static void AppendQuickDevSlot(

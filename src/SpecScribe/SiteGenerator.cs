@@ -364,6 +364,7 @@ public sealed class SiteGenerator
             WriteActionItems(nav, workInventory);
             WriteDeferredWork(nav, workInventory);
             WriteFollowUpDetails(nav, workInventory);
+            WriteFollowUpGroupPages(nav, workInventory);
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav, workInventory);
@@ -2799,6 +2800,31 @@ public sealed class SiteGenerator
         catch (Exception ex)
         {
             return new GenerationEvent(GenerationOutcome.Error, "README.md", sw.Elapsed, ex.Message);
+        }
+    }
+
+    /// <summary>Writes filtered follow-up group list pages under <c>follow-ups/group-*.html</c>
+    /// (Follow-ups orphan, Unplanned, epic-N). Membership matches sunburst sets; no empty pages (NFR8).
+    /// No Resolve <c>data-copy</c> on group pages. [Story 9.13]</summary>
+    private void WriteFollowUpGroupPages(SiteNav nav, WorkInventory? work = null)
+    {
+        var inventory = work ?? WorkInventory.Build(_docs.Values.ToList());
+        var counts = _counts ?? ProjectCounts.Build(
+            _progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
+        var deferredModel = TryParseDeferredWork(inventory);
+        var followUps = BuildFollowUpGeometry(inventory, counts, deferredModel);
+        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel);
+        var groups = FollowUpGroupPages.Enumerate(followUps, unplanned, _epicsModel);
+        if (groups.Count == 0) return;
+
+        var followUpsDir = Path.Combine(_options.OutputRoot, FollowUpSlug.Folder);
+        Directory.CreateDirectory(followUpsDir);
+
+        foreach (var group in groups)
+        {
+            var html = FollowUpGroupTemplater.RenderPage(group, nav);
+            // No ApplyReferenceLinks — group pages intentionally omit Resolve data-copy; keep summaries plain.
+            WriteOutput(group.OutputPath, html);
         }
     }
 

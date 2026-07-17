@@ -445,7 +445,13 @@ public class SiteGeneratorAdapterTests : IDisposable
         // [Story 9.12; golden-diff-normalization-gotchas]
         // spec-accent-kicker-slug-heuristics: C#/tests only — pending-kicker CSS color rule was rejected in review
         // (contrast regression vs --ink-light); golden unchanged by that polish alone.
-        const string expected = "e17707ec60fa3d31a5701b7bb517cb5a0f73f72cfe6b9d77b87bdcb7ed07ede4";
+        // Regenerated for Story 9.13: filtered follow-ups/group-*.html pages + sunburst group-root hrefs
+        // (Follow-ups → group-follow-ups, Unplanned → group-unplanned). Golden fixture still has no
+        // open action_items / deferred / quick-dev — fingerprint may still move from 9.12 geometry/CSS
+        // already in tree plus Charts/GroupRootHref seam. [Story 9.13; golden-diff-normalization-gotchas]
+        // Regenerated for Story 9.12 provenance follow-up: deferred SourceKey; code-review-of-spec/story
+        // attaches to parent quick-dev / epic; aria "from …"; residual done parents. [Story 9.12]
+        const string expected = "9582c3779ab8c634ebe75d5c7080f0919a916d0929ee6d25c5ee7be52dbf2750";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

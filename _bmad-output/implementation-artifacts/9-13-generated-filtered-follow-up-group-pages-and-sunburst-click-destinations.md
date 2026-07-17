@@ -4,7 +4,7 @@ baseline_commit: 0ea1dd8e3bc033a06c1e394559054727e4d5840e
 
 # Story 9.13: Generated Filtered Follow-Up Group Pages and Sunburst Click Destinations
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -107,43 +107,43 @@ Path names are illustrative — keep under `FollowUpSlug.Folder` (`follow-ups/`)
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Group identity + paths (AC: #1)**
-  - [ ] Add pure helpers (e.g. on `FollowUpSlug` or `FollowUpGroupPages`) for `group-follow-ups`, `group-unplanned`, `group-epic-{n}` output paths under `follow-ups/`.
-  - [ ] Unit-test path stability and non-collision with `action-` / `deferred-` prefixes.
+- [x] **Task 1 — Group identity + paths (AC: #1)**
+  - [x] Add pure helpers (e.g. on `FollowUpSlug` or `FollowUpGroupPages`) for `group-follow-ups`, `group-unplanned`, `group-epic-{n}` output paths under `follow-ups/`.
+  - [x] Unit-test path stability and non-collision with `action-` / `deferred-` prefixes.
 
-- [ ] **Task 2 — Membership projection (AC: #1)**
-  - [ ] Pure functions that, given `FollowUpGeometry` + `UnplannedWorkGeometry` (+ epics), enumerate non-empty groups and their members — same sets the sunburst already uses (no second deferred parse; ledger-consistent).
-  - [ ] Pin: Follow-ups members = unattributed actions only; Unplanned = `UnplannedSet`; epic group = attributed actions + deferred for that epic.
+- [x] **Task 2 — Membership projection (AC: #1)**
+  - [x] Pure functions that, given `FollowUpGeometry` + `UnplannedWorkGeometry` (+ epics), enumerate non-empty groups and their members — same sets the sunburst already uses (no second deferred parse; ledger-consistent).
+  - [x] Pin: Follow-ups members = unattributed actions only; Unplanned = `UnplannedSet`; epic group = attributed actions + deferred for that epic.
 
-- [ ] **Task 3 — Group list templater (AC: #1)**
-  - [ ] New templater rendering the page shell + `FollowUpRow` list for a filtered membership set (title, crumb, rows).
-  - [ ] Support mixed Unplanned members (deferred + quick-dev) without mislabeling as stories.
-  - [ ] NFR8: caller never asks for an empty group page.
+- [x] **Task 3 — Group list templater (AC: #1)**
+  - [x] New templater rendering the page shell + `FollowUpRow` list for a filtered membership set (title, crumb, rows).
+  - [x] Support mixed Unplanned members (deferred + quick-dev) without mislabeling as stories.
+  - [x] NFR8: caller never asks for an empty group page.
 
-- [ ] **Task 4 — Emit pages (AC: #1)**
-  - [ ] `SiteGenerator.WriteFollowUpGroupPages` beside `WriteFollowUpDetails`; call from `GenerateAll` after geometry inputs exist.
-  - [ ] Use `WriteOutput` (SPA/webview capture). Coordinate folder creation with detail writer (group-only repo still creates `follow-ups/`).
-  - [ ] No empty files.
+- [x] **Task 4 — Emit pages (AC: #1)**
+  - [x] `SiteGenerator.WriteFollowUpGroupPages` beside `WriteFollowUpDetails`; call from `GenerateAll` after geometry inputs exist.
+  - [x] Use `WriteOutput` (SPA/webview capture). Coordinate folder creation with detail writer (group-only repo still creates `follow-ups/`).
+  - [x] No empty files.
 
-- [ ] **Task 5 — Rewire sunburst group roots (AC: #2)**
-  - [ ] Follow-ups orphan → group-follow-ups path (prefixed on epic-depth pages).
-  - [ ] Unplanned root → group-unplanned path (replace temporary `GroupRootHref` body).
-  - [ ] Leave leaf hrefs and epic→epic.html unchanged.
-  - [ ] Assert group hrefs never equal `action-items.html` or the unfiltered deferred list path when a group page exists.
+- [x] **Task 5 — Rewire sunburst group roots (AC: #2)**
+  - [x] Follow-ups orphan → group-follow-ups path (prefixed on epic-depth pages).
+  - [x] Unplanned root → group-unplanned path (replace temporary `GroupRootHref` body).
+  - [x] Leave leaf hrefs and epic→epic.html unchanged.
+  - [x] Assert group hrefs never equal `action-items.html` or the unfiltered deferred list path when a group page exists.
 
-- [ ] **Task 6 — Guardrails**
-  - [ ] No hash/query filters on full lists.
-  - [ ] No new authoring schema; no new `--status-*` token; never color-only.
-  - [ ] Do not absorb 9.6/9.10/9.11 chrome beyond row reuse.
-  - [ ] Do not implement 10.7 density modes.
-  - [ ] No JS navigation.
+- [x] **Task 6 — Guardrails**
+  - [x] No hash/query filters on full lists.
+  - [x] No new authoring schema; no new `--status-*` token; never color-only.
+  - [x] Do not absorb 9.6/9.10/9.11 chrome beyond row reuse.
+  - [x] Do not implement 10.7 density modes.
+  - [x] No JS navigation.
 
-- [ ] **Task 7 — Tests + golden (AC: #1, #2)**
-  - [ ] Path/membership unit tests.
-  - [ ] `FollowUpSurfacesTests` / new tests: group pages exist with only that group's items; empty → no page.
-  - [ ] `ChartsTests`: orphan + Unplanned roots href to `follow-ups/group-…`; leaves still `follow-ups/action-` / `deferred-` / spec paths; epic arc still `epics/epic-`.
-  - [ ] Golden fingerprint moves → regen per `golden-diff-normalization-gotchas`; three parity suites green.
-  - [ ] `dotnet test` from repo root.
+- [x] **Task 7 — Tests + golden (AC: #1, #2)**
+  - [x] Path/membership unit tests.
+  - [x] `FollowUpSurfacesTests` / new tests: group pages exist with only that group's items; empty → no page.
+  - [x] `ChartsTests`: orphan + Unplanned roots href to `follow-ups/group-…`; leaves still `follow-ups/action-` / `deferred-` / spec paths; epic arc still `epics/epic-`.
+  - [x] Golden fingerprint moves → regen per `golden-diff-normalization-gotchas`; three parity suites green.
+  - [x] `dotnet test` from repo root.
 
 ## Dev Notes
 
@@ -265,7 +265,7 @@ Generate to `SpecScribeOutput/`. Confirm `follow-ups/group-follow-ups.html` / `g
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Composer (Auto)
 
 ### Debug Log References
 
@@ -273,4 +273,31 @@ Generate to `SpecScribeOutput/`. Confirm `follow-ups/group-follow-ups.html` / `g
 
 Ultimate context engine analysis completed — comprehensive developer guide created.
 
+Implemented Story 9.13 end-to-end:
+- `FollowUpGroupPages` path helpers + membership projection (Follow-ups / Unplanned / epic-N; NFR8 omit empty).
+- `FollowUpGroupTemplater` renders filtered list pages with shared `FollowUpRow` grammar; no Resolve `data-copy`.
+- `SiteGenerator.WriteFollowUpGroupPages` emits via `WriteOutput` beside detail pages.
+- Rewired Charts Follow-ups orphan → `FollowUpsGroupHref`; `UnplannedWorkGeometry.GroupRootHref` → stable `group-unplanned` path.
+- Leaves + epic→epic.html unchanged; no hash/query filters; no new authoring schema.
+- Tests: `FollowUpGroupPagesTests`, surfaces e2e, Charts/Unplanned href pins; golden fingerprint regenerated.
+- `dotnet test`: 1354 passed.
+
 ### File List
+
+- src/SpecScribe/FollowUpGroupPages.cs (new)
+- src/SpecScribe/FollowUpGroupTemplater.cs (new)
+- src/SpecScribe/FollowUpGeometry.cs
+- src/SpecScribe/UnplannedWorkGeometry.cs
+- src/SpecScribe/Charts.cs
+- src/SpecScribe/SiteGenerator.cs
+- tests/SpecScribe.Tests/FollowUpGroupPagesTests.cs (new)
+- tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
+- tests/SpecScribe.Tests/UnplannedWorkGeometryTests.cs
+- tests/SpecScribe.Tests/ChartsTests.cs
+- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/9-13-generated-filtered-follow-up-group-pages-and-sunburst-click-destinations.md
+
+## Change Log
+
+- 2026-07-17: Story 9.13 — generated filtered follow-up group pages + sunburst group-root destinations; status → review.

@@ -598,7 +598,10 @@ public static class SprintTemplater
         var cssClass = member.IsDone
             ? "done"
             : isDirect ? "unplanned" : StatusStyles.ForSprint(member.Status ?? "open");
-        var tip = PathUtil.Html($"{kindLabel}\n{member.Title}");
+        var fromLine = !isDirect && member.SourceKey is { Length: > 0 } sk
+            ? $"\nFrom: {NormalizeCardSourceKey(sk)}"
+            : string.Empty;
+        var tip = PathUtil.Html($"{kindLabel}\n{member.Title}{fromLine}");
         var hiddenAttr = hidden ? " hidden" : string.Empty;
         var overflowAttr = capOverflow ? " data-cap-overflow=\"1\"" : string.Empty;
         var href = PathUtil.Html(prefix + member.Href);
@@ -608,7 +611,25 @@ public static class SprintTemplater
         sb.Append($"          <span class=\"sprint-card-id\">{PathUtil.Html(kindLabel)}</span>\n");
         sb.Append("        </div>\n");
         sb.Append($"        <span class=\"sprint-card-title\">{PathUtil.Html(member.Title)}</span>\n");
+        if (!isDirect && member.SourceKey is { Length: > 0 } sourceKey)
+        {
+            var parentHref = member.SourceHref is { Length: > 0 } sh ? prefix + sh : null;
+            var parentLabel = NormalizeCardSourceKey(sourceKey);
+            if (parentHref is not null)
+                sb.Append($"        <span class=\"sprint-card-source\">from <span class=\"sprint-card-source-ref\">{PathUtil.Html(parentLabel)}</span></span>\n");
+            else
+                sb.Append($"        <span class=\"sprint-card-source\">from {PathUtil.Html(parentLabel)}</span>\n");
+        }
         sb.Append("      </a>\n");
+    }
+
+    private static string NormalizeCardSourceKey(string key)
+    {
+        var bare = key.Trim().Trim('`');
+        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
+        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+        var storyId = FollowUpRefs.StoryIdFromKey(bare);
+        return storyId is not null ? $"Story {storyId}" : bare;
     }
 
     /// <summary>The rich card tooltip text (plain, <c>\n</c>-separated for the js-tip node): epic name, story

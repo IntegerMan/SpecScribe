@@ -260,7 +260,8 @@ Composer (Cursor agent router)
 - Project sunburst: synthetic **Unplanned** root (NFR8 omit when empty); Follow-ups orphan = unattributed action items only; attributed quick-dev as story-ring peers; legend + hint name Direct change / Unplanned.
 - Sprint by-status **Unplanned** lane + by-epic **Unplanned / Direct work** swimlane; distinct `unplanned-card` markup (never "Story …"); Home Now & Next and `WriteSprint` wired to the same set.
 - Group-root href temporary/swappable for 9.13; no new authoring schema; no filtered group pages; CSS uses `--sb-unplanned` (not a `--status-*` token).
-- `dotnet test`: 1332 passed. Golden fingerprint regenerated.
+- Provenance follow-up: preserve `SourceKey` on deferred groups/slots; code-review-of-story → epic; code-review-of-spec → inherit parent quick-dev epic or stay with resurfaced parent under Unplanned; aria/board show "from Direct change/Story …".
+- `dotnet test`: green. Golden fingerprint regenerated.
 
 ### File List
 

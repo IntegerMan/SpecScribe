@@ -5297,6 +5297,13 @@ a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--
 .sprint-lane.unplanned .sprint-lane-head { border-bottom-color: var(--sb-unplanned, #0e7490); }
 .sprint-card.unplanned { border-left-color: var(--sb-unplanned, #0e7490); }
 .sprint-card.unplanned-card .sprint-card-id { color: var(--sb-unplanned, #0e7490); }
+.sprint-card-source {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  margin-top: 0.15rem;
+  line-height: 1.25;
+}
 .sprint-epic-lane.unplanned .sprint-epic-title { color: var(--ink); font-style: italic; }
 
 .sprint-cards { display: flex; flex-direction: column; gap: 0.45rem; }

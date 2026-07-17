@@ -11,12 +11,16 @@ public sealed record DeferredWorkModel(
     string? PlainBodyHtml = null,
     string? PreambleHtml = null);
 
-/// <summary>One <c>## Deferred from:</c> section with optional source-story provenance. [Story 9.6]</summary>
+/// <summary>One <c>## Deferred from:</c> section with optional source-story / source-spec provenance. [Story 9.6]</summary>
 public sealed record DeferredWorkGroup(
     string ProvenanceLabel,
     string? SourceStoryId,
     string? SourceStoryHref,
-    IReadOnlyList<DeferredWorkItem> Items);
+    IReadOnlyList<DeferredWorkItem> Items,
+    /// <summary>Raw provenance key from the heading or <c>source_spec:</c> line — e.g.
+    /// <c>spec-home-next-steps-label-and-code-review</c> or <c>9-8-slug</c>. Preserved even when
+    /// <see cref="SourceStoryId"/> is null so geometry can attach deferred to its parent quick-dev. [Story 9.12]</summary>
+    string? SourceKey = null);
 
 /// <summary>One top-level deferred-work list item. [Story 9.6]</summary>
 public sealed record DeferredWorkItem(
@@ -69,12 +73,13 @@ public static class DeferredWorkParser
 
                 var sourceFile = FollowUpRefs.SourceSpecFileFromText(section)
                     ?? ExtractKeyFromLabel(label);
-                var sourceId = sourceFile is null ? null : FollowUpRefs.StoryIdFromKey(sourceFile);
+                var sourceKey = NormalizeProvenanceKey(sourceFile);
+                var sourceId = sourceKey is null ? null : FollowUpRefs.StoryIdFromKey(sourceKey);
                 // Prefer story id when it's a story key; otherwise keep the filename as the ref label.
                 var sourceHref = FollowUpRefs.ResolveHref(sourceFile ?? sourceId, hrefMap, outputRelativePrefix);
 
                 var items = ParseItems(section, hrefMap, outputRelativePrefix);
-                groups.Add(new DeferredWorkGroup(label, sourceId, sourceHref, items));
+                groups.Add(new DeferredWorkGroup(label, sourceId, sourceHref, items, SourceKey: sourceKey));
             }
 
             // Headings with no parseable list items → keep the plain body rather than empty groups.
@@ -185,5 +190,15 @@ public static class DeferredWorkParser
         if (m.Success) return m.Groups[1].Value;
         m = Regex.Match(label, @"\b(spec-[a-z0-9-]+(?:\.md)?)\b", RegexOptions.IgnoreCase);
         return m.Success ? m.Groups[1].Value : null;
+    }
+
+    /// <summary>Strips <c>.md</c>/<c>.html</c> so story-id and quick-dev matching stay deterministic.</summary>
+    private static string? NormalizeProvenanceKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return null;
+        var bare = key.Trim().Trim('`');
+        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
+        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+        return bare.Length > 0 ? bare : null;
     }
 }
