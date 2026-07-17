@@ -16,6 +16,36 @@ public class DeferredWorkParserTests
         };
 
     [Fact]
+    public void Parse_StoryHyphenHeading_ResolvesSourceStoryId()
+    {
+        var md = """
+            ## Deferred from: code review of story-3-8 (2026-07-09)
+
+            - Commit body containing a literal 0x1F control char could truncate numstat rows.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+
+        Assert.True(model.IsStructured);
+        var group = Assert.Single(model.Groups);
+        Assert.Equal("3.8", group.SourceStoryId);
+        Assert.False(Assert.Single(group.Items).Resolved);
+    }
+
+    [Fact]
+    public void Parse_StoryDottedHeading_ResolvesSourceStoryId()
+    {
+        var md = """
+            ## Deferred from: code review of story-3.5 (2026-07-08)
+
+            - Legend arrays can drift between project and epic sunbursts.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        Assert.Equal("3.5", Assert.Single(model.Groups).SourceStoryId);
+    }
+
+    [Fact]
     public void Parse_TwoDeferredFromGroups_ResolvesSourceStoryHref()
     {
         var md = """

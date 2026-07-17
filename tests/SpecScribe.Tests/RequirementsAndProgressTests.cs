@@ -361,6 +361,63 @@ public class RequirementsParserTests
         Assert.Contains("Requirements flow", html);
         Assert.Contains("req-status-grid", html);
         Assert.Contains("req-flow-svg", html);
+        // Chip deep-links prefer #at-a-glance when FR+NFR exist (review 2026-07-17).
+        Assert.Contains("href=\"#at-a-glance\"", html);
+        Assert.DoesNotContain("href=\"#nfr-uxdr-coverage\"", html);
+    }
+
+    [Fact]
+    public void RenderIndex_DesignOnly_SatisfactionChipsLinkToCoverage()
+    {
+        var epics = EpicsParser.Parse("""
+            # Epics
+            ## Requirements Inventory
+            ### Functional Requirements
+            **Core**
+            ### Non-Functional Requirements
+            ### UX Design Requirements
+            UX-DR1: A design requirement
+            ## FR Coverage Map
+            ## NFR Coverage Map
+            ## UX-DR Coverage Map
+            UX-DR1: Epic 1 - covered
+            ## Epic List
+            ### Epic 1: Alone
+            Goal.
+            ## Epic 1: Alone
+            ### Story 1.1: A
+            As a user, I want x, so that y.
+            """);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse("""
+            # Epics
+            ## Requirements Inventory
+            ### Functional Requirements
+            **Core**
+            ### Non-Functional Requirements
+            ### UX Design Requirements
+            UX-DR1: A design requirement
+            ## FR Coverage Map
+            ## NFR Coverage Map
+            ## UX-DR Coverage Map
+            UX-DR1: Epic 1 - covered
+            ## Epic List
+            ### Epic 1: Alone
+            Goal.
+            ## Epic 1: Alone
+            ### Story 1.1: A
+            As a user, I want x, so that y.
+            """, epics, progress);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+
+        Assert.Contains("id=\"satisfaction\"", html);
+        Assert.Contains("href=\"#nfr-uxdr-coverage\"", html);
+        Assert.DoesNotContain("id=\"at-a-glance\"", html);
+        // At least one non-zero reading is an <a>; zero-count readings stay <span>.
+        Assert.Contains("<a class=\"satisfaction-chip status-badge", html);
+        Assert.Contains("<span class=\"satisfaction-chip status-badge", html);
     }
 
     [Fact]

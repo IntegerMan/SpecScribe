@@ -174,8 +174,14 @@ public static class DeferredWorkParser
 
     private static string? ExtractKeyFromLabel(string label)
     {
-        // "code review of 8-8-generation-time-recency-signals.md (2026-07-15)"
-        var m = Regex.Match(label, @"\b(\d+-\d+-[a-z0-9-]+(?:\.md)?)\b", RegexOptions.IgnoreCase);
+        // Prefer explicit story review headings: "code review of story-3-8" / "story-3.5".
+        // Must come before the N-M-slug pattern so trailing dates like (2026-07-09) aren't
+        // mistaken for artifact keys.
+        var m = Regex.Match(label, @"\b(story-\d+[.-]\d+)\b", RegexOptions.IgnoreCase);
+        if (m.Success) return m.Groups[1].Value;
+        // Full artifact slug: "8-8-generation-time-recency-signals.md" — require a letter in the
+        // slug segment so bare dates (2026-07-09) never match.
+        m = Regex.Match(label, @"\b(\d+-\d+-[a-z0-9-]*[a-z][a-z0-9-]*(?:\.md)?)\b", RegexOptions.IgnoreCase);
         if (m.Success) return m.Groups[1].Value;
         m = Regex.Match(label, @"\b(spec-[a-z0-9-]+(?:\.md)?)\b", RegexOptions.IgnoreCase);
         return m.Success ? m.Groups[1].Value : null;

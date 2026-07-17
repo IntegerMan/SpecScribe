@@ -119,17 +119,17 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</section>\n\n");
     }
 
-    /// <summary>The unified homepage tile band — headline stats + Epic Status + Overall Progress + Deferred +
-    /// Action Items as one flex-wrap row set (typically two dense rows). Journey accents and work-stage
-    /// visibility classes ride on each card; the first card of a group carries a floating caption. No cluster
-    /// wrappers — wrappers would break the wrap into uneven columns. [Story 9.8]</summary>
+    /// <summary>The unified homepage tile band — a 5-column grid (2×5 when Overview/Track show their
+    /// curated 10 tiles). Journey accents and work-stage visibility classes ride on each card; captions
+    /// sit in a reserved padding slot so they never stagger rows. [Story 9.8]</summary>
     private void AppendTileBand(StringBuilder sb, DashboardView view, ProgressModel p)
     {
         sb.Append("<div class=\"dashboard-tile-band\">\n");
 
         var reqTiles = view.StatTiles.Where(IsRequirementsStat).ToList();
         var epicStoryTiles = view.StatTiles.Where(t => t.Label is "Epics drafted" or "Stories defined").ToList();
-        var executionTiles = view.StatTiles.Where(t => t.Label is "Planned tasks done" or "Direct changes").ToList();
+        var plannedTiles = view.StatTiles.Where(t => t.Label is "Planned tasks done").ToList();
+        var directTiles = view.StatTiles.Where(t => t.Label is "Direct changes").ToList();
         var insightTiles = view.StatTiles.Where(t => t.Label is "Commit" or "Commits").ToList();
         var claimed = new HashSet<string>(StringComparer.Ordinal);
         void Claim(IEnumerable<StatTile> tiles)
@@ -138,20 +138,28 @@ public sealed partial class HtmlRenderAdapter
         }
         Claim(reqTiles);
         Claim(epicStoryTiles);
-        Claim(executionTiles);
+        Claim(plannedTiles);
+        Claim(directTiles);
         Claim(insightTiles);
 
-        // Visibility classes live ON each tile so flex-wrap still sees cards as peers.
+        // Overview/Track → 10 tiles (2×5). Review → 8 tiles (2×4 via CSS). Develop → commits only.
+        // Direct changes skips Overview (redundant with Deferred); Commits skips Overview (Develop home).
         AppendStatJourney(sb, "requirements", "Requirements", reqTiles,
             "wm-panel wm-show-overview wm-show-requirements wm-show-track");
         AppendEpicsJourney(sb, p, view.Epics, epicStoryTiles,
             "wm-panel wm-show-overview wm-show-plan wm-show-review wm-show-track");
-        AppendExecutionJourney(sb, view.ProgressBars, executionTiles,
+        AppendStatJourney(sb, "execution", "Execution", plannedTiles,
             "wm-panel wm-show-overview wm-show-review wm-show-track");
+        AppendStatJourney(sb, "execution", "Execution", directTiles,
+            "wm-panel wm-show-review",
+            showLead: plannedTiles.Count == 0);
+        AppendOverallProgressTile(sb, view.ProgressBars,
+            "wm-panel wm-show-overview wm-show-review wm-show-track",
+            lead: plannedTiles.Count == 0 && directTiles.Count == 0);
         AppendFollowUpJourney(sb, view.Work, view.OpenRetroActionItems, view.Counts,
-            "wm-panel wm-show-overview wm-show-review");
+            "wm-panel wm-show-overview wm-show-review wm-show-track");
         AppendStatJourney(sb, "insights", "Insights", insightTiles,
-            "wm-panel wm-show-overview wm-show-develop");
+            "wm-panel wm-show-develop");
 
         foreach (var tile in view.StatTiles)
         {
@@ -168,7 +176,8 @@ public sealed partial class HtmlRenderAdapter
         tile.Label is "Functional reqs" or "Non-functional" or "Design reqs";
 
     private static void AppendStatJourney(
-        StringBuilder sb, string key, string label, IReadOnlyList<StatTile> tiles, string showClass)
+        StringBuilder sb, string key, string label, IReadOnlyList<StatTile> tiles, string showClass,
+        bool showLead = true)
     {
         for (var i = 0; i < tiles.Count; i++)
         {
@@ -176,7 +185,7 @@ public sealed partial class HtmlRenderAdapter
             sb.Append(Charts.StatCard(
                 tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
                 extraClass: $"journey-card journey-{key} {showClass}",
-                journeyLabel: i == 0 ? label : null));
+                journeyLabel: showLead && i == 0 ? label : null));
         }
     }
 
@@ -192,20 +201,6 @@ public sealed partial class HtmlRenderAdapter
                 journeyLabel: i == 0 ? "Epics & Stories" : null));
         }
         AppendEpicStatusTile(sb, p, epicsModel, showClass, lead: tiles.Count == 0);
-    }
-
-    private void AppendExecutionJourney(
-        StringBuilder sb, IReadOnlyList<ProgressBarView> bars, IReadOnlyList<StatTile> tiles, string showClass)
-    {
-        for (var i = 0; i < tiles.Count; i++)
-        {
-            var tile = tiles[i];
-            sb.Append(Charts.StatCard(
-                tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
-                extraClass: $"journey-card journey-execution {showClass}",
-                journeyLabel: i == 0 ? "Execution" : null));
-        }
-        AppendOverallProgressTile(sb, bars, showClass, lead: tiles.Count == 0);
     }
 
     private void AppendFollowUpJourney(
@@ -239,7 +234,7 @@ public sealed partial class HtmlRenderAdapter
 
         // Ring carries progressbar semantics so assistive tech still gets the single completion value. [Story 1.4 AC #1]
         sb.Append($"<div class=\"tile-card-visual\" role=\"progressbar\" aria-valuenow=\"{pct}\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Overall progress: {pct}%\">\n");
-        sb.Append(Charts.Donut(segments, size: 72, ariaLabel: $"Overall progress: {pct}%", centerText: $"{pct}%"));
+        sb.Append(Charts.Donut(segments, size: 52, ariaLabel: $"Overall progress: {pct}%", centerText: $"{pct}%"));
         sb.Append("</div>\n");
         sb.Append("<div class=\"stat-label\">Overall progress</div>\n");
         sb.Append("</div>\n");
@@ -282,7 +277,7 @@ public sealed partial class HtmlRenderAdapter
             : "no epics yet";
 
         sb.Append("<div class=\"tile-card-visual\">\n");
-        sb.Append(Charts.Donut(segments, size: 72, ariaLabel: $"Epic status: {ariaParts}", centerText: centerText));
+        sb.Append(Charts.Donut(segments, size: 52, ariaLabel: $"Epic status: {ariaParts}", centerText: centerText));
         sb.Append("</div>\n");
         sb.Append("<div class=\"stat-label\">Epic status</div>\n");
         sb.Append("</div>\n");
@@ -326,9 +321,11 @@ public sealed partial class HtmlRenderAdapter
     private void AppendRequirementsPanel(StringBuilder sb, RequirementsModel? requirements, EpicsModel? epicsModel,
         ProjectCounts counts)
     {
-        if (requirements is null || !requirements.All.Any()) return;
+        // Gate on Everything so Design-only inventories still get the satisfaction rollup (ledger is over
+        // Everything). FR+NFR grid/flow stay gated on All. [Story 9.9 review]
+        if (requirements is null || !requirements.Everything.Any()) return;
 
-        var grid = Charts.RequirementStatusGrid(requirements.All.ToList(), prefix: string.Empty);
+        var hasFrNfr = requirements.All.Any();
 
         sb.Append("<div class=\"chart-panel req-panel wm-panel wm-show-requirements wm-show-track\">\n");
         if (epicsModel is not null)
@@ -338,16 +335,19 @@ public sealed partial class HtmlRenderAdapter
             sb.Append(StatusStyles.LegendKey());
             sb.Append("</h3>\n");
             sb.Append("<div class=\"req-panel-header-aside\">");
-            sb.Append(RenderRequirementsTabs());
+            if (hasFrNfr) sb.Append(RenderRequirementsTabs());
             sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a>");
             sb.Append("</div>\n</div>\n");
             AppendSatisfactionRollup(sb, counts.RequirementsOverall);
-            sb.Append("<div class=\"req-view req-view-flow\">");
-            sb.Append(Charts.RequirementFlow(requirements, epicsModel));
-            sb.Append("</div>\n");
-            sb.Append("<div class=\"req-view req-view-grid\">");
-            sb.Append(grid);
-            sb.Append("</div>\n");
+            if (hasFrNfr)
+            {
+                sb.Append("<div class=\"req-view req-view-flow\">");
+                sb.Append(Charts.RequirementFlow(requirements, epicsModel));
+                sb.Append("</div>\n");
+                sb.Append("<div class=\"req-view req-view-grid\">");
+                sb.Append(Charts.RequirementStatusGrid(requirements.All.ToList(), prefix: string.Empty));
+                sb.Append("</div>\n");
+            }
         }
         else
         {
@@ -356,7 +356,10 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("</h3>");
             sb.Append("<a class=\"view-epic-link\" href=\"requirements.html\">View Requirements &rarr;</a></div>\n");
             AppendSatisfactionRollup(sb, counts.RequirementsOverall);
-            sb.Append(grid);
+            if (hasFrNfr)
+            {
+                sb.Append(Charts.RequirementStatusGrid(requirements.All.ToList(), prefix: string.Empty));
+            }
         }
 
         sb.Append("</div>\n\n");

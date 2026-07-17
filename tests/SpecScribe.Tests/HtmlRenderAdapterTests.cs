@@ -475,6 +475,33 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
+    public void RenderDashboardBody_DesignOnly_ShowsSatisfactionRollup()
+    {
+        var requirements = new RequirementsModel
+        {
+            Functional = Array.Empty<RequirementInfo>(),
+            NonFunctional = Array.Empty<RequirementInfo>(),
+            Design = new[] { Req(RequirementKind.Design, 1, RequirementStatus.Planned) },
+        };
+        var view = DashboardViewBuilder.Build(
+            Nav(),
+            ProgressModel.Empty,
+            RequirementsEpics(),
+            requirements,
+            CommandCatalog.Empty,
+            WorkInventory.Empty,
+            sprint: null,
+            coverage: null);
+
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        Assert.Contains("satisfaction-rollup", body);
+        Assert.Contains("requirements.html#satisfaction", body);
+        Assert.DoesNotContain("req-status-grid", body);
+        Assert.DoesNotContain("req-flow-svg", body);
+    }
+
+    [Fact]
     public void RenderDashboardBody_NoRequirements_OmitsSatisfactionRollup()
     {
         var view = DashboardViewBuilder.Build(
@@ -896,11 +923,30 @@ public class HtmlRenderAdapterTests
         Assert.Contains("overall-progress-tile", body);
         Assert.Contains("stat-label\">Overall progress</div>", body);
         Assert.Contains("stat-label\">Epic status</div>", body);
-        // Direct changes rides with Execution (after Planned tasks, before Overall Progress).
+        // Direct changes rides with Execution in DOM order (after Planned, before Overall) but is
+        // Review-only — Overview/Track omit it so those stages stay a clean 2×5.
         var plannedAt = body.IndexOf("stat-label\">Planned tasks done</div>", StringComparison.Ordinal);
         var directAt = body.IndexOf("stat-label\">Direct changes</div>", StringComparison.Ordinal);
         var progressAt = body.IndexOf("overall-progress-tile", StringComparison.Ordinal);
         Assert.True(plannedAt >= 0 && directAt > plannedAt && progressAt > directAt);
+        var directCls = CardClassBefore(body, directAt);
+        Assert.Contains("wm-show-review", directCls);
+        Assert.DoesNotContain("wm-show-overview", directCls);
+        // Commits are Develop-only (not Overview) so Overview stays at 10 tiles.
+        var commitsAt = body.IndexOf("stat-label\">Commits</div>", StringComparison.Ordinal);
+        Assert.True(commitsAt >= 0);
+        var commitsCls = CardClassBefore(body, commitsAt);
+        Assert.Contains("wm-show-develop", commitsCls);
+        Assert.DoesNotContain("wm-show-overview", commitsCls);
+    }
+
+    private static string CardClassBefore(string body, int labelAt)
+    {
+        var classAt = body.LastIndexOf("class=\"stat-card", labelAt, StringComparison.Ordinal);
+        Assert.True(classAt >= 0 && classAt < labelAt);
+        var end = body.IndexOf('"', classAt + 7);
+        Assert.True(end > classAt);
+        return body[(classAt + 7)..end];
     }
 
     [Fact]

@@ -70,6 +70,7 @@ public class StylesheetTests
         // Story 9.9 satisfaction band / bracketed bar — token-routed only
         Assert.Contains(".satisfaction-band", css);
         Assert.Contains(".satisfaction-chips", css);
+        Assert.Contains("a.satisfaction-chip { cursor: pointer; }", css);
         Assert.Contains(".satisfaction-rollup", css);
         Assert.Contains(".satisfaction-note", css);
         Assert.Contains(".satisfaction-bracket .seg.active { background: var(--status-active); }", css);
@@ -317,6 +318,8 @@ public class StylesheetTests
         Assert.Contains(".work-mode-pill", css);
         Assert.Contains("#wm-track:checked ~ label[for=\"wm-track\"]", css);
         Assert.Contains("body:has(#wm-track:checked) .dashboard .wm-panel:not(.wm-show-track)", css);
+        Assert.Contains("grid-template-columns: repeat(5, minmax(0, 1fr))", css);
+        Assert.Contains("body:has(#wm-review:checked) .dashboard-tile-band", css);
         Assert.DoesNotContain(".work-mode-strip", css);
         Assert.DoesNotContain(".dashboard-stage-anchor", css);
         Assert.DoesNotContain("opacity: 0.48", css);

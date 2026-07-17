@@ -157,6 +157,15 @@ public sealed record FollowUpGeometry(
         foreach (var story in epic.Stories)
             if (string.Equals(story.Id, storyId, StringComparison.Ordinal))
                 return epic.Number;
+
+        // Story id known but not in the model (renumbered/removed) — still attribute to the
+        // epic encoded in the id when that epic exists, so deferred work doesn't fall into the
+        // unattributed Follow-ups slice. [Story 9.7 attribution follow-up]
+        var dot = storyId.IndexOf('.');
+        if (dot > 0
+            && int.TryParse(storyId.AsSpan(0, dot), out var epicNum)
+            && epics.Epics.Any(e => e.Number == epicNum))
+            return epicNum;
         return null;
     }
 

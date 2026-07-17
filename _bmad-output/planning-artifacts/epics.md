@@ -2008,6 +2008,26 @@ So that I do not draw wrong conclusions from artifacts of the data.
 **Then** the dead zone is annotated (for example "First commit Jul 4") or the window is trimmed
 **And** single-contributor files suppress or reword multi-contributor phrasing (for example "People to talk to").
 
+### Story 10.7: Sunburst Navigability at Project Scale
+
+As a maintainer scanning remaining work on a large project,
+I want the project and epic sunbursts to stay readable and drillable when dozens of stories and follow-ups share a ring,
+So that wedge density never becomes a wall of unreadable slices and I can still reach the item I care about.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a project sunburst whose story/follow-up ring has enough peers that individual wedges become hard to hit or read
+**When** it renders
+**Then** the chart offers a clear navigability path — for example progressive drill-down (project → epic → story/follow-up), a companion scannable list, focus/hover emphasis that survives keyboard, or an alternate density mode — rather than relying on ever-tinier SVG wedges alone
+**And** existing deep links (story pages, follow-up detail slugs) remain the destination of any wedge or list row that represents an item.
+
+2.
+**Given** an epic-scoped sunburst with a large attributed follow-up set
+**When** a maintainer opens that epic
+**Then** follow-ups remain attributable and reachable without collapsing into an opaque orange band
+**And** the solution degrades cleanly when follow-ups are absent (NFR8) and does not invent a new authoring schema.
+
 <!-- Epics 11–15 added 2026-07-10: per-framework coverage extracted from Epic 4 (Stories 4.3–4.7) into their own
      spike-led epics (append-only, no renumber). Each epic's Story X.1 is a Framework Integration Spike that scopes
      the mapping to Epic 4's shared adapter contract — classifying artifacts as mappable/partial/unsupported and

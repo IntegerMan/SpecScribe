@@ -3784,24 +3784,41 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 
 /* ====================== DASHBOARD TILE BAND ====================== */
-/* Homepage tiles share one flex-wrap panel (typically two dense rows of ~5). Journey identity is an accent
-   rail on each card plus a floating caption above the first card of a group — not separate cluster wrappers,
-   which would stack groups into uneven columns. Work-stage visibility classes live on the cards themselves. */
+/* Fixed 5-column grid (2 dense rows when 10 tiles show). Journey captions sit in a reserved top
+   padding slot on every card so a mid-band journey-lead cannot stagger the row. Work-stage
+   visibility classes live on the cards themselves — never cluster wrappers. [Story 9.8] */
 .dashboard-tile-band {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.35rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.85rem 0.75rem;
   align-items: stretch;
-  padding-top: 1.45rem;
-  margin-bottom: 1.5rem;
+  padding-top: 0;
+  margin-bottom: 1.25rem;
+}
+/* Review shows 8 tiles → 2×4 reads cleaner than a ragged 5+3. */
+body:has(#wm-review:checked) .dashboard-tile-band {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .dashboard-tile-band .stat-card,
 .dashboard-tile-band .tile-card {
-  flex: 1 1 calc(20% - 0.8rem);
-  min-width: 140px;
-  max-width: 220px;
+  min-width: 0;
+  max-width: none;
   margin-bottom: 0;
   box-sizing: border-box;
+  /* Top padding = caption slot (shared by every tile so rows stay level). */
+  padding: 1.2rem 0.7rem 0.6rem;
+}
+.dashboard-tile-band .stat-number {
+  font-size: 1.5rem;
+  line-height: 1.05;
+}
+.dashboard-tile-band .stat-label {
+  font-size: 0.66rem;
+  margin-top: 0.15rem;
+}
+.dashboard-tile-band .stat-sub {
+  font-size: 0.66rem;
+  margin-top: 0.12rem;
 }
 .journey-card.journey-requirements { border-left: 3px solid var(--rust-light); }
 .journey-card.journey-epics { border-left: 3px solid var(--moss-light); }
@@ -3810,15 +3827,14 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .journey-card.journey-insights { border-left: 3px solid var(--gold-light); }
 .journey-lead {
   position: relative;
-  margin-top: 0.15rem;
 }
 .journey-lead .tile-journey-label {
   position: absolute;
-  top: -1.15rem;
-  left: 0;
-  right: 0;
+  top: 0.22rem;
+  left: 0.7rem;
+  right: 0.7rem;
   margin: 0;
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-faded);
@@ -3829,7 +3845,37 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   pointer-events: none;
 }
 
-/* Donut tiles match Stories Defined language: visual centered above, label centered below. */
+/* Donut tiles: compact ring above label — same outer padding as text tiles. */
+.dashboard-tile-band .tile-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  text-align: center;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+.dashboard-tile-band .tile-card-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.dashboard-tile-band .tile-card-visual > svg,
+.dashboard-tile-band .tile-card > svg {
+  width: 52px;
+  height: 52px;
+  flex: none;
+}
+.dashboard-tile-band .tile-card .stat-label {
+  margin-top: 0.05rem;
+  width: 100%;
+}
+
+/* Shared tile-card chrome (also used outside the home band). */
 .tile-card {
   display: flex;
   flex-direction: column;
@@ -4064,8 +4110,8 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   align-items: center;
   gap: 0.35rem;
   text-decoration: none;
-  cursor: pointer;
 }
+a.satisfaction-chip { cursor: pointer; }
 a.satisfaction-chip:hover { filter: brightness(0.97); }
 .satisfaction-chip-word { font-weight: 600; }
 .satisfaction-chip-count {
@@ -4490,9 +4536,13 @@ body:has(main.req-detail) .doc-header {
   .doc-header h1 { font-size: 1.5rem; }
   .chart-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  /* Mobile: one tile per row so requirement-kind + journey tiles stay readable. [Story 9.2 review] */
+  /* Mobile: two tiles per row; Review keeps the same denser packing. [Story 9.2 / 9.8] */
+  .dashboard-tile-band,
+  body:has(#wm-review:checked) .dashboard-tile-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .dashboard-tile-band .stat-card,
-  .dashboard-tile-band .tile-card { max-width: none; flex-basis: 100%; }
+  .dashboard-tile-band .tile-card { max-width: none; }
 }
 
 /* ====================== ON-BRAND TOOLTIPS (Story 1.5 C1/C2) ======================

@@ -60,13 +60,12 @@ public static class RequirementsTemplater
         AppendSatisfactionBand(sb, sat, model);
 
         sb.Append("<section class=\"dashboard\">\n<div class=\"chart-row\">\n");
-        // Overall six-tier donut over Everything leads the row: it speaks the SAME six-tier vocabulary as the
-        // Sankey and the per-kind donuts (the four-reading band above is the exec rollup), and it fills the
-        // grid's fourth cell so Functional/Non-functional/Design round out to a 2×2 on desktop. [Story 9.9]
-        var everything = model.Everything.ToList();
-        if (everything.Count > 0 && (model.NonFunctional.Count > 0 || model.Design.Count > 0))
+        // Overall six-tier donut over Everything leads the row: same vocabulary as the Sankey / per-kind
+        // donuts; fills the 2×2 fourth cell. Segments read the ProjectCounts ledger (not a local recount).
+        // [Story 9.9 + review patch]
+        if (sat.Total > 0 && (model.NonFunctional.Count > 0 || model.Design.Count > 0))
         {
-            AppendStatusDonut(sb, "Overall", everything);
+            AppendSatisfactionDonut(sb, "Overall", sat);
         }
         AppendStatusDonut(sb, "Functional", model.Functional);
         // Non-functional / Design donuts absent (not empty) when the project has none — NFR8. [Story 9.2]
@@ -140,20 +139,23 @@ public static class RequirementsTemplater
     {
         if (sat.Total <= 0) return;
 
-        // Chip targets: FR/NFR detail → at-a-glance; deferred/unmapped → coverage when that section exists.
+        // Chip targets (review 2026-07-17): prefer #at-a-glance whenever FR+NFR exist; otherwise coverage
+        // (Design-only / NFR-only without FR glance) or the band itself. Never leave Satisfied/In-flight unlinked
+        // when the band is showing. [Story 9.9]
         var hasCoverage = model.NonFunctional.Count > 0 || model.Design.Count > 0;
-        var glanceHref = model.All.Any() ? "#at-a-glance" : null;
-        var coverageHref = hasCoverage ? "#nfr-uxdr-coverage" : glanceHref;
+        var detailHref = model.All.Any()
+            ? "#at-a-glance"
+            : hasCoverage ? "#nfr-uxdr-coverage" : "#satisfaction";
 
         sb.Append("<div class=\"section-divider\" id=\"satisfaction\">Satisfaction at a glance</div>\n");
         sb.Append("<section class=\"satisfaction-band chart-panel\" aria-label=\"Requirement satisfaction summary\">\n");
         sb.Append(Charts.RequirementSatisfactionBar(sat));
         sb.Append(Charts.RequirementSatisfactionChips(
             sat,
-            satisfiedHref: glanceHref,
-            inFlightHref: glanceHref,
-            deferredHref: coverageHref,
-            unmappedHref: coverageHref));
+            satisfiedHref: detailHref,
+            inFlightHref: detailHref,
+            deferredHref: detailHref,
+            unmappedHref: detailHref));
         // Names the rollup so the four readings read as a grouping of the six canonical tiers (which the bar's
         // In-flight bracket and the Overall donut below both show in full), not a parallel vocabulary. [Story 9.9]
         sb.Append("<p class=\"satisfaction-note\">A rollup of the six status tiers over all "
@@ -548,6 +550,31 @@ public static class RequirementsTemplater
         sb.Append("</div>\n</div>\n\n");
     }
 
+    /// <summary>Overall (or other ledger-backed) donut — six tiers from <see cref="ProjectCounts.RequirementSatisfaction"/>
+    /// so the donut cannot drift from the satisfaction band. [Story 9.9 review]</summary>
+    private static void AppendSatisfactionDonut(
+        StringBuilder sb, string label, ProjectCounts.RequirementSatisfaction sat)
+    {
+        var statusSegments = SatisfactionSegments(sat);
+        sb.Append("<div class=\"chart-panel\">\n");
+        sb.Append($"<h3>{PathUtil.Html(label)} ({sat.Total})</h3>\n<div class=\"donut-and-legend\">\n");
+        sb.Append(Charts.Donut(statusSegments, ariaLabel:
+            $"{label} requirements: {sat.Done} done, {sat.Active} partially implemented, {sat.Ready} ready for dev, "
+            + $"{sat.Planned} planned, {sat.Unmapped} not yet mapped, {sat.Deferred} deferred"));
+        sb.Append(Charts.DonutLegend(statusSegments));
+        sb.Append("</div>\n</div>\n\n");
+    }
+
+    private static (string, int, string)[] SatisfactionSegments(ProjectCounts.RequirementSatisfaction sat) =>
+    [
+        ("Done", sat.Done, "done"),
+        ("Partially implemented", sat.Active, "active"),
+        ("Ready for dev", sat.Ready, "ready"),
+        ("Planned", sat.Planned, "pending"),
+        ("Not yet mapped", sat.Unmapped, "pending"),
+        ("Deferred", sat.Deferred, "deferred"),
+    ];
+
     /// <summary>A clickable navigator card for one group: a compact status pie chart, the group name, and
     /// its requirement count, anchoring down to the group's section. Reuses the epic-mosaic card layout.</summary>
     private static void AppendGroupCard(StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs)
@@ -563,10 +590,8 @@ public static class RequirementsTemplater
     }
 
     private static (int Done, int Active, int Ready, int Planned, int Unmapped, int Deferred) StatusCounts(IReadOnlyList<RequirementInfo> reqs) => (
-        // Per-kind donut path keeps a local count: threading ProjectCounts through every AppendStatusDonut/
-        // AppendGroupCard call would contort the render for no shared-number benefit (donuts are already
-        // scoped to the list they render). Overall satisfaction reads the ledger (AppendSatisfactionBand).
-        // [Story 9.9 — documented half-migration]
+        // Per-kind / group-card donuts keep a local count (scoped to the list they render). The Overall
+        // donut and satisfaction band read the ProjectCounts ledger. [Story 9.9]
         reqs.Count(r => r.Status == RequirementStatus.Done),
         reqs.Count(r => r.Status == RequirementStatus.Active),
         reqs.Count(r => r.Status == RequirementStatus.Ready),

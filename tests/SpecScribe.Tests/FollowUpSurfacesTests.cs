@@ -250,12 +250,17 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("Recommended", html);
         Assert.Contains("next-step-desc", html);
         Assert.Contains("Copies a quick-dev prompt", html);
+        Assert.Contains("Close with AI", html);
+        Assert.Contains(">Close</span>", html); // secondary kicker
+        Assert.DoesNotContain("Draft a new story", html);
+        Assert.DoesNotContain("Open sprint planning", html);
         foreach (Match m in Regex.Matches(html, "data-copy=\"([^\"]*)\""))
         {
             Assert.DoesNotContain("<a", m.Groups[1].Value);
             Assert.Contains("Route Epic 1 debt before Story 2.1 planning", m.Groups[1].Value);
             Assert.Contains("/bmad-quick-dev", m.Groups[1].Value);
         }
+        Assert.Contains("data-copy=\"/bmad-quick-dev Close this retrospective action item", html);
     }
 
     [Fact]

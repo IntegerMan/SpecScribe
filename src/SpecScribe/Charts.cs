@@ -1912,7 +1912,8 @@ public static class Charts
         var label = $"{Icons.ForStatus(iconClass)}<span class=\"satisfaction-chip-word\">{Html(word)}</span>" +
                     $"<span class=\"satisfaction-chip-count\">{count}</span>";
         var cls = $"satisfaction-chip status-badge {cssClass} js-tip";
-        if (href is { Length: > 0 })
+        // Zero-count chips stay visible (four-reading row) but are not links. [Story 9.9 review]
+        if (href is { Length: > 0 } && count > 0)
         {
             sb.Append($"  <a class=\"{cls}\" href=\"{Html(href)}\" data-tip=\"{tipEsc}\" title=\"{tipEsc}\">{label}</a>\n");
         }

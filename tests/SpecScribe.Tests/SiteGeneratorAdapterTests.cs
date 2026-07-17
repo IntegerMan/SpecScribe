@@ -431,7 +431,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // aggregate "N open items" wedge with mismatched sizing). Golden fixture still has no follow-ups.
         // Regenerated for Story 9.11 Next Steps polish on follow-up detail pages (reuse story-page
         // chart-panel.next-steps cards; .followup-detail .next-steps spacing).
-        const string expected = "73fb5912870288e29363496905be4e021679528c87d04a2640ba8c6f204a85d3";
+        // Regenerated for Story 9.8 tile-band polish: 5-col CSS grid, compact tiles, curated Overview/Track
+        // 2×5 (Direct/Commits demoted off Overview), Review 2×4. [Story 9.8 grid; golden-diff-normalization-gotchas]
+        // Regenerated for Story 9.9 review patches: Overall donut from ProjectCounts ledger; chip hrefs prefer
+        // #at-a-glance when FR+NFR exist; Home panel gates on Everything; zero-count chips are non-links;
+        // a.satisfaction-chip cursor only. [Story 9.9 code review; golden-diff-normalization-gotchas]
+        const string expected = "88534c283119f6a9a0ed46c5802135673f12bd5bfc0d6992fd6183a90d456e20";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

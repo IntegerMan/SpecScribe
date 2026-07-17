@@ -87,13 +87,24 @@ public static class FollowUpRefs
         return html;
     }
 
-    /// <summary>Resolves a story id ("N.M") from a filename token like <c>8-8-slug.md</c>.</summary>
+    /// <summary>Resolves a story id ("N.M") from a filename or review-heading token —
+    /// <c>8-8-slug.md</c>, <c>story-3-8</c>, <c>story-3.8</c>, or bare <c>3.8</c>.</summary>
     public static string? StoryIdFromKey(string token)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
         var bare = token.Trim().Trim('`');
         if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
             bare = bare[..^3];
+        if (bare.StartsWith("story-", StringComparison.OrdinalIgnoreCase))
+            bare = bare[6..];
+
+        // "3.8" / leftover after stripping story-
+        var dotted = Regex.Match(bare, @"^(?<epic>\d+)\.(?<story>\d+)$");
+        if (dotted.Success
+            && int.TryParse(dotted.Groups["epic"].Value, out var de)
+            && int.TryParse(dotted.Groups["story"].Value, out var ds))
+            return $"{de}.{ds}";
+
         var m = Regex.Match(bare, @"^(?<epic>\d+)-(?<story>\d+)(?:-|$)", RegexOptions.IgnoreCase);
         if (!m.Success) return null;
         if (!int.TryParse(m.Groups["epic"].Value, out var epic) || !int.TryParse(m.Groups["story"].Value, out var story))

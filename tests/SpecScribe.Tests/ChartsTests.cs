@@ -440,6 +440,93 @@ public class ChartsTests
     }
 
     [Fact]
+    public void Sunburst_FollowUps_StoryHyphenProvenance_AttributesToEpic()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 3,
+                    Title = "Insight Surfaces",
+                    GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted,
+                    Section = EpicSection.FurtherDevelopment,
+                    Stories = new[] { Story("3.8", "Deep git insights", "done", 1, 1, epicNumber: 3) },
+                },
+            },
+        };
+        // Real deferred-work heading form — used to land in the unattributed Follow-ups slice.
+        var deferredMarkdown = """
+            ## Deferred from: code review of story-3-8 (2026-07-09)
+
+            - Commit body containing a literal 0x1F control char could truncate numstat rows.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        Assert.Equal("3.8", deferredModel.Groups[0].SourceStoryId);
+
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 1),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        Assert.Empty(geometry.UnattributedDeferredItems);
+        Assert.Single(geometry.DeferredForEpicNumber(3));
+
+        var svg = Charts.Sunburst(model, followUps: geometry);
+        Assert.Contains("1 follow-up", svg);
+        Assert.Contains("Deferred item: Commit body containing a literal 0x1F", svg);
+        Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
+    }
+
+    [Fact]
+    public void Sunburst_FollowUps_EpicFallback_WhenStoryMissingFromModel()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            // Epic 3 exists but story 3.8 was renumbered away — still attribute via the epic prefix.
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 3,
+                    Title = "Insight Surfaces",
+                    GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted,
+                    Section = EpicSection.FurtherDevelopment,
+                    Stories = new[] { Story("3.1", "Other", "done", 1, 1, epicNumber: 3) },
+                },
+            },
+        };
+        var deferredMarkdown = """
+            ## Deferred from: code review of story-3-8 (2026-07-09)
+
+            - Orphaned story provenance still belongs on Epic 3.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 1),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        Assert.Single(geometry.DeferredForEpicNumber(3));
+        Assert.Empty(geometry.UnattributedDeferredItems);
+    }
+
+    [Fact]
     public void Sunburst_FollowUps_OmittedWhenLedgerIsZero()
     {
         var model = new EpicsModel

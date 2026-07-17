@@ -4,7 +4,7 @@ baseline_commit: 8d9aac44fe721e35315cef0881cb04ba64b2ded9
 
 # Story 9.9: Requirement Satisfaction Status at a Glance
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -121,6 +121,18 @@ The four readings are a **semantic grouping over the six canonical `RequirementS
   - [x] `StatusStylesTests` / `StylesheetTests`: `LegendKey()` now includes a "Not yet mapped" row (pending swatch + unmapped icon + word); assert any new band/bar CSS classes exist and route color through tokens.
   - [x] Golden fingerprint **will move** (requirements.html + Home body) → regenerate the constant in `SiteGeneratorAdapterTests` (test `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`, ~:207; constant ~:398) per `golden-diff-normalization-gotchas`, from a clean full build (a `--no-build`/partial build produces a stale hash — see 9.1's debug log). Confirm the three parity suites green: `RenderParityTests`, `RenderSectionParityTests`, `RenderSpaParityTests`.
   - [x] Run the full suite from repo root: `dotnet test`.
+
+### Review Findings
+
+- [x] [Review][Decision] Overall donut vs create-story form lock — **Resolved: keep** Overall donut (owner 2026-07-17). Form deviation accepted; ledger-wire becomes a patch.
+- [x] [Review][Decision] Home ships full bar + chips vs compact rollup — **Resolved: keep** bar + chips on Home (owner 2026-07-17). Placement deviation accepted.
+- [x] [Review][Decision] Deferred/Unmapped chip deep-link prefers coverage over FR glance — **Resolved: prefer glance** when `model.All` non-empty; coverage only when FR+NFR empty (owner 2026-07-17). Becomes a patch.
+- [x] [Review][Patch] Wire Overall donut segments to `ProjectCounts` ledger (retire local recount for that donut) [`RequirementsTemplater.cs:69`]
+- [x] [Review][Patch] Deferred/Unmapped chips prefer `#at-a-glance` when `model.All` non-empty [`RequirementsTemplater.cs:145`]
+- [x] [Review][Patch] Design-only Home skips satisfaction rollup [`HtmlRenderAdapter.Dashboard.cs:324`]
+- [x] [Review][Patch] Design-only hub Satisfied/In-flight chips lose deep links [`RequirementsTemplater.cs:145`]
+- [x] [Review][Patch] Zero-count satisfaction chips still become links when hrefs are supplied [`Charts.cs:1906`]
+- [x] [Review][Patch] `.satisfaction-chip { cursor: pointer }` applies to non-link spans [`specscribe.css` ~4113]
 
 ## Dev Notes
 
@@ -259,3 +271,4 @@ Composer (Cursor agent)
 | 2026-07-16 | create-story — ready-for-dev. Owner locked: (1) requirements-hub-owned "Satisfaction at a glance" band spanning FR+NFR+UX-DR + compact Home rollup; (2) four-reading summary (Satisfied · In flight · Deferred on purpose · Unmapped) as one proportional stacked bar + count chips over the six canonical tiers (no parallel colors/words); (3) extend `ProjectCounts` ledger + retire local recount; (4) close the legend gap (add "Not yet mapped" row) and include UX-DR/Design in the holistic reading. Composes 9.1–9.3 + 8.2/8.3; absorbs none. |
 | 2026-07-16 | Implemented — satisfaction ledger + hub band + Home rollup + legend Unmapped row; status → review. |
 | 2026-07-16 | UI coherence pass — bracketed four-reading bar (In-flight keeps real tier colors), rollup caption, Overall 2×2 donut, Home rollup bar bridges the Sankey; golden regenerated; 1283 green. |
+| 2026-07-17 | Code review — keep Overall donut + Home bar+chips; Overall donut wired to ledger; chip hrefs prefer `#at-a-glance`; Design-only Home/hub gates fixed; zero-count chips non-links; CSS cursor on `a.satisfaction-chip` only; golden regenerated; 1308 green; status → done. |

@@ -291,6 +291,8 @@ public class RetroTests : IDisposable
         Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix Story 1.1 heatmap debt before Epic 2\"", detail);
         Assert.DoesNotContain("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix <a", detail);
         Assert.Contains("Copies a quick-dev prompt", detail);
+        Assert.Contains("Close with AI", detail);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Close this retrospective action item (Epic 1) in sprint-status.yaml", detail);
     }
 
     private static int CountOccurrences(string haystack, string needle)

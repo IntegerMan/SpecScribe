@@ -10,7 +10,15 @@ namespace SpecScribe;
 /// the active module doesn't expose is omitted rather than printed as a command that doesn't exist.</summary>
 public static class BmadCommands
 {
-    private sealed record Suggestion(string Command, string Description, string? DisplayLabel = null);
+    /// <param name="DisplayLabel">When set, the command badge shows this label while copying <see cref="Command"/>.</param>
+    /// <param name="Kicker">Optional non-primary kicker override (e.g. "Close" for follow-up close-out).</param>
+    /// <param name="Accent">Optional left-rail accent override (<c>review</c>/<c>active</c>/…).</param>
+    private sealed record Suggestion(
+        string Command,
+        string Description,
+        string? DisplayLabel = null,
+        string? Kicker = null,
+        string? Accent = null);
 
     /// <summary>A destination the command's "send elsewhere" menu can target. Cursor is the one IDE with a
     /// public "open with the prompt pre-filled" deeplink (it never auto-runs), so it gets a real link. Every
@@ -160,10 +168,11 @@ public static class BmadCommands
         {
             var s = suggestions[i];
             var isPrimary = i == 0;
-            var accent = AccentForCommand(s.Command);
+            var accent = s.Accent ?? AccentForCommand(s.Command);
+            var kicker = isPrimary ? "Recommended" : (s.Kicker ?? KickerForCommand(s.Command, isPrimary: false));
             var cardClass = isPrimary ? "next-step-card next-step-card-primary" : "next-step-card";
             sb.Append($"  <div class=\"{cardClass} {accent}\">\n");
-            sb.Append($"    <span class=\"next-step-kicker\">{PathUtil.Html(KickerForCommand(s.Command, isPrimary))}</span>\n");
+            sb.Append($"    <span class=\"next-step-kicker\">{PathUtil.Html(kicker)}</span>\n");
             var badge = s.DisplayLabel is { Length: > 0 } label
                 ? RenderLabeledCommand(label, s.Command)
                 : RenderCommandBadge(s.Command);
@@ -575,22 +584,23 @@ public static class BmadCommands
     {
         var suggestions = new List<Suggestion>();
         var quickDev = commands.Command("quick-dev");
-        if (quickDev is { Length: > 0 })
-        {
-            var epicNote = item.EpicNumber is { } e ? $" (Epic {e})" : string.Empty;
-            // RAW action text in the payload — never linkified (copy-payload corruption trap).
-            var prompt = $"{quickDev} Resolve this retrospective action item{epicNote}: {item.Action}";
-            suggestions.Add(new Suggestion(
-                prompt,
-                "Copies a quick-dev prompt with this action item's full text so AI can implement the fix.",
-                DisplayLabel: "Resolve with AI"));
-        }
+        if (quickDev is not { Length: > 0 }) return suggestions;
 
-        Add(suggestions, commands.Command("create-story"),
-            "Draft a new story from this follow-up so the work can be planned and tracked in the sprint.");
+        var epicNote = item.EpicNumber is { } e ? $" (Epic {e})" : string.Empty;
+        // RAW action text in payloads — never linkified (copy-payload corruption trap).
+        suggestions.Add(new Suggestion(
+            $"{quickDev} Resolve this retrospective action item{epicNote}: {item.Action}",
+            "Copies a quick-dev prompt with this action item's full text so AI can implement the fix.",
+            DisplayLabel: "Resolve with AI"));
 
-        Add(suggestions, commands.Command("sprint-status"),
-            "Open sprint planning to update status once this follow-up is underway or done.");
+        // Close-out: mark the sprint-status action item done — not draft/plan workflows that
+        // don't carry enough context to solve or settle this specific follow-up. [Story 9.11]
+        suggestions.Add(new Suggestion(
+            $"{quickDev} Close this retrospective action item{epicNote} in sprint-status.yaml (set its status to done). Only close it if the work is already complete or you just finished it: {item.Action}",
+            "Copies a prompt that asks AI to mark this action item done in sprint-status.yaml once the work is settled.",
+            DisplayLabel: "Close with AI",
+            Kicker: "Close",
+            Accent: "review"));
 
         return suggestions;
     }
@@ -599,24 +609,26 @@ public static class BmadCommands
     {
         var suggestions = new List<Suggestion>();
         var quickDev = commands.Command("quick-dev");
-        if (quickDev is { Length: > 0 })
-        {
-            var lead = FollowUpRow.SummarizeFromHtml(item.BodyHtml, maxChars: 200);
-            var body = string.IsNullOrWhiteSpace(lead)
-                ? PathUtil.StripHtmlTags(item.BodyHtml).Trim()
-                : lead;
-            var prompt = $"{quickDev} Address this deferred-work item: {body}";
-            suggestions.Add(new Suggestion(
-                prompt,
-                "Copies a quick-dev prompt with this deferred item's text so AI can pick up the parked work.",
-                DisplayLabel: "Address with AI"));
-        }
+        if (quickDev is not { Length: > 0 }) return suggestions;
 
-        Add(suggestions, commands.Command("create-story"),
-            "Draft a story that owns this deferred promise so it stops living only in the backlog note.");
+        var lead = FollowUpRow.SummarizeFromHtml(item.BodyHtml, maxChars: 200);
+        var body = string.IsNullOrWhiteSpace(lead)
+            ? PathUtil.StripHtmlTags(item.BodyHtml).Trim()
+            : lead;
 
-        Add(suggestions, commands.Command("sprint-status"),
-            "Check sprint status to see whether a resolving story is already tracked.");
+        suggestions.Add(new Suggestion(
+            $"{quickDev} Address this deferred-work item: {body}",
+            "Copies a quick-dev prompt with this deferred item's text so AI can pick up the parked work.",
+            DisplayLabel: "Address with AI"));
+
+        // Close-out: mark the deferred-work note item resolved — not draft/plan workflows that
+        // don't produce a usable fix for this specific parked item. [Story 9.11]
+        suggestions.Add(new Suggestion(
+            $"{quickDev} Close this deferred-work item in deferred-work.md (mark it RESOLVED, keep the audit trail). Only close it if the work is already complete or you just finished it: {body}",
+            "Copies a prompt that asks AI to mark this item RESOLVED in deferred-work.md once the work is settled.",
+            DisplayLabel: "Close with AI",
+            Kicker: "Close",
+            Accent: "review"));
 
         return suggestions;
     }
