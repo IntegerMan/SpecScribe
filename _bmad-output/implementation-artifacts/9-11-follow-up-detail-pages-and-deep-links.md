@@ -4,7 +4,7 @@ baseline_commit: 8d9aac44fe721e35315cef0881cb04ba64b2ded9
 
 # Story 9.11: Follow-Up Detail Pages and Deep Links
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -236,3 +236,16 @@ Composer (Auto)
 ### Change Log
 
 - 2026-07-17: Story 9.11 implemented — per-item `follow-ups/{slug}.html` detail pages, stable content-hash slugs, sunburst + list deep links, Resolve-with-AI on detail with raw `data-copy`; status → review.
+- 2026-07-17: Code review — 6 patches applied (skip ApplyReferenceLinks on deferred detail, prefix provenance/resolving hrefs, idempotent listHref prefix, reference-equal slug map + hash-prefix collision guard, open-only near-dupes, unstructured per-item pages); richer collision identity kept; status → done.
+
+### Review Findings
+
+- [x] [Review][Decision] Collision-hash identity includes Status/Owner/Resolved — **kept richer identity on purpose** (status/owner/Resolved distinguish same-text rows under collision).
+- [x] [Review][Patch] Unstructured deferred items get per-item detail pages — generate from unstructured list items (owner decision 2026-07-17) [`SiteGenerator.cs:WriteFollowUpDetails`]
+- [x] [Review][Patch] Deferred detail pages run ApplyReferenceLinks despite Address/Close data-copy payloads [`SiteGenerator.cs:2882`]
+- [x] [Review][Patch] Deferred detail provenance/resolving hrefs use deferred-work page depth (often "") and 404 from follow-ups/ [`FollowUpDetailTemplater.cs:141`]
+- [x] [Review][Patch] BuildDeferredSlots miss/unstructured fallback does linkPrefix + already-prefixed listHref [`FollowUpGeometry.cs:171`]
+- [x] [Review][Patch] Identical authored content still yields the same final slug and silently overwrites the detail file [`FollowUpSlug.cs:102`]
+- [x] [Review][Patch] WriteFollowUpDetails FindNearDuplicates uses open+done while the list page uses open only — cross-link teasers can disagree [`SiteGenerator.cs:2854`]
+- [x] [Review][Defer] Watch-mode GenerateOne does not refresh follow-ups/ (or WriteDeferredWork) — deferred, pre-existing incremental gap [`SiteGenerator.cs:364`]
+- [x] [Review][Defer] ExtractTopLevelListItems aborts the scan on an unclosed top-level li — deferred, pre-existing / rare malformed HTML [`FollowUpGeometry.cs:266`]

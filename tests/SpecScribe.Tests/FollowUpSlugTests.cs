@@ -75,6 +75,21 @@ public class FollowUpSlugTests
     }
 
     [Fact]
+    public void AssignActionSlugs_FullyIdenticalTwins_ShareStableSlug()
+    {
+        var twinA = new SprintActionItem("Exact duplicate action", "open", 1, "Dana");
+        var twinB = new SprintActionItem("Exact duplicate action", "open", 1, "Dana");
+
+        var slugs = FollowUpSlug.AssignActionSlugs(new[] { twinA, twinB });
+        Assert.Equal(slugs[twinA], slugs[twinB]);
+        Assert.StartsWith("action-exact-duplicate-action-", slugs[twinA]);
+
+        var reordered = FollowUpSlug.AssignActionSlugs(new[] { twinB, twinA });
+        Assert.Equal(slugs[twinA], reordered[twinA]);
+        Assert.Equal(slugs[twinB], reordered[twinB]);
+    }
+
+    [Fact]
     public void Kebabize_IsFilesystemAndUrlSafe_CapsWords()
     {
         var slug = FollowUpSlug.Kebabize("Hello, World!!! Foo Bar Baz Qux Quux Corge Grault Garply");

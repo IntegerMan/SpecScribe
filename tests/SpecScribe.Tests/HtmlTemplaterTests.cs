@@ -975,6 +975,50 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_QuickDev_EpicParentAndDeferredPanel_UnplannedFallback_Nfr8Omit()
+    {
+        var nav = SiteNav.Build(new[] { "implementation-artifacts/spec-x.md" }, "SpecScribe", hasAdrs: false);
+        var doc = Doc(
+            "implementation-artifacts/spec-tooltip.md",
+            "implementation-artifacts/spec-tooltip.html",
+            "Tooltip fix",
+            new Frontmatter { Route = "one-shot", Status = "done", Created = "2026-07-15" },
+            "<p>body</p>");
+
+        var slot = new FollowUpDeferredSlot(
+            new DeferredWorkItem("<p>Expose RequirementLinkifier.</p>", false, null, null),
+            "code review of spec-tooltip (2026-07-15)",
+            null,
+            "follow-ups/deferred-x.html",
+            "spec-tooltip");
+
+        var epicChrome = new HtmlTemplater.QuickDevPageChrome(
+            new[] { slot },
+            EpicNumber: 9,
+            EpicCrumbLabel: "9 · Follow-ups",
+            EpicHref: "epics/epic-9.html");
+        var epicHtml = HtmlTemplater.RenderPage(doc, nav, quickDev: epicChrome);
+        Assert.Contains(">Epics</a>", epicHtml);
+        Assert.Contains("epics/epic-9.html", epicHtml);
+        Assert.Contains("Follow-ups", epicHtml);
+        Assert.Contains("id=\"sec-deferred-from-artifact\"", epicHtml);
+        Assert.Contains("Expose RequirementLinkifier", epicHtml);
+        Assert.Contains("follow-ups/deferred-x.html", epicHtml);
+
+        var unplannedChrome = new HtmlTemplater.QuickDevPageChrome(
+            Array.Empty<FollowUpDeferredSlot>(),
+            UnplannedHref: FollowUpGroupPages.UnplannedPath);
+        var unplannedHtml = HtmlTemplater.RenderPage(doc, nav, quickDev: unplannedChrome);
+        Assert.Contains("Unplanned", unplannedHtml);
+        Assert.Contains(FollowUpGroupPages.UnplannedPath, unplannedHtml);
+        Assert.DoesNotContain("deferred-from-artifact", unplannedHtml);
+
+        var plain = HtmlTemplater.RenderPage(doc, nav);
+        Assert.DoesNotContain("deferred-from-artifact", plain);
+        Assert.DoesNotContain("Unplanned", plain);
+    }
+
+    [Fact]
     public void RenderEpicsIndex_EmptyModelEmitsCreateEpicsGuidanceWhenModuleExposesIt()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

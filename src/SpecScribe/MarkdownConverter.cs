@@ -176,6 +176,7 @@ public static class MarkdownConverter
                 Title = GetString(map, "title"),
                 Project = GetString(map, "project"),
                 Date = GetString(map, "date"),
+                Created = GetString(map, "created"),
                 Author = GetString(map, "author"),
                 Version = GetString(map, "version"),
                 Status = GetString(map, "status"),

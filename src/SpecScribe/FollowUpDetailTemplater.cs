@@ -97,8 +97,11 @@ public static class FollowUpDetailTemplater
         return sb.ToString();
     }
 
-    /// <summary>Renders a deferred-work item detail page. Safe to run through
-    /// <c>ApplyReferenceLinks</c> (no copy payload). [Story 9.11]</summary>
+    /// <summary>Renders a deferred-work item detail page. Address/Close Next Steps embed
+    /// <c>data-copy</c> — do <em>not</em> run through site-level <c>ApplyReferenceLinks</c>
+    /// (RequirementLinkifier would corrupt FR mentions inside the attribute). Parser hrefs are
+    /// output-root-relative (or deferred-work-page depth); re-prefix for <c>follow-ups/</c>.
+    /// [Story 9.11]</summary>
     public static string RenderDeferredPage(
         DeferredWorkItem item,
         string provenanceLabel,
@@ -138,8 +141,8 @@ public static class FollowUpDetailTemplater
         sb.Append("    <p>Deferred from: ");
         if (sourceStoryHref is { Length: > 0 })
         {
-            // Parser hrefs are relative to implementation-artifacts/; follow-ups/ is the same depth.
-            sb.Append($"<a href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(sourceStoryHref))}\">{PathUtil.Html(provenanceLabel)}</a>");
+            var href = FollowUpGeometry.ApplyLinkPrefix(prefix, sourceStoryHref);
+            sb.Append($"<a href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(href))}\">{PathUtil.Html(provenanceLabel)}</a>");
         }
         else
         {
@@ -150,7 +153,8 @@ public static class FollowUpDetailTemplater
         if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
         {
             var label = rr.Contains('.') && !rr.Contains('-') ? $"Story {rr}" : rr;
-            sb.Append($"  <a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(rh))}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
+            var href = FollowUpGeometry.ApplyLinkPrefix(prefix, rh);
+            sb.Append($"  <a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(href))}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
         }
         else if (item.ResolvingRef is { Length: > 0 } rr2)
         {

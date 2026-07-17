@@ -37,9 +37,25 @@ public static class DeferredWorkTemplater
 
         if (!model.IsStructured)
         {
-            sb.Append("<article class=\"doc-body deferred-work-fallback\">\n");
-            sb.Append(model.PlainBodyHtml ?? string.Empty);
-            sb.Append("</article>\n");
+            var unstructured = FollowUpGeometry.UnstructuredItems(model.PlainBodyHtml);
+            if (unstructured.Count == 0)
+            {
+                sb.Append("<article class=\"doc-body deferred-work-fallback\">\n");
+                sb.Append(model.PlainBodyHtml ?? string.Empty);
+                sb.Append("</article>\n");
+            }
+            else
+            {
+                // Per-item detail deep links even without ## Deferred from: headings (Story 9.11).
+                var pairs = unstructured.Select(i => (Item: i, ProvenanceLabel: "Deferred work")).ToList();
+                var detailSlugs = FollowUpSlug.AssignDeferredSlugs(pairs);
+                sb.Append("<section class=\"deferred-work-wrap\">\n");
+                sb.Append("  <ul class=\"followup-rows-list deferred-items-list\">\n");
+                foreach (var item in unstructured)
+                    RenderItem(sb, item, "Deferred work", prefix, detailSlugs);
+                sb.Append("  </ul>\n");
+                sb.Append("</section>\n");
+            }
         }
         else
         {

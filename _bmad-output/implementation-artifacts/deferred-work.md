@@ -2,6 +2,26 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-artifact-review-nav-and-deferred.md (2026-07-17)
+
+- source_spec: `spec-artifact-review-nav-and-deferred.md`
+  summary: Watch-mode `GenerateOne` rewrites quick-dev chrome but does not refresh story `DeferredFromThis` panels or regenerate `follow-ups/*` detail/group pages after deferred-work edits.
+  evidence: Blind Hunter + Edge Case Hunter — incremental family shared with prior watch gaps; full GenerateAll stays correct.
+- source_spec: `spec-artifact-review-nav-and-deferred.md`
+  summary: No SiteGenerator integration test asserts rewritten quick-dev breadcrumbs / story reverse panels on a full GenerateAll (unit coverage only).
+  evidence: Blind Hunter — live example still relies on manual regenerate check.
+- source_spec: `spec-artifact-review-nav-and-deferred.md`
+  summary: Stopping `ApplyReferenceLinks` on deferred detail pages (data-copy safety) also drops requirement/story linkification inside deferred body prose.
+  evidence: Blind Hunter — forward-path navigation regression risk; tests pin data-copy only.
+- source_spec: `spec-artifact-review-nav-and-deferred.md`
+  summary: Unstructured deferred items get per-item detail slugs and Unplanned membership without SourceKey reverse-index benefit.
+  evidence: Blind Hunter — expands Unplanned surface relative to earlier 9.12 structured-only reverse path.
+
+## Deferred from: code review of 9-11-follow-up-detail-pages-and-deep-links.md (2026-07-17)
+
+- Watch-mode `GenerateOne` does not call `WriteFollowUpDetails` / `WriteDeferredWork` (GenerateAll-only) — editing `deferred-work.md` in watch can leave sunburst/list deep links pointing at stale or missing `follow-ups/*.html` until a full generate. Same incremental family as prior watch gaps. [`SiteGenerator.cs:364`]
+- `ExtractTopLevelListItems` yields break on an unclosed top-level `<li>` so later siblings never become deferred slots. Rare malformed Markdig output; structured path is unaffected. [`FollowUpGeometry.cs:266`]
+
 ## Deferred from: code review of 9-8-authoring-and-delivery-workflow-coherence.md (2026-07-17)
 
 - ~~Accent/kicker slug heuristics (`AccentForCommand` / `KickerForCommand`) default unknown catalog slugs to accent `ready` and kicker "Also consider"; `sprint-status` painted `active`.~~ **RESOLVED 2026-07-17** (`spec-accent-kicker-slug-heuristics`): unknown slugs fail closed to accent `pending` + kicker "Also consider"; known families covered by unit tests; `sprint-status` accent stays `active`. [`BmadCommands.cs`]

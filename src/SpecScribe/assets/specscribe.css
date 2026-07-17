@@ -5468,9 +5468,24 @@ a.cmd-menu-toggle:hover { color: var(--rust); border-color: var(--gold-light); }
 }
 .sprint-flag:hover { color: var(--rust); border-color: var(--gold-light); }
 
-/* Open action items + deferred-work: scan-first follow-up rows (Story 9.10). */
+/* Follow-up list pages (action-items, deferred-work, group-*): one shared content column.
+   Group pages previously omitted max-width and stretched edge-to-edge on wide viewports. [Story 9.10 / 9.13] */
 .action-items-wrap,
-.deferred-work-wrap { max-width: 1040px; margin: 0 auto; }
+.deferred-work-wrap,
+.followup-group-wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2.5rem;
+}
+/* Keep the centered header on the same column edge as the list (matches follow-up detail). */
+body:has(.action-items-wrap) .doc-header,
+body:has(.deferred-work-wrap) .doc-header,
+body:has(.followup-group-wrap) .doc-header {
+  max-width: 1040px;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
 .followup-rows-list,
 .action-items-list,
 .deferred-items-list { list-style: none; margin: 0; padding: 0; }
@@ -5478,30 +5493,35 @@ a.cmd-menu-toggle:hover { color: var(--rust); border-color: var(--gold-light); }
 .followup-row {
   background: var(--warm-white); border: 1px solid var(--border);
   border-left: 3px solid var(--status-review); border-radius: 6px;
-  padding: 0.65rem 1rem; margin-bottom: 0.65rem;
+  padding: 0.7rem 1rem; margin-bottom: 0.55rem;
 }
 .followup-row.resolved {
   border-left-color: var(--status-done);
   opacity: 0.78;
 }
 .followup-row-scan {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 0.65rem;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem 0.85rem;
 }
 .followup-row-summary {
-  flex: 1 1 12rem; min-width: 0;
+  flex: 1 1 16rem; min-width: 0;
   color: var(--ink); font-size: 0.92rem; line-height: 1.45;
+  text-wrap: pretty;
+}
+.followup-row-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.55rem;
+  flex: 0 1 auto; margin-left: auto;
 }
 .followup-row-source { flex-shrink: 0; }
 .followup-row-primary {
   flex-shrink: 0; font-size: 0.78rem; color: var(--teal);
   text-decoration: none; border-bottom: 1px dotted var(--gold-light);
-  cursor: pointer; list-style: none;
+  cursor: pointer; list-style: none; white-space: nowrap;
 }
 a.followup-row-primary:hover { color: var(--rust); }
 
 /* Per-row disclosure — pure CSS, reuses dev-agent caret grammar (NFR5). */
-.followup-row-detail { margin-top: 0; }
-.followup-row-detail--primary { margin-left: auto; }
+.followup-row-detail { margin-top: 0.45rem; }
+.followup-row-detail--primary { margin-top: 0; }
 .followup-row-detail > summary,
 .followup-row-detail--primary > summary {
   cursor: pointer; list-style: none; font-size: 0.78rem;
@@ -5522,6 +5542,15 @@ a.followup-row-primary:hover { color: var(--rust); }
 .followup-row-detail-body > :first-child { margin-top: 0; }
 .followup-row-detail-body > :last-child { margin-bottom: 0; }
 .followup-detail-fulltext { margin-bottom: 0.5rem; }
+
+.followup-group-all {
+  margin: 1.5rem 0 0;
+  font-size: 0.92rem;
+}
+.followup-group-all a {
+  color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light);
+}
+.followup-group-all a:hover { color: var(--rust); }
 
 /* Follow-up detail pages — shared template for action + deferred items (Story 9.11). */
 main.followup-detail,

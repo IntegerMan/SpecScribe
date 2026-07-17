@@ -110,11 +110,11 @@ public sealed record UnplannedWorkGeometry(
         {
             if (slot.Item.Resolved) continue;
             if (slot.SourceKey is { Length: > 0 } key)
-                residualSourceKeys.Add(NormalizeSourceKey(key));
+                residualSourceKeys.Add(FollowUpGeometry.NormalizeSourceKey(key));
         }
 
         var quickDev = work.QuickDev
-            .Where(q => IsOpenQuickDev(q.Status) || residualSourceKeys.Contains(NormalizeSourceKey(Path.GetFileNameWithoutExtension(q.OutputPath))))
+            .Where(q => IsOpenQuickDev(q.Status) || residualSourceKeys.Contains(FollowUpGeometry.NormalizeSourceKey(Path.GetFileNameWithoutExtension(q.OutputPath))))
             .Select(q =>
             {
                 var epic = ResolveQuickDevEpic(q, epics, followUps);
@@ -132,16 +132,12 @@ public sealed record UnplannedWorkGeometry(
         return new UnplannedWorkGeometry(quickDev, deferred, DeferredListHref: null, linkPrefix);
     }
 
-    private static string NormalizeSourceKey(string key)
-    {
-        var bare = key.Trim().Trim('`');
-        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
-        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
-        return bare;
-    }
+    private static readonly Regex ProvenanceParen = new(
+        @"\(([^)]+)\)", RegexOptions.Compiled);
 
-    /// <summary>Best-effort epic attribution from existing text only — title, filename stem, optional
-    /// deferred note that names this <c>spec-*</c> and carries a source story. No new frontmatter.</summary>
+    /// <summary>Best-effort epic attribution: text heuristics first (title, filename, deferred cue that
+    /// names this <c>spec-*</c>); then unique timing from authored frontmatter date vs deferred
+    /// story-review dates under one epic. Multi-epic ties → null (leave Unplanned). No new schema.</summary>
     public static int? ResolveQuickDevEpic(
         QuickDevEntry entry,
         EpicsModel? epics,
@@ -175,21 +171,66 @@ public sealed record UnplannedWorkGeometry(
             && epicNumbers.Contains(en))
             return en;
 
-        // Optional: deferred item that names this spec file and already resolved a SourceStoryId → epic.
+        // Optional: deferred items that name this spec and already carry an epic — unique only (ties → null).
         if (followUps is not null)
         {
             var stem = Path.GetFileNameWithoutExtension(entry.OutputPath);
+            var cueHits = new HashSet<int>();
             foreach (var slot in followUps.DeferredItems)
             {
-                if (slot.EpicNumber is null) continue;
+                if (slot.EpicNumber is not { } epic) continue;
                 var body = PathUtil.StripHtmlTags(slot.Item.BodyHtml);
                 var provenance = slot.ProvenanceLabel;
                 if (ContainsSpecName(body, stem) || ContainsSpecName(provenance, stem))
-                    return slot.EpicNumber;
+                    cueHits.Add(epic);
             }
+            if (cueHits.Count == 1) return cueHits.First();
+            if (cueHits.Count > 1) return null;
+        }
+
+        // Last: unique same-day timing vs story-keyed deferred reviews — only when this quick-dev
+        // already has residual deferred naming it (avoids same-day coincidence false parents).
+        if (entry.AuthoredDate is { } authored && followUps is not null)
+        {
+            var stem = Path.GetFileNameWithoutExtension(entry.OutputPath);
+            var named = followUps.DeferredItems.Any(s =>
+                !string.IsNullOrWhiteSpace(s.SourceKey)
+                && string.Equals(
+                    FollowUpGeometry.NormalizeSourceKey(s.SourceKey),
+                    FollowUpGeometry.NormalizeSourceKey(stem),
+                    StringComparison.OrdinalIgnoreCase));
+            if (named)
+                return ResolveEpicByTiming(authored, followUps, epicNumbers);
         }
 
         return null;
+    }
+
+    /// <summary>When the quick-dev's authored day uniquely matches deferred story-review dates under
+    /// exactly one epic, attribute there. Two+ epics on that day → null (do not guess).</summary>
+    private static int? ResolveEpicByTiming(
+        DateOnly authored,
+        FollowUpGeometry followUps,
+        HashSet<int> epicNumbers)
+    {
+        var hits = new HashSet<int>();
+        foreach (var slot in followUps.DeferredItems)
+        {
+            if (slot.EpicNumber is not { } epic || !epicNumbers.Contains(epic)) continue;
+            // Story-keyed reviews only — timing cue is "reviews of stories under one epic".
+            if (slot.SourceKey is null || FollowUpRefs.StoryIdFromKey(slot.SourceKey) is null) continue;
+            if (!TryExtractProvenanceDate(slot.ProvenanceLabel, out var day)) continue;
+            if (day == authored) hits.Add(epic);
+        }
+
+        return hits.Count == 1 ? hits.First() : null;
+    }
+
+    private static bool TryExtractProvenanceDate(string provenanceLabel, out DateOnly day)
+    {
+        day = default;
+        var m = ProvenanceParen.Match(provenanceLabel);
+        return m.Success && PortalDates.TryParseDay(m.Groups[1].Value.Trim(), out day);
     }
 
     private static IEnumerable<string> CandidateTokens(QuickDevEntry entry)

@@ -283,6 +283,13 @@ public sealed record StoryPageView
     /// <summary>The prev/next sibling pager (adjacent stories in global epic→story order), rendered inline in the
     /// header. Defaults to <see cref="EntityPager.None"/> so non-generator constructions render no pager. [Prev/next navigation]</summary>
     public EntityPager Pager { get; init; } = EntityPager.None;
+
+    /// <summary>Deferred-work items whose provenance names this story (reverse index). Empty → panel omitted
+    /// (NFR8). [artifact-review-nav-and-deferred]</summary>
+    public IReadOnlyList<FollowUpDeferredSlot> DeferredFromThis { get; init; } = Array.Empty<FollowUpDeferredSlot>();
+
+    /// <summary>Fallback href for reverse-panel rows whose detail URL is missing (deferred-work list).</summary>
+    public string? DeferredListHref { get; init; }
 }
 
 /// <summary>The host-neutral SECTION view model for a STORY PLACEHOLDER page body (a story listed in epics.md

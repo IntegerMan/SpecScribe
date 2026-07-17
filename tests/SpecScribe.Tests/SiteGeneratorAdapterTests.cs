@@ -451,7 +451,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // already in tree plus Charts/GroupRootHref seam. [Story 9.13; golden-diff-normalization-gotchas]
         // Regenerated for Story 9.12 provenance follow-up: deferred SourceKey; code-review-of-spec/story
         // attaches to parent quick-dev / epic; aria "from …"; residual done parents. [Story 9.12]
-        const string expected = "9582c3779ab8c634ebe75d5c7080f0919a916d0929ee6d25c5ee7be52dbf2750";
+        // Regenerated for follow-up list column polish: .followup-group-wrap gains the shared 1040px
+        // content column (+ header alignment) so group pages no longer stretch edge-to-edge; row meta
+        // clustered in .followup-row-meta. [follow-up list UX]
+        const string expected = "691ae3dccc71529559b5fc889f51c8731778d98b0921685b7e4b000b40d4cb43";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

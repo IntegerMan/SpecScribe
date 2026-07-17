@@ -55,12 +55,16 @@ public static class FollowUpRow
         sb.Append($"  <li class=\"{rowClass}\">\n");
         sb.Append("    <div class=\"followup-row-scan\">\n");
         sb.Append($"      <span class=\"followup-row-summary\">{summaryHtml}</span>\n");
-        sb.Append($"      {StatusStyles.Badge(statusToken, statusLabel)}\n");
-        sb.Append($"      <span class=\"followup-row-source pill\">{sourceChipHtml}</span>\n");
+        // Meta cluster stays visually adjacent (status + source + primary) so wide viewports
+        // don't leave a scan gap between the title and its actions.
+        sb.Append("      <div class=\"followup-row-meta\">\n");
+        sb.Append($"        {StatusStyles.Badge(statusToken, statusLabel)}\n");
+        sb.Append($"        <span class=\"followup-row-source pill\">{sourceChipHtml}</span>\n");
 
         if (detailHref is { Length: > 0 })
         {
-            sb.Append($"      <a class=\"followup-row-primary\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(detailHref))}\">View detail &rarr;</a>\n");
+            sb.Append($"        <a class=\"followup-row-primary\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(detailHref))}\">View detail &rarr;</a>\n");
+            sb.Append("      </div>\n");
             sb.Append("    </div>\n");
             if (detailBodyHtml.Length > 0)
             {
@@ -70,16 +74,71 @@ public static class FollowUpRow
                 sb.Append("    </details>\n");
             }
         }
+        else if (detailBodyHtml.Length > 0)
+        {
+            sb.Append("        <details class=\"followup-row-detail followup-row-detail--primary\">\n");
+            sb.Append("          <summary class=\"followup-row-primary\">View detail</summary>\n");
+            sb.Append($"          <div class=\"followup-row-detail-body\">{detailBodyHtml}</div>\n");
+            sb.Append("        </details>\n");
+            sb.Append("      </div>\n");
+            sb.Append("    </div>\n");
+        }
         else
         {
-            sb.Append("      <details class=\"followup-row-detail followup-row-detail--primary\">\n");
-            sb.Append("        <summary class=\"followup-row-primary\">View detail</summary>\n");
-            sb.Append($"        <div class=\"followup-row-detail-body\">{detailBodyHtml}</div>\n");
-            sb.Append("      </details>\n");
+            // No detail href and no body — omit empty primary (I/O: list page / omit link).
+            sb.Append("      </div>\n");
             sb.Append("    </div>\n");
         }
 
         sb.Append("  </li>\n");
+    }
+
+    /// <summary>Reverse-index panel: deferred items that name this story / quick-dev via existing
+    /// provenance. Empty input → empty string (NFR8). Reuses the scan-first row grammar.
+    /// When a slot has no detail href, falls back to <paramref name="deferredListHref"/> when provided;
+    /// otherwise omits the primary link (never an empty disclosure). [artifact-review-nav]</summary>
+    public static string RenderDeferredFromArtifactPanel(
+        IReadOnlyList<FollowUpDeferredSlot> slots,
+        string heading = "Deferred from this artifact",
+        string? deferredListHref = null)
+    {
+        if (slots is null || slots.Count == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel deferred-from-artifact\" id=\"sec-deferred-from-artifact\">\n");
+        sb.Append($"<h3>{PathUtil.Html(heading)}</h3>\n");
+        sb.Append("<ul class=\"followup-rows-list\">\n");
+
+        var ordered = slots
+            .Select((slot, index) => (slot, index))
+            .OrderBy(t => t.slot.Item.Resolved ? 1 : 0)
+            .ThenBy(t => t.index)
+            .Select(t => t.slot);
+
+        foreach (var slot in ordered)
+        {
+            var summaryPlain = SummarizeFromHtml(slot.Item.BodyHtml);
+            var summaryHtml = PathUtil.Html(summaryPlain);
+            var (statusToken, statusLabel) = slot.Item.Resolved
+                ? ("done", "Resolved")
+                : (StatusStyles.ForSprint("open"), "Open");
+            var detailHref = !string.IsNullOrWhiteSpace(slot.DetailHref)
+                ? slot.DetailHref
+                : (!string.IsNullOrWhiteSpace(deferredListHref) ? deferredListHref : null);
+
+            Render(
+                sb,
+                summaryHtml,
+                statusToken,
+                statusLabel,
+                PathUtil.Html(slot.ProvenanceLabel),
+                detailBodyHtml: string.Empty,
+                resolved: slot.Item.Resolved,
+                detailHref: detailHref);
+        }
+
+        sb.Append("</ul>\n</div>\n");
+        return sb.ToString();
     }
 
     private static string TruncatePlainText(string text, int maxChars)

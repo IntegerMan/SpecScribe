@@ -187,11 +187,17 @@ public static class EpicsViewBuilder
         StoryChangeSurface changeSurface,
         CommandCatalog commands,
         string? epicRetroPath,
-        EntityPager? pager = null)
+        EntityPager? pager = null,
+        FollowUpGeometry? followUps = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"BuildStory called for story {story.Id} with no resolved artifact.");
         var prefix = Prefix(outputPath);
+        var geometry = followUps ?? FollowUpGeometry.Empty;
+        var deferred = geometry.DeferredForSource(story.Id, prefix);
+        var deferredListHref = geometry.DeferredHref is { Length: > 0 } dh
+            ? dh
+            : null;
 
         return new StoryPageView
         {
@@ -211,6 +217,8 @@ public static class EpicsViewBuilder
             RemainderHtml = remainderHtml,
             ChangeLogHtml = changeLogHtml,
             Pager = pager ?? EntityPager.None,
+            DeferredFromThis = deferred,
+            DeferredListHref = deferredListHref,
         };
     }
 

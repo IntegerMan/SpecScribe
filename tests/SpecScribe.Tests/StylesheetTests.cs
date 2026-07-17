@@ -678,6 +678,7 @@ public class StylesheetTests
         Assert.Contains(".followup-row", css);
         Assert.Contains(".followup-row.resolved", css);
         Assert.Contains(".followup-row-scan", css);
+        Assert.Contains(".followup-row-meta", css);
         Assert.Contains(".followup-row-detail", css);
         Assert.Contains(".followup-row-detail > summary::before", css);
         Assert.Contains("content: \"▸ \"", css);
@@ -686,10 +687,14 @@ public class StylesheetTests
         Assert.Contains("border-left-color: var(--status-done)", css);
         Assert.Contains("opacity: 0.78", css);
         Assert.Contains("deferred-resolved-mark", css);
+        // Shared content column — group pages must not stretch edge-to-edge.
+        Assert.Contains(".followup-group-wrap", css);
+        Assert.Contains(".action-items-wrap", css);
+        Assert.Contains(".deferred-work-wrap", css);
+        Assert.Contains("max-width: 1040px", css);
         // Group headings for action-items (Story 9.6 AC #2).
         Assert.Contains(".action-items-group", css);
         Assert.Contains(".action-item-cross", css);
-        Assert.Contains(".deferred-work-wrap", css);
     }
 
     // ---- Story 9.11: follow-up detail page --------------------------------

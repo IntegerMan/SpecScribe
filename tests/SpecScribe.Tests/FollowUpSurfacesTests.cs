@@ -264,6 +264,42 @@ public class FollowUpSurfacesTests : IDisposable
     }
 
     [Fact]
+    public void FollowUpDetailTemplater_DeferredPage_RawDataCopy_AndPrefixedProvenanceHref()
+    {
+        var item = new DeferredWorkItem(
+            "<p>Open FR25 casing mismatch still outstanding.</p>",
+            false,
+            "1.1",
+            "epics/story-1-1.html");
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["quick-dev"] = "/bmad-quick-dev",
+        });
+        var nav = new SiteNav
+        {
+            SiteTitle = "SpecScribe",
+            Items = Array.Empty<(string, string)>(),
+            QuickLinks = Array.Empty<(string, string, string)>(),
+        };
+        var html = FollowUpDetailTemplater.RenderDeferredPage(
+            item,
+            "code review of 1-1-foundation.md",
+            "epics/story-1-1.html",
+            "deferred-open-fr25-casing",
+            nav,
+            "implementation-artifacts/deferred-work.html",
+            commands);
+
+        Assert.Contains("href=\"../epics/story-1-1.html\"", html);
+        Assert.Contains("data-copy=", html);
+        foreach (Match m in Regex.Matches(html, "data-copy=\"([^\"]*)\""))
+        {
+            Assert.DoesNotContain("<a", m.Groups[1].Value);
+            Assert.Contains("FR25", m.Groups[1].Value);
+        }
+    }
+
+    [Fact]
     public void DeferredWork_StructuredCards_ResolvedTreatment_HomeCalloutSurvives()
     {
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), """
@@ -298,7 +334,7 @@ public class FollowUpSurfacesTests : IDisposable
     }
 
     [Fact]
-    public void DeferredWork_UnstructuredNote_FallsBackToPlainBody()
+    public void DeferredWork_UnstructuredNote_GetsPerItemRowsAndDetailPages()
     {
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), """
             last_updated: 2026-07-16T12:00:00-04:00
@@ -319,9 +355,41 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
         var html = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
+        Assert.DoesNotContain("deferred-work-fallback", html);
+        Assert.Contains("followup-row", html);
+        Assert.Contains("href=\"../follow-ups/deferred-", html);
+        Assert.Contains("Parked item A", html);
+
+        var followUpsDir = Path.Combine(Site, "follow-ups");
+        Assert.True(Directory.Exists(followUpsDir));
+        var deferredPages = Directory.GetFiles(followUpsDir, "deferred-*.html");
+        Assert.Equal(2, deferredPages.Length);
+        Assert.Contains(deferredPages, p => File.ReadAllText(p).Contains("Parked item A", StringComparison.Ordinal));
+        Assert.Contains(deferredPages, p => File.ReadAllText(p).Contains("Parked item B", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DeferredWork_UnstructuredProseOnly_FallsBackToPlainBody()
+    {
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), """
+            last_updated: 2026-07-16T12:00:00-04:00
+            development_status:
+              epic-1: done
+              1-1-foundation: done
+              epic-1-retrospective: optional
+            """);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), """
+            # Deferred Work
+
+            Just prose — no list items at all.
+            """);
+
+        Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
         Assert.Contains("deferred-work-fallback", html);
         Assert.DoesNotContain("followup-row", html);
-        Assert.Contains("Parked item A", html);
+        Assert.Contains("Just prose", html);
     }
 
     [Fact]

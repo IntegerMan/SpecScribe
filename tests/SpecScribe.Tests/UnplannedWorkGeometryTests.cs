@@ -266,4 +266,176 @@ public class UnplannedWorkGeometryTests
         var unplanned = UnplannedWorkGeometry.From(work, followUps, epics);
         Assert.False(unplanned.HasUnplanned);
     }
+
+    [Fact]
+    public void DeferredForSource_MatchesStoryIdAndSpecStem_Normalized()
+    {
+        var epics = OneEpic();
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-2-auth.md (2026-07-06)
+
+            - Story residual open.
+            - ~~Story residual resolved.~~
+
+            ## Deferred from: code review of spec-tooltip-fix.md (2026-07-07)
+
+            - Spec residual.
+
+            ## Deferred from: misc (2026-07-08)
+
+            - Unrelated park.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = new[]
+            {
+                new QuickDevEntry("Tooltip fix", "implementation-artifacts/spec-tooltip-fix.html", "done", "chore"),
+            },
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 2),
+        };
+        var followUps = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(),
+            ProjectCounts.Empty with { DeferredOpenItems = 2, DirectChanges = 1 },
+            work,
+            deferredModel: deferredModel,
+            epics: epics);
+
+        var byStory = followUps.DeferredForSource("1.2", linkPrefix: "../");
+        Assert.Equal(2, byStory.Count);
+        Assert.All(byStory, s => Assert.StartsWith("../", s.DetailHref, StringComparison.Ordinal));
+        Assert.Contains(byStory, s => !s.Item.Resolved);
+        Assert.Contains(byStory, s => s.Item.Resolved);
+
+        var bySpecMd = followUps.DeferredForSource("spec-tooltip-fix.md");
+        Assert.Single(bySpecMd);
+        Assert.Equal("spec-tooltip-fix", bySpecMd[0].SourceKey);
+
+        Assert.Empty(followUps.DeferredForSource("spec-no-such-thing"));
+        Assert.Empty(followUps.DeferredForSource(null));
+    }
+
+    [Fact]
+    public void ResolveQuickDevEpic_Timing_RequiresNamedResidual_ThenUniqueDayHitsEpic()
+    {
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1, Title = "One", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "1.2", EpicNumber = 1, Title = "A",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                        },
+                    },
+                },
+                new EpicInfo
+                {
+                    Number = 2, Title = "Two", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo
+                        {
+                            Id = "2.1", EpicNumber = 2, Title = "B",
+                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+                        },
+                    },
+                },
+            },
+        };
+
+        var orphan = new QuickDevEntry(
+            "No text cue", "spec-orphaned.html", "ready", null, new DateOnly(2026, 7, 10));
+
+        // Same-day story reviews alone must NOT parent an unrelated quick-dev.
+        var coincidenceMd = """
+            ## Deferred from: code review of 1-2-auth.md (2026-07-10)
+
+            - Only epic 1 that day.
+            """;
+        var coincidenceWork = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var coincidenceFollowUps = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(),
+            ProjectCounts.Empty with { DeferredOpenItems = 1 },
+            coincidenceWork,
+            deferredModel: DeferredWorkParser.Parse(coincidenceMd),
+            epics: epics);
+        Assert.Null(UnplannedWorkGeometry.ResolveQuickDevEpic(orphan, epics, coincidenceFollowUps));
+
+        // Tie across epics on that day — still null even with residual naming the quick-dev.
+        var tiedMd = """
+            ## Deferred from: code review of 1-2-auth.md (2026-07-10)
+
+            - Epic 1 review that day.
+
+            ## Deferred from: code review of 2-1-ship.md (2026-07-10)
+
+            - Epic 2 review that same day.
+
+            ## Deferred from: code review of spec-orphaned.md (2026-07-10)
+
+            - Residual naming the quick-dev.
+            """;
+        var tiedWork = new WorkInventory
+        {
+            QuickDev = new[] { orphan },
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 3),
+        };
+        var tiedFollowUps = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(),
+            ProjectCounts.Empty with { DeferredOpenItems = 3, DirectChanges = 1 },
+            tiedWork,
+            deferredModel: DeferredWorkParser.Parse(tiedMd),
+            epics: epics);
+        Assert.Null(UnplannedWorkGeometry.ResolveQuickDevEpic(orphan, epics, tiedFollowUps));
+
+        // Unique epic day + residual naming this quick-dev → attribute.
+        var uniqueMd = """
+            ## Deferred from: code review of 1-2-auth.md (2026-07-10)
+
+            - Only epic 1.
+
+            ## Deferred from: code review of spec-orphaned.md (2026-07-10)
+
+            - Residual naming the quick-dev.
+            """;
+        var uniqueWork = new WorkInventory
+        {
+            QuickDev = new[] { orphan },
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 2),
+        };
+        var uniqueFollowUps = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(),
+            ProjectCounts.Empty with { DeferredOpenItems = 2, DirectChanges = 1 },
+            uniqueWork,
+            deferredModel: DeferredWorkParser.Parse(uniqueMd),
+            epics: epics);
+        Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(orphan, epics, uniqueFollowUps));
+
+        // Authored date optional once residual already carries a unique epic (deferred cue).
+        var noDate = new QuickDevEntry("No text cue", "spec-orphaned.html", "ready", null);
+        Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(noDate, epics, uniqueFollowUps));
+    }
+
+    [Fact]
+    public void Frontmatter_AuthoredDay_PrefersCreatedOverDate_AndParsesIsoDateTime()
+    {
+        var fm = new Frontmatter { Created = "2026-07-17", Date = "2026-01-01" };
+        Assert.Equal(new DateOnly(2026, 7, 17), fm.AuthoredDay());
+        Assert.Equal(new DateOnly(2026, 7, 5), new Frontmatter { Created = "2026-07-05T00:00:00Z" }.AuthoredDay());
+        Assert.Null(Frontmatter.Empty.AuthoredDay());
+    }
 }

@@ -115,10 +115,11 @@ public static class EpicsTemplater
         SiteNav nav,
         CommandCatalog commands,
         string? epicRetroPath = null,
-        EntityPager? pager = null) =>
+        EntityPager? pager = null,
+        FollowUpGeometry? followUps = null) =>
         HtmlRenderAdapter.Shared.Render(BuildStoryPage(
             epic, story, artifactSourceRelativePath, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord,
-            tasks, reviewFindingsHtml, changeLogHtml, evidence, changeSurface, nav, commands, epicRetroPath, pager)).Content;
+            tasks, reviewFindingsHtml, changeLogHtml, evidence, changeSurface, nav, commands, epicRetroPath, pager, followUps)).Content;
 
     /// <summary>Builds a drafted story page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why
     /// the build/render split exists. [Story 6.4]</summary>
@@ -138,7 +139,8 @@ public static class EpicsTemplater
         SiteNav nav,
         CommandCatalog commands,
         string? epicRetroPath = null,
-        EntityPager? pager = null)
+        EntityPager? pager = null,
+        FollowUpGeometry? followUps = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"RenderStory called for story {story.Id} with no resolved artifact.");
@@ -155,7 +157,7 @@ public static class EpicsTemplater
 
         var view = EpicsViewBuilder.BuildStory(
             epic, story, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, pager);
+            reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, pager, followUps);
         var body = HtmlRenderAdapter.Shared.RenderStoryBody(view);
 
         // A story is a drill leaf (no children); it drills up to its epic page. Its status stage is the story
@@ -237,7 +239,7 @@ public static class EpicsTemplater
     }
 
     /// <summary>Breadcrumb label like "1 · World Rendering & Interac…" — the number alone told you nothing.</summary>
-    private static string EpicCrumbLabel(EpicInfo epic)
+    public static string EpicCrumbLabel(EpicInfo epic)
     {
         var title = PathUtil.StripHtmlTags(epic.Title);
         const int maxLength = 26;

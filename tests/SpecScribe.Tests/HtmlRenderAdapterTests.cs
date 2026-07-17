@@ -1085,6 +1085,29 @@ public class HtmlRenderAdapterTests
     };
 
     [Fact]
+    public void RenderStoryBody_DeferredFromThis_RendersPanelWithLinks_OmitsWhenEmpty()
+    {
+        var evidence = new StoryEvidence(1, 1, null, null, false);
+        var empty = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
+        Assert.DoesNotContain("deferred-from-artifact", empty);
+        Assert.DoesNotContain("sec-deferred-from-artifact", empty);
+
+        var slot = new FollowUpDeferredSlot(
+            new DeferredWorkItem("<p>Park the exposure.</p>", false, null, null),
+            "code review of 1-1-evidence.md (2026-07-09)",
+            EpicNumber: 1,
+            DetailHref: "../follow-ups/deferred-abc.html",
+            SourceKey: "1-1-evidence");
+        var with = StoryBodyView(evidence) with { DeferredFromThis = new[] { slot } };
+        var html = HtmlRenderAdapter.Shared.RenderStoryBody(with);
+        Assert.Contains("id=\"sec-deferred-from-artifact\"", html);
+        Assert.Contains("Deferred from this artifact", html);
+        Assert.Contains("Park the exposure", html);
+        Assert.Contains("href=\"../follow-ups/deferred-abc.html\"", html);
+        Assert.Contains("followup-row", html);
+    }
+
+    [Fact]
     public void RenderStoryBody_EvidenceStrip_PopulatedPillsAndChangeSurfacePanel()
     {
         var evidence = new StoryEvidence(5, 5, "586 passing tests", new DateOnly(2026, 7, 9), VerifiedIsReview: true);

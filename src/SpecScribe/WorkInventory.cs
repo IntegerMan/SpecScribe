@@ -2,8 +2,14 @@ namespace SpecScribe;
 
 /// <summary>One quick-dev / one-shot work item — an <c>implementation-artifacts/spec-*.md</c> file carrying
 /// frontmatter <c>route: one-shot</c>, the output of the <c>bmad-quick-dev</c> workflow. It has a generated
-/// standalone page (<see cref="OutputPath"/>) but is NOT part of the epic/story roll-up.</summary>
-public sealed record QuickDevEntry(string Title, string OutputPath, string? Status, string? Type);
+/// standalone page (<see cref="OutputPath"/>) but is NOT part of the epic/story roll-up.
+/// <see cref="AuthoredDate"/> is best-effort from existing <c>created</c>/<c>date</c> frontmatter only.</summary>
+public sealed record QuickDevEntry(
+    string Title,
+    string OutputPath,
+    string? Status,
+    string? Type,
+    DateOnly? AuthoredDate = null);
 
 /// <summary>The deferred-work note (<c>deferred-work.md</c>) with a count of open (not struck-through) items,
 /// so the home page can surface how much real-but-not-now work is parked.</summary>
@@ -51,7 +57,9 @@ public sealed class WorkInventory
             else if (fileName.StartsWith("spec-", StringComparison.OrdinalIgnoreCase)
                      && string.Equals(doc.Frontmatter.Route?.Trim(), "one-shot", StringComparison.OrdinalIgnoreCase))
             {
-                quickDev.Add(new QuickDevEntry(doc.Title, output, doc.Frontmatter.Status, doc.Frontmatter.Type));
+                quickDev.Add(new QuickDevEntry(
+                    doc.Title, output, doc.Frontmatter.Status, doc.Frontmatter.Type,
+                    doc.Frontmatter.AuthoredDay()));
             }
         }
 

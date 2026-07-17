@@ -365,6 +365,7 @@ public sealed class SiteGenerator
             WriteDeferredWork(nav, workInventory);
             WriteFollowUpDetails(nav, workInventory);
             WriteFollowUpGroupPages(nav, workInventory);
+            RewriteQuickDevPages(nav, workInventory);
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav, workInventory);
@@ -397,7 +398,9 @@ public sealed class SiteGenerator
             var nav = _nav ?? BuildNav(Array.Empty<string>());
             var ev = GenerateOneInternal(sourceFullPath, nav);
             RefreshCoverage();
-            WriteIndex(nav);
+            var inventory = WorkInventory.Build(_docs.Values.ToList());
+            RewriteQuickDevPages(nav, inventory);
+            WriteIndex(nav, inventory);
             // Keep the opt-in SPA form in sync in watch mode: _spaCapture already holds the fresh page (captured by
             // GenerateOneInternal's WriteOutput), so re-emitting rebuilds the manifest/chunks from current state.
             if (_options.EmitSpa) EmitSpaSite(nav);
@@ -675,6 +678,7 @@ public sealed class SiteGenerator
                         Title = parsed.Frontmatter.Title,
                         Project = parsed.Frontmatter.Project,
                         Date = parsed.Frontmatter.Date,
+                        Created = parsed.Frontmatter.Created,
                         Author = parsed.Frontmatter.Author,
                         Version = parsed.Frontmatter.Version,
                         Status = tolerantStatus,
@@ -1918,7 +1922,7 @@ public sealed class SiteGenerator
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                     var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps);
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
@@ -2111,7 +2115,7 @@ public sealed class SiteGenerator
                             storyPage = EpicsTemplater.BuildStoryPage(
                                 epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                                 f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                                _module.Commands, epicRetroPath, StoryPager(model, story));
+                                _module.Commands, epicRetroPath, StoryPager(model, story), followUps);
                         }
                         surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
 
@@ -2357,7 +2361,7 @@ public sealed class SiteGenerator
                         EpicsTemplater.BuildStoryPage(
                             epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                             f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                            _module.Commands, epicRetroPath, StoryPager(model, story)),
+                            _module.Commands, epicRetroPath, StoryPager(model, story), followUps),
                         skipStoryId: story.Id);
                 }
             }
@@ -2828,21 +2832,89 @@ public sealed class SiteGenerator
         }
     }
 
+    /// <summary>Re-renders quick-dev (<c>route: one-shot</c>) doc pages with parent breadcrumb + reverse
+    /// deferred panel once follow-up geometry is known. Runs after group pages so Unplanned hrefs exist when
+    /// membership is non-empty. [artifact-review-nav-and-deferred]</summary>
+    private void RewriteQuickDevPages(SiteNav nav, WorkInventory work)
+    {
+        var counts = _counts ?? ProjectCounts.Build(
+            _progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
+        var deferredModel = TryParseDeferredWork(work);
+        var followUps = BuildFollowUpGeometry(work, counts, deferredModel);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
+
+        foreach (var doc in _docs.Values)
+        {
+            var chrome = BuildQuickDevChrome(doc, followUps, unplanned, _epicsModel);
+            if (chrome is null) continue;
+            var outputRelative = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
+            WriteOutput(outputRelative, ApplyReferenceLinks(
+                HtmlTemplater.RenderPage(doc, nav, quickDev: chrome), outputRelative));
+        }
+    }
+
+    /// <summary>Builds optional chrome for a quick-dev doc page, or null for ordinary docs.</summary>
+    private static HtmlTemplater.QuickDevPageChrome? BuildQuickDevChrome(
+        DocModel doc,
+        FollowUpGeometry followUps,
+        UnplannedWorkGeometry unplanned,
+        EpicsModel? epics)
+    {
+        var norm = PathUtil.NormalizeSlashes(doc.SourceRelativePath);
+        if (!BmadArtifactAdapter.IsUnderImplementationArtifacts(norm)) return null;
+        var slash = norm.LastIndexOf('/');
+        var fileName = slash >= 0 ? norm[(slash + 1)..] : norm;
+        if (!fileName.StartsWith("spec-", StringComparison.OrdinalIgnoreCase)) return null;
+        if (!string.Equals(doc.Frontmatter.Route?.Trim(), "one-shot", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var output = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
+        var prefix = PathUtil.RelativePrefix(output);
+        var stem = Path.GetFileNameWithoutExtension(output);
+        var deferred = followUps.DeferredForSource(stem, prefix);
+
+        var entry = new QuickDevEntry(
+            doc.Title, output, doc.Frontmatter.Status, doc.Frontmatter.Type, doc.Frontmatter.AuthoredDay());
+        var epicNum = UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, followUps);
+
+        var deferredListHref = followUps.DeferredHref is { Length: > 0 } dh
+            ? FollowUpGeometry.ApplyLinkPrefix(prefix, dh)
+            : null;
+
+        if (epicNum is { } en && epics is not null)
+        {
+            var epic = epics.Epics.FirstOrDefault(e => e.Number == en);
+            if (epic is not null)
+            {
+                return new HtmlTemplater.QuickDevPageChrome(
+                    deferred,
+                    EpicNumber: en,
+                    EpicCrumbLabel: EpicsTemplater.EpicCrumbLabel(epic),
+                    EpicHref: $"epics/epic-{en}.html",
+                    DeferredListHref: deferredListHref);
+            }
+        }
+
+        string? unplannedHref = null;
+        if (unplanned.HasUnplanned)
+            unplannedHref = FollowUpGroupPages.UnplannedPath;
+
+        return new HtmlTemplater.QuickDevPageChrome(
+            deferred, UnplannedHref: unplannedHref, DeferredListHref: deferredListHref);
+    }
+
     /// <summary>Writes one detail page per action item and deferred-work item under
     /// <c>follow-ups/{slug}.html</c>, mirroring <see cref="WriteRequirements"/>. Rides
-    /// <see cref="WriteOutput"/> so SPA/webview capture picks them up. Action-item pages are NOT
-    /// run through <see cref="ApplyReferenceLinks"/> (copy-payload trap); deferred pages are.
-    /// NFR8: no items → no folder. [Story 9.11]</summary>
+    /// <see cref="WriteOutput"/> so SPA/webview capture picks them up. Neither action nor deferred
+    /// detail pages run through <see cref="ApplyReferenceLinks"/> (both embed Resolve/Address
+    /// <c>data-copy</c>). Structured and unstructured deferred list items both get pages. NFR8:
+    /// no items → no folder. [Story 9.11]</summary>
     private void WriteFollowUpDetails(SiteNav nav, WorkInventory? work = null)
     {
         var actionItems = _sprint?.ActionItems ?? Array.Empty<SprintActionItem>();
         var inventory = work ?? WorkInventory.Build(_docs.Values.ToList());
         var deferredModel = TryParseDeferredWork(inventory);
-        var deferredPairs = deferredModel is { IsStructured: true }
-            ? deferredModel.Groups
-                .SelectMany(g => g.Items.Select(i => (Item: i, ProvenanceLabel: g.ProvenanceLabel, Group: g)))
-                .ToList()
-            : new List<(DeferredWorkItem Item, string ProvenanceLabel, DeferredWorkGroup Group)>();
+        var deferredPairs = CollectDeferredDetailPairs(deferredModel);
 
         if (actionItems.Count == 0 && deferredPairs.Count == 0) return;
 
@@ -2851,8 +2923,10 @@ public sealed class SiteGenerator
 
         var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
         var deferredHref = inventory.Deferred?.OutputPath;
-        var crossLinks = actionItems.Count > 0
-            ? ActionItemsTemplater.FindNearDuplicates(actionItems)
+        // Match the list page: near-dupe cross-links only among open items.
+        var openForCrossLinks = actionItems.Where(a => !FollowUpGeometry.IsDone(a)).ToList();
+        var crossLinks = openForCrossLinks.Count > 0
+            ? ActionItemsTemplater.FindNearDuplicates(openForCrossLinks)
             : new Dictionary<SprintActionItem, int>();
         var actionSlugs = FollowUpSlug.AssignActionSlugs(actionItems);
 
@@ -2867,21 +2941,39 @@ public sealed class SiteGenerator
             WriteOutput(outputRelative, html);
         }
 
-        if (deferredPairs.Count > 0 && deferredModel is not null)
+        if (deferredPairs.Count > 0)
         {
             var deferredSlugs = FollowUpSlug.AssignDeferredSlugs(
                 deferredPairs.Select(p => (p.Item, p.ProvenanceLabel)).ToList());
             var listPath = inventory.Deferred?.OutputPath ?? "deferred-work.html";
 
-            foreach (var (item, provenanceLabel, group) in deferredPairs)
+            foreach (var (item, provenanceLabel, sourceHref) in deferredPairs)
             {
                 if (!deferredSlugs.TryGetValue(item, out var slug)) continue;
                 var outputRelative = FollowUpSlug.OutputPath(slug);
                 var html = FollowUpDetailTemplater.RenderDeferredPage(
-                    item, provenanceLabel, group.SourceStoryHref, slug, nav, listPath, _module.Commands);
-                WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
+                    item, provenanceLabel, sourceHref, slug, nav, listPath, _module.Commands);
+                // No ApplyReferenceLinks — Address/Close data-copy must stay raw.
+                WriteOutput(outputRelative, html);
             }
         }
+    }
+
+    /// <summary>Structured group items, or unstructured top-level list items when the note has no
+    /// Deferred-from headings. [Story 9.11]</summary>
+    private static List<(DeferredWorkItem Item, string ProvenanceLabel, string? SourceStoryHref)> CollectDeferredDetailPairs(
+        DeferredWorkModel? deferredModel)
+    {
+        if (deferredModel is { IsStructured: true })
+        {
+            return deferredModel.Groups
+                .SelectMany(g => g.Items.Select(i => (Item: i, ProvenanceLabel: g.ProvenanceLabel, SourceStoryHref: g.SourceStoryHref)))
+                .ToList();
+        }
+
+        return FollowUpGeometry.UnstructuredItems(deferredModel?.PlainBodyHtml)
+            .Select(i => (Item: i, ProvenanceLabel: "Deferred work", SourceStoryHref: (string?)null))
+            .ToList();
     }
 
     /// <summary>Ledger-backed follow-up geometry with per-item deferred attribution when the deferred-work
@@ -2946,7 +3038,9 @@ public sealed class SiteGenerator
                 var doc = MarkdownConverter.Convert(file, relative, outputRelative);
                 if (!string.Equals(doc.Frontmatter.Route?.Trim(), "one-shot", StringComparison.OrdinalIgnoreCase))
                     continue;
-                list.Add(new QuickDevEntry(doc.Title, PathUtil.NormalizeSlashes(outputRelative), doc.Frontmatter.Status, doc.Frontmatter.Type));
+                list.Add(new QuickDevEntry(
+                    doc.Title, PathUtil.NormalizeSlashes(outputRelative), doc.Frontmatter.Status, doc.Frontmatter.Type,
+                    doc.Frontmatter.AuthoredDay()));
             }
             catch (IOException) { /* NFR2 */ }
             catch (UnauthorizedAccessException) { /* NFR2 */ }

@@ -539,6 +539,14 @@ public sealed partial class HtmlRenderAdapter
             main.Append("</table>\n</details>\n");
             toc.Add(new Toc.Entry(2, "Dev Agent Record", "sec-dev-agent-record"));
         }
+
+        var deferredPanel = FollowUpRow.RenderDeferredFromArtifactPanel(
+            view.DeferredFromThis, deferredListHref: view.DeferredListHref);
+        if (deferredPanel.Length > 0)
+        {
+            main.Append(deferredPanel);
+            toc.Add(new Toc.Entry(2, "Deferred from this artifact", "sec-deferred-from-artifact"));
+        }
         main.Append("</section>\n\n");
 
         if (view.ReviewFindingsHtml.Length > 0)

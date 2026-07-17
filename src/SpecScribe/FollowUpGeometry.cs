@@ -88,6 +88,9 @@ public sealed record FollowUpGeometry(
             : null;
 
         var deferredSlots = BuildDeferredSlots(deferredModel, epics, work, linkPrefix, deferredHref);
+        // Second pass: quick-dev-sourced slots inherit epic from ResolveQuickDevEpic with the
+        // completed slot set (timing + deferred cues need DeferredItems). Keeps chrome ↔ sunburst coherent.
+        deferredSlots = EnrichQuickDevDeferredEpics(deferredSlots, epics, work);
 
         return new FollowUpGeometry(
             actionItems,
@@ -142,6 +145,53 @@ public sealed record FollowUpGeometry(
     public IReadOnlyList<FollowUpDeferredSlot> UnattributedDeferredItems =>
         DeferredItems.Where(s => s.EpicNumber is null).ToList();
 
+    /// <summary>Normalizes a provenance / filename key the same way deferred <c>SourceKey</c> and
+    /// Unplanned membership do — strip <c>.md</c>/<c>.html</c>, trim backticks, ordinal-ignore-case stems.
+    /// Null/whitespace → empty string (never throws).</summary>
+    public static string NormalizeSourceKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return string.Empty;
+        var bare = key.Trim().Trim('`');
+        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
+        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+        return bare;
+    }
+
+    /// <summary>Reverse index: deferred slots whose <see cref="FollowUpDeferredSlot.SourceKey"/> names
+    /// <paramref name="sourceKeyOrStoryId"/> (spec stem, <c>N-M-slug</c>, or story id <c>N.M</c>).
+    /// Re-prefixes detail hrefs for the calling page depth. Empty when unstructured or no match (NFR8).
+    /// Never throws. [artifact-review-nav-and-deferred]</summary>
+    public IReadOnlyList<FollowUpDeferredSlot> DeferredForSource(string? sourceKeyOrStoryId, string linkPrefix = "")
+    {
+        if (string.IsNullOrWhiteSpace(sourceKeyOrStoryId)) return Array.Empty<FollowUpDeferredSlot>();
+        var needle = NormalizeSourceKey(sourceKeyOrStoryId);
+        if (needle.Length == 0) return Array.Empty<FollowUpDeferredSlot>();
+
+        var needleStoryId = FollowUpRefs.StoryIdFromKey(needle);
+
+        var matches = DeferredItems
+            .Where(s => SourceKeyMatches(s.SourceKey, needle, needleStoryId))
+            .Select(s => s with { DetailHref = ApplyLinkPrefix(linkPrefix, s.DetailHref) })
+            .ToList();
+        return matches;
+    }
+
+    private static bool SourceKeyMatches(string? sourceKey, string needle, string? needleStoryId)
+    {
+        if (string.IsNullOrWhiteSpace(sourceKey)) return false;
+        var key = NormalizeSourceKey(sourceKey);
+        if (key.Length == 0) return false;
+        if (string.Equals(key, needle, StringComparison.OrdinalIgnoreCase)) return true;
+
+        if (needleStoryId is { Length: > 0 })
+        {
+            var fromKey = FollowUpRefs.StoryIdFromKey(key);
+            if (string.Equals(fromKey, needleStoryId, StringComparison.Ordinal)) return true;
+        }
+
+        return false;
+    }
+
     private static IReadOnlyList<FollowUpDeferredSlot> BuildDeferredSlots(
         DeferredWorkModel? model,
         EpicsModel? epics,
@@ -166,9 +216,10 @@ public sealed record FollowUpGeometry(
                 var sourceKey = p.Group.SourceKey;
                 var epic = ResolveEpicNumber(epics, p.Group.SourceStoryId)
                     ?? ResolveEpicFromSourceKey(epics, work, sourceKey);
+                // listHref is already link-prefixed when non-null — ApplyLinkPrefix is idempotent.
                 var href = slugs.TryGetValue(p.Item, out var slug)
                     ? linkPrefix + FollowUpSlug.OutputPath(slug)
-                    : linkPrefix + listHref;
+                    : ApplyLinkPrefix(linkPrefix, listHref);
                 var sourceHref = p.Group.SourceStoryHref is { Length: > 0 } sh
                     ? FollowUpGeometry.ApplyLinkPrefix(linkPrefix, sh)
                     : ResolveSourceHref(work, sourceKey, linkPrefix);
@@ -176,21 +227,33 @@ public sealed record FollowUpGeometry(
             }).ToList();
         }
 
-        var body = model?.PlainBodyHtml;
-        if (string.IsNullOrWhiteSpace(body)) return Array.Empty<FollowUpDeferredSlot>();
+        var unstructured = UnstructuredItems(model?.PlainBodyHtml);
+        if (unstructured.Count == 0) return Array.Empty<FollowUpDeferredSlot>();
 
-        return ExtractTopLevelListItems(body)
-            .Select(t =>
-            {
-                var item = new DeferredWorkItem(t.BodyHtml, t.Resolved, null, null);
-                return new FollowUpDeferredSlot(item, "Deferred work", null, linkPrefix + listHref);
-            })
+        var unstructuredSlugs = FollowUpSlug.AssignDeferredSlugs(
+            unstructured.Select(i => (i, "Deferred work")).ToList());
+        return unstructured.Select(item =>
+        {
+            var href = unstructuredSlugs.TryGetValue(item, out var slug)
+                ? linkPrefix + FollowUpSlug.OutputPath(slug)
+                : ApplyLinkPrefix(linkPrefix, listHref);
+            return new FollowUpDeferredSlot(item, "Deferred work", null, href);
+        }).ToList();
+    }
+
+    /// <summary>Top-level list items from an unstructured deferred-work HTML body.
+    /// Empty when the body has no parseable <c>&lt;li&gt;</c>s. [Story 9.11]</summary>
+    public static IReadOnlyList<DeferredWorkItem> UnstructuredItems(string? bodyHtml)
+    {
+        if (string.IsNullOrWhiteSpace(bodyHtml)) return Array.Empty<DeferredWorkItem>();
+        return ExtractTopLevelListItems(bodyHtml)
+            .Select(t => new DeferredWorkItem(t.BodyHtml, t.Resolved, null, null))
             .ToList();
     }
 
     /// <summary>When the deferred heading names a story key or a quick-dev <c>spec-*</c>, attribute to that
-    /// epic (story → epic directly; quick-dev → inherit the quick-dev's best-effort epic). Code-review
-    /// deferred must not fall into Unplanned as orphans of their parent work. [Story 9.12]</summary>
+    /// epic (story → epic directly; quick-dev → text-only inherit on first pass). Timing/cue enrichment
+    /// runs in <see cref="EnrichQuickDevDeferredEpics"/> once DeferredItems exist. [Story 9.12]</summary>
     private static int? ResolveEpicFromSourceKey(EpicsModel? epics, WorkInventory work, string? sourceKey)
     {
         if (epics is null || string.IsNullOrWhiteSpace(sourceKey)) return null;
@@ -201,7 +264,56 @@ public sealed record FollowUpGeometry(
 
         var quickDev = FindQuickDev(work, sourceKey);
         if (quickDev is null) return null;
-        return UnplannedWorkGeometry.ResolveQuickDevEpic(quickDev, epics);
+        // Text heuristics only here — followUps not available until slots are built.
+        return UnplannedWorkGeometry.ResolveQuickDevEpic(quickDev, epics, followUps: null);
+    }
+
+    /// <summary>Fills null <see cref="FollowUpDeferredSlot.EpicNumber"/> for slots whose SourceKey is a
+    /// quick-dev, using the completed slot set so timing attribution matches page chrome.</summary>
+    private static IReadOnlyList<FollowUpDeferredSlot> EnrichQuickDevDeferredEpics(
+        IReadOnlyList<FollowUpDeferredSlot> slots,
+        EpicsModel? epics,
+        WorkInventory work)
+    {
+        if (epics is null || slots.Count == 0) return slots;
+
+        var temp = new FollowUpGeometry(
+            Array.Empty<SprintActionItem>(),
+            0,
+            null,
+            SiteNav.ActionItemsOutputPath,
+            new Dictionary<SprintActionItem, string>(),
+            slots);
+
+        var changed = false;
+        var enriched = new List<FollowUpDeferredSlot>(slots.Count);
+        foreach (var slot in slots)
+        {
+            if (slot.EpicNumber is not null || string.IsNullOrWhiteSpace(slot.SourceKey))
+            {
+                enriched.Add(slot);
+                continue;
+            }
+
+            var quickDev = FindQuickDev(work, slot.SourceKey);
+            if (quickDev is null)
+            {
+                enriched.Add(slot);
+                continue;
+            }
+
+            var epic = UnplannedWorkGeometry.ResolveQuickDevEpic(quickDev, epics, temp);
+            if (epic is null)
+            {
+                enriched.Add(slot);
+                continue;
+            }
+
+            changed = true;
+            enriched.Add(slot with { EpicNumber = epic });
+        }
+
+        return changed ? enriched : slots;
     }
 
     /// <summary>Matches a provenance key to a <see cref="QuickDevEntry"/> by output stem or filename.</summary>

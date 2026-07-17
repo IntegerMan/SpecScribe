@@ -86,7 +86,7 @@ public static class FollowUpSlug
         Func<TRow, TKey> key,
         Func<TRow, string> baseSlug,
         Func<TRow, string> identity)
-        where TKey : notnull
+        where TKey : class
     {
         var baseCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var row in rows)
@@ -95,13 +95,33 @@ public static class FollowUpSlug
             baseCounts[b] = baseCounts.GetValueOrDefault(b) + 1;
         }
 
-        var result = new Dictionary<TKey, string>();
+        // Reference equality: value-equal records keep distinct dict entries (callers iterate
+        // instance identity); identical authored twins intentionally share one slug/path.
+        var result = new Dictionary<TKey, string>(ReferenceEqualityComparer.Instance);
+        var usedByIdentity = new Dictionary<string, string>(StringComparer.Ordinal); // slug → identity
         foreach (var row in rows)
         {
             var b = baseSlug(row);
+            var id = identity(row);
             var slug = baseCounts[b] > 1
-                ? $"{b}-{ContentSuffix(identity(row))}"
+                ? $"{b}-{ContentSuffix(id)}"
                 : b;
+
+            if (usedByIdentity.TryGetValue(slug, out var ownerId) && ownerId == id)
+            {
+                // Same authored identity (value-equal twin) — share the path; overwrite is identical HTML.
+                result[key(row)] = slug;
+                continue;
+            }
+
+            // Extremely rare: two different identities share a 6-hex SHA prefix.
+            var n = 0;
+            while (usedByIdentity.ContainsKey(slug))
+            {
+                n++;
+                slug = $"{b}-{ContentSuffix($"{id}\n#collision-{n}")}";
+            }
+            usedByIdentity[slug] = id;
             result[key(row)] = slug;
         }
         return result;
