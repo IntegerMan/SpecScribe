@@ -492,3 +492,5 @@ SpecScribeOutput/
 docs/live/
 
 *.patch
+
+*.diff
