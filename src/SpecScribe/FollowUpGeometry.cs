@@ -212,8 +212,21 @@ public sealed record FollowUpGeometry(
     {
         if (string.IsNullOrWhiteSpace(key)) return string.Empty;
         var bare = key.Trim().Trim('`');
-        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
-        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+        // Strip trailing .md / .html repeatedly so compound suffixes (e.g. .md.html) normalize cleanly.
+        while (true)
+        {
+            if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            {
+                bare = bare[..^3];
+                continue;
+            }
+            if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            {
+                bare = bare[..^5];
+                continue;
+            }
+            break;
+        }
         return bare;
     }
 
@@ -381,10 +394,8 @@ public sealed record FollowUpGeometry(
     /// <summary>Matches a provenance key to a <see cref="QuickDevEntry"/> by output stem or filename.</summary>
     public static QuickDevEntry? FindQuickDev(WorkInventory work, string? sourceKey)
     {
-        if (string.IsNullOrWhiteSpace(sourceKey)) return null;
-        var bare = sourceKey.Trim().Trim('`');
-        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
-        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+        var bare = NormalizeSourceKey(sourceKey);
+        if (bare.Length == 0) return null;
 
         foreach (var q in work.QuickDev)
         {
@@ -393,9 +404,6 @@ public sealed record FollowUpGeometry(
             if (string.Equals(stem, bare, StringComparison.OrdinalIgnoreCase)) return q;
             if (string.Equals(file, bare, StringComparison.OrdinalIgnoreCase)) return q;
             if (string.Equals(file, bare + ".html", StringComparison.OrdinalIgnoreCase)) return q;
-            if (string.Equals(stem + ".md", bare + ".md", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(stem, bare, StringComparison.OrdinalIgnoreCase))
-                return q;
         }
         return null;
     }

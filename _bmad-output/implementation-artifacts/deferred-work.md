@@ -42,9 +42,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-13-generated-filtered-follow-up-group-pages-and-sunburst-click-destinations.md (2026-07-17)
 
-- Epic angular weight on project glance is `max(1, Σ max(1, TasksTotal))` and no longer includes follow-up slot counts, so follow-up-heavy / task-light epics get thin wedges that compress open/done aggregates. Hierarchy design; revisit with 10.7 density. [`Charts.cs:172`]
-- Project glance removal of the no-plan outer create-story CTA leaves `TasksTotal == 0` stories looking like planned peers (weight still `max(1, …)`). Hierarchy rewrite; not a 9.13 group-page bug. [`Charts.cs` Sunburst]
-- Source-key normalization is duplicated across Charts / Unplanned cards / FollowUpGeometry, and `FindQuickDev` still has a tautological stem/`.md` comparison branch — cleanup when next touching provenance matching. [`Charts.cs` / `SprintTemplater.cs`]
+- ~~Epic angular weight on project glance is `max(1, Σ max(1, TasksTotal))` and no longer includes follow-up slot counts, so follow-up-heavy / task-light epics get thin wedges that compress open/done aggregates. Hierarchy design; revisit with 10.7 density.~~ **RESOLVED 2026-07-18** (`spec-9-13-deferred-glance-weight-noplan-sourcekey`): glance `EpicWeight` includes EpicSunburst peer set (actions + epic-level deferred + attributed QD) without double-counting story-child deferred. [`Charts.cs`]
+- ~~Project glance removal of the no-plan outer create-story CTA leaves `TasksTotal == 0` stories looking like planned peers (weight still `max(1, …)`). Hierarchy rewrite; not a 9.13 group-page bug.~~ **RESOLVED 2026-07-18** (`spec-9-13-deferred-glance-weight-noplan-sourcekey`): middle-ring `.sb-noplan` + “no task plan yet” on glance and epic detail; no outer create-story fringe. [`Charts.cs`]
+- ~~Source-key normalization is duplicated across Charts / Unplanned cards / FollowUpGeometry, and `FindQuickDev` still has a tautological stem/`.md` comparison branch — cleanup when next touching provenance matching.~~ **RESOLVED 2026-07-18** (`spec-9-13-deferred-glance-weight-noplan-sourcekey`): shared `NormalizeSourceKey`; tautology deleted. [`FollowUpGeometry.cs` / `Charts.cs` / `SprintTemplater.cs`]
 
 ## Deferred from: code review of 9-7-open-follow-ups-in-the-remaining-work-geometry.md (2026-07-17)
 

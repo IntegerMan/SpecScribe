@@ -218,13 +218,11 @@ public static class DeferredWorkParser
         return m.Success ? m.Groups[1].Value : null;
     }
 
-    /// <summary>Strips <c>.md</c>/<c>.html</c> so story-id and quick-dev matching stay deterministic.</summary>
+    /// <summary>Strips <c>.md</c>/<c>.html</c> so story-id and quick-dev matching stay deterministic.
+    /// Null/empty → null (parser contract); strip logic shared with <see cref="FollowUpGeometry.NormalizeSourceKey"/>.</summary>
     private static string? NormalizeProvenanceKey(string? key)
     {
-        if (string.IsNullOrWhiteSpace(key)) return null;
-        var bare = key.Trim().Trim('`');
-        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
-        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+        var bare = FollowUpGeometry.NormalizeSourceKey(key);
         return bare.Length > 0 ? bare : null;
     }
 }

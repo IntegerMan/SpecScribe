@@ -632,9 +632,8 @@ public static class SprintTemplater
 
     private static string NormalizeCardSourceKey(string key)
     {
-        var bare = key.Trim().Trim('`');
-        if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) bare = bare[..^3];
-        if (bare.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) bare = bare[..^5];
+        var bare = FollowUpGeometry.NormalizeSourceKey(key);
+        if (bare.Length == 0) return "unknown source";
         var storyId = FollowUpRefs.StoryIdFromKey(bare);
         return storyId is not null ? $"Story {storyId}" : bare;
     }
