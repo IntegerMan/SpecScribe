@@ -385,10 +385,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for Story 9.4 change-surface UX polish (round 2): collapsible panel (open by default),
         // classification in summary header, two-column touched list with typed links (code/new/sprint/story),
         // Ship section removed, File List paths discovered for code pages. [Story 9.4]
-        // Regenerated for Story 9.7 redesign: follow-ups move from outer band into story-ring peers under
-        // their epic (orange open / green done) + synthetic Follow-ups epic slice for unattributed/deferred;
-        // CSS swaps dashed .sb-followup-action/deferred for solid .sb-followup-open. Zero-follow-up golden
-        // fixture still omits wedges (NFR8) — delta is primarily shared stylesheet. [Story 9.7]
+        // Regenerated for Story 9.7 redesign + code-review patches: story-ring peers, dashed
+        // .sb-followup-open/.sb-followup-done (never .sb-done alone), Done follow-up legend, deferred
+        // aggregate/gating fixes. Zero-follow-up golden fixture still omits wedges (NFR8). [Story 9.7]
         // Regenerated for Story 9.2 code-review patches: requirements tablet/mobile breakpoints (1100px
         // desktop retained), empty Non-functional donut gated, deferred∪header coverage skip, orphan epic
         // absence note, CoverageMapLine UX-DR ingest, RequirementStatTile Unmapped/Deferred sub-line.
@@ -459,7 +458,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // deferred under parent stories (outer ring); date-based quick-dev epic attribution via retro
         // DateText and story LastUpdatedDate; review patches (hint gating, dead commands param, cascade).
         // [spec-sunburst-remaining-work-hierarchy]
-        const string expected = "d9c26cdca4bc48266aa4e5d671dbd529ef1caa1b7ddb54fb08d71a696ae1e273";
+        const string expected = "5e2fddd1d326bc29c2c31143af03dc03a8c0ff778a78f52bc62ac53e7d4af909";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

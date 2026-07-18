@@ -75,9 +75,10 @@ public sealed record FollowUpGeometry(
 
     /// <summary>Builds geometry from the portal ledger + already-projected inventory.
     /// <paramref name="actionItems"/> is the full sprint list (open + done) so completed follow-ups can
-    /// render green; open tallies still come from <paramref name="counts"/>.
+    /// render as follow-up-done; open tallies still come from <paramref name="counts"/>.
     /// When <paramref name="deferredModel"/> is supplied, deferred items are attributed to epics via
-    /// <c>SourceStoryId</c> and rendered as individual story-ring wedges (not one aggregate).</summary>
+    /// <c>SourceStoryId</c> and rendered as individual story-ring wedges. When the ledger reports open
+    /// deferred but no slots can be built, a single aggregate unattributed slot preserves navigability.</summary>
     public static FollowUpGeometry From(
         IReadOnlyList<SprintActionItem> actionItems,
         ProjectCounts counts,
@@ -86,7 +87,8 @@ public sealed record FollowUpGeometry(
         DeferredWorkModel? deferredModel = null,
         EpicsModel? epics = null)
     {
-        var deferredHref = work.Deferred is { } d && counts.DeferredOpenItems > 0
+        // List href whenever the deferred surface exists — resolved items still need reverse-links / green wedges.
+        var deferredHref = work.Deferred is { } d
             ? linkPrefix + d.OutputPath
             : null;
 
@@ -94,6 +96,21 @@ public sealed record FollowUpGeometry(
         // Second pass: quick-dev-sourced slots inherit epic from ResolveQuickDevEpic with the
         // completed slot set (timing + deferred cues need DeferredItems). Keeps chrome ↔ sunburst coherent.
         deferredSlots = EnrichQuickDevDeferredEpics(deferredSlots, epics, work);
+
+        // Ledger open deferred with nothing parseable → one aggregate wedge (Unplanned / list href). Never drop debt.
+        if (deferredSlots.Count == 0 && counts.DeferredOpenItems > 0 && deferredHref is { Length: > 0 })
+        {
+            var n = counts.DeferredOpenItems;
+            var body = $"<p>{n} open deferred {Plural(n, "item", "items")}</p>";
+            deferredSlots = new[]
+            {
+                new FollowUpDeferredSlot(
+                    new DeferredWorkItem(body, Resolved: false, null, null),
+                    "Deferred work",
+                    EpicNumber: null,
+                    deferredHref),
+            };
+        }
 
         return new FollowUpGeometry(
             actionItems,
@@ -103,6 +120,8 @@ public sealed record FollowUpGeometry(
             FollowUpSlug.AssignActionSlugs(actionItems),
             deferredSlots);
     }
+
+    private static string Plural(int n, string singular, string plural) => n == 1 ? singular : plural;
 
     /// <summary>Epic-scoped geometry: this epic's action items and epic-attributed deferred items only.
     /// Preserves the project-wide slug map so detail URLs stay stable under epic filtering.
@@ -159,8 +178,15 @@ public sealed record FollowUpGeometry(
             && (string.IsNullOrEmpty(s.SourceStoryId) || !storySet.Contains(s.SourceStoryId))).ToList();
     }
 
+    /// <summary>Action items with no epic (<c>EpicNumber == null</c>). Prefer
+    /// <see cref="OrphanActionItems"/> when an epic model is available so unknown epic numbers do not vanish.</summary>
     public IReadOnlyList<SprintActionItem> UnattributedActionItems =>
         ActionItems.Where(a => a.EpicNumber is null).ToList();
+
+    /// <summary>Follow-ups orphan membership: null epic <em>or</em> <see cref="SprintActionItem.EpicNumber"/>
+    /// not present in <paramref name="knownEpicNumbers"/>.</summary>
+    public IReadOnlyList<SprintActionItem> OrphanActionItems(IReadOnlySet<int> knownEpicNumbers) =>
+        ActionItems.Where(a => a.EpicNumber is null || !knownEpicNumbers.Contains(a.EpicNumber.Value)).ToList();
 
     public IReadOnlyList<FollowUpDeferredSlot> UnattributedDeferredItems =>
         DeferredItems.Where(s => s.EpicNumber is null).ToList();

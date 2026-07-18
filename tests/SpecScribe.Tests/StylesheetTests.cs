@@ -420,10 +420,14 @@ public class StylesheetTests
         Assert.Contains(".sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done)", css);
         // The focusable legend entries keep the shared on-brand focus ring.
         Assert.Contains(".sunburst-legend .sb-legend-item:focus-visible", css);
-        // Story 9.7 follow-ups: orange open fill + legend swatch (word label; never color-only).
+        // Story 9.7 follow-ups: orange open + green done, both dashed (never color-only / never .sb-done alone).
         Assert.Contains(".sb-followup-open", css);
+        Assert.Contains(".sb-followup-done", css);
+        Assert.Contains("stroke-dasharray", css);
         Assert.Contains(".sb-followup-open-sw", css);
+        Assert.Contains(".sb-followup-done-sw", css);
         Assert.Contains(".sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open)", css);
+        Assert.Contains(".sunburst-panel:has(.sb-followup-done-item:hover) .sb-seg:not(.sb-followup-done)", css);
     }
 
     [Fact]

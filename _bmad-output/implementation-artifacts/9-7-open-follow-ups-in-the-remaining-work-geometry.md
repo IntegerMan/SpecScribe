@@ -4,7 +4,7 @@ baseline_commit: 65756cde15c1405f1398ab2d0835a02aee2118f0
 
 # Story 9.7: Open Follow-Ups in the Remaining-Work Geometry
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -17,21 +17,25 @@ so that process follow-through is visible in the same primary attention surface 
 ## Acceptance Criteria
 
 1.
-**Given** open retrospective action items (and deferred-work entries when present) exist in the project
+**Given** retrospective action items and/or deferred-work entries exist in the project
 **When** the epic/project remaining-work geometry renders (sunburst and any sibling "what's left" summaries that feed the Driver's daily scan)
-**Then** those open follow-ups appear as first-class remaining work — countable and navigable into their detail/provenance surfaces
-**And** counts agree with the Story 8.3 `ProjectCounts` ledger (`OpenActionItems` and related) rather than a parallel recount.
+**Then** those follow-ups appear as first-class remaining work — countable and navigable into their detail/provenance surfaces (open and completed)
+**And** open tallies agree with the Story 8.3 `ProjectCounts` ledger (`OpenActionItems`, `DeferredOpenItems`) rather than a parallel recount
+**And** when the ledger reports open deferred items but per-item slots cannot be built, an aggregate deferred wedge still links to the deferred surface (do not drop ledger debt)
+**And** unattributable deferred items render under the Unplanned root (Story 9.12), while unattributed action items stay on the Follow-ups orphan.
 
 2.
 **Given** follow-up items are not stories or tasks
 **When** the visualization is designed
-**Then** they are not silently mislabeled as stories; the treatment is distinct (shape, label, or ring) and never color-only
+**Then** they are not silently mislabeled as stories; the treatment is distinct (dashed stroke + dedicated classes + word labels) and never color-only
+**And** completed follow-ups use a dedicated follow-up-done class — never reuse story-stage `.sb-done` alone
 **And** Story 9.6 remains the provenance/resolution owner on follow-up pages — this story does not absorb 9.6's card/grouping work.
 
 3.
-**Given** a project with zero open action items and no deferred-work surface
+**Given** a project with no action items and no deferred-work surface (empty follow-up inventory)
 **When** generation runs
-**Then** the sunburst/remaining-work geometry degrades cleanly (no empty fake wedges, no broken links) per NFR8.
+**Then** the sunburst/remaining-work geometry degrades cleanly (no empty fake wedges, no broken links) per NFR8
+**And** when only completed follow-ups remain, done wedges may still render (green follow-up-done) — omit geometry only when there is nothing to show.
 
 ## Context & Scope
 
@@ -57,26 +61,20 @@ Epic 9 completes the requirement → epic → story chain and closes review foll
 | **Action-items / deferred-work page chrome** | Story **9.6** owns these |
 | **Story Pipeline / Now & Next command surface** | Story **9.8** |
 
-### Owner-selected design direction (locked at create-story)
+### Owner-selected design direction (locked — code-review 2026-07-17)
 
-Elicited per Epic 3/7/8 visual-intent practice (Epic 8 retro action #3). Three named directions were considered:
-
-1. **Follow-up outer band (4th ring)** — when ledger open counts > 0, add an outermost ring outside the task ring. Wedges are labeled Action item / Deferred work (never "Story"), link to follow-up detail pages, use a **distinct stroke/shape treatment** (dashed kinship with `.sb-noplan`) plus legend text. Epic-attributed when `EpicNumber` / source story is known.
-2. **Fixed "Follow-ups" angular slice** — one dedicated pie of the circle regardless of epic — simpler, but loses epic context in the primary scan.
-3. **Epic-ring markers only** — dots/ticks on epic arcs — weaker "first-class remaining work" signal; easy to miss.
-
-**Locked choice: #1 Follow-up outer band (4th ring).**
+Elicited per Epic 3/7/8 visual-intent practice; create-story considered three directions (outer band / fixed slice / epic markers). **Owner-accepted redesign (post-implementation):** follow-ups as **story-ring peers** under their epic (not a 4th outer band).
 
 Concrete silhouette rules:
 
-- **Ring placement:** shrink existing epic/story/task radii slightly to make room for `followupInner`/`followupOuter` outside the task ring (same proportional style as today's rings in `Charts.Sunburst` ~167–172). When open follow-up count is 0, **omit the ring entirely** (do not draw a zero wedge).
-- **Action-item wedges:** one wedge per `SprintStatus.OpenActionItems` entry. Place under the matching epic's angular sweep when `EpicNumber` is set; otherwise into a trailing unattributed arc (do not drop items). Equal weight within the follow-up ring (or weight by epic group — equal-per-item is fine and deterministic).
-- **Deferred wedges:** when `ProjectCounts.DeferredOpenItems > 0` and a deferred surface exists (`WorkInventory.Deferred`), emit deferred follow-up geometry. Prefer **one aggregate wedge** linking to `Deferred.OutputPath` with aria/title `"N open deferred items"` when per-item epic attribution is awkward without re-parsing; if `DeferredWorkModel` is already available at render time (optional cache from 9.6's parser), per-open-item wedges attributed via `SourceStoryId` → epic are allowed — **do not re-count** against the ledger either way.
-- **Navigation:** `<a href>` to `SiteNav.ActionItemsOutputPath` / `work.Deferred.OutputPath` (page-level is enough; 9.6 owns in-page provenance). Real links in SVG — no JS required (NFR5 / webview CSP).
-- **Distinct treatment (AC #2, never color-only):** new classes e.g. `.sb-followup-action`, `.sb-followup-deferred` with **dashed stroke** (reuse `.sb-noplan` stroke vocabulary) + legend entries with **word labels** ("Action item", "Deferred work"). Do **not** paint follow-ups as `sb-pending`/`sb-active` story stages. **No new `--status-*` token** (six stage tokens remain the stage→color source). Accent fill may reuse parchment/`--ink-light`/`journey-followup` border cues, but shape+label must disambiguate without color.
-- **Legend + hint:** extend `SunburstLegend` (or append a second legend row) with follow-up entries **only when the ring is present**. Update `sunburst-hint` when follow-ups exist: include "outermost: open follow-ups".
-- **aria-label / `<title>`:** `"Action item: {truncated text}"` / `"Deferred work: N open items"` — never `"Story …"`. Truncate long action text for title readability; full text can live on the destination page.
-- **EpicSunburst:** same follow-up ring, filtered to that epic's open action items (+ deferred attributed to that epic when known). Zero for that epic → omit ring (even if project has other follow-ups).
+- **Ring placement:** attributed action items and epic-level deferred sit in the **story ring** as peers of stories. Story-child deferred nest in a thin outer ring under the parent story. When the follow-up inventory is empty, omit follow-up wedges entirely (no fake zero wedges).
+- **Action-item wedges:** one wedge per sprint action item (open + done). Place under the matching epic when `EpicNumber` resolves to a known epic; otherwise into the trailing **Follow-ups** orphan arc (including `EpicNumber` values missing from the epic model). Equal weight within the peer set is fine and deterministic.
+- **Deferred wedges:** when a deferred surface exists (`WorkInventory.Deferred`), emit per-item wedges from the deferred model when available. Unattributable deferred go to the **Unplanned** root (Story 9.12). When `DeferredOpenItems > 0` but slots cannot be built, emit one **aggregate** wedge linking to `Deferred.OutputPath` with aria/title `"N open deferred items"` — never drop ledger debt. Do not re-count against the ledger.
+- **Navigation:** `<a href>` to detail pages / deferred list / group pages. Real links in SVG — no JS required (NFR5 / webview CSP).
+- **Distinct treatment (AC #2, never color-only):** `.sb-followup-open` / `.sb-followup-done` with **dashed stroke** (kinship with `.sb-noplan`) + legend word labels ("Open follow-up", "Done follow-up"). Do **not** paint follow-ups as story-stage `.sb-done` / `.sb-pending` / etc. **No new `--status-*` token.**
+- **Legend + hint:** extend `SunburstLegend` with follow-up entries when any follow-up wedges are present. Hint describes story-ring peers + dashed treatment — not "outermost: open follow-ups".
+- **aria-label / `<title>`:** `"Action item: …"` / `"Action item (done): …"` / `"Deferred item: …"` — never `"Story …"`. Truncate long text; empty text gets a fallback label.
+- **EpicSunburst:** same peer treatment, filtered to that epic. Empty for that epic → omit follow-up wedges (even if the project has others). Center label stays story-first when stories exist; when an epic has follow-ups/direct work but zero stories, do not claim "0 stories" as the only center signal.
 
 ## Tasks / Subtasks
 
@@ -110,6 +108,27 @@ Concrete silhouette rules:
   - [x] `ProjectCountsTests` untouched unless a new assertion documents geometry-must-read-ledger (optional regression comment/test).
   - [x] Golden fingerprint will move (dashboard + epics index + epic pages with follow-ups) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Shared `BodyHtml` path → HTML/webview/SPA stay aligned; **no** new `HostRenderException`. Confirm three `Render*ParityTests` green.
   - [x] Run `dotnet test` from repo root.
+
+### Review Findings
+
+- [x] [Review][Decision] Accept story-ring redesign vs restore locked 4th outer band — resolved: accept redesign; update AC/locked design to story-ring peers.
+- [x] [Review][Decision] Distinct non-color-only treatment for follow-ups (esp. done) — resolved: add distinct classes/stroke for open + done follow-ups (not story-stage fills).
+- [x] [Review][Decision] Completed follow-ups when open ledger is zero — resolved: show done always; fix deferred gating so resolved items still appear.
+- [x] [Review][Decision] Unattributable deferred on Unplanned vs Follow-ups orphan — resolved: ratify Unplanned placement; update 9.7 AC to match 9.12.
+
+- [x] [Review][Patch] Update AC + locked silhouette to story-ring peers (not 4th outer band); ratify unattributable deferred → Unplanned [`9-7-open-follow-ups-in-the-remaining-work-geometry.md`]
+- [x] [Review][Patch] Distinct CSS/SVG classes + stroke for open and done follow-ups (never reuse `.sb-done` alone) [`Charts.cs` / `specscribe.css`]
+- [x] [Review][Patch] Build deferred slots whenever deferred surface/model has items — do not gate on `DeferredOpenItems > 0` [`FollowUpGeometry.cs:89`]
+- [x] [Review][Patch] Emit deferred aggregate (or reconcile) when `DeferredOpenCount > 0` but slots empty [`FollowUpGeometry.cs:89` / `Charts.cs`]
+- [x] [Review][Patch] Prefix `DeferredListHref` with story page depth in `BuildStory` [`EpicsViewBuilder.cs:198`]
+- [x] [Review][Patch] Treat action items whose `EpicNumber` is missing from the epic model as unattributed orphans [`Charts.cs:173` / `FollowUpGeometry.cs:162`]
+- [x] [Review][Patch] Fallback label when action/deferred text is empty [`Charts.cs:439`]
+- [x] [Review][Patch] Include story-child deferred in epic aria follow-up count [`Charts.cs:220`]
+- [x] [Review][Patch] EpicSunburst center should not read “0 stories” when only follow-ups/direct work exist [`Charts.cs:619`]
+- [x] [Review][Patch] Clamp annular pad to ≤ half sweep so tiny wedges cannot invert [`Charts.cs:205` / `Charts.cs:490`]
+
+- [x] [Review][Defer] Epic/story weight ignores nested story-child deferred crowding [`Charts.cs:195`] — deferred, pre-existing
+- [x] [Review][Defer] `FollowUpGeometry.From` does not assert list lengths vs ledger open counts [`FollowUpGeometry.cs:81`] — deferred, pre-existing
 
 ## Dev Notes
 
@@ -251,6 +270,7 @@ Composer (Auto)
 
 - 2026-07-16: Implemented Story 9.7 — open follow-ups as outermost sunburst band (project + epic), ledger-agreed counts, dashed distinct treatment, tests + golden.
 - 2026-07-16: Redesign per owner feedback — follow-ups as story-ring peers under epics (orange/green) + unattributed Follow-ups epic slice; removed outer band.
+- 2026-07-17: Code review — accepted story-ring redesign + Unplanned for unattributable deferred in AC; patches: `.sb-followup-done` dashed distinct treatment, deferred gating/aggregate, orphan unknown-epic, DeferredListHref prefix, empty-label fallback, aria/center/pad fixes; golden regenerated.
 
 ---
 

@@ -170,7 +170,8 @@ public static class Charts
         var hasFollowUps = geometry.HasAny;
         var hasUnplanned = unplannedGeo.HasUnplanned;
         var hasStoryChildDeferred = HasAnyStoryChildDeferred(geometry, epics);
-        var unattributed = geometry.UnattributedActionItems;
+        var knownEpics = epics.Select(e => e.Number).ToHashSet();
+        var unattributed = geometry.OrphanActionItems(knownEpics);
         var orphanSlots = unattributed.Count;
         var unplannedSlots = unplannedGeo.UnplannedMemberCount;
 
@@ -217,7 +218,8 @@ public static class Charts
             var sweep = weight * anglePerUnit;
             var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
-            var followUpCount = epicFollowUps.Count + epicLevelDeferred.Count;
+            var followUpCount = epicFollowUps.Count + epicLevelDeferred.Count
+                + epic.Stories.Sum(s => geometry.StoryChildDeferred(epic.Number, s.Id).Count);
             var directCount = epicQuickDev.Count;
             var followNote = followUpCount > 0
                 ? $", {followUpCount} {Plural(followUpCount, "follow-up", "follow-ups")}"
@@ -228,7 +230,7 @@ public static class Charts
 
             var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{followNote}{directNote}";
             sb.Append($"  <a href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(epicAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{epicClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, angle + pad, angle + sweep - pad)}\">");
+            sb.Append($"    <path class=\"sb-seg sb-{epicClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
             sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{Html(followNote)}{Html(directNote)}</title></path>\n");
             sb.Append("  </a>\n");
 
@@ -272,14 +274,14 @@ public static class Charts
             var orphanWeight = Math.Max(1, orphanSlots);
             var sweep = orphanWeight * anglePerUnit;
             var openOrphans = unattributed.Count(a => !FollowUpGeometry.IsDone(a));
-            var orphanClass = openOrphans > 0 ? "followup-open" : "done";
+            var orphanClass = openOrphans > 0 ? "followup-open" : "followup-done";
             var orphanHref = geometry.FollowUpsGroupHref;
             var orphanAria = openOrphans > 0
                 ? $"Follow-ups: {orphanSlots} unattributed {Plural(orphanSlots, "item", "items")}"
                 : $"Follow-ups: {orphanSlots} completed unattributed {Plural(orphanSlots, "item", "items")}";
 
             sb.Append($"  <a href=\"{Html(orphanHref)}\" aria-label=\"{Html(orphanAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{orphanClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, angle + pad, angle + sweep - pad)}\">");
+            sb.Append($"    <path class=\"sb-seg sb-{orphanClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
             sb.Append($"<title>{Html(orphanAria)}</title></path>\n  </a>\n");
 
             var slotSweep = sweep / orphanSlots;
@@ -306,7 +308,7 @@ public static class Charts
                 : $"Unplanned: {unplannedSlots} completed direct / one-off {Plural(unplannedSlots, "item", "items")}";
 
             sb.Append($"  <a href=\"{Html(rootHref)}\" aria-label=\"{Html(rootAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{rootClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, angle + pad, angle + sweep - pad)}\">");
+            sb.Append($"    <path class=\"sb-seg sb-{rootClass}\" d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
             sb.Append($"<title>Unplanned / Direct work: {Html(rootAria)}</title></path>\n  </a>\n");
 
             var slotSweep = sweep / unplannedSlots;
@@ -351,7 +353,7 @@ public static class Charts
         if (hasStoryChildDeferred) parts[0] += " &middot; outer: story-child deferred";
         parts[0] += ".";
         if (hasFollowUps)
-            parts.Add("Orange = open follow-up; green = done. Unattributed action items share a Follow-ups slice.");
+            parts.Add("Dashed wedges = follow-ups (orange open / green done) — never story stages. Unattributed action items share a Follow-ups slice.");
         if (hasUnplanned)
             parts.Add("Unplanned = direct / one-shot work outside the epic plan.");
         return $"<div class=\"sunburst-hint\">{string.Join(" ", parts)}</div>\n\n";
@@ -413,16 +415,16 @@ public static class Charts
 
         var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}{taskNote}";
         sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(storyAria)}\">\n");
-        sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, angle + pad, angle + sweep - pad)}\">");
+        sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
         sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}{Html(taskNote)}</title></path>\n  </a>\n");
 
         var children = geometry.StoryChildDeferred(story.EpicNumber, story.Id);
         if (children.Count > 0)
         {
             // Parent already inset by pad — children divide the usable sweep with no second pad.
-            var usable = Math.Max(0, sweep - 2 * pad);
+            var usable = Math.Max(0, sweep - 2 * Math.Min(pad, sweep / 2));
             var childSweep = usable / children.Count;
-            var childAngle = angle + pad;
+            var childAngle = InsetStart(angle, sweep, pad);
             foreach (var slot in children)
             {
                 AppendDeferredItemSlot(sb, slot, childAngle, childSweep, pad: 0, c, deferredInner, deferredOuter);
@@ -437,8 +439,9 @@ public static class Charts
     {
         var done = FollowUpGeometry.IsDone(item);
         var text = TruncateFollowUpText(PathUtil.StripHtmlTags(item.Action));
+        if (string.IsNullOrWhiteSpace(text)) text = "(no action text)";
         var label = done ? $"Action item (done): {text}" : $"Action item: {text}";
-        AppendFollowUpSlot(sb, label, href, done ? "done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
+        AppendFollowUpSlot(sb, label, href, done ? "followup-done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
     }
 
     private static void AppendDeferredItemSlot(
@@ -448,11 +451,12 @@ public static class Charts
         var resolved = slot.Item.Resolved;
         var text = TruncateFollowUpText(
             PathUtil.StripHtmlTags(FollowUpRow.SummarizeFromHtml(slot.Item.BodyHtml)));
+        if (string.IsNullOrWhiteSpace(text)) text = "(no deferred text)";
         var from = DeferredSourceSuffix(slot);
         var label = resolved
             ? $"Deferred item (resolved): {text}{from}"
             : $"Deferred item: {text}{from}";
-        AppendFollowUpSlot(sb, label, slot.DetailHref, resolved ? "done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
+        AppendFollowUpSlot(sb, label, slot.DetailHref, resolved ? "followup-done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
     }
 
     /// <summary>Names the story or quick-dev this deferred item stemmed from (code-review provenance),
@@ -487,9 +491,16 @@ public static class Charts
         double c, double storyInner, double storyOuter)
     {
         sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(label)}\">");
-        sb.Append($"<path class=\"sb-seg sb-{cssClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, angle + pad, angle + sweep - pad)}\">");
+        sb.Append($"<path class=\"sb-seg sb-{cssClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
         sb.Append($"<title>{Html(label)}</title></path></a>\n");
     }
+
+    /// <summary>Pad inset that never exceeds half the sweep (avoids inverted annular sectors on tiny wedges).</summary>
+    private static double InsetStart(double angle, double sweep, double pad) =>
+        angle + Math.Min(pad, Math.Max(0, sweep) / 2);
+
+    private static double InsetEnd(double angle, double sweep, double pad) =>
+        angle + sweep - Math.Min(pad, Math.Max(0, sweep) / 2);
 
     private static (string Status, string Label)[] BuildSunburstLegendItems(bool hasFollowUps, bool hasUnplanned = false)
     {
@@ -499,7 +510,10 @@ public static class Charts
             ("active", "In development"), ("review", "In review"), ("done", "Done"),
         };
         if (hasFollowUps)
+        {
             items.Add(("followup-open", "Open follow-up"));
+            items.Add(("followup-done", "Done follow-up"));
+        }
         if (hasUnplanned)
             items.Add(("unplanned", "Direct change"));
         return items.ToArray();
@@ -576,15 +590,15 @@ public static class Charts
 
             var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}{taskNote}";
             sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(storyAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, angle + pad, angle + sw - pad)}\">");
+            sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, InsetStart(angle, sw, pad), InsetEnd(angle, sw, pad))}\">");
             sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}{Html(taskNote)}</title></path>\n  </a>\n");
 
             var children = geometry.StoryChildDeferred(epic.Number, story.Id);
             if (children.Count > 0)
             {
-                var usable = Math.Max(0, sw - 2 * pad);
+                var usable = Math.Max(0, sw - 2 * Math.Min(pad, sw / 2));
                 var childSweep = usable / children.Count;
-                var childAngle = angle + pad;
+                var childAngle = InsetStart(angle, sw, pad);
                 foreach (var slot in children)
                 {
                     AppendDeferredItemSlot(sb, slot, childAngle, childSweep, pad: 0, c, deferredInner, deferredOuter);
@@ -617,8 +631,17 @@ public static class Charts
         }
 
         var storyCount = epic.Stories.Count;
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{storyCount}</text>\n");
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(storyCount, "story", "stories")}</text>\n");
+        if (storyCount > 0)
+        {
+            sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{storyCount}</text>\n");
+            sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(storyCount, "story", "stories")}</text>\n");
+        }
+        else
+        {
+            var peerCount = epicFollowUps.Count + epicLevelDeferred.Count + epicQuickDev.Count;
+            sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{peerCount}</text>\n");
+            sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(peerCount, "item", "items")}</text>\n");
+        }
         sb.Append("</svg>\n");
 
         sb.Append(SunburstLegend(BuildSunburstLegendItems(hasFollowUps, hasDirect)));
@@ -629,7 +652,7 @@ public static class Charts
             if (hasDirect) hint += " &amp; direct work";
             if (hasStoryChildDeferred) hint += " &middot; outer: story-child deferred";
             hint += ".";
-            if (hasFollowUps) hint += " Orange = open follow-up; green = done.";
+            if (hasFollowUps) hint += " Dashed wedges = follow-ups (orange open / green done) — never story stages.";
             if (hasDirect) hint += " Direct changes are one-shot work attributed to this epic.";
             sb.Append($"<div class=\"sunburst-hint\">{hint}</div>\n\n");
         }

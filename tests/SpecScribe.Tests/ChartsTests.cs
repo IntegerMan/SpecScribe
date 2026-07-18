@@ -384,14 +384,15 @@ public class ChartsTests
         Assert.Equal(4, geometry.DeferredItems.Count);
         Assert.Single(geometry.UnattributedDeferredItems);
         Assert.Single(unplanned.UnattributableDeferred);
-        // Open follow-ups are orange; completed action items reuse done green — never a 4th outer ring.
+        // Open follow-ups are orange dashed; completed use followup-done (never story-stage sb-done alone).
         Assert.Contains("class=\"sb-seg sb-followup-open\"", svg);
+        Assert.Contains("class=\"sb-seg sb-followup-done\"", svg);
         Assert.Contains("aria-label=\"Action item: Fix the heatmap debt\"", svg);
         Assert.Contains("aria-label=\"Action item (done): Ship delivery follow-up\"", svg);
         Assert.Contains("aria-label=\"Action item: Unscoped cleanup\"", svg);
         Assert.Contains("Deferred item: Epic 1 deferred open item.", svg);
         Assert.Contains("Deferred item: Unattributed deferred open item.", svg);
-        // No aggregate deferred wedge with an inflated count label.
+        // No aggregate deferred wedge when per-item slots exist.
         Assert.DoesNotContain("Deferred work: 4 open", svg);
         Assert.DoesNotContain("Deferred work: 3 open", svg);
         // Unattributed deferred moved to Unplanned; Follow-ups orphan holds action items only. [Story 9.12]
@@ -399,13 +400,14 @@ public class ChartsTests
         Assert.Contains("aria-label=\"Unplanned:", svg);
         Assert.DoesNotContain("outermost: open follow-ups", svg);
         Assert.Contains("Open follow-up</span>", svg);
+        Assert.Contains("Done follow-up</span>", svg);
         Assert.Contains("stories (sized by tasks) &amp; follow-ups", svg);
         // Per-item detail hrefs (Story 9.11) on action wedges.
         Assert.Contains("href=\"follow-ups/action-", svg);
         Assert.Contains("href=\"follow-ups/action-fix-the-heatmap-debt", svg);
         Assert.Contains("href=\"follow-ups/deferred-", svg);
-        // Epic 1 aria mentions its follow-ups (action items only; story-child deferred are in the outer ring).
-        Assert.Contains("1 follow-up", svg);
+        // Epic 1 aria includes action + story-child deferred (outer ring).
+        Assert.Contains("3 follow-ups", svg);
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
         {
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
@@ -546,6 +548,98 @@ public class ChartsTests
         Assert.DoesNotContain("sb-followup", withEmpty);
         Assert.DoesNotContain("Open follow-up</span>", without);
         Assert.Equal(without, withEmpty);
+    }
+
+    [Fact]
+    public void FollowUpGeometry_AggregateDeferred_WhenLedgerOpenButNoSlots()
+    {
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 2),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 2 };
+        // No deferred model → slots empty → aggregate preserves ledger debt.
+        var geometry = FollowUpGeometry.From(Array.Empty<SprintActionItem>(), counts, work);
+        Assert.Equal(2, geometry.DeferredOpenCount);
+        Assert.Single(geometry.DeferredItems);
+        Assert.Equal("deferred-work.html", geometry.DeferredHref);
+        Assert.Contains("2 open deferred items", geometry.DeferredItems[0].Item.BodyHtml);
+
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "A", "ready", 0, 1)) },
+        };
+        var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
+        var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
+        Assert.Contains("Deferred item: 2 open deferred items", svg);
+        Assert.Contains("href=\"deferred-work.html\"", svg);
+    }
+
+    [Fact]
+    public void FollowUpGeometry_BuildsResolvedDeferred_WhenOpenCountIsZero()
+    {
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - ~~Already resolved parking lot.~~
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 0),
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "A", "done", 1, 1)) },
+        };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), ProjectCounts.Empty, work, deferredModel: deferredModel, epics: model);
+        Assert.NotNull(geometry.DeferredHref);
+        Assert.Single(geometry.DeferredItems);
+        Assert.True(geometry.DeferredItems[0].Item.Resolved);
+    }
+
+    [Fact]
+    public void Sunburst_OrphanActionItems_IncludeUnknownEpicNumber()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "A", "ready", 0, 1)) },
+        };
+        var geometry = new FollowUpGeometry(
+            new[] { new SprintActionItem("Ghost epic debt", "open", EpicNumber: 99, Owner: null) },
+            DeferredOpenCount: 0,
+            DeferredHref: null,
+            ActionItemsHref: SiteNav.ActionItemsOutputPath);
+        var svg = Charts.Sunburst(model, followUps: geometry);
+        Assert.Contains("aria-label=\"Action item: Ghost epic debt\"", svg);
+        Assert.Contains("Follow-ups:", svg);
+    }
+
+    [Fact]
+    public void Sunburst_EmptyActionText_GetsFallbackLabel()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "A", "ready", 0, 1)) },
+        };
+        var geometry = new FollowUpGeometry(
+            new[] { new SprintActionItem("   ", "open", EpicNumber: 1, Owner: null) },
+            DeferredOpenCount: 0,
+            DeferredHref: null,
+            ActionItemsHref: SiteNav.ActionItemsOutputPath);
+        var svg = Charts.Sunburst(model, followUps: geometry);
+        Assert.Contains("Action item: (no action text)", svg);
     }
 
     [Fact]
@@ -2048,8 +2142,8 @@ public class ChartsTests
         var svg = Charts.Sunburst(model, followUps: geometry);
 
         Assert.Contains("Deferred item: Story-child deferred item from code review.", svg);
-        // Story-child deferred is not counted as an epic follow-up in the epic's aria note.
-        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story\"", svg);
+        // Story-child deferred counts in the epic aria follow-up total (outer ring under the story).
+        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story, 1 follow-up\"", svg);
     }
 
     [Fact]

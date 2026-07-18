@@ -2451,11 +2451,33 @@ a.ref-file-node:focus-visible {
 }
 .sunburst .sb-noplan:hover { fill: var(--parchment-dark); opacity: 1; stroke: var(--gold-light); stroke-width: 1.5; }
 
-/* Story 9.7: follow-ups sit in the story ring (and unattributed ones under a Follow-ups epic slice).
-   Orange = open/postponed; green reuses .sb-done when completed. Word labels in aria/legend — never
-   color-only (UX-DR17). Chart-local token, not a new lifecycle --status-*. */
-.sb-followup-open { fill: var(--sb-followup-open, #d97706); }
+/* Story 9.7: follow-ups sit in the story ring (and unattributed action items under a Follow-ups epic slice).
+   Open = orange fill + dashed stroke; done = green fill + dashed stroke via .sb-followup-done — never reuse
+   story-stage .sb-done alone (AC #2 / UX-DR17). Chart-local tokens, not new lifecycle --status-*. */
+.sb-followup-open {
+  fill: var(--sb-followup-open, #d97706);
+  stroke: var(--ink-light);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 2.5;
+}
+.sb-followup-done {
+  fill: var(--sb-followup-done, var(--status-done));
+  stroke: var(--ink-light);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 2.5;
+}
 .sunburst-legend .sb-followup-open-sw { background: var(--sb-followup-open, #d97706); }
+.sunburst-legend .sb-followup-done-sw {
+  background: var(--sb-followup-done, var(--status-done));
+  box-shadow: inset 0 0 0 1px var(--ink-light);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.18) 1px,
+    rgba(0, 0, 0, 0.18) 2px
+  );
+}
 /* Unplanned / direct-change wedges — distinct from lifecycle status tokens (no --status-* reuse). [Story 9.12] */
 .sb-unplanned { fill: var(--sb-unplanned, #0e7490); }
 .sunburst-legend .sb-unplanned-sw { background: var(--sb-unplanned, #0e7490); }
@@ -2509,6 +2531,8 @@ a.ref-file-node:focus-visible {
 .sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done),
 .sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open),
 .sunburst-panel:has(.sb-followup-open-item:focus-visible) .sb-seg:not(.sb-followup-open),
+.sunburst-panel:has(.sb-followup-done-item:hover) .sb-seg:not(.sb-followup-done),
+.sunburst-panel:has(.sb-followup-done-item:focus-visible) .sb-seg:not(.sb-followup-done),
 .sunburst-panel:has(.sb-unplanned-item:hover) .sb-seg:not(.sb-unplanned),
 .sunburst-panel:has(.sb-unplanned-item:focus-visible) .sb-seg:not(.sb-unplanned) {
   opacity: 0.28;
