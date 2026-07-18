@@ -788,7 +788,7 @@ public class ChartsTests
             },
             Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 1),
         };
-        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1, DirectChanges = 2 };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1, DirectChanges = 2, OpenActionItems = 1 };
         var geometry = FollowUpGeometry.From(
             new[] { new SprintActionItem("Orphan action", "open", null, null) },
             counts, work, deferredModel: deferredModel, epics: model);
@@ -2366,5 +2366,153 @@ public class ChartsTests
         var knownIds = model.Epics[0].Stories.Select(s => s.Id);
         Assert.Empty(geometry.StoryChildDeferred(1, "1.1"));
         Assert.Single(geometry.EpicLevelDeferred(1, knownIds));
+    }
+
+    [Fact]
+    public void EpicSunburst_StoryChildDeferred_GrowsParentStorySweep()
+    {
+        // Crowded thin story (TasksTotal=1, 6 nested deferred) must out-sweep equal-task peer with none.
+        var epic = Epic(
+            Story("1.1", "Crowded", "active", 0, 1),
+            Story("1.2", "Thin peer", "ready", 0, 1));
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Nested deferred one.
+            - Nested deferred two.
+            - Nested deferred three.
+            - Nested deferred four.
+            - Nested deferred five.
+            - Nested deferred six.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 6),
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { epic },
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 6 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        Assert.Equal(6, geometry.StoryChildDeferred(1, "1.1").Count);
+
+        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", followUps: geometry);
+        var crowded = OuterArcSweepRadians(svg, "Story 1.1: Crowded");
+        var peer = OuterArcSweepRadians(svg, "Story 1.2: Thin peer");
+        Assert.True(crowded > peer * 5,
+            $"Crowded sweep {crowded:F3} should be ~7× peer {peer:F3} (weight 7 vs 1).");
+        Assert.Contains("sized by tasks + nested deferred", svg);
+        Assert.Contains("Deferred item: Nested deferred one.", svg);
+        // Outer children share the grown parent: one nested wedge ≫ the thin peer story wedge.
+        var child = OuterArcSweepRadians(svg, "Deferred item: Nested deferred one.");
+        Assert.True(child > peer * 0.7,
+            $"Child sweep {child:F3} should be roughly peer/1-scale of crowded/6, larger than peer/7.");
+    }
+
+    [Fact]
+    public void Sunburst_StoryChildDeferred_GrowsStoryAndEpicWeight()
+    {
+        // Project glance: nested count still grows story/epic weight even though leaves aggregate.
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                Epic(
+                    Story("1.1", "Crowded", "active", 0, 1),
+                    Story("1.2", "Thin peer", "ready", 0, 1)),
+            },
+        };
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Nested deferred one.
+            - Nested deferred two.
+            - Nested deferred three.
+            - Nested deferred four.
+            - Nested deferred five.
+            - Nested deferred six.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 6),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 6 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        var svg = Charts.Sunburst(model, followUps: geometry);
+        var crowded = OuterArcSweepRadians(svg, "Story 1.1: Crowded");
+        var peer = OuterArcSweepRadians(svg, "Story 1.2: Thin peer");
+        Assert.True(crowded > peer * 5,
+            $"Crowded sweep {crowded:F3} should be ~7× peer {peer:F3} on project glance.");
+        Assert.Contains("sized by tasks + nested deferred", svg);
+        Assert.DoesNotContain("Deferred item: Nested deferred one.", svg);
+        Assert.Contains("Epic 1: 6 open follow-ups", svg);
+    }
+
+    [Fact]
+    public void FollowUpGeometry_From_OpenActionItemsAgreeWithLedger()
+    {
+        // Happy path: filtered open count matches ProjectCounts; done items remain for wedges.
+        var items = new[]
+        {
+            new SprintActionItem("Open one", "open", EpicNumber: 1, Owner: null),
+            new SprintActionItem("Open two", "open", EpicNumber: 1, Owner: null),
+            new SprintActionItem("Done one", "done", EpicNumber: 1, Owner: null),
+        };
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = null,
+        };
+        var counts = ProjectCounts.Empty with { OpenActionItems = 2 };
+        var geometry = FollowUpGeometry.From(items, counts, work);
+        Assert.Equal(2, geometry.OpenActionItems.Count);
+        Assert.Equal(3, geometry.ActionItems.Count);
+    }
+
+    /// <summary>Angular sweep of the outer arc on the first path after an aria-label match.
+    /// Used to lock story-weight ratios without exposing Charts internals.</summary>
+    private static double OuterArcSweepRadians(string svg, string ariaContains)
+    {
+        var marker = $"aria-label=\"{ariaContains}";
+        var i = svg.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(i >= 0, $"Missing aria containing '{ariaContains}'");
+        var dIdx = svg.IndexOf(" d=\"", i, StringComparison.Ordinal);
+        Assert.True(dIdx >= 0, "Missing path d after aria-label");
+        var start = dIdx + 4;
+        var end = svg.IndexOf('"', start);
+        var d = svg[start..end];
+        var parts = d.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        Assert.True(parts.Length >= 11 && parts[0] == "M" && parts[3] == "A",
+            $"Unexpected annular path: {d}");
+        var x1 = double.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+        var y1 = double.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture);
+        // M x y A rx ry rot largeArc sweep x2 y2 …
+        var x2 = double.Parse(parts[9], System.Globalization.CultureInfo.InvariantCulture);
+        var y2 = double.Parse(parts[10], System.Globalization.CultureInfo.InvariantCulture);
+        var widthIdx = svg.IndexOf("width=\"", StringComparison.Ordinal);
+        Assert.True(widthIdx >= 0);
+        var wStart = widthIdx + 7;
+        var wEnd = svg.IndexOf('"', wStart);
+        var size = double.Parse(svg[wStart..wEnd], System.Globalization.CultureInfo.InvariantCulture);
+        var c = size / 2.0;
+        var a0 = Math.Atan2(y1 - c, x1 - c);
+        var a1 = Math.Atan2(y2 - c, x2 - c);
+        var sweep = a1 - a0;
+        while (sweep < 0) sweep += 2 * Math.PI;
+        while (sweep > 2 * Math.PI) sweep -= 2 * Math.PI;
+        return sweep;
     }
 }

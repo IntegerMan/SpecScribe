@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-9-7-deferred-angular-weight-and-ledger-assert.md (2026-07-18)
+
+- source_spec: `spec-9-7-deferred-angular-weight-and-ledger-assert.md`
+  summary: `Math.Max(1, TasksTotal + nestedCount)` leaves a TasksTotal=0 story with exactly one nested deferred at weight 1 — identical to a peer with none — so the floor swallows the smallest crowding case.
+  evidence: Blind Hunter — frozen formula max(1, sum) vs intent to grow with any nested children; would need max(1, TasksTotal) + count (intent renegotiation).
+
 ## Deferred from: code review of spec-9-5-deferred-collapse-and-evidence-polish.md (2026-07-18)
 
 - source_spec: `spec-9-5-deferred-collapse-and-evidence-polish.md`
@@ -42,8 +48,8 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-7-open-follow-ups-in-the-remaining-work-geometry.md (2026-07-17)
 
-- Epic/story angular weight ignores nested story-child deferred crowding — many deferred under a thin `max(1, TasksTotal)` story share a small outer arc without growing the parent sweep. [`Charts.cs:195`]
-- `FollowUpGeometry.From` documents ledger agreement but does not assert `OpenActionItems` / deferred open tallies against `ProjectCounts` at build time (tests cover happy paths only). [`FollowUpGeometry.cs:81`]
+- ~~Epic/story angular weight ignores nested story-child deferred crowding — many deferred under a thin `max(1, TasksTotal)` story share a small outer arc without growing the parent sweep.~~ **RESOLVED 2026-07-18** (`spec-9-7-deferred-angular-weight-and-ledger-assert`): `StoryWeight = max(1, TasksTotal + StoryChildDeferred.Count)` on project glance + epic detail. [`Charts.cs`]
+- ~~`FollowUpGeometry.From` documents ledger agreement but does not assert `OpenActionItems` / deferred open tallies against `ProjectCounts` at build time (tests cover happy paths only).~~ **RESOLVED 2026-07-18** (`spec-9-7-deferred-angular-weight-and-ledger-assert`): `Debug.Assert` open-from-list == `counts.OpenActionItems` (deferred slot count intentionally not equated to ledger). [`FollowUpGeometry.cs`]
 
 ## Deferred from: code review of 9-10-scannable-follow-up-list-pages.md (2026-07-17)
 

@@ -464,7 +464,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // 9821c3f2… with or without watch RefreshFollowUpSurfaces); refresh the byte-parity gate.
         // Regenerated 2026-07-18: TaskSunburst nests deferred under an inner Deferred parent wedge
         // (shared angular budget with tasks) instead of a full-circle outer fringe.
-        const string expected = "974d8d2639cc8be5b0ab55e714d03b96256b68e50b97a25669e86da408c4f306";
+        // Regenerated 2026-07-18: story weight includes nested story-child deferred count
+        // (max(1, TasksTotal + nested)); sunburst hints say "tasks + nested deferred" when present.
+        // [spec-9-7-deferred-angular-weight-and-ledger-assert]
+        const string expected = "5997a2b9dd3df53d5d67a6a2e7d4a6febe7427eeb01ba5b303a667c278636d72";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

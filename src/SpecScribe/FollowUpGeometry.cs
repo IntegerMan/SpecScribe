@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace SpecScribe;
 
 /// <summary>One deferred-work item projected for sunburst geometry. Epic-attributed items render under
@@ -112,6 +114,12 @@ public sealed record FollowUpGeometry(
                     deferredHref),
             };
         }
+
+        // Open action-item tally must agree with ProjectCounts — never a second recount at the chart layer.
+        // Do not assert DeferredItems.Count vs DeferredOpenItems (aggregate wedge + resolved slots are legitimate).
+        var openFromList = actionItems.Count(a => !IsDone(a));
+        Debug.Assert(openFromList == counts.OpenActionItems,
+            $"Open action items must agree with ProjectCounts; list={openFromList}, ledger={counts.OpenActionItems}");
 
         return new FollowUpGeometry(
             actionItems,
