@@ -1101,6 +1101,71 @@ public class RequirementsParserTests
         Assert.DoesNotContain("deferral-sources", unrelated);
     }
 
+    [Fact]
+    public void RenderRequirement_DuplicateEpicNumbers_FirstWins_DoesNotThrow()
+    {
+        // Duplicate epic Number must not abort requirement-page generation. [spec-epic9-deferred-debt-cleanup]
+        var storyFirst = new StoryInfo
+        {
+            Id = "1.1",
+            EpicNumber = 1,
+            Title = "First story",
+            UserStoryHtml = "<p>First</p>",
+            AcBlocksHtml = Array.Empty<string>(),
+        };
+        var storyDup = new StoryInfo
+        {
+            Id = "1.9",
+            EpicNumber = 1,
+            Title = "Dup story",
+            UserStoryHtml = "<p>Dup</p>",
+            AcBlocksHtml = Array.Empty<string>(),
+        };
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 1,
+                    Title = "First Wins",
+                    GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted,
+                    Section = EpicSection.VerticalSlice,
+                    Stories = new[] { storyFirst },
+                },
+                new EpicInfo
+                {
+                    Number = 1,
+                    Title = "Duplicate Loser",
+                    GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted,
+                    Section = EpicSection.VerticalSlice,
+                    Stories = new[] { storyDup },
+                },
+            },
+        };
+        var req = new RequirementInfo
+        {
+            Kind = RequirementKind.Functional,
+            Number = 99,
+            TextHtml = "Covered by epic 1",
+            CoverageEpicNumbers = new[] { 1 },
+            Deferred = false,
+            Status = RequirementStatus.Planned,
+        };
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderRequirement(req, progress, nav, epics);
+
+        Assert.Contains("First Wins", html);
+        Assert.Contains("story-1-1", html);
+        Assert.DoesNotContain("Duplicate Loser", html);
+        Assert.DoesNotContain("story-1-9", html);
+    }
 }
 
 public class ProgressCalculatorTests : IDisposable
