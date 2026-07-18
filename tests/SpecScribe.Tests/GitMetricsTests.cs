@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using SpecScribe;
@@ -128,6 +129,92 @@ public class GitMetricsTests
     {
         // A window of merge-only / empty commits yields no name-only lines at all.
         Assert.Empty(GitMetrics.ParseChangedFiles("\n\n   \n"));
+    }
+
+    [Fact]
+    public void ParseChangedFiles_CollapsesFullPathRenameToTheNewPath()
+    {
+        // Defensive: name-status/numstat-shaped "old => new" lines (not emitted by --name-only) still
+        // collapse to the new path so frequency is not split. Production relies on -M so --name-only
+        // already prints the destination path only for rename commits.
+        var log = "src/Old.cs => src/New.cs\n\n" +
+                  "src/New.cs\n";
+
+        var files = GitMetrics.ParseChangedFiles(log);
+
+        var only = Assert.Single(files);
+        Assert.Equal(("src/New.cs", 2), only);
+    }
+
+    [Fact]
+    public void ParseChangedFiles_CollapsesBraceAbbreviatedRenameToTheNewPath()
+    {
+        // Same defensive collapse for brace-abbreviated rename forms.
+        var log = "src/{Old.cs => New.cs}\n\n" +
+                  "src/New.cs\n";
+
+        var files = GitMetrics.ParseChangedFiles(log);
+
+        var only = Assert.Single(files);
+        Assert.Equal(("src/New.cs", 2), only);
+    }
+
+    [Fact]
+    public void LastCommitTimestamp_UsesMaximumTimeOnLastDayRegardlessOfListOrder()
+    {
+        var lastDay = new DateOnly(2026, 1, 7);
+        var series = new (DateOnly Day, int Count)[] { (lastDay, 2) };
+        // Deliberately oldest-first within the day — max time must still win.
+        var commitsByDay = new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>
+        {
+            [lastDay] = new[]
+            {
+                new CommitInfo("aaa1111", "Earlier", "Alice", "10:00"),
+                new CommitInfo("bbb2222", "Later", "Bob", "14:00"),
+            },
+        };
+
+        var stamp = GitMetrics.LastCommitTimestamp(series, commitsByDay);
+
+        Assert.Equal(new DateTime(2026, 1, 7, 14, 0, 0), stamp);
+    }
+
+    [Fact]
+    public void LastCommitTimestamp_SkipsUnparseableTimesWhenPickingMaximum()
+    {
+        var lastDay = new DateOnly(2026, 1, 7);
+        var series = new (DateOnly Day, int Count)[] { (lastDay, 2) };
+        var commitsByDay = new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>
+        {
+            [lastDay] = new[]
+            {
+                new CommitInfo("aaa1111", "Bad", "Alice", "not-a-time"),
+                new CommitInfo("bbb2222", "Good", "Bob", "14:00"),
+            },
+        };
+
+        Assert.Equal(new DateTime(2026, 1, 7, 14, 0, 0), GitMetrics.LastCommitTimestamp(series, commitsByDay));
+    }
+
+    [Fact]
+    public void LastCommitTimestamp_FallsBackToMidnightWhenNoTimeParses()
+    {
+        var lastDay = new DateOnly(2026, 1, 7);
+        var series = new (DateOnly Day, int Count)[] { (lastDay, 1) };
+        var commitsByDay = new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>
+        {
+            [lastDay] = new[] { new CommitInfo("aaa1111", "Bad time", "Alice", "not-a-time") },
+        };
+
+        Assert.Equal(lastDay.ToDateTime(TimeOnly.MinValue), GitMetrics.LastCommitTimestamp(series, commitsByDay));
+    }
+
+    [Fact]
+    public void LastCommitTimestamp_EmptySeriesReturnsMinValue()
+    {
+        Assert.Equal(DateTime.MinValue, GitMetrics.LastCommitTimestamp(
+            Array.Empty<(DateOnly, int)>(),
+            new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>()));
     }
 
     [Theory]
@@ -763,4 +850,77 @@ public class GitMetricsTests
             DateTime.ParseExact(date, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),
             "subject", "",
             files.Select(f => new DeepFileChange(f.Path, f.Added, f.Deleted)).ToList());
+}
+
+/// <summary>Real-git wiring for <see cref="GitMetrics.TryCompute"/> Story 3.1 fields
+/// (<c>spec-3-1-deferred-debt-cleanup</c>). Asserts hard if git is unavailable — no silent skip.</summary>
+public class GitMetricsTryComputeTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "specscribe-trycompute-" + Guid.NewGuid().ToString("N"));
+
+    public GitMetricsTryComputeTests() => Directory.CreateDirectory(_root);
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_root, recursive: true); } catch { /* best-effort */ }
+    }
+
+    [Fact]
+    public void TryCompute_WiresLastCommitTimestampLast30DayCountAndTopChangedFiles()
+    {
+        Assert.True(TryCreateGitHistory(),
+            "git CLI unavailable on this host — cannot exercise TryCompute field wiring; install git rather than silently skipping this test");
+
+        var pulse = GitMetrics.TryCompute(_root);
+
+        Assert.NotNull(pulse);
+        Assert.Equal(2, pulse!.TotalCommits);
+        Assert.Equal(2, pulse.Last30DayCommitCount);
+        Assert.Equal(pulse.LastCommitDate, DateOnly.FromDateTime(pulse.LastCommitTimestamp));
+        // Two commits both touch tracked.txt → name-only ranking must count both, not merely "some" file.
+        var tracked = Assert.Single(pulse.TopChangedFiles, f => f.Path == "tracked.txt");
+        Assert.Equal(2, tracked.ChangeCount);
+    }
+
+    private bool TryCreateGitHistory()
+    {
+        if (!RunGit("init")) return false;
+        File.WriteAllText(Path.Combine(_root, "tracked.txt"), "one\n");
+        if (!RunGit("add .")) return false;
+        if (!Commit("First commit")) return false;
+        File.WriteAllText(Path.Combine(_root, "tracked.txt"), "one\ntwo\n");
+        return RunGit("add .") && Commit("Second commit");
+    }
+
+    private bool Commit(string message) => RunGit(
+        $"-c user.name=\"Pulse Tester\" -c user.email=pulse@example.com -c commit.gpgsign=false commit -m \"{message}\"");
+
+    private bool RunGit(string arguments)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = arguments,
+                WorkingDirectory = _root,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi);
+            if (process is null) return false;
+            if (!process.WaitForExit(15000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+                return false;
+            }
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }

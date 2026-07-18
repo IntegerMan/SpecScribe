@@ -358,7 +358,7 @@ public class HtmlTemplaterTests
         Assert.Contains("in the last 30 days", html);                 // 30-day rolling count
         Assert.Contains("Jan 5, 2026 at 12:00", html);                // exact last-commit timestamp (one PortalDates token, 24h)
         Assert.Contains("src/Program.cs", html);                      // top changed file
-        Assert.Contains("Top changed files", html);
+        Assert.Contains("Top changed files (last 200 commits)", html);
 
         // Consolidated + graphical presentation. [Story 3.1 AC #3 — owner review follow-up]
         Assert.Contains("git-pulse-body", html);                      // the merged two-part body

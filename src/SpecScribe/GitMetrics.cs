@@ -208,10 +208,12 @@ public static class GitMetrics
 
             // A second, bounded git call for the "top changed files" signal. --name-only prints one path per
             // commit's touched file; the empty --pretty=format: suppresses the commit header lines so only
-            // paths (and blank inter-commit separators) come back. -n 200 caps the window so this never
-            // repeats the uncapped-history timeout risk deferred-work.md flagged for the heatmap log. If it
-            // fails, degrade this one signal to an empty list rather than nulling the whole pulse (AD-4).
-            var nameOnlyText = RunGit(repoRoot, "log --name-only --pretty=format: -n 200");
+            // paths (and blank inter-commit separators) come back. -M collapses renames/moves onto the new
+            // path (same ResolveRenamedPath treatment as the deep numstat path). -n 200 caps the window so
+            // this never repeats the uncapped-history timeout risk deferred-work.md flagged for the heatmap
+            // log. If it fails, degrade this one signal to an empty list rather than nulling the whole pulse
+            // (AD-4).
+            var nameOnlyText = RunGit(repoRoot, "log -M --name-only --pretty=format: -n 200");
             var topChangedFiles = nameOnlyText is null
                 ? Array.Empty<(string, int)>()
                 : ParseChangedFiles(nameOnlyText);
@@ -280,21 +282,40 @@ public static class GitMetrics
     }
 
     /// <summary>The exact timestamp of the most recent commit, reconstructed from data <see cref="ParseLog"/>
-    /// already produced — no extra git call. The last day in the ascending series is the most recent, and its
-    /// per-day list is newest-first (see <c>ParseLog</c>'s preserved git order), so its first entry's HH:mm is
-    /// the latest commit time. Falls back to midnight on that day if the time can't be recovered. Invariant
-    /// time parse for the same non-Gregorian-calendar reasons ParseLog is invariant.</summary>
-    private static DateTime LastCommitTimestamp(
+    /// already produced — no extra git call. The last day in the ascending series is the most recent; among
+    /// that day's commits the latest parseable HH:mm wins (order-independent, so clock-skew / merge list
+    /// order cannot pick a stale first entry). Falls back to midnight on that day if no time can be
+    /// recovered. Invariant time parse for the same non-Gregorian-calendar reasons ParseLog is invariant.
+    /// Public so the max-time contract is unit-testable without a repo.</summary>
+    public static DateTime LastCommitTimestamp(
         IReadOnlyList<(DateOnly Day, int Count)> series,
         IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> commitsByDay)
     {
-        var lastDay = series[^1].Day;
-        if (commitsByDay.TryGetValue(lastDay, out var commits) && commits.Count > 0 &&
-            TimeOnly.TryParseExact(commits[0].Time, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+        if (series.Count == 0)
         {
-            return lastDay.ToDateTime(time);
+            return DateTime.MinValue;
         }
-        return lastDay.ToDateTime(TimeOnly.MinValue);
+
+        var lastDay = series[^1].Day;
+        if (!commitsByDay.TryGetValue(lastDay, out var commits) || commits.Count == 0)
+        {
+            return lastDay.ToDateTime(TimeOnly.MinValue);
+        }
+
+        TimeOnly? latest = null;
+        foreach (var commit in commits)
+        {
+            if (!TimeOnly.TryParseExact(commit.Time, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+            {
+                continue;
+            }
+            if (latest is null || time > latest.Value)
+            {
+                latest = time;
+            }
+        }
+
+        return lastDay.ToDateTime(latest ?? TimeOnly.MinValue);
     }
 
     /// <summary>Sums commits in <paramref name="series"/> whose day is within the trailing
@@ -308,17 +329,22 @@ public static class GitMetrics
         return series.Where(s => s.Day >= cutoff && s.Day <= today).Sum(s => s.Count);
     }
 
-    /// <summary>Parses `git log --name-only --pretty=format:` output — one changed-file path per line, blank
+    /// <summary>Parses `git log -M --name-only --pretty=format:` output — one changed-file path per line, blank
     /// lines separating commits — into the most-changed files, sorted by change count descending (ordinal
-    /// path as a stable tie-break) and truncated to <paramref name="top"/>. Blank/whitespace lines and stray
-    /// carriage returns are skipped, so the parse never throws and never emits phantom entries. Pure, mirroring
-    /// <see cref="ParseLog"/>, so the format contract is unit-testable without a repo.</summary>
+    /// path as a stable tie-break) and truncated to <paramref name="top"/>. Production relies on <c>-M</c> so
+    /// rename commits already emit only the destination path; arrow/brace forms (name-status/numstat shaped)
+    /// are still collapsed via <see cref="ResolveRenamedPath"/> if present. Path keys stay Ordinal (same as
+    /// the rest of the git layer). Blank/whitespace lines and stray carriage returns are skipped, so the
+    /// parse never throws and never emits phantom entries. Pure, mirroring <see cref="ParseLog"/>, so the
+    /// format contract is unit-testable without a repo.</summary>
     public static IReadOnlyList<(string Path, int ChangeCount)> ParseChangedFiles(string log, int top = 5)
     {
-        var counts = new Dictionary<string, int>();
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var line in log.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            var path = line.Trim();
+            var raw = line.Trim();
+            if (raw.Length == 0) continue;
+            var path = ResolveRenamedPath(raw).Trim();
             if (path.Length == 0) continue;
             counts[path] = counts.GetValueOrDefault(path) + 1;
         }

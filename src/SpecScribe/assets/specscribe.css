@@ -921,10 +921,12 @@ a.change-surface-chip:focus-visible {
 }
 
 /* Authored HTML comments (<!-- ... -->) surfaced as visible, de-emphasized asides — distinct from blockquote's
-   gold border/warm-white background via a neutral --border rule and a smaller font-size. Global (not
-   .doc-body-scoped) so RenderInline/RenderBlock fragments rendered outside the .doc-body article (epic goal,
-   AC lines, user-story lines, Gherkin steps, titles) keep the same styling — same reasoning as the global
-   .md-table rule below. [Story 2.6] */
+   gold border/warm-white background via a neutral --border rule and a smaller font-size. Intentionally global
+   (not .doc-body-only): CommentAnnotationRenderer emits .md-comment / .md-comment-inline into .doc-body
+   articles AND into story-card / story-lead / epic-card / AC / user-story / Gherkin / title fragments via
+   RenderInline/RenderBlock. Narrowing to .doc-body alone would drop card/AC styling. Same reasoning as the
+   global .md-table rule below. SpecScribe is the only emitter of these class names today. [Story 2.6;
+   spec-3-1-deferred-debt-cleanup] */
 .md-comment {
   margin: 1rem 0;
   padding: 0.5rem 1rem;

@@ -1355,6 +1355,10 @@ public class ChartsTests
 
         Assert.Contains("git-pulse-bar-fill", html);
         Assert.Contains("src/Program.cs", html);
+        Assert.Contains("Top changed files (last 200 commits)", html);
+        Assert.Contains("aria-label=\"src/Program.cs: 3 changes\"", html);
+        Assert.Contains("aria-label=\"README.md: 1 change\"", html);
+        Assert.Contains("git-pulse-bar-track\" aria-hidden=\"true\"", html);
         // Suppresses the embedded heatmap's own headline (the signal strip above already carries the figures).
         Assert.DoesNotContain("heatmap-headline", html);
     }
@@ -1368,7 +1372,8 @@ public class ChartsTests
 
         var html = Charts.GitPulsePanel(git);
 
-        Assert.Contains("No file changes in recent history.", html);
+        Assert.Contains("No file changes in the last 200 commits.", html);
+        Assert.Contains("Top changed files (last 200 commits)", html);
         Assert.DoesNotContain("git-pulse-bar-fill", html);
     }
 

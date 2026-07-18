@@ -1085,9 +1085,10 @@ public static class Charts
         sb.Append(CommitHeatmap(git.DailySeries, git.CommitsByDay, showHeadline: false));
         sb.Append("    </div>\n");
 
-        // Top changed files as proportional bars (bar width relative to the most-changed file).
+        // Top changed files as proportional bars (bar width relative to the most-changed file). Title names the
+        // bounded -n 200 commit window so it is not read as sharing the adjacent 30-calendar-day signal.
         sb.Append("    <div class=\"git-pulse-files\">\n");
-        sb.Append("      <div class=\"git-pulse-files-title\">Top changed files</div>\n");
+        sb.Append("      <div class=\"git-pulse-files-title\">Top changed files (last 200 commits)</div>\n");
         if (git.TopChangedFiles.Count > 0)
         {
             var maxChanges = git.TopChangedFiles.Max(f => f.ChangeCount);
@@ -1097,19 +1098,22 @@ public static class Charts
                 // Floor the fill so the least-changed file still shows a visible sliver; the exact count stays
                 // in text so the bar is decorative, not the sole information carrier (never color/size-only).
                 var pct = maxChanges <= 0 ? 0 : Math.Clamp((int)Math.Round((double)changeCount / maxChanges * 100), 6, 100);
+                var countText = $"{changeCount} {Plural(changeCount, "change", "changes")}";
+                // Unifying accessible name for label + decorative bar + count (ProgressBar pattern).
+                var rowAria = Html($"{path}: {countText}");
                 // The label links to the file's in-portal code page (or external fallback) via the same seam the
                 // hotspots list uses; when no resolver is supplied (e.g. the webview path) CodeItemLink returns the
                 // plain escaped path, so the output is byte-identical to before.
                 sb.Append(
-                    $"        <li><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{CodeItemLink(path, fileHref)}</span>" +
-                    $"<span class=\"git-pulse-bar-track\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
-                    $"<span class=\"git-pulse-bar-count\">{changeCount} {Plural(changeCount, "change", "changes")}</span></li>\n");
+                    $"        <li aria-label=\"{rowAria}\"><span class=\"git-pulse-bar-label\" title=\"{Html(path)}\">{CodeItemLink(path, fileHref)}</span>" +
+                    $"<span class=\"git-pulse-bar-track\" aria-hidden=\"true\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
+                    $"<span class=\"git-pulse-bar-count\">{countText}</span></li>\n");
             }
             sb.Append("      </ol>\n");
         }
         else
         {
-            sb.Append("      <div class=\"chart-empty\">No file changes in recent history.</div>\n");
+            sb.Append("      <div class=\"chart-empty\">No file changes in the last 200 commits.</div>\n");
         }
         sb.Append("    </div>\n");
 

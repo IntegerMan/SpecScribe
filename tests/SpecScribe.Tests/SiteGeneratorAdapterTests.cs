@@ -479,7 +479,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // and deferred-work Epic 1 ledger closes. [spec-epic1-deferred-debt-cleanup]
         // Regenerated 2026-07-18: undrafted Story 1.2 gains minimal AC; epic-card note-above-AC
         // reorder — exposes AC reorder branch to byte-parity. [spec-epic9-deferred-debt-cleanup]
-        const string expected = "c376d8529bdcb0168a007fa127705d76e63eedb052cf3e7c9c9e5dd7250277af";
+        // Regenerated 2026-07-18: Git Pulse title/empty copy name the 200-commit window; file-bar rows gain
+        // aria-label + decorative track aria-hidden; comment CSS host comment only (no selector change).
+        // [spec-3-1-deferred-debt-cleanup]
+        const string expected = "9645b3a4df5aeae1a85f5fd98c22a2d1a74b53f2bbabb830982a5e4bd9adec7d";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
