@@ -128,6 +128,70 @@ public class RequirementLinkifierTests
         Assert.Equal(input, RequirementLinkifier.Linkify(input, model, ""));
     }
 
+    [Fact]
+    public void Linkify_NeverRewritesIdsInsideTagAttributes()
+    {
+        // Same corruption class StoryEpicLinkifier already guards: a mention inside data-tip / data-copy
+        // must stay plain text. Injecting <a href="…"> into the attribute shatters the tag and dumps the
+        // payload into the visible button face (Address deferred Next Steps on epic pages).
+        var model = Requirements((RequirementKind.Design, 1), (RequirementKind.Functional, 25));
+        const string tip = "<div data-tip=\"See UX-DR1 and FR25\">visible</div>";
+        Assert.Equal(tip, RequirementLinkifier.Linkify(tip, model, ""));
+
+        const string copy =
+            "<button class=\"cmd-copy\" data-copy=\"/bmad-quick-dev Address UX-DR1 — owner deferred trim\" " +
+            "aria-label=\"Address deferred — copy command\">" +
+            "<span class=\"cmd-text\">Address deferred</span></button>";
+        Assert.Equal(copy, RequirementLinkifier.Linkify(copy, model, "../"));
+    }
+
+    [Fact]
+    public void Linkify_AddressDeferredBadge_KeepsShortLabelWhenPayloadMentionsUxDr()
+    {
+        var model = Requirements((RequirementKind.Design, 1));
+        var catalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["quick-dev"] = "/bmad-quick-dev",
+            ["sprint-status"] = "/bmad-sprint-status",
+        });
+        var slot = new FollowUpDeferredSlot(
+            new DeferredWorkItem(
+                "<p>Epic 1 header back-fill tags UX-DR1 — owner deferred confirmation/trim; mappings left as-is.</p>",
+                Resolved: false, null, null),
+            "code review of 9-2", 9,
+            "../follow-ups/deferred-epic-1-header-back-fil-tags-ux-dr1.html",
+            "9-2-nfr-and-ux-dr-coverage-maps");
+        var epic = new EpicInfo
+        {
+            Number = 9,
+            Title = "E",
+            GoalHtml = "",
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.VerticalSlice,
+            Stories =
+            [
+                new StoryInfo
+                {
+                    Id = "9.1", Title = "S", Status = "in-progress", EpicNumber = 9,
+                    UserStoryHtml = "", AcBlocksHtml = Array.Empty<string>(),
+                }
+            ],
+        };
+
+        var html = BmadCommands.RenderEpicNextSteps(epic, catalog, [slot]);
+        Assert.Contains("UX-DR1", html); // payload carries the mention
+
+        var linked = RequirementLinkifier.Linkify(html, model, "../");
+
+        // Visible face stays the short label — not the spilled copy payload.
+        Assert.Contains("cmd-text\">Address deferred<", linked);
+        Assert.DoesNotContain("cmd-text\">/bmad-quick-dev", linked);
+        // UX-DR1 lived only inside the protected data-copy attribute → no req-ref injection.
+        Assert.DoesNotContain("req-ref", linked);
+        Assert.DoesNotContain("requirements/ux-dr1.html", linked);
+        Assert.Contains("UX-DR1", linked);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;

@@ -453,9 +453,9 @@ public class FollowUpSurfacesTests : IDisposable
 
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
         Assert.Contains("sb-followup-open", index);
-        Assert.Contains("stories (sized by tasks) &amp; follow-ups", index);
+        Assert.Contains("open vs done follow-ups (aggregated)", index);
         Assert.DoesNotContain("outermost: open follow-ups", index);
-        Assert.Contains("href=\"follow-ups/action-", index);
+        Assert.Contains("href=\"follow-ups/group-", index);
         Assert.Contains("Open follow-up</span>", index);
         // StatCards still present (geometry does not replace them).
         Assert.Contains("Action items", index);
@@ -529,11 +529,13 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("Open casing mismatch", epic1Html);
         Assert.DoesNotContain("Unscoped cleanup orphan", epic1Html);
 
-        // Index sunburst: Follow-ups orphan → filtered group page; epic arc stays epic page; leaves stay details.
+        // Index sunburst: Follow-ups orphan → filtered group page; epic arc stays epic page;
+        // follow-up leaves are aggregated (group-epic-N / group-follow-ups), not per-item detail.
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
         Assert.Contains("href=\"follow-ups/group-follow-ups.html\"", index);
         Assert.Contains("href=\"epics/epic-1.html\"", index);
-        Assert.Contains("href=\"follow-ups/action-", index);
+        Assert.Contains("href=\"follow-ups/group-epic-", index);
+        Assert.DoesNotContain("href=\"follow-ups/action-", index);
         // Orphan root must not dump into the whole-site action-items index.
         var orphanIdx = index.IndexOf("aria-label=\"Follow-ups:", StringComparison.Ordinal);
         Assert.True(orphanIdx >= 0);

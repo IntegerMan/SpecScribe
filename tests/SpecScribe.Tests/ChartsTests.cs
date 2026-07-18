@@ -384,30 +384,26 @@ public class ChartsTests
         Assert.Equal(4, geometry.DeferredItems.Count);
         Assert.Single(geometry.UnattributedDeferredItems);
         Assert.Single(unplanned.UnattributableDeferred);
-        // Open follow-ups are orange dashed; completed use followup-done (never story-stage sb-done alone).
+        // Project glance aggregates open vs done — no per-item leaf wedges.
         Assert.Contains("class=\"sb-seg sb-followup-open\"", svg);
         Assert.Contains("class=\"sb-seg sb-followup-done\"", svg);
-        Assert.Contains("aria-label=\"Action item: Fix the heatmap debt\"", svg);
-        Assert.Contains("aria-label=\"Action item (done): Ship delivery follow-up\"", svg);
-        Assert.Contains("aria-label=\"Action item: Unscoped cleanup\"", svg);
-        Assert.Contains("Deferred item: Epic 1 deferred open item.", svg);
-        Assert.Contains("Deferred item: Unattributed deferred open item.", svg);
-        // No aggregate deferred wedge when per-item slots exist.
-        Assert.DoesNotContain("Deferred work: 4 open", svg);
-        Assert.DoesNotContain("Deferred work: 3 open", svg);
+        Assert.Contains("Epic 1: 3 open follow-ups", svg); // 1 action + 2 deferred
+        Assert.Contains("Epic 2:", svg);
+        Assert.Contains("done follow-up", svg);
+        Assert.DoesNotContain("aria-label=\"Action item: Fix the heatmap debt\"", svg);
+        Assert.DoesNotContain("Deferred item: Epic 1 deferred open item.", svg);
         // Unattributed deferred moved to Unplanned; Follow-ups orphan holds action items only. [Story 9.12]
         Assert.Contains("aria-label=\"Follow-ups: 1 unattributed item\"", svg);
         Assert.Contains("aria-label=\"Unplanned:", svg);
         Assert.DoesNotContain("outermost: open follow-ups", svg);
         Assert.Contains("Open follow-up</span>", svg);
         Assert.Contains("Done follow-up</span>", svg);
-        Assert.Contains("stories (sized by tasks) &amp; follow-ups", svg);
-        // Per-item detail hrefs (Story 9.11) on action wedges.
-        Assert.Contains("href=\"follow-ups/action-", svg);
-        Assert.Contains("href=\"follow-ups/action-fix-the-heatmap-debt", svg);
-        Assert.Contains("href=\"follow-ups/deferred-", svg);
-        // Epic 1 aria includes action + story-child deferred (outer ring).
-        Assert.Contains("3 follow-ups", svg);
+        Assert.Contains("open vs done follow-ups (aggregated)", svg);
+        // Aggregates link to group pages, not per-item detail.
+        Assert.Contains($"href=\"{FollowUpGroupPages.EpicPath(1)}\"", svg);
+        Assert.Contains($"href=\"{FollowUpGroupPages.FollowUpsPath}\"", svg);
+        Assert.DoesNotContain("href=\"follow-ups/action-fix-the-heatmap-debt", svg);
+        Assert.Contains("3 open /", svg);
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
         {
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
@@ -440,7 +436,9 @@ public class ChartsTests
 
         var svg = Charts.Sunburst(model, followUps: geometry);
 
-        Assert.Contains("Deferred item: Only epic-attributed deferred item.", svg);
+        Assert.Contains("Epic 1: 1 open follow-up", svg);
+        Assert.Contains($"href=\"{FollowUpGroupPages.EpicPath(1)}\"", svg);
+        Assert.DoesNotContain("Deferred item: Only epic-attributed deferred item.", svg);
         Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
     }
 
@@ -486,8 +484,10 @@ public class ChartsTests
         Assert.Single(geometry.DeferredForEpicNumber(3));
 
         var svg = Charts.Sunburst(model, followUps: geometry);
-        // Story-child deferred renders in the outer ring under story 3.8, not as an epic peer.
-        Assert.Contains("Deferred item: Commit body containing a literal 0x1F", svg);
+        // Project glance: story-attributed deferred folds into epic open aggregate.
+        Assert.Contains("Epic 3: 1 open follow-up", svg);
+        Assert.Contains($"href=\"{FollowUpGroupPages.EpicPath(3)}\"", svg);
+        Assert.DoesNotContain("Deferred item: Commit body containing a literal 0x1F", svg);
         Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
     }
 
@@ -574,8 +574,10 @@ public class ChartsTests
         };
         var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
         var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
-        Assert.Contains("Deferred item: 2 open deferred items", svg);
-        Assert.Contains("href=\"deferred-work.html\"", svg);
+        // Unparseable ledger debt lands in Unplanned open aggregate (not a per-item wedge).
+        Assert.Contains("Unplanned: 1 open item", svg);
+        Assert.Contains("aria-label=\"Unplanned:", svg);
+        Assert.DoesNotContain("Deferred item: 2 open deferred items", svg);
     }
 
     [Fact]
@@ -620,8 +622,9 @@ public class ChartsTests
             DeferredHref: null,
             ActionItemsHref: SiteNav.ActionItemsOutputPath);
         var svg = Charts.Sunburst(model, followUps: geometry);
-        Assert.Contains("aria-label=\"Action item: Ghost epic debt\"", svg);
+        Assert.Contains("Follow-ups: 1 open unattributed item", svg);
         Assert.Contains("Follow-ups:", svg);
+        Assert.DoesNotContain("aria-label=\"Action item: Ghost epic debt\"", svg);
     }
 
     [Fact]
@@ -639,7 +642,9 @@ public class ChartsTests
             DeferredHref: null,
             ActionItemsHref: SiteNav.ActionItemsOutputPath);
         var svg = Charts.Sunburst(model, followUps: geometry);
-        Assert.Contains("Action item: (no action text)", svg);
+        // Empty action text still counts in the epic open aggregate (no per-item leaf).
+        Assert.Contains("Epic 1: 1 open follow-up", svg);
+        Assert.DoesNotContain("Action item: (no action text)", svg);
     }
 
     [Fact]
@@ -738,20 +743,20 @@ public class ChartsTests
         var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
 
         Assert.Contains("aria-label=\"Unplanned:", svg);
-        Assert.Contains("aria-label=\"Direct change: Fix the footer\"", svg);
-        Assert.Contains("href=\"implementation-artifacts/spec-fix-footer.html\"", svg);
-        Assert.Contains("aria-label=\"Deferred item: Parked direct deferred item.\"", svg);
+        Assert.Contains("Unplanned: 2 open items", svg); // open QD + unattributable deferred
+        Assert.DoesNotContain("aria-label=\"Direct change: Fix the footer\"", svg);
+        Assert.DoesNotContain("aria-label=\"Deferred item: Parked direct deferred item.\"", svg);
         Assert.Contains("Direct change</span>", svg);
         Assert.Contains("Unplanned = direct / one-shot work", svg);
         Assert.Contains("class=\"sb-seg sb-unplanned\"", svg);
         Assert.DoesNotContain("Direct change: Done one-shot", svg);
-        // Follow-ups orphan still holds the unattributed action only.
+        // Follow-ups orphan still holds the unattributed action only (aggregated).
         Assert.Contains("aria-label=\"Follow-ups: 1 unattributed item\"", svg);
         Assert.Contains($"href=\"{FollowUpGroupPages.FollowUpsPath}\"", svg);
         Assert.Contains($"href=\"{FollowUpGroupPages.UnplannedPath}\"", svg);
         Assert.DoesNotContain($"href=\"{SiteNav.ActionItemsOutputPath}\"", svg);
         Assert.DoesNotContain("href=\"deferred-work.html\"", svg);
-        Assert.Contains("aria-label=\"Action item: Orphan action\"", svg);
+        Assert.Contains("Follow-ups: 1 open unattributed item", svg);
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
     }
@@ -793,8 +798,10 @@ public class ChartsTests
 
         var svg = Charts.Sunburst(model, unplanned: unplannedAttributed);
         Assert.DoesNotContain("aria-label=\"Unplanned:", svg);
-        Assert.Contains("aria-label=\"Direct change: Story 1.1 hotfix\"", svg);
-        Assert.Contains("1 direct change", svg);
+        Assert.Contains("Epic 1: 1 open follow-up", svg);
+        Assert.Contains($"href=\"{FollowUpGroupPages.EpicPath(1)}\"", svg);
+        Assert.DoesNotContain("aria-label=\"Direct change: Story 1.1 hotfix\"", svg);
+        Assert.Contains("1 open / 0 done follow-ups", svg);
     }
 
     [Fact]
@@ -835,10 +842,12 @@ public class ChartsTests
 
         foreach (var member in unplanned.UnplannedSet)
         {
-            Assert.Contains($"href=\"{member.Href}\"", svg);
             Assert.Contains($"href=\"{member.Href}\"", board);
             Assert.Contains($"href=\"{member.Href}\"", byEpic);
         }
+        // Project sunburst aggregates Unplanned — leaves stay on the sprint board / group page.
+        Assert.Contains($"href=\"{FollowUpGroupPages.UnplannedPath}\"", svg);
+        Assert.DoesNotContain("href=\"spec-polish.html\"", svg);
         Assert.Contains("sprint-lane unplanned", board);
         Assert.Contains("sprint-epic-lane unplanned", byEpic);
         Assert.Contains("Direct change", board);
@@ -2113,9 +2122,9 @@ public class ChartsTests
     }
 
     [Fact]
-    public void Sunburst_StoryChildDeferred_NestsUnderParentStory()
+    public void Sunburst_StoryChildDeferred_AggregatesUnderEpic()
     {
-        // I/O matrix: deferred with SourceStoryId → story renders as outer-ring child under that story's sweep.
+        // Project glance: story-child deferred collapses into epic open/done aggregates.
         var model = new EpicsModel
         {
             OverviewHtml = string.Empty,
@@ -2141,15 +2150,15 @@ public class ChartsTests
 
         var svg = Charts.Sunburst(model, followUps: geometry);
 
-        Assert.Contains("Deferred item: Story-child deferred item from code review.", svg);
-        // Story-child deferred counts in the epic aria follow-up total (outer ring under the story).
-        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story, 1 follow-up\"", svg);
+        Assert.Contains("Epic 1: 1 open follow-up", svg);
+        Assert.Contains("1 open / 0 done follow-ups", svg);
+        Assert.DoesNotContain("Deferred item: Story-child deferred item from code review.", svg);
     }
 
     [Fact]
-    public void Sunburst_RetroActionItems_AsEpicMiddlePeers()
+    public void Sunburst_RetroActionItems_InEpicOpenAggregate()
     {
-        // I/O matrix: retro action item with epic:N appears as epic-level middle child, not under a story.
+        // Project glance: retro action with epic:N contributes to epic open aggregate (not a middle peer).
         var model = new EpicsModel
         {
             OverviewHtml = string.Empty,
@@ -2170,8 +2179,8 @@ public class ChartsTests
 
         var svg = Charts.Sunburst(model, followUps: geometry);
 
-        Assert.Contains("aria-label=\"Action item: Retro action\"", svg);
-        Assert.Contains("1 follow-up", svg);
+        Assert.Contains("Epic 1: 1 open follow-up", svg);
+        Assert.DoesNotContain("aria-label=\"Action item: Retro action\"", svg);
     }
 
     [Fact]
@@ -2223,8 +2232,8 @@ public class ChartsTests
 
         Assert.DoesNotContain("sb-followup-open", svg);
         Assert.DoesNotContain("Deferred item", svg);
-        // Hint must not claim an outer ring when none exists.
-        Assert.DoesNotContain("outer: story-child deferred", svg);
+        // Hint must not claim an outer aggregate ring when none exists.
+        Assert.DoesNotContain("open vs done follow-ups (aggregated)", svg);
     }
 
     [Fact]

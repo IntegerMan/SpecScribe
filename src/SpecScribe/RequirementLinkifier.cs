@@ -6,12 +6,19 @@ namespace SpecScribe;
 /// real links to that requirement's generated page, wherever they appear in a rendered body. Runs as a
 /// whole-page post-process (like <see cref="SourceLinkifier"/>) so a reference is linked no matter which
 /// template emitted it. Anchor-aware: it never rewrites a token already inside an &lt;a&gt;…&lt;/a&gt;
-/// span, so re-linking the requirement pages' own links (or nav) is a no-op.</summary>
+/// span, so re-linking the requirement pages' own links (or nav) is a no-op. Also skips &lt;code&gt;/&lt;pre&gt;/
+/// &lt;svg&gt;/&lt;head&gt;/&lt;script&gt;/&lt;style&gt; and every standalone tag so attribute values
+/// (<c>data-copy</c>, <c>data-tip</c>, <c>aria-label</c>, …) never receive an injected &lt;a&gt; — the same
+/// corruption trap <see cref="StoryEpicLinkifier"/> already guards against.</summary>
 public static class RequirementLinkifier
 {
-    // Captures whole anchor spans so Regex.Split hands them back as delimiters we skip over.
-    private static readonly Regex AnchorSplit = new(
-        "(<a\\b[^>]*>.*?</a>)",
+    // Same protected-split grammar as StoryEpicLinkifier: element pairs first, then any standalone tag so
+    // replacement stays in text nodes only. Without the standalone-tag arm, a mention inside data-copy /
+    // data-tip would get an <a href="…"> injected into the attribute and shatter the tag.
+    // [spec-address-deferred-next-steps UX]
+    private static readonly Regex ProtectedSplit = new(
+        "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<svg\\b[^>]*>.*?</svg>"
+        + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>|<[^>]*>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
     // Whole-token match for FR / NFR / UX-DR ids (word-boundary anchored). UX-DR is a single alternation
@@ -29,10 +36,10 @@ public static class RequirementLinkifier
             return html;
         }
 
-        var parts = AnchorSplit.Split(html);
+        var parts = ProtectedSplit.Split(html);
         for (var i = 0; i < parts.Length; i++)
         {
-            // Odd indices are the captured <a>…</a> spans — leave them untouched.
+            // Odd indices are the captured protected spans — leave them untouched.
             if (i % 2 == 1) continue;
             parts[i] = ReplaceRefs(parts[i], requirements, outputRelativePrefix, skipId);
         }
