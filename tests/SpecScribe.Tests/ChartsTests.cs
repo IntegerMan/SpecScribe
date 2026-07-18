@@ -158,6 +158,62 @@ public class ChartsTests
     }
 
     [Fact]
+    public void TaskSunburst_DeferredFromStory_OuterRingWithLinks()
+    {
+        var tasks = new List<TaskItem>
+        {
+            new("Ship it", Done: true, Subtasks: Array.Empty<TaskItem>()),
+            new("Polish copy", Done: false, Subtasks: Array.Empty<TaskItem>()),
+        };
+        var deferred = new[]
+        {
+            new FollowUpDeferredSlot(
+                new DeferredWorkItem("<p>Park the exposure.</p>", false, null, null),
+                "code review of 9-6.md",
+                EpicNumber: 9,
+                DetailHref: "../follow-ups/deferred-park.html",
+                SourceKey: "9-6-follow-up"),
+            new FollowUpDeferredSlot(
+                new DeferredWorkItem("<p>~~Already fixed.~~</p>", true, null, null),
+                "code review of 9-6.md",
+                EpicNumber: 9,
+                DetailHref: "../follow-ups/deferred-fixed.html",
+                SourceKey: "9-6-follow-up"),
+        };
+
+        var svg = Charts.TaskSunburst(tasks, deferred: deferred);
+
+        Assert.Contains("class=\"sb-seg sb-followup-open\"", svg);
+        Assert.Contains("class=\"sb-seg sb-followup-done\"", svg);
+        Assert.Contains("Deferred item: Park the exposure.", svg);
+        Assert.Contains("href=\"../follow-ups/deferred-park.html\"", svg);
+        Assert.Contains("Open follow-up</span>", svg);
+        Assert.Contains("outer: deferred from this story", svg);
+        Assert.Contains("1 open deferred item", svg);
+        Assert.Contains("1/2</text>", svg); // task center still primary when tasks exist
+    }
+
+    [Fact]
+    public void TaskSunburst_DeferredOnly_WhenNoTasks()
+    {
+        var deferred = new[]
+        {
+            new FollowUpDeferredSlot(
+                new DeferredWorkItem("<p>Only deferred.</p>", false, null, null),
+                "from story",
+                1,
+                "follow-ups/deferred-only.html"),
+        };
+
+        var svg = Charts.TaskSunburst(Array.Empty<TaskItem>(), deferred: deferred);
+
+        Assert.Contains("Deferred item: Only deferred.", svg);
+        Assert.Contains("1/1</text>", svg);
+        Assert.Contains(">deferred</text>", svg);
+        Assert.DoesNotContain("No tasks tracked", svg);
+    }
+
+    [Fact]
     public void DonutLegend_EntriesAreKeyboardReachableAndStatusKeyedForEmphasis()
     {
         // The donut half of the interactive-legend emphasis (Story 3.5 Task 3, review follow-up: Subtask 3.1

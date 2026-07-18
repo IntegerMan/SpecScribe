@@ -462,7 +462,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // div.sprint-card hover / source-ref links. [Story 9.13 review]
         // Regenerated 2026-07-18: fingerprint on main already drifted from expected 0e02f9c5… (same
         // 9821c3f2… with or without watch RefreshFollowUpSurfaces); refresh the byte-parity gate.
-        const string expected = "9821c3f2211733f2fa36b696c4c1fbcbf0a00f55df4eec3d99c9e0a5104481bf";
+        const string expected = "21b87eb87fa3f4d245c1a25adcf6feed11d6e08396c8d343f7cd5474e97a7338";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

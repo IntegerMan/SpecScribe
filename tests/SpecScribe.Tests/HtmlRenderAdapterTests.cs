@@ -1105,6 +1105,10 @@ public class HtmlRenderAdapterTests
         Assert.Contains("Park the exposure", html);
         Assert.Contains("href=\"../follow-ups/deferred-abc.html\"", html);
         Assert.Contains("followup-row", html);
+        // Story-level task sunburst also carries deferred geometry when the panel is present.
+        Assert.Contains("id=\"sec-task-breakdown\"", html);
+        Assert.Contains("Deferred item: Park the exposure.", html);
+        Assert.Contains("deferred from this story", html);
     }
 
     [Fact]

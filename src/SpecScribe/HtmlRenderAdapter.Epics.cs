@@ -499,10 +499,10 @@ public sealed partial class HtmlRenderAdapter
         }
 
         main.Append("<section class=\"dashboard-narrow\">\n<div class=\"chart-row\">\n");
-        if (view.Tasks.Count > 0)
+        if (view.Tasks.Count > 0 || view.DeferredFromThis.Count > 0)
         {
             main.Append("<div class=\"chart-panel sunburst-panel\" id=\"sec-task-breakdown\">\n<h3>Task Breakdown</h3>\n");
-            main.Append(Charts.TaskSunburst(view.Tasks));
+            main.Append(Charts.TaskSunburst(view.Tasks, deferred: view.DeferredFromThis));
             main.Append("</div>\n");
             toc.Add(new Toc.Entry(2, "Task Breakdown", "sec-task-breakdown"));
         }

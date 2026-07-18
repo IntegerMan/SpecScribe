@@ -1,0 +1,508 @@
+diff --git a/src/SpecScribe/ActionItemsTemplater.cs b/src/SpecScribe/ActionItemsTemplater.cs
+index ac95604..4cd317b 100644
+--- a/src/SpecScribe/ActionItemsTemplater.cs
++++ b/src/SpecScribe/ActionItemsTemplater.cs
+@@ -94,12 +94,13 @@ public static class ActionItemsTemplater
+     }
+ 
+     /// <summary>Conservative near-duplicate detector: pairs from different epics whose normalized token
+-    /// overlap is high. Prefer false negatives. Pure and deterministic. [Story 9.6]</summary>
+-    public static IReadOnlyDictionary<SprintActionItem, int> FindNearDuplicates(IReadOnlyList<SprintActionItem> openItems)
++    /// overlap is high. Accumulates all counterpart epics (sorted, distinct) — not first-match-only.
++    /// Prefer false negatives. Pure and deterministic. [Story 9.6]</summary>
++    public static IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>> FindNearDuplicates(IReadOnlyList<SprintActionItem> openItems)
+     {
+         // Reference equality: value-equal records (same action/status/epic/owner) must not collide and
+         // silently drop a cross-link while both rows still render.
+-        var result = new Dictionary<SprintActionItem, int>(ReferenceEqualityComparer.Instance);
++        var accum = new Dictionary<SprintActionItem, HashSet<int>>(ReferenceEqualityComparer.Instance);
+         for (var i = 0; i < openItems.Count; i++)
+         {
+             var a = openItems[i];
+@@ -109,11 +110,25 @@ public static class ActionItemsTemplater
+                 var b = openItems[j];
+                 if (b.EpicNumber is null || b.EpicNumber == a.EpicNumber) continue;
+                 if (!AreNearDuplicates(a.Action, b.Action)) continue;
+-                result.TryAdd(a, b.EpicNumber.Value);
+-                result.TryAdd(b, a.EpicNumber.Value);
++                Add(accum, a, b.EpicNumber.Value);
++                Add(accum, b, a.EpicNumber.Value);
+             }
+         }
++
++        var result = new Dictionary<SprintActionItem, IReadOnlyList<int>>(ReferenceEqualityComparer.Instance);
++        foreach (var kv in accum)
++            result[kv.Key] = kv.Value.OrderBy(e => e).ToList();
+         return result;
++
++        static void Add(Dictionary<SprintActionItem, HashSet<int>> map, SprintActionItem item, int epic)
++        {
++            if (!map.TryGetValue(item, out var set))
++            {
++                set = new HashSet<int>();
++                map[item] = set;
++            }
++            set.Add(epic);
++        }
+     }
+ 
+     /// <summary>True when two action texts are highly similar (Jaccard ≥ 0.45 on significant tokens AND
+@@ -141,7 +156,7 @@ public static class ActionItemsTemplater
+         EpicsModel? epicsModel,
+         IReadOnlyDictionary<string, string>? hrefMap,
+         string prefix,
+-        IReadOnlyDictionary<SprintActionItem, int> crossLinks,
++        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>> crossLinks,
+         IReadOnlyDictionary<SprintActionItem, string> detailSlugs,
+         IReadOnlyDictionary<int, string>? epicRetroMap)
+     {
+@@ -157,18 +172,7 @@ public static class ActionItemsTemplater
+         if (detailHref is null)
+         {
+             detail.Append($"<div class=\"followup-row-fulltext\">{FollowUpRefs.LinkifyVisibleText(item.Action, epicsModel, hrefMap, prefix)}</div>\n");
+-            if (crossLinks.TryGetValue(item, out var otherEpic))
+-            {
+-                if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
+-                {
+-                    var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(otherRetro));
+-                    detail.Append($"<a class=\"action-item-cross\" href=\"{PathUtil.Html(href)}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
+-                }
+-                else
+-                {
+-                    detail.Append($"<span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
+-                }
+-            }
++            AppendCrossLinks(detail, item, crossLinks, epicRetroMap, prefix);
+             if (deferredWorkHref is { Length: > 0 } && DeferralHeuristics.IsDebtRelated(item.Action))
+             {
+                 var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(deferredWorkHref));
+@@ -193,6 +197,28 @@ public static class ActionItemsTemplater
+             detailHref: detailHref);
+     }
+ 
++    internal static void AppendCrossLinks(
++        StringBuilder sb,
++        SprintActionItem item,
++        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>? crossLinks,
++        IReadOnlyDictionary<int, string>? epicRetroMap,
++        string prefix)
++    {
++        if (crossLinks is null || !crossLinks.TryGetValue(item, out var otherEpics)) return;
++        foreach (var otherEpic in otherEpics)
++        {
++            if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
++            {
++                var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(otherRetro));
++                sb.Append($"<a class=\"action-item-cross\" href=\"{PathUtil.Html(href)}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
++            }
++            else
++            {
++                sb.Append($"<span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
++            }
++        }
++    }
++
+     private static string RenderGroupHeading(int? epicNumber, IReadOnlyDictionary<int, string>? epicRetroMap)
+     {
+         if (epicNumber is null)
+diff --git a/src/SpecScribe/DeferredWorkParser.cs b/src/SpecScribe/DeferredWorkParser.cs
+index 3c61894..5e1dece 100644
+--- a/src/SpecScribe/DeferredWorkParser.cs
++++ b/src/SpecScribe/DeferredWorkParser.cs
+@@ -43,6 +43,11 @@ public static class DeferredWorkParser
+         @"\*\*\[\s*RESOLVED\b|\[\s*RESOLVED\b",
+         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+ 
++    // Column-0 CommonMark unordered [-*+] or ordered N. / N) — nested/indented lines stay continuations.
++    private static readonly Regex TopLevelListMarker = new(
++        @"^(?:[-*+][ \t]|\d+[.)][ \t])",
++        RegexOptions.Compiled);
++
+     /// <summary>Parses <paramref name="markdown"/> into a structured model. On any failure or when no
+     /// Deferred-from headings exist, returns <c>IsStructured = false</c> with an optional plain-body
+     /// fallback (rendered from <paramref name="fallbackBodyHtml"/> when supplied).</summary>
+@@ -115,12 +120,9 @@ public static class DeferredWorkParser
+         void Flush()
+         {
+             if (current.Count == 0) return;
+-            // Strip the leading "- " from the first line.
+             var first = current[0];
+-            if (first.StartsWith("- ", StringComparison.Ordinal))
+-                first = first[2..];
+-            else if (first.StartsWith("-\t", StringComparison.Ordinal))
+-                first = first[2..];
++            if (TryStripTopLevelListMarker(first, out var stripped))
++                first = stripped;
+ 
+             var md = first;
+             if (current.Count > 1)
+@@ -153,8 +155,8 @@ public static class DeferredWorkParser
+ 
+         foreach (var line in lines)
+         {
+-            // Top-level list item: starts with "- " at column 0 (no leading whitespace).
+-            if (line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("-\t", StringComparison.Ordinal))
++            // Top-level list item: column-0 unordered/ordered markers (no leading whitespace).
++            if (TopLevelListMarker.IsMatch(line))
+             {
+                 Flush();
+                 current.Add(line);
+@@ -177,6 +179,18 @@ public static class DeferredWorkParser
+         return items;
+     }
+ 
++    private static bool TryStripTopLevelListMarker(string line, out string remainder)
++    {
++        var m = TopLevelListMarker.Match(line);
++        if (!m.Success)
++        {
++            remainder = line;
++            return false;
++        }
++        remainder = line[m.Length..];
++        return true;
++    }
++
+     private static string? ExtractKeyFromLabel(string label)
+     {
+         // Prefer explicit story review headings: "code review of story-3-8" / "story-3.5".
+diff --git a/src/SpecScribe/DeferredWorkTemplater.cs b/src/SpecScribe/DeferredWorkTemplater.cs
+index 18597e1..ae2499f 100644
+--- a/src/SpecScribe/DeferredWorkTemplater.cs
++++ b/src/SpecScribe/DeferredWorkTemplater.cs
+@@ -129,13 +129,13 @@ public static class DeferredWorkTemplater
+             detail.Append($"<div class=\"deferred-item-body\">{item.BodyHtml}</div>\n");
+             if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
+             {
+-                var label = rr.Contains('.') && !rr.Contains('-') ? $"Story {rr}" : rr;
++                var label = FollowUpRefs.ResolvingLabel(rr);
+                 var href = FollowUpGeometry.ApplyLinkPrefix(prefix, rh);
+                 detail.Append($"<a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(href))}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
+             }
+             else if (item.ResolvingRef is { Length: > 0 } rr2)
+             {
+-                var label = rr2.Contains('.') && !rr2.Contains('-') ? $"Story {rr2}" : rr2;
++                var label = FollowUpRefs.ResolvingLabel(rr2);
+                 detail.Append($"<span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(label)}</span>\n");
+             }
+             if (item.Resolved)
+diff --git a/src/SpecScribe/FollowUpDetailTemplater.cs b/src/SpecScribe/FollowUpDetailTemplater.cs
+index e3d3cca..8232075 100644
+--- a/src/SpecScribe/FollowUpDetailTemplater.cs
++++ b/src/SpecScribe/FollowUpDetailTemplater.cs
+@@ -18,7 +18,7 @@ public static class FollowUpDetailTemplater
+         string? deferredWorkHref = null,
+         EpicsModel? epicsModel = null,
+         IReadOnlyDictionary<string, string>? hrefMap = null,
+-        IReadOnlyDictionary<SprintActionItem, int>? crossLinks = null)
++        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>? crossLinks = null)
+     {
+         var outputPath = FollowUpSlug.OutputPath(slug);
+         var prefix = PathUtil.RelativePrefix(outputPath);
+@@ -65,17 +65,20 @@ public static class FollowUpDetailTemplater
+         }
+         sb.Append("  </div>\n");
+ 
+-        if (crossLinks is not null && crossLinks.TryGetValue(item, out var otherEpic))
++        if (crossLinks is not null && crossLinks.TryGetValue(item, out var otherEpics))
+         {
+             sb.Append("  <div class=\"followup-detail-cross\">\n");
+-            if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
++            foreach (var otherEpic in otherEpics)
+             {
+-                var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(otherRetro));
+-                sb.Append($"    <a class=\"action-item-cross\" href=\"{PathUtil.Html(href)}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
+-            }
+-            else
+-            {
+-                sb.Append($"    <span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
++                if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
++                {
++                    var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(otherRetro));
++                    sb.Append($"    <a class=\"action-item-cross\" href=\"{PathUtil.Html(href)}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
++                }
++                else
++                {
++                    sb.Append($"    <span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
++                }
+             }
+             sb.Append("  </div>\n");
+         }
+@@ -157,13 +160,13 @@ public static class FollowUpDetailTemplater
+ 
+         if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
+         {
+-            var label = rr.Contains('.') && !rr.Contains('-') ? $"Story {rr}" : rr;
++            var label = FollowUpRefs.ResolvingLabel(rr);
+             var href = FollowUpGeometry.ApplyLinkPrefix(prefix, rh);
+             sb.Append($"  <a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(href))}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
+         }
+         else if (item.ResolvingRef is { Length: > 0 } rr2)
+         {
+-            sb.Append($"  <span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(rr2)}</span>\n");
++            sb.Append($"  <span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(FollowUpRefs.ResolvingLabel(rr2))}</span>\n");
+         }
+ 
+         sb.Append("</section>\n");
+diff --git a/src/SpecScribe/FollowUpRefs.cs b/src/SpecScribe/FollowUpRefs.cs
+index fc528a7..afcd28e 100644
+--- a/src/SpecScribe/FollowUpRefs.cs
++++ b/src/SpecScribe/FollowUpRefs.cs
+@@ -16,15 +16,24 @@ public static class FollowUpRefs
+         @"\bspec-[a-z0-9][a-z0-9-]*(?:\.md)?\b",
+         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+ 
+-    // "RESOLVED in 6.11" / "RESOLVED in Story 6.4" / "Resolved … `spec-…`"
++    // "RESOLVED in 6.11" / "RESOLVED in Story 6.4" (trailing punctuation/em-dash OK via \b)
+     private static readonly Regex ResolvedInStory = new(
+         @"RESOLVED\s+in\s+(?:Story\s+)?(?<epic>\d+)\.(?<story>\d+)\b",
+         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+ 
++    // After a RESOLVED marker: backtick story-key or spec-* token (live notes: **RESOLVED …** (`spec-…`)).
++    private static readonly Regex ResolvedThenBacktickRef = new(
++        @"RESOLVED\b[^`\n]{0,120}`(?<token>(?:\d+-\d+-[a-z0-9][a-z0-9-]*|spec-[a-z0-9][a-z0-9-]*)(?:\.md)?)`",
++        RegexOptions.Compiled | RegexOptions.IgnoreCase);
++
+     private static readonly Regex SourceSpecLine = new(
+         @"source_spec:\s*`?(?<file>[^`\s\n]+)`?",
+         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+ 
++    private static readonly Regex DottedStoryId = new(
++        @"^\d+\.\d+$",
++        RegexOptions.Compiled);
++
+     /// <summary>Builds a filename-stem → output-href map for docs under implementation-artifacts
+     /// (spec pages) plus every story's generated page path. Keys are bare stems and <c>.md</c> forms.</summary>
+     public static IReadOnlyDictionary<string, string> BuildHrefMap(EpicsModel? epics, IEnumerable<DocModel>? docs)
+@@ -88,11 +97,13 @@ public static class FollowUpRefs
+     }
+ 
+     /// <summary>Resolves a story id ("N.M") from a filename or review-heading token —
+-    /// <c>8-8-slug.md</c>, <c>story-3-8</c>, <c>story-3.8</c>, or bare <c>3.8</c>.</summary>
++    /// <c>8-8-slug.md</c>, path-prefixed forms, <c>story-3-8</c>, <c>story-3.8</c>, or bare <c>3.8</c>.</summary>
+     public static string? StoryIdFromKey(string token)
+     {
+         if (string.IsNullOrWhiteSpace(token)) return null;
+-        var bare = token.Trim().Trim('`');
++        var bare = token.Trim().Trim('`').Replace('\\', '/');
++        // Path-prefixed source_spec tokens: use filename stem (same discipline as ResolveHref / BuildHrefMap).
++        bare = Path.GetFileName(bare);
+         if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+             bare = bare[..^3];
+         if (bare.StartsWith("story-", StringComparison.OrdinalIgnoreCase))
+@@ -112,14 +123,28 @@ public static class FollowUpRefs
+         return $"{epic}.{story}";
+     }
+ 
+-    /// <summary>Extracts a resolving story id from RESOLVED markers in item markdown, if present.</summary>
++    /// <summary>Extracts a resolving story id or backtick story/spec token from RESOLVED markers, if present.
++    /// Prefer false negatives — does not invent status.</summary>
+     public static string? ResolvingStoryIdFromText(string markdown)
+     {
+         var m = ResolvedInStory.Match(markdown);
+-        if (!m.Success) return null;
+-        if (!int.TryParse(m.Groups["epic"].Value, out var epic) || !int.TryParse(m.Groups["story"].Value, out var story))
+-            return null;
+-        return $"{epic}.{story}";
++        if (m.Success
++            && int.TryParse(m.Groups["epic"].Value, out var epic)
++            && int.TryParse(m.Groups["story"].Value, out var story))
++            return $"{epic}.{story}";
++
++        var bt = ResolvedThenBacktickRef.Match(markdown);
++        if (!bt.Success) return null;
++        var token = bt.Groups["token"].Value;
++        return StoryIdFromKey(token) ?? token;
++    }
++
++    /// <summary>Chip/link label for a resolving ref: <c>Story N.M</c> only for dotted story ids;
++    /// otherwise the raw filename/stem (never <c>Story readme.md</c>).</summary>
++    public static string ResolvingLabel(string resolvingRef)
++    {
++        var bare = resolvingRef.Trim();
++        return DottedStoryId.IsMatch(bare) ? $"Story {bare}" : bare;
+     }
+ 
+     /// <summary>Extracts a <c>source_spec:</c> filename token from markdown text, if present.</summary>
+diff --git a/src/SpecScribe/SiteGenerator.cs b/src/SpecScribe/SiteGenerator.cs
+index 3622944..aaeab06 100644
+--- a/src/SpecScribe/SiteGenerator.cs
++++ b/src/SpecScribe/SiteGenerator.cs
+@@ -3017,7 +3017,8 @@ public sealed class SiteGenerator
+         var openForCrossLinks = actionItems.Where(a => !FollowUpGeometry.IsDone(a)).ToList();
+         var crossLinks = openForCrossLinks.Count > 0
+             ? ActionItemsTemplater.FindNearDuplicates(openForCrossLinks)
+-            : new Dictionary<SprintActionItem, int>();
++            : (IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>)
++                new Dictionary<SprintActionItem, IReadOnlyList<int>>(ReferenceEqualityComparer.Instance);
+         var actionSlugs = FollowUpSlug.AssignActionSlugs(actionItems);
+ 
+         foreach (var item in actionItems)
+diff --git a/tests/SpecScribe.Tests/DeferredWorkParserTests.cs b/tests/SpecScribe.Tests/DeferredWorkParserTests.cs
+index 31a338e..0381aa0 100644
+--- a/tests/SpecScribe.Tests/DeferredWorkParserTests.cs
++++ b/tests/SpecScribe.Tests/DeferredWorkParserTests.cs
+@@ -238,6 +238,118 @@ public class DeferredWorkParserTests
+         Assert.Equal(2, model.Groups[0].Items.Count);
+     }
+ 
++    [Fact]
++    public void Parse_StarPlusAndNumberedListMarkers_BecomeItems()
++    {
++        var md = """
++            ## Deferred from: review of 1-1-foundation.md
++
++            * Star item
++            + Plus item
++            1. Numbered dot item
++            2) Numbered paren item
++              - nested stays continuation of paren item
++            """;
++
++        var model = DeferredWorkParser.Parse(md);
++        Assert.True(model.IsStructured);
++        Assert.Equal(4, model.Groups[0].Items.Count);
++        Assert.Contains("Star item", model.Groups[0].Items[0].BodyHtml);
++        Assert.Contains("Plus item", model.Groups[0].Items[1].BodyHtml);
++        Assert.Contains("Numbered dot item", model.Groups[0].Items[2].BodyHtml);
++        Assert.Contains("Numbered paren item", model.Groups[0].Items[3].BodyHtml);
++        Assert.Contains("nested stays", model.Groups[0].Items[3].BodyHtml);
++    }
++
++    [Fact]
++    public void Parse_PathPrefixedSourceSpec_ResolvesStoryIdAndPlaceholderHref()
++    {
++        var md = """
++            ## Deferred from: code review of path-prefixed note
++
++            - source_spec: `_bmad-output/implementation-artifacts/8-8-generation-time-recency-signals.md`
++            - Open path-map casing mismatch on Windows.
++            """;
++
++        var model = DeferredWorkParser.Parse(md); // no href map — placeholder path
++        Assert.True(model.IsStructured);
++        var group = Assert.Single(model.Groups);
++        Assert.Equal("8.8", group.SourceStoryId);
++        Assert.Equal("epics/story-8-8.html", group.SourceStoryHref);
++    }
++
++    [Fact]
++    public void Parse_ResolvedWithBacktickSpec_SetsResolvingRef()
++    {
++        var md = """
++            ## Deferred from: review of 1-1-foundation.md
++
++            - ~~Stale watch path~~ **RESOLVED 2026-07-18** (`spec-webview-doc-page-surfaces`): writers refresh.
++            """;
++
++        var model = DeferredWorkParser.Parse(md, HrefMap);
++        var item = Assert.Single(model.Groups[0].Items);
++        Assert.True(item.Resolved);
++        Assert.Equal("spec-webview-doc-page-surfaces", item.ResolvingRef);
++        Assert.Contains("spec-webview-doc-page-surfaces.html", item.ResolvingHref);
++    }
++
++    [Fact]
++    public void Parse_ResolvedInStoryWithEmDash_StillExtractsStoryId()
++    {
++        var md = """
++            ## Deferred from: review of 6-3-vs-code-integration-spike.md
++
++            - **[RESOLVED in 6.11 — the 6.4 claim was STALE]** ~~Live-push watcher~~
++            """;
++
++        var model = DeferredWorkParser.Parse(md);
++        var item = Assert.Single(model.Groups[0].Items);
++        Assert.True(item.Resolved);
++        Assert.Equal("6.11", item.ResolvingRef);
++        Assert.Equal("epics/story-6-11.html", item.ResolvingHref);
++    }
++
++    [Fact]
++    public void ResolvingLabel_StoryIdGetsPrefix_FilenameDoesNot()
++    {
++        Assert.Equal("Story 6.4", FollowUpRefs.ResolvingLabel("6.4"));
++        Assert.Equal("readme.md", FollowUpRefs.ResolvingLabel("readme.md"));
++        Assert.Equal("spec-foo.md", FollowUpRefs.ResolvingLabel("spec-foo.md"));
++    }
++
++    [Fact]
++    public void Templater_ResolvingChip_DoesNotPrefixStoryOntoFilename()
++    {
++        var model = new DeferredWorkModel(
++            true,
++            new[]
++            {
++                new DeferredWorkGroup(
++                    "review",
++                    null,
++                    null,
++                    new[]
++                    {
++                        new DeferredWorkItem("<p>Closed via readme.</p>", true, "readme.md", "docs/readme.html"),
++                        new DeferredWorkItem("<p>Closed in story.</p>", true, "6.4", "epics/story-6-4.html"),
++                    }),
++            });
++
++        // Force the no-detailHref seam so list chips render (Story 9.10).
++        var html = DeferredWorkTemplater.RenderPage(model, SiteNav.Build(Array.Empty<string>(), "Test", hasAdrs: false), "deferred-work.html");
++        // With AssignDeferredSlugs, list uses detail links — assert via detail page instead.
++        var detailReadme = FollowUpDetailTemplater.RenderDeferredPage(
++            model.Groups[0].Items[0], "review", null, "deferred-readme", SiteNav.Build(Array.Empty<string>(), "Test", hasAdrs: false), "deferred-work.html");
++        var detailStory = FollowUpDetailTemplater.RenderDeferredPage(
++            model.Groups[0].Items[1], "review", null, "deferred-story", SiteNav.Build(Array.Empty<string>(), "Test", hasAdrs: false), "deferred-work.html");
++
++        Assert.Contains("Resolving: readme.md", detailReadme);
++        Assert.DoesNotContain("Story readme.md", detailReadme);
++        Assert.Contains("Resolving: Story 6.4", detailStory);
++        _ = html; // keep model path exercised
++    }
++
+     [Fact]
+     public void Templater_StructuredPreamble_RendersAboveGroups()
+     {
+diff --git a/tests/SpecScribe.Tests/FollowUpSurfacesTests.cs b/tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
+index 8a8c196..b0c3e19 100644
+--- a/tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
++++ b/tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
+@@ -577,6 +577,40 @@ public class FollowUpSurfacesTests : IDisposable
+         Assert.True(map.ContainsKey(a));
+         Assert.True(map.ContainsKey(a2));
+         Assert.True(map.ContainsKey(b));
++        Assert.Equal(new[] { 2 }, map[a]);
++        Assert.Equal(new[] { 1 }, map[b]);
++    }
++
++    [Fact]
++    public void FindNearDuplicates_ThreeEpics_ListsAllCounterpartEpicsSorted()
++    {
++        const string epic1Text =
++            "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog for review before Epic 3 planning";
++        const string epic2Text =
++            "Triage Epic 1's deferred heatmap tech debt (HeatLevel collapse on sparse history, unmapped ForEpic status classes, non-invariant heatmap date formatting) before starting Epic 3 Story 3.2 or 3.5 - carried unaddressed across two retrospectives now";
++        // Near-duplicate of epic1Text with enough shared significant tokens for Jaccard ≥ 0.45.
++        const string epic3Text =
++            "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog before Epic 3 planning — still open from Epic 3 retro";
++
++        var a = new SprintActionItem(epic1Text, "open", 1, "Dana");
++        var b = new SprintActionItem(epic2Text, "open", 2, "Dana");
++        var c = new SprintActionItem(epic3Text, "open", 3, "Dana");
++
++        Assert.True(ActionItemsTemplater.AreNearDuplicates(epic1Text, epic3Text));
++
++        var map = ActionItemsTemplater.FindNearDuplicates(new[] { a, b, c });
++        Assert.Equal(new[] { 2, 3 }, map[a]);
++        Assert.Equal(new[] { 1, 3 }, map[b]);
++        Assert.Equal(new[] { 1, 2 }, map[c]);
++
++        var sb = new System.Text.StringBuilder();
++        ActionItemsTemplater.AppendCrossLinks(sb, a, map, null, "");
++        var cross = sb.ToString();
++        Assert.Contains("also raised in Epic 2 retrospective", cross);
++        Assert.Contains("also raised in Epic 3 retrospective", cross);
++        // Epic 2 before Epic 3 (sorted).
++        Assert.True(
++            cross.IndexOf("Epic 2", StringComparison.Ordinal) < cross.IndexOf("Epic 3", StringComparison.Ordinal));
+     }
+ 
+     [Fact]

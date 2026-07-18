@@ -677,68 +677,107 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>A per-story task sunburst: inner ring = top-level tasks, outer ring = their subtasks,
-    /// weighted so a task with many subtasks gets proportionally more outer-ring space. Same visual
-    /// language as the project sunburst (green = done, grey = not done yet) but scoped to one story's
-    /// checklist — there are no task pages to link to, so segments carry a tooltip only, not a link.</summary>
-    public static string TaskSunburst(IReadOnlyList<TaskItem> tasks, int size = 280)
+    /// <summary>A per-story task sunburst: inner ring = top-level tasks, middle = subtasks (when present),
+    /// optional outer ring = deferred items stemmed from this story (open/done follow-up treatment, linked
+    /// to detail pages). Same visual language as the project/epic sunbursts for lifecycle greens/greys;
+    /// deferred reuse <c>sb-followup-*</c>. Task/subtask segments are tooltip-only (no task pages).
+    /// [spec-sunburst-remaining-work-hierarchy]</summary>
+    public static string TaskSunburst(
+        IReadOnlyList<TaskItem> tasks,
+        int size = 280,
+        IReadOnlyList<FollowUpDeferredSlot>? deferred = null)
     {
-        if (tasks.Count == 0) return "<div class=\"chart-empty\">No tasks tracked for this story yet.</div>";
+        var deferredItems = deferred ?? Array.Empty<FollowUpDeferredSlot>();
+        if (tasks.Count == 0 && deferredItems.Count == 0)
+            return "<div class=\"chart-empty\">No tasks tracked for this story yet.</div>";
 
+        var hasDeferred = deferredItems.Count > 0;
         var c = size / 2.0;
-        var taskInner = size * 0.16;
-        var taskOuter = size * 0.36;
-        var subInner = size * 0.37;
-        var subOuter = size * 0.48;
-
-        var totalWeight = tasks.Sum(t => Math.Max(1, t.Subtasks.Count));
-        var anglePerUnit = 2 * Math.PI / totalWeight;
+        // When deferred share the chart, pull task/subtask rings in to leave an outer fringe.
+        var taskInner = size * (hasDeferred ? 0.14 : 0.16);
+        var taskOuter = size * (hasDeferred ? 0.30 : 0.36);
+        var subInner = size * (hasDeferred ? 0.31 : 0.37);
+        var subOuter = size * (hasDeferred ? 0.40 : 0.48);
+        var deferredInner = size * 0.41;
+        var deferredOuter = size * 0.48;
         const double pad = 0.01;
 
-        // Center headline is the top-level task tally, consistent with every other page's "tasks" figure
-        // (home, epic, project/epic sunburst outer rings) — subtasks stay visible via the outer ring and
-        // tooltips instead of being folded into the number so it no longer reads as a subtask count.
+        var sb = new StringBuilder();
         var tasksDone = tasks.Count(t => t.Done);
         var tasksTotal = tasks.Count;
+        var openDeferred = deferredItems.Count(s => !s.Item.Resolved);
+        var centerLabel = tasksTotal > 0 ? "tasks" : "deferred";
+        var centerNum = tasksTotal > 0
+            ? $"{tasksDone}/{tasksTotal}"
+            : $"{openDeferred}/{deferredItems.Count}";
+        var aria = tasksTotal > 0
+            ? $"Task breakdown: {tasksDone} of {tasksTotal} tasks done"
+            : $"Deferred breakdown: {openDeferred} of {deferredItems.Count} open";
+        if (tasksTotal > 0 && hasDeferred)
+            aria += $", {openDeferred} open deferred {Plural(openDeferred, "item", "items")}";
 
-        var sb = new StringBuilder();
-        // The chart itself is not focusable (no task pages to drill to); the story page renders the task
-        // checklist as real text as the non-pointer equivalent. Its role="img" name carries the tally so the
-        // whole chart is still announced. [Story 1.4 AC #1]
-        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html($"Task breakdown: {tasksDone} of {tasksTotal} tasks done")}\">\n");
+        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
 
-        var angle = -Math.PI / 2;
-        foreach (var task in tasks)
+        if (tasksTotal > 0)
         {
-            var weight = Math.Max(1, task.Subtasks.Count);
-            var sweep = weight * anglePerUnit;
-            var cls = task.Done ? "done" : "pending";
-
-            sb.Append($"  <path class=\"sb-seg sb-{cls}\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad, angle + sweep - pad)}\">");
-            sb.Append($"<title>{Html(task.Text)} — {(task.Done ? "done" : "not done")}</title></path>\n");
-
-            if (task.Subtasks.Count > 0)
+            var totalWeight = tasks.Sum(t => Math.Max(1, t.Subtasks.Count));
+            var anglePerUnit = 2 * Math.PI / totalWeight;
+            var angle = -Math.PI / 2;
+            foreach (var task in tasks)
             {
-                var subSweep = sweep / task.Subtasks.Count;
-                var subAngle = angle;
-                foreach (var sub in task.Subtasks)
-                {
-                    var subCls = sub.Done ? "done" : "pending";
-                    sb.Append($"  <path class=\"sb-seg sb-{subCls}\" d=\"{AnnularSector(c, subInner, subOuter, subAngle + pad, subAngle + subSweep - pad)}\">");
-                    sb.Append($"<title>{Html(sub.Text)} — {(sub.Done ? "done" : "not done")}</title></path>\n");
-                    subAngle += subSweep;
-                }
-            }
+                var weight = Math.Max(1, task.Subtasks.Count);
+                var sweep = weight * anglePerUnit;
+                var cls = task.Done ? "done" : "pending";
 
-            angle += sweep;
+                sb.Append($"  <path class=\"sb-seg sb-{cls}\" d=\"{AnnularSector(c, taskInner, taskOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
+                sb.Append($"<title>{Html(task.Text)} — {(task.Done ? "done" : "not done")}</title></path>\n");
+
+                if (task.Subtasks.Count > 0)
+                {
+                    var subSweep = sweep / task.Subtasks.Count;
+                    var subAngle = angle;
+                    foreach (var sub in task.Subtasks)
+                    {
+                        var subCls = sub.Done ? "done" : "pending";
+                        sb.Append($"  <path class=\"sb-seg sb-{subCls}\" d=\"{AnnularSector(c, subInner, subOuter, InsetStart(subAngle, subSweep, pad), InsetEnd(subAngle, subSweep, pad))}\">");
+                        sb.Append($"<title>{Html(sub.Text)} — {(sub.Done ? "done" : "not done")}</title></path>\n");
+                        subAngle += subSweep;
+                    }
+                }
+
+                angle += sweep;
+            }
         }
 
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{tasksDone}/{tasksTotal}</text>\n");
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">tasks</text>\n");
+        if (hasDeferred)
+        {
+            var slotSweep = 2 * Math.PI / deferredItems.Count;
+            var slotAngle = -Math.PI / 2;
+            foreach (var slot in deferredItems)
+            {
+                AppendDeferredItemSlot(sb, slot, slotAngle, slotSweep, pad, c, deferredInner, deferredOuter);
+                slotAngle += slotSweep;
+            }
+        }
+
+        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{centerNum}</text>\n");
+        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{centerLabel}</text>\n");
         sb.Append("</svg>\n");
 
-        sb.Append(SunburstLegend(("pending", "Not done"), ("done", "Done")));
-        sb.Append("<div class=\"sunburst-hint\">Inner ring: tasks &middot; outer ring: subtasks. Hover a segment for details.</div>\n\n");
+        var legend = new List<(string, string)> { ("pending", "Not done"), ("done", "Done") };
+        if (hasDeferred)
+        {
+            legend.Add(("followup-open", "Open follow-up"));
+            legend.Add(("followup-done", "Done follow-up"));
+        }
+        sb.Append(SunburstLegend(legend.ToArray()));
+
+        var hint = hasDeferred
+            ? (tasksTotal > 0
+                ? "Inner ring: tasks &middot; middle: subtasks &middot; outer: deferred from this story. Click a deferred segment to open it."
+                : "Outer ring: deferred from this story. Click a segment to open it.")
+            : "Inner ring: tasks &middot; outer ring: subtasks. Hover a segment for details.";
+        sb.Append($"<div class=\"sunburst-hint\">{hint}</div>\n\n");
         return sb.ToString();
     }
 
