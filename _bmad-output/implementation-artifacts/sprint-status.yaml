@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: "2026-07-18"
+# last_updated: "2026-07-18" # epic-9 retrospective closed
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -168,7 +168,7 @@ development_status:
   # together — sunburst/remaining-work follow-ups, authoring/delivery workflow, requirement-satisfaction status.
   # 2026-07-16 (correct-course): Stories 9.10–9.11 appended together — scannable follow-up list pages + per-item
   # detail pages with stable slug deep links. Extends FR30; does not absorb 9.6.
-  epic-9: in-progress
+  epic-9: done # 2026-07-18 epic-9 retrospective — all 13 stories done
   9-1-requirement-pages-link-to-their-covering-stories: done # 2026-07-16: code review — patches applied (phantom-epic empty state distinct from Unmapped, remove dead coveringEpic param, zero-stories empty-state test); ToDictionary duplicate-epic defer kept
   9-2-nfr-and-ux-dr-coverage-maps: done # 2026-07-16: code review — patches applied (responsive 1100px column, honest tile sub-lines, deferred∪header skip, UX-DR map ingest, orphan epic note, empty NFR donut gate); Epic 1 back-fill confirmation deferred
   9-3-deferred-on-purpose-vs-unmapped-coverage-states: done # 2026-07-16: code review — patches applied (DebtWords exact restore, EpicMention IgnoreCase, WorkInventory threaded into WriteRequirements, ribbon CSS assert, Task 1/File List/sprint-status hygiene). Implemented Unmapped tier (enum+StatusStyles+Sankey/aria+donuts/cards/detail+deferral-source links); retired 9.2 section-local seam. Owner design: Unmapped reuses tan --status-pending (own icon+word) vs Deferred grey — no 7th --status-* token. AC #2 deferral-source link is best-effort over CoverageNote — no new epics.md authoring schema.
@@ -188,7 +188,7 @@ development_status:
   # group pages (not hash/query on full lists). Run create-story when scheduled.
   9-12-unplanned-and-one-off-work-in-geometry-and-sprint: done # code-review 2026-07-17: ratified aggregates + 9.13 GroupRootHref + hybrid residual sunburst weight + date attribution; patches applied (orphan deferred, retros enrich, resolved filter, SourceHref link, followup-done class, title fallback); 2 deferred (watch GenerateOne groups, ContainsSpecName). 1413 tests green. # create-story 2026-07-17: OWNER-LOCKED — BOTH Unplanned sunburst synthetic root AND sprint Unplanned lane (same membership set). Membership = open route:one-shot quick-dev (status not done/resolved) + unattributable deferred; unattributed ACTION items stay on Follow-ups orphan (9.13 treats them as separate groups). Attribution prefers epic when SourceStoryId / text-derived Story N.M resolves. Extend FollowUpGeometry + Charts.Sunburst + SprintTemplater; one pure helper for sunburst↔board equality. No new authoring schema. Do NOT build 9.13 filtered group pages (group-root href temporary/swappable). Ledger-agreed (DirectChanges/DeferredOpenItems). NFR8 omit when empty. Never mislabel as stories; no new --status-* token. Golden moves → regen.
   9-13-generated-filtered-follow-up-group-pages-and-sunburst-click-destinations: done # create-story 2026-07-17: OWNER-LOCKED — GENERATED filtered group pages under follow-ups/group-*.html (NOT hash/query on full lists). Groups: Follow-ups (unattributed actions), Unplanned (UnplannedSet), epic-N attributed follow-ups. Reuse FollowUpRow (9.10); WriteOutput beside WriteFollowUpDetails. Rewire Charts orphanHref + UnplannedWorkGeometry.GroupRootHref only; leaves + epic→epic.html unchanged. No empty pages (NFR8). No new wedge for epic aggregate (pages exist for AC1/10.7). Ledger-agreed membership; no new authoring schema; no new --status-* token. Golden moves → regen. # code-review 2026-07-17: patches applied (orphan membership, QD-only epic pages, DeferredListHref, sprint provenance link, watch group pages, legend, empty summary); hierarchy decision accepted.
-  epic-9-retrospective: optional
+  epic-9-retrospective: done # epic-9-retro-2026-07-18.md
 
   # Epic 10 seeded 2026-07-12 (create-story 10.1). Portal Legibility: nav reach, chart metadata, glossary,
   # dates, doc legibility. Stories 10.2–10.6 listed backlog for tracking; run create-story per story when scheduled.
@@ -371,8 +371,36 @@ action_items:
   - epic: 8
     action: "Run create-story for Stories 9.7, 9.8, and 9.9 when scheduled (backlog until then); elicit visual intent up front for any new sunburst / workflow / satisfaction surfaces"
     owner: "create-story runner"
-    status: open
+    status: done # 2026-07-18 epic-9 retro: 9.7–9.9 created and shipped
   - epic: 8
     action: "Carry forward: fix KnownIndexGroups omitting adrs/retros (open since Epic 4 / Epic 6 Action)"
+    owner: "Charlie (Senior Dev)"
+    status: open
+  - epic: 9
+    action: "When correct-course appends would roughly double an epic's story count, split into a sibling epic (or freeze a contract at the boundary) instead of absorbing the second arc"
+    owner: "Alice (Product Owner) + Amelia (Developer)"
+    status: open
+  - epic: 9
+    action: "For any new/changed sunburst (or sibling remaining-work geometry), lock membership set + click destinations + cross-screen parity rules at create-story before implementation; Story 10.7 preserves the 9.13 click contract"
+    owner: "Sally (UX Designer) + create-story runner"
+    status: open
+  - epic: 9
+    action: "Create-story for Epic 10 backlog stories 10.6 and 10.7; elicit visual/geometry intent up front"
+    owner: "Matthew (Project Lead) / create-story runner"
+    status: open
+  - epic: 9
+    action: "Create-story for Epic 19 (19.1 spike, then 19.2) so next-sprint sequencing has detail"
+    owner: "Matthew (Project Lead) / create-story runner"
+    status: open
+  - epic: 9
+    action: "Carry forward: fix KnownIndexGroups omitting adrs/retros (open since Epic 4) — burn down via portal visibility, not a blocking debt sprint"
+    owner: "Charlie (Senior Dev)"
+    status: open
+  - epic: 9
+    action: "Carry forward: formalize visual-intent elicitation in create-story process"
+    owner: "Sally (UX Designer)"
+    status: open
+  - epic: 9
+    action: "Radar: watch/GenerateOne follow-up detail + group page regen gap"
     owner: "Charlie (Senior Dev)"
     status: open
