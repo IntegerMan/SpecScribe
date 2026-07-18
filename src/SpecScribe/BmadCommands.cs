@@ -806,4 +806,195 @@ public static class BmadCommands
 
         return sb.ToString();
     }
+
+    // ---- List-batch pane (deferred-work / action-items / follow-up group pages) --------------------
+
+    /// <summary>One open item projected for a list-batch Address/Close prompt — plain (un-linkified) text
+    /// so the numbered cue line in the copyable prompt never carries HTML. <see cref="ProvenanceKey"/> is the
+    /// bracketed cue (deferred <c>SourceKey</c>/heading label, or an "Epic N"/"Unattributed" chip for action
+    /// items); <see cref="DetailHref"/> the per-item detail deep link, when one exists.
+    /// [spec-follow-up-list-batch-actions]</summary>
+    public sealed record ListBatchEntry(string Summary, string? ProvenanceKey, string? DetailHref);
+
+    /// <summary>Renders the horizontal Next Steps–style batch pane for a follow-up LIST page (whole-site
+    /// deferred backlog, whole-site open action-items, or a generated follow-up group page): three cards —
+    /// Address all, Address first 5 (omitted per kind under 6 open), Close all — each holding a
+    /// Deferred | Action items button pair (or a single button when only one kind is present on the page).
+    /// Gated on <c>quick-dev</c> plus at least one open item across both kinds (NFR8); <c>Kind == "direct"</c>
+    /// members never reach this renderer — callers filter them out before building the entry lists.
+    /// [spec-follow-up-list-batch-actions]</summary>
+    public static string RenderListBatchPane(
+        string pageTitle, CommandCatalog commands,
+        IReadOnlyList<ListBatchEntry>? openDeferred = null,
+        IReadOnlyList<ListBatchEntry>? openActions = null)
+    {
+        var quickDev = commands.Command("quick-dev");
+        var deferred = openDeferred ?? Array.Empty<ListBatchEntry>();
+        var actions = openActions ?? Array.Empty<ListBatchEntry>();
+        if (quickDev is not { Length: > 0 } || (deferred.Count == 0 && actions.Count == 0))
+            return string.Empty;
+
+        var cards = new StringBuilder();
+        var cardCount = 0;
+
+        var addressAll = RenderListBatchCard("Address all", "active",
+            ("Deferred", BuildDeferredAddressBatch(pageTitle, deferred, quickDev)),
+            ("Action items", BuildActionAddressBatch(pageTitle, actions, quickDev)));
+        if (addressAll.Length > 0) { cards.Append(addressAll); cardCount++; }
+
+        if (deferred.Count >= 6 || actions.Count >= 6)
+        {
+            var addressFirst5 = RenderListBatchCard("Address first 5", "active",
+                ("Deferred", deferred.Count >= 6
+                    ? BuildDeferredAddressBatch(pageTitle, deferred.Take(5).ToList(), quickDev, deferred.Count, isFirstN: true)
+                    : null),
+                ("Action items", actions.Count >= 6
+                    ? BuildActionAddressBatch(pageTitle, actions.Take(5).ToList(), quickDev, actions.Count, isFirstN: true)
+                    : null));
+            if (addressFirst5.Length > 0) { cards.Append(addressFirst5); cardCount++; }
+        }
+
+        var closeAll = RenderListBatchCard("Close all", "review",
+            ("Deferred", BuildDeferredCloseBatch(pageTitle, deferred, quickDev)),
+            ("Action items", BuildActionCloseBatch(pageTitle, actions, quickDev)));
+        if (closeAll.Length > 0) { cards.Append(closeAll); cardCount++; }
+
+        if (cardCount == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel next-steps list-batch-actions\">\n<h3>Next Steps</h3>\n<div class=\"next-steps-cards\">\n");
+        sb.Append(cards);
+        sb.Append("</div>\n</div>\n\n");
+        return sb.ToString();
+    }
+
+    /// <summary>One list-batch card: up to two labeled command buttons (<c>Deferred</c> / <c>Action items</c>)
+    /// side by side when both kinds resolve, a single button when only one does, or empty (card omitted
+    /// entirely) when neither resolves.</summary>
+    private static string RenderListBatchCard(
+        string kicker, string accent,
+        (string Label, Suggestion? Suggestion) deferredButton,
+        (string Label, Suggestion? Suggestion) actionButton)
+    {
+        var active = new List<(string Label, Suggestion Suggestion)>();
+        if (deferredButton.Suggestion is not null) active.Add((deferredButton.Label, deferredButton.Suggestion));
+        if (actionButton.Suggestion is not null) active.Add((actionButton.Label, actionButton.Suggestion));
+        if (active.Count == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.Append($"  <div class=\"next-step-card {accent}\">\n");
+        sb.Append($"    <span class=\"next-step-kicker\">{PathUtil.Html(kicker)}</span>\n");
+
+        if (active.Count == 1)
+        {
+            var (label, s) = active[0];
+            sb.Append($"    <div class=\"next-step-command\">{RenderLabeledCommand(label, s.Command)}</div>\n");
+            sb.Append($"    <p class=\"next-step-desc\">{PathUtil.Html(s.Description)}</p>\n");
+        }
+        else
+        {
+            sb.Append("    <div class=\"next-step-command-group\">\n");
+            foreach (var (label, s) in active)
+            {
+                sb.Append("      <div class=\"next-step-command-item\">\n");
+                sb.Append($"        <div class=\"next-step-command\">{RenderLabeledCommand(label, s.Command)}</div>\n");
+                sb.Append($"        <p class=\"next-step-desc\">{PathUtil.Html(s.Description)}</p>\n");
+                sb.Append("      </div>\n");
+            }
+            sb.Append("    </div>\n");
+        }
+
+        sb.Append("  </div>\n");
+        return sb.ToString();
+    }
+
+    private static void AppendNumberedList(StringBuilder sb, IReadOnlyList<ListBatchEntry> items)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            var provenance = item.ProvenanceKey is { Length: > 0 } pk ? $" [{pk}]" : string.Empty;
+            var cue = item.DetailHref is { Length: > 0 } dh ? $" \u2192 {dh}" : string.Empty;
+            sb.Append($"\n{i + 1}. {item.Summary}{provenance}{cue}");
+        }
+    }
+
+    /// <summary>Parenthetical count for the prompt lead line — e.g. <c>3 items</c> or
+    /// <c>first 5 of 12 open items</c>.</summary>
+    private static string ScopeNote(int shown, int? totalCount, bool isFirstN) =>
+        isFirstN
+            ? $"first {shown} of {totalCount ?? shown} open items"
+            : $"{shown} item{(shown == 1 ? "" : "s")}";
+
+    /// <summary>Human description under the card button — avoids doubling "of open …" when
+    /// <see cref="ScopeNote"/> already says "open items".</summary>
+    private static string BatchCardDescription(string verbPhrase, string pageTitle, int shown, int? totalCount, bool isFirstN)
+    {
+        var countPhrase = isFirstN
+            ? $"the first {shown} of {totalCount ?? shown} open"
+            : $"{shown} open";
+        return $"Copies a quick-dev prompt listing {countPhrase} {verbPhrase} on {pageTitle}.";
+    }
+
+    private static Suggestion? BuildDeferredAddressBatch(
+        string pageTitle, IReadOnlyList<ListBatchEntry> items, string quickDev,
+        int? totalCount = null, bool isFirstN = false)
+    {
+        if (items.Count == 0) return null;
+        var scope = ScopeNote(items.Count, totalCount, isFirstN);
+
+        var promptSb = new StringBuilder();
+        promptSb.Append($"{quickDev} Address open deferred work on {pageTitle} ({scope}). Find writeups in deferred-work.md and follow-up detail pages:");
+        AppendNumberedList(promptSb, items);
+
+        return new Suggestion(
+            promptSb.ToString(),
+            BatchCardDescription("deferred items so AI can address them", pageTitle, items.Count, totalCount, isFirstN));
+    }
+
+    private static Suggestion? BuildDeferredCloseBatch(string pageTitle, IReadOnlyList<ListBatchEntry> items, string quickDev)
+    {
+        if (items.Count == 0) return null;
+        var n = items.Count;
+        var scope = $"{n} item{(n == 1 ? "" : "s")}";
+
+        var promptSb = new StringBuilder();
+        promptSb.Append($"{quickDev} Close open deferred work on {pageTitle} ({scope}) \u2014 mark each RESOLVED in deferred-work.md (keep the audit trail). Only close an item if the work is already complete or you just finished it. Find writeups in deferred-work.md and follow-up detail pages:");
+        AppendNumberedList(promptSb, items);
+
+        return new Suggestion(
+            promptSb.ToString(),
+            BatchCardDescription("deferred items so AI can mark them RESOLVED once settled", pageTitle, n, null, isFirstN: false));
+    }
+
+    private static Suggestion? BuildActionAddressBatch(
+        string pageTitle, IReadOnlyList<ListBatchEntry> items, string quickDev,
+        int? totalCount = null, bool isFirstN = false)
+    {
+        if (items.Count == 0) return null;
+        var scope = ScopeNote(items.Count, totalCount, isFirstN);
+
+        var promptSb = new StringBuilder();
+        promptSb.Append($"{quickDev} Resolve open retrospective action items on {pageTitle} ({scope}). Find full text in sprint-status.yaml and follow-up detail pages:");
+        AppendNumberedList(promptSb, items);
+
+        return new Suggestion(
+            promptSb.ToString(),
+            BatchCardDescription("action items so AI can resolve them", pageTitle, items.Count, totalCount, isFirstN));
+    }
+
+    private static Suggestion? BuildActionCloseBatch(string pageTitle, IReadOnlyList<ListBatchEntry> items, string quickDev)
+    {
+        if (items.Count == 0) return null;
+        var n = items.Count;
+        var scope = $"{n} item{(n == 1 ? "" : "s")}";
+
+        var promptSb = new StringBuilder();
+        promptSb.Append($"{quickDev} Close open retrospective action items on {pageTitle} ({scope}) in sprint-status.yaml (set each to done). Only close an item if the work is already complete or you just finished it. Find full text in sprint-status.yaml and follow-up detail pages:");
+        AppendNumberedList(promptSb, items);
+
+        return new Suggestion(
+            promptSb.ToString(),
+            BatchCardDescription("action items so AI can mark them done once settled", pageTitle, n, null, isFirstN: false));
+    }
 }

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -200,6 +201,126 @@ public class FollowUpGroupPagesTests
 
         var empty = new FollowUpGroupSpec("group-x", "X", "x", Array.Empty<FollowUpGroupMember>());
         Assert.Throws<ArgumentException>(() => FollowUpGroupTemplater.RenderPage(empty, nav));
+    }
+
+    // ---- List-batch Address/Close pane (spec-follow-up-list-batch-actions) ----------------------------
+
+    private static readonly CommandCatalog QuickDevOnly = new(
+        "BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
+
+    private static FollowUpGroupMember OpenMember(string kind, string label) => new(
+        kind,
+        PathUtil.Html(label),
+        $"follow-ups/{kind}-{label}.html",
+        "open",
+        "Open",
+        PathUtil.Html("Epic 1"),
+        Resolved: false,
+        RawSummary: label,
+        RawProvenance: "Epic 1");
+
+    [Fact]
+    public void Templater_ListBatchPane_MixedPair_BothKindsSixOrMore()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var members = Enumerable.Range(1, 6)
+            .SelectMany(i => new[] { OpenMember("deferred", $"Deferred {i}"), OpenMember("action", $"Action {i}") })
+            .ToList();
+        var group = new FollowUpGroupSpec("group-epic-1", "Epic 1 follow-ups", "Attributed follow-ups for Epic 1", members);
+
+        var html = FollowUpGroupTemplater.RenderPage(group, nav, QuickDevOnly);
+
+        Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
+        Assert.Contains(">Address all<", html);
+        Assert.Contains(">Address first 5<", html);
+        Assert.Contains(">Close all<", html);
+        Assert.Contains("class=\"next-step-command-group\"", html);
+        // Every one of the three cards carries both a Deferred and an Action items button (dual pair).
+        Assert.Equal(3, Regex.Matches(html, "<span class=\"cmd-text\">Deferred</span>").Count);
+        Assert.Equal(3, Regex.Matches(html, "<span class=\"cmd-text\">Action items</span>").Count);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Address open deferred work on Epic 1 follow-ups (6 items)", html);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Resolve open retrospective action items on Epic 1 follow-ups (6 items)", html);
+
+        foreach (Match m in Regex.Matches(html, "data-copy=\"([^\"]*)\""))
+            Assert.DoesNotContain("<a", m.Groups[1].Value);
+    }
+
+    [Fact]
+    public void Templater_ListBatchPane_SingleKindOnly_WhenOtherKindEmpty()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var members = Enumerable.Range(1, 6).Select(i => OpenMember("deferred", $"Deferred {i}")).ToList();
+        var group = new FollowUpGroupSpec("group-epic-1", "Epic 1 follow-ups", "x", members);
+
+        var html = FollowUpGroupTemplater.RenderPage(group, nav, QuickDevOnly);
+
+        Assert.DoesNotContain("next-step-command-group", html);
+        Assert.Contains("<span class=\"cmd-text\">Deferred</span>", html);
+        Assert.DoesNotContain("Action items</span>", html);
+    }
+
+    [Fact]
+    public void Templater_ListBatchPane_OmitsFirst5ForLowCountKind_OnMixedPage()
+    {
+        // 6 deferred (>=6) + 3 actions (<6): Address first 5 shows only the Deferred button.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var members = Enumerable.Range(1, 6).Select(i => OpenMember("deferred", $"Deferred {i}"))
+            .Concat(Enumerable.Range(1, 3).Select(i => OpenMember("action", $"Action {i}")))
+            .ToList();
+        var group = new FollowUpGroupSpec("group-epic-1", "Epic 1 follow-ups", "x", members);
+
+        var html = FollowUpGroupTemplater.RenderPage(group, nav, QuickDevOnly);
+
+        var first5Start = html.IndexOf(">Address first 5<", StringComparison.Ordinal);
+        Assert.True(first5Start >= 0);
+        var nextKicker = html.IndexOf("next-step-kicker", first5Start + 1, StringComparison.Ordinal);
+        var first5Card = nextKicker > 0 ? html[first5Start..nextKicker] : html[first5Start..];
+        Assert.Contains("Deferred</span>", first5Card);
+        Assert.DoesNotContain("Action items</span>", first5Card);
+
+        // Address all / Close all still pair both kinds despite the low action count.
+        Assert.Equal(2, Regex.Matches(html, "<span class=\"cmd-text\">Action items</span>").Count);
+    }
+
+    [Fact]
+    public void Templater_ListBatchPane_IgnoresDirectKind()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var members = new List<FollowUpGroupMember>
+        {
+            new(
+                "direct",
+                PathUtil.Html("Direct change UNIQUE-MARKER"),
+                "follow-ups/direct.html",
+                "open",
+                "Open",
+                PathUtil.Html("Direct change"),
+                Resolved: false,
+                RawSummary: "Direct change UNIQUE-MARKER",
+                RawProvenance: "Direct change"),
+        };
+        var group = new FollowUpGroupSpec("group-unplanned", "Unplanned", "x", members);
+
+        var html = FollowUpGroupTemplater.RenderPage(group, nav, QuickDevOnly);
+
+        // No deferred/action open items in scope (the only member is Kind == "direct") → pane omitted
+        // (NFR8), and the direct row's text never reaches a batch command payload.
+        Assert.DoesNotContain("list-batch-actions", html);
+        Assert.DoesNotContain("data-copy=", html);
+        Assert.Contains("Direct change UNIQUE-MARKER", html); // still rendered as an ordinary row
+    }
+
+    [Fact]
+    public void Templater_ListBatchPane_Omitted_WhenNoQuickDev()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var members = new List<FollowUpGroupMember> { OpenMember("deferred", "Deferred x") };
+        var group = new FollowUpGroupSpec("group-epic-1", "Epic 1 follow-ups", "x", members);
+
+        var html = FollowUpGroupTemplater.RenderPage(group, nav, CommandCatalog.Empty);
+
+        Assert.DoesNotContain("list-batch-actions", html);
+        Assert.DoesNotContain("data-copy=", html);
     }
 
     private static EpicsModel OneEpicModel() => new()

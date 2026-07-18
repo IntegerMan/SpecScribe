@@ -690,6 +690,150 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains(">Resolved</span>", groupAfterResolve);
     }
 
+    // ---- List-batch Address/Close pane (spec-follow-up-list-batch-actions) ----------------------------
+
+    [Fact]
+    public void DeferredWorkTemplater_ListBatchPane_ThreeCards_SingleDeferredButton_WhenSixOrMoreOpen()
+    {
+        var markdown = "## Deferred from: misc (2026-07-15)\n\n"
+            + string.Join("\n", Enumerable.Range(1, 6).Select(i => $"- Open deferred item {i}."));
+        var model = DeferredWorkParser.Parse(markdown);
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = DeferredWorkTemplater.RenderPage(
+            model, nav, "implementation-artifacts/deferred-work.html", "Deferred Work", commands);
+
+        Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
+        Assert.Contains(">Address all<", html);
+        Assert.Contains(">Address first 5<", html);
+        Assert.Contains(">Close all<", html);
+        // Deferred-only page: single Deferred button per card, never an Action items pair.
+        Assert.DoesNotContain("<span class=\"cmd-text\">Action items</span>", html);
+        Assert.DoesNotContain("next-step-command-group", html);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Address open deferred work on Deferred Work (6 items)", html);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Address open deferred work on Deferred Work (first 5 of 6 open items)", html);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Close open deferred work on Deferred Work (6 items)", html);
+        Assert.Contains("Only close an item if the work is already complete", html);
+        // Item must appear inside a batch data-copy payload — not merely in a list row.
+        var batchCopies = Regex.Matches(html, "data-copy=\"([^\"]*)\"")
+            .Cast<Match>()
+            .Select(m => m.Groups[1].Value)
+            .ToList();
+        Assert.Contains(batchCopies, payload => payload.Contains("Open deferred item 1.", StringComparison.Ordinal));
+
+        foreach (var payload in batchCopies)
+        {
+            Assert.DoesNotContain("<a", payload);
+            Assert.DoesNotContain("../follow-ups/", payload);
+        }
+    }
+
+    [Fact]
+    public void DeferredWorkTemplater_ListBatchPane_NoFirst5_WhenUnderSixOpen()
+    {
+        var markdown = "## Deferred from: misc (2026-07-15)\n\n"
+            + string.Join("\n", Enumerable.Range(1, 3).Select(i => $"- Open deferred item {i}."));
+        var model = DeferredWorkParser.Parse(markdown);
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = DeferredWorkTemplater.RenderPage(
+            model, nav, "deferred-work.html", "Deferred Work", commands);
+
+        Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
+        Assert.Contains(">Address all<", html);
+        Assert.DoesNotContain(">Address first 5<", html);
+        Assert.Contains(">Close all<", html);
+    }
+
+    [Fact]
+    public void DeferredWorkTemplater_ListBatchPane_Omitted_WhenNoQuickDev()
+    {
+        var markdown = "## Deferred from: misc (2026-07-15)\n\n- Open deferred item.";
+        var model = DeferredWorkParser.Parse(markdown);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = DeferredWorkTemplater.RenderPage(
+            model, nav, "deferred-work.html", "Deferred Work", CommandCatalog.Empty);
+
+        Assert.DoesNotContain("list-batch-actions", html);
+        Assert.DoesNotContain("data-copy=", html);
+    }
+
+    [Fact]
+    public void DeferredWorkTemplater_ListBatchPane_Omitted_WhenZeroOpenItems()
+    {
+        var markdown = """
+            ## Deferred from: misc (2026-07-15)
+
+            - **[RESOLVED]** ~~Already fixed.~~
+            """;
+        var model = DeferredWorkParser.Parse(markdown);
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = DeferredWorkTemplater.RenderPage(model, nav, "deferred-work.html", "Deferred Work", commands);
+
+        Assert.DoesNotContain("list-batch-actions", html);
+    }
+
+    [Fact]
+    public void ActionItemsTemplater_ListBatchPane_NoFirst5_WhenUnderSixOpen()
+    {
+        var open = Enumerable.Range(1, 3)
+            .Select(i => new SprintActionItem($"Fix issue {i}", "open", 1, "Dana"))
+            .ToArray();
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = ActionItemsTemplater.RenderPage(open, null, commands, nav);
+
+        Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
+        Assert.Contains(">Address all<", html);
+        Assert.DoesNotContain(">Address first 5<", html);
+        Assert.Contains(">Close all<", html);
+        // Action-only page: single Action items button per card, never a Deferred pair.
+        Assert.DoesNotContain("<span class=\"cmd-text\">Deferred</span>", html);
+        Assert.DoesNotContain("next-step-command-group", html);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Resolve open retrospective action items on Open Action Items (3 items)", html);
+        Assert.Contains("data-copy=\"/bmad-quick-dev Close open retrospective action items on Open Action Items (3 items)", html);
+    }
+
+    [Fact]
+    public void ActionItemsTemplater_ListBatchPane_Omitted_WhenNoQuickDev()
+    {
+        var open = new[] { new SprintActionItem("Fix issue", "open", 1, "Dana") };
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = ActionItemsTemplater.RenderPage(open, null, CommandCatalog.Empty, nav);
+
+        Assert.DoesNotContain("list-batch-actions", html);
+    }
+
+    [Fact]
+    public void ActionItemsTemplater_ListBatchPane_RawDataCopy_NoLinkifyInAttribute()
+    {
+        // Six-plus open items with Story N.M mentions — the visible row summary linkifies these (separate
+        // <a> elements); the batch pane's data-copy payload must stay raw regardless. [Story 9.6 trap]
+        var open = Enumerable.Range(1, 6)
+            .Select(i => new SprintActionItem($"Fix Story 1.{i} heatmap debt before Epic 2", "open", 1, "Dana"))
+            .ToArray();
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = ActionItemsTemplater.RenderPage(open, null, commands, nav);
+
+        Assert.Contains("Story 1.1", html);
+        var matches = Regex.Matches(html, "data-copy=\"([^\"]*)\"");
+        Assert.NotEmpty(matches);
+        foreach (Match m in matches)
+        {
+            Assert.DoesNotContain("<a", m.Groups[1].Value);
+            Assert.DoesNotContain("&lt;a", m.Groups[1].Value);
+        }
+    }
+
     [Fact]
     public void GenerateOne_RefreshesDeferredListAndDetailPages()
     {

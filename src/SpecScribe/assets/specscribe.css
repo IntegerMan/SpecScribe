@@ -2640,6 +2640,22 @@ a.ref-file-node:focus-visible {
   .next-steps-cards { grid-template-columns: 1fr; }
 }
 
+/* List-batch pane (deferred-work / action-items / follow-up group pages): a card may hold a Deferred |
+   Action items button pair instead of one command — same card shell, two labeled badges side by side.
+   [spec-follow-up-list-batch-actions] */
+.next-step-command-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+.next-step-command-item {
+  flex: 1 1 45%;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .next-steps-list { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
 
 /* The command <code> (.cmd-text) carries no pill of its own — the surrounding .cmd-badge is the pill. */

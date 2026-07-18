@@ -10,8 +10,12 @@ public static class DeferredWorkTemplater
         DeferredWorkModel model,
         SiteNav nav,
         string outputRelativePath,
-        string title = "Deferred Work")
+        string title = "Deferred Work",
+        CommandCatalog? commands = null,
+        EpicsModel? epicsModel = null,
+        IReadOnlyDictionary<string, string>? hrefMap = null)
     {
+        var catalog = commands ?? CommandCatalog.Empty;
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
@@ -49,10 +53,15 @@ public static class DeferredWorkTemplater
                 // Per-item detail deep links even without ## Deferred from: headings (Story 9.11).
                 var pairs = unstructured.Select(i => (Item: i, ProvenanceLabel: "Deferred work")).ToList();
                 var detailSlugs = FollowUpSlug.AssignDeferredSlugs(pairs);
+                var openEntries = unstructured
+                    .Where(i => !i.Resolved)
+                    .Select(i => ToListBatchEntry(i, "Deferred work", detailSlugs))
+                    .ToList();
+                sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
                 sb.Append("<section class=\"deferred-work-wrap\">\n");
                 sb.Append("  <ul class=\"followup-rows-list deferred-items-list\">\n");
                 foreach (var item in unstructured)
-                    RenderItem(sb, item, "Deferred work", prefix, detailSlugs);
+                    RenderItem(sb, item, "Deferred work", prefix, detailSlugs, epicsModel, hrefMap);
                 sb.Append("  </ul>\n");
                 sb.Append("</section>\n");
             }
@@ -63,7 +72,13 @@ public static class DeferredWorkTemplater
                 .SelectMany(g => g.Items.Select(i => (Item: i, ProvenanceLabel: g.ProvenanceLabel)))
                 .ToList();
             var detailSlugs = FollowUpSlug.AssignDeferredSlugs(pairs);
+            var openEntries = model.Groups
+                .SelectMany(g => g.Items
+                    .Where(i => !i.Resolved)
+                    .Select(i => ToListBatchEntry(i, g.SourceKey ?? g.ProvenanceLabel, detailSlugs)))
+                .ToList();
 
+            sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
             sb.Append("<section class=\"deferred-work-wrap\">\n");
             if (model.PreambleHtml is { Length: > 0 } preamble)
             {
@@ -73,7 +88,7 @@ public static class DeferredWorkTemplater
             }
             foreach (var group in model.Groups)
             {
-                RenderGroup(sb, group, prefix, detailSlugs);
+                RenderGroup(sb, group, prefix, detailSlugs, epicsModel, hrefMap);
             }
             sb.Append("</section>\n");
         }
@@ -84,7 +99,28 @@ public static class DeferredWorkTemplater
         return sb.ToString();
     }
 
-    private static void RenderGroup(StringBuilder sb, DeferredWorkGroup group, string prefix, IReadOnlyDictionary<DeferredWorkItem, string> detailSlugs)
+    /// <summary>Projects one open deferred item for the list-batch Address/Close pane — raw summary text
+    /// (never linkified) plus its detail deep link when one exists. <paramref name="provenanceKey"/> is the
+    /// group's <see cref="DeferredWorkGroup.SourceKey"/> when known, else its heading label.
+    /// [spec-follow-up-list-batch-actions]</summary>
+    private static BmadCommands.ListBatchEntry ToListBatchEntry(
+        DeferredWorkItem item, string provenanceKey,
+        IReadOnlyDictionary<DeferredWorkItem, string> detailSlugs)
+    {
+        var summary = FollowUpRow.SummarizeFromHtml(item.BodyHtml, maxChars: 200);
+        if (string.IsNullOrWhiteSpace(summary))
+            summary = PathUtil.StripHtmlTags(item.BodyHtml).Trim();
+        if (string.IsNullOrWhiteSpace(summary))
+            summary = "(no deferred text)";
+        // Site-root-relative detail cue (no page-depth prefix) so prompts match group/story Address deferred.
+        var href = detailSlugs.TryGetValue(item, out var slug) ? FollowUpSlug.OutputPath(slug) : null;
+        return new BmadCommands.ListBatchEntry(summary, provenanceKey, href);
+    }
+
+    private static void RenderGroup(
+        StringBuilder sb, DeferredWorkGroup group, string prefix,
+        IReadOnlyDictionary<DeferredWorkItem, string> detailSlugs,
+        EpicsModel? epicsModel, IReadOnlyDictionary<string, string>? hrefMap)
     {
         sb.Append("<section class=\"deferred-group\">\n");
         sb.Append("  <h2 class=\"deferred-group-title\">");
@@ -104,7 +140,7 @@ public static class DeferredWorkTemplater
 
         sb.Append("  <ul class=\"followup-rows-list deferred-items-list\">\n");
         foreach (var item in ordered)
-            RenderItem(sb, item, group.ProvenanceLabel, prefix, detailSlugs);
+            RenderItem(sb, item, group.ProvenanceLabel, prefix, detailSlugs, epicsModel, hrefMap);
         sb.Append("  </ul>\n");
         sb.Append("</section>\n");
     }
@@ -114,10 +150,13 @@ public static class DeferredWorkTemplater
         DeferredWorkItem item,
         string provenanceLabel,
         string prefix,
-        IReadOnlyDictionary<DeferredWorkItem, string> detailSlugs)
+        IReadOnlyDictionary<DeferredWorkItem, string> detailSlugs,
+        EpicsModel? epicsModel,
+        IReadOnlyDictionary<string, string>? hrefMap)
     {
         var summaryPlain = FollowUpRow.SummarizeFromHtml(item.BodyHtml);
-        var summaryHtml = PathUtil.Html(summaryPlain);
+        // Visible text only — same selective linkify action-items uses; never whole-page ApplyReferenceLinks.
+        var summaryHtml = FollowUpRefs.LinkifyVisibleText(summaryPlain, epicsModel, hrefMap, prefix);
         var detailHref = detailSlugs.TryGetValue(item, out var slug)
             ? prefix + FollowUpSlug.OutputPath(slug)
             : null;
@@ -126,6 +165,7 @@ public static class DeferredWorkTemplater
         var detail = new StringBuilder();
         if (detailHref is null)
         {
+            // Keep parser BodyHtml as-is for structure; summaries above carry selective Story/Epic/FR links.
             detail.Append($"<div class=\"deferred-item-body\">{item.BodyHtml}</div>\n");
             if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
             {

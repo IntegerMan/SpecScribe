@@ -284,8 +284,12 @@ public class RetroTests : IDisposable
         Assert.Contains("class=\"story-ref\"", html);
         Assert.Contains(">Story 1.1</a>", html);
         Assert.Contains("href=\"follow-ups/action-", html);
-        // Resolve payload is on the detail page, not the list (Story 9.11).
-        Assert.DoesNotContain("data-copy=", html);
+        // Resolve payload is on the detail page, not individual list rows (Story 9.11) — the page-level
+        // list-batch pane (spec-follow-up-list-batch-actions) is the only data-copy source on this page.
+        var rowsMarkup = html[html.IndexOf("<ul class=\"followup-rows-list", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("data-copy=", rowsMarkup);
+        Assert.Contains("data-copy=", html);
+        Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
 
         var detail = FollowUpDetailTemplater.RenderActionPage(
             open[0], FollowUpSlug.AssignActionSlugs(open)[open[0]], nav, commands, map, epicsModel: epics);

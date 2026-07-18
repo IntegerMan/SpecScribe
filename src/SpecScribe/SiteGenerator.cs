@@ -2818,10 +2818,13 @@ public sealed class SiteGenerator
         var prefix = PathUtil.RelativePrefix(outputPath);
         var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
         var model = DeferredWorkParser.Parse(markdown, hrefMap, prefix, doc.BodyHtml);
-        var html = DeferredWorkTemplater.RenderPage(model, nav, outputPath, doc.Title);
-        // Structured cards have no copyable command payload — ApplyReferenceLinks is safe here and
-        // catches inline "Story N.M"/"Epic N"/"FR-N" mentions the parser doesn't own.
-        WriteOutput(outputPath, ApplyReferenceLinks(html, outputPath));
+        var html = DeferredWorkTemplater.RenderPage(
+            model, nav, outputPath, doc.Title, _module.Commands, _epicsModel, hrefMap);
+        // NOT reference-linkified: the list-batch pane's Address/Close data-copy payloads embed raw item
+        // text (which can contain "Story N.M"/"Epic N"/"FR-N" mentions) — the linkifier would wrap those
+        // in <a> tags INSIDE the attribute value and corrupt the copyable command, the same trap
+        // WriteActionItems already avoids. [spec-follow-up-list-batch-actions]
+        WriteOutput(outputPath, html);
     }
 
     /// <summary>Writes <c>diagnostics.html</c> — the whole-run report of the run's non-fatal notices plus the
@@ -2901,8 +2904,9 @@ public sealed class SiteGenerator
 
         foreach (var group in groups)
         {
-            var html = FollowUpGroupTemplater.RenderPage(group, nav);
-            // No ApplyReferenceLinks — group pages intentionally omit Resolve data-copy; keep summaries plain.
+            var html = FollowUpGroupTemplater.RenderPage(group, nav, _module.Commands);
+            // No ApplyReferenceLinks — the list-batch pane's data-copy payloads embed raw item text
+            // (same corruption trap as WriteActionItems / WriteDeferredWork); row summaries stay plain.
             WriteOutput(group.OutputPath, html);
             emitted.Add(Path.GetFileName(group.OutputPath.Replace('/', Path.DirectorySeparatorChar)));
         }

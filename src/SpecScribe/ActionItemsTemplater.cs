@@ -53,7 +53,9 @@ public static class ActionItemsTemplater
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {openCount} open {Charts.Plural(openCount, "item", "items")} &middot; from retrospectives</div>\n");
         sb.Append("</header>\n\n");
 
-        sb.Append("<main id=\"main-content\">\n<section class=\"action-items-wrap\">\n");
+        sb.Append("<main id=\"main-content\">\n");
+        sb.Append(RenderListBatchPane("Open Action Items", groups, commands, detailSlugs));
+        sb.Append("<section class=\"action-items-wrap\">\n");
 
         foreach (var group in groups)
         {
@@ -70,6 +72,33 @@ public static class ActionItemsTemplater
         sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
+    }
+
+    /// <summary>Projects the whole-site open action-items list into the list-batch Address/Close pane —
+    /// entries in the same epic-ascending group order the rows themselves render in, so "first 5" matches
+    /// the page's existing display order. All items passed to this templater are already open, so no
+    /// further <c>!IsDone</c> filter is needed here. [spec-follow-up-list-batch-actions]</summary>
+    private static string RenderListBatchPane(
+        string pageTitle,
+        IReadOnlyList<ActionItemGroup> groups,
+        CommandCatalog commands,
+        IReadOnlyDictionary<SprintActionItem, string> detailSlugs)
+    {
+        var entries = groups
+            .SelectMany(g => g.Items)
+            .Select(item =>
+            {
+                var summary = FollowUpRow.SummarizePlainText(item.Action, maxChars: 200);
+                if (string.IsNullOrWhiteSpace(summary))
+                    summary = string.IsNullOrWhiteSpace(item.Action) ? "(no action text)" : item.Action.Trim();
+                var provenance = item.EpicNumber is { } en ? $"Epic {en}" : "Unattributed";
+                // Site-root-relative detail cue (no page-depth prefix) — matches deferred/group prompts.
+                var href = detailSlugs.TryGetValue(item, out var slug) ? FollowUpSlug.OutputPath(slug) : null;
+                return new BmadCommands.ListBatchEntry(summary, provenance, href);
+            })
+            .ToList();
+
+        return BmadCommands.RenderListBatchPane(pageTitle, commands, openActions: entries);
     }
 
     /// <summary>Groups open items by epic number ascending; null-epic items trail as "Unattributed".

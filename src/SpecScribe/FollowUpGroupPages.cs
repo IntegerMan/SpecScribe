@@ -9,7 +9,15 @@ public sealed record FollowUpGroupMember(
     string StatusLabel,
     string SourceChipHtml,
     bool Resolved,
-    string DetailBodyHtml = "");
+    string DetailBodyHtml = "",
+    /// <summary>Plain, un-escaped summary text for the list-batch Address/Close command payloads — the
+    /// pre-<see cref="PathUtil.Html"/> text <see cref="SummaryHtml"/> was escaped from. Null on
+    /// members that never feed a batch prompt (<c>Kind == "direct"</c>) or on older/test-constructed
+    /// members; callers fall back to a stripped <see cref="SummaryHtml"/>. [spec-follow-up-list-batch-actions]</summary>
+    string? RawSummary = null,
+    /// <summary>Plain, un-escaped provenance/source-chip text (e.g. "Epic 1", a deferred heading label)
+    /// for the same batch payloads. [spec-follow-up-list-batch-actions]</summary>
+    string? RawProvenance = null);
 
 /// <summary>One non-empty filtered group page to emit under <c>follow-ups/group-*.html</c>. [Story 9.13]</summary>
 public sealed record FollowUpGroupSpec(
@@ -143,7 +151,9 @@ public static class FollowUpGroupPages
             StatusStyles.ForSprint(item.Status),
             StatusStyles.SprintLabel(item.Status),
             PathUtil.Html(sourceChip),
-            FollowUpGeometry.IsDone(item));
+            FollowUpGeometry.IsDone(item),
+            RawSummary: summary,
+            RawProvenance: sourceChip);
     }
 
     private static FollowUpGroupMember FromDeferred(FollowUpDeferredSlot slot, string sourceChip)
@@ -160,7 +170,9 @@ public static class FollowUpGroupPages
             token,
             label,
             PathUtil.Html(sourceChip),
-            slot.Item.Resolved);
+            slot.Item.Resolved,
+            RawSummary: summary,
+            RawProvenance: slot.SourceKey is { Length: > 0 } sk ? sk : sourceChip);
     }
 
     private static FollowUpGroupMember FromQuickDev(UnplannedQuickDevSlot slot)
