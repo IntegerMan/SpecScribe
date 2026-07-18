@@ -578,4 +578,124 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.True(map.ContainsKey(a2));
         Assert.True(map.ContainsKey(b));
     }
+
+    [Fact]
+    public void RegenerateEpics_AfterDeferredWorkEdit_RefreshesDeferredListAndDetailPages()
+    {
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), """
+            last_updated: 2026-07-16T12:00:00-04:00
+            development_status:
+              epic-1: done
+              1-1-foundation: done
+              epic-1-retrospective: optional
+            """);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), StructuredDeferred);
+
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var beforeDetails = Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html");
+        Assert.Equal(2, beforeDetails.Length);
+        Assert.DoesNotContain(
+            Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html")
+                .Select(File.ReadAllText),
+            h => h.Contains("Brand-new watch deferred item", StringComparison.Ordinal));
+
+        // Watch routes deferred-work.md → RegenerateEpics (IsEpicsRelated), not GenerateOne.
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), """
+            # Deferred Work
+
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Open casing mismatch still outstanding.
+            - Brand-new watch deferred item.
+
+            ## Deferred from: code review of 2-1-delivery.md (2026-07-15)
+
+            - **[RESOLVED in 2.1]** ~~Already fixed in Story 2.1~~ — kept for the audit trail.
+            """);
+
+        var ev = gen.RegenerateEpics();
+        Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
+
+        var deferredList = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
+        Assert.Contains("Brand-new watch deferred item", deferredList);
+
+        var afterDetails = Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html");
+        Assert.True(afterDetails.Length >= 3);
+        Assert.Contains(
+            afterDetails.Select(File.ReadAllText),
+            h => h.Contains("Brand-new watch deferred item", StringComparison.Ordinal));
+
+        // Group pages also refresh (9.13 prune/membership).
+        Assert.True(File.Exists(Path.Combine(Site, "follow-ups", "group-epic-1.html")));
+        Assert.Contains(
+            "Brand-new watch deferred item",
+            File.ReadAllText(Path.Combine(Site, "follow-ups", "group-epic-1.html")));
+
+        // Resolve the new open bullet — list must show it settled; group may still list it as Resolved.
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), """
+            # Deferred Work
+
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Open casing mismatch still outstanding.
+            - **[RESOLVED in 1.1]** ~~Brand-new watch deferred item.~~
+
+            ## Deferred from: code review of 2-1-delivery.md (2026-07-15)
+
+            - **[RESOLVED in 2.1]** ~~Already fixed in Story 2.1~~ — kept for the audit trail.
+            """);
+        Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateEpics().Outcome);
+
+        var afterResolve = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
+        Assert.Contains("Brand-new watch deferred item", afterResolve);
+        Assert.Contains("class=\"followup-row resolved\"", afterResolve);
+        var groupAfterResolve = File.ReadAllText(Path.Combine(Site, "follow-ups", "group-epic-1.html"));
+        Assert.Contains("Brand-new watch deferred item", groupAfterResolve);
+        Assert.Contains(">Resolved</span>", groupAfterResolve);
+    }
+
+    [Fact]
+    public void GenerateOne_RefreshesDeferredListAndDetailPages()
+    {
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), """
+            last_updated: 2026-07-16T12:00:00-04:00
+            development_status:
+              epic-1: done
+              1-1-foundation: done
+              epic-1-retrospective: optional
+            """);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), StructuredDeferred);
+        var planningDoc = Path.Combine(Source, "planning-artifacts", "watch-parity-note.md");
+        File.WriteAllText(planningDoc, "# Watch Parity Note\n\nA non-epics planning doc for GenerateOne.\n");
+
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), """
+            # Deferred Work
+
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Open casing mismatch still outstanding.
+            - GenerateOne-parity deferred item.
+
+            ## Deferred from: code review of 2-1-delivery.md (2026-07-15)
+
+            - **[RESOLVED in 2.1]** ~~Already fixed in Story 2.1~~ — kept for the audit trail.
+            """);
+        // Touch the planning doc so GenerateOne has a real source change; deferred sync is inside RefreshFollowUpSurfaces.
+        File.WriteAllText(planningDoc, "# Watch Parity Note\n\nUpdated.\n");
+
+        var ev = gen.GenerateOne(planningDoc);
+        Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
+
+        Assert.Contains(
+            "GenerateOne-parity deferred item",
+            File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html")));
+        Assert.Contains(
+            Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html").Select(File.ReadAllText),
+            h => h.Contains("GenerateOne-parity deferred item", StringComparison.Ordinal));
+    }
 }

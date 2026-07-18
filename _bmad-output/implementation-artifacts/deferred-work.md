@@ -2,9 +2,18 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-epic9-watch-followup-surface-refresh.md (2026-07-18)
+
+- source_spec: `spec-epic9-watch-followup-surface-refresh.md`
+  summary: Every `RegenerateEpics` (any impl-artifact story save) now rewrites deferred list + all follow-up detail/group pages + quick-dev chrome even when `deferred-work.md` did not change — correctness over scoped I/O; revisit if watch lag shows up.
+  evidence: Blind Hunter — intentional breadth of RefreshFollowUpSurfaces on the epics watch route; AD-5 still avoids full GenerateAll.
+- source_spec: `spec-epic9-watch-followup-surface-refresh.md`
+  summary: Non-group orphan `follow-ups/deferred-*.html` after item remove/slug rewrite still not pruned (group-* prune only); SPA capture can keep serving stale detail files in long watch sessions.
+  evidence: Blind Hunter — out of scope per spec Never/aggressive wipe; same GenerateAll-without-wipe behavior.
+
 ## Deferred from: code review of 9-12-unplanned-and-one-off-work-in-geometry-and-sprint.md (2026-07-17)
 
-- Watch-mode `GenerateOne` rewrites quick-dev + index but does not call `WriteFollowUpGroupPages` — Unplanned/Follow-ups group destinations can stay stale until full `GenerateAll`. Same incremental family as 9.11 / artifact-review deferrals. [`SiteGenerator.cs:393`]
+- ~~Watch-mode `GenerateOne` rewrites quick-dev + index but does not call `WriteFollowUpGroupPages` — Unplanned/Follow-ups group destinations can stay stale until full `GenerateAll`. Same incremental family as 9.11 / artifact-review deferrals.~~ **RESOLVED 2026-07-18** (`spec-epic9-watch-followup-surface-refresh`): `RefreshFollowUpSurfaces` runs group pages (and deferred list/details) from `GenerateOne` and `RegenerateEpics` — the real watch route for `deferred-work.md`. [`SiteGenerator.cs`]
 - `ContainsSpecName` uses `text.Contains(stem)` without token boundaries — overlapping stems (e.g. `spec-a` vs `spec-ab`) can mis-attribute or multi-hit→null. Cleanup when next touching cue matching. [`UnplannedWorkGeometry.cs`]
 
 ## Deferred from: code review of 9-13-generated-filtered-follow-up-group-pages-and-sunburst-click-destinations.md (2026-07-17)
@@ -41,7 +50,7 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-11-follow-up-detail-pages-and-deep-links.md (2026-07-17)
 
-- Watch-mode `GenerateOne` does not call `WriteFollowUpDetails` / `WriteDeferredWork` (GenerateAll-only) — editing `deferred-work.md` in watch can leave sunburst/list deep links pointing at stale or missing `follow-ups/*.html` until a full generate. Same incremental family as prior watch gaps. [`SiteGenerator.cs:364`]
+- ~~Watch-mode `GenerateOne` does not call `WriteFollowUpDetails` / `WriteDeferredWork` (GenerateAll-only) — editing `deferred-work.md` in watch can leave sunburst/list deep links pointing at stale or missing `follow-ups/*.html` until a full generate. Same incremental family as prior watch gaps.~~ **RESOLVED 2026-07-18** (`spec-epic9-watch-followup-surface-refresh`): `RegenerateEpics` (watch path for impl-artifacts / deferred-work) and `GenerateOne` both call `RefreshFollowUpSurfaces` (`WriteDeferredWork` + `WriteFollowUpDetails` + group/quick-dev). [`SiteGenerator.cs`]
 - `ExtractTopLevelListItems` yields break on an unclosed top-level `<li>` so later siblings never become deferred slots. Rare malformed Markdig output; structured path is unaffected. [`FollowUpGeometry.cs:266`]
 
 ## Deferred from: code review of 9-8-authoring-and-delivery-workflow-coherence.md (2026-07-17)

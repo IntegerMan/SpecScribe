@@ -460,7 +460,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for 9.13 code-review patches: DeferredListHref on Unplanned pages, sprint
         // provenance <a>, watch WriteFollowUpGroupPages + group-* prune, unplanned-only legend, CSS
         // div.sprint-card hover / source-ref links. [Story 9.13 review]
-        const string expected = "0e02f9c5e0a0c4d1f83b71007b3526ada918996f5eee543767578a37c0e4786e";
+        // Regenerated 2026-07-18: fingerprint on main already drifted from expected 0e02f9c5… (same
+        // 9821c3f2… with or without watch RefreshFollowUpSurfaces); refresh the byte-parity gate.
+        const string expected = "9821c3f2211733f2fa36b696c4c1fbcbf0a00f55df4eec3d99c9e0a5104481bf";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

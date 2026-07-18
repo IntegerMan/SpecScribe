@@ -362,10 +362,7 @@ public sealed class SiteGenerator
             WriteCodeMap(nav);
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
-            WriteDeferredWork(nav, workInventory);
-            WriteFollowUpDetails(nav, workInventory);
-            WriteFollowUpGroupPages(nav, workInventory);
-            RewriteQuickDevPages(nav, workInventory);
+            RefreshFollowUpSurfaces(nav, workInventory);
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav, workInventory);
@@ -398,9 +395,7 @@ public sealed class SiteGenerator
             var nav = _nav ?? BuildNav(Array.Empty<string>());
             var ev = GenerateOneInternal(sourceFullPath, nav);
             RefreshCoverage();
-            var inventory = WorkInventory.Build(_docs.Values.ToList());
-            WriteFollowUpGroupPages(nav, inventory);
-            RewriteQuickDevPages(nav, inventory);
+            var inventory = RefreshFollowUpSurfaces(nav);
             WriteIndex(nav, inventory);
             // Keep the opt-in SPA form in sync in watch mode: _spaCapture already holds the fresh page (captured by
             // GenerateOneInternal's WriteOutput), so re-emitting rebuilds the manifest/chunks from current state.
@@ -507,7 +502,10 @@ public sealed class SiteGenerator
             if (ingest.SourceFullPath is null)
             {
                 RefreshCoverage();
-                WriteIndex(nav);
+                // Still refresh deferred/follow-up HTML — deferred-work.md is under implementation-artifacts/
+                // and routes here, not GenerateOne. [spec-epic9-watch-followup-surface-refresh]
+                var skippedInventory = RefreshFollowUpSurfaces(nav, sourceFiles: files);
+                WriteIndex(nav, skippedInventory);
                 if (_options.EmitSpa) EmitSpaSite(nav);
                 return new GenerationEvent(GenerationOutcome.Skipped, BmadArtifactAdapter.EpicsFileName, sw.Elapsed, $"{BmadArtifactAdapter.EpicsFileName} not found");
             }
@@ -528,13 +526,19 @@ public sealed class SiteGenerator
                 _requirements = ingest.Requirements;
             }
 
+            // deferred-work.md edits land here (IsEpicsRelated). Sync BodyHtml/open tallies before epic
+            // sunburst render so wedges and later follow-up writers agree with on-disk content.
+            SyncDeferredDocFromDisk(files);
+            _counts = null;
+
             var epicsEvents = new List<GenerationEvent>(MapDiagnostics(ingest.Diagnostics));
             if (ingest is { Epics: { } epicsModel, Requirements: { } requirementsModel } && progress is not null)
             {
                 epicsEvents.AddRange(RenderEpicsPages(ingest.SourceFullPath, files, ingest.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
             }
             RefreshCoverage();
-            WriteIndex(nav);
+            var followUpInventory = RefreshFollowUpSurfaces(nav, sourceFiles: files);
+            WriteIndex(nav, followUpInventory);
             if (_options.EmitSpa) EmitSpaSite(nav);
 
             var errored = epicsEvents.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
@@ -2715,6 +2719,72 @@ public sealed class SiteGenerator
             open, EpicRetroMap, _module.Commands, nav, deferredHref, counts, _epicsModel, hrefMap,
             allActionItemsForSlugs: _sprint?.ActionItems);
         WriteOutput(SiteNav.ActionItemsOutputPath, html);
+    }
+
+    /// <summary>Rewrites deferred list + follow-up detail/group pages + quick-dev chrome from current
+    /// on-disk deferred content. Shared by <see cref="GenerateAll"/>, <see cref="GenerateOne"/>, and
+    /// <see cref="RegenerateEpics"/> so watch edits don't leave deep links stale.
+    /// Returns the inventory used for the writes (callers can pass it to <see cref="WriteIndex"/>).
+    /// [spec-epic9-watch-followup-surface-refresh]</summary>
+    private WorkInventory RefreshFollowUpSurfaces(
+        SiteNav nav,
+        WorkInventory? work = null,
+        IReadOnlyList<string>? sourceFiles = null)
+    {
+        if (work is null)
+        {
+            SyncDeferredDocFromDisk(sourceFiles);
+            work = WorkInventory.Build(_docs.Values.ToList());
+            // Watch paths may still hold a GenerateAll-era ledger; rebuild so open tallies match the note.
+            _counts = ProjectCounts.Build(
+                _progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
+        }
+
+        WriteDeferredWork(nav, work);
+        WriteFollowUpDetails(nav, work);
+        WriteFollowUpGroupPages(nav, work);
+        RewriteQuickDevPages(nav, work);
+        return work;
+    }
+
+    /// <summary>Re-converts <c>deferred-work.md</c> into <see cref="_docs"/> so open tallies and
+    /// <see cref="TryParseDeferredWork"/> fallback BodyHtml match the on-disk note after watch edits.
+    /// Clears prior deferred-work <see cref="_docs"/> entries first so a deleted or moved note cannot
+    /// leave stale inventory for the writers. Unreadable note: leave cleared (NFR2).
+    /// [spec-epic9-watch-followup-surface-refresh]</summary>
+    private void SyncDeferredDocFromDisk(IReadOnlyList<string>? sourceFiles = null)
+    {
+        foreach (var key in _docs.Keys.Where(IsDeferredWorkDocKey).ToList())
+            _docs.Remove(key);
+
+        var files = sourceFiles ?? EnumerateSourceFiles();
+        foreach (var file in files)
+        {
+            var relative = ToSourceRelative(file);
+            var norm = PathUtil.NormalizeSlashes(relative);
+            if (!BmadArtifactAdapter.IsUnderImplementationArtifacts(norm)) continue;
+            var slash = norm.LastIndexOf('/');
+            var fileName = slash >= 0 ? norm[(slash + 1)..] : norm;
+            if (!string.Equals(fileName, "deferred-work.md", StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                if (!File.Exists(file)) return;
+                var outputRelative = PathUtil.ToOutputRelative(relative);
+                _docs[relative] = MarkdownConverter.Convert(file, relative, outputRelative);
+            }
+            catch (IOException) { /* NFR2 — inventory stays without deferred */ }
+            catch (UnauthorizedAccessException) { /* NFR2 */ }
+            return;
+        }
+    }
+
+    private static bool IsDeferredWorkDocKey(string sourceRelative)
+    {
+        var norm = PathUtil.NormalizeSlashes(sourceRelative);
+        var slash = norm.LastIndexOf('/');
+        var fileName = slash >= 0 ? norm[(slash + 1)..] : norm;
+        return string.Equals(fileName, "deferred-work.md", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Overwrites the deferred-work doc page with the structured card template when a
