@@ -2121,15 +2121,18 @@ public sealed class SiteGenerator
 
                         var storyStage = StatusStyles.ForStory(story);
                         // `commands` = full Next Steps set (incl. done's muted correct-course hatch when exposed);
-                        // `helperCommand` = PrimaryStoryCommand (null for done — hatch is not a primary).
-                        // [spec-vscode-sidebar-shortcuts-…-quickpick; Story 8.5]
-                        var storyCommands = BmadCommands.StoryCommands(story, _module.Commands);
+                        // `helperCommand` = PrimaryStoryCommand (null for done unless Address deferred is primary —
+                        // hatch is never a primary). [spec-vscode-sidebar-shortcuts-…-quickpick; Story 8.5;
+                        // spec-address-deferred-next-steps]
+                        var storyOpenDeferred = followUps?.DeferredForSource(story.Id)
+                            ?.Where(s => !s.Item.Resolved).ToList();
+                        var storyCommands = BmadCommands.StoryCommands(story, _module.Commands, storyOpenDeferred);
                         outlineStories.Add(new OutlineStory(
                             story.Id, story.Title, storyStage, StatusStyles.StoryLabel(storyStage),
                             PathUtil.NormalizeSlashes(storyPage.OutputRelativePath),
                             storySourcePath,
                             story.TasksDone, story.TasksTotal,
-                            BmadCommands.PrimaryStoryCommand(story, _module.Commands),
+                            BmadCommands.PrimaryStoryCommand(story, _module.Commands, storyOpenDeferred),
                             storyCommands));
                     }
 

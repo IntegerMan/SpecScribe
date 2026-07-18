@@ -531,6 +531,235 @@ public class BmadCommandsTests
         Assert.Equal("Plan", BmadCommands.KickerForCommand("/bmad-sprint-status", isPrimary: false));
     }
 
+    // ---- Address deferred I/O matrix ----------------------------------------------------------------
+
+    private static readonly CommandCatalog BmmWithQuickDev = new("BMad Method", new Dictionary<string, string>
+    {
+        ["create-story"] = "/bmad-create-story",
+        ["dev-story"] = "/bmad-dev-story",
+        ["code-review"] = "/bmad-code-review",
+        ["correct-course"] = "/bmad-correct-course",
+        ["check-implementation-readiness"] = "/bmad-check-implementation-readiness",
+        ["quick-dev"] = "/bmad-quick-dev",
+    });
+
+    private static FollowUpDeferredSlot OpenSlot(string body, string? sourceKey = null, string? detailHref = null) =>
+        new(new DeferredWorkItem($"<p>{body}</p>", Resolved: false, null, null),
+            "code review of 6-5-test", EpicNumber: 6,
+            DetailHref: detailHref ?? "follow-ups/deferred-test.html",
+            SourceKey: sourceKey ?? "6-5-test");
+
+    private static FollowUpDeferredSlot ResolvedSlot(string body) =>
+        new(new DeferredWorkItem($"<p>{body}</p>", Resolved: true, null, null),
+            "code review of 6-5-test", EpicNumber: 6,
+            DetailHref: "follow-ups/deferred-resolved.html",
+            SourceKey: "6-5-test");
+
+    [Fact]
+    public void RenderNextSteps_DoneStoryWithOpenDeferred_AddressDeferredPrimary_NoCelebration()
+    {
+        var deferred = new[] { OpenSlot("Extract helper method"), OpenSlot("Add logging") };
+        var html = BmadCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
+
+        Assert.Contains("Address deferred", html);
+        Assert.Contains("next-step-card-primary", html);
+        Assert.Contains("done-deferred-status", html);
+        Assert.Contains("2 open deferred items remain", html);
+        Assert.DoesNotContain("all-done", html);
+        Assert.DoesNotContain("All done", html);
+        Assert.Contains("Extract helper method", html);
+        Assert.Contains("Add logging", html);
+        Assert.Contains("6-5-test", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_DoneStoryWithNoOpenDeferred_CelebratoryAllDone()
+    {
+        var html = BmadCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev);
+        Assert.Contains("all-done", html);
+        Assert.Contains("All done", html);
+        Assert.DoesNotContain("Address deferred", html);
+        Assert.DoesNotContain("done-deferred-status", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_DoneStoryWithOnlyResolvedDeferred_CelebratoryAllDone()
+    {
+        var deferred = new[] { ResolvedSlot("Already fixed") };
+        var html = BmadCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
+        Assert.Contains("all-done", html);
+        Assert.Contains("All done", html);
+        Assert.DoesNotContain("Address deferred", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_InProgressWithOpenDeferred_AddressDeferredNotPrimary()
+    {
+        var deferred = new[] { OpenSlot("Fix edge case") };
+        var html = BmadCommands.RenderNextSteps(Story("6.5", "in-progress"), BmmWithQuickDev, deferred);
+
+        Assert.Contains("/bmad-dev-story 6.5", html);
+        Assert.Contains("Address deferred", html);
+        var primaryIdx = html.IndexOf("next-step-card-primary", StringComparison.Ordinal);
+        var devIdx = html.IndexOf("/bmad-dev-story 6.5", StringComparison.Ordinal);
+        var addrIdx = html.IndexOf("Address deferred", StringComparison.Ordinal);
+        Assert.True(primaryIdx < devIdx, "dev-story should be under the primary card");
+        Assert.True(devIdx < addrIdx, "Address deferred should come after dev-story");
+    }
+
+    [Fact]
+    public void RenderNextSteps_ReviewWithOpenDeferred_AddressDeferredNotPrimary()
+    {
+        var deferred = new[] { OpenSlot("Fix edge case") };
+        var html = BmadCommands.RenderNextSteps(Story("6.5", "review"), BmmWithQuickDev, deferred);
+
+        Assert.Contains("/bmad-code-review 6.5", html);
+        Assert.Contains("Address deferred", html);
+        var reviewIdx = html.IndexOf("/bmad-code-review 6.5", StringComparison.Ordinal);
+        var addrIdx = html.IndexOf("Address deferred", StringComparison.Ordinal);
+        Assert.True(reviewIdx < addrIdx, "code-review should precede Address deferred");
+    }
+
+    [Fact]
+    public void RenderEpicNextSteps_EpicWithOpenDeferred_AddressDeferredCoversAll()
+    {
+        var deferred = new[]
+        {
+            OpenSlot("Story-child item", "6-5-slug", "follow-ups/deferred-1.html"),
+            OpenSlot("Epic-level item", "spec-infra", "follow-ups/deferred-2.html"),
+        };
+        var epic = Epic(hasRetro: false, Story("1.1", "in-progress"));
+        var html = BmadCommands.RenderEpicNextSteps(epic, BmmWithQuickDev, deferred);
+
+        Assert.Contains("Address deferred", html);
+        Assert.Contains("Story-child item", html);
+        Assert.Contains("Epic-level item", html);
+        Assert.Contains("2 item", html);
+    }
+
+    [Fact]
+    public void RenderEpicNextSteps_DoneEpicWithOpenDeferred_AddressDeferredPrimary()
+    {
+        var deferred = new[] { OpenSlot("Left over item") };
+        var doneEpic = Epic(hasRetro: true, Story("1.1", "done"), Story("1.2", "done"));
+        var html = BmadCommands.RenderEpicNextSteps(doneEpic, BmmWithQuickDev, deferred);
+
+        Assert.Contains("Address deferred", html);
+        Assert.Contains("next-step-card-primary", html);
+        Assert.Contains("done-deferred-status", html);
+        Assert.DoesNotContain("all-done", html);
+    }
+
+    [Fact]
+    public void RenderEpicNextSteps_ReviewEpicWithDeferred_AddressDeferredDemoted()
+    {
+        var deferred = new[] { OpenSlot("Needs fixing") };
+        var catalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["retrospective"] = "/bmad-retrospective",
+            ["quick-dev"] = "/bmad-quick-dev",
+        });
+        var reviewEpic = Epic(hasRetro: false, Story("1.1", "done"), Story("1.2", "done"));
+        var html = BmadCommands.RenderEpicNextSteps(reviewEpic, catalog, deferred);
+
+        Assert.Contains("/bmad-retrospective 1", html);
+        Assert.Contains("Address deferred", html);
+        var retroIdx = html.IndexOf("/bmad-retrospective", StringComparison.Ordinal);
+        var addrIdx = html.IndexOf("Address deferred", StringComparison.Ordinal);
+        Assert.True(retroIdx < addrIdx, "retro should be primary; address deferred demoted");
+    }
+
+    [Fact]
+    public void RenderNextSteps_OpenDeferredButNoQuickDev_OmitsAddressDeferred()
+    {
+        var catalogNoQd = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/bmad-dev-story",
+            ["code-review"] = "/bmad-code-review",
+        });
+        var deferred = new[] { OpenSlot("Should not show") };
+
+        var htmlDone = BmadCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred);
+        Assert.DoesNotContain("Address deferred", htmlDone);
+        Assert.Contains("all-done", htmlDone);
+
+        var htmlActive = BmadCommands.RenderNextSteps(Story("6.5", "in-progress"), catalogNoQd, deferred);
+        Assert.DoesNotContain("Address deferred", htmlActive);
+    }
+
+    [Fact]
+    public void StoryCommands_DoneWithOpenDeferred_AddressDeferredPresent()
+    {
+        var deferred = new[] { OpenSlot("Deferred task") };
+        var cmds = BmadCommands.StoryCommands(Story("6.5", "done"), BmmWithQuickDev, deferred);
+
+        Assert.True(cmds.Count >= 1);
+        Assert.Contains(cmds, c => c.Command.Contains("Address open deferred"));
+        Assert.Equal(cmds[0].Command, BmadCommands.PrimaryStoryCommand(Story("6.5", "done"), BmmWithQuickDev, deferred));
+    }
+
+    [Fact]
+    public void PrimaryStoryCommand_DoneWithOpenDeferredButNoQuickDev_HatchIsNotPrimary()
+    {
+        var catalogNoQd = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["correct-course"] = "/bmad-correct-course",
+        });
+        var deferred = new[] { OpenSlot("Parked work") };
+
+        Assert.Null(BmadCommands.PrimaryStoryCommand(Story("6.5", "done"), catalogNoQd, deferred));
+        Assert.DoesNotContain("Address deferred",
+            BmadCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred));
+        Assert.Contains("all-done", BmadCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred));
+    }
+
+    [Fact]
+    public void RenderEpicNextSteps_PendingEpicWithOpenDeferred_AddressDeferredDemoted()
+    {
+        var epic = new EpicInfo
+        {
+            Number = 1,
+            Title = "Pending",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Pending,
+            Section = EpicSection.VerticalSlice,
+            Stories = Array.Empty<StoryInfo>(),
+        };
+        var deferred = new[] { OpenSlot("From planning") };
+        var catalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
+        {
+            ["create-epics-and-stories"] = "/bmad-create-epics-and-stories",
+            ["quick-dev"] = "/bmad-quick-dev",
+        });
+        var html = BmadCommands.RenderEpicNextSteps(epic, catalog, deferred);
+
+        Assert.Contains("Address deferred", html);
+        var createIdx = html.IndexOf("create-epics", StringComparison.Ordinal);
+        var addrIdx = html.IndexOf("Address deferred", StringComparison.Ordinal);
+        Assert.True(createIdx >= 0 && createIdx < addrIdx);
+    }
+
+    [Fact]
+    public void StoryCommands_DoneWithNoDeferred_EmptyOrHatchOnly()
+    {
+        var cmds = BmadCommands.StoryCommands(Story("6.5", "done"), BmmWithQuickDev);
+        var primary = BmadCommands.PrimaryStoryCommand(Story("6.5", "done"), BmmWithQuickDev);
+
+        Assert.Null(primary);
+        if (cmds.Count > 0)
+            Assert.Contains("correct-course", cmds[0].Command);
+    }
+
+    [Fact]
+    public void RenderNextSteps_DoneWithDeferredPanel_SingleItemGrammar()
+    {
+        var deferred = new[] { OpenSlot("Single item") };
+        var html = BmadCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
+
+        Assert.Contains("1 open deferred item remains", html);
+        Assert.Contains("(1 item)", html);
+    }
+
     [Fact]
     public void RenderNextSteps_CheckImplementationAlternate_UsesPendingAccentAndValidateKicker()
     {

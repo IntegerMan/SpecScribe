@@ -111,6 +111,7 @@ public static class EpicsViewBuilder
             ? new UnplannedWorkGeometry(epicQuickDev, Array.Empty<FollowUpDeferredSlot>())
             : UnplannedWorkGeometry.Empty;
 
+        var openDeferred = scopedDeferred.Where(s => !s.Item.Resolved).ToList();
         return new EpicPageView
         {
             Number = epic.Number,
@@ -121,8 +122,8 @@ public static class EpicsViewBuilder
             FrMetaHtml = epic.FrMetaHtml,
             HasStories = progress.StoryCount > 0,
             ProgressBars = bars,
-            NextActionsPanelHtml = RenderNextActionsPanel(epic, prefix, commands),
-            NextStepsHtml = BmadCommands.RenderEpicNextSteps(epic, commands),
+            NextActionsPanelHtml = RenderNextActionsPanel(epic, prefix, commands, openDeferred),
+            NextStepsHtml = BmadCommands.RenderEpicNextSteps(epic, commands, openDeferred),
             RetroAffordanceHtml = RenderRetroAffordance(epic, epicClass, prefix, commands, epicRetroPath),
             UndraftedBannerHtml = consolidated ? RenderUndraftedBanner(epic, undrafted, commands) : string.Empty,
             Epic = epic,
@@ -196,8 +197,9 @@ public static class EpicsViewBuilder
         var geometry = followUps ?? FollowUpGeometry.Empty;
         var deferred = geometry.DeferredForSource(story.Id, prefix);
         var deferredListHref = geometry.DeferredHref is { Length: > 0 } dh
-            ? dh
+            ? FollowUpGeometry.ApplyLinkPrefix(prefix, dh)
             : null;
+        var openDeferred = deferred.Where(s => !s.Item.Resolved).ToList();
 
         return new StoryPageView
         {
@@ -210,7 +212,7 @@ public static class EpicsViewBuilder
             RetroLinkHtml = RenderStoryRetroLink(epic.Number, prefix, epicRetroPath),
             BlurbHtml = blurbHtml,
             Tasks = tasks,
-            NextStepsHtml = BmadCommands.RenderNextSteps(story, commands),
+            NextStepsHtml = BmadCommands.RenderNextSteps(story, commands, openDeferred),
             AcceptanceCriteria = acceptanceCriteria,
             DevAgentRecord = devAgentRecord.Select(d => new DevAgentEntry(d.Label, d.ContentHtml)).ToList(),
             ReviewFindingsHtml = reviewFindingsHtml,
@@ -302,13 +304,15 @@ public static class EpicsViewBuilder
 
     /// <summary>Relocated from <c>EpicsTemplater.AppendNextActionsPanel</c> + <c>AppendUpNextCard</c> — one panel
     /// (Up Next spotlight card + the epic's next-step commands).</summary>
-    private static string RenderNextActionsPanel(EpicInfo epic, string prefix, CommandCatalog commands)
+    private static string RenderNextActionsPanel(
+        EpicInfo epic, string prefix, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
         var sb = new StringBuilder();
         sb.Append("<div class=\"chart-panel\">\n<h3>Up Next</h3>\n");
         AppendUpNextCard(sb, epic, prefix);
 
-        var nextStepsInner = BmadCommands.RenderEpicNextStepsInner(epic, commands);
+        var nextStepsInner = BmadCommands.RenderEpicNextStepsInner(epic, commands, openDeferred);
         if (nextStepsInner.Length > 0)
         {
             sb.Append(nextStepsInner);

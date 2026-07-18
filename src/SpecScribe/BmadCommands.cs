@@ -35,10 +35,20 @@ public static class BmadCommands
         new SendTarget("Open in Cursor", "cursor://anysphere.cursor-deeplink/prompt?text={cmd}"),
     };
 
-    public static string RenderNextSteps(StoryInfo story, CommandCatalog commands) =>
-        StatusStyles.ForStory(story) == "done"
-            ? RenderAllDonePanel(commands)
-            : RenderPanel(ForStory(story, commands));
+    public static string RenderNextSteps(
+        StoryInfo story, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
+    {
+        if (StatusStyles.ForStory(story) == "done")
+        {
+            var open = OpenOnly(openDeferred);
+            return open.Count > 0 && commands.Command("quick-dev") is { Length: > 0 }
+                ? RenderDoneWithDeferredPanel(story.Id, "Story", open, commands)
+                : RenderAllDonePanel(commands);
+        }
+
+        return RenderPanel(ForStory(story, commands, openDeferred));
+    }
 
     /// <summary>The FULL status-gated next-step command list for a story — the exact set the story page's
     /// "Next Steps" panel renders (<see cref="RenderNextSteps"/>), projected as data for a non-HTML host
@@ -52,17 +62,29 @@ public static class BmadCommands
     /// (e.g. no code-review before work is reviewable) lives here, never in TypeScript (AD-2).
     /// Whitespace-only catalog values are dropped so the emitted list never carries a blank command.
     /// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick; Story 8.5]</summary>
-    public static IReadOnlyList<OutlineStoryCommand> StoryCommands(StoryInfo story, CommandCatalog commands)
+    public static IReadOnlyList<OutlineStoryCommand> StoryCommands(
+        StoryInfo story, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
         if (StatusStyles.ForStory(story) == "done")
         {
+            var cmds = new List<OutlineStoryCommand>();
+            var open = OpenOnly(openDeferred);
+            if (open.Count > 0)
+            {
+                var addr = BuildAddressDeferredSuggestion(story.Id, "Story", open, commands);
+                if (addr is not null)
+                    cmds.Add(new OutlineStoryCommand(addr.Command, addr.Description));
+            }
+
             var hatch = DoneEscapeHatch(commands);
-            return hatch is null
-                ? Array.Empty<OutlineStoryCommand>()
-                : [new OutlineStoryCommand(hatch.Command, hatch.Description)];
+            if (hatch is not null)
+                cmds.Add(new OutlineStoryCommand(hatch.Command, hatch.Description));
+
+            return cmds;
         }
 
-        return ForStory(story, commands)
+        return ForStory(story, commands, openDeferred)
             .Where(s => !string.IsNullOrWhiteSpace(s.Command))
             .Select(s => new OutlineStoryCommand(s.Command, s.Description))
             .ToList();
@@ -71,17 +93,40 @@ public static class BmadCommands
     /// <summary>The single most-actionable slash command for a story — the FIRST entry of
     /// <see cref="StoryCommands"/> for non-done statuses, kept as one string for payload back-compat
     /// (an older shim reads only this) and as the single-command convenience for tests/hosts.
-    /// Returns null when the story is done (celebratory terminal state — a muted correct-course hatch in
-    /// <see cref="StoryCommands"/> is not a primary) or the detected module exposes no matching command —
-    /// the caller then omits the action, never printing a command that isn't installed. Composed here in C#
-    /// so the shim authors no command (AD-2). [Story 6.9; Story 8.5]</summary>
-    public static string? PrimaryStoryCommand(StoryInfo story, CommandCatalog commands) =>
-        StatusStyles.ForStory(story) == "done"
-            ? null
-            : StoryCommands(story, commands).FirstOrDefault()?.Command;
+    /// Returns null when the story is done with no Address-deferred primary (celebratory terminal state —
+    /// a muted <c>correct-course</c> hatch in <see cref="StoryCommands"/> is never a primary), or when
+    /// the detected module exposes no matching command. When done with open deferred and quick-dev is
+    /// installed, returns the Address-deferred command. Composed here in C# so the shim authors no
+    /// command (AD-2). [Story 6.9; Story 8.5; spec-address-deferred-next-steps]</summary>
+    public static string? PrimaryStoryCommand(
+        StoryInfo story, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
+    {
+        if (StatusStyles.ForStory(story) == "done")
+        {
+            var open = OpenOnly(openDeferred);
+            if (open.Count == 0) return null;
+            // Address deferred is a primary when present; correct-course hatch never is.
+            return BuildAddressDeferredSuggestion(story.Id, "Story", open, commands)?.Command;
+        }
 
-    public static string RenderEpicNextSteps(EpicInfo epic, CommandCatalog commands) =>
-        RenderPanel(ForEpic(epic, commands));
+        return StoryCommands(story, commands, openDeferred).FirstOrDefault()?.Command;
+    }
+
+    public static string RenderEpicNextSteps(
+        EpicInfo epic, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
+    {
+        var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
+        if (epicClass == "done")
+        {
+            var open = OpenOnly(openDeferred);
+            if (open.Count > 0 && commands.Command("quick-dev") is { Length: > 0 })
+                return RenderDoneWithDeferredPanel($"{epic.Number}", "Epic", open, commands);
+        }
+
+        return RenderPanel(ForEpic(epic, commands, openDeferred));
+    }
 
     public static string RenderProjectNextSteps(EpicsModel model, CommandCatalog commands) =>
         RenderPanel(ForProject(model, commands));
@@ -114,8 +159,10 @@ public static class BmadCommands
 
     /// <summary>The heading + list on their own (no chart-panel wrapper), for callers that want to fold
     /// the Next Steps into a shared panel rather than give it a standalone one.</summary>
-    public static string RenderEpicNextStepsInner(EpicInfo epic, CommandCatalog commands) =>
-        RenderInner(ForEpic(epic, commands));
+    public static string RenderEpicNextStepsInner(
+        EpicInfo epic, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null) =>
+        RenderInner(ForEpic(epic, commands, openDeferred));
 
     /// <summary>The story actions pane for a DONE story: celebratory terminal state (checkmark + success
     /// styling) instead of a primary command or code-review nudge. When the module exposes
@@ -245,8 +292,11 @@ public static class BmadCommands
         sb.Append("<ul class=\"next-steps-list next-steps-overflow\">\n");
         foreach (var s in alternates)
         {
+            var badge = s.DisplayLabel is { Length: > 0 } label
+                ? RenderLabeledCommand(label, s.Command)
+                : RenderCommandBadge(s.Command);
             sb.Append("  <li class=\"next-steps-alt\">" +
-                      RenderCommandBadge(s.Command) +
+                      badge +
                       $"<span class=\"next-steps-desc\">{PathUtil.Html(s.Description)}</span></li>\n");
         }
         sb.Append("</ul>\n</div>\n");
@@ -390,17 +440,18 @@ public static class BmadCommands
     /// the story id — but a `ready` story has no changes yet, so it gets no code-review at all. Mid-sprint
     /// / review recovery uses a demoted <c>correct-course</c> alternate when the module exposes it.
     /// [Story 8.5]</summary>
-    private static List<Suggestion> ForStory(StoryInfo story, CommandCatalog commands)
+    private static List<Suggestion> ForStory(
+        StoryInfo story, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
         var status = story.Status?.Trim().ToLowerInvariant() ?? string.Empty;
         var suggestions = new List<Suggestion>();
 
         if (status.Contains("ready"))
         {
-            // Nothing has been implemented yet, so there's nothing to review — code-review only
-            // enters the list once work starts (see the "progress"/"done" branches below).
             Add(suggestions, commands.Command("dev-story", story.Id),
                 "Implements the story exactly as specified — tasks, acceptance criteria, and dev notes drive the work.");
+            AppendDeferredAlternate(suggestions, story.Id, "Story", openDeferred, commands);
             return suggestions;
         }
 
@@ -412,6 +463,7 @@ public static class BmadCommands
                 "Review the work so far — worth running before marking the story done.");
             Add(suggestions, commands.Command("correct-course"),
                 "Re-plan this story mid-sprint if scope shifted or something's blocking.");
+            AppendDeferredAlternate(suggestions, story.Id, "Story", openDeferred, commands);
             return suggestions;
         }
 
@@ -421,18 +473,17 @@ public static class BmadCommands
                 "Final adversarial pass over the story's changes.");
             Add(suggestions, commands.Command("correct-course"),
                 "If review surfaces a scope problem, re-plan before re-review.");
+            AppendDeferredAlternate(suggestions, story.Id, "Story", openDeferred, commands);
             return suggestions;
         }
 
         if (status.Contains("done") || status.Contains("complete"))
         {
-            // A done story is finished — no next action. RenderNextSteps renders a celebratory "All done" panel
-            // instead of this (empty) list, so a completed story is never nagged to re-review. [spec-sunburst-retro]
+            // Done stories are handled by RenderNextSteps (all-done or done-with-deferred panel),
+            // not this list — keep empty so callers never treat a hatch as a ForStory primary.
             return suggestions;
         }
 
-        // No recognizable status — the plan doesn't exist yet. create-story advances *this* story (primary);
-        // for an epic's first story, readiness check is a demoted preparatory alternate.
         Add(suggestions, commands.Command("create-story", story.Id),
             "Generates the dedicated story file with full implementation context.");
 
@@ -442,21 +493,23 @@ public static class BmadCommands
                 "Verifies the requirements, UX, architecture, and epics stay aligned before this epic's first story begins.");
         }
 
+        AppendDeferredAlternate(suggestions, story.Id, "Story", openDeferred, commands);
         return suggestions;
     }
 
-    private static List<Suggestion> ForEpic(EpicInfo epic, CommandCatalog commands)
+    private static List<Suggestion> ForEpic(
+        EpicInfo epic, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
-        // Retro-gated: an all-stories-done epic reads as "review" until its retro closes it out (then "done").
-        // Keying the retro suggestion off "review" fires it exactly when it's needed and stops nagging an epic
-        // that already has a retro. [spec-sunburst-retro]
         var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
         var suggestions = new List<Suggestion>();
+        var entityId = epic.Number.ToString();
 
         if (epicClass == "pending")
         {
             Add(suggestions, commands.Command("create-epics-and-stories"),
                 $"Drafts the story breakdown for Epic {epic.Number} from the plan and architecture — it doesn't have one yet.");
+            AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
             return suggestions;
         }
 
@@ -464,12 +517,12 @@ public static class BmadCommands
         {
             Add(suggestions, commands.Command("retrospective", epic.Number.ToString()),
                 "Runs a retrospective now that every story in this epic is done.");
+            AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
             return suggestions;
         }
 
         if (epicClass == "done")
         {
-            // Every story done and the retrospective is captured — nothing more to suggest at the epic level.
             return suggestions;
         }
 
@@ -489,6 +542,7 @@ public static class BmadCommands
                     "Drafts the next story in this epic that doesn't have an implementation plan yet.");
                 Add(suggestions, commands.Command("sprint-status"),
                     "Surfaces this epic's current risks and the recommended next action.");
+                AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
                 return suggestions;
             }
 
@@ -501,6 +555,7 @@ public static class BmadCommands
                     "Drafts the next story in this epic that doesn't have an implementation plan yet.");
             }
 
+            AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
             return suggestions;
         }
 
@@ -515,6 +570,7 @@ public static class BmadCommands
                 "Generates the implementation plan for the next story in this epic.");
         }
 
+        AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
         return suggestions;
     }
 
@@ -647,6 +703,82 @@ public static class BmadCommands
         var sb = new StringBuilder();
         sb.Append("<div class=\"chart-panel next-steps all-done\">\n<h3>Next Steps</h3>\n");
         sb.Append($"<p class=\"all-done-complete\"><span class=\"all-done-icon\">{Icons.ForStatus("done")}</span>{PathUtil.Html(message)}</p>\n");
+        sb.Append("</div>\n\n");
+        return sb.ToString();
+    }
+
+    // ---- Address deferred helpers -------------------------------------------------------------------
+
+    private static IReadOnlyList<FollowUpDeferredSlot> OpenOnly(IReadOnlyList<FollowUpDeferredSlot>? slots) =>
+        slots is null ? Array.Empty<FollowUpDeferredSlot>()
+            : slots.Where(s => !s.Item.Resolved).ToList();
+
+    private static Suggestion? BuildAddressDeferredSuggestion(
+        string entityId, string entityKind,
+        IReadOnlyList<FollowUpDeferredSlot> openSlots, CommandCatalog commands)
+    {
+        var quickDev = commands.Command("quick-dev");
+        if (quickDev is not { Length: > 0 } || openSlots.Count == 0) return null;
+
+        var promptSb = new StringBuilder();
+        promptSb.Append($"{quickDev} Address open deferred work for {entityKind} {entityId} ({openSlots.Count} item{(openSlots.Count == 1 ? "" : "s")}). Find writeups in deferred-work.md and follow-up detail pages:");
+        for (var i = 0; i < openSlots.Count; i++)
+        {
+            var slot = openSlots[i];
+            var summary = FollowUpRow.SummarizeFromHtml(slot.Item.BodyHtml ?? string.Empty, maxChars: 200);
+            if (string.IsNullOrWhiteSpace(summary))
+                summary = PathUtil.StripHtmlTags(slot.Item.BodyHtml ?? string.Empty).Trim();
+            var provenance = slot.SourceKey is { Length: > 0 } sk ? $" [{sk}]" : string.Empty;
+            var cue = slot.DetailHref is { Length: > 0 } dh ? $" → {dh}" : string.Empty;
+            promptSb.Append($"\n{i + 1}. {summary}{provenance}{cue}");
+        }
+
+        return new Suggestion(
+            promptSb.ToString(),
+            $"Copies a quick-dev prompt listing the {openSlots.Count} open deferred item{(openSlots.Count == 1 ? "" : "s")} so AI can address them.",
+            DisplayLabel: "Address deferred");
+    }
+
+    private static void AppendDeferredAlternate(
+        List<Suggestion> suggestions, string entityId, string entityKind,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred, CommandCatalog commands)
+    {
+        var open = OpenOnly(openDeferred);
+        var addr = BuildAddressDeferredSuggestion(entityId, entityKind, open, commands);
+        if (addr is not null)
+            suggestions.Add(addr);
+    }
+
+    private static string RenderDoneWithDeferredPanel(
+        string entityId, string entityKind,
+        IReadOnlyList<FollowUpDeferredSlot> openSlots, CommandCatalog commands)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel next-steps\">\n<h3>Next Steps</h3>\n");
+        sb.Append($"<p class=\"done-deferred-status\">{entityKind} {PathUtil.Html(entityId)} is complete — {openSlots.Count} open deferred item{(openSlots.Count == 1 ? "" : "s")} remain{(openSlots.Count == 1 ? "s" : "")}.</p>\n");
+
+        var addr = BuildAddressDeferredSuggestion(entityId, entityKind, openSlots, commands);
+        if (addr is not null)
+        {
+            sb.Append("<div class=\"next-steps-cards\">\n");
+            var accent = addr.Accent ?? AccentForCommand(addr.Command);
+            var badge = addr.DisplayLabel is { Length: > 0 } label
+                ? RenderLabeledCommand(label, addr.Command)
+                : RenderCommandBadge(addr.Command);
+            sb.Append($"  <div class=\"next-step-card next-step-card-primary {accent}\">\n");
+            sb.Append($"    <span class=\"next-step-kicker\">Recommended</span>\n");
+            sb.Append($"    <div class=\"next-step-command\">{badge}</div>\n");
+            sb.Append($"    <p class=\"next-step-desc\">{PathUtil.Html(addr.Description)}</p>\n");
+            sb.Append("  </div>\n");
+            sb.Append("</div>\n");
+        }
+
+        var hatch = entityKind == "Story" ? DoneEscapeHatch(commands) : null;
+        if (hatch is not null)
+        {
+            sb.Append(RenderAlternatesGroup([hatch]));
+        }
+
         sb.Append("</div>\n\n");
         return sb.ToString();
     }

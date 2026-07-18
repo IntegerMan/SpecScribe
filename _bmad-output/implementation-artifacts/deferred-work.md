@@ -2,6 +2,11 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 9-7-open-follow-ups-in-the-remaining-work-geometry.md (2026-07-17)
+
+- Epic/story angular weight ignores nested story-child deferred crowding — many deferred under a thin `max(1, TasksTotal)` story share a small outer arc without growing the parent sweep. [`Charts.cs:195`]
+- `FollowUpGeometry.From` documents ledger agreement but does not assert `OpenActionItems` / deferred open tallies against `ProjectCounts` at build time (tests cover happy paths only). [`FollowUpGeometry.cs:81`]
+
 ## Deferred from: code review of 9-10-scannable-follow-up-list-pages.md (2026-07-17)
 
 - Nested / unclosed top-level `<li>` handling in `ExtractTopLevelListItems` can truncate nested lists or drop later siblings; structured Deferred-from path unaffected. Related to prior 9.11 deferral. [`FollowUpGeometry.cs:367`]
@@ -565,3 +570,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-undrafted-create-story-panel-above-ac.md`
   summary: SiteGeneratorAdapter golden fixture's undrafted story has no Acceptance Criteria, so the reordered AC branch is invisible to the byte-parity gate.
   evidence: Blind Hunter. Pre-existing fixture gap; only the new unit test covers note-above-AC ordering.
+
+## Deferred from: code review of spec-address-deferred-next-steps.md (2026-07-17)
+
+- source_spec: `spec-address-deferred-next-steps.md`
+  summary: Cap Address-deferred multi-item prompt length when many open items (truncate with an "and N more…" tail).
+  evidence: Blind Hunter — BuildAddressDeferredSuggestion concatenates every open slot (~200 chars each) with no length budget; large backlogs can produce impractical clipboard/deep-link payloads.
