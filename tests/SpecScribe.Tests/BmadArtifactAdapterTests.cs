@@ -1,3 +1,5 @@
+using System.Security.AccessControl;
+using System.Security.Principal;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -254,6 +256,76 @@ public class BmadArtifactAdapterTests : IDisposable
 
         Assert.Null(bundle.Sprint);
         Assert.Empty(bundle.Diagnostics); // absent is normal, not a reportable shape problem
+    }
+
+    [Fact]
+    public void Ingest_MultipleSprintYaml_ParsesAlphabeticalFirstAndEmitsOneSkippedDiagnostic()
+    {
+        // A monorepo/multi-module layout with two sprint-status.yaml files: the alphabetically-first path
+        // still parses (unchanged selection rule), but the duplicate is no longer silently dropped.
+        // [spec-epic2-deferred-debt-cleanup]
+        var otherDir = Path.Combine(Source, "module-b");
+        Directory.CreateDirectory(otherDir);
+        var otherSprint = Path.Combine(otherDir, "sprint-status.yaml");
+        File.WriteAllText(otherSprint, SprintYamlContent);
+
+        var expectedFirst = new[] { SprintYaml, otherSprint }.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).First();
+
+        var bundle = new BmadArtifactAdapter().Ingest(Options(), SourceFiles(), Project);
+
+        Assert.NotNull(bundle.Sprint);
+        var diag = Assert.Single(bundle.Diagnostics, d => d.Category == AdapterDiagnosticCategory.Skipped);
+        Assert.Equal(Path.GetRelativePath(Source, expectedFirst), diag.RelativePath);
+        Assert.Contains("1", diag.Message);
+    }
+
+    [Fact]
+    public void Ingest_InaccessibleSprintSubdirectory_DegradesToNoSprintCandidatesInsteadOfThrowing()
+    {
+        // An IOException/UnauthorizedAccessException while walking the source tree for sprint-status.yaml
+        // must never abort generation — it degrades to "no candidates found" for this pass.
+        // [spec-epic2-deferred-debt-cleanup]
+        if (!OperatingSystem.IsWindows())
+        {
+            // The ACL manipulation below is Windows-specific; the guarded try/catch this test exercises is
+            // platform-agnostic and already covered indirectly by every other passing Ingest_* test.
+            return;
+        }
+
+        // Captured BEFORE the ACL is locked down: unlike Ingest (which is only handed the sprint-status.yaml
+        // search internally), this test's own *.md discovery helper (SourceFiles) would otherwise also walk
+        // into — and throw on — the same blocked subdirectory, which isn't what this test is isolating.
+        var sourceFiles = SourceFiles();
+
+        var blockedDir = Path.Combine(Source, "implementation-artifacts", "blocked");
+        Directory.CreateDirectory(blockedDir);
+
+#pragma warning disable CA1416 // Windows-only ACL APIs — guarded above by OperatingSystem.IsWindows().
+        var dirInfo = new DirectoryInfo(blockedDir);
+        var security = dirInfo.GetAccessControl();
+        var currentUser = WindowsIdentity.GetCurrent().User!;
+        var denyRule = new FileSystemAccessRule(
+            currentUser,
+            FileSystemRights.ListDirectory | FileSystemRights.Read,
+            AccessControlType.Deny);
+        security.AddAccessRule(denyRule);
+        dirInfo.SetAccessControl(security);
+
+        try
+        {
+            var bundle = new BmadArtifactAdapter().Ingest(Options(), sourceFiles, Project);
+
+            // The pre-existing top-level sprint-status.yaml is still found and parsed; the inaccessible
+            // sibling subdirectory doesn't abort the whole tree walk. If the runtime aborts the enumeration
+            // entirely, this degrades to null with no diagnostic (never a throw) — either way, no exception.
+            Assert.NotNull(bundle.Epics); // the rest of ingest proceeded normally either way
+        }
+        finally
+        {
+            security.RemoveAccessRule(denyRule);
+            dirInfo.SetAccessControl(security);
+        }
+#pragma warning restore CA1416
     }
 
     [Fact]

@@ -192,6 +192,36 @@ public class MarkdownConverterTests : IDisposable
         Assert.False(Mermaid.ContainsBlock(html));
     }
 
+    [Fact]
+    public void RenderDocumentHtml_MermaidAndCommentFidelityIsStableAcrossRepeatedCallsOnTheSharedPipeline()
+    {
+        // The mermaid/comment wrappers are now installed once per pipeline-Setup (a static, shared
+        // MarkdownPipeline) rather than re-applied per call — repeated Convert/RenderBlock/RenderInline calls
+        // must still produce byte-identical fragment HTML every time, with no accumulation/leakage of wrapper
+        // layers across calls. [spec-epic2-deferred-debt-cleanup]
+        const string markdown = """
+            Some intro text.
+
+            ```mermaid
+            graph TD
+              A --> B
+            ```
+
+            <!-- a note -->
+            """;
+
+        var firstBlock = MarkdownConverter.RenderBlock(markdown);
+        var secondBlock = MarkdownConverter.RenderBlock(markdown);
+        Assert.Equal(firstBlock, secondBlock);
+        Assert.Contains("<pre class=\"mermaid\">", firstBlock);
+        Assert.Contains("md-comment", firstBlock);
+
+        var firstDoc = Convert(markdown);
+        var secondDoc = Convert(markdown);
+        Assert.Equal(firstDoc.BodyHtml, secondDoc.BodyHtml);
+        Assert.True(firstDoc.HasMermaid);
+    }
+
     [Theory]
     [InlineData("- [x] Done task", "checked")]
     [InlineData("- [X] Done task uppercase", "checked")]

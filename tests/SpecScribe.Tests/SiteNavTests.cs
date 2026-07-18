@@ -153,6 +153,107 @@ public class SiteNavTests
     }
 
     [Fact]
+    public void Build_EmitsOneDisambiguatedSpecQuickLinkPerKernelWhenMultiple()
+    {
+        // Two SPEC.md kernels: each gets its own quick-link, disambiguated by the kernel's own folder rather
+        // than the shared friendly "Spec" label (which would render two identical, indistinguishable cards).
+        // [spec-epic2-deferred-debt-cleanup]
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/epics.md",
+            "specs/alpha/SPEC.md",
+            "specs/beta/SPEC.md",
+        }, "SpecScribe", hasAdrs: false);
+
+        Assert.DoesNotContain("Spec", nav.QuickLinks.Select(q => q.Label));
+        var alphaLink = Assert.Single(nav.QuickLinks, q => q.Label == "Spec — alpha");
+        Assert.Equal("specs/alpha/SPEC.html", alphaLink.OutputRelativePath);
+        var betaLink = Assert.Single(nav.QuickLinks, q => q.Label == "Spec — beta");
+        Assert.Equal("specs/beta/SPEC.html", betaLink.OutputRelativePath);
+        Assert.Equal("Read this SPEC kernel and its companions.", alphaLink.Description);
+    }
+
+    [Fact]
+    public void Build_CollidingParentFolderNamesDisambiguateWithSpecsRelativeDir()
+    {
+        // Nested kernels that share the immediate parent name ("core") must not both read "Spec — core".
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/epics.md",
+            "specs/pkg-a/core/SPEC.md",
+            "specs/pkg-b/core/SPEC.md",
+        }, "SpecScribe", hasAdrs: false);
+
+        Assert.Contains(nav.QuickLinks, q => q.Label == "Spec — pkg-a/core");
+        Assert.Contains(nav.QuickLinks, q => q.Label == "Spec — pkg-b/core");
+    }
+
+    [Fact]
+    public void Build_KeepsSingleSpecKernelLabelPlainWhenOnlyOneKernelExistsAlongsideOtherSpecsFolders()
+    {
+        // A lone kernel still reads "Spec" — the disambiguated form only kicks in at 2+. [spec-epic2-deferred-debt-cleanup]
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/epics.md",
+            "specs/only-one/SPEC.md",
+        }, "SpecScribe", hasAdrs: false);
+
+        var specLink = Assert.Single(nav.QuickLinks, q => q.Label == "Spec");
+        Assert.Equal("specs/only-one/SPEC.html", specLink.OutputRelativePath);
+    }
+
+    [Fact]
+    public void Build_DuplicateWellKnownModuleDocEmitsOneSkippedDiagnosticNamingChosenPathAndCount()
+    {
+        // Two `prd.md` files: alphabetical-first still wins for the link (unchanged selection rule), but the
+        // duplicate is no longer silently dropped — it surfaces as one Skipped diagnostic. [spec-epic2-deferred-debt-cleanup]
+        var diagnostics = new List<AdapterDiagnostic>();
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/prds/prd-b/prd.md",
+            "planning-artifacts/prds/prd-a/prd.md",
+            "planning-artifacts/epics.md",
+        }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false, diagnostics: diagnostics);
+
+        var prdLink = Assert.Single(nav.QuickLinks, q => q.Label == "PRD");
+        Assert.Equal("planning-artifacts/prds/prd-a/prd.html", prdLink.OutputRelativePath);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdapterDiagnosticCategory.Skipped, diagnostic.Category);
+        Assert.Equal("planning-artifacts/prds/prd-a/prd.md", diagnostic.RelativePath);
+        Assert.Contains("1", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Build_NoDuplicateModuleDocsEmitsNoDiagnostics()
+    {
+        var diagnostics = new List<AdapterDiagnostic>();
+        SiteNav.Build(new[]
+        {
+            "planning-artifacts/prds/prd-x/prd.md",
+            "planning-artifacts/epics.md",
+        }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false, diagnostics: diagnostics);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void Build_WithoutDiagnosticsSinkStillPicksAlphabeticalFirstOnDuplicateModuleDoc()
+    {
+        // The diagnostics sink is optional (defaults to null) — omitting it must not throw, and selection
+        // stays alphabetical-first exactly as before. [spec-epic2-deferred-debt-cleanup]
+        var nav = SiteNav.Build(new[]
+        {
+            "planning-artifacts/prds/prd-b/prd.md",
+            "planning-artifacts/prds/prd-a/prd.md",
+            "planning-artifacts/epics.md",
+        }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false);
+
+        var prdLink = Assert.Single(nav.QuickLinks, q => q.Label == "PRD");
+        Assert.Equal("planning-artifacts/prds/prd-a/prd.html", prdLink.OutputRelativePath);
+    }
+
+    [Fact]
     public void RenderNavBar_AddsMobileToggleAndActivePageSemantics()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true);

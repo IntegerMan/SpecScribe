@@ -14,6 +14,7 @@ public static class MarkdownConverter
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
+        .Use(new DocumentRendererWrappersExtension())
         .Build();
 
     private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder()
@@ -54,28 +55,54 @@ public static class MarkdownConverter
         };
     }
 
-    /// <summary>Renders a parsed markdown document to HTML with the mermaid-aware code-block renderer and the
-    /// comment-aware HTML renderers applied, so <c>```mermaid</c> fences become <c>&lt;pre class="mermaid"&gt;</c>
-    /// and <c>&lt;!-- ... --&gt;</c> comments become visible annotations here exactly as they do in full-page
-    /// <see cref="Convert"/>. Shared by <see cref="Convert"/>, <see cref="RenderBlock"/>, and
-    /// <see cref="RenderInline"/> so fragment rendering (story remainder, dev-agent record, review findings,
-    /// change log, epics overview/inventory, titles, AC lines) carries the same fidelity as a full page —
-    /// otherwise a fence or comment authored inside an artifact body renders inert or invisible.</summary>
+    /// <summary>Renders a parsed markdown document to HTML. The mermaid-aware code-block renderer and the
+    /// comment-aware HTML renderers are installed once per <see cref="Pipeline"/> (by
+    /// <see cref="DocumentRendererWrappersExtension"/>, run from <see cref="MarkdownPipeline.Setup(IMarkdownRenderer)"/>
+    /// below) rather than re-applied on every call, so <c>```mermaid</c> fences become
+    /// <c>&lt;pre class="mermaid"&gt;</c> and <c>&lt;!-- ... --&gt;</c> comments become visible annotations here
+    /// exactly as they do in full-page <see cref="Convert"/>. Shared by <see cref="Convert"/>,
+    /// <see cref="RenderBlock"/>, and <see cref="RenderInline"/> so fragment rendering (story remainder,
+    /// dev-agent record, review findings, change log, epics overview/inventory, titles, AC lines) carries the
+    /// same fidelity as a full page — otherwise a fence or comment authored inside an artifact body renders
+    /// inert or invisible. [spec-epic2-deferred-debt-cleanup]</summary>
     private static string RenderDocumentHtml(MarkdownDocument document)
     {
         using var writer = new StringWriter();
         var renderer = new HtmlRenderer(writer);
         Pipeline.Setup(renderer);
-        UseMermaidCodeBlocks(renderer);
-        UseCommentAnnotations(renderer);
         renderer.Render(document);
         writer.Flush();
         return writer.ToString();
     }
 
+    /// <summary>Installs the mermaid-aware code-block renderer and the comment-aware HTML renderers onto every
+    /// <see cref="HtmlRenderer"/> built from <see cref="Pipeline"/>, once per <see cref="MarkdownPipeline.Setup(IMarkdownRenderer)"/>
+    /// call rather than as a separate per-call pass. Markdig runs every registered extension's
+    /// <see cref="IMarkdownExtension.Setup(MarkdownPipeline, IMarkdownRenderer)"/> from inside that same
+    /// <c>Setup</c>, and by the time it does, the renderer's own default object renderers (the
+    /// <see cref="CodeBlockRenderer"/>/<see cref="Markdig.Renderers.Html.HtmlBlockRenderer"/>/
+    /// <see cref="Markdig.Renderers.Html.Inlines.HtmlInlineRenderer"/> this wraps) are already registered by
+    /// the <see cref="HtmlRenderer"/> constructor itself — so this is the idiomatic once-per-pipeline seam, not
+    /// a race with pipeline setup order. [spec-epic2-deferred-debt-cleanup]</summary>
+    private sealed class DocumentRendererWrappersExtension : IMarkdownExtension
+    {
+        public void Setup(MarkdownPipelineBuilder pipeline)
+        {
+            // No parser-side hooks — this extension only wraps renderer-side object renderers.
+        }
+
+        public void Setup(MarkdownPipeline pipeline, IMarkdownRenderer renderer)
+        {
+            if (renderer is not HtmlRenderer htmlRenderer) return;
+            UseMermaidCodeBlocks(htmlRenderer);
+            UseCommentAnnotations(htmlRenderer);
+        }
+    }
+
     /// <summary>Replaces the default fenced-code renderer with one that emits mermaid blocks as
-    /// <c>&lt;pre class="mermaid"&gt;</c>. Must run after <see cref="MarkdownPipeline.Setup(IMarkdownRenderer)"/>
-    /// so the default renderer it wraps is already registered.</summary>
+    /// <c>&lt;pre class="mermaid"&gt;</c>. Must run after the <see cref="HtmlRenderer"/> constructor's default
+    /// renderer registration, which <see cref="DocumentRendererWrappersExtension"/>'s pipeline-Setup timing
+    /// already guarantees.</summary>
     private static void UseMermaidCodeBlocks(HtmlRenderer renderer)
     {
         var existing = renderer.ObjectRenderers.OfType<CodeBlockRenderer>().FirstOrDefault();
@@ -87,8 +114,9 @@ public static class MarkdownConverter
 
     /// <summary>Replaces the default HTML block/inline renderers with comment-aware wrappers that render
     /// <c>&lt;!-- ... --&gt;</c> as a visible, muted annotation; every other HTML block/inline is delegated to the
-    /// wrapped defaults unchanged. Must run after <see cref="MarkdownPipeline.Setup(IMarkdownRenderer)"/> so the
-    /// default renderers it wraps are already registered.</summary>
+    /// wrapped defaults unchanged. Must run after the <see cref="HtmlRenderer"/> constructor's default renderer
+    /// registration, which <see cref="DocumentRendererWrappersExtension"/>'s pipeline-Setup timing already
+    /// guarantees.</summary>
     private static void UseCommentAnnotations(HtmlRenderer renderer)
     {
         var existingBlock = renderer.ObjectRenderers.OfType<Markdig.Renderers.Html.HtmlBlockRenderer>().FirstOrDefault();

@@ -191,15 +191,27 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
     /// it's a <c>.yaml</c>, so it's outside the <c>*.md</c> source enumeration). Absent → null with no
     /// diagnostic (graceful omission, as today); present-but-uninterpretable → null PLUS an
     /// <see cref="AdapterDiagnosticCategory.Unsupported"/> diagnostic, giving AC #2's "unsupported shape"
-    /// case a visible, categorized, non-fatal report where it used to degrade silently. [Story 4.1]</summary>
+    /// case a visible, categorized, non-fatal report where it used to degrade silently. [Story 4.1]
+    /// <para>Discovery is IO-safe: inaccessible subdirectories are skipped
+    /// (<see cref="EnumerationOptions.IgnoreInaccessible"/>) so one locked folder does not discard reachable
+    /// <c>sprint-status.yaml</c> files; a residual IO/permissions failure still degrades to "no candidates"
+    /// instead of aborting ingest. When more than one <c>sprint-status.yaml</c> exists (a monorepo/multi-module
+    /// layout), alphabetical OrdinalIgnoreCase first-wins exactly as before, but the pick is no longer silent —
+    /// one <see cref="AdapterDiagnosticCategory.Skipped"/> diagnostic names the chosen path and how many siblings
+    /// were skipped. [spec-epic2-deferred-debt-cleanup]</para></summary>
     private static SprintStatus? IngestSprint(ForgeOptions options, List<AdapterDiagnostic> diagnostics)
     {
-        var sprintPath = Directory.Exists(options.SourceRoot)
-            ? Directory.EnumerateFiles(options.SourceRoot, SprintStatusFileName, SearchOption.AllDirectories)
-                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault()
-            : null;
+        var candidates = FindSprintStatusCandidates(options.SourceRoot);
+        var sprintPath = candidates.Count > 0 ? candidates[0] : null;
         if (sprintPath is null) return null;
+
+        if (candidates.Count > 1)
+        {
+            diagnostics.Add(new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Skipped,
+                ToSourceRelative(options, sprintPath),
+                $"{candidates.Count - 1} duplicate '{SprintStatusFileName}' file(s) skipped in favor of this one"));
+        }
 
         var sprint = SprintStatusParser.ParseFile(sprintPath);
         if (sprint is null)
@@ -214,6 +226,30 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
         // Story 8.2 AC #3: present-but-unmapped sprint ledger values → Unsupported (non-fatal).
         CollectUnrecognizedSprintStatuses(sprint, ToSourceRelative(options, sprintPath), diagnostics);
         return sprint;
+    }
+
+    /// <summary>Every <c>sprint-status.yaml</c> under <paramref name="sourceRoot"/>, alphabetical
+    /// OrdinalIgnoreCase (first-wins selection stays with the caller). Inaccessible subdirectories are
+    /// skipped via <see cref="EnumerationOptions.IgnoreInaccessible"/> so one locked folder does not wipe
+    /// reachable candidates; a residual <see cref="IOException"/>/<see cref="UnauthorizedAccessException"/>
+    /// still degrades to an empty list rather than aborting generation. [spec-epic2-deferred-debt-cleanup]</summary>
+    private static List<string> FindSprintStatusCandidates(string sourceRoot)
+    {
+        if (!Directory.Exists(sourceRoot)) return new List<string>();
+        try
+        {
+            return Directory.EnumerateFiles(sourceRoot, SprintStatusFileName, new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true,
+                })
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new List<string>();
+        }
     }
 
     /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per sprint ledger or action-item

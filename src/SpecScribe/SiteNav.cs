@@ -83,7 +83,8 @@ public sealed class SiteNav
         bool hasAdrs = false,
         bool hasReadme = false,
         bool hasSprint = false,
-        bool hasCodeMap = false)
+        bool hasCodeMap = false,
+        List<AdapterDiagnostic>? diagnostics = null)
     {
         var items = new List<(string, string)> { ("Home", HomeOutputPath) };
         var quickLinks = new List<(string, string, string)>();
@@ -97,14 +98,28 @@ public sealed class SiteNav
 
         // Module docs (PRD/Architecture, or GDD/Narrative/etc.) are matched by filename anywhere in the
         // source tree, so a missing doc is simply skipped rather than producing a broken link. In-nav docs
-        // ride the top nav; all discovered docs appear in the dashboard quick links.
+        // ride the top nav; all discovered docs appear in the dashboard quick links. When more than one file
+        // shares a well-known filename, alphabetical OrdinalIgnoreCase first-wins for the link (unchanged
+        // selection rule) but the pick is no longer silent — the skipped sibling(s) surface as one Skipped
+        // diagnostic so a duplicate doesn't just vanish. [spec-epic2-deferred-debt-cleanup]
         foreach (var doc in moduleDocs ?? Array.Empty<ModuleDoc>())
         {
-            var match = sourceRelativePaths.FirstOrDefault(p =>
-                string.Equals(Path.GetFileName(p), doc.FileName, StringComparison.OrdinalIgnoreCase));
-            if (match is null)
+            var matches = sourceRelativePaths
+                .Where(p => string.Equals(Path.GetFileName(p), doc.FileName, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (matches.Count == 0)
             {
                 continue;
+            }
+
+            var match = matches[0];
+            if (matches.Count > 1)
+            {
+                diagnostics?.Add(new AdapterDiagnostic(
+                    AdapterDiagnosticCategory.Skipped,
+                    match,
+                    $"{matches.Count - 1} duplicate '{doc.FileName}' file(s) skipped in favor of this one"));
             }
 
             var outputPath = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(match));
@@ -161,12 +176,30 @@ public sealed class SiteNav
         // directory the same way epics/ADRs are matched by well-known presence, so an absent kernel simply
         // omits the link (no broken nav). The existing "Architecture" (ARCHITECTURE-SPINE) module-doc nav
         // entry is a separate concern and is left untouched — not duplicated here. [Story 2.2 Task 3]
-        var specKernelHub = sourceRelativePaths.FirstOrDefault(p =>
-            IsUnderSpecs(p) && string.Equals(Path.GetFileName(p), "SPEC.md", StringComparison.OrdinalIgnoreCase));
-        if (specKernelHub is not null)
+        // A project can carry more than one kernel (e.g. per-package specs/): one quick-link per SPEC.md,
+        // ordered alphabetically OrdinalIgnoreCase. A single kernel keeps the friendly "Spec" label; two or
+        // more disambiguate with the kernel's own folder so the cards are distinguishable rather than
+        // identical. [spec-epic2-deferred-debt-cleanup]
+        var specKernels = sourceRelativePaths
+            .Where(p => IsUnderSpecs(p) && string.Equals(Path.GetFileName(p), "SPEC.md", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var multiKernel = specKernels.Count > 1;
+        // Prefer the immediate parent folder for multi-kernel labels; when two kernels share that name
+        // (e.g. specs/pkg-a/core/SPEC.md vs specs/pkg-b/core/SPEC.md), fall back to the specs-relative
+        // directory so the quick-links stay distinguishable. [spec-epic2-deferred-debt-cleanup]
+        var folderLabels = multiKernel
+            ? SpecKernelDisambiguatedLabels(specKernels)
+            : null;
+        for (var i = 0; i < specKernels.Count; i++)
         {
-            var specOutputPath = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(specKernelHub));
-            quickLinks.Add(("Spec", specOutputPath, "Read the canonical SPEC kernel and its companions."));
+            var specKernel = specKernels[i];
+            var specOutputPath = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(specKernel));
+            var label = multiKernel ? $"Spec — {folderLabels![i]}" : "Spec";
+            var description = multiKernel
+                ? "Read this SPEC kernel and its companions."
+                : "Read the canonical SPEC kernel and its companions.";
+            quickLinks.Add((label, specOutputPath, description));
         }
 
         return new SiteNav { Items = items, QuickLinks = quickLinks, SiteTitle = siteTitle };
@@ -177,6 +210,44 @@ public sealed class SiteNav
     /// disjoint from Story 2.1's <c>implementation-artifacts/spec-*.md</c> quick-dev files. [Story 2.2 Task 1]</summary>
     private static bool IsUnderSpecs(string sourceRelativePath) =>
         PathUtil.NormalizeSlashes(sourceRelativePath).StartsWith("specs/", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>One display suffix per multi-kernel path: prefer the immediate parent folder name, but when
+    /// that name collides across kernels (or is empty), use the specs-relative directory (e.g.
+    /// <c>pkg-a/core</c>) so quick-link labels stay distinguishable. [spec-epic2-deferred-debt-cleanup]</summary>
+    private static IReadOnlyList<string> SpecKernelDisambiguatedLabels(IReadOnlyList<string> specKernels)
+    {
+        var preferred = specKernels.Select(SpecKernelFolderName).ToList();
+        var collision = preferred
+            .GroupBy(s => s, StringComparer.OrdinalIgnoreCase)
+            .Any(g => g.Count() > 1 || string.IsNullOrEmpty(g.Key));
+        if (!collision) return preferred;
+        return specKernels.Select(SpecKernelSpecsRelativeDir).ToList();
+    }
+
+    /// <summary>The folder directly containing a <c>SPEC.md</c> kernel (e.g. <c>specs/foo/SPEC.md</c> →
+    /// <c>foo</c>). Empty when the path has no directory segment. [spec-epic2-deferred-debt-cleanup]</summary>
+    private static string SpecKernelFolderName(string specSourceRelativePath)
+    {
+        var normalized = PathUtil.NormalizeSlashes(specSourceRelativePath);
+        var dirEnd = normalized.LastIndexOf('/');
+        if (dirEnd < 0) return string.Empty;
+        var dir = normalized[..dirEnd];
+        var parentEnd = dir.LastIndexOf('/');
+        return parentEnd < 0 ? dir : dir[(parentEnd + 1)..];
+    }
+
+    /// <summary>Specs-relative directory of a kernel (e.g. <c>specs/pkg-a/core/SPEC.md</c> →
+    /// <c>pkg-a/core</c>; <c>specs/SPEC.md</c> → <c>specs</c>). [spec-epic2-deferred-debt-cleanup]</summary>
+    private static string SpecKernelSpecsRelativeDir(string specSourceRelativePath)
+    {
+        var normalized = PathUtil.NormalizeSlashes(specSourceRelativePath);
+        var dirEnd = normalized.LastIndexOf('/');
+        if (dirEnd < 0) return "specs";
+        var dir = normalized[..dirEnd];
+        if (dir.StartsWith("specs/", StringComparison.OrdinalIgnoreCase))
+            return dir["specs/".Length..];
+        return string.Equals(dir, "specs", StringComparison.OrdinalIgnoreCase) ? "specs" : dir;
+    }
 
     /// <summary>Projects this nav's already host-neutral data into the typed <see cref="NavigationView"/> the
     /// render adapters consume, with <paramref name="activeOutputRelativePath"/> marking the current page. The

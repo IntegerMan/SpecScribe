@@ -40,7 +40,13 @@ public static class Icons
     {
         if (label is not { Length: > 0 }) return string.Empty;
 
-        return label.Trim() switch
+        // Multi-kernel Spec quick-links use display labels like "Spec — alpha" while the curated glyph key
+        // stays "Spec" (IconKey ≠ DisplayLabel). [spec-epic2-deferred-debt-cleanup]
+        var key = label.Trim();
+        if (key.StartsWith("Spec — ", StringComparison.Ordinal))
+            key = "Spec";
+
+        return key switch
         {
             "Home" => Svg("<path d=\"M2.5 8 8 3.3 13.5 8\"/><path d=\"M4 6.7V13h8V6.7\"/>"),
             // Journey-group triggers on the dark nav bar (Docs / Work); Architecture reuses its own glyph below.

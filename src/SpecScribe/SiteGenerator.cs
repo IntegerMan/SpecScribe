@@ -173,7 +173,8 @@ public sealed class SiteGenerator
             _module = bundle.Module;
             SetRetros(bundle.Retros);
 
-            var nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasCodeMap: _codeFiles.Count > 0);
+            var navDiagnostics = new List<AdapterDiagnostic>();
+            var nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasCodeMap: _codeFiles.Count > 0, diagnostics: navDiagnostics);
             _nav = nav;
 
             // Render the README up front so that, if it fails, we can drop the Readme nav entry before any
@@ -184,7 +185,8 @@ public sealed class SiteGenerator
                 readmeEvent = GenerateReadmeInternal(nav);
                 if (readmeEvent is { Outcome: GenerationOutcome.Error })
                 {
-                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false, hasSprint: SprintAvailable, hasCodeMap: _codeFiles.Count > 0);
+                    navDiagnostics.Clear();
+                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false, hasSprint: SprintAvailable, hasCodeMap: _codeFiles.Count > 0, diagnostics: navDiagnostics);
                     _nav = nav;
                 }
             }
@@ -213,6 +215,11 @@ public sealed class SiteGenerator
             // Adapter diagnostics surface on the same event channel per-file failures always used — the typed
             // AdapterDiagnostic is the only report for a failure the adapter caught (never double-reported).
             events.AddRange(MapDiagnostics(bundle.Diagnostics));
+
+            // Nav-build diagnostics (duplicate well-known module docs) ride the same channel. Rebuilding nav
+            // after a failed README render (above) replaces navDiagnostics wholesale rather than appending, so
+            // this merge always reflects exactly the SiteNav actually in play. [spec-epic2-deferred-debt-cleanup]
+            events.AddRange(MapDiagnostics(navDiagnostics));
 
             // Unrecognized top-level source folders render coherently (each gets its own home-index band, see
             // HtmlTemplater.RenderIndex) AND are reported as categorized non-fatal structure notices on the
@@ -490,7 +497,8 @@ public sealed class SiteGenerator
             EnsureScaffold();
 
             var files = EnumerateSourceFiles();
-            var nav = BuildNav(files.Select(ToSourceRelative).ToList());
+            var navDiagnostics = new List<AdapterDiagnostic>();
+            var nav = BuildNav(files.Select(ToSourceRelative).ToList(), navDiagnostics);
             _nav = nav;
 
             // Scoped re-ingest through the adapter: exactly the epics + story-artifact + requirements re-parse
@@ -532,6 +540,7 @@ public sealed class SiteGenerator
             _counts = null;
 
             var epicsEvents = new List<GenerationEvent>(MapDiagnostics(ingest.Diagnostics));
+            epicsEvents.AddRange(MapDiagnostics(navDiagnostics));
             if (ingest is { Epics: { } epicsModel, Requirements: { } requirementsModel } && progress is not null)
             {
                 epicsEvents.AddRange(RenderEpicsPages(ingest.SourceFullPath, files, ingest.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
@@ -3418,14 +3427,18 @@ public sealed class SiteGenerator
     /// <summary>Builds the site nav, folding in whether any ADRs exist (they live outside the _bmad-output
     /// file list the nav is otherwise derived from). Also detects the active BMad module so the nav shows
     /// that module's planning docs and the templaters emit that module's workflow commands.</summary>
-    private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives)
+    /// <param name="diagnostics">Optional sink for nav-build diagnostics (e.g. duplicate well-known module
+    /// docs) — callers with an event stream to merge into pass a list; incremental callers that rebuild nav
+    /// from an empty source list (before the first full generate) have nothing to discover and can omit it.
+    /// [spec-epic2-deferred-debt-cleanup]</param>
+    private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives, List<AdapterDiagnostic>? diagnostics = null)
     {
         _module = ModuleContext.Detect(_options.RepoRoot, sourceRelatives);
         // CodeMapAvailable = the cached source-code walk is non-empty — the SINGLE signal that gates both the nav
         // item/quick link here and the WriteCodeMap page write, so a Code Map link is never emitted to a page that
         // wasn't produced. The incremental watch paths that call BuildNav reuse the last full run's _codeFiles (the
         // treemap only regenerates on a full rebuild). [Story 7.6 Subtask 3.4]
-        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasCodeMap: _codeFiles.Count > 0);
+        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasCodeMap: _codeFiles.Count > 0, diagnostics: diagnostics);
     }
 
     private static readonly IReadOnlyDictionary<string, DateOnly> EmptyDates = new Dictionary<string, DateOnly>();

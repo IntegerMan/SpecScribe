@@ -35,6 +35,7 @@ public class IconsTests
     [InlineData("Requirements")]
     [InlineData("ADRs")]
     [InlineData("Spec")]
+    [InlineData("Spec — alpha")]
     [InlineData("Sprint")]
     [InlineData("Overview")]
     [InlineData("Planning Artifacts")]

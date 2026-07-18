@@ -24,6 +24,14 @@ public static class SprintStatusParser
     private static readonly Regex StoryKey = new(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
     private static readonly Regex LastUpdatedLine = new(@"(?m)^last_updated:[ \t]*(?<v>.+?)[ \t]*$", RegexOptions.Compiled);
 
+    // A YAML block-scalar header (`>`/`|`) plus optional chomp (`+`/`-`) and/or indent digit in either
+    // order (`>-`, `|2`, `|2-`, `>1+`), with nothing else on the line — the folded/literal BODY lives on
+    // the following indented lines, which this single-line regex never reads. Matching only the bare
+    // indicator (not a real date) keeps `ExtractLastUpdated` from ever surfacing the indicator character
+    // itself as if it were the value. [spec-epic2-deferred-debt-cleanup]
+    private static readonly Regex BlockScalarIndicatorOnly = new(
+        @"^[>|](?:[+-]\d*|\d+[+-]?)?$", RegexOptions.Compiled);
+
     /// <summary>Reads and parses the yaml at <paramref name="fullPath"/>. Returns <c>null</c> when the file is
     /// absent or unreadable — matching the "matched by presence, omit when absent" discipline of README/epics/ADRs.</summary>
     public static SprintStatus? ParseFile(string? fullPath)
@@ -153,17 +161,32 @@ public static class SprintStatusParser
         return result;
     }
 
+    /// <summary>Reads the optional single-line <c>last_updated:</c> scalar. A YAML block-scalar form
+    /// (<c>&gt;</c>/<c>|</c>, optionally chomp-indicated) degrades to <c>null</c> — same as absent — rather
+    /// than surfacing the bare indicator character as if it were the date; parsing the folded/literal body
+    /// itself is intentionally out of scope (null-degrade is enough for a metadata field no surface treats as
+    /// load-bearing). [spec-epic2-deferred-debt-cleanup]</summary>
     private static string? ExtractLastUpdated(string yaml)
     {
         var m = LastUpdatedLine.Match(yaml);
         if (!m.Success) return null;
-        var value = m.Groups["v"].Value.Trim().Trim('"', '\'');
-        return string.IsNullOrEmpty(value) ? null : value;
+        // Strip a trailing YAML comment so `last_updated: > # folded` still degrades as a block-scalar
+        // indicator rather than storing ">` # folded" as a fake date. [spec-epic2-deferred-debt-cleanup]
+        var raw = m.Groups["v"].Value;
+        var hash = raw.IndexOf('#');
+        if (hash >= 0) raw = raw[..hash];
+        var value = raw.Trim().Trim('"', '\'');
+        if (string.IsNullOrEmpty(value) || BlockScalarIndicatorOnly.IsMatch(value)) return null;
+        return value;
     }
 
     /// <summary>Slices out one top-level block: the line <c>key:</c> (no leading whitespace) plus every
     /// following line until the next top-level, non-comment key (or EOF). Comment and blank lines inside the
-    /// block are kept (YAML ignores them). Returns <c>null</c> when the key isn't present at the top level.</summary>
+    /// block are kept (YAML ignores them). Returns <c>null</c> when the key isn't present at the top level —
+    /// OR when the same <c>key:</c> header reappears at the top level after the block has started: a
+    /// malformed hand-authored file with two <c>development_status:</c> blocks fails closed (null, "no usable
+    /// map") rather than silently truncating at the second header and dropping every entry after it.
+    /// [spec-epic2-deferred-debt-cleanup]</summary>
     private static string? ExtractTopLevelBlock(string yaml, string key)
     {
         var lines = yaml.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
@@ -172,14 +195,22 @@ public static class SprintStatusParser
         for (var i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
+            var isHeader = line.StartsWith(header, StringComparison.Ordinal)
+                && (line.Length == header.Length || line[header.Length] is ' ' or '\t');
             if (start < 0)
             {
-                if (line.StartsWith(header, StringComparison.Ordinal)
-                    && (line.Length == header.Length || line[header.Length] is ' ' or '\t'))
+                if (isHeader)
                 {
                     start = i;
                 }
                 continue;
+            }
+
+            // A duplicate top-level occurrence of THIS key is malformed input, not the block's natural end —
+            // fail closed rather than truncating and silently dropping every entry after the first header.
+            if (isHeader)
+            {
+                return null;
             }
 
             // End at the next top-level key (a non-blank line that doesn't start with whitespace or '#').

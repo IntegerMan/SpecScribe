@@ -146,4 +146,64 @@ public class SprintStatusParserTests
         // Absent last_updated → null (never an error).
         Assert.Null(SprintStatusParser.Parse("development_status:\n  epic-1: done\n")!.LastUpdated);
     }
+
+    [Theory]
+    [InlineData("last_updated: >\ndevelopment_status:\n  epic-1: done\n")]
+    [InlineData("last_updated: |\ndevelopment_status:\n  epic-1: done\n")]
+    [InlineData("last_updated: >-\ndevelopment_status:\n  epic-1: done\n")]
+    [InlineData("last_updated: |+\ndevelopment_status:\n  epic-1: done\n")]
+    [InlineData("last_updated: |2-\ndevelopment_status:\n  epic-1: done\n")]
+    [InlineData("last_updated: >1+\ndevelopment_status:\n  epic-1: done\n")]
+    [InlineData("last_updated: > # folded date\ndevelopment_status:\n  epic-1: done\n")]
+    public void Parse_BlockScalarLastUpdatedDegradesToNullRatherThanTheBareIndicator(string yaml)
+    {
+        // A `>`/`|` block-scalar form (with an optional `+`/`-` chomp indicator) has its actual body on the
+        // FOLLOWING indented lines — this single-line regex never reads those, so the value must degrade to
+        // null rather than surfacing the bare indicator character as if it were the date.
+        // [spec-epic2-deferred-debt-cleanup]
+        var sprint = SprintStatusParser.Parse(yaml);
+
+        Assert.NotNull(sprint);
+        Assert.Null(sprint!.LastUpdated);
+    }
+
+    [Fact]
+    public void Parse_DuplicateTopLevelDevelopmentStatusKeyFailsClosedRatherThanTruncating()
+    {
+        // A malformed file with two `development_status:` blocks must not silently truncate at the second
+        // header and drop every entry after it — the whole block extraction fails closed (null), matching
+        // the existing "no usable development_status map" degrade path. [spec-epic2-deferred-debt-cleanup]
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: in-progress
+              1-1-foundation: done
+
+            development_status:
+              epic-2: backlog
+            """);
+
+        Assert.Null(sprint);
+    }
+
+    [Fact]
+    public void Parse_DuplicateTopLevelActionItemsKeyFailsClosedToEmptyActionItems()
+    {
+        // Same fail-closed contract for the other block-sliced key: action_items degrades to empty rather
+        // than the truncated first-occurrence content. [spec-epic2-deferred-debt-cleanup]
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: done
+
+            action_items:
+              - action: "First"
+                status: open
+
+            action_items:
+              - action: "Second"
+                status: open
+            """);
+
+        Assert.NotNull(sprint);
+        Assert.Empty(sprint!.ActionItems);
+    }
 }
