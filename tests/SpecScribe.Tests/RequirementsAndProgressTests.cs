@@ -544,6 +544,69 @@ public class RequirementsParserTests
     }
 
     [Fact]
+    public void RequirementInfo_Id_FailsClosed_OnUnknownKind()
+    {
+        var forged = new RequirementInfo
+        {
+            Kind = (RequirementKind)999,
+            Number = 7,
+            TextHtml = "x",
+            CoverageEpicNumbers = Array.Empty<int>(),
+            Deferred = false,
+            Status = RequirementStatus.Unmapped,
+        };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => _ = forged.Id);
+        Assert.Contains("999", ex.Message);
+        Assert.Throws<InvalidOperationException>(() => _ = forged.Slug);
+    }
+
+    [Fact]
+    public void Parse_DesignSection_SkipsStrayFrOrNfrLines()
+    {
+        var epics = EpicsParser.Parse("""
+            # Epics
+            ## Requirements Inventory
+            ### Functional Requirements
+            ### NonFunctional Requirements
+            ### UX Design Requirements
+            UX-DR1: Real design
+            FR9: Stray functional in design section
+            NFR9: Stray non-functional in design section
+            ### FR Coverage Map
+            ## Epic List
+            ### Epic 1: Alone
+            Goal.
+            ## Epic 1: Alone
+            ### Story 1.1: A
+            As a user, I want x, so that y.
+            """);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse("""
+            # Epics
+            ## Requirements Inventory
+            ### Functional Requirements
+            ### NonFunctional Requirements
+            ### UX Design Requirements
+            UX-DR1: Real design
+            FR9: Stray functional in design section
+            NFR9: Stray non-functional in design section
+            ### FR Coverage Map
+            ## Epic List
+            ### Epic 1: Alone
+            Goal.
+            ## Epic 1: Alone
+            ### Story 1.1: A
+            As a user, I want x, so that y.
+            """, epics, progress);
+
+        Assert.Single(reqs.Design);
+        Assert.Equal("UX-DR1", reqs.Design[0].Id);
+        Assert.False(reqs.ById.ContainsKey("FR9"));
+        Assert.False(reqs.ById.ContainsKey("NFR9"));
+    }
+
+    [Fact]
     public void Parse_NfrAndUxDr_CoverageFromEpicHeaderUnion_UnmappedStayEmpty()
     {
         var (reqs, epics) = ParseMultiEpic();

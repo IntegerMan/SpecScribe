@@ -590,21 +590,21 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-2-nfr-and-ux-dr-coverage-maps.md (2026-07-16)
 
-- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+- ~~source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
   summary: Epic 1 header back-fill tags UX-DR1–13 and 16–18 as delivered by Epic 1 — owner deferred confirmation/trim; mappings left as-is. Reason: deferred by owner during 9.2 review.
-  evidence: Blind Hunter + Acceptance Auditor (over-claim risk vs under-claiming guardrail).
-- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  evidence: Blind Hunter + Acceptance Auditor (over-claim risk vs under-claiming guardrail).~~ **RESOLVED 2026-07-18** (`spec-9-2-deferred-coverage-maps-cleanup`): owner confirmed Epic 1 UX-DR1–13 and 16–18 header tags as-is — no trim; `epics.md` unchanged.
+- ~~source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
   summary: `ParseUxDrs` is a near-copy of `ParseDefs` (coverage resolve, epic title lookup, `RequirementInfo` construction, `DeriveStatus`); kind-specific regex alone did not require a second path, so future coverage/status fixes can drift between FR/NFR and UX-DR.
-  evidence: Blind Hunter. [`RequirementsParser.cs`](../../src/SpecScribe/RequirementsParser.cs)
-- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  evidence: Blind Hunter. [`RequirementsParser.cs`](../../src/SpecScribe/RequirementsParser.cs)~~ **RESOLVED 2026-07-18** (`spec-9-2-deferred-coverage-maps-cleanup`): UX-DR folds into shared `ParseDefs` via unified `DefLine` (`FR|NFR|UX-DR`); `ParseUxDrs` removed. [`RequirementsParser.cs`]
+- ~~source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
   summary: `AppendCoverageRow` rebuilds `epics.Epics.ToDictionary` on every NFR/UX-DR row — needless repeated allocation on the requirements index.
-  evidence: Blind Hunter. [`RequirementsTemplater.cs`](../../src/SpecScribe/RequirementsTemplater.cs)
-- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  evidence: Blind Hunter. [`RequirementsTemplater.cs`](../../src/SpecScribe/RequirementsTemplater.cs)~~ **RESOLVED 2026-07-18** (`spec-9-2-deferred-coverage-maps-cleanup`): dictionary built once per NFR/UX-DR coverage section and passed into rows. [`RequirementsTemplater.cs`]
+- ~~source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
   summary: `RequirementInfo.Id`’s switch defaults unknown `RequirementKind` values to `"NFR" + Number` instead of failing closed.
-  evidence: Blind Hunter. Pre-existing fail-open pattern; Design was added as an explicit arm.
-- source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
+  evidence: Blind Hunter. Pre-existing fail-open pattern; Design was added as an explicit arm.~~ **RESOLVED 2026-07-18** (`spec-9-2-deferred-coverage-maps-cleanup`): explicit FR/NFR/Design arms; unknown kind throws. [`RequirementsModel.cs`]
+- ~~source_spec: `9-2-nfr-and-ux-dr-coverage-maps.md`
   summary: Task 7 asked to prove FR flow/grid/donut HTML stayed byte-identical; tests only locked FR coverage epic numbers / updated golden fingerprints rather than an explicit FR HTML baseline assertion. Superseded in practice by Story 9.3’s intentional Unmapped-tier changes to those surfaces.
-  evidence: Acceptance Auditor + Blind Hunter.
+  evidence: Acceptance Auditor + Blind Hunter.~~ **RESOLVED 2026-07-18** (`spec-9-2-deferred-coverage-maps-cleanup`): closed as superseded by Story 9.3 Unmapped-tier surface changes — no pre-9.3 FR HTML byte-identity golden restored.
 
 ## Deferred from: code review of spec-undrafted-create-story-panel-above-ac (2026-07-16)
 
@@ -620,3 +620,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-address-deferred-next-steps.md`
   summary: Cap Address-deferred multi-item prompt length when many open items (truncate with an "and N more…" tail).
   evidence: Blind Hunter — BuildAddressDeferredSuggestion concatenates every open slot (~200 chars each) with no length budget; large backlogs can produce impractical clipboard/deep-link payloads.
+
+## Deferred from: code review of spec-9-2-deferred-coverage-maps-cleanup.md (2026-07-18)
+
+- source_spec: `spec-9-2-deferred-coverage-maps-cleanup.md`
+  summary: `DefLine` and `CoverageMapLine` are now identical `FR|NFR|UX-DR` patterns under two names — a fix to one can drift from the other without a compile error.
+  evidence: Blind Hunter. Pre-existing dual-regex shape; unify made them identical. Consolidate when next touching RequirementsParser regexes.

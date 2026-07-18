@@ -30,12 +30,14 @@ public sealed class RequirementInfo
     /// <summary>The numeric part, e.g. 25 for "FR25".</summary>
     public required int Number { get; init; }
 
-    /// <summary>"FR25" / "NFR7" / "UX-DR12".</summary>
+    /// <summary>"FR25" / "NFR7" / "UX-DR12". Unknown <see cref="RequirementKind"/> values throw
+    /// rather than silently defaulting to an NFR id.</summary>
     public string Id => Kind switch
     {
         RequirementKind.Functional => "FR" + Number,
+        RequirementKind.NonFunctional => "NFR" + Number,
         RequirementKind.Design => "UX-DR" + Number,
-        _ => "NFR" + Number,
+        _ => throw new InvalidOperationException($"Unknown RequirementKind: {Kind}"),
     };
 
     /// <summary>"fr25" / "nfr7" / "ux-dr12" — the output filename stem under requirements/.</summary>

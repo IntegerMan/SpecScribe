@@ -18,8 +18,8 @@ namespace SpecScribe;
 /// Each requirement's <see cref="RequirementStatus"/> is rolled up from its covering epic(s)' progress.</summary>
 public static class RequirementsParser
 {
-    private static readonly Regex DefLine = new(@"^(FR|NFR)(\d+):\s*(.+)$", RegexOptions.Compiled);
-    private static readonly Regex UxDrLine = new(@"^UX-DR(\d+):\s*(.+)$", RegexOptions.Compiled);
+    // Shared def-line matcher for FR / NFR / UX-DR — one ParseDefs path; kind filter keeps sections honest. [Story 9.2 deferred]
+    private static readonly Regex DefLine = new(@"^(FR|NFR|UX-DR)(\d+):\s*(.+)$", RegexOptions.Compiled);
     // FR Coverage Map lines may name FR, NFR, or UX-DR (Task 2 header∪map union for Design). [Story 9.2 review]
     private static readonly Regex CoverageMapLine = new(@"^(FR|NFR|UX-DR)(\d+):\s*(.+)$", RegexOptions.Compiled);
     private static readonly Regex CategoryLine = new(@"^\*\*(.+?)\*\*$", RegexOptions.Compiled);
@@ -58,7 +58,8 @@ public static class RequirementsParser
             mapCoverage, headerCoverage, epicsByNumber);
         var nonFunctional = ParseDefs(nfrLines, RequirementKind.NonFunctional, withCategories: false,
             mapCoverage, headerCoverage, epicsByNumber);
-        var design = ParseUxDrs(uxDrLines, mapCoverage, headerCoverage, epicsByNumber);
+        var design = ParseDefs(uxDrLines, RequirementKind.Design, withCategories: false,
+            mapCoverage, headerCoverage, epicsByNumber);
 
         return new RequirementsModel
         {
@@ -259,7 +260,13 @@ public static class RequirementsParser
                 continue;
             }
 
-            var lineKind = def.Groups[1].Value == "FR" ? RequirementKind.Functional : RequirementKind.NonFunctional;
+            var lineKind = def.Groups[1].Value switch
+            {
+                "FR" => RequirementKind.Functional,
+                "NFR" => RequirementKind.NonFunctional,
+                "UX-DR" => RequirementKind.Design,
+                _ => throw new InvalidOperationException($"Unknown requirement prefix: {def.Groups[1].Value}"),
+            };
             if (lineKind != kind) continue; // guards against a stray cross-kind line in the wrong section
 
             var number = int.Parse(def.Groups[2].Value);
@@ -284,49 +291,6 @@ public static class RequirementsParser
                 CoverageNote = cov.Note,
                 Deferred = deferred,
                 Status = DeriveStatus(deferred, epicNumbers, epicsByNumber),
-            });
-        }
-
-        return result;
-    }
-
-    /// <summary>Parses "UX-DR{n}: …" definition lines (no categories). [Story 9.2 Task 1]</summary>
-    private static List<RequirementInfo> ParseUxDrs(
-        string[] lines,
-        IReadOnlyDictionary<string, Coverage> mapCoverage,
-        IReadOnlyDictionary<string, List<int>> headerCoverage,
-        IReadOnlyDictionary<int, EpicInfo> epicsByNumber)
-    {
-        var result = new List<RequirementInfo>();
-
-        foreach (var raw in lines)
-        {
-            var line = raw.Trim();
-            if (line.Length == 0) continue;
-
-            var def = UxDrLine.Match(line);
-            if (!def.Success) continue;
-
-            var number = int.Parse(def.Groups[1].Value);
-            var id = "UX-DR" + number;
-            var cov = ResolveCoverage(id, RequirementKind.Design, mapCoverage, headerCoverage);
-
-            var epicNumbers = cov.EpicNumbers;
-            int? epicNumber = epicNumbers.Count > 0 ? epicNumbers[0] : null;
-            string? epicTitle = epicNumber is { } en && epicsByNumber.TryGetValue(en, out var e) ? e.Title : null;
-
-            result.Add(new RequirementInfo
-            {
-                Kind = RequirementKind.Design,
-                Number = number,
-                TextHtml = MarkdownConverter.RenderInline(def.Groups[2].Value),
-                Category = null,
-                CoverageEpicNumber = epicNumber,
-                CoverageEpicNumbers = epicNumbers,
-                CoverageEpicTitleHtml = epicTitle,
-                CoverageNote = cov.Note,
-                Deferred = cov.Deferred,
-                Status = DeriveStatus(cov.Deferred, epicNumbers, epicsByNumber),
             });
         }
 

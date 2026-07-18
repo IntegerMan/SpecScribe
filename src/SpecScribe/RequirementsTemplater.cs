@@ -414,34 +414,38 @@ public static class RequirementsTemplater
         // Section-level verification approach (AC #2) — a bare per-item badge is never the only signal.
         sb.Append("<p class=\"epic-goal\">Cross-cutting obligations verified across the codebase by tests and architectural invariants, tracked here by the epics that deliver them. Coverage is epic-level — a badge reflects the delivering epic's roll-up, not a per-requirement claim.</p>\n");
 
+        // Once per coverage section (not per row, not per subgroup). [Story 9.2 deferred]
+        var byNumber = epics.Epics.ToDictionary(e => e.Number);
+
         if (hasNfr)
         {
-            AppendCoverageSubGroup(sb, "Non-functional requirements", model.NonFunctional, epics);
+            AppendCoverageSubGroup(sb, "Non-functional requirements", model.NonFunctional, byNumber);
         }
         if (hasDesign)
         {
-            AppendCoverageSubGroup(sb, "UX design requirements", model.Design, epics);
+            AppendCoverageSubGroup(sb, "UX design requirements", model.Design, byNumber);
         }
 
         sb.Append("</div>\n\n");
     }
 
     private static void AppendCoverageSubGroup(
-        StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs, EpicsModel epics)
+        StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs,
+        IReadOnlyDictionary<int, EpicInfo> byNumber)
     {
         sb.Append($"<h3 class=\"nfr-uxdr-subgroup-title\">{PathUtil.Html(label)}</h3>\n");
         foreach (var req in reqs)
         {
-            AppendCoverageRow(sb, req, epics, prefix: string.Empty);
+            AppendCoverageRow(sb, req, byNumber, prefix: string.Empty);
         }
     }
 
     /// <summary>One NFR/UX-DR coverage row: id + badge, then description, then a "Delivered by" epic card
     /// list (never jammed into the header). Reuses req-card / status-badge vocabulary. [Story 9.2 Task 4]</summary>
-    private static void AppendCoverageRow(StringBuilder sb, RequirementInfo req, EpicsModel epics, string prefix)
+    private static void AppendCoverageRow(
+        StringBuilder sb, RequirementInfo req, IReadOnlyDictionary<int, EpicInfo> byNumber, string prefix)
     {
         var href = $"{prefix}requirements/{req.Slug}.html";
-        var byNumber = epics.Epics.ToDictionary(e => e.Number);
 
         // Story 9.3 Task 6: retired 9.2's section-local Deferred/"Not yet mapped" special-casing. RequirementStatus
         // now carries a real Unmapped tier (DeriveStatus derives it from empty CoverageEpicNumbers + not deferred),
