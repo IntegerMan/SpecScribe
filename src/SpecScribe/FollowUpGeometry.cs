@@ -433,7 +433,9 @@ public sealed record FollowUpGeometry(
         return null;
     }
 
-    /// <summary>Top-level rendered list items from an unstructured deferred-work body.</summary>
+    /// <summary>Top-level rendered list items from an unstructured deferred-work body.
+    /// Nested <c>&lt;li&gt;</c> are balanced (full inner HTML kept); an unclosed top-level item is skipped
+    /// so later siblings can still become slots. [spec-epic9-deferred-debt-cleanup]</summary>
     private static IEnumerable<(string BodyHtml, bool Resolved)> ExtractTopLevelListItems(string bodyHtml)
     {
         var depth = 0;
@@ -442,23 +444,86 @@ public sealed record FollowUpGeometry(
         {
             if (StartsAt(bodyHtml, i, "<ul") || StartsAt(bodyHtml, i, "<ol")) { depth++; i += 3; continue; }
             if (StartsAt(bodyHtml, i, "</ul") || StartsAt(bodyHtml, i, "</ol")) { depth = Math.Max(0, depth - 1); i += 4; continue; }
-            if (depth == 1 && StartsAt(bodyHtml, i, "<li"))
+            if (depth == 1 && IsLiOpenAt(bodyHtml, i))
             {
-                var close = bodyHtml.IndexOf("</li>", i, StringComparison.OrdinalIgnoreCase);
-                if (close < 0) yield break;
-                var innerStart = bodyHtml.IndexOf('>', i) + 1;
-                if (innerStart <= i) { i++; continue; }
+                var tagEnd = bodyHtml.IndexOf('>', i);
+                if (tagEnd < 0) yield break;
+                var innerStart = tagEnd + 1;
+                var closeEnd = FindBalancedLiEnd(bodyHtml, innerStart);
+                if (closeEnd < 0)
+                {
+                    // Unclosed — advance past this open tag only; keep scanning for later siblings.
+                    i = innerStart;
+                    continue;
+                }
+
+                var close = closeEnd - "</li>".Length;
                 var inner = bodyHtml[innerStart..close];
                 var resolved = inner.Contains("<del", StringComparison.OrdinalIgnoreCase);
                 yield return (inner.Trim(), resolved);
-                i = close + 5;
+                i = closeEnd;
                 continue;
             }
             i++;
         }
-
-        static bool StartsAt(string haystack, int index, string needle) =>
-            index + needle.Length <= haystack.Length
-            && string.CompareOrdinal(haystack, index, needle, 0, needle.Length) == 0;
     }
+
+    /// <summary>Index just past the matching <c>&lt;/li&gt;</c> for content starting at
+    /// <paramref name="afterOpenTag"/>, counting nested <c>&lt;li&gt;</c> depth. -1 if unbalanced.
+    /// Mirrors <c>CollapsibleSections.FindBalancedDetailsEnd</c>.</summary>
+    private static int FindBalancedLiEnd(string html, int afterOpenTag)
+    {
+        var depth = 1;
+        var pos = afterOpenTag;
+        while (pos < html.Length && depth > 0)
+        {
+            var nextOpen = IndexOfLiOpen(html, pos);
+            var nextClose = html.IndexOf("</li>", pos, StringComparison.OrdinalIgnoreCase);
+            if (nextClose < 0) return -1;
+
+            if (nextOpen >= 0 && nextOpen < nextClose)
+            {
+                var gt = html.IndexOf('>', nextOpen);
+                if (gt < 0) return -1;
+                depth++;
+                pos = gt + 1;
+                continue;
+            }
+
+            depth--;
+            pos = nextClose + "</li>".Length;
+            if (depth == 0) return pos;
+        }
+
+        return -1;
+    }
+
+    /// <summary>True at a real <c>&lt;li&gt;</c> open — not <c>&lt;link&gt;</c>/<c>&lt;listing&gt;</c>
+    /// (those share the <c>&lt;li</c> prefix).</summary>
+    private static bool IsLiOpenAt(string html, int index)
+    {
+        if (index + 3 > html.Length) return false;
+        if (string.Compare(html, index, "<li", 0, 3, StringComparison.OrdinalIgnoreCase) != 0)
+            return false;
+        if (index + 3 == html.Length) return false;
+        var c = html[index + 3];
+        return c is '>' or '/' or ' ' or '\t' or '\n' or '\r';
+    }
+
+    private static int IndexOfLiOpen(string html, int start)
+    {
+        var pos = start;
+        while (pos < html.Length)
+        {
+            var hit = html.IndexOf("<li", pos, StringComparison.OrdinalIgnoreCase);
+            if (hit < 0) return -1;
+            if (IsLiOpenAt(html, hit)) return hit;
+            pos = hit + 3;
+        }
+        return -1;
+    }
+
+    private static bool StartsAt(string haystack, int index, string needle) =>
+        index + needle.Length <= haystack.Length
+        && string.CompareOrdinal(haystack, index, needle, 0, needle.Length) == 0;
 }

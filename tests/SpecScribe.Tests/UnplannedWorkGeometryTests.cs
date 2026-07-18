@@ -736,4 +736,50 @@ public class UnplannedWorkGeometryTests
         Assert.Equal("(no title)", UnplannedWorkGeometry.DisplayTitle("   "));
         Assert.Equal("Real", UnplannedWorkGeometry.DisplayTitle("Real"));
     }
+
+    [Fact]
+    public void ResolveQuickDevEpic_DeferredCue_OverlappingStem_DoesNotMatchLongerName()
+    {
+        // stem spec-a must not hit body that only names spec-ab. [spec-epic9-deferred-debt-cleanup]
+        var epics = OneEpic();
+        var entry = new QuickDevEntry("Short stem", "spec-a.html", "ready", null);
+        var slot = new FollowUpDeferredSlot(
+            new DeferredWorkItem("Only mentions spec-ab in this note.", Resolved: false, null, null),
+            "Epic 1",
+            EpicNumber: 1,
+            "follow-ups/deferred-x.html",
+            SourceKey: "spec-ab");
+        var followUps = new FollowUpGeometry(
+            Array.Empty<SprintActionItem>(),
+            DeferredOpenCount: 1,
+            DeferredHref: "deferred-work.html",
+            ActionItemsHref: SiteNav.ActionItemsOutputPath,
+            DeferredSlots: new[] { slot });
+
+        Assert.Null(UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, followUps));
+    }
+
+    [Theory]
+    [InlineData("Please see spec-a for context.")]
+    [InlineData("Please see spec-a.md for context.")]
+    [InlineData("Please see spec-a.html for context.")]
+    public void ResolveQuickDevEpic_DeferredCue_ExactStemAndExtensions_Match(string body)
+    {
+        var epics = OneEpic();
+        var entry = new QuickDevEntry("Exact stem", "spec-a.html", "ready", null);
+        var slot = new FollowUpDeferredSlot(
+            new DeferredWorkItem(body, Resolved: false, null, null),
+            "Epic 1",
+            EpicNumber: 1,
+            "follow-ups/deferred-x.html",
+            SourceKey: "other");
+        var followUps = new FollowUpGeometry(
+            Array.Empty<SprintActionItem>(),
+            DeferredOpenCount: 1,
+            DeferredHref: "deferred-work.html",
+            ActionItemsHref: SiteNav.ActionItemsOutputPath,
+            DeferredSlots: new[] { slot });
+
+        Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, followUps));
+    }
 }

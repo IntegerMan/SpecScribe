@@ -113,4 +113,24 @@ public class FollowUpRowTests
         Assert.Contains("full body", html);
         Assert.DoesNotContain("href=", html);
     }
+
+    [Fact]
+    public void Render_NoHrefEmptyBody_OmitsPrimary()
+    {
+        var sb = new StringBuilder();
+        FollowUpRow.Render(
+            sb,
+            summaryHtml: "Short lead",
+            statusToken: "open",
+            statusLabel: "Open",
+            sourceChipHtml: "Epic 1",
+            detailBodyHtml: "",
+            detailHref: null);
+
+        var html = sb.ToString();
+        Assert.Contains("followup-row-summary", html);
+        Assert.DoesNotContain("followup-row-primary", html);
+        Assert.DoesNotContain("followup-row-detail", html);
+        Assert.DoesNotContain("href=", html);
+    }
 }

@@ -205,7 +205,7 @@ public static class RequirementsTemplater
         // Resolve every covering epic (not just the primary), in coverage order, skipping numbers with no
         // matching epic — the same best-effort resolution as RequirementsParser.StoriesFor. This also fixes the
         // pre-existing gap where a multi-epic requirement (e.g. "Epics 1 & 2") showed only the primary epic.
-        var byNumber = epics.Epics.ToDictionary(e => e.Number);
+        var byNumber = EpicsByNumberFirstWins(epics);
         var coveringEpics = req.CoverageEpicNumbers
             .Where(byNumber.ContainsKey)
             .Select(n => byNumber[n])
@@ -415,7 +415,8 @@ public static class RequirementsTemplater
         sb.Append("<p class=\"epic-goal\">Cross-cutting obligations verified across the codebase by tests and architectural invariants, tracked here by the epics that deliver them. Coverage is epic-level — a badge reflects the delivering epic's roll-up, not a per-requirement claim.</p>\n");
 
         // Once per coverage section (not per row, not per subgroup). [Story 9.2 deferred]
-        var byNumber = epics.Epics.ToDictionary(e => e.Number);
+        // First-wins on duplicate epic numbers so generation never throws. [spec-epic9-deferred-debt-cleanup]
+        var byNumber = EpicsByNumberFirstWins(epics);
 
         if (hasNfr)
         {
@@ -618,6 +619,12 @@ public static class RequirementsTemplater
             ("Deferred", deferred, "deferred"),
         };
     }
+
+    /// <summary>Epic lookup by number — first-wins on duplicates so page generation never throws
+    /// <see cref="ArgumentException"/> from <c>ToDictionary</c>. Matches <c>SiteGenerator.SetRetros</c>.
+    /// [spec-epic9-deferred-debt-cleanup]</summary>
+    private static Dictionary<int, EpicInfo> EpicsByNumberFirstWins(EpicsModel epics) =>
+        epics.Epics.GroupBy(e => e.Number).ToDictionary(g => g.Key, g => g.First());
 
     /// <summary>A stable in-page anchor id for a group heading, e.g. "Core Loop &amp; Time" → "grp-core-loop-time".</summary>
     private static string GroupAnchor(string label)

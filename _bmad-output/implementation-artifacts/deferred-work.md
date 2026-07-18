@@ -38,7 +38,7 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 ## Deferred from: code review of 9-12-unplanned-and-one-off-work-in-geometry-and-sprint.md (2026-07-17)
 
 - ~~Watch-mode `GenerateOne` rewrites quick-dev + index but does not call `WriteFollowUpGroupPages` — Unplanned/Follow-ups group destinations can stay stale until full `GenerateAll`. Same incremental family as 9.11 / artifact-review deferrals.~~ **RESOLVED 2026-07-18** (`spec-epic9-watch-followup-surface-refresh`): `RefreshFollowUpSurfaces` runs group pages (and deferred list/details) from `GenerateOne` and `RegenerateEpics` — the real watch route for `deferred-work.md`. [`SiteGenerator.cs`]
-- `ContainsSpecName` uses `text.Contains(stem)` without token boundaries — overlapping stems (e.g. `spec-a` vs `spec-ab`) can mis-attribute or multi-hit→null. Cleanup when next touching cue matching. [`UnplannedWorkGeometry.cs`]
+- ~~`ContainsSpecName` uses `text.Contains(stem)` without token boundaries — overlapping stems (e.g. `spec-a` vs `spec-ab`) can mis-attribute or multi-hit→null. Cleanup when next touching cue matching. [`UnplannedWorkGeometry.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic9-deferred-debt-cleanup`): hyphen-aware token match (`(?<![\w-])stem(?:\.(?:md|html))?(?![\w-])`). [`UnplannedWorkGeometry.cs`]
 
 ## Deferred from: code review of 9-13-generated-filtered-follow-up-group-pages-and-sunburst-click-destinations.md (2026-07-17)
 
@@ -53,9 +53,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-10-scannable-follow-up-list-pages.md (2026-07-17)
 
-- Nested / unclosed top-level `<li>` handling in `ExtractTopLevelListItems` can truncate nested lists or drop later siblings; structured Deferred-from path unaffected. Related to prior 9.11 deferral. [`FollowUpGeometry.cs:367`]
-- Unstructured deferred notes that contain `<li>` items render as `.followup-row` + slugs instead of the prior plain-body `deferred-work-fallback` article (prose-only fallback remains). 9.11 overlay; out of pure-9.10 scope. [`DeferredWorkTemplater.cs:38`]
-- `FollowUpRowTests` covers `Summarize*` only — no direct asserts for `Render` empty-primary / href-vs-disclosure branches. [`FollowUpRowTests.cs`]
+- ~~Nested / unclosed top-level `<li>` handling in `ExtractTopLevelListItems` can truncate nested lists or drop later siblings; structured Deferred-from path unaffected. Related to prior 9.11 deferral. [`FollowUpGeometry.cs:367`]~~ **RESOLVED 2026-07-18** (`spec-epic9-deferred-debt-cleanup`): balanced nested `<li>` + unclosed skips item only (siblings kept). [`FollowUpGeometry.cs`]
+- ~~Unstructured deferred notes that contain `<li>` items render as `.followup-row` + slugs instead of the prior plain-body `deferred-work-fallback` article (prose-only fallback remains). 9.11 overlay; out of pure-9.10 scope. [`DeferredWorkTemplater.cs:38`]~~ **RESOLVED 2026-07-18** (`spec-epic9-deferred-debt-cleanup`): accepted intentional Story 9.11 overlay — keep rows+slugs; prose-only fallback unchanged.
+- ~~`FollowUpRowTests` covers `Summarize*` only — no direct asserts for `Render` empty-primary / href-vs-disclosure branches. [`FollowUpRowTests.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic9-deferred-debt-cleanup`): empty-primary Render assert added (href/disclosure already covered). [`FollowUpRowTests.cs`]
 
 ## Deferred from: code review of spec-artifact-review-nav-and-deferred.md (2026-07-17)
 
@@ -75,7 +75,7 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 ## Deferred from: code review of 9-11-follow-up-detail-pages-and-deep-links.md (2026-07-17)
 
 - ~~Watch-mode `GenerateOne` does not call `WriteFollowUpDetails` / `WriteDeferredWork` (GenerateAll-only) — editing `deferred-work.md` in watch can leave sunburst/list deep links pointing at stale or missing `follow-ups/*.html` until a full generate. Same incremental family as prior watch gaps.~~ **RESOLVED 2026-07-18** (`spec-epic9-watch-followup-surface-refresh`): `RegenerateEpics` (watch path for impl-artifacts / deferred-work) and `GenerateOne` both call `RefreshFollowUpSurfaces` (`WriteDeferredWork` + `WriteFollowUpDetails` + group/quick-dev). [`SiteGenerator.cs`]
-- `ExtractTopLevelListItems` yields break on an unclosed top-level `<li>` so later siblings never become deferred slots. Rare malformed Markdig output; structured path is unaffected. [`FollowUpGeometry.cs:266`]
+- ~~`ExtractTopLevelListItems` yields break on an unclosed top-level `<li>` so later siblings never become deferred slots. Rare malformed Markdig output; structured path is unaffected. [`FollowUpGeometry.cs:266`]~~ **RESOLVED 2026-07-18** (`spec-epic9-deferred-debt-cleanup`): unclosed top-level `<li>` skips that item only; later siblings still extract. [`FollowUpGeometry.cs`]
 
 ## Deferred from: code review of 9-8-authoring-and-delivery-workflow-coherence.md (2026-07-17)
 
@@ -106,7 +106,7 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-1-requirement-pages-link-to-their-covering-stories.md (2026-07-16)
 
-- `epics.Epics.ToDictionary(e => e.Number)` in `RenderRequirement` can throw on duplicate epic numbers and abort requirement-page generation — same pre-existing pattern as `StoriesFor` / parser `DeriveStatus`; revisit if epic-list de-dupe is added. [`RequirementsTemplater.cs:155`]
+- ~~`epics.Epics.ToDictionary(e => e.Number)` in `RenderRequirement` can throw on duplicate epic numbers and abort requirement-page generation — same pre-existing pattern as `StoriesFor` / parser `DeriveStatus`; revisit if epic-list de-dupe is added. [`RequirementsTemplater.cs:155`]~~ **RESOLVED 2026-07-18** (`spec-epic9-deferred-debt-cleanup`): first-wins `GroupBy` + `First()` in requirement/coverage render helpers. [`RequirementsTemplater.cs`]
 
 ## Deferred from: code review of 8-8-generation-time-recency-signals.md (2026-07-15)
 
@@ -608,12 +608,12 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of spec-undrafted-create-story-panel-above-ac (2026-07-16)
 
-- source_spec: `spec-undrafted-create-story-panel-above-ac.md`
+- ~~source_spec: `spec-undrafted-create-story-panel-above-ac.md`
   summary: Epic-page story cards still render undrafted guidance after AC blocks, while placeholder pages now put create-story guidance above AC — sibling surfaces disagree on CTA placement.
-  evidence: Blind Hunter. `AppendStoryCard` leaves `not-detailed-note` after AC; placeholder reorder was intentional scope for the full story page only.
-- source_spec: `spec-undrafted-create-story-panel-above-ac.md`
+  evidence: Blind Hunter. `AppendStoryCard` leaves `not-detailed-note` after AC; placeholder reorder was intentional scope for the full story page only.~~ **RESOLVED 2026-07-18** (`spec-epic9-deferred-debt-cleanup`): undrafted epic cards emit `not-detailed-note` above AC (match placeholder). [`HtmlRenderAdapter.Epics.cs`]
+- ~~source_spec: `spec-undrafted-create-story-panel-above-ac.md`
   summary: SiteGeneratorAdapter golden fixture's undrafted story has no Acceptance Criteria, so the reordered AC branch is invisible to the byte-parity gate.
-  evidence: Blind Hunter. Pre-existing fixture gap; only the new unit test covers note-above-AC ordering.
+  evidence: Blind Hunter. Pre-existing fixture gap; only the new unit test covers note-above-AC ordering.~~ **RESOLVED 2026-07-18** (`spec-epic9-deferred-debt-cleanup`): Story 1.2 golden fixture gains minimal AC; fingerprint re-baselined. [`SiteGeneratorAdapterTests.cs`]
 
 ## Deferred from: code review of spec-address-deferred-next-steps.md (2026-07-17)
 

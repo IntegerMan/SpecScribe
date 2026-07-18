@@ -266,6 +266,13 @@ public sealed partial class HtmlRenderAdapter
         }
         sb.Append($"  <div class=\"user-story\">{card.UserStoryHtml}</div>\n");
 
+        // Undrafted: create-story note above AC (match placeholder). Drafted: AC then view-plan link.
+        // [spec-epic9-deferred-debt-cleanup]
+        if (card.ViewPlanHref is null)
+        {
+            sb.Append($"  <div class=\"not-detailed-note\">{card.NoteHtml}</div>\n");
+        }
+
         if (card.AcBlocksHtml.Count > 0)
         {
             sb.Append("  <div class=\"ac-label\">Acceptance Criteria</div>\n  <div class=\"ac-list\">\n");
@@ -279,10 +286,6 @@ public sealed partial class HtmlRenderAdapter
         if (card.ViewPlanHref is { } viewHref)
         {
             sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(viewHref)}\">View full story plan &rarr;</a>\n");
-        }
-        else
-        {
-            sb.Append($"  <div class=\"not-detailed-note\">{card.NoteHtml}</div>\n");
         }
 
         sb.Append("</div>\n\n");

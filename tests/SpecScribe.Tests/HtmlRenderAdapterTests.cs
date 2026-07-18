@@ -189,6 +189,32 @@ public class HtmlRenderAdapterTests
         Assert.Contains("<div class=\"epic-card\">", html[..acIdx]);
     }
 
+    [Fact]
+    public void RenderEpicBody_UndraftedCard_RendersCreateStoryNoteAboveAcceptanceCriteria()
+    {
+        var undrafted = new StoryCardView
+        {
+            Id = "1.2",
+            TitleHtml = "Undrafted",
+            AnchorId = "story-1-2",
+            StatusStage = "drafted",
+            Status = null,
+            TasksDone = 0,
+            TasksTotal = 0,
+            TitleHref = "epics/story-1-2.html",
+            ViewPlanHref = null,
+            UserStoryHtml = "<p>As a maintainer…</p>",
+            AcBlocksHtml = new[] { "<div>AC block</div>" },
+            NoteHtml = "<span>create its plan with</span>",
+        };
+
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(EpicPage(undrafted));
+
+        var noteIdx = html.IndexOf("not-detailed-note", StringComparison.Ordinal);
+        var acIdx = html.IndexOf("ac-label", StringComparison.Ordinal);
+        Assert.True(noteIdx >= 0 && acIdx > noteIdx, "Undrafted create-story note must render above AC on epic cards");
+    }
+
     private static StoryCardView Card(
         string id = "1.1",
         string? status = "review",

@@ -334,11 +334,14 @@ public sealed record UnplannedWorkGeometry(
         return null;
     }
 
+    /// <summary>True when <paramref name="text"/> names <paramref name="stem"/> as a hyphen-aware token
+    /// (optional <c>.md</c>/<c>.html</c>). Plain <c>Contains</c> would let <c>spec-a</c> hit <c>spec-ab</c>.
+    /// Guards match <see cref="RenderParity"/> status-class boundaries — <c>\b</c> treats <c>-</c> as a break.</summary>
     private static bool ContainsSpecName(string text, string stem)
     {
         if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(stem)) return false;
-        return text.Contains(stem, StringComparison.OrdinalIgnoreCase)
-            || text.Contains(stem + ".md", StringComparison.OrdinalIgnoreCase)
-            || text.Contains(stem + ".html", StringComparison.OrdinalIgnoreCase);
+        // (?<![\w-])stem(?:\.(?:md|html))?(?![\w-]) — case-insensitive.
+        var pattern = $@"(?<![\w-]){Regex.Escape(stem)}(?:\.(?:md|html))?(?![\w-])";
+        return Regex.IsMatch(text, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 }

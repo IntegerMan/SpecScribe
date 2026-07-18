@@ -902,9 +902,9 @@ public class RequirementsParserTests
         Assert.Contains($"href=\"../{StoryEpicLinkifier.StoryPagePath("2.1")}\"", html);
 
         // Rendered as grouped compact story cards, with a canonical status badge (drafted → "Drafted").
+        // One Contains of the full Badge markup proves icon+label share the same span (Story 2.5 deferred).
         Assert.Contains("coverage-story-card", html);
-        Assert.Contains("status-badge drafted", html);
-        Assert.Contains(">Drafted<", html);
+        Assert.Contains(StatusStyles.Badge("drafted", "Drafted"), html);
 
         // Honest, epic-level framing — never phrased as a per-story mapping.
         Assert.Contains("grouped by epic", html);
@@ -1100,6 +1100,7 @@ public class RequirementsParserTests
         var unrelated = RenderDetailWithSources("FR3", new Dictionary<int, string> { [7] = "retros/epic-7-retro.html" }, deferredWorkHref: null);
         Assert.DoesNotContain("deferral-sources", unrelated);
     }
+
 }
 
 public class ProgressCalculatorTests : IDisposable

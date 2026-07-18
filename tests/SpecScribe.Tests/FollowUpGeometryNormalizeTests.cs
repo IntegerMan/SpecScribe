@@ -36,4 +36,38 @@ public class FollowUpGeometryNormalizeTests
         Assert.Null(FollowUpGeometry.FindQuickDev(work, "spec-other"));
         Assert.Null(FollowUpGeometry.FindQuickDev(work, null));
     }
+
+    [Fact]
+    public void UnstructuredItems_NestedList_PreservesInnerHtmlAndSibling()
+    {
+        var body = "<ul><li>Outer with nested<ul><li>inner</li></ul> tail</li><li>Sibling</li></ul>";
+        var items = FollowUpGeometry.UnstructuredItems(body);
+
+        Assert.Equal(2, items.Count);
+        Assert.Contains("<ul><li>inner</li></ul>", items[0].BodyHtml);
+        Assert.Contains("Outer with nested", items[0].BodyHtml);
+        Assert.Equal("Sibling", items[1].BodyHtml);
+    }
+
+    [Fact]
+    public void UnstructuredItems_UnclosedTopLevel_StillExtractsLaterSibling()
+    {
+        // Missing </li> on first item must not abort the scan. [spec-epic9-deferred-debt-cleanup]
+        var body = "<ul><li>Broken open<li>Later sibling</li></ul>";
+        var items = FollowUpGeometry.UnstructuredItems(body);
+
+        Assert.Contains(items, i => i.BodyHtml.Contains("Later sibling", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void UnstructuredItems_LinkTag_DoesNotCountAsListItem()
+    {
+        // <link> shares the <li prefix — must not inflate LI depth. [review patch]
+        var body = "<ul><li>Item with <link rel=\"x\" href=\"y\"> and text</li><li>Sibling</li></ul>";
+        var items = FollowUpGeometry.UnstructuredItems(body);
+
+        Assert.Equal(2, items.Count);
+        Assert.Contains("<link", items[0].BodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Sibling", items[1].BodyHtml);
+    }
 }

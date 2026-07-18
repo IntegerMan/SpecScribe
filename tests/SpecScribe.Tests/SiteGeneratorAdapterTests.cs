@@ -61,6 +61,13 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         As a maintainer, I want the follow-up (no artifact yet).
 
+        **Acceptance Criteria:**
+
+        1.
+        **Given** an undrafted story
+        **When** the site generates
+        **Then** a placeholder page exists
+
         ## Epic 2: Delivery
 
         ### Story 2.1: Delivery Story
@@ -470,7 +477,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated 2026-07-18: unify sticky-nav scroll-margin-top onto var(--nav-offset)
         // (.ac-criterion, .req-index .section-divider[id], .code-line) + case-insensitive req linkify
         // and deferred-work Epic 1 ledger closes. [spec-epic1-deferred-debt-cleanup]
-        const string expected = "bc2daeafc93490cc4ff54b25025caca70f80adb75556d5dc4fe978eb12fc11e6";
+        // Regenerated 2026-07-18: undrafted Story 1.2 gains minimal AC; epic-card note-above-AC
+        // reorder — exposes AC reorder branch to byte-parity. [spec-epic9-deferred-debt-cleanup]
+        const string expected = "c376d8529bdcb0168a007fa127705d76e63eedb052cf3e7c9c9e5dd7250277af";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
