@@ -94,12 +94,13 @@ public static class ActionItemsTemplater
     }
 
     /// <summary>Conservative near-duplicate detector: pairs from different epics whose normalized token
-    /// overlap is high. Prefer false negatives. Pure and deterministic. [Story 9.6]</summary>
-    public static IReadOnlyDictionary<SprintActionItem, int> FindNearDuplicates(IReadOnlyList<SprintActionItem> openItems)
+    /// overlap is high. Accumulates all counterpart epics (sorted, distinct) — not first-match-only.
+    /// Prefer false negatives. Pure and deterministic. [Story 9.6]</summary>
+    public static IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>> FindNearDuplicates(IReadOnlyList<SprintActionItem> openItems)
     {
         // Reference equality: value-equal records (same action/status/epic/owner) must not collide and
         // silently drop a cross-link while both rows still render.
-        var result = new Dictionary<SprintActionItem, int>(ReferenceEqualityComparer.Instance);
+        var accum = new Dictionary<SprintActionItem, HashSet<int>>(ReferenceEqualityComparer.Instance);
         for (var i = 0; i < openItems.Count; i++)
         {
             var a = openItems[i];
@@ -109,11 +110,25 @@ public static class ActionItemsTemplater
                 var b = openItems[j];
                 if (b.EpicNumber is null || b.EpicNumber == a.EpicNumber) continue;
                 if (!AreNearDuplicates(a.Action, b.Action)) continue;
-                result.TryAdd(a, b.EpicNumber.Value);
-                result.TryAdd(b, a.EpicNumber.Value);
+                Add(accum, a, b.EpicNumber.Value);
+                Add(accum, b, a.EpicNumber.Value);
             }
         }
+
+        var result = new Dictionary<SprintActionItem, IReadOnlyList<int>>(ReferenceEqualityComparer.Instance);
+        foreach (var kv in accum)
+            result[kv.Key] = kv.Value.OrderBy(e => e).ToList();
         return result;
+
+        static void Add(Dictionary<SprintActionItem, HashSet<int>> map, SprintActionItem item, int epic)
+        {
+            if (!map.TryGetValue(item, out var set))
+            {
+                set = new HashSet<int>();
+                map[item] = set;
+            }
+            set.Add(epic);
+        }
     }
 
     /// <summary>True when two action texts are highly similar (Jaccard ≥ 0.45 on significant tokens AND
@@ -141,7 +156,7 @@ public static class ActionItemsTemplater
         EpicsModel? epicsModel,
         IReadOnlyDictionary<string, string>? hrefMap,
         string prefix,
-        IReadOnlyDictionary<SprintActionItem, int> crossLinks,
+        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>> crossLinks,
         IReadOnlyDictionary<SprintActionItem, string> detailSlugs,
         IReadOnlyDictionary<int, string>? epicRetroMap)
     {
@@ -157,18 +172,7 @@ public static class ActionItemsTemplater
         if (detailHref is null)
         {
             detail.Append($"<div class=\"followup-row-fulltext\">{FollowUpRefs.LinkifyVisibleText(item.Action, epicsModel, hrefMap, prefix)}</div>\n");
-            if (crossLinks.TryGetValue(item, out var otherEpic))
-            {
-                if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
-                {
-                    var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(otherRetro));
-                    detail.Append($"<a class=\"action-item-cross\" href=\"{PathUtil.Html(href)}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
-                }
-                else
-                {
-                    detail.Append($"<span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
-                }
-            }
+            AppendCrossLinks(detail, item, crossLinks, epicRetroMap, prefix);
             if (deferredWorkHref is { Length: > 0 } && DeferralHeuristics.IsDebtRelated(item.Action))
             {
                 var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(deferredWorkHref));
@@ -191,6 +195,29 @@ public static class ActionItemsTemplater
             PathUtil.Html(sourceChip),
             detail.ToString(),
             detailHref: detailHref);
+    }
+
+    internal static void AppendCrossLinks(
+        StringBuilder sb,
+        SprintActionItem item,
+        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>? crossLinks,
+        IReadOnlyDictionary<int, string>? epicRetroMap,
+        string prefix)
+    {
+        if (crossLinks is null || !crossLinks.TryGetValue(item, out var otherEpics) || otherEpics is null || otherEpics.Count == 0)
+            return;
+        foreach (var otherEpic in otherEpics)
+        {
+            if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
+            {
+                var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(otherRetro));
+                sb.Append($"<a class=\"action-item-cross\" href=\"{PathUtil.Html(href)}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
+            }
+            else
+            {
+                sb.Append($"<span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
+            }
+        }
     }
 
     private static string RenderGroupHeading(int? epicNumber, IReadOnlyDictionary<int, string>? epicRetroMap)

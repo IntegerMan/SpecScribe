@@ -18,7 +18,7 @@ public static class FollowUpDetailTemplater
         string? deferredWorkHref = null,
         EpicsModel? epicsModel = null,
         IReadOnlyDictionary<string, string>? hrefMap = null,
-        IReadOnlyDictionary<SprintActionItem, int>? crossLinks = null)
+        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>? crossLinks = null)
     {
         var outputPath = FollowUpSlug.OutputPath(slug);
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -65,18 +65,10 @@ public static class FollowUpDetailTemplater
         }
         sb.Append("  </div>\n");
 
-        if (crossLinks is not null && crossLinks.TryGetValue(item, out var otherEpic))
+        if (crossLinks is not null && crossLinks.TryGetValue(item, out var otherEpics) && otherEpics is { Count: > 0 })
         {
             sb.Append("  <div class=\"followup-detail-cross\">\n");
-            if (epicRetroMap is not null && epicRetroMap.TryGetValue(otherEpic, out var otherRetro))
-            {
-                var href = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(otherRetro));
-                sb.Append($"    <a class=\"action-item-cross\" href=\"{PathUtil.Html(href)}\">also raised in Epic {otherEpic} retrospective &rarr;</a>\n");
-            }
-            else
-            {
-                sb.Append($"    <span class=\"action-item-cross\">also raised in Epic {otherEpic} retrospective</span>\n");
-            }
+            ActionItemsTemplater.AppendCrossLinks(sb, item, crossLinks, epicRetroMap, prefix);
             sb.Append("  </div>\n");
         }
 
@@ -157,13 +149,13 @@ public static class FollowUpDetailTemplater
 
         if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
         {
-            var label = rr.Contains('.') && !rr.Contains('-') ? $"Story {rr}" : rr;
+            var label = FollowUpRefs.ResolvingLabel(rr);
             var href = FollowUpGeometry.ApplyLinkPrefix(prefix, rh);
             sb.Append($"  <a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(href))}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
         }
         else if (item.ResolvingRef is { Length: > 0 } rr2)
         {
-            sb.Append($"  <span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(rr2)}</span>\n");
+            sb.Append($"  <span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(FollowUpRefs.ResolvingLabel(rr2))}</span>\n");
         }
 
         sb.Append("</section>\n");

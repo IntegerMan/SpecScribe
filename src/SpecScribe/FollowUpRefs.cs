@@ -16,14 +16,23 @@ public static class FollowUpRefs
         @"\bspec-[a-z0-9][a-z0-9-]*(?:\.md)?\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    // "RESOLVED in 6.11" / "RESOLVED in Story 6.4" / "Resolved … `spec-…`"
+    // "RESOLVED in 6.11" / "RESOLVED in Story 6.4" (trailing punctuation/em-dash OK via \b)
     private static readonly Regex ResolvedInStory = new(
         @"RESOLVED\s+in\s+(?:Story\s+)?(?<epic>\d+)\.(?<story>\d+)\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // After a RESOLVED marker: backtick story-key or spec-* token (live notes: **RESOLVED …** (`spec-…`)).
+    private static readonly Regex ResolvedThenBacktickRef = new(
+        @"RESOLVED\b[^`\n]{0,120}`(?<token>(?:\d+-\d+-[a-z0-9][a-z0-9-]*|spec-[a-z0-9][a-z0-9-]*)(?:\.md)?)`",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex SourceSpecLine = new(
         @"source_spec:\s*`?(?<file>[^`\s\n]+)`?",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex DottedStoryId = new(
+        @"^\d+\.\d+$",
+        RegexOptions.Compiled);
 
     /// <summary>Builds a filename-stem → output-href map for docs under implementation-artifacts
     /// (spec pages) plus every story's generated page path. Keys are bare stems and <c>.md</c> forms.</summary>
@@ -88,11 +97,14 @@ public static class FollowUpRefs
     }
 
     /// <summary>Resolves a story id ("N.M") from a filename or review-heading token —
-    /// <c>8-8-slug.md</c>, <c>story-3-8</c>, <c>story-3.8</c>, or bare <c>3.8</c>.</summary>
+    /// <c>8-8-slug.md</c>, path-prefixed forms, <c>story-3-8</c>, <c>story-3.8</c>, or bare <c>3.8</c>.</summary>
     public static string? StoryIdFromKey(string token)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
-        var bare = token.Trim().Trim('`');
+        var bare = token.Trim().Trim('`').Replace('\\', '/');
+        // Path-prefixed source_spec tokens: use filename stem (same discipline as ResolveHref / BuildHrefMap).
+        bare = Path.GetFileName(bare);
+        if (string.IsNullOrEmpty(bare)) return null;
         if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
             bare = bare[..^3];
         if (bare.StartsWith("story-", StringComparison.OrdinalIgnoreCase))
@@ -112,14 +124,31 @@ public static class FollowUpRefs
         return $"{epic}.{story}";
     }
 
-    /// <summary>Extracts a resolving story id from RESOLVED markers in item markdown, if present.</summary>
+    /// <summary>Extracts a resolving story id or backtick story/spec token from RESOLVED markers, if present.
+    /// Prefer false negatives — does not invent status.</summary>
     public static string? ResolvingStoryIdFromText(string markdown)
     {
         var m = ResolvedInStory.Match(markdown);
-        if (!m.Success) return null;
-        if (!int.TryParse(m.Groups["epic"].Value, out var epic) || !int.TryParse(m.Groups["story"].Value, out var story))
-            return null;
-        return $"{epic}.{story}";
+        if (m.Success
+            && int.TryParse(m.Groups["epic"].Value, out var epic)
+            && int.TryParse(m.Groups["story"].Value, out var story))
+            return $"{epic}.{story}";
+
+        var bt = ResolvedThenBacktickRef.Match(markdown);
+        if (!bt.Success) return null;
+        var token = bt.Groups["token"].Value;
+        return StoryIdFromKey(token) ?? token;
+    }
+
+    /// <summary>Chip/link label for a resolving ref: <c>Story N.M</c> only for dotted story ids;
+    /// otherwise the raw filename/stem (never <c>Story readme.md</c>).</summary>
+    public static string ResolvingLabel(string resolvingRef)
+    {
+        var bare = resolvingRef.Trim().Replace('\\', '/');
+        if (string.IsNullOrEmpty(bare)) return bare;
+        // Path-prefixed refs: chip shows filename, never the full path.
+        bare = Path.GetFileName(bare);
+        return DottedStoryId.IsMatch(bare) ? $"Story {bare}" : bare;
     }
 
     /// <summary>Extracts a <c>source_spec:</c> filename token from markdown text, if present.</summary>

@@ -577,6 +577,40 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.True(map.ContainsKey(a));
         Assert.True(map.ContainsKey(a2));
         Assert.True(map.ContainsKey(b));
+        Assert.Equal(new[] { 2 }, map[a]);
+        Assert.Equal(new[] { 1 }, map[b]);
+    }
+
+    [Fact]
+    public void FindNearDuplicates_ThreeEpics_ListsAllCounterpartEpicsSorted()
+    {
+        const string epic1Text =
+            "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog for review before Epic 3 planning";
+        const string epic2Text =
+            "Triage Epic 1's deferred heatmap tech debt (HeatLevel collapse on sparse history, unmapped ForEpic status classes, non-invariant heatmap date formatting) before starting Epic 3 Story 3.2 or 3.5 - carried unaddressed across two retrospectives now";
+        // Near-duplicate of epic1Text with enough shared significant tokens for Jaccard ≥ 0.45.
+        const string epic3Text =
+            "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog before Epic 3 planning — still open from Epic 3 retro";
+
+        var a = new SprintActionItem(epic1Text, "open", 1, "Dana");
+        var b = new SprintActionItem(epic2Text, "open", 2, "Dana");
+        var c = new SprintActionItem(epic3Text, "open", 3, "Dana");
+
+        Assert.True(ActionItemsTemplater.AreNearDuplicates(epic1Text, epic3Text));
+
+        var map = ActionItemsTemplater.FindNearDuplicates(new[] { a, b, c });
+        Assert.Equal(new[] { 2, 3 }, map[a]);
+        Assert.Equal(new[] { 1, 3 }, map[b]);
+        Assert.Equal(new[] { 1, 2 }, map[c]);
+
+        var sb = new System.Text.StringBuilder();
+        ActionItemsTemplater.AppendCrossLinks(sb, a, map, null, "");
+        var cross = sb.ToString();
+        Assert.Contains("also raised in Epic 2 retrospective", cross);
+        Assert.Contains("also raised in Epic 3 retrospective", cross);
+        // Epic 2 before Epic 3 (sorted).
+        Assert.True(
+            cross.IndexOf("Epic 2", StringComparison.Ordinal) < cross.IndexOf("Epic 3", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -43,6 +43,11 @@ public static class DeferredWorkParser
         @"\*\*\[\s*RESOLVED\b|\[\s*RESOLVED\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    // Column-0 CommonMark unordered [-*+] or ordered N. / N) — nested/indented lines stay continuations.
+    private static readonly Regex TopLevelListMarker = new(
+        @"^(?:[-*+][ \t]|\d+[.)][ \t])",
+        RegexOptions.Compiled);
+
     /// <summary>Parses <paramref name="markdown"/> into a structured model. On any failure or when no
     /// Deferred-from headings exist, returns <c>IsStructured = false</c> with an optional plain-body
     /// fallback (rendered from <paramref name="fallbackBodyHtml"/> when supplied).</summary>
@@ -115,12 +120,14 @@ public static class DeferredWorkParser
         void Flush()
         {
             if (current.Count == 0) return;
-            // Strip the leading "- " from the first line.
             var first = current[0];
-            if (first.StartsWith("- ", StringComparison.Ordinal))
-                first = first[2..];
-            else if (first.StartsWith("-\t", StringComparison.Ordinal))
-                first = first[2..];
+            if (TryStripTopLevelListMarker(first, out var stripped))
+                first = stripped;
+            if (string.IsNullOrWhiteSpace(first) && current.Count == 1)
+            {
+                current.Clear();
+                return;
+            }
 
             var md = first;
             if (current.Count > 1)
@@ -130,10 +137,17 @@ public static class DeferredWorkParser
             var resolved = bodyHtml.Contains("<del", StringComparison.OrdinalIgnoreCase)
                 || ResolvedMarker.IsMatch(md);
 
-            string? resolvingRef = FollowUpRefs.ResolvingStoryIdFromText(md);
-            string? resolvingHref = resolvingRef is null
-                ? null
-                : FollowUpRefs.ResolveHref(resolvingRef, hrefMap, prefix);
+            // Resolving links only when the item is actually resolved — prefer false negatives
+            // (open prose mentioning RESOLVED / nearby backticks must not grow a chip).
+            string? resolvingRef = null;
+            string? resolvingHref = null;
+            if (resolved)
+            {
+                resolvingRef = FollowUpRefs.ResolvingStoryIdFromText(md);
+                resolvingHref = resolvingRef is null
+                    ? null
+                    : FollowUpRefs.ResolveHref(resolvingRef, hrefMap, prefix);
+            }
 
             // Item-level source_spec is origin metadata on open items (group provenance already covers it).
             // Only promote it to Resolving* when the item is actually resolved and no RESOLVED-in id was found.
@@ -153,8 +167,8 @@ public static class DeferredWorkParser
 
         foreach (var line in lines)
         {
-            // Top-level list item: starts with "- " at column 0 (no leading whitespace).
-            if (line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("-\t", StringComparison.Ordinal))
+            // Top-level list item: column-0 unordered/ordered markers (no leading whitespace).
+            if (TopLevelListMarker.IsMatch(line))
             {
                 Flush();
                 current.Add(line);
@@ -175,6 +189,18 @@ public static class DeferredWorkParser
         }
         Flush();
         return items;
+    }
+
+    private static bool TryStripTopLevelListMarker(string line, out string remainder)
+    {
+        var m = TopLevelListMarker.Match(line);
+        if (!m.Success)
+        {
+            remainder = line;
+            return false;
+        }
+        remainder = line[m.Length..];
+        return true;
     }
 
     private static string? ExtractKeyFromLabel(string label)

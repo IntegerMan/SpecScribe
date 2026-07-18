@@ -129,13 +129,13 @@ public static class DeferredWorkTemplater
             detail.Append($"<div class=\"deferred-item-body\">{item.BodyHtml}</div>\n");
             if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
             {
-                var label = rr.Contains('.') && !rr.Contains('-') ? $"Story {rr}" : rr;
+                var label = FollowUpRefs.ResolvingLabel(rr);
                 var href = FollowUpGeometry.ApplyLinkPrefix(prefix, rh);
                 detail.Append($"<a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(href))}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
             }
             else if (item.ResolvingRef is { Length: > 0 } rr2)
             {
-                var label = rr2.Contains('.') && !rr2.Contains('-') ? $"Story {rr2}" : rr2;
+                var label = FollowUpRefs.ResolvingLabel(rr2);
                 detail.Append($"<span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(label)}</span>\n");
             }
             if (item.Resolved)

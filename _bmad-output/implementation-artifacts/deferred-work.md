@@ -2,6 +2,18 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-9-6-deferred-followup-heuristics.md (2026-07-18)
+
+- source_spec: `spec-9-6-deferred-followup-heuristics.md`
+  summary: `NormalizeProvenanceKey` / geometry `SourceKey` still keep path-prefixed `_bmad-output/.../stem` tokens after `StoryIdFromKey` gained filename stripping — stem equality for non-story `spec-*` joins can miss.
+  evidence: Blind Hunter — path strip scoped to StoryIdFromKey only; geometry/quick-dev joins use SourceKey as stored.
+- source_spec: `spec-9-6-deferred-followup-heuristics.md`
+  summary: `ResolveHref` map/stem lookup does not normalize `\` → `/` before `GetFileNameWithoutExtension`, so backslash path-prefixed tokens can miss on non-Windows hosts.
+  evidence: Blind Hunter — adjacent to StoryIdFromKey path fix; ResolveHref still raw-token-first.
+- source_spec: `spec-9-6-deferred-followup-heuristics.md`
+  summary: Column-0 `* `/`+ ` thematic-break-shaped lines (e.g. `* * *`) can parse as deferred list items.
+  evidence: Edge Case Hunter — CommonMark ambiguity; live BMAD notes use `-`; prefer revisit with marker polish.
+
 ## Deferred from: code review of spec-epic9-watch-followup-surface-refresh.md (2026-07-18)
 
 - source_spec: `spec-epic9-watch-followup-surface-refresh.md`
@@ -68,11 +80,11 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-6-follow-up-item-provenance-and-resolution-paths.md (2026-07-17)
 
-- Top-level deferred bullets only recognized as column-0 `- ` / `-\t`; `*` / `+` / numbered lists never become items. Live notes use `-`; foreign frameworks may not. [`DeferredWorkParser.cs:139`]
-- Path-prefixed `source_spec` tokens can fail `StoryIdFromKey` (and skip placeholder href) when the href map misses; map lookup by filename stem usually still works. [`FollowUpRefs.cs:91-101`]
-- `ResolvingStoryIdFromText` only accepts `RESOLVED in [Story] N.M` — other closure phrasings leave `Resolved` true without a resolving link. Intentional best-effort heuristic. [`FollowUpRefs.cs:105-111`]
-- Near-dupe cross-link keeps only the first counterpart epic (“first match wins for stability”); multi-epic repeats understate provenance. [`ActionItemsTemplater.cs:100`]
-- Resolving chip label heuristic (`Contains('.') && !Contains('-')`) can emit `Story readme.md` for hyphen-free filenames. Rare. [`DeferredWorkTemplater.cs:108`]
+- ~~Top-level deferred bullets only recognized as column-0 `- ` / `-\t`; `*` / `+` / numbered lists never become items. Live notes use `-`; foreign frameworks may not.~~ **[RESOLVED in `spec-9-6-deferred-followup-heuristics`]** Column-0 CommonMark unordered `[-*+]` and ordered `N.`/`N)` markers parse as items. [`DeferredWorkParser.cs`]
+- ~~Path-prefixed `source_spec` tokens can fail `StoryIdFromKey` (and skip placeholder href) when the href map misses; map lookup by filename stem usually still works.~~ **[RESOLVED in `spec-9-6-deferred-followup-heuristics`]** `StoryIdFromKey` strips to filename stem before matching. [`FollowUpRefs.cs`]
+- ~~`ResolvingStoryIdFromText` only accepts `RESOLVED in [Story] N.M` — other closure phrasings leave `Resolved` true without a resolving link. Intentional best-effort heuristic.~~ **[RESOLVED in `spec-9-6-deferred-followup-heuristics`]** Also extracts `N.M` with trailing punctuation and backtick story/spec tokens after RESOLVED. [`FollowUpRefs.cs`]
+- ~~Near-dupe cross-link keeps only the first counterpart epic (“first match wins for stability”); multi-epic repeats understate provenance.~~ **[RESOLVED in `spec-9-6-deferred-followup-heuristics`]** Accumulates sorted distinct counterpart epics; one cross-link each. [`ActionItemsTemplater.cs`]
+- ~~Resolving chip label heuristic (`Contains('.') && !Contains('-')`) can emit `Story readme.md` for hyphen-free filenames. Rare.~~ **[RESOLVED in `spec-9-6-deferred-followup-heuristics`]** `FollowUpRefs.ResolvingLabel` prefixes `Story` only for dotted `N.M` ids. [`DeferredWorkTemplater.cs` / `FollowUpDetailTemplater.cs`]
 
 ## Deferred from: code review of 9-5-distinct-acceptance-criteria-blocks-and-collapsed-dev-notes.md (2026-07-16)
 

@@ -3017,7 +3017,8 @@ public sealed class SiteGenerator
         var openForCrossLinks = actionItems.Where(a => !FollowUpGeometry.IsDone(a)).ToList();
         var crossLinks = openForCrossLinks.Count > 0
             ? ActionItemsTemplater.FindNearDuplicates(openForCrossLinks)
-            : new Dictionary<SprintActionItem, int>();
+            : (IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>)
+                new Dictionary<SprintActionItem, IReadOnlyList<int>>(ReferenceEqualityComparer.Instance);
         var actionSlugs = FollowUpSlug.AssignActionSlugs(actionItems);
 
         foreach (var item in actionItems)

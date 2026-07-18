@@ -239,6 +239,120 @@ public class DeferredWorkParserTests
     }
 
     [Fact]
+    public void Parse_StarPlusAndNumberedListMarkers_BecomeItems()
+    {
+        var md = """
+            ## Deferred from: review of 1-1-foundation.md
+
+            * Star item
+            + Plus item
+            1. Numbered dot item
+            2) Numbered paren item
+              - nested stays continuation of paren item
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        Assert.True(model.IsStructured);
+        Assert.Equal(4, model.Groups[0].Items.Count);
+        Assert.Contains("Star item", model.Groups[0].Items[0].BodyHtml);
+        Assert.Contains("Plus item", model.Groups[0].Items[1].BodyHtml);
+        Assert.Contains("Numbered dot item", model.Groups[0].Items[2].BodyHtml);
+        Assert.Contains("Numbered paren item", model.Groups[0].Items[3].BodyHtml);
+        Assert.Contains("nested stays", model.Groups[0].Items[3].BodyHtml);
+    }
+
+    [Fact]
+    public void Parse_PathPrefixedSourceSpec_ResolvesStoryIdAndPlaceholderHref()
+    {
+        var md = """
+            ## Deferred from: code review of path-prefixed note
+
+            - source_spec: `_bmad-output/implementation-artifacts/8-8-generation-time-recency-signals.md`
+            - Open path-map casing mismatch on Windows.
+            """;
+
+        var model = DeferredWorkParser.Parse(md); // no href map — placeholder path
+        Assert.True(model.IsStructured);
+        var group = Assert.Single(model.Groups);
+        Assert.Equal("8.8", group.SourceStoryId);
+        Assert.Equal("epics/story-8-8.html", group.SourceStoryHref);
+    }
+
+    [Fact]
+    public void Parse_ResolvedWithBacktickSpec_SetsResolvingRef()
+    {
+        var md = """
+            ## Deferred from: review of 1-1-foundation.md
+
+            - ~~Stale watch path~~ **RESOLVED 2026-07-18** (`spec-webview-doc-page-surfaces`): writers refresh.
+            """;
+
+        var model = DeferredWorkParser.Parse(md, HrefMap);
+        var item = Assert.Single(model.Groups[0].Items);
+        Assert.True(item.Resolved);
+        Assert.Equal("spec-webview-doc-page-surfaces", item.ResolvingRef);
+        Assert.Contains("spec-webview-doc-page-surfaces.html", item.ResolvingHref);
+    }
+
+    [Fact]
+    public void Parse_ResolvedInStoryWithEmDash_StillExtractsStoryId()
+    {
+        var md = """
+            ## Deferred from: review of 6-3-vs-code-integration-spike.md
+
+            - **[RESOLVED in 6.11 — the 6.4 claim was STALE]** ~~Live-push watcher~~
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        var item = Assert.Single(model.Groups[0].Items);
+        Assert.True(item.Resolved);
+        Assert.Equal("6.11", item.ResolvingRef);
+        Assert.Equal("epics/story-6-11.html", item.ResolvingHref);
+    }
+
+    [Fact]
+    public void Parse_OpenItemMentioningResolvedNearBacktick_DoesNotSetResolvingRef()
+    {
+        var md = """
+            ## Deferred from: review of 1-1-foundation.md
+
+            - Not RESOLVED yet (`spec-webview-doc-page-surfaces`) — still outstanding.
+            """;
+
+        var model = DeferredWorkParser.Parse(md, HrefMap);
+        var item = Assert.Single(model.Groups[0].Items);
+        Assert.False(item.Resolved);
+        Assert.Null(item.ResolvingRef);
+        Assert.Null(item.ResolvingHref);
+    }
+
+    [Fact]
+    public void ResolvingLabel_StoryIdGetsPrefix_FilenameDoesNot()
+    {
+        Assert.Equal("Story 6.4", FollowUpRefs.ResolvingLabel("6.4"));
+        Assert.Equal("readme.md", FollowUpRefs.ResolvingLabel("readme.md"));
+        Assert.Equal("spec-foo.md", FollowUpRefs.ResolvingLabel("spec-foo.md"));
+        Assert.Equal("readme.md", FollowUpRefs.ResolvingLabel("_bmad-output/docs/readme.md"));
+    }
+
+    [Fact]
+    public void Templater_ResolvingChip_DoesNotPrefixStoryOntoFilename()
+    {
+        var readme = new DeferredWorkItem("<p>Closed via readme.</p>", true, "readme.md", "docs/readme.html");
+        var story = new DeferredWorkItem("<p>Closed in story.</p>", true, "6.4", "epics/story-6-4.html");
+        var nav = SiteNav.Build(Array.Empty<string>(), "Test", hasAdrs: false);
+
+        var detailReadme = FollowUpDetailTemplater.RenderDeferredPage(
+            readme, "review", null, "deferred-readme", nav, "deferred-work.html");
+        var detailStory = FollowUpDetailTemplater.RenderDeferredPage(
+            story, "review", null, "deferred-story", nav, "deferred-work.html");
+
+        Assert.Contains("Resolving: readme.md", detailReadme);
+        Assert.DoesNotContain("Story readme.md", detailReadme);
+        Assert.Contains("Resolving: Story 6.4", detailStory);
+    }
+
+    [Fact]
     public void Templater_StructuredPreamble_RendersAboveGroups()
     {
         var model = new DeferredWorkModel(
