@@ -261,7 +261,8 @@ public static class StatusStyles
     public static string Badge(string cssClass, string label, string iconClass)
     {
         var tip = PathUtil.Html(StageMeaning(iconClass));
-        return $"<span class=\"status-badge {cssClass} js-tip\" data-tip=\"{tip}\" title=\"{tip}\">{Icon(iconClass)}{PathUtil.Html(label)}</span>";
+        var cls = PathUtil.Html(cssClass);
+        return $"<span class=\"status-badge {cls} js-tip\" data-tip=\"{tip}\" title=\"{tip}\">{Icon(iconClass)}{PathUtil.Html(label)}</span>";
     }
 
     /// <summary>On-demand status legend disclosure: a compact "?" toggle that opens a single-column popover

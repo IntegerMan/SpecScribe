@@ -221,9 +221,27 @@ public class StatusStylesTests
     public void Badge_RendersIconAndTextInsideTheStatusBadgeSpan()
     {
         var badge = StatusStyles.Badge("done", "Done");
-        Assert.Contains("class=\"status-badge done js-tip\"", badge);
-        Assert.Contains("aria-hidden=\"true\"", badge); // the icon is decorative
-        Assert.Contains("Done", badge); // the word always stays (UX-DR17: never icon-only)
+        // One combined assert: class + icon + label share the same span (Story 2.5 deferred co-location).
+        Assert.Contains(
+            $"class=\"status-badge done js-tip\" data-tip=\"{PathUtil.Html(StatusStyles.StageMeaning("done"))}\" " +
+            $"title=\"{PathUtil.Html(StatusStyles.StageMeaning("done"))}\">{Icons.ForStatus("done")}Done</span>",
+            badge);
+        Assert.StartsWith("<span ", badge);
+        Assert.EndsWith("</span>", badge);
+    }
+
+    [Fact]
+    public void Badge_EscapesHostileCssClass()
+    {
+        var hostile = "done\" onmouseover=\"x";
+        var badge = StatusStyles.Badge(hostile, "X");
+        var escaped = PathUtil.Html(hostile);
+        var tip = PathUtil.Html(StatusStyles.StageMeaning(hostile));
+        // Full escaped badge: no attribute breakout; icon (empty for unknown class) + label in same span.
+        Assert.Equal(
+            $"<span class=\"status-badge {escaped} js-tip\" data-tip=\"{tip}\" title=\"{tip}\">{Icons.ForStatus(hostile)}X</span>",
+            badge);
+        Assert.DoesNotContain("onmouseover=\"", badge);
     }
 
     // ---- Story 8.2: stage meanings, tooltips, legend key --------------------------------------
@@ -253,11 +271,10 @@ public class StatusStylesTests
     {
         var tip = StatusStyles.StageMeaning("ready");
         var badge = StatusStyles.Badge("ready", "Ready for dev");
-        Assert.Contains("js-tip", badge);
-        Assert.Contains($"data-tip=\"{PathUtil.Html(tip)}\"", badge);
-        Assert.Contains($"title=\"{PathUtil.Html(tip)}\"", badge);
-        Assert.Contains("class=\"status-badge ready js-tip\"", badge);
-        Assert.Contains("Ready for dev", badge);
+        Assert.Contains(
+            $"class=\"status-badge ready js-tip\" data-tip=\"{PathUtil.Html(tip)}\" title=\"{PathUtil.Html(tip)}\">" +
+            $"{Icons.ForStatus("ready")}Ready for dev</span>",
+            badge);
     }
 
     [Fact]

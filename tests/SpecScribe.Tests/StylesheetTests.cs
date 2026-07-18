@@ -226,6 +226,10 @@ public class StylesheetTests
         var ruleEnd = css.IndexOf('}', ruleStart);
         var rule = css[ruleStart..ruleEnd];
         Assert.DoesNotContain("#", rule);
+        Assert.DoesNotContain("rgb(", rule, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("rgba(", rule, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("hsl(", rule, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("hsla(", rule, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -88,8 +88,8 @@ public sealed record DashboardView
     /// <summary>The dashboard quick-link pills (a superset of the top nav, each with a description).</summary>
     public required IReadOnlyList<NavQuickLink> QuickLinks { get; init; }
 
-    /// <summary>The quick-dev / deferred-work inventory the "Direct &amp; Quick-Dev Work" band renders. Carried
-    /// as already-projected domain input (its entries are data).</summary>
+    /// <summary>The quick-dev / deferred-work inventory used by Unplanned / Direct surfaces (and related home
+    /// chrome). Carried as already-projected domain input (its entries are data).</summary>
     public required WorkInventory Work { get; init; }
 
     /// <summary>The count of open retrospective action items — the "Retro Action Items" callout in the work band
