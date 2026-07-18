@@ -4,7 +4,7 @@ baseline_commit: 8d9aac44fe721e35315cef0881cb04ba64b2ded9
 
 # Story 9.10: Scannable Follow-Up List Pages
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -94,6 +94,19 @@ Concrete silhouette rules:
   - [x] Keep the existing degrade tests green (`Degrade_NoActionItems_*`, `Degrade_NoDeferredWork_*`).
   - [x] Golden fingerprint moves (both page bodies change) → regen `SiteGeneratorAdapterTests.cs` expected hash (currently line ~398) per `golden-diff-normalization-gotchas`. These pages ride `WriteOutput` → SPA/webview capture, so no new `HostRenderException`; confirm SPA/webview capture still slices them (they emit `main#main-content`).
   - [x] Run `dotnet test` from repo root.
+
+### Review Findings
+
+- [x] [Review][Patch] Omit list “More” disclosure when `detailHref` is set (owner: scan + View detail only) [`FollowUpRow.cs:64`] [`ActionItemsTemplater.cs:154`] [`DeferredWorkTemplater.cs:125`]
+- [x] [Review][Patch] Abbreviation false sentence ends truncate scan leads [`FollowUpRow.cs:153`]
+- [x] [Review][Patch] Metadata-only / same-line `source_spec`/`evidence` handling pollutes or drops scan leads [`FollowUpRow.cs:14`]
+- [x] [Review][Patch] Restore heavy list content when `detailHref` is null (additive 9.10 seam) [`ActionItemsTemplater.cs:154`] [`DeferredWorkTemplater.cs:125`]
+- [x] [Review][Patch] Span teasers still styled as links (hover / dotted underline) [`specscribe.css:5608`] [`specscribe.css:5623`]
+- [x] [Review][Patch] Stale FollowUpRow type comment still says heavy detail stays in `<details>` until 9.11 [`FollowUpRow.cs:6`]
+- [x] [Review][Decision] Post-9.11 list “More” disclosure role — **resolved → omit More when `detailHref` is set** (option 2); subsumes ✓-only More patch.
+- [x] [Review][Defer] Nested / unclosed `<li>` in unstructured deferred extraction [`FollowUpGeometry.cs:367`] — deferred, pre-existing
+- [x] [Review][Defer] Unstructured deferred notes with list items no longer use plain-body fallback [`DeferredWorkTemplater.cs:38`] — deferred, pre-existing (9.11 overlay)
+- [x] [Review][Defer] `FollowUpRow.Render` branches lack direct unit coverage [`FollowUpRowTests.cs`] — deferred, pre-existing (partially addressed: Render href/disclosure tests added)
 
 ## Dev Notes
 
@@ -222,3 +235,4 @@ Composer
 ### Change Log
 
 - 2026-07-16: Story 9.10 — compress action-items and deferred-work list pages to shared scan-first `.followup-row` grammar; heavy detail in per-row `<details>`; golden fingerprint regen.
+- 2026-07-17: Code review — omit list More when detailHref set; abbreviation/metadata summarize fixes; null-href disclosure seam restored; span-as-link CSS; golden regen; status → done.

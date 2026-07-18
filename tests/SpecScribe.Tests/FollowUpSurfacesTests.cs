@@ -164,17 +164,14 @@ public class FollowUpSurfacesTests : IDisposable
         var epic2 = html.IndexOf("From the Epic 2 retrospective", StringComparison.Ordinal);
         Assert.True(epic1 >= 0 && epic2 > epic1, "Epic 1 group must precede Epic 2");
 
-        // Cross-link teaser on list; full linked cross-ref lives on the detail page.
-        Assert.Contains("also raised in Epic 2 retrospective", html);
-        Assert.Contains("also raised in Epic 1 retrospective", html);
+        // Cross-link lives on the detail page (list is scan + View detail only).
+        Assert.DoesNotContain("also raised", html);
         var scheduleIdx = html.IndexOf("Schedule retros promptly", StringComparison.Ordinal);
-        var scheduleRowStart = html.LastIndexOf("class=\"followup-row\"", scheduleIdx, StringComparison.Ordinal);
-        var scheduleRowEnd = html.IndexOf("</li>", scheduleIdx, StringComparison.Ordinal);
-        var scheduleRow = html[scheduleRowStart..scheduleRowEnd];
-        Assert.DoesNotContain("also raised", scheduleRow);
+        Assert.True(scheduleIdx >= 0);
 
         // List page no longer embeds Resolve-with-AI (moved to detail).
         Assert.DoesNotContain("data-copy=", html);
+        Assert.DoesNotContain("followup-row-detail", html);
     }
 
     [Fact]
@@ -320,7 +317,7 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("class=\"followup-row\"", html);
         Assert.Contains("class=\"followup-row resolved\"", html);
         Assert.Contains(">Resolved</span>", html);
-        Assert.Contains("deferred-resolved-mark", html);
+        Assert.DoesNotContain("followup-row-detail", html);
         Assert.Contains("followup-row-primary", html);
         Assert.Contains("href=\"../follow-ups/deferred-", html);
 

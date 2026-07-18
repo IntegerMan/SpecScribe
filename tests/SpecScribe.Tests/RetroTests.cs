@@ -202,14 +202,15 @@ public class RetroTests : IDisposable
         // Provenance lives on the group heading (Story 9.6) — linked to the epic's retro page.
         Assert.Contains("class=\"action-items-group\"", html);
         Assert.Contains("href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\">From the Epic 1 retrospective", html);
-        // Story 9.11: Resolve-with-AI moved to the detail page; list rows deep-link there.
+        // Story 9.11 + code review 9.10: Resolve-with-AI on detail page; list is scan + View detail only.
         Assert.Contains("href=\"follow-ups/action-", html);
         Assert.Contains("class=\"followup-row-primary\"", html);
-        Assert.Contains("Resolve with AI on the detail page", html);
+        Assert.DoesNotContain("Resolve with AI on the detail page", html);
+        Assert.DoesNotContain("followup-row-detail", html);
         Assert.DoesNotContain("<span class=\"cmd-text\">Resolve with AI</span>", html);
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
 
-        // No quick-dev command exposed → no resolve teaser (graceful).
+        // No quick-dev command exposed → still no resolve chrome on the list.
         var noCmd = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
         Assert.DoesNotContain("Resolve with AI", noCmd);
     }
@@ -229,11 +230,12 @@ public class RetroTests : IDisposable
 
         // Wider layout wrapper (not the 860 doc column).
         Assert.Contains("class=\"action-items-wrap\"", html);
-        // Story 9.11: list shows a deferred teaser; the live backlog link lives on the detail page.
-        Assert.Equal(1, CountOccurrences(html, "class=\"action-item-deferred\">Also in deferred-work backlog"));
+        // Code review 9.10: list omits deferred teaser when detail URL exists; link lives on detail page.
+        Assert.DoesNotContain("action-item-deferred", html);
         Assert.Contains("href=\"follow-ups/action-", html);
+        Assert.DoesNotContain("followup-row-detail", html);
 
-        // No deferred href → no deferred teaser at all, even for the debt item.
+        // No deferred href → still no deferred chrome on the list (detail path owns it).
         var noHref = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
         Assert.DoesNotContain("action-item-deferred", noHref);
     }

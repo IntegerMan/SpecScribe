@@ -459,7 +459,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // deferred under parent stories (outer ring); date-based quick-dev epic attribution via retro
         // DateText and story LastUpdatedDate; review patches (hint gating, dead commands param, cascade).
         // [spec-sunburst-remaining-work-hierarchy]
-        const string expected = "cbce3ae61c190777b7ea71212e6bfae88e03ab7e3d17f0a99fa5ae892605672c";
+        const string expected = "d9c26cdca4bc48266aa4e5d671dbd529ef1caa1b7ddb54fb08d71a696ae1e273";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

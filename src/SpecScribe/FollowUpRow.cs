@@ -4,16 +4,29 @@ using System.Text.RegularExpressions;
 namespace SpecScribe;
 
 /// <summary>Shared scan-first row grammar for action-items and deferred-work list pages.
-/// Heavy per-item detail lives in a collapsed <c>&lt;details&gt;</c> until Story 9.11 detail URLs land. [Story 9.10]</summary>
+/// When a Story 9.11 detail URL is present, the row is scan line + primary link only (no list
+/// <c>&lt;details&gt;</c>). Without a detail URL, heavy content stays in a collapsed native
+/// disclosure. [Story 9.10]</summary>
 public static class FollowUpRow
 {
     private static readonly Regex SummaryField = new(
         @"^\s*summary:\s*(?<text>.+?)\s*$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
 
-    private static readonly Regex MetadataLine = new(
-        @"^\s*(?:source_spec|evidence)\s*:.*$",
+    /// <summary>Whole-line evidence fields (values often contain spaces).</summary>
+    private static readonly Regex EvidenceLine = new(
+        @"^[ \t]*evidence\s*:.*?\r?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+    /// <summary><c>source_spec:</c> path (optionally backtick-wrapped); trailing same-line prose is kept.</summary>
+    private static readonly Regex SourceSpecLine = new(
+        @"^[ \t]*source_spec\s*:\s*(?:`[^`\r\n]+`|\S+)(?<trail>[ \t]+\S.*?)?\r?$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+    private static readonly HashSet<string> TitleAbbrevs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "dr", "mr", "mrs", "ms", "vs", "etc", "approx", "cf", "al",
+    };
 
     /// <summary>Derives a short plain-text lead from existing authored text — prefers an authored
     /// <c>summary:</c> field when present, otherwise the first non-metadata sentence. No new authoring
@@ -26,9 +39,12 @@ public static class FollowUpRow
         if (summary.Success)
             return TruncatePlainText(summary.Groups["text"].Value.Trim(), maxChars);
 
-        var withoutMeta = MetadataLine.Replace(plainText, "");
+        var withoutMeta = EvidenceLine.Replace(plainText, "");
+        withoutMeta = SourceSpecLine.Replace(withoutMeta, m =>
+            m.Groups["trail"].Success ? m.Groups["trail"].Value.TrimStart() : "");
         var trimmed = withoutMeta.Trim();
-        if (trimmed.Length == 0) trimmed = plainText.Trim();
+        // Metadata-only bullets must not fall back to restoring source_spec/evidence as the lead.
+        if (trimmed.Length == 0) return string.Empty;
 
         var end = FindFirstSentenceEnd(trimmed);
         var lead = end > 0 ? trimmed[..end].Trim() : trimmed;
@@ -39,8 +55,9 @@ public static class FollowUpRow
     public static string SummarizeFromHtml(string html, int maxChars = 120) =>
         SummarizePlainText(PathUtil.StripHtmlTags(html), maxChars);
 
-    /// <summary>Renders one scan-first follow-up row: summary + status + source chip + primary affordance,
-    /// with heavy detail collapsed in <c>&lt;details&gt;</c>. [Story 9.10]</summary>
+    /// <summary>Renders one scan-first follow-up row: summary + status + source chip + primary affordance.
+    /// With <paramref name="detailHref"/>, omits list disclosure (detail page owns the body).
+    /// Without it, heavy detail collapses into native <c>&lt;details&gt;</c>. [Story 9.10]</summary>
     public static void Render(
         StringBuilder sb,
         string summaryHtml,
@@ -63,16 +80,10 @@ public static class FollowUpRow
 
         if (detailHref is { Length: > 0 })
         {
+            // Owner (code review 9.10): scan + View detail only — no list-page More disclosure.
             sb.Append($"        <a class=\"followup-row-primary\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(detailHref))}\">View detail &rarr;</a>\n");
             sb.Append("      </div>\n");
             sb.Append("    </div>\n");
-            if (detailBodyHtml.Length > 0)
-            {
-                sb.Append("    <details class=\"followup-row-detail\">\n");
-                sb.Append("      <summary class=\"followup-row-detail-toggle\">More</summary>\n");
-                sb.Append($"      <div class=\"followup-row-detail-body\">{detailBodyHtml}</div>\n");
-                sb.Append("    </details>\n");
-            }
         }
         else if (detailBodyHtml.Length > 0)
         {
@@ -160,10 +171,33 @@ public static class FollowUpRow
             {
                 if (i + 1 < text.Length && char.IsDigit(text[i + 1])) continue;
             }
+            if (c == '.' && IsAbbreviationPeriod(text, i)) continue;
+
             var next = i + 1 < text.Length ? text[i + 1] : ' ';
             if (next is ' ' or '\n' or '\r' || i == text.Length - 1)
                 return i + 1;
         }
         return -1;
+    }
+
+    /// <summary>True when <paramref name="periodIndex"/> is an abbreviation/initial period, not a sentence end.</summary>
+    private static bool IsAbbreviationPeriod(string text, int periodIndex)
+    {
+        // e.g. / i.e. / U.S. — letter '.' letter '.' (this index is the second or first of a pair)
+        if (periodIndex >= 2
+            && char.IsLetter(text[periodIndex - 1])
+            && text[periodIndex - 2] == '.'
+            && periodIndex >= 3
+            && char.IsLetter(text[periodIndex - 3]))
+            return true;
+
+        // First period of e.g. / i.e. — next char is a letter (not whitespace), so the main loop
+        // already skips via the whitespace check; still guard title abbrevs below.
+
+        var start = periodIndex;
+        while (start > 0 && char.IsLetter(text[start - 1])) start--;
+        if (start == periodIndex) return false;
+        var word = text[start..periodIndex];
+        return TitleAbbrevs.Contains(word);
     }
 }

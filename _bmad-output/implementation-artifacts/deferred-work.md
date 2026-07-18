@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 9-10-scannable-follow-up-list-pages.md (2026-07-17)
+
+- Nested / unclosed top-level `<li>` handling in `ExtractTopLevelListItems` can truncate nested lists or drop later siblings; structured Deferred-from path unaffected. Related to prior 9.11 deferral. [`FollowUpGeometry.cs:367`]
+- Unstructured deferred notes that contain `<li>` items render as `.followup-row` + slugs instead of the prior plain-body `deferred-work-fallback` article (prose-only fallback remains). 9.11 overlay; out of pure-9.10 scope. [`DeferredWorkTemplater.cs:38`]
+- `FollowUpRowTests` covers `Summarize*` only — no direct asserts for `Render` empty-primary / href-vs-disclosure branches. [`FollowUpRowTests.cs`]
+
 ## Deferred from: code review of spec-artifact-review-nav-and-deferred.md (2026-07-17)
 
 - source_spec: `spec-artifact-review-nav-and-deferred.md`

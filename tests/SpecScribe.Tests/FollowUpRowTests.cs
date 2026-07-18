@@ -1,3 +1,4 @@
+using System.Text;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -43,5 +44,73 @@ public class FollowUpRowTests
 
         Assert.Contains("Still outstanding path casing", lead);
         Assert.DoesNotContain("source_spec", lead);
+    }
+
+    [Fact]
+    public void SummarizePlainText_MetadataOnly_ReturnsEmpty()
+    {
+        var lead = FollowUpRow.SummarizePlainText("source_spec: `spec-example.md`\nevidence: review note");
+        Assert.Equal(string.Empty, lead);
+    }
+
+    [Fact]
+    public void SummarizePlainText_SameLineSourceSpec_KeepsTrailingProse()
+    {
+        var lead = FollowUpRow.SummarizePlainText("source_spec: foo.md Still outstanding path casing.");
+        Assert.StartsWith("Still outstanding path casing", lead);
+        Assert.DoesNotContain("source_spec", lead);
+        Assert.DoesNotContain("foo.md", lead);
+    }
+
+    [Fact]
+    public void SummarizePlainText_SkipsTitleAbbreviationPeriods()
+    {
+        var lead = FollowUpRow.SummarizePlainText("Talk to Dr. Smith about the heatmap debt before Epic 2.");
+        Assert.Contains("Dr. Smith about the heatmap debt", lead);
+    }
+
+    [Fact]
+    public void SummarizePlainText_SkipsEgAbbreviation()
+    {
+        var lead = FollowUpRow.SummarizePlainText("Use e.g. configure the path before shipping.");
+        Assert.StartsWith("Use e.g. configure the path", lead);
+    }
+
+    [Fact]
+    public void Render_WithDetailHref_OmitsDisclosure()
+    {
+        var sb = new StringBuilder();
+        FollowUpRow.Render(
+            sb,
+            summaryHtml: "Short lead",
+            statusToken: "open",
+            statusLabel: "Open",
+            sourceChipHtml: "Epic 1",
+            detailBodyHtml: "<span>teaser should not render</span>",
+            detailHref: "follow-ups/action-short-lead.html");
+
+        var html = sb.ToString();
+        Assert.Contains("followup-row-primary", html);
+        Assert.Contains("follow-ups/action-short-lead.html", html);
+        Assert.DoesNotContain("followup-row-detail", html);
+        Assert.DoesNotContain("teaser should not render", html);
+    }
+
+    [Fact]
+    public void Render_WithoutDetailHref_ShowsDisclosureBody()
+    {
+        var sb = new StringBuilder();
+        FollowUpRow.Render(
+            sb,
+            summaryHtml: "Short lead",
+            statusToken: "open",
+            statusLabel: "Open",
+            sourceChipHtml: "Epic 1",
+            detailBodyHtml: "<div class=\"heavy\">full body</div>");
+
+        var html = sb.ToString();
+        Assert.Contains("followup-row-detail", html);
+        Assert.Contains("full body", html);
+        Assert.DoesNotContain("href=", html);
     }
 }

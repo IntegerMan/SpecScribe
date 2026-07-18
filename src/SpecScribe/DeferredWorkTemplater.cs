@@ -122,16 +122,24 @@ public static class DeferredWorkTemplater
             ? prefix + FollowUpSlug.OutputPath(slug)
             : null;
 
-        // Teaser: resolving links and full body live on the detail page (Story 9.11).
+        // With a detail URL: scan + View detail only (code review 9.10). Without: full disclosure (9.10 seam).
         var detail = new StringBuilder();
-        if (item.ResolvingRef is { Length: > 0 } rr)
+        if (detailHref is null)
         {
-            var label = rr.Contains('.') && !rr.Contains('-') ? $"Story {rr}" : rr;
-            detail.Append($"<span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(label)}</span>\n");
-        }
-        if (item.Resolved)
-        {
-            detail.Append("<span class=\"deferred-resolved-mark\" aria-hidden=\"true\">✓</span>\n");
+            detail.Append($"<div class=\"deferred-item-body\">{item.BodyHtml}</div>\n");
+            if (item.ResolvingHref is { Length: > 0 } rh && item.ResolvingRef is { Length: > 0 } rr)
+            {
+                var label = rr.Contains('.') && !rr.Contains('-') ? $"Story {rr}" : rr;
+                var href = FollowUpGeometry.ApplyLinkPrefix(prefix, rh);
+                detail.Append($"<a class=\"deferred-item-resolving\" href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(href))}\">Resolving: {PathUtil.Html(label)} &rarr;</a>\n");
+            }
+            else if (item.ResolvingRef is { Length: > 0 } rr2)
+            {
+                var label = rr2.Contains('.') && !rr2.Contains('-') ? $"Story {rr2}" : rr2;
+                detail.Append($"<span class=\"deferred-item-resolving\">Resolving: {PathUtil.Html(label)}</span>\n");
+            }
+            if (item.Resolved)
+                detail.Append("<span class=\"deferred-resolved-mark\" aria-hidden=\"true\">✓</span>\n");
         }
 
         var (statusToken, statusLabel) = item.Resolved

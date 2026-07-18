@@ -1,0 +1,1107 @@
+diff --git a/src/SpecScribe/Charts.cs b/src/SpecScribe/Charts.cs
+index f27bddf..717c50a 100644
+--- a/src/SpecScribe/Charts.cs
++++ b/src/SpecScribe/Charts.cs
+@@ -171,7 +171,6 @@ public static class Charts
+         var unplannedGeo = unplanned ?? UnplannedWorkGeometry.Empty;
+         var hasFollowUps = geometry.HasAny;
+         var hasUnplanned = unplannedGeo.HasUnplanned;
+-        // Follow-ups orphan = unattributed action items only (unattributable deferred → Unplanned). [Story 9.12]
+         var unattributed = geometry.UnattributedActionItems;
+         var orphanSlots = unattributed.Count;
+         var unplannedSlots = unplannedGeo.UnplannedMemberCount;
+@@ -181,14 +180,23 @@ public static class Charts
+         var epicOuter = size * 0.28;
+         var storyInner = size * 0.285;
+         var storyOuter = size * 0.415;
+-        var taskInner = size * 0.42;
+-        var taskOuter = size * 0.465;
++        var deferredInner = size * 0.42;
++        var deferredOuter = size * 0.465;
++
++        // Weight each story by max(1, TasksTotal). [spec-sunburst-remaining-work-hierarchy]
++        int StoryWeight(StoryInfo s) => Math.Max(1, s.TasksTotal);
++
++        // Epic-level deferred = deferred items with no resolvable story parent.
++        IReadOnlyList<FollowUpDeferredSlot> EpicLevelDeferred(EpicInfo e)
++        {
++            var storyIds = e.Stories.Select(s => s.Id);
++            return geometry.EpicLevelDeferred(e.Number, storyIds);
++        }
+ 
+-        // Weight each epic by stories + attributed follow-ups + attributed quick-dev so postponed work widens its slice.
+         int EpicWeight(EpicInfo e) =>
+-            Math.Max(1, e.Stories.Count
++            Math.Max(1, e.Stories.Sum(StoryWeight)
+                 + geometry.ForEpicNumber(e.Number).Count
+-                + geometry.DeferredForEpicNumber(e.Number).Count
++                + EpicLevelDeferred(e).Count
+                 + unplannedGeo.ForEpic(e.Number).Count);
+ 
+         var totalWeight = epics.Sum(EpicWeight)
+@@ -204,13 +212,13 @@ public static class Charts
+         foreach (var epic in epics)
+         {
+             var epicFollowUps = geometry.ForEpicNumber(epic.Number);
+-            var epicDeferred = geometry.DeferredForEpicNumber(epic.Number);
++            var epicLevelDeferred = EpicLevelDeferred(epic);
+             var epicQuickDev = unplannedGeo.ForEpic(epic.Number);
+             var weight = EpicWeight(epic);
+             var sweep = weight * anglePerUnit;
+             var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
+             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
+-            var followUpCount = epicFollowUps.Count + epicDeferred.Count;
++            var followUpCount = epicFollowUps.Count + epicLevelDeferred.Count;
+             var directCount = epicQuickDev.Count;
+             var followNote = followUpCount > 0
+                 ? $", {followUpCount} {Plural(followUpCount, "follow-up", "follow-ups")}"
+@@ -225,28 +233,33 @@ public static class Charts
+             sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{Html(followNote)}{Html(directNote)}</title></path>\n");
+             sb.Append("  </a>\n");
+ 
+-            var slotCount = epic.Stories.Count + epicFollowUps.Count + epicDeferred.Count + epicQuickDev.Count;
+-            if (slotCount > 0)
++            var slotWeight = epic.Stories.Sum(StoryWeight)
++                + epicFollowUps.Count + epicLevelDeferred.Count + epicQuickDev.Count;
++            if (slotWeight > 0)
+             {
+-                var slotSweep = sweep / slotCount;
++                var anglePerUnitSlot = sweep / slotWeight;
+                 var slotAngle = angle;
+                 foreach (var story in epic.Stories)
+                 {
+-                    AppendStorySlot(sb, story, slotAngle, slotSweep, pad, c, storyInner, storyOuter, taskInner, taskOuter, commands);
+-                    slotAngle += slotSweep;
++                    var sw = StoryWeight(story) * anglePerUnitSlot;
++                    AppendWeightedStorySlot(sb, story, geometry, slotAngle, sw, pad, c, storyInner, storyOuter, deferredInner, deferredOuter);
++                    slotAngle += sw;
+                 }
+                 foreach (var item in epicFollowUps)
+                 {
++                    var slotSweep = 1.0 * anglePerUnitSlot;
+                     AppendActionItemSlot(sb, item, geometry.HrefFor(item), slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                     slotAngle += slotSweep;
+                 }
+-                foreach (var slot in epicDeferred)
++                foreach (var slot in epicLevelDeferred)
+                 {
++                    var slotSweep = 1.0 * anglePerUnitSlot;
+                     AppendDeferredItemSlot(sb, slot, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                     slotAngle += slotSweep;
+                 }
+                 foreach (var qd in epicQuickDev)
+                 {
++                    var slotSweep = 1.0 * anglePerUnitSlot;
+                     AppendQuickDevSlot(sb, qd, slotAngle, slotSweep, pad, c, storyInner, storyOuter);
+                     slotAngle += slotSweep;
+                 }
+@@ -255,7 +268,6 @@ public static class Charts
+             angle += sweep;
+         }
+ 
+-        // Unattributed action items only: synthetic epic-level "Follow-ups" slice. [Story 9.12]
+         if (orphanSlots > 0)
+         {
+             var orphanWeight = Math.Max(1, orphanSlots);
+@@ -282,7 +294,6 @@ public static class Charts
+             angle += sweep;
+         }
+ 
+-        // Unplanned / Direct work: open unattributable quick-dev + unattributable deferred. [Story 9.12]
+         if (unplannedSlots > 0)
+         {
+             var unplannedWeight = Math.Max(1, unplannedSlots);
+@@ -327,15 +338,15 @@ public static class Charts
+     private static string BuildSunburstHint(bool hasFollowUps, bool hasUnplanned)
+     {
+         if (!hasFollowUps && !hasUnplanned)
+-            return "<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n";
++            return "<div class=\"sunburst-hint\">Inner ring: epics &middot; middle: stories (sized by tasks). Click any segment to open it.</div>\n\n";
+ 
+         var parts = new List<string>
+         {
+-            "Inner ring: epics &middot; middle: stories",
++            "Inner ring: epics &middot; middle: stories (sized by tasks)",
+         };
+         if (hasFollowUps) parts[0] += " &amp; follow-ups";
+         if (hasUnplanned) parts[0] += " &amp; direct work";
+-        parts[0] += " &middot; outer: task completion.";
++        parts[0] += " &middot; outer: story-child deferred.";
+         if (hasFollowUps)
+             parts.Add("Orange = open follow-up; green = done. Unattributed action items share a Follow-ups slice.");
+         if (hasUnplanned)
+@@ -381,58 +392,38 @@ public static class Charts
+         return sb.ToString();
+     }
+ 
+-    /// <summary>The E4 placeholder arc: a faint dashed outer-ring sector for a story that has no task plan
+-    /// yet, turning an otherwise-blank gap into a call to action. Kept a real link (to the story/epic) and
+-    /// carries a <c>&lt;title&gt;</c> + <c>aria-label</c> so it reads "No task plan yet — run
+-    /// /…-create-story N.N" for pointer, keyboard and screen-reader users alike; the command is only named
+-    /// when the active module actually exposes it (never a command that doesn't exist). Pure SVG + CSS — the
+-    /// dashed look is the <c>.sb-noplan</c> class, not a JS effect. [UXO E4]</summary>
+-    private static void AppendNoPlanArc(StringBuilder sb, StoryInfo story, string href, double c, double rInner, double rOuter, double a0, double a1, CommandCatalog? commands)
+-    {
+-        var command = commands?.Command("create-story", story.Id);
+-        var title = command is { Length: > 0 }
+-            ? $"Story {story.Id}: no task plan yet — run {command}"
+-            : $"Story {story.Id}: no task plan yet";
+-        var aria = $"Story {story.Id}: no task plan yet";
+-
+-        sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(aria)}\"><path class=\"sb-seg sb-noplan\" d=\"{AnnularSector(c, rInner, rOuter, a0, a1)}\">");
+-        sb.Append($"<title>{Html(title)}</title></path></a>\n");
+-    }
+-
+-    private static void AppendStorySlot(
+-        StringBuilder sb, StoryInfo story, double angle, double sweep, double pad,
+-        double c, double storyInner, double storyOuter, double taskInner, double taskOuter, CommandCatalog? commands)
++    /// <summary>Renders a task-weighted story in the middle ring with its child deferred in the outer ring.
++    /// No task completion arcs or noplan placeholder — story size reflects task count.
++    /// [spec-sunburst-remaining-work-hierarchy]</summary>
++    private static void AppendWeightedStorySlot(
++        StringBuilder sb, StoryInfo story, FollowUpGeometry geometry,
++        double angle, double sweep, double pad,
++        double c, double storyInner, double storyOuter, double deferredInner, double deferredOuter)
+     {
+         var storyClass = StatusStyles.ForStory(story);
+         var storyHref = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
+         var storyTitle = PathUtil.StripHtmlTags(story.Title);
+         var statusNote = story.Status is { Length: > 0 } s ? $" — {s}" : string.Empty;
++        var taskNote = story.TasksTotal > 0
++            ? $", {story.TasksDone}/{story.TasksTotal} tasks"
++            : string.Empty;
+ 
+-        var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}";
++        var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}{taskNote}";
+         sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(storyAria)}\">\n");
+         sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, angle + pad, angle + sweep - pad)}\">");
+-        sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}</title></path>\n  </a>\n");
++        sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}{Html(taskNote)}</title></path>\n  </a>\n");
+ 
+-        if (story.TasksTotal > 0)
++        var children = geometry.StoryChildDeferred(story.EpicNumber, story.Id);
++        if (children.Count > 0)
+         {
+-            var doneSweep = (sweep - 2 * pad) * story.TasksDone / story.TasksTotal;
+-            if (story.TasksDone > 0)
+-            {
+-                var doneAria = $"Story {story.Id}: {story.TasksDone} of {story.TasksTotal} {Plural(story.TasksTotal, "task", "tasks")} done";
+-                sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(doneAria)}\"><path class=\"sb-seg sb-done\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad, angle + pad + doneSweep)}\">");
+-                sb.Append($"<title>Story {story.Id}: {story.TasksDone} of {story.TasksTotal} {Plural(story.TasksTotal, "task", "tasks")} done</title></path></a>\n");
+-            }
+-            if (story.TasksDone < story.TasksTotal)
++            var childSweep = (sweep - 2 * pad) / children.Count;
++            var childAngle = angle + pad;
++            foreach (var slot in children)
+             {
+-                var remainAria = $"Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining";
+-                sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(remainAria)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad + doneSweep, angle + sweep - pad)}\">");
+-                sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining</title></path></a>\n");
++                AppendDeferredItemSlot(sb, slot, childAngle, childSweep, pad, c, deferredInner, deferredOuter);
++                childAngle += childSweep;
+             }
+         }
+-        else
+-        {
+-            AppendNoPlanArc(sb, story, storyHref, c, taskInner, taskOuter, angle + pad, angle + sweep - pad, commands);
+-        }
+     }
+ 
+     private static void AppendActionItemSlot(
+@@ -530,10 +521,10 @@ public static class Charts
+                $"L {F(x3)} {F(y3)} A {F(rInner)} {F(rInner)} 0 {largeArc} 0 {F(x4)} {F(y4)} Z";
+     }
+ 
+-    /// <summary>An epic-scoped sunburst: inner ring = this epic's stories (equal weight, colored by
+-    /// status) plus attributed follow-ups (orange open / green done) and attributed direct changes,
+-    /// outer ring = task done/remaining per story where a task plan exists. Does <em>not</em> draw the
+-    /// project-level Unplanned root. [UXO E4; Story 9.7; 9.12]</summary>
++    /// <summary>An epic-scoped sunburst: inner ring = this epic's stories (task-weighted, colored by
++    /// status) plus epic-level peers (action items, attributed quick-dev, epic-only deferred),
++    /// outer ring = story-child deferred under each parent story. Does <em>not</em> draw the
++    /// project-level Unplanned root. [spec-sunburst-remaining-work-hierarchy]</summary>
+     public static string EpicSunburst(
+         EpicInfo epic,
+         Func<StoryInfo, string> hrefBuilder,
+@@ -544,20 +535,23 @@ public static class Charts
+     {
+         var geometry = (followUps ?? FollowUpGeometry.Empty).ForEpic(epic.Number);
+         var epicFollowUps = geometry.ActionItems;
+-        var epicDeferred = geometry.DeferredItems;
++        var storyIds = epic.Stories.Select(s => s.Id);
++        var epicLevelDeferred = geometry.EpicLevelDeferred(epic.Number, storyIds);
+         var epicQuickDev = (unplanned ?? UnplannedWorkGeometry.Empty).ForEpic(epic.Number);
+-        var slotCount = epic.Stories.Count + epicFollowUps.Count + epicDeferred.Count + epicQuickDev.Count;
+-        if (slotCount == 0) return "<div class=\"chart-empty\">No stories drafted for this epic yet.</div>";
++
++        int StoryWeight(StoryInfo s) => Math.Max(1, s.TasksTotal);
++        var totalWeight = epic.Stories.Sum(StoryWeight) + epicFollowUps.Count + epicLevelDeferred.Count + epicQuickDev.Count;
++        if (totalWeight == 0) return "<div class=\"chart-empty\">No stories drafted for this epic yet.</div>";
+ 
+         var hasFollowUps = geometry.HasAny;
+         var hasDirect = epicQuickDev.Count > 0;
+         var c = size / 2.0;
+         var storyInner = size * 0.16;
+         var storyOuter = size * 0.36;
+-        var taskInner = size * 0.37;
+-        var taskOuter = size * 0.46;
++        var deferredInner = size * 0.37;
++        var deferredOuter = size * 0.46;
+ 
+-        var anglePerSlot = 2 * Math.PI / slotCount;
++        var anglePerUnit = 2 * Math.PI / totalWeight;
+         const double pad = 0.012;
+ 
+         var sb = new StringBuilder();
+@@ -566,57 +560,54 @@ public static class Charts
+         var angle = -Math.PI / 2;
+         foreach (var story in epic.Stories)
+         {
+-            // Epic pages supply their own href builder (artifact path or in-page anchor).
+             var storyClass = StatusStyles.ForStory(story);
+             var href = hrefBuilder(story);
+             var storyTitle = PathUtil.StripHtmlTags(story.Title);
+             var statusNote = story.Status is { Length: > 0 } s ? $" — {s}" : string.Empty;
++            var taskNote = story.TasksTotal > 0
++                ? $", {story.TasksDone}/{story.TasksTotal} tasks"
++                : string.Empty;
++            var sw = StoryWeight(story) * anglePerUnit;
+ 
+-            var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}";
++            var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}{taskNote}";
+             sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(storyAria)}\">\n");
+-            sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, angle + pad, angle + anglePerSlot - pad)}\">");
+-            sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}</title></path>\n  </a>\n");
++            sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, angle + pad, angle + sw - pad)}\">");
++            sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}{Html(taskNote)}</title></path>\n  </a>\n");
+ 
+-            if (story.TasksTotal > 0)
++            var children = geometry.StoryChildDeferred(epic.Number, story.Id);
++            if (children.Count > 0)
+             {
+-                var doneSweep = (anglePerSlot - 2 * pad) * story.TasksDone / story.TasksTotal;
+-                if (story.TasksDone > 0)
++                var childSweep = (sw - 2 * pad) / children.Count;
++                var childAngle = angle + pad;
++                foreach (var slot in children)
+                 {
+-                    var doneAria = $"Story {story.Id}: {story.TasksDone} of {story.TasksTotal} {Plural(story.TasksTotal, "task", "tasks")} done";
+-                    sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(doneAria)}\"><path class=\"sb-seg sb-done\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad, angle + pad + doneSweep)}\">");
+-                    sb.Append($"<title>Story {story.Id}: {story.TasksDone} of {story.TasksTotal} {Plural(story.TasksTotal, "task", "tasks")} done</title></path></a>\n");
++                    AppendDeferredItemSlot(sb, slot, childAngle, childSweep, pad, c, deferredInner, deferredOuter);
++                    childAngle += childSweep;
+                 }
+-                if (story.TasksDone < story.TasksTotal)
+-                {
+-                    var remainAria = $"Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining";
+-                    sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(remainAria)}\"><path class=\"sb-seg sb-pending\" d=\"{AnnularSector(c, taskInner, taskOuter, angle + pad + doneSweep, angle + anglePerSlot - pad)}\">");
+-                    sb.Append($"<title>Story {story.Id}: {story.TasksTotal - story.TasksDone} {Plural(story.TasksTotal - story.TasksDone, "task", "tasks")} remaining</title></path></a>\n");
+-                }
+-            }
+-            else
+-            {
+-                AppendNoPlanArc(sb, story, href, c, taskInner, taskOuter, angle + pad, angle + anglePerSlot - pad, commands);
+             }
+ 
+-            angle += anglePerSlot;
++            angle += sw;
+         }
+ 
+         foreach (var item in epicFollowUps)
+         {
+-            AppendActionItemSlot(sb, item, geometry.HrefFor(item), angle, anglePerSlot, pad, c, storyInner, storyOuter);
+-            angle += anglePerSlot;
++            var slotSweep = 1.0 * anglePerUnit;
++            AppendActionItemSlot(sb, item, geometry.HrefFor(item), angle, slotSweep, pad, c, storyInner, storyOuter);
++            angle += slotSweep;
+         }
+ 
+-        foreach (var slot in epicDeferred)
++        foreach (var slot in epicLevelDeferred)
+         {
+-            AppendDeferredItemSlot(sb, slot, angle, anglePerSlot, pad, c, storyInner, storyOuter);
+-            angle += anglePerSlot;
++            var slotSweep = 1.0 * anglePerUnit;
++            AppendDeferredItemSlot(sb, slot, angle, slotSweep, pad, c, storyInner, storyOuter);
++            angle += slotSweep;
+         }
+ 
+         foreach (var qd in epicQuickDev)
+         {
+-            AppendQuickDevSlot(sb, qd, angle, anglePerSlot, pad, c, storyInner, storyOuter);
+-            angle += anglePerSlot;
++            var slotSweep = 1.0 * anglePerUnit;
++            AppendQuickDevSlot(sb, qd, angle, slotSweep, pad, c, storyInner, storyOuter);
++            angle += slotSweep;
+         }
+ 
+         var storyCount = epic.Stories.Count;
+@@ -627,17 +618,17 @@ public static class Charts
+         sb.Append(SunburstLegend(BuildSunburstLegendItems(hasFollowUps, hasDirect)));
+         if (hasFollowUps || hasDirect)
+         {
+-            var hint = "Inner ring: stories";
++            var hint = "Inner ring: stories (sized by tasks)";
+             if (hasFollowUps) hint += " &amp; follow-ups";
+             if (hasDirect) hint += " &amp; direct work";
+-            hint += " &middot; outer: task completion.";
++            hint += " &middot; outer: story-child deferred.";
+             if (hasFollowUps) hint += " Orange = open follow-up; green = done.";
+             if (hasDirect) hint += " Direct changes are one-shot work attributed to this epic.";
+             sb.Append($"<div class=\"sunburst-hint\">{hint}</div>\n\n");
+         }
+         else
+         {
+-            sb.Append("<div class=\"sunburst-hint\">Inner ring: stories &middot; outer: task completion. Click any segment to open it.</div>\n\n");
++            sb.Append("<div class=\"sunburst-hint\">Inner ring: stories (sized by tasks) &middot; outer: story-child deferred. Click any segment to open it.</div>\n\n");
+         }
+         return sb.ToString();
+     }
+diff --git a/src/SpecScribe/FollowUpGeometry.cs b/src/SpecScribe/FollowUpGeometry.cs
+index 37acd14..fbaa018 100644
+--- a/src/SpecScribe/FollowUpGeometry.cs
++++ b/src/SpecScribe/FollowUpGeometry.cs
+@@ -12,7 +12,10 @@ public sealed record FollowUpDeferredSlot(
+     /// to the parent quick-dev / story it stemmed from. [Story 9.12]</summary>
+     string? SourceKey = null,
+     /// <summary>Href to the provenance source page when resolvable (story page or quick-dev spec).</summary>
+-    string? SourceHref = null);
++    string? SourceHref = null,
++    /// <summary>Story id (<c>N.M</c>) when this deferred item stems from a story code review — used to
++    /// nest the item under its parent story in the sunburst outer ring. [spec-sunburst-remaining-work-hierarchy]</summary>
++    string? SourceStoryId = null);
+ 
+ /// <summary>Inputs for sunburst follow-up geometry (Story 9.7 / FR30). Counts for <em>open</em> items must
+ /// agree with <see cref="ProjectCounts"/> — never re-parsed from yaml/markdown at the chart layer.
+@@ -139,6 +142,23 @@ public sealed record FollowUpGeometry(
+     public IReadOnlyList<FollowUpDeferredSlot> DeferredForEpicNumber(int epicNumber) =>
+         DeferredItems.Where(s => s.EpicNumber == epicNumber).ToList();
+ 
++    /// <summary>Story-child deferred: items whose <see cref="FollowUpDeferredSlot.SourceStoryId"/> resolves to
++    /// a known story in the given epic. These render in the sunburst outer ring under their parent story's
++    /// sweep. [spec-sunburst-remaining-work-hierarchy]</summary>
++    public IReadOnlyList<FollowUpDeferredSlot> StoryChildDeferred(int epicNumber, string storyId) =>
++        DeferredItems.Where(s => s.EpicNumber == epicNumber
++            && !string.IsNullOrEmpty(s.SourceStoryId)
++            && string.Equals(s.SourceStoryId, storyId, StringComparison.Ordinal)).ToList();
++
++    /// <summary>Epic-level deferred: items attributed to the epic but NOT parented to any known story —
++    /// these remain middle-ring peers of stories. [spec-sunburst-remaining-work-hierarchy]</summary>
++    public IReadOnlyList<FollowUpDeferredSlot> EpicLevelDeferred(int epicNumber, IEnumerable<string> knownStoryIds)
++    {
++        var storySet = new HashSet<string>(knownStoryIds, StringComparer.Ordinal);
++        return DeferredItems.Where(s => s.EpicNumber == epicNumber
++            && (string.IsNullOrEmpty(s.SourceStoryId) || !storySet.Contains(s.SourceStoryId))).ToList();
++    }
++
+     public IReadOnlyList<SprintActionItem> UnattributedActionItems =>
+         ActionItems.Where(a => a.EpicNumber is null).ToList();
+ 
+@@ -214,16 +234,17 @@ public sealed record FollowUpGeometry(
+             return pairs.Select(p =>
+             {
+                 var sourceKey = p.Group.SourceKey;
+-                var epic = ResolveEpicNumber(epics, p.Group.SourceStoryId)
++                var sourceStoryId = p.Group.SourceStoryId
++                    ?? (sourceKey is not null ? FollowUpRefs.StoryIdFromKey(sourceKey) : null);
++                var epic = ResolveEpicNumber(epics, sourceStoryId)
+                     ?? ResolveEpicFromSourceKey(epics, work, sourceKey);
+-                // listHref is already link-prefixed when non-null — ApplyLinkPrefix is idempotent.
+                 var href = slugs.TryGetValue(p.Item, out var slug)
+                     ? linkPrefix + FollowUpSlug.OutputPath(slug)
+                     : ApplyLinkPrefix(linkPrefix, listHref);
+                 var sourceHref = p.Group.SourceStoryHref is { Length: > 0 } sh
+                     ? FollowUpGeometry.ApplyLinkPrefix(linkPrefix, sh)
+                     : ResolveSourceHref(work, sourceKey, linkPrefix);
+-                return new FollowUpDeferredSlot(p.Item, p.ProvenanceLabel, epic, href, sourceKey, sourceHref);
++                return new FollowUpDeferredSlot(p.Item, p.ProvenanceLabel, epic, href, sourceKey, sourceHref, sourceStoryId);
+             }).ToList();
+         }
+ 
+diff --git a/src/SpecScribe/SiteGenerator.cs b/src/SpecScribe/SiteGenerator.cs
+index 33d5b7c..caab8dc 100644
+--- a/src/SpecScribe/SiteGenerator.cs
++++ b/src/SpecScribe/SiteGenerator.cs
+@@ -1888,7 +1888,7 @@ public sealed class SiteGenerator
+             var deferredModel = ResolveDeferredModel(workForFollowUps, files);
+             var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
+             var followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
+-            var unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model);
++            var unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model, retros: _retros);
+             File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps, unplanned), "epics.html"));
+ 
+             // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
+@@ -2075,7 +2075,7 @@ public sealed class SiteGenerator
+             var work = WorkInventory.Build(docs);
+             var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
+             var followUps = BuildFollowUpGeometry(work, counts);
+-            var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
++            var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
+             var dashboardPage = HtmlTemplater.BuildIndexPage(
+                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
+                 work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned);
+@@ -2328,7 +2328,7 @@ public sealed class SiteGenerator
+         var work = WorkInventory.Build(docs);
+         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
+         var followUps = BuildFollowUpGeometry(work, counts);
+-        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
++        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
+         var dashboardPage = HtmlTemplater.BuildIndexPage(
+             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
+             work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned);
+@@ -2501,7 +2501,7 @@ public sealed class SiteGenerator
+         // Incremental paths may call WriteIndex without going through GenerateAll's ledger build — rebuild then.
+         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
+         var followUps = BuildFollowUpGeometry(inventory, counts);
+-        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel);
++        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
+         var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned);
+         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
+     }
+@@ -2634,7 +2634,7 @@ public sealed class SiteGenerator
+         var work = WorkInventory.Build(_docs.Values.ToList());
+         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
+         var followUps = BuildFollowUpGeometry(work, counts);
+-        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
++        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
+         var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, counts, unplanned);
+         WriteOutput(SiteNav.SprintOutputPath, ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
+     }
+@@ -2817,7 +2817,7 @@ public sealed class SiteGenerator
+             _progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
+         var deferredModel = TryParseDeferredWork(inventory);
+         var followUps = BuildFollowUpGeometry(inventory, counts, deferredModel);
+-        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel);
++        var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
+         var groups = FollowUpGroupPages.Enumerate(followUps, unplanned, _epicsModel);
+         if (groups.Count == 0) return;
+ 
+@@ -2841,11 +2841,11 @@ public sealed class SiteGenerator
+             _progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
+         var deferredModel = TryParseDeferredWork(work);
+         var followUps = BuildFollowUpGeometry(work, counts, deferredModel);
+-        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel);
++        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
+ 
+         foreach (var doc in _docs.Values)
+         {
+-            var chrome = BuildQuickDevChrome(doc, followUps, unplanned, _epicsModel);
++            var chrome = BuildQuickDevChrome(doc, followUps, unplanned, _epicsModel, _retros);
+             if (chrome is null) continue;
+             var outputRelative = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
+             WriteOutput(outputRelative, ApplyReferenceLinks(
+@@ -2858,7 +2858,8 @@ public sealed class SiteGenerator
+         DocModel doc,
+         FollowUpGeometry followUps,
+         UnplannedWorkGeometry unplanned,
+-        EpicsModel? epics)
++        EpicsModel? epics,
++        IReadOnlyList<RetroModel>? retros = null)
+     {
+         var norm = PathUtil.NormalizeSlashes(doc.SourceRelativePath);
+         if (!BmadArtifactAdapter.IsUnderImplementationArtifacts(norm)) return null;
+@@ -2875,7 +2876,7 @@ public sealed class SiteGenerator
+ 
+         var entry = new QuickDevEntry(
+             doc.Title, output, doc.Frontmatter.Status, doc.Frontmatter.Type, doc.Frontmatter.AuthoredDay());
+-        var epicNum = UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, followUps);
++        var epicNum = UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, followUps, retros);
+ 
+         var deferredListHref = followUps.DeferredHref is { Length: > 0 } dh
+             ? FollowUpGeometry.ApplyLinkPrefix(prefix, dh)
+diff --git a/src/SpecScribe/UnplannedWorkGeometry.cs b/src/SpecScribe/UnplannedWorkGeometry.cs
+index f3233b1..82b2d38 100644
+--- a/src/SpecScribe/UnplannedWorkGeometry.cs
++++ b/src/SpecScribe/UnplannedWorkGeometry.cs
+@@ -99,7 +99,8 @@ public sealed record UnplannedWorkGeometry(
+         WorkInventory work,
+         FollowUpGeometry followUps,
+         EpicsModel? epics = null,
+-        string linkPrefix = "")
++        string linkPrefix = "",
++        IReadOnlyList<RetroModel>? retros = null)
+     {
+         var unattributedDeferred = followUps.UnattributedDeferredItems
+             .Select(s => s with { DetailHref = FollowUpGeometry.ApplyLinkPrefix(linkPrefix, s.DetailHref) })
+@@ -117,7 +118,7 @@ public sealed record UnplannedWorkGeometry(
+             .Where(q => IsOpenQuickDev(q.Status) || residualSourceKeys.Contains(FollowUpGeometry.NormalizeSourceKey(Path.GetFileNameWithoutExtension(q.OutputPath))))
+             .Select(q =>
+             {
+-                var epic = ResolveQuickDevEpic(q, epics, followUps);
++                var epic = ResolveQuickDevEpic(q, epics, followUps, retros);
+                 var href = FollowUpGeometry.ApplyLinkPrefix(linkPrefix, q.OutputPath);
+                 return new UnplannedQuickDevSlot(q, epic, href);
+             })
+@@ -136,12 +137,15 @@ public sealed record UnplannedWorkGeometry(
+         @"\(([^)]+)\)", RegexOptions.Compiled);
+ 
+     /// <summary>Best-effort epic attribution: text heuristics first (title, filename, deferred cue that
+-    /// names this <c>spec-*</c>); then unique timing from authored frontmatter date vs deferred
+-    /// story-review dates under one epic. Multi-epic ties → null (leave Unplanned). No new schema.</summary>
++    /// names this <c>spec-*</c>); then unique timing from authored frontmatter date vs retro
++    /// <see cref="RetroModel.DateText"/> and/or story <see cref="StoryInfo.LastUpdatedDate"/> under one
++    /// epic; then fallback to deferred review dates. Multi-epic ties → null (leave Unplanned). No new
++    /// schema. [spec-sunburst-remaining-work-hierarchy]</summary>
+     public static int? ResolveQuickDevEpic(
+         QuickDevEntry entry,
+         EpicsModel? epics,
+-        FollowUpGeometry? followUps = null)
++        FollowUpGeometry? followUps = null,
++        IReadOnlyList<RetroModel>? retros = null)
+     {
+         if (epics is null) return null;
+ 
+@@ -188,9 +192,17 @@ public sealed record UnplannedWorkGeometry(
+             if (cueHits.Count > 1) return null;
+         }
+ 
++        // Date-based attribution: unique-day match AuthoredDate to retro DateText or story LastUpdatedDate
++        // under exactly one epic. [spec-sunburst-remaining-work-hierarchy]
++        if (entry.AuthoredDate is { } authored)
++        {
++            var dateHit = ResolveEpicByDateMatch(authored, epics, retros);
++            if (dateHit is not null) return dateHit;
++        }
++
+         // Last: unique same-day timing vs story-keyed deferred reviews — only when this quick-dev
+         // already has residual deferred naming it (avoids same-day coincidence false parents).
+-        if (entry.AuthoredDate is { } authored && followUps is not null)
++        if (entry.AuthoredDate is { } authored2 && followUps is not null)
+         {
+             var stem = Path.GetFileNameWithoutExtension(entry.OutputPath);
+             var named = followUps.DeferredItems.Any(s =>
+@@ -200,12 +212,51 @@ public sealed record UnplannedWorkGeometry(
+                     FollowUpGeometry.NormalizeSourceKey(stem),
+                     StringComparison.OrdinalIgnoreCase));
+             if (named)
+-                return ResolveEpicByTiming(authored, followUps, epicNumbers);
++                return ResolveEpicByTiming(authored2, followUps, epicNumbers);
+         }
+ 
+         return null;
+     }
+ 
++    /// <summary>Unique-day match: checks <paramref name="authored"/> against each epic's retro
++    /// <see cref="RetroModel.DateText"/> and against story <see cref="StoryInfo.LastUpdatedDate"/> values.
++    /// Returns the epic number only when exactly one epic matches; ties → null.
++    /// [spec-sunburst-remaining-work-hierarchy]</summary>
++    private static int? ResolveEpicByDateMatch(
++        DateOnly authored,
++        EpicsModel epics,
++        IReadOnlyList<RetroModel>? retros)
++    {
++        var hits = new HashSet<int>();
++
++        // Match against retro DateText per epic.
++        if (retros is { Count: > 0 })
++        {
++            foreach (var retro in retros)
++            {
++                if (retro.DateText is not { Length: > 0 } dt) continue;
++                if (!PortalDates.TryParseDay(dt, out var retroDay)) continue;
++                if (retroDay == authored)
++                    hits.Add(retro.EpicNumber);
++            }
++        }
++
++        // Match against story LastUpdatedDate — group by owning epic.
++        foreach (var epic in epics.Epics)
++        {
++            foreach (var story in epic.Stories)
++            {
++                if (story.LastUpdatedDate == authored)
++                {
++                    hits.Add(epic.Number);
++                    break;
++                }
++            }
++        }
++
++        return hits.Count == 1 ? hits.First() : null;
++    }
++
+     /// <summary>When the quick-dev's authored day uniquely matches deferred story-review dates under
+     /// exactly one epic, attribute there. Two+ epics on that day → null (do not guess).</summary>
+     private static int? ResolveEpicByTiming(
+diff --git a/tests/SpecScribe.Tests/ChartsTests.cs b/tests/SpecScribe.Tests/ChartsTests.cs
+index b77ba7a..9c3739e 100644
+--- a/tests/SpecScribe.Tests/ChartsTests.cs
++++ b/tests/SpecScribe.Tests/ChartsTests.cs
+@@ -61,10 +61,11 @@ public class ChartsTests
+ 
+         // Epic + story segment <a>s carry a descriptive aria-label (keyboard/SR name)...
+         Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story\"", svg);
+-        Assert.Contains("aria-label=\"Story 1.1: Do the thing — in progress\"", svg);
+-        // ...the task ring links are named too...
+-        Assert.Contains("aria-label=\"Story 1.1: 2 of 5 tasks done\"", svg);
+-        Assert.Contains("aria-label=\"Story 1.1: 3 tasks remaining\"", svg);
++        // Story now includes task count in the aria-label (no separate task ring).
++        Assert.Contains("aria-label=\"Story 1.1: Do the thing — in progress, 2/5 tasks\"", svg);
++        // No task ring arcs — removed per spec-sunburst-remaining-work-hierarchy.
++        Assert.DoesNotContain("tasks done\"", svg);
++        Assert.DoesNotContain("tasks remaining\"", svg);
+         // ...and the pointer-only <title> tooltips are still present (both paths retained).
+         Assert.Contains("<title>Epic 1: First Epic", svg);
+         Assert.Contains("<title>Story 1.1: Do the thing", svg);
+@@ -258,11 +259,10 @@ public class ChartsTests
+ 
+         var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+ 
+-        Assert.Contains("aria-label=\"Story 1.1: A story — done\"", svg);
+-        Assert.Contains("aria-label=\"Story 1.1: 3 of 3 tasks done\"", svg);
+-        Assert.Contains("role=\"img\"", svg); // whole-chart name retained
+-        // Center headlines the epic's story count (singular here), never a task fraction, even when tasks
+-        // exist — the outer ring already conveys task completion. [epic-sunburst story-count]
++        // Story aria now includes task count (no separate task ring).
++        Assert.Contains("aria-label=\"Story 1.1: A story — done, 3/3 tasks\"", svg);
++        Assert.DoesNotContain("tasks done\"", svg);
++        Assert.Contains("role=\"img\"", svg);
+         Assert.Contains(">1</text>", svg);
+         Assert.Contains(">story</text>", svg);
+         Assert.DoesNotContain(">tasks</text>", svg);
+@@ -275,10 +275,10 @@ public class ChartsTests
+     });
+ 
+     [Fact]
+-    public void Sunburst_UnplannedStoryGetsDashedPlaceholderArcWithCreateStoryCta()
++    public void Sunburst_TaskWeighting_LargerStoryTakesMoreAngularSpace()
+     {
+-        // A story with a plan and one without: only the unplanned one gets the dashed placeholder arc, and
+-        // its tooltip names the module's create-story command for that id. [Story 2.1 UXO E4]
++        // Story with TasksTotal=5 should take more space than one with TasksTotal=0 (weighted by max(1, TasksTotal)).
++        // No task fringe or noplan arcs rendered — spec-sunburst-remaining-work-hierarchy.
+         var model = new EpicsModel
+         {
+             OverviewHtml = string.Empty,
+@@ -288,16 +288,17 @@ public class ChartsTests
+ 
+         var svg = Charts.Sunburst(model, commands: Catalog());
+ 
+-        // The placeholder arc exists, is a real link, and carries the call-to-action tooltip + aria fallback.
+-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
+-        Assert.Contains("<title>Story 1.2: no task plan yet — run /bmad-create-story 1.2</title>", svg);
+-        Assert.Contains("aria-label=\"Story 1.2: no task plan yet\"", svg);
+-        // The planned story keeps its real task ring, not a placeholder.
+-        Assert.Contains("aria-label=\"Story 1.1: 2 of 5 tasks done\"", svg);
++        // No task fringe (no sb-noplan, no sb-done/sb-pending task arcs).
++        Assert.DoesNotContain("class=\"sb-seg sb-noplan\"", svg);
++        Assert.DoesNotContain("tasks done\"", svg);
++        Assert.DoesNotContain("tasks remaining\"", svg);
++        // Both stories render in the middle ring with task counts in their aria-labels.
++        Assert.Contains("aria-label=\"Story 1.1: Planned — in progress, 2/5 tasks\"", svg);
++        Assert.Contains("aria-label=\"Story 1.2: Unplanned — ready\"", svg);
+     }
+ 
+     [Fact]
+-    public void Sunburst_PlaceholderOmitsCommandWhenModuleLacksIt()
++    public void Sunburst_NoTaskFringe_EmptyTaskStory()
+     {
+         var model = new EpicsModel
+         {
+@@ -306,24 +307,22 @@ public class ChartsTests
+             Epics = new[] { Epic(Story("1.1", "Unplanned", "ready", 0, 0)) },
+         };
+ 
+-        // No catalog → no command is invented; the placeholder still reads as a next action, just unnamed.
+         var svg = Charts.Sunburst(model);
+ 
+-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
+-        Assert.Contains("<title>Story 1.1: no task plan yet</title>", svg);
+-        Assert.DoesNotContain("run /", svg);
++        // No noplan arc, no task fringe — spec-sunburst-remaining-work-hierarchy.
++        Assert.DoesNotContain("class=\"sb-seg sb-noplan\"", svg);
++        Assert.DoesNotContain("no task plan yet", svg);
+     }
+ 
+     [Fact]
+-    public void EpicSunburst_UnplannedStoryGetsDashedPlaceholderArc()
++    public void EpicSunburst_NoTaskFringe_EmptyTaskStory()
+     {
+         var epic = Epic(Story("1.1", "Unplanned", "ready", 0, 0));
+ 
+         var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", commands: Catalog());
+ 
+-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
+-        Assert.Contains("<title>Story 1.1: no task plan yet — run /bmad-create-story 1.1</title>", svg);
+-        // The story segment itself stays a real link (the placeholder doesn't replace navigation).
++        Assert.DoesNotContain("class=\"sb-seg sb-noplan\"", svg);
++        Assert.DoesNotContain("no task plan yet", svg);
+         Assert.Contains("aria-label=\"Story 1.1: Unplanned — ready\"", svg);
+     }
+ 
+@@ -400,13 +399,13 @@ public class ChartsTests
+         Assert.Contains("aria-label=\"Unplanned:", svg);
+         Assert.DoesNotContain("outermost: open follow-ups", svg);
+         Assert.Contains("Open follow-up</span>", svg);
+-        Assert.Contains("stories &amp; follow-ups", svg);
++        Assert.Contains("stories (sized by tasks) &amp; follow-ups", svg);
+         // Per-item detail hrefs (Story 9.11) on action wedges.
+         Assert.Contains("href=\"follow-ups/action-", svg);
+         Assert.Contains("href=\"follow-ups/action-fix-the-heatmap-debt", svg);
+         Assert.Contains("href=\"follow-ups/deferred-", svg);
+-        // Epic 1 aria mentions its follow-ups (action + two deferred).
+-        Assert.Contains("3 follow-ups", svg);
++        // Epic 1 aria mentions its follow-ups (action items only; story-child deferred are in the outer ring).
++        Assert.Contains("1 follow-up", svg);
+         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
+         {
+             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
+@@ -485,7 +484,7 @@ public class ChartsTests
+         Assert.Single(geometry.DeferredForEpicNumber(3));
+ 
+         var svg = Charts.Sunburst(model, followUps: geometry);
+-        Assert.Contains("1 follow-up", svg);
++        // Story-child deferred renders in the outer ring under story 3.8, not as an epic peer.
+         Assert.Contains("Deferred item: Commit body containing a literal 0x1F", svg);
+         Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
+     }
+@@ -1997,4 +1996,138 @@ public class ChartsTests
+         }
+         return count;
+     }
++
++    [Fact]
++    public void Sunburst_NoTaskArcs_TaskWeightedStories()
++    {
++        // I/O matrix: Story with TasksTotal=12 beside TasksTotal=0 peer — larger story takes ~12x angular
++        // weight vs max(1,0)=1 for empty; no task fringe renders. [spec-sunburst-remaining-work-hierarchy]
++        var model = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[] { Epic(Story("1.1", "Big story", "active", 6, 12), Story("1.2", "Small story", "ready", 0, 0)) },
++        };
++
++        var svg = Charts.Sunburst(model);
++
++        Assert.DoesNotContain("sb-noplan", svg);
++        Assert.DoesNotContain("tasks done", svg);
++        Assert.DoesNotContain("tasks remaining", svg);
++        Assert.Contains("aria-label=\"Story 1.1: Big story — active, 6/12 tasks\"", svg);
++        Assert.Contains("aria-label=\"Story 1.2: Small story — ready\"", svg);
++    }
++
++    [Fact]
++    public void Sunburst_StoryChildDeferred_NestsUnderParentStory()
++    {
++        // I/O matrix: deferred with SourceStoryId → story renders as outer-ring child under that story's sweep.
++        var model = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[] { Epic(Story("1.1", "Do the thing", "active", 2, 4)) },
++        };
++        var deferredMarkdown = """
++            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
++
++            - Story-child deferred item from code review.
++            """;
++        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
++        var work = new WorkInventory
++        {
++            QuickDev = Array.Empty<QuickDevEntry>(),
++            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
++        };
++        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
++        var geometry = FollowUpGeometry.From(
++            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
++
++        Assert.Equal("1.1", geometry.StoryChildDeferred(1, "1.1")[0].SourceStoryId);
++
++        var svg = Charts.Sunburst(model, followUps: geometry);
++
++        Assert.Contains("Deferred item: Story-child deferred item from code review.", svg);
++        // Story-child deferred is not counted as an epic follow-up in the epic's aria note.
++        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story\"", svg);
++    }
++
++    [Fact]
++    public void Sunburst_RetroActionItems_AsEpicMiddlePeers()
++    {
++        // I/O matrix: retro action item with epic:N appears as epic-level middle child, not under a story.
++        var model = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[] { Epic(Story("1.1", "Do the thing", "active", 1, 2)) },
++        };
++        var items = new[]
++        {
++            new SprintActionItem("Retro action", "open", EpicNumber: 1, Owner: "Alice"),
++        };
++        var work = new WorkInventory
++        {
++            QuickDev = Array.Empty<QuickDevEntry>(),
++            Deferred = null,
++        };
++        var counts = ProjectCounts.Empty with { OpenActionItems = 1 };
++        var geometry = FollowUpGeometry.From(items, counts, work, epics: model);
++
++        var svg = Charts.Sunburst(model, followUps: geometry);
++
++        Assert.Contains("aria-label=\"Action item: Retro action\"", svg);
++        Assert.Contains("1 follow-up", svg);
++    }
++
++    [Fact]
++    public void EpicSunburst_StoryChildDeferred_InOuterRing()
++    {
++        // Same nesting rules apply on the epic detail sunburst. [spec-sunburst-remaining-work-hierarchy]
++        var epic = Epic(Story("1.1", "Story A", "active", 2, 4));
++        var deferredMarkdown = """
++            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
++
++            - Story-child deferred for epic sunburst.
++            """;
++        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
++        var work = new WorkInventory
++        {
++            QuickDev = Array.Empty<QuickDevEntry>(),
++            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
++        };
++        var model = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[] { epic },
++        };
++        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
++        var geometry = FollowUpGeometry.From(
++            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
++
++        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", followUps: geometry);
++
++        Assert.Contains("Deferred item: Story-child deferred for epic sunburst.", svg);
++        Assert.DoesNotContain("sb-noplan", svg);
++        Assert.DoesNotContain("tasks done", svg);
++        Assert.Contains("sized by tasks", svg);
++    }
++
++    [Fact]
++    public void Sunburst_EmptyDeferredChildren_NoOuterFringe()
++    {
++        // NFR8: when a story has no nested deferred, no outer fringe on that sweep.
++        var model = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[] { Epic(Story("1.1", "Clean story", "done", 3, 3)) },
++        };
++
++        var svg = Charts.Sunburst(model);
++
++        Assert.DoesNotContain("sb-followup-open", svg);
++        Assert.DoesNotContain("Deferred item", svg);
++    }
+ }
+diff --git a/tests/SpecScribe.Tests/FollowUpSurfacesTests.cs b/tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
+index 06752f0..545e2c3 100644
+--- a/tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
++++ b/tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
+@@ -436,7 +436,7 @@ public class FollowUpSurfacesTests : IDisposable
+ 
+         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+         Assert.Contains("sb-followup-open", index);
+-        Assert.Contains("stories &amp; follow-ups", index);
++        Assert.Contains("stories (sized by tasks) &amp; follow-ups", index);
+         Assert.DoesNotContain("outermost: open follow-ups", index);
+         Assert.Contains("href=\"follow-ups/action-", index);
+         Assert.Contains("Open follow-up</span>", index);
+diff --git a/tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs b/tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+index 6dbe93d..6538854 100644
+--- a/tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
++++ b/tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+@@ -454,7 +454,11 @@ public class SiteGeneratorAdapterTests : IDisposable
+         // Regenerated for follow-up list column polish: .followup-group-wrap gains the shared 1040px
+         // content column (+ header alignment) so group pages no longer stretch edge-to-edge; row meta
+         // clustered in .followup-row-meta. [follow-up list UX]
+-        const string expected = "691ae3dccc71529559b5fc889f51c8731778d98b0921685b7e4b000b40d4cb43";
++        // Regenerated for spec-sunburst-remaining-work-hierarchy: removed task/noplan outer wedges from
++        // project + epic sunbursts; weight story middle wedges by max(1, TasksTotal); nest story-child
++        // deferred under parent stories (outer ring); date-based quick-dev epic attribution via retro
++        // DateText and story LastUpdatedDate. [spec-sunburst-remaining-work-hierarchy]
++        const string expected = "f1c87d0cc47c43aaf50dc427e1833fb0151a92b9e8af65b0fc79f29ca953e0c8";
+         Assert.True(
+             expected == fingerprint,
+             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
+diff --git a/tests/SpecScribe.Tests/UnplannedWorkGeometryTests.cs b/tests/SpecScribe.Tests/UnplannedWorkGeometryTests.cs
+index 3aec3ad..afcd57b 100644
+--- a/tests/SpecScribe.Tests/UnplannedWorkGeometryTests.cs
++++ b/tests/SpecScribe.Tests/UnplannedWorkGeometryTests.cs
+@@ -438,4 +438,176 @@ public class UnplannedWorkGeometryTests
+         Assert.Equal(new DateOnly(2026, 7, 5), new Frontmatter { Created = "2026-07-05T00:00:00Z" }.AuthoredDay());
+         Assert.Null(Frontmatter.Empty.AuthoredDay());
+     }
++
++    [Fact]
++    public void ResolveQuickDevEpic_DateMatch_RetroDateText_UniqueSingleEpic()
++    {
++        // AuthoredDate uniquely matches one epic's retro DateText → attribute to that epic.
++        var epics = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[]
++            {
++                new EpicInfo
++                {
++                    Number = 1, Title = "One", GoalHtml = string.Empty,
++                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
++                    Stories = Array.Empty<StoryInfo>(),
++                },
++                new EpicInfo
++                {
++                    Number = 2, Title = "Two", GoalHtml = string.Empty,
++                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
++                    Stories = Array.Empty<StoryInfo>(),
++                },
++            },
++        };
++        var retros = new[]
++        {
++            new RetroModel
++            {
++                EpicNumber = 1, Title = "Retro", DateText = "2026-07-10",
++                Participants = Array.Empty<string>(), BodyHtml = string.Empty,
++                SourceRelativePath = "x.md", OutputRelativePath = "x.html",
++            },
++        };
++
++        var entry = new QuickDevEntry("No text cue", "spec-mystery.html", "ready", null, new DateOnly(2026, 7, 10));
++        Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: retros));
++    }
++
++    [Fact]
++    public void ResolveQuickDevEpic_DateMatch_StoryLastUpdatedDate_UniqueSingleEpic()
++    {
++        // AuthoredDate uniquely matches one story's LastUpdatedDate under one epic → attribute.
++        var story = new StoryInfo
++        {
++            Id = "2.1", EpicNumber = 2, Title = "Ship",
++            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
++            LastUpdatedDate = new DateOnly(2026, 7, 12),
++        };
++        var epics = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[]
++            {
++                new EpicInfo
++                {
++                    Number = 1, Title = "One", GoalHtml = string.Empty,
++                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
++                    Stories = Array.Empty<StoryInfo>(),
++                },
++                new EpicInfo
++                {
++                    Number = 2, Title = "Two", GoalHtml = string.Empty,
++                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
++                    Stories = new[] { story },
++                },
++            },
++        };
++
++        var entry = new QuickDevEntry("No text cue", "spec-other.html", "ready", null, new DateOnly(2026, 7, 12));
++        Assert.Equal(2, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: null));
++    }
++
++    [Fact]
++    public void ResolveQuickDevEpic_DateMatch_MultiEpicTie_StaysNull()
++    {
++        // Ambiguous multi-epic date tie → null (never guess). [spec-sunburst-remaining-work-hierarchy]
++        var epics = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[]
++            {
++                new EpicInfo
++                {
++                    Number = 1, Title = "One", GoalHtml = string.Empty,
++                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
++                    Stories = new[]
++                    {
++                        new StoryInfo
++                        {
++                            Id = "1.1", EpicNumber = 1, Title = "A",
++                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
++                            LastUpdatedDate = new DateOnly(2026, 7, 10),
++                        },
++                    },
++                },
++                new EpicInfo
++                {
++                    Number = 2, Title = "Two", GoalHtml = string.Empty,
++                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
++                    Stories = new[]
++                    {
++                        new StoryInfo
++                        {
++                            Id = "2.1", EpicNumber = 2, Title = "B",
++                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
++                            LastUpdatedDate = new DateOnly(2026, 7, 10),
++                        },
++                    },
++                },
++            },
++        };
++
++        var entry = new QuickDevEntry("No text cue", "spec-orphan.html", "ready", null, new DateOnly(2026, 7, 10));
++        Assert.Null(UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: null));
++    }
++
++    [Fact]
++    public void ResolveQuickDevEpic_TextCues_TakePrecedence_OverDateMatch()
++    {
++        // Text/filename/story-mention cues preferred over date heuristics.
++        var epics = new EpicsModel
++        {
++            OverviewHtml = string.Empty,
++            RequirementsInventoryHtml = string.Empty,
++            Epics = new[]
++            {
++                new EpicInfo
++                {
++                    Number = 1, Title = "One", GoalHtml = string.Empty,
++                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
++                    Stories = new[]
++                    {
++                        new StoryInfo
++                        {
++                            Id = "1.1", EpicNumber = 1, Title = "A",
++                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
++                            LastUpdatedDate = new DateOnly(2026, 7, 10),
++                        },
++                    },
++                },
++                new EpicInfo
++                {
++                    Number = 2, Title = "Two", GoalHtml = string.Empty,
++                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
++                    Stories = new[]
++                    {
++                        new StoryInfo
++                        {
++                            Id = "2.1", EpicNumber = 2, Title = "B",
++                            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
++                        },
++                    },
++                },
++            },
++        };
++        var retros = new[]
++        {
++            new RetroModel
++            {
++                EpicNumber = 2, Title = "Retro 2", DateText = "2026-07-10",
++                Participants = Array.Empty<string>(), BodyHtml = string.Empty,
++                SourceRelativePath = "x.md", OutputRelativePath = "x.html",
++            },
++        };
++
++        // Title names "Epic 1" explicitly — text cue wins over date match to epic 2's retro.
++        var entry = new QuickDevEntry("Epic 1 cleanup", "spec-cleanup.html", "ready", null, new DateOnly(2026, 7, 10));
++        Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: retros));
++    }
+ }

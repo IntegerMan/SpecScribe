@@ -5601,11 +5601,12 @@ body:has(main.followup-detail) .doc-header {
 }
 .action-items-group a { color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); }
 .action-items-group a:hover { color: var(--rust); }
-.action-item-cross { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; border-bottom: 1px dotted var(--border); display: inline-block; margin-top: 0.35rem; }
-a.action-item-cross { color: var(--teal); border-bottom-color: var(--gold-light); }
+.action-item-cross { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; display: inline-block; margin-top: 0.35rem; }
+a.action-item-cross { color: var(--teal); border-bottom: 1px dotted var(--gold-light); }
 a.action-item-cross:hover { color: var(--rust); }
-.action-item-deferred { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; border-bottom: 1px dotted var(--border); display: inline-block; margin-top: 0.35rem; margin-left: 0.5rem; }
-.action-item-deferred:hover { color: var(--rust); }
+.action-item-deferred { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; display: inline-block; margin-top: 0.35rem; margin-left: 0.5rem; }
+a.action-item-deferred { color: var(--teal); border-bottom: 1px dotted var(--gold-light); }
+a.action-item-deferred:hover { color: var(--rust); }
 .action-item-resolve { margin-top: 0.5rem; }
 
 /* Deferred-work structured groups — sibling of action-items (Story 9.6). */
@@ -5620,7 +5621,8 @@ a.action-item-cross:hover { color: var(--rust); }
   font-size: 0.85rem; color: var(--ink-light); font-weight: 700;
   display: inline-block; margin-top: 0.35rem;
 }
-.deferred-item-resolving { font-size: 0.78rem; color: var(--teal); text-decoration: none; border-bottom: 1px dotted var(--gold-light); display: inline-block; margin-top: 0.35rem; }
+.deferred-item-resolving { font-size: 0.78rem; color: var(--ink-light); text-decoration: none; display: inline-block; margin-top: 0.35rem; }
+a.deferred-item-resolving { color: var(--teal); border-bottom: 1px dotted var(--gold-light); }
 a.deferred-item-resolving:hover { color: var(--rust); }
 .deferred-item-body { color: var(--ink); font-size: 0.92rem; line-height: 1.5; }
 .deferred-item-body > :first-child { margin-top: 0; }
