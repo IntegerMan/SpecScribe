@@ -121,7 +121,8 @@ public static class EpicsParser
     // Newest-first Change Log row in list/table form with bold or plain action:
     // "- 2026-07-11 — **Code review passed…**", "- 2026-07-11: Code review passed…",
     // or "| 2026-07-11 | Code review passed… |". Distinct from Story 8.8's max-date scan — the evidence
-    // strip wants the first parseable entry + whether its action reads as verification. [Story 9.4]
+    // strip wants the top dated-shape entry (abort if that date is unparseable) + whether its action
+    // reads as verification. [Story 9.4]
     private static readonly Regex ChangeLogTopEntry = new(
         @"^\s*(?:[-*]\s+|\|\s*)(?<date>\d{4}-\d{2}-\d{2})\b(?:\s*\|\s*|\s+[—–-]\s+|\s*:\s*)(?:\*\*(?<bold>[^*]+)\*\*|(?<plain>.*?))(?:\s*\|)?\s*$",
         RegexOptions.Compiled);
@@ -162,9 +163,10 @@ public static class EpicsParser
 
     /// <summary>Top (newest-first) Change Log entry shaped <c>- YYYY-MM-dd — **action**</c>, with a flag for
     /// whether the action text reads as verification/review/done and the raw action for the visible
-    /// "Latest change" cue. Returns null when the section or a matching dated entry is absent; malformed
-    /// dates degrade to null (never throws). Distinct from <see cref="ExtractLatestChangeLogDate"/>
-    /// (Story 8.8 max-date across table/list forms). [Story 9.4]</summary>
+    /// "Latest change" cue. Returns null when the section or a matching dated entry is absent; the first
+    /// dated-shape row with an unparseable calendar date also returns null (do not skip to a later row).
+    /// Never throws. Distinct from <see cref="ExtractLatestChangeLogDate"/> (Story 8.8 max-date across
+    /// table/list forms). [Story 9.4]</summary>
     public static (DateOnly Date, bool IsVerification, string Action)? ExtractChangeLogVerification(string? raw)
     {
         if (raw is null) return null;
@@ -182,7 +184,8 @@ public static class EpicsParser
             if (!DateOnly.TryParseExact(m.Groups["date"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
                     DateTimeStyles.None, out var date))
             {
-                continue; // malformed row → skip to a later parseable row
+                // First dated-shape match is the "top" entry — bad calendar → no verified/updated pill.
+                return null;
             }
             var action = (m.Groups["bold"].Success ? m.Groups["bold"].Value : m.Groups["plain"].Value)
                 .Trim()
@@ -287,13 +290,17 @@ public static class EpicsParser
 
     private static readonly Regex DevAgentSubHeading = new(@"^### (.+)$", RegexOptions.Compiled);
 
-    /// <summary>Pulls the "## Dev Agent Record" section's subsections (Agent Model Used, Debug Log
+    /// <summary>Pulls the Dev Agent Record section's subsections (Agent Model Used, Debug Log
     /// References, Completion Notes List, File List) into label/content pairs for a compact table,
-    /// instead of four mostly-empty headings buried at the bottom of the page.</summary>
+    /// instead of four mostly-empty headings buried at the bottom of the page. Accepts
+    /// <c>## Dev Agent Record</c> or <c>### Dev Agent Record</c> (same heading order as
+    /// <see cref="ExtractTestEvidence"/>).</summary>
     public static IReadOnlyList<(string Label, string ContentHtml)> ExtractDevAgentRecord(string raw)
     {
         var lines = raw.Replace("\r\n", "\n").Split('\n');
         var headingIdx = Array.FindIndex(lines, l => l.TrimEnd() == "## Dev Agent Record");
+        if (headingIdx < 0)
+            headingIdx = Array.FindIndex(lines, l => l.TrimEnd() == "### Dev Agent Record");
         if (headingIdx < 0) return Array.Empty<(string, string)>();
 
         var sectionEnd = lines.Length;

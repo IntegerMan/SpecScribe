@@ -38,10 +38,24 @@ public static partial class CollapsibleSections
     [GeneratedRegex(@"\s*\bid=""[^""]*""", RegexOptions.None)]
     private static partial Regex IdAttribute();
 
-    /// <summary>Wraps every H2 whose Markdig auto-id is in <paramref name="headingSlugs"/> in a
-    /// collapsed <c>&lt;details class="collapsible-section"&gt;</c>, keeping the H2 (with its id) inside
-    /// the always-visible <c>&lt;summary&gt;</c> and stripping ids from buried h3+ headings. Returns
-    /// <paramref name="remainderHtml"/> unchanged when nothing matches (NFR8 degrade-to-absent).</summary>
+    // Markdig AutoIdentifier collision form: base + "-" + decimal counter (references → references-1).
+    [GeneratedRegex(@"-\d+$")]
+    private static partial Regex MarkdigCollisionSuffix();
+
+    /// <summary>Strips a trailing Markdig collision suffix (<c>-N</c>) for slug-set membership only.
+    /// Raw id stays on the heading / details so anchors remain unique.</summary>
+    internal static string BaseSlugForMatch(string slug)
+    {
+        var m = MarkdigCollisionSuffix().Match(slug);
+        return m.Success ? slug[..m.Index] : slug;
+    }
+
+    /// <summary>Wraps every H2 whose Markdig auto-id (or Markdig collision form of that id, e.g.
+    /// <c>references-1</c>) is in <paramref name="headingSlugs"/> in a collapsed
+    /// <c>&lt;details class="collapsible-section"&gt;</c>, keeping the H2 (with its raw id) inside
+    /// the always-visible <c>&lt;summary&gt;</c> and stripping ids from buried h3+ headings.
+    /// <paramref name="headingSlugs"/> must list base slugs only (no <c>-N</c> collision forms).
+    /// Returns <paramref name="remainderHtml"/> unchanged when nothing matches (NFR8 degrade-to-absent).</summary>
     public static string WrapSections(string remainderHtml, IReadOnlySet<string> headingSlugs)
     {
         if (string.IsNullOrEmpty(remainderHtml) || headingSlugs.Count == 0)
@@ -57,7 +71,7 @@ public static partial class CollapsibleSections
         foreach (Match m in matches)
         {
             var slug = m.Groups["id"].Value;
-            if (!headingSlugs.Contains(slug)) continue;
+            if (!headingSlugs.Contains(BaseSlugForMatch(slug))) continue;
 
             var afterHeading = m.Index + m.Length;
             var nextH2 = H2Open().Match(remainderHtml, afterHeading);

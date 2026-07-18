@@ -508,7 +508,7 @@ public class EpicsParserTests
         => Assert.Null(EpicsParser.ExtractChangeLogVerification("# Story 1.1\nNo change log.\n"));
 
     [Fact]
-    public void ExtractChangeLogVerification_SkipsMalformedDate()
+    public void ExtractChangeLogVerification_MalformedTopDateReturnsNull()
     {
         var raw = """
             # Story 1.1
@@ -516,9 +516,7 @@ public class EpicsParserTests
             - 2026-13-99 — **Code review passed.**
             - 2026-07-09 — **Verified generated output.**
             """;
-        var result = EpicsParser.ExtractChangeLogVerification(raw);
-        Assert.NotNull(result);
-        Assert.Equal(new DateOnly(2026, 7, 9), result!.Value.Date);
+        Assert.Null(EpicsParser.ExtractChangeLogVerification(raw));
     }
 
     [Fact]
@@ -697,5 +695,24 @@ public class EpicsParserTests
         var (label, content) = Assert.Single(record);
         Assert.Equal("Agent Model Used", label);
         Assert.Contains("Some model", content);
+    }
+
+    [Fact]
+    public void ExtractDevAgentRecord_RecognizesH3Heading()
+    {
+        var raw = """
+            # Story 1.1
+            ### Dev Agent Record
+            ### Agent Model Used
+            Claude
+            ### File List
+            - src/SpecScribe/EpicsParser.cs
+            """;
+        var record = EpicsParser.ExtractDevAgentRecord(raw);
+        Assert.Equal(2, record.Count);
+        Assert.Equal("Agent Model Used", record[0].Label);
+        Assert.Contains("Claude", record[0].ContentHtml);
+        Assert.Equal("File List", record[1].Label);
+        Assert.Contains("EpicsParser.cs", record[1].ContentHtml);
     }
 }

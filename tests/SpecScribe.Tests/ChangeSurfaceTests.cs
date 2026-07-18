@@ -24,6 +24,22 @@ public class ChangeSurfaceTests
     }
 
     [Fact]
+    public void ExtractFileList_RecognizesH3DevAgentRecord()
+    {
+        var raw = """
+            # Story 1.1
+            ### Dev Agent Record
+            ### File List
+            - src/SpecScribe/ChangeSurface.cs
+            - tests/SpecScribe.Tests/ChangeSurfaceTests.cs
+            """;
+        var files = ChangeSurface.ExtractFileList(raw);
+        Assert.Equal(2, files.Count);
+        Assert.Contains("src/SpecScribe/ChangeSurface.cs", files);
+        Assert.Contains("tests/SpecScribe.Tests/ChangeSurfaceTests.cs", files);
+    }
+
+    [Fact]
     public void ExtractFileList_ReturnsEmptyWhenAbsent()
         => Assert.Empty(ChangeSurface.ExtractFileList("# Story 1.1\nNo dev record.\n"));
 

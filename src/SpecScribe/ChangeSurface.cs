@@ -14,8 +14,9 @@ public static class ChangeSurface
     /// authored label (may include annotations like <c>(new)</c>).</summary>
     public sealed record FileListEntry(string Path, string DisplayLabel);
 
-    /// <summary>Extracts file paths from <c>## Dev Agent Record</c> → <c>### File List</c>. Returns an empty
-    /// list when the subsection is absent or has no parseable paths. Never throws. [ADR 0007]</summary>
+    /// <summary>Extracts file paths from <c>##</c>/<c>### Dev Agent Record</c> → <c>### File List</c>.
+    /// Returns an empty list when the subsection is absent or has no parseable paths. Never throws.
+    /// [ADR 0007]</summary>
     public static IReadOnlyList<string> ExtractFileList(string? raw)
         => ExtractFileListEntries(raw).Select(e => e.Path).ToList();
 
@@ -26,6 +27,8 @@ public static class ChangeSurface
 
         var lines = raw.Replace("\r\n", "\n").Split('\n');
         var devIdx = Array.FindIndex(lines, l => l.TrimEnd() == "## Dev Agent Record");
+        if (devIdx < 0)
+            devIdx = Array.FindIndex(lines, l => l.TrimEnd() == "### Dev Agent Record");
         if (devIdx < 0) return Array.Empty<FileListEntry>();
 
         var sectionEnd = lines.Length;

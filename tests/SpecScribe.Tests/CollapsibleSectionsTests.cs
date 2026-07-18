@@ -72,6 +72,35 @@ public class CollapsibleSectionsTests
     }
 
     [Fact]
+    public void WrapSections_WrapsMarkdigCollisionSlugForms()
+    {
+        const string html = """
+            <h2 id="context-scope">Context &amp; Scope</h2>
+            <p>Keep me open.</p>
+            <h2 id="dev-notes">Dev Notes</h2>
+            <p>first notes</p>
+            <h2 id="dev-notes-1">Dev Notes</h2>
+            <p>second notes</p>
+            <h2 id="references">References</h2>
+            <p>first</p>
+            <h2 id="references-1">References</h2>
+            <p>second</p>
+            <h2 id="tasks-subtasks">Tasks / Subtasks</h2>
+            <p>Also open.</p>
+            """;
+
+        var wrapped = CollapsibleSections.WrapStoryRemainder(html);
+
+        Assert.Contains("id=\"dev-notes-section\"", wrapped);
+        Assert.Contains("id=\"dev-notes-1-section\"", wrapped);
+        Assert.Contains("id=\"references-section\"", wrapped);
+        Assert.Contains("id=\"references-1-section\"", wrapped);
+        Assert.Contains("<summary><h2 id=\"references-1\">References</h2></summary>", wrapped);
+        Assert.DoesNotContain("id=\"context-scope-section\"", wrapped);
+        Assert.DoesNotContain("id=\"tasks-subtasks-section\"", wrapped);
+    }
+
+    [Fact]
     public void WrapSections_NoMatchingHeading_ReturnsInputUnchanged()
     {
         const string html = """

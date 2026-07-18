@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-9-5-deferred-collapse-and-evidence-polish.md (2026-07-18)
+
+- source_spec: `spec-9-5-deferred-collapse-and-evidence-polish.md`
+  summary: H3 `Dev Agent Record` section bounds still end only at the next `## `, so peer `###` headings stay inside File List / Dev Agent Record extraction windows (same FindSection quirk as pre-existing `ExtractTestEvidence`).
+  evidence: Edge Case Hunter + Blind Hunter — spreading H3 DAR support without H3-aware section end; Ask First left SplitStoryArtifact ##-only remainder stop out of this batch.
+
 ## Deferred from: code review of spec-9-6-deferred-followup-heuristics.md (2026-07-18)
 
 - source_spec: `spec-9-6-deferred-followup-heuristics.md`
@@ -88,9 +94,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 9-5-distinct-acceptance-criteria-blocks-and-collapsed-dev-notes.md (2026-07-16)
 
-- Markdig duplicate-slug forms (`references-1`) never match exact `StoryRemainderSlugs` (`dev-notes`/`references`) — second same-titled H2 stays expanded. Rare; revisit if foreign-framework artifacts collide. [`CollapsibleSections.cs:14-15`]
-- Adjacent 9.4 polish in the same working tree: `ExtractChangeLogVerification` continues past malformed dated rows instead of returning null on the first dated-shape match. Revisit in 9.4 review. [`EpicsParser.cs:182-186`]
-- Adjacent 9.4 polish: `ExtractTestEvidence` falls back to `### Dev Agent Record` while sibling file-list / change-surface extractors may not — asymmetric empty surfaces. Revisit in 9.4 review. [`EpicsParser.cs:143-146`]
+- ~~Markdig duplicate-slug forms (`references-1`) never match exact `StoryRemainderSlugs` (`dev-notes`/`references`) — second same-titled H2 stays expanded. Rare; revisit if foreign-framework artifacts collide.~~ **[RESOLVED in `spec-9-5-deferred-collapse-and-evidence-polish`]** Collision suffix stripped for set membership only. [`CollapsibleSections.cs`]
+- ~~Adjacent 9.4 polish in the same working tree: `ExtractChangeLogVerification` continues past malformed dated rows instead of returning null on the first dated-shape match. Revisit in 9.4 review.~~ **[RESOLVED in `spec-9-5-deferred-collapse-and-evidence-polish`]** First dated-shape unparseable date → null. [`EpicsParser.cs`]
+- ~~Adjacent 9.4 polish: `ExtractTestEvidence` falls back to `### Dev Agent Record` while sibling file-list / change-surface extractors may not — asymmetric empty surfaces. Revisit in 9.4 review.~~ **[RESOLVED in `spec-9-5-deferred-collapse-and-evidence-polish`]** File List + Dev Agent Record accept H3 DAR. [`ChangeSurface.cs` / `EpicsParser.cs`]
 
 ## Deferred from: code review of 9-1-requirement-pages-link-to-their-covering-stories.md (2026-07-16)
 
