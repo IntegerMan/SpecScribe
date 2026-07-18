@@ -272,6 +272,13 @@ development_status:
   18-2-priority-bmad-module-baseline-coverage: backlog
   epic-18-retrospective: optional
 
+  # Epic 19 added 2026-07-17: directed work-graph visualization + query across
+  # epics/stories/quick-dev/deferred/reviews/code. Spike-led (19.1). Exploratory — not release-blocking.
+  epic-19: backlog
+  19-1-work-graph-model-and-coverage-spike: backlog
+  19-2-directed-graph-visualization-and-path-query: backlog
+  epic-19-retrospective: optional
+
 action_items:
   - epic: 1
     action: "Route Epic 1's deferred tech debt (heatmap HeatLevel collapse, unmapped ForEpic status classes, non-invariant heatmap date formatting) into the deferred-work backlog for review before Epic 3 planning"

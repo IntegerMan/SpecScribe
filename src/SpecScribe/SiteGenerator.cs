@@ -2947,13 +2947,18 @@ public sealed class SiteGenerator
             var deferredSlugs = FollowUpSlug.AssignDeferredSlugs(
                 deferredPairs.Select(p => (p.Item, p.ProvenanceLabel)).ToList());
             var listPath = inventory.Deferred?.OutputPath ?? "deferred-work.html";
+            // Geometry carries resolved EpicNumber (source story / quick-dev inherit) for the epic pill.
+            var counts = _counts ?? ProjectCounts.Build(
+                _progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
+            var geometry = BuildFollowUpGeometry(inventory, counts, deferredModel);
 
             foreach (var (item, provenanceLabel, sourceHref) in deferredPairs)
             {
                 if (!deferredSlugs.TryGetValue(item, out var slug)) continue;
                 var outputRelative = FollowUpSlug.OutputPath(slug);
+                var epicNumber = geometry.DeferredItems.FirstOrDefault(s => s.Item == item)?.EpicNumber;
                 var html = FollowUpDetailTemplater.RenderDeferredPage(
-                    item, provenanceLabel, sourceHref, slug, nav, listPath, _module.Commands);
+                    item, provenanceLabel, sourceHref, slug, nav, listPath, _module.Commands, epicNumber);
                 // No ApplyReferenceLinks — Address/Close data-copy must stay raw.
                 WriteOutput(outputRelative, html);
             }

@@ -35,6 +35,8 @@ public static class FollowUpDetailTemplater
         sb.Append("  <div class=\"story-kicker\">Action item</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(title)}</h1>\n");
         sb.Append($"  <div class=\"meta-pills\">{StatusStyles.Badge(statusToken, statusLabel)}");
+        if (item.EpicNumber is { } epicNum)
+            sb.Append(EpicPillLink(prefix, epicNum));
         sb.Append(StatusStyles.LegendKey());
         sb.Append("</div>\n</header>\n\n");
 
@@ -109,7 +111,8 @@ public static class FollowUpDetailTemplater
         string slug,
         SiteNav nav,
         string listOutputPath,
-        CommandCatalog? commands = null)
+        CommandCatalog? commands = null,
+        int? epicNumber = null)
     {
         var outputPath = FollowUpSlug.OutputPath(slug);
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -127,6 +130,8 @@ public static class FollowUpDetailTemplater
         sb.Append("  <div class=\"story-kicker\">Deferred work</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(title)}</h1>\n");
         sb.Append($"  <div class=\"meta-pills\">{StatusStyles.Badge(statusToken, statusLabel)}");
+        if (epicNumber is { } en)
+            sb.Append(EpicPillLink(prefix, en));
         sb.Append(StatusStyles.LegendKey());
         if (item.Resolved)
             sb.Append("<span class=\"deferred-resolved-mark\" aria-hidden=\"true\">✓</span>");
@@ -201,5 +206,13 @@ public static class FollowUpDetailTemplater
     private static void AppendBackLink(StringBuilder sb, string href, string label)
     {
         sb.Append($"<p class=\"followup-detail-back\"><a href=\"{PathUtil.Html(PathUtil.NormalizeSlashes(href))}\">&larr; {PathUtil.Html(label)}</a></p>\n");
+    }
+
+    /// <summary>Stylized epic page link in the meta-pills row — same <c>pill pill-link</c> treatment
+    /// as retrospective detail pages. Omit when unattributed (NFR8).</summary>
+    private static string EpicPillLink(string prefix, int epicNumber)
+    {
+        var href = PathUtil.NormalizeSlashes(prefix + $"epics/epic-{epicNumber}.html");
+        return $"<a class=\"pill pill-link\" href=\"{PathUtil.Html(href)}\">Epic {epicNumber} &rarr;</a>";
     }
 }

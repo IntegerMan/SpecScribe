@@ -1001,6 +1001,9 @@ public class HtmlTemplaterTests
         Assert.Contains(">Epics</a>", epicHtml);
         Assert.Contains("epics/epic-9.html", epicHtml);
         Assert.Contains("Follow-ups", epicHtml);
+        // Lifecycle frontmatter uses status-badge (green done), not a grey generic pill.
+        Assert.Contains("status-badge done", epicHtml);
+        Assert.DoesNotContain("pill status-done", epicHtml);
         Assert.Contains("id=\"sec-deferred-from-artifact\"", epicHtml);
         Assert.Contains("Expose RequirementLinkifier", epicHtml);
         Assert.Contains("follow-ups/deferred-x.html", epicHtml);

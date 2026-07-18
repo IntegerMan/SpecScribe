@@ -261,6 +261,23 @@ public class FollowUpSurfacesTests : IDisposable
     }
 
     [Fact]
+    public void FollowUpDetailTemplater_DeferredPage_OmitsEpicPill_WhenUnattributed()
+    {
+        var item = new DeferredWorkItem("<p>Orphan deferred.</p>", false, null, null);
+        var nav = new SiteNav
+        {
+            SiteTitle = "SpecScribe",
+            Items = Array.Empty<(string, string)>(),
+            QuickLinks = Array.Empty<(string, string, string)>(),
+        };
+        var html = FollowUpDetailTemplater.RenderDeferredPage(
+            item, "Deferred work", null, "deferred-orphan", nav, "deferred-work.html");
+
+        Assert.DoesNotContain("pill-link", html);
+        Assert.DoesNotContain("epics/epic-", html);
+    }
+
+    [Fact]
     public void FollowUpDetailTemplater_DeferredPage_RawDataCopy_AndPrefixedProvenanceHref()
     {
         var item = new DeferredWorkItem(
@@ -285,9 +302,12 @@ public class FollowUpSurfacesTests : IDisposable
             "deferred-open-fr25-casing",
             nav,
             "implementation-artifacts/deferred-work.html",
-            commands);
+            commands,
+            epicNumber: 1);
 
         Assert.Contains("href=\"../epics/story-1-1.html\"", html);
+        Assert.Contains("class=\"pill pill-link\" href=\"../epics/epic-1.html\"", html);
+        Assert.Contains("Epic 1", html);
         Assert.Contains("data-copy=", html);
         foreach (Match m in Regex.Matches(html, "data-copy=\"([^\"]*)\""))
         {

@@ -196,6 +196,7 @@ FR33: Epic 16 - VS Code extension packaging and Marketplace publication (depends
 FR34: Epic 16 - Release-facing documentation, changelog, and versioning policy.
 FR35: Epic 6 - Native VS Code host-integration surfaces (discoverability, commands, tree view/status bar, editor bridges, reactivity), seated from the VS Code Native-Integration Recommendations (docs/VSCodeIntegrationRecommendations.md).
 FR36: Epic 18 - BMad module/expansion coverage exploration and baseline via the shared adapter contract.
+FR37: Epic 19 - Directed work graph across epics, stories, quick-dev, deferred work, reviews, and code (queryable provenance).
 NFR10: Epic 17 - Pre-publication code hardening and security/privacy review for public + private codebase readiness.
 
 ## Epic List
@@ -273,7 +274,12 @@ A dedicated pre-publication pass to remediate structural weaknesses, inconsisten
 Extend first-class BMad support beyond the BMM core to BMad's own module and expansion ecosystem (for example BMad Builder, Creative Intelligence, and game-dev / GDS-style expansions), led by a landscape-and-coverage spike that maps each module's distinctive artifacts to Epic 4's shared adapter contract before baseline coverage. Distinct from the third-party-framework Epics 11–15; exploratory, not release-blocking.
 **FRs covered:** FR36
 
+### Epic 19: Directed Work Graph — Traceability Across Artifacts
+Make the directed relationships among epics, stories, quick-dev, deferred work, retrospectives/code reviews, and code navigable as a queryable graph — so provenance chains, cycles, and "what stemmed from what" stop living only as breadcrumbs and reverse-link panels.
+**FRs covered:** FR37 (seat in PRD when convenient)
+
 <!-- Epics 17–18 added 2026-07-11 (SCP 2026-07-11, correct-course): Epic 17 = pre-publication hardening (NFR10), gates Epic 16's cut; Epic 18 = BMad-native module exploration (FR36), distinct from framework Epics 11–15. Append-only, no renumber. Run create-story per story when scheduled (17.1 / 18.1 spike first). -->
+<!-- Epic 19 added 2026-07-17: directed work-graph visualization + query across reviews/stories/epics/deferred/code. Exploratory insight surface; spike-led. -->
 
 <!-- 2026-07-11: Story 5.4 (OSS onboarding/reference docs) removed from Epic 5 and folded into Epic 16 Story 16.6; FR18 coverage moved Epic 5 → Epic 16. -->
 
@@ -2648,3 +2654,52 @@ So that I can track progress without switching tools or losing module-specific w
 **When** they are discovered
 **Then** they surface as explicit non-fatal notices (coverage-tier labeling where partial) and never block full-site generation
 **And** any module-specific next-step-command vocabulary flows through the adapter contract rather than being hard-coded (NFR8).
+
+<!-- Epic 19 added 2026-07-17: directed work graph across epics/stories/quick-dev/deferred/reviews/code.
+     Spike-led. Exploratory — not release-blocking. Run create-story when scheduled. -->
+
+## Epic 19: Directed Work Graph — Traceability Across Artifacts
+
+Make the directed relationships among epics, stories, quick-dev / one-shot work, deferred-work items, retrospectives and code-review provenance, and source code navigable as a first-class graph — so a Driver or Reviewer can see and query "what stemmed from what," detect cycles or ambiguous reverse-links, and explore beyond breadcrumbs and per-page reverse panels.
+
+**FRs covered:** FR37 (sync into PRD when convenient) · **NFRs:** NFR8 · **Depends on:** Epic 9 (follow-up provenance), Epic 7 (code citations) as data sources — does not block either.
+
+### Story 19.1: Work-Graph Model and Coverage Spike
+
+As a maintainer who traces debt across reviews and stories,
+I want the portal's entity types and directed edges inventoried and scoped before any visualization ships,
+So that the graph has a defined node/edge vocabulary, cycle semantics, and non-goals rather than an ad-hoc diagram.
+
+**Acceptance Criteria:**
+
+1.
+**Given** existing provenance seams (deferred `source_spec` / Deferred-from headings, action-item `epic:`, quick-dev epic attribution, story↔requirement links, code citations)
+**When** the spike inventories them
+**Then** a written coverage map lists node types (at least: epic, story, quick-dev, deferred item, action item, retro, code file) and directed edge kinds (stemmed-from, resolves, covers, cites, raised-in), marks each as already derivable vs requiring new heuristics, and names cycles/ambiguous reverse-links as first-class queries
+**And** deliberately out-of-scope edges (e.g. inventing story parents for retro actions) are listed with rationale.
+
+2.
+**Given** the spike's recommended first surface
+**When** the spike documents findings
+**Then** it proposes one primary visualization + query path for Story 19.2 (e.g. epic-scoped subgraph, cycle finder, or "path from deferred → epic") with success criteria and NFR8 absence rules when a project has no follow-up/code graph
+**And** no new authoring schema is required for the MVP path.
+
+### Story 19.2: Directed Graph Visualization and Path Query
+
+As a Driver scanning remaining work,
+I want a portal surface that draws the directed work graph for a chosen scope and answers simple path/cycle queries,
+So that circular-looking reverse links and multi-hop provenance become inspectable instead of inferred from breadcrumbs.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a project with attributed deferred/quick-dev/story/epic links (per Story 19.1's mappable edges)
+**When** the graph surface renders for a chosen scope (at least epic-scoped)
+**Then** nodes and directed edges are navigable to existing detail pages, and a cycle or multi-hop path query surfaces ambiguous or circular provenance when present
+**And** zero-graph projects omit the surface cleanly (NFR8).
+
+2.
+**Given** the same underlying ledger counts and provenance parsers as Epic 9
+**When** the graph builds
+**Then** it does not invent a second authoring schema or re-count open items against ProjectCounts
+**And** HTML/SPA parity holds for the new page(s).
