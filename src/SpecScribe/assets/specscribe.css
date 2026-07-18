@@ -1024,7 +1024,7 @@ pre.code-file code[class*="language-"] {
      1.55em == the block's line-height, keeping every row exactly one line tall. */
   min-height: 1.55em;
   /* Keep a jumped-to line clear of the sticky nav when reached via a "#L{n}" link. */
-  scroll-margin-top: 5rem;
+  scroll-margin-top: var(--nav-offset);
 }
 
 /* Line number from a CSS counter on data-ln, NOT a text child — so Prism's tokenizer only ever sees pure source and
@@ -2276,7 +2276,7 @@ a.ref-file-node:focus-visible {
   border-radius: 4px;
   background: var(--parchment);
   /* Keep the highlighted criterion clear of the sticky nav when jumped to via a "#ac-N" link. */
-  scroll-margin-top: 5rem;
+  scroll-margin-top: var(--nav-offset);
 }
 
 /* :target must read stronger than resting — deeper tint + thicker gold inset bar so the jumped-to
@@ -2438,10 +2438,9 @@ a.ref-file-node:focus-visible {
 .sb-pending { fill: var(--status-pending); }
 .sb-unrecognized { fill: var(--status-unrecognized); }
 
-/* E4 placeholder arc: a story with no task plan yet. Faint dashed OUTLINE (transparent fill) reads as
-   "nothing here yet — a next action", distinct from both a filled task slice and a story off the edge of the
-   data. Static (the dashes don't animate); the whole-chart aria-label + the segment <title>/aria carry the
-   "No task plan yet — run …" call to action. [Story 2.1 UXO E4] */
+/* Middle-ring stories with no task plan (TasksTotal == 0): faint dashed outline, transparent fill.
+   Distinct from filled status wedges; no outer create-story fringe. Aria/title carry "no task plan yet".
+   [spec-9-13-deferred-glance-weight-noplan-sourcekey] */
 .sb-noplan {
   fill: transparent;
   stroke: var(--status-pending);
@@ -2502,6 +2501,18 @@ a.ref-file-node:focus-visible {
 .sunburst-legend .sb-active-sw { background: var(--status-active); }
 .sunburst-legend .sb-review-sw { background: var(--status-review); }
 .sunburst-legend .sb-done-sw { background: var(--status-done); }
+.sunburst-legend .sb-noplan-sw {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--status-pending);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 1px,
+    var(--status-pending) 1px,
+    var(--status-pending) 2px
+  );
+  opacity: 0.7;
+}
 
 /* ---- Interactive-legend emphasis (Story 3.5 Task 3; the item Story 1.5 deferred here, UXO C3) ----
    Hovering OR keyboard-focusing a legend entry isolates its status: matching segments stay full, every other
@@ -2534,7 +2545,9 @@ a.ref-file-node:focus-visible {
 .sunburst-panel:has(.sb-followup-done-item:hover) .sb-seg:not(.sb-followup-done),
 .sunburst-panel:has(.sb-followup-done-item:focus-visible) .sb-seg:not(.sb-followup-done),
 .sunburst-panel:has(.sb-unplanned-item:hover) .sb-seg:not(.sb-unplanned),
-.sunburst-panel:has(.sb-unplanned-item:focus-visible) .sb-seg:not(.sb-unplanned) {
+.sunburst-panel:has(.sb-unplanned-item:focus-visible) .sb-seg:not(.sb-unplanned),
+.sunburst-panel:has(.sb-noplan-item:hover) .sb-seg:not(.sb-noplan),
+.sunburst-panel:has(.sb-noplan-item:focus-visible) .sb-seg:not(.sb-noplan) {
   opacity: 0.28;
 }
 
@@ -4344,7 +4357,7 @@ h1:has(> .status-legend) {
 /* The status-tile grid + requirements-flow panels sit in the same stretched column as every other section. */
 .req-index .chart-panel { margin-left: 0; margin-right: 0; }
 /* Anchored group dividers clear the sticky nav when jumped to. */
-.req-index .section-divider[id] { scroll-margin-top: 4.5rem; }
+.req-index .section-divider[id] { scroll-margin-top: var(--nav-offset); }
 
 .req-group-grid {
   margin: 0 0 1.5rem;

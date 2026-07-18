@@ -71,6 +71,58 @@ public class RequirementLinkifierTests
     }
 
     [Fact]
+    public void Linkify_LinksLowercaseAndMixedCaseKnownIds_PreservingAuthoredCasing()
+    {
+        var model = Requirements(
+            (RequirementKind.Functional, 6),
+            (RequirementKind.NonFunctional, 2),
+            (RequirementKind.Design, 1));
+        var html = RequirementLinkifier.Linkify("<p>see fr6, Nfr2, and Ux-Dr1.</p>", model, "../");
+
+        Assert.Contains("<a class=\"req-ref\" href=\"../requirements/fr6.html\">fr6</a>", html);
+        Assert.Contains("<a class=\"req-ref\" href=\"../requirements/nfr2.html\">Nfr2</a>", html);
+        Assert.Contains("<a class=\"req-ref\" href=\"../requirements/ux-dr1.html\">Ux-Dr1</a>", html);
+    }
+
+    [Fact]
+    public void Linkify_LeavesUnknownLowercaseIdsAlone()
+    {
+        var model = Requirements((RequirementKind.Functional, 1));
+        var html = RequirementLinkifier.Linkify("<p>fr99 is not defined.</p>", model, "");
+
+        Assert.Equal("<p>fr99 is not defined.</p>", html);
+    }
+
+    [Fact]
+    public void Linkify_DoesNotPartialMatchMultiDigitIds()
+    {
+        var onlyFr6 = Requirements((RequirementKind.Functional, 6));
+        Assert.DoesNotContain("<a", RequirementLinkifier.Linkify("<p>FR60 stays plain.</p>", onlyFr6, ""));
+
+        var onlyFr60 = Requirements((RequirementKind.Functional, 60));
+        Assert.DoesNotContain("<a", RequirementLinkifier.Linkify("<p>FR6 stays plain.</p>", onlyFr60, ""));
+    }
+
+    [Fact]
+    public void Linkify_WhenBothFr6AndFr60Known_EachLinksToItsOwnSlug()
+    {
+        var model = Requirements((RequirementKind.Functional, 6), (RequirementKind.Functional, 60));
+        var html = RequirementLinkifier.Linkify("<p>FR6 and FR60.</p>", model, "");
+
+        Assert.Contains("<a class=\"req-ref\" href=\"requirements/fr6.html\">FR6</a>", html);
+        Assert.Contains("<a class=\"req-ref\" href=\"requirements/fr60.html\">FR60</a>", html);
+    }
+
+    [Fact]
+    public void Linkify_SkipIdSuppressesLowercaseSelfMention()
+    {
+        var model = Requirements((RequirementKind.Functional, 1));
+        var html = RequirementLinkifier.Linkify("<p>fr1 details</p>", model, "", skipId: "FR1");
+
+        Assert.Equal("<p>fr1 details</p>", html);
+    }
+
+    [Fact]
     public void Linkify_LinksEveryOccurrenceOfARepeatedId()
     {
         var model = Requirements((RequirementKind.Functional, 6));

@@ -467,7 +467,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated 2026-07-18: story weight includes nested story-child deferred count
         // (max(1, TasksTotal + nested)); sunburst hints say "tasks + nested deferred" when present.
         // [spec-9-7-deferred-angular-weight-and-ledger-assert]
-        const string expected = "5997a2b9dd3df53d5d67a6a2e7d4a6febe7427eeb01ba5b303a667c278636d72";
+        // Regenerated 2026-07-18: unify sticky-nav scroll-margin-top onto var(--nav-offset)
+        // (.ac-criterion, .req-index .section-divider[id], .code-line) + case-insensitive req linkify
+        // and deferred-work Epic 1 ledger closes. [spec-epic1-deferred-debt-cleanup]
+        const string expected = "bc2daeafc93490cc4ff54b25025caca70f80adb75556d5dc4fe978eb12fc11e6";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -21,9 +21,13 @@ public static class RequirementLinkifier
         + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>|<[^>]*>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
-    // Whole-token match for FR / NFR / UX-DR ids (word-boundary anchored). UX-DR is a single alternation
-    // arm, so it cannot be partially matched as a bare "DR{n}". [Story 9.2 Task 5]
-    private static readonly Regex RefPattern = new(@"\b(FR|NFR|UX-DR)(\d+)\b", RegexOptions.Compiled);
+    // Whole-token match for FR / NFR / UX-DR ids (word-boundary anchored). Case-insensitive so
+    // lowercase/mixed-case prose refs align with ById (OrdinalIgnoreCase); authored casing is
+    // preserved in the link text via m.Value. UX-DR is a single alternation arm, so it cannot be
+    // partially matched as a bare "DR{n}". [Story 9.2 Task 5; spec-epic1-deferred-debt-cleanup]
+    private static readonly Regex RefPattern = new(
+        @"\b(FR|NFR|UX-DR)(\d+)\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     /// <param name="html">Already-rendered HTML to scan.</param>
     /// <param name="requirements">The known requirement set — only ids present here are linked.</param>

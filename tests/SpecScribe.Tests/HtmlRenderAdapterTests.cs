@@ -239,6 +239,18 @@ public class HtmlRenderAdapterTests
     };
 
     [Fact]
+    public void RenderEpicBody_EmitsTitleHtmlInH1_WithoutPathUtilDoubleEscape()
+    {
+        // Titles are opaque RenderInline HTML (Story 6.2 TitleHtml). PathUtil.Html would turn
+        // <strong> into &lt;strong&gt; — the deferred "wrap h1 in Html()" prescription must not return.
+        var view = EpicPage(Card()) with { TitleHtml = "Paired <strong>Progress</strong>" };
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(view);
+
+        Assert.Contains("<h1>Paired <strong>Progress</strong></h1>", html);
+        Assert.DoesNotContain("&lt;strong&gt;", html);
+    }
+
+    [Fact]
     public void RenderEpicBody_PairsStatusAndTaskBadgesWhenBothPresent()
     {
         var statusBadge = StatusStyles.Badge("review", "review");
