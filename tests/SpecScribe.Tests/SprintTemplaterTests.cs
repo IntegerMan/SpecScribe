@@ -707,4 +707,41 @@ public class SprintTemplaterTests
         Assert.DoesNotContain("sprint-lane unplanned",
             SprintTemplater.RenderBoard(sprint, epics, unplanned: UnplannedWorkGeometry.Empty));
     }
+
+    [Fact]
+    public void RenderBoard_UnplannedDeferred_SourceHrefIsNavigableLink()
+    {
+        var epics = SampleEpics();
+        var sprint = Sample();
+        var work = new WorkInventory
+        {
+            QuickDev = new[]
+            {
+                new QuickDevEntry("Fix footer", "implementation-artifacts/spec-fix-footer.html", "ready", "chore"),
+            },
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var deferredMarkdown = """
+            ## Deferred from: code review of spec-fix-footer.md (2026-07-15)
+
+            - Parked item with parent.
+            """;
+        var followUps = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(),
+            ProjectCounts.Empty with { DeferredOpenItems = 1, DirectChanges = 1 },
+            work,
+            deferredModel: DeferredWorkParser.Parse(deferredMarkdown),
+            epics: epics);
+        var deferredMember = Assert.Single(followUps.UnattributedDeferredItems);
+        Assert.False(string.IsNullOrEmpty(deferredMember.SourceHref));
+
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, epics);
+        Assert.Contains(unplanned.UnplannedSet, m => m.Kind == "deferred" && m.SourceHref is { Length: > 0 });
+
+        var board = SprintTemplater.RenderBoard(sprint, epics, unplanned: unplanned);
+        Assert.Contains("sprint-card-source-ref", board);
+        Assert.Contains("from <a class=\"sprint-card-source-ref\" href=", board);
+        Assert.Contains("href=\"implementation-artifacts/spec-fix-footer.html\"", board);
+        Assert.DoesNotContain("from <span class=\"sprint-card-source-ref\"", board);
+    }
 }

@@ -227,13 +227,19 @@ public class UnplannedWorkGeometryTests
         Assert.Contains(unplanned.UnplannedSet, m => m.Kind == "direct");
         Assert.Contains(unplanned.UnplannedSet, m =>
             m.Kind == "deferred" && m.SourceKey == "spec-home-next-steps-label-and-code-review");
+        // Hybrid: board has 2 members; sunburst weight counts open deferred only.
+        Assert.Equal(2, unplanned.UnplannedMemberCount);
+        Assert.Equal(1, unplanned.SunburstUnplannedWeight);
 
+        // Project glance aggregates Unplanned (no per-item leaves); weight excludes resurfaced done parent.
         var svg = Charts.Sunburst(
             OneEpic(),
             followUps: followUps,
             unplanned: unplanned);
-        Assert.Contains("from Direct change: spec-home-next-steps-label-and-code-review", svg);
-        Assert.Contains("aria-label=\"Direct change (done): Home next steps label\"", svg);
+        Assert.Contains("aria-label=\"Unplanned:", svg);
+        Assert.Contains($"href=\"{FollowUpGroupPages.UnplannedPath}\"", svg);
+        Assert.Contains("Unplanned: 1 open item", svg);
+        Assert.DoesNotContain("Unplanned: 1 done item", svg);
     }
 
     [Fact]
@@ -663,5 +669,71 @@ public class UnplannedWorkGeometryTests
 
         var entry = new QuickDevEntry("No text cue", "spec-mystery.html", "ready", null, new DateOnly(2026, 7, 10));
         Assert.Equal(1, UnplannedWorkGeometry.ResolveQuickDevEpic(entry, epics, retros: retros));
+    }
+
+    [Fact]
+    public void From_OmitsResolvedUnattributableDeferred_FromMembership()
+    {
+        var deferredMarkdown = """
+            ## Deferred from: misc (2026-07-06)
+
+            - Open note.
+            - ~~Resolved note.~~
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var followUps = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(),
+            ProjectCounts.Empty with { DeferredOpenItems = 1 },
+            work,
+            deferredModel: deferredModel,
+            epics: OneEpic());
+
+        Assert.Equal(2, followUps.UnattributedDeferredItems.Count);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, OneEpic());
+        Assert.Single(unplanned.UnattributableDeferred);
+        Assert.False(unplanned.UnattributableDeferred[0].Item.Resolved);
+        Assert.Equal(1, unplanned.SunburstUnplannedWeight);
+    }
+
+    [Fact]
+    public void From_UnknownEpicDeferred_LandsInUnplanned_ViaOrphanDeferred()
+    {
+        var slot = new FollowUpDeferredSlot(
+            new DeferredWorkItem("<p>Ghost epic debt.</p>", Resolved: false, null, null),
+            "Ghost",
+            EpicNumber: 99,
+            "follow-ups/deferred-ghost.html",
+            SourceKey: "99-1-ghost");
+        var followUps = new FollowUpGeometry(
+            Array.Empty<SprintActionItem>(),
+            DeferredOpenCount: 1,
+            DeferredHref: "deferred-work.html",
+            ActionItemsHref: SiteNav.ActionItemsOutputPath,
+            DeferredSlots: new[] { slot });
+        Assert.Empty(followUps.UnattributedDeferredItems);
+        Assert.Single(followUps.OrphanDeferredItems(new HashSet<int> { 1 }));
+
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, OneEpic());
+        Assert.True(unplanned.HasUnplanned);
+        Assert.Single(unplanned.UnattributableDeferred);
+        Assert.Equal(99, unplanned.UnattributableDeferred[0].EpicNumber);
+    }
+
+    [Fact]
+    public void DisplayTitle_Blank_FallsBackToNoTitle()
+    {
+        Assert.Equal("(no title)", UnplannedWorkGeometry.DisplayTitle(""));
+        Assert.Equal("(no title)", UnplannedWorkGeometry.DisplayTitle("   "));
+        Assert.Equal("Real", UnplannedWorkGeometry.DisplayTitle("Real"));
     }
 }

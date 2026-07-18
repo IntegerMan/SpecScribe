@@ -158,11 +158,23 @@ public static class BmadCommands
     }
 
     /// <summary>The heading + list on their own (no chart-panel wrapper), for callers that want to fold
-    /// the Next Steps into a shared panel rather than give it a standalone one.</summary>
+    /// the Next Steps into a shared panel rather than give it a standalone one (epic page Up Next).
+    /// Done epics with open deferred get the same done-with-deferred body as
+    /// <see cref="RenderEpicNextSteps"/> — without a nested chart-panel. [spec-address-deferred-next-steps]</summary>
     public static string RenderEpicNextStepsInner(
         EpicInfo epic, CommandCatalog commands,
-        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null) =>
-        RenderInner(ForEpic(epic, commands, openDeferred));
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
+    {
+        var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
+        if (epicClass == "done")
+        {
+            var open = OpenOnly(openDeferred);
+            if (open.Count > 0 && commands.Command("quick-dev") is { Length: > 0 })
+                return RenderDoneWithDeferredBody($"{epic.Number}", "Epic", open, commands, includeHeading: true);
+        }
+
+        return RenderInner(ForEpic(epic, commands, openDeferred));
+    }
 
     /// <summary>The story actions pane for a DONE story: celebratory terminal state (checkmark + success
     /// styling) instead of a primary command or code-review nudge. When the module exposes
@@ -754,7 +766,22 @@ public static class BmadCommands
         IReadOnlyList<FollowUpDeferredSlot> openSlots, CommandCatalog commands)
     {
         var sb = new StringBuilder();
-        sb.Append("<div class=\"chart-panel next-steps\">\n<h3>Next Steps</h3>\n");
+        sb.Append("<div class=\"chart-panel next-steps\">\n");
+        sb.Append(RenderDoneWithDeferredBody(entityId, entityKind, openSlots, commands, includeHeading: true));
+        sb.Append("</div>\n\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Done-with-deferred status line + Address deferred primary card (and story hatch when
+    /// exposed). Shared by the standalone Next Steps panel and the epic Up Next fold-in.</summary>
+    private static string RenderDoneWithDeferredBody(
+        string entityId, string entityKind,
+        IReadOnlyList<FollowUpDeferredSlot> openSlots, CommandCatalog commands,
+        bool includeHeading)
+    {
+        var sb = new StringBuilder();
+        if (includeHeading)
+            sb.Append("<h3>Next Steps</h3>\n");
         sb.Append($"<p class=\"done-deferred-status\">{entityKind} {PathUtil.Html(entityId)} is complete — {openSlots.Count} open deferred item{(openSlots.Count == 1 ? "" : "s")} remain{(openSlots.Count == 1 ? "s" : "")}.</p>\n");
 
         var addr = BuildAddressDeferredSuggestion(entityId, entityKind, openSlots, commands);
@@ -775,11 +802,8 @@ public static class BmadCommands
 
         var hatch = entityKind == "Story" ? DoneEscapeHatch(commands) : null;
         if (hatch is not null)
-        {
             sb.Append(RenderAlternatesGroup([hatch]));
-        }
 
-        sb.Append("</div>\n\n");
         return sb.ToString();
     }
 }

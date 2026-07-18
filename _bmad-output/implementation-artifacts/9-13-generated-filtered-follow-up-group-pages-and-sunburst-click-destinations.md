@@ -4,7 +4,7 @@ baseline_commit: 0ea1dd8e3bc033a06c1e394559054727e4d5840e
 
 # Story 9.13: Generated Filtered Follow-Up Group Pages and Sunburst Click Destinations
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -144,6 +144,20 @@ Path names are illustrative — keep under `FollowUpSlug.Folder` (`follow-ups/`)
   - [x] `ChartsTests`: orphan + Unplanned roots href to `follow-ups/group-…`; leaves still `follow-ups/action-` / `deferred-` / spec paths; epic arc still `epics/epic-`.
   - [x] Golden fingerprint moves → regen per `golden-diff-normalization-gotchas`; three parity suites green.
   - [x] `dotnet test` from repo root.
+
+### Review Findings
+
+- [x] [Review][Decision] Project glance hierarchy vs 9.13 Charts seam — **Accepted** (2026-07-17): hierarchy rewrite (aggregates + `group-epic-*` wiring + leaf removal on project glance) kept as intentional adjacent `spec-sunburst-remaining-work-hierarchy` work; 9.13 patch list proceeds without narrowing Charts back to href-only seam.
+- [x] [Review][Patch] Align Follow-ups group membership with sunburst orphans [`FollowUpGroupPages.cs`] — Enumerate uses `OrphanActionItems` when epics model present; unknown epic numbers stay on Follow-ups (not `group-epic-N`).
+- [x] [Review][Patch] Epic aggregate can href a missing group page (QD-only) [`FollowUpGroupPages.cs`] — emit gate includes `unplanned.ForEpic(n)`.
+- [x] [Review][Patch] Wire `DeferredListHref` in `UnplannedWorkGeometry.From` [`UnplannedWorkGeometry.cs`] — passes `followUps.DeferredHref`.
+- [x] [Review][Patch] Sprint Unplanned card computes `parentHref` but never emits an `<a>` [`SprintTemplater.cs`] — div card + navigable provenance link when SourceHref present.
+- [x] [Review][Patch] Watch `GenerateOne` skips `WriteFollowUpGroupPages` [`SiteGenerator.cs`] — called on GenerateOne; stale `group-*.html` pruned.
+- [x] [Review][Patch] Unplanned-only glance sets `hasAggregates = true` [`Charts.cs`] — unplanned branch no longer sets hasAggregates.
+- [x] [Review][Patch] Group rows lack empty-summary fallback [`FollowUpGroupPages.cs`] — “(no action/deferred text)” fallbacks.
+- [x] [Review][Defer] Epic angular weight ignores follow-up slot counts [`Charts.cs:172`] — deferred, pre-existing / hierarchy design (thin wedges for follow-up-heavy epics)
+- [x] [Review][Defer] Project glance dropped no-plan create-story outer CTA [`Charts.cs` Sunburst] — deferred, pre-existing / hierarchy rewrite (TasksTotal==0 stories look like planned peers)
+- [x] [Review][Defer] Duplicated source-key normalization / tautological FindQuickDev branch [`Charts.cs` / `SprintTemplater.cs`] — deferred, pre-existing cleanup
 
 ## Dev Notes
 
@@ -301,3 +315,4 @@ Implemented Story 9.13 end-to-end:
 ## Change Log
 
 - 2026-07-17: Story 9.13 — generated filtered follow-up group pages + sunburst group-root destinations; status → review.
+- 2026-07-17: Code review — applied 7 patches; accepted hierarchy rewrite decision; status → done.

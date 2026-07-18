@@ -399,6 +399,7 @@ public sealed class SiteGenerator
             var ev = GenerateOneInternal(sourceFullPath, nav);
             RefreshCoverage();
             var inventory = WorkInventory.Build(_docs.Values.ToList());
+            WriteFollowUpGroupPages(nav, inventory);
             RewriteQuickDevPages(nav, inventory);
             WriteIndex(nav, inventory);
             // Keep the opt-in SPA form in sync in watch mode: _spaCapture already holds the fresh page (captured by
@@ -2822,16 +2823,31 @@ public sealed class SiteGenerator
         var followUps = BuildFollowUpGeometry(inventory, counts, deferredModel);
         var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
         var groups = FollowUpGroupPages.Enumerate(followUps, unplanned, _epicsModel);
-        if (groups.Count == 0) return;
 
         var followUpsDir = Path.Combine(_options.OutputRoot, FollowUpSlug.Folder);
-        Directory.CreateDirectory(followUpsDir);
+        var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (groups.Count > 0)
+            Directory.CreateDirectory(followUpsDir);
 
         foreach (var group in groups)
         {
             var html = FollowUpGroupTemplater.RenderPage(group, nav);
             // No ApplyReferenceLinks — group pages intentionally omit Resolve data-copy; keep summaries plain.
             WriteOutput(group.OutputPath, html);
+            emitted.Add(Path.GetFileName(group.OutputPath.Replace('/', Path.DirectorySeparatorChar)));
+        }
+
+        // Prune stale group-* pages when membership shrinks (watch + full generate without wipe of follow-ups/).
+        if (Directory.Exists(followUpsDir))
+        {
+            foreach (var file in Directory.EnumerateFiles(followUpsDir, "group-*.html"))
+            {
+                var name = Path.GetFileName(file);
+                if (emitted.Contains(name)) continue;
+                File.Delete(file);
+                if (_spaCapture is not null)
+                    _spaCapture.Remove(PathUtil.NormalizeSlashes(Path.Combine(FollowUpSlug.Folder, name)));
+            }
         }
     }
 
@@ -2997,7 +3013,8 @@ public sealed class SiteGenerator
             work,
             linkPrefix,
             deferredModel,
-            _epicsModel);
+            _epicsModel,
+            _retros);
 
     /// <summary>Work inventory for follow-up + unplanned sunburst geometry. Uses the populated
     /// <see cref="_docs"/> when available; otherwise (e.g. during <see cref="RenderEpicsPages"/>, before the

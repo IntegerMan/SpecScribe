@@ -457,8 +457,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // project + epic sunbursts; weight story middle wedges by max(1, TasksTotal); nest story-child
         // deferred under parent stories (outer ring); date-based quick-dev epic attribution via retro
         // DateText and story LastUpdatedDate; review patches (hint gating, dead commands param, cascade).
-        // [spec-sunburst-remaining-work-hierarchy]
-        const string expected = "5e2fddd1d326bc29c2c31143af03dc03a8c0ff778a78f52bc62ac53e7d4af909";
+        // Regenerated for 9.13 code-review patches: DeferredListHref on Unplanned pages, sprint
+        // provenance <a>, watch WriteFollowUpGroupPages + group-* prune, unplanned-only legend, CSS
+        // div.sprint-card hover / source-ref links. [Story 9.13 review]
+        const string expected = "0e02f9c5e0a0c4d1f83b71007b3526ada918996f5eee543767578a37c0e4786e";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

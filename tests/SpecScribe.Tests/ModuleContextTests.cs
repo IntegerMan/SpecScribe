@@ -651,6 +651,21 @@ public class BmadCommandsTests
     }
 
     [Fact]
+    public void RenderEpicNextStepsInner_DoneEpicWithOpenDeferred_AddressDeferredInUpNextFoldIn()
+    {
+        // Epic pages with stories only render Up Next (RenderEpicNextStepsInner), not the standalone
+        // RenderEpicNextSteps panel — done+deferred must surface there. [spec-address-deferred-next-steps]
+        var deferred = new[] { OpenSlot("Left over item") };
+        var doneEpic = Epic(hasRetro: true, Story("1.1", "done"), Story("1.2", "done"));
+        var inner = BmadCommands.RenderEpicNextStepsInner(doneEpic, BmmWithQuickDev, deferred);
+
+        Assert.Contains("Address deferred", inner);
+        Assert.Contains("done-deferred-status", inner);
+        Assert.Contains("next-step-card-primary", inner);
+        Assert.DoesNotContain("chart-panel", inner); // fold-in — no nested panel wrapper
+    }
+
+    [Fact]
     public void RenderEpicNextSteps_ReviewEpicWithDeferred_AddressDeferredDemoted()
     {
         var deferred = new[] { OpenSlot("Needs fixing") };

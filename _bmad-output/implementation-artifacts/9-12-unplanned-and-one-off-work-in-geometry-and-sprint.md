@@ -4,7 +4,7 @@ baseline_commit: 8cc95353c91ec1b8ee61029a2b021676263dd6f5
 
 # Story 9.12: Unplanned and One-Off Work in Geometry and Sprint
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -17,28 +17,30 @@ so that parked direct work is visible beside the epic plan instead of vanishing 
 ## Acceptance Criteria
 
 1.
-**Given** open quick-dev (`route: one-shot`) specs and/or deferred items whose provenance cannot resolve to an epic
+**Given** open quick-dev (`route: one-shot`) specs and/or open deferred items whose provenance cannot resolve to an epic
 **When** the project sunburst renders
-**Then** those items appear under a dedicated synthetic root slice (e.g. Unplanned / Direct work), separate from epic-attributed stories and from retro action items that do have an epic
-**And** when provenance or sprint timing can identify an epic, the item prefers that epic's story ring over the Unplanned root
-**And** counts remain ledger-agreed (Story 8.3); NFR8 omits the Unplanned slice when empty.
+**Then** those items appear under a dedicated synthetic root slice (e.g. Unplanned / Direct work) as open/done **aggregates** (not per-item leaf wedges — leaves live on the sprint board / Unplanned group page), separate from epic-attributed stories and from retro action items that do have an epic
+**And** when provenance, text cues, or unique-day timing (retro `DateText` / story `LastUpdatedDate`) can identify an epic, the item prefers that epic over the Unplanned root (ambiguous ties stay Unplanned)
+**And** sunburst Unplanned weight counts open members only — done quick-dev resurfaced for residual provenance do not inflate the root
+**And** counts remain ledger-agreed (Story 8.3); NFR8 omits the Unplanned slice when empty of open members.
 
 2.
-**Given** the same unplanned / one-off set
+**Given** the shared unplanned membership set (open unattributable quick-dev + open unattributable deferred, plus done quick-dev parents resurfaced when open deferred still names them)
 **When** the sprint board renders
-**Then** those items also appear in an unplanned / one-off lane (or equivalent board grouping) so the sprint view and the sunburst describe the same residual work
-**And** no new authoring schema is required — attribution derives from existing provenance, frontmatter, and sprint data.
+**Then** those items appear in an unplanned / one-off lane so the board lists every member; the sunburst root weight may omit resurfaced done parents (hybrid — board shows provenance, glance stays open-debt sized)
+**And** no new authoring schema is required — attribution derives from existing provenance, frontmatter, authored dates, and sprint/retro data.
+**And** Unplanned group-root href targets the filtered Unplanned group page (`follow-ups/group-unplanned.html`, Story 9.13).
 
 ## Context & Scope
 
 Epic 9 extends FR30 from standalone follow-up pages into the Driver's primary remaining-work surfaces. Story **9.7** put action items + deferred items into the sunburst as story-ring peers (epic-attributed) plus a synthetic **Follow-ups** slice for unattributed orphans. Story **9.11** deep-linked those wedges to per-item detail pages. Quick-dev / one-shot specs (`WorkInventory.QuickDev`, ledger `DirectChanges`) still live only as a Home "Direct changes" tile — invisible in the sunburst and absent from the sprint board. Unattributable deferred items share the opaque Follow-ups orphan bucket with unattributed action items, so direct work and process debt look the same.
 
-**This story makes unplanned / one-off work first-class in both geometry and sprint.** It does **not** build Story 9.13's generated filtered group pages (group-wedge destinations stay page-level / best-effort until 9.13), does **not** absorb 9.6/9.10/9.11 list/detail chrome, and does **not** invent a new authoring schema.
+**This story makes unplanned / one-off work first-class in both geometry and sprint.** Filtered group pages are owned by Story **9.13**; this story may wire `GroupRootHref` to `follow-ups/group-unplanned.html` once those pages exist. It does **not** absorb 9.6/9.10/9.11 list/detail chrome, and does **not** invent a new authoring schema.
 
 ### Owner prefs (locked 2026-07-17 in sprint-status.yaml)
 
 1. **BOTH** a dedicated Unplanned sunburst root **AND** a sprint unplanned lane — not one or the other.
-2. Generated filtered group pages are **Story 9.13** (not hash/query filters on full lists). Leave group-root hrefs rewirable; do not invent filtered pages here.
+2. Generated filtered group pages are **Story 9.13** (not hash/query filters on full lists). Group-root href targets the Unplanned group page when 9.13 is present.
 
 ### Surfaces in scope
 
@@ -52,7 +54,7 @@ Epic 9 extends FR30 from standalone follow-up pages into the Driver's primary re
 
 | Surface | Why out |
 |---------|---------|
-| **Generated filtered group pages** | Story **9.13** |
+| **Generated filtered group page *implementation*** | Story **9.13** (9.12 may consume `GroupRootHref` → Unplanned path) |
 | **Action-items / deferred-work list chrome** | Stories **9.6 / 9.10 / 9.11** |
 | **Home Direct-changes StatTile / Follow-up StatCards** | Already correct (ledger). Keep; optional hint text only |
 | **Story Pipeline / sprint progress wheel** | Yaml-tracked stories only — do not mislabel one-offs as stories |
@@ -66,22 +68,23 @@ Epic 9 extends FR30 from standalone follow-up pages into the Driver's primary re
 - Add a dedicated epic-level synthetic slice labeled **"Unplanned"** / **"Direct work"** (aria + title must say that — never "Follow-ups", never "Story").
 - **Membership (the unplanned set):**
   1. **Open** quick-dev entries: `WorkInventory.QuickDev` where `route: one-shot` already classified them, and status is **not** done/resolved (case-insensitive). Null/empty status counts as open (remaining work).
-  2. **Unattributable deferred items:** `FollowUpGeometry.UnattributedDeferredItems` (epic number null after existing `ResolveEpicNumber` / `SourceStoryId` attribution).
+  2. **Open unattributable / orphan deferred:** epic number null **or** epic number absent from the epics model (parallel to `OrphanActionItems`); resolved deferred are omitted.
+  3. **Hybrid residual:** done quick-dev parents may reappear in the **board** set when open deferred still names them; they do **not** count toward sunburst Unplanned weight.
 - **Split from today's Follow-ups orphan slice:** unattributed **action items** stay in the existing synthetic **Follow-ups** slice (9.13 treats "Unplanned root" and "unattributed action items" as separate groups). Do **not** dump quick-dev into Follow-ups.
-- **Attribution preference (AC #1):** when an item can resolve to an epic, place it under that epic's story ring instead of Unplanned:
-  - Deferred: keep today's `SourceStoryId` → epic path (`FollowUpGeometry.ResolveEpicNumber`) — already correct.
-  - Quick-dev: best-effort over **existing** text only — e.g. `FollowUpRefs.StoryIdFromKey` / Story N.M / Epic N mentions in title or filename stem; optional: a deferred note that names the `spec-*` file and carries a source story. No new frontmatter fields. If unresolved → Unplanned.
-- **Leaf wedges:** one wedge per open quick-dev (href = `QuickDevEntry.OutputPath`) and one per unattributable deferred item (href = existing `FollowUpDeferredSlot.DetailHref` / 9.11). Aria labels: `"Direct change: {title}"` / `"Deferred item: …"` — never `"Story …"`.
-- **Group root href (temporary until 9.13):** link the Unplanned epic-level arc to a sensible existing page (prefer deferred page when only deferred members; else first quick-dev page or deferred list). Document the seam so 9.13 can swap to `follow-ups/…` filtered group pages without reshaping geometry membership.
-- **Distinct treatment (never color-only):** reuse `.sb-followup-open` / done green for deferred peers if they already read as follow-ups; give quick-dev a **distinct label + class** (e.g. `.sb-unplanned` / `.sb-direct`) with word legend entry **"Direct change"** / **"Unplanned"** — not a lifecycle stage swatch. No new `--status-*` token.
-- **Weighting:** Unplanned root weight = max(1, member count), same pattern as today's orphan Follow-ups slice (`Charts.Sunburst` ~235–268).
-- **NFR8:** zero members → omit Unplanned root entirely (no empty wedge, no legend entry, no broken link).
-- **Hint text:** when Unplanned is present, extend `sunburst-hint` to name it (e.g. "Unplanned = direct / one-shot work outside the epic plan").
+- **Attribution preference (AC #1):** when an item can resolve to an epic, place it under that epic instead of Unplanned:
+  - Deferred: keep today's `SourceStoryId` → epic path (`FollowUpGeometry.ResolveEpicNumber`) — already correct; inherit parent quick-dev epic when enriched.
+  - Quick-dev: text/filename/`FollowUpRefs` / deferred cue first; then unique-day match of `AuthoredDate` to retro `DateText` or story `LastUpdatedDate` under one epic; then unique deferred-timing fallback. Multi-epic ties → null (Unplanned). No new frontmatter fields.
+- **Project glance:** Unplanned root uses open/done **aggregates** linking to the Unplanned group page — not per-item leaf wedges (hierarchy redesign). Epic sunburst may still show attributed quick-dev as middle-ring peers. Aria/titles never say "Story …" for direct/unplanned.
+- **Group root href:** `FollowUpGroupPages.UnplannedPath` (`follow-ups/group-unplanned.html`) when the set is non-empty (Story 9.13).
+- **Distinct treatment (never color-only):** open Unplanned uses `.sb-unplanned`; done Unplanned aggregates use `.sb-followup-done` (not story `.sb-done`). Legend entry **"Direct change"** / **"Unplanned"** — not a lifecycle stage swatch. No new `--status-*` token.
+- **Weighting:** Unplanned root weight = max(1, **open** member count) — excludes resurfaced done residual parents.
+- **NFR8:** zero open members → omit Unplanned root entirely (no empty wedge, no legend entry, no broken link).
+- **Hint text:** when Unplanned is present, extend `sunburst-hint` to name it (e.g. "Unplanned = direct / one-shot work outside the epic plan") without implying follow-up legend swatches unless follow-up aggregates exist.
 
 **Silhouette — sprint unplanned lane (AC #2):**
 
-- Render the **same membership set** as the sunburst Unplanned root (shared pure helper — one source of truth for "what is unplanned").
-- **By-status board:** add a trailing lane (or clearly labeled grouping) **"Unplanned"** that holds cards for those items — not fake `SprintEntry` stories. Cards link to the same hrefs as sunburst leaves (spec page / deferred detail). Status badge from existing quick-dev `Status` / deferred resolved flag via `StatusStyles` — no new token.
+- Render the **full board membership set** from the shared pure helper (open members + resurfaced done residual parents).
+- **By-status board:** add a trailing lane (or clearly labeled grouping) **"Unplanned"** that holds cards for those items — not fake `SprintEntry` stories. Cards link to spec page / deferred detail (and provenance `SourceHref` when present). Status badge from existing quick-dev `Status` / deferred resolved flag via `StatusStyles` — no new token.
 - **By-epic board:** add a trailing synthetic swimlane **"Unplanned / Direct work"** (always after real epics; ignore epic filter defaults so it stays visible when the set is non-empty — or treat like `n < 0` "Ungrouped" but with the Unplanned label). Same cards.
 - **Home board cap:** include unplanned cards in the home board when the set is non-empty; respect existing cap patterns without hiding the entire Unplanned lane.
 - **NFR8:** empty set → no Unplanned lane / swimlane.
@@ -93,14 +96,14 @@ Epic 9 extends FR30 from standalone follow-up pages into the Driver's primary re
   - [x] Introduce a pure helper (extend `FollowUpGeometry` or add `UnplannedWorkGeometry` / methods on `WorkInventory`) that, given `WorkInventory` + deferred slots + optional `EpicsModel`, returns:
     - epic-attributed quick-dev (for epic story-ring peers)
     - unplanned members (open unattributable quick-dev + unattributable deferred slots)
-  - [x] Open-filter for quick-dev: status not done/resolved; null/empty → open.
-  - [x] Attribution: deferred via existing epic resolution; quick-dev via best-effort text/filename only (reuse `FollowUpRefs` where possible).
+  - [x] Open-filter for quick-dev: status not done/resolved; null/empty → open; hybrid residual may re-include done parents for the board only.
+  - [x] Attribution: deferred via existing epic resolution; quick-dev via text/filename cues then unique-day date/timing (reuse `FollowUpRefs` where possible).
   - [x] Assert member counts are consistent with ledger fields used for display (`DirectChanges` / `DeferredOpenItems` are authorities for *totals*; geometry may show the open subset — document and test the relationship; never invent a second parse of deferred markdown that can drift from `ProjectCounts.DeferredOpenItems`).
 
 - [x] **Task 2 — Project sunburst Unplanned root (AC: #1)**
-  - [x] Extend `Charts.Sunburst` to render the Unplanned synthetic root when the set is non-empty; omit when empty.
-  - [x] Move unattributable deferred wedges out of the Follow-ups orphan slice into Unplanned; keep unattributed action items on Follow-ups.
-  - [x] Render open quick-dev leaf wedges under Unplanned (or under the preferred epic when attributed).
+  - [x] Extend `Charts.Sunburst` to render the Unplanned synthetic root when open members are non-empty; omit when empty.
+  - [x] Move unattributable deferred out of the Follow-ups orphan slice into Unplanned; keep unattributed action items on Follow-ups.
+  - [x] Project glance: Unplanned open/done aggregates (leaves on board / group page); attributed quick-dev under preferred epic on epic sunburst.
   - [x] Update legend + `sunburst-hint`; aria/titles never say "Story".
   - [x] Thread inputs from existing `DashboardView` / epics index call sites (`HtmlRenderAdapter.Dashboard.cs`, `HtmlRenderAdapter.Epics.cs`) — Charts stays pure.
 
@@ -112,7 +115,7 @@ Epic 9 extends FR30 from standalone follow-up pages into the Driver's primary re
 
 - [x] **Task 4 — Guardrails (AC: #1, #2)**
   - [x] Do **not** change `sprint-status.yaml` / `deferred-work.md` / quick-dev frontmatter schemas.
-  - [x] Do **not** build 9.13 filtered group pages; keep group-root hrefs simple and documented.
+  - [x] Group-root href may target Story 9.13 filtered Unplanned group page; do not re-implement group-page generation here.
   - [x] Do **not** fold DirectChanges into epic/story/task tallies (Story 2.1 / WorkInventory invariant).
   - [x] Leave 9.6/9.10/9.11 templaters alone except read-only reuse of deferred slots / detail hrefs.
   - [x] No JS for navigation (webview CSP; NFR5).
@@ -123,6 +126,28 @@ Epic 9 extends FR30 from standalone follow-up pages into the Driver's primary re
   - [x] Ledger agreement pins where counts are displayed.
   - [x] Golden fingerprint will move (home + sprint + epics index) → regen `SiteGeneratorAdapterTests` expected hash per `golden-diff-normalization-gotchas`. Confirm three `Render*ParityTests` green; no new `HostRenderException`.
   - [x] Run `dotnet test` from repo root.
+
+### Review Findings
+
+- [x] [Review][Decision] Project glance aggregates vs 9.12 per-item Unplanned leaf wedges — **resolved: ratify aggregates** (match hierarchy); amend 9.12 AC/Task 2; fix failing leaf-aria test → becomes patch.
+- [x] [Review][Patch] Amend 9.12 AC/Task 2 + silhouette to project-glance Unplanned open/done aggregates (leaves on sprint board / group page); align `From_CodeReviewOfSpec_KeepsParentAndChildTogether…` assertions [`tests/SpecScribe.Tests/UnplannedWorkGeometryTests.cs:235`]
+- [x] [Review][Decision] Unplanned group-root href — 9.13 pages vs temporary seam — **resolved: ratify 9.13 destinations**; amend 9.12 out-of-scope / Task 4 to allow `GroupRootHref` → `FollowUpGroupPages.UnplannedPath` → becomes patch.
+- [x] [Review][Patch] Amend 9.12 Task 4 / out-of-scope / silhouette: group-root may target filtered Unplanned group page (9.13); temporary deferred/first-qd seam no longer required [`_bmad-output/implementation-artifacts/9-12-unplanned-and-one-off-work-in-geometry-and-sprint.md`]
+- [x] [Review][Decision] Done quick-dev residual resurfacing vs open-only membership — **resolved: hybrid** — resurface done parents for board/provenance display; exclude them from sunburst weight / `UnplannedMemberCount` → becomes patch.
+- [x] [Review][Patch] Hybrid residual: keep done QD parents in sprint Unplanned membership/provenance; exclude from sunburst `UnplannedMemberCount`/root weight; amend AC/Task 1 to document [`src/SpecScribe/UnplannedWorkGeometry.cs` / `Charts.cs` / `SprintTemplater.cs`]
+- [x] [Review][Decision] Date/timing epic attribution vs text-only AC — **resolved: amend 9.12 AC** to ratify date/timing tiers after text cues (unique-only; ties → Unplanned; match hierarchy) → becomes patch.
+- [x] [Review][Patch] Amend 9.12 AC/Task 1 attribution: text cues first, then unique-day retro/story date match, then deferred timing; document in silhouette [`_bmad-output/implementation-artifacts/9-12-unplanned-and-one-off-work-in-geometry-and-sprint.md`]
+- [x] [Review][Patch] Unplanned deferred card computes `SourceHref`/`parentHref` but never emits an `<a>` — both branches are non-linked `<span>` [`src/SpecScribe/SprintTemplater.cs:616`]
+- [x] [Review][Patch] Filter resolved unattributable deferred out of Unplanned membership (or NFR8 empty when only resolved remain) — docs say open subset; `From` keeps all null-epic deferred [`src/SpecScribe/UnplannedWorkGeometry.cs:129`]
+- [x] [Review][Patch] Do not set `hasAggregates = true` solely because Unplanned is present — Unplanned-only charts get follow-up legend keys and “outer: open vs done follow-ups” hint copy [`src/SpecScribe/Charts.cs:264`]
+- [x] [Review][Patch] Epic open/done aggregate hrefs point at `group-epic-N.html` even when Enumerate skips QD-only epics (actions+deferred empty) → 404 [`src/SpecScribe/Charts.cs:228` / `FollowUpGroupPages.cs:98`]
+- [x] [Review][Patch] Align Follow-ups group-page membership with sunburst `OrphanActionItems` (unknown epic numbers) — today Enumerate uses null-epic-only `UnattributedActionItems` [`src/SpecScribe/FollowUpGroupPages.cs:53` / `Charts.cs:168`]
+- [x] [Review][Patch] Pass retros into deferred quick-dev epic enrichment so date-attributed parents do not leave children Unplanned [`src/SpecScribe/FollowUpGeometry.cs:352`]
+- [x] [Review][Patch] Add orphan-deferred handling parallel to `OrphanActionItems` — deferred with unknown epic number currently vanish from Unplanned and every epic wedge [`src/SpecScribe/FollowUpGeometry.cs:191`]
+- [x] [Review][Patch] Empty/whitespace quick-dev titles need a fallback on wedges/cards (action/deferred already use “(no … text)”) [`src/SpecScribe/Charts.cs:493` / `SprintTemplater.cs:613`]
+- [x] [Review][Patch] Done Unplanned/direct wedges use story `done` class instead of follow-up/unplanned done styling — legend emphasis misses them [`src/SpecScribe/Charts.cs:285`]
+- [x] [Review][Defer] Watch/`GenerateOne` skips `WriteFollowUpGroupPages` [`src/SpecScribe/SiteGenerator.cs:393`] — deferred, pre-existing
+- [x] [Review][Defer] `ContainsSpecName` substring false positives on overlapping stems [`src/SpecScribe/UnplannedWorkGeometry.cs`] — deferred, pre-existing
 
 ## Dev Notes
 
@@ -289,3 +314,4 @@ Composer (Cursor agent router)
 ## Change Log
 
 - 2026-07-17: Story 9.12 — Unplanned sunburst root + sprint Unplanned lane from shared `UnplannedWorkGeometry`; Follow-ups orphan split; golden regen.
+- 2026-07-17: Code review — ratified aggregates + 9.13 group-root + hybrid residual weight + date attribution; patches applied (orphan deferred, retros enrich, resolved filter, followup-done class, title fallback).

@@ -85,7 +85,8 @@ public sealed record FollowUpGeometry(
         WorkInventory work,
         string linkPrefix = "",
         DeferredWorkModel? deferredModel = null,
-        EpicsModel? epics = null)
+        EpicsModel? epics = null,
+        IReadOnlyList<RetroModel>? retros = null)
     {
         // List href whenever the deferred surface exists — resolved items still need reverse-links / green wedges.
         var deferredHref = work.Deferred is { } d
@@ -94,8 +95,8 @@ public sealed record FollowUpGeometry(
 
         var deferredSlots = BuildDeferredSlots(deferredModel, epics, work, linkPrefix, deferredHref);
         // Second pass: quick-dev-sourced slots inherit epic from ResolveQuickDevEpic with the
-        // completed slot set (timing + deferred cues need DeferredItems). Keeps chrome ↔ sunburst coherent.
-        deferredSlots = EnrichQuickDevDeferredEpics(deferredSlots, epics, work);
+        // completed slot set (timing + deferred cues + retros need DeferredItems). Keeps chrome ↔ sunburst coherent.
+        deferredSlots = EnrichQuickDevDeferredEpics(deferredSlots, epics, work, retros);
 
         // Ledger open deferred with nothing parseable → one aggregate wedge (Unplanned / list href). Never drop debt.
         if (deferredSlots.Count == 0 && counts.DeferredOpenItems > 0 && deferredHref is { Length: > 0 })
@@ -190,6 +191,11 @@ public sealed record FollowUpGeometry(
 
     public IReadOnlyList<FollowUpDeferredSlot> UnattributedDeferredItems =>
         DeferredItems.Where(s => s.EpicNumber is null).ToList();
+
+    /// <summary>Unplanned deferred membership: null epic <em>or</em> <see cref="FollowUpDeferredSlot.EpicNumber"/>
+    /// not present in <paramref name="knownEpicNumbers"/> — parallel to <see cref="OrphanActionItems"/>.</summary>
+    public IReadOnlyList<FollowUpDeferredSlot> OrphanDeferredItems(IReadOnlySet<int> knownEpicNumbers) =>
+        DeferredItems.Where(s => s.EpicNumber is null || !knownEpicNumbers.Contains(s.EpicNumber.Value)).ToList();
 
     /// <summary>Normalizes a provenance / filename key the same way deferred <c>SourceKey</c> and
     /// Unplanned membership do — strip <c>.md</c>/<c>.html</c>, trim backticks, ordinal-ignore-case stems.
@@ -316,11 +322,12 @@ public sealed record FollowUpGeometry(
     }
 
     /// <summary>Fills null <see cref="FollowUpDeferredSlot.EpicNumber"/> for slots whose SourceKey is a
-    /// quick-dev, using the completed slot set so timing attribution matches page chrome.</summary>
+    /// quick-dev, using the completed slot set + retros so date attribution matches page chrome.</summary>
     private static IReadOnlyList<FollowUpDeferredSlot> EnrichQuickDevDeferredEpics(
         IReadOnlyList<FollowUpDeferredSlot> slots,
         EpicsModel? epics,
-        WorkInventory work)
+        WorkInventory work,
+        IReadOnlyList<RetroModel>? retros = null)
     {
         if (epics is null || slots.Count == 0) return slots;
 
@@ -349,7 +356,7 @@ public sealed record FollowUpGeometry(
                 continue;
             }
 
-            var epic = UnplannedWorkGeometry.ResolveQuickDevEpic(quickDev, epics, temp);
+            var epic = UnplannedWorkGeometry.ResolveQuickDevEpic(quickDev, epics, temp, retros);
             if (epic is null)
             {
                 enriched.Add(slot);

@@ -757,8 +757,35 @@ public class ChartsTests
         Assert.DoesNotContain($"href=\"{SiteNav.ActionItemsOutputPath}\"", svg);
         Assert.DoesNotContain("href=\"deferred-work.html\"", svg);
         Assert.Contains("Follow-ups: 1 open unattributed item", svg);
+        Assert.Contains("Open follow-up</span>", svg); // follow-ups present → legend OK
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
+    }
+
+    [Fact]
+    public void Sunburst_UnplannedOnly_DoesNotShowFollowUpLegendSwatches()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Do the thing", "ready", 0, 1)) },
+        };
+        var work = new WorkInventory
+        {
+            QuickDev = new[]
+            {
+                new QuickDevEntry("Fix the footer", "implementation-artifacts/spec-fix-footer.html", "ready", "chore"),
+            },
+            Deferred = null,
+        };
+        var unplanned = UnplannedWorkGeometry.From(work, FollowUpGeometry.Empty, model);
+        var svg = Charts.Sunburst(model, followUps: FollowUpGeometry.Empty, unplanned: unplanned);
+
+        Assert.Contains("aria-label=\"Unplanned:", svg);
+        Assert.Contains("Direct change</span>", svg);
+        Assert.DoesNotContain("Open follow-up</span>", svg);
+        Assert.DoesNotContain("Done follow-up</span>", svg);
     }
 
     [Fact]

@@ -5219,7 +5219,11 @@ a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2
   text-decoration: none; color: inherit;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-a.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--rust-light); transform: translateY(-1px); }
+a.sprint-card:hover,
+div.sprint-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--rust-light); transform: translateY(-1px); }
+.sprint-card-source a.sprint-card-source-ref { color: var(--rust); text-decoration: none; }
+.sprint-card-source a.sprint-card-source-ref:hover { text-decoration: underline; }
+a.sprint-card-title { color: inherit; text-decoration: none; }
 .sprint-card.pending { border-left-color: var(--status-pending); }
 .sprint-card.ready { border-left-color: var(--status-ready); }
 .sprint-card.active { border-left-color: var(--status-active); }

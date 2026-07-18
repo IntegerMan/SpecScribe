@@ -167,7 +167,7 @@ public static class Charts
         var knownEpics = epics.Select(e => e.Number).ToHashSet();
         var unattributed = geometry.OrphanActionItems(knownEpics);
         var orphanSlots = unattributed.Count;
-        var unplannedSlots = unplannedGeo.UnplannedMemberCount;
+        var unplannedSlots = unplannedGeo.SunburstUnplannedWeight;
 
         int StoryWeight(StoryInfo s) => Math.Max(1, s.TasksTotal);
         int EpicWeight(EpicInfo e) => Math.Max(1, e.Stories.Sum(StoryWeight));
@@ -187,7 +187,7 @@ public static class Charts
         var aggregateOuter = size * 0.465;
 
         var hasAggregates = false;
-        var hasUnplanned = unplannedGeo.HasUnplanned;
+        var hasUnplanned = unplannedGeo.SunburstUnplannedWeight > 0;
 
         var sb = new StringBuilder();
         sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"Project progress sunburst\">\n");
@@ -261,13 +261,13 @@ public static class Charts
 
         if (unplannedSlots > 0)
         {
-            hasAggregates = true;
+            // Do not set hasAggregates — Unplanned uses hasUnplanned for legend/hint (avoid follow-up swatches).
             var unplannedWeight = Math.Max(1, unplannedSlots);
             var sweep = unplannedWeight * anglePerUnit;
             var openUnplanned = unplannedGeo.UnplannedQuickDev.Count(q => UnplannedWorkGeometry.IsOpenQuickDev(q.Entry.Status))
                 + unplannedGeo.UnattributableDeferred.Count(s => !s.Item.Resolved);
             var doneUnplanned = Math.Max(0, unplannedSlots - openUnplanned);
-            var rootClass = openUnplanned > 0 ? "unplanned" : "done";
+            var rootClass = openUnplanned > 0 ? "unplanned" : "followup-done";
             var rootHref = unplannedGeo.GroupRootHref ?? "#";
             var rootAria = openUnplanned > 0
                 ? $"Unplanned: {unplannedSlots} direct / one-off {Plural(unplannedSlots, "item", "items")}"
@@ -282,7 +282,7 @@ public static class Charts
                 openLabel: $"Unplanned: {openUnplanned} open {Plural(openUnplanned, "item", "items")}",
                 doneLabel: $"Unplanned: {doneUnplanned} done {Plural(doneUnplanned, "item", "items")}",
                 openClass: "unplanned",
-                doneClass: "done");
+                doneClass: "followup-done");
 
             angle += sweep;
         }
@@ -494,10 +494,10 @@ public static class Charts
         StringBuilder sb, UnplannedQuickDevSlot slot, double angle, double sweep, double pad,
         double c, double storyInner, double storyOuter)
     {
-        var title = TruncateFollowUpText(PathUtil.StripHtmlTags(slot.Entry.Title));
+        var title = TruncateFollowUpText(UnplannedWorkGeometry.DisplayTitle(slot.Entry.Title));
         var open = UnplannedWorkGeometry.IsOpenQuickDev(slot.Entry.Status);
         var label = open ? $"Direct change: {title}" : $"Direct change (done): {title}";
-        AppendFollowUpSlot(sb, label, slot.Href, open ? "unplanned" : "done", angle, sweep, pad, c, storyInner, storyOuter);
+        AppendFollowUpSlot(sb, label, slot.Href, open ? "unplanned" : "followup-done", angle, sweep, pad, c, storyInner, storyOuter);
     }
 
     private static void AppendFollowUpSlot(

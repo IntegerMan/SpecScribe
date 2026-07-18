@@ -22,10 +22,11 @@ public sealed record UnplannedMember(
     string? SourceHref = null);
 
 /// <summary>Projection of unplanned / one-off work for the project sunburst and sprint board.
-/// Membership = open unattributable quick-dev + unattributable deferred slots (from
-/// <see cref="FollowUpGeometry"/>). Unattributed action items stay on the Follow-ups orphan (9.13).
+/// Board membership = open unattributable/orphan quick-dev + open orphan deferred + done quick-dev
+/// parents resurfaced when open deferred still names them. Sunburst weight counts open members only
+/// (hybrid residual). Unattributed action items stay on the Follow-ups orphan (9.13).
 /// Counts: open quick-dev is a subset of <see cref="ProjectCounts.DirectChanges"/> (all statuses);
-/// unattributable deferred are the unattributed open subset of ledger-backed deferred slots —
+/// orphan deferred are the unattributed open subset of ledger-backed deferred slots —
 /// never a second parse of deferred markdown. [Story 9.12]</summary>
 public sealed record UnplannedWorkGeometry(
     IReadOnlyList<UnplannedQuickDevSlot> QuickDevSlots,
@@ -43,7 +44,7 @@ public sealed record UnplannedWorkGeometry(
         Array.Empty<UnplannedQuickDevSlot>(),
         Array.Empty<FollowUpDeferredSlot>());
 
-    /// <summary>Open quick-dev with no resolvable epic — Unplanned root / lane members.</summary>
+    /// <summary>Quick-dev with no resolvable epic — Unplanned root / lane members (may include resurfaced done parents).</summary>
     public IReadOnlyList<UnplannedQuickDevSlot> UnplannedQuickDev =>
         QuickDevSlots.Where(s => s.EpicNumber is null).ToList();
 
@@ -51,23 +52,30 @@ public sealed record UnplannedWorkGeometry(
     public IReadOnlyList<UnplannedQuickDevSlot> ForEpic(int epicNumber) =>
         QuickDevSlots.Where(s => s.EpicNumber == epicNumber).ToList();
 
+    /// <summary>Board / group-page presence — includes resurfaced done residual parents.</summary>
     public bool HasUnplanned => UnplannedMemberCount > 0;
 
+    /// <summary>Full board membership count (open + resurfaced done residual parents + open deferred).</summary>
     public int UnplannedMemberCount => UnplannedQuickDev.Count + UnattributableDeferred.Count;
 
-    /// <summary>Shared membership set for sunburst Unplanned root and sprint Unplanned lane —
-    /// one source of truth; tests pin equality across surfaces. [Story 9.12]</summary>
+    /// <summary>Sunburst Unplanned root weight — open members only (excludes resurfaced done residual parents). [Story 9.12 hybrid]</summary>
+    public int SunburstUnplannedWeight =>
+        UnplannedQuickDev.Count(q => IsOpenQuickDev(q.Entry.Status))
+        + UnattributableDeferred.Count(s => !s.Item.Resolved);
+
+    /// <summary>Shared membership set for sprint Unplanned lane + group page —
+    /// one source of truth for board cards. Sunburst weight uses <see cref="SunburstUnplannedWeight"/>. [Story 9.12]</summary>
     public IReadOnlyList<UnplannedMember> UnplannedSet =>
         UnplannedQuickDev
             .Select(s => new UnplannedMember(
                 "direct",
-                s.Entry.Title,
+                DisplayTitle(s.Entry.Title),
                 s.Href,
                 s.Entry.Status,
                 !IsOpenQuickDev(s.Entry.Status)))
             .Concat(UnattributableDeferred.Select(d => new UnplannedMember(
                 "deferred",
-                PathUtil.StripHtmlTags(FollowUpRow.SummarizeFromHtml(d.Item.BodyHtml)),
+                DisplayTitle(PathUtil.StripHtmlTags(FollowUpRow.SummarizeFromHtml(d.Item.BodyHtml))),
                 d.DetailHref,
                 d.Item.Resolved ? "done" : "open",
                 d.Item.Resolved,
@@ -91,10 +99,17 @@ public sealed record UnplannedWorkGeometry(
             && !s.Equals("resolved", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Non-empty title for wedges/cards; blank/whitespace → <c>(no title)</c>.</summary>
+    public static string DisplayTitle(string? title)
+    {
+        var t = PathUtil.StripHtmlTags(title ?? string.Empty).Trim();
+        return t.Length > 0 ? t : "(no title)";
+    }
+
     /// <summary>Builds unplanned geometry from inventory + already-projected follow-up slots.
-    /// Reuses <see cref="FollowUpGeometry.UnattributedDeferredItems"/> — never re-parses deferred markdown.
-    /// Done quick-dev that still have open deferred from their code review are re-surfaced as parents so
-    /// residual work stays attached to the item it stemmed from. [Story 9.12]</summary>
+    /// Reuses orphan deferred (null epic or unknown epic number) — never re-parses deferred markdown.
+    /// Done quick-dev that still have open deferred from their code review are re-surfaced as parents for
+    /// the board; sunburst weight excludes them. [Story 9.12]</summary>
     public static UnplannedWorkGeometry From(
         WorkInventory work,
         FollowUpGeometry followUps,
@@ -102,14 +117,23 @@ public sealed record UnplannedWorkGeometry(
         string linkPrefix = "",
         IReadOnlyList<RetroModel>? retros = null)
     {
-        var unattributedDeferred = followUps.UnattributedDeferredItems
+        IReadOnlyList<FollowUpDeferredSlot> orphanDeferred;
+        if (epics is not null)
+        {
+            var known = epics.Epics.Select(e => e.Number).ToHashSet();
+            orphanDeferred = followUps.OrphanDeferredItems(known);
+        }
+        else
+            orphanDeferred = followUps.UnattributedDeferredItems;
+
+        var unattributedDeferred = orphanDeferred
+            .Where(s => !s.Item.Resolved)
             .Select(s => s with { DetailHref = FollowUpGeometry.ApplyLinkPrefix(linkPrefix, s.DetailHref) })
             .ToList();
 
         var residualSourceKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var slot in unattributedDeferred)
         {
-            if (slot.Item.Resolved) continue;
             if (slot.SourceKey is { Length: > 0 } key)
                 residualSourceKeys.Add(FollowUpGeometry.NormalizeSourceKey(key));
         }
@@ -125,12 +149,8 @@ public sealed record UnplannedWorkGeometry(
             .ToList();
 
         // Deferred that inherit an epic via parent quick-dev are already attributed in FollowUpGeometry.
-        // Remaining unattributable deferred stay here — including children of unplanned quick-dev parents.
-        var deferred = unattributedDeferred
-            .Where(s => s.EpicNumber is null)
-            .ToList();
-
-        return new UnplannedWorkGeometry(quickDev, deferred, DeferredListHref: null, linkPrefix);
+        // Remaining orphan deferred stay here — including children of unplanned quick-dev parents.
+        return new UnplannedWorkGeometry(quickDev, unattributedDeferred, DeferredListHref: followUps.DeferredHref, linkPrefix);
     }
 
     private static readonly Regex ProvenanceParen = new(

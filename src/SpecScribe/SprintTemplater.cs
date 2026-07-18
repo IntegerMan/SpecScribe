@@ -605,22 +605,29 @@ public static class SprintTemplater
         var hiddenAttr = hidden ? " hidden" : string.Empty;
         var overflowAttr = capOverflow ? " data-cap-overflow=\"1\"" : string.Empty;
         var href = PathUtil.Html(prefix + member.Href);
-
-        sb.Append($"      <a class=\"sprint-card js-tip unplanned-card {cssClass}\"{hiddenAttr}{overflowAttr} href=\"{href}\" data-tip=\"{tip}\">\n");
+        var parentHref = !isDirect && member.SourceHref is { Length: > 0 } sh ? prefix + sh : null;
+        // Div wrapper when a provenance link is present so we never nest <a> inside the card <a>.
+        var useDiv = parentHref is not null;
+        if (useDiv)
+            sb.Append($"      <div class=\"sprint-card js-tip unplanned-card {cssClass}\"{hiddenAttr}{overflowAttr} data-tip=\"{tip}\" tabindex=\"0\" role=\"group\">\n");
+        else
+            sb.Append($"      <a class=\"sprint-card js-tip unplanned-card {cssClass}\"{hiddenAttr}{overflowAttr} href=\"{href}\" data-tip=\"{tip}\">\n");
         sb.Append("        <div class=\"sprint-card-head\">\n");
         sb.Append($"          <span class=\"sprint-card-id\">{PathUtil.Html(kindLabel)}</span>\n");
         sb.Append("        </div>\n");
-        sb.Append($"        <span class=\"sprint-card-title\">{PathUtil.Html(member.Title)}</span>\n");
+        if (useDiv)
+            sb.Append($"        <a class=\"sprint-card-title\" href=\"{href}\">{PathUtil.Html(member.Title)}</a>\n");
+        else
+            sb.Append($"        <span class=\"sprint-card-title\">{PathUtil.Html(member.Title)}</span>\n");
         if (!isDirect && member.SourceKey is { Length: > 0 } sourceKey)
         {
-            var parentHref = member.SourceHref is { Length: > 0 } sh ? prefix + sh : null;
             var parentLabel = NormalizeCardSourceKey(sourceKey);
             if (parentHref is not null)
-                sb.Append($"        <span class=\"sprint-card-source\">from <span class=\"sprint-card-source-ref\">{PathUtil.Html(parentLabel)}</span></span>\n");
+                sb.Append($"        <span class=\"sprint-card-source\">from <a class=\"sprint-card-source-ref\" href=\"{PathUtil.Html(parentHref)}\">{PathUtil.Html(parentLabel)}</a></span>\n");
             else
                 sb.Append($"        <span class=\"sprint-card-source\">from {PathUtil.Html(parentLabel)}</span>\n");
         }
-        sb.Append("      </a>\n");
+        sb.Append(useDiv ? "      </div>\n" : "      </a>\n");
     }
 
     private static string NormalizeCardSourceKey(string key)

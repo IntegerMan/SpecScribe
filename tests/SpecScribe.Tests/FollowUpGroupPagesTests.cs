@@ -31,7 +31,7 @@ public class FollowUpGroupPagesTests
     }
 
     [Fact]
-    public void Enumerate_FollowUps_IsUnattributedActionsOnly()
+    public void Enumerate_FollowUps_IncludesNullAndUnknownEpicOrphans()
     {
         var model = OneEpicModel();
         var items = new[]
@@ -39,17 +39,20 @@ public class FollowUpGroupPagesTests
             new SprintActionItem("Attributed", "open", 1, null),
             new SprintActionItem("Orphan A", "open", null, null),
             new SprintActionItem("Orphan B", "done", null, null),
+            new SprintActionItem("Ghost epic debt", "open", 99, null),
         };
         var work = new WorkInventory { QuickDev = Array.Empty<QuickDevEntry>(), Deferred = null };
-        var geometry = FollowUpGeometry.From(items, ProjectCounts.Empty with { OpenActionItems = 2 }, work, epics: model);
+        var geometry = FollowUpGeometry.From(items, ProjectCounts.Empty with { OpenActionItems = 3 }, work, epics: model);
         var unplanned = UnplannedWorkGeometry.Empty;
 
         var groups = FollowUpGroupPages.Enumerate(geometry, unplanned, model);
         var followUps = Assert.Single(groups, g => g.Slug == FollowUpGroupPages.FollowUpsSlug);
-        Assert.Equal(2, followUps.Count);
+        Assert.Equal(3, followUps.Count);
         Assert.All(followUps.Members, m => Assert.Equal("action", m.Kind));
         Assert.Contains(followUps.Members, m => m.SummaryHtml.Contains("Orphan A", StringComparison.Ordinal));
+        Assert.Contains(followUps.Members, m => m.SummaryHtml.Contains("Ghost epic debt", StringComparison.Ordinal));
         Assert.DoesNotContain(followUps.Members, m => m.SummaryHtml.Contains("Attributed", StringComparison.Ordinal));
+        Assert.DoesNotContain(groups, g => g.Slug == FollowUpGroupPages.EpicSlug(99));
         Assert.DoesNotContain(groups, g => g.Slug == FollowUpGroupPages.UnplannedSlug);
     }
 
@@ -79,12 +82,16 @@ public class FollowUpGroupPagesTests
             epics: model);
         var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
 
+        Assert.Equal("deferred-work.html", unplanned.DeferredListHref);
+
         var groups = FollowUpGroupPages.Enumerate(geometry, unplanned, model);
         Assert.DoesNotContain(groups, g => g.Slug == FollowUpGroupPages.FollowUpsSlug);
         var page = Assert.Single(groups, g => g.Slug == FollowUpGroupPages.UnplannedSlug);
         Assert.Equal(2, page.Count);
         Assert.Contains(page.Members, m => m.Kind == "direct");
         Assert.Contains(page.Members, m => m.Kind == "deferred");
+        Assert.Equal("deferred-work.html", page.WholeSiteListHref);
+        Assert.Equal("All deferred work", page.WholeSiteListLabel);
     }
 
     [Fact]
@@ -119,9 +126,43 @@ public class FollowUpGroupPagesTests
     }
 
     [Fact]
+    public void Enumerate_EpicGroup_EmitsWhenQuickDevOnly()
+    {
+        var model = OneEpicModel();
+        var work = new WorkInventory
+        {
+            QuickDev = new[]
+            {
+                new QuickDevEntry("Story 1.1 hotfix", "spec-hotfix.html", "ready", null),
+            },
+            Deferred = null,
+        };
+        var geometry = FollowUpGeometry.Empty;
+        var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
+        Assert.NotEmpty(unplanned.ForEpic(1));
+
+        var groups = FollowUpGroupPages.Enumerate(geometry, unplanned, model);
+        var epic = Assert.Single(groups, g => g.Slug == FollowUpGroupPages.EpicSlug(1));
+        Assert.Contains(epic.Members, m => m.Kind == "direct");
+        Assert.Contains(epic.Members, m => m.SummaryHtml.Contains("hotfix", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void Enumerate_EmptyInputs_YieldsNoGroups()
     {
         Assert.Empty(FollowUpGroupPages.Enumerate(FollowUpGeometry.Empty, UnplannedWorkGeometry.Empty));
+    }
+
+    [Fact]
+    public void Enumerate_EmptyActionText_GetsFallbackSummary()
+    {
+        var model = OneEpicModel();
+        var items = new[] { new SprintActionItem("   ", "open", null, null) };
+        var work = new WorkInventory { QuickDev = Array.Empty<QuickDevEntry>(), Deferred = null };
+        var geometry = FollowUpGeometry.From(items, ProjectCounts.Empty with { OpenActionItems = 1 }, work, epics: model);
+        var groups = FollowUpGroupPages.Enumerate(geometry, UnplannedWorkGeometry.Empty, model);
+        var followUps = Assert.Single(groups, g => g.Slug == FollowUpGroupPages.FollowUpsSlug);
+        Assert.Contains("(no action text)", Assert.Single(followUps.Members).SummaryHtml);
     }
 
     [Fact]

@@ -50,14 +50,18 @@ public static class FollowUpGroupPages
     {
         var groups = new List<FollowUpGroupSpec>();
 
-        var unattributed = followUps.UnattributedActionItems;
-        if (unattributed.Count > 0)
+        // Match Charts.Sunburst orphan wedge: null epic OR epic number absent from the model.
+        var knownEpics = epics?.Epics.Select(e => e.Number).ToHashSet() ?? new HashSet<int>();
+        var orphans = epics is not null
+            ? followUps.OrphanActionItems(knownEpics)
+            : followUps.UnattributedActionItems;
+        if (orphans.Count > 0)
         {
             groups.Add(new FollowUpGroupSpec(
                 FollowUpsSlug,
                 "Follow-ups",
                 "Unattributed action items",
-                unattributed.Select(a => FromAction(a, followUps, "Unattributed")).ToList(),
+                orphans.Select(a => FromAction(a, followUps, OrphanSourceChip(a))).ToList(),
                 SiteNav.ActionItemsOutputPath,
                 "All open action items"));
         }
@@ -81,28 +85,35 @@ public static class FollowUpGroupPages
                 unplanned.DeferredListHref is { Length: > 0 } ? "All deferred work" : null));
         }
 
+        // Known epics only when a model is present — unknown epic numbers stay on Follow-ups, not group-epic-N.
         var epicNumbers = new SortedSet<int>();
-        foreach (var a in followUps.ActionItems)
-            if (a.EpicNumber is { } en) epicNumbers.Add(en);
-        foreach (var d in followUps.DeferredItems)
-            if (d.EpicNumber is { } en) epicNumbers.Add(en);
         if (epics is not null)
+        {
             foreach (var e in epics.Epics)
                 epicNumbers.Add(e.Number);
+        }
+        else
+        {
+            foreach (var a in followUps.ActionItems)
+                if (a.EpicNumber is { } en) epicNumbers.Add(en);
+            foreach (var d in followUps.DeferredItems)
+                if (d.EpicNumber is { } en) epicNumbers.Add(en);
+        }
 
         foreach (var n in epicNumbers)
         {
             var actions = followUps.ForEpicNumber(n);
             var deferred = followUps.DeferredForEpicNumber(n);
-            // Pin: epic group = attributed actions + deferred. Optional quick-dev for completeness.
-            if (actions.Count == 0 && deferred.Count == 0) continue;
+            var qdForEpic = unplanned.ForEpic(n);
+            // Match Charts.CountEpicFollowUpAggregates: actions + deferred + attributed quick-dev.
+            if (actions.Count == 0 && deferred.Count == 0 && qdForEpic.Count == 0) continue;
 
             var members = new List<FollowUpGroupMember>();
             foreach (var a in actions)
                 members.Add(FromAction(a, followUps, $"Epic {n}"));
             foreach (var slot in deferred)
                 members.Add(FromDeferred(slot, sourceChip: slot.ProvenanceLabel));
-            foreach (var qd in unplanned.ForEpic(n))
+            foreach (var qd in qdForEpic)
                 members.Add(FromQuickDev(qd));
 
             groups.Add(new FollowUpGroupSpec(
@@ -117,10 +128,14 @@ public static class FollowUpGroupPages
         return groups;
     }
 
+    private static string OrphanSourceChip(SprintActionItem item) =>
+        item.EpicNumber is { } n ? $"Epic {n} (unknown)" : "Unattributed";
+
     private static FollowUpGroupMember FromAction(
         SprintActionItem item, FollowUpGeometry geometry, string sourceChip)
     {
         var summary = FollowUpRow.SummarizePlainText(item.Action);
+        if (string.IsNullOrWhiteSpace(summary)) summary = "(no action text)";
         return new FollowUpGroupMember(
             "action",
             PathUtil.Html(summary),
@@ -134,6 +149,7 @@ public static class FollowUpGroupPages
     private static FollowUpGroupMember FromDeferred(FollowUpDeferredSlot slot, string sourceChip)
     {
         var summary = FollowUpRow.SummarizeFromHtml(slot.Item.BodyHtml);
+        if (string.IsNullOrWhiteSpace(summary)) summary = "(no deferred text)";
         var (token, label) = slot.Item.Resolved
             ? ("done", "Resolved")
             : (StatusStyles.ForSprint("open"), "Open");

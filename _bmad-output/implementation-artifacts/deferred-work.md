@@ -2,6 +2,17 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 9-12-unplanned-and-one-off-work-in-geometry-and-sprint.md (2026-07-17)
+
+- Watch-mode `GenerateOne` rewrites quick-dev + index but does not call `WriteFollowUpGroupPages` — Unplanned/Follow-ups group destinations can stay stale until full `GenerateAll`. Same incremental family as 9.11 / artifact-review deferrals. [`SiteGenerator.cs:393`]
+- `ContainsSpecName` uses `text.Contains(stem)` without token boundaries — overlapping stems (e.g. `spec-a` vs `spec-ab`) can mis-attribute or multi-hit→null. Cleanup when next touching cue matching. [`UnplannedWorkGeometry.cs`]
+
+## Deferred from: code review of 9-13-generated-filtered-follow-up-group-pages-and-sunburst-click-destinations.md (2026-07-17)
+
+- Epic angular weight on project glance is `max(1, Σ max(1, TasksTotal))` and no longer includes follow-up slot counts, so follow-up-heavy / task-light epics get thin wedges that compress open/done aggregates. Hierarchy design; revisit with 10.7 density. [`Charts.cs:172`]
+- Project glance removal of the no-plan outer create-story CTA leaves `TasksTotal == 0` stories looking like planned peers (weight still `max(1, …)`). Hierarchy rewrite; not a 9.13 group-page bug. [`Charts.cs` Sunburst]
+- Source-key normalization is duplicated across Charts / Unplanned cards / FollowUpGeometry, and `FindQuickDev` still has a tautological stem/`.md` comparison branch — cleanup when next touching provenance matching. [`Charts.cs` / `SprintTemplater.cs`]
+
 ## Deferred from: code review of 9-7-open-follow-ups-in-the-remaining-work-geometry.md (2026-07-17)
 
 - Epic/story angular weight ignores nested story-child deferred crowding — many deferred under a thin `max(1, TasksTotal)` story share a small outer arc without growing the parent sweep. [`Charts.cs:195`]
