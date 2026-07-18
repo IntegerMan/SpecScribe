@@ -462,7 +462,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // div.sprint-card hover / source-ref links. [Story 9.13 review]
         // Regenerated 2026-07-18: fingerprint on main already drifted from expected 0e02f9c5… (same
         // 9821c3f2… with or without watch RefreshFollowUpSurfaces); refresh the byte-parity gate.
-        const string expected = "21b87eb87fa3f4d245c1a25adcf6feed11d6e08396c8d343f7cd5474e97a7338";
+        // Regenerated 2026-07-18: TaskSunburst nests deferred under an inner Deferred parent wedge
+        // (shared angular budget with tasks) instead of a full-circle outer fringe.
+        const string expected = "974d8d2639cc8be5b0ab55e714d03b96256b68e50b97a25669e86da408c4f306";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

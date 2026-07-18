@@ -677,10 +677,10 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>A per-story task sunburst: inner ring = top-level tasks, middle = subtasks (when present),
-    /// optional outer ring = deferred items stemmed from this story (open/done follow-up treatment, linked
-    /// to detail pages). Same visual language as the project/epic sunbursts for lifecycle greens/greys;
-    /// deferred reuse <c>sb-followup-*</c>. Task/subtask segments are tooltip-only (no task pages).
+    /// <summary>A per-story task sunburst: inner ring = top-level tasks plus a Deferred parent wedge when
+    /// this story has stemmed deferred items; outer ring = subtasks under each task and deferred items
+    /// only under the Deferred parent (so they never look like children of unrelated tasks). Deferred
+    /// reuse <c>sb-followup-*</c> and link to detail pages. Task/subtask segments are tooltip-only.
     /// [spec-sunburst-remaining-work-hierarchy]</summary>
     public static string TaskSunburst(
         IReadOnlyList<TaskItem> tasks,
@@ -693,19 +693,17 @@ public static class Charts
 
         var hasDeferred = deferredItems.Count > 0;
         var c = size / 2.0;
-        // When deferred share the chart, pull task/subtask rings in to leave an outer fringe.
-        var taskInner = size * (hasDeferred ? 0.14 : 0.16);
-        var taskOuter = size * (hasDeferred ? 0.30 : 0.36);
-        var subInner = size * (hasDeferred ? 0.31 : 0.37);
-        var subOuter = size * (hasDeferred ? 0.40 : 0.48);
-        var deferredInner = size * 0.41;
-        var deferredOuter = size * 0.48;
+        var taskInner = size * 0.16;
+        var taskOuter = size * 0.36;
+        var outerInner = size * 0.37;
+        var outerOuter = size * 0.48;
         const double pad = 0.01;
 
         var sb = new StringBuilder();
         var tasksDone = tasks.Count(t => t.Done);
         var tasksTotal = tasks.Count;
         var openDeferred = deferredItems.Count(s => !s.Item.Resolved);
+        var doneDeferred = deferredItems.Count - openDeferred;
         var centerLabel = tasksTotal > 0 ? "tasks" : "deferred";
         var centerNum = tasksTotal > 0
             ? $"{tasksDone}/{tasksTotal}"
@@ -718,46 +716,58 @@ public static class Charts
 
         sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
 
-        if (tasksTotal > 0)
+        // One shared angular budget: tasks and a Deferred parent are peers on the inner ring.
+        var deferredWeight = hasDeferred ? Math.Max(1, deferredItems.Count) : 0;
+        var totalWeight = tasks.Sum(t => Math.Max(1, t.Subtasks.Count)) + deferredWeight;
+        var anglePerUnit = 2 * Math.PI / Math.Max(1, totalWeight);
+        var angle = -Math.PI / 2;
+
+        foreach (var task in tasks)
         {
-            var totalWeight = tasks.Sum(t => Math.Max(1, t.Subtasks.Count));
-            var anglePerUnit = 2 * Math.PI / totalWeight;
-            var angle = -Math.PI / 2;
-            foreach (var task in tasks)
+            var weight = Math.Max(1, task.Subtasks.Count);
+            var sweep = weight * anglePerUnit;
+            var cls = task.Done ? "done" : "pending";
+
+            sb.Append($"  <path class=\"sb-seg sb-{cls}\" d=\"{AnnularSector(c, taskInner, taskOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
+            sb.Append($"<title>{Html(task.Text)} — {(task.Done ? "done" : "not done")}</title></path>\n");
+
+            if (task.Subtasks.Count > 0)
             {
-                var weight = Math.Max(1, task.Subtasks.Count);
-                var sweep = weight * anglePerUnit;
-                var cls = task.Done ? "done" : "pending";
-
-                sb.Append($"  <path class=\"sb-seg sb-{cls}\" d=\"{AnnularSector(c, taskInner, taskOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
-                sb.Append($"<title>{Html(task.Text)} — {(task.Done ? "done" : "not done")}</title></path>\n");
-
-                if (task.Subtasks.Count > 0)
+                var subSweep = sweep / task.Subtasks.Count;
+                var subAngle = angle;
+                foreach (var sub in task.Subtasks)
                 {
-                    var subSweep = sweep / task.Subtasks.Count;
-                    var subAngle = angle;
-                    foreach (var sub in task.Subtasks)
-                    {
-                        var subCls = sub.Done ? "done" : "pending";
-                        sb.Append($"  <path class=\"sb-seg sb-{subCls}\" d=\"{AnnularSector(c, subInner, subOuter, InsetStart(subAngle, subSweep, pad), InsetEnd(subAngle, subSweep, pad))}\">");
-                        sb.Append($"<title>{Html(sub.Text)} — {(sub.Done ? "done" : "not done")}</title></path>\n");
-                        subAngle += subSweep;
-                    }
+                    var subCls = sub.Done ? "done" : "pending";
+                    sb.Append($"  <path class=\"sb-seg sb-{subCls}\" d=\"{AnnularSector(c, outerInner, outerOuter, InsetStart(subAngle, subSweep, pad), InsetEnd(subAngle, subSweep, pad))}\">");
+                    sb.Append($"<title>{Html(sub.Text)} — {(sub.Done ? "done" : "not done")}</title></path>\n");
+                    subAngle += subSweep;
                 }
-
-                angle += sweep;
             }
+
+            angle += sweep;
         }
 
         if (hasDeferred)
         {
-            var slotSweep = 2 * Math.PI / deferredItems.Count;
-            var slotAngle = -Math.PI / 2;
+            var sweep = deferredWeight * anglePerUnit;
+            var parentClass = openDeferred > 0 ? "followup-open" : "followup-done";
+            var parentLabel = openDeferred > 0
+                ? $"Deferred: {openDeferred} open / {doneDeferred} done"
+                : $"Deferred: {doneDeferred} done";
+            // Jump to the story-page deferred panel — the parent is a group, not one item.
+            AppendFollowUpSlot(sb, parentLabel, "#sec-deferred-from-artifact", parentClass,
+                angle, sweep, pad, c, taskInner, taskOuter);
+
+            var usable = Math.Max(0, sweep - 2 * Math.Min(pad, sweep / 2));
+            var childSweep = usable / deferredItems.Count;
+            var childAngle = InsetStart(angle, sweep, pad);
             foreach (var slot in deferredItems)
             {
-                AppendDeferredItemSlot(sb, slot, slotAngle, slotSweep, pad, c, deferredInner, deferredOuter);
-                slotAngle += slotSweep;
+                AppendDeferredItemSlot(sb, slot, childAngle, childSweep, pad: 0, c, outerInner, outerOuter);
+                childAngle += childSweep;
             }
+
+            angle += sweep;
         }
 
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{centerNum}</text>\n");
@@ -774,8 +784,8 @@ public static class Charts
 
         var hint = hasDeferred
             ? (tasksTotal > 0
-                ? "Inner ring: tasks &middot; middle: subtasks &middot; outer: deferred from this story. Click a deferred segment to open it."
-                : "Outer ring: deferred from this story. Click a segment to open it.")
+                ? "Inner ring: tasks &amp; Deferred parent &middot; outer: subtasks under tasks, deferred items under Deferred. Click a deferred segment to open it."
+                : "Inner ring: Deferred &middot; outer: deferred items. Click a segment to open it.")
             : "Inner ring: tasks &middot; outer ring: subtasks. Hover a segment for details.";
         sb.Append($"<div class=\"sunburst-hint\">{hint}</div>\n\n");
         return sb.ToString();

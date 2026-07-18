@@ -187,8 +187,10 @@ public class ChartsTests
         Assert.Contains("class=\"sb-seg sb-followup-done\"", svg);
         Assert.Contains("Deferred item: Park the exposure.", svg);
         Assert.Contains("href=\"../follow-ups/deferred-park.html\"", svg);
-        Assert.Contains("Open follow-up</span>", svg);
-        Assert.Contains("outer: deferred from this story", svg);
+        // Deferred parent is an inner-ring peer of tasks — children nest only under that wedge.
+        Assert.Contains("Deferred: 1 open / 1 done", svg);
+        Assert.Contains("href=\"#sec-deferred-from-artifact\"", svg);
+        Assert.Contains("Deferred parent", svg);
         Assert.Contains("1 open deferred item", svg);
         Assert.Contains("1/2</text>", svg); // task center still primary when tasks exist
     }
@@ -208,6 +210,7 @@ public class ChartsTests
         var svg = Charts.TaskSunburst(Array.Empty<TaskItem>(), deferred: deferred);
 
         Assert.Contains("Deferred item: Only deferred.", svg);
+        Assert.Contains("Deferred:", svg);
         Assert.Contains("1/1</text>", svg);
         Assert.Contains(">deferred</text>", svg);
         Assert.DoesNotContain("No tasks tracked", svg);
