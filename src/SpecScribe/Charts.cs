@@ -1547,10 +1547,13 @@ public static class Charts
                 }
                 else
                 {
-                    // No href (e.g. the page failed to generate) and nothing else interactive on the card, so
-                    // it stays non-focusable — a tabindex here would be a dead keyboard stop with no action.
-                    // The tooltip content is already present in the card body for sighted/AT users either way.
-                    sb.Append($"    <div class=\"{cls}\" data-tip=\"{tip}\">{body}</div>\n");
+                    // No href (e.g. the page failed to generate): the card itself has no other interactive
+                    // control, but its js-tip tooltip carries the decision-journal (memlog) date that is NOT
+                    // shown in the card body (Task 3.3 above keeps only the primary mtime visible). Without a
+                    // tabindex this secondary date would be reachable by hover only — mirroring the same
+                    // "tabindex only when a tooltip makes keyboard focus meaningful" convention used by Tile
+                    // (Charts.cs) keeps it reachable by keyboard/AT focus too.
+                    sb.Append($"    <div class=\"{cls}\" data-tip=\"{tip}\" tabindex=\"0\">{body}</div>\n");
                 }
             }
             else

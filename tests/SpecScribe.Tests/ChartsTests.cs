@@ -3121,4 +3121,28 @@ public class ChartsTests
         // The window text still opens at the true first commit — old-repo history is never trimmed.
         Assert.Contains(Charts.DReadable(firstCommit), svg);
     }
+
+    [Fact]
+    public void ArtifactCoveragePanel_NoHrefPresentCard_StaysFocusableForItsTooltip()
+    {
+        // A present family whose page failed to generate (Href is null) has no other interactive control on
+        // its card, but the js-tip tooltip still carries the memlog date that isn't shown in the card body —
+        // tabindex="0" must survive so keyboard/AT users can reach it by focus, not just hover. [Story 3.6 review]
+        var family = new ArtifactFamily(
+            Label: "Epics",
+            ConceptIconKey: "epics",
+            Description: "Feature breakdown into implementable stories.",
+            Present: true,
+            LastModified: new DateOnly(2026, 7, 1),
+            SourcePath: "planning-artifacts/epics.md",
+            MemlogUpdated: new DateOnly(2026, 6, 20),
+            Href: null);
+        var coverage = new ArtifactCoverage { Families = [family] };
+
+        var html = Charts.ArtifactCoveragePanel(coverage, new DateOnly(2026, 7, 19));
+
+        Assert.Contains("coverage-card js-tip present family-epics\" data-tip=", html);
+        Assert.Contains("tabindex=\"0\"", html);
+        Assert.DoesNotContain("<a class=\"coverage-card", html);
+    }
 }
