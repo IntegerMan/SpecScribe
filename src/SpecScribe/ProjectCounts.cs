@@ -108,6 +108,11 @@ public sealed record ProjectCounts
     /// <summary>Story ids (or raw keys) present in sprint-status.yaml with no matching epics.md story (sorted).</summary>
     public required IReadOnlyList<string> OrphanTrackedRows { get; init; }
 
+    /// <summary>Story ids that appear more than once in epics.md (sorted). First-wins membership still
+    /// applies for untracked/orphan reconcile; these ids are named on the Unsupported channel so duplicates
+    /// are not silent. [spec-epic8-deferred-debt-cleanup]</summary>
+    public required IReadOnlyList<string> DuplicateDefinedStoryIds { get; init; }
+
     /// <summary>Satisfaction over <see cref="RequirementsModel.Everything"/> (FR+NFR+UX-DR). Empty when
     /// requirements were not supplied to <see cref="Build"/>. [Story 9.9]</summary>
     public required RequirementSatisfaction RequirementsOverall { get; init; }
@@ -117,8 +122,11 @@ public sealed record ProjectCounts
     public required RequirementSatisfaction RequirementsNonFunctional { get; init; }
     public required RequirementSatisfaction RequirementsDesign { get; init; }
 
-    /// <summary>True when either reconciliation list is non-empty — emit exactly one non-fatal notice.</summary>
-    public bool HasDivergence => UntrackedDefinedStories.Count > 0 || OrphanTrackedRows.Count > 0;
+    /// <summary>True when reconcile lists or duplicate defined ids are non-empty — emit exactly one non-fatal notice.</summary>
+    public bool HasDivergence =>
+        UntrackedDefinedStories.Count > 0
+        || OrphanTrackedRows.Count > 0
+        || DuplicateDefinedStoryIds.Count > 0;
 
     public static readonly ProjectCounts Empty = new()
     {
@@ -138,6 +146,7 @@ public sealed record ProjectCounts
         OpenActionItems = 0,
         UntrackedDefinedStories = Array.Empty<string>(),
         OrphanTrackedRows = Array.Empty<string>(),
+        DuplicateDefinedStoryIds = Array.Empty<string>(),
         RequirementsOverall = RequirementSatisfaction.Empty,
         RequirementsFunctional = RequirementSatisfaction.Empty,
         RequirementsNonFunctional = RequirementSatisfaction.Empty,
@@ -195,9 +204,15 @@ public sealed record ProjectCounts
         Debug.Assert(storiesTracked == storyEntries.Count,
             $"Tracked story stage partition must equal StoriesTracked; got Σ={storiesTracked}, total={storyEntries.Count}");
 
-        var (untracked, orphans) = hasSprint && epics is not null
-            ? Reconcile(epics, storyEntries)
-            : (Array.Empty<string>() as IReadOnlyList<string>, Array.Empty<string>() as IReadOnlyList<string>);
+        IReadOnlyList<string> untracked = Array.Empty<string>();
+        IReadOnlyList<string> orphans = Array.Empty<string>();
+        IReadOnlyList<string> duplicates = Array.Empty<string>();
+        if (epics is not null)
+        {
+            (untracked, orphans, duplicates) = hasSprint
+                ? Reconcile(epics, storyEntries)
+                : (Array.Empty<string>(), Array.Empty<string>(), FindDuplicateDefinedIds(epics));
+        }
 
         var overall = RequirementSatisfaction.From(requirements?.Everything);
         var functional = RequirementSatisfaction.From(requirements?.Functional);
@@ -227,6 +242,7 @@ public sealed record ProjectCounts
             OpenActionItems = sprint?.OpenActionItems.Count ?? 0,
             UntrackedDefinedStories = untracked,
             OrphanTrackedRows = orphans,
+            DuplicateDefinedStoryIds = duplicates,
             RequirementsOverall = overall,
             RequirementsFunctional = functional,
             RequirementsNonFunctional = nonFunctional,
@@ -234,20 +250,45 @@ public sealed record ProjectCounts
         };
     }
 
+    /// <summary>Max ids listed per side of <see cref="DivergenceMessage"/> before <c>+N more</c>.
+    /// Totals in the prose stay accurate. [spec-epic8-deferred-debt-cleanup]</summary>
+    internal const int DivergenceIdListCap = 10;
+
     /// <summary>Deterministic one-line notice for a divergent ledger — input-only, for the
     /// <see cref="AdapterDiagnostic"/> channel. [Story 8.3]</summary>
     public string DivergenceMessage()
     {
         var parts = new List<string>();
+        if (DuplicateDefinedStoryIds.Count > 0)
+        {
+            parts.Add($"{DuplicateDefinedStoryIds.Count} duplicated story {Plural(DuplicateDefinedStoryIds.Count, "id", "ids")} in epics.md ({FormatIdList(DuplicateDefinedStoryIds)})");
+        }
         if (UntrackedDefinedStories.Count > 0)
         {
-            parts.Add($"{UntrackedDefinedStories.Count} defined {Plural(UntrackedDefinedStories.Count, "story", "stories")} missing from sprint-status.yaml ({string.Join(", ", UntrackedDefinedStories)})");
+            parts.Add($"{UntrackedDefinedStories.Count} defined {Plural(UntrackedDefinedStories.Count, "story", "stories")} missing from sprint-status.yaml ({FormatIdList(UntrackedDefinedStories)})");
         }
         if (OrphanTrackedRows.Count > 0)
         {
-            parts.Add($"{OrphanTrackedRows.Count} tracked {Plural(OrphanTrackedRows.Count, "row", "rows")} with no matching defined story ({string.Join(", ", OrphanTrackedRows)})");
+            parts.Add($"{OrphanTrackedRows.Count} tracked {Plural(OrphanTrackedRows.Count, "row", "rows")} with no matching defined story ({FormatIdList(OrphanTrackedRows)})");
         }
+
+        // Duplicate-only (no untracked/orphan reconcile) is an epics.md integrity issue — don't blame sprint.
+        if (DuplicateDefinedStoryIds.Count > 0
+            && UntrackedDefinedStories.Count == 0
+            && OrphanTrackedRows.Count == 0)
+        {
+            return "Count divergence in epics.md: " + string.Join("; ", parts);
+        }
+
         return "Count divergence between epics.md and sprint-status.yaml: " + string.Join("; ", parts);
+    }
+
+    private static string FormatIdList(IReadOnlyList<string> ids)
+    {
+        if (ids.Count <= DivergenceIdListCap)
+            return string.Join(", ", ids);
+        var shown = string.Join(", ", ids.Take(DivergenceIdListCap));
+        return $"{shown}, +{ids.Count - DivergenceIdListCap} more";
     }
 
     private static IReadOnlyList<StageCount> BuildDefinedStoryStages(ProgressModel progress)
@@ -266,16 +307,7 @@ public sealed record ProjectCounts
             .ToList();
     }
 
-    private static string LabelForDefined(string css) => css switch
-    {
-        "done" => "Done",
-        "review" => "In review",
-        "active" => "In development",
-        "ready" => "Ready for dev",
-        "drafted" => "Drafted",
-        "unrecognized" => "Unrecognized",
-        _ => css,
-    };
+    private static string LabelForDefined(string css) => StatusStyles.StoryLabel(css);
 
     private static IReadOnlyList<StageCount> BuildTrackedStoryStages(IReadOnlyList<SprintEntry> stories) =>
         TrackedStageOrder
@@ -285,9 +317,11 @@ public sealed record ProjectCounts
                 s.CssClass))
             .ToList();
 
-    private static (IReadOnlyList<string> Untracked, IReadOnlyList<string> Orphans) Reconcile(
+    private static (IReadOnlyList<string> Untracked, IReadOnlyList<string> Orphans, IReadOnlyList<string> Duplicates) Reconcile(
         EpicsModel epics, IReadOnlyList<SprintEntry> storyEntries)
     {
+        var duplicates = FindDuplicateDefinedIds(epics);
+        // First-wins membership for reconcile — duplicates are reported separately, not collapsed silently.
         var definedIds = epics.Epics
             .SelectMany(e => e.Stories)
             .Select(s => s.Id)
@@ -316,8 +350,18 @@ public sealed record ProjectCounts
             .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return (untracked, orphans);
+        return (untracked, orphans, duplicates);
     }
+
+    private static IReadOnlyList<string> FindDuplicateDefinedIds(EpicsModel epics) =>
+        epics.Epics
+            .SelectMany(e => e.Stories)
+            .Select(s => s.Id)
+            .GroupBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.First())
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     private static string StoryIdOf(SprintEntry entry) =>
         entry.EpicNumber is { } e && entry.StoryMinor is { } m

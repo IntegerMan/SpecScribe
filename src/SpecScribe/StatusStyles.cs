@@ -42,16 +42,43 @@ public static class StatusStyles
         var s = value.Trim();
         if (s.Length == 0) return "drafted";
 
-        s = s.ToLowerInvariant();
-        if (s.Contains("done") || s.Contains("complete")) return "done";
-        if (s.Contains("review")) return "review";
-        // Bare "active"/"wip" are canonical synonyms (exact) — Distinct from Contains("progress").
-        if (s is "active" or "wip" || s.Contains("progress") || s.Contains("in-dev") || s.Contains("in progress"))
-            return "active";
-        if (s.Contains("ready")) return "ready";
-        // Explicit drafted/draft words are known canonical synonyms (not "unrecognized").
-        if (s.Contains("draft")) return "drafted";
+        // ForSprint-shaped: normalize then exact/synonym match. Token checks (not bare Contains) so
+        // "incomplete" cannot invent "done" via a "complete" substring. [spec-epic8-deferred-debt-cleanup]
+        var n = Normalize(s).Replace('_', '-').Replace(' ', '-').TrimEnd('.', '!', '?', ':', ',');
+        return n switch
+        {
+            "done" or "complete" or "completed" => "done",
+            "review" or "in-review" => "review",
+            "active" or "wip" or "in-progress" or "in-dev" or "progress" => "active",
+            "ready" or "ready-for-dev" => "ready",
+            "draft" or "drafted" => "drafted",
+            _ => ForStatusFromTokens(n),
+        };
+    }
 
+    /// <summary>Word-token fallback after exact synonym miss — matches known stage tokens as whole kebab
+    /// segments so substring traps like <c>incomplete</c>⊇<c>complete</c> cannot invent a stage.
+    /// Done/complete stay exact-only above so <c>not-complete</c> / <c>almost-complete</c> stay unrecognized.</summary>
+    private static string ForStatusFromTokens(string normalized)
+    {
+        var tokens = normalized.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        // Multi-segment "…-in-dev-…" keeps the explicit in-dev synonym without bare Contains.
+        for (var i = 0; i < tokens.Length - 1; i++)
+        {
+            if (string.Equals(tokens[i], "in", StringComparison.Ordinal)
+                && string.Equals(tokens[i + 1], "dev", StringComparison.Ordinal))
+                return "active";
+        }
+
+        if (tokens.Contains("review", StringComparer.Ordinal)) return "review";
+        if (tokens.Contains("progress", StringComparer.Ordinal)
+            || tokens.Contains("active", StringComparer.Ordinal)
+            || tokens.Contains("wip", StringComparer.Ordinal))
+            return "active";
+        if (tokens.Contains("ready", StringComparer.Ordinal)) return "ready";
+        if (tokens.Contains("draft", StringComparer.Ordinal)
+            || tokens.Contains("drafted", StringComparer.Ordinal))
+            return "drafted";
         return "unrecognized";
     }
 
@@ -280,19 +307,13 @@ public static class StatusStyles
         sb.Append("    <ul class=\"status-legend-key-list\">\n");
         foreach (var stage in LegendStages)
         {
+            // Single label seam — no parallel stage→word switch that can drift from StoryLabel / siblings.
+            // [spec-epic8-deferred-debt-cleanup]
             var word = stage switch
             {
-                "pending" => "Pending",
-                "drafted" => "Drafted",
-                "ready" => "Ready for dev",
-                "active" => "In development",
-                "review" => "In review",
-                "done" => "Done",
-                "deferred" => "Deferred",
-                // Requirement-facing word from RequirementLabel — StageMeaning/Icons own the rest. [Story 9.9]
-                "unmapped" => "Not yet mapped",
-                "retired" => "Retired",
-                "unrecognized" => "Unrecognized",
+                "deferred" => RequirementLabel(RequirementStatus.Deferred),
+                "unmapped" => RequirementLabel(RequirementStatus.Unmapped),
+                "retired" => SprintLabel("retired"),
                 _ => StoryLabel(stage),
             };
             var meaning = PathUtil.Html(StageMeaning(stage));

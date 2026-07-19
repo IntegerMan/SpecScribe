@@ -351,16 +351,7 @@ public sealed class SiteGenerator
             // Story 8.3: one portal-wide count ledger. Divergence → exactly one Unsupported AdapterDiagnostic
             // (same channel as Story 8.2 / 4.1).
             _counts = ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, workInventory, _epicsModel, _requirements);
-            if (_counts.HasDivergence)
-            {
-                events.AddRange(MapDiagnostics(new[]
-                {
-                    new AdapterDiagnostic(
-                        AdapterDiagnosticCategory.Unsupported,
-                        BmadArtifactAdapter.SprintStatusFileName,
-                        _counts.DivergenceMessage()),
-                }));
-            }
+            AppendCountDivergenceNotice(events, _counts);
             // Sprint page reads the epics model (titles/links) + the shared ledger (tracked totals). [Story 2.3; 8.3]
             WriteSprint(nav);
             // The source-code treemap reads the cached source-code walk + the (now-populated) deep-git per-file
@@ -515,7 +506,10 @@ public sealed class SiteGenerator
                 var skippedInventory = RefreshFollowUpSurfaces(nav, sourceFiles: files);
                 WriteIndex(nav, skippedInventory);
                 if (_options.EmitSpa) EmitSpaSite(nav);
-                return new GenerationEvent(GenerationOutcome.Skipped, BmadArtifactAdapter.EpicsFileName, sw.Elapsed, $"{BmadArtifactAdapter.EpicsFileName} not found");
+                var skippedMsg = $"{BmadArtifactAdapter.EpicsFileName} not found";
+                if (_counts is { HasDivergence: true } skippedDivergent)
+                    skippedMsg += $"; [Unsupported] {skippedDivergent.DivergenceMessage()}";
+                return new GenerationEvent(GenerationOutcome.Skipped, BmadArtifactAdapter.EpicsFileName, sw.Elapsed, skippedMsg);
             }
 
             // Same partial-failure caching rules as GenerateAll: a broken mid-edit save must leave the last
@@ -547,6 +541,10 @@ public sealed class SiteGenerator
             }
             RefreshCoverage();
             var followUpInventory = RefreshFollowUpSurfaces(nav, sourceFiles: files);
+            // RefreshFollowUpSurfaces rebuilds _counts when null; re-emit Unsupported divergence onto this
+            // path's events (GenerateAll already emitted via AppendCountDivergenceNotice). [spec-epic8-deferred-debt-cleanup]
+            if (_counts is not null)
+                AppendCountDivergenceNotice(epicsEvents, _counts);
             WriteIndex(nav, followUpInventory);
             if (_options.EmitSpa) EmitSpaSite(nav);
 
@@ -556,7 +554,10 @@ public sealed class SiteGenerator
                 return errored;
             }
 
-            return new GenerationEvent(GenerationOutcome.Updated, ToSourceRelative(ingest.SourceFullPath), sw.Elapsed, $"{ingest.ConsumedSourceRelatives.Count} stories");
+            var summary = $"{ingest.ConsumedSourceRelatives.Count} stories";
+            if (_counts is { HasDivergence: true } divergent)
+                summary += $"; [Unsupported] {divergent.DivergenceMessage()}";
+            return new GenerationEvent(GenerationOutcome.Updated, ToSourceRelative(ingest.SourceFullPath), sw.Elapsed, summary);
         }
     }
 
@@ -2556,6 +2557,21 @@ public sealed class SiteGenerator
                 ? GenerationOutcome.Error
                 : GenerationOutcome.Skipped,
             d.RelativePath, TimeSpan.Zero, $"[{d.Category}] {d.Message}", FromAdapterDiagnostic: true, FromAdrDiagnostic: fromAdr));
+
+    /// <summary>Appends the Story 8.3 Unsupported count-divergence notice when the ledger is divergent.
+    /// Shared by <see cref="GenerateAll"/> and <see cref="RegenerateEpics"/> so watch rebuilds re-emit.
+    /// Callers must not invoke twice for the same run with the same list. [spec-epic8-deferred-debt-cleanup]</summary>
+    private static void AppendCountDivergenceNotice(List<GenerationEvent> events, ProjectCounts counts)
+    {
+        if (!counts.HasDivergence) return;
+        events.AddRange(MapDiagnostics(new[]
+        {
+            new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Unsupported,
+                BmadArtifactAdapter.SprintStatusFileName,
+                counts.DivergenceMessage()),
+        }));
+    }
 
     /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per top-level source folder
     /// outside the well-known home-index set — the "unrecognized structure degrades, visibly" half of the

@@ -482,7 +482,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated 2026-07-18: Git Pulse title/empty copy name the 200-commit window; file-bar rows gain
         // aria-label + decorative track aria-hidden; comment CSS host comment only (no selector change).
         // [spec-3-1-deferred-debt-cleanup]
-        const string expected = "9645b3a4df5aeae1a85f5fd98c22a2d1a74b53f2bbabb830982a5e4bd9adec7d";
+        // Regenerated 2026-07-18: Epic 8 deferred — LegendKey words via label helpers; DefinedStoryStages
+        // labels via StoryLabel; ForStatus exact/token classifiers (no incomplete→done). [spec-epic8-deferred-debt-cleanup]
+        const string expected = "c06251f374a77ed37e29729086ab84ef841d8959b0e170eb9f761d9b3cc0b1d3";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

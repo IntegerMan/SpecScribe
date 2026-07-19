@@ -156,11 +156,40 @@ public class StatusStylesTests
 
     [Theory]
     [InlineData("done", "done")]
+    [InlineData("complete", "done")]
+    [InlineData("completed", "done")]
+    [InlineData("done.", "done")]
     [InlineData("ready-for-dev", "ready")]
-    [InlineData(null, "drafted")]
+    [InlineData("Ready for Dev", "ready")]
+    [InlineData("ready_for_dev", "ready")]
+    [InlineData("in progress", "active")]
+    [InlineData("in-progress", "active")]
+    [InlineData("still-in-dev", "active")]
+    [InlineData("incomplete", "unrecognized")]
+    [InlineData("not-complete", "unrecognized")]
+    [InlineData("almost-complete", "unrecognized")]
     [InlineData("frobnicated", "unrecognized")]
+    [InlineData(null, "drafted")]
+    [InlineData("", "drafted")]
     public void ForStatus_MapsRawStatusText(string? status, string expected)
         => Assert.Equal(expected, StatusStyles.ForStatus(status));
+
+    [Fact]
+    public void LegendKey_StageWordsComeFromLabelHelpers()
+    {
+        var html = StatusStyles.LegendKey();
+        foreach (var stage in StatusStyles.LegendStages)
+        {
+            var word = stage switch
+            {
+                "deferred" => StatusStyles.RequirementLabel(RequirementStatus.Deferred),
+                "unmapped" => StatusStyles.RequirementLabel(RequirementStatus.Unmapped),
+                "retired" => StatusStyles.SprintLabel("retired"),
+                _ => StatusStyles.StoryLabel(stage),
+            };
+            Assert.Contains($">{word}</span>", html);
+        }
+    }
 
     [Theory]
     // development_status lifecycle onto the shared six-stage vocabulary. [Story 2.3 Task 2]

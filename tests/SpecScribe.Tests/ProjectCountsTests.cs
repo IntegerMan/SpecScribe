@@ -266,6 +266,57 @@ public class ProjectCountsTests
     }
 
     [Fact]
+    public void Build_DuplicateDefinedStoryId_SurfacesOnDivergenceChannel_FirstWinsMembership()
+    {
+        var epics = EpicsWith(Epic(1, "Foundation", EpicStatus.Drafted,
+            Story("1.1", 1, "A"), Story("1.1", 1, "A duplicate"), Story("1.2", 1, "B")));
+        var progress = ProgressFor(epics);
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              1-1-a: done
+              1-2-b: backlog
+            """)!;
+
+        var counts = ProjectCounts.Build(progress, sprint, WorkInventory.Empty, epics);
+
+        Assert.True(counts.HasDivergence);
+        Assert.Equal(new[] { "1.1" }, counts.DuplicateDefinedStoryIds);
+        Assert.Empty(counts.UntrackedDefinedStories);
+        Assert.Empty(counts.OrphanTrackedRows);
+        var msg = counts.DivergenceMessage();
+        Assert.StartsWith("Count divergence in epics.md:", msg);
+        Assert.Contains("duplicated story id", msg, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1.1", msg);
+        Assert.DoesNotContain("sprint-status.yaml", msg);
+    }
+
+    [Fact]
+    public void DivergenceMessage_CapsIdLists_WithMoreSuffix_TotalsStayAccurate()
+    {
+        // Use zero-padded ids so ordinal sort order matches numeric order and Contains(id) isn't ambiguous.
+        var stories = Enumerable.Range(1, 12)
+            .Select(i => Story($"1.{i:D2}", 1, $"S{i}"))
+            .ToArray();
+        var epics = EpicsWith(Epic(1, "Foundation", EpicStatus.Drafted, stories));
+        var progress = ProgressFor(epics);
+        // Track none — all 12 defined ids are untracked.
+        var sprint = SprintStatusParser.Parse("""
+            development_status:
+              epic-1: backlog
+            """)!;
+
+        var counts = ProjectCounts.Build(progress, sprint, WorkInventory.Empty, epics);
+        var msg = counts.DivergenceMessage();
+
+        Assert.Equal(12, counts.UntrackedDefinedStories.Count);
+        Assert.Contains("12 defined stories missing", msg);
+        Assert.Contains($"+{12 - ProjectCounts.DivergenceIdListCap} more", msg);
+        var listed = string.Join(", ", counts.UntrackedDefinedStories.Take(ProjectCounts.DivergenceIdListCap));
+        Assert.Contains(listed, msg);
+        Assert.DoesNotContain(counts.UntrackedDefinedStories[ProjectCounts.DivergenceIdListCap], msg);
+    }
+
+    [Fact]
     public void Build_RequirementSatisfaction_SumsTiersAndFourReadings_AcrossEverything()
     {
         var requirements = new RequirementsModel

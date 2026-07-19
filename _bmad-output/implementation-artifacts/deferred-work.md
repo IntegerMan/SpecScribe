@@ -122,23 +122,23 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 8-8-generation-time-recency-signals.md (2026-07-15)
 
-- Path map for story git dates uses `StringComparer.Ordinal`, matching the git layer's Ordinal path keys — case-only mismatches between git and `ArtifactSourcePath` on Windows silently miss the git date. Low likelihood; revisit if IgnoreCase is adopted git-wide. [`ProgressCalculator.cs`]
+- ~~Path map for story git dates uses `StringComparer.Ordinal`, matching the git layer's Ordinal path keys — case-only mismatches between git and `ArtifactSourcePath` on Windows silently miss the git date. Low likelihood; revisit if IgnoreCase is adopted git-wide. [`ProgressCalculator.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic8-deferred-debt-cleanup`): accepted Ordinal consistency with the git layer / Story 3.1 path-key policy — IgnoreCase deferred until a deliberate git-wide comparer change.
 
 ## Deferred from: code review of 8-3-single-source-of-truth-for-every-count.md (2026-07-15)
 
-- Incremental `WriteIndex` / `WriteSprint` / `WriteActionItems` rebuild `_counts` when null but have no events list to re-emit the Unsupported divergence notice — same watch-mode notice-gap pattern as prior stories. [`SiteGenerator.cs`]
-- `Reconcile` builds defined ids with `ToHashSet`, so a duplicated story id in `epics.md` is silently collapsed for untracked/orphan reporting. [`ProjectCounts.cs`]
-- `DivergenceMessage` joins every untracked/orphan id with no cap — large drift sets produce unbounded diagnostic strings. [`ProjectCounts.cs`]
-- Generation-level 8.3 tests regex HTML for "Stories defined" / sprint subtitle but never assert Story Pipeline funnel drafted total == `StoriesDefined` or that Defined vs Tracked stay distinct on every surface under drift. [`SiteGeneratorSprintTests.cs`]
+- ~~Incremental `WriteIndex` / `WriteSprint` / `WriteActionItems` rebuild `_counts` when null but have no events list to re-emit the Unsupported divergence notice — same watch-mode notice-gap pattern as prior stories. [`SiteGenerator.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic8-deferred-debt-cleanup`): `RegenerateEpics` re-emits Unsupported via shared `AppendCountDivergenceNotice` after follow-up surfaces rebuild `_counts`; summary message carries the notice for watch callers.
+- ~~`Reconcile` builds defined ids with `ToHashSet`, so a duplicated story id in `epics.md` is silently collapsed for untracked/orphan reporting. [`ProjectCounts.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic8-deferred-debt-cleanup`): first-wins membership retained; duplicates listed on `DuplicateDefinedStoryIds` and named in `DivergenceMessage` / HasDivergence.
+- ~~`DivergenceMessage` joins every untracked/orphan id with no cap — large drift sets produce unbounded diagnostic strings. [`ProjectCounts.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic8-deferred-debt-cleanup`): each id list capped at 10 with `+N more`; prose totals stay accurate.
+- ~~Generation-level 8.3 tests regex HTML for "Stories defined" / sprint subtitle but never assert Story Pipeline funnel drafted total == `StoriesDefined` or that Defined vs Tracked stay distinct on every surface under drift. [`SiteGeneratorSprintTests.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic8-deferred-debt-cleanup`): funnel drafted aria/count pinned to Stories defined; Defined≠Tracked asserted under orphan drift on index + sprint; watch re-emit covered.
 
 ## Deferred from: code review of 8-2-canonical-status-model-with-portal-wide-legend.md (2026-07-15)
 
-- Substring `Contains` classifiers in `ForStatus` can still invent lifecycle stages (e.g. `incomplete` → done) and bypass the unrecognized safety net — pre-existing fuzzy matching, not introduced by 8.2's absent-vs-unmapped change. [`StatusStyles.cs`]
-- `LegendKey()` keeps an inline stage→word switch beside `StoryLabel` / siblings — drift risk if labels diverge later; words currently match. [`StatusStyles.cs`]
+- ~~Substring `Contains` classifiers in `ForStatus` can still invent lifecycle stages (e.g. `incomplete` → done) and bypass the unrecognized safety net — pre-existing fuzzy matching, not introduced by 8.2's absent-vs-unmapped change. [`StatusStyles.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic8-deferred-debt-cleanup`): ForSprint-shaped exact/synonym match + kebab-token fallback; `incomplete` → unrecognized.
+- ~~`LegendKey()` keeps an inline stage→word switch beside `StoryLabel` / siblings — drift risk if labels diverge later; words currently match. [`StatusStyles.cs`]~~ **RESOLVED 2026-07-18** (`spec-epic8-deferred-debt-cleanup`): legend words route through `StoryLabel` / `RequirementLabel` / `SprintLabel`.
 
 ## Deferred from: code review of 8-1-integration-spike-cross-surface-status-verification.md (2026-07-14)
 
-- Epic 6 standing surface-coverage action lacks a machine-readable split between the Epic 8 instance (claimed executed) and the standing rule (still open); readers can misread the whole `in-progress` item. Pre-existing process/status shape; wording fix already flagged on the same action item. [`sprint-status.yaml:315`]
+- ~~Epic 6 standing surface-coverage action lacks a machine-readable split between the Epic 8 instance (claimed executed) and the standing rule (still open); readers can misread the whole `in-progress` item. Pre-existing process/status shape; wording fix already flagged on the same action item. [`sprint-status.yaml:315`]~~ **RESOLVED 2026-07-18** (`spec-epic8-deferred-debt-cleanup`): split into two action items — Epic 8 instance `done` + standing surface-coverage gate as its own row.
 
 ## Deferred from: code review of spec-webview-doc-page-surfaces (2026-07-13)
 

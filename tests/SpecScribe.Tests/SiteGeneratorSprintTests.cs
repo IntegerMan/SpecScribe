@@ -173,6 +173,14 @@ public class SiteGeneratorSprintTests : IDisposable
         Assert.True(epicsStories.Success, "epics-index Stories defined stat missing");
         Assert.Equal(dashStories.Groups[1].Value, epicsStories.Groups[1].Value);
         Assert.Equal("2", dashStories.Groups[1].Value);
+
+        // Funnel drafted total == StoriesDefined (aria-label + first stage count). [spec-epic8-deferred-debt-cleanup]
+        Assert.Contains("aria-label=\"Story pipeline: 2 stories drafted", index);
+        Assert.Contains("funnel-band funnel-drafted", index);
+        var funnelDraftedCount = Regex.Match(
+            index,
+            @"funnel-stage-count[^>]*>2</text>\s*<text[^>]*class=""funnel-stage-label""[^>]*>Drafted</text>");
+        Assert.True(funnelDraftedCount.Success, "funnel Drafted stage count should equal Stories defined (2)");
     }
 
     /// <summary>Story 8.3 AC #2: an orphan tracked yaml row yields exactly one non-fatal Unsupported notice,
@@ -210,6 +218,38 @@ public class SiteGeneratorSprintTests : IDisposable
             index, @"<div class=""stat-number"">(\d+)</div><div class=""stat-label"">Stories defined</div>");
         Assert.True(dashStories.Success);
         Assert.Equal("2", dashStories.Groups[1].Value); // Defined stays the epics.md count
+
+        // Defined ≠ Tracked stay distinct under drift on index + sprint. [spec-epic8-deferred-debt-cleanup]
+        Assert.Contains("2 stories drafted", index); // funnel drafted = Defined
+        Assert.DoesNotContain("aria-label=\"Story pipeline: 3 stories drafted", index);
+        Assert.Contains("3 stories", sprint); // Tracked
+        Assert.Contains("from sprint-status.yaml", sprint);
+    }
+
+    /// <summary>Watch-mode epics regenerate re-emits Unsupported divergence after rebuilding _counts.
+    /// [spec-epic8-deferred-debt-cleanup]</summary>
+    [Fact]
+    public void RegenerateEpics_DivergentCounts_ReEmitsUnsupportedInSummary()
+    {
+        File.WriteAllText(SprintYaml, """
+            last_updated: 2026-07-06T22:00:00-04:00
+            development_status:
+              epic-1: in-progress
+              1-1-foundation: in-progress
+              1-2-undrafted: backlog
+              9-9-orphan: backlog
+              epic-1-retrospective: optional
+            """);
+        var gen = new SiteGenerator(Options());
+        var full = gen.GenerateAll();
+        Assert.Single(full, e =>
+            e.Message is { } m && m.Contains("Count divergence", StringComparison.Ordinal));
+
+        var ev = gen.RegenerateEpics();
+        Assert.Equal(GenerationOutcome.Updated, ev.Outcome);
+        Assert.Contains("[Unsupported]", ev.Message);
+        Assert.Contains("Count divergence", ev.Message);
+        Assert.Contains("9.9", ev.Message!);
     }
 
     /// <summary>Every local (non-anchor, non-http) href on the page resolves to a file that was actually
