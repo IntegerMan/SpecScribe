@@ -174,7 +174,23 @@ public sealed class SiteGenerator
             SetRetros(bundle.Retros);
 
             var navDiagnostics = new List<AdapterDiagnostic>();
-            var nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasCodeMap: _codeFiles.Count > 0, diagnostics: navDiagnostics);
+            // Deep-git availability is knowable here: ComputeProgress ran in the Ingest callback above.
+            // Gate Insights children on the data signal (not later render success) — same tradeoff Sprint/ADRs
+            // accept; see SiteNav.Build remarks. [Story 10.1]
+            var hasGitInsights = progress?.DeepGit?.Insights is not null;
+            var hasDeepAnalytics = progress?.DeepGit is not null;
+            var hasActionItems = _sprint?.OpenActionItems.Count > 0;
+            var deferredWorkPath = SiteNav.FindDeferredWorkOutputPath(sourceRelatives);
+            var hasDeferredWork = deferredWorkPath is not null;
+            var nav = SiteNav.Build(
+                sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable,
+                hasCodeMap: _codeFiles.Count > 0,
+                hasGitInsights: hasGitInsights,
+                hasDeepAnalytics: hasDeepAnalytics,
+                hasActionItems: hasActionItems,
+                hasDeferredWork: hasDeferredWork,
+                deferredWorkOutputPath: deferredWorkPath,
+                diagnostics: navDiagnostics);
             _nav = nav;
 
             // Render the README up front so that, if it fails, we can drop the Readme nav entry before any
@@ -186,7 +202,12 @@ public sealed class SiteGenerator
                 if (readmeEvent is { Outcome: GenerationOutcome.Error })
                 {
                     navDiagnostics.Clear();
-                    nav = SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false, hasSprint: SprintAvailable, hasCodeMap: _codeFiles.Count > 0, diagnostics: navDiagnostics);
+                    nav = SiteNav.Build(
+                        sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), hasReadme: false,
+                        hasSprint: SprintAvailable, hasCodeMap: _codeFiles.Count > 0,
+                        hasGitInsights: hasGitInsights, hasDeepAnalytics: hasDeepAnalytics,
+                        hasActionItems: hasActionItems, hasDeferredWork: hasDeferredWork,
+                        deferredWorkOutputPath: deferredWorkPath, diagnostics: navDiagnostics);
                     _nav = nav;
                 }
             }
@@ -3454,7 +3475,18 @@ public sealed class SiteGenerator
         // item/quick link here and the WriteCodeMap page write, so a Code Map link is never emitted to a page that
         // wasn't produced. The incremental watch paths that call BuildNav reuse the last full run's _codeFiles (the
         // treemap only regenerates on a full rebuild). [Story 7.6 Subtask 3.4]
-        return SiteNav.Build(sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable, hasCodeMap: _codeFiles.Count > 0, diagnostics: diagnostics);
+        // Insights / Follow-ups gates reuse the last full run's _progress / _sprint / source list the same way.
+        // [Story 10.1]
+        var deferredWorkPath = SiteNav.FindDeferredWorkOutputPath(sourceRelatives);
+        return SiteNav.Build(
+            sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable,
+            hasCodeMap: _codeFiles.Count > 0,
+            hasGitInsights: _progress?.DeepGit?.Insights is not null,
+            hasDeepAnalytics: _progress?.DeepGit is not null,
+            hasActionItems: _sprint?.OpenActionItems.Count > 0,
+            hasDeferredWork: deferredWorkPath is not null,
+            deferredWorkOutputPath: deferredWorkPath,
+            diagnostics: diagnostics);
     }
 
     private static readonly IReadOnlyDictionary<string, DateOnly> EmptyDates = new Dictionary<string, DateOnly>();

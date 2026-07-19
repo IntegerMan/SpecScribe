@@ -7,6 +7,11 @@ namespace SpecScribe;
 /// <see cref="SiteNav.Items"/> — lifted, not reinvented. [Story 6.1]</summary>
 public sealed record NavItem(string Label, string OutputRelativePath, string ConceptKey);
 
+/// <summary>One journey-organized top-nav group: a disclosure header label + icon concept key, and the leaf
+/// <see cref="NavItem"/> children it discloses. An empty <see cref="Label"/> means the children render as flat
+/// top-level links (Home, or a single-child group collapsed out of a pointless one-item disclosure). [Story 10.1]</summary>
+public sealed record NavGroup(string Label, string ConceptKey, IReadOnlyList<NavItem> Children);
+
 /// <summary>One dashboard quick-link as host-neutral data — the superset of the nav bar that also carries a
 /// short per-entry description. Lifted from <see cref="SiteNav.QuickLinks"/>. [Story 6.1]</summary>
 public sealed record NavQuickLink(string Label, string OutputRelativePath, string Description);
@@ -24,9 +29,14 @@ public sealed record NavigationView
     /// <summary>The project name — the nav brand and page-title suffix. Was <see cref="SiteNav.SiteTitle"/>.</summary>
     public required string SiteTitle { get; init; }
 
-    /// <summary>The ordered top-nav items (label + output-relative target + icon concept key). A surface renders
-    /// these in order; the HTML adapter marks the one matching <see cref="ActiveOutputRelativePath"/> current.</summary>
+    /// <summary>The ordered top-nav leaf items (label + output-relative target + icon concept key) — a FLATTENED,
+    /// in-render-order projection of every leaf in <see cref="Groups"/> (plus flat top-level links like Home).
+    /// Kept for RenderParity, the SPA manifest, and dashboard active-item logic. [Story 6.1; 10.1]</summary>
     public required IReadOnlyList<NavItem> Items { get; init; }
+
+    /// <summary>The hierarchical top-nav structure the renderer walks (journey groups → children). Flat top-level
+    /// links use an empty <see cref="NavGroup.Label"/>. Always agrees with <see cref="Items"/>. [Story 10.1]</summary>
+    public IReadOnlyList<NavGroup> Groups { get; init; } = Array.Empty<NavGroup>();
 
     /// <summary>The dashboard quick-link grid — a superset of <see cref="Items"/> carrying a description each.</summary>
     public required IReadOnlyList<NavQuickLink> QuickLinks { get; init; }

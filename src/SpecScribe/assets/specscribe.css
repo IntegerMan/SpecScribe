@@ -255,9 +255,9 @@ body {
   flex: 1 1 auto;
 }
 
-/* Flat links + group triggers on the dark bar: ink-on-parchment inverted to gold on near-black. */
+/* Flat links + group summaries on the dark bar: ink-on-parchment inverted to gold on near-black. */
 .site-menu-link,
-.site-menu-trigger {
+.site-nav-group-summary {
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
@@ -271,31 +271,33 @@ body {
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
+  list-style: none;
 }
+.site-nav-group-summary::-webkit-details-marker { display: none; }
 .site-menu-link:hover,
-.site-menu-trigger:hover,
+.site-nav-group-summary:hover,
 .site-menu-link.active,
-.site-menu-group.has-active > .site-menu-trigger { color: #f5c842; border-bottom-color: currentColor; }
+.site-nav-group.has-active > .site-nav-group-summary { color: #f5c842; border-bottom-color: currentColor; }
 /* Journey family tints on the dark bar — carry the color that used to live only on the white chips. */
-.site-menu-group.family-planning > .site-menu-trigger { color: #f3e09a; }
-.site-menu-group.family-architecture > .site-menu-trigger { color: #7eb8b0; }
-.site-menu-group.family-epics > .site-menu-trigger { color: #8fbc8f; }
-.site-menu-group.family-planning > .site-menu-trigger:hover,
-.site-menu-group.family-planning.has-active > .site-menu-trigger { color: #f8ebc0; border-bottom-color: #f3e09a; }
-.site-menu-group.family-architecture > .site-menu-trigger:hover,
-.site-menu-group.family-architecture.has-active > .site-menu-trigger { color: #a8d4ce; border-bottom-color: var(--teal); }
-.site-menu-group.family-epics > .site-menu-trigger:hover,
-.site-menu-group.family-epics.has-active > .site-menu-trigger { color: #b5d4b5; border-bottom-color: var(--moss-light); }
+.site-nav-group.family-planning > .site-nav-group-summary { color: #f3e09a; }
+.site-nav-group.family-architecture > .site-nav-group-summary { color: #7eb8b0; }
+.site-nav-group.family-epics > .site-nav-group-summary { color: #8fbc8f; }
+.site-nav-group.family-planning > .site-nav-group-summary:hover,
+.site-nav-group.family-planning.has-active > .site-nav-group-summary { color: #f8ebc0; border-bottom-color: #f3e09a; }
+.site-nav-group.family-architecture > .site-nav-group-summary:hover,
+.site-nav-group.family-architecture.has-active > .site-nav-group-summary { color: #a8d4ce; border-bottom-color: var(--teal); }
+.site-nav-group.family-epics > .site-nav-group-summary:hover,
+.site-nav-group.family-epics.has-active > .site-nav-group-summary { color: #b5d4b5; border-bottom-color: var(--moss-light); }
 .site-menu-link:focus-visible,
-.site-menu-trigger:focus-visible { outline: 2px solid var(--gold-light); outline-offset: -2px; }
+.site-nav-group-summary:focus-visible { outline: 2px solid var(--gold-light); outline-offset: -2px; }
 .site-menu-link .ss-icon,
-.site-menu-trigger .ss-icon,
+.site-nav-group-summary .ss-icon,
 .site-menu-item .ss-icon { width: 1em; height: 1em; flex: none; }
 .site-menu-caret { font-size: 0.7em; opacity: 0.65; margin-left: 0.1em; }
 
-/* Dropdown panel: CSS-only (hover + :focus-within); works on static / webview / SPA with no per-menu JS. */
-.site-menu-group { position: relative; display: inline-flex; }
-.site-menu-panel {
+/* Native <details> disclosure — zero JS (webview CSP + SPA swaps). Desktop: hover/open panel. [Story 10.1] */
+.site-nav-group { position: relative; display: inline-flex; flex-direction: column; }
+.site-nav-group-panel {
   position: absolute;
   top: 100%;
   left: 0;
@@ -309,8 +311,9 @@ body {
   border-radius: 0 0 6px 6px;
   box-shadow: 0 6px 18px var(--shadow);
 }
-.site-menu-group:hover > .site-menu-panel,
-.site-menu-group:focus-within > .site-menu-panel { display: flex; }
+.site-nav-group[open] > .site-nav-group-panel,
+.site-nav-group:hover > .site-nav-group-panel,
+.site-nav-group:focus-within > .site-nav-group-panel { display: flex; }
 .site-menu-item {
   display: flex;
   align-items: center;
@@ -2642,17 +2645,23 @@ a.ref-file-node:focus-visible {
   .next-steps-cards { grid-template-columns: 1fr; }
 }
 
-/* List-batch pane (deferred-work / action-items / follow-up group pages): a card may hold a Deferred |
-   Action items button pair instead of one command — same card shell, two labeled badges side by side.
-   [spec-follow-up-list-batch-actions] */
+/* List-batch pane (deferred-work / action-items / follow-up group pages): three cards across the shared
+   1040px list column; Deferred | Action items stack vertically inside each card (not side-by-side).
+   Pane markup lives inside .*-wrap so max-width is inherited. [spec-follow-up-list-batch-actions] */
+.list-batch-actions .next-steps-cards {
+  /* Three equal cards; minmax(0,…) avoided — StylesheetTests guards that exact footer-legend string. */
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 960px) {
+  .list-batch-actions .next-steps-cards { grid-template-columns: 1fr; }
+}
 .next-step-command-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.7rem;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 .next-step-command-item {
-  flex: 1 1 45%;
-  min-width: 140px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -4564,9 +4573,9 @@ body:has(main.req-detail) .doc-header {
     order: 5;
   }
   .site-nav.site-nav-open .site-nav-links { display: flex; }
-  .site-menu-link, .site-menu-trigger { width: 100%; justify-content: flex-start; padding: 0.5rem 0.2rem; }
-  .site-menu-group { display: block; }
-  .site-menu-panel {
+  .site-menu-link, .site-nav-group-summary { width: 100%; justify-content: flex-start; padding: 0.5rem 0.2rem; }
+  .site-nav-group { display: block; }
+  .site-nav-group-panel {
     position: static;
     display: flex;
     min-width: 0;

@@ -38,9 +38,9 @@ public static class FollowUpGroupTemplater
         sb.Append(StatusStyles.LegendKey());
         sb.Append("</div>\n</header>\n\n");
 
-        sb.Append("<main id=\"main-content\">\n");
+        sb.Append("<main id=\"main-content\">\n<section class=\"followup-group-wrap\">\n");
+        // Pane lives inside the wrap so it shares the 1040px list column. [spec-follow-up-list-batch-actions]
         sb.Append(RenderListBatchPane(group, commands ?? CommandCatalog.Empty));
-        sb.Append("<section class=\"followup-group-wrap\">\n");
         sb.Append("<ul class=\"followup-rows-list\">\n");
         foreach (var member in group.Members)
         {

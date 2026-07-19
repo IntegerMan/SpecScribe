@@ -57,8 +57,8 @@ public static class DeferredWorkTemplater
                     .Where(i => !i.Resolved)
                     .Select(i => ToListBatchEntry(i, "Deferred work", detailSlugs))
                     .ToList();
-                sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
                 sb.Append("<section class=\"deferred-work-wrap\">\n");
+                sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
                 sb.Append("  <ul class=\"followup-rows-list deferred-items-list\">\n");
                 foreach (var item in unstructured)
                     RenderItem(sb, item, "Deferred work", prefix, detailSlugs, epicsModel, hrefMap);
@@ -78,8 +78,8 @@ public static class DeferredWorkTemplater
                     .Select(i => ToListBatchEntry(i, g.SourceKey ?? g.ProvenanceLabel, detailSlugs)))
                 .ToList();
 
-            sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
             sb.Append("<section class=\"deferred-work-wrap\">\n");
+            sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
             if (model.PreambleHtml is { Length: > 0 } preamble)
             {
                 sb.Append("<div class=\"deferred-work-preamble doc-body\">\n");

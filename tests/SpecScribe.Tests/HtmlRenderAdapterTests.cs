@@ -880,14 +880,14 @@ public class HtmlRenderAdapterTests
     // ----- Home welcome: Work label, Docs grouping, removed CTAs, journey segments --------------------------
 
     [Fact]
-    public void RenderNav_ShowsWorkGroupInsteadOfDelivery()
+    public void RenderNav_ShowsDeliveryGroupInsteadOfWork()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
         var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView(SiteNav.HomeOutputPath));
 
-        Assert.Contains("site-menu-trigger", html);
-        Assert.Contains("Work<span", html);
-        Assert.DoesNotContain("Delivery<span", html);
+        Assert.Contains("site-nav-group-summary", html);
+        Assert.Contains("Delivery", html);
+        Assert.DoesNotContain(">Work<", html);
         Assert.Contains("href=\"epics.html\"", html);
         Assert.Contains("href=\"sprint.html\"", html);
         Assert.Contains("href=\"requirements.html\"", html);
@@ -916,12 +916,12 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("key-view-group", keyViews);
         Assert.DoesNotContain("Docs<span", keyViews);
         // Dark bar still carries the journey menus (with family color classes).
-        Assert.Contains("site-menu-group family-planning", html);
-        Assert.Contains("site-menu-group family-epics", html);
+        Assert.Contains("site-nav-group family-planning", html);
+        Assert.Contains("site-nav-group family-epics", html);
     }
 
     [Fact]
-    public void RenderNav_OffHome_GroupsPlanningDocsUnderDocsOnKeyViewsBand()
+    public void RenderNav_OffHome_GroupsPlanningDocsUnderProjectOnKeyViewsBand()
     {
         var nav = SiteNav.Build(new[]
         {
@@ -937,11 +937,11 @@ public class HtmlRenderAdapterTests
 
         Assert.Contains("key-view-group", keyViews);
         Assert.Contains("key-view-trigger", keyViews);
-        Assert.Contains("Docs<span", keyViews);
+        Assert.Contains("Project<span", keyViews);
         Assert.Contains("aria-expanded=\"false\"", keyViews);
-        Assert.Contains("aria-controls=\"key-view-panel-docs\"", keyViews);
-        Assert.Contains("id=\"key-view-panel-docs\"", keyViews);
-        // Related planning docs live under the Docs dropdown — not as five peer pills.
+        Assert.Contains("aria-controls=\"key-view-panel-project\"", keyViews);
+        Assert.Contains("id=\"key-view-panel-project\"", keyViews);
+        // Related planning docs live under the Project dropdown — not as five peer pills.
         Assert.DoesNotContain("class=\"quick-link-pill family-planning\" href=\"readme.html\"", keyViews);
         Assert.Contains("key-view-item", keyViews);
         Assert.Contains("href=\"readme.html\"", keyViews);

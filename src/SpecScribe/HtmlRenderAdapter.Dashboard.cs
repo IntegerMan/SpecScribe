@@ -415,12 +415,20 @@ public sealed partial class HtmlRenderAdapter
     /// (planning / architecture / epics / requirements).</summary>
     private static string QuickLinkFamily(string label)
     {
-        if (label.Equals("Work", StringComparison.OrdinalIgnoreCase)
+        if (label.Equals("Delivery", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Work", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Epics", StringComparison.OrdinalIgnoreCase)
-            || label.Equals("Sprint", StringComparison.OrdinalIgnoreCase))
+            || label.Equals("Sprint", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Follow-ups", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Action Items", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Deferred Work", StringComparison.OrdinalIgnoreCase))
             return "family-epics";
-        if (label.Contains("Architecture", StringComparison.OrdinalIgnoreCase) || label.Contains("ADR", StringComparison.OrdinalIgnoreCase)
-            || label.Equals("Code Map", StringComparison.OrdinalIgnoreCase))
+        if (label.Equals("Insights", StringComparison.OrdinalIgnoreCase)
+            || label.Contains("Architecture", StringComparison.OrdinalIgnoreCase)
+            || label.Contains("ADR", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Code Map", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Git Insights", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Deep Analytics", StringComparison.OrdinalIgnoreCase))
             return "family-architecture";
         if (label.Contains("Requirement", StringComparison.OrdinalIgnoreCase))
             return "family-requirements";

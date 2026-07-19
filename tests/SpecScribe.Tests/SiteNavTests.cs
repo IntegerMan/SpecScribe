@@ -23,17 +23,19 @@ public class SiteNavTests
             "planning-artifacts/epics.md",
         }, "SpecScribe", ModuleContext.DocsFor(BmadModule.GameDevStudio), hasAdrs: true);
 
+        // Journey order: Home → Delivery (Epics/Requirements) → Project (module docs + ADRs). [Story 10.1]
         Assert.Equal(
-            new[] { "Home", "GDD", "Narrative", "Game Architecture", "ADRs", "Epics", "Requirements" },
+            new[] { "Home", "Epics", "Requirements", "GDD", "Narrative", "Game Architecture", "ADRs" },
             nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
-    public void Build_IncludesReadmeRightAfterHomeWhenAvailable()
+    public void Build_IncludesReadmeInProjectGroupWhenAvailable()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: true);
 
-        Assert.Equal(new[] { "Home", "Readme", "Epics", "Requirements" }, nav.Items.Select(i => i.Label).ToArray());
+        // Readme sits in Project (after Delivery), not immediately after Home. [Story 10.1]
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Readme" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.ReadmeOutputPath, nav.Items.First(i => i.Label == "Readme").OutputRelativePath);
         Assert.True(nav.HasReadme);
     }
@@ -52,14 +54,15 @@ public class SiteNavTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        // Sprint sits in the delivery-tracking neighborhood (after Epics/Requirements); existing labels stay
-        // exactly as they were, with no duplicates. [Story 2.3 Task 5]
         Assert.Equal(new[] { "Home", "Epics", "Requirements", "Sprint" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.SprintOutputPath, nav.Items.First(i => i.Label == "Sprint").OutputRelativePath);
         Assert.True(nav.HasSprint);
 
         var sprintQuick = Assert.Single(nav.QuickLinks, q => q.Label == "Sprint");
         Assert.Equal(SiteNav.SprintOutputPath, sprintQuick.OutputRelativePath);
+
+        var delivery = Assert.Single(nav.Groups, g => g.Label == "Delivery");
+        Assert.Equal(new[] { "Epics", "Requirements", "Sprint" }, delivery.Children.Select(c => c.Label).ToArray());
     }
 
     [Fact]
@@ -70,19 +73,19 @@ public class SiteNavTests
         Assert.DoesNotContain("Sprint", nav.Items.Select(i => i.Label));
         Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Sprint");
         Assert.False(nav.HasSprint);
-        // The existing delivery views are untouched (no Sprint injected between them).
         Assert.Equal(new[] { "Home", "Epics", "Requirements" }, nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
-    public void Build_AddsCodeMapItemAndQuickLinkWhenAvailable()
+    public void Build_AddsCodeMapUnderInsights_CollapsesWhenAlone()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasCodeMap: true);
 
-        // Code Map sits in the insight/tracking neighborhood after Epics/Requirements. [Story 7.6 Subtask 3.3]
+        // Single Insights child collapses to a flat top-level link (empty group label). [Story 10.1]
         Assert.Equal(new[] { "Home", "Epics", "Requirements", "Code Map" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.CodeMapOutputPath, nav.Items.First(i => i.Label == "Code Map").OutputRelativePath);
         Assert.True(nav.HasCodeMap);
+        Assert.DoesNotContain(nav.Groups, g => g.Label == "Insights");
 
         var quick = Assert.Single(nav.QuickLinks, q => q.Label == "Code Map");
         Assert.Equal(SiteNav.CodeMapOutputPath, quick.OutputRelativePath);
@@ -99,6 +102,57 @@ public class SiteNavTests
     }
 
     [Fact]
+    public void Build_InsightsGroup_PresentOnlyWithDeepGitSignals()
+    {
+        var without = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        Assert.DoesNotContain(without.Groups, g => g.Label == "Insights");
+        Assert.DoesNotContain("Git Insights", without.Items.Select(i => i.Label));
+        Assert.DoesNotContain("Deep Analytics", without.Items.Select(i => i.Label));
+
+        var with = SiteNav.Build(
+            new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false,
+            hasGitInsights: true, hasDeepAnalytics: true);
+
+        var insights = Assert.Single(with.Groups, g => g.Label == "Insights");
+        Assert.Equal(new[] { "Git Insights", "Deep Analytics" }, insights.Children.Select(c => c.Label).ToArray());
+        Assert.Equal(SiteNav.GitInsightsOutputPath, insights.Children[0].OutputRelativePath);
+        Assert.Equal(SiteNav.DeepAnalyticsOutputPath, insights.Children[1].OutputRelativePath);
+    }
+
+    [Fact]
+    public void Build_FollowUpsGroup_GatesOnActionItemsAndDeferredWork()
+    {
+        var none = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe");
+        Assert.DoesNotContain(none.Groups, g => g.Label == "Follow-ups");
+
+        var both = SiteNav.Build(
+            new[] { "planning-artifacts/epics.md" }, "SpecScribe",
+            hasActionItems: true, hasDeferredWork: true,
+            deferredWorkOutputPath: "implementation-artifacts/deferred-work.html");
+
+        var followUps = Assert.Single(both.Groups, g => g.Label == "Follow-ups");
+        Assert.Equal(new[] { "Action Items", "Deferred Work" }, followUps.Children.Select(c => c.Label).ToArray());
+        Assert.Equal(SiteNav.ActionItemsOutputPath, followUps.Children[0].OutputRelativePath);
+        Assert.Equal("implementation-artifacts/deferred-work.html", followUps.Children[1].OutputRelativePath);
+    }
+
+    [Fact]
+    public void Build_OmitsEmptyFollowUpsAndInsightsGroups()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        Assert.DoesNotContain(nav.Groups, g => g.Label is "Insights" or "Follow-ups");
+    }
+
+    [Fact]
+    public void Build_DoesNotEmitStructureNavOrQuickLink()
+    {
+        // Structure was retired (Story 7.6 → Code Map); Story 10.1 confirms it stays gone. [Story 10.1 AC2]
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasCodeMap: true);
+        Assert.DoesNotContain("Structure", nav.Items.Select(i => i.Label));
+        Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Structure");
+    }
+
+    [Fact]
     public void Build_PutsBmadMethodDocsInNavAndQuickLinks()
     {
         var nav = SiteNav.Build(new[]
@@ -110,9 +164,9 @@ public class SiteNavTests
             "planning-artifacts/epics.md",
         }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false);
 
-        // PRD + Architecture ride the top nav; the brief and UX docs are quick-links only.
+        // Delivery before Project; PRD + Architecture ride Project; brief/UX stay quick-links only. [Story 10.1]
         Assert.Equal(
-            new[] { "Home", "PRD", "Architecture", "Epics", "Requirements" },
+            new[] { "Home", "Epics", "Requirements", "PRD", "Architecture" },
             nav.Items.Select(i => i.Label).ToArray());
 
         var quickLabels = nav.QuickLinks.Select(q => q.Label).ToArray();
@@ -123,7 +177,7 @@ public class SiteNavTests
     }
 
     [Fact]
-    public void Build_AddsSpecKernelQuickLinkWhenSpecKernelPresentWithoutDuplicatingArchitecture()
+    public void Build_AddsSpecKernelToProjectGroupAndQuickLinks()
     {
         var nav = SiteNav.Build(new[]
         {
@@ -133,15 +187,14 @@ public class SiteNavTests
             "specs/spec-x/ARCHITECTURE-SPINE.md",
         }, "SpecScribe", ModuleContext.DocsFor(BmadModule.BmadMethod), hasAdrs: false);
 
-        // The kernel quick-link points at the SPEC hub's generated page (the natural entry point). Its label
-        // reads "Spec" — the friendlier pill label, not the internal "Spec Kernel" jargon. [Story 2.2 polish]
         var specLink = Assert.Single(nav.QuickLinks, q => q.Label == "Spec");
         Assert.Equal("specs/spec-x/SPEC.html", specLink.OutputRelativePath);
 
-        // It is a quick-link only — no new top-nav "Spec"/"Specs" item — and the existing ARCHITECTURE-SPINE
-        // "Architecture" nav entry stays exactly once (not duplicated or removed). [Story 2.2 Task 3]
-        Assert.DoesNotContain("Spec", nav.Items.Select(i => i.Label));
-        Assert.Equal(new[] { "Home", "PRD", "Architecture", "Epics", "Requirements" }, nav.Items.Select(i => i.Label).ToArray());
+        // Spec rides the Project group in the top nav (Story 10.1) and stays a quick-link too.
+        Assert.Contains("Spec", nav.Items.Select(i => i.Label));
+        Assert.Equal(
+            new[] { "Home", "Epics", "Requirements", "PRD", "Architecture", "Spec" },
+            nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
@@ -155,9 +208,6 @@ public class SiteNavTests
     [Fact]
     public void Build_EmitsOneDisambiguatedSpecQuickLinkPerKernelWhenMultiple()
     {
-        // Two SPEC.md kernels: each gets its own quick-link, disambiguated by the kernel's own folder rather
-        // than the shared friendly "Spec" label (which would render two identical, indistinguishable cards).
-        // [spec-epic2-deferred-debt-cleanup]
         var nav = SiteNav.Build(new[]
         {
             "planning-artifacts/epics.md",
@@ -176,7 +226,6 @@ public class SiteNavTests
     [Fact]
     public void Build_CollidingParentFolderNamesDisambiguateWithSpecsRelativeDir()
     {
-        // Nested kernels that share the immediate parent name ("core") must not both read "Spec — core".
         var nav = SiteNav.Build(new[]
         {
             "planning-artifacts/epics.md",
@@ -191,7 +240,6 @@ public class SiteNavTests
     [Fact]
     public void Build_KeepsSingleSpecKernelLabelPlainWhenOnlyOneKernelExistsAlongsideOtherSpecsFolders()
     {
-        // A lone kernel still reads "Spec" — the disambiguated form only kicks in at 2+. [spec-epic2-deferred-debt-cleanup]
         var nav = SiteNav.Build(new[]
         {
             "planning-artifacts/epics.md",
@@ -205,8 +253,6 @@ public class SiteNavTests
     [Fact]
     public void Build_DuplicateWellKnownModuleDocEmitsOneSkippedDiagnosticNamingChosenPathAndCount()
     {
-        // Two `prd.md` files: alphabetical-first still wins for the link (unchanged selection rule), but the
-        // duplicate is no longer silently dropped — it surfaces as one Skipped diagnostic. [spec-epic2-deferred-debt-cleanup]
         var diagnostics = new List<AdapterDiagnostic>();
         var nav = SiteNav.Build(new[]
         {
@@ -240,8 +286,6 @@ public class SiteNavTests
     [Fact]
     public void Build_WithoutDiagnosticsSinkStillPicksAlphabeticalFirstOnDuplicateModuleDoc()
     {
-        // The diagnostics sink is optional (defaults to null) — omitting it must not throw, and selection
-        // stays alphabetical-first exactly as before. [spec-epic2-deferred-debt-cleanup]
         var nav = SiteNav.Build(new[]
         {
             "planning-artifacts/prds/prd-b/prd.md",
@@ -254,17 +298,50 @@ public class SiteNavTests
     }
 
     [Fact]
+    public void FindDeferredWorkOutputPath_ReturnsFirstAlphabeticalMatch()
+    {
+        var path = SiteNav.FindDeferredWorkOutputPath(new[]
+        {
+            "implementation-artifacts/zz-other.md",
+            "implementation-artifacts/deferred-work.md",
+        });
+        Assert.Equal("implementation-artifacts/deferred-work.html", path);
+    }
+
+    [Fact]
+    public void ToNavigationView_ProjectsGroupsAndFlattenedItems()
+    {
+        var nav = SiteNav.Build(
+            new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false,
+            hasGitInsights: true, hasDeepAnalytics: true,
+            hasActionItems: true, hasDeferredWork: true,
+            deferredWorkOutputPath: "implementation-artifacts/deferred-work.html");
+
+        var view = nav.ToNavigationView(SiteNav.EpicsOutputPath);
+
+        Assert.Equal(nav.Items.Select(i => (i.Label, i.OutputRelativePath)).ToList(),
+            view.Items.Select(i => (i.Label, i.OutputRelativePath)).ToList());
+        Assert.Equal(nav.Groups.Count, view.Groups.Count);
+        Assert.Contains(view.Groups, g => g.Label == "Insights" && g.Children.Count == 2);
+        Assert.Contains(view.Groups, g => g.Label == "Follow-ups" && g.Children.Count == 2);
+        Assert.Contains(view.Groups, g => g.Label == "Delivery");
+    }
+
+    [Fact]
     public void RenderNavBar_AddsMobileToggleAndActivePageSemantics()
     {
-        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
 
         var html = nav.RenderNavBar(SiteNav.RequirementsOutputPath);
 
         Assert.Contains("class=\"site-nav-toggle\"", html);
         Assert.Contains("aria-controls=\"site-nav-links\"", html);
-        // The active nav item carries its section icon (decorative) ahead of the label text. [Story 2.5 Task 4]
         Assert.Contains("aria-current=\"page\"><svg", html);
         Assert.Contains(">Requirements</a>", html);
+        Assert.Contains("site-nav-group", html);
+        Assert.Contains("<summary class=\"site-nav-group-summary\"", html);
+        Assert.Contains("Delivery", html);
+        Assert.Contains("Project", html);
     }
 
     [Fact]
@@ -274,16 +351,23 @@ public class SiteNavTests
 
         var html = nav.RenderNavBar(SiteNav.HomeOutputPath);
 
-        // Every nav item this build produces (Home/Readme/ADRs/Epics/Requirements) is a curated concept, so
-        // each carries a decorative icon paired with its still-present text label (never icon-only). [Story 2.5]
         Assert.Contains("aria-hidden=\"true\" focusable=\"false\"", html);
         foreach (var label in nav.Items.Select(i => i.Label))
         {
-            // The menu renames "Epics" to "Epics & Stories" for display; every other item shows its label
-            // verbatim. Either way the text label is present alongside its decorative icon (never icon-only).
             var display = label == "Epics" ? "Epics &amp; Stories" : label;
             Assert.Contains($">{display}</a>", html);
         }
+    }
+
+    [Fact]
+    public void RenderNavBar_OpensActiveGroupAndMarksActiveLeaf()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+        var html = nav.RenderNavBar(SiteNav.SprintOutputPath);
+
+        Assert.Contains("site-nav-group has-active family-epics\" open", html);
+        Assert.Contains("class=\"site-menu-item active\" aria-current=\"page\"", html);
+        Assert.Contains(">Sprint</a>", html);
     }
 
     [Fact]
@@ -304,11 +388,6 @@ public class SiteNavTests
     [Fact]
     public void RenderNavMarkup_CarriesTheBrandMark_TokenColoredAndDecorative()
     {
-        // The Scribe's Nib header mark (spec-scribes-nib-branding): present on every surface via the ONE nav
-        // seam, decorative (aria-hidden — the brand's accessible name stays the wordmark text), with fallback
-        // width/height so a stylesheet miss can't paint the 300×150 replaced-element default, and colored ONLY
-        // via CSS currentColor — the SVG markup must carry no hex, or the webview brand recolor would silently
-        // stop driving the mark. Guards the MARKUP (the stylesheet-side twin lives in StylesheetTests).
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var markup = HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView("index.html"));
 
@@ -319,7 +398,6 @@ public class SiteNavTests
         Assert.Contains("width=\"16\"", svg);
         Assert.Contains(HtmlRenderAdapter.NibPathData, svg);
         Assert.DoesNotContain("#", svg);
-        // The wordmark still renders as the brand span's own text, right after the mark.
         Assert.Contains("</svg>SpecScribe</span>", markup);
     }
 }

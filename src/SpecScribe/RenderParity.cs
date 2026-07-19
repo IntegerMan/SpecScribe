@@ -104,8 +104,8 @@ public static class RenderParity
     public static SemanticFacts FromPageView(PageView page) => new()
     {
         SiteTitle = page.Nav.SiteTitle,
-        // The nav graph is the journey-grouped menu the adapter renders (top-nav items merged with the
-        // quick-link superset), taken in render order from the ONE source both share so this can't drift.
+        // The nav graph is the flattened leaf list from NavigationView.Items (Groups projected in render
+        // order), taken from the ONE source both share so this can't drift. [Story 10.1]
         Nav = HtmlRenderAdapter.Shared.NavMenuOrder(page.Nav)
             .Select(e => new NavFact(e.Label, NormalizeTarget(e.OutputRelativePath),
                 PathsEqual(e.OutputRelativePath, page.Nav.ActiveOutputRelativePath)))

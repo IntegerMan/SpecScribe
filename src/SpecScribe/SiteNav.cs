@@ -15,14 +15,17 @@ public sealed class SiteNav
     public const string ReadmeOutputPath = "readme.html";
 
     /// <summary>The opt-in deep-git analytics page (hotspots + change-coupling graph). Generated only when
-    /// <c>--deep-git</c> is set; the dashboard's Git Pulse panel links here when the data exists. Shared between
-    /// the generator (which writes the file) and the templater (which links to it) so the two can't disagree. [Story 3.2]</summary>
+    /// <c>--deep-git</c> is set; rides the Insights nav group when the deep-git data signal is present at
+    /// nav-build time (ComputeProgress runs in the Ingest callback before <see cref="Build"/>). Shared between
+    /// the generator (which writes the file) and the templater (which links to it) so the two can't disagree.
+    /// [Story 3.2; 10.1]</summary>
     public const string DeepAnalyticsOutputPath = "deep-analytics.html";
 
     /// <summary>The opt-in aggregate Git Insights hub (file change frequency, activity over time, contributor
-    /// attribution). Generated only when <c>--deep-git</c> produced deep data; reached from the dashboard's Git
-    /// Pulse panel (not the top nav — nav is built before git is computed, so a nav entry could dangle). Shared
-    /// between the generator (writes the file) and the templaters (link to it) so the two can't disagree. [Story 3.8]</summary>
+    /// attribution). Generated only when <c>--deep-git</c> produced deep data; rides the Insights nav group
+    /// gated on <c>DeepGit.Insights</c> at nav-build time (same ingest-before-nav ordering as Deep Analytics).
+    /// Shared between the generator (writes the file) and the templaters (link to it) so the two can't disagree.
+    /// [Story 3.8; 10.1]</summary>
     public const string GitInsightsOutputPath = "git-insights.html";
 
     /// <summary>The chronological activity timeline page (heatmap + a newest-first list of active dates linking to
@@ -55,7 +58,13 @@ public sealed class SiteNav
     /// file) and the footer (links to it) so the two can't disagree. [Story 4.8]</summary>
     public const string AboutOutputPath = "about.html";
 
+    /// <summary>Flattened leaf list in render order — every child across <see cref="Groups"/> (including flat
+    /// top-level links). Compatibility contract for RenderParity / SPA / Has* predicates. [Story 10.1]</summary>
     public required IReadOnlyList<(string Label, string OutputRelativePath)> Items { get; init; }
+
+    /// <summary>Journey-organized top-nav groups. Empty-label groups are flat top-level links (Home, or a
+    /// single-child collapse). [Story 10.1]</summary>
+    public required IReadOnlyList<(string Label, IReadOnlyList<(string Label, string OutputRelativePath)> Children)> Groups { get; init; }
 
     /// <summary>Every discoverable key view for the dashboard's quick-link grid. A superset of the nav bar:
     /// it also carries module docs kept out of the top nav (brief, UX) plus a short description per entry.</summary>
@@ -76,6 +85,15 @@ public sealed class SiteNav
 
     public bool HasCodeMap => Items.Any(i => i.Label == "Code Map");
 
+    /// <summary>Assembles the journey-organized top nav (Home · Delivery · Insights · Follow-ups · Project).
+    /// Every child is added only when its availability signal is true; an empty group is omitted; a group with
+    /// exactly one available child collapses to a flat top-level link. [Story 10.1]</summary>
+    /// <remarks>
+    /// Accepted tradeoff (same contract Structure/Sprint/ADRs already accept): git pages are gated on the
+    /// deep-git <em>data</em> signal available at nav-build time, not on successful later render. If a git page
+    /// fails to render after nav was already embedded in earlier pages, the Insights child would point at a
+    /// page that wasn't written — an NFR2-exceptional degradation. Do not attempt a post-render nav rebuild.
+    /// </remarks>
     public static SiteNav Build(
         IReadOnlyList<string> sourceRelativePaths,
         string siteTitle,
@@ -84,22 +102,30 @@ public sealed class SiteNav
         bool hasReadme = false,
         bool hasSprint = false,
         bool hasCodeMap = false,
+        bool hasGitInsights = false,
+        bool hasDeepAnalytics = false,
+        bool hasActionItems = false,
+        bool hasDeferredWork = false,
+        string? deferredWorkOutputPath = null,
         List<AdapterDiagnostic>? diagnostics = null)
     {
-        var items = new List<(string, string)> { ("Home", HomeOutputPath) };
+        var delivery = new List<(string Label, string Path)>();
+        var insights = new List<(string Label, string Path)>();
+        var followUps = new List<(string Label, string Path)>();
+        var project = new List<(string Label, string Path)>();
         var quickLinks = new List<(string, string, string)>();
 
-        // The README is the project's front-door narrative, so it sits first after Home.
+        // The README is the project's front-door narrative — Project group, first among module docs.
         if (hasReadme)
         {
-            items.Add(("Readme", ReadmeOutputPath));
+            project.Add(("Readme", ReadmeOutputPath));
             quickLinks.Add(("Readme", ReadmeOutputPath, "Read the project overview."));
         }
 
         // Module docs (PRD/Architecture, or GDD/Narrative/etc.) are matched by filename anywhere in the
         // source tree, so a missing doc is simply skipped rather than producing a broken link. In-nav docs
-        // ride the top nav; all discovered docs appear in the dashboard quick links. When more than one file
-        // shares a well-known filename, alphabetical OrdinalIgnoreCase first-wins for the link (unchanged
+        // ride the Project group; all discovered docs appear in the dashboard quick links. When more than one
+        // file shares a well-known filename, alphabetical OrdinalIgnoreCase first-wins for the link (unchanged
         // selection rule) but the pick is no longer silent — the skipped sibling(s) surface as one Skipped
         // diagnostic so a duplicate doesn't just vanish. [spec-epic2-deferred-debt-cleanup]
         foreach (var doc in moduleDocs ?? Array.Empty<ModuleDoc>())
@@ -125,7 +151,7 @@ public sealed class SiteNav
             var outputPath = PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(match));
             if (doc.InNav)
             {
-                items.Add((doc.Label, outputPath));
+                project.Add((doc.Label, outputPath));
             }
 
             quickLinks.Add((doc.Label, outputPath, doc.Description));
@@ -135,35 +161,55 @@ public sealed class SiteNav
         // so their availability is signalled by the caller rather than the source-file list.
         if (hasAdrs)
         {
-            items.Add(("ADRs", AdrsLandingOutputPath));
+            project.Add(("ADRs", AdrsLandingOutputPath));
         }
 
         var hasEpics = sourceRelativePaths.Any(BmadArtifactAdapter.IsEpicsFile);
         if (hasEpics)
         {
-            items.Add(("Epics", EpicsOutputPath));
+            delivery.Add(("Epics", EpicsOutputPath));
             // Requirements are parsed out of epics.md, so they share its availability guard.
-            items.Add(("Requirements", RequirementsOutputPath));
+            delivery.Add(("Requirements", RequirementsOutputPath));
             quickLinks.Add(("Epics", EpicsOutputPath, "Track epic and story delivery progress."));
             quickLinks.Add(("Requirements", RequirementsOutputPath, "Review FR/NFR coverage and status."));
         }
 
         // The sprint tracking file (sprint-status.yaml) is its own first-class delivery view, gated on the
         // file's presence exactly like ADRs/Readme — signalled by the caller since the yaml isn't in the
-        // *.md source list. Sits in the Epics/Requirements delivery-tracking neighborhood. [Story 2.3 Task 5]
+        // *.md source list. [Story 2.3 Task 5]
         if (hasSprint)
         {
-            items.Add(("Sprint", SprintOutputPath));
+            delivery.Add(("Sprint", SprintOutputPath));
             quickLinks.Add(("Sprint", SprintOutputPath, "See where every epic and story sits."));
         }
 
-        // The source-code treemap is its own first-class insight surface, gated on the source-code walk the same
-        // way Sprint gates on the yaml. Sits in the Epics/Sprint insight-tracking neighborhood. Its nav label
-        // routes through Icons.ForConcept("Code Map"). [Story 7.6 Subtask 3.3]
+        // Insights: deep-git pages (data signal at nav-build time) + Code Map (source-code walk).
+        // Gate on the data signal — not on successful later render (accepted tradeoff; see method remarks).
+        if (hasGitInsights)
+        {
+            insights.Add(("Git Insights", GitInsightsOutputPath));
+        }
+
+        if (hasDeepAnalytics)
+        {
+            insights.Add(("Deep Analytics", DeepAnalyticsOutputPath));
+        }
+
         if (hasCodeMap)
         {
-            items.Add(("Code Map", CodeMapOutputPath));
+            insights.Add(("Code Map", CodeMapOutputPath));
             quickLinks.Add(("Code Map", CodeMapOutputPath, "Explore the codebase by size and change activity."));
+        }
+
+        // Follow-ups: open retro action items + deferred-work note (NFR8 — omit when absent).
+        if (hasActionItems)
+        {
+            followUps.Add(("Action Items", ActionItemsOutputPath));
+        }
+
+        if (hasDeferredWork && !string.IsNullOrEmpty(deferredWorkOutputPath))
+        {
+            followUps.Add(("Deferred Work", PathUtil.NormalizeSlashes(deferredWorkOutputPath)));
         }
 
         if (hasAdrs)
@@ -171,23 +217,13 @@ public sealed class SiteNav
             quickLinks.Add(("ADRs", AdrsLandingOutputPath, "Browse architecture decisions."));
         }
 
-        // The spec kernel (SPEC.md + companions under specs/) is a first-class artifact class: surface a
-        // dashboard quick-link to its canonical SPEC hub — the natural entry point — gated on the specs/
-        // directory the same way epics/ADRs are matched by well-known presence, so an absent kernel simply
-        // omits the link (no broken nav). The existing "Architecture" (ARCHITECTURE-SPINE) module-doc nav
-        // entry is a separate concern and is left untouched — not duplicated here. [Story 2.2 Task 3]
-        // A project can carry more than one kernel (e.g. per-package specs/): one quick-link per SPEC.md,
-        // ordered alphabetically OrdinalIgnoreCase. A single kernel keeps the friendly "Spec" label; two or
-        // more disambiguate with the kernel's own folder so the cards are distinguishable rather than
-        // identical. [spec-epic2-deferred-debt-cleanup]
+        // Spec kernels: Project-group nav children + dashboard quick-links (same presence gate).
+        // [Story 2.2 Task 3; Story 10.1 Project group]
         var specKernels = sourceRelativePaths
             .Where(p => IsUnderSpecs(p) && string.Equals(Path.GetFileName(p), "SPEC.md", StringComparison.OrdinalIgnoreCase))
             .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var multiKernel = specKernels.Count > 1;
-        // Prefer the immediate parent folder for multi-kernel labels; when two kernels share that name
-        // (e.g. specs/pkg-a/core/SPEC.md vs specs/pkg-b/core/SPEC.md), fall back to the specs-relative
-        // directory so the quick-links stay distinguishable. [spec-epic2-deferred-debt-cleanup]
         var folderLabels = multiKernel
             ? SpecKernelDisambiguatedLabels(specKernels)
             : null;
@@ -199,10 +235,39 @@ public sealed class SiteNav
             var description = multiKernel
                 ? "Read this SPEC kernel and its companions."
                 : "Read the canonical SPEC kernel and its companions.";
+            project.Add((label, specOutputPath));
             quickLinks.Add((label, specOutputPath, description));
         }
 
-        return new SiteNav { Items = items, QuickLinks = quickLinks, SiteTitle = siteTitle };
+        // Assemble groups: Home always flat; named groups omit when empty; single child collapses flat.
+        var groups = new List<(string Label, IReadOnlyList<(string Label, string OutputRelativePath)> Children)>
+        {
+            ("", new List<(string, string)> { ("Home", HomeOutputPath) }),
+        };
+        AppendGroup(groups, "Delivery", delivery);
+        AppendGroup(groups, "Insights", insights);
+        AppendGroup(groups, "Follow-ups", followUps);
+        AppendGroup(groups, "Project", project);
+
+        var items = groups.SelectMany(g => g.Children).ToList();
+        return new SiteNav { Items = items, Groups = groups, QuickLinks = quickLinks, SiteTitle = siteTitle };
+    }
+
+    /// <summary>Adds a named group when it has children; a single child collapses to a flat top-level link
+    /// (empty group label) so shallow repos don't get one-item dropdowns. [Story 10.1]</summary>
+    private static void AppendGroup(
+        List<(string Label, IReadOnlyList<(string Label, string OutputRelativePath)> Children)> groups,
+        string label,
+        List<(string Label, string Path)> children)
+    {
+        if (children.Count == 0) return;
+        if (children.Count == 1)
+        {
+            groups.Add(("", children.Select(c => (c.Label, c.Path)).ToList()));
+            return;
+        }
+
+        groups.Add((label, children.Select(c => (c.Label, c.Path)).ToList()));
     }
 
     /// <summary>True when a source path lives under the <c>specs/</c> directory (the spec-kernel folder
@@ -249,14 +314,31 @@ public sealed class SiteNav
         return string.Equals(dir, "specs", StringComparison.OrdinalIgnoreCase) ? "specs" : dir;
     }
 
+    /// <summary>True when <paramref name="sourceRelativePaths"/> contains a <c>deferred-work.md</c> (any folder).
+    /// Returns the output-relative HTML path for the first match (alphabetical OrdinalIgnoreCase). [Story 10.1]</summary>
+    public static string? FindDeferredWorkOutputPath(IReadOnlyList<string> sourceRelativePaths)
+    {
+        var match = sourceRelativePaths
+            .Where(p => string.Equals(Path.GetFileName(p), "deferred-work.md", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        return match is null ? null : PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(match));
+    }
+
     /// <summary>Projects this nav's already host-neutral data into the typed <see cref="NavigationView"/> the
     /// render adapters consume, with <paramref name="activeOutputRelativePath"/> marking the current page. The
     /// icon concept key is the item's label (the mapping <see cref="RenderNavBar"/> always used); a non-HTML
     /// surface reads it without re-deriving it. This is the "named typed view of SiteNav's data" the delivery
-    /// contract (AD-2) needs — <see cref="Build"/> stays the producer. [Story 6.1]</summary>
+    /// contract (AD-2) needs — <see cref="Build"/> stays the producer. [Story 6.1; 10.1]</summary>
     public NavigationView ToNavigationView(string activeOutputRelativePath) => new()
     {
         SiteTitle = SiteTitle,
+        Groups = Groups.Select(g => new NavGroup(
+            g.Label,
+            string.IsNullOrEmpty(g.Label)
+                ? (g.Children.Count > 0 ? g.Children[0].Label : "")
+                : g.Label,
+            g.Children.Select(c => new NavItem(c.Label, c.OutputRelativePath, c.Label)).ToList())).ToList(),
         Items = Items.Select(i => new NavItem(i.Label, i.OutputRelativePath, i.Label)).ToList(),
         QuickLinks = QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description)).ToList(),
         ActiveOutputRelativePath = activeOutputRelativePath,

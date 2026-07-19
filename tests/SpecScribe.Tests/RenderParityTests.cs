@@ -74,10 +74,28 @@ public class RenderParityTests
         Assert.Equal(new[] { "epics/story-1-1.html", "epics/story-1-2.html" }, facts.ChildDrillTargets);
         Assert.Equal("active", facts.StatusStage);
         Assert.Equal(ForgeOptions.StylesheetName, facts.Stylesheet); // "../" prefix + ?v= token folded away
-        // The nav targets are recovered in order; an epic page is not itself a nav item, so nothing is active.
-        Assert.Equal(new[] { "index.html", "readme.html", "adrs/index.html", "epics.html", "requirements.html" },
+        // Journey order: Home → Delivery → Project (Readme + ADRs). [Story 10.1]
+        Assert.Equal(new[] { "index.html", "epics.html", "requirements.html", "readme.html", "adrs/index.html" },
             facts.Nav.Select(n => n.Target).ToList());
         Assert.DoesNotContain(facts.Nav, n => n.Active);
+    }
+
+    [Fact]
+    public void Extract_GroupedNav_RecoversOnlyLeafAnchors_NotGroupSummaries()
+    {
+        var nav = SiteNav.Build(
+            new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true,
+            hasGitInsights: true, hasDeepAnalytics: true);
+        var page = EpicPage(nav);
+        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        var facts = RenderParity.Extract(html, page);
+
+        Assert.Equal(
+            new[] { "index.html", "epics.html", "requirements.html", "sprint.html", "git-insights.html", "deep-analytics.html" },
+            facts.Nav.Select(n => n.Target).ToList());
+        // Group headers are <summary>, not <a> — never mistaken for nav facts.
+        Assert.DoesNotContain(facts.Nav, n => n.Label is "Delivery" or "Insights");
+        Assert.Empty(RenderParity.FindDivergences(page, html, "html"));
     }
 
     [Fact]

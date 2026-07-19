@@ -235,6 +235,7 @@ public class FollowUpSurfacesTests : IDisposable
         {
             SiteTitle = "SpecScribe",
             Items = Array.Empty<(string, string)>(),
+            Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
             QuickLinks = Array.Empty<(string, string, string)>(),
         };
         var html = FollowUpDetailTemplater.RenderActionPage(
@@ -268,6 +269,7 @@ public class FollowUpSurfacesTests : IDisposable
         {
             SiteTitle = "SpecScribe",
             Items = Array.Empty<(string, string)>(),
+            Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
             QuickLinks = Array.Empty<(string, string, string)>(),
         };
         var html = FollowUpDetailTemplater.RenderDeferredPage(
@@ -293,6 +295,7 @@ public class FollowUpSurfacesTests : IDisposable
         {
             SiteTitle = "SpecScribe",
             Items = Array.Empty<(string, string)>(),
+            Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
             QuickLinks = Array.Empty<(string, string, string)>(),
         };
         var html = FollowUpDetailTemplater.RenderDeferredPage(

@@ -53,9 +53,8 @@ public static class ActionItemsTemplater
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {openCount} open {Charts.Plural(openCount, "item", "items")} &middot; from retrospectives</div>\n");
         sb.Append("</header>\n\n");
 
-        sb.Append("<main id=\"main-content\">\n");
+        sb.Append("<main id=\"main-content\">\n<section class=\"action-items-wrap\">\n");
         sb.Append(RenderListBatchPane("Open Action Items", groups, commands, detailSlugs));
-        sb.Append("<section class=\"action-items-wrap\">\n");
 
         foreach (var group in groups)
         {

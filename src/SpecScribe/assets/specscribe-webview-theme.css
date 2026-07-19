@@ -75,7 +75,11 @@
 .vscode-light .site-nav a,
 .vscode-dark .site-nav a,
 .vscode-high-contrast .site-nav a,
-.vscode-high-contrast-light .site-nav a {
+.vscode-high-contrast-light .site-nav a,
+.vscode-light .site-nav-group-summary,
+.vscode-dark .site-nav-group-summary,
+.vscode-high-contrast .site-nav-group-summary,
+.vscode-high-contrast-light .site-nav-group-summary {
   color: var(--vscode-foreground);
 }
 
@@ -86,7 +90,11 @@
 .vscode-high-contrast .site-nav a:hover,
 .vscode-high-contrast .site-nav a.active,
 .vscode-high-contrast-light .site-nav a:hover,
-.vscode-high-contrast-light .site-nav a.active {
+.vscode-high-contrast-light .site-nav a.active,
+.vscode-light .site-nav-group.has-active > .site-nav-group-summary,
+.vscode-dark .site-nav-group.has-active > .site-nav-group-summary,
+.vscode-high-contrast .site-nav-group.has-active > .site-nav-group-summary,
+.vscode-high-contrast-light .site-nav-group.has-active > .site-nav-group-summary {
   color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground, var(--vscode-foreground)));
 }
 
@@ -281,6 +289,7 @@
 .vscode-high-contrast .view-epic-link:focus-visible,
 .vscode-high-contrast .site-nav a:focus-visible,
 .vscode-high-contrast .site-nav-toggle:focus-visible,
+.vscode-high-contrast .site-nav-group-summary:focus-visible,
 .vscode-high-contrast-light .index-card:focus-visible,
 .vscode-high-contrast-light .index-card--primary h2 a:focus-visible,
 .vscode-high-contrast-light .index-card-branch:focus-visible,
@@ -297,7 +306,8 @@
 .vscode-high-contrast-light .ac-ref:focus-visible,
 .vscode-high-contrast-light .view-epic-link:focus-visible,
 .vscode-high-contrast-light .site-nav a:focus-visible,
-.vscode-high-contrast-light .site-nav-toggle:focus-visible {
+.vscode-high-contrast-light .site-nav-toggle:focus-visible,
+.vscode-high-contrast-light .site-nav-group-summary:focus-visible {
   outline-color: var(--vscode-focusBorder);
 }
 

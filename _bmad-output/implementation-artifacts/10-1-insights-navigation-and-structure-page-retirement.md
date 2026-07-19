@@ -1,6 +1,10 @@
+---
+baseline_commit: dd343ec40d6fa4efa04d622dee38f4a4d77d1dd7
+---
+
 # Story 10.1: Insights Navigation and Structure Page Retirement
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -89,48 +93,48 @@ So the availability signal for both git pages is already in hand at nav-build ti
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Introduce the hierarchical nav model** (AC: 1)
-  - [ ] In [NavigationView.cs](src/SpecScribe/NavigationView.cs), add a `NavGroup` record: `(string Label, string ConceptKey, IReadOnlyList<NavItem> Children)`. Keep `NavItem` as-is (it is the leaf).
-  - [ ] Add `IReadOnlyList<NavGroup> Groups` to `NavigationView` as the hierarchical structure the renderer consumes. **Keep `Items` as a FLATTENED, in-render-order projection of every leaf** (group children flattened, plus any flat top-level links like Home). This preserves every existing flat consumer: `RenderParity.FromPageView` (nav-fact check), the SPA manifest (`SpaBundle(... nav.Items ...)`, [SiteGenerator.cs:1004](src/SpecScribe/SiteGenerator.cs)), and the dashboard active-item logic. Populate `Groups` and `Items` from one source so they can never disagree.
-  - [ ] Update `SiteNav.ToNavigationView` ([SiteNav.cs:178](src/SpecScribe/SiteNav.cs)) to project the grouped structure into `NavGroup`s (concept key = group label, mirroring the existing per-item convention) and the flattened `Items`.
+- [x] **Task 1 — Introduce the hierarchical nav model** (AC: 1)
+  - [x] In [NavigationView.cs](src/SpecScribe/NavigationView.cs), add a `NavGroup` record: `(string Label, string ConceptKey, IReadOnlyList<NavItem> Children)`. Keep `NavItem` as-is (it is the leaf).
+  - [x] Add `IReadOnlyList<NavGroup> Groups` to `NavigationView` as the hierarchical structure the renderer consumes. **Keep `Items` as a FLATTENED, in-render-order projection of every leaf** (group children flattened, plus any flat top-level links like Home). This preserves every existing flat consumer: `RenderParity.FromPageView` (nav-fact check), the SPA manifest (`SpaBundle(... nav.Items ...)`, [SiteGenerator.cs:1004](src/SpecScribe/SiteGenerator.cs)), and the dashboard active-item logic. Populate `Groups` and `Items` from one source so they can never disagree.
+  - [x] Update `SiteNav.ToNavigationView` ([SiteNav.cs:178](src/SpecScribe/SiteNav.cs)) to project the grouped structure into `NavGroup`s (concept key = group label, mirroring the existing per-item convention) and the flattened `Items`.
 
-- [ ] **Task 2 — Assemble the grouped taxonomy in `SiteNav.Build`** (AC: 1, 2)
-  - [ ] Restructure `SiteNav.Build` ([SiteNav.cs:71-165](src/SpecScribe/SiteNav.cs)) to emit the journey-organized groups from the Design Direction table. Every child is added **only when its existing availability signal is true** (reuse the exact gates: `hasReadme`, module-doc filename match, `hasAdrs`, epics presence, `hasSprint`, and the new `hasGitInsights`/`hasDeepAnalytics`/action-items/deferred signals).
-  - [ ] Add `hasGitInsights`, `hasDeepAnalytics` parameters (default `false`). Add signals for the Follow-ups children — **decide the seam**: the cleanest is to pass `hasActionItems` (⇐ `_sprint?.OpenActionItems.Count > 0`) and `hasDeferredWork` (⇐ `WorkInventory.Build(...).Deferred is not null`) into `Build`, computed by the generator before the nav build. Note `WorkInventory`/action-items are currently computed **late** ([SiteGenerator.cs:236-237](src/SpecScribe/SiteGenerator.cs)); you will need the deferred/action-item presence signal **before** nav build — either compute a lightweight presence check early, or (preferred) compute the `WorkInventory` and open-action-item count up front and reuse the instance later (it is already built from `_docs`/`_sprint`, both available by line 100 after ingest). Do not double-build wastefully.
-  - [ ] Retire **Structure**: remove the `hasStructure` gate, the Structure `Items`/`QuickLinks` entries, and the `HasStructure` convenience. (See Task 5 for the page itself.)
-  - [ ] Implement the "single available child collapses to a flat top-level link" refinement (recommended) so shallow repos don't get one-item dropdowns.
-  - [ ] Preserve the existing dashboard **QuickLinks** superset behavior for the entries that remain (Readme, module docs, Epics, Requirements, Sprint, ADRs, Spec) **minus Structure**. QuickLinks stay flat (grid) — grouping is a top-nav concern this story owns; do not restructure the "Explore Key Views" grid.
+- [x] **Task 2 — Assemble the grouped taxonomy in `SiteNav.Build`** (AC: 1, 2)
+  - [x] Restructure `SiteNav.Build` ([SiteNav.cs:71-165](src/SpecScribe/SiteNav.cs)) to emit the journey-organized groups from the Design Direction table. Every child is added **only when its existing availability signal is true** (reuse the exact gates: `hasReadme`, module-doc filename match, `hasAdrs`, epics presence, `hasSprint`, and the new `hasGitInsights`/`hasDeepAnalytics`/action-items/deferred signals).
+  - [x] Add `hasGitInsights`, `hasDeepAnalytics` parameters (default `false`). Add signals for the Follow-ups children — **decide the seam**: the cleanest is to pass `hasActionItems` (⇐ `_sprint?.OpenActionItems.Count > 0`) and `hasDeferredWork` (⇐ `WorkInventory.Build(...).Deferred is not null`) into `Build`, computed by the generator before the nav build. Note `WorkInventory`/action-items are currently computed **late** ([SiteGenerator.cs:236-237](src/SpecScribe/SiteGenerator.cs)); you will need the deferred/action-item presence signal **before** nav build — either compute a lightweight presence check early, or (preferred) compute the `WorkInventory` and open-action-item count up front and reuse the instance later (it is already built from `_docs`/`_sprint`, both available by line 100 after ingest). Do not double-build wastefully.
+  - [x] Retire **Structure**: remove the `hasStructure` gate, the Structure `Items`/`QuickLinks` entries, and the `HasStructure` convenience. (See Task 5 for the page itself.)
+  - [x] Implement the "single available child collapses to a flat top-level link" refinement (recommended) so shallow repos don't get one-item dropdowns.
+  - [x] Preserve the existing dashboard **QuickLinks** superset behavior for the entries that remain (Readme, module docs, Epics, Requirements, Sprint, ADRs, Spec) **minus Structure**. QuickLinks stay flat (grid) — grouping is a top-nav concern this story owns; do not restructure the "Explore Key Views" grid.
 
-- [ ] **Task 3 — Render grouped markup in `RenderNavMarkup`** (AC: 1, 2)
-  - [ ] Update `HtmlRenderAdapter.RenderNavMarkup` ([HtmlRenderAdapter.cs:53-76](src/SpecScribe/HtmlRenderAdapter.cs)) to walk `nav.Groups`: flat top-level links (Home) render as today's `<a>`; each group renders a **non-anchor** disclosure header (`<summary>` inside `<details class="site-nav-group">`, header carries `Icons.ForConcept(group.ConceptKey)` + label) with its child `<a>` links inside. Preserve the active-page marking (`class="active" aria-current="page"`) on the matching leaf, and — recommended — mark the *containing group* open/current when one of its children is active so the active page is visible without expanding.
-  - [ ] Preserve `RenderNav` = `RenderNavMarkup` + `NavToggleScript` split exactly ([HtmlRenderAdapter.cs:46](src/SpecScribe/HtmlRenderAdapter.cs)); the webview keeps calling `RenderNavMarkup` only. The disclosure must need **no** new script (native `<details>`).
-  - [ ] Add a new concept-key glyph for each new group in [Icons.cs](src/SpecScribe/Icons.cs) (`ForConcept` — e.g. "Insights", "Follow-ups", "Delivery", "Project"). Fall back gracefully (the method already returns empty for unknown keys).
+- [x] **Task 3 — Render grouped markup in `RenderNavMarkup`** (AC: 1, 2)
+  - [x] Update `HtmlRenderAdapter.RenderNavMarkup` ([HtmlRenderAdapter.cs:53-76](src/SpecScribe/HtmlRenderAdapter.cs)) to walk `nav.Groups`: flat top-level links (Home) render as today's `<a>`; each group renders a **non-anchor** disclosure header (`<summary>` inside `<details class="site-nav-group">`, header carries `Icons.ForConcept(group.ConceptKey)` + label) with its child `<a>` links inside. Preserve the active-page marking (`class="active" aria-current="page"`) on the matching leaf, and — recommended — mark the *containing group* open/current when one of its children is active so the active page is visible without expanding.
+  - [x] Preserve `RenderNav` = `RenderNavMarkup` + `NavToggleScript` split exactly ([HtmlRenderAdapter.cs:46](src/SpecScribe/HtmlRenderAdapter.cs)); the webview keeps calling `RenderNavMarkup` only. The disclosure must need **no** new script (native `<details>`).
+  - [x] Add a new concept-key glyph for each new group in [Icons.cs](src/SpecScribe/Icons.cs) (`ForConcept` — e.g. "Insights", "Follow-ups", "Delivery", "Project"). Fall back gracefully (the method already returns empty for unknown keys).
 
-- [ ] **Task 4 — Thread the git-page availability signal & correct the stale comments** (AC: 1, 2)
-  - [ ] In [SiteGenerator.cs](src/SpecScribe/SiteGenerator.cs), pass `hasGitInsights`/`hasDeepAnalytics` (derived from the `progress` local's `DeepGit`/`DeepGit.Insights`) to **both** `SiteNav.Build` calls (lines 100 and 111) and ensure the watch-mode `BuildNav`/`RegenerateEpics` path carries the same signal from `_progress`.
-  - [ ] Rewrite the stale "not in the top nav — nav is built before git is computed" doc comments on `GitInsightsOutputPath`/`DeepAnalyticsOutputPath` ([SiteNav.cs:17-26](src/SpecScribe/SiteNav.cs)) to state they now ride the Insights group, gated on the deep-git data signal available at nav-build time.
-  - [ ] Add the accepted-tradeoff comment (render-failure-after-nav-build) described in the Critical Timing Note.
+- [x] **Task 4 — Thread the git-page availability signal & correct the stale comments** (AC: 1, 2)
+  - [x] In [SiteGenerator.cs](src/SpecScribe/SiteGenerator.cs), pass `hasGitInsights`/`hasDeepAnalytics` (derived from the `progress` local's `DeepGit`/`DeepGit.Insights`) to **both** `SiteNav.Build` calls (lines 100 and 111) and ensure the watch-mode `BuildNav`/`RegenerateEpics` path carries the same signal from `_progress`.
+  - [x] Rewrite the stale "not in the top nav — nav is built before git is computed" doc comments on `GitInsightsOutputPath`/`DeepAnalyticsOutputPath` ([SiteNav.cs:17-26](src/SpecScribe/SiteNav.cs)) to state they now ride the Insights group, gated on the deep-git data signal available at nav-build time.
+  - [x] Add the accepted-tradeoff comment (render-failure-after-nav-build) described in the Critical Timing Note.
 
-- [ ] **Task 5 — Complete the Structure retirement (the "pending revert")** (AC: 2)
-  - [ ] Remove the Structure nav item + quick-link (Task 2). This alone satisfies AC2's nav requirement.
-  - [ ] **Recommended (confirm at review):** finish the Story 3.4 "pending revert" — stop generating `structure.html`: remove the `WriteStructure` call ([SiteGenerator.cs:233](src/SpecScribe/SiteGenerator.cs)), `WriteStructure`/`RenderStructurePage`/`BuildStructureHrefMap`, `SiteNav.StructureOutputPath`, and the now-unused `ProjectTree` / `Charts.ProjectStructureTree` structure-tree code **only if** nothing else consumes them (grep first — the webview/outline work reused some tree concepts; verify `ProjectTree`/`Charts.ProjectStructureTree` have no other caller before deleting). The source-code treemap (Story 7.6) is a **new** surface, not this artifact tree, so the artifact tree has no future. If any shared helper is still referenced elsewhere, retire only the nav + page emission and leave the helper.
-  - [ ] Do **not** leave an orphaned `structure.html` with no inbound links — if you keep generating it, that is dead output; prefer full removal.
+- [x] **Task 5 — Complete the Structure retirement (the "pending revert")** (AC: 2)
+  - [x] Remove the Structure nav item + quick-link (Task 2). This alone satisfies AC2's nav requirement.
+  - [x] **Recommended (confirm at review):** finish the Story 3.4 "pending revert" — stop generating `structure.html`: remove the `WriteStructure` call ([SiteGenerator.cs:233](src/SpecScribe/SiteGenerator.cs)), `WriteStructure`/`RenderStructurePage`/`BuildStructureHrefMap`, `SiteNav.StructureOutputPath`, and the now-unused `ProjectTree` / `Charts.ProjectStructureTree` structure-tree code **only if** nothing else consumes them (grep first — the webview/outline work reused some tree concepts; verify `ProjectTree`/`Charts.ProjectStructureTree` have no other caller before deleting). The source-code treemap (Story 7.6) is a **new** surface, not this artifact tree, so the artifact tree has no future. If any shared helper is still referenced elsewhere, retire only the nav + page emission and leave the helper.
+  - [x] Do **not** leave an orphaned `structure.html` with no inbound links — if you keep generating it, that is dead output; prefer full removal.
 
-- [ ] **Task 6 — CSS + host theming for the disclosure groups** (AC: 1)
-  - [ ] Style `.site-nav-group` / its `<summary>` / the child link list in [specscribe.css](src/SpecScribe/assets/specscribe.css) to match the existing nav pill language (Story 1.4/1.5 polish, focus rings, reduced-motion). Ensure the disclosure works within the ≤640px mobile collapse.
-  - [ ] Verify the new nav elements theme correctly under the webview's `.vscode-*` theme bridge (Story 6.5 — [see story-6-5-webview-theming-live]) so chrome maps to `--vscode-*` host variables. The theme bridge is a **separate inline `<style>`** and must not leak into the generated HTML surface (byte-parity guardrail). Do not add nav colors that the bridge can't retune.
+- [x] **Task 6 — CSS + host theming for the disclosure groups** (AC: 1)
+  - [x] Style `.site-nav-group` / its `<summary>` / the child link list in [specscribe.css](src/SpecScribe/assets/specscribe.css) to match the existing nav pill language (Story 1.4/1.5 polish, focus rings, reduced-motion). Ensure the disclosure works within the ≤640px mobile collapse.
+  - [x] Verify the new nav elements theme correctly under the webview's `.vscode-*` theme bridge (Story 6.5 — [see story-6-5-webview-theming-live]) so chrome maps to `--vscode-*` host variables. The theme bridge is a **separate inline `<style>`** and must not leak into the generated HTML surface (byte-parity guardrail). Do not add nav colors that the bridge can't retune.
 
-- [ ] **Task 7 — Update parity, golden, and nav tests** (AC: 1, 2)
-  - [ ] **`RenderParity`**: confirm the flat-leaf nav-fact path still holds (group headers are non-anchor `<summary>`, so `ExtractNav`'s `<a>`-anchor recovery returns exactly the flattened leaves in document order = `page.Nav.Items`). Add/extend tests in [RenderParityTests.cs](tests/SpecScribe.Tests/RenderParityTests.cs) for a grouped nav: leaves recovered in order, active leaf inside a group still marked, no group header mistaken for a nav fact. If any real divergence surfaces on webview/SPA, register a documented `HostRenderException` — but the shared `RenderNavMarkup` should mean **none is needed** (all three surfaces emit identical grouped markup).
-  - [ ] **`SiteNavTests`** ([SiteNavTests.cs](tests/SpecScribe.Tests/SiteNavTests.cs)): the existing assertions compare `nav.Items.Select(i => i.Label)` against flat arrays — update them to the new flattened order, and add group-structure assertions (`nav.Groups`), Insights-group-present-only-with-deep-git, Follow-ups-group gating, Structure-absent, empty-group-omitted, and single-child-collapse cases.
-  - [ ] **`SiteGeneratorStructureTests`** ([SiteGeneratorStructureTests.cs](tests/SpecScribe.Tests/SiteGeneratorStructureTests.cs)): this whole file asserts the *presence* of `structure.html` + the Structure nav/quick-link. Rework it to assert the **retired** behavior (no Structure nav item, no quick-link, and — if you remove the page — no `structure.html`). Keep the `AssertNoBrokenLocalLinks` helper pattern; it is exactly the NFR8 guard you want on the new nav.
-  - [ ] Add generation-level tests (temp-dir fixture style, mirroring `SiteGeneratorStructureTests`/`SiteGeneratorGitInsightsTests`) proving: with `--deep-git` producing insights, `index.html` (and an interior page) carries an Insights group linking `git-insights.html` + `deep-analytics.html`; with `--deep-git` off, no Insights group and no dead links; with open action items / deferred work, a Follow-ups group links `action-items.html` + `deferred-work.html`; with none, no Follow-ups group.
-  - [ ] **Golden byte regen**: the nav markup changes on **every page**, so every committed golden/byte-parity fingerprint that pins nav bytes must be regenerated (see [golden-diff-normalization-gotchas]). Regenerate intentionally, and eyeball the diff to confirm it is *only* the nav restructure (plus Structure removal), not an unintended body change. Run the webview + SPA parity suites ([SiteGeneratorWebviewTests.cs](tests/SpecScribe.Tests/SiteGeneratorWebviewTests.cs), [SiteGeneratorSpaTests.cs](tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs), [RenderSpaParityTests.cs](tests/SpecScribe.Tests/RenderSpaParityTests.cs)) — they must stay green (the shared `RenderNavMarkup` is why they should).
+- [x] **Task 7 — Update parity, golden, and nav tests** (AC: 1, 2)
+  - [x] **`RenderParity`**: confirm the flat-leaf nav-fact path still holds (group headers are non-anchor `<summary>`, so `ExtractNav`'s `<a>`-anchor recovery returns exactly the flattened leaves in document order = `page.Nav.Items`). Add/extend tests in [RenderParityTests.cs](tests/SpecScribe.Tests/RenderParityTests.cs) for a grouped nav: leaves recovered in order, active leaf inside a group still marked, no group header mistaken for a nav fact. If any real divergence surfaces on webview/SPA, register a documented `HostRenderException` — but the shared `RenderNavMarkup` should mean **none is needed** (all three surfaces emit identical grouped markup).
+  - [x] **`SiteNavTests`** ([SiteNavTests.cs](tests/SpecScribe.Tests/SiteNavTests.cs)): the existing assertions compare `nav.Items.Select(i => i.Label)` against flat arrays — update them to the new flattened order, and add group-structure assertions (`nav.Groups`), Insights-group-present-only-with-deep-git, Follow-ups-group gating, Structure-absent, empty-group-omitted, and single-child-collapse cases.
+  - [x] **`SiteGeneratorStructureTests`** ([SiteGeneratorStructureTests.cs](tests/SpecScribe.Tests/SiteGeneratorStructureTests.cs)): this whole file asserts the *presence* of `structure.html` + the Structure nav/quick-link. Rework it to assert the **retired** behavior (no Structure nav item, no quick-link, and — if you remove the page — no `structure.html`). Keep the `AssertNoBrokenLocalLinks` helper pattern; it is exactly the NFR8 guard you want on the new nav.
+  - [x] Add generation-level tests (temp-dir fixture style, mirroring `SiteGeneratorStructureTests`/`SiteGeneratorGitInsightsTests`) proving: with `--deep-git` producing insights, `index.html` (and an interior page) carries an Insights group linking `git-insights.html` + `deep-analytics.html`; with `--deep-git` off, no Insights group and no dead links; with open action items / deferred work, a Follow-ups group links `action-items.html` + `deferred-work.html`; with none, no Follow-ups group.
+  - [x] **Golden byte regen**: the nav markup changes on **every page**, so every committed golden/byte-parity fingerprint that pins nav bytes must be regenerated (see [golden-diff-normalization-gotchas]). Regenerate intentionally, and eyeball the diff to confirm it is *only* the nav restructure (plus Structure removal), not an unintended body change. Run the webview + SPA parity suites ([SiteGeneratorWebviewTests.cs](tests/SpecScribe.Tests/SiteGeneratorWebviewTests.cs), [SiteGeneratorSpaTests.cs](tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs), [RenderSpaParityTests.cs](tests/SpecScribe.Tests/RenderSpaParityTests.cs)) — they must stay green (the shared `RenderNavMarkup` is why they should).
 
-- [ ] **Task 8 — Verify end-to-end on the real repo** (AC: 1, 2)
-  - [ ] `dotnet run` a full generate on this repo **without** `--deep-git`: nav shows Home + Delivery + (Follow-ups if action items/deferred exist) + Project; **no** Insights group; no dead links; no Structure.
-  - [ ] Full generate **with** `--deep-git`: Insights group appears with Git Insights + Deep Analytics; open both from an interior page (not Home). Confirm `--spa` and the webview both render the grouped nav (open the SPA in the preview browser).
-  - [ ] Confirm keyboard/AT: `<summary>` group headers are focusable and toggle on Enter/Space; the active page's group is discoverable.
+- [x] **Task 8 — Verify end-to-end on the real repo** (AC: 1, 2)
+  - [x] `dotnet run` a full generate on this repo **without** `--deep-git`: nav shows Home + Delivery + (Follow-ups if action items/deferred exist) + Project; **no** Insights group; no dead links; no Structure.
+  - [x] Full generate **with** `--deep-git`: Insights group appears with Git Insights + Deep Analytics; open both from an interior page (not Home). Confirm `--spa` and the webview both render the grouped nav (open the SPA in the preview browser).
+  - [x] Confirm keyboard/AT: `<summary>` group headers are focusable and toggle on Enter/Space; the active page's group is discoverable.
 
 ## Dev Notes
 
@@ -194,8 +198,44 @@ So the availability signal for both git pages is already in hand at nav-build ti
 
 ### Agent Model Used
 
+Composer (Cursor agent)
+
 ### Debug Log References
+
+- Full suite: 1556 passed (0 failed)
+- E2E: generate without --deep-git → Delivery/Follow-ups/Project, no Insights, no structure.html
+- E2E: generate with --deep-git → Insights group on epics.html with git-insights + deep-analytics + code-map
 
 ### Completion Notes List
 
+- Introduced `NavGroup` + `NavigationView.Groups`; `Items` remains the flattened leaf projection for RenderParity/SPA.
+- `SiteNav.Build` emits Home / Delivery / Insights / Follow-ups / Project; single-child groups collapse flat; Structure already retired (Story 7.6 Code Map).
+- Insights gated on deep-git data at nav-build time; Follow-ups on open action items + deferred-work.md presence (`FindDeferredWorkOutputPath`).
+- `RenderNavMarkup` walks Groups with native `<details class="site-nav-group">` / `<summary>` (no JS); active group opens.
+- Spec kernels now ride the Project group (and stay quick-links); Code Map sits under Insights.
+- CSS + webview theme bridge cover `.site-nav-group-summary`; golden fingerprint regenerated.
+- New `SiteGeneratorGroupedNavTests`; Structure retirement already done by 7.6 (asserted absent).
+
 ### File List
+
+- src/SpecScribe/NavigationView.cs
+- src/SpecScribe/SiteNav.cs
+- src/SpecScribe/HtmlRenderAdapter.cs
+- src/SpecScribe/HtmlRenderAdapter.Dashboard.cs
+- src/SpecScribe/SiteGenerator.cs
+- src/SpecScribe/Icons.cs
+- src/SpecScribe/RenderParity.cs
+- src/SpecScribe/assets/specscribe.css
+- src/SpecScribe/assets/specscribe-webview-theme.css
+- tests/SpecScribe.Tests/SiteNavTests.cs
+- tests/SpecScribe.Tests/RenderParityTests.cs
+- tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs
+- tests/SpecScribe.Tests/SiteGeneratorGroupedNavTests.cs
+- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs
+- tests/SpecScribe.Tests/FollowUpSurfacesTests.cs
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/10-1-insights-navigation-and-structure-page-retirement.md
+
+## Change Log
+
+- 2026-07-18: Implemented journey-organized hierarchical nav (Delivery/Insights/Follow-ups/Project) with native details disclosure; threaded deep-git + follow-up gates; regenerated golden fingerprint; status → review.
