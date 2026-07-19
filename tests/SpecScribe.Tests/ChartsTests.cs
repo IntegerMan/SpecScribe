@@ -2829,4 +2829,74 @@ public class ChartsTests
         Assert.Contains("heatmap-window", svg);
         Assert.Contains("chart-frame-window", svg);
     }
+
+    // ---- Story 10.6 AC2a: young-repo heatmap dead-zone trim + first-commit accent ----
+
+    [Fact]
+    public void CommitHeatmap_YoungRepoTrimsDeadZoneToAboutOneWeekLead()
+    {
+        // A project 10 days old sits well inside the 15-week floor — the old behavior padded the grid all the
+        // way back to firstCommit-105d (months of blank cells). The trim should instead start ~1 week before
+        // the first commit (then week-snap), so the grid never spans more than a few weeks.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var firstCommit = today.AddDays(-10);
+        var series = new (DateOnly Day, int Count)[] { (firstCommit, 2) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        // Extract the grid's viewBox width to recover the week count (width = leftGutter + weeks*(cell+gap)).
+        var viewBox = System.Text.RegularExpressions.Regex.Match(svg, "viewBox=\"0 0 (\\d+) ");
+        Assert.True(viewBox.Success);
+        var width = int.Parse(viewBox.Groups[1].Value);
+        var weeks = (width - 26) / 14; // leftGutter=26, cell+gap=14
+        // 10 days back + ~1 week lead + week-snap slack is at most 4 weeks — nowhere near the old ~15-16 week pad.
+        Assert.True(weeks <= 4, $"expected a trimmed young-repo grid, got {weeks} weeks (width {width})");
+    }
+
+    [Fact]
+    public void CommitHeatmap_YoungRepoMarksFirstCommitWithCaptionAndSvgAccent()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var firstCommit = today.AddDays(-10);
+        var series = new (DateOnly Day, int Count)[] { (firstCommit, 2) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        // Text caption (the accessible half of the never-color-only pairing)...
+        Assert.Contains($"<p class=\"heatmap-first-commit\">First commit {Charts.DReadable(firstCommit)}</p>", svg);
+        // ...plus a decorative SVG accent mark, distinct shape (a rect), not a bare color change.
+        Assert.Contains("heatmap-first-commit-mark", svg);
+        Assert.Contains($"<title>First commit {Charts.DReadable(firstCommit)}</title>", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_YoungRepoMarkerSurvivesWithHeadlineSuppressed()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var firstCommit = today.AddDays(-10);
+        var series = new (DateOnly Day, int Count)[] { (firstCommit, 2) };
+
+        var svg = Charts.CommitHeatmap(series, showHeadline: false);
+
+        Assert.DoesNotContain("heatmap-headline", svg);
+        Assert.Contains("heatmap-first-commit-mark", svg);
+        Assert.Contains("class=\"heatmap-first-commit\"", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_OldRepoWindowAndNoFirstCommitMarkerUnchanged()
+    {
+        // A repo well past the 15-week floor: the old-repo branch (start = firstCommit, full history shown)
+        // must stay untouched, and there is no lead-in dead zone to mark.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var firstCommit = today.AddDays(-200);
+        var series = new (DateOnly Day, int Count)[] { (firstCommit, 1), (today.AddDays(-1), 3) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        Assert.DoesNotContain("heatmap-first-commit-mark", svg);
+        Assert.DoesNotContain("class=\"heatmap-first-commit\"", svg);
+        // The window text still opens at the true first commit — old-repo history is never trimmed.
+        Assert.Contains(Charts.DReadable(firstCommit), svg);
+    }
 }

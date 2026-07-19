@@ -1,6 +1,10 @@
+---
+baseline_commit: 26cc545dbd159a5ef6548f74dd68abccc8a7c2c3
+---
+
 # Story 10.6: Insight-Chart Context Polish
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -102,31 +106,31 @@ If `ChartMeta`/`Framed` exist at implement time, route panel-level notes through
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Process-path classifier (shared, NFR8)** (AC: 1)
-  - [ ] Add `IsProcessPath` / `ClassifyCoupling` in `GitMetrics.cs`. Stylesheets count as process **for coupling only**. No SpecScribe path literals.
-  - [ ] Unit-test matrix: source↔source → code; yaml↔css → process; `src/A.cs`↔`package-lock.json` → process; ambiguous → code.
+- [x] **Task 1 — Process-path classifier (shared, NFR8)** (AC: 1)
+  - [x] Add `IsProcessPath` / `ClassifyCoupling` in `GitMetrics.cs`. Stylesheets count as process **for coupling only**. No SpecScribe path literals.
+  - [x] Unit-test matrix: source↔source → code; yaml↔css → process; `src/A.cs`↔`package-lock.json` → process; ambiguous → code.
 
-- [ ] **Task 2 — Annotate coupling views (designed)** (AC: 1)
-  - [ ] `CouplingTable` + `CouplingGraph`: Kind badge + dashed process edges + `<title>`; never color-only.
-  - [ ] `DeepAnalyticsTemplater`: one explanatory note when any process pair present; preserve lightbox + a11y twin.
-  - [ ] CSS: intentional chrome; no new `--status-*` token.
+- [x] **Task 2 — Annotate coupling views (designed)** (AC: 1)
+  - [x] `CouplingTable` + `CouplingGraph`: Kind badge + dashed process edges + `<title>`; never color-only.
+  - [x] `DeepAnalyticsTemplater`: one explanatory note when any process pair present; preserve lightbox + a11y twin.
+  - [x] CSS: intentional chrome; no new `--status-*` token.
 
-- [ ] **Task 3 — Heatmap trim (~1 week lead) + accent first-commit mark** (AC: 2a)
-  - [ ] Young-repo start ≈ `firstCommit − 7 days` then week-snap; old-repo unchanged.
-  - [ ] Caption + SVG accent line/box at first-commit week; works with `showHeadline` true/false.
-  - [ ] Preserve future-day muting, `LinkedCommitDays`, `HeatLevel`, `:target`, aria-label, `--col` stagger. Frozen heatmap contrast spec — extend only.
+- [x] **Task 3 — Heatmap trim (~1 week lead) + accent first-commit mark** (AC: 2a)
+  - [x] Young-repo start ≈ `firstCommit − 7 days` then week-snap; old-repo unchanged.
+  - [x] Caption + SVG accent line/box at first-commit week; works with `showHeadline` true/false.
+  - [x] Preserve future-day muting, `LinkedCommitDays`, `HeatLevel`, `:target`, aria-label, `--col` stagger. Frozen heatmap contrast spec — extend only.
 
-- [ ] **Task 4 — Sole-contributor phrasing** (AC: 2b)
-  - [ ] `TotalContributors <= 1` → "Sole contributor:"; soften hub lead/prompt when `ContributorCount == 1`.
-  - [ ] Update `GitInsightsTemplaterTests` accordingly.
+- [x] **Task 4 — Sole-contributor phrasing** (AC: 2b)
+  - [x] `TotalContributors <= 1` → "Sole contributor:"; soften hub lead/prompt when `ContributorCount == 1`.
+  - [x] Update `GitInsightsTemplaterTests` accordingly.
 
-- [ ] **Task 5 — Tests + golden** (AC: 1, 2)
-  - [ ] `ChartsTests`: young-repo window + caption + accent; old-repo still passes.
-  - [ ] `DeepAnalyticsTemplaterTests` + classifier matrix + `StylesheetTests`.
-  - [ ] Golden regen on dashboard / git-insights / deep-analytics; baseline green first; RenderParity green.
+- [x] **Task 5 — Tests + golden** (AC: 1, 2)
+  - [x] `ChartsTests`: young-repo window + caption + accent; old-repo still passes.
+  - [x] `DeepAnalyticsTemplaterTests` + classifier matrix + `StylesheetTests`.
+  - [x] Golden regen on dashboard / git-insights / deep-analytics; baseline green first; RenderParity green.
 
-- [ ] **Task 6 — Verify end-to-end (shine check)** (AC: 1, 2)
-  - [ ] `--deep-git` and without; webview + SPA; eyeball finished for a non-expert reader.
+- [x] **Task 6 — Verify end-to-end (shine check)** (AC: 1, 2)
+  - [x] `--deep-git` and without; webview + SPA; eyeball finished for a non-expert reader.
 
 ## Dev Notes
 
@@ -175,12 +179,40 @@ If `ChartMeta`/`Framed` exist at implement time, route panel-level notes through
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Sonnet 5 (claude-sonnet-5)
 
 ### Debug Log References
+
+- `dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj` — full suite, 1649/1649 green after golden fingerprint regen (`SiteGeneratorAdapterTests.GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens` updated to `48f2ed0d…`).
+- `dotnet run --project src/SpecScribe/SpecScribe.csproj -c Debug -- generate --deep-git` against this repo (self-hosted verification) — 594 pages generated.
+- Browser verification (local static server over the generated output) of `deep-analytics.html`, `git-insights.html`, and `index.html`'s Git Pulse panel.
 
 ### Completion Notes List
 
 Ultimate context engine analysis completed. Owner locked 2026-07-18: annotate-in-place; trim≈firstCommit−1w + accent mark; sole-contributor reword; shine bar. Related backlog seated: 7.9 (code-map file-type discrete), 17.5 (large-file / CSS investigation).
 
+Implemented 2026-07-19. `Charts.ChartMeta` gained an optional `Note` slot (Story 10.2's `Framed`/frame-slot pattern already existed at implement time, so the coordination note's "route through that frame" applied directly) — `FrameNoteSlot` renders it as a rust-accented caveat paragraph, distinct from the italic `Why` framing sentence. `GitMetrics.ClassifyCoupling`/`IsProcessPath` is pattern/extension-only (yaml/json/toml/lock/css/scss/less extensions, bin/obj/dist/node_modules dirs, a small lockfile-basename list for extension-less cases like `go.sum`) — no SpecScribe literal anywhere (NFR8). `CouplingTable` gained a trailing "Kind" column with a badge shown only on process pairs (code pairs, the majority, leave the cell blank rather than a redundant "Code" label); `CouplingGraph` edges get a second `process-edge` CSS class (dashed stroke) plus an extended `<title>`. `DeepAnalyticsTemplater` shows `Charts.ProcessCouplingNote` via the new frame `Note` slot only when at least one coupled pair classifies as process, and extends the existing `coupling-legend` sentence with the dashed-line convention in the same case — verified live against this repo's own history, where the story's literal example (`sprint-status.yaml` ↔ `specscribe.css`, 77×) renders with the "Process" badge and dashed edge exactly as designed.
+
+`CommitHeatmap`'s young-repo branch (`firstCommit >= minStart`) now starts at `firstCommit - 7 days` (then week-snaps) instead of the old `end - 15 weeks` full pad; the old-repo branch (`firstCommit < minStart`) is untouched. When trimmed, a decorative SVG `<rect class="heatmap-first-commit-mark">` (rust accent, `aria-hidden`) marks the first-commit week boundary and a `<p class="heatmap-first-commit">First commit {DReadable}</p>` caption carries the same information as text (never color-only) — both gated on the same `isYoungRepo` flag, so an old repo's grid is byte-identical to before. Verified live: this repo (first commit 2026-07-04, ~15 days old at generation time) now renders a real 4-week grid with the accent + caption on all three surfaces that call `CommitHeatmap` (dashboard Git Pulse, Git Insights, and — via the same builder — the commit-day timeline), confirming the single shared builder reaches every call site by construction.
+
+`GitInsightsTemplater.AppendContributorPanel` rewords its per-file lead to "Sole contributor:" when `file.TotalContributors <= 1` (guarding on the file's true distinct-author count, not the capped `Contributors.Count`, so a truncated multi-contributor list never mis-reads as solo); the hub-wide unselected-state prompt softens its "the people to talk to" → "the person to talk to" when `insights.ContributorCount == 1`. This repo has 2 contributors, so both stay in their plural/multi form live — covered instead by new unit tests with 1-contributor fixtures.
+
+Golden fingerprint regenerated and documented (`48f2ed0d…`, replacing 10.5's `7630b334…`); RenderParity, SPA (`SiteGeneratorAdapterTests`), and webview (`SiteGeneratorWebviewTests`, `WebviewThemingTests`) suites all green in the same full run, confirming the shared builders reach every render adapter without adapter-specific changes. 1649/1649 tests green (25 new classifier tests, 4 new coupling-annotation tests, 4 new heatmap trim/accent tests, 4 new sole-contributor tests).
+
 ### File List
+
+- `src/SpecScribe/GitMetrics.cs` (UPDATE) — `IsProcessPath`, `CouplingKind`, `ClassifyCoupling`, plus the `ProcessExtensions`/`ProcessDirNames`/`ProcessBasenames` pattern tables.
+- `src/SpecScribe/Charts.cs` (UPDATE) — `ChartMeta.Note` + `FrameNoteSlot` + `ProcessCouplingNote`; `CouplingTable` Kind column/badge; `CouplingGraph` dashed process edges; `CommitHeatmap` young-repo trim + first-commit accent/caption.
+- `src/SpecScribe/DeepAnalyticsTemplater.cs` (UPDATE) — process-pair detection, `Note` slot wiring, dashed-edge legend addendum.
+- `src/SpecScribe/GitInsightsTemplater.cs` (UPDATE) — sole-contributor panel lead + hub-wide unselected-prompt softening.
+- `src/SpecScribe/assets/specscribe.css` (UPDATE) — `.chart-frame-note`, `.coupling-kind`/`.coupling-kind-badge`, `.coupling-edge.process-edge`, `.heatmap-first-commit`/`.heatmap-first-commit-mark`.
+- `tests/SpecScribe.Tests/GitMetricsTests.cs` (UPDATE) — `IsProcessPath`/`ClassifyCoupling` matrix (25 cases).
+- `tests/SpecScribe.Tests/DeepAnalyticsTemplaterTests.cs` (UPDATE) — process-coupling annotation coverage (note, badge, dashed edge).
+- `tests/SpecScribe.Tests/ChartsTests.cs` (UPDATE) — young-repo trim/caption/accent + old-repo-unchanged coverage.
+- `tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs` (UPDATE) — sole-contributor phrasing coverage.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` (UPDATE) — golden content fingerprint regenerated (`48f2ed0d…`).
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (UPDATE) — status transitions for `10-6-insight-chart-context-polish`.
+
+## Change Log
+
+- 2026-07-19: dev-story — implemented both ACs. AC1: `GitMetrics.ClassifyCoupling`/`IsProcessPath` (pattern/extension-only, NFR8) + Kind badge on `CouplingTable` + dashed edges on `CouplingGraph` + a new `Charts.ChartMeta.Note` frame slot carrying `DeepAnalyticsTemplater`'s explanatory note when any process pair is present — verified live against this repo, where `sprint-status.yaml ↔ specscribe.css` (the story's own example) renders marked "Process". AC2a: `CommitHeatmap`'s young-repo branch trims the dead-zone pad from a full 15-week floor to `firstCommit - 7 days` (week-snapped), old-repo branch untouched, plus a first-commit SVG accent + text caption (never color-only) — verified live, since this repo is itself ~15 days old and now renders a real 4-week grid with the marker on all three surfaces sharing the builder (dashboard, Git Insights, commit-day timeline). AC2b: `GitInsightsTemplater` rewords "People to talk to" → "Sole contributor:" on `TotalContributors <= 1` and softens the hub-wide unselected prompt on `ContributorCount == 1` — covered by new fixtures since this repo has 2 contributors. Golden fingerprint regenerated (baseline confirmed green first). 1649/1649 tests green (37 new). Verified end-to-end via `dotnet run generate --deep-git` against this repo's own history, browsed in-app. Status → review.

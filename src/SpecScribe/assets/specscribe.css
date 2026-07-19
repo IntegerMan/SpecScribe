@@ -3083,6 +3083,16 @@ a.ref-file-node:focus-visible {
   line-height: 1.5;
   font-style: italic;
 }
+/* Panel-level data caveat (Story 10.6) — a rust accent border distinguishes it from the italic --why
+   framing sentence: this is "read the data carefully here", not "why this metric matters". */
+.chart-frame-note {
+  font-size: 0.78rem;
+  color: var(--ink-faded);
+  margin: 0 0 0.65rem;
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--rust-light);
+  line-height: 1.5;
+}
 
 .chart-row {
   display: grid;
@@ -3521,6 +3531,8 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    themes it with the neutral chart tokens. overflow:visible lets node labels spill past the square viewBox. */
 .coupling-graph { display: block; width: 100%; max-width: 500px; height: auto; margin: 0 auto; overflow: visible; }
 .coupling-edge { stroke: var(--rust); stroke-linecap: round; }
+/* Process-coupling edges (Story 10.6, AC1) are dashed — never color-only — same rust stroke as a code edge. */
+.coupling-edge.process-edge { stroke-dasharray: 5 3; }
 .coupling-node { fill: var(--parchment-dark); stroke: var(--rust-light); stroke-width: 1.5; }
 /* No CSS font-size here on purpose: the label size is an SVG user-unit attribute (font-size="13") so it scales
    up with the graph when enlarged in the lightbox. A CSS rem here would override that and stay tiny. */
@@ -3602,6 +3614,19 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   font-family: 'Courier New', monospace;
   color: var(--rust);
   white-space: nowrap;
+}
+/* Kind column (Story 10.6, AC1): narrow, only process pairs carry a visible badge — code pairs (the
+   majority case) leave the cell blank rather than a redundant "Code" label on every row. */
+.coupling-table .coupling-kind { width: 5.5rem; white-space: nowrap; }
+.coupling-kind-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--rust);
+  border: 1px dashed var(--rust-light);
+  border-radius: 3px;
+  padding: 0.08rem 0.35rem;
 }
 
 /* Pure-CSS :target lightbox for the enlarged graph — hidden until the "Expand" link targets it. */
@@ -3724,6 +3749,16 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .heatmap a:focus-visible .heatmap-cell {
   stroke: var(--teal);
   stroke-width: 2;
+}
+
+/* Young-repo first-commit marker (Story 10.6, AC2a) — a thin rust accent bar at the trimmed lead-in's edge,
+   paired with the text caption below (never color-only). Distinct token from the gold heat-level fills so it
+   reads as a boundary line, not another heat cell. */
+.heatmap-first-commit-mark { fill: var(--rust); opacity: 0.75; }
+.heatmap-first-commit {
+  font-size: 0.74rem;
+  color: var(--ink-light);
+  margin: 0.35rem 0 0;
 }
 
 .heatmap-legend {

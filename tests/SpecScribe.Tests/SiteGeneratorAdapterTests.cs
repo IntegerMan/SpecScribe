@@ -498,7 +498,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // collapsible <details class="toc-group"> parent on every long TOC-bearing page (AC2); epic pages gain
         // a collapsed Retired <details> section for classified retirement/superseded story leading-comments,
         // e.g. Story 3.4 on epic-3 (AC3); specscribe.css gains .ref-chip/.assumption-tag/.toc-group/.retired-section.
-        const string expected = "7630b334ac450272c5eff0e7b16c1852359eeb3a900009cdd116849305a9eb26";
+        // Regenerated 2026-07-18: Story 10.6 insight-chart context polish — GitMetrics.ClassifyCoupling adds a
+        // Kind column + badge to the coupling table and a dashed-edge class to process-coupled graph edges, plus
+        // Charts.ChartMeta gains a Note slot (unused by this fixture — no process-classified pairs, so byte
+        // delta here is limited to the new empty Kind <th>/<td> cells); CommitHeatmap's young-repo trim/
+        // first-commit marker and GitInsightsTemplater's sole-contributor reword are both no-ops on this fixture
+        // (old enough repo, multi-contributor); specscribe.css gains .chart-frame-note/.coupling-kind*/
+        // .process-edge/.heatmap-first-commit* rules (shared stylesheet, so every page's <link> byte count moves).
+        const string expected = "48f2ed0da56f0d1d28d29486e3f294c87e026098054e148d385d834b4df815bd";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

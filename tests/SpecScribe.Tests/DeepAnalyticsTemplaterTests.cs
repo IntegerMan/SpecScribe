@@ -181,6 +181,72 @@ public class DeepAnalyticsTemplaterTests
         Assert.Contains(">src/B.cs<", bars); // still present, just plain
     }
 
+    // ---- Story 10.6 AC1: process-vs-code coupling annotation ----
+
+    [Fact]
+    public void RenderPage_MarksProcessPairsWithKindBadgeAndDashedEdgeAndExplanatoryNote()
+    {
+        var deep = new DeepGitPulse(
+            Hotspots: Array.Empty<(string, int)>(),
+            Coupling: new (string, string, int)[]
+            {
+                ("src/A.cs", "src/B.cs", 5),               // code <-> code
+                ("sprint-status.yaml", "theme.css", 4),      // process <-> process
+            });
+
+        var html = DeepAnalyticsTemplater.RenderPage(deep, Nav());
+
+        // The explanatory note appears once, via the shared frame's Note slot.
+        Assert.Contains("chart-frame-note", html);
+        Assert.Contains(Charts.ProcessCouplingNote, html);
+        // Table: the process pair carries a visible "Process" badge; the code pair's Kind cell is empty.
+        Assert.Contains("coupling-kind-badge", html);
+        Assert.Contains(">Process<", html);
+        // Graph: the process edge is dashed (a second class, never color-only); the code edge is not. The graph
+        // renders twice (main panel + :target lightbox), so each edge kind appears once per render.
+        Assert.Equal(2, Count(html, "class=\"coupling-edge process-edge\""));
+        Assert.Equal(2, Count(html, "class=\"coupling-edge\""));
+        // NFR8: the shared note text never names a SpecScribe-specific file.
+        Assert.DoesNotContain("sprint-status.yaml", Charts.ProcessCouplingNote);
+        Assert.DoesNotContain("specscribe.css", Charts.ProcessCouplingNote);
+    }
+
+    [Fact]
+    public void RenderPage_NoProcessPairsOmitsNoteAndDashedEdges()
+    {
+        var html = DeepAnalyticsTemplater.RenderPage(SampleDeep(), Nav());
+
+        Assert.DoesNotContain("chart-frame-note", html);
+        Assert.DoesNotContain("process-edge", html);
+        Assert.DoesNotContain("coupling-kind-badge", html);
+    }
+
+    [Fact]
+    public void CouplingTable_ProcessPairGetsBadgeCodePairDoesNot()
+    {
+        var coupling = new (string, string, int)[]
+        {
+            ("src/A.cs", "src/B.cs", 3),
+            ("src/A.cs", "package-lock.json", 2),
+        };
+
+        var table = Charts.CouplingTable(coupling);
+
+        Assert.Contains("<th scope=\"col\" class=\"coupling-kind\">Kind</th>", table);
+        Assert.Equal(1, Count(table, "coupling-kind-badge"));
+    }
+
+    [Fact]
+    public void CouplingGraph_ProcessEdgeIsDashedWithTitleSuffix()
+    {
+        var coupling = new (string, string, int)[] { ("config.yaml", "src/A.cs", 4) };
+
+        var svg = Charts.CouplingGraph(coupling);
+
+        Assert.Contains("class=\"coupling-edge process-edge\"", svg);
+        Assert.Contains("(process-coupling)", svg);
+    }
+
     [Fact]
     public void CodeItemLink_EscapesHrefAndLabel()
     {

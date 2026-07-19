@@ -148,8 +148,14 @@ public static class GitInsightsTemplater
         {
             AppendContributorPanel(sb, files[i], i, fileHref, commitHref);
         }
+        // Hub-wide softening (Story 10.6, AC2b): "the people to talk to" reads oddly in a solo repo, where every
+        // file's contributor panel already says "Sole contributor:" — soften the shared unselected-state prompt
+        // the same way.
+        var prompt = insights.ContributorCount == 1
+            ? "Select a file to see who has been working on it — the person to talk to about that area."
+            : "Select a file to see who has been working on it — the people to talk to about that area.";
         sb.Append("      <div class=\"gi-detail-default chart-panel\">\n");
-        sb.Append("        <p class=\"gi-detail-prompt\">Select a file to see who has been working on it — the people to talk to about that area.</p>\n");
+        sb.Append($"        <p class=\"gi-detail-prompt\">{prompt}</p>\n");
         sb.Append("      </div>\n");
         sb.Append("    </div>\n");
 
@@ -193,7 +199,11 @@ public static class GitInsightsTemplater
         }
         else
         {
-            sb.Append("        <p class=\"gi-detail-lead\">People to talk to about this file:</p>\n");
+            // Sole-contributor reword (Story 10.6, AC2b): "People to talk to" reads as comic when there is
+            // exactly one person to talk to. TotalContributors (the file's full distinct-author count), not
+            // the capped Contributors.Count, so a truncated multi-contributor list never mis-reads as solo.
+            var lead = file.TotalContributors <= 1 ? "Sole contributor:" : "People to talk to about this file:";
+            sb.Append($"        <p class=\"gi-detail-lead\">{lead}</p>\n");
             sb.Append("        <ul class=\"gi-contributor-list\">\n");
             foreach (var contributor in file.Contributors)
             {

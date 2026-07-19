@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace SpecScribe;
@@ -48,6 +49,9 @@ public static class DeepAnalyticsTemplater
         // Change Coupling — graph is the centerpiece; chrome via Charts.Framed (Story 10.2). Chart-intrinsic
         // node/edge legend stays in the body; the old deep-page-lead framing moved into Charts.WhyText.
         var hasCoupling = deep.Coupling.Count > 0;
+        // Process-vs-code coupling (Story 10.6, AC1): shown only when it applies, so a purely code-coupled
+        // project never sees copy about a case that doesn't exist for it.
+        var hasProcessPairs = deep.Coupling.Any(p => GitMetrics.ClassifyCoupling(p.FileA, p.FileB) == GitMetrics.CouplingKind.Process);
         var couplingBody = new StringBuilder();
         if (hasCoupling)
         {
@@ -56,13 +60,19 @@ public static class DeepAnalyticsTemplater
         couplingBody.Append(Charts.CouplingGraph(deep.Coupling, fileHref: fileHref));
         if (hasCoupling)
         {
-            couplingBody.Append("    <p class=\"coupling-legend\">Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together.</p>\n");
+            var legend = "Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together.";
+            if (hasProcessPairs)
+            {
+                legend = "Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together &middot; dashed lines mark process-coupling.";
+            }
+            couplingBody.Append($"    <p class=\"coupling-legend\">{legend}</p>\n");
         }
         sb.Append("<section class=\"deep-page-section\">\n");
         sb.Append(Charts.Framed(
             new Charts.ChartMeta(
                 Title: "Change Coupling",
                 Window: window,
+                Note: hasProcessPairs ? Charts.ProcessCouplingNote : null,
                 Why: Charts.WhyText(Charts.ChartMetric.ChangeCoupling)),
             couplingBody.ToString(),
             panelClass: "chart-panel deep-page-graph-panel"));

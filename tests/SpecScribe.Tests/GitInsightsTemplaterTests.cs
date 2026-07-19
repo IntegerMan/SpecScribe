@@ -212,6 +212,70 @@ public class GitInsightsTemplaterTests
         Assert.DoesNotContain("href=\"commit/fff9999", resolved);
     }
 
+    // ---- Story 10.6 AC2b: sole-contributor phrasing ----
+
+    [Fact]
+    public void RenderPage_SoleContributorFileRewordsPanelLeadButMultiContributorFileDoesNot()
+    {
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
+
+        // SampleInsights: Charts.cs has TotalContributors 2 (multi, unchanged), HtmlTemplater.cs has 1 (solo).
+        Assert.Contains("People to talk to about this file:", html);
+        Assert.Contains("Sole contributor:", html);
+    }
+
+    [Fact]
+    public void RenderPage_SoleContributorUsesTotalContributorsNotTheCappedList()
+    {
+        // A file whose Contributors list is truncated (shown 1) but TotalContributors is really 3 must NOT
+        // read as solo — the plural lead stays, with the honest "and N more" disclosure.
+        var insights = new GitInsightsData(
+            Files: new[]
+            {
+                new FileChangeStat("src/A.cs", 5, 10, 2, "abc1234def", new DateOnly(2026, 7, 1),
+                    new[] { new FileContributor("Alice", 3, new DateOnly(2026, 7, 1)) }, TotalContributors: 3),
+            },
+            Activity: Array.Empty<(DateOnly, int)>(),
+            CommitCount: 5,
+            ContributorCount: 3,
+            TotalFilesTouched: 1);
+
+        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
+
+        Assert.Contains("People to talk to about this file:", html);
+        Assert.DoesNotContain("Sole contributor:", html);
+        Assert.Contains("and 2 more contributors", html);
+    }
+
+    [Fact]
+    public void RenderPage_SoleRepoContributorSoftensTheUnselectedPrompt()
+    {
+        var insights = new GitInsightsData(
+            Files: new[]
+            {
+                new FileChangeStat("src/A.cs", 5, 10, 2, "abc1234def", new DateOnly(2026, 7, 1),
+                    new[] { new FileContributor("Alice", 5, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
+            },
+            Activity: Array.Empty<(DateOnly, int)>(),
+            CommitCount: 5,
+            ContributorCount: 1,
+            TotalFilesTouched: 1);
+
+        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
+
+        Assert.Contains("Select a file to see who has been working on it — the person to talk to about that area.", html);
+        Assert.DoesNotContain("the people to talk to about that area.", html);
+    }
+
+    [Fact]
+    public void RenderPage_MultiContributorRepoKeepsThePluralUnselectedPrompt()
+    {
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
+
+        // SampleInsights has ContributorCount: 2 — plural prompt stays.
+        Assert.Contains("Select a file to see who has been working on it — the people to talk to about that area.", html);
+    }
+
     [Fact]
     public void RenderPage_EmptyFilesDegradesToFriendlyNoteWithNoMasterDetail()
     {

@@ -21,12 +21,15 @@ public static class Charts
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
-    /// applies (a status donut has no time window; a heatmap has no ranking caption). [Story 10.2]</summary>
+    /// applies (a status donut has no time window; a heatmap has no ranking caption). <paramref name="Note"/> is
+    /// a caveat about the data itself (e.g. "some pairs are process-coupling, not a code dependency") — distinct
+    /// from <paramref name="Why"/>'s generic "why this metric matters" framing. [Story 10.2; Note: Story 10.6]</summary>
     public sealed record ChartMeta(
         string Title,
         string? Window = null,
         string? Ranking = null,
-        string? Why = null);
+        string? Why = null,
+        string? Note = null);
 
     /// <summary>ONE shared source of metric-generic framing sentences (NFR8 — never project-specific). Callers
     /// reference these via <see cref="WhyText"/>; after Story 10.2 there must be no second hand-rolled
@@ -42,6 +45,14 @@ public static class Charts
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
 
+    /// <summary>The change-coupling panel's process-vs-code explanatory note (Story 10.6, AC1): shown once,
+    /// only when at least one coupled pair classifies as <see cref="GitMetrics.CouplingKind.Process"/>, so a
+    /// project with purely code-to-code coupling never sees copy about a case that doesn't apply to it.
+    /// Pattern/extension-generic (NFR8) — never names a specific repo's config or stylesheet file.</summary>
+    public const string ProcessCouplingNote =
+        "Pairs marked “Process” involve config, lockfile, build-output, or stylesheet files, which often " +
+        "change together as routine upkeep rather than a real code dependency.";
+
     /// <summary>Window slot markup — the ONE place a numeric analysis window is rendered. Empty/null → omit.
     /// [Story 10.2]</summary>
     public static string FrameWindowSlot(string? window) =>
@@ -55,8 +66,14 @@ public static class Charts
     public static string FrameWhySlot(string? why) =>
         string.IsNullOrEmpty(why) ? string.Empty : $"<p class=\"chart-frame-why\">{Html(why)}</p>\n";
 
-    /// <summary>Wraps a chart body in the standard panel scaffold so title/window/ranking/why are metadata-consistent
-    /// by construction. Optional slots omit their element entirely when null/empty. [Story 10.2 AC2]</summary>
+    /// <summary>Note slot markup — the ONE place a panel-level data caveat is rendered (e.g. process-vs-code
+    /// coupling), distinct from the generic <see cref="FrameWhySlot"/> framing. Empty/null → omit. [Story 10.6]</summary>
+    public static string FrameNoteSlot(string? note) =>
+        string.IsNullOrEmpty(note) ? string.Empty : $"<p class=\"chart-frame-note\">{Html(note)}</p>\n";
+
+    /// <summary>Wraps a chart body in the standard panel scaffold so title/window/ranking/note/why are
+    /// metadata-consistent by construction. Optional slots omit their element entirely when null/empty. [Story
+    /// 10.2 AC2; Note slot: Story 10.6]</summary>
     public static string Framed(ChartMeta meta, string body, string panelClass = "chart-panel")
     {
         var sb = new StringBuilder();
@@ -67,6 +84,7 @@ public static class Charts
         if (window.Length > 0) sb.Append($"    {window}\n");
         sb.Append("  </div>\n");
         sb.Append(FrameRankingSlot(meta.Ranking));
+        sb.Append(FrameNoteSlot(meta.Note));
         sb.Append(body);
         sb.Append(FrameWhySlot(meta.Why));
         sb.Append("</div>\n");
@@ -1004,7 +1022,12 @@ public static class Charts
         // The heatmap is the primary "how has the work gone" visual, so show a fuller ~15-week window (it
         // scales up to fill its panel via CSS) rather than the old 7-week postage stamp. [Story 1.5 E1]
         var minStart = end.AddDays(-7 * 15);
-        var start = firstCommit < minStart ? firstCommit : minStart;
+        // A project younger than the 15-week floor used to pad the grid all the way back to minStart, painting
+        // months of pre-project blank cells (the "dead zone" misreading). Trim to a short ~1-week lead-in
+        // instead, so the grid starts near the actual first commit; the marker below highlights exactly where.
+        // Old-repo behavior (grid already fuller than 15 weeks) is unchanged. [Story 10.6 AC2a]
+        var isYoungRepo = firstCommit >= minStart;
+        var start = isYoungRepo ? firstCommit.AddDays(-7) : firstCommit;
 
         // Snap to full weeks (Sunday..Saturday) so the grid is rectangular.
         start = start.AddDays(-(int)start.DayOfWeek);
@@ -1115,7 +1138,30 @@ public static class Charts
             }
         }
 
+        // First-commit accent (Story 10.6, AC2a): a thin vertical marker at the boundary of the first-commit
+        // week, drawn only for the young-repo trim case — an old repo's grid already starts exactly at
+        // firstCommit, so there is no lead-in to mark. Decorative (aria-hidden); the caption below is the
+        // accessible/text-equivalent half of the "never color-only" pairing.
+        if (isYoungRepo)
+        {
+            var firstCommitWeek = (firstCommit.DayNumber - start.DayNumber) / 7;
+            if (firstCommitWeek is >= 0 && firstCommitWeek < weeks)
+            {
+                var markX = leftGutter + firstCommitWeek * (cell + gap) - gap / 2.0 - 1;
+                var markHeight = 7 * (cell + gap) - gap + 4;
+                sb.Append($"  <rect class=\"heatmap-first-commit-mark\" x=\"{F(markX)}\" y=\"{topGutter - 2}\" width=\"2\" height=\"{markHeight}\" aria-hidden=\"true\">" +
+                          $"<title>First commit {Html(DReadable(firstCommit))}</title></rect>\n");
+            }
+        }
+
         sb.Append("</svg>\n");
+
+        // Text-equivalent half of the first-commit marker (never color/accent-only) — same young-repo gate as
+        // the SVG mark above.
+        if (isYoungRepo)
+        {
+            sb.Append($"<p class=\"heatmap-first-commit\">First commit {Html(DReadable(firstCommit))}</p>\n");
+        }
 
         // Real-value legend + numeric window (Story 10.2): per-level count ranges from the SAME HeatLevel
         // thresholds the cells use; window is the grid span (weeks + first..last), distinct from the Git Pulse
@@ -1500,7 +1546,10 @@ public static class Charts
     /// <see cref="CouplingGraph"/>): one row per coupled file pair with its co-change count, headed and aligned
     /// so the counts scan as a column. Full paths shown as real text (ellipsis-truncated via CSS, full value in
     /// the cell <c>title</c>) so the visual graph is never the sole information carrier. Not statuses, so no
-    /// <c>--status-*</c> tokens. Degrades to a friendly note when nothing crosses the coupling threshold. [Story 3.2]</summary>
+    /// <c>--status-*</c> tokens. A trailing "Kind" column carries a visible "Process" text badge
+    /// (<see cref="GitMetrics.ClassifyCoupling"/>) when either file in the pair is process signal; code pairs
+    /// leave the cell blank rather than a redundant "Code" label on the majority case (Story 10.6, AC1). Degrades
+    /// to a friendly note when nothing crosses the coupling threshold. [Story 3.2; Kind column: Story 10.6]</summary>
     public static string CouplingTable(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling, Func<string, string?>? fileHref = null)
     {
         if (coupling.Count == 0) return "<div class=\"chart-empty\">No significant change coupling detected.</div>\n";
@@ -1511,15 +1560,21 @@ public static class Charts
                   "<th scope=\"col\">File</th>" +
                   "<th scope=\"col\">Coupled with</th>" +
                   "<th scope=\"col\" class=\"coupling-num\">Together</th>" +
+                  "<th scope=\"col\" class=\"coupling-kind\">Kind</th>" +
                   "</tr></thead>\n");
         sb.Append("  <tbody>\n");
         foreach (var (fileA, fileB, coChanges) in coupling)
         {
+            var isProcess = GitMetrics.ClassifyCoupling(fileA, fileB) == GitMetrics.CouplingKind.Process;
+            var kindCell = isProcess
+                ? "<span class=\"coupling-kind-badge\" title=\"At least one file is config, lockfile, build output, or a stylesheet — routine upkeep, not necessarily a code dependency.\">Process</span>"
+                : string.Empty;
             sb.Append(
                 "    <tr>" +
                 $"<td class=\"coupling-file\" title=\"{Html(fileA)}\">{CodeItemLink(fileA, fileHref)}</td>" +
                 $"<td class=\"coupling-file\" title=\"{Html(fileB)}\">{CodeItemLink(fileB, fileHref)}</td>" +
-                $"<td class=\"coupling-num\">{coChanges}&times;</td></tr>\n");
+                $"<td class=\"coupling-num\">{coChanges}&times;</td>" +
+                $"<td class=\"coupling-kind\">{kindCell}</td></tr>\n");
         }
         sb.Append("  </tbody>\n</table>\n");
         return sb.ToString();
@@ -1574,14 +1629,18 @@ public static class Charts
         var aria = $"Change coupling graph: {coupling.Count} coupled file {Plural(coupling.Count, "pair", "pairs")} across {count} {Plural(count, "file", "files")}";
         sb.Append($"<svg class=\"coupling-graph\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
 
-        // Edges first so nodes render on top of them. Width + opacity scale with the co-change count.
+        // Edges first so nodes render on top of them. Width + opacity scale with the co-change count. Process
+        // pairs (Story 10.6, AC1) get a second class for a dashed stroke (never color-only) plus a title suffix.
         foreach (var (a, b, w) in coupling)
         {
             var (x1, y1) = Pos(order[a]);
             var (x2, y2) = Pos(order[b]);
-            sb.Append($"  <line class=\"coupling-edge\" x1=\"{F(x1)}\" y1=\"{F(y1)}\" x2=\"{F(x2)}\" y2=\"{F(y2)}\" " +
+            var isProcess = GitMetrics.ClassifyCoupling(a, b) == GitMetrics.CouplingKind.Process;
+            var edgeClass = isProcess ? "coupling-edge process-edge" : "coupling-edge";
+            var titleSuffix = isProcess ? " (process-coupling)" : string.Empty;
+            sb.Append($"  <line class=\"{edgeClass}\" x1=\"{F(x1)}\" y1=\"{F(y1)}\" x2=\"{F(x2)}\" y2=\"{F(y2)}\" " +
                       $"stroke-width=\"{F(ScaleW(w, 1.5, 6))}\" stroke-opacity=\"{F(ScaleW(w, 0.35, 0.9))}\">" +
-                      $"<title>{Html(Basename(a))} &harr; {Html(Basename(b))}: {w}&times; together</title></line>\n");
+                      $"<title>{Html(Basename(a))} &harr; {Html(Basename(b))}: {w}&times; together{titleSuffix}</title></line>\n");
         }
 
         // Nodes + labels, placed just outside the ring and anchored away from center so text clears the circle.

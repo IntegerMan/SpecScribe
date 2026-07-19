@@ -866,6 +866,71 @@ public class GitMetricsTests
             DateTime.ParseExact(date, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),
             "subject", "",
             files.Select(f => new DeepFileChange(f.Path, f.Added, f.Deleted)).ToList());
+
+    // ---- Story 10.6 AC1: process-vs-code coupling classifier (framework-neutral, never a SpecScribe literal) ----
+
+    [Theory]
+    [InlineData("src/App.cs")]
+    [InlineData("lib/util.py")]
+    [InlineData("app/main.go")]
+    [InlineData("Component.tsx")]
+    [InlineData("README.md")]
+    [InlineData("Makefile")]
+    public void IsProcessPath_SourceAndAmbiguousPathsAreNotProcess(string path) =>
+        Assert.False(GitMetrics.IsProcessPath(path));
+
+    [Theory]
+    [InlineData("config/settings.yaml")]
+    [InlineData("config/settings.yml")]
+    [InlineData("package.json")]
+    [InlineData("pyproject.toml")]
+    [InlineData("package-lock.json")]
+    [InlineData("Gemfile.lock")]
+    [InlineData("go.sum")]
+    [InlineData("src/styles/theme.css")]
+    [InlineData("src/styles/theme.scss")]
+    [InlineData("src/styles/theme.less")]
+    [InlineData("bin/App.dll")]
+    [InlineData("obj/Debug/App.dll")]
+    [InlineData("packages/app/dist/bundle.js")]
+    [InlineData("frontend/node_modules/lib/index.js")]
+    public void IsProcessPath_ConfigStatusLockfileBuildOutputAndStylesheetsAreProcess(string path) =>
+        Assert.True(GitMetrics.IsProcessPath(path));
+
+    [Fact]
+    public void ClassifyCoupling_SourceToSourceIsCode()
+    {
+        Assert.Equal(GitMetrics.CouplingKind.Code, GitMetrics.ClassifyCoupling("src/A.cs", "src/B.cs"));
+    }
+
+    [Fact]
+    public void ClassifyCoupling_YamlToCssIsProcess()
+    {
+        Assert.Equal(GitMetrics.CouplingKind.Process, GitMetrics.ClassifyCoupling("status.yaml", "theme.css"));
+    }
+
+    [Fact]
+    public void ClassifyCoupling_SourceToLockfileIsProcess()
+    {
+        Assert.Equal(GitMetrics.CouplingKind.Process, GitMetrics.ClassifyCoupling("src/A.cs", "package-lock.json"));
+    }
+
+    [Fact]
+    public void ClassifyCoupling_AmbiguousPathsDefaultToCode()
+    {
+        // Neither side matches a known process pattern — false negative (code) is cheaper than hiding a
+        // real dependency behind an over-eager process classification (owner-locked design rule).
+        Assert.Equal(GitMetrics.CouplingKind.Code, GitMetrics.ClassifyCoupling("README.md", "Makefile"));
+    }
+
+    [Fact]
+    public void ClassifyCoupling_EitherSideProcessMakesTheWholePairProcess()
+    {
+        // Only ONE side needs to be process — a code file co-committed with a process file is still
+        // routine-upkeep coupling, not a code dependency.
+        Assert.Equal(GitMetrics.CouplingKind.Process, GitMetrics.ClassifyCoupling("src/A.cs", "config/app.json"));
+        Assert.Equal(GitMetrics.CouplingKind.Process, GitMetrics.ClassifyCoupling("config/app.json", "src/A.cs"));
+    }
 }
 
 /// <summary>Real-git wiring for <see cref="GitMetrics.TryCompute"/> Story 3.1 fields

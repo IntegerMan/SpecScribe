@@ -185,6 +185,75 @@ public static class GitMetrics
     /// co-change signal) — they still count toward hotspot frequency. [Story 3.2 Subtask 2.5]</summary>
     private const int CouplingFileSetCap = 50;
 
+    /// <summary>Extensions that are process signal for <b>coupling</b> classification only (Story 10.6, AC1):
+    /// config/status/lockfile formats plus stylesheet extensions — the live symptom class ("sprint-status.yaml
+    /// changes together with specscribe.css" reads as a code dependency when it is really committing-habit).
+    /// Marking a path process here never demotes it elsewhere (code map, code pages, language treatment) — this
+    /// is a coupling-only lens. Pattern/extension-only, per repo, never a SpecScribe path literal (NFR8).</summary>
+    private static readonly HashSet<string> ProcessExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".yml", ".yaml", ".json", ".toml", ".lock", ".css", ".scss", ".less",
+    };
+
+    /// <summary>Directory segments that mark everything beneath them as process/build-output for coupling
+    /// classification (Story 10.6, AC1) — matched anywhere in the path, not just at the root, so a nested
+    /// <c>packages/app/dist/bundle.js</c> still classifies as process.</summary>
+    private static readonly HashSet<string> ProcessDirNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "bin", "obj", "dist", "node_modules",
+    };
+
+    /// <summary>Lockfile basenames whose extension alone wouldn't mark them process (Story 10.6, AC1) — e.g.
+    /// <c>go.sum</c> carries no recognized process extension. Most language lockfiles (<c>package-lock.json</c>,
+    /// <c>yarn.lock</c>, <c>Cargo.lock</c>, …) already match via <see cref="ProcessExtensions"/>; this list only
+    /// covers the exceptions. Framework-neutral (NFR8): common cross-ecosystem names, never a SpecScribe literal.</summary>
+    private static readonly HashSet<string> ProcessBasenames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "go.sum",
+    };
+
+    /// <summary>Whether coupled-with kind (Story 10.6, AC1): the file's own git history/dependency role, not
+    /// whether the pair it's part of hides a real code dependency.</summary>
+    public enum CouplingKind
+    {
+        /// <summary>Application/library source — the default when a path matches no process pattern (ambiguous
+        /// paths classify as code: a false negative here is cheaper than hiding a real dependency).</summary>
+        Code,
+
+        /// <summary>Config, status, lockfile, build-output, or stylesheet — the routine-upkeep class that tends
+        /// to get co-committed with unrelated source changes rather than reflecting a code dependency.</summary>
+        Process,
+    }
+
+    /// <summary>True when <paramref name="path"/> is process signal for <b>coupling</b> classification (Story
+    /// 10.6, AC1): a directory segment in <see cref="ProcessDirNames"/>, a basename in
+    /// <see cref="ProcessBasenames"/>, or an extension in <see cref="ProcessExtensions"/> (stylesheets included —
+    /// process for coupling purposes only, never elsewhere in the portal). Pattern/extension-only, so it
+    /// generalizes across repositories without any SpecScribe-specific literal (NFR8). Pure and repo-free.</summary>
+    public static bool IsProcessPath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+
+        var normalized = path.Replace('\\', '/');
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0) return false;
+
+        if (segments.Take(segments.Length - 1).Any(ProcessDirNames.Contains)) return true;
+
+        var fileName = segments[^1];
+        if (ProcessBasenames.Contains(fileName)) return true;
+
+        var ext = Path.GetExtension(fileName);
+        return ext.Length > 0 && ProcessExtensions.Contains(ext);
+    }
+
+    /// <summary>Classifies a coupled file pair for the Deep Analytics graph/table (Story 10.6, AC1): a pair is
+    /// <see cref="CouplingKind.Process"/> when EITHER path is process (<see cref="IsProcessPath"/>) — one process
+    /// file co-committed with a code file is still routine-upkeep coupling, not a code dependency. Two code files
+    /// stay <see cref="CouplingKind.Code"/>. Pure and repo-free.</summary>
+    public static CouplingKind ClassifyCoupling(string pathA, string pathB) =>
+        IsProcessPath(pathA) || IsProcessPath(pathB) ? CouplingKind.Process : CouplingKind.Code;
+
     public static GitPulse? TryCompute(string repoRoot)
     {
         try
