@@ -197,6 +197,8 @@ FR34: Epic 16 - Release-facing documentation, changelog, and versioning policy.
 FR35: Epic 6 - Native VS Code host-integration surfaces (discoverability, commands, tree view/status bar, editor bridges, reactivity), seated from the VS Code Native-Integration Recommendations (docs/VSCodeIntegrationRecommendations.md).
 FR36: Epic 18 - BMad module/expansion coverage exploration and baseline via the shared adapter contract.
 FR37: Epic 19 - Directed work graph across epics, stories, quick-dev, deferred work, reviews, and code (queryable provenance).
+FR38: Epic 20 - Interactive project explorer (drill-in zoomable sunburst + related-work side pane) as a progressive enhancement over the static Story 10.7 sunburst.
+FR39: Epic 21 - Value & correlation insights (traceability coverage matrix, delivery cadence / cycle-time, planning↔code impact map) derived at generation time.
 NFR10: Epic 17 - Pre-publication code hardening and security/privacy review for public + private codebase readiness.
 
 ## Epic List
@@ -278,8 +280,17 @@ Extend first-class BMad support beyond the BMM core to BMad's own module and exp
 Make the directed relationships among epics, stories, quick-dev, deferred work, retrospectives/code reviews, and code navigable as a queryable graph — so provenance chains, cycles, and "what stemmed from what" stop living only as breadcrumbs and reverse-link panels.
 **FRs covered:** FR37 (seat in PRD when convenient)
 
+### Epic 20: Interactive Project Explorer — Drill-In Sunburst with Related-Work Pane
+Turn the static remaining-work sunburst into a fluid, explorable map: click a wedge to zoom in and reveal nested children, breadcrumb back out, with a live related-work side pane. SpecScribe's first rich client-interactive surface; a progressive enhancement over the static Story 10.7 sunburst.
+**FRs covered:** FR38 (seat in PRD when convenient)
+
+### Epic 21: Value & Correlation Insights — Traceability, Cadence, and Planning↔Code
+High-impact displays that make product value legible and reveal correlations across work items and code: a traceability coverage matrix, delivery cadence / cycle-time, and a planning↔code impact map — all generation-time-derived.
+**FRs covered:** FR39 (seat in PRD when convenient)
+
 <!-- Epics 17–18 added 2026-07-11 (SCP 2026-07-11, correct-course): Epic 17 = pre-publication hardening (NFR10), gates Epic 16's cut; Epic 18 = BMad-native module exploration (FR36), distinct from framework Epics 11–15. Append-only, no renumber. Run create-story per story when scheduled (17.1 / 18.1 spike first). -->
 <!-- Epic 19 added 2026-07-17: directed work-graph visualization + query across reviews/stories/epics/deferred/code. Exploratory insight surface; spike-led. -->
+<!-- Epics 20–21 added 2026-07-19 (SCP 2026-07-19, correct-course): Epic 20 = interactive drill-in sunburst explorer + related-work pane (first rich client-interactive surface, enhances static Story 10.7); Epic 21 = value & correlation insights (traceability matrix, cadence/cycle-time, planning↔code map). Same SCP also added Stories 7.10–7.12 (code risk/ownership/freshness insights) and 10.8–10.11 (unified list grammar + client-light sort/filter + context-aware white-bar nav + sticky section nav). Append-only; the contextual-nav cluster folded into Epic 10 rather than a new epic, freeing 21 for the insights epic. -->
 
 <!-- 2026-07-11: Story 5.4 (OSS onboarding/reference docs) removed from Epic 5 and folded into Epic 16 Story 16.6; FR18 coverage moved Epic 5 → Epic 16. -->
 
@@ -1452,6 +1463,71 @@ So that I can see at a glance where C#, TypeScript, CSS, config, and other kinds
 **Then** it does **not** change Story 10.6's coupling process-vs-code classifier (orthogonal concern) and does not require rewriting the sequential metric dimensions
 **And** HTML + webview + SPA stay coherent on the shared code-map surface.
 
+<!-- Stories 7.10–7.12 added 2026-07-19 (SCP 2026-07-19, correct-course): correlation/risk code insights on top of
+     the existing deep-git signals (churn, size, author, last-commit). All extend GitMetrics.TryComputeDeep /
+     ParseNumstatLog (the single --deep-git numstat path — no second git log), reuse the Story 7.2 code-page link
+     seam and the Story 10.2 chart-metadata standard, and degrade on shallow/non-git/solo repos (NFR8). -->
+
+### Story 7.10: Refactor-Target Risk Quadrant (Churn × Size)
+
+As a tech lead deciding where to invest cleanup,
+I want files plotted by how often they change against how large they are,
+So that the high-churn, high-size quadrant surfaces refactor targets instead of me guessing.
+
+**Acceptance Criteria:**
+
+1.
+**Given** deep-git numstat change-frequency data and per-file size already computed
+**When** the quadrant renders
+**Then** each file is a point on change-frequency × size axes with the high/high quadrant visually flagged as elevated risk
+**And** points link to their code page via the Story 7.2 seam, with a Story 10.2-compliant legend, axes, and framing sentence.
+
+2.
+**Given** a shallow or non-git repo, or a repo too small to be meaningful (NFR8)
+**When** the underlying data is thin
+**Then** the chart is omitted or shows a designed empty state rather than an axis of one dot
+**And** "complexity" remains a **size proxy only** — this story does not add a cyclomatic-complexity analyzer; a real complexity metric would be a separate story.
+
+### Story 7.11: Code Ownership & Bus-Factor Insights
+
+As a maintainer assessing project resilience,
+I want to see how concentrated authorship is across the codebase,
+So that knowledge silos ("only one person has touched this") become visible before they become a risk.
+
+**Acceptance Criteria:**
+
+1.
+**Given** deep-git author attribution
+**When** the ownership view renders
+**Then** each file or area shows its dominant-author share and contributor count, and single-author concentrations are flagged as bus-factor risks using the existing sole-contributor vocabulary (`GitInsightsTemplater`)
+**And** entries link to their code page (Story 7.2 seam).
+
+2.
+**Given** a solo-maintainer repo (the common OSS case, NFR8)
+**When** ownership would trivially be "one person everywhere"
+**Then** the surface reframes honestly (e.g., "single-maintainer project") rather than flagging every file as a bus-factor risk
+**And** the classification is generation-time deterministic (FR31).
+
+### Story 7.12: Code Freshness / Age Map
+
+As a newcomer orienting to a codebase,
+I want to see which areas are actively evolving versus long-untouched,
+So that I can tell load-bearing hot code from stable or possibly-dead corners.
+
+**Acceptance Criteria:**
+
+1.
+**Given** each file's last-commit date from the deep-git path
+**When** the freshness map renders
+**Then** files are shaded by recency of last change, reusing the `--status-*` / heat token system (not a new palette) with a real-value legend per the Story 10.2 chart-metadata standard
+**And** color is never the sole signal (path + date remain available as text / tooltip).
+
+2.
+**Given** generation-time determinism (FR31, NFR3)
+**When** freshness is computed
+**Then** it derives from git timestamps only — no per-visitor "now" drift — and a from-scratch CI regeneration produces identical output
+**And** non-git repos omit the surface cleanly (NFR8).
+
 ## Epic 8: Dashboard Command Center — Trustworthy Status at a Glance
 
 Give the Driver an accurate 30-second pulse and a friction-free path to the next unit of work: one canonical status vocabulary everywhere, counts that always agree, progress and workflow state paired, readiness self-explanatory, and state-aware next-step commands. Optimizes the home dashboard for the daily journeys (1–2) defined in docs/UserJourneys.md.
@@ -2104,6 +2180,95 @@ So that wedge density never becomes a wall of unreadable slices and I can still 
 **Then** follow-ups remain attributable and reachable without collapsing into an opaque orange band
 **And** the solution degrades cleanly when follow-ups are absent (NFR8) and does not invent a new authoring schema.
 
+<!-- Stories 10.8–10.9 added 2026-07-19 (SCP 2026-07-19, correct-course): list-page polish. 10.8 generalizes Story
+     9.10's follow-up row grammar into one shared list primitive across every index; 10.9 layers client-light
+     sort/group/filter as a progressive enhancement reusing the Epic 20 interactivity budget (not a second JS stack).
+     Route status through the canonical --status-* tokens (Story 8.2) and counts through Story 8.3's single source. -->
+
+### Story 10.8: Unified List-Page Grammar Across Every Index
+
+As a stakeholder scanning any index page,
+I want every list page — requirements, stories, epics, follow-ups, code files, ADRs, commits — to share one scannable row grammar,
+So that I learn the pattern once and read every list the same way.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the Story 9.10 follow-up row grammar as the seed
+**When** it is generalized into a shared list primitive
+**Then** each index renders through it with consistent row anatomy (primary label, status badge via the canonical `--status-*` tokens, key metadata, deep link) and a designed empty state (Story 8.6)
+**And** it does not re-count items against the single-source counts (Story 8.3).
+
+2.
+**Given** HTML, webview, and SPA surfaces
+**When** a list renders
+**Then** all three stay coherent
+**And** no index invents a one-off row layout outside the shared primitive.
+
+### Story 10.9: Client-Light Sort, Group & Filter on List Pages
+
+As a maintainer hunting one item in a long list,
+I want to sort, group, and text-filter a list page in place,
+So that a hundred-row index becomes reachable without scrolling the whole thing.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a list page with JavaScript available
+**When** I sort (status / date / name), toggle grouping, or type into a filter
+**Then** rows reorder or hide live client-side within the Epic 20 interactivity budget (not a second client stack)
+**And** the controls are keyboard-operable with `aria` state.
+
+2.
+**Given** JavaScript off (NFR8)
+**When** the page loads
+**Then** it renders in a sensible server-defined default order with every row present
+**And** the sort/group/filter controls are a progressive enhancement, never a gate on seeing the data.
+
+<!-- Stories 10.10–10.11 added 2026-07-19 (SCP 2026-07-19, correct-course): contextual-wayfinding redesign, folded
+     into Epic 10 per owner. The white bar itself becomes context-aware — same bar, page-type-specific contents —
+     rather than gaining a separate sidebar rail. Owner intent: "the white bar used effectively throughout, with
+     different context on each page or page type." Built on the Story 10.1 RenderNavMarkup seam (3-surface parity),
+     the existing EntityPager prev/next, and Story 10.5's grouped TOC. -->
+
+### Story 10.10: Context-Aware Navigation Bar
+
+As a reader on any page,
+I want the top navigation bar to carry navigation relevant to where I am,
+So that the white bar earns its space on every page instead of only working on the home dashboard.
+
+**Acceptance Criteria:**
+
+1.
+**Given** every page type (home, epic, story, requirement, code file, follow-up, ADR, commit, insight)
+**When** the nav is defined
+**Then** a page-type → nav-content mapping specifies what the bar surfaces on each — home keeps the global journey groups; an epic page surfaces its stories; a code page surfaces sibling files / sections; a requirement page surfaces its family; a follow-up page surfaces its group — all built from data already in the view models via the Story 10.1 `RenderNavMarkup` seam (no new authoring schema).
+
+2.
+**Given** that mapping
+**When** an interior page renders
+**Then** the bar shows its page-type-appropriate contents with the active item marked, a page with no meaningful local context (NFR8) falls back cleanly to the global nav rather than an empty bar
+**And** HTML, webview, and SPA stay coherent through the shared seam.
+
+### Story 10.11: Sticky Section Nav & Breadcrumb Coherence
+
+As a reader on a long interior page,
+I want sticky in-page section navigation plus consistent breadcrumb and prev/next controls,
+So that orientation and traversal feel the same everywhere instead of improvised per page.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a long page (extending Story 10.5's grouped TOC)
+**When** it renders
+**Then** a sticky section nav tracks the current section, and breadcrumb plus the existing `EntityPager` prev/next are unified into one coherent wayfinding treatment across page types.
+
+2.
+**Given** keyboard and reduced-motion users
+**When** they use section or breadcrumb navigation
+**Then** focus and scroll behavior honor the existing a11y and reduced-motion conventions
+**And** there is no per-visitor state (FR31 determinism).
+
 <!-- Epics 11–15 added 2026-07-10: per-framework coverage extracted from Epic 4 (Stories 4.3–4.7) into their own
      spike-led epics (append-only, no renumber). Each epic's Story X.1 is a Framework Integration Spike that scopes
      the mapping to Epic 4's shared adapter contract — classifying artifacts as mappable/partial/unsupported and
@@ -2755,3 +2920,142 @@ So that circular-looking reverse links and multi-hop provenance become inspectab
 **When** the graph builds
 **Then** it does not invent a second authoring schema or re-count open items against ProjectCounts
 **And** HTML/SPA parity holds for the new page(s).
+
+<!-- Epic 20 added 2026-07-19 (SCP 2026-07-19, correct-course): interactive project explorer — the owner's drill-in
+     zoomable sunburst + related-work side pane. SpecScribe's first rich client-interactive surface; a progressive
+     enhancement over the static Story 10.7 sunburst (which stays the no-JS baseline and is in active dev). Consumes
+     Epic 19's work-graph edges + the existing Charts.Sunburst/FollowUpGeometry weights. Spike-led. FR38. -->
+
+## Epic 20: Interactive Project Explorer — Drill-In Sunburst with Related-Work Pane
+
+Turn the static remaining-work sunburst into a fluid, explorable map of the whole project: click a wedge to zoom into it in place, reveal its nested children, and breadcrumb back out — paired with a live side pane that shows the work-graph nodes related to whatever is selected. SpecScribe's first rich client-interactive surface; it degrades cleanly to the static Story 10.7 sunburst and Story 9.13 linked pages when JavaScript is unavailable (NFR8).
+
+**FRs covered:** FR38 (sync into PRD when convenient) · **NFRs:** NFR8 · **Depends on:** Epic 19 (work-graph edges) as its relationship source, the existing `Charts.Sunburst`/`EpicSunburst` + `FollowUpGeometry` weights as its hierarchy source, and Story 6.7 (SPA adapter) as prior art for a JS delivery surface. Story 10.7 is the static baseline this enhances — not retired.
+
+### Story 20.1: Interactive Explorer Architecture Spike
+
+As a maintainer introducing the project's first rich client-interactive surface,
+I want the client-interactivity boundary, data payload, and degrade-to-static contract scoped before any explorer ships,
+So that we cross the "pure SVG, no JS" line deliberately and once, with a named budget rather than by accretion.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the existing static sunburst geometry and Epic 19's directed-edge model
+**When** the spike defines the explorer's data contract
+**Then** it specifies a single generation-time payload (node hierarchy + related-edge adjacency) that the client hydrates, names the JS size and dependency budget and whether any framework is introduced, and confirms the payload reuses `FollowUpGeometry` / sunburst weights rather than deriving a second geometry.
+
+2.
+**Given** JavaScript-off, reduced-motion, and assistive-technology visitors
+**When** the spike documents the degrade contract
+**Then** the static Story 10.7 sunburst plus Story 9.13 linked pages remain the no-JS baseline, and the interactive layer is defined as a progressive enhancement over that exact markup — not a parallel site or a second authoring schema — with HTML/SPA parity rules named for any new payload.
+
+### Story 20.2: Zoomable Drill-In Sunburst Navigation
+
+As a maintainer exploring a large project,
+I want to click a sunburst wedge to zoom into it and reveal its nested children, then breadcrumb back out,
+So that I can traverse epic → story → follow-up depth in place without losing my orientation or opening a new page for every hop.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the rendered explorer with JavaScript available
+**When** I activate a wedge (click, Enter, or Space)
+**Then** the chart re-centers on that node, expands its children into the rings, and shows a breadcrumb trail of the current zoom scope
+**And** activating the center or a breadcrumb crumb navigates back outward without a full page load.
+
+2.
+**Given** keyboard and screen-reader users
+**When** they traverse the explorer
+**Then** focus order, roving-tabindex wedge navigation, and `aria` live announcements of the current zoom scope all work
+**And** a wedge's terminal open action still honors the Story 9.13 destination contract (leaf → detail page, group wedge → generated filtered list page), so the explorer does not invent a parallel navigation scheme.
+
+### Story 20.3: Related-Work Side Pane on Selection
+
+As a Driver inspecting one item,
+I want a side pane that lists the work-graph nodes related to my current selection,
+So that "what stemmed from what" is visible beside the map instead of buried in per-page reverse panels.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a selected explorer node and Epic 19's directed edges
+**When** the pane renders
+**Then** it groups related nodes by edge kind (stemmed-from, resolves, covers, cites, raised-in), each entry linking to its detail page
+**And** the pane updates as the selection changes, reusing Epic 19's edges and Epic 9's parsers without re-counting open items against ProjectCounts.
+
+2.
+**Given** a selection with no work-graph edges, or a JavaScript-off visitor (NFR8)
+**When** the pane would otherwise be empty or unhydrated
+**Then** an empty selection shows a designed empty state
+**And** with JS off the relationship data is still delivered as a server-rendered "Related" block, never JS-gated.
+
+<!-- Epic 21 added 2026-07-19 (SCP 2026-07-19, correct-course): value & correlation insights — cross-cutting displays
+     that make product value legible and surface correlations across work items AND code. Distinct from Epic 7's
+     code-only signals (Stories 7.10–7.12) and from the graph/explorer surfaces (Epics 19/20). Seated as Epic 21
+     (the number freed when the contextual-nav cluster folded into Epic 10). All derive at generation time from
+     existing artifacts + git (FR31); degrade cleanly when data is absent (NFR8). Spike-optional. FR39. -->
+
+## Epic 21: Value & Correlation Insights — Traceability, Cadence, and Planning↔Code
+
+Give first-time visitors and stakeholders a few high-impact displays that make the product's value legible at a glance and reveal correlations across work items and code: a visual traceability matrix, delivery-cadence signals, and a planning-to-code impact map. All derived at generation time from existing artifacts + git (FR31 determinism), degrading cleanly when the underlying data is absent (NFR8).
+
+**FRs covered:** FR39 (sync into PRD when convenient) · **NFRs:** NFR8, and FR31 (generation-time determinism) · **Depends on:** Story 9.2 (requirement-coverage data), Epic 7 (code citations / git commit→file data), and Epic 19 (work-graph edges) as data sources — does not block any of them.
+
+### Story 21.1: Traceability Coverage Matrix
+
+As a stakeholder judging project rigor,
+I want a visual FR/NFR/UX-DR × covering-work grid,
+So that coverage completeness and the exact gaps are legible in one glance instead of read line-by-line.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the Story 9.2 coverage data and the FR Coverage Map
+**When** the matrix renders
+**Then** requirements form one axis and covering stories/epics the other, each cell showing covered / deferred-on-purpose / unmapped via the canonical `--status-*` tokens
+**And** it carries a Story 10.2-compliant legend and framing sentence, and cells deep-link to the requirement/story pages.
+
+2.
+**Given** a project with sparse or no requirement mapping (NFR8)
+**When** the underlying data is thin
+**Then** the matrix degrades to an honest state (e.g., "coverage not yet mapped") rather than a misleading empty grid
+**And** it does not re-count items against the single-source counts (Story 8.3).
+
+### Story 21.2: Delivery Cadence & Story Cycle-Time
+
+As a maintainer reflecting on throughput,
+I want to see how work has flowed over time — completion cadence and, where derivable, story cycle-time,
+So that delivery rhythm becomes a visible property of the project.
+
+**Acceptance Criteria:**
+
+1.
+**Given** git history and story / sprint-status change data
+**When** the cadence view renders
+**Then** it shows completion-over-time and, where first-touch → done dates are derivable, a cycle-time distribution, each clearly labeled with its analysis window per Story 10.2.
+
+2.
+**Given** projects where transition history isn't reliably derivable (NFR8, honesty)
+**When** cycle-time can't be trusted
+**Then** that metric is omitted or explicitly marked approximate rather than fabricated
+**And** the whole surface is generation-time deterministic (FR31) — no per-visitor "now" drift, identical output on a from-scratch CI regen.
+
+### Story 21.3: Planning ↔ Code Impact Map
+
+As someone connecting plans to reality,
+I want to see which code areas each epic/story actually touched,
+So that "what did this work change" becomes visible instead of inferred.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Epic 7 code citations and git commit→file data attributed to stories/epics
+**When** the impact map renders
+**Then** it correlates planning items with the code areas their commits touched (e.g., epic → touched files / areas), navigable to both the story and the code pages, reusing Epic 19's edges rather than a second schema.
+
+2.
+**Given** no commit-to-story attribution available (NFR8)
+**When** the correlation can't be built
+**Then** the surface is omitted cleanly
+**And** it never re-counts open items against ProjectCounts.

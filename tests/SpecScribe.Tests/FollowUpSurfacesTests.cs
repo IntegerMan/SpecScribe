@@ -448,7 +448,10 @@ public class FollowUpSurfacesTests : IDisposable
     [Fact]
     public void HomeAndEpicSunburst_ShowFollowUpGeometry_WhenOpenItemsExist()
     {
-        // Story 9.7 + 9.11: open action items appear as story-ring peers; wedges deep-link to per-item detail.
+        // Story 9.7 + 9.11 + 10.7: open action items appear as story-ring peers on the project glance; on the
+        // epic sunburst, epic-level peers (actions here — the deferred items are story-child, nested under
+        // their story) now aggregate into one open/done wedge linking to the group-epic-N page (AC2) instead
+        // of one leaf wedge per item.
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), SprintWithDupes);
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), StructuredDeferred);
 
@@ -466,16 +469,18 @@ public class FollowUpSurfacesTests : IDisposable
 
         var epic1 = File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html"));
         Assert.Contains("sb-followup-open", epic1);
-        Assert.Contains("href=\"../follow-ups/action-", epic1);
-        Assert.Contains("Schedule retros promptly", epic1);
-        // Deferred wedges must also climb out of epics/ — not epics/follow-ups/… (404).
+        // Epic-level peers (2 open actions) aggregate to the group page — no per-item action wedge/text.
+        Assert.Contains("href=\"../follow-ups/group-epic-1.html\"", epic1);
+        Assert.DoesNotContain("href=\"../follow-ups/action-", epic1);
+        Assert.DoesNotContain("Schedule retros promptly", epic1);
+        // Story-child deferred stays nested and unchanged — still climbs out of epics/ (not epics/follow-ups/…, 404).
         Assert.Contains("href=\"../follow-ups/deferred-", epic1);
         Assert.DoesNotContain("href=\"follow-ups/deferred-", epic1);
         Assert.DoesNotContain("href=\"follow-ups/action-", epic1);
 
         var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
         Assert.Contains("sb-followup-open", epic2);
-        Assert.Contains("href=\"../follow-ups/", epic2);
+        Assert.Contains("href=\"../follow-ups/group-epic-2.html\"", epic2);
     }
 
     [Fact]

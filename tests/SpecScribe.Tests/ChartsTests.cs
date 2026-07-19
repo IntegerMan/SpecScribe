@@ -711,8 +711,11 @@ public class ChartsTests
     }
 
     [Fact]
-    public void EpicSunburst_FollowUps_AreStoryRingPeers_FilteredToEpic()
+    public void EpicSunburst_FollowUps_AreAggregated_FilteredToEpic()
     {
+        // Story 10.7 AC2: epic-level peers (actions + epic-level deferred) no longer render as individual
+        // leaf wedges — they collapse into one open/done aggregate that links to the generated
+        // group-epic-N page (the same 9.13 destination the project glance's outer aggregate already uses).
         var epic1 = Epic(Story("1.1", "One", "ready", 0, 1));
         var epic2 = new EpicInfo
         {
@@ -734,6 +737,7 @@ public class ChartsTests
             ActionItemsHref: SiteNav.ActionItemsOutputPath,
             DeferredSlots: new[]
             {
+                // No SourceStoryId → epic-level peer, not a story-child leaf.
                 new FollowUpDeferredSlot(
                     new DeferredWorkItem("<p>Epic 1 deferred</p>", false, null, null),
                     "from 1.1",
@@ -744,18 +748,25 @@ public class ChartsTests
         var svg1 = Charts.EpicSunburst(epic1, _ => "epics/epic-1.html", followUps: geometry);
         var svg2 = Charts.EpicSunburst(epic2, _ => "epics/epic-2.html", followUps: geometry);
 
-        Assert.Contains("aria-label=\"Action item: Epic 1 only\"", svg1);
-        Assert.Contains("aria-label=\"Deferred item: Epic 1 deferred\"", svg1);
+        // Epic 1: 1 open action + 1 open epic-level deferred = 2 open / 0 done — one aggregate wedge.
+        Assert.Contains("aria-label=\"Epic 1: 2 open follow-ups\"", svg1);
         Assert.Contains("class=\"sb-seg sb-followup-open\"", svg1);
-        Assert.Contains("href=\"follow-ups/action-", svg1);
-        Assert.Contains("href=\"follow-ups/deferred-epic-1.html\"", svg1);
+        Assert.Contains("href=\"follow-ups/group-epic-1.html\"", svg1);
+        Assert.DoesNotContain("aria-label=\"Action item: Epic 1 only\"", svg1);
+        Assert.DoesNotContain("aria-label=\"Deferred item: Epic 1 deferred\"", svg1);
+        Assert.DoesNotContain("href=\"follow-ups/action-", svg1);
+        Assert.DoesNotContain("href=\"follow-ups/deferred-epic-1.html\"", svg1);
         Assert.DoesNotContain("Epic 2 only", svg1);
+
+        // Epic 2: 1 open action only.
+        Assert.Contains("aria-label=\"Epic 2: 1 open follow-up\"", svg2);
+        Assert.Contains("href=\"follow-ups/group-epic-2.html\"", svg2);
         Assert.DoesNotContain("Deferred item: Epic 1 deferred", svg2);
-        Assert.Contains("aria-label=\"Action item: Epic 2 only\"", svg2);
+        Assert.DoesNotContain("aria-label=\"Action item: Epic 2 only\"", svg2);
         Assert.DoesNotContain("Epic 1 only", svg2);
         Assert.DoesNotContain("outermost: open follow-ups", svg1);
 
-        // When ActionItemsHref carries an epics/ depth prefix, deferred DetailHref must too.
+        // When ActionItemsHref carries an epics/ depth prefix, the aggregate href must too.
         var prefixed = new FollowUpGeometry(
             geometry.ActionItems,
             geometry.DeferredOpenCount,
@@ -763,9 +774,156 @@ public class ChartsTests
             ActionItemsHref: "../" + SiteNav.ActionItemsOutputPath,
             DeferredSlots: geometry.DeferredItems);
         var svgPrefixed = Charts.EpicSunburst(epic1, _ => "epics/epic-1.html", followUps: prefixed);
-        Assert.Contains("href=\"../follow-ups/action-", svgPrefixed);
-        Assert.Contains("href=\"../follow-ups/deferred-epic-1.html\"", svgPrefixed);
-        Assert.DoesNotContain("href=\"follow-ups/deferred-epic-1.html\"", svgPrefixed);
+        Assert.Contains("href=\"../follow-ups/group-epic-1.html\"", svgPrefixed);
+        Assert.DoesNotContain("href=\"follow-ups/group-epic-1.html\"", svgPrefixed);
+    }
+
+    [Fact]
+    public void EpicSunburst_PeerAggregate_OmittedWhenNoPeers()
+    {
+        // NFR8: no epic-level peers at all → no aggregate wedge (story-only chart).
+        var epic = Epic(Story("1.1", "Solo", "active", 1, 2));
+
+        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+
+        Assert.DoesNotContain("sb-followup-open", svg);
+        Assert.DoesNotContain("sb-followup-done", svg);
+        Assert.DoesNotContain("group-epic-", svg);
+    }
+
+    [Fact]
+    public void EpicSunburst_PeerAggregate_ExcludesStoryChildDeferred_DiffersFromGlanceAggregate()
+    {
+        // Story 10.7 AC2 critical split: story-child deferred must NOT double-count into the epic-chart's
+        // peer aggregate (it stays a nested leaf under its story) — while the project glance's own
+        // CountEpicFollowUpAggregates DOES include it (existing 9.13/glance behavior). Same data, two
+        // deliberately different counts.
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(Story("1.1", "Do the thing", "active", 2, 4)) },
+        };
+        var epic = model.Epics[0];
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Story-child deferred item from code review.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var counts = ProjectCounts.Empty with { DeferredOpenItems = 1 };
+        var geometry = FollowUpGeometry.From(
+            Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
+
+        Assert.Equal("1.1", geometry.StoryChildDeferred(1, "1.1")[0].SourceStoryId);
+
+        var epicSvg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", followUps: geometry);
+        // The epic chart draws no peer aggregate — the only deferred item here is a story-child leaf.
+        Assert.DoesNotContain("href=\"follow-ups/group-epic-1.html\"", epicSvg);
+        Assert.Contains("Deferred item: Story-child deferred item from code review.", epicSvg);
+
+        // The project glance's own aggregate DOES count the same story-child item (different, correct count).
+        var glanceSvg = Charts.Sunburst(model, followUps: geometry);
+        Assert.Contains("Epic 1: 1 open follow-up", glanceSvg);
+    }
+
+    [Fact]
+    public void Sunburst_DenseEpic_StoryRingCollapsesToSummaryWedge()
+    {
+        // Story 10.7 AC1: an epic with 8+ stories collapses its middle ring to one summary wedge — same
+        // destination as the epic's own inner-ring wedge, never a new click scheme.
+        var denseStories = Enumerable.Range(1, 8)
+            .Select(i => Story($"1.{i}", $"Story {i}", "ready", 0, 1))
+            .ToArray();
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(denseStories) },
+        };
+
+        var svg = Charts.Sunburst(model);
+
+        Assert.Contains("class=\"sb-seg sb-story-summary", svg);
+        Assert.Contains("href=\"epics/epic-1.html\" aria-label=\"Epic 1: 8 stories (sized by tasks)\"", svg);
+        Assert.DoesNotContain("aria-label=\"Story 1.1:", svg);
+        Assert.DoesNotContain("aria-label=\"Story 1.8:", svg);
+        Assert.Contains("collapse to one summary wedge", svg);
+    }
+
+    [Fact]
+    public void Sunburst_SparseEpic_JustBelowThreshold_KeepsPerStoryWedges()
+    {
+        // Boundary: one below StoryDensityCollapseThreshold (7 stories) still renders individually.
+        Assert.Equal(8, Charts.StoryDensityCollapseThreshold);
+        var sparseStories = Enumerable.Range(1, 7)
+            .Select(i => Story($"1.{i}", $"Story {i}", "ready", 0, 1))
+            .ToArray();
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(sparseStories) },
+        };
+
+        var svg = Charts.Sunburst(model);
+
+        Assert.DoesNotContain("sb-story-summary", svg);
+        Assert.Contains("aria-label=\"Story 1.1:", svg);
+        Assert.Contains("aria-label=\"Story 1.7:", svg);
+    }
+
+    [Fact]
+    public void SunburstCompanionList_ListsEpicsAndFollowUpRoots_SameDestinationsAsChart()
+    {
+        var epic1 = Epic(Story("1.1", "One", "active", 1, 2));
+        var epic2 = new EpicInfo
+        {
+            Number = 2,
+            Title = "Second",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.FurtherDevelopment,
+            Stories = new[] { Story("2.1", "Two", "ready", 0, 1, epicNumber: 2) },
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { epic1, epic2 },
+        };
+        var items = new[] { new SprintActionItem("Orphan action", "open", EpicNumber: null, Owner: null) };
+        var work = new WorkInventory { QuickDev = Array.Empty<QuickDevEntry>(), Deferred = null };
+        var counts = ProjectCounts.Empty with { OpenActionItems = 1 };
+        var geometry = FollowUpGeometry.From(items, counts, work, epics: model);
+
+        var list = Charts.SunburstCompanionList(model, followUps: geometry);
+
+        Assert.Contains("Remaining work by epic", list);
+        Assert.Contains("<li><a href=\"epics/epic-1.html\">Epic 1: First Epic — 1 story</a></li>", list);
+        Assert.Contains("href=\"epics/epic-2.html\">Epic 2: Second — 1 story</a>", list);
+        Assert.Contains($"href=\"{geometry.FollowUpsGroupHref}\"", list);
+        Assert.Contains("1 unattributed item", list);
+        // NFR8: no Unplanned row when nothing is unplanned.
+        Assert.DoesNotContain("Unplanned:", list);
+    }
+
+    [Fact]
+    public void SunburstCompanionList_EmptyProject_ReturnsEmptyString()
+    {
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = Array.Empty<EpicInfo>(),
+        };
+
+        Assert.Equal(string.Empty, Charts.SunburstCompanionList(model));
     }
 
     [Fact]

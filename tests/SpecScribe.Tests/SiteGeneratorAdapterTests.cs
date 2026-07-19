@@ -505,7 +505,15 @@ public class SiteGeneratorAdapterTests : IDisposable
         // first-commit marker and GitInsightsTemplater's sole-contributor reword are both no-ops on this fixture
         // (old enough repo, multi-contributor); specscribe.css gains .chart-frame-note/.coupling-kind*/
         // .process-edge/.heatmap-first-commit* rules (shared stylesheet, so every page's <link> byte count moves).
-        const string expected = "48f2ed0da56f0d1d28d29486e3f294c87e026098054e148d385d834b4df815bd";
+        // Regenerated for Story 10.7: home + epics-index glance sunburst panels gain a companion scannable
+        // list (Charts.SunburstCompanionList) below the chart — every page with an epic gets this markup, so
+        // both home and epics.html shift; specscribe.css gains .sunburst-companion-list/.sb-story-summary
+        // rules (this fixture's epics stay under the 8-story density-collapse threshold, so the summary-wedge
+        // class itself never renders here — only the shared stylesheet + companion-list markup shift the
+        // hash). EpicSunburst's epic-level peers (action/deferred/quick-dev) now aggregate into one open/done
+        // wedge instead of per-item leaves, but this fixture has no open action_items/deferred-work.md, so
+        // that branch is a no-op here too.
+        const string expected = "96d557ffe444378b82dbdd5b6d13fe4a2960169a658df7ea40d9a519517f8292";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -1,6 +1,10 @@
+---
+baseline_commit: 33c89ea4bbc2f3d2e42f7115a47254ce78e2317a
+---
+
 # Story 10.7: Sunburst Navigability at Project Scale
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -151,38 +155,38 @@ If the epic chart reused `CountEpicFollowUpAggregates`, story-child items would 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Density collapse on project glance** (AC: 1)
-  - [ ] Add `StoryDensityCollapseThreshold = 8` and per-epic sparse/dense branch in `Charts.Sunburst`.
-  - [ ] Dense: single summary middle wedge → `epics/epic-{n}.html`; preserve outer aggregates + `EpicWeight`.
-  - [ ] Update hint + legend participation for `sb-story-summary` (or chosen class).
-  - [ ] Unit tests: epic with 8+ stories → one summary href to epic page, no per-story middle hrefs under that epic; epic with 7 → per-story unchanged.
+- [x] **Task 1 — Density collapse on project glance** (AC: 1)
+  - [x] Add `StoryDensityCollapseThreshold = 8` and per-epic sparse/dense branch in `Charts.Sunburst`.
+  - [x] Dense: single summary middle wedge → `epics/epic-{n}.html`; preserve outer aggregates + `EpicWeight`.
+  - [x] Update hint + legend participation for `sb-story-summary` (or chosen class).
+  - [x] Unit tests: epic with 8+ stories → one summary href to epic page, no per-story middle hrefs under that epic; epic with 7 → per-story unchanged.
 
-- [ ] **Task 2 — Companion scannable list on glance panels** (AC: 1)
-  - [ ] Pure helper rendering epic (+ Follow-ups / Unplanned) rows with counts and 9.13 destinations.
-  - [ ] Wire under sunburst in `HtmlRenderAdapter.Dashboard` + epics-index glance (same markup).
-  - [ ] NFR8: omit empty synthetic roots; never link group rows to unfiltered whole-site dumps.
+- [x] **Task 2 — Companion scannable list on glance panels** (AC: 1)
+  - [x] Pure helper rendering epic (+ Follow-ups / Unplanned) rows with counts and 9.13 destinations.
+  - [x] Wire under sunburst in `HtmlRenderAdapter.Dashboard` + epics-index glance (same markup).
+  - [x] NFR8: omit empty synthetic roots; never link group rows to unfiltered whole-site dumps.
 
-- [ ] **Task 3 — EpicSunburst aggregate epic-level peers** (AC: 2)
-  - [ ] Remove per-item middle slots for actions / epic-level deferred / attributed QD.
-  - [ ] Count open/done from epic-level peers only (exclude `StoryChildDeferred`); draw aggregate → `FollowUpGroupPages.EpicPath(n)`; omit when empty.
-  - [ ] Keep story wedges + nested story-child deferred leaves.
-  - [ ] Update hint; optional “All follow-ups…” link.
-  - [ ] Tests: many peers → aggregate hrefs to `group-epic-N`, no `action-`/`deferred-` leaf hrefs for epic-level peers; zero peers → no aggregate; story-child deferred still detail-linked; assert aggregate count ≠ glance `CountEpicFollowUpAggregates` when story-child deferred exist.
+- [x] **Task 3 — EpicSunburst aggregate epic-level peers** (AC: 2)
+  - [x] Remove per-item middle slots for actions / epic-level deferred / attributed QD.
+  - [x] Count open/done from epic-level peers only (exclude `StoryChildDeferred`); draw aggregate → `FollowUpGroupPages.EpicPath(n)`; omit when empty.
+  - [x] Keep story wedges + nested story-child deferred leaves.
+  - [x] Update hint; optional “All follow-ups…” link.
+  - [x] Tests: many peers → aggregate hrefs to `group-epic-N`, no `action-`/`deferred-` leaf hrefs for epic-level peers; zero peers → no aggregate; story-child deferred still detail-linked; assert aggregate count ≠ glance `CountEpicFollowUpAggregates` when story-child deferred exist.
 
-- [ ] **Task 4 — Guardrails** (AC: 1, 2)
-  - [ ] No JS hash drill; no `?filter=` / `#group=` on full lists; no new authoring schema; no new `--status-*`.
-  - [ ] Do not absorb 10.2 ChartMeta, 10.6 polish, or TaskSunburst redesign.
-  - [ ] Membership parity with `FollowUpGroupPages` / sprint Unplanned set unchanged.
+- [x] **Task 4 — Guardrails** (AC: 1, 2)
+  - [x] No JS hash drill; no `?filter=` / `#group=` on full lists; no new authoring schema; no new `--status-*`.
+  - [x] Do not absorb 10.2 ChartMeta, 10.6 polish, or TaskSunburst redesign.
+  - [x] Membership parity with `FollowUpGroupPages` / sprint Unplanned set unchanged.
 
-- [ ] **Task 5 — Tests + golden** (AC: 1, 2)
-  - [ ] Extend `ChartsTests` (sparse/dense matrix, epic aggregate matrix, destination matrix).
-  - [ ] Extend `FollowUpSurfacesTests` / adapter tests if companion markup appears in GenerateAll HTML.
-  - [ ] Golden fingerprint moves → regen per `golden-diff-normalization-gotchas`; RenderParity + SPA/webview green.
-  - [ ] `dotnet test` from repo root.
+- [x] **Task 5 — Tests + golden** (AC: 1, 2)
+  - [x] Extend `ChartsTests` (sparse/dense matrix, epic aggregate matrix, destination matrix).
+  - [x] Extend `FollowUpSurfacesTests` / adapter tests if companion markup appears in GenerateAll HTML.
+  - [x] Golden fingerprint moves → regen per `golden-diff-normalization-gotchas`; RenderParity + SPA/webview green.
+  - [x] `dotnet test` from repo root.
 
-- [ ] **Task 6 — Verify end-to-end** (AC: 1, 2)
-  - [ ] Large-fixture or synthetic model with ≥8 stories under one epic + many epic-level follow-ups: wedges hittable, companion list works, group pages open from aggregates.
-  - [ ] Empty follow-ups / small projects: no empty rings, no dead companion rows (NFR8).
+- [x] **Task 6 — Verify end-to-end** (AC: 1, 2)
+  - [x] Large-fixture or synthetic model with ≥8 stories under one epic + many epic-level follow-ups: wedges hittable, companion list works, group pages open from aggregates.
+  - [x] Empty follow-ups / small projects: no empty rings, no dead companion rows (NFR8).
 
 ## Dev Notes
 
@@ -287,4 +291,25 @@ Follow `_bmad-output/project-context.md` when populated; until then, follow patt
 
 Ultimate context engine analysis completed — comprehensive developer guide created. Owner-locked 2026-07-18: per-epic density collapse at 8 stories; companion glance list; EpicSunburst peer aggregates → `group-epic-N`; preserve 9.13 destinations; no JS hash drill; EpicWeight unbounded.
 
+Implemented 2026-07-19. AC1: `Charts.StoryDensityCollapseThreshold = 8` gates a new per-epic sparse/dense branch in `Charts.Sunburst` — epics at/above the threshold render one `AppendStorySummarySlot` wedge (class `sb-story-summary sb-{epicClass}`, reusing the epic's own status fill — no new `--status-*` token — plus a distinguishing hatch stroke) spanning the same sweep the per-story wedges would have occupied, linking to `epics/epic-{n}.html` (identical to the epic's own inner-ring destination, not a new scheme); epics below the threshold are untouched. `BuildSunburstHint` gained a `hasDenseEpics` clause explaining the collapse in one sentence. A new `Charts.SunburstCompanionList` helper renders a plain, keyboard-reachable `<ul>` — one row per epic (story count + open follow-ups, reusing `CountEpicFollowUpAggregates`) plus Follow-ups/Unplanned rows only when non-empty (NFR8) — called identically from `HtmlRenderAdapter.Dashboard` and `HtmlRenderAdapter.Epics` (epics-index glance) so both surfaces render byte-identical markup by construction, not by convention.
+
+AC2: `Charts.EpicSunburst` no longer emits per-item middle wedges for epic-level actions/deferred/quick-dev — `AppendActionItemSlot`/`AppendQuickDevSlot` were deleted (their only call sites) — the peer count now draws ONE open/done aggregate wedge via the existing `AppendOpenDoneAggregateRing` helper, on a new outermost ring (`peerAggInner`/`peerAggOuter`, beyond the existing story-child-deferred ring so the two never overlap) linking to `geometry.LinkPrefix + FollowUpGroupPages.EpicPath(epic.Number)` — the same `group-epic-N` page 9.13 already emits. The open/done split deliberately excludes `StoryChildDeferred` (those stay nested leaves under their parent story, unchanged) — a dedicated test proves the epic-chart aggregate count differs from the project-glance's `CountEpicFollowUpAggregates`, which *does* include story-child items, confirming the two counts are intentionally different. The aggregate omits entirely when there are zero epic-level peers (NFR8). Hint/legend updated to describe the aggregate instead of the removed per-item peer classes.
+
+Verified end-to-end via `dotnet run --project src/SpecScribe -- generate --deep-git` against this repo's own history (which already has 5 epics at 8+ stories — 6, 7, 8, 9, 16 — a real large-fixture exercise, not a synthetic one): the dense epics render exactly one `sb-story-summary` wedge each with the expected aria-label (e.g. "Epic 9: 13 stories (sized by tasks + nested deferred)"), sparse epics (e.g. Epic 1, 5 stories) still render per-story wedges unchanged (mixed sparse+dense on one chart confirmed), the companion list renders "Remaining work by epic" with per-epic counts plus an "Unplanned: 53 open items" row, and epic-9's own chart draws a single "Epic 9: 3 open follow-ups" aggregate linking to `../follow-ups/group-epic-9.html` (which exists and is populated) with zero remaining `Action item:` leaf text.
+
+Two pre-existing tests asserted the now-removed per-item EpicSunburst behavior and were updated to assert the aggregate instead: `EpicSunburst_FollowUps_AreStoryRingPeers_FilteredToEpic` (renamed `EpicSunburst_FollowUps_AreAggregated_FilteredToEpic`) and `FollowUpSurfacesTests.HomeAndEpicSunburst_ShowFollowUpGeometry_WhenOpenItemsExist`. Golden fingerprint regenerated per `golden-diff-normalization-gotchas` (confirmed stable across 3 repeated runs after an explicit rebuild — the first post-change hash was stale, exactly Gotcha 6's known trap). 1655/1655 tests green (12 new: dense/sparse boundary matrix, companion-list matrix incl. empty-project, peer-aggregate omit-when-empty, peer-aggregate-excludes-story-child-differs-from-glance). RenderParity/SPA/webview suites green in the same run — no adapter-specific changes needed since Dashboard/Epics-index route through the shared `HtmlRenderAdapter`. Status → review.
+
 ### File List
+
+- `src/SpecScribe/Charts.cs` (UPDATE) — `StoryDensityCollapseThreshold` + per-epic sparse/dense branch + `AppendStorySummarySlot` in `Sunburst`; new `SunburstCompanionList` helper; `BuildSunburstHint` gains `hasDenseEpics`; `EpicSunburst` epic-level peers collapse to one `AppendOpenDoneAggregateRing` wedge (new `peerAggInner`/`peerAggOuter` ring) instead of per-item leaves; deleted now-dead `AppendActionItemSlot`/`AppendQuickDevSlot`.
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` (UPDATE) — emits `Charts.SunburstCompanionList` under the glance sunburst.
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs` (UPDATE) — emits `Charts.SunburstCompanionList` under the epics-index glance sunburst (same call, same markup as Dashboard).
+- `src/SpecScribe/assets/specscribe.css` (UPDATE) — `.sb-story-summary` (dense-wedge hatch stroke) + `.sunburst-companion-list` (list/heading/link chrome).
+- `tests/SpecScribe.Tests/ChartsTests.cs` (UPDATE) — dense/sparse boundary matrix, `SunburstCompanionList` matrix (incl. empty-project), `EpicSunburst` peer-aggregate omit-when-empty + excludes-story-child-differs-from-glance; renamed/rewrote `EpicSunburst_FollowUps_AreStoryRingPeers_FilteredToEpic` → `EpicSunburst_FollowUps_AreAggregated_FilteredToEpic`.
+- `tests/SpecScribe.Tests/FollowUpSurfacesTests.cs` (UPDATE) — `HomeAndEpicSunburst_ShowFollowUpGeometry_WhenOpenItemsExist` updated for the aggregate destination (story-child deferred assertions unchanged).
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` (UPDATE) — golden content fingerprint regenerated (`96d557ff…`).
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (UPDATE) — status transitions for `10-7-sunburst-navigability-at-project-scale`.
+
+## Change Log
+
+- 2026-07-19: dev-story — implemented both ACs. AC1: `Charts.Sunburst` collapses any epic at/above `StoryDensityCollapseThreshold` (8) stories to one `sb-story-summary` summary wedge → `epics/epic-{n}.html` (same destination as the epic's own inner-ring wedge — no new click scheme), reusing the epic's status fill (no new `--status-*`); epics below the threshold render per-story wedges unchanged, and mixed sparse+dense charts are supported. A new `Charts.SunburstCompanionList` renders a plain keyboard-reachable list (epic rows with story + open-follow-up counts, Follow-ups/Unplanned rows only when non-empty per NFR8) called identically from the Dashboard and Epics-index glance panels. AC2: `Charts.EpicSunburst` collapses epic-level actions/deferred/quick-dev into one open/done aggregate wedge (reusing `AppendOpenDoneAggregateRing` on a new outer ring) linking to the existing `follow-ups/group-epic-N.html` page instead of one leaf wedge per peer — deliberately excluding story-child deferred (which stay nested under their story), proven by a test asserting the epic-chart count differs from the glance's own `CountEpicFollowUpAggregates`. Verified end-to-end via `dotnet run generate --deep-git` against this repo's own history, which already has 5 epics at 8+ stories (6, 7, 8, 9, 16) plus real follow-up data — confirmed dense wedges, sparse wedges, companion list, and the epic-9 aggregate all render and link correctly. Two pre-existing tests asserting the removed per-item EpicSunburst leaves were updated for the new aggregate. Golden fingerprint regenerated (`96d557ff…`, confirmed stable across repeated runs per the known stale-first-hash gotcha). 1655/1655 tests green (12 new). Status → review.

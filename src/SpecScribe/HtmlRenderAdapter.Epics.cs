@@ -31,6 +31,7 @@ public sealed partial class HtmlRenderAdapter
         AppendEpicsProgressPanel(sb, view.Progress, view.Counts);
         sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
         sb.Append(Charts.Sunburst(model, followUps: view.FollowUps, unplanned: view.UnplannedWork));
+        sb.Append(Charts.SunburstCompanionList(model, followUps: view.FollowUps, unplanned: view.UnplannedWork));
         sb.Append("</div>\n");
         sb.Append("</section>\n\n");
 
