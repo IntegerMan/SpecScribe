@@ -904,13 +904,18 @@ public class ChartsTests
 
         var list = Charts.SunburstCompanionList(model, followUps: geometry);
 
-        Assert.Contains("Remaining work by epic", list);
-        Assert.Contains("<li><a href=\"epics/epic-1.html\">Epic 1: First Epic — 1 story</a></li>", list);
-        Assert.Contains("href=\"epics/epic-2.html\">Epic 2: Second — 1 story</a>", list);
+        Assert.Contains("class=\"epic-remaining-grid\"", list);
+        Assert.Contains("aria-label=\"Epic 1: First Epic — 1 story\"", list);
+        Assert.Contains("href=\"epics/epic-1.html\"", list);
+        Assert.Contains("<span class=\"epic-remaining-num\">Epic 1</span>", list);
+        Assert.Contains("<span class=\"epic-remaining-title\">First Epic</span>", list);
+        Assert.Contains("aria-label=\"Epic 2: Second — 1 story\"", list);
+        Assert.Contains("href=\"epics/epic-2.html\"", list);
         Assert.Contains($"href=\"{geometry.FollowUpsGroupHref}\"", list);
         Assert.Contains("1 unattributed item", list);
-        // NFR8: no Unplanned row when nothing is unplanned.
+        // NFR8: no Unplanned tile when nothing is unplanned.
         Assert.DoesNotContain("Unplanned:", list);
+        Assert.DoesNotContain("epic-remaining-unplanned", list);
     }
 
     [Fact]

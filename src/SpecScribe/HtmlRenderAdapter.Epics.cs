@@ -31,8 +31,16 @@ public sealed partial class HtmlRenderAdapter
         AppendEpicsProgressPanel(sb, view.Progress, view.Counts);
         sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
         sb.Append(Charts.Sunburst(model, followUps: view.FollowUps, unplanned: view.UnplannedWork));
-        sb.Append(Charts.SunburstCompanionList(model, followUps: view.FollowUps, unplanned: view.UnplannedWork));
         sb.Append("</div>\n");
+
+        // Remaining Work by Epic — its own panel (Story 10.7 AC1 follow-up), same helper/markup as Dashboard.
+        var companionGrid = Charts.SunburstCompanionList(model, followUps: view.FollowUps, unplanned: view.UnplannedWork);
+        if (companionGrid.Length > 0)
+        {
+            sb.Append("<div class=\"chart-panel epic-remaining-panel\">\n<h3>Remaining Work by Epic</h3>\n");
+            sb.Append(companionGrid);
+            sb.Append("</div>\n");
+        }
         sb.Append("</section>\n\n");
 
         if (model.OverviewHtml.Length > 0)

@@ -2647,28 +2647,59 @@ a.ref-file-node:focus-visible {
 }
 .sunburst .sb-story-summary:hover { stroke: var(--gold-light); stroke-width: 2.5; }
 
-/* Companion scannable list (Story 10.7 AC1): a plain, keyboard-reachable list twin beside the glance
-   sunburst so a reader is never limited to hitting shrinking SVG wedges — same epic/group-page
-   destinations as the chart, not a second nav scheme. */
-.sunburst-companion-list { margin-top: 1rem; text-align: left; }
-.sunburst-companion-list h4 {
-  margin: 0 0 0.4rem;
-  font-size: 0.78rem;
-  color: var(--ink-light);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+/* Remaining Work by Epic — its own panel (Story 10.7 AC1), a small responsive tile grid beside the glance
+   sunburst so a reader is never limited to hitting shrinking SVG wedges. Grammar mirrors the established
+   .next-step-card / .epic-mosaic-card accent-bar cards elsewhere (owner feedback: read as a first-class
+   panel, not a plain link list) — left accent = epic status, reusing the same --status-*/chart-local tokens
+   as the sunburst wedges (never color-only: the tile's own title/count text always restates it). Same
+   epic/group-page destinations as the chart, not a second nav scheme. */
+.epic-remaining-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.7rem;
 }
-.sunburst-companion-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
-.sunburst-companion-list li a {
-  color: var(--ink);
+.epic-remaining-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
   text-decoration: none;
-  border-bottom: 1px dotted var(--gold-light);
-  font-size: 0.85rem;
+  color: inherit;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
-.sunburst-companion-list li a:hover,
-.sunburst-companion-list li a:focus-visible {
-  border-bottom-style: solid;
-  color: var(--rust);
+.epic-remaining-tile:hover,
+.epic-remaining-tile:focus-visible {
+  box-shadow: 0 3px 10px var(--shadow);
+  border-color: var(--gold-light);
+  transform: translateY(-1px);
+}
+.epic-remaining-num {
+  font-family: 'Courier New', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+}
+.epic-remaining-title { font-size: 0.85rem; font-weight: bold; color: var(--ink); line-height: 1.3; }
+.epic-remaining-count { font-size: 0.72rem; color: var(--ink-faded); }
+.epic-remaining-followups { color: var(--sb-followup-open, #d97706); }
+
+.epic-remaining-review { border-left-color: var(--status-review); }
+.epic-remaining-active { border-left-color: var(--status-active); }
+.epic-remaining-ready { border-left-color: var(--status-ready); }
+.epic-remaining-drafted { border-left-color: var(--status-drafted); }
+.epic-remaining-pending { border-left-color: var(--status-pending); }
+.epic-remaining-done { border-left-color: var(--status-done); }
+.epic-remaining-followup-open { border-left-color: var(--sb-followup-open, #d97706); }
+.epic-remaining-unplanned { border-left-color: var(--sb-unplanned, #0e7490); }
+
+@media (max-width: 640px) {
+  .epic-remaining-grid { grid-template-columns: 1fr; }
 }
 
 /* ====================== NEXT STEPS (BMad commands) ====================== */

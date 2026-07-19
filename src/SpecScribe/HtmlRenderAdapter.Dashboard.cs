@@ -43,8 +43,18 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("<div class=\"chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
             sb.Append(Charts.Sunburst(epicsForSunburst, followUps: view.FollowUps, unplanned: view.UnplannedWork));
-            sb.Append(Charts.SunburstCompanionList(epicsForSunburst, followUps: view.FollowUps, unplanned: view.UnplannedWork));
             sb.Append("</div>\n\n");
+
+            // Remaining Work by Epic — its own panel (Story 10.7 AC1 follow-up: owner asked for a distinct,
+            // more polished panel rather than a plain list crammed under the sunburst).
+            var companionGrid = Charts.SunburstCompanionList(epicsForSunburst, followUps: view.FollowUps, unplanned: view.UnplannedWork);
+            if (companionGrid.Length > 0)
+            {
+                sb.Append("<div class=\"chart-panel epic-remaining-panel wm-panel wm-show-overview wm-show-track\">\n");
+                sb.Append("<h3>Remaining Work by Epic</h3>\n");
+                sb.Append(companionGrid);
+                sb.Append("</div>\n\n");
+            }
         }
 
         // Project Next Steps — Overview + Review (body from DashboardView; wrap here so wm-* classes

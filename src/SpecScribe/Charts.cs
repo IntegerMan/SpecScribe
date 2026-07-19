@@ -460,12 +460,14 @@ public static class Charts
         return (open, done);
     }
 
-    /// <summary>Companion scannable list for the project-glance sunburst (AC1): a plain, keyboard-reachable
-    /// HTML list beside the chart — one row per epic (plus Follow-ups / Unplanned roots when non-empty) —
-    /// so a reader is never limited to hitting shrinking SVG wedges. Same destinations as the chart (epic
-    /// page / generated group page); counts reuse the existing aggregate helpers, never a second ledger
-    /// parse. Called identically from the Dashboard and Epics-index glance panels so both surfaces render
-    /// the exact same markup. Empty synthetic roots are omitted (NFR8).</summary>
+    /// <summary>Companion scannable tile grid for the project-glance sunburst (AC1): one clickable tile per
+    /// epic (plus Follow-ups / Unplanned roots when non-empty) — a small responsive grid with a left status
+    /// accent bar (reused <c>--status-*</c>/chart-local tokens, never color-only — the tile's own text always
+    /// carries the same status/count info) — so a reader is never limited to hitting shrinking SVG wedges.
+    /// Same destinations as the chart (epic page / generated group page); counts reuse the existing aggregate
+    /// helpers, never a second ledger parse. Returns just the grid (no panel wrapper or heading — callers own
+    /// those, exactly like <see cref="Sunburst"/>) so the Dashboard and Epics-index glance panels render this
+    /// identically. Empty synthetic roots are omitted (NFR8); returns "" when there are no epics at all.</summary>
     public static string SunburstCompanionList(
         EpicsModel model,
         FollowUpGeometry? followUps = null,
@@ -479,38 +481,51 @@ public static class Charts
         var knownEpics = epics.Select(e => e.Number).ToHashSet();
 
         var sb = new StringBuilder();
-        sb.Append("<div class=\"sunburst-companion-list\">\n");
-        sb.Append("  <h4>Remaining work by epic</h4>\n");
-        sb.Append("  <ul>\n");
+        sb.Append("<div class=\"epic-remaining-grid\">\n");
 
         foreach (var epic in epics)
         {
             var (openCount, _) = CountEpicFollowUpAggregates(epic, geometry, unplannedGeo);
+            var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
+            var storyNote = $"{epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}";
             var followNote = openCount > 0
-                ? $", {openCount} open {Plural(openCount, "follow-up", "follow-ups")}"
+                ? $"{openCount} open {Plural(openCount, "follow-up", "follow-ups")}"
                 : string.Empty;
-            var label = $"Epic {epic.Number}: {epicTitle} — {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{followNote}";
-            sb.Append($"    <li><a href=\"epics/epic-{epic.Number}.html\">{Html(label)}</a></li>\n");
+            var aria = $"Epic {epic.Number}: {epicTitle} — {storyNote}" + (followNote.Length > 0 ? $", {followNote}" : string.Empty);
+            sb.Append($"  <a class=\"epic-remaining-tile epic-remaining-{epicClass}\" href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(aria)}\">\n");
+            sb.Append($"    <span class=\"epic-remaining-num\">Epic {epic.Number}</span>\n");
+            sb.Append($"    <span class=\"epic-remaining-title\">{Html(epicTitle)}</span>\n");
+            sb.Append($"    <span class=\"epic-remaining-count\">{Html(storyNote)}</span>\n");
+            if (followNote.Length > 0)
+                sb.Append($"    <span class=\"epic-remaining-count epic-remaining-followups\">{Html(followNote)}</span>\n");
+            sb.Append("  </a>\n");
         }
 
         var unattributed = geometry.OrphanActionItems(knownEpics);
         if (unattributed.Count > 0)
         {
             var open = unattributed.Count(a => !FollowUpGeometry.IsDone(a));
-            var openNote = open > 0 ? $", {open} open" : string.Empty;
-            var label = $"Follow-ups: {unattributed.Count} unattributed {Plural(unattributed.Count, "item", "items")}{openNote}";
-            sb.Append($"    <li><a href=\"{Html(geometry.FollowUpsGroupHref)}\">{Html(label)}</a></li>\n");
+            var itemNote = $"{unattributed.Count} unattributed {Plural(unattributed.Count, "item", "items")}";
+            var aria = itemNote + (open > 0 ? $", {open} open" : string.Empty);
+            sb.Append($"  <a class=\"epic-remaining-tile epic-remaining-followup-open\" href=\"{Html(geometry.FollowUpsGroupHref)}\" aria-label=\"{Html(aria)}\">\n");
+            sb.Append("    <span class=\"epic-remaining-num\">Follow-ups</span>\n");
+            sb.Append("    <span class=\"epic-remaining-title\">Unattributed items</span>\n");
+            sb.Append($"    <span class=\"epic-remaining-count\">{Html(itemNote)}</span>\n");
+            sb.Append("  </a>\n");
         }
 
         if (unplannedGeo.SunburstUnplannedWeight > 0 && unplannedGeo.GroupRootHref is { Length: > 0 } rootHref)
         {
             var count = unplannedGeo.SunburstUnplannedWeight;
-            var label = $"Unplanned: {count} open {Plural(count, "item", "items")}";
-            sb.Append($"    <li><a href=\"{Html(rootHref)}\">{Html(label)}</a></li>\n");
+            var countNote = $"{count} open {Plural(count, "item", "items")}";
+            sb.Append($"  <a class=\"epic-remaining-tile epic-remaining-unplanned\" href=\"{Html(rootHref)}\" aria-label=\"Unplanned: {Html(countNote)}\">\n");
+            sb.Append("    <span class=\"epic-remaining-num\">Unplanned</span>\n");
+            sb.Append("    <span class=\"epic-remaining-title\">Direct / one-off work</span>\n");
+            sb.Append($"    <span class=\"epic-remaining-count\">{Html(countNote)}</span>\n");
+            sb.Append("  </a>\n");
         }
 
-        sb.Append("  </ul>\n");
         sb.Append("</div>\n");
         return sb.ToString();
     }
