@@ -8,6 +8,94 @@ namespace SpecScribe;
 /// (a hallmark of a project that's just getting started).</summary>
 public static class Charts
 {
+    /// <summary>Metric keys for <see cref="WhyText"/> — the ONE shared source of framing sentences so a new
+    /// chart inherits the standard by construction rather than re-typing copy (Story 10.2 AC2).</summary>
+    public enum ChartMetric
+    {
+        /// <summary>Commit-activity cadence (heatmap / activity window).</summary>
+        ActivityCadence,
+        /// <summary>File churn / hotspots (defect-risk framing).</summary>
+        FileChurn,
+        /// <summary>Change coupling between files (hidden-dependency framing).</summary>
+        ChangeCoupling,
+    }
+
+    /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
+    /// applies (a status donut has no time window; a heatmap has no ranking caption). [Story 10.2]</summary>
+    public sealed record ChartMeta(
+        string Title,
+        string? Window = null,
+        string? Ranking = null,
+        string? Why = null);
+
+    /// <summary>ONE shared source of metric-generic framing sentences (NFR8 — never project-specific). Callers
+    /// reference these via <see cref="WhyText"/>; after Story 10.2 there must be no second hand-rolled
+    /// "why this matters" copy at call sites. [Story 10.2 AC2]</summary>
+    public static string WhyText(ChartMetric metric) => metric switch
+    {
+        ChartMetric.ActivityCadence =>
+            "Commit activity over time shows where work concentrated — busy and quiet stretches are both signals.",
+        ChartMetric.FileChurn =>
+            "Files that change most often are where defects tend to cluster.",
+        ChartMetric.ChangeCoupling =>
+            "Files that change together often may hide a dependency worth a second look.",
+        _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
+    };
+
+    /// <summary>Window slot markup — the ONE place a numeric analysis window is rendered. Empty/null → omit.
+    /// [Story 10.2]</summary>
+    public static string FrameWindowSlot(string? window) =>
+        string.IsNullOrEmpty(window) ? string.Empty : $"<span class=\"chart-frame-window\">{Html(window)}</span>";
+
+    /// <summary>Ranking slot markup — the ONE place a ranked-list metric caption is rendered. [Story 10.2]</summary>
+    public static string FrameRankingSlot(string? ranking) =>
+        string.IsNullOrEmpty(ranking) ? string.Empty : $"<p class=\"chart-frame-ranking\">{Html(ranking)}</p>\n";
+
+    /// <summary>Why-it-matters slot markup — the ONE place a framing sentence is rendered. [Story 10.2]</summary>
+    public static string FrameWhySlot(string? why) =>
+        string.IsNullOrEmpty(why) ? string.Empty : $"<p class=\"chart-frame-why\">{Html(why)}</p>\n";
+
+    /// <summary>Wraps a chart body in the standard panel scaffold so title/window/ranking/why are metadata-consistent
+    /// by construction. Optional slots omit their element entirely when null/empty. [Story 10.2 AC2]</summary>
+    public static string Framed(ChartMeta meta, string body, string panelClass = "chart-panel")
+    {
+        var sb = new StringBuilder();
+        sb.Append($"<div class=\"{Html(panelClass)}\">\n");
+        sb.Append("  <div class=\"chart-frame-head\">\n");
+        sb.Append($"    <h3>{Html(meta.Title)}</h3>\n");
+        var window = FrameWindowSlot(meta.Window);
+        if (window.Length > 0) sb.Append($"    {window}\n");
+        sb.Append("  </div>\n");
+        sb.Append(FrameRankingSlot(meta.Ranking));
+        sb.Append(body);
+        sb.Append(FrameWhySlot(meta.Why));
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Inclusive count-range label for a heatmap legend swatch, derived from the SAME thresholds
+    /// <see cref="HeatLevel"/> uses — so cell shade and legend text can never disagree. [Story 10.2]</summary>
+    public static string HeatLevelRange(int level, int maxCount)
+    {
+        if (level is < 0 or > 4) throw new ArgumentOutOfRangeException(nameof(level), level, "Heat level must be 0..4.");
+        if (level == 0) return "0";
+        if (maxCount <= 1)
+        {
+            // Uniform/sparse history: HeatLevel only ever paints nonzero cells as level-1 — levels 2–4 are unused.
+            return level == 1 ? "1" : "\u2014";
+        }
+
+        var (t1, t2, t3) = HeatThresholds(maxCount);
+        return level switch
+        {
+            1 => FormatHeatRange(1, t1),
+            2 => FormatHeatRange(t1 + 1, t2),
+            3 => FormatHeatRange(t2 + 1, t3),
+            4 => FormatHeatRange(t3 + 1, maxCount, openEnded: true),
+            _ => "0",
+        };
+    }
+
     /// <summary>A dashboard stat card. When <paramref name="tooltip"/> is supplied the card opts into the shared
     /// body-level <c>js-tip</c>/<c>data-tip</c> path (never clipped under sticky nav) and becomes keyboard-focusable
     /// so it's reachable by hover, focus and touch — used to define what a number actually counts (UX-DR4).
@@ -1029,12 +1117,20 @@ public static class Charts
 
         sb.Append("</svg>\n");
 
-        sb.Append("<div class=\"heatmap-legend\">Less ");
+        // Real-value legend + numeric window (Story 10.2): per-level count ranges from the SAME HeatLevel
+        // thresholds the cells use; window is the grid span (weeks + first..last), distinct from the Git Pulse
+        // 30-day signal. Lives in the builder so it appears both standalone and when the headline is suppressed.
+        var windowText = $"{weeks.ToString(CultureInfo.InvariantCulture)} {Plural(weeks, "week", "weeks")} · {DReadable(firstCommit)} \u2013 {DReadable(lastCommit)}";
+        sb.Append("<div class=\"heatmap-meta\">\n");
+        sb.Append("<div class=\"heatmap-legend\">");
         for (var l = 0; l <= 4; l++)
         {
-            sb.Append($"<span class=\"heatmap-legend-swatch level-{l}\"></span>");
+            sb.Append($"<span class=\"heatmap-legend-item\"><span class=\"heatmap-legend-swatch level-{l}\"></span>" +
+                      $"<span class=\"heatmap-legend-label\">{Html(HeatLevelRange(l, maxCount))}</span></span>");
         }
-        sb.Append(" More</div>\n");
+        sb.Append("</div>\n");
+        sb.Append($"<span class=\"chart-frame-window heatmap-window\">{Html(windowText)}</span>\n");
+        sb.Append("</div>\n");
 
         return sb.ToString();
     }
@@ -1081,14 +1177,22 @@ public static class Charts
         sb.Append("  <div class=\"git-pulse-body\">\n");
 
         // Activity heatmap (headline suppressed — the signal strip above already carries those numbers).
+        // Window caption lives inside the heatmap builder; why-sentence from the shared ChartMeta source.
         sb.Append("    <div class=\"git-pulse-activity\">\n");
         sb.Append(CommitHeatmap(git.DailySeries, git.CommitsByDay, showHeadline: false));
+        sb.Append(FrameWhySlot(WhyText(ChartMetric.ActivityCadence)));
         sb.Append("    </div>\n");
 
-        // Top changed files as proportional bars (bar width relative to the most-changed file). Title names the
-        // bounded -n 200 commit window so it is not read as sharing the adjacent 30-calendar-day signal.
+        // Top changed files as proportional bars. Ranking + window + why come from the shared frame slots
+        // (Story 10.2) — honest window is min(200, TotalCommits), never a lying literal "200".
+        var filesWindowCommits = Math.Min(200, git.TotalCommits);
+        var filesWindow = $"Last {filesWindowCommits.ToString(CultureInfo.InvariantCulture)} commits";
+        var filesRanking = git.TopChangedFiles.Count > 0
+            ? $"Top {git.TopChangedFiles.Count.ToString(CultureInfo.InvariantCulture)} files by change count"
+            : null;
         sb.Append("    <div class=\"git-pulse-files\">\n");
-        sb.Append("      <div class=\"git-pulse-files-title\">Top changed files (last 200 commits)</div>\n");
+        sb.Append($"      <div class=\"chart-frame-head\"><span class=\"git-pulse-files-title\">Top changed files</span>{FrameWindowSlot(filesWindow)}</div>\n");
+        sb.Append(FrameRankingSlot(filesRanking));
         if (git.TopChangedFiles.Count > 0)
         {
             var maxChanges = git.TopChangedFiles.Max(f => f.ChangeCount);
@@ -1113,8 +1217,9 @@ public static class Charts
         }
         else
         {
-            sb.Append("      <div class=\"chart-empty\">No file changes in the last 200 commits.</div>\n");
+            sb.Append($"      <div class=\"chart-empty\">No file changes in the last {filesWindowCommits.ToString(CultureInfo.InvariantCulture)} commits.</div>\n");
         }
+        sb.Append(FrameWhySlot(WhyText(ChartMetric.FileChurn)));
         sb.Append("    </div>\n");
 
         sb.Append("  </div>\n");
@@ -2441,6 +2546,26 @@ public static class Charts
     private static string CapitalizeFirst(string s) =>
         s.Length == 0 ? s : char.ToUpper(s[0], CultureInfo.InvariantCulture) + s[1..];
 
+    /// <summary>Inclusive upper bounds for heat levels 1/2/3 at a given <paramref name="maxCount"/> —
+    /// the SINGLE source of truth shared by <see cref="HeatLevel"/> and <see cref="HeatLevelRange"/>.
+    /// [Story 10.2]</summary>
+    private static (int T1, int T2, int T3) HeatThresholds(int maxCount)
+    {
+        var t1 = Math.Max(1, (int)Math.Floor(0.25 * maxCount));
+        var t2 = Math.Max(t1, (int)Math.Floor(0.5 * maxCount));
+        var t3 = Math.Max(t2, (int)Math.Floor(0.75 * maxCount));
+        return (t1, t2, t3);
+    }
+
+    private static string FormatHeatRange(int lo, int hi, bool openEnded = false)
+    {
+        if (lo > hi) return "\u2014"; // collapsed unused bucket at low maxCount
+        var loText = lo.ToString(CultureInfo.InvariantCulture);
+        if (lo == hi) return loText;
+        if (openEnded) return loText + "+";
+        return loText + "\u2013" + hi.ToString(CultureInfo.InvariantCulture);
+    }
+
     private static int HeatLevel(int count, int maxCount)
     {
         if (count <= 0) return 0;
@@ -2449,14 +2574,11 @@ public static class Charts
         // maximally busy, which the visual-truthfulness rule forbids; level 1 reads it as light activity. Repos
         // with a busier day (maxCount >= 2) fall through to the ratio buckets below. [heatmap-debt-triage]
         if (maxCount <= 1) return 1;
-        var ratio = (double)count / maxCount;
-        return ratio switch
-        {
-            <= 0.25 => 1,
-            <= 0.5 => 2,
-            <= 0.75 => 3,
-            _ => 4,
-        };
+        var (t1, t2, t3) = HeatThresholds(maxCount);
+        if (count <= t1) return 1;
+        if (count <= t2) return 2;
+        if (count <= t3) return 3;
+        return 4;
     }
 
     private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);

@@ -50,13 +50,13 @@ public static class GitInsightsTemplater
         sb.Append("  <div class=\"meta-pills\">\n");
         sb.Append($"    <span class=\"pill\">{N(insights.CommitCount)} {Charts.Plural(insights.CommitCount, "commit", "commits")} analyzed</span>\n");
         var filesLabel = insights.TotalFilesTouched > insights.Files.Count
-            ? $"top {N(insights.Files.Count)} of {N(insights.TotalFilesTouched)} files"
+            ? $"top {N(insights.Files.Count)} of {N(insights.TotalFilesTouched)} files by commit count"
             : $"{N(insights.Files.Count)} {Charts.Plural(insights.Files.Count, "file", "files")}";
         sb.Append($"    <span class=\"pill\">{filesLabel}</span>\n");
         sb.Append($"    <span class=\"pill\">{N(insights.ContributorCount)} {Charts.Plural(insights.ContributorCount, "contributor", "contributors")}</span>\n");
         sb.Append("  </div>\n</header>\n\n");
 
-        AppendFilesAndContributorsSection(sb, insights.Files, fileHref, commitHref);
+        AppendFilesAndContributorsSection(sb, insights, fileHref, commitHref);
         AppendActivitySection(sb, insights, git);
 
         sb.Append("</main>\n\n");
@@ -71,16 +71,30 @@ public static class GitInsightsTemplater
     /// contributor panel on the right, so "select a file → see who works on it" needs no JS. Right: one
     /// contributor panel per file (all present in the HTML; CSS reveals the targeted one) plus a default
     /// prompt when nothing is selected. Answers "who do I talk to about this file?" rather than presenting a
-    /// global people ranking.</summary>
+    /// global people ranking. Window/ranking/why chrome comes from the shared <see cref="Charts"/> frame slots
+    /// (Story 10.2).</summary>
     private static void AppendFilesAndContributorsSection(
         StringBuilder sb,
-        IReadOnlyList<FileChangeStat> files,
+        GitInsightsData insights,
         Func<string, string?>? fileHref,
         Func<string, string?>? commitHref)
     {
+        var files = insights.Files;
+        var window = insights.CommitCount > 0
+            ? $"Last {N(insights.CommitCount)} commits"
+            : null;
+        var ranking = files.Count == 0
+            ? null
+            : insights.TotalFilesTouched > files.Count
+                ? $"Top {N(files.Count)} of {N(insights.TotalFilesTouched)} files by commit count"
+                : $"Top {N(files.Count)} files by commit count";
+
         sb.Append("<section class=\"deep-page-section git-insights-section\">\n");
-        sb.Append("  <h2>Files &amp; Contributors</h2>\n");
-        sb.Append("  <p class=\"deep-page-lead\">The files that changed most often in the analyzed window. Select a file to see who has been working on it — the people to talk to about that area.</p>\n");
+        sb.Append("  <div class=\"chart-frame-head\"><h2>Files &amp; Contributors</h2>");
+        if (!string.IsNullOrEmpty(window)) sb.Append(Charts.FrameWindowSlot(window));
+        sb.Append("</div>\n");
+        sb.Append(Charts.FrameRankingSlot(ranking));
+        sb.Append(Charts.FrameWhySlot(Charts.WhyText(Charts.ChartMetric.FileChurn)));
 
         if (files.Count == 0)
         {
@@ -222,10 +236,13 @@ public static class GitInsightsTemplater
     private static void AppendActivitySection(StringBuilder sb, GitInsightsData insights, GitPulse? git)
     {
         sb.Append("<section class=\"deep-page-section git-insights-section\">\n");
-        sb.Append("  <h2>Activity Over Time</h2>\n");
+        sb.Append("  <div class=\"chart-frame-head\"><h2>Activity Over Time</h2></div>\n");
         var windowDays = git?.DailySeries.Count ?? insights.Activity.Count;
         var windowCommits = git is not null ? git.DailySeries.Sum(d => d.Count) : insights.Activity.Sum(a => a.Count);
-        sb.Append($"  <p class=\"deep-page-lead\">{N(windowCommits)} {Charts.Plural(windowCommits, "commit", "commits")} across {N(windowDays)} active {Charts.Plural(windowDays, "day", "days")}. Each active day in the heatmap links to that day's commit log.</p>\n");
+        // Numeric window + framing via shared slots (Story 10.2); heatmap builder carries its own grid-span window.
+        sb.Append(Charts.FrameWindowSlot($"{N(windowCommits)} {Charts.Plural(windowCommits, "commit", "commits")} across {N(windowDays)} active {Charts.Plural(windowDays, "day", "days")}"));
+        sb.Append("\n");
+        sb.Append(Charts.FrameWhySlot(Charts.WhyText(Charts.ChartMetric.ActivityCadence)));
         sb.Append("  <div class=\"chart-panel\">\n");
         if (git is not null && git.DailySeries.Count > 0)
         {

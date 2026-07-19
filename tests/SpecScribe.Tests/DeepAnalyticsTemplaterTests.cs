@@ -33,9 +33,44 @@ public class DeepAnalyticsTemplaterTests
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
         Assert.Contains("<main id=\"main-content\" class=\"deep-page\">", html);
         Assert.Contains("Deep Git Analytics", html);        // h1
-        Assert.Contains(">Change Coupling</h2>", html);
-        // Hotspots moved into the lower row beside the ranked pairs, so it now reads as a panel <h3>.
+        Assert.Contains(">Change Coupling</h3>", html);     // framed panel title (Story 10.2)
+        // Hotspots sit in the lower row beside the ranked pairs as a framed panel <h3>.
         Assert.Contains(">Git Hotspots</h3>", html);
+        Assert.Contains("chart-frame-why", html);
+        Assert.Contains(Charts.WhyText(Charts.ChartMetric.ChangeCoupling), html);
+        Assert.Contains(Charts.WhyText(Charts.ChartMetric.FileChurn), html);
+        Assert.DoesNotContain("recent history", html);
+        Assert.DoesNotContain("deep-page-lead", html);
+        Assert.DoesNotContain("deep-page-note", html);
+    }
+
+    [Fact]
+    public void RenderPage_CarriesNumericWindowAndRankingMetricFromSharedFrame()
+    {
+        // AnalyzedCommits + Insights.TotalFilesTouched drive honest window/ranking captions (Story 10.2).
+        var deep = new DeepGitPulse(
+            Hotspots: new (string, int)[] { ("src/A.cs", 9), ("src/B.cs", 4) },
+            Coupling: new (string, string, int)[] { ("src/A.cs", "src/B.cs", 5) },
+            AnalyzedCommits: 42)
+        {
+            Insights = new GitInsightsData(
+                Files: Array.Empty<FileChangeStat>(),
+                Activity: Array.Empty<(DateOnly, int)>(),
+                CommitCount: 42,
+                ContributorCount: 1,
+                TotalFilesTouched: 100),
+        };
+
+        var html = DeepAnalyticsTemplater.RenderPage(deep, Nav());
+
+        Assert.Contains("Last 42 commits", html);
+        Assert.Contains("Top 2 of 100 files by change count", html);
+        Assert.Contains("Top 1 coupled pair by shared commits", html);
+        Assert.Contains("class=\"chart-frame-window\"", html);
+        Assert.Contains("class=\"chart-frame-ranking\"", html);
+        // Framing sentences come from Charts.WhyText — no project-specific filenames in the why copy.
+        Assert.DoesNotContain("SpecScribe", Charts.WhyText(Charts.ChartMetric.FileChurn));
+        Assert.DoesNotContain("SpecScribe", Charts.WhyText(Charts.ChartMetric.ChangeCoupling));
     }
 
     [Fact]

@@ -369,6 +369,22 @@ public class GitMetricsTests
         var empty = GitMetrics.ParseNumstatLog(string.Empty);
         Assert.Empty(empty.Hotspots);
         Assert.Empty(empty.Coupling);
+        Assert.Equal(0, empty.AnalyzedCommits);
+    }
+
+    [Fact]
+    public void ParseNumstatLog_AnalyzedCommitsReflectsParsedCommitCount()
+    {
+        // Honest window for deep pages: the parsed commit count (bounded by -n 300), never a hard-coded 300.
+        var log = Numstat(
+            new[] { "A.cs" },
+            new[] { "B.cs" },
+            new[] { "C.cs" });
+
+        var deep = GitMetrics.ParseNumstatLog(log);
+
+        Assert.Equal(3, deep.AnalyzedCommits);
+        Assert.Equal(3, deep.Commits.Count);
     }
 
     [Fact]

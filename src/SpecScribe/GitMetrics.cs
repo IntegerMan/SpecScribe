@@ -30,10 +30,12 @@ public sealed record GitPulse(
 /// most often) and <paramref name="Coupling"/> (which file pairs change together). Both are purely file-path
 /// signals — never author/productivity signals (PRD non-goal). Populated only when <c>--deep-git</c> is set;
 /// a null <see cref="DeepGitPulse"/> means "not opted in, or deep analysis failed" and the panel is omitted
-/// entirely rather than shown empty. [Story 3.2]</summary>
+/// entirely rather than shown empty. <paramref name="AnalyzedCommits"/> is the honest window size (parsed
+/// commit count from the bounded <c>-n 300</c> fetch — never a hard-coded "300"). [Story 3.2; Story 10.2]</summary>
 public sealed record DeepGitPulse(
     IReadOnlyList<(string Path, int Changes)> Hotspots,
-    IReadOnlyList<(string FileA, string FileB, int CoChanges)> Coupling)
+    IReadOnlyList<(string FileA, string FileB, int CoChanges)> Coupling,
+    int AnalyzedCommits = 0)
 {
     /// <summary>The Git Insights hub aggregates (file frequency + churn, contributor attribution, activity)
     /// computed from the SAME shared numstat parse — one fetch, one parse, several views. Settable (not
@@ -455,7 +457,7 @@ public static class GitMetrics
             .ToList();
 
         var fileInsights = BuildFileInsights(commits, out var coChangePairs);
-        return new DeepGitPulse(hotspots, coupling)
+        return new DeepGitPulse(hotspots, coupling, AnalyzedCommits: commits.Count)
         {
             Insights = BuildInsights(commits),
             Commits = commits,

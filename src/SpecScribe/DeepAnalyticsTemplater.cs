@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace SpecScribe;
@@ -7,13 +8,16 @@ namespace SpecScribe;
 /// its precise text companion, and the file hotspots. A synthesized page (no markdown source), so it builds its
 /// own shell the way <see cref="CommitDayTemplater"/> does rather than going through
 /// <see cref="HtmlTemplater.RenderPage"/>. Generated only when <c>--deep-git</c> produced data; the dashboard's
-/// Git Pulse panel links here. Pure HTML/CSS + inline SVG — no JS, matching the chart convention. [Story 3.2]</summary>
+/// Git Pulse panel links here. Pure HTML/CSS + inline SVG — no JS, matching the chart convention.
+/// Panel chrome (title/window/ranking/why) comes from <see cref="Charts.Framed"/> by construction (Story 10.2).
+/// [Story 3.2; Story 10.2]</summary>
 public static class DeepAnalyticsTemplater
 {
     public static string RenderPage(DeepGitPulse deep, SiteNav nav, Func<string, string?>? fileHref = null)
     {
         var outputPath = SiteNav.DeepAnalyticsOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath);
+        var window = AnalyzedWindow(deep);
 
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
@@ -35,58 +39,58 @@ public static class DeepAnalyticsTemplater
         sb.Append("  <div class=\"meta-pills\">\n");
         sb.Append($"    <span class=\"pill\">{deep.Coupling.Count} coupled {Charts.Plural(deep.Coupling.Count, "pair", "pairs")}</span>\n");
         sb.Append($"    <span class=\"pill\">{deep.Hotspots.Count} {Charts.Plural(deep.Hotspots.Count, "hotspot", "hotspots")}</span>\n");
+        if (deep.AnalyzedCommits > 0)
+        {
+            sb.Append($"    <span class=\"pill\">{N(deep.AnalyzedCommits)} {Charts.Plural(deep.AnalyzedCommits, "commit", "commits")} analyzed</span>\n");
+        }
         sb.Append("  </div>\n</header>\n\n");
 
-        // Change Coupling — the graph is the centerpiece, given the full content width to breathe. Its exact,
-        // screen-reader friendly companion (the ranked table) now sits in the lower row beside the hotspots, so
-        // the visualization is never the sole information carrier.
+        // Change Coupling — graph is the centerpiece; chrome via Charts.Framed (Story 10.2). Chart-intrinsic
+        // node/edge legend stays in the body; the old deep-page-lead framing moved into Charts.WhyText.
         var hasCoupling = deep.Coupling.Count > 0;
+        var couplingBody = new StringBuilder();
+        if (hasCoupling)
+        {
+            couplingBody.Append("    <a class=\"coupling-expand\" href=\"#coupling-zoom\" aria-label=\"Expand the change-coupling graph\">&#10530; Expand</a>\n");
+        }
+        couplingBody.Append(Charts.CouplingGraph(deep.Coupling, fileHref: fileHref));
+        if (hasCoupling)
+        {
+            couplingBody.Append("    <p class=\"coupling-legend\">Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together.</p>\n");
+        }
         sb.Append("<section class=\"deep-page-section\">\n");
-        sb.Append("  <h2>Change Coupling</h2>\n");
-        sb.Append("  <p class=\"deep-page-lead\">Files that tend to change in the same commits. Thicker links and larger nodes mean the files change together more often — a hint at hidden dependencies worth a second look.</p>\n");
-        sb.Append("  <div class=\"chart-panel deep-page-graph-panel\">\n");
-        // Expand affordance: a pure-CSS :target lightbox (same mechanism as the commit heatmap's drill-down) —
-        // no JS. Only offered when there's actually a graph to enlarge.
-        if (hasCoupling)
-        {
-            sb.Append("    <a class=\"coupling-expand\" href=\"#coupling-zoom\" aria-label=\"Expand the change-coupling graph\">&#10530; Expand</a>\n");
-        }
-        sb.Append(Charts.CouplingGraph(deep.Coupling, fileHref: fileHref));
-        if (hasCoupling)
-        {
-            sb.Append("    <p class=\"coupling-legend\">Node size = how often a file is coupled &middot; link thickness = how many commits changed the two files together.</p>\n");
-        }
-        sb.Append("  </div>\n");
+        sb.Append(Charts.Framed(
+            new Charts.ChartMeta(
+                Title: "Change Coupling",
+                Window: window,
+                Why: Charts.WhyText(Charts.ChartMetric.ChangeCoupling)),
+            couplingBody.ToString(),
+            panelClass: "chart-panel deep-page-graph-panel"));
         sb.Append("</section>\n\n");
 
-        // Lower row — the precise text companions side by side: the ranked coupling pairs and the change hotspots.
-        // Two equal panels on wide screens, stacked on narrow.
+        // Lower row — ranked pairs + hotspots, both framed.
         sb.Append("<section class=\"deep-page-section\">\n");
         sb.Append("  <div class=\"deep-page-lower\">\n");
 
-        sb.Append("    <div class=\"chart-panel deep-page-list-panel\">\n");
-        sb.Append("      <div class=\"deep-page-panel-head\">\n");
-        sb.Append("        <h3>Ranked Pairs</h3>\n");
-        if (hasCoupling)
-        {
-            sb.Append($"        <span class=\"deep-page-panel-count\">{deep.Coupling.Count} {Charts.Plural(deep.Coupling.Count, "pair", "pairs")}</span>\n");
-        }
-        sb.Append("      </div>\n");
-        sb.Append("      <p class=\"deep-page-note\">Files that changed together most often, with the number of shared commits.</p>\n");
-        sb.Append(Charts.CouplingTable(deep.Coupling, fileHref));
-        sb.Append("    </div>\n");
+        sb.Append(Charts.Framed(
+            new Charts.ChartMeta(
+                Title: "Ranked Pairs",
+                Window: window,
+                Ranking: hasCoupling
+                    ? $"Top {N(deep.Coupling.Count)} coupled {Charts.Plural(deep.Coupling.Count, "pair", "pairs")} by shared commits"
+                    : null,
+                Why: Charts.WhyText(Charts.ChartMetric.ChangeCoupling)),
+            Charts.CouplingTable(deep.Coupling, fileHref),
+            panelClass: "chart-panel deep-page-list-panel"));
 
-        sb.Append("    <div class=\"chart-panel deep-page-list-panel\">\n");
-        sb.Append("      <div class=\"deep-page-panel-head\">\n");
-        sb.Append("        <h3>Git Hotspots</h3>\n");
-        if (deep.Hotspots.Count > 0)
-        {
-            sb.Append($"        <span class=\"deep-page-panel-count\">{deep.Hotspots.Count} {Charts.Plural(deep.Hotspots.Count, "hotspot", "hotspots")}</span>\n");
-        }
-        sb.Append("      </div>\n");
-        sb.Append("      <p class=\"deep-page-note\">The files changed most often across recent history — the parts of the codebase carrying the most churn.</p>\n");
-        sb.Append(Charts.HotspotBars(deep.Hotspots, fileHref));
-        sb.Append("    </div>\n");
+        sb.Append(Charts.Framed(
+            new Charts.ChartMeta(
+                Title: "Git Hotspots",
+                Window: window,
+                Ranking: HotspotRanking(deep),
+                Why: Charts.WhyText(Charts.ChartMetric.FileChurn)),
+            Charts.HotspotBars(deep.Hotspots, fileHref),
+            panelClass: "chart-panel deep-page-list-panel"));
 
         sb.Append("  </div>\n");
         sb.Append("</section>\n\n");
@@ -112,4 +116,21 @@ public static class DeepAnalyticsTemplater
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
+
+    private static string? AnalyzedWindow(DeepGitPulse deep) =>
+        deep.AnalyzedCommits > 0
+            ? $"Last {N(deep.AnalyzedCommits)} commits"
+            : null;
+
+    private static string? HotspotRanking(DeepGitPulse deep)
+    {
+        if (deep.Hotspots.Count == 0) return null;
+        var n = deep.Hotspots.Count;
+        var total = deep.Insights?.TotalFilesTouched ?? 0;
+        return total > n
+            ? $"Top {N(n)} of {N(total)} files by change count"
+            : $"Top {N(n)} files by change count";
+    }
+
+    private static string N(int n) => n.ToString(CultureInfo.InvariantCulture);
 }

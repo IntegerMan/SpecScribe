@@ -2983,6 +2983,41 @@ a.ref-file-node:focus-visible {
    so it doesn't butt against the content of the section before it. */
 .chart-panel h3:not(:first-child) { margin-top: 1.3rem; }
 
+/* ====================== CHART FRAME (Story 10.2) ======================
+   Shared panel chrome for title / numeric window / ranking caption / why-it-matters. Slot markup is emitted
+   only from Charts.Framed / Frame*Slot — muted caption type for window/ranking, slightly emphasized why.
+   Reuses --ink-light / --ink-faded so the host theme bridge needs no new mapping. */
+.chart-frame-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  margin-bottom: 0.55rem;
+}
+.chart-frame-head h3,
+.chart-frame-head h2 {
+  margin-bottom: 0;
+}
+.chart-frame-window {
+  font-size: 0.74rem;
+  color: var(--ink-light);
+  white-space: nowrap;
+}
+.chart-frame-ranking {
+  font-size: 0.78rem;
+  color: var(--ink-faded);
+  margin: 0 0 0.65rem;
+  line-height: 1.45;
+}
+.chart-frame-why {
+  font-size: 0.78rem;
+  color: var(--ink-faded);
+  margin: 0.75rem 0 0;
+  line-height: 1.5;
+  font-style: italic;
+}
+
 .chart-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3192,8 +3227,9 @@ a.ref-file-node:focus-visible {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-light);
-  margin-bottom: 0.55rem;
+  margin-bottom: 0;
 }
+.chart-frame-head .git-pulse-files-title { margin-bottom: 0; }
 /* Proportional bar list: label (truncates, full path in title) | track+fill | exact count. The count text
    makes the bar decorative rather than the sole information carrier (never size/color-only). [Story 1.4/1.5] */
 .git-pulse-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -3627,15 +3663,32 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .heatmap-legend {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
   font-size: 0.7rem;
   color: var(--ink-light);
+}
+
+.heatmap-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
   margin-top: 0.5rem;
 }
 
+.heatmap-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.heatmap-legend-label { color: var(--ink-faded); }
+
 .heatmap-legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 /* Same token + same 0.3 as the level-0 cells (via opacity, not a hand-copied rgba), so retuning
-   --parchment-dark can never desync the "Less" swatch from the grid. */
+   --parchment-dark can never desync the level-0 swatch from the grid. */
 .heatmap-legend-swatch.level-0 { background: var(--parchment-dark); opacity: 0.3; }
 .heatmap-legend-swatch.level-1 { background: #ecd18f; }
 .heatmap-legend-swatch.level-2 { background: #dfb455; }

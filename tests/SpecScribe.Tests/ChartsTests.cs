@@ -1355,7 +1355,11 @@ public class ChartsTests
 
         Assert.Contains("git-pulse-bar-fill", html);
         Assert.Contains("src/Program.cs", html);
-        Assert.Contains("Top changed files (last 200 commits)", html);
+        Assert.Contains("Top changed files", html);
+        Assert.Contains("Last 5 commits", html); // honest window = min(200, TotalCommits)
+        Assert.Contains("Top 2 files by change count", html);
+        Assert.Contains("chart-frame-why", html);
+        Assert.Contains(Charts.WhyText(Charts.ChartMetric.FileChurn), html);
         Assert.Contains("aria-label=\"src/Program.cs: 3 changes\"", html);
         Assert.Contains("aria-label=\"README.md: 1 change\"", html);
         Assert.Contains("git-pulse-bar-track\" aria-hidden=\"true\"", html);
@@ -1372,8 +1376,9 @@ public class ChartsTests
 
         var html = Charts.GitPulsePanel(git);
 
-        Assert.Contains("No file changes in the last 200 commits.", html);
-        Assert.Contains("Top changed files (last 200 commits)", html);
+        Assert.Contains("No file changes in the last 5 commits.", html);
+        Assert.Contains("Top changed files", html);
+        Assert.Contains("Last 5 commits", html);
         Assert.DoesNotContain("git-pulse-bar-fill", html);
     }
 
@@ -2687,5 +2692,141 @@ public class ChartsTests
         while (sweep < 0) sweep += 2 * Math.PI;
         while (sweep > 2 * Math.PI) sweep -= 2 * Math.PI;
         return sweep;
+    }
+
+    // ---- Chart frame + heatmap real-value legend (Story 10.2) ----
+
+    [Fact]
+    public void Framed_RendersAllSlotsWhenSuppliedAndOmitsWhenNull()
+    {
+        var full = Charts.Framed(
+            new Charts.ChartMeta("Title <X>", Window: "Last 3 commits", Ranking: "Top 2 of 9 by change count", Why: "Why matters."),
+            body: "<div class=\"body\">ok</div>\n");
+
+        Assert.Contains("<h3>Title &lt;X&gt;</h3>", full);
+        Assert.Contains("class=\"chart-frame-window\">Last 3 commits</span>", full);
+        Assert.Contains("class=\"chart-frame-ranking\">Top 2 of 9 by change count</p>", full);
+        Assert.Contains("class=\"chart-frame-why\">Why matters.</p>", full);
+        Assert.Contains("<div class=\"body\">ok</div>", full);
+
+        var bare = Charts.Framed(new Charts.ChartMeta("Bare"), body: "<p>x</p>\n");
+        Assert.Contains("<h3>Bare</h3>", bare);
+        Assert.DoesNotContain("chart-frame-window", bare);
+        Assert.DoesNotContain("chart-frame-ranking", bare);
+        Assert.DoesNotContain("chart-frame-why", bare);
+    }
+
+    [Fact]
+    public void Framed_HtmlEscapesEverySlot()
+    {
+        var html = Charts.Framed(
+            new Charts.ChartMeta("<t>", Window: "<w>", Ranking: "<r>", Why: "<y>"),
+            body: "b");
+
+        Assert.Contains("&lt;t&gt;", html);
+        Assert.Contains("&lt;w&gt;", html);
+        Assert.Contains("&lt;r&gt;", html);
+        Assert.Contains("&lt;y&gt;", html);
+        Assert.DoesNotContain("<t>", html);
+    }
+
+    [Fact]
+    public void WhyText_IsMetricGenericAndDefinedOnce()
+    {
+        // AC2 teeth: framing sentences live in WhyText, never name this repo.
+        foreach (Charts.ChartMetric m in Enum.GetValues<Charts.ChartMetric>())
+        {
+            var why = Charts.WhyText(m);
+            Assert.False(string.IsNullOrWhiteSpace(why));
+            Assert.DoesNotContain("SpecScribe", why, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("BMAD", why, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void HeatLevelRange_MatchesCellLevelsForGradedHistory()
+    {
+        const int maxCount = 8;
+        // Drive legend ranges from the shared helper; verify every count maps to a level whose range covers it.
+        for (var count = 0; count <= maxCount; count++)
+        {
+            // Reconstruct HeatLevel via the public range helper + known thresholds (cells use the private twin).
+            var level = count == 0 ? 0
+                : maxCount <= 1 ? 1
+                : count <= (int)Math.Floor(0.25 * maxCount) ? 1
+                : count <= (int)Math.Floor(0.5 * maxCount) ? 2
+                : count <= (int)Math.Floor(0.75 * maxCount) ? 3
+                : 4;
+            var label = Charts.HeatLevelRange(level, maxCount);
+            if (count == 0)
+            {
+                Assert.Equal("0", label);
+                continue;
+            }
+            Assert.DoesNotContain("Less", label);
+            Assert.DoesNotContain("More", label);
+            // Range label must mention the count (as a single digit or as bounds containing it).
+            if (label.EndsWith('+'))
+            {
+                var lo = int.Parse(label.TrimEnd('+'), System.Globalization.CultureInfo.InvariantCulture);
+                Assert.True(count >= lo);
+            }
+            else if (label.Contains('\u2013'))
+            {
+                var parts = label.Split('\u2013');
+                var lo = int.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
+                var hi = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+                Assert.InRange(count, lo, hi);
+            }
+            else
+            {
+                Assert.Equal(count.ToString(System.Globalization.CultureInfo.InvariantCulture), label);
+            }
+        }
+    }
+
+    [Fact]
+    public void HeatLevelRange_UniformHistoryDegradesWithoutNonsense()
+    {
+        Assert.Equal("0", Charts.HeatLevelRange(0, 1));
+        Assert.Equal("1", Charts.HeatLevelRange(1, 1));
+        Assert.Equal("\u2014", Charts.HeatLevelRange(2, 1));
+        Assert.Equal("\u2014", Charts.HeatLevelRange(4, 0));
+    }
+
+    [Fact]
+    public void CommitHeatmap_LegendCarriesRealRangesAndNumericWindow()
+    {
+        var series = new (DateOnly Day, int Count)[]
+        {
+            (new DateOnly(2026, 1, 5), 1),
+            (new DateOnly(2026, 1, 8), 8),
+        };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        Assert.Contains("heatmap-legend", svg);
+        Assert.Contains("heatmap-legend-label", svg);
+        Assert.DoesNotContain(">Less ", svg);
+        Assert.DoesNotContain(" More<", svg);
+        // Window: weeks + date span (DReadable).
+        Assert.Contains("chart-frame-window", svg);
+        Assert.Contains("week", svg);
+        Assert.Contains(Charts.DReadable(new DateOnly(2026, 1, 5)), svg);
+        Assert.Contains(Charts.DReadable(new DateOnly(2026, 1, 8)), svg);
+        // Real range text for the busiest bucket (level-4 open-ended).
+        Assert.Contains(Charts.HeatLevelRange(4, 8), svg);
+        Assert.Contains(Charts.HeatLevelRange(0, 8), svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_WindowPresentWhenHeadlineSuppressed()
+    {
+        var series = new (DateOnly Day, int Count)[] { (new DateOnly(2026, 1, 5), 3) };
+        var svg = Charts.CommitHeatmap(series, showHeadline: false);
+
+        Assert.DoesNotContain("heatmap-headline", svg);
+        Assert.Contains("heatmap-window", svg);
+        Assert.Contains("chart-frame-window", svg);
     }
 }

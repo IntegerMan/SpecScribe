@@ -60,6 +60,11 @@ public class GitInsightsTemplaterTests
         Assert.Contains("Git Insights</h1>", html);
         Assert.Contains(">Files &amp; Contributors</h2>", html);
         Assert.Contains(">Activity Over Time</h2>", html);
+        Assert.Contains("by commit count", html);
+        Assert.Contains("chart-frame-why", html);
+        Assert.Contains(Charts.WhyText(Charts.ChartMetric.FileChurn), html);
+        Assert.Contains(Charts.WhyText(Charts.ChartMetric.ActivityCadence), html);
+        Assert.DoesNotContain("deep-page-lead", html);
         Assert.Contains("crumb-current", html); // breadcrumb trail back home
     }
 
@@ -81,7 +86,7 @@ public class GitInsightsTemplaterTests
 
         var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
 
-        Assert.Contains("top 1 of 60 files", html);
+        Assert.Contains("top 1 of 60 files by commit count", html);
         Assert.Contains("and 4 more contributors", html);
     }
 

@@ -484,7 +484,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         // [spec-3-1-deferred-debt-cleanup]
         // Regenerated 2026-07-18: Story 10.1 journey nav — Home/Delivery/Insights/Follow-ups/Project groups
         // via native <details>, Spec in Project, Structure stays retired; every page's nav bytes change.
-        const string expected = "4a47debdf52ccc0cb05cbf3847050b29ba771fcd201379515d814d246bd72a27";
+        // Regenerated 2026-07-18: Story 10.2 chart metadata — Charts.Framed + real-value heatmap legend +
+        // ranking/window/why slots on Git Pulse / deep analytics / git insights; specscribe.css .chart-frame-*.
+        const string expected = "28a711741ca794cb4539ae295c41616ef57e385386377a052d70d441ee6c3442";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
