@@ -2650,7 +2650,7 @@ a.ref-file-node:focus-visible {
 /* Remaining Work by Epic — its own panel (Story 10.7 AC1), a small responsive tile grid beside the glance
    sunburst so a reader is never limited to hitting shrinking SVG wedges. Grammar mirrors the established
    .next-step-card / .epic-mosaic-card accent-bar cards elsewhere (owner feedback: read as a first-class
-   panel, not a plain link list) — left accent = epic status, reusing the same --status-*/chart-local tokens
+   panel, not a plain link list) — left accent = epic status, reusing the same --status-* / chart-local tokens
    as the sunburst wedges (never color-only: the tile's own title/count text always restates it). Same
    epic/group-page destinations as the chart, not a second nav scheme. */
 .epic-remaining-grid {
