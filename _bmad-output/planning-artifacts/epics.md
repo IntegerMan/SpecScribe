@@ -1423,6 +1423,35 @@ So that I can see a file's real neighbourhood — the artifacts that cite it and
 **Then** the graph is the single relationship surface — no redundant visible list duplicating what the nodes already convey
 **And** an accessible text equivalent of every node/link is still present for assistive tech (NFR6/UX-DR16), and node/edge counts stay bounded so a hub file's graph remains legible.
 
+<!-- 2026-07-18 (owner-directed, append-only): Story 7.9 seated — Code Map file-type colorize with a
+     discrete/categorical palette (orthogonal to Story 10.6's coupling process-path heuristic). -->
+
+### Story 7.9: Code Map File-Type Colorize (Discrete Palette)
+
+As a reviewer exploring an unfamiliar codebase on the Code Map,
+I want a colorize dimension that paints tiles by **file type / language** using a **discrete (categorical) color scheme**,
+So that I can see at a glance where C#, TypeScript, CSS, config, and other kinds of mass live — without confusing that view with sequential churn/recency ramps.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the Code Map (Story 7.6) with its existing sequential git-metric colorize dimensions
+**When** I choose a **File type** (or equivalent) colorize dimension
+**Then** each file tile is filled from a **discrete palette** keyed by extension/language family (not a sequential ramp like change-frequency or recency)
+**And** a legend lists each category with its swatch and a human label, and color is never the sole signal (path + type remain available as text / tooltip / table).
+
+2.
+**Given** unknown or rare extensions
+**When** the dimension renders
+**Then** they map to a documented "Other" (or similar) bucket rather than inventing unbounded colors
+**And** the dimension degrades cleanly when the map has no files (existing empty/neutral path), and reduced-motion / a11y conventions from Story 7.6 are preserved.
+
+3.
+**Given** this dimension is categorical
+**When** it is implemented
+**Then** it does **not** change Story 10.6's coupling process-vs-code classifier (orthogonal concern) and does not require rewriting the sequential metric dimensions
+**And** HTML + webview + SPA stay coherent on the shared code-map surface.
+
 ## Epic 8: Dashboard Command Center — Trustworthy Status at a Glance
 
 Give the Driver an accurate 30-second pulse and a friction-free path to the next unit of work: one canonical status vocabulary everywhere, counts that always agree, progress and workflow state paired, readiness self-explanatory, and state-aware next-step commands. Optimizes the home dashboard for the daily journeys (1–2) defined in docs/UserJourneys.md.
@@ -2604,6 +2633,29 @@ So that the community preview ships from a known, deliberate state rather than a
 **When** the sign-off is produced
 **Then** a release-readiness record states that structural, security/privacy, and performance reviews passed (or lists accepted limitations), and that the tool is cleared to run against public and private codebases
 **And** this sign-off is the gate Epic 16's publish/cut stories (16.3+, 16.7) depend on.
+
+<!-- 2026-07-18 (owner-directed, append-only): Story 17.5 seated — investigate oversized source files
+     (notably specscribe.css) and propose a split/modularization path before more feature CSS accumulates. -->
+
+### Story 17.5: Large-File Investigation (CSS and Kindred Hotspots)
+
+As the SpecScribe maintainer preparing the codebase for outside contributors,
+I want a deliberate investigation of oversized source files — especially `src/SpecScribe/assets/specscribe.css` and any C#/TS peers that repeatedly absorb every feature change —
+So that we have a concrete, sequenced plan to split or modularize them before release hardening locks the shape in.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the current `specscribe.css` (and a shortlist of other large/hotspot files identified by size + change frequency)
+**When** the investigation runs
+**Then** it records measured size (lines / bytes), ownership hotspots (which features keep appending), coupling risks (regen/golden impact, webview theming bridge), and 2–3 viable modularization options (e.g. layer split by domain: base tokens / chrome / charts / code-pages / insights) with trade-offs
+**And** it does **not** perform a big-bang rewrite in this story — findings + a recommended sequence are the deliverable (implementation may land here only for a thin, reversible first slice if the recommendation is unambiguous and tests stay green).
+
+2.
+**Given** Stories 17.1 (structural sweep) and 17.3 (performance) may overlap
+**When** this investigation concludes
+**Then** its recommendations are fed into 17.1/17.3 Dev Notes (or scheduled follow-on tasks) so the hardening epic does not rediscover the same debt
+**And** any accepted "leave as-is for preview" decision is explicit with rationale (not silent).
 
 <!-- Epic 18 added 2026-07-11 (SCP 2026-07-11, correct-course): BMad-native module/expansion exploration
      (FR36), distinct from the third-party-framework Epics 11–15. Spike-led (18.1) per the Epics 11–15 pattern.
