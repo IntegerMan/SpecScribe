@@ -2695,13 +2695,6 @@ public sealed class SiteGenerator
         WriteOutput(SiteNav.SprintOutputPath, ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
     }
 
-    /// <summary>Writes <c>structure.html</c> — the interactive project/artifact structure tree. Gated on the
-    /// same source-artifact signal as its nav item (<c>sourceRelatives.Count &gt; 0</c>) so the page and its link
-    /// are one signal; a project with no <c>_bmad-output</c> <c>*.md</c> files omits both. Builds the
-    /// output-href map from the fully-populated <see cref="_docs"/> (plus the special <c>epics.md → epics.html</c>
-    /// mapping) so navigable leaves route to real pages and non-navigable ones render as plain text — never a
-    /// broken link. The whole gather+build is wrapped never-throw → <see cref="ProjectTree.Empty"/> so any failure
-    /// degrades to omission and generation still succeeds (AD-4 / NFR2). [Story 3.4 Task 3]</summary>
     /// <summary>Writes <c>code-map.html</c> — the source-code treemap (Story 7.6). Builds the pure
     /// <see cref="CodeMap"/> over the cached source-code walk (<see cref="_codeFiles"/>) joined to the deep-git
     /// per-file metrics (<see cref="DeepGitPulse.CodeMapMetrics"/>, empty when <c>--deep-git</c> is off → sized-by-LOC

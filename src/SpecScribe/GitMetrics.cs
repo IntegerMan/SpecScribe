@@ -433,7 +433,12 @@ public static class GitMetrics
     /// Obeys the same never-throw contract as <see cref="TryCompute"/>: any failure yields <c>null</c>, which
     /// the dashboard treats as "no deep data" and simply omits the panel, never an error. This is a separate
     /// call from <see cref="TryCompute"/>, so a deep failure leaves the baseline <see cref="GitPulse"/> intact
-    /// (partial data beats none; AD-4). [Story 3.2]</summary>
+    /// (partial data beats none; AD-4). The "single shared git code path" is scoped to the deep-git family
+    /// (this story, 3.8, 7.4, 7.5) — it deliberately does not absorb <see cref="TryCompute"/>'s separate,
+    /// always-on, lighter <c>--name-only</c> call (bounded at <c>-n 200</c>, vs this call's <c>-n 300</c> —
+    /// the two bounds are independent and may drift; that's expected, not a bug), which stays on its own
+    /// bounded window regardless of <c>--deep-git</c> so the FR-10 performance gate never depends on this
+    /// heavier fetch. [Story 3.2]</summary>
     public static DeepGitPulse? TryComputeDeep(string repoRoot)
     {
         try
