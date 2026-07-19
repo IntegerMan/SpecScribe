@@ -48,6 +48,28 @@ public class ListRowTests
     }
 
     [Fact]
+    public void Render_WithSortAttributes_EmitsDataSortAttrsOnLi()
+    {
+        // Story 10.9: additive data-sort-* attrs feed the client sort/group/filter enhancement.
+        var sb = new StringBuilder();
+        ListRow.Render(
+            sb, "Summary", badgeHtml: null, chipsHtml: Array.Empty<string>(), primaryLinkHtml: null,
+            sortName: "ADR 0001", sortDate: "2026-07-19", sortStatus: "done");
+
+        Assert.Contains("<li class=\"list-row\" data-sort-name=\"ADR 0001\" data-sort-date=\"2026-07-19\" data-sort-status=\"done\">", sb.ToString());
+    }
+
+    [Fact]
+    public void Render_WithoutSortAttributes_OmitsThem()
+    {
+        var sb = new StringBuilder();
+        ListRow.Render(sb, "Summary", badgeHtml: null, chipsHtml: Array.Empty<string>(), primaryLinkHtml: null);
+
+        Assert.Contains("<li class=\"list-row\">", sb.ToString());
+        Assert.DoesNotContain("data-sort-", sb.ToString());
+    }
+
+    [Fact]
     public void PrimaryLink_WithExtraClass_AppendsIt()
     {
         var html = ListRow.PrimaryLink("x.html", "Go", "extra-class");

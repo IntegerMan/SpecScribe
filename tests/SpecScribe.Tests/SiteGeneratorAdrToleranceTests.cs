@@ -198,13 +198,15 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
         var landing = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
-        Assert.Contains("<ul class=\"adr-landing-list list-rows-list\">", landing);
-        Assert.Contains("<li class=\"list-row\">", landing);
+        // Story 10.9: js-listable opts the synthesized landing into the client sort/group/filter enhancement.
+        Assert.Contains("<ul class=\"adr-landing-list list-rows-list js-listable\">", landing);
         Assert.Contains("<strong>ADR 0001: Use Widgets</strong>", landing);
         Assert.Contains("We chose widgets because they scale well.", landing);
         // "Accepted" isn't a recognized lifecycle word, so it degrades to the slugged pill (never color-only).
         Assert.Contains("class=\"pill status-accepted\"", landing);
         Assert.Contains("<span class=\"list-row-chip pill\">Jul 10, 2026</span>", landing);
         Assert.Contains("<a class=\"list-row-primary\" href=\"0001-widgets.html\">View record &rarr;</a>", landing);
+        Assert.Contains("data-sort-name=\"ADR 0001: Use Widgets\"", landing);
+        Assert.Contains("data-sort-date=\"2026-07-10\"", landing);
     }
 }

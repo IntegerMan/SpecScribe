@@ -22,13 +22,20 @@ public static class ListRow
         IReadOnlyList<string> chipsHtml,
         string? primaryLinkHtml,
         bool resolved = false,
-        string? extraRowClass = null)
+        string? extraRowClass = null,
+        string? sortName = null,
+        string? sortDate = null,
+        string? sortStatus = null)
     {
         var rowClass = "list-row";
         if (resolved) rowClass += " resolved";
         if (extraRowClass is { Length: > 0 }) rowClass += " " + extraRowClass;
 
-        sb.Append($"  <li class=\"{rowClass}\">\n");
+        sb.Append($"  <li class=\"{rowClass}\"");
+        if (sortName is { Length: > 0 }) sb.Append($" data-sort-name=\"{PathUtil.Html(sortName)}\"");
+        if (sortDate is { Length: > 0 }) sb.Append($" data-sort-date=\"{PathUtil.Html(sortDate)}\"");
+        if (sortStatus is { Length: > 0 }) sb.Append($" data-sort-status=\"{PathUtil.Html(sortStatus)}\"");
+        sb.Append(">\n");
         sb.Append("    <div class=\"list-row-scan\">\n");
         sb.Append($"      <span class=\"list-row-summary\">{summaryHtml}</span>\n");
         sb.Append("      <div class=\"list-row-meta\">\n");

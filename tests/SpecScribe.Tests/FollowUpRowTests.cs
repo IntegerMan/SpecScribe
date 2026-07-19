@@ -133,4 +133,39 @@ public class FollowUpRowTests
         Assert.DoesNotContain("followup-row-detail", html);
         Assert.DoesNotContain("href=", html);
     }
+
+    [Fact]
+    public void Render_WithSortAttributes_EmitsDataSortAttrsOnLi()
+    {
+        // Story 10.9: additive data-sort-* attrs feed the client sort/group/filter enhancement.
+        var sb = new StringBuilder();
+        FollowUpRow.Render(
+            sb,
+            summaryHtml: "Short lead",
+            statusToken: "open",
+            statusLabel: "Open",
+            sourceChipHtml: "Epic 1",
+            detailBodyHtml: "",
+            sortName: "Short lead",
+            sortStatus: "open");
+
+        var html = sb.ToString();
+        Assert.Contains("<li class=\"followup-row\" data-sort-name=\"Short lead\" data-sort-status=\"open\">", html);
+        Assert.DoesNotContain("data-sort-date=", html);
+    }
+
+    [Fact]
+    public void Render_WithoutSortAttributes_OmitsThem()
+    {
+        var sb = new StringBuilder();
+        FollowUpRow.Render(
+            sb,
+            summaryHtml: "Short lead",
+            statusToken: "open",
+            statusLabel: "Open",
+            sourceChipHtml: "Epic 1",
+            detailBodyHtml: "");
+
+        Assert.DoesNotContain("data-sort-", sb.ToString());
+    }
 }

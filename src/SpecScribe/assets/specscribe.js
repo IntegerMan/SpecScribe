@@ -586,6 +586,154 @@
     try { enhanceSprintEpicFilter(root); } catch (err) { /* degrade — server default remains */ }
   });
 
+  // ---- List-row sort / group / filter (action items, deferred work, follow-up groups, ADR
+  // landing) [Story 10.9] -----------------------------------------------------------------------
+  // Progressive enhancement ONLY (NFR5/NFR8): every ul.js-listable arrives complete and in a sensible
+  // server-defined order, so with JS off this block never runs and the page already reads correctly.
+  // Generalizes the enhanceSortableTable/enhanceSprintEpicFilter pattern above to <li>-shaped list rows
+  // instead of <table> rows or card grids: reads the data-sort-* attributes ListRow/FollowUpRow already
+  // emit, offers only the sort keys the page's rows actually populate, and reorders the existing <li>
+  // elements in place (no re-render, no data refetch). Sorting/grouping never runs until the reader
+  // acts — the server order stands as the true default (AC #2).
+  var STATUS_GROUP_RANK = ["pending", "drafted", "ready", "active", "review", "done", "deferred", "retired", "unrecognized"];
+
+  function enhanceListRows(container) {
+    var items = Array.prototype.filter.call(container.children, function (el) {
+      return el.tagName === "LI" && !el.classList.contains("list-row-group-heading");
+    });
+    if (items.length === 0) return;
+
+    var hasName = items.some(function (li) { return li.hasAttribute("data-sort-name"); });
+    var hasDate = items.some(function (li) { return li.hasAttribute("data-sort-date"); });
+    var hasStatus = items.some(function (li) { return li.hasAttribute("data-sort-status"); });
+    if (!hasName && !hasDate && !hasStatus) return;
+
+    var bar = document.createElement("div");
+    bar.className = "list-controls";
+
+    var sortSelect = null;
+    if (hasName || hasDate || hasStatus) {
+      var sortWrap = document.createElement("label");
+      sortWrap.className = "list-controls-sort";
+      sortWrap.appendChild(document.createTextNode("Sort by "));
+      sortSelect = document.createElement("select");
+      if (hasName) addSortOption(sortSelect, "name", "Name");
+      if (hasDate) addSortOption(sortSelect, "date", "Date");
+      if (hasStatus) addSortOption(sortSelect, "status", "Status");
+      sortWrap.appendChild(sortSelect);
+      bar.appendChild(sortWrap);
+    }
+
+    var groupBtn = null;
+    if (hasStatus) {
+      groupBtn = document.createElement("button");
+      groupBtn.type = "button";
+      groupBtn.className = "list-controls-group";
+      groupBtn.setAttribute("aria-pressed", "false");
+      groupBtn.textContent = "Group by status";
+      bar.appendChild(groupBtn);
+    }
+
+    var filterWrap = document.createElement("div");
+    filterWrap.className = "gi-filter list-controls-filter";
+    var filterLabel = document.createElement("label");
+    filterLabel.appendChild(document.createTextNode("Filter "));
+    var filterInput = document.createElement("input");
+    filterInput.type = "search";
+    filterLabel.appendChild(filterInput);
+    var filterCount = document.createElement("span");
+    filterCount.className = "gi-filter-count";
+    filterCount.setAttribute("aria-live", "polite");
+    filterWrap.appendChild(filterLabel);
+    filterWrap.appendChild(filterCount);
+    bar.appendChild(filterWrap);
+
+    container.parentNode.insertBefore(bar, container);
+
+    function addSortOption(select, value, label) {
+      var opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = label;
+      select.appendChild(opt);
+    }
+
+    function statusRank(token) {
+      var idx = STATUS_GROUP_RANK.indexOf(token || "");
+      return idx === -1 ? STATUS_GROUP_RANK.length : idx;
+    }
+
+    function sortKey(li, mode) {
+      if (mode === "date") return li.getAttribute("data-sort-date") || "";
+      if (mode === "status") return statusRank(li.getAttribute("data-sort-status"));
+      return (li.getAttribute("data-sort-name") || li.textContent).trim().toLowerCase();
+    }
+
+    function applyView() {
+      var mode = sortSelect ? sortSelect.value : null;
+      var q = filterInput.value.trim().toLowerCase();
+
+      var shown = 0;
+      items.forEach(function (li) {
+        var match = !q || li.textContent.toLowerCase().indexOf(q) >= 0;
+        li.classList.toggle("list-row-hidden", !match);
+        if (match) shown++;
+      });
+      filterCount.textContent = q ? shown + " of " + items.length + " rows" : "";
+
+      var ordered = items.slice();
+      if (mode) {
+        ordered.sort(function (a, b) {
+          var ka = sortKey(a, mode);
+          var kb = sortKey(b, mode);
+          if (ka < kb) return -1;
+          if (ka > kb) return 1;
+          return 0;
+        });
+      }
+
+      Array.prototype.forEach.call(container.querySelectorAll(".list-row-group-heading"), function (h) {
+        h.parentNode.removeChild(h);
+      });
+
+      var grouping = groupBtn && groupBtn.getAttribute("aria-pressed") === "true";
+      if (grouping) {
+        var lastToken = null;
+        ordered.sort(function (a, b) { return statusRank(a.getAttribute("data-sort-status")) - statusRank(b.getAttribute("data-sort-status")); });
+        ordered.forEach(function (li) {
+          var token = li.getAttribute("data-sort-status") || "";
+          if (token !== lastToken) {
+            var heading = document.createElement("li");
+            heading.className = "list-row-group-heading";
+            var h3 = document.createElement("h3");
+            h3.setAttribute("role", "group");
+            var badge = li.querySelector(".status-badge");
+            h3.textContent = badge ? badge.textContent : (token || "Other");
+            heading.appendChild(h3);
+            container.appendChild(heading);
+            lastToken = token;
+          }
+          container.appendChild(li);
+        });
+      } else {
+        ordered.forEach(function (li) { container.appendChild(li); });
+      }
+    }
+
+    if (sortSelect) sortSelect.addEventListener("change", applyView);
+    if (groupBtn) {
+      groupBtn.addEventListener("click", function () {
+        var pressed = groupBtn.getAttribute("aria-pressed") === "true";
+        groupBtn.setAttribute("aria-pressed", String(!pressed));
+        applyView();
+      });
+    }
+    filterInput.addEventListener("input", applyView);
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".js-listable"), function (list) {
+    try { enhanceListRows(list); } catch (err) { /* degrade silently — the server-ordered list stands */ }
+  });
+
   // ---- Source-code treemap: dimension switch + directory zoom [Story 7.6, round 2] ---------
   // Progressive enhancement ONLY. The server ships up to four self-contained ".codemap-view" panels (one per
   // exclude-spec-dev / exclude-tests filter combination — Story 7.6 round 2), each with a correct, sized-by-LOC

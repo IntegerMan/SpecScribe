@@ -66,10 +66,17 @@ public static class FollowUpRow
         string sourceChipHtml,
         string detailBodyHtml,
         bool resolved = false,
-        string? detailHref = null)
+        string? detailHref = null,
+        string? sortName = null,
+        string? sortDate = null,
+        string? sortStatus = null)
     {
         var rowClass = resolved ? "followup-row resolved" : "followup-row";
-        sb.Append($"  <li class=\"{rowClass}\">\n");
+        sb.Append($"  <li class=\"{rowClass}\"");
+        if (sortName is { Length: > 0 }) sb.Append($" data-sort-name=\"{PathUtil.Html(sortName)}\"");
+        if (sortDate is { Length: > 0 }) sb.Append($" data-sort-date=\"{PathUtil.Html(sortDate)}\"");
+        if (sortStatus is { Length: > 0 }) sb.Append($" data-sort-status=\"{PathUtil.Html(sortStatus)}\"");
+        sb.Append(">\n");
         sb.Append("    <div class=\"followup-row-scan\">\n");
         sb.Append($"      <span class=\"followup-row-summary\">{summaryHtml}</span>\n");
         // Meta cluster stays visually adjacent (status + source + primary) so wide viewports

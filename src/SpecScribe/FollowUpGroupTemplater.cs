@@ -41,7 +41,7 @@ public static class FollowUpGroupTemplater
         sb.Append("<main id=\"main-content\">\n<section class=\"followup-group-wrap\">\n");
         // Pane lives inside the wrap so it shares the 1040px list column. [spec-follow-up-list-batch-actions]
         sb.Append(RenderListBatchPane(group, commands ?? CommandCatalog.Empty));
-        sb.Append("<ul class=\"followup-rows-list\">\n");
+        sb.Append("<ul class=\"followup-rows-list js-listable\">\n");
         foreach (var member in group.Members)
         {
             // Detail hrefs from geometry may already carry a depth prefix; normalize for this page.
@@ -54,7 +54,9 @@ public static class FollowUpGroupTemplater
                 member.SourceChipHtml,
                 member.DetailBodyHtml,
                 resolved: member.Resolved,
-                detailHref: detailHref);
+                detailHref: detailHref,
+                sortName: member.RawSummary ?? PathUtil.StripHtmlTags(member.SummaryHtml),
+                sortStatus: member.StatusToken);
         }
         sb.Append("</ul>\n");
 

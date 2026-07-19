@@ -542,7 +542,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated again same story: the fallback rule was tightened so a local context containing ONLY the
         // current (active) item — nothing else to navigate to, e.g. this fixture's lone-file code directories —
         // degrades to the generic band instead of a degenerate one-item band (NFR8). Stable across 2 runs.
-        const string expected = "e156056104a46ee824054544195fc8d3a9de13e204313a049517fe0d152bd1f3";
+        // Regenerated for Story 10.9: ListRow.Render/FollowUpRow.Render gain additive data-sort-* attrs, and the
+        // four in-scope <ul> wrappers (action items, deferred work, follow-up groups, synthesized ADR landing)
+        // gain the js-listable opt-in class; specscribe.js/specscribe.css gain the enhanceListRows enhancement +
+        // .list-controls*/.list-row-group-heading rules (shared assets, so every page's byte count moves too).
+        // Two other stories landed on main concurrently with this one (unrelated commits between HEAD f0f30bd
+        // and d274cee), each independently shifting this fixture's byte content — the hash was re-verified
+        // stable across 2 repeated runs against the final concurrent state before locking in.
+        const string expected = "d250f2d6663a66d52235b4177695c9a03189233005e143061dad58cf4240f2fa";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

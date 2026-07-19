@@ -59,7 +59,7 @@ public static class DeferredWorkTemplater
                     .ToList();
                 sb.Append("<section class=\"deferred-work-wrap\">\n");
                 sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
-                sb.Append("  <ul class=\"followup-rows-list deferred-items-list\">\n");
+                sb.Append("  <ul class=\"followup-rows-list deferred-items-list js-listable\">\n");
                 foreach (var item in unstructured)
                     RenderItem(sb, item, "Deferred work", prefix, detailSlugs, epicsModel, hrefMap);
                 sb.Append("  </ul>\n");
@@ -138,7 +138,7 @@ public static class DeferredWorkTemplater
             .ThenBy(t => t.index)
             .Select(t => t.item);
 
-        sb.Append("  <ul class=\"followup-rows-list deferred-items-list\">\n");
+        sb.Append("  <ul class=\"followup-rows-list deferred-items-list js-listable\">\n");
         foreach (var item in ordered)
             RenderItem(sb, item, group.ProvenanceLabel, prefix, detailSlugs, epicsModel, hrefMap);
         sb.Append("  </ul>\n");
@@ -194,6 +194,8 @@ public static class DeferredWorkTemplater
             PathUtil.Html(provenanceLabel),
             detail.ToString(),
             resolved: item.Resolved,
-            detailHref: detailHref);
+            detailHref: detailHref,
+            sortName: summaryPlain,
+            sortStatus: statusToken);
     }
 }

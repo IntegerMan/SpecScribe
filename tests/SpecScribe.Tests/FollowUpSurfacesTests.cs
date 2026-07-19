@@ -159,6 +159,13 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("followup-row-primary", html);
         Assert.Contains("href=\"follow-ups/action-", html);
 
+        // Story 10.9: opt-in client sort/group/filter — the wrapper carries js-listable and each row
+        // carries the machine-sortable name/status attributes (no per-item date exists on action items).
+        Assert.Contains("followup-rows-list action-items-list js-listable", html);
+        Assert.Contains("data-sort-name=", html);
+        Assert.Contains("data-sort-status=", html);
+        Assert.DoesNotContain("data-sort-date=", html);
+
         // Groups ordered by epic ascending.
         var epic1 = html.IndexOf("From the Epic 1 retrospective", StringComparison.Ordinal);
         var epic2 = html.IndexOf("From the Epic 2 retrospective", StringComparison.Ordinal);
@@ -343,6 +350,11 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.DoesNotContain("followup-row-detail", html);
         Assert.Contains("followup-row-primary", html);
         Assert.Contains("href=\"../follow-ups/deferred-", html);
+
+        // Story 10.9: deferred-work rows are opted into the same client sort/group/filter enhancement.
+        Assert.Contains("followup-rows-list deferred-items-list js-listable", html);
+        Assert.Contains("data-sort-name=", html);
+        Assert.Contains("data-sort-status=", html);
 
         // Provenance source link still on the group heading.
         Assert.Contains("href=\"../epics/story-1-1.html\"", html);
@@ -531,6 +543,10 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.DoesNotContain("data-copy=", orphanHtml);
         Assert.DoesNotContain("?filter=", orphanHtml);
         Assert.DoesNotContain("#group=", orphanHtml);
+
+        // Story 10.9: follow-up group pages are also in scope for the js-listable enhancement.
+        Assert.Contains("followup-rows-list js-listable", orphanHtml);
+        Assert.Contains("data-sort-name=", orphanHtml);
 
         var epic1Html = File.ReadAllText(epic1Group);
         Assert.Contains("Schedule retros promptly", epic1Html);

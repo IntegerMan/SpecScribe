@@ -5181,6 +5181,44 @@ body:has(main.req-detail) .doc-header {
    is satisfied by construction — there is no new motion to neutralize. */
 .gi-row-hidden { display: none; }
 
+/* ---- List-row sort / group / filter control bar (Story 10.9) ----
+   Injected only at enhancement time above an opted-in ul.js-listable — never shipped in the no-JS page.
+   Reuses .gi-filter's label/input/count visual language rather than inventing new chrome. */
+.list-controls { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1rem; margin: 0 0 0.6rem; }
+.list-controls-sort { font-size: 0.85rem; color: var(--ink-faded); display: flex; align-items: baseline; gap: 0.4rem; }
+.list-controls-sort select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--parchment-deep);
+  border-radius: 4px;
+  background: var(--warm-white);
+  color: var(--ink);
+}
+.list-controls-sort select:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.list-controls-group {
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid var(--parchment-deep);
+  border-radius: 4px;
+  background: var(--warm-white);
+  color: var(--ink);
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+.list-controls-group[aria-pressed="true"] { background: var(--teal); color: var(--warm-white); border-color: var(--teal); }
+.list-controls-group:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.list-controls-filter { margin: 0; }
+
+/* Filtered-out list rows hide the same way .gi-row-hidden does — display-based, no motion. */
+.list-row-hidden { display: none; }
+
+/* Group cluster heading: a real <li> wrapper (valid <ul> content model) carrying a visible <h3> so grouping
+   is never color-only (UX-DR17) — the row's own status badge label supplies the text, no second vocabulary. */
+.list-row-group-heading { list-style: none; margin: 0.9rem 0 0.3rem; }
+.list-row-group-heading:first-child { margin-top: 0; }
+.list-row-group-heading h3 { margin: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faded); }
+
 /* ---- Files & Contributors master-detail (Story 3.8 redesign) ----
    File table on the left; selecting a file reveals its contributor panel on the right. The reveal is pure
    CSS :target (same no-JS mechanism as the commit-heatmap drill-down and the coupling lightbox) — clicking a

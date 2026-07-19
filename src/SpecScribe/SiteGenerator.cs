@@ -845,7 +845,7 @@ public sealed class SiteGenerator
                 // Story 10.8: the most primitive of the six list-shaped indexes — routed onto the shared
                 // ListRow anatomy (summary, status badge, metadata chip, one primary link) instead of the
                 // old bare "<a>title</a> — status" line.
-                body.Append("<p>Architecture decision records for this project.</p>\n<ul class=\"adr-landing-list list-rows-list\">\n");
+                body.Append("<p>Architecture decision records for this project.</p>\n<ul class=\"adr-landing-list list-rows-list js-listable\">\n");
                 foreach (var adr in _adrs)
                 {
                     // Records live under the adrs/ output subdir alongside this landing — the href is the
@@ -864,7 +864,11 @@ public sealed class SiteGenerator
                         : Array.Empty<string>();
                     var primaryLink = ListRow.PrimaryLink(PathUtil.Html(href), "View record");
 
-                    ListRow.Render(body, summaryHtml, badgeHtml, chips, primaryLink);
+                    ListRow.Render(
+                        body, summaryHtml, badgeHtml, chips, primaryLink,
+                        sortName: adr.Title,
+                        sortDate: adr.Date is { } sortDate ? PortalDates.IsoDay(sortDate) : null,
+                        sortStatus: !string.IsNullOrWhiteSpace(adr.Status) ? StatusStyles.ForSprint(adr.Status) : null);
                 }
                 body.Append("</ul>\n");
 

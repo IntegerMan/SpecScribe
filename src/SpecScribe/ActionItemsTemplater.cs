@@ -59,7 +59,7 @@ public static class ActionItemsTemplater
         foreach (var group in groups)
         {
             sb.Append(RenderGroupHeading(group.EpicNumber, epicRetroMap));
-            sb.Append("<ul class=\"followup-rows-list action-items-list\">\n");
+            sb.Append("<ul class=\"followup-rows-list action-items-list js-listable\">\n");
             foreach (var item in group.Items)
             {
                 RenderCard(sb, item, deferredWorkHref, quickDev, epicsModel, hrefMap, prefix, crossLinks, detailSlugs, epicRetroMap);
@@ -222,7 +222,9 @@ public static class ActionItemsTemplater
             StatusStyles.SprintLabel(item.Status),
             PathUtil.Html(sourceChip),
             detail.ToString(),
-            detailHref: detailHref);
+            detailHref: detailHref,
+            sortName: summaryPlain,
+            sortStatus: StatusStyles.ForSprint(item.Status));
     }
 
     internal static void AppendCrossLinks(
