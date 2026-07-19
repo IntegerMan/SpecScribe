@@ -74,29 +74,6 @@ The Epic 4 write-up assumed `docs/adrs` appears as a SourceRoot top-level segmen
 
 ## Suggested Review Order
 
-**Semantics documentation**
-
-- SourceRoot-only KnownIndexGroups warning — do not whitelist adrs/retros here
-  [`DashboardViewBuilder.cs:12`](../../src/SpecScribe/DashboardViewBuilder.cs#L12)
-
-- UnrecognizedTopLevelFolders: ADR root outside SourceRoot caveat
-  [`SiteGenerator.cs:2597`](../../src/SpecScribe/SiteGenerator.cs#L2597)
-
-**Debt close-out**
-
-- Four KnownIndexGroups action items marked done
-  [`sprint-status.yaml:330`](sprint-status.yaml#L330)
-
-- Story 4.8 deferred bullet resolved as misdiagnosed
-  [`deferred-work.md:285`](deferred-work.md#L285)
-
-**Regression pin**
-
-- Asserts adrs/docs/retros stay non-well-known; clean fixture emits no structure notices
-  [`SiteGeneratorAdapterTests.cs:589`](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs#L589)
-
-## Suggested Review Order
-
 **Path-model docs (no logic change)**
 
 - SourceRoot-only KnownIndexGroups semantics + do-not-whitelist guardrail
@@ -118,5 +95,5 @@ The Epic 4 write-up assumed `docs/adrs` appears as a SourceRoot top-level segmen
 
 **Pin test**
 
-- Normal BMad layout asserts no skipped adrs/docs/retros structure notices
+- Asserts adrs/docs/retros stay non-well-known; clean fixture emits no structure notices
   [`SiteGeneratorAdapterTests.cs:589`](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs#L589)
