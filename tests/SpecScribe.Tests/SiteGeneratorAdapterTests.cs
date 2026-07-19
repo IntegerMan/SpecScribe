@@ -196,6 +196,8 @@ public class SiteGeneratorAdapterTests : IDisposable
             "epics/story-1-1.html",
             "epics/story-1-2.html",
             "epics/story-2-1.html",
+            // Story 10.3: the how-to-read orientation page is written on every full run, like about.html/diagnostics.html.
+            "how-to-read.html",
             "implementation-artifacts/epic-1-retro-2026-07-06.html",
             "index.html",
             "requirements.html",
@@ -486,7 +488,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // via native <details>, Spec in Project, Structure stays retired; every page's nav bytes change.
         // Regenerated 2026-07-18: Story 10.2 chart metadata — Charts.Framed + real-value heatmap legend +
         // ranking/window/why slots on Git Pulse / deep analytics / git insights; specscribe.css .chart-frame-*.
-        const string expected = "28a711741ca794cb4539ae295c41616ef57e385386377a052d70d441ee6c3442";
+        // Regenerated 2026-07-18: Story 10.3 glossary + in-place vocabulary — new how-to-read.html orientation
+        // page (written every run); every page's nav gains a "How to read this portal" Project-group entry +
+        // icon; specscribe.css gains abbr[title]/.howtoread-* rules. This non-module fixture has no _bmad
+        // folder, so ModuleContext is None — the glossary is empty and the abbr expander is a no-op (AC2);
+        // the delta here is purely the new page + the shared nav/CSS additions.
+        const string expected = "452785b22c7d243967d353fc6c88bdf3e0394853f9b587a7f4a3e35f2c49c1fa";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

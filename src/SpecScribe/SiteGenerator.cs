@@ -395,6 +395,7 @@ public sealed class SiteGenerator
             // diagnostics page reads the notice list, so it never self-references. [Story 4.8 Task 6]
             events.Add(WriteDiagnostics(nav, events));
             events.Add(WriteAbout(nav));
+            events.Add(WriteHowToRead(nav));
 
             // Opt-in JSON+SPA delivery form, emitted LAST so every captured page is present. Strictly additive:
             // writes only its own files under OutputRoot, leaving every static page byte-identical (AC #3/#5/#6).
@@ -2904,6 +2905,19 @@ public sealed class SiteGenerator
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutOutputPath, sw.Elapsed);
     }
 
+    /// <summary>Writes <c>how-to-read.html</c> — the first-time-visitor orientation page (reading order +
+    /// glossary), sourced from <see cref="_module"/> (adapter-supplied vocabulary, AC2). Static (no run
+    /// dependency); written on every full run alongside About/Diagnostics so its Home quick-link never 404s.
+    /// Deliberately NOT run through <see cref="ApplyReferenceLinks"/> — it defines the glossary terms, so it
+    /// must not self-expand them into nested &lt;abbr&gt;. [Story 10.3]</summary>
+    private GenerationEvent WriteHowToRead(SiteNav nav)
+    {
+        var sw = Stopwatch.StartNew();
+        var html = HowToReadTemplater.RenderPage(nav, _module.Docs, _module.Glossary, _module.Commands);
+        WriteOutput(SiteNav.HowToReadOutputPath, html);
+        return new GenerationEvent(GenerationOutcome.Generated, SiteNav.HowToReadOutputPath, sw.Elapsed);
+    }
+
     /// <summary>Path to the repo-root README that feeds the optional Readme page.</summary>
     private string ReadmeSourcePath => Path.Combine(_options.RepoRoot, "README.md");
 
@@ -3318,6 +3332,10 @@ public sealed class SiteGenerator
         // external base here: a configured/detected --code-url never diverts a citation from its in-portal page.
         html = CodeReferenceLinkifier.Linkify(
             html, _codePages, codeSourceBaseUrl: null, prefix, _options.RepoRoot, _options.SourceRoot);
+        // Story 10.3: first-use <abbr> expansion for bare acronyms (FR/AC/ADR/...). Runs LAST so it never
+        // rewrites text inside any anchor the linkifiers above just created; a no-op when the detected
+        // module publishes no glossary (NFR8 — undetected frameworks stay byte-unchanged).
+        html = AbbreviationExpander.Expand(html, _module.Glossary);
         return html;
     }
 

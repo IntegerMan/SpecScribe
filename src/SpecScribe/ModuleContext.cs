@@ -12,6 +12,13 @@ public enum BmadModule { Unknown, BmadMethod, GameDevStudio }
 /// dashboard quick links regardless.</summary>
 public sealed record ModuleDoc(string FileName, string Label, string Description, bool InNav);
 
+/// <summary>One portal-vocabulary entry a module publishes. <see cref="Term"/> is the token as it appears
+/// in prose ("FR", "ADR", "spec kernel"); <see cref="Expansion"/> is the <c>&lt;abbr title&gt;</c> text
+/// ("Functional Requirement"); <see cref="Definition"/> is the one-line gloss shown on the how-to-read
+/// page. <see cref="IsAcronym"/>-true entries (short, all-caps acronyms) drive the in-page
+/// <see cref="AbbreviationExpander"/>; longer terms appear only in the glossary list.</summary>
+public sealed record GlossaryTerm(string Term, string Expansion, string Definition, bool IsAcronym);
+
 /// <summary>The workflow slash-commands a module exposes, parsed from its <c>module-help.csv</c> so the
 /// "Next Steps" panels show the commands that actually exist (<c>/bmad-*</c> for BMad Method, <c>/gds-*</c>
 /// for Game Dev Studio) rather than a hard-coded set. Keyed by skill base-name — the skill id minus its
@@ -60,12 +67,14 @@ public sealed class ModuleContext
     public required BmadModule Module { get; init; }
     public required CommandCatalog Commands { get; init; }
     public required IReadOnlyList<ModuleDoc> Docs { get; init; }
+    public required IReadOnlyList<GlossaryTerm> Glossary { get; init; }
 
     public static readonly ModuleContext None = new()
     {
         Module = BmadModule.Unknown,
         Commands = CommandCatalog.Empty,
         Docs = Array.Empty<ModuleDoc>(),
+        Glossary = Array.Empty<GlossaryTerm>(),
     };
 
     /// <summary>Well-known BMad Method planning-doc filenames, matched anywhere in the source tree (folder
@@ -111,6 +120,39 @@ public sealed class ModuleContext
         BmadModule.BmadMethod => BmadMethodDocs,
         BmadModule.GameDevStudio => GameDevStudioDocs,
         _ => Array.Empty<ModuleDoc>(),
+    };
+
+    // The portal vocabulary a module publishes: acronyms that expand in-page on first use, plus longer
+    // terms that only appear in the how-to-read glossary. This is the single source of BMAD vocabulary —
+    // shared rendering (AbbreviationExpander, HowToReadTemplater) holds zero acronym literals of its own.
+    private static readonly IReadOnlyList<GlossaryTerm> BmadMethodGlossary = new[]
+    {
+        new GlossaryTerm("FR", "Functional Requirement", "A specific capability the system must provide.", IsAcronym: true),
+        new GlossaryTerm("NFR", "Non-Functional Requirement", "A quality attribute the system must meet, such as performance or accessibility.", IsAcronym: true),
+        new GlossaryTerm("AC", "Acceptance Criterion", "A testable condition that defines when a story is complete.", IsAcronym: true),
+        new GlossaryTerm("ADR", "Architecture Decision Record", "A record of a significant architecture decision and its rationale.", IsAcronym: true),
+        new GlossaryTerm("PRD", "Product Requirements Document", "The document defining what the product should do and why.", IsAcronym: true),
+        new GlossaryTerm("spec kernel", "spec kernel", "The distilled, preservation-validated machine contract used for downstream work.", IsAcronym: false),
+        new GlossaryTerm("quick-dev", "quick-dev", "A lightweight implementation workflow for small changes outside the full story pipeline.", IsAcronym: false),
+        new GlossaryTerm("epic", "epic", "A grouping of related stories that together deliver a larger capability.", IsAcronym: false),
+        new GlossaryTerm("story", "story", "A single unit of implementable work with its own acceptance criteria.", IsAcronym: false),
+        new GlossaryTerm("sprint", "sprint", "The current slice of stories being actively developed.", IsAcronym: false),
+    };
+
+    private static readonly IReadOnlyList<GlossaryTerm> GameDevStudioGlossary = new[]
+    {
+        new GlossaryTerm("GDD", "Game Design Document", "The document defining the game's core design baseline.", IsAcronym: true),
+        new GlossaryTerm("narrative beat", "narrative beat", "A discrete story moment or event in the narrative design.", IsAcronym: false),
+        new GlossaryTerm("game architecture", "game architecture", "Source-derived architecture notes for the game codebase.", IsAcronym: false),
+    };
+
+    /// <summary>The portal vocabulary a module publishes. Unknown/undetected modules publish nothing, so
+    /// the glossary section and the abbreviation expander both degrade to absent (NFR8).</summary>
+    public static IReadOnlyList<GlossaryTerm> GlossaryFor(BmadModule module) => module switch
+    {
+        BmadModule.BmadMethod => BmadMethodGlossary,
+        BmadModule.GameDevStudio => GameDevStudioGlossary,
+        _ => Array.Empty<GlossaryTerm>(),
     };
 
     private static readonly Regex ManifestModulePattern = new(
@@ -282,6 +324,7 @@ public sealed class ModuleContext
             Module = module,
             Commands = new CommandCatalog(moduleLabel, byStep),
             Docs = DocsFor(module),
+            Glossary = GlossaryFor(module),
         };
     }
 

@@ -58,6 +58,13 @@ public sealed class SiteNav
     /// file) and the footer (links to it) so the two can't disagree. [Story 4.8]</summary>
     public const string AboutOutputPath = "about.html";
 
+    /// <summary>The "How to read this portal" orientation page: a suggested reading order through the pages
+    /// that exist plus the detected module's glossary. Written on EVERY full run (like
+    /// <see cref="DiagnosticsOutputPath"/>/<see cref="AboutOutputPath"/>) so its link can never dangle. Reached
+    /// from Home's Explore Key Views grid (a <c>QuickLinks</c> entry) — deliberately NOT a top-nav item, the
+    /// same info-page convention as About/Diagnostics. [Story 10.3]</summary>
+    public const string HowToReadOutputPath = "how-to-read.html";
+
     /// <summary>Flattened leaf list in render order — every child across <see cref="Groups"/> (including flat
     /// top-level links). Compatibility contract for RenderParity / SPA / Has* predicates. [Story 10.1]</summary>
     public required IReadOnlyList<(string Label, string OutputRelativePath)> Items { get; init; }
@@ -114,6 +121,15 @@ public sealed class SiteNav
         var followUps = new List<(string Label, string Path)>();
         var project = new List<(string Label, string Path)>();
         var quickLinks = new List<(string, string, string)>();
+
+        // The how-to-read orientation page is written on every run (like About/Diagnostics), so it can lead
+        // unconditionally. Story 10.1's journey-organized top nav (shared chrome on every page, including
+        // Home) replaced the old flat "Explore Key Views" quick-link grid this story was originally
+        // designed against — so unlike About/Diagnostics, how-to-read rides the Project group (below) AND
+        // the quick-link band (site-nav-key-views, shown on non-Home pages) so a first-time visitor reaches
+        // it from Home's nav bar without prior BMAD fluency. [Story 10.3]
+        project.Add(("How to read this portal", HowToReadOutputPath));
+        quickLinks.Add(("How to read this portal", HowToReadOutputPath, "New here? Start with the reading order and glossary."));
 
         // The README is the project's front-door narrative — Project group, first among module docs.
         if (hasReadme)

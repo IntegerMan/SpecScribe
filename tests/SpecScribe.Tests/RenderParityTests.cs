@@ -74,8 +74,8 @@ public class RenderParityTests
         Assert.Equal(new[] { "epics/story-1-1.html", "epics/story-1-2.html" }, facts.ChildDrillTargets);
         Assert.Equal("active", facts.StatusStage);
         Assert.Equal(ForgeOptions.StylesheetName, facts.Stylesheet); // "../" prefix + ?v= token folded away
-        // Journey order: Home → Delivery → Project (Readme + ADRs). [Story 10.1]
-        Assert.Equal(new[] { "index.html", "epics.html", "requirements.html", "readme.html", "adrs/index.html" },
+        // Journey order: Home → Delivery → Project (how-to-read + Readme + ADRs). [Story 10.1; 10.3]
+        Assert.Equal(new[] { "index.html", "epics.html", "requirements.html", "how-to-read.html", "readme.html", "adrs/index.html" },
             facts.Nav.Select(n => n.Target).ToList());
         Assert.DoesNotContain(facts.Nav, n => n.Active);
     }
@@ -91,7 +91,7 @@ public class RenderParityTests
         var facts = RenderParity.Extract(html, page);
 
         Assert.Equal(
-            new[] { "index.html", "epics.html", "requirements.html", "sprint.html", "git-insights.html", "deep-analytics.html" },
+            new[] { "index.html", "epics.html", "requirements.html", "sprint.html", "git-insights.html", "deep-analytics.html", "how-to-read.html" },
             facts.Nav.Select(n => n.Target).ToList());
         // Group headers are <summary>, not <a> — never mistaken for nav facts.
         Assert.DoesNotContain(facts.Nav, n => n.Label is "Delivery" or "Insights");

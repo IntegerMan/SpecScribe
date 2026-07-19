@@ -1770,6 +1770,13 @@ a.ref-file-node:focus-visible {
 .info-page a { color: var(--teal); }
 .info-page a:hover { color: var(--rust); }
 
+/* How-to-read orientation page (Story 10.3): headings match .doc-body's rust/underline treatment since this
+   synthesized page has no markdown wrapper of its own; the glossary dl widens .cap-row's label column to fit
+   terms like "spec kernel" without wrapping. */
+.howtoread-panel h2 { color: var(--rust); border-bottom: 1px solid var(--border); font-size: 1.3rem; padding-bottom: 0.3rem; margin: 2rem 0 0.8rem; line-height: 1.3; }
+.howtoread-order { margin: 0.5rem 0; padding-left: 1.4rem; color: var(--ink-faded); line-height: 1.8; }
+.howtoread-glossary .cap-row { grid-template-columns: 9rem 1fr; }
+
 /* A small pre-release marker beside the About page's title — gold pill on the parchment palette, deliberately
    outside the lifecycle --status-* vocabulary (a release channel isn't a delivery stage). [About polish] */
 .preview-badge {
@@ -4084,6 +4091,13 @@ body:has(#wm-review:checked) .dashboard-tile-band {
 }
 .story-ref:hover,
 .epic-ref:hover { color: var(--teal-deep); border-bottom-style: solid; }
+
+/* First-use acronym expansion (Story 10.3) — native <abbr title> affordance, no JS needed. */
+abbr[title] {
+  text-decoration: none;
+  border-bottom: 1px dotted var(--ink-light);
+  cursor: help;
+}
 
 .req-card {
   max-width: 1100px;

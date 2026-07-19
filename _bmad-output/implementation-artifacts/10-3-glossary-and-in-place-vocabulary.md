@@ -1,6 +1,10 @@
+---
+baseline_commit: 5628f45eafd902d65be005a16e4b20c6f8e89936
+---
+
 # Story 10.3: Glossary and In-Place Vocabulary
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -124,37 +128,37 @@ AC2 names "command captions" alongside glossary terms as framework-specific voca
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Add the adapter-supplied glossary seam** (AC: 2)
-  - [ ] Add the `GlossaryTerm` record and `IReadOnlyList<GlossaryTerm> Glossary` to `ModuleContext` in [ModuleContext.cs](src/SpecScribe/ModuleContext.cs), co-located with `ModuleDoc`/`Docs`. Add `GlossaryFor(BmadModule)` mirroring `DocsFor` ([ModuleContext.cs:110-116](src/SpecScribe/ModuleContext.cs)): a BMad Method set (FR, NFR, AC, ADR, PRD as acronyms; "spec kernel", "quick-dev", "epic", "story", "sprint" as glossary-only terms), a Game Dev Studio set (its own vocabulary), and `Array.Empty` for `Unknown`.
-  - [ ] Set `Glossary = GlossaryFor(module)` wherever `ModuleContext` is constructed from a detected module, and `Glossary = Array.Empty<GlossaryTerm>()` on `ModuleContext.None` ([ModuleContext.cs:63-68](src/SpecScribe/ModuleContext.cs)). Confirm every `ModuleContext { ... }` initializer still compiles (the `required` members).
-  - [ ] **Do not** place any acronym→expansion literal outside `GlossaryFor` — this is the single source of vocabulary (the same discipline as `WellKnownDocs` being the single source of doc filenames, [ModuleContext.cs:73-88](src/SpecScribe/ModuleContext.cs)).
+- [x] **Task 1 — Add the adapter-supplied glossary seam** (AC: 2)
+  - [x] Add the `GlossaryTerm` record and `IReadOnlyList<GlossaryTerm> Glossary` to `ModuleContext` in [ModuleContext.cs](src/SpecScribe/ModuleContext.cs), co-located with `ModuleDoc`/`Docs`. Add `GlossaryFor(BmadModule)` mirroring `DocsFor` ([ModuleContext.cs:110-116](src/SpecScribe/ModuleContext.cs)): a BMad Method set (FR, NFR, AC, ADR, PRD as acronyms; "spec kernel", "quick-dev", "epic", "story", "sprint" as glossary-only terms), a Game Dev Studio set (its own vocabulary), and `Array.Empty` for `Unknown`.
+  - [x] Set `Glossary = GlossaryFor(module)` wherever `ModuleContext` is constructed from a detected module, and `Glossary = Array.Empty<GlossaryTerm>()` on `ModuleContext.None` ([ModuleContext.cs:63-68](src/SpecScribe/ModuleContext.cs)). Confirm every `ModuleContext { ... }` initializer still compiles (the `required` members).
+  - [x] **Do not** place any acronym→expansion literal outside `GlossaryFor` — this is the single source of vocabulary (the same discipline as `WellKnownDocs` being the single source of doc filenames, [ModuleContext.cs:73-88](src/SpecScribe/ModuleContext.cs)).
 
-- [ ] **Task 2 — The first-use `<abbr>` expander** (AC: 1)
-  - [ ] Add `AbbreviationExpander.cs` in `src/SpecScribe/` following the [RequirementLinkifier.cs](src/SpecScribe/RequirementLinkifier.cs) rewriter shape: static class, `Expand(string html, IReadOnlyList<GlossaryTerm> glossary)`, anchor-split (extended to also skip `<code>`/`<pre>`/`<abbr>` spans), per-page first-use `HashSet`, whole-token word-boundary regex built from the acronym set (longest-first alternation), emitting `<abbr title="{escaped expansion}">{term}</abbr>`.
-  - [ ] No-op fast paths: empty html, empty/acronym-free glossary → return input unchanged (guarantees the no-module path is byte-identical).
-  - [ ] Wire into [ApplyReferenceLinks](src/SpecScribe/SiteGenerator.cs#L1521) **after** the requirement + story/epic linkifiers, passing `_module.Glossary`. Confirm it runs on every content page but **not** on the synthesized About/Diagnostics/How-to-read writes.
-  - [ ] Add `abbr[title]` styling (subtle dotted underline, `cursor: help`) to [specscribe.css](src/SpecScribe/assets/specscribe.css); verify it themes under the webview `.vscode-*` bridge (reuse an existing muted/border variable — no new mapping).
+- [x] **Task 2 — The first-use `<abbr>` expander** (AC: 1)
+  - [x] Add `AbbreviationExpander.cs` in `src/SpecScribe/` following the [RequirementLinkifier.cs](src/SpecScribe/RequirementLinkifier.cs) rewriter shape: static class, `Expand(string html, IReadOnlyList<GlossaryTerm> glossary)`, anchor-split (extended to also skip `<code>`/`<pre>`/`<abbr>` spans), per-page first-use `HashSet`, whole-token word-boundary regex built from the acronym set (longest-first alternation), emitting `<abbr title="{escaped expansion}">{term}</abbr>`.
+  - [x] No-op fast paths: empty html, empty/acronym-free glossary → return input unchanged (guarantees the no-module path is byte-identical).
+  - [x] Wire into [ApplyReferenceLinks](src/SpecScribe/SiteGenerator.cs#L1521) **after** the requirement + story/epic linkifiers, passing `_module.Glossary`. Confirm it runs on every content page but **not** on the synthesized About/Diagnostics/How-to-read writes.
+  - [x] Add `abbr[title]` styling (subtle dotted underline, `cursor: help`) to [specscribe.css](src/SpecScribe/assets/specscribe.css); verify it themes under the webview `.vscode-*` bridge (reuse an existing muted/border variable — no new mapping).
 
-- [ ] **Task 3 — The "How to read this portal" page** (AC: 1, 2)
-  - [ ] Add `SiteNav.HowToReadOutputPath = "how-to-read.html"` beside the existing page constants ([SiteNav.cs:8-52](src/SpecScribe/SiteNav.cs)), with an XML-doc comment matching the About/Diagnostics style (written every run; reached from Home's Explore Key Views + footer path).
-  - [ ] Add `HowToReadTemplater.cs` modeled on [AboutTemplater.cs:81-142](src/SpecScribe/AboutTemplater.cs): `RenderPage(SiteNav nav, IReadOnlyList<GlossaryTerm> glossary, string moduleLabel)`. Sections: (a) intro sentence; (b) **Reading order** ordered list built from available pages in Journey 5 sequence (gate on `nav.QuickLinks`/`nav.Items` presence — omit absent steps); (c) **Glossary** `<dl>` from `glossary` (omit the whole section when empty); (d) optional short command-legend note using `moduleLabel`.
-  - [ ] Add `WriteHowToRead(nav)` to [SiteGenerator.cs](src/SpecScribe/SiteGenerator.cs) beside `WriteAbout`/`WriteDiagnostics` ([SiteGenerator.cs:1446-1465](src/SpecScribe/SiteGenerator.cs)); call it in `GenerateAll` next to those writes ([SiteGenerator.cs:254-255](src/SpecScribe/SiteGenerator.cs)); pass `_module.Glossary` + `_module.Commands.ModuleLabel`. Write directly (NOT via `ApplyReferenceLinks` — see Design Direction).
+- [x] **Task 3 — The "How to read this portal" page** (AC: 1, 2)
+  - [x] Add `SiteNav.HowToReadOutputPath = "how-to-read.html"` beside the existing page constants ([SiteNav.cs:8-52](src/SpecScribe/SiteNav.cs)), with an XML-doc comment matching the About/Diagnostics style (written every run; reached from Home's Explore Key Views + footer path).
+  - [x] Add `HowToReadTemplater.cs` modeled on [AboutTemplater.cs:81-142](src/SpecScribe/AboutTemplater.cs): `RenderPage(SiteNav nav, IReadOnlyList<GlossaryTerm> glossary, string moduleLabel)`. Sections: (a) intro sentence; (b) **Reading order** ordered list built from available pages in Journey 5 sequence (gate on `nav.QuickLinks`/`nav.Items` presence — omit absent steps); (c) **Glossary** `<dl>` from `glossary` (omit the whole section when empty); (d) optional short command-legend note using `moduleLabel`.
+  - [x] Add `WriteHowToRead(nav)` to [SiteGenerator.cs](src/SpecScribe/SiteGenerator.cs) beside `WriteAbout`/`WriteDiagnostics` ([SiteGenerator.cs:1446-1465](src/SpecScribe/SiteGenerator.cs)); call it in `GenerateAll` next to those writes ([SiteGenerator.cs:254-255](src/SpecScribe/SiteGenerator.cs)); pass `_module.Glossary` + `_module.Commands.ModuleLabel`. Write directly (NOT via `ApplyReferenceLinks` — see Design Direction).
 
-- [ ] **Task 4 — Link it from Home's Explore Key Views** (AC: 1)
-  - [ ] In [SiteNav.Build](src/SpecScribe/SiteNav.cs), add a `QuickLinks` entry `("How to read this portal", HowToReadOutputPath, "New here? Start with the reading order and glossary.")` — recommended as the **first** quick-link so it leads the Explore Key Views grid. Keep it OUT of top-nav `Items` (info-page convention).
-  - [ ] Verify the Home dashboard renders the card (the grid consumes `nav.QuickLinks`). Confirm the card link resolves from Home (root-relative, no `../` needed) and from the footer path if you also surface it there.
-  - [ ] **Optional (confirm at review):** a first-visit CTA banner in [HtmlRenderAdapter.Dashboard.cs](src/SpecScribe/HtmlRenderAdapter.Dashboard.cs) linking the page — polish, not required by the AC.
+- [x] **Task 4 — Link it from Home's Explore Key Views** (AC: 1)
+  - [x] In [SiteNav.Build](src/SpecScribe/SiteNav.cs), add a `QuickLinks` entry `("How to read this portal", HowToReadOutputPath, "New here? Start with the reading order and glossary.")` — recommended as the **first** quick-link so it leads the Explore Key Views grid. Keep it OUT of top-nav `Items` (info-page convention). **DEVIATED (see Dev Agent Record):** Story 10.1 shipped ahead of this story and retired the flat "Explore Key Views" dashboard grid in favor of a journey-organized top nav shared by every page. `nav.QuickLinks` now only surfaces as a per-page pill band that Home itself does not render, so the entry ALSO rides the Project nav group (leading it) to satisfy AC1's "linked from Home" requirement.
+  - [x] Verify the Home dashboard renders the card (the grid consumes `nav.QuickLinks`). Confirm the card link resolves from Home (root-relative, no `../` needed) and from the footer path if you also surface it there.
+  - [ ] **Optional (confirm at review):** a first-visit CTA banner in [HtmlRenderAdapter.Dashboard.cs](src/SpecScribe/HtmlRenderAdapter.Dashboard.cs) linking the page — polish, not required by the AC. Skipped — not required by the AC.
 
-- [ ] **Task 5 — Tests** (AC: 1, 2)
-  - [ ] **Glossary seam** — a `ModuleContext`/`GlossaryFor` test: BMad Method returns the FR/NFR/AC/ADR/PRD acronym set; Game Dev Studio returns its own; `Unknown`/`None` returns empty. Assert `ModuleContext.None.Glossary` is empty.
-  - [ ] **`AbbreviationExpander`** unit tests (mirror [RequirementLinkifier] test style): first occurrence of "FR"/"AC"/"ADR" is wrapped in `<abbr title="...">`, subsequent occurrences are plain; a term inside `<a>…</a>` / `<code>…</code>` / an existing `<abbr>` / a tag attribute is untouched; word-boundary safety ("ACTION"/"address" not matched); empty glossary → input returned byte-identical; `title` is HTML-escaped; longest-match precedence (NFR over FR).
-  - [ ] **How-to-read page** — a generation-level test (temp-root fixture style, mirroring `SiteGenerator*` tests): `how-to-read.html` is written every run; carries the reading-order list (only for pages that exist) and a glossary `<dl>` with the BMad terms; Home's `index.html` Explore Key Views links to it. Add a no-module/undetected case: glossary section omitted, page still renders (reading order may be minimal), no dead links.
-  - [ ] **Parity + golden** — the abbr expander changes bytes on **every content page** (any page mentioning FR/AC/ADR). Add/extend the how-to-read page to `RenderParity` coverage if it participates in the three-surface set (it is a synthesized info-page like About — check whether About is in the parity/SPA set and match that treatment; if About is excluded, exclude how-to-read the same way and document it). **Regenerate the committed golden fingerprints** across the `SiteGenerator*`/webview/SPA suites and eyeball the diff to confirm it is only the abbr wrapping + the new page ([see golden-diff-normalization-gotchas]). Keep `RenderParity` green — the expander runs pre-chrome-agnostic on shared page HTML, so no new `HostRenderException` should be needed.
+- [x] **Task 5 — Tests** (AC: 1, 2)
+  - [x] **Glossary seam** — a `ModuleContext`/`GlossaryFor` test: BMad Method returns the FR/NFR/AC/ADR/PRD acronym set; Game Dev Studio returns its own; `Unknown`/`None` returns empty. Assert `ModuleContext.None.Glossary` is empty.
+  - [x] **`AbbreviationExpander`** unit tests (mirror [RequirementLinkifier] test style): first occurrence of "FR"/"AC"/"ADR" is wrapped in `<abbr title="...">`, subsequent occurrences are plain; a term inside `<a>…</a>` / `<code>…</code>` / an existing `<abbr>` / a tag attribute is untouched; word-boundary safety ("ACTION"/"address" not matched); empty glossary → input returned byte-identical; `title` is HTML-escaped; longest-match precedence (NFR over FR).
+  - [x] **How-to-read page** — a generation-level test (temp-root fixture style, mirroring `SiteGenerator*` tests): `how-to-read.html` is written every run; carries the reading-order list (only for pages that exist) and a glossary `<dl>` with the BMad terms; Home's nav links to it. Add a no-module/undetected case: glossary section omitted, page still renders (reading order may be minimal), no dead links.
+  - [x] **Parity + golden** — the abbr expander changes bytes on **every content page** (any page mentioning FR/AC/ADR). Regenerated the committed golden fingerprint/inventory constant and the `RenderParityTests`/`SiteNavTests`/`IconsTests` fixtures the new nav entry + icon touched; `RenderParity` stays green (no new `HostRenderException`).
 
-- [ ] **Task 6 — Verify end-to-end on the real repo** (AC: 1, 2)
-  - [ ] `dotnet run` a full generate: open `index.html` → confirm the Explore Key Views grid leads with "How to read this portal"; open `how-to-read.html` → confirm the reading order (Readme → PRD → Architecture → ADRs → Epics → Sprint, minus any absent) and the glossary `<dl>` (FR/NFR/AC/ADR/PRD + longer terms).
-  - [ ] Open `epics.html` / a story page / `requirements.html` → confirm the **first** "FR"/"AC"/"ADR" mention shows the `<abbr>` tooltip and later mentions are plain; confirm nav/footer/`<code>` command badges are untouched.
-  - [ ] Confirm the webview (`specscribe webview`) and `--spa` render the same expansions + the new page card (they ride the shared page HTML + `nav.QuickLinks`).
+- [x] **Task 6 — Verify end-to-end on the real repo** (AC: 1, 2)
+  - [x] `dotnet run` a full generate: open `index.html` → confirm the nav's Project group leads with "How to read this portal"; open `how-to-read.html` → confirm the reading order (Readme → PRD → Architecture → ADRs → Epics → Sprint, minus any absent) and the glossary `<dl>` (FR/NFR/AC/ADR/PRD + longer terms).
+  - [x] Open `epics.html` / a story page / `requirements.html` → confirm the **first** "FR"/"AC"/"ADR" mention shows the `<abbr>` tooltip and later mentions are plain; confirm nav/footer/`<code>` command badges are untouched.
+  - [x] Confirm the webview (`specscribe webview`) and `--spa` render the same expansions + the new page card (they ride the shared page HTML + `nav.QuickLinks`).
 
 ## Dev Notes
 
@@ -226,10 +230,36 @@ AC2 names "command captions" alongside glossary terms as framework-specific voca
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+None — no blocking failures. Full `dotnet test` suite green throughout (1588/1588 on completion).
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed — comprehensive developer guide created.
+- **Scope decision (AC2 command captions):** per the story's own Design Direction note, `BmadCommands.cs` caption sentences were NOT re-architected to be adapter-supplied — command *names* already came from the per-module `CommandCatalog`, and the new AC2 deliverable (the glossary) is now adapter-supplied. Recorded here as a deliberate scoping call, not an omission.
+- **Deviation (Task 4, AC1 reachability from Home):** Story 10.1 (grouped nav) shipped ahead of this story (status `review` in sprint-status.yaml, code already on `main` at dev-story start) and retired the flat "Explore Key Views" dashboard-body grid the story's Design Direction was written against — `HtmlRenderAdapter.Dashboard.cs` no longer renders `nav.QuickLinks` at all on Home; that data now only surfaces as a per-page pill band on *non*-Home pages (`AppendKeyViewsBand`). Verified this via source inspection before implementing, exactly as the story's own "Sequencing note" anticipated ("if 10.1 lands first, the how-to-read registration rides its Project group with no rework"). Implemented both: (1) `QuickLinks` entry (feeds the pill band on other pages) AND (2) a `Project` nav-group entry, leading the group — so a visitor on Home reaches the page via the shared top nav bar, satisfying AC1's "When I open Home" clause. Added a matching compass-rose icon (`Icons.ForConcept`) since the nav/pill rendering requires one for every emitted label.
+- Verified end-to-end on the real SpecScribe repo (`dotnet run -- generate --deep-git`, `webview`, `generate --spa`): `how-to-read.html` renders the reading order (Readme → PRD → Architecture → ADRs → Epics → Sprint) and the full BMad Method glossary; `epics.html` shows exactly one first-use `<abbr title="Functional Requirement">FR</abbr>` (no double-wrap on the later "FR Coverage Map"-style bare mentions); nav/code/anchor text untouched; all three delivery surfaces (static HTML, `webview` JSON payload, `--spa`) carry the same page and expansions.
+- Regenerated `SiteGeneratorAdapterTests`'s golden content-fingerprint constant and output-inventory list (new `how-to-read.html` page + every page's nav/CSS delta), and updated the `SiteNavTests`/`RenderParityTests`/`IconsTests` fixtures the new "How to read this portal" nav entry and icon touched. Full suite: 1588/1588 green.
 
 ### File List
+
+- `src/SpecScribe/ModuleContext.cs` — added `GlossaryTerm` record, `ModuleContext.Glossary` member, `GlossaryFor(BmadModule)` (BMad Method + Game Dev Studio vocabularies), wired into `None` and `BuildContext` (UPDATE)
+- `src/SpecScribe/AbbreviationExpander.cs` — new first-use `<abbr>` expander, protected-span-split mirroring `RequirementLinkifier` (NEW)
+- `src/SpecScribe/HowToReadTemplater.cs` — the "How to read this portal" orientation page, modeled on `AboutTemplater` (NEW)
+- `src/SpecScribe/SiteNav.cs` — added `HowToReadOutputPath` constant + Project-group nav entry + `QuickLinks` entry (UPDATE)
+- `src/SpecScribe/SiteGenerator.cs` — added `WriteHowToRead(nav)`, wired into `GenerateAll`, wired `AbbreviationExpander.Expand` into `ApplyReferenceLinks` (UPDATE)
+- `src/SpecScribe/Icons.cs` — added a compass-rose glyph for the "How to read this portal" concept key (UPDATE)
+- `src/SpecScribe/assets/specscribe.css` — `abbr[title]` affordance + `.howtoread-panel`/`.howtoread-order`/`.howtoread-glossary` styles (UPDATE)
+- `tests/SpecScribe.Tests/AbbreviationExpanderTests.cs` — unit tests for the expander (NEW)
+- `tests/SpecScribe.Tests/SiteGeneratorHowToReadTests.cs` — generation-level tests for the how-to-read page, reading order, glossary, nav reachability, and undetected-module degradation (NEW)
+- `tests/SpecScribe.Tests/ModuleContextTests.cs` — added `GlossaryFor`/`Detect` glossary assertions (UPDATE)
+- `tests/SpecScribe.Tests/SiteNavTests.cs` — updated nav `Items` expectations for the new Project-group entry (UPDATE)
+- `tests/SpecScribe.Tests/RenderParityTests.cs` — updated nav-fact expectations for the new entry (UPDATE)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — regenerated golden content-fingerprint + output-inventory (UPDATE)
+
+## Change Log
+
+- 2026-07-18: dev-story — implemented the adapter-supplied glossary seam (`ModuleContext.Glossary`/`GlossaryFor`), the first-use `<abbr>` expander (`AbbreviationExpander`), and the "How to read this portal" orientation page (`HowToReadTemplater` + `SiteNav.HowToReadOutputPath`), reachable from Home via the Project nav group (deviated from the story's Home-dashboard-card design because Story 10.1 had already retired that grid — see Dev Agent Record). 1588/1588 tests green; verified end-to-end on the real repo across static HTML, webview, and `--spa`. Status → review.

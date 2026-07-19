@@ -92,6 +92,48 @@ public class ModuleContextTests : IDisposable
         Assert.Equal(BmadModule.Unknown, ctx.Module);
         Assert.True(ctx.Commands.IsEmpty);
         Assert.Empty(ctx.Docs);
+        Assert.Empty(ctx.Glossary);
+    }
+
+    // ---- Story 10.3: the adapter-supplied glossary seam (AC2) ----------------------------------------
+
+    [Fact]
+    public void GlossaryFor_BmadMethod_ReturnsFrNfrAcAdrPrdAcronymSet()
+    {
+        var glossary = ModuleContext.GlossaryFor(BmadModule.BmadMethod);
+
+        foreach (var term in new[] { "FR", "NFR", "AC", "ADR", "PRD" })
+        {
+            Assert.Contains(glossary, g => g.Term == term && g.IsAcronym);
+        }
+        // Longer terms are glossary-only, not acronym-shaped (no <abbr> expansion for these).
+        Assert.Contains(glossary, g => g.Term == "spec kernel" && !g.IsAcronym);
+        Assert.Contains(glossary, g => g.Term == "quick-dev" && !g.IsAcronym);
+    }
+
+    [Fact]
+    public void GlossaryFor_GameDevStudio_ReturnsItsOwnVocabulary_NotBmadTerms()
+    {
+        var glossary = ModuleContext.GlossaryFor(BmadModule.GameDevStudio);
+
+        Assert.Contains(glossary, g => g.Term == "GDD" && g.IsAcronym);
+        Assert.DoesNotContain(glossary, g => g.Term is "FR" or "NFR" or "AC" or "ADR" or "PRD");
+    }
+
+    [Fact]
+    public void GlossaryFor_Unknown_ReturnsEmpty()
+    {
+        Assert.Empty(ModuleContext.GlossaryFor(BmadModule.Unknown));
+    }
+
+    [Fact]
+    public void Detect_ReadsBmadMethodModule_PopulatesGlossary()
+    {
+        WriteModule("bmm", BmmCsv, "core", "bmm");
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.Contains(ctx.Glossary, g => g.Term == "FR");
     }
 
     [Fact]
