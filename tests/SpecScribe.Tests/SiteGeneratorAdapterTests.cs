@@ -505,15 +505,20 @@ public class SiteGeneratorAdapterTests : IDisposable
         // first-commit marker and GitInsightsTemplater's sole-contributor reword are both no-ops on this fixture
         // (old enough repo, multi-contributor); specscribe.css gains .chart-frame-note/.coupling-kind*/
         // .process-edge/.heatmap-first-commit* rules (shared stylesheet, so every page's <link> byte count moves).
-        // Regenerated for Story 10.7: home + epics-index glance sunburst panels gain a companion scannable
-        // list (Charts.SunburstCompanionList) below the chart — every page with an epic gets this markup, so
-        // both home and epics.html shift; specscribe.css gains .sunburst-companion-list/.sb-story-summary
-        // rules (this fixture's epics stay under the 8-story density-collapse threshold, so the summary-wedge
-        // class itself never renders here — only the shared stylesheet + companion-list markup shift the
-        // hash). EpicSunburst's epic-level peers (action/deferred/quick-dev) now aggregate into one open/done
-        // wedge instead of per-item leaves, but this fixture has no open action_items/deferred-work.md, so
-        // that branch is a no-op here too.
-        const string expected = "96d557ffe444378b82dbdd5b6d13fe4a2960169a658df7ea40d9a519517f8292";
+        // Regenerated for Story 10.7: home + epics-index glance sunburst panels gain a NEW "Remaining Work by
+        // Epic" panel — Charts.SunburstCompanionList emits a small tile grid (own chart-panel, owner-directed
+        // polish pass: a plain link list read as underwhelming, so it became its own bordered/accented panel
+        // matching the .next-step-card/.epic-mosaic-card grammar) below the sunburst panel on every page with
+        // an epic; specscribe.css gains .epic-remaining-grid/.epic-remaining-tile/.sb-story-summary rules
+        // (this fixture's epics stay under the 8-story density-collapse threshold, so the summary-wedge class
+        // itself never renders here — only the shared stylesheet + new tile-grid panel shift the hash).
+        // EpicSunburst's epic-level peers (action/deferred/quick-dev) now aggregate into one open/done wedge
+        // instead of per-item leaves, but this fixture has no open action_items/deferred-work.md, so that
+        // branch is a no-op here too.
+        // Regenerated for deferred-diagnostic-severity-bucketing: specscribe.css gained .status-badge.diag-info
+        // (a third diagnostics-severity badge tone). This fixture emits no unrecognized-top-level-folder
+        // notice, so only the shared stylesheet content shifted the hash.
+        const string expected = "bfe79913eede7c2f6b79156413d629be462a04bbdac68e564f77d0a974c00033";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -606,6 +611,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
         var notice = Assert.Single(events, e => e.Outcome == GenerationOutcome.Skipped && e.RelativePath == "design-notes/");
         Assert.Contains("unrecognized top-level folder", notice.Message);
+        // Informational (not Unsupported): a benign structural notice must not share a diagnostics-page bucket
+        // with a genuine per-artifact ingestion failure. [deferred-diagnostic-severity-bucketing]
+        Assert.StartsWith("[Informational]", notice.Message);
 
         // The doc page still renders; the home no longer carries the (removed) unrecognized-folder index band.
         Assert.True(File.Exists(Path.Combine(Site, "design-notes", "ideas.html")));

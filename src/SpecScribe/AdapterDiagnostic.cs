@@ -22,6 +22,13 @@ public enum AdapterDiagnosticCategory
     /// <summary>An ingestion failure that isn't tied to a single artifact's shape (I/O, environment). Still
     /// non-fatal to the run; surfaces as an error event.</summary>
     Error,
+
+    /// <summary>Not an ingestion problem at all — a purely structural observation about the source tree (e.g. a
+    /// top-level folder outside the well-known set) that renders coherently on its own and needs no action. Kept
+    /// distinct from <see cref="Unsupported"/> so a human reading the Story 4.8 diagnostics page can tell "FYI,
+    /// nothing to do" apart from a genuine per-artifact ingestion failure, even though both are non-fatal and
+    /// otherwise ride the same channel. [deferred-diagnostic-severity-bucketing]</summary>
+    Informational,
 }
 
 /// <summary>One categorized, non-fatal problem an <see cref="IArtifactAdapter"/> hit while ingesting a source

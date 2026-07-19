@@ -62,6 +62,25 @@ public class DiagnosticsTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_InformationalNotice_GetsItsOwnDiagInfoBadgeClass_DistinctFromWarning()
+    {
+        // A benign structural notice (Informational) must not visually compete with — or share a bucket with —
+        // a genuine per-artifact ingestion failure (Unsupported), even though both are GenerationOutcome.Skipped.
+        // [deferred-diagnostic-severity-bucketing]
+        var notices = new[]
+        {
+            new DiagnosticNotice("Unsupported", "impl/sprint-status.yaml", "no development_status map", DiagnosticSeverity.Warning),
+            new DiagnosticNotice("Informational", "design-notes/", "unrecognized top-level folder", DiagnosticSeverity.Info),
+        };
+
+        var html = DiagnosticsTemplater.RenderPage(notices, Config(), Nav());
+
+        Assert.Contains(">Informational</span>", html);
+        Assert.Contains("status-badge diag-info", html);
+        Assert.Contains("status-badge diag-warn", html);
+    }
+
+    [Fact]
     public void RenderPage_EmptyNoticeList_RendersAllClearStateNotAnEmptyTable()
     {
         var html = DiagnosticsTemplater.RenderPage(Array.Empty<DiagnosticNotice>(), Config(), Nav());
@@ -124,6 +143,23 @@ public class DiagnosticsTemplaterTests
         Assert.Equal("[Error] raw exception text", notices[2].Message);
         Assert.Equal("Skipped", notices[3].Category);
         Assert.Null(notices[3].Message);
+    }
+
+    [Fact]
+    public void FromEvents_InformationalCategory_MapsToInfoSeverity_NotWarning()
+    {
+        // [Informational] rides the same GenerationOutcome.Skipped outcome as [Unsupported], but must not
+        // collapse to the same Warning severity — that's the whole point of the category.
+        // [deferred-diagnostic-severity-bucketing]
+        var events = new[]
+        {
+            new GenerationEvent(GenerationOutcome.Skipped, "design-notes/", TimeSpan.Zero, "[Informational] unrecognized top-level folder", FromAdapterDiagnostic: true),
+        };
+
+        var notice = Assert.Single(DiagnosticNotice.FromEvents(events));
+
+        Assert.Equal("Informational", notice.Category);
+        Assert.Equal(DiagnosticSeverity.Info, notice.Severity);
     }
 
     // ---- DiagnosticsConfig.FromRun: local-first, repo-relative formatting (Task 3) ----

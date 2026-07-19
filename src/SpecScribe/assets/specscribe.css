@@ -2424,9 +2424,12 @@ a.ref-file-node:focus-visible {
 /* Story 4.8 — generation-diagnostics severity badges. Deliberately NOT the --status-* lifecycle stage tokens:
    a run notice (unsupported/malformed/skipped/error) is not a delivery stage. Error borrows the site's
    established --rust attention accent; warning stays muted/neutral parchment. The category word is always
-   present as text beside the color (never color-only, UX-DR17 / NFR6). */
+   present as text beside the color (never color-only, UX-DR17 / NFR6). diag-info is a step further still —
+   a purely structural, no-action-needed notice (Informational) — so it never competes visually with a genuine
+   warning even though both are non-fatal. [deferred-diagnostic-severity-bucketing] */
 .status-badge.diag-error { background: var(--diag-error-bg); color: var(--rust); border-color: var(--rust); }
 .status-badge.diag-warn { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
+.status-badge.diag-info { background: transparent; color: var(--ink-light); border-color: var(--border); border-style: dashed; }
 
 .status-badge.task-badge {
   display: inline-flex;

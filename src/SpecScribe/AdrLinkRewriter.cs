@@ -47,6 +47,18 @@ public static class AdrLinkRewriter
         // The ADR root's README is rendered as the landing page. The root sits one level below the output
         // root (adrs/), so a reference climbs to it with exactly one "../" fewer than rootPrefix carries; a
         // nested README keeps its own name and needs no mapping.
+        //
+        // This subtraction is correct ONLY because SiteGenerator.EnumerateAdrFiles recurses exactly one level
+        // below AdrSourceRoot (Task 1's explicit bound), so rootPrefix here is always "../" (top-level record)
+        // or "../../" (one nested level) — never deeper. Nothing ties that recursion bound to this arithmetic
+        // today; the assert below is the guard, so a future deepening of EnumerateAdrFiles fails loudly here
+        // instead of silently mis-resolving README links for records nested more than one level down.
+        // [deferred-adrlinkrewriter-climb-arithmetic]
+        System.Diagnostics.Debug.Assert(
+            rootPrefix.Length <= "../../".Length,
+            "AdrLinkRewriter's climb arithmetic assumes ADR records nest at most one level below AdrSourceRoot " +
+            "(see SiteGenerator.EnumerateAdrFiles); a deeper rootPrefix means that bound moved and this formula " +
+            "needs revisiting.");
         var climbToAdrRoot = rootPrefix.Length >= "../".Length ? rootPrefix[..^"../".Length] : string.Empty;
         if (string.Equals(mdPath, climbToAdrRoot + "README.md", StringComparison.OrdinalIgnoreCase))
         {

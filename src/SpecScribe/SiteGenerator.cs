@@ -2562,12 +2562,14 @@ public sealed class SiteGenerator
 
     /// <summary>Surfaces adapter diagnostics on the existing event/reporter channel: malformed artifacts and
     /// ingest errors report as <see cref="GenerationOutcome.Error"/> (exactly how per-file parse failures
-    /// always reported), unsupported/skipped shapes as <see cref="GenerationOutcome.Skipped"/>. Always
-    /// non-fatal — the run has already continued past whatever these describe (AC #2). [Story 4.1]
+    /// always reported), unsupported/skipped/informational shapes as <see cref="GenerationOutcome.Skipped"/>.
+    /// Always non-fatal — the run has already continued past whatever these describe (AC #2). [Story 4.1]
     /// <para>The message is prefixed with the fine <see cref="AdapterDiagnosticCategory"/> word (e.g.
-    /// <c>[Unsupported]</c>) so the coarse <see cref="GenerationOutcome"/> collapse (four categories → two
-    /// outcomes) doesn't lose the distinction the Story 4.8 diagnostics page shows. Additive and harmless on
-    /// the console path (which already prints messages); recovered by
+    /// <c>[Unsupported]</c>) so the coarse <see cref="GenerationOutcome"/> collapse (five categories → two
+    /// outcomes) doesn't lose the distinction the Story 4.8 diagnostics page shows — including telling a benign
+    /// <c>Informational</c> structural notice apart from a genuine <c>Unsupported</c> ingestion failure, even
+    /// though both land on <see cref="GenerationOutcome.Skipped"/> [deferred-diagnostic-severity-bucketing].
+    /// Additive and harmless on the console path (which already prints messages); recovered by
     /// <see cref="DiagnosticsTemplater"/> without needing a second channel. [Story 4.8 Task 2]</para></summary>
     /// <param name="fromAdr">True when <paramref name="diagnostics"/>' <see cref="AdapterDiagnostic.RelativePath"/>
     /// is relative to the ADR output subdir / <c>AdrSourceRoot</c> rather than the source root (the
@@ -2595,7 +2597,7 @@ public sealed class SiteGenerator
         }));
     }
 
-    /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per top-level SourceRoot folder
+    /// <summary>One <see cref="AdapterDiagnosticCategory.Informational"/> notice per top-level SourceRoot folder
     /// outside the well-known set — the "unrecognized structure degrades, visibly" half of the grouping contract.
     /// Derived from SourceRoot relatives only. When <see cref="ForgeOptions.AdrSourceRoot"/> is outside SourceRoot
     /// (normal BMad: SourceRoot=<c>_bmad-output</c>, ADRs at <c>docs/adrs</c>), ADR files never appear here; if
@@ -2604,6 +2606,10 @@ public sealed class SiteGenerator
     /// implementation-artifacts segment (e.g. <c>tracking/implementation-artifacts/1-1-x.md</c>) is excluded:
     /// those paths are already covered by the known Implementation Artifacts prefix, so flagging the wrapper as
     /// "unrecognized" would contradict Task 4's location tolerance.
+    /// <para><see cref="AdapterDiagnosticCategory.Informational"/> (not <c>Unsupported</c>) deliberately keeps this
+    /// benign "renders fine, just not in a well-known group" notice out of the same diagnostics-page bucket as a
+    /// genuine per-artifact ingestion failure (e.g. an unusable <c>sprint-status.yaml</c>) — both are non-fatal,
+    /// but only one needs a human's attention. [deferred-diagnostic-severity-bucketing]</para>
     /// [Story 4.2 Task 5] [Review][Patch] [spec-close-known-index-groups-misdiagnosis]</summary>
     private static IReadOnlyList<AdapterDiagnostic> UnrecognizedTopLevelFolders(IReadOnlyList<string> sourceRelatives)
     {
@@ -2618,7 +2624,7 @@ public sealed class SiteGenerator
                 .All(BmadArtifactAdapter.IsUnderImplementationArtifacts))
             .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .Select(f => new AdapterDiagnostic(
-                AdapterDiagnosticCategory.Unsupported, f + "/",
+                AdapterDiagnosticCategory.Informational, f + "/",
                 "unrecognized top-level folder; its documents render in their own home-index section"))
             .ToList();
     }

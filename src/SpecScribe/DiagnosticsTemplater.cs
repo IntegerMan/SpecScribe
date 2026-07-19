@@ -5,9 +5,11 @@ namespace SpecScribe;
 /// <summary>Severity axis for a diagnostics notice — deliberately distinct from the lifecycle
 /// <c>--status-*</c> stage vocabulary (a run notice is not a delivery stage). Drives only the badge color:
 /// <see cref="Error"/> borrows the site's established <c>--rust</c> attention accent, <see cref="Warning"/>
-/// stays muted/neutral. The category word is always rendered as text beside the color (never color-only,
-/// UX-DR17 / NFR6). [Story 4.8]</summary>
-public enum DiagnosticSeverity { Error, Warning }
+/// stays muted/neutral, <see cref="Info"/> is the same neutral tone with less border weight for a notice that
+/// needs no action at all (<see cref="AdapterDiagnosticCategory.Informational"/> — a structural observation, not
+/// an ingestion failure) [deferred-diagnostic-severity-bucketing]. The category word is always rendered as text
+/// beside the color (never color-only, UX-DR17 / NFR6). [Story 4.8]</summary>
+public enum DiagnosticSeverity { Error, Warning, Info }
 
 /// <summary>Which real root (if any) <see cref="DiagnosticNotice.SourcePath"/> is relative to — the "which
 /// directory do I combine this with" bit the <c>webview</c> command's Problems-panel channel needs. A single
@@ -57,7 +59,9 @@ public sealed record DiagnosticNotice(
             }
 
             var (category, message) = SplitCategory(e);
-            var severity = e.Outcome == GenerationOutcome.Error ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning;
+            var severity = e.Outcome == GenerationOutcome.Error ? DiagnosticSeverity.Error
+                : category == nameof(AdapterDiagnosticCategory.Informational) ? DiagnosticSeverity.Info
+                : DiagnosticSeverity.Warning;
             // FromAdapterDiagnostic/FromAdrDiagnostic are the exact "is this a real source artifact, and which
             // root" bits MapDiagnostics already set — carry them verbatim (rather than re-deriving from the path
             // string) so the Problems channel (Story 6.12) and this page derive from one type. [Story 6.12] [Review][Patch]
@@ -226,7 +230,12 @@ public static class DiagnosticsTemplater
         sb.Append("    <tbody>\n");
         foreach (var notice in notices)
         {
-            var cssClass = notice.Severity == DiagnosticSeverity.Error ? "diag-error" : "diag-warn";
+            var cssClass = notice.Severity switch
+            {
+                DiagnosticSeverity.Error => "diag-error",
+                DiagnosticSeverity.Info => "diag-info",
+                _ => "diag-warn",
+            };
             sb.Append("      <tr>\n");
             sb.Append($"        <td>{Badge(cssClass, notice.Category)}</td>\n");
             sb.Append($"        <td class=\"diagnostics-source\">{PathUtil.Html(notice.SourcePath)}</td>\n");
