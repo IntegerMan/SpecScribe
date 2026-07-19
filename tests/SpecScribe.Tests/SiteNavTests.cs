@@ -405,4 +405,64 @@ public class SiteNavTests
         Assert.DoesNotContain("#", svg);
         Assert.Contains("</svg>SpecScribe</span>", markup);
     }
+
+    // ---- Story 10.10: Insights local-context helper ----
+
+    [Fact]
+    public void BuildInsightsLocalContext_MultipleInsightPages_ReturnsGroupMembershipWithActiveMarked()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe",
+            hasAdrs: false, hasGitInsights: true, hasDeepAnalytics: true, hasCodeMap: true);
+
+        var localContext = nav.BuildInsightsLocalContext(SiteNav.GitInsightsOutputPath);
+
+        Assert.NotNull(localContext);
+        Assert.Equal("Insights", localContext!.Title);
+        Assert.Equal(new[] { "Git Insights", "Deep Analytics", "Code Map" }, localContext.Items.Select(i => i.Label).ToArray());
+        Assert.True(localContext.Items.Single(i => i.Label == "Git Insights").IsActive);
+        Assert.False(localContext.Items.Single(i => i.Label == "Deep Analytics").IsActive);
+    }
+
+    [Fact]
+    public void BuildInsightsLocalContext_SingleInsightPage_ReturnsNull()
+    {
+        // Only one Insights child → SiteNav.Build collapses the group to a flat link — nothing to navigate
+        // between, so the local-context band must degrade to null (NFR8: no degenerate one-item band).
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasGitInsights: true);
+
+        var localContext = nav.BuildInsightsLocalContext(SiteNav.GitInsightsOutputPath);
+
+        Assert.Null(localContext);
+    }
+
+    [Fact]
+    public void BuildInsightsLocalContext_NoInsightPages_ReturnsNull()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var localContext = nav.BuildInsightsLocalContext(SiteNav.GitInsightsOutputPath);
+
+        Assert.Null(localContext);
+    }
+
+    [Fact]
+    public void ToNavigationView_ThreadsLocalContextOntoNavigationView()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var localContext = new NavLocalContext("Stories in this epic", new[] { new NavLocalItem("Story 1.1", "story-1-1.html", false) });
+
+        var view = nav.ToNavigationView("epics/epic-1.html", localContext);
+
+        Assert.Same(localContext, view.LocalContext);
+    }
+
+    [Fact]
+    public void ToNavigationView_DefaultsLocalContextToNull()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var view = nav.ToNavigationView("epics/epic-1.html");
+
+        Assert.Null(view.LocalContext);
+    }
 }

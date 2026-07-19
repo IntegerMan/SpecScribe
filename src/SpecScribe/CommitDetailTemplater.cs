@@ -29,7 +29,8 @@ public static class CommitDetailTemplater
         DeepCommit commit,
         SiteNav nav,
         Func<string, string?>? fileHref = null,
-        EntityPager? pager = null)
+        EntityPager? pager = null,
+        NavLocalContext? localContext = null)
     {
         var shortHash = ShortHash(commit.Hash);
         var outputPath = $"commit/{shortHash}.html";
@@ -42,7 +43,7 @@ public static class CommitDetailTemplater
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
             $"Commit {shortHash} in {nav.SiteTitle}: {subject}"));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, localContext));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
             ("Home", "index.html"),

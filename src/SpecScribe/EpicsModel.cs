@@ -21,6 +21,13 @@ public sealed class StoryInfo
 
     public required IReadOnlyList<string> AcBlocksHtml { get; init; }
 
+    /// <summary>Non-retirement HTML comments found while scanning this story's AC region in epics.md (e.g. a
+    /// correct-course note trailing after the last AC line, before the next story heading), pre-rendered as
+    /// block-level <c>.md-comment</c> annotations (markers stripped), in source order; empty when none. Kept
+    /// separate from <see cref="AcBlocksHtml"/> so they render as their own sibling blocks after the AC list
+    /// instead of leaking as literal gherkin content. Named opaque fragment.</summary>
+    public IReadOnlyList<string> TrailingNotesHtml { get; init; } = Array.Empty<string>();
+
     /// <summary>Set once a matching implementation-artifacts/*.md file is resolved; null if this story
     /// has no drafted detail file yet.</summary>
     public string? ArtifactOutputPath { get; set; }

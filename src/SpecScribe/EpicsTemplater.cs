@@ -80,7 +80,7 @@ public static class EpicsTemplater
             Kind = PageKind.Epic,
             OutputRelativePath = outputPath,
             Title = $"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath),
+            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, "Stories in this epic", activeStoryId: null)),
             Breadcrumb = breadcrumb,
             Assets = new AssetManifest
             {
@@ -168,7 +168,7 @@ public static class EpicsTemplater
             Kind = PageKind.Story,
             OutputRelativePath = outputPath,
             Title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath),
+            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"Stories in Epic {epic.Number}", story.Id)),
             Breadcrumb = breadcrumb,
             Assets = new AssetManifest
             {
@@ -220,7 +220,7 @@ public static class EpicsTemplater
             Kind = PageKind.Story,
             OutputRelativePath = outputPath,
             Title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath),
+            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"Stories in Epic {epic.Number}", story.Id)),
             Breadcrumb = breadcrumb,
             Assets = new AssetManifest
             {
@@ -236,6 +236,22 @@ public static class EpicsTemplater
             BodyHtml = body,
         };
         return page;
+    }
+
+    /// <summary>Builds the white sub-header band's local context for epic/story pages: the epic's own story list
+    /// (already resolved on <c>epic.Stories</c>, the exact href expression <see cref="BuildEpicPage"/> already
+    /// uses for <c>ChildTargets</c>), no recomputation. On the epic page no story is "current" (all inactive); on
+    /// a story/placeholder page the current story is marked active. [Story 10.10]</summary>
+    private static NavLocalContext BuildStoriesLocalContext(EpicInfo epic, string outputPath, string title, string? activeStoryId)
+    {
+        var prefix = PathUtil.RelativePrefix(outputPath);
+        var items = epic.Stories
+            .Select(s => new NavLocalItem(
+                $"Story {s.Id}",
+                prefix + (s.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(s.Id)),
+                activeStoryId is not null && string.Equals(s.Id, activeStoryId, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        return new NavLocalContext(title, items);
     }
 
     /// <summary>Breadcrumb label like "1 · World Rendering & Interac…" — the number alone told you nothing.</summary>

@@ -804,7 +804,15 @@ public sealed class SiteGenerator
                 var pager = EntityPager.FromSequence(_adrs, i,
                     e => prefix + e.OutputRelativePath,
                     e => e.Title);
-                WriteOutput(entry.OutputRelativePath, ApplyReferenceLinks(HtmlTemplater.RenderPage(recordDoc, nav, pager), entry.OutputRelativePath));
+                // Story 10.10: the white sub-header band's local context for an ADR page — the SAME _adrs list
+                // already passed to EntityPager.FromSequence above, not a second query.
+                var adrLocalContext = new NavLocalContext(
+                    "ADRs",
+                    _adrs.Select(e => new NavLocalItem(
+                        e.Title,
+                        prefix + e.OutputRelativePath,
+                        string.Equals(e.OutputRelativePath, entry.OutputRelativePath, StringComparison.OrdinalIgnoreCase))).ToList());
+                WriteOutput(entry.OutputRelativePath, ApplyReferenceLinks(HtmlTemplater.RenderPage(recordDoc, nav, pager, localContext: adrLocalContext), entry.OutputRelativePath));
                 // A record occupying the landing slot (e.g. an `index.md`) must, on successful write, suppress the
                 // synthesized landing below so it isn't clobbered — same "only on a successful write" rule the
                 // non-record branch above follows. [Prev/next navigation]
@@ -958,7 +966,15 @@ public sealed class SiteGenerator
                 var pager = EntityPager.FromSequence(days, i,
                     d => prefix + PathUtil.NormalizeSlashes($"commits/{Charts.D(d)}.html"),
                     Charts.DReadable);
-                var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, pager, nav, commitHref);
+                // Story 10.10: the white sub-header band's local context — the SAME day family already built
+                // above for the pager, not a second query.
+                var dayLocalContext = new NavLocalContext(
+                    "Recent activity",
+                    days.Select(d => new NavLocalItem(
+                        Charts.DReadable(d),
+                        prefix + PathUtil.NormalizeSlashes($"commits/{Charts.D(d)}.html"),
+                        d == day)).ToList());
+                var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, pager, nav, commitHref, dayLocalContext);
 
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
@@ -1199,7 +1215,15 @@ public sealed class SiteGenerator
                     s => prefix + s.OutputRelative,
                     s => CommitPagerLabel(s.Commit));
                 var pager = new EntityPager(raw.Next, raw.Prev);
-                var html = CommitDetailTemplater.RenderPage(commit, nav, CodePageHref, pager);
+                // Story 10.10: the white sub-header band's local context — the SAME slots family already built
+                // above for the pager, not a second query.
+                var commitLocalContext = new NavLocalContext(
+                    "Recent commits",
+                    slots.Select(s => new NavLocalItem(
+                        CommitPagerLabel(s.Commit),
+                        prefix + s.OutputRelative,
+                        string.Equals(s.OutputRelative, outputRelative, StringComparison.OrdinalIgnoreCase))).ToList());
+                var html = CommitDetailTemplater.RenderPage(commit, nav, CodePageHref, pager, commitLocalContext);
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
 
                 entries.Add(new CommitDetailEntry(commit.Hash, outputRelative));
@@ -1627,12 +1651,22 @@ public sealed class SiteGenerator
                     p => codePrefix + PathUtil.NormalizeSlashes($"code/{p}.html"),
                     Path.GetFileName);
 
+                // Story 10.10: the white sub-header band's local context for a code page — the SAME sibling-file
+                // family already assembled above for the pager, not a second directory listing.
+                var siblingDir = slash < 0 ? string.Empty : rel[..slash];
+                var localContext = new NavLocalContext(
+                    string.IsNullOrEmpty(siblingDir) ? "Files in this directory" : $"Files in {siblingDir}",
+                    siblings.Select(p => new NavLocalItem(
+                        Path.GetFileName(p),
+                        codePrefix + PathUtil.NormalizeSlashes($"code/{p}.html"),
+                        string.Equals(p, rel, StringComparison.OrdinalIgnoreCase))).ToList());
+
                 string html;
                 GenerationOutcome outcome;
                 if (new FileInfo(full).Length > MaxCodeFileBytes)
                 {
                     html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
-                        "This file is too large to render inline.", nav, referencedBy, externalUrl, pager);
+                        "This file is too large to render inline.", nav, referencedBy, externalUrl, pager, localContext);
                     outcome = GenerationOutcome.Skipped;
                 }
                 else if (TryReadCodeText(full, out var text))
@@ -1640,13 +1674,13 @@ public sealed class SiteGenerator
                     var lines = SplitCodeLines(text);
                     html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl,
                         insight, CodePageHref, CommitHref, dayHref: DayHref, pager: pager,
-                        storyRelatedEdges: storyRelatedEdges, relatedRelatedEdges: relatedRelatedEdges);
+                        storyRelatedEdges: storyRelatedEdges, relatedRelatedEdges: relatedRelatedEdges, localContext: localContext);
                     outcome = GenerationOutcome.Generated;
                 }
                 else
                 {
                     html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
-                        "This file is not a readable text file and can't be shown inline.", nav, referencedBy, externalUrl, pager);
+                        "This file is not a readable text file and can't be shown inline.", nav, referencedBy, externalUrl, pager, localContext);
                     outcome = GenerationOutcome.Skipped;
                 }
 
@@ -3093,13 +3127,30 @@ public sealed class SiteGenerator
                 new Dictionary<SprintActionItem, IReadOnlyList<int>>(ReferenceEqualityComparer.Instance);
         var actionSlugs = FollowUpSlug.AssignActionSlugs(actionItems);
 
+        // Story 10.10: the white sub-header band's local context for a follow-up detail page — the SAME
+        // filtered group-page membership Story 9.13 already computes (Follow-ups orphan / Unplanned /
+        // epic-N), reused here rather than a parallel same-epic recount, so "This group" on a detail page
+        // always matches the group page it links back to. Computed once up front (mirrors
+        // WriteFollowUpGroupPages) and shared by both the action-item and deferred-item loops below.
+        var counts = _counts ?? ProjectCounts.Build(
+            _progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
+        var geometry = BuildFollowUpGeometry(inventory, counts, deferredModel);
+        var unplanned = UnplannedWorkGeometry.From(inventory, geometry, _epicsModel, retros: _retros);
+        var groupSpecs = FollowUpGroupPages.Enumerate(geometry, unplanned, _epicsModel);
+        var groupByHref = new Dictionary<string, FollowUpGroupSpec>(StringComparer.OrdinalIgnoreCase);
+        foreach (var spec in groupSpecs)
+            foreach (var member in spec.Members)
+                if (member.DetailHref is { Length: > 0 })
+                    groupByHref[NormalizeFollowUpHref(member.DetailHref)] = spec;
+
         foreach (var item in actionItems)
         {
             if (!actionSlugs.TryGetValue(item, out var slug)) continue;
             var outputRelative = FollowUpSlug.OutputPath(slug);
+            var actionLocalContext = BuildFollowUpGroupLocalContext(groupByHref, outputRelative);
             var html = FollowUpDetailTemplater.RenderActionPage(
                 item, slug, nav, _module.Commands, EpicRetroMap, deferredHref,
-                _epicsModel, hrefMap, crossLinks);
+                _epicsModel, hrefMap, crossLinks, actionLocalContext);
             // No ApplyReferenceLinks — Resolve-with-AI data-copy must stay raw.
             WriteOutput(outputRelative, html);
         }
@@ -3109,22 +3160,59 @@ public sealed class SiteGenerator
             var deferredSlugs = FollowUpSlug.AssignDeferredSlugs(
                 deferredPairs.Select(p => (p.Item, p.ProvenanceLabel)).ToList());
             var listPath = inventory.Deferred?.OutputPath ?? "deferred-work.html";
+
             // Geometry carries resolved EpicNumber (source story / quick-dev inherit) for the epic pill.
-            var counts = _counts ?? ProjectCounts.Build(
-                _progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
-            var geometry = BuildFollowUpGeometry(inventory, counts, deferredModel);
+            var deferredEpicByItem = new Dictionary<DeferredWorkItem, int?>(ReferenceEqualityComparer.Instance);
+            foreach (var p in deferredPairs)
+                deferredEpicByItem[p.Item] = geometry.DeferredItems.FirstOrDefault(s => s.Item == p.Item)?.EpicNumber;
 
             foreach (var (item, provenanceLabel, sourceHref) in deferredPairs)
             {
                 if (!deferredSlugs.TryGetValue(item, out var slug)) continue;
                 var outputRelative = FollowUpSlug.OutputPath(slug);
-                var epicNumber = geometry.DeferredItems.FirstOrDefault(s => s.Item == item)?.EpicNumber;
+                var epicNumber = deferredEpicByItem[item];
+                var deferredLocalContext = BuildFollowUpGroupLocalContext(groupByHref, outputRelative);
                 var html = FollowUpDetailTemplater.RenderDeferredPage(
-                    item, provenanceLabel, sourceHref, slug, nav, listPath, _module.Commands, epicNumber);
+                    item, provenanceLabel, sourceHref, slug, nav, listPath, _module.Commands, epicNumber, deferredLocalContext);
                 // No ApplyReferenceLinks — Address/Close data-copy must stay raw.
                 WriteOutput(outputRelative, html);
             }
         }
+    }
+
+    /// <summary>The white sub-header band's local context for a follow-up detail page: the SAME
+    /// <see cref="FollowUpGroupSpec"/> membership Story 9.13's filtered group pages already enumerate,
+    /// looked up by this item's own detail href. Null when the item isn't a member of any enumerated group
+    /// (shouldn't happen in practice — every action/deferred item lands on either the Follow-ups orphan or an
+    /// epic-N group) or when that group has only one member (NFR8 — falls back to the generic band). [Story 10.10]</summary>
+    private static NavLocalContext? BuildFollowUpGroupLocalContext(
+        IReadOnlyDictionary<string, FollowUpGroupSpec> groupByHref, string outputRelative)
+    {
+        if (!groupByHref.TryGetValue(NormalizeFollowUpHref(outputRelative), out var spec)) return null;
+
+        var prefix = PathUtil.RelativePrefix(outputRelative);
+        var current = NormalizeFollowUpHref(outputRelative);
+        var items = spec.Members
+            .Where(m => m.DetailHref is { Length: > 0 })
+            .Select(m => new NavLocalItem(
+                m.RawSummary ?? PathUtil.StripHtmlTags(m.SummaryHtml),
+                prefix + NormalizeFollowUpHref(m.DetailHref),
+                string.Equals(NormalizeFollowUpHref(m.DetailHref), current, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        return new NavLocalContext(spec.Title, items);
+    }
+
+    /// <summary>Site-root-relative form of a follow-up member/detail href — strips any page-depth prefix a
+    /// caller-supplied <c>linkPrefix</c> may have baked in, mirroring <see cref="FollowUpGroupTemplater"/>'s
+    /// own defensive stripping, so hrefs built at different call depths still compare equal. [Story 10.10]</summary>
+    private static string NormalizeFollowUpHref(string href)
+    {
+        var normalized = PathUtil.NormalizeSlashes(href);
+        while (normalized.StartsWith("../", StringComparison.Ordinal))
+            normalized = normalized[3..];
+        if (normalized.StartsWith("./", StringComparison.Ordinal))
+            normalized = normalized[2..];
+        return normalized;
     }
 
     /// <summary>Structured group items, or unstructured top-level list items when the note has no
@@ -3311,7 +3399,7 @@ public sealed class SiteGenerator
         foreach (var req in requirements.Everything)
         {
             var outputRelative = $"requirements/{req.Slug}.html";
-            var html = RequirementsTemplater.RenderRequirement(req, progress, nav, model, EpicRetroMap, deferredWorkHref);
+            var html = RequirementsTemplater.RenderRequirement(req, progress, nav, model, EpicRetroMap, deferredWorkHref, requirements);
             WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative, skipRequirementId: req.Id));
         }
     }

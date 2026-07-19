@@ -39,7 +39,7 @@ public static class CodeMapTemplater
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
             $"Source-code treemap for {nav.SiteTitle} — every file sized by its lines of code and colorable by git-derived change activity, with a full text-equivalent listing."));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, nav.BuildInsightsLocalContext(outputPath)));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Code Map", null) }));
 
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");

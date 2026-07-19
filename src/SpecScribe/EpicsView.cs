@@ -58,6 +58,11 @@ public sealed record StoryCardView
     /// <summary>The acceptance-criteria blocks as already-projected HTML (named opaque fragments).</summary>
     public required IReadOnlyList<string> AcBlocksHtml { get; init; }
 
+    /// <summary>Non-retirement epics.md comments found in this story's AC region, pre-rendered as block-level
+    /// <c>.md-comment</c> annotations, in source order; empty when none. Rendered as sibling blocks after the
+    /// AC list (named opaque fragments).</summary>
+    public IReadOnlyList<string> TrailingNotesHtml { get; init; } = Array.Empty<string>();
+
     /// <summary>The pre-rendered "no plan yet — draft it with…" guidance HTML for an undrafted story, or null
     /// when the story has an artifact. Command-catalog driven, so pre-rendered (named opaque fragment).</summary>
     public string? NoteHtml { get; init; }
@@ -322,6 +327,11 @@ public sealed record StoryPlaceholderView
 
     /// <summary>The epics.md acceptance-criteria blocks as HTML (named opaque fragments; empty → panel omitted).</summary>
     public required IReadOnlyList<string> AcBlocksHtml { get; init; }
+
+    /// <summary>Non-retirement epics.md comments found in this story's AC region, pre-rendered as block-level
+    /// <c>.md-comment</c> annotations, in source order; empty when none. Rendered as sibling blocks after the
+    /// AC panel (named opaque fragments).</summary>
+    public IReadOnlyList<string> TrailingNotesHtml { get; init; } = Array.Empty<string>();
 
     /// <summary>The pre-rendered "create its plan with…" note HTML (named opaque fragment).</summary>
     public required string NoteHtml { get; init; }

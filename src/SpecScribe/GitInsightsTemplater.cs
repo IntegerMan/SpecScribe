@@ -36,7 +36,7 @@ public static class GitInsightsTemplater
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
             $"Aggregate git insights for {nav.SiteTitle}: file change frequency, who works on each file, and activity over time."));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, nav.BuildInsightsLocalContext(outputPath)));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
             ("Home", "index.html"),

@@ -801,6 +801,7 @@ public static class EpicsParser
         var userStoryHtml = MarkdownConverter.RenderInline(JoinUserStoryLines(narrativeLines));
 
         var acBlocks = new List<string>();
+        var trailingNotes = new List<string>();
         if (acIdx >= 0)
         {
             var currentBlockLines = new List<string>();
@@ -825,6 +826,28 @@ public static class EpicsParser
             {
                 var line = lines[i].Trim();
                 if (line.Length == 0) continue;
+
+                // A non-retirement HTML comment sitting in the AC range (e.g. a correct-course note trailing
+                // after the last AC line, before the next story heading) would otherwise be swept in as
+                // literal gherkin content. Retirement/superseded comments never reach here — they're already
+                // blanked by HoistBetweenStoryRetiredComments before ParseStory runs. Lazy match to the next
+                // "-->", mirroring that same hoist; an unterminated "<!--" degrades to ordinary AC content.
+                if (line.StartsWith("<!--", StringComparison.Ordinal))
+                {
+                    var closeLine = -1;
+                    for (var j = i; j < endIdx; j++)
+                    {
+                        if (lines[j].Contains("-->", StringComparison.Ordinal)) { closeLine = j; break; }
+                    }
+                    if (closeLine >= 0)
+                    {
+                        FlushBlock();
+                        var commentText = string.Join("\n", lines[i..(closeLine + 1)].Select(l => l.Trim()));
+                        trailingNotes.Add(MarkdownConverter.RenderBlock(commentText));
+                        i = closeLine;
+                        continue;
+                    }
+                }
 
                 // A bare "1." line numbers the block that follows; as content it would render as an
                 // empty markdown <ol>. Flush whatever came before and let the number ride the next block.
@@ -852,6 +875,7 @@ public static class EpicsParser
             UserStoryHtml = userStoryHtml,
             UserStoryNoteHtml = userStoryNoteHtml,
             AcBlocksHtml = acBlocks,
+            TrailingNotesHtml = trailingNotes,
         };
         return (story, retiredNoticeHtml);
     }

@@ -18,7 +18,8 @@ public static class FollowUpDetailTemplater
         string? deferredWorkHref = null,
         EpicsModel? epicsModel = null,
         IReadOnlyDictionary<string, string>? hrefMap = null,
-        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>? crossLinks = null)
+        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>? crossLinks = null,
+        NavLocalContext? localContext = null)
     {
         var outputPath = FollowUpSlug.OutputPath(slug);
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -28,7 +29,7 @@ public static class FollowUpDetailTemplater
 
         var sb = new StringBuilder();
         AppendShellOpen(sb, nav, outputPath, prefix, title, "Action item",
-            ("Open Action Items", SiteNav.ActionItemsOutputPath));
+            ("Open Action Items", SiteNav.ActionItemsOutputPath), localContext);
 
         sb.Append("<main id=\"main-content\" class=\"followup-detail\">\n");
         sb.Append("<header class=\"doc-header\">\n");
@@ -104,7 +105,8 @@ public static class FollowUpDetailTemplater
         SiteNav nav,
         string listOutputPath,
         CommandCatalog? commands = null,
-        int? epicNumber = null)
+        int? epicNumber = null,
+        NavLocalContext? localContext = null)
     {
         var outputPath = FollowUpSlug.OutputPath(slug);
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -115,7 +117,7 @@ public static class FollowUpDetailTemplater
 
         var sb = new StringBuilder();
         AppendShellOpen(sb, nav, outputPath, prefix, title, "Deferred work",
-            ("Deferred Work", PathUtil.NormalizeSlashes(listOutputPath)));
+            ("Deferred Work", PathUtil.NormalizeSlashes(listOutputPath)), localContext);
 
         sb.Append("<main id=\"main-content\" class=\"followup-detail\">\n");
         sb.Append("<header class=\"doc-header\">\n");
@@ -173,14 +175,14 @@ public static class FollowUpDetailTemplater
 
     private static void AppendShellOpen(
         StringBuilder sb, SiteNav nav, string outputPath, string prefix, string title, string kindLabel,
-        (string Label, string Href) listCrumb)
+        (string Label, string Href) listCrumb, NavLocalContext? localContext = null)
     {
         sb.Append(PathUtil.RenderHeadOpen(
             $"{title} — {nav.SiteTitle}",
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
             $"{kindLabel} follow-up for {nav.SiteTitle}."));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, localContext));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
             ("Home", "index.html"),

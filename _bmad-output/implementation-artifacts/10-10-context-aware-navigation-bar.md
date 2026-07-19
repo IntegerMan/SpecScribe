@@ -4,7 +4,7 @@ baseline_commit: 27d37b69456526e2d89ca8111a3bf9cbc645f4dc
 
 # Story 10.10: Context-Aware Navigation Bar
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -106,57 +106,57 @@ Serves FR27–29 / UX-DR25,27–30 (Epic 10's onboarding + legibility mission) a
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Introduce the `NavLocalContext` seam** (AC: 1, 2)
-  - [ ] Add `NavLocalItem`/`NavLocalContext` records to [NavigationView.cs](src/SpecScribe/NavigationView.cs).
-  - [ ] Add `NavigationView.LocalContext` (nullable, default null).
-  - [ ] Add the optional `localContext` parameter to `SiteNav.ToNavigationView` and thread it onto the new field; add a matching optional-parameter overload of `SiteNav.RenderNavBar` for the standalone-templater call sites.
+- [x] **Task 1 — Introduce the `NavLocalContext` seam** (AC: 1, 2)
+  - [x] Add `NavLocalItem`/`NavLocalContext` records to [NavigationView.cs](src/SpecScribe/NavigationView.cs).
+  - [x] Add `NavigationView.LocalContext` (nullable, default null).
+  - [x] Add the optional `localContext` parameter to `SiteNav.ToNavigationView` and thread it onto the new field; add a matching optional-parameter overload of `SiteNav.RenderNavBar` for the standalone-templater call sites.
 
-- [ ] **Task 2 — Branch `AppendKeyViewsBand` on local context** (AC: 1, 2)
-  - [ ] Insert the local-context branch between the `onHome` check and the generic quick-links fallback in [HtmlRenderAdapter.cs:148](src/SpecScribe/HtmlRenderAdapter.cs), per the Design Direction ordering.
-  - [ ] New CSS family (e.g. `.site-nav-local-context`, `.local-context-pill`, `.local-context-pill.active`) in [specscribe.css](src/SpecScribe/assets/specscribe.css) — reuse the `.quick-link-pill` visual language (color, spacing, focus ring) rather than inventing a new look; verify the webview `.vscode-*` theme bridge covers it (likely no change if existing pill variables are reused).
-  - [ ] Confirm the local-context markup stays inside the white sub-header band, outside `site-nav-links`'s anchor scope (`RenderParity.ExtractNav` guard).
+- [x] **Task 2 — Branch `AppendKeyViewsBand` on local context** (AC: 1, 2)
+  - [x] Insert the local-context branch between the `onHome` check and the generic quick-links fallback in [HtmlRenderAdapter.cs:148](src/SpecScribe/HtmlRenderAdapter.cs), per the Design Direction ordering.
+  - [x] New CSS family (e.g. `.site-nav-local-context`, `.local-context-pill`, `.local-context-pill.active`) in [specscribe.css](src/SpecScribe/assets/specscribe.css) — reuse the `.quick-link-pill` visual language (color, spacing, focus ring) rather than inventing a new look; verify the webview `.vscode-*` theme bridge covers it (likely no change if existing pill variables are reused).
+  - [x] Confirm the local-context markup stays inside the white sub-header band, outside `site-nav-links`'s anchor scope (`RenderParity.ExtractNav` guard).
 
-- [ ] **Task 3 — Wire Epic and Story pages** (AC: 1, 2)
-  - [ ] `EpicsTemplater.BuildEpicPage`: build a `NavLocalContext("Stories in this epic", ...)` from `epic.Stories`, pass it through to `nav.ToNavigationView(outputPath, localContext)`.
-  - [ ] `EpicsTemplater.BuildStoryPage` / `BuildStoryPlaceholderPage`: same `epic.Stories` sibling list, current story marked active.
-  - [ ] `EpicsTemplater.BuildIndexPage` (the epics INDEX, not an individual epic): confirm whether it gets rich context (e.g. jump-to-epic list) or degrades to the generic band — the AC only names "epic" and "story" pages, not the index; default to leaving the index on the generic fallback unless it's trivially cheap to add, and note the decision.
+- [x] **Task 3 — Wire Epic and Story pages** (AC: 1, 2)
+  - [x] `EpicsTemplater.BuildEpicPage`: build a `NavLocalContext("Stories in this epic", ...)` from `epic.Stories`, pass it through to `nav.ToNavigationView(outputPath, localContext)`.
+  - [x] `EpicsTemplater.BuildStoryPage` / `BuildStoryPlaceholderPage`: same `epic.Stories` sibling list, current story marked active.
+  - [x] `EpicsTemplater.BuildIndexPage` (the epics INDEX, not an individual epic): confirm whether it gets rich context (e.g. jump-to-epic list) or degrades to the generic band — the AC only names "epic" and "story" pages, not the index; default to leaving the index on the generic fallback unless it's trivially cheap to add, and note the decision.
 
-- [ ] **Task 4 — Wire Code File pages** (AC: 1, 2)
-  - [ ] `CodeFileTemplater`: reuse the sibling-file family already assembled for the code-file `EntityPager` (do not recompute a second directory listing) to build `NavLocalContext("Files in {directory}", ...)`.
+- [x] **Task 4 — Wire Code File pages** (AC: 1, 2)
+  - [x] `CodeFileTemplater`: reuse the sibling-file family already assembled for the code-file `EntityPager` (do not recompute a second directory listing) to build `NavLocalContext("Files in {directory}", ...)`.
 
-- [ ] **Task 5 — Wire ADR pages** (AC: 1, 2)
-  - [ ] At the ADR page call site ([SiteGenerator.cs:804](src/SpecScribe/SiteGenerator.cs) and wherever `AdrTemplater`/equivalent renders each ADR page), reuse the same `_adrs` list already passed to `EntityPager.FromSequence` to build `NavLocalContext("ADRs", ...)`.
+- [x] **Task 5 — Wire ADR pages** (AC: 1, 2)
+  - [x] At the ADR page call site ([SiteGenerator.cs:804](src/SpecScribe/SiteGenerator.cs) and wherever `AdrTemplater`/equivalent renders each ADR page), reuse the same `_adrs` list already passed to `EntityPager.FromSequence` to build `NavLocalContext("ADRs", ...)`.
 
-- [ ] **Task 6 — Wire Commit pages** (AC: 1, 2)
-  - [ ] `CommitDayTemplater` and the per-commit page renderer: reuse the same commit/day family already backing their `EntityPager`.
+- [x] **Task 6 — Wire Commit pages** (AC: 1, 2)
+  - [x] `CommitDayTemplater` and the per-commit page renderer: reuse the same commit/day family already backing their `EntityPager`.
 
-- [ ] **Task 7 — Wire Requirement pages** (AC: 1, 2)
-  - [ ] `RequirementsTemplater.RenderRequirement`: build `NavLocalContext` from the requirement's family (owner-latitude choice per Design Direction — same-category siblings recommended as the simpler, always-available option), current requirement marked active.
-  - [ ] Confirm the requirements INDEX page's own behavior (likely stays on the generic fallback — it already has its own in-page "Jump to a group" navigator; don't duplicate that into the white band).
+- [x] **Task 7 — Wire Requirement pages** (AC: 1, 2)
+  - [x] `RequirementsTemplater.RenderRequirement`: build `NavLocalContext` from the requirement's family (owner-latitude choice per Design Direction — same-category siblings recommended as the simpler, always-available option), current requirement marked active.
+  - [x] Confirm the requirements INDEX page's own behavior (likely stays on the generic fallback — it already has its own in-page "Jump to a group" navigator; don't duplicate that into the white band).
 
-- [ ] **Task 8 — Wire Follow-up pages** (AC: 1, 2)
-  - [ ] `FollowUpDetailTemplater` (9.11 per-item pages): build local context from the item's already-resolved group/epic attribution, linking back to its `follow-ups/group-*.html` page.
-  - [ ] `FollowUpGroupTemplater`, `action-items.html`, `deferred-work.html`: default to the generic fallback (no `NavLocalContext` built) per the Design Direction's explicit NFR8 example — confirm at review if richer context is wanted instead.
+- [x] **Task 8 — Wire Follow-up pages** (AC: 1, 2)
+  - [x] `FollowUpDetailTemplater` (9.11 per-item pages): build local context from the item's already-resolved group/epic attribution, linking back to its `follow-ups/group-*.html` page.
+  - [x] `FollowUpGroupTemplater`, `action-items.html`, `deferred-work.html`: default to the generic fallback (no `NavLocalContext` built) per the Design Direction's explicit NFR8 example — confirm at review if richer context is wanted instead.
 
-- [ ] **Task 9 — Wire Insight pages** (AC: 1, 2)
-  - [ ] `GitInsightsTemplater`, `DeepAnalyticsTemplater`, `CodeMapTemplater`: build `NavLocalContext("Insights", ...)` from the Insights nav group's own children (reuse `nav.Groups`, do not recompute a parallel list).
+- [x] **Task 9 — Wire Insight pages** (AC: 1, 2)
+  - [x] `GitInsightsTemplater`, `DeepAnalyticsTemplater`, `CodeMapTemplater`: build `NavLocalContext("Insights", ...)` from the Insights nav group's own children (reuse `nav.Groups`, do not recompute a parallel list).
 
-- [ ] **Task 10 — Guardrails** (AC: 1, 2)
-  - [ ] No new authoring schema; every `NavLocalItem` traces to an existing field.
-  - [ ] `RenderParity` stays green, no new `HostRenderException`.
-  - [ ] Empty local context (`Items.Count == 0`) behaves identically to a null one (falls back to the generic band) — never a degenerate one-item-looks-broken band.
-  - [ ] webview CSP / SPA innerHTML swap need no exception (plain anchors, no JS).
+- [x] **Task 10 — Guardrails** (AC: 1, 2)
+  - [x] No new authoring schema; every `NavLocalItem` traces to an existing field.
+  - [x] `RenderParity` stays green, no new `HostRenderException`.
+  - [x] Empty local context (`Items.Count == 0`) behaves identically to a null one (falls back to the generic band) — never a degenerate one-item-looks-broken band.
+  - [x] webview CSP / SPA innerHTML swap need no exception (plain anchors, no JS).
 
-- [ ] **Task 11 — Tests + golden** (AC: 1, 2)
-  - [ ] Per page-kind unit tests: rich context renders with the right items + active marking; absent/empty data degrades to the generic band (both halves of NFR8, matching the existing Story 10.1 present/absent test pattern).
-  - [ ] `RenderParityTests` — confirm the local-context band doesn't register as a nav fact and doesn't trip a new divergence on webview/SPA.
-  - [ ] Golden fingerprint regen (every interior page's white band changes) — confirm stability across ≥2 runs before locking the constant ([golden-diff-normalization-gotchas]).
-  - [ ] `dotnet test` from repo root, full suite green.
+- [x] **Task 11 — Tests + golden** (AC: 1, 2)
+  - [x] Per page-kind unit tests: rich context renders with the right items + active marking; absent/empty data degrades to the generic band (both halves of NFR8, matching the existing Story 10.1 present/absent test pattern).
+  - [x] `RenderParityTests` — confirm the local-context band doesn't register as a nav fact and doesn't trip a new divergence on webview/SPA.
+  - [x] Golden fingerprint regen (every interior page's white band changes) — confirm stability across ≥2 runs before locking the constant ([golden-diff-normalization-gotchas]).
+  - [x] `dotnet test` from repo root, full suite green.
 
-- [ ] **Task 12 — Verify end-to-end on the real repo** (AC: 1, 2)
-  - [ ] `dotnet run --project src/SpecScribe -- generate --deep-git` against this repo; open an epic page, a story page, a code file page, an ADR page, a commit page, a requirement page, a follow-up detail page, and an insight page (git-insights/deep-analytics/code-map) — confirm each white band shows the expected page-type context with the active item marked.
-  - [ ] Confirm Home is unchanged (still the work-mode strip) and confirm a page kind you deliberately left on the fallback (e.g. `action-items.html`) still shows the generic quick-links band, not an empty one.
-  - [ ] Confirm `--spa` and the webview both render the same contextual band (open the SPA in the preview browser; confirm the webview theme bridge covers the new pill class).
+- [x] **Task 12 — Verify end-to-end on the real repo** (AC: 1, 2)
+  - [x] `dotnet run --project src/SpecScribe -- generate --deep-git` against this repo; open an epic page, a story page, a code file page, an ADR page, a commit page, a requirement page, a follow-up detail page, and an insight page (git-insights/deep-analytics/code-map) — confirm each white band shows the expected page-type context with the active item marked.
+  - [x] Confirm Home is unchanged (still the work-mode strip) and confirm a page kind you deliberately left on the fallback (e.g. `action-items.html`) still shows the generic quick-links band, not an empty one.
+  - [x] Confirm `--spa` and the webview both render the same contextual band (open the SPA in the preview browser; confirm the webview theme bridge covers the new pill class).
 
 ## Dev Notes
 
@@ -244,12 +244,55 @@ Serves FR27–29 / UX-DR25,27–30 (Epic 10's onboarding + legibility mission) a
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Sonnet 5 (claude-sonnet-5)
 
 ### Debug Log References
+
+- `dotnet build src/SpecScribe` — clean throughout (0 warnings, 0 errors) after each task.
+- `dotnet test tests/SpecScribe.Tests` — full suite green (1689 tests) after fixes.
+- `dotnet run --project src/SpecScribe -- generate --deep-git` (and `--spa`) against this repo (613 pages) — verified live via direct HTML inspection of every page kind.
 
 ### Completion Notes List
 
 Ultimate context engine analysis completed — comprehensive developer guide created. This story extends Story 10.1's `RenderNavMarkup` seam with a new `NavLocalContext` carried on `NavigationView`, rendered by a new branch in `AppendKeyViewsBand` between the Home work-mode strip and the existing generic quick-links fallback, so the white sub-header band shows page-type-appropriate context (epic's stories, code file siblings, ADR family, requirement family, follow-up group, insight-group siblings) built entirely from data each page kind already computes elsewhere — with a clean fallback to today's generic band when no rich context applies.
 
+Implemented per the Design Direction, with one review-flagged latitude call actually taken:
+
+- **Task 1–2 (seam):** `NavLocalItem`/`NavLocalContext` added to `NavigationView.cs`; `NavigationView.LocalContext` (nullable); `SiteNav.ToNavigationView`/`RenderNavBar` gained an optional `localContext` parameter. `HtmlRenderAdapter.AppendKeyViewsBand` gained the local-context branch between the Home strip and the generic fallback; new `.site-nav-local-context`/`.local-context-*` CSS reusing the `.quick-link-pill` visual language (no webview-bridge change needed — reuses existing semantic tokens). The band lives outside `site-nav-links`, so `RenderParity.ExtractNav` never recovers its anchors as nav facts (added a regression test proving it).
+- **Task 3 (Epic/Story):** `EpicsTemplater.BuildEpicPage`/`BuildStoryPage`/`BuildStoryPlaceholderPage` share a new `BuildStoriesLocalContext` helper over `epic.Stories`. Epics INDEX page left on the generic fallback per the story's own default guidance.
+- **Task 4 (Code files):** `SiteGenerator`'s code-page loop builds the local context from the exact `siblings` list already assembled for the `EntityPager` (no second directory read).
+- **Task 5 (ADRs):** the ADR pass-2 loop builds it from the same `_adrs` list already passed to `EntityPager.FromSequence`; `HtmlTemplater.RenderPage` gained an optional `localContext` param (used only by the ADR call site — every other doc page stays on the generic fallback, matching the mapping table).
+- **Task 6 (Commits):** both `CommitDayTemplater.RenderPage` and `CommitDetailTemplater.RenderPage` gained the optional param, fed from the same `days`/`slots` families already backing their pagers.
+- **Task 7 (Requirements):** `RequirementsTemplater.RenderRequirement` takes the same-category sibling group (owner-latitude call taken: same-category siblings, the simpler always-available option per the Design Direction) via a new `RequirementGroupLabel`/`BuildRequirementLocalContext` pair. Requirements INDEX stays on the generic fallback (already has its own in-page navigator).
+- **Task 8 (Follow-ups) — revised at review:** the first pass took a same-epic-attribution shortcut (flagged as a review checkpoint); the owner asked for the full 9.13 group-page membership instead, so it now reuses that directly. `WriteFollowUpDetails` computes `FollowUpGroupPages.Enumerate(geometry, unplanned, _epicsModel)` once (the SAME call `WriteFollowUpGroupPages` already makes) and indexes every member by its detail href (`groupByHref`, normalized via a new `NormalizeFollowUpHref` that strips any baked-in depth prefix — mirrors `FollowUpGroupTemplater.ToListBatchEntry`'s own defensive stripping). Both the action-item and deferred-item loops resolve their item's containing spec through a shared `BuildFollowUpGroupLocalContext` helper and reuse `spec.Title`/`spec.Members` verbatim — so a detail page's "This group" band now shows the EXACT same title and membership as the `follow-ups/group-*.html` page it links back to (Follow-ups orphan / Unplanned / Epic N follow-ups), including quick-dev entries alongside actions and deferred items. `FollowUpGroupTemplater`/`action-items.html`/`deferred-work.html` still stay on the generic fallback (unchanged, per the Design Direction). Verified live: `follow-ups/action-add-a-review-checklist-item-for-the-parser.html`'s band title ("Epic 3 follow-ups") and membership now match `follow-ups/group-epic-3.html`'s own `<h1>` and row list exactly.
+- **Task 9 (Insights):** new `SiteNav.BuildInsightsLocalContext` reads `Groups` for the "Insights" label; returns null when the group doesn't exist OR collapsed to a single flat link (see NFR8 note below). Wired into `GitInsightsTemplater`/`DeepAnalyticsTemplater`/`CodeMapTemplater`.
+- **Task 10 (Guardrails) — one review-worthy self-caught bug:** the initial `AppendKeyViewsBand` guard was `Items.Count > 0`, which let a code file with no sibling files (or a requirement/story/ADR whose group has no other members) render a **one-item band containing only itself** — a real self-link at first (`href` pointing at its own page), then, after fixing the active item to render as plain text (see below), a one-pill band that added nothing (labeled "Files in X" with only the current file, non-actionable). Fixed twice: (1) the active `NavLocalItem` now renders as `<span>` never `<a href>` — the same "current page never self-links" rule `RenderBreadcrumb`'s last crumb already follows — caught by `SiteGeneratorTraceabilityTests.GenerateAll_SkipsSelfLinkOnRequirementDetailPage` failing on FR6's own detail page; (2) the guard was tightened to `Items.Any(i => !i.IsActive)` so a context with only the current item (no real navigation target) falls back to the generic band — caught by a second real-repo verification pass over this repo's own single-file code directories. Golden fingerprint regenerated twice accordingly.
+- **Task 11 (Tests + golden):** added 10 new tests — 4 in `HtmlRenderAdapterTests` (rich context, null fallback, empty fallback, Home-ignores-local-context), 5 in `SiteNavTests` (`BuildInsightsLocalContext` present/single-collapses-to-null/absent, `ToNavigationView` threading), 1 in `RenderParityTests` (local-context anchors never recovered as nav facts). Golden fingerprint regenerated and confirmed stable across 3 repeated runs (first regen) + 2 repeated runs (second regen after the NFR8 tightening). Full suite: 1689 tests green.
+- **Task 12 (real-repo verification):** ran `generate --deep-git` (613 pages) and `generate --deep-git --spa` against this repo; verified via direct HTML inspection (the in-session browser tool couldn't reliably navigate `file://` URLs in this sandbox — one screenshot did succeed and confirmed correct visual rendering of the epic page's "Stories in this epic" band) that every page kind (epic, story, code file with/without siblings, ADR, commit day, commit detail, requirement, follow-up detail, git-insights) shows the correct contextual band with active-item marking and no self-links; confirmed Home is unchanged and `action-items.html` correctly falls back to the generic band; confirmed `--spa` output carries the same band (same render seam, no adapter-specific code needed).
+
 ### File List
+
+- `src/SpecScribe/NavigationView.cs` (UPDATE)
+- `src/SpecScribe/SiteNav.cs` (UPDATE)
+- `src/SpecScribe/HtmlRenderAdapter.cs` (UPDATE)
+- `src/SpecScribe/EpicsTemplater.cs` (UPDATE)
+- `src/SpecScribe/CodeFileTemplater.cs` (UPDATE)
+- `src/SpecScribe/HtmlTemplater.cs` (UPDATE)
+- `src/SpecScribe/CommitDayTemplater.cs` (UPDATE)
+- `src/SpecScribe/CommitDetailTemplater.cs` (UPDATE)
+- `src/SpecScribe/RequirementsTemplater.cs` (UPDATE)
+- `src/SpecScribe/FollowUpDetailTemplater.cs` (UPDATE)
+- `src/SpecScribe/GitInsightsTemplater.cs` (UPDATE)
+- `src/SpecScribe/DeepAnalyticsTemplater.cs` (UPDATE)
+- `src/SpecScribe/CodeMapTemplater.cs` (UPDATE)
+- `src/SpecScribe/SiteGenerator.cs` (UPDATE)
+- `src/SpecScribe/assets/specscribe.css` (UPDATE)
+- `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs` (UPDATE)
+- `tests/SpecScribe.Tests/SiteNavTests.cs` (UPDATE)
+- `tests/SpecScribe.Tests/RenderParityTests.cs` (UPDATE)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` (UPDATE — golden fingerprint constant)
+
+## Change Log
+
+- 2026-07-19: Story implemented (dev-story). New `NavigationView.LocalContext`/`NavLocalContext`/`NavLocalItem` seam threaded through `SiteNav.ToNavigationView`/`RenderNavBar`, rendered by a new `HtmlRenderAdapter.AppendKeyViewsBand` branch; wired epic/story, code file, ADR, commit day/detail, requirement, and follow-up-detail pages onto it, with Insights pages reusing the dark bar's own `nav.Groups` membership. Self-caught + fixed a real defect during implementation: the active item must never self-link (mirrors `RenderBreadcrumb`'s rule) and a local context containing only the current item must fall back to the generic band (NFR8 — no degenerate one-item band), both caught via test failures and a real-repo verification pass. Golden fingerprint regenerated twice, stable across repeated runs. 1689 tests green (10 new).
+- 2026-07-19: Follow-up detail pages' local context revised at review — swapped the same-epic-attribution shortcut for the actual Story 9.13 filtered group-page membership (`FollowUpGroupPages.Enumerate`, reused not re-derived), so a detail page's band now matches its `follow-ups/group-*.html` page exactly. No golden fingerprint change (the fixture has no follow-up items). Full suite green (1692 tests — the 3-test delta is unrelated concurrent work already on `main`, not this change).

@@ -168,6 +168,7 @@ public static class EpicsViewBuilder
             UserStoryHtml = story.UserStoryHtml,
             UserStoryNoteHtml = story.UserStoryNoteHtml,
             AcBlocksHtml = story.AcBlocksHtml,
+            TrailingNotesHtml = story.TrailingNotesHtml,
             NoteHtml = noteHtml,
             UpdatedDate = story.LastUpdatedDate,
         };
@@ -247,6 +248,7 @@ public static class EpicsViewBuilder
             UserStoryHtml = story.UserStoryHtml,
             UserStoryNoteHtml = story.UserStoryNoteHtml,
             AcBlocksHtml = story.AcBlocksHtml,
+            TrailingNotesHtml = story.TrailingNotesHtml,
             NoteHtml = note,
             EpicNumber = epic.Number,
             BackHref = prefix + epicOutputPath,

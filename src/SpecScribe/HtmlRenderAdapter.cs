@@ -154,6 +154,15 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
             return;
         }
 
+        // NFR8: at least one NAVIGABLE (non-active) item must exist, or the band is either empty or a
+        // degenerate "here you are, with nowhere else to go" single self-link — both fall back to the
+        // generic band rather than rendering a band that looks broken.
+        if (nav.LocalContext is { } localContext && localContext.Items.Any(i => !i.IsActive))
+        {
+            AppendLocalContextBand(sb, localContext);
+            return;
+        }
+
         if (nav.QuickLinks.Count == 0) return;
 
         var entries = nav.QuickLinks
@@ -183,6 +192,31 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
                 sb.Append($"          <a class=\"key-view-item\" href=\"{PathUtil.Html(prefix + m.Path)}\" data-tooltip=\"{PathUtil.Html(m.Desc)}\">{Icons.ForConcept(m.Label)}{PathUtil.Html(m.Title)}</a>\n");
             }
             sb.Append("        </div>\n      </div>\n");
+        }
+        sb.Append("    </div>\n  </div>\n");
+    }
+
+    /// <summary>The white sub-header band's page-type-specific local-context branch: a small title label + a pill
+    /// per <see cref="NavLocalItem"/> (the active one marked), reusing the <c>.quick-link-pill</c> visual
+    /// language under a distinct CSS family (<c>.site-nav-local-context</c>/<c>.local-context-pill</c>) so it can
+    /// be told apart from the generic quick-links band. Plain anchors only — no JS, no webview CSP exception
+    /// needed. <see cref="NavLocalItem.Href"/> is already relative to the current page (the
+    /// <c>PagerLink.Href</c> convention), so this never recomputes a prefix per item. The active item renders as
+    /// plain text (a <c>&lt;span&gt;</c>), never a self-link — the same "current page never self-links" rule
+    /// <see cref="RenderBreadcrumb"/> already applies to its last crumb. [Story 10.10]</summary>
+    private static void AppendLocalContextBand(StringBuilder sb, NavLocalContext localContext)
+    {
+        sb.Append("  <div class=\"site-nav-key-views site-nav-local-context\" aria-label=\"" + PathUtil.Html(localContext.Title) + "\">\n");
+        sb.Append("    <div class=\"local-context-pills\">\n");
+        sb.Append($"      <span class=\"local-context-label\">{PathUtil.Html(localContext.Title)}</span>\n");
+        foreach (var item in localContext.Items)
+        {
+            if (item.IsActive)
+            {
+                sb.Append($"      <span class=\"local-context-pill active\" aria-current=\"page\">{PathUtil.Html(item.Label)}</span>\n");
+                continue;
+            }
+            sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"local-context-pill\">{PathUtil.Html(item.Label)}</a>\n");
         }
         sb.Append("    </div>\n  </div>\n");
     }

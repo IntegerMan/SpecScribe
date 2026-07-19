@@ -346,7 +346,7 @@ public sealed class SiteNav
     /// icon concept key is the item's label (the mapping <see cref="RenderNavBar"/> always used); a non-HTML
     /// surface reads it without re-deriving it. This is the "named typed view of SiteNav's data" the delivery
     /// contract (AD-2) needs — <see cref="Build"/> stays the producer. [Story 6.1; 10.1]</summary>
-    public NavigationView ToNavigationView(string activeOutputRelativePath) => new()
+    public NavigationView ToNavigationView(string activeOutputRelativePath, NavLocalContext? localContext = null) => new()
     {
         SiteTitle = SiteTitle,
         Groups = Groups.Select(g => new NavGroup(
@@ -358,14 +358,38 @@ public sealed class SiteNav
         Items = Items.Select(i => new NavItem(i.Label, i.OutputRelativePath, i.Label)).ToList(),
         QuickLinks = QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description)).ToList(),
         ActiveOutputRelativePath = activeOutputRelativePath,
+        LocalContext = localContext,
     };
+
+    /// <summary>Builds the white sub-header band's local context for an Insights page (<c>git-insights.html</c>,
+    /// <c>deep-analytics.html</c>, <c>code-map.html</c>) from THIS SAME Insights nav group's membership — the
+    /// exact list <see cref="Build"/> already computed for the dark bar, not a parallel query. Null when the
+    /// Insights group doesn't exist or collapsed to a single flat link (nothing to navigate between — NFR8: a
+    /// degenerate one-item band is not "meaningful local context"). [Story 10.10]</summary>
+    public NavLocalContext? BuildInsightsLocalContext(string activeOutputRelativePath)
+    {
+        var group = Groups.FirstOrDefault(g => string.Equals(g.Label, "Insights", StringComparison.Ordinal));
+        if (group.Children is null || group.Children.Count < 2) return null;
+
+        var prefix = PathUtil.RelativePrefix(activeOutputRelativePath);
+        var current = PathUtil.NormalizeSlashes(activeOutputRelativePath);
+        var items = group.Children
+            .Select(c => new NavLocalItem(
+                c.Label,
+                prefix + c.OutputRelativePath,
+                string.Equals(PathUtil.NormalizeSlashes(c.OutputRelativePath), current, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        return new NavLocalContext("Insights", items);
+    }
 
     /// <summary>Renders the site nav bar. The string-building was re-homed behind
     /// <see cref="HtmlRenderAdapter"/> in Story 6.1 (the DELIVERY seam); this now projects to a
     /// <see cref="NavigationView"/> and delegates, so the bytes are unchanged and un-migrated pages keep calling
-    /// this exactly as before.</summary>
-    public string RenderNavBar(string currentOutputRelativePath) =>
-        HtmlRenderAdapter.Shared.RenderNav(ToNavigationView(currentOutputRelativePath));
+    /// this exactly as before. The optional <paramref name="localContext"/> lets standalone-templater call sites
+    /// (code files, requirements, follow-ups, ADRs, commits, insight pages) supply the white band's page-type
+    /// context without hand-building a <see cref="NavigationView"/> themselves. [Story 10.10]</summary>
+    public string RenderNavBar(string currentOutputRelativePath, NavLocalContext? localContext = null) =>
+        HtmlRenderAdapter.Shared.RenderNav(ToNavigationView(currentOutputRelativePath, localContext));
 
     /// <summary>Renders a "Home / Epics / Epic 1 / Story 1.1" trail. The last entry (current page) should
     /// have a null path so it renders as plain text rather than a self-link. Re-homed behind

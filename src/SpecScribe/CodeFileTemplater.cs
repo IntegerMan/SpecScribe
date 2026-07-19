@@ -50,10 +50,11 @@ public static class CodeFileTemplater
         Func<DateOnly, string?>? dayHref = null,
         EntityPager? pager = null,
         IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
-        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null)
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null,
+        NavLocalContext? localContext = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
-        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true, pager: pager);
+        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true, pager: pager, localContext: localContext);
 
         var count = lines.Count;
         sb.Append($"  <div class=\"meta-pills\"><span class=\"pill\">{count.ToString(CultureInfo.InvariantCulture)} {(count == 1 ? "line" : "lines")}</span></div>\n");
@@ -660,10 +661,11 @@ public static class CodeFileTemplater
         SiteNav nav,
         IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy = null,
         string? externalSourceUrl = null,
-        EntityPager? pager = null)
+        EntityPager? pager = null,
+        NavLocalContext? localContext = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
-        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, pager: pager);
+        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, pager: pager, localContext: localContext);
 
         sb.Append("  <div class=\"meta-pills\"><span class=\"pill\">Not rendered</span></div>\n");
         sb.Append("</header>\n\n");
@@ -681,7 +683,7 @@ public static class CodeFileTemplater
     /// it — mirroring the synthesized-page shape of <see cref="CommitDayTemplater"/>. <paramref name="highlight"/>
     /// adds the vendored Prism stylesheet + highlighter to the head (only the full page, which actually renders a
     /// <c>&lt;code&gt;</c> block, asks for them).</summary>
-    private static StringBuilder BeginShell(string repoRelativePath, string outputRelativePath, string prefix, SiteNav nav, bool highlight = false, EntityPager? pager = null)
+    private static StringBuilder BeginShell(string repoRelativePath, string outputRelativePath, string prefix, SiteNav nav, bool highlight = false, EntityPager? pager = null, NavLocalContext? localContext = null)
     {
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
@@ -690,7 +692,7 @@ public static class CodeFileTemplater
             prefix + ForgeOptions.ScriptName,
             $"Source file {repoRelativePath} in {nav.SiteTitle}.",
             highlight ? HighlightHead(prefix) : null));
-        sb.Append(nav.RenderNavBar(outputRelativePath));
+        sb.Append(nav.RenderNavBar(outputRelativePath, localContext));
         sb.Append(SiteNav.RenderBreadcrumb(outputRelativePath, new (string, string?)[]
         {
             ("Home", "index.html"),

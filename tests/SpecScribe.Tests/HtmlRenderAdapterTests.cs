@@ -981,6 +981,73 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("work-mode-jumps", keyViews);
     }
 
+    // ---- Story 10.10: page-type-specific local-context band ----
+
+    [Fact]
+    public void RenderNav_OffHome_WithLocalContext_ShowsLocalContextBandInsteadOfGenericQuickLinks()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var localContext = new NavLocalContext("Stories in this epic", new[]
+        {
+            new NavLocalItem("Story 1.1", "story-1-1.html", IsActive: false),
+            new NavLocalItem("Story 1.2", "story-1-2.html", IsActive: true),
+        });
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("epics/epic-1.html", localContext));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.Contains("site-nav-local-context", keyViews);
+        Assert.Contains("Stories in this epic", keyViews);
+        Assert.Contains("local-context-pill", keyViews);
+        Assert.Contains("href=\"story-1-1.html\"", keyViews);
+        Assert.Contains("Story 1.1</a>", keyViews);
+        // The active item renders as plain text, never a self-link (mirrors the breadcrumb's last-crumb rule).
+        Assert.DoesNotContain("href=\"story-1-2.html\"", keyViews);
+        Assert.Contains("local-context-pill active", keyViews);
+        Assert.Contains("aria-current=\"page\">Story 1.2</span>", keyViews);
+        // The generic quick-links band is suppressed while local context is present.
+        Assert.DoesNotContain("quick-link-pills", keyViews);
+    }
+
+    [Fact]
+    public void RenderNav_OffHome_NullLocalContext_FallsBackToGenericQuickLinksBand()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("epics/epic-1.html"));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.DoesNotContain("site-nav-local-context", keyViews);
+        Assert.Contains("quick-link-pills", keyViews);
+    }
+
+    [Fact]
+    public void RenderNav_OffHome_EmptyLocalContext_FallsBackToGenericQuickLinksBand()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var empty = new NavLocalContext("Stories in this epic", Array.Empty<NavLocalItem>());
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("epics/epic-1.html", empty));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        // NFR8: an empty local context behaves exactly like a null one — never a degenerate empty band.
+        Assert.DoesNotContain("site-nav-local-context", keyViews);
+        Assert.Contains("quick-link-pills", keyViews);
+    }
+
+    [Fact]
+    public void RenderNav_OnHome_LocalContextIsIgnored_WorkModeStripStillShows()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var localContext = new NavLocalContext("Stories in this epic", new[] { new NavLocalItem("Story 1.1", "epics/story-1-1.html", false) });
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView(SiteNav.HomeOutputPath, localContext));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.Contains("work-mode-jumps", keyViews);
+        Assert.DoesNotContain("site-nav-local-context", keyViews);
+    }
+
     [Fact]
     public void RenderDashboardBody_JourneySegments_DoNotDuplicateStatTiles()
     {

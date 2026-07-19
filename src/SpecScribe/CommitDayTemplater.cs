@@ -18,7 +18,8 @@ public static class CommitDayTemplater
         IReadOnlyList<(string Label, string Href)> artifacts,
         EntityPager? pager,
         SiteNav nav,
-        Func<string, string?>? commitHref = null)
+        Func<string, string?>? commitHref = null,
+        NavLocalContext? localContext = null)
     {
         var readable = Charts.DReadable(day);
         var outputPath = $"commits/{Charts.D(day)}.html";
@@ -37,7 +38,7 @@ public static class CommitDayTemplater
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
             BuildMetaDescription(readable, nav.SiteTitle, commits.Count, artifacts.Count)));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, localContext));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
             ("Home", "index.html"),

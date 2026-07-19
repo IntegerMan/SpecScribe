@@ -534,7 +534,15 @@ public class SiteGeneratorAdapterTests : IDisposable
         // place — shifts every page's shared stylesheet content). The epics-index empty-state guidance now routes
         // through ListRow.EmptyState (byte-identical output; this fixture always has epics so the branch never
         // fires). Stable across 3 repeated runs before locking in (known stale-first-hash trap).
-        const string expected = "550297dda9b131edeac17a64de7df373accab42f3b3cbf927722a8105753d6d2";
+        // Regenerated for Story 10.10: the white sub-header band now carries page-type-specific local context
+        // (NavigationView.LocalContext, rendered by a new AppendKeyViewsBand branch) instead of the generic
+        // quick-links band on every epic/story/code/ADR/commit/requirement/follow-up-detail page this fixture
+        // exercises; specscribe.css gains .site-nav-local-context/.local-context-* rules (shared stylesheet, so
+        // every page's byte count moves too). Stable across 3 repeated runs before locking in.
+        // Regenerated again same story: the fallback rule was tightened so a local context containing ONLY the
+        // current (active) item — nothing else to navigate to, e.g. this fixture's lone-file code directories —
+        // degrades to the generic band instead of a degenerate one-item band (NFR8). Stable across 2 runs.
+        const string expected = "e156056104a46ee824054544195fc8d3a9de13e204313a049517fe0d152bd1f3";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

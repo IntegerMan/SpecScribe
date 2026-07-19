@@ -99,6 +99,25 @@ public class RenderParityTests
     }
 
     [Fact]
+    public void Extract_LocalContextBand_NeverRecoveredAsNavFacts()
+    {
+        // Story 10.10: the white sub-header band's page-type local context lives outside site-nav-links'
+        // anchor scope, so it must never register as a NavigationView.Items nav fact or trip a divergence.
+        var nav = Nav();
+        var localContext = new NavLocalContext("Stories in this epic", new[]
+        {
+            new NavLocalItem("Story 1.1", "story-1-1.html", IsActive: false),
+            new NavLocalItem("Story 1.2", "story-1-2.html", IsActive: true),
+        });
+        var page = EpicPage(nav) with { Nav = nav.ToNavigationView("epics/epic-1.html", localContext) };
+        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+
+        var facts = RenderParity.Extract(html, page);
+        Assert.DoesNotContain(facts.Nav, n => n.Label is "Story 1.1" or "Story 1.2");
+        Assert.Empty(RenderParity.FindDivergences(page, html, "html"));
+    }
+
+    [Fact]
     public void FindDivergences_CatchesADroppedChildLink()
     {
         // The rendered body links only story 1.1; the PageView (fake) claims a child the output doesn't contain.

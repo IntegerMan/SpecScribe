@@ -16,6 +16,20 @@ public sealed record NavGroup(string Label, string ConceptKey, IReadOnlyList<Nav
 /// short per-entry description. Lifted from <see cref="SiteNav.QuickLinks"/>. [Story 6.1]</summary>
 public sealed record NavQuickLink(string Label, string OutputRelativePath, string Description);
 
+/// <summary>One entry in a page's local-context list — the white sub-header band's page-type-specific content
+/// (a sibling story, a sibling code file, an ADR, ...). <see cref="Href"/> is already relative to the current
+/// page (the same convention <c>PagerLink.Href</c> uses), so the renderer never recomputes a prefix per item.
+/// [Story 10.10]</summary>
+public sealed record NavLocalItem(string Label, string Href, bool IsActive);
+
+/// <summary>The white sub-header band's page-type-appropriate local context (e.g. "Stories in this epic"), built
+/// entirely from data the rendering call site already computed for some other purpose (an <c>EntityPager</c>
+/// family, <c>epic.Stories</c>, <c>_adrs</c>, <c>nav.Groups</c>) — no new authoring schema. Null or an empty
+/// <see cref="Items"/> list, or a list containing only the current (active) item — nothing else to navigate
+/// to — all mean "no rich context for this page"; the renderer falls back to the existing generic quick-links
+/// band (NFR8: never a degenerate one-item-looks-broken band). [Story 10.10]</summary>
+public sealed record NavLocalContext(string Title, IReadOnlyList<NavLocalItem> Items);
+
 /// <summary>The site navigation graph as a host-neutral view model — the AD-2 "navigation graph" the shared
 /// renderer emits and every delivery adapter consumes WITHOUT reinterpreting source artifacts
 /// ([ARCHITECTURE-SPINE.md AD-2]). It is the DELIVERY-seam mirror of Story 4.1's ingestion-seam
@@ -52,4 +66,10 @@ public sealed record NavigationView
     /// only Overview is emitted — NFR8 degrade for stages with nothing to emphasize. Ignored off Home.
     /// Defaults true so existing <see cref="SiteNav.ToNavigationView"/> call sites stay unchanged. [Story 9.8]</summary>
     public bool FullHomeWorkModeStrip { get; init; } = true;
+
+    /// <summary>The current page's local-context list for the white sub-header band (e.g. an epic's stories, a
+    /// code file's directory siblings). Null (the default) means "no rich context computed for this page" —
+    /// <see cref="HtmlRenderAdapter"/> falls back to the generic quick-links band, unchanged from before this
+    /// field existed. [Story 10.10]</summary>
+    public NavLocalContext? LocalContext { get; init; }
 }

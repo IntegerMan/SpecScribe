@@ -165,7 +165,7 @@ public static class RequirementsTemplater
     }
 
     public static string RenderRequirement(RequirementInfo req, ProgressModel progress, SiteNav nav, EpicsModel epics,
-        IReadOnlyDictionary<int, string>? epicRetroMap = null, string? deferredWorkHref = null)
+        IReadOnlyDictionary<int, string>? epicRetroMap = null, string? deferredWorkHref = null, RequirementsModel? requirements = null)
     {
         var outputPath = $"requirements/{req.Slug}.html";
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -178,7 +178,7 @@ public static class RequirementsTemplater
 
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen($"{req.Id} — {nav.SiteTitle}", prefix + ForgeOptions.StylesheetName, prefix + ForgeOptions.ScriptName));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, requirements is null ? null : BuildRequirementLocalContext(req, prefix, requirements)));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
             ("Home", "index.html"),
@@ -625,6 +625,30 @@ public static class RequirementsTemplater
     /// [spec-epic9-deferred-debt-cleanup]</summary>
     private static Dictionary<int, EpicInfo> EpicsByNumberFirstWins(EpicsModel epics) =>
         epics.Epics.GroupBy(e => e.Number).ToDictionary(g => g.Key, g => g.First());
+
+    /// <summary>The white sub-header band's local context for a requirement detail page: the other requirements
+    /// in the same category grouping (mirrors <see cref="RenderIndex"/>'s <c>groups</c> construction — same-
+    /// category siblings, the simpler always-available option per the Design Direction's owner-latitude call),
+    /// current requirement marked active. [Story 10.10]</summary>
+    private static NavLocalContext BuildRequirementLocalContext(RequirementInfo req, string prefix, RequirementsModel requirements)
+    {
+        var groupLabel = RequirementGroupLabel(req);
+        var siblings = requirements.Everything.Where(r => RequirementGroupLabel(r) == groupLabel).ToList();
+        var items = siblings
+            .Select(r => new NavLocalItem(r.Id, prefix + $"requirements/{r.Slug}.html", string.Equals(r.Id, req.Id, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        return new NavLocalContext($"{groupLabel}", items);
+    }
+
+    /// <summary>The category grouping a requirement belongs to — mirrors <see cref="RenderIndex"/>'s group-key
+    /// construction (functional: <c>Category ?? "Functional Requirements"</c>; all NFRs: one group), extended
+    /// with a Design fallback so UX-DR detail pages also resolve a group. [Story 10.10]</summary>
+    private static string RequirementGroupLabel(RequirementInfo req) => req.Kind switch
+    {
+        RequirementKind.NonFunctional => "Non-Functional Requirements",
+        RequirementKind.Design => req.Category ?? "UX Design Requirements",
+        _ => req.Category ?? "Functional Requirements",
+    };
 
     /// <summary>A stable in-page anchor id for a group heading, e.g. "Core Loop &amp; Time" → "grp-core-loop-time".</summary>
     private static string GroupAnchor(string label)

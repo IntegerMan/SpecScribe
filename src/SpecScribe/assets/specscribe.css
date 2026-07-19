@@ -363,6 +363,44 @@ body {
 .quick-link-pill.family-requirements { border-left-color: var(--rust-light); }
 .quick-link-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
+/* Page-type-specific local-context band (Story 10.10) — reuses the quick-link-pill visual language under a
+   distinct class family so it can be told apart from the generic quick-links band. */
+.site-nav-local-context .local-context-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.55rem 1.5rem;
+  box-sizing: border-box;
+}
+.local-context-label {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-faded);
+  margin-right: 0.2rem;
+}
+.local-context-pill {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 0.78rem;
+  color: var(--ink-faded);
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 999px;
+  padding: 0.28rem 0.8rem;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.local-context-pill:hover { box-shadow: 0 2px 8px var(--shadow); transform: translateY(-1px); color: var(--ink); }
+.local-context-pill.active { border-left-color: var(--rust); color: var(--rust); font-weight: bold; }
+.local-context-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
 /* White-band grouped key views — hover/focus-within + click `.is-open` (JS sets aria-expanded). */
 .key-view-group { position: relative; display: inline-flex; }
 .key-view-group.family-planning > .key-view-trigger { border-left-color: var(--gold-light); }
@@ -4825,6 +4863,7 @@ body:has(main.req-detail) .doc-header {
     background: transparent;
   }
   .site-nav-key-views .quick-link-pills { padding: 0.45rem 0.8rem; }
+  .site-nav-local-context .local-context-pills { padding: 0.45rem 0.8rem; }
   /* Key-view groups mirror the dark-bar mobile treatment: panels stay open and in-flow. */
   .key-view-group { display: block; width: 100%; }
   .key-view-trigger { width: 100%; justify-content: flex-start; }

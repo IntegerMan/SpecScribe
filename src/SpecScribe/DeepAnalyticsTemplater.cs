@@ -26,7 +26,7 @@ public static class DeepAnalyticsTemplater
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
             $"Deeper git insights for {nav.SiteTitle}: change coupling between files and the repository's change hotspots."));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, nav.BuildInsightsLocalContext(outputPath)));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
             ("Home", "index.html"),

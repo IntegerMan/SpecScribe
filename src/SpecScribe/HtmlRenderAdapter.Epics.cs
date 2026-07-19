@@ -305,6 +305,11 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("  </div>\n");
         }
 
+        foreach (var note in card.TrailingNotesHtml)
+        {
+            sb.Append($"  {note}");
+        }
+
         if (card.ViewPlanHref is { } viewHref)
         {
             sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(viewHref)}\">View full story plan &rarr;</a>\n");
@@ -641,6 +646,11 @@ public sealed partial class HtmlRenderAdapter
                 sb.Append($"  <div class=\"ac-block\">{block}</div>\n");
             }
             sb.Append("</div>\n</div>\n</section>\n\n");
+        }
+
+        foreach (var note in view.TrailingNotesHtml)
+        {
+            sb.Append($"<div class=\"story-lead\">{note}</div>\n\n");
         }
 
         sb.Append("<section class=\"dashboard-narrow\">\n");

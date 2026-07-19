@@ -328,6 +328,88 @@ public class EpicsParserTests
         Assert.Single(epic.RetiredNoticesHtml);
     }
 
+    private const string TrailingNoteEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: First story
+
+        As a maintainer, I want the first story, so that work starts.
+
+        **Acceptance Criteria:**
+
+        1.
+        **Given** a list page
+        **When** I sort
+        **Then** rows reorder within the --status-* budget
+
+        <!-- Stories 1.2-1.3 added 2026-07-19 (correct-course): folded into Epic 1 per owner. -->
+
+        ### Story 1.2: Second story
+
+        As a maintainer, I want the second story, so that work continues.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_NonRetirementComment_BetweenTwoStories_RendersAsTrailingNote_NotSweptIntoAcBlock()
+    {
+        // Only retirement/superseded/deprecated comments get diverted to the epic's Retired section; an
+        // ordinary correct-course note in the same between-story position must still render (as its own
+        // marker-free .md-comment block) rather than leak literal <!--/--> text into the AC content.
+        var epic = EpicsParser.Parse(TrailingNoteEpicsMd).Epics[0];
+        var first = epic.Stories.Single(s => s.Id == "1.1");
+
+        var note = Assert.Single(first.TrailingNotesHtml);
+        Assert.Contains("Stories 1.2-1.3 added", note);
+        Assert.Contains("class=\"md-comment\"", note);
+        Assert.DoesNotContain("<!--", note);
+        Assert.DoesNotContain("-->", note);
+
+        // The AC content contains no trace of the comment (the "--status-*" AC line survives untouched).
+        var acHtml = string.Concat(first.AcBlocksHtml);
+        Assert.DoesNotContain("Stories 1.2-1.3 added", acHtml);
+        Assert.DoesNotContain("<!--", acHtml);
+        Assert.Contains("--status-*", acHtml);
+
+        // Not classified as a retirement notice.
+        Assert.Empty(epic.RetiredNoticesHtml);
+
+        // The following story is unaffected.
+        var second = epic.Stories.Single(s => s.Id == "1.2");
+        Assert.Empty(second.TrailingNotesHtml);
+        Assert.Contains("the second story", second.UserStoryHtml);
+    }
+
+    [Fact]
+    public void Parse_RetirementComment_BetweenTwoStories_DoesNotAlsoAppearInTrailingNotesHtml()
+    {
+        // Retirement comments are hoisted to the epic's Retired section BEFORE ParseStory's AC scan runs, so
+        // they must not also surface via TrailingNotesHtml (no double-render).
+        var epic = EpicsParser.Parse(BetweenStoriesRetiredNoticeEpicsMd).Epics[0];
+        var first = epic.Stories.Single(s => s.Id == "1.1");
+        Assert.Empty(first.TrailingNotesHtml);
+    }
+
+    [Fact]
+    public void Parse_StoryWithoutTrailingComment_HasEmptyTrailingNotes()
+    {
+        var story = EpicsParser.Parse(SampleEpicsMd).Epics[0].Stories[0];
+        Assert.Empty(story.TrailingNotesHtml);
+    }
+
     /// <summary>Wraps a raw user-story-region body into a minimal epics.md and returns the parsed first story,
     /// so the leading-comment edge cases can be exercised without repeating the epics scaffold each time.</summary>
     private static StoryInfo ParseStoryWithBody(string body) => EpicsParser.Parse($"""
