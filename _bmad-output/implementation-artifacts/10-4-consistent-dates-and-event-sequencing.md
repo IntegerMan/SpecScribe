@@ -1,6 +1,10 @@
+---
+baseline_commit: 14232d6f82bb2971b0b54045952485b58ec77175
+---
+
 # Story 10.4: Consistent Dates and Event Sequencing
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -152,40 +156,40 @@ The change log is currently opaque HTML. Add a **tolerant structured parse** in 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Add the `PortalDates` single-source formatter** (AC: 1)
-  - [ ] Add `src/SpecScribe/PortalDates.cs`: `Day(DateOnly)`, `Day(DateTime)`, `DayWithWeekday(DateOnly)`, `IsoDay(DateOnly)`, `Timestamp(DateOnly, hhmm, zoneLabel?)`, and the one `DayFormat` constant (recommend `"MMM d, yyyy"`). Pure, `InvariantCulture`, no I/O.
-  - [ ] Decide + document the **time-of-day** token (recommend 24-hour `HH:mm`) and the **timezone policy** (git times stay author-offset; generation clock labeled with `TimeZoneInfo.Local`; commit clock captioned or offset-suffixed). Record the decision in the Dev Agent Record.
+- [x] **Task 1 — Add the `PortalDates` single-source formatter** (AC: 1)
+  - [x] Add `src/SpecScribe/PortalDates.cs`: `Day(DateOnly)`, `Day(DateTime)`, `DayWithWeekday(DateOnly)`, `IsoDay(DateOnly)`, `Timestamp(DateOnly, hhmm, zoneLabel?)`, and the one `DayFormat` constant (recommend `"MMM d, yyyy"`). Pure, `InvariantCulture`, no I/O.
+  - [x] Decide + document the **time-of-day** token (recommend 24-hour `HH:mm`) and the **timezone policy** (git times stay author-offset; generation clock labeled with `TimeZoneInfo.Local`; commit clock captioned or offset-suffixed). Record the decision in the Dev Agent Record.
 
-- [ ] **Task 2 — Route every human date/clock through `PortalDates`** (AC: 1)
-  - [ ] Footer generation clock: replace the inline `MMMM d, yyyy 'at' h:mm tt` in [PathUtil.cs:111](src/SpecScribe/PathUtil.cs) with `PortalDates` (24-hour + local-zone label). **Then widen the golden `FooterClock` normalization regex** at [SiteGeneratorAdapterTests.cs:221](tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs) to match the new footer shape incl. the zone token (else the fingerprint becomes machine-dependent — see gotcha).
-  - [ ] Git Pulse last-commit ([Charts.cs:627](src/SpecScribe/Charts.cs)) and heatmap `DReadable`/month-label ([Charts.cs:561,1067](src/SpecScribe/Charts.cs)): route through `PortalDates.DayWithWeekday`/`Timestamp`. Leave `D` (URL) → `PortalDates.IsoDay` (byte-identical ISO).
-  - [ ] Per-commit `HH:mm` ([GitMetrics.cs:194](src/SpecScribe/GitMetrics.cs)) and its consumers (day pages, commit lists): route the *display* through `PortalDates`; leave the parse contract (`--date=format:%Y-%m-%dT%H:%M`) untouched.
-  - [ ] Doc card meta ([DashboardViewBuilder.cs:383](src/SpecScribe/DashboardViewBuilder.cs) `CardMeta`) and retro `DateText` ([RetroParser.cs:55](src/SpecScribe/RetroParser.cs) / [RetroTemplater.cs:38,77](src/SpecScribe/RetroTemplater.cs)): where the authored value is a parseable date, normalize it through `PortalDates.Day`; where it's free text, leave it (degrade — NFR8). Confirm `ConsoleUi.cs:162` (console-only, not portal output) is out of scope or aligned for consistency, your call.
-  - [ ] **Grep-guard:** after wiring, no `ToString("…[yMd]…")` human-date format string remains in `src/` outside `PortalDates` (the T7 teeth). Machine tokens (`IsoDay`, git parse format) are the only allowed exceptions.
+- [x] **Task 2 — Route every human date/clock through `PortalDates`** (AC: 1)
+  - [x] Footer generation clock: replace the inline `MMMM d, yyyy 'at' h:mm tt` in [PathUtil.cs:111](src/SpecScribe/PathUtil.cs) with `PortalDates` (24-hour + local-zone label). **Then widen the golden `FooterClock` normalization regex** at [SiteGeneratorAdapterTests.cs:221](tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs) to match the new footer shape incl. the zone token (else the fingerprint becomes machine-dependent — see gotcha).
+  - [x] Git Pulse last-commit ([Charts.cs:627](src/SpecScribe/Charts.cs)) and heatmap `DReadable`/month-label ([Charts.cs:561,1067](src/SpecScribe/Charts.cs)): route through `PortalDates.DayWithWeekday`/`Timestamp`. Leave `D` (URL) → `PortalDates.IsoDay` (byte-identical ISO).
+  - [x] Per-commit `HH:mm` ([GitMetrics.cs:194](src/SpecScribe/GitMetrics.cs)) and its consumers (day pages, commit lists): route the *display* through `PortalDates`; leave the parse contract (`--date=format:%Y-%m-%dT%H:%M`) untouched.
+  - [x] Doc card meta ([DashboardViewBuilder.cs:383](src/SpecScribe/DashboardViewBuilder.cs) `CardMeta`) and retro `DateText` ([RetroParser.cs:55](src/SpecScribe/RetroParser.cs) / [RetroTemplater.cs:38,77](src/SpecScribe/RetroTemplater.cs)): where the authored value is a parseable date, normalize it through `PortalDates.Day`; where it's free text, leave it (degrade — NFR8). Confirm `ConsoleUi.cs:162` (console-only, not portal output) is out of scope or aligned for consistency, your call.
+  - [x] **Grep-guard:** after wiring, no `ToString("…[yMd]…")` human-date format string remains in `src/` outside `PortalDates` (the T7 teeth). Machine tokens (`IsoDay`, git parse format) are the only allowed exceptions.
 
-- [ ] **Task 3 — ADR dates + one-line summaries** (AC: 1)
-  - [ ] Add `DateOnly? Date` + `string? Summary` to `AdrEntry` ([AdrModel.cs](src/SpecScribe/AdrModel.cs)).
-  - [ ] Add `ExtractAdrDate` + `ExtractAdrSummary` beside `ExtractAdrStatus` ([SiteGenerator.cs:2108](src/SpecScribe/SiteGenerator.cs)); wire them into the `new AdrEntry(...)` construction at [SiteGenerator.cs:608](src/SpecScribe/SiteGenerator.cs). Tolerant, `null` when absent.
-  - [ ] Surface both on the ADR card: `BuildAdrCard` ([DashboardViewBuilder.cs:360](src/SpecScribe/DashboardViewBuilder.cs)) sets the meta/summary; the Adr branch of `AppendIndexCard` ([HtmlRenderAdapter.Dashboard.cs:380](src/SpecScribe/HtmlRenderAdapter.Dashboard.cs)) renders them (date via `PortalDates.Day`), reusing existing muted `<p>`/`.index-card-path` grammar. Sorting unchanged.
+- [x] **Task 3 — ADR dates + one-line summaries** (AC: 1)
+  - [x] Add `DateOnly? Date` + `string? Summary` to `AdrEntry` ([AdrModel.cs](src/SpecScribe/AdrModel.cs)).
+  - [x] Add `ExtractAdrDate` + `ExtractAdrSummary` beside `ExtractAdrStatus` ([SiteGenerator.cs:2108](src/SpecScribe/SiteGenerator.cs)); wire them into the `new AdrEntry(...)` construction at [SiteGenerator.cs:608](src/SpecScribe/SiteGenerator.cs). Tolerant, `null` when absent.
+  - [x] Surface both on the ADR card: `BuildAdrCard` ([DashboardViewBuilder.cs:360](src/SpecScribe/DashboardViewBuilder.cs)) sets the meta/summary; the Adr branch of `AppendIndexCard` ([HtmlRenderAdapter.Dashboard.cs:380](src/SpecScribe/HtmlRenderAdapter.Dashboard.cs)) renders them (date via `PortalDates.Day`), reusing existing muted `<p>`/`.index-card-path` grammar. Sorting unchanged.
 
-- [ ] **Task 4 — Same-day change-log sequence markers** (AC: 2)
-  - [ ] In `EpicsParser` where the Change Log fragment is built ([EpicsParser.cs:116-138](src/SpecScribe/EpicsParser.cs)), add a tolerant pre-render pass: parse `- YYYY-MM-DD: text` list items, group consecutive same-date runs, add an ordinal marker to runs of N>1 (recommend "(k of N)"), reformat the visible date via `PortalDates.Day`. Degrade to as-is on any unrecognized shape; never reorder or drop content. Keep the `ChangeLogHtml` opaque-fragment output contract.
-  - [ ] Style the marker with existing badge/muted vocabulary (no new `--status-*` token, not color-only).
+- [x] **Task 4 — Same-day change-log sequence markers** (AC: 2)
+  - [x] In `EpicsParser` where the Change Log fragment is built ([EpicsParser.cs:116-138](src/SpecScribe/EpicsParser.cs)), add a tolerant pre-render pass: parse `- YYYY-MM-DD: text` list items, group consecutive same-date runs, add an ordinal marker to runs of N>1 (recommend "(k of N)"), reformat the visible date via `PortalDates.Day`. Degrade to as-is on any unrecognized shape; never reorder or drop content. Keep the `ChangeLogHtml` opaque-fragment output contract.
+  - [x] Style the marker with existing badge/muted vocabulary (no new `--status-*` token, not color-only).
 
-- [ ] **Task 5 — Confirm superseded/deprecated ADR states render distinctly** (AC: 2)
-  - [ ] Add regression coverage: an ADR record with status "Superseded by ADR 0007" (multi-word) yields `status-superseded` on BOTH the page pill and the index card (note the two class-derivation paths differ). Same for "Deprecated". Confirm the CSS strikethrough/muted rule ([specscribe.css:271-272](src/SpecScribe/assets/specscribe.css)) applies. Add a small CSS/mapping fix only if a real gap surfaces.
+- [x] **Task 5 — Confirm superseded/deprecated ADR states render distinctly** (AC: 2)
+  - [x] Add regression coverage: an ADR record with status "Superseded by ADR 0007" (multi-word) yields `status-superseded` on BOTH the page pill and the index card (note the two class-derivation paths differ). Same for "Deprecated". Confirm the CSS strikethrough/muted rule ([specscribe.css:271-272](src/SpecScribe/assets/specscribe.css)) applies. Add a small CSS/mapping fix only if a real gap surfaces.
 
-- [ ] **Task 6 — Tests** (AC: 1, 2)
-  - [ ] **`PortalDates`** unit tests: each method's exact output for a fixed date/time; invariant across a non-Gregorian `CultureInfo.CurrentCulture` (mirror the `GitMetrics` non-Gregorian rationale — set `th-TH` and assert stable output); `IsoDay` stays `yyyy-MM-dd`.
-  - [ ] **ADR extraction** unit tests: `**Date:**` line, `## Date` heading, frontmatter fallback, unparseable → `null`; summary from `## Context` first paragraph, absent → `null`. A generation-level test: `index.html` ADR cards show the date + summary for the four real-shaped ADRs.
-  - [ ] **Change-log sequencing**: a story with two same-date entries renders ordinal markers on both and none on a unique date; an unrecognized change-log shape renders unchanged (degrade); order preserved.
-  - [ ] **Timezone/format**: footer renders the chosen time token + zone label; Git Pulse and footer now share the time-of-day format; a commit-time display carries its zone treatment.
-  - [ ] **Parity + golden**: date changes touch **many** pages (footer on every page; Git Pulse/heatmap on index; ADR cards on index; change log on story pages). Keep `RenderParity`/SPA/webview green (the changes are in shared page HTML + view models, so no new `HostRenderException` expected — confirm). **Regenerate the golden fingerprint constant** at [SiteGeneratorAdapterTests.cs:213](tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs) **after** widening the `FooterClock` normalization regex, and eyeball the diff to confirm it is only the intended date/format/ADR/change-log changes ([see golden-diff-normalization-gotchas]). **Confirm the baseline is green before starting** — a pre-existing unrelated golden drift (spec-comment-block work) has ridden recent commits; don't inherit or mask it.
+- [x] **Task 6 — Tests** (AC: 1, 2)
+  - [x] **`PortalDates`** unit tests: each method's exact output for a fixed date/time; invariant across a non-Gregorian `CultureInfo.CurrentCulture` (mirror the `GitMetrics` non-Gregorian rationale — set `th-TH` and assert stable output); `IsoDay` stays `yyyy-MM-dd`.
+  - [x] **ADR extraction** unit tests: `**Date:**` line, `## Date` heading, frontmatter fallback, unparseable → `null`; summary from `## Context` first paragraph, absent → `null`. A generation-level test: `index.html` ADR cards show the date + summary for the four real-shaped ADRs.
+  - [x] **Change-log sequencing**: a story with two same-date entries renders ordinal markers on both and none on a unique date; an unrecognized change-log shape renders unchanged (degrade); order preserved.
+  - [x] **Timezone/format**: footer renders the chosen time token + zone label; Git Pulse and footer now share the time-of-day format; a commit-time display carries its zone treatment.
+  - [x] **Parity + golden**: date changes touch **many** pages (footer on every page; Git Pulse/heatmap on index; ADR cards on index; change log on story pages). Keep `RenderParity`/SPA/webview green (the changes are in shared page HTML + view models, so no new `HostRenderException` expected — confirm). **Regenerate the golden fingerprint constant** at [SiteGeneratorAdapterTests.cs:213](tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs) **after** widening the `FooterClock` normalization regex, and eyeball the diff to confirm it is only the intended date/format/ADR/change-log changes ([see golden-diff-normalization-gotchas]). **Confirm the baseline is green before starting** — a pre-existing unrelated golden drift (spec-comment-block work) has ridden recent commits; don't inherit or mask it.
 
-- [ ] **Task 7 — Verify end-to-end on the real repo** (AC: 1, 2)
-  - [ ] `dotnet run` a full generate (with `--deep-git` so Git Pulse/commit surfaces populate): confirm footer, Git Pulse last-commit, heatmap tooltips, ADR cards, retro cards, and change logs all read in the **one** date format and one time-of-day format; confirm the footer clock and any git times are zone-legible and distinguishable.
-  - [ ] Open `index.html`: ADR cards show date + one-line summary; a story page with two same-date change-log entries shows sequence markers.
-  - [ ] Confirm `specscribe webview` and `--spa` render the same (they ride shared page HTML + view models).
+- [x] **Task 7 — Verify end-to-end on the real repo** (AC: 1, 2)
+  - [x] `dotnet run` a full generate (with `--deep-git` so Git Pulse/commit surfaces populate): confirm footer, Git Pulse last-commit, heatmap tooltips, ADR cards, retro cards, and change logs all read in the **one** date format and one time-of-day format; confirm the footer clock and any git times are zone-legible and distinguishable.
+  - [x] Open `index.html`: ADR cards show date + one-line summary; a story page with two same-date change-log entries shows sequence markers.
+  - [x] Confirm `specscribe webview` and `--spa` render the same (they ride shared page HTML + view models).
 
 ## Dev Notes
 
@@ -265,10 +269,52 @@ The change log is currently opaque HTML. Add a **tolerant structured parse** in 
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+None — no blocking failures. Full `dotnet test` suite green: 1588/1588 passing at current `main` (`c7ba041`).
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed — comprehensive developer guide created.
+- **Bookkeeping backfill, not new implementation.** This story was implemented earlier via a bundled quick-dev session (`_bmad-output/implementation-artifacts/spec-7-3-10-4-honest-navigable-portal-dates.md`, commit `14232d6` "Dates and misc. work", 2026-07-13) that intentionally kept three related concerns together: the 7.3 artifact-day git-derivation bug fix, this story's date/timezone unification, and date-linkification follow-up. sprint-status.yaml already reflected `10-4-consistent-dates-and-event-sequencing: review` with a detailed note, but this standalone story file's own Tasks/Subtasks, Dev Agent Record, and File List were never updated to match — this dev-story run verified every AC/task against the actual diff and closed that gap rather than re-implementing already-shipped work.
+- **AC1 verified in code:** `PortalDates` ([PortalDates.cs](src/SpecScribe/PortalDates.cs)) is the single date/clock formatter — `Day`/`DayWithWeekday`/`IsoDay`/`MonthShort`/`TimeOfDay`/`Timestamp`/`TryParseDay`/`ReformatAuthored`/`LocalZoneLabel`, one `DayFormat` ("MMM d, yyyy") and one `TimeFormat` ("HH:mm"), pure + `InvariantCulture`. All call sites route through it: footer clock (`PathUtil.cs`, now machine-local + `UTC±hh:mm` zone label via `LocalZoneLabel`), Git Pulse last-commit + heatmap `D`/`DReadable`/month-gutter (`Charts.cs`; `D` stays ISO for hrefs, only `DReadable` humanizes), per-commit time display (`GitMetrics.cs`; parse contract `--date=format:%Y-%m-%dT%H:%M` untouched), doc card meta + retro `DateText` (normalized via `ReformatAuthored`, degrading free text verbatim). Timezone policy matches the story's owner-confirmed design exactly: git times stay in the commit's authored offset (never `format-local:`/UTC), generation clock stays machine-local but is now labeled.
+- **AC1 ADR dates/summaries verified:** `AdrEntry` gained `Date`/`Summary` ([AdrModel.cs](src/SpecScribe/AdrModel.cs)); `ExtractAdrDate`/`ExtractAdrSummary` in `SiteGenerator.cs` mirror `ExtractAdrStatus`'s tolerance (`**Date:**` line / `## Date` heading / frontmatter; first `## Context` paragraph / H1 em-dash-tail fallback), null-safe degrade. Surfaced on both `BuildAdrCard` and the index-card Adr branch.
+- **AC2 verified in code:** `EpicsParser.SequenceChangeLog` recognizes `- YYYY-MM-DD: text` change-log items, reformats dates through `PortalDates.Day`, and adds a "(k of N)" ordinal marker to source-adjacency-guarded same-date runs (an intervening differently-dated bullet correctly breaks the run) — unique dates get no marker, unrecognized shapes degrade to as-is untouched, never reordered. Superseded/deprecated pill distinctness ( `.pill.status-superseded`/`.status-deprecated` strikethrough+muted) was already present in CSS and is now test-covered (`SiteGeneratorAdrToleranceTests.cs`).
+- **Golden gotcha confirmed handled:** the `FooterClock` normalization regex in `SiteGeneratorAdapterTests.cs` was widened to match the new 24-hour + `UTC±hh:mm`-label footer shape before the fingerprint constant was regenerated, exactly per this story's flagged risk.
+- **Tests confirmed present:** `PortalDatesTests.cs` (incl. non-Gregorian `th-TH` invariance), `ChangeLogSequencingTests.cs`, `SiteGeneratorAdrToleranceTests.cs`, plus updated `ChartsTests`/`GitMetricsFileInsightsTests`/`PathUtilTests`/`RetroTests`/`EpicsParserTests`/`SiteGeneratorTimelineTests`/`SiteGeneratorWebviewTests`/`StylesheetTests`/`SiteGeneratorCommitDetailsTests`/`HtmlTemplaterTests` cover the new behavior and updated golden expectations. Ran the full suite at current `main` to confirm no drift: 1588/1588 green.
 
 ### File List
+
+Files touched for this story's scope, extracted from commit `14232d6` (which also carried unrelated bundled work — code-page tabs, VS Code workspace/indicators, code-map declutter follow-ups — omitted here):
+
+- `src/SpecScribe/PortalDates.cs` — the single date/time formatter (NEW)
+- `src/SpecScribe/PathUtil.cs` — footer clock routed through `PortalDates` (24h + `LocalZoneLabel`) (UPDATE)
+- `src/SpecScribe/Charts.cs` — `D`/`DReadable`/month-label + Git Pulse last-commit routed through `PortalDates` (UPDATE)
+- `src/SpecScribe/GitMetrics.cs` — per-commit time display routed through `PortalDates`; parse contract unchanged (UPDATE)
+- `src/SpecScribe/DashboardViewBuilder.cs` — `CardMeta` date normalization + `BuildAdrCard` date/summary (UPDATE)
+- `src/SpecScribe/DashboardView.cs` — ADR card view-model fields for date/summary (UPDATE)
+- `src/SpecScribe/RetroTemplater.cs` — retro `DateText` normalized when parseable (UPDATE)
+- `src/SpecScribe/AdrModel.cs` — `AdrEntry` gains `Date`/`Summary` (UPDATE)
+- `src/SpecScribe/SiteGenerator.cs` — `ExtractAdrDate`/`ExtractAdrSummary` wired into `AdrEntry` construction (UPDATE)
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — Adr index-card branch renders date/summary (UPDATE)
+- `src/SpecScribe/EpicsParser.cs` — `SequenceChangeLog` same-day change-log ordinal markers + date reformat; balance-aware `SourceCitationBrackets` regex fix (UPDATE)
+- `tests/SpecScribe.Tests/PortalDatesTests.cs` — unit tests incl. non-Gregorian invariance (NEW)
+- `tests/SpecScribe.Tests/ChangeLogSequencingTests.cs` — same-day sequencing + degrade tests (NEW)
+- `tests/SpecScribe.Tests/SiteGeneratorAdrToleranceTests.cs` — ADR date/summary extraction + status-pill distinctness tests (NEW)
+- `tests/SpecScribe.Tests/ChartsTests.cs` — updated for `PortalDates`-routed chart date/time output (UPDATE)
+- `tests/SpecScribe.Tests/GitMetricsFileInsightsTests.cs` — updated for display-time routing (UPDATE)
+- `tests/SpecScribe.Tests/PathUtilTests.cs` — updated footer clock expectations (UPDATE)
+- `tests/SpecScribe.Tests/RetroTests.cs` — updated retro date normalization expectations (UPDATE)
+- `tests/SpecScribe.Tests/EpicsParserTests.cs` — updated for the balance-aware citation regex + change-log carve (UPDATE)
+- `tests/SpecScribe.Tests/SiteGeneratorTimelineTests.cs` — updated timeline date expectations (UPDATE)
+- `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs` — updated commit-detail date expectations (UPDATE)
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` — updated status-pill expectations (UPDATE)
+- `tests/SpecScribe.Tests/StylesheetTests.cs` — updated for reused badge/muted vocabulary (UPDATE)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — widened `FooterClock` normalization regex + regenerated golden content-fingerprint constant (UPDATE)
+
+## Change Log
+
+- 2026-07-13: Implemented via bundled quick-dev session `spec-7-3-10-4-honest-navigable-portal-dates.md` (commit `14232d6`) — `PortalDates` single-source formatter (one date token, 24h time token, labeled machine-local footer zone, author-offset git times), ADR `Date`/`Summary` extraction + card surfacing, and same-day change-log "(k of N)" sequencing with source-adjacency-guarded degrade. 997 tests green at that time; sprint-status.yaml updated to `review`.
+- 2026-07-18: dev-story — verified the shipped implementation against every AC/task in this story, found no gaps; backfilled this file's Tasks/Subtasks, Dev Agent Record, and File List (previously stale from the standalone-story path being superseded by the bundled session). No code changes this session. Full suite re-confirmed green: 1588/1588. Status → review (already matched sprint-status.yaml).
