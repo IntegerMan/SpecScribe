@@ -78,6 +78,26 @@ public class CodeSourceUrlResolverTests
         Assert.Null(CodeSourceUrlResolver.FromRemoteUrl(remote, "main"));
     }
 
+    [Theory]
+    // A query string or fragment on the remote itself (rare, but seen on some self-hosted/proxied remotes) must
+    // not leak into the parsed repo name. [Story 7.7 deferred fix]
+    [InlineData("https://github.com/owner/repo.git?ref=x", "repo")]
+    [InlineData("https://github.com/owner/repo.git#readme", "repo")]
+    [InlineData("https://github.com/owner/repo?ref=x", "repo")]
+    public void ParseRemote_QueryOrFragmentOnRemote_DoesNotLeakIntoRepoName(string remote, string expectedRepo)
+    {
+        var parsed = CodeSourceUrlResolver.ParseRemote(remote);
+        Assert.NotNull(parsed);
+        Assert.Equal(expectedRepo, parsed!.Value.Repo);
+    }
+
+    [Fact]
+    public void FromRemoteUrl_QueryStringOnRemote_BuildsCleanBlobBase()
+    {
+        Assert.Equal("https://github.com/owner/repo/blob/main",
+            CodeSourceUrlResolver.FromRemoteUrl("https://github.com/owner/repo.git?ref=x", "main"));
+    }
+
     [Fact]
     public void ParseRemote_Ipv6HostWithPort_StripsOnlyThePort()
     {

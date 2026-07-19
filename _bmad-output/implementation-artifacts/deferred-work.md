@@ -166,20 +166,26 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of story-7-7 (2026-07-13)
 
-- source_spec: `7-7-external-source-linking-and-auto-detection.md`
-  summary: A query string or fragment on the git remote URL itself (e.g. `repo.git?ref=x`) leaks into the generated
-  repo name, since `ParseRemote` only strips a literal trailing `.git`.
-  evidence: Edge Case Hunter. Rare remote shape in practice. [CodeSourceUrlResolver.cs](../../src/SpecScribe/CodeSourceUrlResolver.cs)
-- source_spec: `7-7-external-source-linking-and-auto-detection.md`
-  summary: An explicit `--code-url` value that already contains its own `#...` fragment isn't sanitized before the
-  repo-relative path is appended, corrupting the resulting link.
-  evidence: Edge Case Hunter. Requires a deliberately unusual `--code-url`. [SiteGenerator.cs:1307-1310](../../src/SpecScribe/SiteGenerator.cs)
-- source_spec: `7-7-external-source-linking-and-auto-detection.md`
-  summary: `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` on the webview JSON payload and the unconditional
+- ~~A query string or fragment on the git remote URL itself (e.g. `repo.git?ref=x`) leaks into the generated
+  repo name, since `ParseRemote` only strips a literal trailing `.git`.~~ **RESOLVED 2026-07-19**
+  (`bmad-quick-dev` deferred-work pass): `ParseRemote` now strips any `?query`/`#fragment` from the remote's
+  path segment before splitting into `(host, owner, repo)`, so `repo.git?ref=x` and `repo.git#readme` both parse
+  to `repo`. [`CodeSourceUrlResolver.cs`]
+- ~~An explicit `--code-url` value that already contains its own `#...` fragment isn't sanitized before the
+  repo-relative path is appended, corrupting the resulting link.~~ **RESOLVED 2026-07-19** (`bmad-quick-dev`
+  deferred-work pass): `ForgeOptions.TryValidateCodeUrl` now strips a trailing `#...` fragment from the validated
+  base (a fragment is only valid at the end of a URL, and `BuildExternalSourceUrl` appends the repo-relative path
+  after this base). [`ForgeOptions.cs`]
+- ~~`JavaScriptEncoder.UnsafeRelaxedJsonEscaping` on the webview JSON payload and the unconditional
   `generator.CapturePages = true` in `WebviewCommand.Execute` are real considerations (JSON-escaping relaxation on a
   payload that embeds arbitrary HTML; forced whole-site page capture on every webview run) but belong to the
-  bundled webview-doc-page-surfaces work riding the same commit/files, not Story 7.7 itself.
-  evidence: Blind Hunter. [Commands.cs](../../src/SpecScribe/Commands.cs)
+  bundled webview-doc-page-surfaces work riding the same commit/files, not Story 7.7 itself.~~ **CLOSED as
+  misattributed 2026-07-19** (`bmad-quick-dev` deferred-work pass, no code change): both considerations are
+  already tracked under their real owning story — the relaxed JSON escaping is documented-safe in
+  `WebviewCommand.CamelCase`'s own summary (payload is only ever `JSON.parse`d, never embedded into markup), and
+  the unconditional whole-site capture is the same full-regeneration behavior already deferred under
+  "Scoped re-render not implemented" (Story 6.4) and the `spec-webview-doc-page-surfaces` per-save-cost deferral
+  above. No Story 7.7 file was touched by either concern.
 
 ## Deferred from: code review of story-7-1 (2026-07-13)
 

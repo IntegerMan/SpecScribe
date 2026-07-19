@@ -183,7 +183,12 @@ public sealed class ForgeOptions
 
     /// <summary>Validates a candidate <c>--code-url</c> value: must be non-blank and an absolute http(s) URL.
     /// Rejects whitespace-only input and schemeless values (e.g. <c>example.com/repo</c>) that would otherwise
-    /// silently produce a broken external link. [Story 7.1, code-review patch]</summary>
+    /// silently produce a broken external link. [Story 7.1, code-review patch]
+    /// <para>Also strips a trailing <c>#...</c> fragment the caller included in the base itself — <see
+    /// cref="SiteGenerator.BuildExternalSourceUrl"/> appends the repo-relative path after this base, and a
+    /// fragment can only be valid at the very end of a URL, so a base carrying one would corrupt every generated
+    /// link (the repo-relative path ends up inside the fragment instead of the path). [Story 7.7 deferred fix]</para>
+    /// </summary>
     private static bool TryValidateCodeUrl(string? candidate, out string validated)
     {
         validated = string.Empty;
@@ -192,7 +197,10 @@ public sealed class ForgeOptions
         if (trimmed.Length == 0) return false;
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)) return false;
         if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return false;
-        validated = trimmed;
+        // Strip only a trailing fragment, on the original string — not a full Uri round-trip — so an
+        // already-valid base's exact casing/encoding survives untouched (only the deferred defect is fixed).
+        var fragmentIdx = trimmed.IndexOf('#');
+        validated = fragmentIdx >= 0 ? trimmed[..fragmentIdx] : trimmed;
         return true;
     }
 

@@ -136,6 +136,11 @@ public static class CodeSourceUrlResolver
             if (colon >= 0) host = host[..colon];
         }
 
+        // A query string or fragment on the remote itself (e.g. "repo.git?ref=x" from an unusual host config)
+        // is not part of the repo path — strip it before segmenting, or it rides along into the parsed repo name.
+        var queryOrFragment = path.IndexOfAny(['?', '#']);
+        if (queryOrFragment >= 0) path = path[..queryOrFragment];
+
         var segments = path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length < 2 || host.Length == 0) return null;
 

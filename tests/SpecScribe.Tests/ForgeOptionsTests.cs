@@ -202,4 +202,19 @@ public class ForgeOptionsTests : IDisposable
 
         Assert.Equal("https://github.com/owner/repo/blob/main", settings.Resolve().CodeSourceBaseUrl);
     }
+
+    [Fact]
+    public void SiteSettings_CodeUrlWithTrailingFragment_IsStrippedBeforeStoring()
+    {
+        // An explicit --code-url that already carries its own "#..." fragment would otherwise corrupt every
+        // generated link, since SiteGenerator.BuildExternalSourceUrl appends the repo-relative path after this
+        // base — a fragment is only valid at the very end of a URL. [Story 7.7 deferred fix]
+        var settings = new SiteSettings
+        {
+            Source = Path.Combine(Repo, "_bmad-output"),
+            CodeUrl = "https://github.com/owner/repo/blob/main#readme",
+        };
+
+        Assert.Equal("https://github.com/owner/repo/blob/main", settings.Resolve().CodeSourceBaseUrl);
+    }
 }
