@@ -410,6 +410,90 @@ public class EpicsParserTests
         Assert.Empty(story.TrailingNotesHtml);
     }
 
+    private const string MidBlockCommentEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: First story
+
+        As a maintainer, I want the first story, so that work starts.
+
+        **Acceptance Criteria:**
+
+        **Given** a list page
+        <!-- clarifying aside, not a boundary note -->
+        **When** I sort
+        **Then** rows reorder
+        """;
+
+    [Fact]
+    public void Parse_CommentMidGivenWhenThenBlock_DoesNotSplitOrCorruptTheAcBlock()
+    {
+        // A comment dropped BETWEEN a Given and its When/Then continuation is a different shape than a
+        // boundary note — hoisting it would flush a half-built block. It must degrade to ordinary AC content
+        // (the pre-existing swallow behavior) rather than split one AC entry into two.
+        var story = EpicsParser.Parse(MidBlockCommentEpicsMd).Epics[0].Stories[0];
+
+        Assert.Empty(story.TrailingNotesHtml);
+        var block = Assert.Single(story.AcBlocksHtml);
+        Assert.Contains("a list page", block);
+        Assert.Contains("I sort", block);
+        Assert.Contains("rows reorder", block);
+    }
+
+    private const string MultipleTrailingNotesEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: First story
+
+        As a maintainer, I want the first story, so that work starts.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+
+        <!-- First note: added 2026-07-19. -->
+
+        <!-- Second note: added 2026-07-19. -->
+
+        ### Story 1.2: Second story
+
+        As a maintainer, I want the second story, so that work continues.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_MultipleTrailingComments_AllRenderInSourceOrder()
+    {
+        var story = EpicsParser.Parse(MultipleTrailingNotesEpicsMd).Epics[0].Stories[0];
+
+        Assert.Equal(2, story.TrailingNotesHtml.Count);
+        Assert.Contains("First note", story.TrailingNotesHtml[0]);
+        Assert.Contains("Second note", story.TrailingNotesHtml[1]);
+    }
+
     /// <summary>Wraps a raw user-story-region body into a minimal epics.md and returns the parsed first story,
     /// so the leading-comment edge cases can be exercised without repeating the epics scaffold each time.</summary>
     private static StoryInfo ParseStoryWithBody(string body) => EpicsParser.Parse($"""

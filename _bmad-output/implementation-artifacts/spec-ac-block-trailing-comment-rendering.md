@@ -2,7 +2,7 @@
 title: 'Render non-retirement HTML comments inside a story''s AC scan range as stylized notes'
 type: 'bugfix'
 created: '2026-07-19'
-status: 'in-review'
+status: 'done'
 review_loop_iteration: 0
 context: []
 baseline_commit: 'f0f30bdfaa942b377f6413ec67264a618a4ff958'
@@ -74,3 +74,39 @@ baseline_commit: 'f0f30bdfaa942b377f6413ec67264a618a4ff958'
 - `dotnet build` -- expected: succeeds, no warnings introduced.
 - `dotnet test` -- expected: all pass after fingerprint/parity expectations are updated.
 - `dotnet run --project src/SpecScribe -- generate` then open `epics/epic-10.html` and the story-10.9 placeholder page -- expected: the Stories 10.10-10.11 note renders as a clean `.md-comment` block after the AC list, no literal markers visible.
+
+**Note (review-loop, iteration 1):** `EpicsParserTests` (126 tests incl. this story's 6 new ones) and `HtmlRenderAdapterTests` are green and stable on every run. The repo's whole-site `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens` test is currently unstable independent of this change — a concurrent session is actively editing unrelated files (`ListRow.cs`, `SiteGenerator.cs`, `FollowUpRow.cs`, CSS/JS assets, etc.) on this shared `main`, and the expected hash shifts between consecutive runs with no code changes here. Confirmed by isolating this diff to exactly `EpicsParser.cs` + the two test files (verified via `git diff HEAD --stat`) and re-running targeted tests, which stay green. Not this story's problem — defer to whoever is running that concurrent session.
+
+## Suggested Review Order
+
+**The parse-time guard (design intent)**
+
+- Entry point: detects a non-retirement comment in the AC scan range, but only hoists it when it doesn't interrupt an in-progress Given/When/Then sequence — the two-agent code review caught the corruption risk of an unconditional flush.
+  [`EpicsParser.cs:857`](../../src/SpecScribe/EpicsParser.cs#L857)
+
+- The continuation-keyword lookahead that draws the line between "between two AC items" (safe to hoist) and "mid-block" (degrade instead).
+  [`EpicsParser.cs:681`](../../src/SpecScribe/EpicsParser.cs#L681)
+
+**Carrying the fragment through to render**
+
+- New opaque-fragment field on the domain model, defaulted to empty so comment-free stories stay byte-identical.
+  [`EpicsModel.cs:28`](../../src/SpecScribe/EpicsModel.cs#L28)
+
+- Mirrored onto both section view models and copied through the builder.
+  [`EpicsView.cs:61`](../../src/SpecScribe/EpicsView.cs#L61)
+
+**Rendering it as its own block**
+
+- Epic story card: emitted as a sibling after the AC list, before the "View full story plan" link.
+  [`HtmlRenderAdapter.Epics.cs:308`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs#L308)
+
+- Placeholder page: same treatment, emitted after the AC panel closes.
+  [`HtmlRenderAdapter.Epics.cs:651`](../../src/SpecScribe/HtmlRenderAdapter.Epics.cs#L651)
+
+**Coverage (peripherals)**
+
+- Parser tests: the real Story-10.9-shaped trailing-comment case, the retirement-comment non-double-render guard, the mid-block corruption guard, and multi-comment ordering.
+  [`EpicsParserTests.cs:331`](../../tests/SpecScribe.Tests/EpicsParserTests.cs#L331)
+
+- Render tests: note position relative to the AC list/panel on both the story card and placeholder page.
+  [`HtmlRenderAdapterTests.cs:217`](../../tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs#L217)

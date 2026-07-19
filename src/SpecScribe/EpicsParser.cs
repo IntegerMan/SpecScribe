@@ -678,6 +678,24 @@ public static class EpicsParser
         return -1;
     }
 
+    /// <summary>True when the nearest non-blank line in <c>[from, end)</c> is a bare Given/When/Then continuation
+    /// keyword (**When**/**Then**/**And**/**But** — not **Given**, which always starts a fresh block). Used to
+    /// tell a comment that sits BETWEEN two AC items (safe to hoist) apart from one dropped MID an item's
+    /// Given/When/Then sequence (would corrupt the block if hoisted) — see the AC scan loop in <see cref="ParseStory"/>.</summary>
+    private static bool NextNonBlankIsAcContinuation(string[] lines, int from, int end)
+    {
+        for (var k = from; k < end; k++)
+        {
+            var t = lines[k].Trim();
+            if (t.Length == 0) continue;
+            return t.StartsWith("**When**", StringComparison.Ordinal)
+                || t.StartsWith("**Then**", StringComparison.Ordinal)
+                || t.StartsWith("**And**", StringComparison.Ordinal)
+                || t.StartsWith("**But**", StringComparison.Ordinal);
+        }
+        return false;
+    }
+
     private static List<SectionEntry> ParseEpicSections(string[] lines)
     {
         var epicStarts = new List<(int Index, int Number, string Title)>();
@@ -832,6 +850,10 @@ public static class EpicsParser
                 // literal gherkin content. Retirement/superseded comments never reach here — they're already
                 // blanked by HoistBetweenStoryRetiredComments before ParseStory runs. Lazy match to the next
                 // "-->", mirroring that same hoist; an unterminated "<!--" degrades to ordinary AC content.
+                // A comment dropped MID-block — between a **Given** and its **When**/**Then**/**And**/**But**
+                // continuation — is a different shape: hoisting it would flush a half-built block and corrupt
+                // the AC numbering. Only hoist when the next non-blank line isn't such a continuation keyword;
+                // otherwise fall through and degrade to ordinary AC content, same as an unterminated comment.
                 if (line.StartsWith("<!--", StringComparison.Ordinal))
                 {
                     var closeLine = -1;
@@ -839,7 +861,7 @@ public static class EpicsParser
                     {
                         if (lines[j].Contains("-->", StringComparison.Ordinal)) { closeLine = j; break; }
                     }
-                    if (closeLine >= 0)
+                    if (closeLine >= 0 && !NextNonBlankIsAcContinuation(lines, closeLine + 1, endIdx))
                     {
                         FlushBlock();
                         var commentText = string.Join("\n", lines[i..(closeLine + 1)].Select(l => l.Trim()));

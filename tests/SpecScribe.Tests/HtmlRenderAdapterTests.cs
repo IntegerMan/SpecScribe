@@ -215,6 +215,52 @@ public class HtmlRenderAdapterTests
         Assert.True(noteIdx >= 0 && acIdx > noteIdx, "Undrafted create-story note must render above AC on epic cards");
     }
 
+    [Fact]
+    public void RenderEpicBody_TrailingNotes_RenderAfterAcListBeforeViewPlanLink()
+    {
+        var card = Card() with
+        {
+            AcBlocksHtml = new[] { "<div>AC block</div>" },
+            TrailingNotesHtml = new[] { "<aside class=\"md-comment\">Stories 1.2-1.3 added: folded into this epic.</aside>" },
+        };
+
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(EpicPage(card));
+
+        var acIdx = html.IndexOf("ac-list", StringComparison.Ordinal);
+        var noteIdx = html.IndexOf("md-comment", StringComparison.Ordinal);
+        var linkIdx = html.IndexOf("view-epic-link", StringComparison.Ordinal);
+        Assert.True(acIdx >= 0 && noteIdx > acIdx && linkIdx > noteIdx,
+            "Trailing note must sit after the AC list and before the view-plan link");
+        Assert.Contains("Stories 1.2-1.3 added", html);
+        Assert.DoesNotContain("<!--", html);
+    }
+
+    [Fact]
+    public void StoryPlaceholder_TrailingNotes_RenderAfterAcPanel()
+    {
+        var view = new StoryPlaceholderView
+        {
+            Id = "1.1",
+            TitleHtml = "Story with trailing note",
+            StatusStage = "drafted",
+            RetroLinkHtml = string.Empty,
+            UserStoryHtml = "<p>As a user…</p>",
+            AcBlocksHtml = new[] { "<div>AC 1</div>" },
+            TrailingNotesHtml = new[] { "<aside class=\"md-comment\">Stories 1.2-1.3 added: folded into this epic.</aside>" },
+            NoteHtml = "<span>create its plan with</span>",
+            EpicNumber = 1,
+            BackHref = "../epics/epic-1.html",
+        };
+
+        var html = HtmlRenderAdapter.Shared.RenderStoryPlaceholderBody(view);
+
+        var acIdx = html.IndexOf("ac-panel", StringComparison.Ordinal);
+        var noteIdx = html.IndexOf("md-comment", StringComparison.Ordinal);
+        Assert.True(acIdx >= 0 && noteIdx > acIdx, "Trailing note must render after the AC panel");
+        Assert.Contains("Stories 1.2-1.3 added", html);
+        Assert.DoesNotContain("<!--", html);
+    }
+
     private static StoryCardView Card(
         string id = "1.1",
         string? status = "review",
