@@ -1,6 +1,10 @@
+---
+baseline_commit: d08e19c3fec5b162baad8622ddcd91fb0056661c
+---
+
 # Story 10.5: Document Rendering Legibility
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -110,31 +114,31 @@ The notice is an authored **HTML comment**, currently peeled as the next story's
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — `ReferenceChipRenderer`: wiki-link + file:line chips + assumption tags** (AC: 1)
-  - [ ] Add `src/SpecScribe/ReferenceChipRenderer.cs` (name at latitude). Anchor-split + `<code>`/`<pre>`-skipping over rendered HTML, modeled on [`CodeReferenceLinkifier`](src/SpecScribe/CodeReferenceLinkifier.cs:36-130). Matchers: `[[name]]` → `<span class="ref-chip">`; `[ASSUMPTION: …]` (case-insensitive) → `<span class="md-comment-inline assumption-tag">`; bare extension-bearing `file:line` in non-anchor, non-code text → chip styling (anchor-aware so 7.2's links are preserved). Pure, no I/O, HTML-escape-safe.
-  - [ ] Wire into [`SiteGenerator.ApplyReferenceLinks`](src/SpecScribe/SiteGenerator.cs:2212), **after** `CodeReferenceLinkifier` ([:2228](src/SpecScribe/SiteGenerator.cs)). Confirm the `file:line` matcher never re-links or double-wraps 7.2's output (the #1 boundary).
-  - [ ] Add `.ref-chip` + `.assumption-tag` CSS reusing existing tokens (`--parchment-dark`/`--rust`/`--ink-light`, the `.md-comment-inline` muted-italic vocabulary) — no new `--status-*` token, not color-only.
+- [x] **Task 1 — `ReferenceChipRenderer`: wiki-link + file:line chips + assumption tags** (AC: 1)
+  - [x] Add `src/SpecScribe/ReferenceChipRenderer.cs` (name at latitude). Anchor-split + `<code>`/`<pre>`-skipping over rendered HTML, modeled on [`CodeReferenceLinkifier`](src/SpecScribe/CodeReferenceLinkifier.cs:36-130). Matchers: `[[name]]` → `<span class="ref-chip">`; `[ASSUMPTION: …]` (case-insensitive) → `<span class="md-comment-inline assumption-tag">`; bare extension-bearing `file:line` in non-anchor, non-code text → chip styling (anchor-aware so 7.2's links are preserved). Pure, no I/O, HTML-escape-safe.
+  - [x] Wire into [`SiteGenerator.ApplyReferenceLinks`](src/SpecScribe/SiteGenerator.cs:2212), **after** `CodeReferenceLinkifier` ([:2228](src/SpecScribe/SiteGenerator.cs)). Confirm the `file:line` matcher never re-links or double-wraps 7.2's output (the #1 boundary).
+  - [x] Add `.ref-chip` + `.assumption-tag` CSS reusing existing tokens (`--parchment-dark`/`--rust`/`--ink-light`, the `.md-comment-inline` muted-italic vocabulary) — no new `--status-*` token, not color-only.
 
-- [ ] **Task 2 — Collapsible grouped TOC** (AC: 2)
-  - [ ] In [`Toc.RenderSidebar`](src/SpecScribe/Toc.cs:18) only: emit level-2 entries with following level-3 children as `<details class="toc-group">` (summary = the parent link, body = child `.toc-h3` links); childless level-2 stays a plain `<a>`. Preserve the anchor-dedupe guard, `aria-label`, empty-fallback, and the summary-as-jump-link (invariant + a11y).
-  - [ ] Add `.toc-group`/`.toc-group > summary` CSS reusing the `.dev-agent-details` caret pattern ([specscribe.css:1731-1733](src/SpecScribe/assets/specscribe.css)); confirm the narrow-screen strip ([specscribe.css:348-368](src/SpecScribe/assets/specscribe.css)) still reads. Decide default open/collapsed state (recommend open on wide) and record it.
-  - [ ] **Coordinate with Story 9.5** (see Design Direction warning) — do not both restructure the long TOC in conflicting ways.
+- [x] **Task 2 — Collapsible grouped TOC** (AC: 2)
+  - [x] In [`Toc.RenderSidebar`](src/SpecScribe/Toc.cs:18) only: emit level-2 entries with following level-3 children as `<details class="toc-group">` (summary = the parent link, body = child `.toc-h3` links); childless level-2 stays a plain `<a>`. Preserve the anchor-dedupe guard, `aria-label`, empty-fallback, and the summary-as-jump-link (invariant + a11y).
+  - [x] Add `.toc-group`/`.toc-group > summary` CSS reusing the `.dev-agent-details` caret pattern ([specscribe.css:1731-1733](src/SpecScribe/assets/specscribe.css)); confirm the narrow-screen strip ([specscribe.css:348-368](src/SpecScribe/assets/specscribe.css)) still reads. Decide default open/collapsed state (recommend open on wide) and record it.
+  - [x] **Coordinate with Story 9.5** (see Design Direction warning) — do not both restructure the long TOC in conflicting ways.
 
-- [ ] **Task 3 — Collapsed "Retired" section on epic pages** (AC: 3)
-  - [ ] In `EpicsParser`, add a tolerant retirement/superseded detector over the peeled leading-comment text ([EpicsParser.cs:437-451,24-29,530](src/SpecScribe/EpicsParser.cs)); a matched comment is classified as a retired notice, **not** attached as the next story's `userStoryNoteHtml`.
-  - [ ] Add an additive `RetiredNoticesHtml` (rendered-fragment list) to the epic view model; populate it from the matched notices.
-  - [ ] Render a collapsed `<details class="chart-panel retired-section"><summary>Retired</summary>…</details>` after the story cards in [`RenderEpicBody`](src/SpecScribe/HtmlRenderAdapter.Epics.cs:196-202); add a single "Retired" TOC entry. Degrade to no-section when empty; leave non-retirement leading comments in place.
-  - [ ] Add `.retired-section` CSS (reuse the shared caret + muted vocabulary).
+- [x] **Task 3 — Collapsed "Retired" section on epic pages** (AC: 3)
+  - [x] In `EpicsParser`, add a tolerant retirement/superseded detector over the peeled leading-comment text ([EpicsParser.cs:437-451,24-29,530](src/SpecScribe/EpicsParser.cs)); a matched comment is classified as a retired notice, **not** attached as the next story's `userStoryNoteHtml`.
+  - [x] Add an additive `RetiredNoticesHtml` (rendered-fragment list) to the epic view model; populate it from the matched notices.
+  - [x] Render a collapsed `<details class="chart-panel retired-section"><summary>Retired</summary>…</details>` after the story cards in [`RenderEpicBody`](src/SpecScribe/HtmlRenderAdapter.Epics.cs:196-202); add a single "Retired" TOC entry. Degrade to no-section when empty; leave non-retirement leading comments in place.
+  - [x] Add `.retired-section` CSS (reuse the shared caret + muted vocabulary).
 
-- [ ] **Task 4 — Tests** (AC: 1, 2, 3)
-  - [ ] **`ReferenceChipRenderer`** unit tests (pure-function style, like `CodeReferenceLinkifier`/`RequirementLinkifier` tests): `[[name]]`→chip; `[ASSUMPTION: x]`→annotation span; `file:line`→chip; **negatives** — `file:line` inside `<code>`/`<pre>` untouched; text inside an existing `<a>` untouched; a 7.2-resolved code link is not double-wrapped; ambiguous `word: 3` (no extension) left raw.
-  - [ ] **TOC grouping** tests: an entry list with h2→h3→h3 renders one `<details class="toc-group">` with two children; a childless h2 stays a plain `<a>`; anchor-dedupe still holds; empty list → `""` (invariant); the summary keeps its `#id` jump link.
-  - [ ] **Retired section** tests: an epic whose story is preceded by a `<!-- Story N retired … -->` comment renders a collapsed `Retired` `<details>` after the cards and **no** inline `.md-comment` note above the following story; an epic with an ordinary seat-note comment renders it inline as today (degrade); an epic with no retirement notice renders no Retired section; active cards preserved and in order.
-  - [ ] **Parity + golden.** These touch shared render paths: AC1 post-process rides `ApplyReferenceLinks` (HTML write path — **confirm whether the webview/SPA adapters also apply it**, matching the existing linkifiers' behavior; flag any `HostRenderException`/parity-registry need); AC2's `Toc.RenderSidebar` and AC3's `RenderEpicBody` are the shared adapters that HTML+webview+SPA all use → keep `RenderParity`/SPA/webview green (**no new exception expected** — confirm). **Regenerate `GoldenContentFingerprint`** at [SiteGeneratorAdapterTests.cs:213](tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs) — TOC changes hit every long page, chips hit prose, the Retired section hits epic pages. **Confirm the baseline is green first** — a known unrelated pre-existing golden drift (`977cb973`, spec-comment-block work) has ridden recent commits; do not inherit or mask it. Eyeball the diff to prove it is only chips/TOC-grouping/Retired-section.
+- [x] **Task 4 — Tests** (AC: 1, 2, 3)
+  - [x] **`ReferenceChipRenderer`** unit tests (pure-function style, like `CodeReferenceLinkifier`/`RequirementLinkifier` tests): `[[name]]`→chip; `[ASSUMPTION: x]`→annotation span; `file:line`→chip; **negatives** — `file:line` inside `<code>`/`<pre>` untouched; text inside an existing `<a>` untouched; a 7.2-resolved code link is not double-wrapped; ambiguous `word: 3` (no extension) left raw.
+  - [x] **TOC grouping** tests: an entry list with h2→h3→h3 renders one `<details class="toc-group">` with two children; a childless h2 stays a plain `<a>`; anchor-dedupe still holds; empty list → `""` (invariant); the summary keeps its `#id` jump link.
+  - [x] **Retired section** tests: an epic whose story is preceded by a `<!-- Story N retired … -->` comment renders a collapsed `Retired` `<details>` after the cards and **no** inline `.md-comment` note above the following story; an epic with an ordinary seat-note comment renders it inline as today (degrade); an epic with no retirement notice renders no Retired section; active cards preserved and in order.
+  - [x] **Parity + golden.** These touch shared render paths: AC1 post-process rides `ApplyReferenceLinks` (HTML write path — **confirm whether the webview/SPA adapters also apply it**, matching the existing linkifiers' behavior; flag any `HostRenderException`/parity-registry need); AC2's `Toc.RenderSidebar` and AC3's `RenderEpicBody` are the shared adapters that HTML+webview+SPA all use → keep `RenderParity`/SPA/webview green (**no new exception expected** — confirm). **Regenerate `GoldenContentFingerprint`** at [SiteGeneratorAdapterTests.cs:213](tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs) — TOC changes hit every long page, chips hit prose, the Retired section hits epic pages. **Confirm the baseline is green first** — a known unrelated pre-existing golden drift (`977cb973`, spec-comment-block work) has ridden recent commits; do not inherit or mask it. Eyeball the diff to prove it is only chips/TOC-grouping/Retired-section.
 
-- [ ] **Task 5 — Verify end-to-end on the real repo** (AC: 1, 2, 3)
-  - [ ] `dotnet run` a full generate: open a long page (PRD or story 3.7) → the "On this page" TOC groups subsections under collapsible parents and is still present; open a story/doc with prose containing `[[…]]`/`file:line`/`[ASSUMPTION: …]` → all render as chips/annotations, no raw brackets; open the **epic-3** page → the Story 3.4 retirement notice is in a collapsed "Retired" section, **not** pinned above an active story.
-  - [ ] Confirm `specscribe webview` (CSP — the `<details>` disclosures must work with **no** JS) and `--spa` render the same (they ride the shared TOC/adapter seams).
+- [x] **Task 5 — Verify end-to-end on the real repo** (AC: 1, 2, 3)
+  - [x] `dotnet run` a full generate: open a long page (PRD or story 3.7) → the "On this page" TOC groups subsections under collapsible parents and is still present; open a story/doc with prose containing `[[…]]`/`file:line`/`[ASSUMPTION: …]` → all render as chips/annotations, no raw brackets; open the **epic-3** page → the Story 3.4 retirement notice is in a collapsed "Retired" section, **not** pinned above an active story.
+  - [x] Confirm `specscribe webview` (CSP — the `<details>` disclosures must work with **no** JS) and `--spa` render the same (they ride the shared TOC/adapter seams).
 
 ## Dev Notes
 
@@ -216,10 +220,39 @@ The notice is an authored **HTML comment**, currently peeled as the next story's
 
 ### Agent Model Used
 
+Claude (Sonnet 5), via the `bmad-dev-story` workflow.
+
 ### Debug Log References
+
+- Real-repo `dotnet run generate` on `epic-3.html` surfaced a live parsing bug the design doc's simplified example didn't anticipate: the actual Story 3.4 retirement comment sits BETWEEN two stories (after Story 3.3's last AC line, before "### Story 3.5"), not as the leading comment of either story's own region. Without a fix it was silently swept into Story 3.3's trailing AC-block text as literal gherkin-line junk (a pre-existing quirk, now also fixed as a side effect). Added `EpicsParser.HoistBetweenStoryRetiredComments` — a pre-pass that blanks a matched between-story retirement comment's lines before per-story parsing runs, so it neither pollutes the preceding story's AC content nor becomes the following story's leading-comment note.
+- Real-repo verification also surfaced that `ReferenceChipRenderer`'s protected split didn't exclude `<svg>...</svg>` subtrees: chart tooltips (e.g. the sunburst's `<title>` text) carry raw, unrendered text inside SVG, where SVG `<title>` has no HTML sub-parsing — an injected `<span>` there would show as literal visible markup instead of a styled chip. Fixed by adding `<svg>...</svg>` to the protected-span alternation (mirrors `AbbreviationExpander.ProtectedSplit`'s existing `<svg>` protection).
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed — comprehensive developer guide created.
+- AC1: `ReferenceChipRenderer` (new) matches `[[wiki-link]]` → non-link `.ref-chip`, `[ASSUMPTION: …]` → `.md-comment-inline.assumption-tag` (Story 2.6 vocabulary), and bare extension-bearing `file:line` → `.ref-chip`, in one combined regex (no double-wrap risk between the three shapes). Wired into `SiteGenerator.ApplyReferenceLinks` after `CodeReferenceLinkifier`, before `AbbreviationExpander`. A citation 7.2 already resolved into a real `<a>` is left untouched (Decision #1 from the design doc — the simplest boundary, keeps 7.2 untouched). Protected-span split mirrors `CodeReferenceLinkifier`/`AbbreviationExpander` (`<a>`/`<code>`/`<pre>`/`<svg>` pairs + any standalone tag never rewritten).
+- AC2: `Toc.RenderSidebar` groups a level-2 entry followed by level-3 children into `<details class="toc-group" open>` (summary = the parent's own jump link); a childless level-2 stays a plain `<a>` (no empty caret); a stray leading level-3 degrades to a plain link (NFR8). Anchor-dedupe, `aria-label`, and the empty-fallback are unchanged. Narrow-screen strip gets `.toc-group { flex-basis: 100% }` so a grouped parent takes its own row instead of cramming between single-link chips.
+- AC3: retirement/superseded notices are detected in TWO shapes — (a) a story's own leading comment (existing `ParseStory` peel, now classify-not-attach via a word-boundaried `retired|superseded|deprecated` regex), and (b) the REAL-WORLD shape discovered during Task 5 verification — a standalone comment sitting between two stories (`HoistBetweenStoryRetiredComments`, new). Both feed an additive `EpicInfo.RetiredNoticesHtml` → `EpicPageView.RetiredNoticesHtml`, rendered as one collapsed `<details class="chart-panel retired-section">` after the story-card loop in `RenderEpicBody`, with a single "Retired" TOC entry. Verified against the real Story 3.4 notice on `epics/epic-3.html`.
+- Golden fingerprint regenerated twice (once for the three ACs, once more for the SVG-protection fix — the fixture used by `SiteGeneratorAdapterTests` doesn't exercise SVG tooltips, so only the first regen actually changed that constant); baseline confirmed green before each regen (stashed working changes, ran the fingerprint test alone, popped the stash) per the story's review checkpoint.
+- Full suite: 1612/1612 green. Verified end-to-end via `dotnet run generate`, `--spa`, and `webview` on this actual repo — all three ACs reach the SPA/webview surfaces (no new parity/`HostRenderException` needed, confirmed by grep on the emitted JSON).
+- Flagged (out of scope, spawned as a separate background task): a pre-existing bug on baseline `main`, unrelated to this story — `*emphasis*` text inside a heading renders as the literal C# type name `Markdig.Syntax.Inlines.EmphasisInline` in the "On this page" TOC (reproduced on `docs/adrs/0006-delivery-architecture-and-distribution.html`).
 
 ### File List
+
+- `src/SpecScribe/ReferenceChipRenderer.cs` — NEW (AC1: `[[wiki-link]]`/`[ASSUMPTION: …]`/bare `file:line` → chips/annotation)
+- `src/SpecScribe/SiteGenerator.cs` — UPDATE (wire `ReferenceChipRenderer.Render` into `ApplyReferenceLinks`, after `CodeReferenceLinkifier`, before `AbbreviationExpander`)
+- `src/SpecScribe/Toc.cs` — UPDATE (`RenderSidebar` groups level-3 children under a collapsible level-2 `<details class="toc-group">`)
+- `src/SpecScribe/EpicsParser.cs` — UPDATE (retirement/superseded classification on a story's own leading comment; new `HoistBetweenStoryRetiredComments` for the between-story real-world shape; `SectionEntry.RetiredNoticesHtml`)
+- `src/SpecScribe/EpicsModel.cs` — UPDATE (additive `EpicInfo.RetiredNoticesHtml`)
+- `src/SpecScribe/EpicsView.cs` — UPDATE (additive `EpicPageView.RetiredNoticesHtml`)
+- `src/SpecScribe/EpicsViewBuilder.cs` — UPDATE (`BuildEpic` threads `epic.RetiredNoticesHtml` onto the view)
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs` — UPDATE (`RenderEpicBody` renders the collapsed Retired `<details>` after story cards + one TOC entry)
+- `src/SpecScribe/assets/specscribe.css` — UPDATE (`.ref-chip`, `.assumption-tag`, `.toc-group`(+narrow-screen), `.retired-section`)
+- `tests/SpecScribe.Tests/ReferenceChipRendererTests.cs` — NEW (12 tests: chip/annotation matching + anchor/code/svg-safety negatives)
+- `tests/SpecScribe.Tests/TocTests.cs` — UPDATE (+3 grouping tests: grouped parent, childless parent, stray-h3 degrade)
+- `tests/SpecScribe.Tests/EpicsParserTests.cs` — UPDATE (+5 tests: leading-comment retirement, between-story retirement, ordinary-note non-classification, keyword case-insensitivity)
+- `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs` — UPDATE (+2 tests: Retired section present/absent + TOC entry)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — UPDATE (regenerated `GoldenContentFingerprint`)
+
+## Change Log
+
+- 2026-07-18: dev-story — implemented all three ACs (`ReferenceChipRenderer` chips/annotations, grouped collapsible TOC, collapsed epic Retired section); discovered and fixed two real-repo-only gaps beyond the design doc's simplified examples: (1) the actual Story 3.4 retirement notice sits BETWEEN two stories, not as either story's leading comment — added `EpicsParser.HoistBetweenStoryRetiredComments`; (2) `ReferenceChipRenderer` needed to skip `<svg>...</svg>` subtrees so chart-tooltip text (SVG `<title>`, no HTML sub-parsing) never gets literal `<span>` markup injected. Golden fingerprint regenerated (confirmed baseline green first). 1612/1612 tests green. Verified end-to-end via `dotnet run generate`, `--spa`, and `webview` against this repo's own `epics/epic-3.html` and `story-10-5.html`. Status → review.

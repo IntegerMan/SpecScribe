@@ -265,6 +265,36 @@ public class HtmlRenderAdapterTests
     };
 
     [Fact]
+    public void RenderEpicBody_NoRetiredNotices_OmitsRetiredSection()
+    {
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(EpicPage(Card()));
+
+        Assert.DoesNotContain("retired-section", html);
+        Assert.DoesNotContain("<summary>Retired</summary>", html);
+    }
+
+    [Fact]
+    public void RenderEpicBody_RetiredNotices_RenderCollapsedSectionAfterStoryCardsWithTocEntry()
+    {
+        var view = EpicPage(Card()) with
+        {
+            RetiredNoticesHtml = new[] { "<aside class=\"md-comment\">Story 3.4 retired 2026-07-08 — superseded by Story 7.6.</aside>" },
+        };
+
+        var html = HtmlRenderAdapter.Shared.RenderEpicBody(view);
+
+        Assert.Contains("<details class=\"chart-panel retired-section\" id=\"sec-retired\">", html);
+        Assert.Contains("<summary>Retired</summary>", html);
+        Assert.Contains("Story 3.4 retired 2026-07-08", html);
+        // No open="" attribute — collapsed by default.
+        Assert.DoesNotContain("retired-section\" open", html);
+        // The story card content must precede the Retired section (active content stays first).
+        Assert.True(html.IndexOf("story-card", StringComparison.Ordinal) < html.IndexOf("retired-section", StringComparison.Ordinal));
+        // A single "Retired" TOC entry makes the section reachable (on-page-TOC invariant).
+        Assert.Contains("<a class=\"toc-link\" href=\"#sec-retired\">Retired</a>", html);
+    }
+
+    [Fact]
     public void RenderEpicBody_EmitsTitleHtmlInH1_WithoutPathUtilDoubleEscape()
     {
         // Titles are opaque RenderInline HTML (Story 6.2 TitleHtml). PathUtil.Html would turn

@@ -158,6 +158,176 @@ public class EpicsParserTests
         Assert.Equal(string.Empty, story.UserStoryNoteHtml);
     }
 
+    [Fact]
+    public void Parse_OrdinarySeatNoteComment_HasNoRetiredNotices()
+    {
+        // Story 10.5 AC3: an ordinary seat-mapping comment (no retired/superseded/deprecated keyword) stays
+        // inline as today — it must not be classified as a retirement notice.
+        var epic = EpicsParser.Parse(CommentedStoryEpicsMd).Epics[0];
+        Assert.Empty(epic.RetiredNoticesHtml);
+    }
+
+    private const string RetiredNoticeEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: Kept story
+
+        As a developer, I want the first story, so that work starts.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+
+        ### Story 1.2: Successor story
+
+        <!-- Story 3.4 retired 2026-07-08 — artifact tree retired; source-code treemap moved to Story 7.6. -->
+
+        As a developer, I want the successor, so that work continues.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_RetirementComment_DivertsToEpicRetiredNoticesNotStoryNote()
+    {
+        var epic = EpicsParser.Parse(RetiredNoticeEpicsMd).Epics[0];
+
+        var notice = Assert.Single(epic.RetiredNoticesHtml);
+        Assert.Contains("Story 3.4 retired", notice);
+        Assert.Contains("class=\"md-comment\"", notice);
+
+        // The comment is NOT attached to the following story's card note (it would otherwise pin above it).
+        var successor = epic.Stories.Single(s => s.Id == "1.2");
+        Assert.Equal(string.Empty, successor.UserStoryNoteHtml);
+        Assert.Contains("the successor", successor.UserStoryHtml);
+    }
+
+    private const string BetweenStoriesRetiredNoticeEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: First story
+
+        As a developer, I want the first story, so that work starts.
+
+        **Acceptance Criteria:**
+
+        1.
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        **And** the loop closes.
+
+        <!-- Story 1.4 retired 2026-07-08 (SCP 2026-07-08). The original approach was retired and
+             replaced by a later story. -->
+
+        ### Story 1.5: Second story
+
+        As a developer, I want the second story, so that work continues.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_RetirementComment_BetweenTwoStories_IsHoistedNotSweptIntoPrecedingAcBlock()
+    {
+        // Real-world placement (mirrors the actual Story 3.4 notice in epics.md): a standalone retirement
+        // comment sits AFTER the preceding story's last AC line and BEFORE the next story heading — not
+        // inside either story's own region. Without hoisting, this comment gets swept into the preceding
+        // story's trailing AC-block text as literal gherkin-line junk.
+        var epic = EpicsParser.Parse(BetweenStoriesRetiredNoticeEpicsMd).Epics[0];
+
+        var notice = Assert.Single(epic.RetiredNoticesHtml);
+        Assert.Contains("Story 1.4 retired", notice);
+        Assert.Contains("class=\"md-comment\"", notice);
+
+        // The preceding story's AC block must NOT contain the comment's raw or rendered text.
+        var first = epic.Stories.Single(s => s.Id == "1.1");
+        Assert.DoesNotContain("retired", string.Concat(first.AcBlocksHtml), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<!--", string.Concat(first.AcBlocksHtml));
+
+        // The following story is unaffected — no note attached, narrative intact.
+        var second = epic.Stories.Single(s => s.Id == "1.5");
+        Assert.Equal(string.Empty, second.UserStoryNoteHtml);
+        Assert.Contains("the second story", second.UserStoryHtml);
+    }
+
+    [Fact]
+    public void Parse_NoRetirementComment_EpicHasEmptyRetiredNotices()
+    {
+        var epic = EpicsParser.Parse(SampleEpicsMd).Epics[0];
+        Assert.Empty(epic.RetiredNoticesHtml);
+    }
+
+    [Theory]
+    [InlineData("superseded")]
+    [InlineData("deprecated")]
+    [InlineData("RETIRED")]
+    public void Parse_RetirementKeyword_IsCaseInsensitiveAndRecognizesAllThreeWords(string keyword)
+    {
+        var md = $$"""
+            # Epics
+
+            ## Epic List
+
+            ### Epic 1: Foundation
+
+            Goal.
+
+            ## Epic 1: Foundation
+
+            ### Story 1.1: Kept story
+
+            As a developer, I want the first story, so that work starts.
+
+            **Acceptance Criteria:**
+
+            **Given** nothing
+            **When** it builds
+            **Then** it succeeds
+
+            ### Story 1.2: Successor story
+
+            <!-- Story 3.4 is {{keyword}} as of 2026-07-08. -->
+
+            As a developer, I want the successor, so that work continues.
+
+            **Acceptance Criteria:**
+
+            **Given** nothing
+            **When** it builds
+            **Then** it succeeds
+            """;
+
+        var epic = EpicsParser.Parse(md).Epics[0];
+        Assert.Single(epic.RetiredNoticesHtml);
+    }
+
     /// <summary>Wraps a raw user-story-region body into a minimal epics.md and returns the parsed first story,
     /// so the leading-comment edge cases can be exercised without repeating the epics scaffold each time.</summary>
     private static StoryInfo ParseStoryWithBody(string body) => EpicsParser.Parse($"""

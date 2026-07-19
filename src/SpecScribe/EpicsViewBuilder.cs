@@ -133,6 +133,7 @@ public static class EpicsViewBuilder
             Pager = pager ?? EntityPager.None,
             FollowUps = epicFollowUps,
             UnplannedWork = epicUnplanned,
+            RetiredNoticesHtml = epic.RetiredNoticesHtml,
         };
     }
 

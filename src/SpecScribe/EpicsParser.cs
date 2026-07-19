@@ -29,6 +29,14 @@ public static class EpicsParser
     /// alone.</summary>
     private static readonly Regex LeadingHtmlComments = new(@"\A\s*(?:<!--.*?-->\s*)+", RegexOptions.Singleline | RegexOptions.Compiled);
 
+    /// <summary>Tolerant retirement/superseded detector (Story 10.5 AC3) over a peeled leading-comment's raw
+    /// text — word-boundaried, case-insensitive, no new authoring schema (recognizes the free-text seat-mapping
+    /// comments authors already write, e.g. <c>&lt;!-- Story 3.4 retired 2026-07-08 ... --&gt;</c>). A matched
+    /// comment is classified as a retired notice and diverted away from <see cref="StoryInfo.UserStoryNoteHtml"/>
+    /// to the epic's <see cref="EpicInfo.RetiredNoticesHtml"/> collection instead of being attached to the next
+    /// story card.</summary>
+    private static readonly Regex RetirementKeyword = new(@"\b(retired|superseded|deprecated)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public static EpicsModel Parse(string raw)
     {
         var body = MarkdownConverter.StripFrontmatter(raw);
@@ -59,6 +67,7 @@ public static class EpicsParser
                 Status = stories.Count > 0 ? EpicStatus.Drafted : EpicStatus.Pending,
                 Section = entry.IsFurtherDevelopment ? EpicSection.FurtherDevelopment : EpicSection.VerticalSlice,
                 Stories = stories,
+                RetiredNoticesHtml = section?.RetiredNoticesHtml ?? new List<string>(),
             });
         }
 
@@ -603,6 +612,70 @@ public static class EpicsParser
         public string Goal = string.Empty;
         public string? MetaRaw;
         public List<StoryInfo> Stories = new();
+
+        /// <summary>Rendered retirement/superseded notices found in this epic (Story 10.5, AC3) — either a
+        /// story's own leading comment (see <see cref="ParseStory"/>) or one hoisted from between two stories
+        /// by <see cref="HoistBetweenStoryRetiredComments"/> — collected in source order, empty when none
+        /// matched.</summary>
+        public List<string> RetiredNoticesHtml = new();
+    }
+
+    /// <summary>Story 10.5 AC3: finds and peels standalone retirement/superseded HTML comments that sit
+    /// BETWEEN two stories in an epic's body — the real-world placement (the actual Story 3.4 notice sits
+    /// after Story 3.3's last Acceptance-Criteria line and before the "### Story 3.5" heading, not inside
+    /// either story's own region). A comment sitting immediately after a "### Story" heading is a DIFFERENT
+    /// shape — a story marked retired via its own leading comment — and is left untouched here;
+    /// <see cref="ParseStory"/>'s leading-comment peel already classifies that case. Blanks the matched
+    /// comment's own lines in place (to empty strings) so they degrade to the blank lines the existing AC-block
+    /// parser already skips, rather than being swept in as literal AC-block text (today's quirk). An
+    /// unterminated <c>&lt;!--</c> or a comment that doesn't match a retirement keyword is left completely
+    /// untouched (NFR8 — no behavior change for ordinary between-story content).</summary>
+    private static List<string> HoistBetweenStoryRetiredComments(
+        string[] lines, int scanStart, int scanEnd, IReadOnlyList<(int Index, int EpicNum, int StoryNum, string Title)> storyStarts)
+    {
+        var notices = new List<string>();
+        var headingLines = new HashSet<int>(storyStarts.Select(s => s.Index));
+
+        var i = scanStart;
+        while (i < scanEnd)
+        {
+            if (!lines[i].TrimStart().StartsWith("<!--", StringComparison.Ordinal)) { i++; continue; }
+
+            var startLine = i;
+            var closeLine = -1;
+            for (var j = i; j < scanEnd; j++)
+            {
+                if (lines[j].Contains("-->", StringComparison.Ordinal)) { closeLine = j; break; }
+            }
+            if (closeLine < 0) { i++; continue; } // unterminated — leave alone, mirrors LeadingHtmlComments' degrade.
+
+            var precedingNonBlank = PrecedingNonBlankLineIndex(lines, startLine);
+            var isLeadingCommentOfAStory = precedingNonBlank >= 0 && headingLines.Contains(precedingNonBlank);
+            if (!isLeadingCommentOfAStory)
+            {
+                var commentText = string.Join("\n", lines[startLine..(closeLine + 1)]);
+                if (RetirementKeyword.IsMatch(commentText))
+                {
+                    notices.Add(MarkdownConverter.RenderBlock(commentText));
+                    for (var k = startLine; k <= closeLine; k++) lines[k] = string.Empty;
+                }
+            }
+
+            i = closeLine + 1;
+        }
+
+        return notices;
+    }
+
+    /// <summary>The index of the nearest non-blank line before <paramref name="fromExclusive"/>, or -1 when
+    /// every earlier line is blank (or <paramref name="fromExclusive"/> is 0).</summary>
+    private static int PrecedingNonBlankLineIndex(string[] lines, int fromExclusive)
+    {
+        for (var k = fromExclusive - 1; k >= 0; k--)
+        {
+            if (lines[k].Trim().Length > 0) return k;
+        }
+        return -1;
     }
 
     private static List<SectionEntry> ParseEpicSections(string[] lines)
@@ -633,6 +706,15 @@ public static class EpicsParser
                 }
             }
 
+            // Story 10.5 AC3: hoist retirement/superseded comments that sit BETWEEN two stories — the real
+            // placement (e.g. the actual Story 3.4 notice sits after Story 3.3's last AC line and before
+            // "### Story 3.5", not inside either story's own body) — before any story is parsed, so the
+            // comment's lines never pollute the preceding story's trailing AC-block text (today's swallow-as-
+            // AC-content quirk) and never become the following story's leading-comment note.
+            var betweenStoryRetiredNotices = storyStarts.Count > 0
+                ? HoistBetweenStoryRetiredComments(lines, storyStarts[0].Index, bodyEnd, storyStarts)
+                : new List<string>();
+
             var preambleEnd = storyStarts.Count > 0 ? storyStarts[0].Index : bodyEnd;
             var goalLines = new List<string>();
             var metaLines = new List<string>();
@@ -657,12 +739,18 @@ public static class EpicsParser
                 Goal = string.Join(" ", goalLines),
                 MetaRaw = metaLines.Count > 0 ? string.Join("\n", metaLines) : null,
             };
+            section.RetiredNoticesHtml.AddRange(betweenStoryRetiredNotices);
 
             for (var s = 0; s < storyStarts.Count; s++)
             {
                 var (sIdx, epicNum, storyNum, storyTitle) = storyStarts[s];
                 var storyEnd = s + 1 < storyStarts.Count ? storyStarts[s + 1].Index : bodyEnd;
-                section.Stories.Add(ParseStory(lines, sIdx, storyEnd, epicNum, storyNum, storyTitle));
+                var (story, retiredNoticeHtml) = ParseStory(lines, sIdx, storyEnd, epicNum, storyNum, storyTitle);
+                section.Stories.Add(story);
+                if (retiredNoticeHtml is { Length: > 0 })
+                {
+                    section.RetiredNoticesHtml.Add(retiredNoticeHtml);
+                }
             }
 
             results.Add(section);
@@ -671,7 +759,10 @@ public static class EpicsParser
         return results;
     }
 
-    private static StoryInfo ParseStory(string[] lines, int startIdx, int endIdx, int epicNum, int storyNum, string title)
+    /// <summary>Returns the parsed story plus, when its leading comment is classified as a retirement/superseded
+    /// notice (Story 10.5, AC3), that notice's rendered HTML (null otherwise) — the caller diverts it to the
+    /// epic's Retired section instead of attaching it as this story's <see cref="StoryInfo.UserStoryNoteHtml"/>.</summary>
+    private static (StoryInfo Story, string? RetiredNoticeHtml) ParseStory(string[] lines, int startIdx, int endIdx, int epicNum, int storyNum, string title)
     {
         var acIdx = -1;
         for (var i = startIdx + 1; i < endIdx; i++)
@@ -694,9 +785,15 @@ public static class EpicsParser
         var commentMd = leading.Success ? leading.Value.Trim() : string.Empty;
         var narrativeText = leading.Success ? regionText[leading.Length..] : regionText;
 
-        var userStoryNoteHtml = HasCommentText(commentMd)
+        // A leading comment that reads as a retirement/superseded notice (Story 10.5, AC3) is classified —
+        // not attached as this story's note — so it never renders inline above an active story card; an
+        // ordinary seat-mapping note (no keyword match) stays exactly where it is (degrade, NFR8).
+        var hasCommentText = HasCommentText(commentMd);
+        var isRetiredNotice = hasCommentText && RetirementKeyword.IsMatch(commentMd);
+        var userStoryNoteHtml = hasCommentText && !isRetiredNotice
             ? MarkdownConverter.RenderBlock(commentMd)
             : string.Empty;
+        var retiredNoticeHtml = isRetiredNotice ? MarkdownConverter.RenderBlock(commentMd) : null;
         var narrativeLines = narrativeText.Split('\n')
             .Select(l => l.Trim())
             .Where(l => l.Length > 0)
@@ -747,7 +844,7 @@ public static class EpicsParser
             FlushBlock();
         }
 
-        return new StoryInfo
+        var story = new StoryInfo
         {
             Id = $"{epicNum}.{storyNum}",
             EpicNumber = epicNum,
@@ -756,6 +853,7 @@ public static class EpicsParser
             UserStoryNoteHtml = userStoryNoteHtml,
             AcBlocksHtml = acBlocks,
         };
+        return (story, retiredNoticeHtml);
     }
 
     private static string RenderAcLine(string line)

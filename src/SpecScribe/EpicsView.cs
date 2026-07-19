@@ -189,6 +189,10 @@ public sealed record EpicPageView
     /// <summary>Epic-attributed quick-dev only (project Unplanned root is never drawn on epic pages).
     /// [Story 9.12]</summary>
     public UnplannedWorkGeometry UnplannedWork { get; init; } = UnplannedWorkGeometry.Empty;
+
+    /// <summary>Rendered retirement/superseded notices for this epic (Story 10.5, AC3) — rendered in a
+    /// collapsed "Retired" section after the story cards; empty omits the section entirely (NFR8).</summary>
+    public IReadOnlyList<string> RetiredNoticesHtml { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>Compact verification facts for the story-page evidence strip — tasks (from

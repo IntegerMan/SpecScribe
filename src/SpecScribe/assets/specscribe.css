@@ -850,6 +850,22 @@ a.change-surface-chip:focus-visible {
 .toc-sidebar a:hover { text-decoration: underline; }
 .toc-sidebar a.toc-h3 { color: var(--ink-light); font-size: 0.73rem; padding-left: 0.85rem; }
 
+/* Story 10.5 AC2 — level-3 subsections grouped under a collapsible level-2 parent. Same caret grammar as
+   .dev-agent-details, open by default so the "On this page" TOC stays visible at a glance; a childless h2
+   isn't wrapped at all (no empty caret — see Toc.RenderSidebar). */
+.toc-group { margin: 0; }
+.toc-group > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+}
+.toc-group > summary::-webkit-details-marker { display: none; }
+.toc-group > summary::before { content: "▸ "; flex: none; color: var(--gold); font-size: 0.7rem; }
+.toc-group[open] > summary::before { content: "▾ "; }
+.toc-group > summary > a { flex: 1; }
+
 /* Clicked TOC links must land the target below the sticky nav, not hidden under it. */
 .doc-body h2[id], .doc-body h3[id],
 .page-main .chart-panel[id], .page-main section[id],
@@ -879,6 +895,10 @@ a.change-surface-chip:focus-visible {
   /* Links wrap rather than forcing horizontal overflow when a heading is longer than a narrow screen. */
   .toc-sidebar a { overflow-wrap: anywhere; }
   .toc-sidebar a.toc-h3 { padding-left: 0; }
+  /* A grouped parent takes its own full-width row in the strip (its children read as a small stacked list)
+     rather than cramming a multi-child disclosure between plain single-link chips. [Story 10.5 AC2] */
+  .toc-group { flex-basis: 100%; display: flex; flex-direction: column; }
+  .toc-group > summary { flex-basis: 100%; }
 }
 
 /* ====================== ARTICLE BODY ====================== */
@@ -944,6 +964,28 @@ a.change-surface-chip:focus-visible {
   color: var(--ink-light);
   font-style: italic;
   font-size: 0.85em;
+}
+
+/* Story 10.5 AC1 — [[wiki-link]] names and bare file:line citations Markdig otherwise passes through as raw
+   text, rendered as a designed chip. Intentionally global (not .doc-body-only): ReferenceChipRenderer runs on
+   every generated page, including story-card/AC/epic-card prose, mirroring the .md-comment global rule above. */
+.ref-chip {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85em;
+  background: var(--parchment-dark);
+  color: var(--rust);
+  border: 1px solid var(--border);
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* [ASSUMPTION: …] reuses .md-comment-inline's muted-italic vocabulary (Story 2.6); the label stays visible
+   text (not color-only) with a small non-italic accent so it reads as a tag, not just emphasis. */
+.assumption-tag strong {
+  font-style: normal;
+  color: var(--rust);
+  letter-spacing: 0.03em;
 }
 
 .doc-body code {
@@ -2754,6 +2796,23 @@ a.ref-file-node:focus-visible {
   flex: 1;
   min-width: 0;
 }
+
+/* Story 10.5 AC3 — retired/superseded story notices on an epic page, collapsed by default so they preserve
+   history without cluttering the active list. Same caret grammar as .dev-agent-details; the panel itself
+   reuses .chart-panel's box so it reads like the other epic-page panels when opened. */
+.retired-section > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 0;
+}
+.retired-section > summary::-webkit-details-marker { display: none; }
+.retired-section > summary::before { content: "▸ "; color: var(--gold); }
+.retired-section[open] > summary::before { content: "▾ "; }
+.retired-section[open] > summary { margin-bottom: 0.9rem; }
 
 /* Fixed layout + wrapping so long file paths / identifiers in the record wrap inside the content column
    instead of forcing the table wider than its grid track (which would spill horizontally off the page). */

@@ -493,7 +493,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // icon; specscribe.css gains abbr[title]/.howtoread-* rules. This non-module fixture has no _bmad
         // folder, so ModuleContext is None — the glossary is empty and the abbr expander is a no-op (AC2);
         // the delta here is purely the new page + the shared nav/CSS additions.
-        const string expected = "452785b22c7d243967d353fc6c88bdf3e0394853f9b587a7f4a3e35f2c49c1fa";
+        // Regenerated 2026-07-18: Story 10.5 document-rendering legibility — [[wiki-link]]/bare file:line/
+        // [ASSUMPTION:] chips via ReferenceChipRenderer (AC1); Toc.RenderSidebar groups h3 children under a
+        // collapsible <details class="toc-group"> parent on every long TOC-bearing page (AC2); epic pages gain
+        // a collapsed Retired <details> section for classified retirement/superseded story leading-comments,
+        // e.g. Story 3.4 on epic-3 (AC3); specscribe.css gains .ref-chip/.assumption-tag/.toc-group/.retired-section.
+        const string expected = "7630b334ac450272c5eff0e7b16c1852359eeb3a900009cdd116849305a9eb26";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

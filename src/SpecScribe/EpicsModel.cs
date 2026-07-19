@@ -61,6 +61,11 @@ public sealed class EpicInfo
     /// retro closes it out. Default false. Deliberately NOT consumed by requirements roll-up (a retro is a
     /// closure ritual, not an implementation signal).</summary>
     public bool HasRetrospective { get; set; }
+
+    /// <summary>Rendered retirement/superseded notices classified out of story leading-comments in this epic
+    /// (Story 10.5, AC3) — e.g. Story 3.4's retirement note. Empty when none matched; rendered in a collapsed
+    /// "Retired" section after the active story cards instead of inline above the following story.</summary>
+    public IReadOnlyList<string> RetiredNoticesHtml { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>One numbered acceptance criterion pulled from a story artifact's "## Acceptance Criteria"

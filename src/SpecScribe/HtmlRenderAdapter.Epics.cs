@@ -217,6 +217,18 @@ public sealed partial class HtmlRenderAdapter
             toc.Add(new Toc.Entry(2, $"Story {card.Id}", card.AnchorId));
         }
 
+        if (view.RetiredNoticesHtml.Count > 0)
+        {
+            main.Append("<details class=\"chart-panel retired-section\" id=\"sec-retired\">\n");
+            main.Append("  <summary>Retired</summary>\n");
+            foreach (var notice in view.RetiredNoticesHtml)
+            {
+                main.Append($"  {notice}");
+            }
+            main.Append("</details>\n\n");
+            toc.Add(new Toc.Entry(2, "Retired", "sec-retired"));
+        }
+
         var sb = new StringBuilder();
         sb.Append("<main id=\"main-content\">\n");
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));

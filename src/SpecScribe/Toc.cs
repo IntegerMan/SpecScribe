@@ -14,26 +14,72 @@ public static class Toc
     public sealed record Entry(int Level, string Text, string AnchorId);
 
     /// <summary>Renders the accessible "On this page" sidebar nav from an ordered entry list. Returns "" when
-    /// there are no entries so the caller can fall back to a single-column layout.</summary>
+    /// there are no entries so the caller can fall back to a single-column layout. A level-2 entry immediately
+    /// followed by one or more level-3 entries groups them under a native, pure-CSS <c>&lt;details
+    /// class="toc-group"&gt;</c> disclosure (open by default — the "On this page" TOC stays visible at a
+    /// glance); a level-2 with no level-3 children stays a plain link (no empty caret). A stray level-3 with no
+    /// preceding level-2 (shouldn't occur in practice) degrades to a plain link rather than being dropped
+    /// (NFR8). [Story 10.5, AC2]</summary>
     public static string RenderSidebar(IReadOnlyList<Entry> entries)
     {
         if (entries.Count == 0) return string.Empty;
 
+        // Detail-page TOCs merge hardcoded panel ids (sec-*, ac-N) with remainder-heading auto-ids into one
+        // namespace; keep only the first entry per AnchorId so we never render two links to the same anchor
+        // (a browser jumps to the first matching id, making the later link a silent dead end). Dedupe BEFORE
+        // grouping so a parent's child count reflects only entries that will actually render.
+        var seen = new HashSet<string>();
+        var deduped = new List<Entry>();
+        foreach (var e in entries)
+        {
+            if (seen.Add(e.AnchorId)) deduped.Add(e);
+        }
+
         var sb = new StringBuilder();
         sb.Append("<nav class=\"toc-sidebar\" aria-label=\"On this page\">\n");
         sb.Append("  <span class=\"toc-label\">On this page</span>\n");
-        // Detail-page TOCs merge hardcoded panel ids (sec-*, ac-N) with remainder-heading auto-ids into one
-        // namespace; keep only the first entry per AnchorId so we never render two links to the same anchor
-        // (a browser jumps to the first matching id, making the later link a silent dead end).
-        var seen = new HashSet<string>();
-        foreach (var e in entries)
+
+        for (var i = 0; i < deduped.Count; i++)
         {
-            if (!seen.Add(e.AnchorId)) continue;
-            var cls = e.Level >= 3 ? "toc-link toc-h3" : "toc-link";
-            sb.Append($"  <a class=\"{cls}\" href=\"#{PathUtil.Html(e.AnchorId)}\">{PathUtil.Html(e.Text)}</a>\n");
+            var e = deduped[i];
+            if (e.Level >= 3)
+            {
+                sb.Append(RenderLink(e)); // stray leading h3 — degrade to a plain link, never drop it.
+                continue;
+            }
+
+            var children = new List<Entry>();
+            var j = i + 1;
+            while (j < deduped.Count && deduped[j].Level >= 3)
+            {
+                children.Add(deduped[j]);
+                j++;
+            }
+
+            if (children.Count == 0)
+            {
+                sb.Append(RenderLink(e));
+                continue;
+            }
+
+            sb.Append("  <details class=\"toc-group\" open>\n");
+            sb.Append($"    <summary><a class=\"toc-link\" href=\"#{PathUtil.Html(e.AnchorId)}\">{PathUtil.Html(e.Text)}</a></summary>\n");
+            foreach (var child in children)
+            {
+                sb.Append("  ").Append(RenderLink(child));
+            }
+            sb.Append("  </details>\n");
+            i = j - 1; // skip past the children just rendered
         }
+
         sb.Append("</nav>\n");
         return sb.ToString();
+    }
+
+    private static string RenderLink(Entry e)
+    {
+        var cls = e.Level >= 3 ? "toc-link toc-h3" : "toc-link";
+        return $"  <a class=\"{cls}\" href=\"#{PathUtil.Html(e.AnchorId)}\">{PathUtil.Html(e.Text)}</a>\n";
     }
 
     /// <summary>Wraps main-content HTML and its sidebar rail into the shared two-column page shell. The rail

@@ -3332,6 +3332,9 @@ public sealed class SiteGenerator
         // external base here: a configured/detected --code-url never diverts a citation from its in-portal page.
         html = CodeReferenceLinkifier.Linkify(
             html, _codePages, codeSourceBaseUrl: null, prefix, _options.RepoRoot, _options.SourceRoot);
+        // Story 10.5 AC1: [[wiki-link]]/[ASSUMPTION: …]/bare file:line chips. Runs AFTER CodeReferenceLinkifier
+        // so a citation it already resolved into a real <a> is left untouched (never re-linked/double-wrapped).
+        html = ReferenceChipRenderer.Render(html);
         // Story 10.3: first-use <abbr> expansion for bare acronyms (FR/AC/ADR/...). Runs LAST so it never
         // rewrites text inside any anchor the linkifiers above just created; a no-op when the detected
         // module publishes no glossary (NFR8 — undetected frameworks stay byte-unchanged).

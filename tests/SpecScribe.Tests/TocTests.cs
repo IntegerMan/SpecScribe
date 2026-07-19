@@ -51,6 +51,49 @@ public class TocTests
     }
 
     [Fact]
+    public void RenderSidebar_GroupsLevel3ChildrenUnderCollapsibleLevel2Parent()
+    {
+        // Story 10.5 AC2: h2 -> h3 -> h3 renders one <details class="toc-group"> with two children.
+        var html = Toc.RenderSidebar(new[]
+        {
+            new Toc.Entry(2, "Parent", "sec-parent"),
+            new Toc.Entry(3, "Child One", "sec-child-1"),
+            new Toc.Entry(3, "Child Two", "sec-child-2"),
+        });
+
+        Assert.Equal(1, html.Split("<details class=\"toc-group\"").Length - 1);
+        Assert.Equal(1, html.Split("</details>").Length - 1);
+        // The summary keeps a real jump link to the parent's own section (invariant + a11y).
+        Assert.Contains("<summary><a class=\"toc-link\" href=\"#sec-parent\">Parent</a></summary>", html);
+        Assert.Contains("<a class=\"toc-link toc-h3\" href=\"#sec-child-1\">Child One</a>", html);
+        Assert.Contains("<a class=\"toc-link toc-h3\" href=\"#sec-child-2\">Child Two</a>", html);
+    }
+
+    [Fact]
+    public void RenderSidebar_ChildlessLevel2StaysAPlainLinkNotWrapped()
+    {
+        var html = Toc.RenderSidebar(new[]
+        {
+            new Toc.Entry(2, "Alone", "sec-alone"),
+            new Toc.Entry(2, "Also Alone", "sec-also-alone"),
+        });
+
+        Assert.DoesNotContain("toc-group", html);
+        Assert.Contains("<a class=\"toc-link\" href=\"#sec-alone\">Alone</a>", html);
+        Assert.Contains("<a class=\"toc-link\" href=\"#sec-also-alone\">Also Alone</a>", html);
+    }
+
+    [Fact]
+    public void RenderSidebar_StrayLeadingLevel3DegradesToPlainLink()
+    {
+        // No preceding level-2 to attach to — shouldn't occur in practice, but must degrade, never drop (NFR8).
+        var html = Toc.RenderSidebar(new[] { new Toc.Entry(3, "Orphan", "sec-orphan") });
+
+        Assert.DoesNotContain("toc-group", html);
+        Assert.Contains("<a class=\"toc-link toc-h3\" href=\"#sec-orphan\">Orphan</a>", html);
+    }
+
+    [Fact]
     public void WrapWithSidebar_NoEntriesReturnsContentUnwrapped()
     {
         const string main = "<article>content</article>";
