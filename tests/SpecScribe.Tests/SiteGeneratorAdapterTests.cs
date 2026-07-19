@@ -586,6 +586,27 @@ public class SiteGeneratorAdapterTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_NormalBmadLayout_DoesNotEmitUnrecognizedNoticeForAdrsDocsOrRetros()
+    {
+        // Pins the path model behind the closed Epic 4 KnownIndexGroups debt: UnrecognizedTopLevelFolders walks
+        // SourceRoot only. Separate AdrSourceRoot (docs/adrs) never enters sourceRelatives; retros live under
+        // already-well-known implementation-artifacts/. A normal BMad fixture must not emit unrecognized-folder
+        // notices — and adrs/docs/retros must stay OUT of the well-known set (a no-op whitelist must fail this pin).
+        // [spec-close-known-index-groups-misdiagnosis]
+        Assert.False(HtmlTemplater.IsWellKnownTopLevelFolder("adrs"));
+        Assert.False(HtmlTemplater.IsWellKnownTopLevelFolder("docs"));
+        Assert.False(HtmlTemplater.IsWellKnownTopLevelFolder("retros"));
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        Assert.DoesNotContain(events, e =>
+            e.Outcome == GenerationOutcome.Skipped
+            && e.Message is not null
+            && e.Message.Contains("unrecognized top-level folder", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void GenerateAll_CleanFixture_ProducesAboutAndAllClearDiagnostics()
     {
         // Story 4.8: both pages are written on every full run. This fixture is clean (valid sprint yaml, only

@@ -2594,15 +2594,16 @@ public sealed class SiteGenerator
         }));
     }
 
-    /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per top-level source folder
-    /// outside the well-known home-index set — the "unrecognized structure degrades, visibly" half of the
-    /// grouping contract. Derived from the source tree (not the rendered bands) so a folder whose docs were
-    /// all consumed into dedicated surfaces still reports its unrecognized shape once. A top-level folder
-    /// whose files are ENTIRELY under a nested implementation-artifacts segment (e.g.
-    /// <c>tracking/implementation-artifacts/1-1-x.md</c>) is excluded: those docs land in the known
-    /// Implementation Artifacts band (see <see cref="HtmlTemplater.RenderIndex"/>'s ancestor-tolerant match),
-    /// so flagging the wrapper folder as "unrecognized" would contradict Task 4's location tolerance and the
-    /// notice's own claim that the docs "render in their own home-index section." [Story 4.2 Task 5] [Review][Patch]</summary>
+    /// <summary>One <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per top-level SourceRoot folder
+    /// outside the well-known set — the "unrecognized structure degrades, visibly" half of the grouping contract.
+    /// Derived from SourceRoot relatives only. When <see cref="ForgeOptions.AdrSourceRoot"/> is outside SourceRoot
+    /// (normal BMad: SourceRoot=<c>_bmad-output</c>, ADRs at <c>docs/adrs</c>), ADR files never appear here; if
+    /// SourceRoot contains the ADR tree (e.g. repo-root as source), the first-segment folder (often <c>docs</c>)
+    /// is still evaluated like any other SourceRoot top. A top-level folder whose files are ENTIRELY under a nested
+    /// implementation-artifacts segment (e.g. <c>tracking/implementation-artifacts/1-1-x.md</c>) is excluded:
+    /// those paths are already covered by the known Implementation Artifacts prefix, so flagging the wrapper as
+    /// "unrecognized" would contradict Task 4's location tolerance.
+    /// [Story 4.2 Task 5] [Review][Patch] [spec-close-known-index-groups-misdiagnosis]</summary>
     private static IReadOnlyList<AdapterDiagnostic> UnrecognizedTopLevelFolders(IReadOnlyList<string> sourceRelatives)
     {
         var normalized = sourceRelatives.Select(PathUtil.NormalizeSlashes).ToList();

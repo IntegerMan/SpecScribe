@@ -327,7 +327,8 @@ action_items:
   - epic: 4
     action: "Schedule a story/spec to fix HtmlTemplater.KnownIndexGroups omitting 'adrs'/'retros' from the well-known folder set, so a normally-laid-out BMad repo doesn't permanently trip an 'unrecognized top-level folder' notice for its own ADR directory (blocks Story 4.8's all-clear diagnostics state from ever being reachable on real projects)."
     owner: "Alice (Product Owner)"
-    status: open
+    status: done # misdiagnosed; see spec-close-known-index-groups-misdiagnosis
+
   - epic: 4
     action: "Before Epic 6 Story 6.1 (view-model contract) starts, read Story 4.1's ingestion-vs-delivery-adapter distinction (AD-1 vs AD-2) directly, so 6.1's contract naming doesn't collide with IArtifactAdapter."
     owner: "create-story runner for 6.1"
@@ -351,7 +352,8 @@ action_items:
   - epic: 6
     action: "Fix KnownIndexGroups omitting 'adrs'/'retros' (carried from Epic 4 Action #1) - now in DashboardViewBuilder after Story 6.2's byte-identical relocation; needs its own story with the golden-diff drill, not a byte-identical patch."
     owner: "Charlie (Senior Dev)"
-    status: open
+    status: done # misdiagnosed; see spec-close-known-index-groups-misdiagnosis
+
   - epic: 6
     action: "Close the F5-in-real-VS-Code smoke for the shipped 6.4/6.5/6.8-6.12 extension surface - the Project Lead's ongoing manual VS Code + webview testing satisfies this going forward; record done after the first live pass."
     owner: "Matthew (Project Lead)"
@@ -383,7 +385,8 @@ action_items:
   - epic: 8
     action: "Carry forward: fix KnownIndexGroups omitting adrs/retros (open since Epic 4 / Epic 6 Action)"
     owner: "Charlie (Senior Dev)"
-    status: open
+    status: done # misdiagnosed; see spec-close-known-index-groups-misdiagnosis
+
   - epic: 9
     action: "When correct-course appends would roughly double an epic's story count, split into a sibling epic (or freeze a contract at the boundary) instead of absorbing the second arc"
     owner: "Alice (Product Owner) + Amelia (Developer)"
@@ -403,7 +406,8 @@ action_items:
   - epic: 9
     action: "Carry forward: fix KnownIndexGroups omitting adrs/retros (open since Epic 4) — burn down via portal visibility, not a blocking debt sprint"
     owner: "Charlie (Senior Dev)"
-    status: open
+    status: done # misdiagnosed; see spec-close-known-index-groups-misdiagnosis
+
   - epic: 9
     action: "Carry forward: formalize visual-intent elicitation in create-story process"
     owner: "Sally (UX Designer)"

@@ -9,10 +9,14 @@ namespace SpecScribe;
 /// [Story 6.2; home-index bands removed in spec-declutter-home-dashboard]</summary>
 public static class DashboardViewBuilder
 {
-    /// <summary>The ordered WELL-KNOWN home-index groups (friendly title + source-path prefix), fixed order
-    /// Overview → Planning → Spec Kernel → Implementation. Relocated verbatim from <c>HtmlTemplater</c> (its
-    /// former <c>KnownIndexGroups</c>) — the known set renders exactly as it always has; only folders OUTSIDE it
-    /// get the appended structure-derived bands. [Story 4.2 Task 3; relocated Story 6.2]</summary>
+    /// <summary>The ordered WELL-KNOWN <see cref="ForgeOptions.SourceRoot"/> top-level folders (friendly title +
+    /// source-path prefix), fixed order Overview → Planning → Spec Kernel → Implementation. Relocated verbatim
+    /// from <c>HtmlTemplater</c> (its former <c>KnownIndexGroups</c>). Titles are unused post-declutter (home-index
+    /// bands removed); the prefixes alone gate <see cref="IsWellKnownTopLevelFolder"/>. This set is SourceRoot-only —
+    /// ADR roots (<see cref="ForgeOptions.AdrSourceRoot"/>, typically <c>docs/adrs</c>) never appear as SourceRoot
+    /// tops, and retros live under the already-listed <c>implementation-artifacts/</c> prefix (not a top-level
+    /// <c>retros/</c> folder), so do NOT "fix" all-clear diagnostics by adding <c>adrs</c>/<c>retros</c> here
+    /// (that was a misdiagnosed Epic 4 debt). [Story 4.2 Task 3; relocated Story 6.2; spec-close-known-index-groups-misdiagnosis]</summary>
     private static readonly (string Title, string Prefix)[] KnownIndexGroups =
     {
         ("Overview", ""),
@@ -21,9 +25,11 @@ public static class DashboardViewBuilder
         ("Implementation Artifacts", BmadArtifactAdapter.ImplementationArtifactsDirName),
     };
 
-    /// <summary>Whether a top-level source folder is one of the well-known home-index groups — the signal the
-    /// generator uses to emit an "unrecognized structure" notice for anything else. Relocated from
-    /// <c>HtmlTemplater</c>; <see cref="HtmlTemplater.IsWellKnownTopLevelFolder"/> now delegates here. [Story 4.2 Task 3/5]</summary>
+    /// <summary>Whether a top-level <see cref="ForgeOptions.SourceRoot"/> folder is one of the well-known groups —
+    /// the signal the generator uses to emit an "unrecognized structure" notice for anything else. Relocated from
+    /// <c>HtmlTemplater</c>; <see cref="HtmlTemplater.IsWellKnownTopLevelFolder"/> now delegates here. Do not extend
+    /// this for ADR/<c>retros</c> roots — those are not SourceRoot tops in normal BMad layout (see
+    /// <c>KnownIndexGroups</c>). [Story 4.2 Task 3/5; spec-close-known-index-groups-misdiagnosis]</summary>
     public static bool IsWellKnownTopLevelFolder(string folder) =>
         KnownIndexGroups.Any(g => g.Prefix.Length > 0 && string.Equals(g.Prefix, folder, StringComparison.OrdinalIgnoreCase));
 
