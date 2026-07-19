@@ -157,7 +157,8 @@ public sealed partial class HtmlRenderAdapter
             commands.Command("create-epics-and-stories"),
             "No epics yet. Break your plan into epics and stories with",
             "No epics yet — add them to your plan to see them here.");
-        sb.Append($"<div class=\"epic-card empty-state\">\n  <div class=\"pending-note\">{note}</div>\n</div>\n\n");
+        // Story 10.8: routes through the promoted ListRow.EmptyState helper (byte-identical output).
+        sb.Append(ListRow.EmptyState(note, "epic-card"));
     }
 
     // ----- Epic page ----------------------------------------------------------------------------------------

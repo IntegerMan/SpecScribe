@@ -1062,6 +1062,38 @@ public class RequirementsParserTests
         Assert.DoesNotContain(">Planned<", fr4Card);
     }
 
+    [Fact]
+    public void RenderIndex_RequirementCard_AlreadyConformsToSharedRowAnatomy()
+    {
+        // Story 10.8 AC1: req-card is one of the six list-shaped indexes generalized onto the shared row
+        // anatomy (primary label, badge via StatusStyles, ≤2 metadata items, one primary link). Its badge
+        // and metadata chip already route through the Story 8.2 vocabulary and its own established CSS
+        // family, so no markup rewrite was needed here — this pins that the contract already holds: exactly
+        // one status badge and exactly one primary req-id-link per card.
+        var (reqs, epics) = ParseMultiEpic();
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+
+        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var fr1 = html[html.IndexOf("id=\"fr1\"", StringComparison.Ordinal)..];
+        var fr1Card = fr1[..fr1.IndexOf("</div>\n\n", StringComparison.Ordinal)];
+
+        Assert.Equal(1, CountOccurrences(fr1Card, "req-id-link"));
+        Assert.Equal(1, CountOccurrences(fr1Card, "status-badge"));
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+        return count;
+    }
+
     private static string RenderDetailWithSources(string reqId, IReadOnlyDictionary<int, string>? retroMap, string? deferredWorkHref)
     {
         var (reqs, epics) = ParseMultiEpic();

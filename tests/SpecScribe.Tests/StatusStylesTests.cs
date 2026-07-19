@@ -415,4 +415,23 @@ public class StatusStylesTests
         Assert.NotEqual(StatusStyles.StageMeaning("unmapped"), StatusStyles.StageMeaning("deferred"));
         Assert.NotEqual(StatusStyles.StageMeaning("unmapped"), StatusStyles.StageMeaning("pending"));
     }
+
+    [Fact]
+    public void FreeTextBadge_KnownLifecycleWord_RoutesThroughCanonicalBadge()
+    {
+        var badge = StatusStyles.FreeTextBadge("Accepted");
+        // "Accepted" isn't itself a sprint token, but this pins the escape hatch: anything ForSprint recognizes
+        // (e.g. "done") must route through the canonical Badge, never the raw slugged-pill fallback.
+        var known = StatusStyles.FreeTextBadge("done");
+        Assert.Contains("status-badge done", known);
+        Assert.DoesNotContain("pill status-", known);
+    }
+
+    [Fact]
+    public void FreeTextBadge_UnrecognizedWord_DegradesToSluggedPill()
+    {
+        var badge = StatusStyles.FreeTextBadge("Superseded by ADR 2");
+        Assert.Contains("class=\"pill status-superseded-by-adr-2\"", badge);
+        Assert.Contains("Superseded by ADR 2", badge);
+    }
 }

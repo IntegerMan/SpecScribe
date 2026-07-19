@@ -163,8 +163,11 @@ public sealed record FileInsight(
 /// bounded numstat fetch: per-file change frequency + churn + the file's contributors (the master-detail
 /// "who works on this file" drill-down), and the per-day activity series for the analyzed window
 /// (<paramref name="CommitCount"/> commits, <paramref name="ContributorCount"/> distinct authors — headline
-/// context only, never a ranked people list). <paramref name="TotalFilesTouched"/> is the full distinct-file
-/// count before the top-N take, so the page can disclose when <see cref="Files"/> is truncated. [Story 3.8]</summary>
+/// context only, never a ranked people list). <paramref name="CommitCount"/> is always equal to
+/// <paramref name="Activity"/>'s summed counts by construction (a commit whose date failed to parse is excluded
+/// from both, rather than inflating one total without the other). <paramref name="TotalFilesTouched"/> is the
+/// full distinct-file count before the top-N take, so the page can disclose when <see cref="Files"/> is
+/// truncated. [Story 3.8]</summary>
 public sealed record GitInsightsData(
     IReadOnlyList<FileChangeStat> Files,
     IReadOnlyList<(DateOnly Day, int Count)> Activity,
@@ -587,8 +590,13 @@ public static class GitMetrics
                     stamp = parsed;
                 }
                 subject = fields[3].Trim();
-                body = fields[4].Trim();
-                numstatBlock = fields[5];
+                // A free-text body containing a raw 0x1F byte splits into extra fields here, which would shift
+                // the numstat block off a fixed fields[5] and silently drop everything after it. The format
+                // string's trailing %x1f always closes the body, so the numstat rows are always the LAST field
+                // regardless of how many sentinel-shaped pieces the body itself was split into; rejoin those
+                // middle pieces (re-inserting the sentinel) to recover the original body text.
+                body = string.Join(FieldSentinel, fields[4..^1]).Trim();
+                numstatBlock = fields[^1];
             }
             else
             {
@@ -721,7 +729,12 @@ public static class GitMetrics
             .Select(kv => (Day: kv.Key, Count: kv.Value))
             .ToList();
 
-        return new GitInsightsData(files, activity, commits.Count, allAuthors.Count, fileStats.Count);
+        // CommitCount is derived from the same dated commits Activity sums (never commits.Count, which would
+        // include any commit whose %ad timestamp failed to parse and was therefore excluded from byDay) — the
+        // headline "N commits analyzed" figure can then never disagree with the activity series below it.
+        var commitCount = activity.Sum(a => a.Count);
+
+        return new GitInsightsData(files, activity, commitCount, allAuthors.Count, fileStats.Count);
     }
 
     /// <summary>History rows kept per file — recent commits that touched it, newest-first. Bounded so a

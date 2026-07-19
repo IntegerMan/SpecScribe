@@ -1037,6 +1037,10 @@ public class HtmlTemplaterTests
         Assert.DoesNotContain("/bmad-create-epics-and-stories", noCmd);
         Assert.DoesNotContain("data-copy", noCmd);
         Assert.Contains("No epics yet", noCmd);
+
+        // Story 10.8: now routed through the shared ListRow.EmptyState helper — byte-identical
+        // .epic-card.empty-state + .pending-note wrapper.
+        Assert.Contains("<div class=\"epic-card empty-state\">\n  <div class=\"pending-note\">", noCmd);
     }
 
     [Fact]

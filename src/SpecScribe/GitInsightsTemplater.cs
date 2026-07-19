@@ -174,7 +174,10 @@ public static class GitInsightsTemplater
         Func<string, string?>? fileHref,
         Func<string, string?>? commitHref)
     {
-        sb.Append($"      <div class=\"gi-contributors-panel chart-panel\" id=\"gi-file-{index}\" role=\"region\" aria-label=\"Contributors to {PathUtil.Html(file.Path)}\">\n");
+        // tabindex="-1": not in the tab order, but focusable via script — lets the progressive-enhancement
+        // script (specscribe.js) move focus here when :target reveals this panel, without adding an extra
+        // no-JS tab stop. [Deferred, Story 3.8]
+        sb.Append($"      <div class=\"gi-contributors-panel chart-panel\" id=\"gi-file-{index}\" role=\"region\" tabindex=\"-1\" aria-label=\"Contributors to {PathUtil.Html(file.Path)}\">\n");
         sb.Append("        <div class=\"gi-detail-head\">\n");
         sb.Append($"          <h3 class=\"gi-detail-title\"><code>{PathUtil.Html(file.Path)}</code></h3>\n");
 

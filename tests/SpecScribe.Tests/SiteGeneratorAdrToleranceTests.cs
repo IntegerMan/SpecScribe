@@ -183,4 +183,28 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         Assert.Contains("status-superseded", File.ReadAllText(Path.Combine(Site, "adrs", "0001-superseded.html")));
         Assert.Contains("status-deprecated", File.ReadAllText(Path.Combine(Site, "adrs", "0002-deprecated.html")));
     }
+
+    [Fact]
+    public void GenerateAll_SynthesizedLanding_RoutesThroughSharedListRowPrimitive()
+    {
+        // Story 10.8: the synthesized ADR landing (no README/index-slot record) now renders each entry through
+        // ListRow — summary + status badge + a date chip + one primary "View record" link — instead of the old
+        // bare "<a>title</a> — status" line. No README here, so this exercises the synthesized branch.
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0001-widgets.md"),
+            "# ADR 0001: Use Widgets\n\n**Status:** Accepted\n\n**Date:** 2026-07-10\n\n## Context\n\nWe chose widgets because they scale well.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        var landing = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+        Assert.Contains("<ul class=\"adr-landing-list list-rows-list\">", landing);
+        Assert.Contains("<li class=\"list-row\">", landing);
+        Assert.Contains("<strong>ADR 0001: Use Widgets</strong>", landing);
+        Assert.Contains("We chose widgets because they scale well.", landing);
+        // "Accepted" isn't a recognized lifecycle word, so it degrades to the slugged pill (never color-only).
+        Assert.Contains("class=\"pill status-accepted\"", landing);
+        Assert.Contains("<span class=\"list-row-chip pill\">Jul 10, 2026</span>", landing);
+        Assert.Contains("<a class=\"list-row-primary\" href=\"0001-widgets.html\">View record &rarr;</a>", landing);
+    }
 }

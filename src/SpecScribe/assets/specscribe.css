@@ -2686,6 +2686,15 @@ a.ref-file-node:focus-visible {
   color: var(--ink-light);
 }
 .epic-remaining-title { font-size: 0.85rem; font-weight: bold; color: var(--ink); line-height: 1.3; }
+/* Status as visible text, never color-only (UX-DR17) — the left accent bar is the at-a-glance signal, this
+   label is the always-present one a colorblind or non-visual reader relies on. [code-review 2026-07-19] */
+.epic-remaining-status {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-light);
+}
 .epic-remaining-count { font-size: 0.72rem; color: var(--ink-faded); }
 .epic-remaining-followups { color: var(--sb-followup-open, #d97706); }
 
@@ -5785,37 +5794,51 @@ body:has(.followup-group-wrap) .doc-header {
 }
 
 .followup-rows-list,
+.list-rows-list,
 .action-items-list,
 .deferred-items-list { list-style: none; margin: 0; padding: 0; }
 
-.followup-row {
+/* Story 10.8: .list-row is the generalized sibling of .followup-row — same card shell (background/border/
+   padding), reused by the ADR landing list and (nested inside their own pre-existing row shells) the
+   requirements/epics/timeline families' metadata chips. .followup-row keeps its own class untouched — the
+   two are combined here only so their SHARED visual rules never drift apart. */
+.followup-row,
+.list-row {
   background: var(--warm-white); border: 1px solid var(--border);
   border-left: 3px solid var(--status-review); border-radius: 6px;
   padding: 0.7rem 1rem; margin-bottom: 0.55rem;
 }
-.followup-row.resolved {
+.followup-row.resolved,
+.list-row.resolved {
   border-left-color: var(--status-done);
   opacity: 0.78;
 }
-.followup-row-scan {
+.followup-row-scan,
+.list-row-scan {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem 0.85rem;
+  width: 100%;
 }
-.followup-row-summary {
+.followup-row-summary,
+.list-row-summary {
   flex: 1 1 16rem; min-width: 0;
   color: var(--ink); font-size: 0.92rem; line-height: 1.45;
   text-wrap: pretty;
 }
-.followup-row-meta {
+.followup-row-meta,
+.list-row-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.55rem;
   flex: 0 1 auto; margin-left: auto;
 }
-.followup-row-source { flex-shrink: 0; }
-.followup-row-primary {
+.followup-row-source,
+.list-row-chip { flex-shrink: 0; }
+.followup-row-primary,
+.list-row-primary {
   flex-shrink: 0; font-size: 0.78rem; color: var(--teal);
   text-decoration: none; border-bottom: 1px dotted var(--gold-light);
   cursor: pointer; list-style: none; white-space: nowrap;
 }
-a.followup-row-primary:hover { color: var(--rust); }
+a.followup-row-primary:hover,
+a.list-row-primary:hover { color: var(--rust); }
 
 /* Per-row disclosure — pure CSS, reuses dev-agent caret grammar (NFR5). */
 .followup-row-detail { margin-top: 0.45rem; }

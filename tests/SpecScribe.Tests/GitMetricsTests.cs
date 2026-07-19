@@ -522,6 +522,63 @@ public class GitMetricsTests
     }
 
     [Fact]
+    public void ParseNumstatRecords_BodyContainingRawFieldSentinelDoesNotTruncateNumstatRows()
+    {
+        // A body embedding the raw 0x1F field-sentinel byte (pathological, but not impossible in arbitrary
+        // commit text) used to shift the numstat block off a fixed fields[5] index and silently drop rows
+        // after it. It must not truncate — every numstat row still lands in Files. [Deferred, Story 3.8]
+        var body = "before" + FS + "after";
+        var log = Rec("abc123", "Alice", "2026-07-01T09:15", "Subject", body,
+            "3\t1\tsrc/A.cs",
+            "10\t0\tsrc/B.cs");
+
+        var commit = Assert.Single(GitMetrics.ParseNumstatRecords(log));
+
+        Assert.Equal(body, commit.Body);
+        Assert.Equal(2, commit.Files.Count);
+        Assert.Equal(new DeepFileChange("src/A.cs", 3, 1), commit.Files[0]);
+        Assert.Equal(new DeepFileChange("src/B.cs", 10, 0), commit.Files[1]);
+    }
+
+    [Fact]
+    public void BuildInsights_CommitCountNeverDivergesFromSummedActivity()
+    {
+        // A commit with no parseable timestamp is still counted per-file, but must not inflate CommitCount past
+        // what Activity sums — the two totals can never disagree by construction. [Deferred, Story 3.8]
+        var commits = new[]
+        {
+            Commit("h2", "Alice", "2026-07-02T10:00", ("A.cs", 1, 0)),
+            new DeepCommit("h1", "Bob", null, "s", "", new[] { new DeepFileChange("A.cs", 1, 0) }),
+        };
+
+        var insights = GitMetrics.BuildInsights(commits);
+
+        Assert.Equal(2, Assert.Single(insights.Files).Changes); // both commits still counted per-file
+        Assert.Equal(insights.Activity.Sum(a => a.Count), insights.CommitCount);
+        Assert.Equal(1, insights.CommitCount); // the undated commit is excluded from this dated aggregate
+    }
+
+    [Fact]
+    public void BuildInsights_ChurnSumsEveryNumstatRowWhileChangesCountsOncePerCommit()
+    {
+        // A rename+modify pair resolving to the same path emits two numstat rows within one commit. Changes
+        // counts the commit once (dedup via seenInCommit); churn sums both rows regardless — an intentional,
+        // documented tradeoff (deferred-work.md, story-3-8), pinned here so it can't silently change either
+        // way without a test failing.
+        var commit = new DeepCommit("h1", "Alice", new DateTime(2026, 7, 1, 10, 0, 0), "s", "", new[]
+        {
+            new DeepFileChange("A.cs", 3, 1),
+            new DeepFileChange("A.cs", 2, 0),
+        });
+
+        var file = Assert.Single(GitMetrics.BuildInsights(new[] { commit }).Files);
+
+        Assert.Equal(1, file.Changes);      // deduped: one commit, one change
+        Assert.Equal(5, file.LinesAdded);   // churn sums both rows: 3 + 2
+        Assert.Equal(1, file.LinesDeleted); // churn sums both rows: 1 + 0
+    }
+
+    [Fact]
     public void BuildInsights_OrdersFilesByChangeCountThenOrdinalPathAndTruncates()
     {
         var commits = new[]

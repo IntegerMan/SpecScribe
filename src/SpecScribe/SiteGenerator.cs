@@ -834,7 +834,10 @@ public sealed class SiteGenerator
             try
             {
                 var body = new StringBuilder();
-                body.Append("<p>Architecture decision records for this project.</p>\n<ul class=\"adr-landing-list\">\n");
+                // Story 10.8: the most primitive of the six list-shaped indexes — routed onto the shared
+                // ListRow anatomy (summary, status badge, metadata chip, one primary link) instead of the
+                // old bare "<a>title</a> — status" line.
+                body.Append("<p>Architecture decision records for this project.</p>\n<ul class=\"adr-landing-list list-rows-list\">\n");
                 foreach (var adr in _adrs)
                 {
                     // Records live under the adrs/ output subdir alongside this landing — the href is the
@@ -843,12 +846,17 @@ public sealed class SiteGenerator
                     var href = adr.OutputRelativePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
                         ? adr.OutputRelativePath[prefix.Length..]
                         : adr.OutputRelativePath;
-                    body.Append($"<li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(adr.Title)}</a>");
-                    if (!string.IsNullOrWhiteSpace(adr.Status))
-                    {
-                        body.Append($" — {PathUtil.Html(adr.Status)}");
-                    }
-                    body.Append("</li>\n");
+
+                    var summaryHtml = adr.Summary is { Length: > 0 } summary
+                        ? $"<strong>{PathUtil.Html(adr.Title)}</strong> — {PathUtil.Html(summary)}"
+                        : PathUtil.Html(adr.Title);
+                    var badgeHtml = !string.IsNullOrWhiteSpace(adr.Status) ? StatusStyles.FreeTextBadge(adr.Status) : null;
+                    var chips = adr.Date is { } date
+                        ? new[] { ListRow.Chip(PathUtil.Html(PortalDates.Day(date))) }
+                        : Array.Empty<string>();
+                    var primaryLink = ListRow.PrimaryLink(PathUtil.Html(href), "View record");
+
+                    ListRow.Render(body, summaryHtml, badgeHtml, chips, primaryLink);
                 }
                 body.Append("</ul>\n");
 

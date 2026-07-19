@@ -461,13 +461,17 @@ public static class Charts
     }
 
     /// <summary>Companion scannable tile grid for the project-glance sunburst (AC1): one clickable tile per
-    /// epic (plus Follow-ups / Unplanned roots when non-empty) — a small responsive grid with a left status
-    /// accent bar (reused <c>--status-*</c>/chart-local tokens, never color-only — the tile's own text always
-    /// carries the same status/count info) — so a reader is never limited to hitting shrinking SVG wedges.
-    /// Same destinations as the chart (epic page / generated group page); counts reuse the existing aggregate
-    /// helpers, never a second ledger parse. Returns just the grid (no panel wrapper or heading — callers own
-    /// those, exactly like <see cref="Sunburst"/>) so the Dashboard and Epics-index glance panels render this
-    /// identically. Empty synthetic roots are omitted (NFR8); returns "" when there are no epics at all.</summary>
+    /// epic that still has remaining work (plus Follow-ups / Unplanned roots when non-empty) — a small
+    /// responsive grid with a left status accent bar AND a visible status-label span (reused
+    /// <c>--status-*</c>/chart-local tokens; never color-only — the label text always restates the same
+    /// status the accent conveys) — so a reader is never limited to hitting shrinking SVG wedges. A fully
+    /// done epic with zero open follow-ups has nothing left to report here (NFR8) — it's still reachable via
+    /// the sunburst's own inner-ring wedge, the Epic Status tile, and the Progress-by-Epic panel, so omitting
+    /// it isn't a lost destination, just a decluttered "what's left" list. Same destinations as the chart
+    /// (epic page / generated group page); counts reuse the existing aggregate helpers, never a second ledger
+    /// parse. Returns just the grid (no panel wrapper or heading — callers own those, exactly like
+    /// <see cref="Sunburst"/>) so the Dashboard and Epics-index glance panels render this identically. Returns
+    /// "" when there is nothing left to show at all.</summary>
     public static string SunburstCompanionList(
         EpicsModel model,
         FollowUpGeometry? followUps = null,
@@ -481,21 +485,27 @@ public static class Charts
         var knownEpics = epics.Select(e => e.Number).ToHashSet();
 
         var sb = new StringBuilder();
-        sb.Append("<div class=\"epic-remaining-grid\">\n");
+        var tileCount = 0;
 
         foreach (var epic in epics)
         {
             var (openCount, _) = CountEpicFollowUpAggregates(epic, geometry, unplannedGeo);
             var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
+            // Nothing remaining to report: every story done, retro closed, no open follow-ups (NFR8).
+            if (epicClass == "done" && openCount == 0) continue;
+
+            tileCount++;
             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
+            var statusLabel = StatusStyles.EpicLabel(epicClass);
             var storyNote = $"{epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}";
             var followNote = openCount > 0
                 ? $"{openCount} open {Plural(openCount, "follow-up", "follow-ups")}"
                 : string.Empty;
-            var aria = $"Epic {epic.Number}: {epicTitle} — {storyNote}" + (followNote.Length > 0 ? $", {followNote}" : string.Empty);
+            var aria = $"Epic {epic.Number}: {epicTitle} — {statusLabel}, {storyNote}" + (followNote.Length > 0 ? $", {followNote}" : string.Empty);
             sb.Append($"  <a class=\"epic-remaining-tile epic-remaining-{epicClass}\" href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(aria)}\">\n");
             sb.Append($"    <span class=\"epic-remaining-num\">Epic {epic.Number}</span>\n");
             sb.Append($"    <span class=\"epic-remaining-title\">{Html(epicTitle)}</span>\n");
+            sb.Append($"    <span class=\"epic-remaining-status\">{Html(statusLabel)}</span>\n");
             sb.Append($"    <span class=\"epic-remaining-count\">{Html(storyNote)}</span>\n");
             if (followNote.Length > 0)
                 sb.Append($"    <span class=\"epic-remaining-count epic-remaining-followups\">{Html(followNote)}</span>\n");
@@ -505,6 +515,7 @@ public static class Charts
         var unattributed = geometry.OrphanActionItems(knownEpics);
         if (unattributed.Count > 0)
         {
+            tileCount++;
             var open = unattributed.Count(a => !FollowUpGeometry.IsDone(a));
             var itemNote = $"{unattributed.Count} unattributed {Plural(unattributed.Count, "item", "items")}";
             var aria = itemNote + (open > 0 ? $", {open} open" : string.Empty);
@@ -517,6 +528,7 @@ public static class Charts
 
         if (unplannedGeo.SunburstUnplannedWeight > 0 && unplannedGeo.GroupRootHref is { Length: > 0 } rootHref)
         {
+            tileCount++;
             var count = unplannedGeo.SunburstUnplannedWeight;
             var countNote = $"{count} open {Plural(count, "item", "items")}";
             sb.Append($"  <a class=\"epic-remaining-tile epic-remaining-unplanned\" href=\"{Html(rootHref)}\" aria-label=\"Unplanned: {Html(countNote)}\">\n");
@@ -526,8 +538,9 @@ public static class Charts
             sb.Append("  </a>\n");
         }
 
-        sb.Append("</div>\n");
-        return sb.ToString();
+        if (tileCount == 0) return string.Empty;
+
+        return "<div class=\"epic-remaining-grid\">\n" + sb + "</div>\n";
     }
 
     /// <summary>Open/done aggregate wedges under a parent sweep. Omits empty sides (NFR8).</summary>

@@ -78,9 +78,17 @@ public static class TimelineTemplater
                 // separator convention) — never a raw non-ASCII char run through the HTML encoder.
                 var summary = string.Join(" &middot; ", parts.Select(PathUtil.Html));
 
+                // Story 10.8: shares the list-row visual grammar (background/spacing/meta cluster) with every
+                // other index via the CSS the ListRow primitive defines, while keeping the exact `timeline-row`/
+                // `timeline-date`/`timeline-summary` class names and structure the existing suite pins — commits
+                // carry no lifecycle status, so this is the badge-less path (summary + metadata chip + link only).
                 sb.Append("  <li class=\"timeline-row\">\n");
-                sb.Append($"    <a class=\"timeline-date\" href=\"commits/{Charts.D(day)}.html\">{PathUtil.Html(Charts.DReadable(day))}</a>\n");
-                sb.Append($"    <span class=\"timeline-summary\">{summary}</span>\n");
+                sb.Append("    <div class=\"list-row-scan\">\n");
+                sb.Append($"      <a class=\"timeline-date\" href=\"commits/{Charts.D(day)}.html\">{PathUtil.Html(Charts.DReadable(day))}</a>\n");
+                sb.Append("      <div class=\"list-row-meta\">\n");
+                sb.Append($"        <span class=\"timeline-summary\">{summary}</span>\n");
+                sb.Append("      </div>\n");
+                sb.Append("    </div>\n");
                 sb.Append("  </li>\n");
             }
             sb.Append("</ol>\n");

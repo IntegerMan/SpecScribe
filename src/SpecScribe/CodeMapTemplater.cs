@@ -182,7 +182,11 @@ public static class CodeMapTemplater
     /// every file with its path, line count, and (when present) git metrics as TEXT, so color is never the sole
     /// signal (AC #4). Ordered by the default dimension (change frequency) descending, then lines, so the reading
     /// order is meaningful. Each path links to its in-portal code page when the guarded resolver supplies one.
-    /// [Subtask 4.6]</summary>
+    /// [Subtask 4.6]
+    /// <para><b>Story 10.8 scope:</b> stays a genuine <c>&lt;table&gt;</c> (Design Direction #5) — its multi-column
+    /// numeric header row is load-bearing for the accessible/no-JS reading of the treemap, and files carry no
+    /// lifecycle status, so there is no badge to route through the shared row primitive. Only a badge-bearing
+    /// row family gets rewired onto <see cref="ListRow"/>.</para></summary>
     private static void AppendFileTable(StringBuilder sb, IReadOnlyList<CodeMapNode> files, bool hasMetrics, Func<string, string?>? fileHref, string prefix)
     {
         var ordered = files

@@ -905,11 +905,14 @@ public class ChartsTests
         var list = Charts.SunburstCompanionList(model, followUps: geometry);
 
         Assert.Contains("class=\"epic-remaining-grid\"", list);
-        Assert.Contains("aria-label=\"Epic 1: First Epic — 1 story\"", list);
+        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story\"", list);
         Assert.Contains("href=\"epics/epic-1.html\"", list);
         Assert.Contains("<span class=\"epic-remaining-num\">Epic 1</span>", list);
         Assert.Contains("<span class=\"epic-remaining-title\">First Epic</span>", list);
-        Assert.Contains("aria-label=\"Epic 2: Second — 1 story\"", list);
+        // Status is never color-only (UX-DR17) — a visible label span restates what the accent bar shows.
+        Assert.Contains("<span class=\"epic-remaining-status\">In development</span>", list);
+        Assert.Contains("aria-label=\"Epic 2: Second — Ready for dev, 1 story\"", list);
+        Assert.Contains("<span class=\"epic-remaining-status\">Ready for dev</span>", list);
         Assert.Contains("href=\"epics/epic-2.html\"", list);
         Assert.Contains($"href=\"{geometry.FollowUpsGroupHref}\"", list);
         Assert.Contains("1 unattributed item", list);
@@ -926,6 +929,62 @@ public class ChartsTests
             OverviewHtml = string.Empty,
             RequirementsInventoryHtml = string.Empty,
             Epics = Array.Empty<EpicInfo>(),
+        };
+
+        Assert.Equal(string.Empty, Charts.SunburstCompanionList(model));
+    }
+
+    [Fact]
+    public void SunburstCompanionList_DoneEpicWithNoOpenFollowUps_IsOmitted_ButDoneWithFollowUpsStays()
+    {
+        // Live owner feedback: a fully-done epic with nothing open has no "remaining work" to report here —
+        // it's still reachable via the sunburst's own epic wedge, Epic Status tile, and Progress by Epic.
+        // A done epic that STILL has open follow-ups is genuinely not finished, so it must stay (with a
+        // visible "Done" status label, never color-only).
+        var finishedEpic = Epic(Story("1.1", "Wrapped up", "done", 3, 3));
+        finishedEpic.HasRetrospective = true; // retro-gated "done" tier, not "review" [Story 1.5]
+        var doneWithFollowUps = new EpicInfo
+        {
+            Number = 2,
+            Title = "Done But Not Quite",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.FurtherDevelopment,
+            Stories = new[] { Story("2.1", "Wrapped up too", "done", 1, 1, epicNumber: 2) },
+            HasRetrospective = true, // retro-gated "done" tier, not "review" [Story 1.5]
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { finishedEpic, doneWithFollowUps },
+        };
+        var items = new[] { new SprintActionItem("Still open on Epic 2", "open", EpicNumber: 2, Owner: null) };
+        var work = new WorkInventory { QuickDev = Array.Empty<QuickDevEntry>(), Deferred = null };
+        var counts = ProjectCounts.Empty with { OpenActionItems = 1 };
+        var geometry = FollowUpGeometry.From(items, counts, work, epics: model);
+
+        var list = Charts.SunburstCompanionList(model, followUps: geometry);
+
+        Assert.DoesNotContain("Epic 1", list);
+        Assert.DoesNotContain("Wrapped up</span>", list);
+        Assert.Contains("aria-label=\"Epic 2: Done But Not Quite — Done, 1 story, 1 open follow-up\"", list);
+        Assert.Contains("<span class=\"epic-remaining-status\">Done</span>", list);
+        Assert.Contains("class=\"epic-remaining-tile epic-remaining-done\"", list);
+    }
+
+    [Fact]
+    public void SunburstCompanionList_AllEpicsFinishedAndNoOrphanRoots_ReturnsEmptyString()
+    {
+        // NFR8: when every epic is fully done with nothing open and there's no Follow-ups/Unplanned root
+        // either, the whole grid — not just individual tiles — must be empty, never an empty shell.
+        var finishedEpic = Epic(Story("1.1", "Wrapped up", "done", 2, 2));
+        finishedEpic.HasRetrospective = true; // retro-gated "done" tier, not "review" [Story 1.5]
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { finishedEpic },
         };
 
         Assert.Equal(string.Empty, Charts.SunburstCompanionList(model));

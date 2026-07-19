@@ -79,6 +79,22 @@ public class TimelineTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_Rows_ShareTheListRowMetaGrammar()
+    {
+        // Story 10.8: badge-less path onto the shared list-row anatomy — the row keeps its own
+        // timeline-row/timeline-date/timeline-summary classes but nests the summary inside .list-row-scan/
+        // .list-row-meta so it reads the same visual system as every other index.
+        var d1 = new DateOnly(2026, 7, 4);
+        var git = PulseFor((d1, 1));
+
+        var html = TimelineTemplater.RenderPage(git, new[] { d1 }, git.CommitsByDay, NoArtifacts, Nav());
+
+        Assert.Contains("<li class=\"timeline-row\">", html);
+        Assert.Contains("<div class=\"list-row-scan\">", html);
+        Assert.Contains("<div class=\"list-row-meta\">", html);
+    }
+
+    [Fact]
     public void RenderPage_GitPresent_RendersHeatmap()
     {
         var today = DateOnly.FromDateTime(DateTime.Now);

@@ -518,7 +518,23 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated for deferred-diagnostic-severity-bucketing: specscribe.css gained .status-badge.diag-info
         // (a third diagnostics-severity badge tone). This fixture emits no unrecognized-top-level-folder
         // notice, so only the shared stylesheet content shifted the hash.
-        const string expected = "bfe79913eede7c2f6b79156413d629be462a04bbdac68e564f77d0a974c00033";
+        // Regenerated for a Story 10.7 code-review self-catch + owner follow-up: (1) fixed a real bug — the
+        // tile-grid CSS comment literally contained "--status-*/chart-local" (no space), and CSS reads `*/` as
+        // a comment terminator wherever it appears, so that single character sequence silently truncated the
+        // ENTIRE rest of specscribe.css from the browser's perspective (only ~446 of ~1400 rules ever parsed,
+        // corrupting nearly every page's visible styling — caught by the owner reporting the home page looked
+        // broken, root-caused via document.styleSheets[0].cssRules.length in-browser). (2) owner review of the
+        // live tile grid: status was color-only (left accent bar, no text) — added a visible
+        // .epic-remaining-status label span (UX-DR17); a fully-done epic with zero open follow-ups now has
+        // nothing left to report so it's omitted from the panel entirely (NFR8) rather than showing a bare,
+        // uninformative "N stories" tile — this fixture's two epics both stay under 8 stories and have no
+        // follow-up geometry, so the visible delta here is the label span/status text + the CSS byte fix only.
+        // Regenerated for Story 10.8: specscribe.css gains the shared .list-row(-scan|-summary|-meta|-chip|-primary)
+        // family (combined selectors alongside .followup-row/.timeline-row so their shared visuals stay in one
+        // place — shifts every page's shared stylesheet content). The epics-index empty-state guidance now routes
+        // through ListRow.EmptyState (byte-identical output; this fixture always has epics so the branch never
+        // fires). Stable across 3 repeated runs before locking in (known stale-first-hash trap).
+        const string expected = "550297dda9b131edeac17a64de7df373accab42f3b3cbf927722a8105753d6d2";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -279,7 +279,10 @@ public static class CodeFileTemplater
     /// row's hash a guarded link to its per-commit page (null → plain <c>&lt;code&gt;</c>), and its date a guarded
     /// link to that day's <c>commits/{date}.html</c> page (null → plain text). Everything escaped (author names /
     /// subjects / hashes are free-text injection surfaces). Returns empty when the insight is null or carries no
-    /// history, so the caller drops the tab.</summary>
+    /// history, so the caller drops the tab.
+    /// <para><b>Story 10.8 scope:</b> like <see cref="CodeMapTemplater"/>'s file table, stays a genuine
+    /// <c>&lt;table&gt;</c> (Design Direction #5) — its Date/Commit/Author/Summary header row is load-bearing, and
+    /// commits carry no lifecycle status, so there is no badge to route through the shared row primitive.</para></summary>
     private static string BuildHistoryPanel(
         string prefix, FileInsight? insight, Func<string, string?>? commitHref, Func<DateOnly, string?>? dayHref)
     {

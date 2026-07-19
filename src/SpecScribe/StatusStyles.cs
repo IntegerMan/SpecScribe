@@ -203,6 +203,24 @@ public static class StatusStyles
     /// <para><b>Absent vs. unmapped (Story 8.2 AC #3):</b> null/empty → <c>pending</c> (unchanged). A non-empty
     /// string matching no known value → <c>unrecognized</c> (preserves the word via <see cref="SprintLabel"/>,
     /// never invents a lifecycle color).</para> [Story 2.3 Task 2; Story 8.2]</summary>
+    /// <summary>Badge for a free-text status word/phrase that isn't a known lifecycle stage's own vocabulary
+    /// (e.g. an ADR's "Accepted" / "Superseded by ADR 2" line): known lifecycle words route through
+    /// <see cref="ForSprint"/>'s canonical badge; anything else degrades to a slugged <c>.pill.status-*</c>
+    /// span so the word still carries the meaning (never color-only). Re-homed from
+    /// <c>HtmlTemplater.AppendStatusPill</c> so any surface with a free-text status field can call the
+    /// same rule. [Story 10.8]</summary>
+    public static string FreeTextBadge(string status)
+    {
+        var token = ForSprint(status);
+        if (token != "unrecognized")
+        {
+            return Badge(token, SprintLabel(status));
+        }
+
+        var cls = "status-" + status.ToLowerInvariant().Replace(' ', '-');
+        return $"<span class=\"pill {PathUtil.Html(cls)}\">{PathUtil.Html(status)}</span>";
+    }
+
     public static string ForSprint(string? status)
     {
         // Spaced aliases ("in progress", "ready for dev") normalize to kebab so they match the yaml forms.

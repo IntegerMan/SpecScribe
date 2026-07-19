@@ -216,18 +216,8 @@ public static class HtmlTemplater
     {
         if (string.IsNullOrEmpty(status)) return;
         // Lifecycle frontmatter (done / in-progress / …) uses the shared status-badge vocabulary
-        // so "done" reads green like every other surface — not a grey generic pill.
-        var token = StatusStyles.ForSprint(status);
-        if (token != "unrecognized")
-        {
-            sb.Append("    ");
-            sb.Append(StatusStyles.Badge(token, StatusStyles.SprintLabel(status)));
-            sb.Append('\n');
-            return;
-        }
-
-        var cls = "status-" + status.ToLowerInvariant().Replace(' ', '-');
-        sb.Append($"    <span class=\"pill {Html(cls)}\">{Html(status)}</span>\n");
+        // so "done" reads green like every other surface — not a grey generic pill. [Story 10.8: FreeTextBadge]
+        sb.Append("    ").Append(StatusStyles.FreeTextBadge(status)).Append('\n');
     }
 
     private static string Html(string s) => PathUtil.Html(s);

@@ -705,6 +705,25 @@ public class StylesheetTests
         Assert.Contains(".action-item-cross", css);
     }
 
+    // ---- Story 10.8: shared list-row grammar (generalized from followup-row) --------------------------------
+
+    [Fact]
+    public void Stylesheet_ListRow_SharesFollowUpRowGrammar()
+    {
+        var css = ReadStylesheet();
+        Assert.Contains(".list-rows-list", css);
+        Assert.Contains(".list-row", css);
+        Assert.Contains(".list-row.resolved", css);
+        Assert.Contains(".list-row-scan", css);
+        Assert.Contains(".list-row-summary", css);
+        Assert.Contains(".list-row-meta", css);
+        Assert.Contains(".list-row-chip", css);
+        Assert.Contains(".list-row-primary", css);
+        // Shared visual rules, never a competing duplicate of followup-row's own declarations.
+        Assert.Contains(".followup-row,", css);
+        Assert.Contains(".list-row {", css);
+    }
+
     // ---- Story 9.11: follow-up detail page --------------------------------
 
     [Fact]

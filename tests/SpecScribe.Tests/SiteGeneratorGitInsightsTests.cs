@@ -107,6 +107,25 @@ public class SiteGeneratorGitInsightsTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_DeepGitLaterDisabled_RemovesStaleHubFromSameOutputDir()
+    {
+        // Closes a coverage gap (deferred-work.md, story-3-8): a prior run's git-insights.html must not survive
+        // a later run with --deep-git off, into the SAME output dir. GenerateAll's own full recursive output
+        // wipe is what guarantees this — this test pins that guarantee for the hub page specifically.
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise gated hub removal; install git rather than silently skipping this test");
+
+        AssertNoErrors(new SiteGenerator(Options(deepGit: true)).GenerateAll());
+        Assert.True(File.Exists(HubPage), "hub must exist after the deep-git run");
+
+        var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
+
+        AssertNoErrors(events);
+        Assert.False(File.Exists(HubPage), "a stale hub from a prior deep-git run must not survive a later run with --deep-git off");
+        var index = File.ReadAllText(IndexPage);
+        Assert.DoesNotContain("git-insights.html", index);
+    }
+
+    [Fact]
     public void GenerateAll_TwoRunsProduceIdenticalHubMarkup()
     {
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise determinism; install git rather than silently skipping this test");

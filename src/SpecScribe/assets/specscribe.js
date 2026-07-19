@@ -305,6 +305,19 @@
     for (var i = 0; i < open.length; i++) open[i].removeAttribute("open");
   });
 
+  // ---- Focus management for :target-revealed panels [Deferred, Story 3.8] -----------------
+  // Pure-CSS :target reveals the Git Insights file-contributors panel, but never moves focus there — a
+  // keyboard/AT user's focus stays on the link they just activated even though the visible panel changed.
+  // Progressive enhancement only: with JS off, :target still reveals the panel, just without this focus jump.
+  function focusHashTarget() {
+    var id = location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (el && el.classList.contains("gi-contributors-panel")) el.focus();
+  }
+  window.addEventListener("hashchange", focusHashTarget);
+  if (location.hash) focusHashTarget();
+
   // ---- Sortable / filterable tables (Git Insights hub) [Story 3.8] -------------------------
   // Progressive enhancement ONLY (NFR-5): every table.js-sortable arrives complete and server-sorted, so
   // with JS off the page already reads correctly and this block simply never runs. When it does run it
