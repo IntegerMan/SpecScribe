@@ -1094,6 +1094,69 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("site-nav-local-context", keyViews);
     }
 
+    private static NavLocalItem[] Siblings(int count, int? activeIndex = null) =>
+        Enumerable.Range(1, count)
+            .Select(i => new NavLocalItem($"Story 1.{i}", $"story-1-{i}.html", activeIndex == i))
+            .ToArray();
+
+    [Fact]
+    public void RenderNav_LocalContext_AtInlineLimit_RendersEveryItemWithNoMoreDisclosure()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var localContext = new NavLocalContext("Stories in this epic", Siblings(8));
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("epics/epic-1.html", localContext));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.Equal(8, System.Text.RegularExpressions.Regex.Matches(keyViews, "local-context-pill\"").Count
+            + System.Text.RegularExpressions.Regex.Matches(keyViews, "local-context-pill active").Count);
+        Assert.DoesNotContain("key-view-trigger", keyViews);
+        Assert.DoesNotContain("More (", keyViews);
+    }
+
+    [Fact]
+    public void RenderNav_LocalContext_BeyondInlineLimit_CollapsesRemainderIntoMoreDisclosure()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var localContext = new NavLocalContext("Stories in this epic", Siblings(11));
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("epics/epic-1.html", localContext));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        // First 8 render inline as pills; the remaining 3 tuck behind the disclosure, reusing the SAME
+        // key-view-group/-trigger/-panel markup (and its existing JS/CSS) the generic quick-links band uses.
+        Assert.Contains("Story 1.1</a>", keyViews);
+        Assert.Contains("Story 1.8</a>", keyViews);
+        Assert.Contains("key-view-group", keyViews);
+        Assert.Contains("More (3)", keyViews);
+        Assert.Contains("aria-controls=\"local-context-more-panel\"", keyViews);
+        var panel = keyViews[keyViews.IndexOf("key-view-panel", StringComparison.Ordinal)..];
+        Assert.Contains("Story 1.9</a>", panel);
+        Assert.Contains("Story 1.10</a>", panel);
+        Assert.Contains("Story 1.11</a>", panel);
+        Assert.DoesNotContain("Story 1.9</a>", keyViews[..keyViews.IndexOf("key-view-group", StringComparison.Ordinal)]);
+    }
+
+    [Fact]
+    public void RenderNav_LocalContext_ActiveItemBeyondInlineLimit_IsPinnedIntoView()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var localContext = new NavLocalContext("Stories in Epic 1", Siblings(11, activeIndex: 10));
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("epics/story-1-10.html", localContext));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        // Story 1.10 is item #10 (past the 8-item inline window) but must still be visible without opening
+        // the "More" panel — pinned in as a plain-text active pill right before the disclosure trigger.
+        var beforeMore = keyViews[..keyViews.IndexOf("key-view-group", StringComparison.Ordinal)];
+        Assert.Contains("local-context-pill active", beforeMore);
+        Assert.Contains("aria-current=\"page\">Story 1.10</span>", beforeMore);
+        // Not duplicated inside the overflow panel.
+        var panel = keyViews[keyViews.IndexOf("key-view-panel", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("Story 1.10", panel);
+        Assert.Contains("More (2)", keyViews);
+    }
+
     [Fact]
     public void RenderDashboardBody_JourneySegments_DoNotDuplicateStatTiles()
     {
