@@ -1808,21 +1808,25 @@ public class ChartsTests
         var map = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
         var layout = map.Layout();
 
-        // A resolver that yields a page → the rect is wrapped in an <a>; role="link" is omitted on the rect
-        // itself since nesting an interactive role inside the already-interactive <a> is invalid ARIA.
+        // A resolver that yields a page → the rect is wrapped in an <a> that owns focus + tip (Tile pattern);
+        // the geometry child has no tabindex / role / tip attrs (nested focusable inside <a> is invalid a11y).
         var linked = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false,
             fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/A.cs.html\">", linked);
+        Assert.Contains("href=\"code/src/A.cs.html\"", linked);
+        Assert.Contains("class=\"js-tip\"", linked);
         Assert.DoesNotContain("role=\"link\"", linked);
-        // The whole-SVG root still carries role="img" (a separate, valid usage); only the per-rect role is omitted
-        // when the rect is wrapped in a real <a> — assert the rect markup itself has no role attribute.
-        Assert.Contains("<rect class=\"codemap-cell level-none js-tip\" tabindex=\"0\"", linked);
+        // Linked rect: geometry + fill class only — no tabindex, no js-tip, no role, no aria-label on the rect.
+        Assert.Contains("<rect class=\"codemap-cell level-none\"", linked);
+        Assert.DoesNotContain("<rect class=\"codemap-cell level-none js-tip\" tabindex=\"0\"", linked);
         Assert.DoesNotContain("role=\"img\" aria-label=\"A.cs", linked);
+        // Tip + name live on the wrapping <a>.
+        Assert.Matches(@"<a class=""js-tip"" href=""code/src/A\.cs\.html"" aria-label=""[^""]+"" data-tip-html=", linked);
 
         // No resolver → a plain, focusable rect, never a broken link (the 7.1-dormant seam).
         var plain = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
         Assert.DoesNotContain("<a href", plain);
         Assert.Contains("role=\"img\"", plain);
+        Assert.Contains("tabindex=\"0\"", plain);
     }
 
     [Fact]
@@ -1836,7 +1840,7 @@ public class ChartsTests
 
         var linked = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false,
             fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null, prefix: "../");
-        Assert.Contains("<a href=\"../code/src/A.cs.html\">", linked);
+        Assert.Contains("href=\"../code/src/A.cs.html\"", linked);
     }
 
     [Fact]
@@ -3172,6 +3176,30 @@ public class ChartsTests
         Assert.DoesNotContain("class=\"heatmap-first-commit\"", svg);
         // The window text still opens at the true first commit — old-repo history is never trimmed.
         Assert.Contains(Charts.DReadable(firstCommit), svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_FutureDatedFirstCommit_KeepsValidGridWithoutOrphanCaption()
+    {
+        // Clock/timezone skew can put the series Min day well after today. The young-repo lead-in
+        // (firstCommit − 7d) would then start after end and invert the window — clamp must keep a
+        // positive week count, and the first-commit caption must not appear without its SVG mark.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var firstCommit = today.AddDays(21);
+        var series = new (DateOnly Day, int Count)[] { (firstCommit, 2) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        var viewBox = System.Text.RegularExpressions.Regex.Match(svg, "viewBox=\"0 0 (\\d+) ");
+        Assert.True(viewBox.Success);
+        var width = int.Parse(viewBox.Groups[1].Value);
+        Assert.True(width > 26, $"expected a positive-width SVG grid, got width {width}");
+        var weeks = (width - 26) / 14;
+        Assert.True(weeks >= 1, $"expected at least one week after clamp, got {weeks}");
+
+        var hasMark = svg.Contains("heatmap-first-commit-mark", StringComparison.Ordinal);
+        var hasCaption = svg.Contains("class=\"heatmap-first-commit\"", StringComparison.Ordinal);
+        Assert.Equal(hasMark, hasCaption);
     }
 
     [Fact]

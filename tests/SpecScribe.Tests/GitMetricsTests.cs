@@ -988,6 +988,27 @@ public class GitMetricsTests
         Assert.Equal(GitMetrics.CouplingKind.Process, GitMetrics.ClassifyCoupling("src/A.cs", "config/app.json"));
         Assert.Equal(GitMetrics.CouplingKind.Process, GitMetrics.ClassifyCoupling("config/app.json", "src/A.cs"));
     }
+
+    [Fact]
+    public void BranchNameFromOriginHeadSymref_PreservesSlashyBranchNames()
+    {
+        // Taking the segment after the last '/' would collapse these to "foo" / "1.0". [10.4 deferred-debt]
+        Assert.Equal("feature/foo", GitMetrics.BranchNameFromOriginHeadSymref("refs/remotes/origin/feature/foo"));
+        Assert.Equal("main", GitMetrics.BranchNameFromOriginHeadSymref("refs/remotes/origin/main"));
+        Assert.Equal("release/1.0", GitMetrics.BranchNameFromOriginHeadSymref("refs/remotes/origin/release/1.0\n"));
+    }
+
+    [Fact]
+    public void BranchNameFromOriginHeadSymref_ReturnsNullWhenMissingOrNotOrigin()
+    {
+        Assert.Null(GitMetrics.BranchNameFromOriginHeadSymref(null));
+        Assert.Null(GitMetrics.BranchNameFromOriginHeadSymref(""));
+        Assert.Null(GitMetrics.BranchNameFromOriginHeadSymref("   "));
+        Assert.Null(GitMetrics.BranchNameFromOriginHeadSymref("refs/heads/main"));
+        Assert.Null(GitMetrics.BranchNameFromOriginHeadSymref("refs/remotes/upstream/main"));
+        Assert.Null(GitMetrics.BranchNameFromOriginHeadSymref("refs/remotes/origin/"));
+        Assert.Null(GitMetrics.BranchNameFromOriginHeadSymref("refs/remotes/origin/   "));
+    }
 }
 
 /// <summary>Real-git wiring for <see cref="GitMetrics.TryCompute"/> Story 3.1 fields

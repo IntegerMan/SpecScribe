@@ -157,7 +157,7 @@ public sealed record FileInsight(
     IReadOnlyList<(string Author, int Commits)> Contributors,
     IReadOnlyList<(string Path, int CoChanges)> CoupledFiles,
     IReadOnlyList<CommitTouch> History,
-    int TotalContributors = 0);
+    int TotalContributors);
 
 /// <summary>The aggregate views behind the Git Insights hub page (FR-10), all derived from the one shared
 /// bounded numstat fetch: per-file change frequency + churn + the file's contributors (the master-detail
@@ -1020,13 +1020,20 @@ public static class GitMetrics
     /// <c>refs/remotes/origin/HEAD</c> symref, or null when it isn't set (common on a shallow/single-branch clone)
     /// or there is no git (Story 7.7). A fallback for <see cref="TryGetCurrentBranch"/> in detached-HEAD states, so
     /// the external-source URL doesn't have to guess a hardcoded branch name.</summary>
-    public static string? TryGetDefaultBranch(string repoRoot)
+    public static string? TryGetDefaultBranch(string repoRoot) =>
+        BranchNameFromOriginHeadSymref(RunGit(repoRoot, "symbolic-ref refs/remotes/origin/HEAD"));
+
+    /// <summary>Extracts the branch name from a <c>refs/remotes/origin/HEAD</c> symref target, preserving
+    /// slashy names like <c>feature/foo</c>. Returns null when empty or not under that origin prefix —
+    /// never take the segment after the last <c>/</c> (that collapses slashy branches). [Story 10.4 deferred-debt]</summary>
+    public static string? BranchNameFromOriginHeadSymref(string? symref)
     {
-        var symref = RunGit(repoRoot, "symbolic-ref refs/remotes/origin/HEAD");
         if (string.IsNullOrWhiteSpace(symref)) return null;
         symref = symref.Trim();
-        var slash = symref.LastIndexOf('/');
-        return slash >= 0 && slash < symref.Length - 1 ? symref[(slash + 1)..] : null;
+        const string prefix = "refs/remotes/origin/";
+        if (!symref.StartsWith(prefix, StringComparison.Ordinal)) return null;
+        var name = symref[prefix.Length..];
+        return string.IsNullOrWhiteSpace(name) ? null : name;
     }
 
     /// <summary>Lists the repo's git-TRACKED files (repo-relative, forward-slash), or null when the directory is not

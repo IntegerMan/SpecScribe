@@ -201,7 +201,8 @@ public class CodeFileTemplaterTests
         {
             new CommitTouch("abc1234", new DateOnly(2026, 7, 3), "Alice", "Refine the thing"),
             new CommitTouch("def5678", new DateOnly(2026, 7, 1), "Bob", "Seed the thing"),
-        });
+        },
+        TotalContributors: 2);
 
     [Fact]
     public void RenderPage_NullInsight_RendersNoAdvancedCoverageSection()
@@ -335,7 +336,8 @@ public class CodeFileTemplaterTests
             ChangeCount: 1,
             Contributors: new[] { ("A<b>&\"lice", 1) },
             CoupledFiles: new[] { ("src/<x>&.cs", 1) },
-            History: new[] { new CommitTouch("aaa1111", new DateOnly(2026, 7, 1), "E<v>il", "sub&<ject>\"") });
+            History: new[] { new CommitTouch("aaa1111", new DateOnly(2026, 7, 1), "E<v>il", "sub&<ject>\"") },
+            TotalContributors: 1);
 
         var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
 
@@ -355,7 +357,8 @@ public class CodeFileTemplaterTests
             ChangeCount: 3,
             Contributors: new[] { ("Alice", 3) },
             CoupledFiles: Array.Empty<(string, int)>(),
-            History: Array.Empty<CommitTouch>());
+            History: Array.Empty<CommitTouch>(),
+            TotalContributors: 1);
 
         var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
 
@@ -386,7 +389,7 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_Insight_OmitsMoreContributorsNoteWhenListIsComplete()
     {
-        // TotalContributors equals the shown count (or is unset/default) — nothing was truncated, so no note.
+        // TotalContributors equals the shown count — nothing was truncated, so no note.
         var insight = new FileInsight(
             ChangeCount: 2,
             Contributors: new[] { ("Alice", 2) },

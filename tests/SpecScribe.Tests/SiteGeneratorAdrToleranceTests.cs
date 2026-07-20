@@ -230,4 +230,30 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         Assert.Contains("data-sort-name=\"ADR 0001: Use Widgets\"", landing);
         Assert.Contains("data-sort-date=\"2026-07-10\"", landing);
     }
+
+    [Fact]
+    public void GenerateAll_AdrSummary_TruncatesOnGraphemeBoundaryNotUtf16CodeUnits()
+    {
+        // CollapseSummary caps at 160 UTF-16 chars. Place a ZWJ family emoji so a naive `..[159]` cut would
+        // split the cluster; grapheme-aware truncation must keep it whole or omit it wholly. [10.4 deferred-debt]
+        const string family = "\U0001F468\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466"; // 👨‍👩‍👧‍👦
+        var prefix = new string('a', 158);
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0001-grapheme.md"),
+            $"# ADR 0001: Grapheme Cut\n\n**Status:** Accepted\n\n**Date:** 2026-07-10\n\n## Context\n\n{prefix}{family} trailing prose that must not appear after the ellipsis.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        var landing = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+        Assert.Contains("…", landing);
+        Assert.DoesNotContain("trailing prose", landing);
+        // Either the full ZWJ sequence survived before …, or it was omitted as a whole — never a partial cluster.
+        var idx = landing.IndexOf(prefix, StringComparison.Ordinal);
+        Assert.True(idx >= 0, "prefix of the Context summary should appear on the landing");
+        var afterPrefix = landing[(idx + prefix.Length)..];
+        var endsClean = afterPrefix.StartsWith("…", StringComparison.Ordinal)
+                        || afterPrefix.StartsWith(family + "…", StringComparison.Ordinal);
+        Assert.True(endsClean, $"ellipsis cut split a grapheme cluster: …{afterPrefix[..Math.Min(24, afterPrefix.Length)]}…");
+    }
 }

@@ -1108,7 +1108,8 @@ public static class Charts
 
     /// <summary>A GitHub-style commit heatmap: one column per week, one row per day-of-week (Sun top to
     /// Sat bottom), shaded by commit count, with month labels along the top and Mon/Wed/Fri labels on the
-    /// left. Pads the window to a minimum of ~8 weeks so a young project's grid isn't just a single sliver.
+    /// left. Young repos (&lt; ~15 weeks of history) trim to roughly first-commit minus one week of lead-in
+    /// instead of padding months of empty pre-project cells; older repos start at the first commit. [Story 10.6 AC2a]
     /// <para>When <paramref name="commitsByDay"/> is provided, each active day's cell becomes an in-SVG link
     /// to an inline details panel below the chart (short hash + subject per commit, prev/next links between
     /// active days). Panel visibility is pure-CSS <c>:target</c>, so the drill-down needs no JS.</para></summary>
@@ -1137,13 +1138,16 @@ public static class Charts
         // Old-repo behavior (grid already fuller than 15 weeks) is unchanged. [Story 10.6 AC2a]
         var isYoungRepo = firstCommit >= minStart;
         var start = isYoungRepo ? firstCommit.AddDays(-7) : firstCommit;
+        // Future-dated first commits (clock skew) can put the young-repo lead-in after today — clamp so the
+        // window never inverts into a negative week count / broken SVG. [Story 10.6 review]
+        if (start > end) start = end;
 
         // Snap to full weeks (Sunday..Saturday) so the grid is rectangular.
         start = start.AddDays(-(int)start.DayOfWeek);
         end = end.AddDays(6 - (int)end.DayOfWeek);
 
         var totalDays = end.DayNumber - start.DayNumber + 1;
-        var weeks = (int)Math.Ceiling(totalDays / 7.0);
+        var weeks = Math.Max(1, (int)Math.Ceiling(totalDays / 7.0));
         // Scale the heat over only the days the grid actually renders (<= today). A future-dated commit is
         // suppressed from the cells, so it must not inflate maxCount and depress every visible cell's level. [review]
         var maxCount = series.Where(s => s.Day <= today).Select(s => s.Count).DefaultIfEmpty(0).Max();
@@ -1250,11 +1254,14 @@ public static class Charts
         // First-commit accent (Story 10.6, AC2a): a thin vertical marker at the boundary of the first-commit
         // week, drawn only for the young-repo trim case — an old repo's grid already starts exactly at
         // firstCommit, so there is no lead-in to mark. Decorative (aria-hidden); the caption below is the
-        // accessible/text-equivalent half of the "never color-only" pairing.
+        // accessible/text-equivalent half of the "never color-only" pairing. Both halves share the in-range
+        // week gate so a future-skewed firstCommit never gets a caption without a mark (or vice versa).
+        var showFirstCommitMark = false;
         if (isYoungRepo)
         {
             var firstCommitWeek = (firstCommit.DayNumber - start.DayNumber) / 7;
-            if (firstCommitWeek is >= 0 && firstCommitWeek < weeks)
+            showFirstCommitMark = firstCommitWeek is >= 0 && firstCommitWeek < weeks;
+            if (showFirstCommitMark)
             {
                 var markX = leftGutter + firstCommitWeek * (cell + gap) - gap / 2.0 - 1;
                 var markHeight = 7 * (cell + gap) - gap + 4;
@@ -1265,9 +1272,8 @@ public static class Charts
 
         sb.Append("</svg>\n");
 
-        // Text-equivalent half of the first-commit marker (never color/accent-only) — same young-repo gate as
-        // the SVG mark above.
-        if (isYoungRepo)
+        // Text-equivalent half of the first-commit marker (never color/accent-only) — same gate as the SVG mark.
+        if (showFirstCommitMark)
         {
             sb.Append($"<p class=\"heatmap-first-commit\">First commit {Html(DReadable(firstCommit))}</p>\n");
         }
@@ -2154,8 +2160,9 @@ public static class Charts
     /// <summary>Renders the source-code treemap as pure, server-computed SVG (Story 7.6). One <c>&lt;rect&gt;</c>
     /// per node from the precomputed squarified <paramref name="layout"/>: directory rects draw group boundaries +
     /// a clipped label, file rects are the leaves — sized by lines of code, filled by the default colorize
-    /// dimension (change frequency when git metrics exist, else a neutral fill). Every file rect is focusable
-    /// (<c>tabindex="0"</c>) with a descriptive <c>aria-label</c> (name + active metric) and carries every metric as
+    /// dimension (change frequency when git metrics exist, else a neutral fill). Unlinked file rects are focusable
+    /// (<c>tabindex="0"</c>) with a descriptive <c>aria-label</c> (name + active metric); linked cells put tip + name
+    /// on the wrapping <c>&lt;a&gt;</c> (no nested tabindex on the geometry child). Every file rect carries metrics as
     /// <c>data-*</c> attributes so the scoped JS enhancement re-fills it without a round-trip and the tooltip (the
     /// body-level <c>js-tip</c>/<c>data-tip</c> node) reads it. A file routes to its in-portal code page ONLY when
     /// the guarded <paramref name="fileHref"/> returns non-null — otherwise a plain, focusable rect, never a broken
@@ -2251,20 +2258,24 @@ public static class Charts
 
         var href = fileHref?.Invoke(node.RepoRelativePath);
         var isLink = href is { Length: > 0 };
-        // role is omitted when wrapped in a real <a> — nesting role="link" inside an interactive <a> is invalid
-        // ARIA and doubles screen-reader announcements; the anchor itself already carries the link semantics.
-        var roleAttr = isLink ? string.Empty : "role=\"img\" ";
-        var rectMarkup =
-            $"<rect class=\"codemap-cell {levelClass} js-tip\" tabindex=\"0\"{data} " +
-            $"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" " +
-            $"{roleAttr}aria-label=\"{Html(ariaLabel)}\" data-tip-html=\"{Html(card)}\"></rect>";
-
+        // Tip + accessible name live on the interactive element that owns focus. Linked cells: the <a> (Tile
+        // pattern — natively focusable, no nested tabindex on the geometry child). Unlinked: the rect itself
+        // with role="img". Metric data-* / .codemap-cell stay on the rect for the colorize JS either way.
+        // [Story 10.4 deferred-debt; nested focusable inside <a>]
+        var tipAttrs = $"aria-label=\"{Html(ariaLabel)}\" data-tip-html=\"{Html(card)}\"";
         if (isLink)
         {
-            sb.Append($"  <a href=\"{Html(prefix + href)}\">{rectMarkup}</a>\n");
+            var rectMarkup =
+                $"<rect class=\"codemap-cell {levelClass}\"{data} " +
+                $"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\"></rect>";
+            sb.Append($"  <a class=\"js-tip\" href=\"{Html(prefix + href)}\" {tipAttrs}>{rectMarkup}</a>\n");
         }
         else
         {
+            var rectMarkup =
+                $"<rect class=\"codemap-cell {levelClass} js-tip\" tabindex=\"0\"{data} " +
+                $"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" " +
+                $"role=\"img\" {tipAttrs}></rect>";
             sb.Append("  ").Append(rectMarkup).Append('\n');
         }
     }

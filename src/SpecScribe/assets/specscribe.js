@@ -799,8 +799,15 @@
     // The tooltip is a static, server-built HTML card (data-tip-html) listing every metric, so it already satisfies
     // "color is never the sole signal" for any active dimension — no per-dimension tooltip rewrite is needed. Only
     // the aria-label (and the legend) track the active dimension, so we snapshot just the base label.
+    // Linked cells put aria-label on the wrapping <a> (Tile pattern); unlinked cells keep it on the rect.
+    function labelHost(c) {
+      var a = c.closest && c.closest("a");
+      return a || c;
+    }
     cells.forEach(function (c) {
-      if (!c.hasAttribute("data-base-label")) c.setAttribute("data-base-label", c.getAttribute("aria-label") || "");
+      if (!c.hasAttribute("data-base-label")) {
+        c.setAttribute("data-base-label", labelHost(c).getAttribute("aria-label") || "");
+      }
     });
 
     var legendDim = panel.querySelector(".codemap-legend-dim");
@@ -823,9 +830,10 @@
         c.classList.remove("level-none");
         var v = metricFor(c, dim);
         var baseLabel = c.getAttribute("data-base-label") || "";
+        var host = labelHost(c);
         if (v === null) {
           c.classList.add("level-none");
-          c.setAttribute("aria-label", baseLabel + " — no data for " + dimLabel);
+          host.setAttribute("aria-label", baseLabel + " — no data for " + dimLabel);
           return;
         }
         var lvl = bucket(isDate ? (v - min) : v, range);
@@ -833,7 +841,7 @@
         // The bucket level (0-4) IS exactly what the color encodes, so it's the honest text equivalent —
         // never a raw day-number or other value the color itself doesn't literally represent.
         var levelText = lvl === 0 ? "lowest" : lvl === 4 ? "highest" : "level " + lvl + " of 4";
-        c.setAttribute("aria-label", baseLabel + " — " + dimLabel + ": " + levelText);
+        host.setAttribute("aria-label", baseLabel + " — " + dimLabel + ": " + levelText);
       });
       if (legendDim) legendDim.textContent = "Colorized by " + dimLabel;
     }

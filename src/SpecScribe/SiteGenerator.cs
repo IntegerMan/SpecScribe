@@ -4101,9 +4101,18 @@ public sealed class SiteGenerator
         collapsed = Regex.Replace(collapsed, @"^(?:[-*+>|!]\s*|\d+\.\s+)+", string.Empty).Trim();
         const int max = 160;
         if (collapsed.Length <= max) return collapsed;
-        var cut = max - 1;
-        if (char.IsHighSurrogate(collapsed[cut - 1])) cut--; // don't split an astral char (emoji) across the ellipsis
-        return collapsed[..cut].TrimEnd() + "…";
+        // Cut on a grapheme-cluster boundary so ZWJ / combining sequences stay whole (UTF-16 Length alone can
+        // split them). Budget leaves one code unit for the ellipsis. [Story 10.4 deferred-debt]
+        const int budget = max - 1;
+        var kept = new StringBuilder(budget);
+        var elements = StringInfo.GetTextElementEnumerator(collapsed);
+        while (elements.MoveNext())
+        {
+            var element = elements.GetTextElement();
+            if (kept.Length + element.Length > budget) break;
+            kept.Append(element);
+        }
+        return kept.ToString().TrimEnd() + "…";
     }
 
     /// <summary>True for a line made up solely of a single repeated markdown rule/separator character (e.g.

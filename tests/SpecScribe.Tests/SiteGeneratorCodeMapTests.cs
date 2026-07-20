@@ -121,7 +121,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
         var expectedHref = "https://github.com/example/repo/blob/main/src/Sample/Widget.cs";
 
         // Both the SVG rect's <a> and the text-equivalent table's row link to the SAME resolved target.
-        Assert.Contains($"<a href=\"{expectedHref}\">", html);
+        Assert.Contains($"href=\"{expectedHref}\"", html);
         Assert.Contains($"<a href=\"{expectedHref}\">src/Sample/Widget.cs</a>", html);
     }
 

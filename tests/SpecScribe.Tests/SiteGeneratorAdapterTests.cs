@@ -592,7 +592,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // PortalDates.Day; FreeTextBadge CSS class uses the first status word so "Superseded by …" hits
         // .pill.status-superseded; doc header date pills normalize via ReformatAuthored; ### Change Log
         // panels sequence like ## Change Log.
-        const string expected = "7ee2312ad892792de30997c84cb9f9ebf4050a27fdf0df238bcba38d5f6ac7e2";
+        // Regenerated 2026-07-20 (spec-10-4-deferred-debt-cleanup): linked Code Map treemap cells move tip/aria
+        // onto the wrapping <a> and drop nested tabindex on the <rect>; review patches also update colorize JS
+        // labelHost + CSS :focus-within ring for the same Tile pattern (shared asset delta).
+        const string expected = "06c44fa7269b8da419051f4290c6c72343258dcce6912b33118dde60854b0301";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

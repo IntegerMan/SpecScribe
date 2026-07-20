@@ -3597,9 +3597,12 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-cell.level-none { fill: var(--parchment-dark); fill-opacity: 0.55; }
 .codemap-cell:hover { stroke: var(--rust); stroke-width: 1.5; }
 /* SVG focus: default outlines render unreliably around SVG rects, so express focus on the rect itself (teal, the
-   shared ring) — never outline:none without a visible replacement. Matches the heatmap/sunburst convention. */
-.codemap-cell:focus-visible { outline: none; stroke: var(--teal); stroke-width: 2; }
+   shared ring) — never outline:none without a visible replacement. Matches the heatmap/sunburst convention.
+   Linked cells put focus on the wrapping <a> (Tile pattern); :focus-within paints the same ring on the child rect. */
+.codemap-cell:focus-visible,
+.codemap a:focus-visible .codemap-cell { outline: none; stroke: var(--teal); stroke-width: 2; }
 .codemap a { cursor: pointer; }
+.codemap a:focus-visible { outline: none; }
 
 /* Directory boundaries: neutral guide-rule tone, transparent fill so the child cells read through — no text label
    at any depth (identity lives in the tooltip card + text table). When the script makes a directory an activatable
