@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-epic3-deferred-debt-cleanup.md (2026-07-19)
+
+- source_spec: `spec-epic3-deferred-debt-cleanup.md`
+  summary: `SiteGenerator.SelectMemlogUpdatedByFamily`'s ancestor-selection has an unhandled sub-case within its own documented equal-length tie-break: two `.memlog.md` candidate directories that differ only by case (e.g. `Planning-Artifacts` vs `planning-artifacts`) are treated as distinct dictionary-adjacent entries by the caller's file-system walk, so which one wins is enumeration-order-dependent — the same nondeterminism as the already-documented equal-string-length tie, but reachable via case variance rather than a literal duplicate path.
+  evidence: Edge Case Hunter, on the diff extracting `SelectMemlogUpdatedByFamily`. Pre-existing since `BuildMemlogMap` was written (not introduced by the extraction) and requires an unusual authoring mistake (two `.memlog.md` files in case-variant sibling-looking dirs); low likelihood on a normal case-sensitive-authored BMad project layout.
+
 ## Deferred from: code review of spec-3-1-deferred-debt-cleanup.md (2026-07-18)
 
 - source_spec: `spec-3-1-deferred-debt-cleanup.md`
@@ -388,12 +394,12 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of story-3.3 (2026-07-08)
 
-- **No direct test for `SiteGenerator.BuildMemlogMap`'s ancestor-matching logic.** `src/SpecScribe/SiteGenerator.cs:957-999` — the pure `ArtifactCoverage.Build` memlog wiring is well tested with hand-built maps (`Build_MemlogEnrichmentAttachesToMatchingFamily`, `Build_MemlogIsStrictlyAdditive...`), but the directory-prefix/closest-ancestor selection that actually builds those maps — the one genuinely tricky piece (multiple candidate `.memlog.md` files, `StartsWith`-based containment, tie-breaking by directory-string length) — has zero coverage anywhere in the diff.
-- **`HtmlTemplaterTests.RenderIndex_RendersPlanningCoveragePanelWithPresentDateAndMissingChip` isn't fully hermetic.** `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` — the fixture builds `ArtifactCoverage` with a fixed `today`, but `HtmlTemplater.AppendDashboard` internally recomputes staleness against the real `DateTime.Now`, not that fixed date. The test passes today only because wall-clock time hasn't pushed the fixture's family past the 30-day staleness threshold, not because the date is actually pinned.
+- ~~**No direct test for `SiteGenerator.BuildMemlogMap`'s ancestor-matching logic.**~~ **RESOLVED 2026-07-19** (`spec-epic3-deferred-debt-cleanup`). The ancestor-selection loop — the piece this item actually named ("the genuinely tricky piece") — was extracted into `SiteGenerator.SelectMemlogUpdatedByFamily` (internal, static, no disk I/O), unit-tested directly for every edge case (no candidates, root-only, root+scoped coexistence, non-ancestor substring dir, equal-ancestor-depth tie) in `SiteGeneratorMemlogSelectionTests`. The unparseable-`updated:`-date `continue` branch upstream in `BuildMemlogMap` is covered via a real-disk `GenerateAll` fixture (`SiteGeneratorCoverageTests.GenerateAll_MalformedMemlogUpdatedDate_ContributesNoEnrichmentAndDoesNotThrow`). Note: `BuildMemlogMap`'s sibling `catch { continue; }` branch (a file-read failure, e.g. a locked `.memlog.md`) remains untested — deliberately not chased here to avoid a flaky lock-simulation test; pre-existing, low-likelihood, and orthogonal to the ancestor-matching logic this item was about. Ancestor-selection semantics unchanged. [`SiteGenerator.cs`]
+- ~~**`HtmlTemplaterTests.RenderIndex_RendersPlanningCoveragePanelWithPresentDateAndMissingChip` isn't fully hermetic.**~~ **RESOLVED 2026-07-19** (`spec-epic3-deferred-debt-cleanup`). `HtmlRenderAdapter.RenderDashboardBody` (and `HtmlTemplater.RenderIndex`/`BuildIndexPage`) now accept an optional `today` parameter, defaulting to `DateOnly.FromDateTime(DateTime.Now)` for unchanged production behavior; the test now passes its fixture's `today` explicitly instead of depending on the wall clock. [`HtmlRenderAdapter.Dashboard.cs`, `HtmlTemplater.cs`]
 
 ## Deferred from: code review of story-3.5 (2026-07-08)
 
-- **Both epic-level and story-level `Sunburst` call `Charts.SunburstLegend` with an identical hardcoded 6-tuple array.** `src/SpecScribe/Charts.cs` — nothing keeps the two literal `("pending","Pending"), ("drafted","Drafted"), ...` arrays in sync; a future edit to one label and not the other would silently desync the two legends, and no test catches that divergence. Minor maintainability nit, no functional impact today.
+- ~~**Both epic-level and story-level `Sunburst` call `Charts.SunburstLegend` with an identical hardcoded 6-tuple array.**~~ **RESOLVED 2026-07-19 as misdiagnosed** (`spec-epic3-deferred-debt-cleanup`). Verified against current `Charts.cs`: both call sites (epic-level line 429, story-level line 892) already route through one shared `BuildSunburstLegendItems` helper (lines 745-763) — the single hardcoded tuple array lives there, not duplicated at either call site. No code change made; the dedup already landed in commit `9f985b4` ("UX tweaks", 2026-07-16), incidental to unrelated work, after this item was originally flagged (2026-07-08). [`Charts.cs`]
 
 ## Deferred from: code review of story-3-8 (2026-07-09)
 
@@ -412,8 +418,7 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 ## Deferred from: code review of spec-sprint-board-card-tooltip-html-corruption (2026-07-09)
 
 - source_spec: `spec-sprint-board-card-tooltip-html-corruption.md`
-  summary: `RequirementLinkifier` (`src/SpecScribe/RequirementLinkifier.cs`) has the same attribute-corruption exposure that was just fixed in `StoryEpicLinkifier` — an FR/NFR mention sitting inside a non-anchor tag's attribute value (e.g. a tooltip or aria-label) would get a raw `<a>` injected into it, breaking the tag.
-  evidence: `RequirementLinkifier.AnchorSplit` only protects `<a>…</a>` spans (`RequirementLinkifier.cs:13-15`), unlike the fixed `StoryEpicLinkifier.ProtectedSplit`, which now also skips every standalone tag so only real text nodes are scanned. Not caused by this change — pre-existing since the class was written — and not currently known to be triggered by any live template (no site content today puts "FR"/"NFR" text inside a non-anchor attribute), so it's latent rather than reproducible. Apply the same `<[^>]*>` catch-all alternative to `RequirementLinkifier.AnchorSplit` when that seam is next touched.
+  summary: ~~`RequirementLinkifier` (`src/SpecScribe/RequirementLinkifier.cs`) has the same attribute-corruption exposure that was just fixed in `StoryEpicLinkifier` — an FR/NFR mention sitting inside a non-anchor tag's attribute value (e.g. a tooltip or aria-label) would get a raw `<a>` injected into it, breaking the tag.~~ **RESOLVED 2026-07-19 as misdiagnosed** (`spec-epic3-deferred-debt-cleanup`). Verified against current `RequirementLinkifier.cs`/`StoryEpicLinkifier.cs`: both classes' `ProtectedSplit` regexes (the method is no longer named `AnchorSplit`) are byte-for-byte identical, including the `<[^>]*>` catch-all-tag alternative this item asks for. Attribute-corruption regression tests already exist for both linkifiers in `LinkifierTests.cs`. No code change made; already fixed for both classes in the same earlier commit (`06218d5`). [`RequirementLinkifier.cs`]
 
 ## Deferred from: code review of story-4-2 (2026-07-10)
 

@@ -524,7 +524,8 @@ public class HtmlTemplaterTests
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty,
-            coverage: coverage);
+            coverage: coverage,
+            today: new DateOnly(2026, 7, 8));
 
         Assert.Contains("<h3>Planning Artifacts</h3>", html);
         Assert.Contains("coverage-panel", html);

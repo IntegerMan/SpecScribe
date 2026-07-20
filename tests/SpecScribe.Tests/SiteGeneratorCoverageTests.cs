@@ -73,6 +73,40 @@ public class SiteGeneratorCoverageTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_MalformedMemlogUpdatedDate_ContributesNoEnrichmentAndDoesNotThrow()
+    {
+        // A .memlog.md with no parseable "updated:" date must degrade to "no enrichment for this file" rather
+        // than throw or corrupt the primary coverage picture (BuildMemlogMap's `catch { continue; }` /
+        // unparseable-date `continue` path). [Story 3.3 deferred-debt cleanup]
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", ".memlog.md"),
+            "# Decision Journal\n\nupdated: not-a-date\n\nSome notes.\n");
+
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(IndexPage);
+        Assert.DoesNotContain("Decision journal (.memlog) updated", html);
+    }
+
+    [Fact]
+    public void GenerateAll_MalformedMemlogAlongsideValidOne_ValidOneStillEnrichesItsFamily()
+    {
+        // A malformed .memlog.md elsewhere in the tree must not prevent a separate, well-formed, correctly
+        // ancestor-scoped .memlog.md from enriching its family — the malformed one is filtered out before
+        // ancestor-selection runs, not merged with or shadowing a good candidate. [Story 3.3 deferred-debt cleanup]
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", ".memlog.md"),
+            "# Decision Journal\n\nupdated: not-a-date\n\nSome notes.\n");
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", ".memlog.md"),
+            "# Decision Journal\n\nupdated: 2026-07-01\n\nEpics scoped journal.\n");
+
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(IndexPage);
+        Assert.Contains($"Decision journal (.memlog) updated {Charts.DReadable(new DateOnly(2026, 7, 1))}", html);
+    }
+
+    [Fact]
     public void GenerateOne_RefreshesCoveragePanelWithoutAFullRegenerate()
     {
         var gen = new SiteGenerator(Options());

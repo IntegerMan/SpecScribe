@@ -3764,14 +3764,23 @@ public sealed class SiteGenerator
 
         if (memlogs.Count == 0) return result; // strictly additive: the no-memlog primary picture is unchanged
 
-        // A root-level memlog (Dir.Length == 0) only stands in as every family's fallback when it's the ONLY
-        // memlog in the tree — there, it genuinely is the project's one decision journal. Once any nested,
-        // family-scoped memlog exists, the root one no longer blanket-applies to families with no closer
-        // match, so an unrelated project-root journal can't be misattributed as a specific family's own
-        // enrichment. [Story 3.3 review]
+        return SelectMemlogUpdatedByFamily(memlogs, discovered.Families);
+    }
+
+    /// <summary>The pure ancestor-selection core of <see cref="BuildMemlogMap"/>, split out so it's directly
+    /// unit-testable without disk I/O: for each family with a known source path, picks the memlog whose
+    /// directory is the closest (longest matching) ancestor. A root-level memlog (<c>Dir.Length == 0</c>) only
+    /// stands in as every family's fallback when it's the ONLY memlog in the tree — there, it genuinely is the
+    /// project's one decision journal. Once any nested, family-scoped memlog exists, the root one no longer
+    /// blanket-applies to families with no closer match, so an unrelated project-root journal can't be
+    /// misattributed as a specific family's own enrichment. [Story 3.3 review]</summary>
+    internal static IReadOnlyDictionary<string, DateOnly> SelectMemlogUpdatedByFamily(
+        IReadOnlyList<(string Dir, DateOnly Updated)> memlogs, IReadOnlyList<ArtifactFamily> families)
+    {
+        var result = new Dictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
         var hasScopedMemlog = memlogs.Any(ml => ml.Dir.Length > 0);
 
-        foreach (var family in discovered.Families)
+        foreach (var family in families)
         {
             if (family.SourcePath is not { } rel) continue;
             var best = memlogs

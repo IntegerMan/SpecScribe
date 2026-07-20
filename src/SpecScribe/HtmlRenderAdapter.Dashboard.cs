@@ -12,8 +12,10 @@ namespace SpecScribe;
 public sealed partial class HtmlRenderAdapter
 {
     /// <summary>Renders the full <c>&lt;main&gt;…&lt;/main&gt;</c> dashboard body from its section view model —
-    /// the string that becomes <see cref="PageView.BodyHtml"/>. [Story 6.2]</summary>
-    public string RenderDashboardBody(DashboardView view, Func<string, string?>? codeItemHref = null)
+    /// the string that becomes <see cref="PageView.BodyHtml"/>. <paramref name="today"/> defaults to the real
+    /// wall clock for production generation; callers (tests) may pin it so the coverage panel's staleness
+    /// computation is hermetic instead of depending on when the test happens to run. [Story 6.2]</summary>
+    public string RenderDashboardBody(DashboardView view, Func<string, string?>? codeItemHref = null, DateOnly? today = null)
     {
         var sb = new StringBuilder();
 
@@ -22,13 +24,13 @@ public sealed partial class HtmlRenderAdapter
         // Explore Key Views strip), so the dashboard body carries only a visually-hidden H1 — a screen reader still
         // hears the page's name, without a redundant visible title band eating vertical space above the stats.
         sb.Append($"<h1 class=\"sr-only\">{PathUtil.Html(view.SiteTitle)} — project dashboard</h1>\n");
-        AppendDashboardSection(sb, view, codeItemHref);
+        AppendDashboardSection(sb, view, codeItemHref, today);
 
         sb.Append("</main>\n\n");
         return sb.ToString();
     }
 
-    private void AppendDashboardSection(StringBuilder sb, DashboardView view, Func<string, string?>? codeItemHref = null)
+    private void AppendDashboardSection(StringBuilder sb, DashboardView view, Func<string, string?>? codeItemHref = null, DateOnly? today = null)
     {
         var p = view.Progress;
 
@@ -108,7 +110,7 @@ public sealed partial class HtmlRenderAdapter
         // Planning documents — Requirements.
         if (view.Coverage is { IsEmpty: false } coverage)
         {
-            var coverageToday = DateOnly.FromDateTime(DateTime.Now);
+            var coverageToday = today ?? DateOnly.FromDateTime(DateTime.Now);
             sb.Append("<div class=\"chart-panel coverage-panel wm-panel wm-show-requirements\">\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Planning Artifacts</h3>");
             sb.Append(Charts.CoverageMeter(coverage, coverageToday));

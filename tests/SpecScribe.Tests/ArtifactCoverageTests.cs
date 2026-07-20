@@ -277,3 +277,109 @@ public class ArtifactCoverageTests
         Assert.Equal(new DateOnly(2026, 7, 2), Family(withMemlog, "PRD").MemlogUpdated);
     }
 }
+
+/// <summary>Direct unit coverage for <see cref="SiteGenerator.SelectMemlogUpdatedByFamily"/> — the pure
+/// closest-ancestor memlog-selection core of <c>BuildMemlogMap</c> extracted for testability (Story 3.3
+/// deferred-debt cleanup). All pure — no disk. Families are hand-built with only the two fields the method
+/// reads (<c>Label</c>, <c>SourcePath</c>); every other <see cref="ArtifactFamily"/> field is irrelevant here.</summary>
+public class SiteGeneratorMemlogSelectionTests
+{
+    private static ArtifactFamily Family(string label, string sourcePath) =>
+        new(Label: label, ConceptIconKey: label, Description: "", Present: true, LastModified: null,
+            SourcePath: sourcePath, MemlogUpdated: null);
+
+    [Fact]
+    public void NoMemlogCandidates_ReturnsEmptyMap()
+    {
+        var families = new[] { Family("PRD", "planning-artifacts/prds/prd-x/prd.md") };
+
+        var map = SiteGenerator.SelectMemlogUpdatedByFamily(Array.Empty<(string Dir, DateOnly Updated)>(), families);
+
+        Assert.Empty(map);
+    }
+
+    [Fact]
+    public void RootOnlyMemlog_AppliesToEveryPresentFamily()
+    {
+        var families = new[]
+        {
+            Family("PRD", "planning-artifacts/prds/prd-x/prd.md"),
+            Family("Epics", "planning-artifacts/epics.md"),
+        };
+        var rootDate = new DateOnly(2026, 6, 1);
+
+        var map = SiteGenerator.SelectMemlogUpdatedByFamily(
+            new (string Dir, DateOnly Updated)[] { (Dir: "", Updated: rootDate) }, families);
+
+        Assert.Equal(rootDate, map["PRD"]);
+        Assert.Equal(rootDate, map["Epics"]);
+    }
+
+    [Fact]
+    public void RootOnlyMemlog_FamilyLookupIsCaseInsensitive()
+    {
+        // The returned dictionary is built with StringComparer.OrdinalIgnoreCase (production code's deliberate
+        // choice) — a caller looking up a family by a differently-cased label must still find it.
+        var families = new[] { Family("PRD", "planning-artifacts/prds/prd-x/prd.md") };
+        var rootDate = new DateOnly(2026, 6, 1);
+
+        var map = SiteGenerator.SelectMemlogUpdatedByFamily(
+            new (string Dir, DateOnly Updated)[] { (Dir: "", Updated: rootDate) }, families);
+
+        Assert.True(map.TryGetValue("prd", out var lowercase));
+        Assert.Equal(rootDate, lowercase);
+    }
+
+    [Fact]
+    public void RootAndScopedMemlogsCoexist_RootExcludedFromFallback()
+    {
+        // PRD sits under planning-artifacts/prds; a scoped memlog there wins over root. Epics has no scoped
+        // ancestor memlog, and once ANY scoped memlog exists in the tree, root no longer blanket-applies.
+        var families = new[]
+        {
+            Family("PRD", "planning-artifacts/prds/prd-x/prd.md"),
+            Family("Epics", "planning-artifacts/epics.md"),
+        };
+        var rootDate = new DateOnly(2026, 6, 1);
+        var scopedDate = new DateOnly(2026, 7, 1);
+
+        var map = SiteGenerator.SelectMemlogUpdatedByFamily(
+            new (string Dir, DateOnly Updated)[] { (Dir: "", Updated: rootDate), (Dir: "planning-artifacts/prds", Updated: scopedDate) },
+            families);
+
+        Assert.Equal(scopedDate, map["PRD"]);
+        Assert.False(map.ContainsKey("Epics"));
+    }
+
+    [Fact]
+    public void NonAncestorSubstringDir_DoesNotMatch()
+    {
+        // "planning-artifacts/prds" must not match "planning-artifacts/prdsomethingelse/..." — the trailing
+        // "/" in the StartsWith check guards true ancestor containment, not a raw string-prefix match.
+        var families = new[] { Family("PRD", "planning-artifacts/prdsomethingelse/x.md") };
+
+        var map = SiteGenerator.SelectMemlogUpdatedByFamily(
+            new (string Dir, DateOnly Updated)[] { (Dir: "planning-artifacts/prds", Updated: new DateOnly(2026, 7, 1)) }, families);
+
+        Assert.Empty(map);
+    }
+
+    [Fact]
+    public void EqualAncestorDepth_StableOrderDecidesTie()
+    {
+        // Two candidate memlogs at the SAME ancestor dir (the only way two prefixes of one path can tie on
+        // length — distinct-content prefixes of equal length can't both be true ancestors of one path) —
+        // current behavior is a stable sort on dir length only, so whichever candidate is enumerated first
+        // wins. This test pins that documented (not "fixed") behavior rather than asserting either date is
+        // objectively correct.
+        var families = new[] { Family("PRD", "planning-artifacts/prds/prd-x/prd.md") };
+        (string Dir, DateOnly Updated) first = ("planning-artifacts/prds", new DateOnly(2026, 6, 1));
+        (string Dir, DateOnly Updated) second = ("planning-artifacts/prds", new DateOnly(2026, 7, 1)); // same dir, different date
+
+        var mapFirstWins = SiteGenerator.SelectMemlogUpdatedByFamily(new[] { first, second }, families);
+        var mapSecondWins = SiteGenerator.SelectMemlogUpdatedByFamily(new[] { second, first }, families);
+
+        Assert.Equal(first.Item2, mapFirstWins["PRD"]);
+        Assert.Equal(second.Item2, mapSecondWins["PRD"]);
+    }
+}
