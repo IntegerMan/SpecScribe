@@ -585,7 +585,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // with the full text on a native title tooltip, and .local-context-pill gained white-space:nowrap — this
         // fixture's local-context labels (Story N.M, FR1, NFR1) are all short so no truncation fires here; the
         // byte delta is the removed " open" attrs + the one CSS declaration. Verified stable across 3 runs.
-        const string expected = "f81ae96dc1ed234032f983f596d3bd032dc88012554d96edcc2a43232012eb77";
+        // Regenerated 2026-07-20 (spec-7-1-deferred-debt-cleanup): SoftSlugify encodes `/` as `x2f` (with
+        // literal-x2f escaping) so SPA tab radio names stay unique; placeholder pages can emit Insights/History tabs.
+        // Fixture cites no real repo files — refresh the byte-parity gate for any shared markup delta.
+        const string expected = "2f7b84dbb92f6923ebb0c9901def2ffbdfd28697f5c7ad987f752da63b152503";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

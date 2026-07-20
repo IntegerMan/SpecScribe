@@ -598,6 +598,48 @@ public class CodeFileTemplaterTests
         Assert.Null(ex);
     }
 
+    [Fact]
+    public void RenderPlaceholder_WithInsight_RendersInsightsAndHistoryTabs()
+    {
+        var html = CodeFileTemplater.RenderPlaceholder(
+            RepoRelative, OutputPath, "This file is too large to render inline.", Nav(),
+            insight: SampleInsight());
+
+        Assert.Contains("class=\"code-placeholder\">This file is too large to render inline.</p>", html);
+        Assert.DoesNotContain("class=\"code-line\"", html);
+        Assert.Contains("code-tab--insights", html);
+        Assert.Contains("code-tab--history", html);
+        Assert.Contains("Changed in <strong>7</strong> commits", html);
+        Assert.Contains("<table class=\"code-history-table\">", html);
+        Assert.Contains("name=\"code-view-", html);
+    }
+
+    [Fact]
+    public void SoftSlugify_PathSeparatorAndHyphen_ProduceDistinctSlugs()
+    {
+        var withSlash = CodeFileTemplater.SoftSlugify("code/a/b.html");
+        var withHyphen = CodeFileTemplater.SoftSlugify("code/a-b.html");
+        var literalX2f = CodeFileTemplater.SoftSlugify("code/ax2fb.html");
+
+        Assert.NotEqual(withSlash, withHyphen);
+        Assert.Equal("codex2fax2fb-html", withSlash);
+        Assert.Equal("codex2fa-b-html", withHyphen);
+        // Literal "x2f" is escaped before slash encoding, so it cannot collide with an encoded '/'.
+        Assert.NotEqual(withSlash, literalX2f);
+        Assert.Equal("codex2fax2fx2fb-html", literalX2f);
+    }
+
+    [Fact]
+    public void RenderPage_TabGroupNames_DifferForSlashVsHyphenPaths()
+    {
+        var slash = CodeFileTemplater.RenderPage("a/b.cs", "code/a/b.cs.html", new[] { "x" }, Nav(), Refs, insight: SampleInsight());
+        var hyphen = CodeFileTemplater.RenderPage("a-b.cs", "code/a-b.cs.html", new[] { "x" }, Nav(), Refs, insight: SampleInsight());
+
+        Assert.Contains("name=\"code-view-codex2fax2fb-cs-html\"", slash);
+        Assert.Contains("name=\"code-view-codex2fa-b-cs-html\"", hyphen);
+        Assert.DoesNotContain("name=\"code-view-codex2fax2fb-cs-html\"", hyphen);
+    }
+
     /// <summary>The HTML slice between the first occurrence of <paramref name="startMarker"/> and the next occurrence
     /// of <paramref name="endMarker"/> — a coarse but reliable way to assert which tab panel a fragment lands in,
     /// since the panels render as ordered siblings.</summary>

@@ -569,12 +569,19 @@ public static class CodeFileTemplater
     private static string TabGroupName(string outputRelativePath) => "code-view-" + Slugify(outputRelativePath);
 
     /// <summary>Collapses non-alphanumeric runs in a path to a single hyphen and lowercases it — the shared slug
-    /// primitive behind both <see cref="TabGroupName"/> and <see cref="RefGraphGroupSlug"/>.</summary>
-    private static string Slugify(string outputRelativePath)
+    /// primitive behind both <see cref="TabGroupName"/> and <see cref="RefGraphGroupSlug"/>. Path separators are
+    /// encoded as the alphanumeric token <c>x2f</c> (after escaping any pre-existing <c>x2f</c> run as
+    /// <c>x2fx2f</c>) so <c>a/b</c>, <c>a-b</c>, and a literal <c>ax2fb</c> segment never collide under SPA/webview
+    /// document consolidation. [spec-7-1-deferred-debt-cleanup]</summary>
+    internal static string SoftSlugify(string outputRelativePath)
     {
+        // Escape existing x2f first so a literal "x2f" in a filename can't collide with an encoded slash.
+        var encoded = outputRelativePath
+            .Replace("x2f", "x2fx2f", StringComparison.OrdinalIgnoreCase)
+            .Replace("/", "x2f", StringComparison.Ordinal);
         var sb = new StringBuilder();
         var prevHyphen = false;
-        foreach (var c in outputRelativePath)
+        foreach (var c in encoded)
         {
             if (char.IsLetterOrDigit(c))
             {
@@ -589,6 +596,8 @@ public static class CodeFileTemplater
         }
         return sb.ToString();
     }
+
+    private static string Slugify(string outputRelativePath) => SoftSlugify(outputRelativePath);
 
     /// <summary>The <c>&lt;a&gt;</c> to the same file on its hosting platform (Story 7.7), an <em>additive</em> link
     /// out that never replaces the in-portal page. Leads with the host's mark (a GitHub logo when recognizable, else a
@@ -653,7 +662,9 @@ public static class CodeFileTemplater
 
     /// <summary>Renders a clearly-marked placeholder page for a referenced file that exists but can't be shown
     /// inline (binary, oversized, or unreadable). The page still carries the full nav/breadcrumb/a11y shell and a
-    /// stable URL so navigation never breaks (AC #1) — only the line table is replaced by an explanatory note.</summary>
+    /// stable URL so navigation never breaks (AC #1) — only the line table is replaced by an explanatory note.
+    /// When deep-git <paramref name="insight"/> (or relationships) is available, Insights/History/Relationships tabs
+    /// still render — the Code panel holds the placeholder reason. [spec-7-1-deferred-debt-cleanup]</summary>
     public static string RenderPlaceholder(
         string repoRelativePath,
         string outputRelativePath,
@@ -662,19 +673,54 @@ public static class CodeFileTemplater
         IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy = null,
         string? externalSourceUrl = null,
         EntityPager? pager = null,
-        NavLocalContext? localContext = null)
+        NavLocalContext? localContext = null,
+        FileInsight? insight = null,
+        Func<string, string?>? coupledFileHref = null,
+        Func<string, string?>? commitHref = null,
+        Func<DateOnly, string?>? dayHref = null,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
         var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, pager: pager, localContext: localContext);
 
         sb.Append("  <div class=\"meta-pills\"><span class=\"pill\">Not rendered</span></div>\n");
         sb.Append("</header>\n\n");
-        // A file that can't render inline still has relationships worth showing, and (Story 7.7) may still be
-        // viewable on its hosting platform — so both survive the degraded page via the same two-column layout.
-        var body = $"<section class=\"code-source-section\">\n  <div class=\"code-source-head\">\n    <h2>Source</h2>\n  </div>\n" +
-                   $"<p class=\"code-placeholder\">{PathUtil.Html(reason)}</p>\n</section>\n";
-        AppendBody(sb, BuildAside(prefix, repoRelativePath, referencedBy, externalSourceUrl), body);
 
+        var source =
+            $"<section class=\"code-source-section\">\n  <div class=\"code-source-head\">\n    <h2>Source</h2>\n  </div>\n" +
+            $"<p class=\"code-placeholder\">{PathUtil.Html(reason)}</p>\n</section>\n";
+
+        var insightsPanel = BuildInsightsPanel(insight);
+        var relationshipsPanel = BuildRelationshipsPanel(
+            prefix, repoRelativePath, outputRelativePath, referencedBy, insight, coupledFileHref, storyRelatedEdges, relatedRelatedEdges);
+        var historyPanel = BuildHistoryPanel(prefix, insight, commitHref, dayHref);
+
+        var tabs = new List<CodeTab>(4);
+        if (insightsPanel.Length > 0) tabs.Add(new CodeTab("insights", "Insights", insightsPanel));
+        if (relationshipsPanel.Length > 0) tabs.Add(new CodeTab("relationships", "Relationships", relationshipsPanel));
+        if (historyPanel.Length > 0) tabs.Add(new CodeTab("history", "History", historyPanel));
+        tabs.Add(new CodeTab("source", "Code", source));
+
+        if (tabs.Count == 1)
+        {
+            // No insight/relationships — keep the pre-tab two-column layout (aside + placeholder body).
+            AppendBody(sb, BuildAside(prefix, repoRelativePath, referencedBy, externalSourceUrl), source);
+            return EndShell(sb, prefix);
+        }
+
+        // Deep-git / relationships present: same tab shell as RenderPage; Code panel is the placeholder reason.
+        // External link rides beside Source inside a normal page; for placeholders keep it in the aside when we
+        // fall through to tabs without an aside — attach via code-source-head when external is set.
+        if (externalSourceUrl is { Length: > 0 })
+        {
+            source =
+                $"<section class=\"code-source-section\">\n  <div class=\"code-source-head\">\n    <h2>Source</h2>\n    {ExternalSourceAnchor(externalSourceUrl)}\n  </div>\n" +
+                $"<p class=\"code-placeholder\">{PathUtil.Html(reason)}</p>\n</section>\n";
+            tabs[^1] = new CodeTab("source", "Code", source);
+        }
+
+        AppendTabs(sb, outputRelativePath, tabs);
         return EndShell(sb, prefix);
     }
 

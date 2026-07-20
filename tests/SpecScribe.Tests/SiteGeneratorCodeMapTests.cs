@@ -143,6 +143,22 @@ public class SiteGeneratorCodeMapTests : IDisposable
         AssertNoBrokenLocalLinks(IndexPage);
     }
 
+    [Fact]
+    public void GenerateAll_OversizedTextFile_StillAppearsOnCodeMap()
+    {
+        // >1MB text must still contribute LOC to the treemap (streamed count); the 1MB cap is render-only.
+        var oversized = Path.Combine(_root, "src", "Sample", "Huge.cs");
+        var body = new string('x', 1_100_000);
+        File.WriteAllText(oversized, "namespace Sample;\n// " + body + "\n");
+
+        GenerateSite();
+
+        Assert.True(File.Exists(CodeMapPage));
+        var html = File.ReadAllText(CodeMapPage);
+        Assert.Contains("src/Sample/Huge.cs", html);
+        Assert.Contains("src/Sample/Widget.cs", html);
+    }
+
     /// <summary>Every local (non-anchor, non-scheme) href on the page resolves to a file that was actually
     /// generated — the "never a broken link" guarantee (AC #3, NFR2).</summary>
     private void AssertNoBrokenLocalLinks(string pagePath)

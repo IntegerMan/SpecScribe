@@ -75,7 +75,10 @@ public sealed class SiteGenerator
     // Populated by GenerateCodePagesInternal, cached the same way _adrs/_commitDays are so Story 7.2 can reuse it
     // to linkify source citations without re-running discovery. Empty in external mode (--code-url) and when no
     // referenced source files exist.
-    private Dictionary<string, string> _codePages = new(StringComparer.OrdinalIgnoreCase);
+    // Ordinal (not IgnoreCase): matches the git path-key policy (Epic 8) so two case-differing files on a
+    // case-sensitive checkout stay distinct instead of silently colliding. Windows citation case mismatches
+    // degrade to unlink — same class as ProgressCalculator git-date misses. [spec-7-1-deferred-debt-cleanup]
+    private Dictionary<string, string> _codePages = new(StringComparer.Ordinal);
 
     // Story 7.2: discovered ONCE up front (DiscoverCodeReferences), before any citing page is linkified, so
     // ApplyReferenceLinks can resolve citations against a populated _codePages on every page — including the
@@ -84,13 +87,13 @@ public sealed class SiteGenerator
     // file -> citing artifacts back-map that drives each code page's "Referenced by" block (AC #2). Keyed on the
     // citing artifact's SOURCE-relative path (resolved to its output URL at render time, once _referenceMap exists).
     private List<string> _codeReferenced = new();
-    private Dictionary<string, List<(string CitingSourceRelative, string Title)>> _codeReverseMap = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, List<(string CitingSourceRelative, string Title)>> _codeReverseMap = new(StringComparer.Ordinal);
 
     // Forward map (citing artifact SOURCE-relative path -> the set of repo-relative code files it cites), built in
     // the SAME discovery pass as _codeReverseMap (no second scan) — lets the "Show relationships" reference-graph
     // toggle answer "does this citing story ALSO cite one of the center file's related files?" without re-reading
     // any artifact. [reference-graph epic grouping + relationships]
-    private Dictionary<string, HashSet<string>> _citerToFiles = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, HashSet<string>> _citerToFiles = new(StringComparer.Ordinal);
 
     // Story page path (output-relative, normalized) -> owning epic (number + title), resolved ONCE from
     // _epicsModel right before code pages render (BuildStoryEpicLookup) — the reference graph's "Group by epic"
@@ -1306,17 +1309,25 @@ public sealed class SiteGenerator
     /// <summary>The guarded per-commit-detail resolver (Story 7.5): a commit hash → its <c>commit/…html</c> page,
     /// output-relative. Matches <see cref="_commitPages"/> keys (full <c>%H</c>) exactly first, then by prefix so an
     /// abbreviated <c>%h</c> from the baseline day-page fetch still resolves (git can widen <c>%h</c> past 7 chars on
-    /// collision, so prefix — not equality — is the safe rule). Returns null (→ plain hash) when no page exists.
-    /// ≤300 entries, so the linear prefix scan is trivial.</summary>
-    private string? CommitHref(string hash)
+    /// collision, so prefix — not equality — is the safe rule). Returns null (→ plain hash) when no page exists or
+    /// when ≥2 full hashes share the prefix (fail closed — a wrong History link is worse than plain text).
+    /// ≤300 entries, so the linear prefix scan is trivial. [spec-7-1-deferred-debt-cleanup]</summary>
+    private string? CommitHref(string hash) => ResolveCommitPageHref(_commitPages, hash);
+
+    /// <summary>Pure commit-hash → page resolver used by <see cref="CommitHref"/>. Extracted so unit tests can pin
+    /// the exact-match / unique-prefix / ambiguous-prefix contract without spinning up a full generation.</summary>
+    internal static string? ResolveCommitPageHref(IReadOnlyDictionary<string, string> commitPages, string hash)
     {
-        if (hash.Length == 0 || _commitPages.Count == 0) return null;
-        if (_commitPages.TryGetValue(hash, out var exact)) return exact;
-        foreach (var kv in _commitPages)
+        if (hash.Length == 0 || commitPages.Count == 0) return null;
+        if (commitPages.TryGetValue(hash, out var exact)) return exact;
+        string? match = null;
+        foreach (var kv in commitPages)
         {
-            if (kv.Key.StartsWith(hash, StringComparison.Ordinal)) return kv.Value;
+            if (!kv.Key.StartsWith(hash, StringComparison.Ordinal)) continue;
+            if (match is not null) return null; // ambiguous — fail closed
+            match = kv.Value;
         }
-        return null;
+        return match;
     }
 
     /// <summary>The guarded per-day resolver: a commit date → its <c>commits/{date}.html</c> page, output-relative.
@@ -1401,14 +1412,14 @@ public sealed class SiteGenerator
     /// suppresses this pass.</summary>
     private void DiscoverCodeReferences(List<string> sourceFiles)
     {
-        _codePages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _codePages = new Dictionary<string, string>(StringComparer.Ordinal);
         _codeReferenced = new List<string>();
-        _codeReverseMap = new Dictionary<string, List<(string, string)>>(StringComparer.OrdinalIgnoreCase);
-        _citerToFiles = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        _codeReverseMap = new Dictionary<string, List<(string, string)>>(StringComparer.Ordinal);
+        _citerToFiles = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
 
         var repoFull = Path.GetFullPath(_options.RepoRoot);
         var sourceFull = Path.GetFullPath(_options.SourceRoot);
-        var referenced = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var referenced = new SortedSet<string>(StringComparer.Ordinal);
 
         // [Review][Patch] One shared scan body for every corpus that can carry a code citation and is run through
         // ApplyReferenceLinks (CodeReferenceLinkifier included) — the _bmad-output planning/implementation corpus
@@ -1454,7 +1465,7 @@ public sealed class SiteGenerator
                 // relationships" story<->related-file cross edge.
                 var files = _citerToFiles.TryGetValue(citingRelative, out var existingFiles)
                     ? existingFiles
-                    : _citerToFiles[citingRelative] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    : _citerToFiles[citingRelative] = new HashSet<string>(StringComparer.Ordinal);
                 files.Add(PathUtil.NormalizeSlashes(repoRel));
             }
         }
@@ -1689,7 +1700,10 @@ public sealed class SiteGenerator
                 if (new FileInfo(full).Length > MaxCodeFileBytes)
                 {
                     html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
-                        "This file is too large to render inline.", nav, referencedBy, externalUrl, pager, localContext);
+                        "This file is too large to render inline.", nav, referencedBy, externalUrl, pager: pager,
+                        localContext: localContext, insight: insight, coupledFileHref: CodePageHref,
+                        commitHref: CommitHref, dayHref: DayHref,
+                        storyRelatedEdges: storyRelatedEdges, relatedRelatedEdges: relatedRelatedEdges);
                     outcome = GenerationOutcome.Skipped;
                 }
                 else if (TryReadCodeText(full, out var text))
@@ -1703,7 +1717,10 @@ public sealed class SiteGenerator
                 else
                 {
                     html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
-                        "This file is not a readable text file and can't be shown inline.", nav, referencedBy, externalUrl, pager, localContext);
+                        "This file is not a readable text file and can't be shown inline.", nav, referencedBy, externalUrl,
+                        pager: pager, localContext: localContext, insight: insight, coupledFileHref: CodePageHref,
+                        commitHref: CommitHref, dayHref: DayHref,
+                        storyRelatedEdges: storyRelatedEdges, relatedRelatedEdges: relatedRelatedEdges);
                     outcome = GenerationOutcome.Skipped;
                 }
 
@@ -1886,6 +1903,150 @@ public sealed class SiteGenerator
             return true;
         }
         catch (DecoderFallbackException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Streams a source file to count lines without allocating the full string — used by the code-map walk
+    /// so oversized tracked files still contribute LOC. Same binary/UTF-8 guards as <see cref="TryReadCodeText"/>;
+    /// line-count semantics match <see cref="SplitCodeLines"/> (CRLF/CR normalized, trailing phantom line dropped).
+    /// [spec-7-1-deferred-debt-cleanup]</summary>
+    internal static bool TryCountCodeLines(string fullPath, out long lines)
+    {
+        lines = 0;
+        try
+        {
+            using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var buffer = new byte[64 * 1024];
+            var decoder = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetDecoder();
+            var charBuf = new char[64 * 1024];
+            long newlineCount = 0;
+            var anyContent = false;
+            var endsWithNewline = false;
+            var pendingCr = false;
+
+            bool ProcessChar(char c)
+            {
+                if (c == '\0') return false;
+
+                if (pendingCr)
+                {
+                    pendingCr = false;
+                    if (c == '\n')
+                    {
+                        newlineCount++;
+                        endsWithNewline = true;
+                        anyContent = true;
+                        return true;
+                    }
+
+                    newlineCount++;
+                    endsWithNewline = true;
+                }
+
+                anyContent = true;
+                if (c == '\r')
+                {
+                    pendingCr = true;
+                    return true;
+                }
+
+                if (c == '\n')
+                {
+                    newlineCount++;
+                    endsWithNewline = true;
+                }
+                else
+                {
+                    endsWithNewline = false;
+                }
+
+                return true;
+            }
+
+            bool DecodeBytes(byte[] src, int offset, int count)
+            {
+                for (var i = offset; i < offset + count; i++)
+                {
+                    if (src[i] == 0) return false;
+                }
+
+                int charsDecoded;
+                try
+                {
+                    charsDecoded = decoder.GetChars(src, offset, count, charBuf, 0, flush: false);
+                }
+                catch (DecoderFallbackException)
+                {
+                    return false;
+                }
+
+                for (var i = 0; i < charsDecoded; i++)
+                {
+                    if (!ProcessChar(charBuf[i])) return false;
+                }
+
+                return true;
+            }
+
+            // Peek up to 3 bytes for a UTF-8 BOM before the main loop so a short first Read can't leave EF BB BF
+            // in the decode stream (matches TryReadCodeText's whole-buffer strip).
+            var bom = new byte[3];
+            var bomRead = 0;
+            while (bomRead < 3)
+            {
+                var n = stream.Read(bom, bomRead, 3 - bomRead);
+                if (n == 0) break;
+                bomRead += n;
+            }
+
+            if (bomRead == 3 && bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF)
+            {
+                // BOM discarded.
+            }
+            else if (bomRead > 0)
+            {
+                if (!DecodeBytes(bom, 0, bomRead)) return false;
+            }
+
+            int read;
+            while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                if (!DecodeBytes(buffer, 0, read)) return false;
+            }
+
+            try
+            {
+                var flushed = decoder.GetChars(Array.Empty<byte>(), 0, 0, charBuf, 0, flush: true);
+                for (var i = 0; i < flushed; i++)
+                {
+                    if (!ProcessChar(charBuf[i])) return false;
+                }
+            }
+            catch (DecoderFallbackException)
+            {
+                return false;
+            }
+
+            if (pendingCr)
+            {
+                newlineCount++;
+                endsWithNewline = true;
+                anyContent = true;
+            }
+
+            if (!anyContent)
+            {
+                lines = 0;
+                return true;
+            }
+
+            // Match SplitCodeLines: drop a trailing phantom empty entry from a terminating newline.
+            lines = endsWithNewline ? newlineCount : newlineCount + 1;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return false;
         }
@@ -3496,10 +3657,11 @@ public sealed class SiteGenerator
     /// repo-relative + forward-slash. Prefers <c>git ls-files</c> (tracked files only → excludes <c>bin/</c>,
     /// <c>obj/</c>, <c>.git/</c>, <c>node_modules/</c>, and everything <c>.gitignore</c> covers, defining "the
     /// codebase" the way git does); falls back to a bounded directory walk with an explicit exclude list when git is
-    /// unavailable / not a repo. Each file's line count is read with the SAME size cap + binary/UTF-8 guard the code
-    /// pages use (<see cref="TryReadCodeText"/>) — binary/oversized/unreadable files have no meaningful LOC and are
-    /// skipped. Bounded (<see cref="MaxCodeMapFiles"/>) and wrapped never-throw (NFR1/NFR2): any failure yields an
-    /// empty list, so the whole surface omits and generation still succeeds. Runs once per full generation.</summary>
+    /// unavailable / not a repo. Line counts are streamed (no full-string allocation); binary/unreadable files still
+    /// skip, but oversized text files contribute LOC so the treemap isn't silently incomplete — the 1MB cap remains
+    /// for inline code-page rendering only. Bounded (<see cref="MaxCodeMapFiles"/>) and wrapped never-throw
+    /// (NFR1/NFR2): any failure yields an empty list, so the whole surface omits and generation still succeeds. Runs
+    /// once per full generation. [spec-7-1-deferred-debt-cleanup]</summary>
     private IReadOnlyList<(string RepoRelativePath, long Lines)> EnumerateCodeFiles()
     {
         try
@@ -3530,9 +3692,8 @@ public sealed class SiteGenerator
                 try
                 {
                     if (!File.Exists(full)) continue;
-                    if (new FileInfo(full).Length > MaxCodeFileBytes) continue;   // oversized → no meaningful LOC
-                    if (!TryReadCodeText(full, out var text)) continue;           // binary / unreadable → skip
-                    result.Add((normalized, SplitCodeLines(text).Count));
+                    if (!TryCountCodeLines(full, out var lines)) continue; // binary / unreadable → skip
+                    result.Add((normalized, lines));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {

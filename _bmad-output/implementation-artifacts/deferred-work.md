@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-7-1-deferred-debt-cleanup.md (2026-07-20)
+
+- source_spec: `spec-7-1-deferred-debt-cleanup.md`
+  summary: `TryCountCodeLines` / the code-map walk has no per-file byte ceiling after the 1MB skip was removed, so a multi-GB tracked text file can stall generation while streaming LOC.
+  evidence: Edge Case Hunter + Blind Hunter. Spec intentionally includes oversized files on the map; a safety cap (partial count or skip-with-notice) was left for a later NFR1 pass.
+- source_spec: `spec-7-1-deferred-debt-cleanup.md`
+  summary: Ordinal `_codePages` keys that differ only by case can still collide on the output filesystem on a case-insensitive volume (two keys → one `code/….html` path), overwriting each other at write time.
+  evidence: Blind Hunter. Linux collision is fixed; Windows dual-write requires git tracking two case variants, which a case-insensitive checkout normally cannot.
+
 ## Deferred from: code review of 10-3-glossary-and-in-place-vocabulary.md (2026-07-20)
 
 - source_spec: `10-3-glossary-and-in-place-vocabulary.md`
@@ -207,21 +216,21 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of story-7-1 (2026-07-13)
 
-- source_spec: `7-1-in-portal-code-file-browsing.md`
+- ~~source_spec: `7-1-in-portal-code-file-browsing.md`
   summary: `StringComparer.OrdinalIgnoreCase` on repo-relative path dictionaries (`_codePages`, `_codeReverseMap`, discovery's `SortedSet`) risks silently colliding two case-differing files on a case-sensitive (Linux) checkout.
-  evidence: Blind Hunter + Edge Case Hunter (independently flagged). Mirrors the codebase-wide convention already used for `_docs` and the markdown reference map since before this story; deferred as pre-existing, not novel to 7.1. [SiteGenerator.cs:78,87,1109](../../src/SpecScribe/SiteGenerator.cs)
-- source_spec: `7-1-in-portal-code-file-browsing.md`
+  evidence: Blind Hunter + Edge Case Hunter (independently flagged). Mirrors the codebase-wide convention already used for `_docs` and the markdown reference map since before this story; deferred as pre-existing, not novel to 7.1. [SiteGenerator.cs:78,87,1109](../../src/SpecScribe/SiteGenerator.cs)~~ **RESOLVED 2026-07-20** (`spec-7-1-deferred-debt-cleanup`): `_codePages`, `_codeReverseMap`, `_citerToFiles`, and the discovery `SortedSet` now use `StringComparer.Ordinal`, matching the git path-key policy (Epic 8).
+- ~~source_spec: `7-1-in-portal-code-file-browsing.md`
   summary: `CommitHref`'s abbreviated-hash fallback does a linear `Dictionary` scan with no ambiguity check, so two same-prefix short hashes resolve non-deterministically.
-  evidence: Blind Hunter + Edge Case Hunter (independently flagged). `CommitHref`/`_commitPages` are Story 7.5's seam, reused here for the code page's History tab; not introduced by 7.1. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
-- source_spec: `7-1-in-portal-code-file-browsing.md`
+  evidence: Blind Hunter + Edge Case Hunter (independently flagged). `CommitHref`/`_commitPages` are Story 7.5's seam, reused here for the code page's History tab; not introduced by 7.1. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)~~ **RESOLVED 2026-07-20** (`spec-7-1-deferred-debt-cleanup`): prefix fallback returns the unique match or `null` when ≥2 keys share the prefix (`ResolveCommitPageHref`).
+- ~~source_spec: `7-1-in-portal-code-file-browsing.md`
   summary: `EnumerateCodeFiles`/`MaxCodeFileBytes` reuse for the code-map's per-file line count (Story 7.6) reads every tracked file fully into memory just to count lines, and silently omits >1MB files from the size visualization.
-  evidence: Blind Hunter. Out of 7.1's scope (Story 7.6 code, bundled into this diff only because it shares `SiteGenerator.cs`). [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
-- source_spec: `7-1-in-portal-code-file-browsing.md`
+  evidence: Blind Hunter. Out of 7.1's scope (Story 7.6 code, bundled into this diff only because it shares `SiteGenerator.cs`). [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)~~ **RESOLVED 2026-07-20** (`spec-7-1-deferred-debt-cleanup`): `TryCountCodeLines` streams LOC without a full-string alloc; oversized text files still contribute to the map; 1MB cap remains for inline render only.
+- ~~source_spec: `7-1-in-portal-code-file-browsing.md`
   summary: Placeholder pages (binary/oversized/unreadable files) never receive `FileInsight`/History-tab data even when `--deep-git` has it, because `RenderPlaceholder` doesn't accept those parameters.
-  evidence: Edge Case Hunter. Out of 7.1's scope — the Insights/History tabs are Story 7.4/7.8/10.x work bundled into `CodeFileTemplater.cs`. [CodeFileTemplater.cs](../../src/SpecScribe/CodeFileTemplater.cs)
-- source_spec: `7-1-in-portal-code-file-browsing.md`
+  evidence: Edge Case Hunter. Out of 7.1's scope — the Insights/History tabs are Story 7.4/7.8/10.x work bundled into `CodeFileTemplater.cs`. [CodeFileTemplater.cs](../../src/SpecScribe/CodeFileTemplater.cs)~~ **RESOLVED 2026-07-20** (`spec-7-1-deferred-debt-cleanup`): `RenderPlaceholder` accepts insight/href/edge params and emits Insights/History/Relationships tabs when content exists.
+- ~~source_spec: `7-1-in-portal-code-file-browsing.md`
   summary: `TabGroupName` can theoretically collide across two paths that differ only in `/` vs. a literal `-` in a directory name, cross-wiring radio-group tab state.
-  evidence: Blind Hunter. Low likelihood; only affects the SPA/webview whole-document capture mode. [CodeFileTemplater.cs](../../src/SpecScribe/CodeFileTemplater.cs)
+  evidence: Blind Hunter. Low likelihood; only affects the SPA/webview whole-document capture mode. [CodeFileTemplater.cs](../../src/SpecScribe/CodeFileTemplater.cs)~~ **RESOLVED 2026-07-20** (`spec-7-1-deferred-debt-cleanup`): `Slugify` encodes `/` as `x2f` before non-alnum collapse so `a/b` and `a-b` never share a radio group name.
 
 ## Deferred from: code review of story-7-6 (2026-07-13)
 
