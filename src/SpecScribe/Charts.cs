@@ -2496,6 +2496,37 @@ public static class Charts
     private static string FlowStateKey(RequirementInfo req) =>
         req.Status == RequirementStatus.Unmapped ? "unmapped" : StatusStyles.ForRequirement(req);
 
+    /// <summary>The requirements-flow's "No coverage" epic-coverage-key sentinel. Single source for
+    /// <see cref="RequirementFlow"/> and <see cref="RequirementFlowTextEquivalent"/> so a future change to
+    /// coverage semantics can't drift the diagram and its text twin apart. [Story 3.7 deferred-debt cleanup]</summary>
+    private const int NoCoverageKey = -1;
+
+    /// <summary>A requirement with no covering epic — routes to the flow's "No coverage" node/bucket. Single
+    /// source for both <see cref="RequirementFlow"/> and <see cref="RequirementFlowTextEquivalent"/>.</summary>
+    private static bool NoCoverage(RequirementInfo r) => r.CoverageEpicNumbers.Count == 0;
+
+    /// <summary>Ordered epic-coverage keys for the flow's L1 column: covering epic numbers ascending, then
+    /// <see cref="NoCoverageKey"/> last if any requirement has no covering epic. Single source so the diagram
+    /// and its text-equivalent always partition requirements the same way.</summary>
+    private static List<int> CoverageKeys(IReadOnlyList<RequirementInfo> all)
+    {
+        var keys = all.SelectMany(r => r.CoverageEpicNumbers).Distinct().OrderBy(k => k).ToList();
+        if (all.Any(NoCoverage)) keys.Add(NoCoverageKey);
+        return keys;
+    }
+
+    /// <summary>The requirements belonging to one coverage key (a covering epic number, or
+    /// <see cref="NoCoverageKey"/>) — a multi-epic requirement belongs under every covering epic. Single source
+    /// for both <see cref="RequirementFlow"/>'s per-node counts and <see cref="RequirementFlowTextEquivalent"/>'s
+    /// per-epic membership.</summary>
+    private static IEnumerable<RequirementInfo> ForCoverageKey(IEnumerable<RequirementInfo> all, int key) =>
+        key == NoCoverageKey ? all.Where(NoCoverage) : all.Where(r => r.CoverageEpicNumbers.Contains(key));
+
+    /// <summary>Epic titles by number, stripped of markup — the shared lookup behind both the flow diagram's
+    /// node tooltips and its text-equivalent's epic labels.</summary>
+    private static Dictionary<int, string> EpicTitlesByNumber(EpicsModel epics) =>
+        epics.Epics.ToDictionary(e => e.Number, e => PathUtil.StripHtmlTags(e.Title));
+
     /// <summary>The conservation contract behind <see cref="RequirementFlow"/>, exposed for testing: the count
     /// of requirements ENTERING the flow at "definition" (= the requirement total) and how they partition across
     /// the terminal implementation states. Every requirement exits at exactly ONE state
@@ -2532,30 +2563,25 @@ public static class Charts
         if (all.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
 
         var n = all.Count;
-        const int Sentinel = -1; // the "No coverage" node's key
 
         // A requirement with no covering epic routes to the "No coverage" node (weight 1); otherwise its unit
         // weight splits evenly across its covering epics (1/k each). Deterministic and conserves to 1 per req.
-        static bool NoCoverage(RequirementInfo r) => r.CoverageEpicNumbers.Count == 0;
         static double Weight(RequirementInfo r, int key) =>
-            key == Sentinel
+            key == NoCoverageKey
                 ? (NoCoverage(r) ? 1.0 : 0.0)
                 : r.CoverageEpicNumbers.Contains(key) ? 1.0 / r.CoverageEpicNumbers.Count : 0.0;
 
-        var epicKeys = all.SelectMany(r => r.CoverageEpicNumbers).Distinct().OrderBy(k => k).ToList();
-        var hasNoCoverage = all.Any(NoCoverage);
-
         // Ordered L1 nodes: covering epics ascending, then the "No coverage" node last (if any req routes there).
-        var l1Keys = new List<int>(epicKeys);
-        if (hasNoCoverage) l1Keys.Add(Sentinel);
+        var l1Keys = CoverageKeys(all);
+        var epicKeys = l1Keys.Where(k => k != NoCoverageKey).ToList();
 
-        var epicTitleByNumber = epics.Epics.ToDictionary(e => e.Number, e => PathUtil.StripHtmlTags(e.Title));
-        string L1Label(int key) => key == Sentinel ? "No coverage" : $"Epic {key}";
+        var epicTitleByNumber = EpicTitlesByNumber(epics);
+        string L1Label(int key) => key == NoCoverageKey ? "No coverage" : $"Epic {key}";
 
         // L1 throughput = summed fractional weight (drives node height + ribbon thickness); L1 req count = the
         // number of DISTINCT requirements touching the node (the honest integer shown in the label/tooltip).
         double L1Throughput(int key) => all.Sum(r => Weight(r, key));
-        int L1ReqCount(int key) => key == Sentinel ? all.Count(NoCoverage) : all.Count(r => r.CoverageEpicNumbers.Contains(key));
+        int L1ReqCount(int key) => ForCoverageKey(all, key).Count();
 
         // State nodes: the buckets actually populated (a zero state draws no node/ribbon). Shares
         // RequirementFlowConservation's counting so the two can never disagree.
@@ -2683,13 +2709,13 @@ public static class Charts
             var (ly, lh) = l1Layout[i];
             var key = l1Keys[i];
             var count = L1ReqCount(key);
-            var titleExtra = key == Sentinel
+            var titleExtra = key == NoCoverageKey
                 ? "deferred, unmapped, or non-functional"
                 : epicTitleByNumber.TryGetValue(key, out var t) ? t : $"Epic {key}";
 
             // A multi-epic requirement is split across all its covering epics, so it appears in each epic node.
             // Note how many of this node's requirements are shared with another epic, so the split is legible.
-            var shared = key == Sentinel
+            var shared = key == NoCoverageKey
                 ? 0
                 : all.Count(r => r.CoverageEpicNumbers.Contains(key) && r.CoverageEpicNumbers.Count > 1);
             var sharedNote = shared > 0 ? $" · {shared} shared with other epics" : string.Empty;
@@ -2729,26 +2755,23 @@ public static class Charts
         var all = reqs.All.ToList();
         if (all.Count == 0) return string.Empty;
 
-        const int Sentinel = -1;
-        static bool NoCoverage(RequirementInfo r) => r.CoverageEpicNumbers.Count == 0;
-
-        var epicKeys = all.SelectMany(r => r.CoverageEpicNumbers).Distinct().OrderBy(k => k).ToList();
-        if (all.Any(NoCoverage)) epicKeys.Add(Sentinel);
-        if (epicKeys.Count == 0) return string.Empty;
+        // Unlike RequirementFlow's own `epicKeys` (covering epics only, sentinel handled as a separate node),
+        // this walks CoverageKeys' full result INCLUDING the trailing NoCoverageKey — the breakdown lists
+        // "No coverage" as just another row.
+        var coverageKeys = CoverageKeys(all);
+        if (coverageKeys.Count == 0) return string.Empty;
 
         // Same epic-title lookup RequirementFlow's node tooltips use, so the sr-only reading names the epic
         // the way a sighted user sees it on hover, not just its bare number.
-        var epicTitleByNumber = epics.Epics.ToDictionary(e => e.Number, e => PathUtil.StripHtmlTags(e.Title));
-        string L1Label(int key) => key == Sentinel
+        var epicTitleByNumber = EpicTitlesByNumber(epics);
+        string L1Label(int key) => key == NoCoverageKey
             ? "No coverage"
             : epicTitleByNumber.TryGetValue(key, out var title) ? $"Epic {key} ({title})" : $"Epic {key}";
-        IEnumerable<RequirementInfo> ForKey(int key) => key == Sentinel
-            ? all.Where(NoCoverage)
-            : all.Where(r => r.CoverageEpicNumbers.Contains(key));
+        IEnumerable<RequirementInfo> ForKey(int key) => ForCoverageKey(all, key);
 
         var sb = new StringBuilder();
         sb.Append("<ul class=\"req-flow-breakdown sr-only\">\n");
-        foreach (var key in epicKeys)
+        foreach (var key in coverageKeys)
         {
             var members = ForKey(key).ToList();
             // Canonical FlowStates order (done → deferred) so the reading matches the Sankey's state column order.
