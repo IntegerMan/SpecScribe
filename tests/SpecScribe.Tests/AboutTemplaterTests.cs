@@ -25,12 +25,21 @@ public class AboutTemplaterTests
     [Theory]
     // Deterministic build with a full 40-char hex sha → version kept, hash truncated to the first 7.
     [InlineData("0.1.0-preview+9f8e7d6c5b4a3210fedcba98765432100abcdef1", "0.1.0-preview", "9f8e7d6")]
-    // Short hex suffix (< 7 chars) is kept whole.
-    [InlineData("1.0.0+abcd", "1.0.0", "abcd")]
+    // Exactly 7 hex chars (IsShaLike's minimum plausible sha length) is kept whole.
+    [InlineData("1.0.0+abcdef0", "1.0.0", "abcdef0")]
+    // Below the 7-char minimum: too short to plausibly be a git sha, dropped.
+    [InlineData("1.0.0+abcd", "1.0.0", null)]
     // Non-hex "+" suffix (branch/build metadata) is dropped — the Build row shows the date only, never a bogus hash.
     [InlineData("1.0.0+branch-x", "1.0.0", null)]
     // No "+" suffix at all → no commit hash.
     [InlineData("1.0.0", "1.0.0", null)]
+    // Documents the accepted gap (Story 6.1 review): IsShaLike is a shape check, not proof of origin — a
+    // hex-valid-length ALL-DIGIT suffix (e.g. a date-like build number) still passes, since digits are valid hex
+    // characters too and rejecting them risks false negatives on genuine shas that happen to be all-digits.
+    [InlineData("1.0.0+12345678", "1.0.0", "1234567")]
+    // Empty pre-"+" version segment still preserves a real hash — ParseInformationalVersion never silently drops
+    // a plausible commit hash just because the version half is empty (the caller decides how to handle that).
+    [InlineData("+abcdef0", "", "abcdef0")]
     public void ParseInformationalVersion_SplitsVersionAndGuardsHash(
         string informational, string expectedVersion, string? expectedHash)
     {
@@ -43,11 +52,13 @@ public class AboutTemplaterTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    public void ParseInformationalVersion_EmptyInput_SignalsFallback(string? informational)
+    public void ParseInformationalVersion_EmptyInput_ReturnsEmptyVersionAndNullHash(string? informational)
     {
         var (version, hash) = ProductMetadata.ParseInformationalVersion(informational);
 
-        // Empty version string is the caller's cue to fall back to AssemblyName.Version.
+        // FromAssembly keys its own AssemblyName.Version fallback off the PRESENCE of the informational attribute,
+        // not off this empty-string result (an empty result here can also arise from an empty pre-"+" segment
+        // on a non-null informational string — see the "+abcdef0" case above).
         Assert.Equal(string.Empty, version);
         Assert.Null(hash);
     }

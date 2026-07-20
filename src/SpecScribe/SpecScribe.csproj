@@ -25,13 +25,17 @@
 
   <!-- Stamp the build date into a readable assembly attribute so the About page can show which build produced a
        site (the commit hash rides along in AssemblyInformationalVersion's "+<sha>" suffix on deterministic builds).
-       Honors SOURCE_DATE_EPOCH (the reproducible-builds standard, Unix seconds → yyyy-MM-dd UTC) when set, so
-       identical commits produce identical bytes in reproducible/CI builds; otherwise stamps today's UTC date. The
-       epoch is constructed explicitly (no static-field access, which MSBuild property functions can't reach); a
-       date-only ToString needs no timezone conversion, so the naive 1970-01-01 base yields the correct UTC date. -->
+       Honors SOURCE_DATE_EPOCH (the reproducible-builds standard, Unix seconds → yyyy-MM-dd UTC) when set AND
+       well-formed, so identical commits produce identical bytes in reproducible/CI builds; otherwise (unset,
+       non-numeric, or absurdly large/negative) stamps today's UTC date instead of failing the build. The 1-10
+       digit bound comfortably covers any realistic epoch (10 digits reaches year ~2286) while keeping AddSeconds
+       safely inside DateTime's representable range. The epoch is constructed explicitly (no static-field access,
+       which MSBuild property functions can't reach); a date-only ToString needs no timezone conversion, so the
+       naive 1970-01-01 base yields the correct UTC date. -->
   <PropertyGroup>
-    <SpecScribeBuildDate Condition="'$(SOURCE_DATE_EPOCH)' != ''">$([System.DateTime]::new(1970, 1, 1).AddSeconds($(SOURCE_DATE_EPOCH)).ToString('yyyy-MM-dd'))</SpecScribeBuildDate>
-    <SpecScribeBuildDate Condition="'$(SOURCE_DATE_EPOCH)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))</SpecScribeBuildDate>
+    <_SourceDateEpochValid Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SOURCE_DATE_EPOCH)', '^[0-9]{1,10}$'))">true</_SourceDateEpochValid>
+    <SpecScribeBuildDate Condition="'$(_SourceDateEpochValid)' == 'true'">$([System.DateTime]::new(1970, 1, 1).AddSeconds($(SOURCE_DATE_EPOCH)).ToString('yyyy-MM-dd'))</SpecScribeBuildDate>
+    <SpecScribeBuildDate Condition="'$(_SourceDateEpochValid)' != 'true'">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))</SpecScribeBuildDate>
   </PropertyGroup>
   <ItemGroup>
     <AssemblyMetadata Include="BuildDate" Value="$(SpecScribeBuildDate)" />

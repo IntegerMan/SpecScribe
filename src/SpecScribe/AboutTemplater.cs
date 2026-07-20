@@ -17,7 +17,8 @@ namespace SpecScribe;
 /// <param name="CommitHash">The short (7-char) git commit the build came from, recovered from the informational
 /// version's <c>+</c> suffix — or null when the build carries no revision (e.g. built outside a git checkout).</param>
 /// <param name="BuildDate">The build date (UTC, <c>yyyy-MM-dd</c>) stamped into assembly metadata by the csproj —
-/// or null when the attribute is absent.</param>
+/// or null when the attribute is absent. Pinned to <c>SOURCE_DATE_EPOCH</c> when that env var is set at build
+/// time (reproducible builds), otherwise the literal build day.</param>
 public sealed record ProductMetadata(
     string Version, string Description, string Author, string RepositoryUrl,
     string AuthorUrl, string? CommitHash, string? BuildDate)
@@ -54,12 +55,20 @@ public sealed record ProductMetadata(
 
         // Deterministic builds (the SDK default) append "+<commit-sha>" to the informational version. Parse there
         // into (semver, short commit hash); fall back to the plain AssemblyName version when there's no
-        // informational version at all (e.g. built outside a git checkout / without SourceLink).
+        // informational version at all (e.g. built outside a git checkout / without SourceLink). Gated on
+        // PRESENCE of the attribute, not on the parsed version being non-empty — an unusual informational string
+        // with an empty pre-"+" segment should still surface a real commit hash, not be treated as "no version".
         var informational = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        var (version, commitHash) = ParseInformationalVersion(informational);
-        if (version.Length == 0)
+        string version;
+        string? commitHash;
+        if (informational is { Length: > 0 })
+        {
+            (version, commitHash) = ParseInformationalVersion(informational);
+        }
+        else
         {
             version = asm.GetName().Version?.ToString() ?? "unknown";
+            commitHash = null;
         }
 
         var description = asm.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description ?? string.Empty;
@@ -73,9 +82,11 @@ public sealed record ProductMetadata(
 
     /// <summary>Splits an <see cref="AssemblyInformationalVersionAttribute"/> value into its semver part (KEEPING
     /// any <c>-preview</c> pre-release label) and, when the deterministic-build <c>+&lt;sha&gt;</c> suffix is
-    /// present AND looks like a git hash, a short (7-char) commit hash. A non-hex suffix is dropped rather than
-    /// shown as a bogus hash, so the About page's Build row stays honest. Returns an empty version string when
-    /// there's no informational version to parse, signalling the caller to fall back to the AssemblyName version.</summary>
+    /// present and plausibly hex-sha-shaped (see <see cref="IsShaLike"/>), a short (7-char) commit hash. An
+    /// implausible suffix is dropped rather than shown as a bogus hash, so the About page's Build row stays
+    /// honest. Returns an empty version when there's no informational version to parse — callers should key their
+    /// own fallback off the PRESENCE of <paramref name="informational"/>, not off this empty-string result, since
+    /// an unusual informational string can itself parse to an empty version while still carrying a real hash.</summary>
     internal static (string version, string? commitHash) ParseInformationalVersion(string? informational)
     {
         if (informational is not { Length: > 0 } v)
@@ -93,10 +104,14 @@ public sealed record ProductMetadata(
         return (version, commitHash);
     }
 
-    /// <summary>True when every character is an ASCII hex digit — a cheap sanity check that a <c>+</c> suffix is a
-    /// git commit sha before it's surfaced as one (rather than, say, branch/build metadata).</summary>
+    /// <summary>A cheap, best-effort sanity check that a <c>+</c> suffix PLAUSIBLY LOOKS like a git commit sha
+    /// (hex-only, 7–40 chars — real git short/full sha lengths) before it's surfaced as one. This is a shape
+    /// heuristic, not proof: a purely-numeric suffix of hex-valid length (e.g. an 8-digit date-like build number)
+    /// would still pass, since digits are valid hex characters too. Rejecting those would risk false negatives on
+    /// genuine shas that happen to be all-digits by chance, and a git-backed check is out of scope here (no git
+    /// invocation from the build, by design) — so this stays a shape check, deliberately not a proof of origin.</summary>
     internal static bool IsShaLike(string s) =>
-        s.Length > 0 && s.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F'));
+        s.Length is >= 7 and <= 40 && s.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F'));
 }
 
 /// <summary>Renders the About page (<c>about.html</c>): SpecScribe's own product metadata (version,

@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-6-1-deferred-review-cleanup (2026-07-20)
+
+- source_spec: `spec-6-1-deferred-review-cleanup.md`
+  summary: The `SOURCE_DATE_EPOCH` → `BuildDate` MSBuild property behavior (including the new digit-count validation guard) has no automated regression test — only verified via one-off `dotnet msbuild -getProperty` / `dotnet build --no-incremental` + reflection checks run manually this session.
+  evidence: Blind Hunter. Testing an MSBuild property function from the C# unit-test suite would require shelling out to `dotnet build`/`dotnet msbuild` or using the `Microsoft.Build.Evaluation` APIs directly — heavier than the existing unit-test style, and there's no established precedent for MSBuild-level testing in this suite. A future csproj refactor could silently break build-determinism with no CI signal. [`SpecScribe.csproj`]
+- source_spec: `spec-6-1-deferred-review-cleanup.md`
+  summary: No render-level test forces the `CommitHash == null` (rejected/implausible `+` suffix) scenario end-to-end through `AboutTemplater.RenderPage` to confirm the About page's Build row correctly omits the hash portion (via `BuildLabel`'s null-parts-join) rather than emitting a stray separator.
+  evidence: Blind Hunter. Coverage stops at the `ParseInformationalVersion`/`IsShaLike` unit level (which does pin the null-hash outcome) — `RenderPage` calls `ProductMetadata.FromAssembly()` internally rather than accepting an injectable `ProductMetadata`, so exercising this at the render layer would require a DI-style refactor, which is out of scope for this cleanup pass. [`AboutTemplater.cs`]
+
 ## Deferred from: code review of 10-11-sticky-section-nav-and-breadcrumb-coherence (2026-07-20)
 
 - source_spec: `10-11-sticky-section-nav-and-breadcrumb-coherence.md`

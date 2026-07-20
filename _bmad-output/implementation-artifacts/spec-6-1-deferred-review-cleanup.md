@@ -2,7 +2,7 @@
 title: 'Story 6.1 deferred-review cleanup: build-date determinism, product-metadata validation, and non-actionable closures'
 type: 'chore'
 created: '2026-07-20'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '4d2106c'
 context: []
@@ -56,7 +56,7 @@ Applies to `ProductMetadata.ParseInformationalVersion(informational)` → `(vers
 - [x] `tests/SpecScribe.Tests/AboutTemplaterTests.cs` -- add unit tests covering every I/O Matrix row for `ParseInformationalVersion` and `IsPrerelease`. -- pins the edge behavior.
 - [x] `_bmad-output/implementation-artifacts/deferred-work.md` -- in the story-6-1 section, mark items 2 & 3 resolved (this pass), and close item 1 (header line, not a defect) and item 4 (predates 6.1's diff, not actionable via 6.1) with a dated rationale using the existing strike-through convention. -- keeps the deferred log honest.
 
-**Verification status (2026-07-20):** csproj MSBuild eval confirmed both branches (`2026-07-20` default; `2023-11-14` for `SOURCE_DATE_EPOCH=1700000000`), and a `--no-incremental` build with the fixed epoch stamped `BuildDate=2023-11-14` read back via reflection (AC #1/#2 ✓). The 11 `AboutTemplaterTests` (incl. all new parsing/pre-release cases) passed when the suite was last runnable (AC #4 partial ✓). The **full-suite `dotnet test` is currently blocked by a concurrent session's in-flight, non-compiling edits on shared `main`** (`SiteGeneratorHowToReadTests.cs:385` references a removed `RenderPage(methodPresent:)` overload; the golden-fingerprint drift is from their `specscribe.css/.js`/dashboard/nav changes). This is unrelated to this spec's diff (`AboutTemplater.cs`, `SpecScribe.csproj`, `AboutTemplaterTests.cs`, `deferred-work.md`). Re-run the full suite once the tree is coherent.
+**Verification status (2026-07-20, post-review patch pass):** csproj MSBuild eval confirmed the default/valid-epoch/malformed/out-of-range/whitespace/negative cases all resolve safely (no build crash). A `--no-incremental` build with a fixed epoch stamped the expected date, read back via reflection (AC #1/#2 ✓). `AboutTemplaterTests` (14 cases incl. all new parsing/pre-release/boundary cases) green. Full-suite `dotnet test`: **1803/1803 passed** (AC #4 ✓) — the concurrent session's earlier non-compiling tree and golden-fingerprint drift, both noted as blockers in the original pass, have since resolved (their `50c91f8` landed and the golden constant was updated by them).
 
 **Acceptance Criteria:**
 - Given no `SOURCE_DATE_EPOCH` in the environment, when the project builds, then the stamped `BuildDate` is today's UTC date and a normal `specscribe generate` produces byte-identical HTML to before this change.
@@ -84,3 +84,35 @@ MSBuild expression (no static-field access — construct the epoch explicitly so
 
 **Manual checks:**
 - Confirm the story-6-1 block in `deferred-work.md` shows all four items dispositioned (2 & 3 resolved, 1 & 4 closed with rationale).
+
+## Suggested Review Order
+
+**Build-date determinism**
+
+- Entry point: `SOURCE_DATE_EPOCH` validated with a bounded digit-regex before feeding `AddSeconds` — malformed/out-of-range values fall through to `UtcNow` instead of crashing the build (post-review hardening).
+  [`SpecScribe.csproj:36`](../../src/SpecScribe/SpecScribe.csproj#L36)
+
+- The two-branch `SpecScribeBuildDate` property: epoch-derived date when valid, else today's UTC date.
+  [`SpecScribe.csproj:37`](../../src/SpecScribe/SpecScribe.csproj#L37)
+
+**Product-metadata parsing hardening**
+
+- `FromAssembly` now gates its `AssemblyName.Version` fallback on the informational attribute's PRESENCE, not on the parsed version being empty — preserves a real commit hash even from an unusual version string.
+  [`AboutTemplater.cs:64`](../../src/SpecScribe/AboutTemplater.cs#L64)
+
+- `ParseInformationalVersion`: splits semver from the `+<sha>` suffix, dropping an implausible suffix rather than showing a bogus hash.
+  [`AboutTemplater.cs:90`](../../src/SpecScribe/AboutTemplater.cs#L90)
+
+- `IsShaLike`: hex-shape + 7–40 length bound (real git short/full sha lengths) — a deliberate shape heuristic, not proof of origin (documented accepted gap: an all-digit suffix in that length range still passes).
+  [`AboutTemplater.cs:113`](../../src/SpecScribe/AboutTemplater.cs#L113)
+
+- `IsPrerelease`: tightened from bare `Contains('-')` to require non-empty content after the dash.
+  [`AboutTemplater.cs:29`](../../src/SpecScribe/AboutTemplater.cs#L29)
+
+**Tests**
+
+- Full `ParseInformationalVersion`/`IsShaLike` boundary matrix: min/max sha length, non-hex suffix, empty-version-with-hash edge case, and the documented all-digit-suffix gap.
+  [`AboutTemplaterTests.cs:25`](../../tests/SpecScribe.Tests/AboutTemplaterTests.cs#L25)
+
+- `IsPrerelease` trailing-label edge cases (real label / stable / bare trailing dash).
+  [`AboutTemplaterTests.cs:55`](../../tests/SpecScribe.Tests/AboutTemplaterTests.cs#L55)
