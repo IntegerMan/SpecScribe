@@ -5,16 +5,16 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 ## Deferred from: code review of 10-4-consistent-dates-and-event-sequencing.md (2026-07-20)
 
 - source_spec: `10-4-consistent-dates-and-event-sequencing.md`
-  summary: Linked treemap cells omit nested `role="link"` but keep `tabindex="0"` on the `<rect>` inside a real `<a>`, leaving nested focusable content for keyboard/AT.
+  summary: ~~Linked treemap cells omit nested `role="link"` but keep `tabindex="0"` on the `<rect>` inside a real `<a>`, leaving nested focusable content for keyboard/AT.~~ **RESOLVED 2026-07-20** (`spec-10-4-deferred-debt-cleanup`): linked cells put `js-tip`/`aria-label`/`data-tip-html` on the `<a>`; rect drops `tabindex` (Tile pattern).
   evidence: Blind Hunter + Edge Case Hunter, on bundled code-map/`fileHref` work in the same 10.4 review commit range. Outside Story 10.4 ACs; revisit with Code Map / a11y pass.
 - source_spec: `10-4-consistent-dates-and-event-sequencing.md`
-  summary: `CollapseSummary` truncates ADR one-line summaries by UTF-16 code units and can split ZWJ/combining grapheme clusters at the ellipsis cut.
+  summary: ~~`CollapseSummary` truncates ADR one-line summaries by UTF-16 code units and can split ZWJ/combining grapheme clusters at the ellipsis cut.~~ **RESOLVED 2026-07-20** (`spec-10-4-deferred-debt-cleanup`): grapheme-aware cut via `StringInfo.GetTextElementEnumerator`.
   evidence: Blind Hunter + Edge Case Hunter. Rare Unicode edge; current ADRs are ASCII-heavy.
 - source_spec: `10-4-consistent-dates-and-event-sequencing.md`
-  summary: `FileInsight.TotalContributors = 0` default means an overlooked construction path reports zero contributors / hides truncation disclosure instead of failing closed.
+  summary: ~~`FileInsight.TotalContributors = 0` default means an overlooked construction path reports zero contributors / hides truncation disclosure instead of failing closed.~~ **RESOLVED 2026-07-20** (`spec-10-4-deferred-debt-cleanup`): `TotalContributors` is a required positional parameter (matches `FileChangeStat`).
   evidence: Blind Hunter. Bundled non-10.4 change in the same commit range.
 - source_spec: `10-4-consistent-dates-and-event-sequencing.md`
-  summary: Default-branch resolution from `origin/HEAD` symref uses the segment after the last `/`, so a branch name containing slashes (e.g. `feature/foo`) collapses to the final segment.
+  summary: ~~Default-branch resolution from `origin/HEAD` symref uses the segment after the last `/`, so a branch name containing slashes (e.g. `feature/foo`) collapses to the final segment.~~ **RESOLVED 2026-07-20** (`spec-10-4-deferred-debt-cleanup`): strip `refs/remotes/origin/` prefix via `BranchNameFromOriginHeadSymref`.
   evidence: Edge Case Hunter. Bundled external-source URL work in the same commit range.
 
 ## Deferred from: code review of spec-7-1-deferred-debt-cleanup.md (2026-07-20)
