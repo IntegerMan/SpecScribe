@@ -106,10 +106,10 @@ public class SiteGeneratorHowToReadTests : IDisposable
         Assert.True(File.Exists(howToReadPath));
 
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
-        var howToReadIdx = index.IndexOf("href=\"how-to-read.html\"", StringComparison.Ordinal);
-        var readmeIdx = index.IndexOf("href=\"readme.html\"", StringComparison.Ordinal);
-        Assert.True(howToReadIdx >= 0, "Home's nav bar should link to how-to-read.html");
-        Assert.True(readmeIdx < 0 || howToReadIdx < readmeIdx, "how-to-read should lead the Project nav group");
+        Assert.Contains("href=\"how-to-read.html\"", index);
+        Assert.Contains("Help", index);
+        Assert.Contains("href=\"about.html\"", index);
+        Assert.Contains("href=\"diagnostics.html\"", index);
     }
 
     [Fact]

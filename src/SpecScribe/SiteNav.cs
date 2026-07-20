@@ -45,25 +45,20 @@ public sealed class SiteNav
     /// <summary>The generation diagnostics (run-log) page: the run's non-fatal notices (unsupported/malformed/
     /// skipped artifacts + render-time errors) plus the effective configuration and detection results. Written on
     /// EVERY full run (the zero-notice case renders an all-clear state), so — unlike the git pages — its link can
-    /// never dangle. Deliberately NOT a top-nav item: it is reached via the footer → About → Diagnostics path, so
-    /// it stays out of <see cref="Build"/>'s <c>Items</c>/<c>QuickLinks</c>. Shared between the generator (writes
-    /// the file) and the About templater (links to it) so the two can't disagree. [Story 4.8]</summary>
+    /// never dangle. Surfaced under the Help nav group as <c>Logs</c>, and still linked from About. Shared between
+    /// the generator (writes the file) and the About templater (links to it) so the two can't disagree.
+    /// [Story 4.8; Help nav]</summary>
     public const string DiagnosticsOutputPath = "diagnostics.html";
 
     /// <summary>The About page: SpecScribe's own product metadata (version/description/author/repository) plus the
-    /// prominent link to the <see cref="DiagnosticsOutputPath"/> run log. It is the owner-chosen reachability path
-    /// for the diagnostics page — linked from the site-wide footer, written on every full run. Like
-    /// <see cref="DiagnosticsOutputPath"/> it is deliberately NOT a top-nav item (reached via the footer), so it
-    /// stays out of <see cref="Build"/>'s <c>Items</c>/<c>QuickLinks</c>. Shared between the generator (writes the
-    /// file) and the footer (links to it) so the two can't disagree. [Story 4.8]</summary>
+    /// prominent link to the <see cref="DiagnosticsOutputPath"/> run log. Written on every full run; surfaced under
+    /// the Help nav group and via the site-wide footer ("View generation details"). Shared between the generator
+    /// (writes the file) and the footer (links to it) so the two can't disagree. [Story 4.8; Help nav]</summary>
     public const string AboutOutputPath = "about.html";
 
-    /// <summary>The "How to read this portal" orientation page: a suggested reading order through the pages
-    /// that exist plus the detected module's glossary. Written on EVERY full run (like
-    /// <see cref="DiagnosticsOutputPath"/>/<see cref="AboutOutputPath"/>) so its link can never dangle.
-    /// Leads the Project top-nav group (and the non-Home quick-link band) so a first-time visitor reaches it
-    /// from Home's shared nav — Story 10.1 retired the flat Explore Key Views dashboard grid this page was
-    /// originally designed against. [Story 10.3]</summary>
+    /// <summary>The Spec-Driven Development orientation page (<c>how-to-read.html</c>): framework tabs, reading
+    /// order, and glossary. Written on EVERY full run (like About/Diagnostics) so its link can never dangle.
+    /// Surfaced under the Help nav group. [Story 10.3; SDD help; Help nav]</summary>
     public const string HowToReadOutputPath = "how-to-read.html";
 
     /// <summary>Flattened leaf list in render order — every child across <see cref="Groups"/> (including flat
@@ -130,16 +125,17 @@ public sealed class SiteNav
         var insights = new List<(string Label, string Path)>();
         var followUps = new List<(string Label, string Path)>();
         var project = new List<(string Label, string Path)>();
+        var help = new List<(string Label, string Path)>();
         var quickLinks = new List<(string, string, string, string)>();
 
-        // The how-to-read orientation page is written on every run (like About/Diagnostics), so it can lead
-        // unconditionally. Story 10.1's journey-organized top nav (shared chrome on every page, including
-        // Home) replaced the old flat "Explore Key Views" quick-link grid this story was originally
-        // designed against — so unlike About/Diagnostics, how-to-read rides the Project group (below) AND
-        // the quick-link band (site-nav-key-views, shown on non-Home pages) so a first-time visitor reaches
-        // it from Home's nav bar without prior BMAD fluency. [Story 10.3]
-        project.Add(("Spec-Driven Development", HowToReadOutputPath));
-        quickLinks.Add(("Spec-Driven Development", HowToReadOutputPath, "Orientation for spec-driven development: frameworks, commands, and methodology.", "Project"));
+        // Help: always-written orientation + product pages so demos and first-time visitors can find them
+        // without hunting the footer. Order: Spec-Driven Development → About → Logs (diagnostics). [Help nav]
+        help.Add(("Spec-Driven Development", HowToReadOutputPath));
+        help.Add(("About", AboutOutputPath));
+        help.Add(("Logs", DiagnosticsOutputPath));
+        quickLinks.Add(("Spec-Driven Development", HowToReadOutputPath, "Orientation for spec-driven development: frameworks, commands, and methodology.", "Help"));
+        quickLinks.Add(("About", AboutOutputPath, "SpecScribe version, build, and product details.", "Help"));
+        quickLinks.Add(("Logs", DiagnosticsOutputPath, "Generation diagnostics and the run log.", "Help"));
 
         // The README is the project's front-door narrative — Project group, first among module docs.
         if (hasReadme)
@@ -281,6 +277,7 @@ public sealed class SiteNav
         AppendGroup(groups, "Insights", insights);
         AppendGroup(groups, "Follow-ups", followUps);
         AppendGroup(groups, "Project", project);
+        AppendGroup(groups, "Help", help);
 
         var items = groups.SelectMany(g => g.Children).ToList();
         return new SiteNav { Items = items, Groups = groups, QuickLinks = quickLinks, SiteTitle = siteTitle };

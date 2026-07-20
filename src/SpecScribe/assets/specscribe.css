@@ -291,6 +291,9 @@ body {
 .site-nav-group.family-followups > .site-nav-group-summary { color: var(--rust-light); }
 .site-nav-group.family-followups > .site-nav-group-summary:hover,
 .site-nav-group.family-followups.has-active > .site-nav-group-summary { color: #dba07c; border-bottom-color: var(--rust-light); }
+.site-nav-group.family-help > .site-nav-group-summary { color: #b8c4d4; }
+.site-nav-group.family-help > .site-nav-group-summary:hover,
+.site-nav-group.family-help.has-active > .site-nav-group-summary { color: #d4dde8; border-bottom-color: #b8c4d4; }
 .site-menu-link:focus-visible,
 .site-nav-group-summary:focus-visible { outline: 2px solid var(--gold-light); outline-offset: -2px; }
 .site-menu-link .ss-icon,
@@ -365,6 +368,7 @@ body {
 .quick-link-pill.family-epics { border-left-color: var(--moss-light); }
 .quick-link-pill.family-requirements { border-left-color: var(--rust-light); }
 .quick-link-pill.family-followups { border-left-color: var(--rust-light); }
+.quick-link-pill.family-help { border-left-color: #8a9bb0; }
 .quick-link-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
 /* Page-type-specific local-context band (Story 10.10) — reuses the quick-link-pill visual language under a
@@ -413,6 +417,7 @@ body {
 .key-view-group.family-epics > .key-view-trigger { border-left-color: var(--moss-light); }
 .key-view-group.family-requirements > .key-view-trigger { border-left-color: var(--rust-light); }
 .key-view-group.family-followups > .key-view-trigger { border-left-color: var(--rust-light); }
+.key-view-group.family-help > .key-view-trigger { border-left-color: #8a9bb0; }
 .key-view-trigger {
   appearance: none;
   -webkit-appearance: none;
@@ -2789,6 +2794,7 @@ a.ref-file-node:focus-visible {
 .epic-remaining-drafted { border-left-color: var(--status-drafted); }
 .epic-remaining-pending { border-left-color: var(--status-pending); }
 .epic-remaining-done { border-left-color: var(--status-done); }
+.epic-remaining-unrecognized { border-left-color: var(--status-unrecognized); }
 .epic-remaining-followup-open { border-left-color: var(--sb-followup-open, #d97706); }
 .epic-remaining-unplanned { border-left-color: var(--sb-unplanned, #0e7490); }
 

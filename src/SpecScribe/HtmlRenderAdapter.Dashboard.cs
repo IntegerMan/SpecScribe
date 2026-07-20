@@ -450,6 +450,11 @@ public sealed partial class HtmlRenderAdapter
             || label.Equals("Action Items", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Deferred Work", StringComparison.OrdinalIgnoreCase))
             return "family-followups";
+        if (label.Equals("Help", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("About", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Logs", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Spec-Driven Development", StringComparison.OrdinalIgnoreCase))
+            return "family-help";
         return "family-planning";
     }
 

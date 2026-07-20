@@ -170,7 +170,7 @@ public sealed record DiagnosticsConfig
 /// notices in a table (category badge · source path · message), with the effective configuration + detection
 /// results folded into a collapsible <c>&lt;details&gt;</c> below it (Owner-decided diagnostics-first
 /// silhouette). A zero-notice run renders a clean all-clear state instead of an empty table. Reached via the
-/// site-wide footer → About → Diagnostics path (not the top nav). [Story 4.8 Task 4]</summary>
+    /// site-wide Help nav group and the footer → About path. [Story 4.8 Task 4; Help nav]</summary>
 public static class DiagnosticsTemplater
 {
     public static string RenderPage(IReadOnlyList<DiagnosticNotice> notices, DiagnosticsConfig config, SiteNav nav)

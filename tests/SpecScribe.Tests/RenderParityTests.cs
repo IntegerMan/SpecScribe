@@ -74,8 +74,8 @@ public class RenderParityTests
         Assert.Equal(new[] { "epics/story-1-1.html", "epics/story-1-2.html" }, facts.ChildDrillTargets);
         Assert.Equal("active", facts.StatusStage);
         Assert.Equal(ForgeOptions.StylesheetName, facts.Stylesheet); // "../" prefix + ?v= token folded away
-        // Journey order: Home → Delivery → Project (how-to-read + Readme + ADRs). [Story 10.1; 10.3]
-        Assert.Equal(new[] { "index.html", "epics.html", "requirements.html", "how-to-read.html", "readme.html", "adrs/index.html" },
+        // Journey order: Home → Delivery → Project → Help (SDD / About / Logs).
+        Assert.Equal(new[] { "index.html", "epics.html", "requirements.html", "readme.html", "adrs/index.html", "how-to-read.html", "about.html", "diagnostics.html" },
             facts.Nav.Select(n => n.Target).ToList());
         Assert.DoesNotContain(facts.Nav, n => n.Active);
     }
@@ -91,19 +91,17 @@ public class RenderParityTests
         var facts = RenderParity.Extract(html, page);
 
         Assert.Equal(
-            new[] { "index.html", "epics.html", "requirements.html", "sprint.html", "git-insights.html", "deep-analytics.html", "how-to-read.html" },
+            new[] { "index.html", "epics.html", "requirements.html", "sprint.html", "git-insights.html", "deep-analytics.html", "how-to-read.html", "about.html", "diagnostics.html" },
             facts.Nav.Select(n => n.Target).ToList());
         // Group headers are <summary>, not <a> — never mistaken for nav facts.
-        Assert.DoesNotContain(facts.Nav, n => n.Label is "Delivery" or "Insights");
+        Assert.DoesNotContain(facts.Nav, n => n.Label is "Delivery" or "Insights" or "Help");
         Assert.Empty(RenderParity.FindDivergences(page, html, "html"));
     }
 
     [Fact]
     public void Extract_AllFourDarkBarNavGroupsPopulatedTogether_StillFullParity()
     {
-        // Story 10.1 deferred debt: RenderParityTests never exercised all four dark-bar <details> disclosure
-        // groups (Delivery/Insights/Follow-ups/Project, rendered by AppendNavMenu) at once — only pairs, via
-        // Extract_GroupedNav_RecoversOnlyLeafAnchors_NotGroupSummaries above. Give every group-gating signal
+        // Every dark-bar <details> disclosure group (Delivery/Insights/Follow-ups/Project/Help) at once —
         // enough children (>=2, so none collapses to a flat link) to disclose simultaneously.
         var nav = SiteNav.Build(
             new[] { "planning-artifacts/epics.md" }, "SpecScribe",
@@ -120,11 +118,12 @@ public class RenderParityTests
                 "index.html", "epics.html", "requirements.html", "sprint.html",
                 "git-insights.html", "deep-analytics.html",
                 "action-items.html", "deferred-work.html",
-                "how-to-read.html", "readme.html", "adrs/index.html",
+                "readme.html", "adrs/index.html",
+                "how-to-read.html", "about.html", "diagnostics.html",
             },
             facts.Nav.Select(n => n.Target).ToList());
-        // Group headers are <summary>, not <a> — never mistaken for nav facts, on all four groups at once.
-        Assert.DoesNotContain(facts.Nav, n => n.Label is "Delivery" or "Insights" or "Follow-ups" or "Project");
+        // Group headers are <summary>, not <a> — never mistaken for nav facts, on all groups at once.
+        Assert.DoesNotContain(facts.Nav, n => n.Label is "Delivery" or "Insights" or "Follow-ups" or "Project" or "Help");
         Assert.Empty(RenderParity.FindDivergences(page, html, "html"));
     }
 

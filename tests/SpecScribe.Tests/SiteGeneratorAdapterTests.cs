@@ -595,10 +595,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated 2026-07-20 (spec-10-4-deferred-debt-cleanup): linked Code Map treemap cells move tip/aria
         // onto the wrapping <a> and drop nested tabindex on the <rect>; review patches also update colorize JS
         // labelHost + CSS :focus-within ring for the same Tile pattern (shared asset delta).
-        // Regenerated for SDD help page: nav/QuickLinks label "How to read this portal" → "Spec-Driven Development"
-        // on every page; how-to-read.html gained framework tabs (SDD tabstrip + panels + Mermaid init); Icons concept
-        // key renamed; specscribe.css gained .sdd-tabs* styles. Verified stable across 2 runs before locking in.
-        const string expected = "fc964817bd43ec57b286ff3da3c455c18aceda058362fd6ae7d218f4d4c41968";
+        // Regenerated for Help nav: SDD/About/Logs moved into an always-present Help group (dark bar + key-views);
+        // Spec-Driven Development no longer leads Project. Verified stable across 2 runs before locking in.
+        // Regenerated 2026-07-20 (Story 10.7 code-review patches): specscribe.css gains one .epic-remaining-unrecognized
+        // accent rule (shared stylesheet, so the byte-parity gate moves); the paired EpicSunburst peer-aggregate
+        // radii nudge (0.47/0.505 → 0.465/0.495) is a no-op on this fixture, which has no epic-level follow-up peers.
+        const string expected = "2c75b6b998c3ab9538cfb3b01bbd020324d98b4a471d8f5fc97e0d6bbf00d35d";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

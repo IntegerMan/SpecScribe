@@ -44,6 +44,9 @@ public class IconsTests
     [InlineData("Deferred")]
     [InlineData("Code Map")]
     [InlineData("Spec-Driven Development")]
+    [InlineData("Help")]
+    [InlineData("About")]
+    [InlineData("Logs")]
     public void ForConcept_EveryKnownLabelReturnsAGlyph(string label)
         => AssertWellFormedIcon(Icons.ForConcept(label));
 

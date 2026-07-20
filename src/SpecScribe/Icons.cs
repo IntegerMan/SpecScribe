@@ -54,6 +54,10 @@ public static class Icons
             "Work" or "Delivery" => Svg("<path d=\"M2.7 5.5 8 3l5.3 2.5L8 8Z\"/><path d=\"M2.7 8.7 8 11.2l5.3-2.5\"/>"),
             "Insights" => Svg("<path d=\"M8 2.2a3.6 3.6 0 0 0-2.2 6.4c.5.4.8 1 .9 1.6h2.6c.1-.6.4-1.2.9-1.6A3.6 3.6 0 0 0 8 2.2Z\"/><path d=\"M6.4 12.2h3.2M7 13.6h2\"/>"),
             "Follow-ups" => Svg("<path d=\"M4 2.8h8v10.4H4Z\"/><path d=\"m5.8 6 1.1 1.1 1.8-2.1\"/><path d=\"M5.8 9.8h4.4\"/>"),
+            // Help group + always-written help leaves. [Help nav]
+            "Help" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.3\"/><path d=\"M8 11.6v.2M6.2 6.2c0-1.2.9-2.1 1.8-2.1s1.8.9 1.8 2c0 1.1-1.2 1.5-1.8 2.2-.3.3-.5.7-.5 1.2\"/>"),
+            "About" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.3\"/><path d=\"M8 7.2v4.2M8 5v.3\"/>"),
+            "Logs" => Svg("<path d=\"M3.2 2.8h9.6v10.4H3.2Z\"/><path d=\"M5.2 5.6h5.6M5.2 8h5.6M5.2 10.4h3.6\"/>"),
             "Git Insights" => Svg("<path d=\"M2.8 11.2V8.4l2.4-4 2.4 2.4 2.4-3.2 2.4 4.8v3.2\"/><path d=\"M2.8 11.2h10.4\"/>"),
             "Deep Analytics" => Svg("<circle cx=\"4\" cy=\"8\" r=\"1.7\"/><circle cx=\"12\" cy=\"4.2\" r=\"1.7\"/><circle cx=\"12\" cy=\"11.8\" r=\"1.7\"/><path d=\"M5.5 7.2 10.5 4.8M5.5 8.8 10.5 11.2\"/>"),
             "Deferred Work" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.6 5.6 10.4 10.4M10.4 5.6 5.6 10.4\"/>"),
