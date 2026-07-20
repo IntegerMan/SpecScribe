@@ -180,8 +180,29 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        Assert.Contains("status-superseded", File.ReadAllText(Path.Combine(Site, "adrs", "0001-superseded.html")));
-        Assert.Contains("status-deprecated", File.ReadAllText(Path.Combine(Site, "adrs", "0002-deprecated.html")));
+        Assert.Contains("class=\"pill status-superseded\"", File.ReadAllText(Path.Combine(Site, "adrs", "0001-superseded.html")));
+        Assert.DoesNotContain("status-superseded-by", File.ReadAllText(Path.Combine(Site, "adrs", "0001-superseded.html")));
+        Assert.Contains("class=\"pill status-deprecated\"", File.ReadAllText(Path.Combine(Site, "adrs", "0002-deprecated.html")));
+    }
+
+    [Fact]
+    public void GenerateAll_AdrDate_DerivesFromHeadingOrFrontmatter()
+    {
+        // Story 10.4 Task 6: ## Date heading and frontmatter Date fallbacks (bold-line covered by landing test).
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0001-heading-date.md"),
+            "# ADR 0001: Heading Date\n\n**Status:** Accepted\n\n## Date\n\n2026-07-11\n\n## Context\n\nHeading-sourced date.\n");
+        File.WriteAllText(Path.Combine(Adrs, "0002-frontmatter-date.md"),
+            "---\ndate: 2026-07-12\nstatus: accepted\n---\n\n# ADR 0002: Frontmatter Date\n\n## Context\n\nFrontmatter-sourced date.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        var landing = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+        Assert.Contains("data-sort-date=\"2026-07-11\"", landing);
+        Assert.Contains("data-sort-date=\"2026-07-12\"", landing);
+        Assert.Contains("<span class=\"list-row-chip pill\">Jul 11, 2026</span>", landing);
+        Assert.Contains("<span class=\"list-row-chip pill\">Jul 12, 2026</span>", landing);
     }
 
     [Fact]

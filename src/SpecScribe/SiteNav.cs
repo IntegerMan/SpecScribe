@@ -60,9 +60,10 @@ public sealed class SiteNav
 
     /// <summary>The "How to read this portal" orientation page: a suggested reading order through the pages
     /// that exist plus the detected module's glossary. Written on EVERY full run (like
-    /// <see cref="DiagnosticsOutputPath"/>/<see cref="AboutOutputPath"/>) so its link can never dangle. Reached
-    /// from Home's Explore Key Views grid (a <c>QuickLinks</c> entry) — deliberately NOT a top-nav item, the
-    /// same info-page convention as About/Diagnostics. [Story 10.3]</summary>
+    /// <see cref="DiagnosticsOutputPath"/>/<see cref="AboutOutputPath"/>) so its link can never dangle.
+    /// Leads the Project top-nav group (and the non-Home quick-link band) so a first-time visitor reaches it
+    /// from Home's shared nav — Story 10.1 retired the flat Explore Key Views dashboard grid this page was
+    /// originally designed against. [Story 10.3]</summary>
     public const string HowToReadOutputPath = "how-to-read.html";
 
     /// <summary>Flattened leaf list in render order — every child across <see cref="Groups"/> (including flat

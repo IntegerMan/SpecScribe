@@ -858,6 +858,32 @@ So that output stays coherent without blocking file edits.
      intentionally vacant per the append-only / no-renumber convention. Original ACs preserved in the
      Sprint Change Proposal (sprint-change-proposal-2026-07-11.md) and now carried by Story 16.6 AC #1/#3. -->
 
+### Story 5.5: Configurable Date-Page "Today" Cutoff (Timezone Policy)
+
+<!-- Seeded 2026-07-20 from Story 10.4 code review: LinkedCommitDays membership uses machine-local
+     DateTime.Now as "today" while commit days stay author-offset — rare day-boundary mismatch near TZ
+     edges. Owner chose keep machine-local as the default now; expose the policy as a directory-scoped +
+     CLI setting when Epic 5 lands (parity with 5.2). -->
+
+As a maintainer generating the portal across machines or timezones,
+I want to choose how SpecScribe decides which calendar day is "today" when linking and generating date pages,
+So that date-page membership stays predictable for my team's timezone policy without changing the author-offset honesty of commit times.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the default configuration (no override)
+**When** the portal generates date pages and date links
+**Then** "today" remains the generating machine's local calendar day (Story 10.4 status quo)
+**And** git commit times continue to render in each commit's authored offset (never `format-local:` / UTC conversion).
+
+2.
+**Given** I set a directory-scoped setting and/or CLI override for the date-page today policy
+**When** generation runs
+**Then** the chosen policy is applied consistently to `LinkedCommitDays`, date-page generation, and guarded date links
+**And** at least these policies are supported: machine-local (default), UTC calendar day, and an author-local-derived cutoff (e.g. max series / last-commit day)
+**And** effective config + provenance appear on the diagnostics/config log surface (Story 4.8) with interactive/CLI parity (NFR7 / Story 5.2).
+
 ## Epic 6: VS Code Read-Only Companion Surface
 
 Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects, and grow the extension's native host-integration surface (discoverability, commands, tree view/status bar, editor bridges, reactivity) so it feels native — all read-only and rendered from core-emitted data.

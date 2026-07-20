@@ -2237,7 +2237,7 @@ public sealed class SiteGenerator
 
         // Change Log entry dates link through the same guarded DayHref-style resolver the code page's History tab
         // uses — plain text when there's no known commit on that date. [date links]
-        var changeLogHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Change Log", ChangeLogDayHref, storyPrefix);
+        var changeLogHtml = EpicsParser.ExtractChangeLogHtml(artifactRaw, ChangeLogDayHref, storyPrefix);
         blurbHtml = SourceLinkifier.Linkify(blurbHtml, referenceMap, storyPrefix);
         remainderHtml = SourceLinkifier.Linkify(remainderHtml, referenceMap, storyPrefix);
         reviewFindingsHtml = SourceLinkifier.Linkify(reviewFindingsHtml, referenceMap, storyPrefix);

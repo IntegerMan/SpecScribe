@@ -159,7 +159,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         Assert.Contains("class=\"evidence-strip\"", html);
         Assert.Contains("&#10003; 1 task", html);
         Assert.Contains("42 passing tests", html);
-        Assert.Contains("verified 2026-07-16", html);
+        Assert.Contains("verified Jul 16, 2026", html);
         Assert.Contains("href=\"#sec-dev-agent-record\"", html);
     }
 

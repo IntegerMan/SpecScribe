@@ -34,11 +34,18 @@ public static class AbbreviationExpander
             return html;
         }
 
+        // Dedupe by Term so a future module glossary with a repeated acronym can't ArgumentException
+        // the whole-page post-process (extensible GlossaryFor lists are the story's contract). First wins.
+        var unique = acronyms
+            .GroupBy(a => a.Term, StringComparer.Ordinal)
+            .Select(g => g.First())
+            .ToList();
+
         // Longest-term-first alternation so "NFR" wins over "FR" when both would match at the same spot.
         var pattern = new Regex(
-            @"\b(" + string.Join("|", acronyms.OrderByDescending(a => a.Term.Length).Select(a => Regex.Escape(a.Term))) + @")\b",
+            @"\b(" + string.Join("|", unique.OrderByDescending(a => a.Term.Length).Select(a => Regex.Escape(a.Term))) + @")\b",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        var byTerm = acronyms.ToDictionary(a => a.Term, StringComparer.Ordinal);
+        var byTerm = unique.ToDictionary(a => a.Term, StringComparer.Ordinal);
 
         // First-use-per-page state: lives for the duration of this single call, so each page independently
         // expands its own first occurrences.

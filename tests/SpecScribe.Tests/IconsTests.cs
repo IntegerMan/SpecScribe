@@ -43,6 +43,7 @@ public class IconsTests
     [InlineData("Implementation Artifacts")]
     [InlineData("Deferred")]
     [InlineData("Code Map")]
+    [InlineData("How to read this portal")]
     public void ForConcept_EveryKnownLabelReturnsAGlyph(string label)
         => AssertWellFormedIcon(Icons.ForConcept(label));
 

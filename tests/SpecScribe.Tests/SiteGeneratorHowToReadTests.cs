@@ -205,6 +205,19 @@ public class SiteGeneratorHowToReadTests : IDisposable
     }
 
     [Fact]
+    public void HowToRead_EmptySections_DoesNotPromiseContentBelow()
+    {
+        // Undetected module + no reading-order gates → every Append* is a no-op; the intro must not lie.
+        var nav = SiteNav.Build(Array.Empty<string>(), "Empty Project");
+        var html = HowToReadTemplater.RenderPage(
+            nav, Array.Empty<ModuleDoc>(), Array.Empty<GlossaryTerm>(), CommandCatalog.Empty);
+
+        Assert.Contains("No reading-order pages or glossary terms are available for this project yet.", html);
+        Assert.DoesNotContain("sections below", html);
+        Assert.DoesNotContain("Start with the reading order and glossary below", html);
+    }
+
+    [Fact]
     public void UndetectedModule_GlossarySectionOmitted_AndAbbreviationExpanderIsNoOp()
     {
         // No _bmad folder at all — ModuleContext.Detect degrades to None, so the glossary section is

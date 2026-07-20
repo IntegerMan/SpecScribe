@@ -1877,6 +1877,11 @@ a.ref-file-node:focus-visible {
 .howtoread-order { margin: 0.5rem 0; padding-left: 1.4rem; color: var(--ink-faded); line-height: 1.8; }
 .howtoread-glossary .cap-row { grid-template-columns: 9rem 1fr; }
 
+/* Same narrow-screen stack as .cap-row — this two-class rule outranks the shared one-column media query. */
+@media (max-width: 560px) {
+  .howtoread-glossary .cap-row { grid-template-columns: 1fr; gap: 0.1rem; }
+}
+
 /* A small pre-release marker beside the About page's title — gold pill on the parchment palette, deliberately
    outside the lifecycle --status-* vocabulary (a release channel isn't a delivery stage). [About polish] */
 .preview-badge {

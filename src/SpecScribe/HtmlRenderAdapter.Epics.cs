@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 
 namespace SpecScribe;
@@ -350,7 +349,8 @@ public sealed partial class HtmlRenderAdapter
         if (e.VerifiedDate is { } date)
         {
             var label = e.VerifiedIsReview ? "verified" : "updated";
-            var dateText = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            // Story 10.4: every human-facing portal date routes through PortalDates (one date token).
+            var dateText = PortalDates.Day(date);
             verifiedPill =
                 $"<span class=\"status-badge evidence-pill\">{Icons.ForConcept("Verified")}{PathUtil.Html($"{label} {dateText}")}</span>";
         }

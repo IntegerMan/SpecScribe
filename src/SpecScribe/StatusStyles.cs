@@ -206,9 +206,11 @@ public static class StatusStyles
     /// <summary>Badge for a free-text status word/phrase that isn't a known lifecycle stage's own vocabulary
     /// (e.g. an ADR's "Accepted" / "Superseded by ADR 2" line): known lifecycle words route through
     /// <see cref="ForSprint"/>'s canonical badge; anything else degrades to a slugged <c>.pill.status-*</c>
-    /// span so the word still carries the meaning (never color-only). Re-homed from
-    /// <c>HtmlTemplater.AppendStatusPill</c> so any surface with a free-text status field can call the
-    /// same rule. [Story 10.8]</summary>
+    /// span so the word still carries the meaning (never color-only). The CSS class uses the <b>first word</b>
+    /// only so multi-word ADR states like "Superseded by ADR 2" land on <c>.pill.status-superseded</c> (and the
+    /// existing strikethrough/muted rule) rather than a longer slug that never matches; the full phrase stays
+    /// as the visible label. Re-homed from <c>HtmlTemplater.AppendStatusPill</c> so any surface with a free-text
+    /// status field can call the same rule. [Story 10.8; Story 10.4 AC2]</summary>
     public static string FreeTextBadge(string status)
     {
         var token = ForSprint(status);
@@ -217,7 +219,8 @@ public static class StatusStyles
             return Badge(token, SprintLabel(status));
         }
 
-        var cls = "status-" + status.ToLowerInvariant().Replace(' ', '-');
+        var firstWord = status.Trim().Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries)[0];
+        var cls = "status-" + firstWord.ToLowerInvariant();
         return $"<span class=\"pill {PathUtil.Html(cls)}\">{PathUtil.Html(status)}</span>";
     }
 

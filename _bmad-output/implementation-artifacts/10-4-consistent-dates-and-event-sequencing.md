@@ -4,7 +4,7 @@ baseline_commit: 14232d6f82bb2971b0b54045952485b58ec77175
 
 # Story 10.4: Consistent Dates and Event Sequencing
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -191,6 +191,21 @@ The change log is currently opaque HTML. Add a **tolerant structured parse** in 
   - [x] Open `index.html`: ADR cards show date + one-line summary; a story page with two same-date change-log entries shows sequence markers.
   - [x] Confirm `specscribe webview` and `--spa` render the same (they ride shared page HTML + view models).
 
+### Review Findings
+
+*Code review 2026-07-20 (3-layer: Blind Hunter, Edge Case Hunter, Acceptance Auditor). Diff `3c37a9d..5a5e7ee` scoped to Story 10.4 file list (+ bundled 7.3 artifact-day work).*
+
+- [x] [Review][Decision] LinkedCommitDays "today" uses machine-local `DateTime.Now` while commit days are author-offset — **resolved (owner 2026-07-20): keep machine-local as default**; future directory-scoped + CLI policy seated as Epic 5 Story 5.5 (`5-5-configurable-date-page-today-cutoff`, backlog)
+- [x] [Review][Patch] Evidence strip still hand-formats verified dates as bare ISO via `date.ToString("yyyy-MM-dd")` — route through `PortalDates.Day` [src/SpecScribe/HtmlRenderAdapter.Epics.cs:353] — **Fixed:** `PortalDates.Day(date)`
+- [x] [Review][Patch] Doc page header date pills render authored `Frontmatter.Date` verbatim — normalize via `PortalDates.ReformatAuthored` [src/SpecScribe/HtmlTemplater.cs:45] — **Fixed**
+- [x] [Review][Patch] Multi-word "Superseded by …" via `FreeTextBadge` slugifies the full phrase (`status-superseded-by-adr-…`) so `.pill.status-superseded` CSS never matches; ADR page test only `Assert.Contains("status-superseded", …)` which also matches the longer slug [src/SpecScribe/StatusStyles.cs:220] [tests/SpecScribe.Tests/SiteGeneratorAdrToleranceTests.cs:183] — **Fixed:** first-word CSS class + exact `class="pill status-superseded"` assertions
+- [x] [Review][Patch] `### Change Log` is recognized for latest-date/evidence extraction but story carve + `SequenceChangeLog` only run for exact `## Change Log` — H3 change logs skip AC2 reformatting/ordinals [src/SpecScribe/EpicsParser.cs:251,420] — **Fixed:** carve both; `ExtractChangeLogHtml` H2-then-H3; sequence both
+- [x] [Review][Patch] ADR date extraction tests cover `**Date:**` but omit `## Date` heading and frontmatter `Date` fallbacks Task 6 requires [tests/SpecScribe.Tests/SiteGeneratorAdrToleranceTests.cs] — **Fixed:** `GenerateAll_AdrDate_DerivesFromHeadingOrFrontmatter`
+- [x] [Review][Defer] Linked treemap cells drop nested `role="link"` but keep `tabindex="0"` on the `<rect>` inside a real `<a>` — deferred, pre-existing (bundled code-map work in same commit; outside 10.4 ACs) [src/SpecScribe/Charts.cs:2258]
+- [x] [Review][Defer] `CollapseSummary` truncates by UTF-16 code units and can split ZWJ/combining grapheme clusters — deferred, pre-existing (rare Unicode edge on ADR one-liners) [src/SpecScribe/SiteGenerator.cs]
+- [x] [Review][Defer] `FileInsight.TotalContributors = 0` default can hide truncation UI on overlooked construction paths — deferred, pre-existing (bundled non-10.4 in same commit) [src/SpecScribe/GitMetrics.cs]
+- [x] [Review][Defer] Default-branch symref parsing takes the segment after the last `/`, so `origin/feature/foo` collapses — deferred, pre-existing (bundled external-URL work in same commit) [src/SpecScribe/GitMetrics.cs]
+
 ## Dev Notes
 
 ### Architecture patterns & constraints (must follow)
@@ -318,3 +333,4 @@ Files touched for this story's scope, extracted from commit `14232d6` (which als
 
 - 2026-07-13: Implemented via bundled quick-dev session `spec-7-3-10-4-honest-navigable-portal-dates.md` (commit `14232d6`) — `PortalDates` single-source formatter (one date token, 24h time token, labeled machine-local footer zone, author-offset git times), ADR `Date`/`Summary` extraction + card surfacing, and same-day change-log "(k of N)" sequencing with source-adjacency-guarded degrade. 997 tests green at that time; sprint-status.yaml updated to `review`.
 - 2026-07-18: dev-story — verified the shipped implementation against every AC/task in this story, found no gaps; backfilled this file's Tasks/Subtasks, Dev Agent Record, and File List (previously stale from the standalone-story path being superseded by the bundled session). No code changes this session. Full suite re-confirmed green: 1588/1588. Status → review (already matched sprint-status.yaml).
+- 2026-07-20: code review — 1 decision (keep machine-local LinkedCommitDays today; seed Epic 5 Story 5.5 for future config), 5 patches applied (evidence-strip + doc-header dates through PortalDates; FreeTextBadge first-word status class; ### Change Log sequencing; ADR date extraction tests), 4 deferred. Status → done.

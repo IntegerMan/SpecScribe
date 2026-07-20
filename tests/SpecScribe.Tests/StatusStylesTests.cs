@@ -431,7 +431,9 @@ public class StatusStylesTests
     public void FreeTextBadge_UnrecognizedWord_DegradesToSluggedPill()
     {
         var badge = StatusStyles.FreeTextBadge("Superseded by ADR 2");
-        Assert.Contains("class=\"pill status-superseded-by-adr-2\"", badge);
+        // First-word CSS class so multi-word ADR states hit .pill.status-superseded (Story 10.4 AC2); full phrase stays visible.
+        Assert.Contains("class=\"pill status-superseded\"", badge);
         Assert.Contains("Superseded by ADR 2", badge);
+        Assert.DoesNotContain("status-superseded-by", badge);
     }
 }

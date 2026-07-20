@@ -84,6 +84,17 @@ public class AbbreviationExpanderTests
     }
 
     [Fact]
+    public void Expand_DuplicateAcronymTerms_UsesFirstAndDoesNotThrow()
+    {
+        var first = new GlossaryTerm("FR", "Functional Requirement", "A capability.", IsAcronym: true);
+        var duplicate = new GlossaryTerm("FR", "Wrong Expansion", "Should not win.", IsAcronym: true);
+
+        var html = AbbreviationExpander.Expand("<p>FR here.</p>", new[] { first, duplicate });
+
+        Assert.Equal("<p><abbr title=\"Functional Requirement\">FR</abbr> here.</p>", html);
+    }
+
+    [Fact]
     public void Expand_EmptyGlossary_ReturnsInputUnchanged()
     {
         const string input = "<p>FR and NFR mentioned here.</p>";

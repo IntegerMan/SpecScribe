@@ -117,4 +117,24 @@ public class ChangeLogSequencingTests
         Assert.Equal(table, result);
         Assert.False(called, "an unrecognized shape must never consult the resolver");
     }
+
+    [Fact]
+    public void ExtractChangeLogHtml_H3Heading_SequencesSameAsH2()
+    {
+        // Several drafted artifacts use ### Change Log — panel extraction must still reformat + ordinal.
+        var raw = """
+            # Story 1.1
+
+            ### Change Log
+
+            - 2026-07-06: First
+            - 2026-07-06: Second
+            """;
+
+        var html = EpicsParser.ExtractChangeLogHtml(raw);
+
+        Assert.Contains("Jul 6, 2026", html);
+        Assert.Contains("(1 of 2)", html);
+        Assert.Contains("(2 of 2)", html);
+    }
 }

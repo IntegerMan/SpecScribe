@@ -29,18 +29,39 @@ public static class HowToReadTemplater
 
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>How to Read This Portal</h1>\n");
-        sb.Append($"  <div class=\"doc-subtitle\">New here? Start with the reading order and glossary below.</div>\n");
+
+        // Build sections first so the header subtitle + intro can tell the truth when every append is a
+        // no-op (undetected module + no reading-order pages) — never promise content that doesn't exist.
+        var sections = new StringBuilder();
+        AppendReadingOrder(sections, nav, moduleDocs);
+        AppendGlossary(sections, glossary);
+        AppendCommandLegend(sections, commands);
+
+        if (sections.Length > 0)
+        {
+            sb.Append("  <div class=\"doc-subtitle\">New here? Start with the reading order and glossary below.</div>\n");
+        }
+        else
+        {
+            sb.Append("  <div class=\"doc-subtitle\">Orientation for a first visit — content appears as the project grows.</div>\n");
+        }
         sb.Append("</header>\n\n");
 
         sb.Append("<main id=\"main-content\" class=\"info-page\">\n");
         sb.Append("<section class=\"chart-panel howtoread-panel\">\n");
-        sb.Append("  <p>This portal documents a project built with an AI-assisted development methodology. ");
-        sb.Append("If you're new to it, the sections below walk you through what to read first and what the ");
-        sb.Append("recurring terms mean.</p>\n");
 
-        AppendReadingOrder(sb, nav, moduleDocs);
-        AppendGlossary(sb, glossary);
-        AppendCommandLegend(sb, commands);
+        if (sections.Length > 0)
+        {
+            sb.Append("  <p>This portal documents a project built with an AI-assisted development methodology. ");
+            sb.Append("If you're new to it, the sections below walk you through what to read first and what the ");
+            sb.Append("recurring terms mean.</p>\n");
+            sb.Append(sections);
+        }
+        else
+        {
+            sb.Append("  <p>This portal documents a project built with an AI-assisted development methodology. ");
+            sb.Append("No reading-order pages or glossary terms are available for this project yet.</p>\n");
+        }
 
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");

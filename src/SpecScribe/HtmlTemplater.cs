@@ -42,7 +42,10 @@ public static class HtmlTemplater
         }
         main.Append("  <div class=\"meta-pills\">\n");
         AppendPill(main, doc.Frontmatter.Author, "author");
-        AppendPill(main, doc.Frontmatter.Date, "date");
+        // Story 10.4: normalize parseable authored dates through PortalDates; free text stays verbatim (NFR8).
+        AppendPill(main,
+            doc.Frontmatter.Date is { Length: > 0 } d ? PortalDates.ReformatAuthored(d) : null,
+            "date");
         AppendPill(main, doc.Frontmatter.Version, v => $"v{v}");
         AppendStatusPill(main, doc.Frontmatter.Status);
         main.Append($"    <span class=\"pill\">{Html(PathUtil.NormalizeSlashes(doc.SourceRelativePath))}</span>\n");

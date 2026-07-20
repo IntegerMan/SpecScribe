@@ -248,7 +248,9 @@ public static class EpicsParser
         // Change Log (surfaced near the top / at the very bottom respectively). Change Log and Review
         // Findings normally sit after Dev Agent Record and are already past remainderEnd, but carving them
         // explicitly keeps the remainder clean regardless of section order.
-        var carved = new[] { "## Acceptance Criteria", "## Review Findings", "## Change Log" }
+        // Prefer ## Change Log; also carve ### Change Log (several drafted artifacts use the H3 form) so
+        // sequenced change-log panels aren't duplicated inside the remainder (Story 10.4 AC2).
+        var carved = new[] { "## Acceptance Criteria", "## Review Findings", "## Change Log", "### Change Log" }
             .Select(h => FindSection(lines, h, remainderStart, remainderEnd))
             .Where(s => s.Start >= 0)
             .OrderBy(s => s.Start)
@@ -402,9 +404,9 @@ public static class EpicsParser
     /// <summary>Renders a named "## Heading" section of a raw story artifact to block HTML (heading itself
     /// excluded, up to the next H2), with "[Source: ...]" citation brackets stripped as in the remainder.
     /// Returns "" when the section is absent. Used to surface Review Findings and Change Log as their own
-    /// panels on the story page. <paramref name="changeLogDayHref"/> is only consulted for the "## Change Log"
-    /// heading — a guarded date→output-relative-path resolver (null when no day page is known for that date),
-    /// prefixed with <paramref name="hrefPrefix"/> before linking. [date links]</summary>
+    /// panels on the story page. <paramref name="changeLogDayHref"/> is consulted for Change Log headings
+    /// (<c>## Change Log</c> or <c>### Change Log</c>) — a guarded date→output-relative-path resolver (null when
+    /// no day page is known for that date), prefixed with <paramref name="hrefPrefix"/> before linking. [date links]</summary>
     public static string ExtractNamedSectionHtml(
         string raw, string exactHeading, Func<DateOnly, string?>? changeLogDayHref = null, string hrefPrefix = "")
     {
@@ -416,9 +418,20 @@ public static class EpicsParser
         if (slice.Length == 0) return string.Empty;
         // The Change Log gets a tolerant pass that reformats its dates through PortalDates and adds an ordinal cue
         // to same-day runs so events sharing a date read in order (Story 10.4 AC2). Any unrecognized shape (a
-        // table, free prose) passes through untouched — never reordered, never dropped (NFR8).
-        if (exactHeading == "## Change Log") slice = SequenceChangeLog(slice, changeLogDayHref, hrefPrefix);
+        // table, free prose) passes through untouched — never reordered, never dropped (NFR8). H2 and H3 forms
+        // both sequence (several drafted artifacts use ### Change Log).
+        if (exactHeading is "## Change Log" or "### Change Log")
+            slice = SequenceChangeLog(slice, changeLogDayHref, hrefPrefix);
         return MarkdownConverter.RenderBlock(slice);
+    }
+
+    /// <summary>Change Log panel HTML: prefer <c>## Change Log</c>, fall back to <c>### Change Log</c> so H3-authored
+    /// logs still get PortalDates reformatting and same-day ordinals (Story 10.4 AC2). Empty when neither exists.</summary>
+    public static string ExtractChangeLogHtml(
+        string raw, Func<DateOnly, string?>? changeLogDayHref = null, string hrefPrefix = "")
+    {
+        var h2 = ExtractNamedSectionHtml(raw, "## Change Log", changeLogDayHref, hrefPrefix);
+        return h2.Length > 0 ? h2 : ExtractNamedSectionHtml(raw, "### Change Log", changeLogDayHref, hrefPrefix);
     }
 
     /// <summary>Extracts an H3 subsection anywhere in the artifact (e.g. <c>### Verify before marking review</c> under

@@ -588,7 +588,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated 2026-07-20 (spec-7-1-deferred-debt-cleanup): SoftSlugify encodes `/` as `x2f` (with
         // literal-x2f escaping) so SPA tab radio names stay unique; placeholder pages can emit Insights/History tabs.
         // Fixture cites no real repo files — refresh the byte-parity gate for any shared markup delta.
-        const string expected = "2f7b84dbb92f6923ebb0c9901def2ffbdfd28697f5c7ad987f752da63b152503";
+        // Regenerated 2026-07-20 (Story 10.4 code-review patches): evidence-strip verified dates route through
+        // PortalDates.Day; FreeTextBadge CSS class uses the first status word so "Superseded by …" hits
+        // .pill.status-superseded; doc header date pills normalize via ReformatAuthored; ### Change Log
+        // panels sequence like ## Change Log.
+        const string expected = "7ee2312ad892792de30997c84cb9f9ebf4050a27fdf0df238bcba38d5f6ac7e2";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

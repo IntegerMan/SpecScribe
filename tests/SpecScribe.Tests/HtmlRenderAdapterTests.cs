@@ -1480,7 +1480,7 @@ public class HtmlRenderAdapterTests
         Assert.Contains("&#10003; 5 tasks", html);
         Assert.Contains("586 passing tests", html);
         Assert.Contains("evidence-pill tests-pass", html);
-        Assert.Contains("verified 2026-07-09", html);
+        Assert.Contains("verified Jul 9, 2026", html);
         Assert.Contains("class=\"evidence-dev-record-link\"", html);
         Assert.Contains("href=\"#sec-dev-agent-record\"", html);
         Assert.Contains("aria-label=\"Jump to Dev Agent Record for full verification evidence\"", html);
@@ -1524,8 +1524,8 @@ public class HtmlRenderAdapterTests
         var evidence = new StoryEvidence(2, 4, "12 passing tests", new DateOnly(2026, 7, 8), VerifiedIsReview: false);
         var html = HtmlRenderAdapter.Shared.RenderStoryBody(StoryBodyView(evidence));
 
-        Assert.Contains("updated 2026-07-08", html);
-        Assert.DoesNotContain("verified 2026-07-08", html);
+        Assert.Contains("updated Jul 8, 2026", html);
+        Assert.DoesNotContain("verified Jul 8, 2026", html);
     }
 
     [Fact]
