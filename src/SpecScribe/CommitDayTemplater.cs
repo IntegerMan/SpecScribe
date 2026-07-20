@@ -39,16 +39,17 @@ public static class CommitDayTemplater
             prefix + ForgeOptions.ScriptName,
             BuildMetaDescription(readable, nav.SiteTitle, commits.Count, artifacts.Count)));
         sb.Append(nav.RenderNavBar(outputPath, localContext));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
+        // Sibling pager (Prev = newer day, Next = older) rides the coherent wayfinding strip alongside the
+        // breadcrumb now, not the body's own header. [Story 10.11]
+        sb.Append(SiteNav.RenderWayfinding(outputPath, new (string, string?)[]
         {
             ("Home", "index.html"),
             (pageLabel, null),
-        }));
+        }, pager));
 
         // Single <main id="main-content"> landmark / skip-link target. [Story 1.4 AC #1]
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
-        sb.Append(pager?.Render()); // Prev = newer day, Next = older (newest-first order). [Prev/next navigation]
         sb.Append($"  <div class=\"story-kicker\">{PathUtil.Html(kicker)}</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(pageLabel)}</h1>\n");
         sb.Append("  <div class=\"meta-pills\">");

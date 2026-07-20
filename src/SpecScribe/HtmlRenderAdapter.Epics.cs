@@ -170,7 +170,8 @@ public sealed partial class HtmlRenderAdapter
         var toc = new List<Toc.Entry>();
 
         main.Append("<header class=\"doc-header\">\n");
-        main.Append(view.Pager.Render()); // Prev/next across epics by number. [Prev/next navigation]
+        // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
+        // not the body's own header. [Story 10.11]
         main.Append("  <div class=\"kicker-row\">\n");
         main.Append($"    <span class=\"story-kicker\">Epic {view.Number}</span>\n");
         main.Append($"    {StatusStyles.Badge(view.StatusClass, view.StatusLabel)}\n");
@@ -502,7 +503,8 @@ public sealed partial class HtmlRenderAdapter
         var toc = new List<Toc.Entry>();
 
         main.Append("<header class=\"doc-header\">\n");
-        main.Append(view.Pager.Render()); // Prev/next across stories in global epic→story order. [Prev/next navigation]
+        // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
+        // not the body's own header. [Story 10.11]
         main.Append("  <div class=\"kicker-row\">\n");
         main.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(view.Id)}</span>\n");
         if (view.Status is { Length: > 0 } status)
@@ -614,7 +616,8 @@ public sealed partial class HtmlRenderAdapter
         var sb = new StringBuilder();
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
-        sb.Append(view.Pager.Render()); // Prev/next across stories in global epic→story order. [Prev/next navigation]
+        // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
+        // not the body's own header. [Story 10.11]
         sb.Append("  <div class=\"kicker-row\">\n");
         sb.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(view.Id)}</span>\n");
         sb.Append($"    {StatusStyles.Badge(view.StatusStage, "Not yet drafted")}\n");

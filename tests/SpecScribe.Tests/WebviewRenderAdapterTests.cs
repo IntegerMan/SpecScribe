@@ -354,6 +354,24 @@ public class WebviewRenderAdapterTests
     }
 
     [Fact]
+    public void RenderContent_WithPager_CarriesTheCoherentWayfindingStrip_StillNoScript()
+    {
+        // Story 10.11: the pager rides the SAME chrome-level wayfinding strip as the breadcrumb in webview too —
+        // just never the active-section tracking script, which only ever lands at the HtmlRenderAdapter.Render
+        // chrome level (never inside PageView.BodyHtml), so it can't reach this swappable region at all.
+        var page = EpicPage(Nav()) with
+        {
+            Pager = new EntityPager(new PagerLink("../epic-1.html", "Epic 1"), null),
+        };
+
+        var content = WebviewRenderAdapter.Shared.RenderContent(page);
+
+        Assert.Contains("page-wayfinding", content);
+        Assert.Contains("entity-pager", content);
+        Assert.DoesNotContain("<script", content);
+    }
+
+    [Fact]
     public void Render_StampsTheSurfacePathTheBridgeResolvesLinksAgainst()
     {
         var doc = WebviewRenderAdapter.Shared.Render(EpicPage(Nav())).Content;

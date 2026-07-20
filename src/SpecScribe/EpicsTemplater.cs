@@ -82,6 +82,7 @@ public static class EpicsTemplater
             Title = $"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}",
             Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, "Stories in this epic", activeStoryId: null)),
             Breadcrumb = breadcrumb,
+            Pager = pager,
             Assets = new AssetManifest
             {
                 StylesheetHref = prefix + ForgeOptions.StylesheetName,
@@ -170,6 +171,7 @@ public static class EpicsTemplater
             Title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
             Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"Stories in Epic {epic.Number}", story.Id)),
             Breadcrumb = breadcrumb,
+            Pager = pager,
             Assets = new AssetManifest
             {
                 StylesheetHref = PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName,
@@ -222,6 +224,7 @@ public static class EpicsTemplater
             Title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
             Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"Stories in Epic {epic.Number}", story.Id)),
             Breadcrumb = breadcrumb,
+            Pager = pager,
             Assets = new AssetManifest
             {
                 StylesheetHref = prefix + ForgeOptions.StylesheetName,

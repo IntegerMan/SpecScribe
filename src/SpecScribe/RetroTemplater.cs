@@ -61,16 +61,17 @@ public static class RetroTemplater
             prefix + ForgeOptions.ScriptName,
             $"{retro.Title} — a retrospective for {nav.SiteTitle}."));
         sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
+        // Sibling pager (Prev/next across retros in ascending epic order) rides the coherent wayfinding strip
+        // alongside the breadcrumb now, not the body's own header. [Story 10.11]
+        sb.Append(SiteNav.RenderWayfinding(outputPath, new (string, string?)[]
         {
             ("Home", "index.html"),
             ("Sprint Status", "sprint.html"),
             (retro.Title, null),
-        }));
+        }, pager));
 
         var main = new StringBuilder();
         main.Append("<header class=\"doc-header retro-header\">\n");
-        main.Append(pager?.Render()); // Prev/next across retros in ascending epic order. [Prev/next navigation]
         main.Append($"  <div class=\"story-kicker\">Epic {retro.EpicNumber} Retrospective</div>\n");
         main.Append($"  <h1>{PathUtil.Html(HeadingTitle(retro))}</h1>\n");
 
@@ -116,6 +117,11 @@ public static class RetroTemplater
         sb.Append("<main id=\"main-content\">\n");
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
         sb.Append("</main>\n\n");
+        // Appended AFTER </main> (never inside it) — see HtmlTemplater.RenderPage for why. [Story 10.11]
+        if (toc.Count > 0)
+        {
+            sb.Append(Toc.ActiveSectionScript);
+        }
 
         sb.Append(PathUtil.RenderFooter(prefix));
         if (retro.HasMermaid)

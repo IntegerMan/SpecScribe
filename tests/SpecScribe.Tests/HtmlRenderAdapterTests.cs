@@ -116,6 +116,98 @@ public class HtmlRenderAdapterTests
         Assert.Equal("html", HtmlRenderAdapter.Shared.Id);
     }
 
+    // ----- Story 10.11: PageView.Pager + the coherent wayfinding strip ---------------------------------------
+
+    private static EntityPager Pager() => new(
+        new PagerLink("../epic-1.html", "Epic 1"),
+        new PagerLink("../epic-3.html", "Epic 3"));
+
+    [Fact]
+    public void RenderWayfinding_NoPager_IsByteIdenticalToRenderBreadcrumbAlone()
+    {
+        var trail = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Story 1.1", null) });
+
+        var viaWayfinding = HtmlRenderAdapter.Shared.RenderWayfinding("epics/story-1-1.html", trail, pager: null);
+        var viaBreadcrumbAlone = HtmlRenderAdapter.Shared.RenderBreadcrumb("epics/story-1-1.html", trail);
+
+        Assert.Equal(viaBreadcrumbAlone, viaWayfinding);
+        Assert.DoesNotContain("page-wayfinding", viaWayfinding);
+    }
+
+    [Fact]
+    public void RenderWayfinding_EmptyPager_DegradesToBreadcrumbAlone()
+    {
+        var trail = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Story 1.1", null) });
+
+        var viaWayfinding = HtmlRenderAdapter.Shared.RenderWayfinding("epics/story-1-1.html", trail, EntityPager.None);
+
+        Assert.DoesNotContain("page-wayfinding", viaWayfinding);
+        Assert.DoesNotContain("entity-pager", viaWayfinding);
+    }
+
+    [Fact]
+    public void RenderWayfinding_WithPager_WrapsBreadcrumbAndPagerInOneStrip()
+    {
+        var trail = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Story 1.1", null) });
+
+        var html = HtmlRenderAdapter.Shared.RenderWayfinding("epics/story-1-1.html", trail, Pager());
+
+        Assert.Contains("<div class=\"page-wayfinding\">", html);
+        var wrapperStart = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
+        var crumbIdx = html.IndexOf("class=\"breadcrumb\"", StringComparison.Ordinal);
+        var pagerIdx = html.IndexOf("class=\"entity-pager\"", StringComparison.Ordinal);
+        Assert.True(wrapperStart < crumbIdx && crumbIdx < pagerIdx, "expected wrapper, then breadcrumb, then pager");
+    }
+
+    [Fact]
+    public void Render_PageViewPager_RendersInWayfindingStrip_NotInsideBodyHeader()
+    {
+        var nav = Nav();
+        var page = StoryPage(nav) with { Pager = Pager() };
+
+        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+
+        Assert.Contains("<div class=\"page-wayfinding\">", html);
+        Assert.Contains("Epic 1", html);
+        var wayfinding = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
+        var body = html.IndexOf("<main id=\"main-content\">", StringComparison.Ordinal);
+        Assert.True(wayfinding < body, "pager must render in the chrome strip, before the opaque body");
+    }
+
+    [Fact]
+    public void Render_NoPager_OmitsWayfindingStripEntirely()
+    {
+        var html = HtmlRenderAdapter.Shared.Render(StoryPage(Nav())).Content;
+        Assert.DoesNotContain("page-wayfinding", html);
+        Assert.DoesNotContain("entity-pager", html);
+    }
+
+    [Fact]
+    public void Render_TocBearingBody_AppendsActiveSectionScript_AfterBodyBeforeFooter()
+    {
+        var nav = Nav();
+        var withToc = StoryPage(nav) with
+        {
+            BodyHtml = "<main id=\"main-content\">\n<div class=\"page-shell\"><div class=\"page-rail\">"
+                + "<nav class=\"toc-sidebar\" aria-label=\"On this page\"></nav></div></div>\n</main>\n\n",
+        };
+
+        var html = HtmlRenderAdapter.Shared.Render(withToc).Content;
+
+        Assert.Contains("IntersectionObserver", html);
+        var body = html.IndexOf("<main id=\"main-content\">", StringComparison.Ordinal);
+        var script = html.IndexOf("IntersectionObserver", StringComparison.Ordinal);
+        var footer = html.IndexOf("<footer class=\"doc-footer\">", StringComparison.Ordinal);
+        Assert.True(body < script && script < footer, "the tracking script must sit after the body, before the footer");
+    }
+
+    [Fact]
+    public void Render_NoTocInBody_OmitsActiveSectionScript()
+    {
+        var html = HtmlRenderAdapter.Shared.Render(StoryPage(Nav())).Content;
+        Assert.DoesNotContain("IntersectionObserver", html);
+    }
+
     [Fact]
     public void StoryPlaceholder_RendersUserStoryNoteAsOwnBlockAboveTheBlurb()
     {

@@ -43,7 +43,7 @@ public sealed class JsonSpaRenderAdapter : IRenderAdapter
     {
         var sb = new StringBuilder();
         sb.Append(HtmlRenderAdapter.Shared.RenderNavMarkup(page.Nav));
-        sb.Append(HtmlRenderAdapter.Shared.RenderBreadcrumb(page.OutputRelativePath, page.Breadcrumb));
+        sb.Append(HtmlRenderAdapter.Shared.RenderWayfinding(page.OutputRelativePath, page.Breadcrumb, page.Pager));
         sb.Append(page.BodyHtml);
         return sb.ToString();
     }

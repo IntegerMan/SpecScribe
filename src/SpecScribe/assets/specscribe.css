@@ -288,6 +288,9 @@ body {
 .site-nav-group.family-architecture.has-active > .site-nav-group-summary { color: #a8d4ce; border-bottom-color: var(--teal); }
 .site-nav-group.family-epics > .site-nav-group-summary:hover,
 .site-nav-group.family-epics.has-active > .site-nav-group-summary { color: #b5d4b5; border-bottom-color: var(--moss-light); }
+.site-nav-group.family-followups > .site-nav-group-summary { color: var(--rust-light); }
+.site-nav-group.family-followups > .site-nav-group-summary:hover,
+.site-nav-group.family-followups.has-active > .site-nav-group-summary { color: #dba07c; border-bottom-color: var(--rust-light); }
 .site-menu-link:focus-visible,
 .site-nav-group-summary:focus-visible { outline: 2px solid var(--gold-light); outline-offset: -2px; }
 .site-menu-link .ss-icon,
@@ -361,6 +364,7 @@ body {
 .quick-link-pill.family-architecture { border-left-color: var(--teal); }
 .quick-link-pill.family-epics { border-left-color: var(--moss-light); }
 .quick-link-pill.family-requirements { border-left-color: var(--rust-light); }
+.quick-link-pill.family-followups { border-left-color: var(--rust-light); }
 .quick-link-pill:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
 /* Page-type-specific local-context band (Story 10.10) — reuses the quick-link-pill visual language under a
@@ -407,6 +411,7 @@ body {
 .key-view-group.family-architecture > .key-view-trigger { border-left-color: var(--teal); }
 .key-view-group.family-epics > .key-view-trigger { border-left-color: var(--moss-light); }
 .key-view-group.family-requirements > .key-view-trigger { border-left-color: var(--rust-light); }
+.key-view-group.family-followups > .key-view-trigger { border-left-color: var(--rust-light); }
 .key-view-trigger {
   appearance: none;
   -webkit-appearance: none;
@@ -461,19 +466,17 @@ body {
   margin: 0 auto;
   padding: 2.5rem 1.5rem 1.5rem;
   text-align: center;
-  position: relative; /* anchors the absolutely-positioned .entity-pager */
 }
 
-/* Inline sibling pager ("‹ Prev / Next ›"): floats in the header's top-padding whitespace so it adds no page
-   height and never collides with the centered title below it. Disabled (greyed) at a sequence end. [Prev/next navigation] */
+/* Sibling pager ("‹ Prev / Next ›"): now rides the .page-wayfinding strip beside the breadcrumb (Story 10.11)
+   rather than floating inside .doc-header, so it is a normal flex item, not absolutely positioned. Disabled
+   (greyed) at a sequence end. [Prev/next navigation] */
 .entity-pager {
-  position: absolute;
-  top: 1rem;
-  right: 1.5rem;
   display: flex;
   gap: 1.1rem;
   font-family: 'Courier New', monospace;
   font-size: 0.8rem;
+  flex: none;
 }
 .entity-pager-link { color: var(--teal); text-decoration: none; white-space: nowrap; }
 .entity-pager-link:hover { color: var(--rust); text-decoration: underline; }
@@ -887,6 +890,22 @@ a.change-surface-chip:focus-visible {
 
 .toc-sidebar a:hover { text-decoration: underline; }
 .toc-sidebar a.toc-h3 { color: var(--ink-light); font-size: 0.73rem; padding-left: 0.85rem; }
+
+/* Active-section tracking (Story 10.11 AC1): the IntersectionObserver enhancement in Toc.cs toggles this class
+   on the .toc-link matching the section currently in view — ambient "you are here" feedback the sticky TOC
+   otherwise lacks. Bold weight + a left accent bar (color+shape, distinguishable from :hover's underline and
+   from :focus-visible's outline — both can coexist with .is-current on the same link). Purely a visual
+   enhancement: with JS off (or the webview/SPA's non-executing script) no link ever gets this class, so the
+   TOC degrades to exactly today's static list, never a broken control (NFR8). The transition rides the shared
+   --motion-fast/--motion-ease tokens and is neutralized for free by the global reduced-motion block below. */
+.toc-sidebar a.toc-link.is-current {
+  color: var(--rust);
+  font-weight: 700;
+  border-left: 2px solid var(--gold);
+  padding-left: 0.4rem;
+  margin-left: -0.4rem;
+  transition: color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
+}
 
 /* Story 10.5 AC2 — level-3 subsections grouped under a collapsible level-2 parent. Same caret grammar as
    .dev-agent-details, open by default so the "On this page" TOC stays visible at a glance; a childless h2
@@ -2064,6 +2083,28 @@ a.ref-file-node:focus-visible {
 .breadcrumb a:hover { color: var(--rust); text-decoration: underline; }
 .breadcrumb .crumb-sep { color: var(--parchment-deep); }
 .breadcrumb .crumb-current { color: var(--ink-faded); font-weight: bold; }
+
+/* One coherent wayfinding strip: breadcrumb + sibling pager answering the same "where am I / where can I go"
+   question in ONE visual register, instead of the breadcrumb's own full-width strip and the pager floating
+   independently inside the body's header (Story 10.11 AC1). Only emitted when a page HAS a pager — a page
+   with no pager renders .breadcrumb alone, unwrapped, byte-identical to before this story. */
+.page-wayfinding {
+  max-width: 860px;
+  margin: 0.8rem auto 0;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+.page-wayfinding .breadcrumb {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 auto;
+}
 
 /* ====================== EPICS: BANNER + CHIPS ====================== */
 .banner {

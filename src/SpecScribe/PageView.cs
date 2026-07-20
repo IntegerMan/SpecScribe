@@ -57,6 +57,12 @@ public sealed record PageView
     /// <summary>The drill trail to this page (empty on the home page).</summary>
     public required BreadcrumbTrail Breadcrumb { get; init; }
 
+    /// <summary>The sibling prev/next control for this page's family, or null when the page has no family
+    /// (e.g. the home page) or sits alone in one. Rendered alongside <see cref="Breadcrumb"/> as one coherent
+    /// wayfinding strip (mirrors this record's own Story 6.1 breadcrumb hoist) rather than floating inside the
+    /// body's own header. [Story 10.11]</summary>
+    public EntityPager? Pager { get; init; }
+
     /// <summary>The shared assets this page needs.</summary>
     public required AssetManifest Assets { get; init; }
 

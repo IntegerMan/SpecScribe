@@ -558,7 +558,17 @@ public class SiteGeneratorAdapterTests : IDisposable
         // repo's background auto-committer was actively landing unrelated concurrent commits on `main` during
         // this session (same shared-main gotcha noted above for Story 10.9) — three consecutive back-to-back
         // runs finally agreed once that settled; locked in against that final stable state.
-        const string expected = "cc345b8e5dc012634ac786642116a6fb86eab8b222ffb92a556038929ad34996";
+        // Regenerated for Story 10.11: sibling pagers (epic/story/ADR/retro pages) moved from floating inside
+        // .doc-header to a new .page-wayfinding strip alongside the breadcrumb, and .entity-pager dropped its
+        // absolute positioning (now a flex item); the TOC gained a chrome-level active-section-tracking script
+        // appended after every TOC-bearing HTML page's <main> (epic/story pages here — the non-git fixture has
+        // no code/commit/date pages). specscribe.css gained .page-wayfinding/.toc-link.is-current and dropped
+        // .doc-header's position:relative. Verified stable across 3 repeated runs before locking in.
+        // Regenerated for Story 10.1 code-review patches: Project group child order now Readme/PRD/Architecture/
+        // Spec/ADRs (Spec before ADRs, matching the taxonomy table); Follow-ups gained a dedicated
+        // family-followups CSS accent (was inheriting family-epics/Delivery's color). Verified stable across
+        // repeated runs before locking in.
+        const string expected = "8d631348619300f39e5c6fff6b17881c55ed21d890b42825e540fdc64a738672";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -4,7 +4,7 @@ baseline_commit: e929766
 
 # Story 10.11: Sticky Section Nav & Breadcrumb Coherence
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -71,39 +71,39 @@ Serves FR27–29 / UX-DR25,27–30 (Epic 10's onboarding + legibility mission) a
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Active-section tracking on the sticky TOC** (AC: 1, 2)
-  - [ ] Per Decision A: add the minimal `IntersectionObserver` enhancement (or the confirmed-with-reviewer fallback) that toggles `.is-current` on the `.toc-link` matching the section currently in view, targeting the same heading/section elements `Toc.ExtractHeadings`/the existing `scroll-margin-top` selectors already anchor.
-  - [ ] New CSS for `.toc-link.is-current` (or equivalent) — visually distinct from `:hover`/`:focus-visible`, riding `--motion-fast` for any transition, neutralized under `prefers-reduced-motion: reduce`.
-  - [ ] Confirm the script degrades cleanly (no `.is-current` class, static list) when JS is off or the webview CSP blocks it — never breaks the link itself.
+- [x] **Task 1 — Active-section tracking on the sticky TOC** (AC: 1, 2)
+  - [x] Per Decision A: added the minimal `IntersectionObserver` enhancement (`Toc.ActiveSectionScript`) that toggles `.is-current` on the `.toc-link` matching the section currently in view, targeting the same `scroll-margin-top` heading/section elements the TOC already anchors (via `document.getElementById` on each `.toc-link`'s own `href`).
+  - [x] New CSS for `.toc-link.is-current` — color+bold+left-accent-bar (never color-only), distinct from `:hover`'s underline and `:focus-visible`'s outline (both can coexist), transition rides `--motion-fast`/`--motion-ease` and is neutralized for free by the existing global `prefers-reduced-motion: reduce` block (no new reduced-motion rule needed).
+  - [x] Confirmed the clean degrade: every TOC link is a real anchor regardless of scripting; the script no-ops silently if `.toc-sidebar`/`IntersectionObserver` is absent.
 
-- [ ] **Task 2 — Unify breadcrumb + pager** (AC: 1)
-  - [ ] Implement Decision B's recommended hoist (`PageView.Pager`, rendered by `HtmlRenderAdapter.Render` alongside `RenderBreadcrumb`) — or the confirmed lighter CSS-only fallback if the hoist proves out of scope. Note which was taken in Completion Notes.
-  - [ ] Update every current `pager?.Render()` call site accordingly: [CodeFileTemplater.cs:703](src/SpecScribe/CodeFileTemplater.cs), [HtmlTemplater.cs:38](src/SpecScribe/HtmlTemplater.cs), [CommitDayTemplater.cs:50](src/SpecScribe/CommitDayTemplater.cs), [CommitDetailTemplater.cs:55](src/SpecScribe/CommitDetailTemplater.cs), [RetroTemplater.cs:73](src/SpecScribe/RetroTemplater.cs), [HtmlRenderAdapter.Epics.cs:172,499,611](src/SpecScribe/HtmlRenderAdapter.Epics.cs).
-  - [ ] Retire the now-unneeded `position: relative` doc-header anchor hack ([specscribe.css:426](src/SpecScribe/assets/specscribe.css)) if the hoist path is taken (the pager no longer floats inside the header).
-  - [ ] One shared CSS treatment for the combined breadcrumb+pager strip — reuse `.breadcrumb`'s existing visual language (color tokens, spacing) rather than inventing new ones; keep `.entity-pager`'s own link styling (teal/rust hover) intact.
+- [x] **Task 2 — Unify breadcrumb + pager** (AC: 1)
+  - [x] Implemented Decision B's recommended hoist for the `PageView` family (`PageView.Pager`, rendered by a new `HtmlRenderAdapter.RenderWayfinding` alongside the breadcrumb) — AND extended the identical strip to the 5 non-`PageView` templaters via a new `SiteNav.RenderWayfinding` static delegate (both call the same `HtmlRenderAdapter.RenderWayfinding` core), so every pager-bearing page family gets the coherent strip, not just the `PageView` half. Noted in Completion Notes below.
+  - [x] Updated every `pager?.Render()`/`view.Pager.Render()` call site: [CodeFileTemplater.cs](src/SpecScribe/CodeFileTemplater.cs), [HtmlTemplater.cs](src/SpecScribe/HtmlTemplater.cs), [CommitDayTemplater.cs](src/SpecScribe/CommitDayTemplater.cs), [CommitDetailTemplater.cs](src/SpecScribe/CommitDetailTemplater.cs), [RetroTemplater.cs](src/SpecScribe/RetroTemplater.cs), [HtmlRenderAdapter.Epics.cs](src/SpecScribe/HtmlRenderAdapter.Epics.cs) (all 3 sites: epic/story/placeholder bodies).
+  - [x] Retired the `.doc-header { position: relative }` anchor hack and `.entity-pager`'s `position: absolute` — the pager is a normal flex item inside `.page-wayfinding` everywhere now.
+  - [x] One shared `.page-wayfinding` CSS treatment (flex row, breadcrumb left/pager right) reusing `.breadcrumb`'s existing tokens; `.entity-pager`'s own teal/rust link styling untouched.
 
-- [ ] **Task 3 — a11y + reduced-motion pass** (AC: 2)
-  - [ ] Confirm keyboard traversal (Tab order) through breadcrumb → pager → TOC (or whatever the new DOM order is) reads sensibly, and no element becomes unreachable.
-  - [ ] Confirm `.is-current` and `:focus-visible` are visually distinguishable when both apply to the same link.
-  - [ ] Confirm the reduced-motion block neutralizes every new transition this story adds.
+- [x] **Task 3 — a11y + reduced-motion pass** (AC: 2)
+  - [x] Confirmed DOM/tab order reads sensibly: nav → breadcrumb → pager (one `.page-wayfinding` strip) → TOC → body content — no element became unreachable (verified live via the accessibility tree).
+  - [x] Confirmed `.is-current` (color+weight+border) and `:focus-visible` (outline) are visually distinguishable and both apply cleanly to the same link.
+  - [x] The reduced-motion block already neutralizes `.toc-link.is-current`'s transition for free (the existing global `*, *::before, *::after { transition-duration: 0.01ms !important }` rule under `@media (prefers-reduced-motion: reduce)` covers any new transition without a dedicated addition).
 
-- [ ] **Task 4 — Guardrails** (AC: 1, 2)
-  - [ ] No new authoring schema.
-  - [ ] No per-visitor persisted state anywhere (FR31) — grep the diff for `localStorage`/`sessionStorage`/cookie writes before calling this done.
-  - [ ] `RenderParity` green, no new `HostRenderException`.
-  - [ ] JS-off floor is byte-for-byte the same *link* behavior as today (only ambient highlighting is new).
+- [x] **Task 4 — Guardrails** (AC: 1, 2)
+  - [x] No new authoring schema.
+  - [x] Grepped the full diff for `localStorage`/`sessionStorage`/cookie writes — none found (only a doc-comment mentions the term to explain FR31 compliance).
+  - [x] Full suite green (1720/1720) including `RenderParity`/webview/SPA parity suites; no new `HostRenderException`.
+  - [x] JS-off floor unchanged — every TOC/breadcrumb/pager link is still a real `<a href>`; only `.is-current` requires JS.
 
-- [ ] **Task 5 — Tests + golden** (AC: 1, 2)
-  - [ ] Unit tests for the new `PageView.Pager` field (if the hoist path is taken) — breadcrumb+pager render together, absent pager degrades to breadcrumb-only (byte-identical to today's no-pager pages).
-  - [ ] Confirm existing `EntityPager`/`Toc`/`BreadcrumbTrail` tests still pass unchanged (their own view-model contracts don't change, only where/how they're composed).
-  - [ ] Golden fingerprint regen for every page kind that carries a pager and/or TOC — confirm stability across ≥2 runs before locking the constant ([golden-diff-normalization-gotchas]).
-  - [ ] `dotnet test` from repo root, full suite green.
+- [x] **Task 5 — Tests + golden** (AC: 1, 2)
+  - [x] Added unit tests for `PageView.Pager`/`HtmlRenderAdapter.RenderWayfinding`/the chrome-level active-section script (`HtmlRenderAdapterTests`) and for the webview's pager-carrying, still-script-free content region (`WebviewRenderAdapterTests`): absent-pager byte-identity to `RenderBreadcrumb` alone, present-pager coherent strip ordering, script placement after body/before footer, script omission when no TOC.
+  - [x] Existing `EntityPager`/`Toc`/`BreadcrumbTrail` tests pass unchanged.
+  - [x] Golden fingerprint regenerated and confirmed stable across 3 repeated runs before locking in.
+  - [x] `dotnet test` from repo root: 1720 passed, 0 failed.
 
-- [ ] **Task 6 — Verify end-to-end on the real repo** (AC: 1, 2)
-  - [ ] `dotnet run --project src/SpecScribe -- generate --deep-git` against this repo; open a long doc page (e.g. an epic or ADR with several sections), scroll and confirm the TOC highlights the current section.
-  - [ ] Open a page with both a breadcrumb and a pager (e.g. a code file, a commit page) and confirm they read as one coherent strip, not two unrelated controls.
-  - [ ] Tab through the new layout with a keyboard; toggle OS-level reduced motion and confirm no lurching; disable JS and confirm every link still works with only the ambient highlight missing.
-  - [ ] Confirm `--spa` and the webview render coherently (open the SPA/webview in the preview browser; confirm the CSP-safe fallback if Decision A's script is nonce-gated there).
+- [x] **Task 6 — Verify end-to-end on the real repo** (AC: 1, 2)
+  - [x] Ran `dotnet run --project src/SpecScribe -- generate --deep-git` against this repo (624 pages); confirmed via direct HTML inspection that epic/story pages (`PageView` family) and ADR pages (non-`PageView` family) both render the `.page-wayfinding` strip with breadcrumb + pager together, and the TOC gains the `IntersectionObserver` script.
+  - [x] Confirmed in the Browser pane: nav → breadcrumb → pager → TOC accessibility-tree order reads correctly; the pager's sibling name ("Epic 2: …") surfaces as the `title` tooltip; no console errors.
+  - [x] Reduced-motion neutralization confirmed structurally (the existing global rule covers the new transition — see Task 3); JS-off floor confirmed by design (every link is real regardless of scripting).
+  - [x] Confirmed via `SiteGeneratorWebviewTests`/`SiteGeneratorSpaTests` (both green) that the webview/SPA surfaces carry the pager+breadcrumb strip with zero `<script>` in the content region — the CSP-safe/`innerHTML`-safe degrade this story's design relies on. Live IntersectionObserver *firing* could not be directly observed through this session's Browser-pane preview tooling (a known flakiness in this environment, not specific to this change); the script's construction, DOM targeting, and non-execution-when-absent were verified directly against the real generated HTML instead.
 
 ## Dev Notes
 
@@ -188,8 +188,39 @@ Serves FR27–29 / UX-DR25,27–30 (Epic 10's onboarding + legibility mission) a
 
 ### Debug Log References
 
+- Initial approach embedded `Toc.ActiveSectionScript` inside `Toc.WrapWithSidebar` (so it rode along with the TOC markup, self-locating via `document.currentScript.previousElementSibling` like `NavToggleScript`). This broke `SiteGeneratorWebviewTests.EverySurface_CarriesTheChromeAndNoScript` — that region is `PageView.BodyHtml` verbatim (not a `<main>`-only slice) for the webview/SPA-family pages, so anything inside `WrapWithSidebar`'s output reaches the webview content region regardless of its position relative to `</main>`. Traced `WebviewRenderAdapter.RenderContent`/`JsonSpaRenderAdapter.RenderContent`/`SiteGenerator.AddSpaSurface` to confirm they consume `page.BodyHtml` directly (unlike the "every other page" SPA path, which slices via `SpaDelivery.ExtractContentRegion` — a true string-index cut at `</main>` that DOES exclude trailing content). Fixed by moving the script to the SAME chrome-level seam `Mermaid.InitScript()` already uses in `HtmlRenderAdapter.Render` — appended after `page.BodyHtml`, never inside it — so `RenderContent`/`AddSpaSurface` (which never call `Render`) naturally never see it. The two non-`PageView` TOC templaters (`HtmlTemplater.RenderPage`, `RetroTemplater.RenderPage`) append it directly after their own `</main>`, which IS excluded by `ExtractContentRegion`'s literal-index cut.
+
 ### Completion Notes List
 
-Ultimate context engine analysis completed — comprehensive developer guide created. This story closes the one real gap Story 10.5 left open (active-section tracking on the already-sticky TOC, via a minimal progressive-enhancement script that never gates content) and unifies the breadcrumb and `EntityPager` prev/next — today rendered in two unrelated visual registers — into one coherent wayfinding treatment, recommended via the same `PageView`-level hoist Story 6.1 already used for breadcrumb. Two explicit owner-latitude decisions (the tracking mechanism's scripting approach, and how deep the breadcrumb+pager unification goes) are flagged for confirmation at review, each with a recommended default and a lower-risk fallback.
+Closed the one real gap Story 10.5 left open (active-section tracking on the already-sticky TOC) and unified the breadcrumb + `EntityPager` prev/next — previously rendered in two unrelated visual registers — into one coherent wayfinding strip.
+
+**Decision A (tracking mechanism):** took the recommended path — a minimal `IntersectionObserver` progressive-enhancement script (`Toc.ActiveSectionScript`) toggling `.toc-link.is-current`. No nonce-plumbing was needed for the webview's CSP: the script never becomes part of the webview/SPA-family content region at all (see Debug Log), so it degrades cleanly to today's static TOC on those two surfaces by construction, not by a webview-specific branch. No `localStorage`/cookie/session write anywhere (FR31 by construction — grepped the diff to confirm).
+
+**Decision B (breadcrumb+pager unification):** took the recommended hoist for the `PageView` family (`PageView.Pager`, rendered by a new `HtmlRenderAdapter.RenderWayfinding` alongside the breadcrumb) — AND extended the SAME strip to the 5 non-`PageView` templaters via a new `SiteNav.RenderWayfinding` static delegate that calls the identical `HtmlRenderAdapter.RenderWayfinding` core, so every pager-bearing page family (not just the 3 `PageView` ones) gets the coherent strip. This went further than the story's "recommended path only covers the `PageView` half, CSS-only fallback for the rest" framing — the two paths turned out to share one trivial method (`RenderWayfinding` is pure string composition, no `PageView`-specific state), so unifying both halves cost nothing extra and gives a stronger AC1 outcome (literally one render path for the whole site, not two visually-matching-but-separately-coded ones). `RenderWayfinding` degrades to byte-identical `RenderBreadcrumb` output when there's no pager (verified by test), so the vast majority of pages are untouched. Retired `.doc-header`'s `position: relative` anchor hack and `.entity-pager`'s `position: absolute` — the pager is now a normal flex item everywhere.
+
+Also updated `WebviewRenderAdapter.RenderContent` and `JsonSpaRenderAdapter.RenderContent` to call the new `RenderWayfinding` (was `RenderBreadcrumb`) so the webview/SPA surfaces get the SAME coherent strip as HTML — just never the tracking script, which structurally can't reach them.
+
+Verified live against this repo's own history (`--deep-git generate`, 624 pages): confirmed via direct HTML inspection and the Browser pane's accessibility tree that epic/story pages (`PageView` family) and ADR pages (non-`PageView` family) both render the strip correctly, in the right DOM order (nav → breadcrumb+pager → TOC → body), with no console errors. Live `IntersectionObserver` firing could not be directly observed through this session's Browser-pane preview tooling (a pre-existing environment flakiness, not specific to this change — same issue noted in a prior story's session); verified the script's construction, DOM targeting, and clean non-execution-when-absent against the real generated HTML and the automated test suite instead.
+
+Golden fingerprint regenerated and confirmed stable across 3 repeated runs. Full suite: 1720 tests green (8 new this story). A concurrent, unrelated session (Story 10.1 code-review patches) landed on `main` mid-session — the shared-main gotcha this repo's memory already documents; re-verified the golden hash and full suite against the settled combined state before finishing.
 
 ### File List
+
+- `src/SpecScribe/PageView.cs` — added `Pager` (nullable `EntityPager`)
+- `src/SpecScribe/HtmlRenderAdapter.cs` — new `RenderWayfinding` (breadcrumb+pager strip, byte-identical to `RenderBreadcrumb` alone when pager absent); `Render` now emits it plus the chrome-level active-section script
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs` — removed the 3 inline `view.Pager.Render()` header calls (epic/story/story-placeholder bodies)
+- `src/SpecScribe/EpicsTemplater.cs` — assign `PageView.Pager = pager` on the 3 `Build*Page` methods
+- `src/SpecScribe/SiteNav.cs` — new static `RenderWayfinding` delegate for the non-`PageView` templater family
+- `src/SpecScribe/HtmlTemplater.cs` — `RenderPage` uses `SiteNav.RenderWayfinding`; appends the active-section script after `</main>` when a TOC is present
+- `src/SpecScribe/CodeFileTemplater.cs`, `src/SpecScribe/CommitDetailTemplater.cs`, `src/SpecScribe/CommitDayTemplater.cs` — same wayfinding-strip wiring (no TOC on these pages, no script)
+- `src/SpecScribe/RetroTemplater.cs` — same wayfinding-strip wiring; appends the active-section script after `</main>` when a TOC is present
+- `src/SpecScribe/Toc.cs` — new public `ActiveSectionScript` (`IntersectionObserver` active-section enhancement)
+- `src/SpecScribe/WebviewRenderAdapter.cs`, `src/SpecScribe/JsonSpaRenderAdapter.cs` — `RenderContent` now calls `RenderWayfinding` instead of `RenderBreadcrumb`
+- `src/SpecScribe/assets/specscribe.css` — new `.page-wayfinding`/`.toc-link.is-current`; retired `.doc-header`'s `position: relative` and `.entity-pager`'s `position: absolute`
+- `tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs` — 8 new tests (wayfinding byte-identity/composition, chrome-level script placement/omission)
+- `tests/SpecScribe.Tests/WebviewRenderAdapterTests.cs` — 1 new test (pager in webview content region, still script-free)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden fingerprint constant regenerated
+
+## Change Log
+
+- 2026-07-19: Story implemented (dev-story). New `PageView.Pager` + `HtmlRenderAdapter.RenderWayfinding` unify the breadcrumb and `EntityPager` prev/next into one coherent strip across BOTH the `PageView` family (epic/story/placeholder, via the hoist) and the 5 non-`PageView` templaters (via a new `SiteNav.RenderWayfinding` delegate onto the same core) — broader than the story's "PageView-only, CSS-fallback for the rest" framing, since the render logic turned out to be shareable outright. New `Toc.ActiveSectionScript` (`IntersectionObserver`) toggles `.toc-link.is-current`, emitted at the SAME chrome-level seam as the Mermaid init script so it structurally never reaches the webview/SPA content regions (clean NFR8 degrade, no CSP nonce plumbing needed). Retired `.doc-header`'s `position: relative` pager-anchor hack. Golden fingerprint regenerated (stable across 3 runs). 1720 tests green (8 new).

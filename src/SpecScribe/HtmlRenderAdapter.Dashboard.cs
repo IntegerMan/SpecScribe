@@ -429,10 +429,7 @@ public sealed partial class HtmlRenderAdapter
         if (label.Equals("Delivery", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Work", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Epics", StringComparison.OrdinalIgnoreCase)
-            || label.Equals("Sprint", StringComparison.OrdinalIgnoreCase)
-            || label.Equals("Follow-ups", StringComparison.OrdinalIgnoreCase)
-            || label.Equals("Action Items", StringComparison.OrdinalIgnoreCase)
-            || label.Equals("Deferred Work", StringComparison.OrdinalIgnoreCase))
+            || label.Equals("Sprint", StringComparison.OrdinalIgnoreCase))
             return "family-epics";
         if (label.Equals("Insights", StringComparison.OrdinalIgnoreCase)
             || label.Contains("Architecture", StringComparison.OrdinalIgnoreCase)
@@ -443,6 +440,10 @@ public sealed partial class HtmlRenderAdapter
             return "family-architecture";
         if (label.Contains("Requirement", StringComparison.OrdinalIgnoreCase))
             return "family-requirements";
+        if (label.Equals("Follow-ups", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Action Items", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Deferred Work", StringComparison.OrdinalIgnoreCase))
+            return "family-followups";
         return "family-planning";
     }
 

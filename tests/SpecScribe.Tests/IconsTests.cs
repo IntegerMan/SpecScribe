@@ -21,7 +21,7 @@ public class IconsTests
         => Assert.Equal(string.Empty, Icons.ForStatus("not-a-real-status"));
 
     [Theory]
-    [InlineData("Docs")]
+    [InlineData("Project")]
     [InlineData("Work")]
     [InlineData("Delivery")]
     [InlineData("Home")]
@@ -97,7 +97,7 @@ public class IconsTests
         // Nav group triggers, work-mode pills, evidence strip, change-surface chips.
         foreach (var key in new[]
                  {
-                     "Docs", "Architecture", "Work",
+                     "Project", "Architecture", "Work",
                      "Overview", "Requirements", "Plan", "Develop", "Review", "Track",
                      "Tasks", "Tests", "Verified",
                      "Story", "Sprint Status",
@@ -114,7 +114,7 @@ public class IconsTests
         var keys = EmittedConceptKeys().Select(row => (string)row[0]).ToHashSet(StringComparer.Ordinal);
         // Guard against a broken SiteNav fixture silently shrinking reverse coverage.
         Assert.True(keys.Count >= 20, $"Expected ≥20 emitted concept keys, got {keys.Count}");
-        foreach (var required in new[] { "Home", "PRD", "Epics", "Docs", "Work", "Tasks", "Story" })
+        foreach (var required in new[] { "Home", "PRD", "Epics", "Project", "Work", "Tasks", "Story" })
             Assert.Contains(required, keys);
     }
 

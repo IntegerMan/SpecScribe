@@ -659,3 +659,15 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-2-5-deferred-iconography-hardening.md`
   summary: `"Action Items"` remains a curated `Icons.ForConcept` arm with no production call site and no reverse-emitter membership — same orphan class as the removed Direct & Quick-Dev key.
   evidence: Blind Hunter. Grep shows no `ForConcept("Action Items")`; forward InlineData also omits it. Remove or wire when next touching Icons.ForConcept.
+
+## Deferred from: code review of 10-1-insights-navigation-and-structure-page-retirement (2026-07-19)
+
+- source_spec: `10-1-insights-navigation-and-structure-page-retirement.md`
+  summary: Two independently hand-maintained label→group classifiers exist — `SiteNav.Build`'s inline grouping (delivery/insights/followUps/project lists) and `HtmlRenderAdapter.KeyViewGroup`'s separate switch statement for the white key-views band. Nothing enforces the two mappings agree; adding a new nav label to one and forgetting the other silently miscategorizes it on one of the two nav surfaces.
+  evidence: Blind Hunter. Architectural observation, not a concrete bug today — consolidate into one shared classifier when next touching either seam.
+- source_spec: `10-1-insights-navigation-and-structure-page-retirement.md`
+  summary: `RenderParityTests` doesn't exercise all four nav groups (Delivery + Insights + Follow-ups + Project) populated simultaneously on one page — the interaction of all four disclosures rendering together (icon reuse, family-tint collisions, DOM nesting) is never exercised end-to-end.
+  evidence: Blind Hunter. Test-coverage gap, not a defect. Add a combined-groups test case when next touching RenderParityTests.cs.
+- source_spec: `10-1-insights-navigation-and-structure-page-retirement.md`
+  summary: The `.list-batch-actions .next-steps-cards` CSS change (wrapping flex → fixed 3-column grid, command groups stacked vertically instead of side-by-side) is a layout change to the deferred-work/action-items list-batch pane bundled into this nav-restructuring story's commit, with no dedicated test coverage and no explanation beyond a terse comment referencing an unrelated guard.
+  evidence: Blind Hunter. Unrelated scope creep — flagged for hygiene, not broken. Verify the layout change was intentional and give it its own test coverage when next touched.

@@ -180,7 +180,7 @@ public sealed class SiteGenerator
             var hasGitInsights = progress?.DeepGit?.Insights is not null;
             var hasDeepAnalytics = progress?.DeepGit is not null;
             var hasActionItems = _sprint?.OpenActionItems.Count > 0;
-            var deferredWorkPath = SiteNav.FindDeferredWorkOutputPath(sourceRelatives);
+            var deferredWorkPath = SiteNav.FindDeferredWorkOutputPath(sourceRelatives, navDiagnostics);
             var hasDeferredWork = deferredWorkPath is not null;
             var nav = SiteNav.Build(
                 sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable,
@@ -3620,7 +3620,7 @@ public sealed class SiteGenerator
         // treemap only regenerates on a full rebuild). [Story 7.6 Subtask 3.4]
         // Insights / Follow-ups gates reuse the last full run's _progress / _sprint / source list the same way.
         // [Story 10.1]
-        var deferredWorkPath = SiteNav.FindDeferredWorkOutputPath(sourceRelatives);
+        var deferredWorkPath = SiteNav.FindDeferredWorkOutputPath(sourceRelatives, diagnostics);
         return SiteNav.Build(
             sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable,
             hasCodeMap: _codeFiles.Count > 0,

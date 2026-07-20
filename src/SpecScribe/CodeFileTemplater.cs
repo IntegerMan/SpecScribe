@@ -693,11 +693,13 @@ public static class CodeFileTemplater
             $"Source file {repoRelativePath} in {nav.SiteTitle}.",
             highlight ? HighlightHead(prefix) : null));
         sb.Append(nav.RenderNavBar(outputRelativePath, localContext));
-        sb.Append(SiteNav.RenderBreadcrumb(outputRelativePath, new (string, string?)[]
+        // Sibling pager (prev/next across sibling files, alphabetical) rides the coherent wayfinding strip
+        // alongside the breadcrumb now, not the body's own header. [Story 10.11]
+        sb.Append(SiteNav.RenderWayfinding(outputRelativePath, new (string, string?)[]
         {
             ("Home", "index.html"),
             (repoRelativePath, null),
-        }));
+        }, pager));
 
         // Single <main id="main-content"> landmark / skip-link target. [Story 1.4 AC #1] The .code-page wrapper
         // gives the header + two-column body a centered max-width with side gutters (this synthesized page has no
@@ -705,7 +707,6 @@ public static class CodeFileTemplater
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<div class=\"code-page\">\n");
         sb.Append("<header class=\"doc-header\">\n");
-        sb.Append(pager?.Render()); // Prev/next across sibling files in the same directory (alphabetical). [Prev/next navigation]
         sb.Append("  <div class=\"story-kicker\">Source File</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(repoRelativePath)}</h1>\n");
         return sb;

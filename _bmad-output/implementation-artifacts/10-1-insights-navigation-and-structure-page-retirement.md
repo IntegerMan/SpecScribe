@@ -4,7 +4,7 @@ baseline_commit: dd343ec40d6fa4efa04d622dee38f4a4d77d1dd7
 
 # Story 10.1: Insights Navigation and Structure Page Retirement
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -236,6 +236,33 @@ Composer (Cursor agent)
 - _bmad-output/implementation-artifacts/sprint-status.yaml
 - _bmad-output/implementation-artifacts/10-1-insights-navigation-and-structure-page-retirement.md
 
+### Review Findings
+
+*Code review 2026-07-19 (3-layer: Blind Hunter, Edge Case Hunter, Acceptance Auditor).*
+
+**Decisions (resolved same session — owner chose "keep as-is" for all three):**
+
+- [x] [Review][Decision] Insights group includes Code Map, not just Git Insights/Deep Analytics [SiteNav.cs:214] — owner confirmed: keep as-is, Code Map belongs in Insights.
+- [x] [Review][Decision] Deferred Work nav entry gated on file-existence, not `WorkInventory.Deferred` content [SiteGenerator.cs:183, SiteNav.cs:335] — owner confirmed: keep the file-existence gate (page still renders when empty, not a dead link).
+- [x] [Review][Decision] Quick-link-only module docs (Product Brief, UX Design, UX Experience) dropped from dark-bar dropdown [HtmlRenderAdapter.cs:118] — owner confirmed: keep new behavior, it correctly matches the documented `InNav` contract.
+
+**Patch findings (all applied 2026-07-19, 1720 tests green, golden fingerprint regenerated):**
+
+- [x] [Review][Patch] Project group child ordering: ADRs render before Spec kernels; taxonomy table specifies Spec before ADRs [SiteNav.cs:180,254] — moved the ADRs `project.Add` to after the Spec-kernel loop.
+- [x] [Review][Patch] Follow-ups quick links (Action Items, Deferred Work) never added to `quickLinks`, so `KeyViewGroupOrder`'s "Follow-ups" entry is permanently dead — the white key-views band can never show a Follow-ups group [SiteNav.cs Build; HtmlRenderAdapter.cs:174] — added `quickLinks.Add(...)` for both.
+- [x] [Review][Patch] `NavigationView.Groups` should be `required` like `Items` — currently defaults to empty, so a construction site that forgets to set it silently renders zero top-nav links while `Items`-driven RenderParity still passes [NavigationView.cs:253] — made `Groups` `required`; only production construction site (`SiteNav.ToNavigationView`) already set it.
+- [x] [Review][Patch] `FindDeferredWorkOutputPath` silently drops a duplicate `deferred-work.md` with no diagnostic, unlike the sibling module-doc duplicate handling in the same file [SiteNav.cs:335] — added a `Skipped` `AdapterDiagnostic`, threaded `diagnostics` through both call sites.
+- [x] [Review][Patch] Follow-ups has no distinct CSS family tint — `QuickLinkFamily` maps it to `family-epics` (Delivery's color), so the newest journey group is visually indistinguishable from Delivery [HtmlRenderAdapter.Dashboard.cs:433; specscribe.css] — added `family-followups` (`--rust-light`) for the dark-bar summary, white-band pill, and key-view-group.
+- [x] [Review][Patch] Accepted-tradeoff XML remarks on `SiteNav.Build` only describe git-insights/deep-analytics gating; the identical data-signal-before-render risk for Action Items/Deferred Work isn't mentioned [SiteNav.cs:382] — extended the `<remarks>` block.
+- [x] [Review][Patch] Dead `"Docs"` icon-key branch remains in `Icons.ForConcept` after the taxonomy fully migrated "Docs" → "Project" everywhere else [Icons.cs:214] — removed the `"Docs"` arm; updated `IconsTests.cs`'s three stale `"Docs"` references to `"Project"`.
+
+**Deferred findings:**
+
+- [x] [Review][Defer] Two independently hand-maintained label→group classifiers (`SiteNav.Build`'s inline grouping vs. `HtmlRenderAdapter.KeyViewGroup`) can drift as new nav labels are added [SiteNav.cs; HtmlRenderAdapter.cs:311] — deferred, architectural observation not a concrete bug today
+- [x] [Review][Defer] `RenderParityTests` doesn't exercise all four nav groups populated simultaneously in one page [RenderParityTests.cs] — deferred, test-coverage gap not a defect
+- [x] [Review][Defer] `.list-batch-actions` CSS layout change (3-col grid, stacked command groups) is unrelated scope bundled into this story's commit [specscribe.css:740] — deferred, flagged for hygiene, not broken
+
 ## Change Log
 
 - 2026-07-18: Implemented journey-organized hierarchical nav (Delivery/Insights/Follow-ups/Project) with native details disclosure; threaded deep-git + follow-up gates; regenerated golden fingerprint; status → review.
+- 2026-07-19: Code review (3-layer adversarial). 3 decisions resolved (all kept as-is), 7 patch findings logged, 3 deferred to deferred-work.md, 7 dismissed as false-positive/by-design/verified-non-issue.

@@ -49,8 +49,10 @@ public sealed record NavigationView
     public required IReadOnlyList<NavItem> Items { get; init; }
 
     /// <summary>The hierarchical top-nav structure the renderer walks (journey groups → children). Flat top-level
-    /// links use an empty <see cref="NavGroup.Label"/>. Always agrees with <see cref="Items"/>. [Story 10.1]</summary>
-    public IReadOnlyList<NavGroup> Groups { get; init; } = Array.Empty<NavGroup>();
+    /// links use an empty <see cref="NavGroup.Label"/>. Always agrees with <see cref="Items"/>. Required (not
+    /// defaulted) so a construction site that forgets it fails to compile instead of silently rendering an
+    /// empty dark-bar menu while <see cref="Items"/>-driven RenderParity still reports a passing nav. [Story 10.1]</summary>
+    public required IReadOnlyList<NavGroup> Groups { get; init; }
 
     /// <summary>The dashboard quick-link grid — a superset of <see cref="Items"/> carrying a description each.</summary>
     public required IReadOnlyList<NavQuickLink> QuickLinks { get; init; }

@@ -100,6 +100,9 @@ public sealed class SiteNav
     /// deep-git <em>data</em> signal available at nav-build time, not on successful later render. If a git page
     /// fails to render after nav was already embedded in earlier pages, the Insights child would point at a
     /// page that wasn't written — an NFR2-exceptional degradation. Do not attempt a post-render nav rebuild.
+    /// The identical tradeoff applies to Follow-ups: <c>hasActionItems</c>/<c>hasDeferredWork</c> are also
+    /// data signals read before their pages render, so an Action Items or Deferred Work render failure after
+    /// nav embedding carries the same dangling-link risk — gate on the signal, never attempt a rebuild.
     /// </remarks>
     public static SiteNav Build(
         IReadOnlyList<string> sourceRelativePaths,
@@ -173,13 +176,6 @@ public sealed class SiteNav
             quickLinks.Add((doc.Label, outputPath, doc.Description));
         }
 
-        // ADRs sit next to the architecture doc conceptually; they live in docs/adrs, not _bmad-output,
-        // so their availability is signalled by the caller rather than the source-file list.
-        if (hasAdrs)
-        {
-            project.Add(("ADRs", AdrsLandingOutputPath));
-        }
-
         var hasEpics = sourceRelativePaths.Any(BmadArtifactAdapter.IsEpicsFile);
         if (hasEpics)
         {
@@ -217,15 +213,20 @@ public sealed class SiteNav
             quickLinks.Add(("Code Map", CodeMapOutputPath, "Explore the codebase by size and change activity."));
         }
 
-        // Follow-ups: open retro action items + deferred-work note (NFR8 — omit when absent).
+        // Follow-ups: open retro action items + deferred-work note (NFR8 — omit when absent). Also added to
+        // quickLinks (mirroring every other nav child) so the Follow-ups group in KeyViewGroupOrder can
+        // actually surface them on the white key-views band, not just the dark-bar dropdown. [Story 10.1]
         if (hasActionItems)
         {
             followUps.Add(("Action Items", ActionItemsOutputPath));
+            quickLinks.Add(("Action Items", ActionItemsOutputPath, "Review open retrospective action items."));
         }
 
         if (hasDeferredWork && !string.IsNullOrEmpty(deferredWorkOutputPath))
         {
-            followUps.Add(("Deferred Work", PathUtil.NormalizeSlashes(deferredWorkOutputPath)));
+            var normalizedDeferredPath = PathUtil.NormalizeSlashes(deferredWorkOutputPath);
+            followUps.Add(("Deferred Work", normalizedDeferredPath));
+            quickLinks.Add(("Deferred Work", normalizedDeferredPath, "See work explicitly deferred for later."));
         }
 
         if (hasAdrs)
@@ -253,6 +254,15 @@ public sealed class SiteNav
                 : "Read the canonical SPEC kernel and its companions.";
             project.Add((label, specOutputPath));
             quickLinks.Add((label, specOutputPath, description));
+        }
+
+        // ADRs sit next to the architecture doc conceptually; they live in docs/adrs, not _bmad-output,
+        // so their availability is signalled by the caller rather than the source-file list. Ordered after
+        // Spec kernels to match the Design Direction taxonomy table (Readme, PRD, Architecture, Spec, ADRs).
+        // [Story 10.1]
+        if (hasAdrs)
+        {
+            project.Add(("ADRs", AdrsLandingOutputPath));
         }
 
         // Assemble groups: Home always flat; named groups omit when empty; single child collapses flat.
@@ -332,13 +342,24 @@ public sealed class SiteNav
 
     /// <summary>True when <paramref name="sourceRelativePaths"/> contains a <c>deferred-work.md</c> (any folder).
     /// Returns the output-relative HTML path for the first match (alphabetical OrdinalIgnoreCase). [Story 10.1]</summary>
-    public static string? FindDeferredWorkOutputPath(IReadOnlyList<string> sourceRelativePaths)
+    public static string? FindDeferredWorkOutputPath(
+        IReadOnlyList<string> sourceRelativePaths, List<AdapterDiagnostic>? diagnostics = null)
     {
-        var match = sourceRelativePaths
+        var matches = sourceRelativePaths
             .Where(p => string.Equals(Path.GetFileName(p), "deferred-work.md", StringComparison.OrdinalIgnoreCase))
             .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
-        return match is null ? null : PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(match));
+            .ToList();
+        if (matches.Count == 0) return null;
+
+        if (matches.Count > 1)
+        {
+            diagnostics?.Add(new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Skipped,
+                matches[0],
+                $"{matches.Count - 1} duplicate 'deferred-work.md' file(s) skipped in favor of this one"));
+        }
+
+        return PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(matches[0]));
     }
 
     /// <summary>Projects this nav's already host-neutral data into the typed <see cref="NavigationView"/> the
@@ -396,4 +417,11 @@ public sealed class SiteNav
     /// <see cref="HtmlRenderAdapter"/> in Story 6.1; delegates so the bytes are unchanged.</summary>
     public static string RenderBreadcrumb(string currentOutputRelativePath, IReadOnlyList<(string Label, string? OutputRelativePath)> trail) =>
         HtmlRenderAdapter.Shared.RenderBreadcrumb(currentOutputRelativePath, BreadcrumbTrail.From(trail));
+
+    /// <summary>Renders the breadcrumb + sibling pager as one coherent wayfinding strip — the standalone-templater
+    /// counterpart of <see cref="HtmlRenderAdapter.RenderWayfinding"/> for the pages that build their own shell
+    /// rather than going through a <see cref="PageView"/> (code files, commits, retros, generic docs). Delegates
+    /// so the bytes match the <see cref="PageView"/> family exactly. [Story 10.11]</summary>
+    public static string RenderWayfinding(string currentOutputRelativePath, IReadOnlyList<(string Label, string? OutputRelativePath)> trail, EntityPager? pager) =>
+        HtmlRenderAdapter.Shared.RenderWayfinding(currentOutputRelativePath, BreadcrumbTrail.From(trail), pager);
 }

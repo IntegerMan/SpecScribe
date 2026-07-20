@@ -29,8 +29,17 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(page.Title, page.Assets.StylesheetHref, page.Assets.ScriptHref, page.MetaDescription));
         sb.Append(RenderNav(page.Nav));
-        sb.Append(RenderBreadcrumb(page.OutputRelativePath, page.Breadcrumb));
+        sb.Append(RenderWayfinding(page.OutputRelativePath, page.Breadcrumb, page.Pager));
         sb.Append(page.BodyHtml);
+        // The active-section tracking script rides the SAME chrome-level seam as the Mermaid init script below —
+        // appended AFTER the opaque body, never inside it — so the webview's RenderContent and the SPA family
+        // surfaces (both of which use page.BodyHtml directly, not this full Render output) never carry it. That
+        // is what gives webview/SPA their clean NFR8 degrade to today's static TOC there, matching their CSP/
+        // innerHTML non-execution, without a separate per-surface branch. [Story 10.11]
+        if (page.BodyHtml.Contains("class=\"toc-sidebar\"", StringComparison.Ordinal))
+        {
+            sb.Append(Toc.ActiveSectionScript);
+        }
         sb.Append(PathUtil.RenderFooter(PathUtil.RelativePrefix(page.OutputRelativePath)));
         if (page.Assets.MermaidNeeded)
         {
@@ -328,10 +337,17 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     public string RenderBreadcrumb(string currentOutputRelativePath, BreadcrumbTrail trail)
     {
         if (trail.Crumbs.Count == 0) return string.Empty;
-        var prefix = PathUtil.RelativePrefix(currentOutputRelativePath);
 
         var sb = new StringBuilder();
         sb.Append("<div class=\"breadcrumb\" aria-label=\"Breadcrumb\">\n");
+        AppendCrumbs(sb, currentOutputRelativePath, trail);
+        sb.Append("</div>\n\n");
+        return sb.ToString();
+    }
+
+    private static void AppendCrumbs(StringBuilder sb, string currentOutputRelativePath, BreadcrumbTrail trail)
+    {
+        var prefix = PathUtil.RelativePrefix(currentOutputRelativePath);
         for (var i = 0; i < trail.Crumbs.Count; i++)
         {
             if (i > 0) sb.Append("  <span class=\"crumb-sep\">/</span>\n");
@@ -345,6 +361,27 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
                 sb.Append($"  <span class=\"crumb-current\" aria-current=\"page\">{PathUtil.Html(label)}</span>\n");
             }
         }
+    }
+
+    /// <summary>Renders the breadcrumb and the sibling <see cref="EntityPager"/> as ONE coherent wayfinding
+    /// strip — the unification AC1 asks for (they used to answer "where am I / where can I go" in two unrelated
+    /// visual registers: breadcrumb as a full-width strip, pager floated inside the body's own header). Absent a
+    /// pager (null or <see cref="EntityPager.IsEmpty"/>), this is BYTE-IDENTICAL to <see cref="RenderBreadcrumb"/>
+    /// alone — the vast majority of pages have no pager, and their markup must not change. [Story 10.11]</summary>
+    public string RenderWayfinding(string currentOutputRelativePath, BreadcrumbTrail trail, EntityPager? pager)
+    {
+        var pagerHtml = pager?.Render() ?? string.Empty;
+        if (pagerHtml.Length == 0) return RenderBreadcrumb(currentOutputRelativePath, trail);
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"page-wayfinding\">\n");
+        if (trail.Crumbs.Count > 0)
+        {
+            sb.Append("<div class=\"breadcrumb\" aria-label=\"Breadcrumb\">\n");
+            AppendCrumbs(sb, currentOutputRelativePath, trail);
+            sb.Append("</div>\n");
+        }
+        sb.Append(pagerHtml);
         sb.Append("</div>\n\n");
         return sb.ToString();
     }

@@ -108,6 +108,21 @@ public static class Toc
         return sb.ToString();
     }
 
+    /// <summary>A minimal progressive-enhancement script that tracks which section is currently in view and
+    /// toggles <c>.is-current</c> on the matching <c>.toc-link</c> — the ambient "you are here" feedback the
+    /// sticky TOC lacked (every link already works with JS off; this only adds highlighting). Callers append
+    /// this OUTSIDE the <c>&lt;main id="main-content"&gt;</c> landmark (mirroring exactly where
+    /// <see cref="Mermaid.InitScript"/> is emitted) — never inside it, because <c>&lt;main&gt;</c> is the
+    /// swappable "content region" the webview/SPA surfaces extract verbatim; a script embedded there would ride
+    /// along into an <c>innerHTML</c> swap where it can never execute (dead code) and would trip the webview's
+    /// no-script-in-content-region invariant (<c>SiteGeneratorWebviewTests.EverySurface_CarriesTheChromeAndNoScript</c>).
+    /// Placed outside <c>&lt;main&gt;</c>, it simply never reaches those surfaces at all — a clean NFR8 degrade
+    /// to today's static TOC there, matching the webview's own strict-CSP inline-script block. No
+    /// <c>localStorage</c>/cookie/session write anywhere: the current section is recomputed live from scroll
+    /// position on every load (FR31). Self-locating via <c>document.currentScript</c> so it finds the page's
+    /// one <c>.toc-sidebar</c> regardless of exactly where after <c>&lt;main&gt;</c> it lands. [Story 10.11]</summary>
+    public const string ActiveSectionScript = "<script>(function(){var toc=document.querySelector('.toc-sidebar');if(!toc)return;var links=Array.prototype.slice.call(toc.querySelectorAll('a.toc-link'));if(!links.length)return;if(typeof IntersectionObserver==='undefined')return;var map=[];links.forEach(function(link){var href=link.getAttribute('href');if(!href||href.charAt(0)!=='#')return;var target=document.getElementById(href.slice(1));if(target)map.push({link:link,target:target});});if(!map.length)return;var current=null;function setCurrent(link){if(current===link)return;if(current)current.classList.remove('is-current');current=link;if(current)current.classList.add('is-current');}var observer=new IntersectionObserver(function(entries){var visible=entries.filter(function(e){return e.isIntersecting;});if(!visible.length)return;visible.sort(function(a,b){return a.boundingClientRect.top-b.boundingClientRect.top;});var top=visible[0].target;var match=map.filter(function(m){return m.target===top;})[0];if(match)setCurrent(match.link);},{rootMargin:'-15% 0px -70% 0px',threshold:0});map.forEach(function(m){observer.observe(m.target);});})();</script>\n\n";
+
     private static readonly Regex HeadingTag = new(
         @"<h(?<lvl>[23])\b[^>]*\bid=""(?<id>[^""]+)""[^>]*>(?<text>.*?)</h\k<lvl>>",
         RegexOptions.Compiled | RegexOptions.Singleline);

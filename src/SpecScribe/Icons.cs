@@ -50,7 +50,7 @@ public static class Icons
         {
             "Home" => Svg("<path d=\"M2.5 8 8 3.3 13.5 8\"/><path d=\"M4 6.7V13h8V6.7\"/>"),
             // Journey-group triggers on the dark nav bar (Story 10.1 taxonomy).
-            "Docs" or "Project" => Svg("<path d=\"M3 2.8h10v10.4H3Z\"/><path d=\"M5.2 5.6h5.6M5.2 8h5.6M5.2 10.4h3.4\"/>"),
+            "Project" => Svg("<path d=\"M3 2.8h10v10.4H3Z\"/><path d=\"M5.2 5.6h5.6M5.2 8h5.6M5.2 10.4h3.4\"/>"),
             "Work" or "Delivery" => Svg("<path d=\"M2.7 5.5 8 3l5.3 2.5L8 8Z\"/><path d=\"M2.7 8.7 8 11.2l5.3-2.5\"/>"),
             "Insights" => Svg("<path d=\"M8 2.2a3.6 3.6 0 0 0-2.2 6.4c.5.4.8 1 .9 1.6h2.6c.1-.6.4-1.2.9-1.6A3.6 3.6 0 0 0 8 2.2Z\"/><path d=\"M6.4 12.2h3.2M7 13.6h2\"/>"),
             "Follow-ups" => Svg("<path d=\"M4 2.8h8v10.4H4Z\"/><path d=\"m5.8 6 1.1 1.1 1.8-2.1\"/><path d=\"M5.8 9.8h4.4\"/>"),
