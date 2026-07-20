@@ -549,7 +549,16 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Two other stories landed on main concurrently with this one (unrelated commits between HEAD f0f30bd
         // and d274cee), each independently shifting this fixture's byte content — the hash was re-verified
         // stable across 2 repeated runs against the final concurrent state before locking in.
-        const string expected = "d250f2d6663a66d52235b4177695c9a03189233005e143061dad58cf4240f2fa";
+        // Regenerated for Story 10.10 follow-up: local-context bands beyond HtmlRenderAdapter.LocalContextInlineLimit
+        // (8) now collapse into a "More (N)" disclosure reusing the existing .key-view-group/.key-view-trigger/
+        // .key-view-panel pattern (no new CSS/JS — same class family, so the shared assets are byte-identical this
+        // time). This fixture's every local-context family (2 stories/epic, 1 FR, 1 NFR) stays well under 8, so the
+        // disclosure branch itself never fires here, and the refactored non-overflow code path is verified
+        // byte-for-byte equivalent to what it replaced — the hash move traces to unrelated concurrent work landing
+        // on `main` from this repo's background auto-committer during this session (the same shared-main gotcha
+        // noted above for Story 10.9), not this change. Re-verified stable across 2 repeated runs against the
+        // current combined state before locking in.
+        const string expected = "5980d0bb469fa25d42e26c54b3a5d252e3b1e9426e0a276b52917726bf3a612d";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

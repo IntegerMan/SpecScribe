@@ -196,29 +196,77 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         sb.Append("    </div>\n  </div>\n");
     }
 
+    /// <summary>Above this many items, the local-context band stops growing inline and tucks the remainder
+    /// behind a "More" disclosure — otherwise a large epic/ADR/requirement family wraps the white band across
+    /// several lines and dominates the header. [Story 10.10]</summary>
+    private const int LocalContextInlineLimit = 8;
+
     /// <summary>The white sub-header band's page-type-specific local-context branch: a small title label + a pill
     /// per <see cref="NavLocalItem"/> (the active one marked), reusing the <c>.quick-link-pill</c> visual
     /// language under a distinct CSS family (<c>.site-nav-local-context</c>/<c>.local-context-pill</c>) so it can
-    /// be told apart from the generic quick-links band. Plain anchors only — no JS, no webview CSP exception
-    /// needed. <see cref="NavLocalItem.Href"/> is already relative to the current page (the
-    /// <c>PagerLink.Href</c> convention), so this never recomputes a prefix per item. The active item renders as
-    /// plain text (a <c>&lt;span&gt;</c>), never a self-link — the same "current page never self-links" rule
-    /// <see cref="RenderBreadcrumb"/> already applies to its last crumb. [Story 10.10]</summary>
+    /// be told apart from the generic quick-links band. <see cref="NavLocalItem.Href"/> is already relative to
+    /// the current page (the <c>PagerLink.Href</c> convention), so this never recomputes a prefix per item. The
+    /// active item renders as plain text (a <c>&lt;span&gt;</c>), never a self-link — the same "current page
+    /// never self-links" rule <see cref="RenderBreadcrumb"/> already applies to its last crumb. Beyond
+    /// <see cref="LocalContextInlineLimit"/> items, the remainder collapses into a "More" disclosure reusing the
+    /// SAME <c>.key-view-group</c>/<c>.key-view-trigger</c>/<c>.key-view-panel</c> pattern (and its existing
+    /// hover/focus-within CSS + <c>specscribe.js</c> click handler) the generic quick-links band already uses —
+    /// no new JS, no webview CSP exception, since that handler is already class-selector-generic. [Story 10.10]</summary>
     private static void AppendLocalContextBand(StringBuilder sb, NavLocalContext localContext)
     {
         sb.Append("  <div class=\"site-nav-key-views site-nav-local-context\" aria-label=\"" + PathUtil.Html(localContext.Title) + "\">\n");
         sb.Append("    <div class=\"local-context-pills\">\n");
         sb.Append($"      <span class=\"local-context-label\">{PathUtil.Html(localContext.Title)}</span>\n");
-        foreach (var item in localContext.Items)
+
+        var items = localContext.Items;
+        var visible = items.Count > LocalContextInlineLimit ? items.Take(LocalContextInlineLimit).ToList() : items.ToList();
+        var overflow = items.Count > LocalContextInlineLimit ? items.Skip(LocalContextInlineLimit).ToList() : new List<NavLocalItem>();
+
+        // The active item must stay visible without opening the "More" panel (so a reader always sees "you
+        // are here"); if it fell into the overflow window, pin it into view instead of leaving it buried.
+        NavLocalItem? pinnedActive = null;
+        if (overflow.Count > 0 && !visible.Any(i => i.IsActive))
         {
-            if (item.IsActive)
-            {
-                sb.Append($"      <span class=\"local-context-pill active\" aria-current=\"page\">{PathUtil.Html(item.Label)}</span>\n");
-                continue;
-            }
-            sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"local-context-pill\">{PathUtil.Html(item.Label)}</a>\n");
+            pinnedActive = overflow.FirstOrDefault(i => i.IsActive);
+            if (pinnedActive is not null)
+                overflow = overflow.Where(i => i != pinnedActive).ToList();
         }
+
+        foreach (var item in visible)
+        {
+            AppendLocalContextPill(sb, item);
+        }
+        if (pinnedActive is not null)
+        {
+            AppendLocalContextPill(sb, pinnedActive);
+        }
+
+        if (overflow.Count > 0)
+        {
+            const string panelId = "local-context-more-panel";
+            sb.Append("      <div class=\"key-view-group\">\n");
+            sb.Append($"        <button class=\"local-context-pill key-view-trigger\" type=\"button\" aria-haspopup=\"true\" aria-expanded=\"false\" aria-controls=\"{panelId}\">More ({overflow.Count})<span class=\"site-menu-caret\" aria-hidden=\"true\">&#9662;</span></button>\n");
+            sb.Append($"        <div class=\"key-view-panel\" id=\"{panelId}\">\n");
+            foreach (var item in overflow)
+            {
+                sb.Append($"          <a class=\"key-view-item\" href=\"{PathUtil.Html(item.Href)}\">{PathUtil.Html(item.Label)}</a>\n");
+            }
+            sb.Append("        </div>\n      </div>\n");
+        }
+
         sb.Append("    </div>\n  </div>\n");
+    }
+
+    /// <summary>One local-context pill: the active item as plain text (never a self-link — the same rule
+    /// <see cref="RenderBreadcrumb"/>'s last crumb already follows), everything else as a real link.</summary>
+    private static void AppendLocalContextPill(StringBuilder sb, NavLocalItem item)
+    {
+        if (item.IsActive)
+        {
+            sb.Append($"      <span class=\"local-context-pill active\" aria-current=\"page\">{PathUtil.Html(item.Label)}</span>\n");
+            return;
+        }
+        sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"local-context-pill\">{PathUtil.Html(item.Label)}</a>\n");
     }
 
     /// <summary>Home-only white-bar work-stage strip: pure-CSS radios + labels (icons + words) that toggle

@@ -2872,6 +2872,52 @@ So that I can track progress without switching tools or losing module-specific w
 **Then** they surface as explicit non-fatal notices (coverage-tier labeling where partial) and never block full-site generation
 **And** any module-specific next-step-command vocabulary flows through the adapter contract rather than being hard-coded (NFR8).
 
+<!-- Stories 18.3–18.4 added 2026-07-19: BMad-authoring-tool integrations explored in chat (bmad-index-docs,
+     bmad-forge-idea). 18.3 spike-led per the Epics 11–15/18.1 pattern. 18.4 depends on 18.3's pinned contract
+     for its blurb-metadata half but stands alone for the Ideas list surface. Run create-story when scheduled. -->
+
+### Story 18.3: BMad Index-Docs Contract Spike
+
+As a maintainer wanting per-doc descriptions in the portal,
+I want bmad-index-docs' generated index.md format inventoried and pinned as a parseable contract,
+So that SpecScribe can consume it as a blurb/metadata source for doc pages without depending on an unstable prose format.
+
+**Acceptance Criteria:**
+
+1.
+**Given** bmad-index-docs' current output across representative repos
+**When** the spike inventories the index.md entry format (line shape, path resolution, description length/style, edge cases like missing docs or nested folders)
+**Then** a written contract documents the exact entry grammar SpecScribe should parse, flags any repo-to-repo inconsistencies found, and recommends whether to parse it as-is or request a stricter emission mode from bmad-index-docs.
+
+2.
+**Given** the pinned contract
+**When** the spike identifies the seam
+**Then** it recommends which SpecScribe surface(s) should carry the parsed blurb metadata (doc nav/TOC entries and/or a docs landing page) and the fallback behavior when index.md is absent, stale, or references a moved/deleted file
+**And** the follow-on implementation story has an agreed scope boundary.
+
+### Story 18.4: Forged Ideas List Page
+
+As a team using bmad-forge-idea to pressure-test ideas before they become product briefs,
+I want forged idea artifacts (hardened or killed) rendered as a list page in the portal,
+So that idea-stage lineage and rationale are visible alongside requirements/epics rather than lost in standalone files.
+
+**Acceptance Criteria:**
+
+1.
+**Given** bmad-forge-idea's output artifacts (or a defined contract for identifying them) in a repository
+**When** generation runs
+**Then** a new Ideas list page renders each discovered idea with its title, verdict (hardened/killed/in-progress), and a link through to the persona-objections/rationale content, using the existing ListRow primitive per Story 10.8's list-page grammar.
+
+2.
+**Given** an idea that later produced a product brief, PRD, or epic
+**When** the list page renders
+**Then** it links forward to that downstream artifact where discoverable, so the idea's fate is traceable without manual cross-referencing.
+
+3.
+**Given** no forge-idea artifacts exist in a repository
+**When** generation runs
+**Then** the Ideas page/nav entry is omitted entirely rather than showing an empty page, matching existing optional-surface conventions elsewhere in the portal.
+
 <!-- Epic 19 added 2026-07-17: directed work graph across epics/stories/quick-dev/deferred/reviews/code.
      Spike-led. Exploratory — not release-blocking. Run create-story when scheduled. -->
 
