@@ -858,6 +858,63 @@ public class ChartsTests
     }
 
     [Fact]
+    public void Sunburst_DenseEpic_AllNoPlanStoriesCollapsed_SuppressesOrphanedNoPlanLegendSwatch()
+    {
+        // Story 10.7 deferred debt: when every no-plan story lives inside a collapsed 8+-story epic, the
+        // summary wedge carries no .sb-noplan class — the legend must not advertise a "No task plan" swatch
+        // that matches no wedge on the chart.
+        var denseNoPlanStories = Enumerable.Range(1, 8)
+            .Select(i => Story($"1.{i}", $"Story {i}", "ready", 0, 0))
+            .ToArray();
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { Epic(denseNoPlanStories) },
+        };
+
+        var svg = Charts.Sunburst(model);
+
+        Assert.Contains("sb-story-summary", svg);
+        Assert.DoesNotContain("sb-noplan", svg);
+        Assert.DoesNotContain("No task plan", svg);
+    }
+
+    [Fact]
+    public void Sunburst_MixedDenseAndSparseEpics_LegendReflectsOnlyTheVisibleNoPlanWedge()
+    {
+        // Code-review patch: hasVisibleNoPlan is an OR across every epic. A dense-collapsed epic's no-plan
+        // stories must not surface the legend on their own (previous test), but a SEPARATE sparse epic with a
+        // genuine visible no-plan story must still surface it — this is the mixed case that would catch a
+        // regression where the OR itself is wired wrong (e.g. inverted, or scoped to only the last epic).
+        var denseAllPlanned = Enumerable.Range(1, 8)
+            .Select(i => Story($"1.{i}", $"Story {i}", "ready", 1, 1))
+            .ToArray();
+        var epic1 = Epic(denseAllPlanned);
+        var epic2 = new EpicInfo
+        {
+            Number = 2,
+            Title = "Second Epic",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.VerticalSlice,
+            Stories = new[] { Story("2.1", "Visible no-plan story", "ready", 0, 0, epicNumber: 2) },
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { epic1, epic2 },
+        };
+
+        var svg = Charts.Sunburst(model);
+
+        Assert.Contains("sb-story-summary", svg); // epic 1 still dense-collapses
+        Assert.Contains("class=\"sb-seg sb-noplan\"", svg); // epic 2's story wedge is un-collapsed and no-plan
+        Assert.Contains("No task plan", svg); // legend correctly surfaces it
+    }
+
+    [Fact]
     public void Sunburst_SparseEpic_JustBelowThreshold_KeepsPerStoryWedges()
     {
         // Boundary: one below StoryDensityCollapseThreshold (7 stories) still renders individually.

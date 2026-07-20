@@ -42,11 +42,11 @@ public static class AbbreviationExpander
             .ToList();
 
         // Longest-term-first alternation so "NFR" wins over "FR" when both would match at the same spot.
-        // Trailing (?![\s\-\u2013\u2014]*\d{2,}) skips numbered references like "ADR-0005" / "ADR 0005"
+        // Trailing (?![\s\-\u2013\u2014]*\d{2,}|[./:]\d{2,}) skips numbered references like "ADR-0005" / "ADR 0005"
         // (and en/em-dash variants): `\b` alone treats those separators as a boundary, so bare "ADR"
         // would otherwise wrap mid-reference on the first hit. Require ≥2 digits so "ADR 5 years" still expands.
         var pattern = new Regex(
-            @"\b(" + string.Join("|", unique.OrderByDescending(a => a.Term.Length).Select(a => Regex.Escape(a.Term))) + @")\b(?![\s\-\u2013\u2014]*\d{2,})",
+            @"\b(" + string.Join("|", unique.OrderByDescending(a => a.Term.Length).Select(a => Regex.Escape(a.Term))) + @")\b(?![\s\-\u2013\u2014]*\d{2,}|[./:]\d{2,})",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
         var byTerm = unique.ToDictionary(a => a.Term, StringComparer.Ordinal);
 

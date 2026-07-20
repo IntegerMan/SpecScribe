@@ -277,6 +277,100 @@ public class EpicsParserTests
         Assert.Contains("the second story", second.UserStoryHtml);
     }
 
+    private const string PreambleRetiredNoticeEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        Goal text for the epic.
+
+        <!-- Story 0.9 retired 2026-07-08 — approach abandoned before this epic began. -->
+
+        ### Story 1.1: First story
+
+        As a developer, I want the first story, so that work starts.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_RetirementComment_InEpicPreamble_IsHoistedNotSweptIntoGoalText()
+    {
+        // Story 10.5 deferred debt: a retirement comment before the first "### Story" heading (in the epic's
+        // own preamble) must be hoisted the same way a between-story comment is — not left stuck in goal/meta
+        // text, which is what happened when the scan started at storyStarts[0].Index instead of the epic body.
+        var epic = EpicsParser.Parse(PreambleRetiredNoticeEpicsMd).Epics[0];
+
+        var notice = Assert.Single(epic.RetiredNoticesHtml);
+        Assert.Contains("Story 0.9 retired", notice);
+        Assert.Contains("class=\"md-comment\"", notice);
+
+        Assert.DoesNotContain("retired", epic.GoalHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<!--", epic.GoalHtml);
+        Assert.Contains("Goal text for the epic.", epic.GoalHtml);
+    }
+
+    private const string PreambleRetiredNoticeZeroStoryEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ### Epic 2: Second
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        Goal text for the epic.
+
+        <!-- Story 0.9 retired 2026-07-08 — approach abandoned before this epic began. -->
+
+        ## Epic 2: Second
+
+        Second epic goal text.
+
+        ### Story 2.1: Only story
+
+        As a developer, I want the only story, so that work starts.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_RetirementComment_InPreambleOfZeroStoryEpic_IsStillHoisted()
+    {
+        // Code-review patch: the hoist call must not be gated on storyStarts.Count > 0 — an epic with a
+        // preamble retirement comment but NO "### Story" headings at all (e.g. not yet broken into stories)
+        // must still have its comment hoisted, not left leaking into GoalHtml.
+        var epic = EpicsParser.Parse(PreambleRetiredNoticeZeroStoryEpicsMd).Epics.Single(e => e.Number == 1);
+        Assert.Empty(epic.Stories);
+
+        var notice = Assert.Single(epic.RetiredNoticesHtml);
+        Assert.Contains("Story 0.9 retired", notice);
+
+        Assert.DoesNotContain("retired", epic.GoalHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<!--", epic.GoalHtml);
+        Assert.Contains("Goal text for the epic.", epic.GoalHtml);
+    }
+
     [Fact]
     public void Parse_NoRetirementComment_EpicHasEmptyRetiredNotices()
     {

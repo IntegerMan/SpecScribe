@@ -61,6 +61,24 @@ public class ReferenceChipRendererTests
     }
 
     [Fact]
+    public void BareFileLine_InsideKbdSpan_IsUntouched()
+    {
+        // Story 10.5 deferred debt: ProtectedSplit's open-tag-only catch-all didn't shield <kbd> inner text,
+        // so a chip pattern inside a keyboard hint could get rewritten.
+        var html = "<kbd>src/SpecScribe/Foo.cs:42</kbd>";
+
+        Assert.Equal(html, ReferenceChipRenderer.Render(html));
+    }
+
+    [Fact]
+    public void BareFileLine_InsideSampSpan_IsUntouched()
+    {
+        var html = "<samp>src/SpecScribe/Foo.cs:42</samp>";
+
+        Assert.Equal(html, ReferenceChipRenderer.Render(html));
+    }
+
+    [Fact]
     public void BareFileLine_InsideSvgTitle_IsUntouched()
     {
         // Chart tooltips (e.g. the sunburst's <title>) carry raw, unrendered text inside an SVG subtree — SVG

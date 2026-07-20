@@ -81,6 +81,44 @@ public class AbbreviationExpanderTests
     }
 
     [Fact]
+    public void Expand_SkipsNumberedReferences_DotColonOrSlashThenDigits()
+    {
+        // Story 10.5 deferred debt: separators other than space/hyphen/en/em-dash also mark a numbered
+        // reference and must not get a bare-acronym wrap mid-reference.
+        var dot = AbbreviationExpander.Expand("<p>See ADR.0005 for the decision.</p>", Glossary);
+        Assert.Equal("<p>See ADR.0005 for the decision.</p>", dot);
+
+        var colon = AbbreviationExpander.Expand("<p>See ADR:0005 for the decision.</p>", Glossary);
+        Assert.Equal("<p>See ADR:0005 for the decision.</p>", colon);
+
+        var slash = AbbreviationExpander.Expand("<p>See ADR/0005 for the decision.</p>", Glossary);
+        Assert.Equal("<p>See ADR/0005 for the decision.</p>", slash);
+
+        // Bare acronym (no numbered-reference separator) still expands on first use.
+        var bare = AbbreviationExpander.Expand("<p>An ADR records the decision.</p>", Glossary);
+        Assert.Equal(
+            "<p>An <abbr title=\"Architecture Decision Record\">ADR</abbr> records the decision.</p>",
+            bare);
+    }
+
+    [Fact]
+    public void Expand_DotColonSlashFollowedBySpaceThenDigits_StillExpands()
+    {
+        // Code-review patch: widening the separator set to dot/colon/slash must not swallow ordinary prose
+        // where the punctuation is a sentence-terminator or a general separator, not a numbered-reference
+        // marker — those are followed by a SPACE before the digits, unlike "ADR.0005"'s tight citation form.
+        var sentenceEnd = AbbreviationExpander.Expand("<p>See the ADR. 42 people voted for it.</p>", Glossary);
+        Assert.Equal(
+            "<p>See the <abbr title=\"Architecture Decision Record\">ADR</abbr>. 42 people voted for it.</p>",
+            sentenceEnd);
+
+        var colonThenSpace = AbbreviationExpander.Expand("<p>Total FR: 12 requirements.</p>", Glossary);
+        Assert.Equal(
+            "<p>Total <abbr title=\"Functional Requirement\">FR</abbr>: 12 requirements.</p>",
+            colonThenSpace);
+    }
+
+    [Fact]
     public void Expand_SingleDigitAfterSpace_StillExpands()
     {
         // ≥2-digit lookahead: "ADR 5 years" is prose, not a padded citation id.

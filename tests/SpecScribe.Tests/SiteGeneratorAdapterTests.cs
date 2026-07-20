@@ -638,7 +638,16 @@ public class SiteGeneratorAdapterTests : IDisposable
         // cosmetic indentation (10sp → 6sp) and attribute-order (class/href → href/class) delta on every
         // panel row, shared markup so the byte-parity gate moves. Verified stable across 3 repeated runs
         // before locking in.
-        const string expected = "e524740cac8b3a5915a8d1db57305cab2edb69439ef3df767f34e56131a5d0dd";
+        // Regenerated 2026-07-20 (Epic 10 deferred-work cleanup): Charts.Sunburst now tracks hasVisibleNoPlan
+        // (only true when a no-plan story wedge is actually un-collapsed and drawn) instead of hasNoPlan over
+        // every story regardless of dense-collapse — this fixture's project-glance sunburst has a dense (8+
+        // story) epic whose no-plan stories were previously advertising an orphaned "No task plan" legend
+        // swatch matching no visible wedge; the swatch is now correctly suppressed. Isolated via stash-bisection
+        // against the other 5 fixes in this pass (ReferenceChipRenderer kbd/samp shielding, EpicsParser preamble
+        // retirement-comment scan, AbbreviationExpander punctuation separators, SiteGenerator groupByHref
+        // assert) — none of those touch this non-git fixture's content; only Charts.cs shifted the hash.
+        // Verified stable across 3 repeated runs before locking in.
+        const string expected = "5bac4208dcef7163f4acc2dedb64ad535962582b76e3bb2dee80d9b7848ca5e8";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

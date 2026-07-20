@@ -2383,12 +2383,24 @@ public sealed class SiteGenerator
                         }
                         else
                         {
-                            storySourcePath = RepoRelative(artifactFullPath);
-                            var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
-                            storyPage = EpicsTemplater.BuildStoryPage(
-                                epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
-                                f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                                _module.Commands, epicRetroPath, StoryPager(model, story), followUps);
+                            try
+                            {
+                                storySourcePath = RepoRelative(artifactFullPath);
+                                var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
+                                storyPage = EpicsTemplater.BuildStoryPage(
+                                    epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
+                                    f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
+                                    _module.Commands, epicRetroPath, StoryPager(model, story), followUps);
+                            }
+                            catch (IOException)
+                            {
+                                // The artifact was deleted (or otherwise became unreadable) in the sub-second window
+                                // between GenerateAll() and RenderWebviewSurfaces() — degrade this ONE story to a
+                                // placeholder rather than aborting the entire webview bundle, mirroring
+                                // RenderEpicsPages' resilience on the HTML path. [Deferred item, Story 6.4 review]
+                                storySourcePath = null;
+                                storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
+                            }
                         }
                         surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
 
@@ -3352,7 +3364,16 @@ public sealed class SiteGenerator
         foreach (var spec in groupSpecs)
             foreach (var member in spec.Members)
                 if (member.DetailHref is { Length: > 0 })
-                    groupByHref[NormalizeFollowUpHref(member.DetailHref)] = spec;
+                {
+                    var key = NormalizeFollowUpHref(member.DetailHref);
+                    // Enumerate's three membership sources (orphans / unplanned / per-epic) partition follow-up
+                    // items disjointly by construction; this makes that invariant observable in Debug builds
+                    // instead of only silently letting the last-write-wins indexer below hide a collision.
+                    // [Story 10.10 deferred debt]
+                    Debug.Assert(!groupByHref.ContainsKey(key) || ReferenceEquals(groupByHref[key], spec),
+                        $"FollowUpGroupPages.Enumerate's membership sources must stay mutually exclusive, but '{key}' appears in more than one group.");
+                    groupByHref[key] = spec;
+                }
 
         foreach (var item in actionItems)
         {

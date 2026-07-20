@@ -318,6 +318,10 @@ public static class Charts
         var hasAggregates = false;
         var hasUnplanned = unplannedGeo.SunburstUnplannedWeight > 0;
         var hasDenseEpics = false;
+        // Only true when an un-collapsed no-plan story wedge is actually drawn below — a dense-collapsed
+        // epic's zero-task stories fold into one sb-story-summary wedge with no .sb-noplan class, so counting
+        // them here would advertise a legend swatch that matches no wedge on the chart. [Story 10.7 deferred debt]
+        var hasVisibleNoPlan = false;
 
         var sb = new StringBuilder();
         sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"Project progress sunburst\">\n");
@@ -358,6 +362,7 @@ public static class Charts
                     var slotAngle = angle;
                     foreach (var story in epic.Stories)
                     {
+                        if (story.TasksTotal == 0) hasVisibleNoPlan = true;
                         var sw = StoryWeight(epic, story) * anglePerUnitSlot;
                         AppendWeightedStorySlot(sb, story, geometry, slotAngle, sw, pad, c, storyInner, storyOuter,
                             aggregateInner, aggregateOuter, nestStoryChildren: false);
@@ -432,8 +437,7 @@ public static class Charts
         sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(epics.Count, "epic", "epics")}</text>\n");
         sb.Append("</svg>\n");
 
-        var hasNoPlan = epics.Any(e => e.Stories.Any(s => s.TasksTotal == 0));
-        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasAggregates, hasUnplanned, hasNoPlan)));
+        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasAggregates, hasUnplanned, hasVisibleNoPlan)));
         var hasStoryChildDeferred = HasAnyStoryChildDeferred(geometry, epics);
         sb.Append(BuildSunburstHint(hasAggregates, hasUnplanned, hasStoryChildDeferred, hasDenseEpics));
         return sb.ToString();

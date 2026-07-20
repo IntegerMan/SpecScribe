@@ -149,6 +149,58 @@ public class FollowUpGroupPagesTests
     }
 
     [Fact]
+    public void Enumerate_MixedInventory_MembershipSourcesAreMutuallyExclusiveByDetailHref()
+    {
+        // Story 10.10 deferred debt: SiteGenerator.WriteFollowUpDetails builds a href->group lookup assuming
+        // Enumerate's three sources (orphans / unplanned / per-epic) never share a DetailHref. Pins that
+        // invariant across a realistic mixed inventory (an attributed epic action, an orphan action, unplanned
+        // quick-dev, and epic-attributed deferred) so a future change to Enumerate that breaks it is caught.
+        var model = TwoEpicModel();
+        var deferredMarkdown = """
+            ## Deferred from: code review of 1-1-foundation.md (2026-07-15)
+
+            - Epic 1 deferred item.
+            """;
+        var deferredModel = DeferredWorkParser.Parse(deferredMarkdown);
+        var work = new WorkInventory
+        {
+            QuickDev = new[] { new QuickDevEntry("Story 2.1 hotfix", "spec-hotfix.html", "ready", null) },
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", 1),
+        };
+        var items = new[]
+        {
+            new SprintActionItem("Epic 1 action", "open", 1, "Dana"),
+            new SprintActionItem("Orphan action", "open", null, null),
+        };
+        var geometry = FollowUpGeometry.From(
+            items,
+            ProjectCounts.Empty with { OpenActionItems = 2, DeferredOpenItems = 1, DirectChanges = 1 },
+            work,
+            deferredModel: deferredModel,
+            epics: model);
+        var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
+
+        var groups = FollowUpGroupPages.Enumerate(geometry, unplanned, model);
+        Assert.True(groups.Count >= 2, "Test setup should produce at least two groups to make a collision possible.");
+
+        var seenHrefToSlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in groups)
+        {
+            foreach (var member in group.Members)
+            {
+                if (member.DetailHref.Length == 0) continue;
+                if (seenHrefToSlug.TryGetValue(member.DetailHref, out var existingSlug))
+                {
+                    Assert.Fail(
+                        $"DetailHref '{member.DetailHref}' appears in both '{existingSlug}' and '{group.Slug}' — " +
+                        "Enumerate's membership sources are no longer mutually exclusive.");
+                }
+                seenHrefToSlug[member.DetailHref] = group.Slug;
+            }
+        }
+    }
+
+    [Fact]
     public void Enumerate_EmptyInputs_YieldsNoGroups()
     {
         Assert.Empty(FollowUpGroupPages.Enumerate(FollowUpGeometry.Empty, UnplannedWorkGeometry.Empty));
@@ -343,6 +395,53 @@ public class FollowUpGroupPagesTests
                         Id = "1.1",
                         EpicNumber = 1,
                         Title = "Foundation",
+                        UserStoryHtml = string.Empty,
+                        AcBlocksHtml = Array.Empty<string>(),
+                    },
+                },
+            },
+        },
+    };
+
+    private static EpicsModel TwoEpicModel() => new()
+    {
+        OverviewHtml = string.Empty,
+        RequirementsInventoryHtml = string.Empty,
+        Epics = new[]
+        {
+            new EpicInfo
+            {
+                Number = 1,
+                Title = "Foundation",
+                GoalHtml = string.Empty,
+                Status = EpicStatus.Drafted,
+                Section = EpicSection.VerticalSlice,
+                Stories = new[]
+                {
+                    new StoryInfo
+                    {
+                        Id = "1.1",
+                        EpicNumber = 1,
+                        Title = "Foundation",
+                        UserStoryHtml = string.Empty,
+                        AcBlocksHtml = Array.Empty<string>(),
+                    },
+                },
+            },
+            new EpicInfo
+            {
+                Number = 2,
+                Title = "Second",
+                GoalHtml = string.Empty,
+                Status = EpicStatus.Drafted,
+                Section = EpicSection.VerticalSlice,
+                Stories = new[]
+                {
+                    new StoryInfo
+                    {
+                        Id = "2.1",
+                        EpicNumber = 2,
+                        Title = "Second",
                         UserStoryHtml = string.Empty,
                         AcBlocksHtml = Array.Empty<string>(),
                     },

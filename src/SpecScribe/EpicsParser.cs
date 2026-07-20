@@ -763,10 +763,15 @@ public static class EpicsParser
             // placement (e.g. the actual Story 3.4 notice sits after Story 3.3's last AC line and before
             // "### Story 3.5", not inside either story's own body) — before any story is parsed, so the
             // comment's lines never pollute the preceding story's trailing AC-block text (today's swallow-as-
-            // AC-content quirk) and never become the following story's leading-comment note.
-            var betweenStoryRetiredNotices = storyStarts.Count > 0
-                ? HoistBetweenStoryRetiredComments(lines, storyStarts[0].Index, bodyEnd, storyStarts)
-                : new List<string>();
+            // AC-content quirk) and never become the following story's leading-comment note. Scanning starts
+            // right after the epic heading (not at the first story) so a retirement comment sitting in the
+            // epic's own preamble — before any "### Story" heading — is hoisted too, instead of staying stuck
+            // in goal/meta text; the preceding-non-blank-is-a-story-heading guard already keeps this from
+            // misclassifying a story's own leading comment. Called unconditionally (not gated on
+            // storyStarts.Count > 0) so a preamble comment in an epic with ZERO stories is still hoisted — an
+            // empty storyStarts list degrades cleanly (headingLines is empty, so followedByStoryOrEof only
+            // fires at true EOF of the epic body). [Story 10.5 deferred debt; code-review patch]
+            var betweenStoryRetiredNotices = HoistBetweenStoryRetiredComments(lines, idx + 1, bodyEnd, storyStarts);
 
             var preambleEnd = storyStarts.Count > 0 ? storyStarts[0].Index : bodyEnd;
             var goalLines = new List<string>();

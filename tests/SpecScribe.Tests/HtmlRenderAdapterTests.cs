@@ -1119,6 +1119,25 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("work-mode-jumps", keyViews);
     }
 
+    [Fact]
+    public void RenderNav_OffHome_UnrecognizedQuickLinkGroup_FallsBackToProjectGroup()
+    {
+        // Pins the `KeyViewGroupOrder.Contains(q.Group) ? q.Group : "Project"` fallback [Story 10.11 deferred debt]:
+        // an unrecognized/misspelled Group string must silently land in "Project", not be dropped or crash.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var view = nav.ToNavigationView("epics/epic-1.html");
+        var misfiled = new NavQuickLink("Weird Thing", "weird.html", "A weird view", "Nonexistent-Group");
+        view = view with { QuickLinks = view.QuickLinks.Append(misfiled).ToList() };
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(view);
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.Contains("Project<span", keyViews);
+        var projectPanel = keyViews[keyViews.IndexOf("id=\"key-view-panel-project\"", StringComparison.Ordinal)..];
+        Assert.Contains("weird.html", projectPanel);
+        Assert.Contains("Weird Thing</a>", projectPanel);
+    }
+
     // ---- Story 10.10: page-type-specific local-context band ----
 
     [Fact]
