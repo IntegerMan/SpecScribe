@@ -74,6 +74,25 @@ public class CommitDayTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_WithPager_RoutesThroughSiteNavRenderWayfinding()
+    {
+        // Story 10.11: the sibling pager rides SiteNav.RenderWayfinding's coherent strip alongside the
+        // breadcrumb, not the body's own header — confirms this non-PageView templater's call-site wiring.
+        var day = new DateOnly(2026, 7, 6);
+        var pager = new EntityPager(
+            new PagerLink("2026-07-09.html", "Jul 9"),
+            new PagerLink("2026-07-04.html", "Jul 4"));
+
+        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, pager, Nav());
+
+        Assert.Contains("<div class=\"page-wayfinding\">", html);
+        var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
+        var crumbIdx = html.IndexOf("class=\"breadcrumb\"", StringComparison.Ordinal);
+        var pagerIdx = html.IndexOf("class=\"entity-pager\"", StringComparison.Ordinal);
+        Assert.True(wrapperIdx < crumbIdx && crumbIdx < pagerIdx, "expected wrapper, then breadcrumb, then pager");
+    }
+
+    [Fact]
     public void RenderPage_NoPager_OmitsPagerEntirely()
     {
         var day = new DateOnly(2026, 7, 6);

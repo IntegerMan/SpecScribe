@@ -56,7 +56,6 @@ public static class EpicsViewBuilder
         EpicProgress progress,
         CommandCatalog commands,
         string? epicRetroPath,
-        EntityPager? pager = null,
         FollowUpGeometry? followUps = null,
         UnplannedWorkGeometry? unplanned = null)
     {
@@ -130,7 +129,6 @@ public static class EpicsViewBuilder
             Commands = commands,
             Prefix = prefix,
             StoryCards = epic.Stories.Select(s => BuildStoryCard(s, prefix, commands, consolidated)).ToList(),
-            Pager = pager ?? EntityPager.None,
             FollowUps = epicFollowUps,
             UnplannedWork = epicUnplanned,
             RetiredNoticesHtml = epic.RetiredNoticesHtml,
@@ -190,7 +188,6 @@ public static class EpicsViewBuilder
         StoryChangeSurface changeSurface,
         CommandCatalog commands,
         string? epicRetroPath,
-        EntityPager? pager = null,
         FollowUpGeometry? followUps = null)
     {
         var outputPath = story.ArtifactOutputPath
@@ -220,7 +217,6 @@ public static class EpicsViewBuilder
             ReviewFindingsHtml = reviewFindingsHtml,
             RemainderHtml = remainderHtml,
             ChangeLogHtml = changeLogHtml,
-            Pager = pager ?? EntityPager.None,
             DeferredFromThis = deferred,
             DeferredListHref = deferredListHref,
         };
@@ -228,7 +224,7 @@ public static class EpicsViewBuilder
 
     // ----- Story placeholder --------------------------------------------------------------------------------
 
-    public static StoryPlaceholderView BuildStoryPlaceholder(EpicInfo epic, StoryInfo story, CommandCatalog commands, string? epicRetroPath, EntityPager? pager = null)
+    public static StoryPlaceholderView BuildStoryPlaceholder(EpicInfo epic, StoryInfo story, CommandCatalog commands, string? epicRetroPath)
     {
         var outputPath = StoryEpicLinkifier.StoryPagePath(story.Id);
         var prefix = Prefix(outputPath);
@@ -252,7 +248,6 @@ public static class EpicsViewBuilder
             NoteHtml = note,
             EpicNumber = epic.Number,
             BackHref = prefix + epicOutputPath,
-            Pager = pager ?? EntityPager.None,
         };
     }
 

@@ -301,6 +301,26 @@ public class RetroTests : IDisposable
         Assert.Contains("data-copy=\"/bmad-quick-dev Close this retrospective action item (Epic 1) in sprint-status.yaml", detail);
     }
 
+    [Fact]
+    public void RenderPage_WithPager_RoutesThroughSiteNavRenderWayfinding()
+    {
+        // Story 10.11: the sibling pager rides SiteNav.RenderWayfinding's coherent strip alongside the
+        // breadcrumb, not the body's own header — confirms this non-PageView templater's call-site wiring.
+        var retro = Parse();
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var pager = new EntityPager(
+            new PagerLink("epic-1-retro.html", "Epic 1 retro"),
+            new PagerLink("epic-3-retro.html", "Epic 3 retro"));
+
+        var html = RetroTemplater.RenderPage(retro, null, nav, pager);
+
+        Assert.Contains("<div class=\"page-wayfinding\">", html);
+        var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
+        var crumbIdx = html.IndexOf("class=\"breadcrumb\"", StringComparison.Ordinal);
+        var pagerIdx = html.IndexOf("class=\"entity-pager\"", StringComparison.Ordinal);
+        Assert.True(wrapperIdx < crumbIdx && crumbIdx < pagerIdx, "expected wrapper, then breadcrumb, then pager");
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         int count = 0, i = 0;

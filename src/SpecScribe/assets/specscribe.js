@@ -594,9 +594,9 @@
   // instead of <table> rows or card grids: reads the data-sort-* attributes ListRow/FollowUpRow already
   // emit, offers only the sort keys the page's rows actually populate, and reorders the existing <li>
   // elements in place (no re-render, no data refetch). Sorting/grouping never runs until the reader
-  // acts — the server order stands as the true default (AC #2).
-  var STATUS_GROUP_RANK = ["pending", "drafted", "ready", "active", "review", "done", "deferred", "retired", "unrecognized"];
-
+  // acts — the server order stands as the true default (AC #2). Severity ordering for status sort/grouping
+  // comes from the server-emitted data-sort-status-rank (StatusStyles.CanonicalRank) — no status vocabulary
+  // or ordering is hardcoded here (Story 10.9 guardrail; StatusStyles is the single source).
   function enhanceListRows(container) {
     var items = Array.prototype.filter.call(container.children, function (el) {
       return el.tagName === "LI" && !el.classList.contains("list-row-group-heading");
@@ -657,14 +657,18 @@
       select.appendChild(opt);
     }
 
-    function statusRank(token) {
-      var idx = STATUS_GROUP_RANK.indexOf(token || "");
-      return idx === -1 ? STATUS_GROUP_RANK.length : idx;
+    function rowStatusRank(li) {
+      // Canonical severity rank is emitted server-side (StatusStyles.CanonicalRank) as data-sort-status-rank,
+      // so grouping/status-sort never hardcodes a second status order here. Missing/unranked rows sort last.
+      var r = li.getAttribute("data-sort-status-rank");
+      if (r === null) return Number.MAX_SAFE_INTEGER;
+      var n = parseInt(r, 10);
+      return isNaN(n) ? Number.MAX_SAFE_INTEGER : n;
     }
 
     function sortKey(li, mode) {
       if (mode === "date") return li.getAttribute("data-sort-date") || "";
-      if (mode === "status") return statusRank(li.getAttribute("data-sort-status"));
+      if (mode === "status") return rowStatusRank(li);
       return (li.getAttribute("data-sort-name") || li.textContent).trim().toLowerCase();
     }
 
@@ -697,20 +701,22 @@
 
       var grouping = groupBtn && groupBtn.getAttribute("aria-pressed") === "true";
       if (grouping) {
-        var lastToken = null;
-        ordered.sort(function (a, b) { return statusRank(a.getAttribute("data-sort-status")) - statusRank(b.getAttribute("data-sort-status")); });
+        var lastHeadingToken = null;
+        ordered.sort(function (a, b) { return rowStatusRank(a) - rowStatusRank(b); });
         ordered.forEach(function (li) {
           var token = li.getAttribute("data-sort-status") || "";
-          if (token !== lastToken) {
+          // Emit a heading only on the first VISIBLE row of a status group — a heading whose rows are all
+          // hidden by the active filter would announce an empty group (a11y/UX regression when filter+group
+          // compose). Hidden rows still get appended (invisible) so clearing the filter restores them in place.
+          if (!li.classList.contains("list-row-hidden") && token !== lastHeadingToken) {
             var heading = document.createElement("li");
             heading.className = "list-row-group-heading";
             var h3 = document.createElement("h3");
-            h3.setAttribute("role", "group");
             var badge = li.querySelector(".status-badge");
             h3.textContent = badge ? badge.textContent : (token || "Other");
             heading.appendChild(h3);
             container.appendChild(heading);
-            lastToken = token;
+            lastHeadingToken = token;
           }
           container.appendChild(li);
         });

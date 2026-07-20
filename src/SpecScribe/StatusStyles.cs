@@ -294,6 +294,18 @@ public static class StatusStyles
     public static readonly IReadOnlyList<string> LegendStages =
         new[] { "pending", "drafted", "ready", "active", "review", "done", "deferred", "unmapped", "retired", "unrecognized" };
 
+    /// <summary>Canonical severity/teaching rank for a lifecycle css-class token, derived from
+    /// <see cref="LegendStages"/> so client-side status sort/grouping can order rows without hardcoding a second
+    /// status vocabulary in JS (Story 10.9 guardrail). An unknown/absent token ranks after every known stage.
+    /// Emitted as a <c>data-sort-status-rank</c> attribute alongside <c>data-sort-status</c>.</summary>
+    public static int CanonicalRank(string? cssClass)
+    {
+        if (cssClass is not { Length: > 0 }) return LegendStages.Count;
+        for (var i = 0; i < LegendStages.Count; i++)
+            if (string.Equals(LegendStages[i], cssClass, StringComparison.Ordinal)) return i;
+        return LegendStages.Count;
+    }
+
     /// <summary>Renders a complete <c>.status-badge</c> span with its icon prepended before the text — the one
     /// place icon+text pairing is defined, so every badge site calls this instead of hand-inlining the icon
     /// and risking drift (UX-DR17: color + icon + word, never icon-only). Attaches <c>js-tip</c> +

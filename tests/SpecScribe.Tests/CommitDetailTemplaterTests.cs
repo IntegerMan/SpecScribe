@@ -163,6 +163,24 @@ public class CommitDetailTemplaterTests
         Assert.DoesNotContain("<a href=\"../code/", html);
     }
 
+    [Fact]
+    public void RenderPage_WithPager_RoutesThroughSiteNavRenderWayfinding()
+    {
+        // Story 10.11: the sibling pager rides SiteNav.RenderWayfinding's coherent strip alongside the
+        // breadcrumb, not the body's own header — confirms this non-PageView templater's call-site wiring.
+        var pager = new EntityPager(
+            new PagerLink("../commit/older.html", "older commit"),
+            new PagerLink("../commit/newer.html", "newer commit"));
+
+        var html = CommitDetailTemplater.RenderPage(Commit(), Nav(), pager: pager);
+
+        Assert.Contains("<div class=\"page-wayfinding\">", html);
+        var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
+        var crumbIdx = html.IndexOf("class=\"breadcrumb\"", StringComparison.Ordinal);
+        var pagerIdx = html.IndexOf("class=\"entity-pager\"", StringComparison.Ordinal);
+        Assert.True(wrapperIdx < crumbIdx && crumbIdx < pagerIdx, "expected wrapper, then breadcrumb, then pager");
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;

@@ -183,10 +183,6 @@ public sealed record EpicPageView
     /// <summary>The story cards, in epic order (data + named opaque prose).</summary>
     public required IReadOnlyList<StoryCardView> StoryCards { get; init; }
 
-    /// <summary>The prev/next sibling pager (adjacent epics by number), rendered inline in the header. Defaults
-    /// to <see cref="EntityPager.None"/> so non-generator constructions render no pager. [Prev/next navigation]</summary>
-    public EntityPager Pager { get; init; } = EntityPager.None;
-
     /// <summary>Open follow-ups scoped to this epic for the epic sunburst's story-ring peers. Defaults to
     /// <see cref="FollowUpGeometry.Empty"/> (no follow-up wedges when this epic has none). [Story 9.7]</summary>
     public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
@@ -289,10 +285,6 @@ public sealed record StoryPageView
     /// <summary>The change-log HTML (named opaque fragment; empty when absent).</summary>
     public required string ChangeLogHtml { get; init; }
 
-    /// <summary>The prev/next sibling pager (adjacent stories in global epic→story order), rendered inline in the
-    /// header. Defaults to <see cref="EntityPager.None"/> so non-generator constructions render no pager. [Prev/next navigation]</summary>
-    public EntityPager Pager { get; init; } = EntityPager.None;
-
     /// <summary>Deferred-work items whose provenance names this story (reverse index). Empty → panel omitted
     /// (NFR8). [artifact-review-nav-and-deferred]</summary>
     public IReadOnlyList<FollowUpDeferredSlot> DeferredFromThis { get; init; } = Array.Empty<FollowUpDeferredSlot>();
@@ -341,8 +333,4 @@ public sealed record StoryPlaceholderView
 
     /// <summary>The prefix-resolved "← Back to Epic N" href.</summary>
     public required string BackHref { get; init; }
-
-    /// <summary>The prev/next sibling pager (adjacent stories in global epic→story order), rendered inline in the
-    /// header. Defaults to <see cref="EntityPager.None"/> so non-generator constructions render no pager. [Prev/next navigation]</summary>
-    public EntityPager Pager { get; init; } = EntityPager.None;
 }

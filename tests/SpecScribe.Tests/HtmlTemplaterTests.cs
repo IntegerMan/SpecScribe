@@ -977,6 +977,26 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_WithPager_RoutesThroughSiteNavRenderWayfinding()
+    {
+        // Story 10.11: the sibling pager rides SiteNav.RenderWayfinding's coherent strip alongside the
+        // breadcrumb, not the body's own header — confirms this non-PageView templater's call-site wiring.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var doc = Doc("planning-artifacts/prd.md", "PRD");
+        var pager = new EntityPager(
+            new PagerLink("adr-1.html", "ADR 1"),
+            new PagerLink("adr-3.html", "ADR 3"));
+
+        var html = HtmlTemplater.RenderPage(doc, nav, pager);
+
+        Assert.Contains("<div class=\"page-wayfinding\">", html);
+        var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
+        var crumbIdx = html.IndexOf("class=\"breadcrumb\"", StringComparison.Ordinal);
+        var pagerIdx = html.IndexOf("class=\"entity-pager\"", StringComparison.Ordinal);
+        Assert.True(wrapperIdx < crumbIdx && crumbIdx < pagerIdx, "expected wrapper, then breadcrumb, then pager");
+    }
+
+    [Fact]
     public void RenderPage_QuickDev_EpicParentAndDeferredPanel_UnplannedFallback_Nfr8Omit()
     {
         var nav = SiteNav.Build(new[] { "implementation-artifacts/spec-x.md" }, "SpecScribe", hasAdrs: false);

@@ -616,7 +616,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // 2 repeated runs before locking in.
         // Regenerated for About SDD hub+subpages: Help nav splits How to use SpecScribe / About Spec-Driven
         // Development; how-to-read loses framework tabs; seven new about-sdd*.html pages + shared nav/CSS delta.
-        const string expected = "0d61729dcfa6a1b374f26889b9aa6044fdc66d813707fd2351d994f6508b8e06";
+        // Regenerated 2026-07-20 (Story 10.11 code-review patches): Toc.ActiveSectionScript gains an
+        // initial-load fallback (highlights the first heading when nothing intersects the rootMargin band yet),
+        // and HtmlRenderAdapter.Render's TOC-detection substring now matches the full <nav class="toc-sidebar"
+        // aria-label="On this page"> opening tag instead of just the class attribute (shared script/detection
+        // delta on every TOC-bearing page). Verified stable across 2 repeated runs before locking in.
+        const string expected = "ac437891e48842a22a966cf84b13a0dcf17a63259791158514526d2ae5df5ab1";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

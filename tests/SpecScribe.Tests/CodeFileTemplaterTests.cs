@@ -643,6 +643,24 @@ public class CodeFileTemplaterTests
         Assert.DoesNotContain("name=\"code-view-codex2fax2fb-cs-html\"", hyphen);
     }
 
+    [Fact]
+    public void RenderPage_WithPager_RoutesThroughSiteNavRenderWayfinding()
+    {
+        // Story 10.11: the sibling pager rides SiteNav.RenderWayfinding's coherent strip alongside the
+        // breadcrumb, not the body's own header — confirms this non-PageView templater's call-site wiring.
+        var pager = new EntityPager(
+            new PagerLink("../code/a.cs.html", "a.cs"),
+            new PagerLink("../code/c.cs.html", "c.cs"));
+
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), pager: pager);
+
+        Assert.Contains("<div class=\"page-wayfinding\">", html);
+        var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
+        var crumbIdx = html.IndexOf("class=\"breadcrumb\"", StringComparison.Ordinal);
+        var pagerIdx = html.IndexOf("class=\"entity-pager\"", StringComparison.Ordinal);
+        Assert.True(wrapperIdx < crumbIdx && crumbIdx < pagerIdx, "expected wrapper, then breadcrumb, then pager");
+    }
+
     /// <summary>The HTML slice between the first occurrence of <paramref name="startMarker"/> and the next occurrence
     /// of <paramref name="endMarker"/> — a coarse but reliable way to assert which tab panel a fragment lands in,
     /// since the panels render as ordered siblings.</summary>

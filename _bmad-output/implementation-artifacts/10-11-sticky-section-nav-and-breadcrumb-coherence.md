@@ -4,7 +4,7 @@ baseline_commit: e929766
 
 # Story 10.11: Sticky Section Nav & Breadcrumb Coherence
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -104,6 +104,16 @@ Serves FR27–29 / UX-DR25,27–30 (Epic 10's onboarding + legibility mission) a
   - [x] Confirmed in the Browser pane: nav → breadcrumb → pager → TOC accessibility-tree order reads correctly; the pager's sibling name ("Epic 2: …") surfaces as the `title` tooltip; no console errors.
   - [x] Reduced-motion neutralization confirmed structurally (the existing global rule covers the new transition — see Task 3); JS-off floor confirmed by design (every link is real regardless of scripting).
   - [x] Confirmed via `SiteGeneratorWebviewTests`/`SiteGeneratorSpaTests` (both green) that the webview/SPA surfaces carry the pager+breadcrumb strip with zero `<script>` in the content region — the CSP-safe/`innerHTML`-safe degrade this story's design relies on. Live IntersectionObserver *firing* could not be directly observed through this session's Browser-pane preview tooling (a known flakiness in this environment, not specific to this change); the script's construction, DOM targeting, and non-execution-when-absent were verified directly against the real generated HTML instead.
+
+### Review Findings
+
+- [x] [Review][Patch] Dead `Pager` property left on `EpicPageView`/`StoryBodyView`/`StoryPlaceholderView` [src/SpecScribe/EpicsView.cs:188] — removed the dead property + threading (EpicsView.cs, EpicsViewBuilder.cs, EpicsTemplater.cs)
+- [x] [Review][Patch] TOC-script gating via brittle `BodyHtml` substring search instead of a structural flag [src/SpecScribe/HtmlRenderAdapter.cs:39] — narrowed the match to the full `<nav class="toc-sidebar" aria-label="On this page">` opening tag
+- [x] [Review][Patch] `Toc.ActiveSectionScript` never highlights a section on initial load if none intersects the rootMargin band [src/SpecScribe/Toc.cs:147] — added a fallback to the first heading when nothing is visible yet
+- [x] [Review][Patch] `RenderPlaceholder` builds its `source` HTML twice, discarding the first build, plus a confusingly-worded adjacent comment [src/SpecScribe/CodeFileTemplater.cs:690] — builds the conditional head once, reworded the comment
+- [x] [Review][Patch] No unit test directly exercises the 5 non-`PageView` templaters' `SiteNav.RenderWayfinding` wiring [tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs] — added one wayfinding-wiring test to each of CodeFileTemplaterTests/CommitDayTemplaterTests/CommitDetailTemplaterTests/RetroTests/HtmlTemplaterTests
+- [x] [Review][Defer] Record value-equality removes more than the intended item in `AppendLocalContextBand`'s pinned-active dedup [src/SpecScribe/HtmlRenderAdapter.cs:265] — deferred, pre-existing (Story 10.10 scope, bundled into this diff by file overlap)
+- [x] [Review][Defer] `KeyViewGroupOrder` fallback-to-"Project" untested for unrecognized `Group` strings [src/SpecScribe/HtmlRenderAdapter.cs:186] — deferred, pre-existing (Help-nav/QuickLinks work, bundled into this diff by file overlap)
 
 ## Dev Notes
 

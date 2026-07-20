@@ -687,38 +687,34 @@ public static class CodeFileTemplater
         sb.Append("  <div class=\"meta-pills\"><span class=\"pill\">Not rendered</span></div>\n");
         sb.Append("</header>\n\n");
 
-        var source =
-            $"<section class=\"code-source-section\">\n  <div class=\"code-source-head\">\n    <h2>Source</h2>\n  </div>\n" +
-            $"<p class=\"code-placeholder\">{PathUtil.Html(reason)}</p>\n</section>\n";
-
         var insightsPanel = BuildInsightsPanel(insight);
         var relationshipsPanel = BuildRelationshipsPanel(
             prefix, repoRelativePath, outputRelativePath, referencedBy, insight, coupledFileHref, storyRelatedEdges, relatedRelatedEdges);
         var historyPanel = BuildHistoryPanel(prefix, insight, commitHref, dayHref);
+        var hasExtraTabs = insightsPanel.Length > 0 || relationshipsPanel.Length > 0 || historyPanel.Length > 0;
 
-        var tabs = new List<CodeTab>(4);
-        if (insightsPanel.Length > 0) tabs.Add(new CodeTab("insights", "Insights", insightsPanel));
-        if (relationshipsPanel.Length > 0) tabs.Add(new CodeTab("relationships", "Relationships", relationshipsPanel));
-        if (historyPanel.Length > 0) tabs.Add(new CodeTab("history", "History", historyPanel));
-        tabs.Add(new CodeTab("source", "Code", source));
+        // With no insight/relationships tabs, the page keeps the pre-tab two-column layout (aside + placeholder
+        // body), and any external link rides in the aside instead — so the Source panel only carries the
+        // external-link anchor itself when tabs are actually rendered.
+        var sourceHead = hasExtraTabs && externalSourceUrl is { Length: > 0 }
+            ? $"    <h2>Source</h2>\n    {ExternalSourceAnchor(externalSourceUrl)}\n"
+            : "    <h2>Source</h2>\n";
+        var source =
+            $"<section class=\"code-source-section\">\n  <div class=\"code-source-head\">\n{sourceHead}  </div>\n" +
+            $"<p class=\"code-placeholder\">{PathUtil.Html(reason)}</p>\n</section>\n";
 
-        if (tabs.Count == 1)
+        if (!hasExtraTabs)
         {
-            // No insight/relationships — keep the pre-tab two-column layout (aside + placeholder body).
             AppendBody(sb, BuildAside(prefix, repoRelativePath, referencedBy, externalSourceUrl), source);
             return EndShell(sb, prefix);
         }
 
         // Deep-git / relationships present: same tab shell as RenderPage; Code panel is the placeholder reason.
-        // External link rides beside Source inside a normal page; for placeholders keep it in the aside when we
-        // fall through to tabs without an aside — attach via code-source-head when external is set.
-        if (externalSourceUrl is { Length: > 0 })
-        {
-            source =
-                $"<section class=\"code-source-section\">\n  <div class=\"code-source-head\">\n    <h2>Source</h2>\n    {ExternalSourceAnchor(externalSourceUrl)}\n  </div>\n" +
-                $"<p class=\"code-placeholder\">{PathUtil.Html(reason)}</p>\n</section>\n";
-            tabs[^1] = new CodeTab("source", "Code", source);
-        }
+        var tabs = new List<CodeTab>(4);
+        if (insightsPanel.Length > 0) tabs.Add(new CodeTab("insights", "Insights", insightsPanel));
+        if (relationshipsPanel.Length > 0) tabs.Add(new CodeTab("relationships", "Relationships", relationshipsPanel));
+        if (historyPanel.Length > 0) tabs.Add(new CodeTab("history", "History", historyPanel));
+        tabs.Add(new CodeTab("source", "Code", source));
 
         AppendTabs(sb, outputRelativePath, tabs);
         return EndShell(sb, prefix);

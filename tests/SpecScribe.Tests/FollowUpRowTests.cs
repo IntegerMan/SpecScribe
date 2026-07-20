@@ -150,7 +150,8 @@ public class FollowUpRowTests
             sortStatus: "open");
 
         var html = sb.ToString();
-        Assert.Contains("<li class=\"followup-row\" data-sort-name=\"Short lead\" data-sort-status=\"open\">", html);
+        // "open" is not a canonical StatusStyles class, so its CanonicalRank sorts after every known stage.
+        Assert.Contains("<li class=\"followup-row\" data-sort-name=\"Short lead\" data-sort-status=\"open\" data-sort-status-rank=\"10\">", html);
         Assert.DoesNotContain("data-sort-date=", html);
     }
 

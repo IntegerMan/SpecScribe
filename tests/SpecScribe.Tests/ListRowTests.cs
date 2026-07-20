@@ -56,7 +56,8 @@ public class ListRowTests
             sb, "Summary", badgeHtml: null, chipsHtml: Array.Empty<string>(), primaryLinkHtml: null,
             sortName: "ADR 0001", sortDate: "2026-07-19", sortStatus: "done");
 
-        Assert.Contains("<li class=\"list-row\" data-sort-name=\"ADR 0001\" data-sort-date=\"2026-07-19\" data-sort-status=\"done\">", sb.ToString());
+        // "done" is canonical → CanonicalRank 5 (its index in StatusStyles.LegendStages).
+        Assert.Contains("<li class=\"list-row\" data-sort-name=\"ADR 0001\" data-sort-date=\"2026-07-19\" data-sort-status=\"done\" data-sort-status-rank=\"5\">", sb.ToString());
     }
 
     [Fact]

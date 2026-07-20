@@ -4,7 +4,7 @@ baseline_commit: f0f30bdfaa942b377f6413ec67264a618a4ff958
 
 # Story 10.9: Client-Light Sort, Group & Filter on List Pages
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -94,6 +94,18 @@ Serves the onboarding/legibility mission (FR27–29) and directly extends Story 
 - [x] **Task 5 — Verify end-to-end** (AC: 1, 2)
   - [x] Generated against this repo's own history (`dotnet run --project src/SpecScribe -- generate --deep-git`) and opened `action-items.html` (served over a local static HTTP server, since `file://` renders as a static snapshot with no JS execution in the Browser pane) in the Browser pane. `deferred-work.html` and the ADR landing were verified via the raw generated HTML (grep) and the existing unit/e2e test suite; this repo's ADR slot is occupied by a real README, so the synthesized-landing branch is exercised by `SiteGeneratorAdrToleranceTests` instead of live generation.
   - [x] Confirmed: filter narrows to "N of M rows" and hides non-matching `<li>` live; group toggle sets `aria-pressed="true"` and injects a status-labeled `<h3>` heading (text sourced from the row's own badge); native `<select>`/`<button>`/`<input>` controls are keyboard-operable by construction; `aria-live="polite"` present on the filter count; raw generated HTML (script-stripped read) shows every row present with `data-sort-*` attributes and no dead controls with JS off.
+
+### Review Findings
+
+Code review 2026-07-20 (inline adversarial + edge-case + acceptance-audit against the story spec; diff scoped to commit `b87a47e`).
+
+- [x] [Review][Patch] Filter + Group renders dangling empty group headings [src/SpecScribe/assets/specscribe.js] — FIXED: the grouping branch now emits a heading only on the first *visible* (non-`list-row-hidden`) row of each status group, so a status whose rows are all filtered-out no longer shows a heading with nothing under it. `lastToken` → `lastHeadingToken` (only advances when a heading is actually emitted).
+- [x] [Review][Patch] `role="group"` on the grouping `<h3>` strips its heading semantics [src/SpecScribe/assets/specscribe.js] — FIXED: dropped the `h3.setAttribute("role", "group")` call; the `<h3>` now keeps its native heading role and its badge-sourced text still labels the cluster.
+- [x] [Review][Patch] `STATUS_GROUP_RANK` hardcoded the canonical status order as a second string list in JS [src/SpecScribe/assets/specscribe.js + StatusStyles.cs + ListRow.cs + FollowUpRow.cs] — FIXED: added `StatusStyles.CanonicalRank` (derives severity rank from `LegendStages`); `ListRow.Render`/`FollowUpRow.Render` now emit `data-sort-status-rank` beside `data-sort-status`; `enhanceListRows` reads that attribute (`rowStatusRank`) and the `STATUS_GROUP_RANK` array is gone. Status ordering is now single-sourced in C#, no JS status vocabulary.
+
+Dismissed as noise (1): each `<ul class="js-listable">` is enhanced independently, so multi-group pages (action-items, deferred-work) render one control bar per epic/provenance group rather than one page-wide bar — defensible design consistent with the page's server-side grouping, not a defect.
+
+**Verification note (2026-07-20):** All 3 patches applied and grep-confirmed in source. Full suite passed in a clean-compile window (1789 passed / 5 failed — the 5 are the pre-existing `git CLI unavailable on this host` environmental failures, unrelated to this diff). Golden content fingerprint re-locked to `9cb81742f434c48be0b7220eec5afae3504542ae7fd9e3bf5c7cd1a3926376d2` (stable across 2 runs). ⚠️ A concurrent session was actively editing `main` (unrelated About-SDD/nav work — `SiteNav.cs`, `AboutSddTemplater.cs`, `HowToReadTemplater.cs`, etc.) during this review, intermittently breaking the shared build and touching shared nav/asset rendering. **The golden constant must be re-verified once that tree settles** — it was computed with those uncommitted concurrent edits present, so the final hash may differ. Recommend re-running the fingerprint after the concurrent work lands (or isolating in a worktree).
 
 ## Dev Notes
 

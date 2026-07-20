@@ -36,7 +36,7 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         // surfaces (both of which use page.BodyHtml directly, not this full Render output) never carry it. That
         // is what gives webview/SPA their clean NFR8 degrade to today's static TOC there, matching their CSP/
         // innerHTML non-execution, without a separate per-surface branch. [Story 10.11]
-        if (page.BodyHtml.Contains("class=\"toc-sidebar\"", StringComparison.Ordinal))
+        if (page.BodyHtml.Contains("<nav class=\"toc-sidebar\" aria-label=\"On this page\">", StringComparison.Ordinal))
         {
             sb.Append(Toc.ActiveSectionScript);
         }

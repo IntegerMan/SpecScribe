@@ -75,7 +75,13 @@ public static class FollowUpRow
         sb.Append($"  <li class=\"{rowClass}\"");
         if (sortName is { Length: > 0 }) sb.Append($" data-sort-name=\"{PathUtil.Html(sortName)}\"");
         if (sortDate is { Length: > 0 }) sb.Append($" data-sort-date=\"{PathUtil.Html(sortDate)}\"");
-        if (sortStatus is { Length: > 0 }) sb.Append($" data-sort-status=\"{PathUtil.Html(sortStatus)}\"");
+        if (sortStatus is { Length: > 0 })
+        {
+            // Canonical rank travels with the token so the client sorts/groups by severity without hardcoding a
+            // second status order in JS (Story 10.9 guardrail; StatusStyles is the single vocabulary).
+            sb.Append($" data-sort-status=\"{PathUtil.Html(sortStatus)}\"");
+            sb.Append($" data-sort-status-rank=\"{StatusStyles.CanonicalRank(sortStatus)}\"");
+        }
         sb.Append(">\n");
         sb.Append("    <div class=\"followup-row-scan\">\n");
         sb.Append($"      <span class=\"followup-row-summary\">{summaryHtml}</span>\n");

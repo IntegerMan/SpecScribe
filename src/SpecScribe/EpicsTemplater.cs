@@ -67,7 +67,7 @@ public static class EpicsTemplater
             (EpicCrumbLabel(epic), null),
         });
 
-        var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath, pager, followUps, unplanned);
+        var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath, followUps, unplanned);
         var body = HtmlRenderAdapter.Shared.RenderEpicBody(view);
 
         // An epic drills up to the epics index and down to each of its story pages (drafted → the story's
@@ -158,7 +158,7 @@ public static class EpicsTemplater
 
         var view = EpicsViewBuilder.BuildStory(
             epic, story, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, pager, followUps);
+            reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, followUps);
         var body = HtmlRenderAdapter.Shared.RenderStoryBody(view);
 
         // A story is a drill leaf (no children); it drills up to its epic page. Its status stage is the story
@@ -212,7 +212,7 @@ public static class EpicsTemplater
             ($"Story {story.Id}", null),
         });
 
-        var view = EpicsViewBuilder.BuildStoryPlaceholder(epic, story, commands, epicRetroPath, pager);
+        var view = EpicsViewBuilder.BuildStoryPlaceholder(epic, story, commands, epicRetroPath);
         var body = HtmlRenderAdapter.Shared.RenderStoryPlaceholderBody(view);
 
         // A placeholder story page always renders a "Not yet drafted" status badge, so its stage is the story
