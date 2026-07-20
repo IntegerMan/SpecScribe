@@ -399,6 +399,7 @@ public sealed class SiteGenerator
             events.Add(WriteDiagnostics(nav, events));
             events.Add(WriteAbout(nav));
             events.Add(WriteHowToRead(nav));
+            events.AddRange(WriteAboutSdd(nav));
 
             // Opt-in JSON+SPA delivery form, emitted LAST so every captured page is present. Strictly additive:
             // writes only its own files under OutputRoot, leaving every static page byte-identical (AC #3/#5/#6).
@@ -3133,20 +3134,34 @@ public sealed class SiteGenerator
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutOutputPath, sw.Elapsed);
     }
 
-    /// <summary>Writes <c>how-to-read.html</c> — the Spec-Driven Development orientation page (framework
-    /// tabs, reading order, glossary), sourced from <see cref="_module"/> (adapter-supplied vocabulary, AC2)
-    /// plus independent presence flags for tab coloring. Static (no run dependency); written on every full
-    /// run alongside About/Diagnostics so its Home quick-link never 404s. Deliberately NOT run through
+    /// <summary>Writes <c>how-to-read.html</c> — How to use SpecScribe (reading order + glossary). Static;
+    /// written on every full run alongside About/Diagnostics. Deliberately NOT run through
     /// <see cref="ApplyReferenceLinks"/> — it defines the glossary terms, so it must not self-expand them
-    /// into nested &lt;abbr&gt;. [Story 10.3; SDD help page]</summary>
+    /// into nested &lt;abbr&gt;. [Story 10.3; How to use SpecScribe]</summary>
     private GenerationEvent WriteHowToRead(SiteNav nav)
     {
         var sw = Stopwatch.StartNew();
-        var methodPresent = ModuleContext.IsMethodPresent(_options.RepoRoot);
-        var gdsPresent = ModuleContext.IsGdsPresent(_options.RepoRoot);
-        var html = HowToReadTemplater.RenderPage(nav, _module.Docs, _module.Glossary, _module.Commands, methodPresent, gdsPresent);
+        var html = HowToReadTemplater.RenderPage(nav, _module.Docs, _module.Glossary, _module.Commands);
         WriteOutput(SiteNav.HowToReadOutputPath, html);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.HowToReadOutputPath, sw.Elapsed);
+    }
+
+    /// <summary>Writes About Spec-Driven Development hub + framework sub-pages. [About SDD]</summary>
+    private IEnumerable<GenerationEvent> WriteAboutSdd(SiteNav nav)
+    {
+        var methodPresent = ModuleContext.IsMethodPresent(_options.RepoRoot);
+        var gdsPresent = ModuleContext.IsGdsPresent(_options.RepoRoot);
+
+        var sw = Stopwatch.StartNew();
+        WriteOutput(SiteNav.AboutSddOutputPath, AboutSddTemplater.RenderHub(nav, methodPresent, gdsPresent));
+        yield return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutSddOutputPath, sw.Elapsed);
+
+        foreach (var fw in AboutSddTemplater.Frameworks)
+        {
+            sw.Restart();
+            WriteOutput(fw.OutputPath, AboutSddTemplater.RenderFrameworkPage(nav, fw.Id, methodPresent, gdsPresent));
+            yield return new GenerationEvent(GenerationOutcome.Generated, fw.OutputPath, sw.Elapsed);
+        }
     }
 
     /// <summary>Path to the repo-root README that feeds the optional Readme page.</summary>

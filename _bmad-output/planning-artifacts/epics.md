@@ -884,6 +884,31 @@ So that date-page membership stays predictable for my team's timezone policy wit
 **And** at least these policies are supported: machine-local (default), UTC calendar day, and an author-local-derived cutoff (e.g. max series / last-commit day)
 **And** effective config + provenance appear on the diagnostics/config log surface (Story 4.8) with interactive/CLI parity (NFR7 / Story 5.2).
 
+### Story 5.6: How to use SpecScribe — CLI Generate and Watch Guidance
+
+<!-- Seeded 2026-07-20 from About SDD redesign: Help → "How to use SpecScribe" currently covers
+     reading order + glossary only. Expand with SpecScribe product orientation and CLI generate/watch
+     guidance once Epic 5's CLI surface (5.1–5.3) is the source of truth for flags and defaults. -->
+
+As a first-time visitor opening the portal Help menu,
+I want "How to use SpecScribe" to explain how to generate and refresh the site from the CLI (and where settings live),
+So that demos and onboarding cover both reading the portal and producing it — without scattering CLI docs only in the README.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a full generate
+**When** I open Help → How to use SpecScribe
+**Then** the page still includes the honest reading-order and glossary sections (NFR8)
+**And** it adds a concise "Generate with SpecScribe" section covering at least `generate` and `watch` with smart defaults aligned to Stories 5.1–5.3
+**And** it links to About Spec-Driven Development for framework orientation (not duplicating that matrix).
+
+2.
+**Given** directory-scoped settings and/or CLI overrides from Story 5.2
+**When** the How to use page describes configuration
+**Then** it names the same effective settings surface users see on Diagnostics (Story 4.8)
+**And** copy stays framework-agnostic in shared chrome (NFR8).
+
 ## Epic 6: VS Code Read-Only Companion Surface
 
 Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects, and grow the extension's native host-integration surface (discoverability, commands, tree view/status bar, editor bridges, reactivity) so it feels native — all read-only and rendered from core-emitted data.

@@ -62,25 +62,32 @@ public static class Mermaid
     /// diagram, mirroring the <c>HasMermaid</c>-gated injection on full pages.</summary>
     public static bool ContainsBlock(string html) => html.Contains(BlockMarker, StringComparison.Ordinal);
 
-    /// <summary>Static Mermaid flowchart for the BMad Method SDD methodology sequence:
-    /// brief → PRD → epics/stories → develop → review → retrospective. [SDD help page]</summary>
+    /// <summary>Static Mermaid vertical state diagram for the BMad Method SDD methodology sequence.
+    /// Nodes use workflow stage names that map to common slash commands. [About SDD]</summary>
     public static string SddMethodDiagram() => """
-        flowchart LR
-          A["Brief"] --> B["PRD"]
-          B --> C["Epics & Stories"]
-          C --> D["Develop"]
-          D --> E["Review"]
-          E --> F["Retrospective"]
+        stateDiagram-v2
+          direction TB
+          [*] --> Brief: /bmad-product-brief
+          Brief --> PRD: /bmad-prd
+          PRD --> EpicsStories: /bmad-create-epics-and-stories
+          EpicsStories --> Develop: /bmad-dev-story
+          Develop --> Review: /bmad-code-review
+          Review --> Retrospective: /bmad-retrospective
+          Retrospective --> [*]
+          EpicsStories: Epics & Stories
         """;
 
-    /// <summary>Static Mermaid flowchart for the Game Dev Studio SDD methodology sequence —
-    /// a shorter GDS-oriented spine. [SDD help page]</summary>
+    /// <summary>Static Mermaid vertical state diagram for Game Dev Studio workflows. [About SDD]</summary>
     public static string SddGdsDiagram() => """
-        flowchart LR
-          A["GDD"] --> B["Narrative Design"]
-          B --> C["Prototype"]
-          C --> D["Develop"]
-          D --> E["Review"]
+        stateDiagram-v2
+          direction TB
+          [*] --> GDD: /bmgd-gdd
+          GDD --> Narrative: /bmgd-narrative
+          Narrative --> Prototype: /bmgd-quick-dev
+          Prototype --> Develop
+          Develop --> Review
+          Review --> [*]
+          Narrative: Narrative Design
         """;
 
     public static string InitScript() => """
@@ -89,7 +96,7 @@ public static class Mermaid
           mermaid.initialize({
             startOnLoad: true,
             theme: 'base',
-            flowchart: { useMaxWidth: false },
+            flowchart: { useMaxWidth: true },
             themeVariables: {
               background: '#faf7f2',
               primaryColor: '#f4ead5',

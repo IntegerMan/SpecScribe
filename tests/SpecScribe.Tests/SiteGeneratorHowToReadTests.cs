@@ -2,10 +2,9 @@ using SpecScribe;
 
 namespace SpecScribe.Tests;
 
-/// <summary>Generation-level coverage for the Spec-Driven Development orientation page (how-to-read.html):
-/// framework tabs (always rendered, colored by presence), static command lists, Mermaid methodology diagrams,
-/// install CTAs for absent frameworks, Coming Soon stubs for planned frameworks, plus the preserved reading
-/// order and glossary sections. Follows the temp-dir fixture style of <see cref="SiteGeneratorOutlineTests"/>.</summary>
+/// <summary>Generation-level coverage for Help orientation pages: <c>how-to-read.html</c> (How to use SpecScribe —
+/// reading order + glossary only) and the About Spec-Driven Development hub + framework sub-pages. Follows the
+/// temp-dir fixture style of <see cref="SiteGeneratorOutlineTests"/>.</summary>
 public class SiteGeneratorHowToReadTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("specscribe-howtoread-").FullName;
@@ -108,84 +107,126 @@ public class SiteGeneratorHowToReadTests : IDisposable
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
         Assert.Contains("href=\"how-to-read.html\"", index);
         Assert.Contains("Help", index);
+        Assert.Contains("href=\"about-sdd.html\"", index);
         Assert.Contains("href=\"about.html\"", index);
         Assert.Contains("href=\"diagnostics.html\"", index);
     }
 
     [Fact]
-    public void HowToRead_NavAndQuickLinksLabeledSpecDrivenDevelopment()
+    public void HowToRead_NavAndH1LabeledHowToUseSpecScribe()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
         var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
 
-        Assert.Contains("<h1>Spec-Driven Development</h1>", html);
-        Assert.Contains("Spec-Driven Development", html);
-        // The nav bar should carry the new label (not the old one)
+        Assert.Contains("<h1>How to use SpecScribe</h1>", html);
+        Assert.DoesNotContain("sdd-tab", html);
+        Assert.DoesNotContain("class=\"mermaid\"", html);
+
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
-        Assert.Contains("Spec-Driven Development", index);
+        Assert.Contains("How to use SpecScribe", index);
+        Assert.Contains("About Spec-Driven Development", index);
         Assert.DoesNotContain("How to read this portal", index);
     }
 
     [Fact]
-    public void HowToRead_MethodPresent_ShowsCommandsAndMermaidDiagram()
+    public void GenerateAll_WritesAboutSddHubAndFrameworkPages()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
 
-        // Method tab should be present-styled
-        Assert.Contains("sdd-badge--present", html);
-        Assert.Contains("/bmad-help", html);
-        Assert.Contains("/bmad-product-brief", html);
-        Assert.Contains("/bmad-prd", html);
-        Assert.Contains("/bmad-create-epics-and-stories", html);
-        Assert.Contains("/bmad-create-story", html);
-        Assert.Contains("/bmad-dev-story", html);
-        Assert.Contains("/bmad-code-review", html);
-        Assert.Contains("/bmad-retrospective", html);
-        // Mermaid diagram block
-        Assert.Contains("class=\"mermaid\"", html);
-        Assert.Contains("Brief", html);
-        Assert.Contains("Retrospective", html);
-        // Mermaid init script present because page has diagram
-        Assert.Contains("mermaid.esm.min.mjs", html);
+        Assert.True(File.Exists(Path.Combine(Site, "about-sdd.html")));
+        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-bmad.html")));
+        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-gds.html")));
+        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-speckit.html")));
+        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-gsd.html")));
+        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-gsd-pi.html")));
+        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-superpowers.html")));
     }
 
     [Fact]
-    public void HowToRead_GdsAbsent_ShowsInstallCta()
+    public void AboutSdd_Hub_ShowsSupportMatrix()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
+
+        Assert.Contains("<h1>About Spec-Driven Development</h1>", html);
+        Assert.Contains("sdd-support-matrix", html);
+        Assert.Contains("id=\"support-matrix\"", html);
+        Assert.Contains("href=\"about-sdd-bmad.html\"", html);
+        Assert.Contains("href=\"about-sdd-gds.html\"", html);
+        Assert.Contains("href=\"about-sdd-speckit.html\"", html);
+    }
+
+    [Fact]
+    public void AboutSdd_BmadPresent_ShowsDetectedChip()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
+        var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
+
+        Assert.Contains("sdd-detected", hub);
+        Assert.Contains("Detected in this project", hub);
+        Assert.Contains("Detected in this project", bmad);
+        Assert.Contains("/bmad-help", bmad);
+        Assert.Contains("/bmad-product-brief", bmad);
+        Assert.Contains("/bmad-prd", bmad);
+        Assert.Contains("/bmad-create-epics-and-stories", bmad);
+        Assert.Contains("/bmad-create-story", bmad);
+        Assert.Contains("/bmad-dev-story", bmad);
+        Assert.Contains("/bmad-code-review", bmad);
+        Assert.Contains("/bmad-retrospective", bmad);
+        Assert.Contains("class=\"mermaid\"", bmad);
+        Assert.Contains("stateDiagram-v2", bmad);
+        Assert.Contains("mermaid.esm.min.mjs", bmad);
+        Assert.DoesNotContain("BMad is not detected", bmad);
+    }
+
+    [Fact]
+    public void AboutSdd_GdsAbsent_ShowsInstallCta()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "about-sdd-gds.html"));
 
         Assert.Contains("npx bmad-method install --modules gds", html);
         Assert.Contains("https://github.com/bmad-code-org/bmad-module-game-dev-studio", html);
-        Assert.Contains("BMad Game Dev Studio is not installed", html);
+        Assert.Contains("BMad GDS is not detected", html);
+        Assert.Contains("class=\"mermaid\"", html);
+        Assert.Contains("stateDiagram-v2", html);
     }
 
     [Fact]
-    public void HowToRead_PlannedFrameworks_ShowComingSoonOnly()
+    public void AboutSdd_SpecKit_ShowsComingSoon()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
+        var speckit = File.ReadAllText(Path.Combine(Site, "about-sdd-speckit.html"));
 
-        Assert.Contains("Spec Kit — Coming Soon", html);
-        Assert.Contains("GSD — Coming Soon", html);
-        Assert.Contains("GSD-Pi — Coming Soon", html);
-        Assert.Contains("Superpowers — Coming Soon", html);
-        Assert.Contains("sdd-badge--coming-soon", html);
+        Assert.Contains("Coming soon", hub);
+        Assert.Contains("Coming soon", speckit);
+        Assert.Contains("Spec Kit", speckit);
+        Assert.DoesNotContain("class=\"mermaid\"", speckit);
+        Assert.DoesNotContain("mermaid.esm.min.mjs", speckit);
     }
 
     [Fact]
-    public void HowToRead_AllTabsAlwaysRendered()
+    public void AboutSdd_LocalContextWhiteBar_LinksOverviewAndFrameworks()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
+        var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
 
-        Assert.Contains("sdd-tab--method", html);
-        Assert.Contains("sdd-tab--gds", html);
-        Assert.Contains("sdd-tab--speckit", html);
-        Assert.Contains("sdd-tab--gsd", html);
-        Assert.Contains("sdd-tab--gsd-pi", html);
-        Assert.Contains("sdd-tab--superpowers", html);
+        // Hub: Overview is the active pill (span, not a self-link); frameworks are links.
+        Assert.Contains("site-nav-local-context", hub);
+        Assert.Contains("local-context-pill active\" aria-current=\"page\">Overview</span>", hub);
+        Assert.Contains("href=\"about-sdd-bmad.html\" class=\"local-context-pill\">BMad</a>", hub);
+        Assert.Contains("href=\"about-sdd-gds.html\" class=\"local-context-pill\">BMad GDS</a>", hub);
+        Assert.Contains("href=\"about-sdd-speckit.html\" class=\"local-context-pill\">Spec Kit</a>", hub);
+        Assert.Contains("href=\"about-sdd-gsd.html\" class=\"local-context-pill\">GSD</a>", hub);
+        Assert.Contains("href=\"about-sdd-gsd-pi.html\" class=\"local-context-pill\">GSD-Pi</a>", hub);
+        Assert.Contains("href=\"about-sdd-superpowers.html\" class=\"local-context-pill\">Superpowers</a>", hub);
+
+        // Framework page: Overview is a link back to the hub; BMad is the active pill.
+        Assert.Contains("href=\"about-sdd.html\" class=\"local-context-pill\">Overview</a>", bmad);
+        Assert.Contains("local-context-pill active\" aria-current=\"page\">BMad</span>", bmad);
     }
 
     [Fact]
@@ -282,7 +323,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
     }
 
     [Fact]
-    public void HowToRead_NoBmadFolder_TabsStillRendered_MethodAndGdsAbsent()
+    public void AboutSdd_NoBmadFolder_StillWritesHub_FrameworksAbsent()
     {
         var undetectedRoot = Directory.CreateTempSubdirectory("specscribe-howtoread-nomod-").FullName;
         try
@@ -294,17 +335,24 @@ public class SiteGeneratorHowToReadTests : IDisposable
 
             new SiteGenerator(ForgeOptions.Resolve(source: source, output: output, projectName: "SpecScribe", includeReadme: false)).GenerateAll();
 
-            var howToRead = File.ReadAllText(Path.Combine(output, "how-to-read.html"));
-            // Tabs always rendered — never omitted.
-            Assert.Contains("sdd-tab--method", howToRead);
-            Assert.Contains("sdd-tab--gds", howToRead);
-            // Both are absent
-            Assert.Contains("npx bmad-method install</code>", howToRead);
-            Assert.Contains("npx bmad-method install --modules gds", howToRead);
-            // Page still exists
             Assert.True(File.Exists(Path.Combine(output, "how-to-read.html")));
-            // Planned tabs are Coming Soon
-            Assert.Contains("Spec Kit — Coming Soon", howToRead);
+            Assert.True(File.Exists(Path.Combine(output, "about-sdd.html")));
+            Assert.True(File.Exists(Path.Combine(output, "about-sdd-bmad.html")));
+
+            var howToRead = File.ReadAllText(Path.Combine(output, "how-to-read.html"));
+            Assert.DoesNotContain("sdd-tab", howToRead);
+            Assert.Contains("<h1>How to use SpecScribe</h1>", howToRead);
+
+            var bmad = File.ReadAllText(Path.Combine(output, "about-sdd-bmad.html"));
+            Assert.Contains("npx bmad-method install</code>", bmad);
+            Assert.Contains("BMad is not detected", bmad);
+
+            var gds = File.ReadAllText(Path.Combine(output, "about-sdd-gds.html"));
+            Assert.Contains("npx bmad-method install --modules gds", gds);
+
+            var hub = File.ReadAllText(Path.Combine(output, "about-sdd.html"));
+            Assert.Contains("Coming soon", hub);
+            Assert.DoesNotContain("Detected in this project", hub);
         }
         finally
         {
@@ -313,79 +361,27 @@ public class SiteGeneratorHowToReadTests : IDisposable
     }
 
     [Fact]
-    public void HowToRead_DualInstall_BothPresent()
+    public void AboutSdd_DualInstall_BothPresent()
     {
         // Install GDS alongside BMM.
         var gdsDir = Path.Combine(_root, "_bmad", "gds");
         Directory.CreateDirectory(gdsDir);
         File.WriteAllText(Path.Combine(gdsDir, "module-help.csv"), GdsCsv);
-        // Update manifest.
         File.WriteAllText(Path.Combine(_root, "_bmad", "_config", "manifest.yaml"),
             "modules:\n  - name: core\n    version: 6.0.0\n  - name: bmm\n    version: 6.0.0\n  - name: gds\n    version: 6.0.0");
 
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
+        var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
+        var gds = File.ReadAllText(Path.Combine(Site, "about-sdd-gds.html"));
 
-        // Both tabs should be present
-        Assert.Contains("sdd-tab-state--present", html);
-        // Method commands
-        Assert.Contains("/bmad-help", html);
-        // GDS commands
-        Assert.Contains("/bmgd-gdd", html);
-        // GDS methodology diagram nodes
-        Assert.Contains("GDD", html);
-        Assert.Contains("Narrative Design", html);
-        Assert.Contains("Prototype", html);
-        // No install CTAs for either
-        Assert.DoesNotContain("BMad Method is not installed", html);
-        Assert.DoesNotContain("BMad Game Dev Studio is not installed", html);
-    }
-
-    [Fact]
-    public void HowToRead_DefaultTabIsMethod_WhenMethodPresent()
-    {
-        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
-
-        // Method radio should be checked
-        var methodTabSection = html.Substring(
-            html.IndexOf("sdd-tab--method", StringComparison.Ordinal),
-            200);
-        Assert.Contains("checked", methodTabSection);
-    }
-
-    [Fact]
-    public void HowToRead_DefaultTabIsGds_WhenOnlyGdsPresent()
-    {
-        // Remove BMM, install only GDS.
-        Directory.Delete(Path.Combine(_root, "_bmad", "bmm"), recursive: true);
-        var gdsDir = Path.Combine(_root, "_bmad", "gds");
-        Directory.CreateDirectory(gdsDir);
-        File.WriteAllText(Path.Combine(gdsDir, "module-help.csv"), GdsCsv);
-        File.WriteAllText(Path.Combine(_root, "_bmad", "_config", "manifest.yaml"),
-            "modules:\n  - name: core\n    version: 6.0.0\n  - name: gds\n    version: 6.0.0");
-
-        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
-
-        // GDS radio should be checked as default (Method absent, GDS present)
-        var gdsTabSection = html.Substring(
-            html.IndexOf("sdd-tab--gds", StringComparison.Ordinal),
-            200);
-        Assert.Contains("checked", gdsTabSection);
-    }
-
-    [Fact]
-    public void HowToRead_MermaidInitScriptOmittedWhenNoDiagram()
-    {
-        // Render with both absent — no Mermaid diagram rendered.
-        var nav = SiteNav.Build(Array.Empty<string>(), "Empty Project");
-        var html = HowToReadTemplater.RenderPage(
-            nav, Array.Empty<ModuleDoc>(), Array.Empty<GlossaryTerm>(), CommandCatalog.Empty,
-            methodPresent: false, gdsPresent: false);
-
-        Assert.DoesNotContain("mermaid.esm.min.mjs", html);
-        Assert.DoesNotContain("class=\"mermaid\"", html);
+        Assert.Contains("Detected in this project", hub);
+        Assert.Contains("/bmad-help", bmad);
+        Assert.Contains("/bmgd-gdd", gds);
+        Assert.Contains("GDD", gds);
+        Assert.Contains("Narrative Design", gds);
+        Assert.DoesNotContain("BMad is not detected", bmad);
+        Assert.DoesNotContain("BMad GDS is not detected", gds);
     }
 
     [Fact]
@@ -396,21 +392,6 @@ public class SiteGeneratorHowToReadTests : IDisposable
 
         // Must not contain <abbr> tags (page defines the glossary, mustn't self-expand).
         Assert.DoesNotContain("<abbr", html);
-    }
-
-    [Fact]
-    public void HowToRead_KeyboardAccessibleTabs()
-    {
-        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
-
-        // Radio inputs are keyboard-focusable (native radio group navigation).
-        Assert.Contains("type=\"radio\"", html);
-        Assert.Contains("name=\"sdd-framework\"", html);
-        // Presence not conveyed by color alone — badge text states Present/Absent/Coming Soon.
-        Assert.Contains(">Present</span>", html);
-        Assert.Contains(">Absent</span>", html);
-        Assert.Contains(">Coming Soon</span>", html);
     }
 
     private static int CountOccurrences(string haystack, string needle)

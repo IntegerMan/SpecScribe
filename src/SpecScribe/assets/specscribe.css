@@ -6122,130 +6122,72 @@ a.deferred-item-resolving:hover { color: var(--rust); }
 .about-panel p { color: var(--ink-faded); line-height: 1.6; }
 .about-diagnostics-link { margin-top: 1rem; }
 
-/* SDD help page — spec-driven development framework tabs. Zero-JS CSS radio pattern with new class names
-   (.sdd-tabs), not reusing .code-tabs. Present/Absent/Coming Soon states conveyed by color AND text badge.
-   Keyboard-focusable via native radio group. [SDD help page] */
-.sdd-tabs {
-  margin-top: 1.5rem;
+/* About SDD — support matrix, detection chip, framework guides. [About SDD] */
+.about-sdd-panel { margin-top: 0.5rem; }
+.sdd-support-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0 1.25rem;
+  font-size: 0.92rem;
 }
-
-.sdd-tablist {
-  margin: 0 0 1.25rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  background: var(--parchment);
+.sdd-support-matrix th,
+.sdd-support-matrix td {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.25rem;
+  padding: 0.45rem 0.65rem;
+  text-align: center;
 }
-
-.sdd-tablist legend.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+.sdd-support-matrix th[scope="row"],
+.sdd-support-matrix thead th:first-child {
+  text-align: left;
 }
-
-.sdd-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-
-.sdd-tab-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* State styling: present tabs use active ink; absent/coming-soon are muted. */
-.sdd-tab-state--present {
-  color: var(--ink);
-}
-
-.sdd-tab-state--absent,
-.sdd-tab-state--coming-soon {
-  color: var(--ink-light);
-  opacity: 0.7;
-}
-
-/* Badge — text state cue (not color-alone). */
-.sdd-tab-badge {
-  font-size: 0.7rem;
+.sdd-support-matrix--compact { max-width: 22rem; }
+.sdd-check { color: var(--emerald-deep, #3d6b35); font-weight: 700; }
+.sdd-check--no { color: var(--ink-light); font-weight: 500; }
+.sdd-detected,
+.sdd-support-yes,
+.sdd-support-soon {
+  display: inline-block;
+  font-size: 0.75rem;
   font-weight: 700;
-  padding: 0.1rem 0.4rem;
+  padding: 0.1rem 0.45rem;
   border-radius: 4px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  margin-left: 0.35rem;
 }
-
-.sdd-badge--present {
+.sdd-detected {
   background: var(--emerald-bg, #e8f0e4);
   color: var(--emerald-deep, #3d6b35);
 }
-
-.sdd-badge--absent {
-  background: var(--sand-bg, #f4ead5);
+.sdd-support-yes {
+  background: var(--parchment);
   color: var(--ink-light);
+  border: 1px solid var(--border);
 }
-
-.sdd-badge--coming-soon {
+.sdd-support-soon {
   background: var(--border);
   color: var(--ink-light);
 }
-
-/* Checked tab gets active treatment. */
-.sdd-tab:has(.sdd-tab-input:checked) {
-  background: var(--ink);
-  color: var(--parchment);
-}
-
-.sdd-tab:has(.sdd-tab-input:checked) .sdd-tab-badge {
-  background: rgba(255,255,255,0.2);
-  color: var(--parchment);
-}
-
-.sdd-tab:hover:not(:has(.sdd-tab-input:checked)) {
-  color: var(--ink);
-  opacity: 1;
-}
-
-.sdd-tab:has(.sdd-tab-input:focus-visible) {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-}
-
-/* Panel visibility: exactly one panel shown at a time, driven by the checked radio. */
-.sdd-tabpanel {
-  display: none;
-}
-
-.sdd-tabs:has(.sdd-tab--method .sdd-tab-input:checked) .sdd-tabpanel--method,
-.sdd-tabs:has(.sdd-tab--gds .sdd-tab-input:checked) .sdd-tabpanel--gds,
-.sdd-tabs:has(.sdd-tab--speckit .sdd-tab-input:checked) .sdd-tabpanel--speckit,
-.sdd-tabs:has(.sdd-tab--gsd .sdd-tab-input:checked) .sdd-tabpanel--gsd,
-.sdd-tabs:has(.sdd-tab--gsd-pi .sdd-tab-input:checked) .sdd-tabpanel--gsd-pi,
-.sdd-tabs:has(.sdd-tab--superpowers .sdd-tab-input:checked) .sdd-tabpanel--superpowers {
-  display: block;
-}
-
-/* Panel content styling. */
+.sdd-detected-banner { margin: 0 0 1rem; }
+.sdd-framework-links { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0 1rem; }
+.sdd-framework-links li { margin: 0.35rem 0; }
 .sdd-commands {
   list-style: disc;
   padding-left: 1.5rem;
   margin: 0.5rem 0 1rem;
+}
+.sdd-install {
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.65rem 0.9rem;
+  overflow-x: auto;
+  font-size: 0.9rem;
+}
+.sdd-absent-info { color: var(--ink-light); }
+.about-sdd-panel .mermaid {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .sdd-commands li {
@@ -6256,24 +6198,4 @@ a.deferred-item-resolving:hover { color: var(--rust); }
 .sdd-commands code {
   font-weight: 600;
   color: var(--teal-deep);
-}
-
-.sdd-absent-info {
-  color: var(--ink-light);
-  font-style: italic;
-}
-
-.sdd-install {
-  background: var(--parchment-dark, #f4ead5);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.6rem 1rem;
-  font-size: 0.9rem;
-  overflow-x: auto;
-}
-
-.sdd-coming-soon {
-  color: var(--ink-light);
-  font-style: italic;
-  padding: 1rem 0;
 }

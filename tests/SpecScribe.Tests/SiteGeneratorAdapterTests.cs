@@ -198,6 +198,14 @@ public class SiteGeneratorAdapterTests : IDisposable
             "epics/story-2-1.html",
             // Story 10.3: the how-to-read orientation page is written on every full run, like about.html/diagnostics.html.
             "how-to-read.html",
+            // About Spec-Driven Development hub + per-framework sub-pages (always written).
+            "about-sdd.html",
+            "about-sdd-bmad.html",
+            "about-sdd-gds.html",
+            "about-sdd-speckit.html",
+            "about-sdd-gsd.html",
+            "about-sdd-gsd-pi.html",
+            "about-sdd-superpowers.html",
             "implementation-artifacts/epic-1-retro-2026-07-06.html",
             "index.html",
             "requirements.html",
@@ -600,7 +608,15 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated 2026-07-20 (Story 10.7 code-review patches): specscribe.css gains one .epic-remaining-unrecognized
         // accent rule (shared stylesheet, so the byte-parity gate moves); the paired EpicSunburst peer-aggregate
         // radii nudge (0.47/0.505 → 0.465/0.495) is a no-op on this fixture, which has no epic-level follow-up peers.
-        const string expected = "2c75b6b998c3ab9538cfb3b01bbd020324d98b4a471d8f5fc97e0d6bbf00d35d";
+        // Regenerated for Story 10.9 code-review patches: ListRow/FollowUpRow now also emit data-sort-status-rank
+        // (StatusStyles.CanonicalRank) beside data-sort-status so the client sorts/groups by severity without a
+        // hardcoded status order in JS; specscribe.js enhanceListRows drops the STATUS_GROUP_RANK array, reads the
+        // rank attribute, no longer sets role="group" on group headings, and suppresses a group heading whose rows
+        // are all filtered-out (shared assets + every opted-in <li>, so the byte-parity gate moves). Stable across
+        // 2 repeated runs before locking in.
+        // Regenerated for About SDD hub+subpages: Help nav splits How to use SpecScribe / About Spec-Driven
+        // Development; how-to-read loses framework tabs; seven new about-sdd*.html pages + shared nav/CSS delta.
+        const string expected = "0d61729dcfa6a1b374f26889b9aa6044fdc66d813707fd2351d994f6508b8e06";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

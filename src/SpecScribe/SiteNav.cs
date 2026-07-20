@@ -56,10 +56,19 @@ public sealed class SiteNav
     /// (writes the file) and the footer (links to it) so the two can't disagree. [Story 4.8; Help nav]</summary>
     public const string AboutOutputPath = "about.html";
 
-    /// <summary>The Spec-Driven Development orientation page (<c>how-to-read.html</c>): framework tabs, reading
-    /// order, and glossary. Written on EVERY full run (like About/Diagnostics) so its link can never dangle.
-    /// Surfaced under the Help nav group. [Story 10.3; SDD help; Help nav]</summary>
+    /// <summary>The Spec-Driven Development / how-to-use orientation page (<c>how-to-read.html</c>). Written on
+    /// EVERY full run (like About/Diagnostics) so its link can never dangle. Surfaced under Help as
+    /// <c>How to use SpecScribe</c>. [Story 10.3; Help nav]</summary>
     public const string HowToReadOutputPath = "how-to-read.html";
+
+    /// <summary>About Spec-Driven Development hub — support matrix + links to framework guides. [About SDD]</summary>
+    public const string AboutSddOutputPath = "about-sdd.html";
+    public const string AboutSddBmadOutputPath = "about-sdd-bmad.html";
+    public const string AboutSddGdsOutputPath = "about-sdd-gds.html";
+    public const string AboutSddSpecKitOutputPath = "about-sdd-speckit.html";
+    public const string AboutSddGsdOutputPath = "about-sdd-gsd.html";
+    public const string AboutSddGsdPiOutputPath = "about-sdd-gsd-pi.html";
+    public const string AboutSddSuperpowersOutputPath = "about-sdd-superpowers.html";
 
     /// <summary>Flattened leaf list in render order — every child across <see cref="Groups"/> (including flat
     /// top-level links). Compatibility contract for RenderParity / SPA / Has* predicates. [Story 10.1]</summary>
@@ -128,12 +137,14 @@ public sealed class SiteNav
         var help = new List<(string Label, string Path)>();
         var quickLinks = new List<(string, string, string, string)>();
 
-        // Help: always-written orientation + product pages so demos and first-time visitors can find them
-        // without hunting the footer. Order: Spec-Driven Development → About → Logs (diagnostics). [Help nav]
-        help.Add(("Spec-Driven Development", HowToReadOutputPath));
+        // Help: always-written orientation + product pages. Order: How to use SpecScribe → About SDD →
+        // About → Logs. Framework sub-pages ride the white local-context bar, not this dropdown. [Help nav]
+        help.Add(("How to use SpecScribe", HowToReadOutputPath));
+        help.Add(("About Spec-Driven Development", AboutSddOutputPath));
         help.Add(("About", AboutOutputPath));
         help.Add(("Logs", DiagnosticsOutputPath));
-        quickLinks.Add(("Spec-Driven Development", HowToReadOutputPath, "Orientation for spec-driven development: frameworks, commands, and methodology.", "Help"));
+        quickLinks.Add(("How to use SpecScribe", HowToReadOutputPath, "Reading order and glossary for this portal.", "Help"));
+        quickLinks.Add(("About Spec-Driven Development", AboutSddOutputPath, "Frameworks, support matrix, and getting started with SDD.", "Help"));
         quickLinks.Add(("About", AboutOutputPath, "SpecScribe version, build, and product details.", "Help"));
         quickLinks.Add(("Logs", DiagnosticsOutputPath, "Generation diagnostics and the run log.", "Help"));
 
@@ -405,6 +416,27 @@ public sealed class SiteNav
                 string.Equals(PathUtil.NormalizeSlashes(c.OutputRelativePath), current, StringComparison.OrdinalIgnoreCase)))
             .ToList();
         return new NavLocalContext("Insights", items);
+    }
+
+    /// <summary>White-bar local context for About Spec-Driven Development hub + framework sub-pages —
+    /// Overview plus every framework guide. Always meaningful (7+ items). [About SDD]</summary>
+    public NavLocalContext BuildSddLocalContext(string activeOutputRelativePath)
+    {
+        var prefix = PathUtil.RelativePrefix(activeOutputRelativePath);
+        var current = PathUtil.NormalizeSlashes(activeOutputRelativePath);
+        var items = new List<NavLocalItem>
+        {
+            new("Overview", prefix + AboutSddOutputPath,
+                string.Equals(current, AboutSddOutputPath, StringComparison.OrdinalIgnoreCase)),
+        };
+        foreach (var fw in AboutSddTemplater.Frameworks)
+        {
+            items.Add(new NavLocalItem(
+                fw.Label,
+                prefix + fw.OutputPath,
+                string.Equals(current, PathUtil.NormalizeSlashes(fw.OutputPath), StringComparison.OrdinalIgnoreCase)));
+        }
+        return new NavLocalContext("Spec-Driven Development", items);
     }
 
     /// <summary>Renders the site nav bar. The string-building was re-homed behind
