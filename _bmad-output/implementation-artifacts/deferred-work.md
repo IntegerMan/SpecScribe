@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 10-11-sticky-section-nav-and-breadcrumb-coherence (2026-07-20)
+
+- source_spec: `10-11-sticky-section-nav-and-breadcrumb-coherence.md`
+  summary: `AppendLocalContextBand`'s pinned-active-item removal (`overflow.Where(i => i != pinnedActive)`) uses `NavLocalItem` record value-equality — if two overflow items share identical Label+Href+IsActive, all matching items are removed instead of just the pinned one, silently dropping a legitimate sibling from the "More" panel.
+  evidence: Blind Hunter + Edge Case Hunter (independently). This is Story 10.10's local-context band code, bundled into the 10.11 diff by file overlap (HtmlRenderAdapter.cs), not caused by 10.11's own changes. Fix: remove by index/reference instead of value equality. [src/SpecScribe/HtmlRenderAdapter.cs:265]
+- source_spec: `10-11-sticky-section-nav-and-breadcrumb-coherence.md`
+  summary: `KeyViewGroupOrder.Contains(q.Group) ? q.Group : "Project"` fallback has no test coverage for an unrecognized/misspelled `Group` string silently misfiling a nav link into "Project".
+  evidence: Blind Hunter. Help-nav/`QuickLinks.Group` work, bundled into the 10.11 diff by file overlap, not caused by 10.11's own changes. [src/SpecScribe/HtmlRenderAdapter.cs:186]
+
 ## Deferred from: code review of 10-7-sunburst-navigability-at-project-scale (2026-07-20)
 
 - source_spec: `10-7-sunburst-navigability-at-project-scale.md`
@@ -344,9 +353,9 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 ## Deferred from: code review of story-6-1 (2026-07-10)
 
 - source_spec: `6-1-shared-view-model-contract-for-html-and-webview-adapters.md`
-- **`SpecScribe.csproj`'s `BuildDate` MSBuild stamp is non-deterministic.** `$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))` is evaluated at every compile, so two builds of the identical commit on different days produce different assembly bytes — a build-determinism tradeoff. Revisit if reproducible builds become a requirement.
-- **`ProductMetadata.IsPrerelease`/`CommitHash` have no format validation.** `Version.Contains('-')` and `sha[..7]` (no hex check) are naive but low-risk since the version string is developer-controlled via csproj. Add validation if the version source ever becomes less trusted.
-- **ADR-extraction rework, `BmadArtifactAdapter.TryParse` hardening, and `ForgeOptions` README exclusion predate Story 6.1's actual diff window** (landed in an earlier "4.x review" commit, not this story's work) — surfaced during 6.1's review only because the review diff spanned more than this story's own commits. Not actionable via 6.1; revisit if that earlier commit's changes are reviewed directly.
+- ~~**`SpecScribe.csproj`'s `BuildDate` MSBuild stamp is non-deterministic.** `$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))` is evaluated at every compile, so two builds of the identical commit on different days produce different assembly bytes — a build-determinism tradeoff. Revisit if reproducible builds become a requirement.~~ **RESOLVED 2026-07-20** (`spec-6-1-deferred-review-cleanup`): the stamp now honors `SOURCE_DATE_EPOCH` (reproducible-builds standard, Unix seconds → `yyyy-MM-dd` UTC) via the new `SpecScribeBuildDate` MSBuild property, falling back to `UtcNow` for local dev — so identical commits produce identical bytes in reproducible/CI builds. Verified: a build with `SOURCE_DATE_EPOCH=1700000000` stamps `2023-11-14` regardless of wall-clock day; a normal local build is unchanged. [`SpecScribe.csproj`]
+- ~~**`ProductMetadata.IsPrerelease`/`CommitHash` have no format validation.** `Version.Contains('-')` and `sha[..7]` (no hex check) are naive but low-risk since the version string is developer-controlled via csproj. Add validation if the version source ever becomes less trusted.~~ **RESOLVED 2026-07-20** (`spec-6-1-deferred-review-cleanup`): commit-hash recovery is now extracted into `ProductMetadata.ParseInformationalVersion` with an `IsShaLike` hex guard — a non-hex `+` suffix is dropped so the About Build row never shows a bogus hash — and `IsPrerelease` requires a hyphen followed by a non-empty label (a trailing bare `-` no longer reads as pre-release). Pinned by `AboutTemplaterTests.ParseInformationalVersion_*` and `IsPrerelease_RequiresNonEmptyTrailingLabel`. [`AboutTemplater.cs`]
+- ~~**ADR-extraction rework, `BmadArtifactAdapter.TryParse` hardening, and `ForgeOptions` README exclusion predate Story 6.1's actual diff window** (landed in an earlier "4.x review" commit, not this story's work) — surfaced during 6.1's review only because the review diff spanned more than this story's own commits. Not actionable via 6.1; revisit if that earlier commit's changes are reviewed directly.~~ **CLOSED 2026-07-20** (`spec-6-1-deferred-review-cleanup`) as not actionable via Story 6.1: confirmed a scoping artifact — these changes are outside 6.1's diff window and surfaced only because the review diff over-spanned. No code belongs to 6.1; revisit only if that earlier "4.x review" commit is reviewed directly. (The `source_spec:` line above is section metadata, not a defect — no action.)
 
 ## Deferred from: code review of story-4-8 (2026-07-10)
 

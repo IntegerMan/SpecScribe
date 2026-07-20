@@ -22,6 +22,47 @@ public class AboutTemplaterTests
         Assert.Equal(PathUtil.RepositoryUrl, meta.RepositoryUrl);
     }
 
+    [Theory]
+    // Deterministic build with a full 40-char hex sha → version kept, hash truncated to the first 7.
+    [InlineData("0.1.0-preview+9f8e7d6c5b4a3210fedcba98765432100abcdef1", "0.1.0-preview", "9f8e7d6")]
+    // Short hex suffix (< 7 chars) is kept whole.
+    [InlineData("1.0.0+abcd", "1.0.0", "abcd")]
+    // Non-hex "+" suffix (branch/build metadata) is dropped — the Build row shows the date only, never a bogus hash.
+    [InlineData("1.0.0+branch-x", "1.0.0", null)]
+    // No "+" suffix at all → no commit hash.
+    [InlineData("1.0.0", "1.0.0", null)]
+    public void ParseInformationalVersion_SplitsVersionAndGuardsHash(
+        string informational, string expectedVersion, string? expectedHash)
+    {
+        var (version, hash) = ProductMetadata.ParseInformationalVersion(informational);
+
+        Assert.Equal(expectedVersion, version);
+        Assert.Equal(expectedHash, hash);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void ParseInformationalVersion_EmptyInput_SignalsFallback(string? informational)
+    {
+        var (version, hash) = ProductMetadata.ParseInformationalVersion(informational);
+
+        // Empty version string is the caller's cue to fall back to AssemblyName.Version.
+        Assert.Equal(string.Empty, version);
+        Assert.Null(hash);
+    }
+
+    [Theory]
+    [InlineData("0.1.0-preview", true)]  // real trailing pre-release label
+    [InlineData("1.0.0", false)]         // stable
+    [InlineData("1.0.0-", false)]        // trailing bare dash is not a label
+    public void IsPrerelease_RequiresNonEmptyTrailingLabel(string version, bool expected)
+    {
+        var meta = new ProductMetadata(version, "d", "a", "https://repo", "https://author", null, null);
+
+        Assert.Equal(expected, meta.IsPrerelease);
+    }
+
     [Fact]
     public void RenderPage_ShowsAssemblyMetadataAndDiagnosticsLink()
     {

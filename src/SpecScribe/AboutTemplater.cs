@@ -22,9 +22,17 @@ public sealed record ProductMetadata(
     string Version, string Description, string Author, string RepositoryUrl,
     string AuthorUrl, string? CommitHash, string? BuildDate)
 {
-    /// <summary>True when the version carries a pre-release label (a semver <c>-suffix</c>) — drives the About
-    /// page's "Preview" badge.</summary>
-    public bool IsPrerelease => Version.Contains('-');
+    /// <summary>True when the version carries a semver pre-release label — a <c>-</c> followed by non-empty
+    /// content (so a stray trailing <c>-</c> doesn't read as a pre-release). Drives the About page's "Preview"
+    /// badge.</summary>
+    public bool IsPrerelease
+    {
+        get
+        {
+            var dash = Version.IndexOf('-');
+            return dash >= 0 && dash < Version.Length - 1;
+        }
+    }
 
     /// <summary>The dynamic build identifier, <c>"{date} · {hash}"</c>, from whichever of the two build stamps
     /// are present — or null when neither is, so the About page can omit the Build row entirely. Best-effort by
@@ -44,22 +52,12 @@ public sealed record ProductMetadata(
     {
         var asm = typeof(ProductMetadata).Assembly;
 
-        // Deterministic builds (the SDK default) append "+<commit-sha>" to the informational version. Split there:
-        // the left side is the semver (KEEPING any "-preview" pre-release label); the right side, when present, is
-        // the git commit — surfaced as a short hash so a generated site says exactly which build produced it.
+        // Deterministic builds (the SDK default) append "+<commit-sha>" to the informational version. Parse there
+        // into (semver, short commit hash); fall back to the plain AssemblyName version when there's no
+        // informational version at all (e.g. built outside a git checkout / without SourceLink).
         var informational = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        string version;
-        string? commitHash = null;
-        if (informational is { Length: > 0 } v)
-        {
-            var plus = v.Split('+', 2);
-            version = plus[0];
-            if (plus.Length == 2 && plus[1] is { Length: > 0 } sha)
-            {
-                commitHash = sha.Length > 7 ? sha[..7] : sha;
-            }
-        }
-        else
+        var (version, commitHash) = ParseInformationalVersion(informational);
+        if (version.Length == 0)
         {
             version = asm.GetName().Version?.ToString() ?? "unknown";
         }
@@ -72,6 +70,33 @@ public sealed record ProductMetadata(
         return new ProductMetadata(version, description, author, PathUtil.RepositoryUrl,
             PathUtil.AuthorUrl, commitHash, buildDate);
     }
+
+    /// <summary>Splits an <see cref="AssemblyInformationalVersionAttribute"/> value into its semver part (KEEPING
+    /// any <c>-preview</c> pre-release label) and, when the deterministic-build <c>+&lt;sha&gt;</c> suffix is
+    /// present AND looks like a git hash, a short (7-char) commit hash. A non-hex suffix is dropped rather than
+    /// shown as a bogus hash, so the About page's Build row stays honest. Returns an empty version string when
+    /// there's no informational version to parse, signalling the caller to fall back to the AssemblyName version.</summary>
+    internal static (string version, string? commitHash) ParseInformationalVersion(string? informational)
+    {
+        if (informational is not { Length: > 0 } v)
+        {
+            return (string.Empty, null);
+        }
+
+        var plus = v.Split('+', 2);
+        var version = plus[0];
+        string? commitHash = null;
+        if (plus.Length == 2 && plus[1] is { Length: > 0 } sha && IsShaLike(sha))
+        {
+            commitHash = sha.Length > 7 ? sha[..7] : sha;
+        }
+        return (version, commitHash);
+    }
+
+    /// <summary>True when every character is an ASCII hex digit — a cheap sanity check that a <c>+</c> suffix is a
+    /// git commit sha before it's surfaced as one (rather than, say, branch/build metadata).</summary>
+    internal static bool IsShaLike(string s) =>
+        s.Length > 0 && s.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F'));
 }
 
 /// <summary>Renders the About page (<c>about.html</c>): SpecScribe's own product metadata (version,
