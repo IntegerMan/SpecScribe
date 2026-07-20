@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 10-7-sunburst-navigability-at-project-scale (2026-07-20)
+
+- source_spec: `10-7-sunburst-navigability-at-project-scale.md`
+  summary: Dense-collapse (`Charts.Sunburst`) still computes `hasNoPlan` over all stories, but a collapsed 8+-story epic's zero-task stories fold into one `sb-story-summary` wedge with no `.sb-noplan` class — if every no-plan story lives inside a collapsed epic, the legend advertises a "no plan" swatch that matches no wedge and legend-hover dims all segments.
+  evidence: Blind Hunter. Low-impact cosmetic, narrow trigger; correct fix (suppress the legend item when no un-collapsed no-plan wedge exists vs. mark the summary wedge) is not clear-cut. Revisit when next touching sunburst legend logic. [src/SpecScribe/Charts.cs:435]
+
 ## Deferred from: code review of 10-5-document-rendering-legibility.md (2026-07-20)
 
 - source_spec: `10-5-document-rendering-legibility.md`

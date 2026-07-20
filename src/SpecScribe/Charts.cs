@@ -824,8 +824,8 @@ public static class Charts
         var storyOuter = size * 0.36;
         var deferredInner = size * 0.37;
         var deferredOuter = size * 0.46;
-        var peerAggInner = size * 0.47;
-        var peerAggOuter = size * 0.505;
+        var peerAggInner = size * 0.465;
+        var peerAggOuter = size * 0.495;
 
         var anglePerUnit = 2 * Math.PI / totalWeight;
         const double pad = 0.012;
