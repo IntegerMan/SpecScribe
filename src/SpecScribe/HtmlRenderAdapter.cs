@@ -174,8 +174,13 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
 
         if (nav.QuickLinks.Count == 0) return;
 
+        // Fall back to "Project" for a Group value that isn't one of KeyViewGroupOrder's four literals — the
+        // same safety net the old exhaustive KeyViewGroup switch's `_ => "Project"` default arm gave every
+        // label, now preserved even though the mapping itself moved to per-call-site data. [Story 10.1
+        // deferred debt cleanup]
         var entries = nav.QuickLinks
-            .Select(q => (Label: q.Label, Title: QuickLinkTitle(q.Label), Path: q.OutputRelativePath, Desc: q.Description, Group: KeyViewGroup(q.Label)))
+            .Select(q => (Label: q.Label, Title: QuickLinkTitle(q.Label), Path: q.OutputRelativePath, Desc: q.Description,
+                Group: KeyViewGroupOrder.Contains(q.Group) ? q.Group : "Project"))
             .ToList();
 
         sb.Append("  <div class=\"site-nav-key-views\" aria-label=\"Key views\">\n");
@@ -312,18 +317,11 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     public IReadOnlyList<(string Label, string OutputRelativePath)> NavMenuOrder(NavigationView nav) =>
         nav.Items.Select(i => (QuickLinkTitle(i.Label), i.OutputRelativePath)).ToList();
 
-    /// <summary>Ordered key-views band groups (white sub-header off Home). Mirrors the Delivery / Insights /
-    /// Follow-ups / Project taxonomy; quick-link-only docs (brief, UX) land in Project. [Story 10.1]</summary>
+    /// <summary>Display order for the key-views band groups (white sub-header off Home). Per-label group
+    /// membership itself is single-sourced on <see cref="SiteNav.QuickLinks"/>'s <c>Group</c> element, set at
+    /// <see cref="SiteNav.Build"/> time — this array only decides render order among the groups that appear.
+    /// [Story 10.1; Story 10.1 deferred debt cleanup]</summary>
     private static readonly string[] KeyViewGroupOrder = { "Delivery", "Insights", "Follow-ups", "Project" };
-
-    /// <summary>Maps a quick-link label to its key-views band group. [Story 10.1]</summary>
-    private static string KeyViewGroup(string label) => label switch
-    {
-        "Epics" or "Epics & Stories" or "Sprint" or "Requirements" => "Delivery",
-        "Git Insights" or "Deep Analytics" or "Code Map" => "Insights",
-        "Action Items" or "Deferred Work" => "Follow-ups",
-        _ => "Project",
-    };
 
     /// <summary>The HTML surface's inline nav-toggle script, verbatim (self-locating via
     /// <c>document.currentScript</c>, so it must directly follow the nav element). Deliberately NOT emitted by the

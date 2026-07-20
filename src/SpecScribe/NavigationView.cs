@@ -13,8 +13,11 @@ public sealed record NavItem(string Label, string OutputRelativePath, string Con
 public sealed record NavGroup(string Label, string ConceptKey, IReadOnlyList<NavItem> Children);
 
 /// <summary>One dashboard quick-link as host-neutral data — the superset of the nav bar that also carries a
-/// short per-entry description. Lifted from <see cref="SiteNav.QuickLinks"/>. [Story 6.1]</summary>
-public sealed record NavQuickLink(string Label, string OutputRelativePath, string Description);
+/// short per-entry description. Lifted from <see cref="SiteNav.QuickLinks"/>. <c>Group</c> is the single-sourced
+/// white key-views band classification (Delivery/Insights/Follow-ups/Project) set on <see cref="SiteNav.Build"/>;
+/// it defaults to "Project" so pre-existing 3-arg construction sites (which don't exercise band grouping) keep
+/// compiling unchanged. [Story 6.1; Story 10.1 deferred debt cleanup]</summary>
+public sealed record NavQuickLink(string Label, string OutputRelativePath, string Description, string Group = "Project");
 
 /// <summary>One entry in a page's local-context list — the white sub-header band's page-type-specific content
 /// (a sibling story, a sibling code file, an ADR, ...). <see cref="Href"/> is already relative to the current

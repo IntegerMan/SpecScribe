@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of spec-3-7-deferred-debt-cleanup.md (2026-07-19)
+
+- source_spec: `spec-3-7-deferred-debt-cleanup.md`
+  summary: `Charts.RequirementFlowTextEquivalent` duplicates `RequirementFlow`'s `Sentinel`/`NoCoverage`/coverage-partition/epic-label local-function logic rather than sharing it — a future change to coverage semantics (e.g. what the sentinel means) has to be made in two places or the Sankey and its text-equivalent can silently disagree.
+  evidence: Blind Hunter, on the diff adding `RequirementFlowTextEquivalent`. Cosmetic duplication, not a behavior bug today; both copies currently agree exactly. Revisit if `RequirementFlow`'s coverage-partitioning is next touched.
+
 ## Deferred from: code review of spec-epic3-deferred-debt-cleanup.md (2026-07-19)
 
 - source_spec: `spec-epic3-deferred-debt-cleanup.md`
@@ -667,12 +673,6 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 10-1-insights-navigation-and-structure-page-retirement (2026-07-19)
 
-- source_spec: `10-1-insights-navigation-and-structure-page-retirement.md`
-  summary: Two independently hand-maintained label→group classifiers exist — `SiteNav.Build`'s inline grouping (delivery/insights/followUps/project lists) and `HtmlRenderAdapter.KeyViewGroup`'s separate switch statement for the white key-views band. Nothing enforces the two mappings agree; adding a new nav label to one and forgetting the other silently miscategorizes it on one of the two nav surfaces.
-  evidence: Blind Hunter. Architectural observation, not a concrete bug today — consolidate into one shared classifier when next touching either seam.
-- source_spec: `10-1-insights-navigation-and-structure-page-retirement.md`
-  summary: `RenderParityTests` doesn't exercise all four nav groups (Delivery + Insights + Follow-ups + Project) populated simultaneously on one page — the interaction of all four disclosures rendering together (icon reuse, family-tint collisions, DOM nesting) is never exercised end-to-end.
-  evidence: Blind Hunter. Test-coverage gap, not a defect. Add a combined-groups test case when next touching RenderParityTests.cs.
-- source_spec: `10-1-insights-navigation-and-structure-page-retirement.md`
-  summary: The `.list-batch-actions .next-steps-cards` CSS change (wrapping flex → fixed 3-column grid, command groups stacked vertically instead of side-by-side) is a layout change to the deferred-work/action-items list-batch pane bundled into this nav-restructuring story's commit, with no dedicated test coverage and no explanation beyond a terse comment referencing an unrelated guard.
-  evidence: Blind Hunter. Unrelated scope creep — flagged for hygiene, not broken. Verify the layout change was intentional and give it its own test coverage when next touched.
+- ~~Two independently hand-maintained label→group classifiers exist — `SiteNav.Build`'s inline grouping (delivery/insights/followUps/project lists) and `HtmlRenderAdapter.KeyViewGroup`'s separate switch statement for the white key-views band. Nothing enforces the two mappings agree; adding a new nav label to one and forgetting the other silently miscategorizes it on one of the two nav surfaces.~~ **RESOLVED 2026-07-19** (`10-1-deferred-debt-cleanup`): `SiteNav.QuickLinks` now carries its `Group` inline at the same `Build()` call sites that decide delivery/insights/followUps/project membership; `HtmlRenderAdapter` reads `q.Group` directly and the parallel `KeyViewGroup` switch is deleted. [`SiteNav.cs` / `HtmlRenderAdapter.cs`]
+- ~~`RenderParityTests` doesn't exercise all four nav groups (Delivery + Insights + Follow-ups + Project) populated simultaneously on one page — the interaction of all four disclosures rendering together (icon reuse, family-tint collisions, DOM nesting) is never exercised end-to-end.~~ **RESOLVED 2026-07-19** (`10-1-deferred-debt-cleanup`): `Extract_AllFourNavGroupsPopulatedTogether_StillFullParity` builds a `SiteNav` with every group-gating signal on and asserts full parity plus correct summary-vs-anchor handling. [`RenderParityTests.cs`]
+- ~~The `.list-batch-actions .next-steps-cards` CSS change (wrapping flex → fixed 3-column grid, command groups stacked vertically instead of side-by-side) is a layout change to the deferred-work/action-items list-batch pane bundled into this nav-restructuring story's commit, with no dedicated test coverage and no explanation beyond a terse comment referencing an unrelated guard.~~ **RESOLVED 2026-07-19** (`10-1-deferred-debt-cleanup`): confirmed intentional and stable (shipped, unchanged across 18+ subsequent commits) — kept as-is. Added `Stylesheet_HasListBatchThreeColumnLayout` pin and corrected the stray comment. [`specscribe.css` / `StylesheetTests.cs`]

@@ -50,7 +50,7 @@ public static class GitInsightsTemplater
         sb.Append("  <div class=\"meta-pills\">\n");
         sb.Append($"    <span class=\"pill\">{N(insights.CommitCount)} {Charts.Plural(insights.CommitCount, "commit", "commits")} analyzed</span>\n");
         var filesLabel = insights.TotalFilesTouched > insights.Files.Count
-            ? $"top {N(insights.Files.Count)} of {N(insights.TotalFilesTouched)} files by commit count"
+            ? TruncatedFilesRankingFact(insights.Files.Count, insights.TotalFilesTouched, capitalized: false)
             : $"{N(insights.Files.Count)} {Charts.Plural(insights.Files.Count, "file", "files")}";
         sb.Append($"    <span class=\"pill\">{filesLabel}</span>\n");
         sb.Append($"    <span class=\"pill\">{N(insights.ContributorCount)} {Charts.Plural(insights.ContributorCount, "contributor", "contributors")}</span>\n");
@@ -86,7 +86,7 @@ public static class GitInsightsTemplater
         var ranking = files.Count == 0
             ? null
             : insights.TotalFilesTouched > files.Count
-                ? $"Top {N(files.Count)} of {N(insights.TotalFilesTouched)} files by commit count"
+                ? TruncatedFilesRankingFact(files.Count, insights.TotalFilesTouched, capitalized: true)
                 : $"Top {N(files.Count)} files by commit count";
 
         sb.Append("<section class=\"deep-page-section git-insights-section\">\n");
@@ -282,4 +282,11 @@ public static class GitInsightsTemplater
     /// <summary>Invariant integer formatting — derived numbers must read identically regardless of host
     /// culture (the same invariant-formatting discipline the date helpers in <see cref="Charts"/> follow).</summary>
     private static string N(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>The "top N of M files by commit count" truncated-ranking fact, shared by the header meta-pill
+    /// and the Files &amp; Contributors ranking caption so the two can never independently drift (Story 10.2 AC2
+    /// review — they previously duplicated this computation with inconsistent capitalization). Only the leading
+    /// case differs: capitalized for the standalone frame caption, lowercase for the mid-sentence pill.</summary>
+    private static string TruncatedFilesRankingFact(int shown, int total, bool capitalized) =>
+        $"{(capitalized ? "Top" : "top")} {N(shown)} of {N(total)} files by commit count";
 }

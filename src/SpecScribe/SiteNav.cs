@@ -74,8 +74,14 @@ public sealed class SiteNav
     public required IReadOnlyList<(string Label, IReadOnlyList<(string Label, string OutputRelativePath)> Children)> Groups { get; init; }
 
     /// <summary>Every discoverable key view for the dashboard's quick-link grid. A superset of the nav bar:
-    /// it also carries module docs kept out of the top nav (brief, UX) plus a short description per entry.</summary>
-    public required IReadOnlyList<(string Label, string OutputRelativePath, string Description)> QuickLinks { get; init; }
+    /// it also carries module docs kept out of the top nav (brief, UX) plus a short description per entry.
+    /// <c>Group</c> is the single source of truth for which white key-views band group
+    /// (<see cref="HtmlRenderAdapter"/>'s Delivery/Insights/Follow-ups/Project bands) the entry belongs to —
+    /// set once, here, at the same call site that also decides delivery/insights/followUps/project membership,
+    /// so there is no second hand-maintained label→group classifier to drift out of sync. Quick-link-only
+    /// entries with no dedicated Delivery/Insights/Follow-ups gate (How to read, Readme, module docs, ADRs,
+    /// Spec kernels) all land in Project. [Story 10.1 deferred debt cleanup]</summary>
+    public required IReadOnlyList<(string Label, string OutputRelativePath, string Description, string Group)> QuickLinks { get; init; }
 
     /// <summary>The project name (from _bmad/config.toml) — used for the nav brand and page-title suffixes.</summary>
     public required string SiteTitle { get; init; }
@@ -123,7 +129,7 @@ public sealed class SiteNav
         var insights = new List<(string Label, string Path)>();
         var followUps = new List<(string Label, string Path)>();
         var project = new List<(string Label, string Path)>();
-        var quickLinks = new List<(string, string, string)>();
+        var quickLinks = new List<(string, string, string, string)>();
 
         // The how-to-read orientation page is written on every run (like About/Diagnostics), so it can lead
         // unconditionally. Story 10.1's journey-organized top nav (shared chrome on every page, including
@@ -132,13 +138,13 @@ public sealed class SiteNav
         // the quick-link band (site-nav-key-views, shown on non-Home pages) so a first-time visitor reaches
         // it from Home's nav bar without prior BMAD fluency. [Story 10.3]
         project.Add(("How to read this portal", HowToReadOutputPath));
-        quickLinks.Add(("How to read this portal", HowToReadOutputPath, "New here? Start with the reading order and glossary."));
+        quickLinks.Add(("How to read this portal", HowToReadOutputPath, "New here? Start with the reading order and glossary.", "Project"));
 
         // The README is the project's front-door narrative — Project group, first among module docs.
         if (hasReadme)
         {
             project.Add(("Readme", ReadmeOutputPath));
-            quickLinks.Add(("Readme", ReadmeOutputPath, "Read the project overview."));
+            quickLinks.Add(("Readme", ReadmeOutputPath, "Read the project overview.", "Project"));
         }
 
         // Module docs (PRD/Architecture, or GDD/Narrative/etc.) are matched by filename anywhere in the
@@ -173,7 +179,7 @@ public sealed class SiteNav
                 project.Add((doc.Label, outputPath));
             }
 
-            quickLinks.Add((doc.Label, outputPath, doc.Description));
+            quickLinks.Add((doc.Label, outputPath, doc.Description, "Project"));
         }
 
         var hasEpics = sourceRelativePaths.Any(BmadArtifactAdapter.IsEpicsFile);
@@ -182,8 +188,8 @@ public sealed class SiteNav
             delivery.Add(("Epics", EpicsOutputPath));
             // Requirements are parsed out of epics.md, so they share its availability guard.
             delivery.Add(("Requirements", RequirementsOutputPath));
-            quickLinks.Add(("Epics", EpicsOutputPath, "Track epic and story delivery progress."));
-            quickLinks.Add(("Requirements", RequirementsOutputPath, "Review FR/NFR coverage and status."));
+            quickLinks.Add(("Epics", EpicsOutputPath, "Track epic and story delivery progress.", "Delivery"));
+            quickLinks.Add(("Requirements", RequirementsOutputPath, "Review FR/NFR coverage and status.", "Delivery"));
         }
 
         // The sprint tracking file (sprint-status.yaml) is its own first-class delivery view, gated on the
@@ -192,7 +198,7 @@ public sealed class SiteNav
         if (hasSprint)
         {
             delivery.Add(("Sprint", SprintOutputPath));
-            quickLinks.Add(("Sprint", SprintOutputPath, "See where every epic and story sits."));
+            quickLinks.Add(("Sprint", SprintOutputPath, "See where every epic and story sits.", "Delivery"));
         }
 
         // Insights: deep-git pages (data signal at nav-build time) + Code Map (source-code walk).
@@ -210,7 +216,7 @@ public sealed class SiteNav
         if (hasCodeMap)
         {
             insights.Add(("Code Map", CodeMapOutputPath));
-            quickLinks.Add(("Code Map", CodeMapOutputPath, "Explore the codebase by size and change activity."));
+            quickLinks.Add(("Code Map", CodeMapOutputPath, "Explore the codebase by size and change activity.", "Insights"));
         }
 
         // Follow-ups: open retro action items + deferred-work note (NFR8 — omit when absent). Also added to
@@ -219,19 +225,19 @@ public sealed class SiteNav
         if (hasActionItems)
         {
             followUps.Add(("Action Items", ActionItemsOutputPath));
-            quickLinks.Add(("Action Items", ActionItemsOutputPath, "Review open retrospective action items."));
+            quickLinks.Add(("Action Items", ActionItemsOutputPath, "Review open retrospective action items.", "Follow-ups"));
         }
 
         if (hasDeferredWork && !string.IsNullOrEmpty(deferredWorkOutputPath))
         {
             var normalizedDeferredPath = PathUtil.NormalizeSlashes(deferredWorkOutputPath);
             followUps.Add(("Deferred Work", normalizedDeferredPath));
-            quickLinks.Add(("Deferred Work", normalizedDeferredPath, "See work explicitly deferred for later."));
+            quickLinks.Add(("Deferred Work", normalizedDeferredPath, "See work explicitly deferred for later.", "Follow-ups"));
         }
 
         if (hasAdrs)
         {
-            quickLinks.Add(("ADRs", AdrsLandingOutputPath, "Browse architecture decisions."));
+            quickLinks.Add(("ADRs", AdrsLandingOutputPath, "Browse architecture decisions.", "Project"));
         }
 
         // Spec kernels: Project-group nav children + dashboard quick-links (same presence gate).
@@ -253,7 +259,7 @@ public sealed class SiteNav
                 ? "Read this SPEC kernel and its companions."
                 : "Read the canonical SPEC kernel and its companions.";
             project.Add((label, specOutputPath));
-            quickLinks.Add((label, specOutputPath, description));
+            quickLinks.Add((label, specOutputPath, description, "Project"));
         }
 
         // ADRs sit next to the architecture doc conceptually; they live in docs/adrs, not _bmad-output,
@@ -377,7 +383,7 @@ public sealed class SiteNav
                 : g.Label,
             g.Children.Select(c => new NavItem(c.Label, c.OutputRelativePath, c.Label)).ToList())).ToList(),
         Items = Items.Select(i => new NavItem(i.Label, i.OutputRelativePath, i.Label)).ToList(),
-        QuickLinks = QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description)).ToList(),
+        QuickLinks = QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description, q.Group)).ToList(),
         ActiveOutputRelativePath = activeOutputRelativePath,
         LocalContext = localContext,
     };

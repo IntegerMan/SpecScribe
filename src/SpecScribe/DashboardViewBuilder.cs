@@ -69,7 +69,7 @@ public static class DashboardViewBuilder
             ProgressBars = BuildProgressBars(ledger),
             Requirements = requirements,
             Coverage = coverage,
-            QuickLinks = nav.QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description)).ToList(),
+            QuickLinks = nav.QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description, q.Group)).ToList(),
             Work = work,
             OpenRetroActionItems = ledger.OpenActionItems,
             Counts = ledger,

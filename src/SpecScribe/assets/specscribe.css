@@ -2855,7 +2855,8 @@ a.ref-file-node:focus-visible {
    1040px list column; Deferred | Action items stack vertically inside each card (not side-by-side).
    Pane markup lives inside .*-wrap so max-width is inherited. [spec-follow-up-list-batch-actions] */
 .list-batch-actions .next-steps-cards {
-  /* Three equal cards; minmax(0,…) avoided — StylesheetTests guards that exact footer-legend string. */
+  /* Fixed 3 equal cards (unlike the auto-fit default above) so Address all / Address first 5 / Close all
+     stay aligned as one row down to the 960px breakpoint. Pinned by StylesheetTests. */
   grid-template-columns: repeat(3, 1fr);
 }
 @media (max-width: 960px) {
@@ -3462,7 +3463,6 @@ a.ref-file-node:focus-visible {
   color: var(--ink-light);
   margin-bottom: 0;
 }
-.chart-frame-head .git-pulse-files-title { margin-bottom: 0; }
 /* Proportional bar list: label (truncates, full path in title) | track+fill | exact count. The count text
    makes the bar decorative rather than the sole information carrier (never size/color-only). [Story 1.4/1.5] */
 .git-pulse-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -3952,6 +3952,11 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .heatmap-legend-swatch.level-2 { background: #dfb455; }
 .heatmap-legend-swatch.level-3 { background: var(--gold-light); }
 .heatmap-legend-swatch.level-4 { background: var(--gold); }
+
+/* The heatmap's composed window string ("N weeks · <date> – <date>") is much longer than the short captions
+   .chart-frame-window carries elsewhere ("Last 300 commits") — let it wrap instead of inheriting nowrap and
+   risking horizontal overflow on narrow viewports. [Story 10.2 review] */
+.heatmap-window { white-space: normal; }
 
 /* ====================== COMMIT-DAY PAGE (commits/YYYY-MM-DD.html) ====================== */
 /* One row per commit: monospace hash + time, then author, then the subject taking the remaining width.

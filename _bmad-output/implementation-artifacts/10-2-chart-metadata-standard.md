@@ -4,7 +4,7 @@ baseline_commit: b89d6f339d77506cbe6f4b8c1f097869fa1028fe
 
 # Story 10.2: Chart Metadata Standard
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -203,6 +203,15 @@ Rendered scaffold (exact class names are your call; keep them stable once chosen
 - [Source: src/SpecScribe/GitMetrics.cs] — `-n 200` / `-n 300` window bounds; `DeepGitPulse` / `GitInsightsData` records (the honest window numbers).
 - [Source: src/SpecScribe/DeepAnalyticsTemplater.cs] / [GitInsightsTemplater.cs] — the per-page framing copy to consolidate; the "recent history" / "top N of M" sites.
 - [Source: src/SpecScribe/HtmlRenderAdapter.Dashboard.cs] — the dashboard chart-panel call sites and `chart-panel-header-row` pattern.
+
+### Review Findings
+
+- [x] [Review][Patch] Duplicated hand-rolled ranking-caption computation in GitInsightsTemplater.cs [GitInsightsTemplater.cs:52-54,88-90] — fixed via shared `TruncatedFilesRankingFact(shown, total, capitalized)` helper
+- [x] [Review][Patch] TimelineTemplater.cs heatmap call site never wired to a why-sentence (AC1 gap) [TimelineTemplater.cs:52] — added `Charts.FrameWhySlot(Charts.WhyText(Charts.ChartMetric.ActivityCadence))`
+- [x] [Review][Patch] HeatLevelRange's maxCount<=1 branch mislabels the level-1 swatch "1" in the future-dated-commits edge case where every visible cell is actually level-0, so legend and cells briefly disagree [Charts.cs:96-104] — split into maxCount<=0 (always "—") vs maxCount==1 branches
+- [x] [Review][Patch] chart-frame-window's white-space:nowrap risks overflow for the heatmap's long composed window string on narrow viewports [specscribe.css:3225-3229,3930-3937] — added `.heatmap-window { white-space: normal; }` override
+- [x] [Review][Patch] Redundant CSS rule `.chart-frame-head .git-pulse-files-title { margin-bottom: 0; }` duplicates the base rule's value — dead code, its only call site is already always inside `.chart-frame-head` [specscribe.css:3458-3465] — removed
+- [x] [Review][Patch] HeatLevelRange shows duplicate "—" swatches for adjacent unused levels at small maxCount (e.g. maxCount==2, levels 2 and 3 both render "—") — owner decision: merge/suppress unused adjacent levels in the legend rather than showing indistinguishable duplicate dashes [Charts.cs:96-115] — added `IsHeatLevelUnreachable` and skip unreachable levels in the legend loop
 
 ## Dev Agent Record
 

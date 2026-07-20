@@ -5,6 +5,30 @@ namespace SpecScribe.Tests;
 public class SiteNavTests
 {
     [Fact]
+    public void Build_QuickLinkGroups_MatchTheKeyViewsBandTaxonomy()
+    {
+        // Story 10.1 deferred debt: SiteNav.QuickLinks' Group is now the single source of truth for the white
+        // key-views band classification that HtmlRenderAdapter's (now-deleted) KeyViewGroup switch used to
+        // derive independently. Pin every known label's Group here so a future call site can't silently drift
+        // from this taxonomy (Delivery/Insights/Follow-ups; everything else defaults to Project).
+        var nav = SiteNav.Build(
+            new[] { "planning-artifacts/epics.md" }, "SpecScribe",
+            hasAdrs: true, hasReadme: true, hasSprint: true, hasCodeMap: true,
+            hasActionItems: true, hasDeferredWork: true, deferredWorkOutputPath: "deferred-work.html");
+        var groupByLabel = nav.QuickLinks.ToDictionary(q => q.Label, q => q.Group);
+
+        Assert.Equal("Delivery", groupByLabel["Epics"]);
+        Assert.Equal("Delivery", groupByLabel["Requirements"]);
+        Assert.Equal("Delivery", groupByLabel["Sprint"]);
+        Assert.Equal("Insights", groupByLabel["Code Map"]);
+        Assert.Equal("Follow-ups", groupByLabel["Action Items"]);
+        Assert.Equal("Follow-ups", groupByLabel["Deferred Work"]);
+        Assert.Equal("Project", groupByLabel["How to read this portal"]);
+        Assert.Equal("Project", groupByLabel["Readme"]);
+        Assert.Equal("Project", groupByLabel["ADRs"]);
+    }
+
+    [Fact]
     public void Build_OmitsMissingArtifactClasses()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

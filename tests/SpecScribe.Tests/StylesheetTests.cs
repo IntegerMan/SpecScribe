@@ -648,6 +648,23 @@ public class StylesheetTests
         Assert.Equal("#7a6250", TokenValue(ReadStylesheet(), "--status-deferred"));
     }
 
+    [Fact]
+    public void Stylesheet_HasListBatchThreeColumnLayout()
+    {
+        // spec-follow-up-list-batch-actions' pane later gained a dedicated 3-column-fixed layout (stacked
+        // Deferred | Action items pair per card, not side by side) in the Story 10.1 nav-restructuring
+        // commit. Shipped and unchanged since; pinned here per Story 10.1 deferred debt cleanup. Scoped to
+        // each selector's own rule body (not whole-file Contains) so the pin can't stay green if the
+        // property moves to an unrelated selector elsewhere in the stylesheet.
+        var css = ReadStylesheet();
+        Assert.Matches(
+            new Regex(@"\.list-batch-actions \.next-steps-cards\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*1fr\);[^}]*\}"),
+            css);
+        Assert.Matches(
+            new Regex(@"\.next-step-command-group\s*\{[^}]*flex-direction:\s*column;[^}]*\}"),
+            css);
+    }
+
     // ---- Story 9.5: AC resting card + collapsible Dev Notes ---------------------------------
 
     [Fact]

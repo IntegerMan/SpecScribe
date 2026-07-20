@@ -99,6 +99,36 @@ public class RenderParityTests
     }
 
     [Fact]
+    public void Extract_AllFourDarkBarNavGroupsPopulatedTogether_StillFullParity()
+    {
+        // Story 10.1 deferred debt: RenderParityTests never exercised all four dark-bar <details> disclosure
+        // groups (Delivery/Insights/Follow-ups/Project, rendered by AppendNavMenu) at once — only pairs, via
+        // Extract_GroupedNav_RecoversOnlyLeafAnchors_NotGroupSummaries above. Give every group-gating signal
+        // enough children (>=2, so none collapses to a flat link) to disclose simultaneously.
+        var nav = SiteNav.Build(
+            new[] { "planning-artifacts/epics.md" }, "SpecScribe",
+            hasAdrs: true, hasReadme: true, hasSprint: true,
+            hasGitInsights: true, hasDeepAnalytics: true,
+            hasActionItems: true, hasDeferredWork: true, deferredWorkOutputPath: "deferred-work.html");
+        var page = EpicPage(nav);
+        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        var facts = RenderParity.Extract(html, page);
+
+        Assert.Equal(
+            new[]
+            {
+                "index.html", "epics.html", "requirements.html", "sprint.html",
+                "git-insights.html", "deep-analytics.html",
+                "action-items.html", "deferred-work.html",
+                "how-to-read.html", "readme.html", "adrs/index.html",
+            },
+            facts.Nav.Select(n => n.Target).ToList());
+        // Group headers are <summary>, not <a> — never mistaken for nav facts, on all four groups at once.
+        Assert.DoesNotContain(facts.Nav, n => n.Label is "Delivery" or "Insights" or "Follow-ups" or "Project");
+        Assert.Empty(RenderParity.FindDivergences(page, html, "html"));
+    }
+
+    [Fact]
     public void Extract_LocalContextBand_NeverRecoveredAsNavFacts()
     {
         // Story 10.10: the white sub-header band's page-type local context lives outside site-nav-links'

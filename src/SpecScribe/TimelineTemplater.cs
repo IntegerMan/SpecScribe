@@ -50,6 +50,7 @@ public static class TimelineTemplater
         {
             sb.Append("<div class=\"chart-panel timeline-heatmap\">\n");
             sb.Append(Charts.CommitHeatmap(git.DailySeries, git.CommitsByDay));
+            sb.Append(Charts.FrameWhySlot(Charts.WhyText(Charts.ChartMetric.ActivityCadence)));
             sb.Append("</div>\n");
         }
 

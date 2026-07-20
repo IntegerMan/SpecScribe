@@ -568,7 +568,16 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Spec/ADRs (Spec before ADRs, matching the taxonomy table); Follow-ups gained a dedicated
         // family-followups CSS accent (was inheriting family-epics/Delivery's color). Verified stable across
         // repeated runs before locking in.
-        const string expected = "8d631348619300f39e5c6fff6b17881c55ed21d890b42825e540fdc64a738672";
+        // Regenerated for Story 10.1 deferred debt cleanup: the .list-batch-actions .next-steps-cards CSS
+        // comment was corrected (no markup/rule change, but the shared stylesheet's byte content moves, so
+        // every page's asset-cache-busted byte count shifts too). This repo's background auto-committer was
+        // landing unrelated concurrent commits on `main` during this session (same shared-main gotcha as
+        // Story 10.10) — re-verified stable across repeated runs against the settled state before locking in.
+        // Regenerated for Story 10.2 code-review patches: dropped the redundant .chart-frame-head
+        // .git-pulse-files-title CSS rule, added .heatmap-window { white-space: normal; }, Timeline's heatmap
+        // now gets a chart-frame-why sentence, and the heatmap legend skips levels no cell can reach at the
+        // current maxCount (so small/young repos no longer show duplicate "—" swatches).
+        const string expected = "f1d3e1db53541697b73e70b7b95dd0e09df1945822e689c54ad8bcca3e9589fa";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

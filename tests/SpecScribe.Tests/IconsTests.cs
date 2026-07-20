@@ -79,7 +79,7 @@ public class IconsTests
             hasSprint: true,
             hasCodeMap: true);
         foreach (var (label, _) in nav.Items) keys.Add(label);
-        foreach (var (label, _, _) in nav.QuickLinks) keys.Add(label);
+        foreach (var (label, _, _, _) in nav.QuickLinks) keys.Add(label);
 
         // ModuleContext well-known BMad Method doc labels.
         foreach (var doc in ModuleContext.DocsFor(BmadModule.BmadMethod))

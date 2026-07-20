@@ -243,7 +243,7 @@ public class FollowUpSurfacesTests : IDisposable
             SiteTitle = "SpecScribe",
             Items = Array.Empty<(string, string)>(),
             Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
-            QuickLinks = Array.Empty<(string, string, string)>(),
+            QuickLinks = Array.Empty<(string, string, string, string)>(),
         };
         var html = FollowUpDetailTemplater.RenderActionPage(
             item, "action-route-epic-1-debt", nav, commands);
@@ -277,7 +277,7 @@ public class FollowUpSurfacesTests : IDisposable
             SiteTitle = "SpecScribe",
             Items = Array.Empty<(string, string)>(),
             Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
-            QuickLinks = Array.Empty<(string, string, string)>(),
+            QuickLinks = Array.Empty<(string, string, string, string)>(),
         };
         var html = FollowUpDetailTemplater.RenderDeferredPage(
             item, "Deferred work", null, "deferred-orphan", nav, "deferred-work.html");
@@ -303,7 +303,7 @@ public class FollowUpSurfacesTests : IDisposable
             SiteTitle = "SpecScribe",
             Items = Array.Empty<(string, string)>(),
             Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
-            QuickLinks = Array.Empty<(string, string, string)>(),
+            QuickLinks = Array.Empty<(string, string, string, string)>(),
         };
         var html = FollowUpDetailTemplater.RenderDeferredPage(
             item,
