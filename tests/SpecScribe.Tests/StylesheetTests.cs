@@ -741,6 +741,26 @@ public class StylesheetTests
         Assert.Contains(".list-row {", css);
     }
 
+    // ---- Story 10.6: insight-chart context polish chrome -----------------------------------------------
+
+    [Fact]
+    public void Stylesheet_InsightChartContextPolish_SeamsPresent()
+    {
+        var css = ReadStylesheet();
+        // Process-coupling note frame slot (rust accent, distinct from italic Why).
+        Assert.Contains(".chart-frame-note", css);
+        Assert.Contains("border-left: 3px solid var(--rust-light)", css);
+        // Coupling Kind column + Process badge + dashed process edges.
+        Assert.Contains(".coupling-table .coupling-kind", css);
+        Assert.Contains(".coupling-kind-badge", css);
+        Assert.Contains(".coupling-edge.process-edge", css);
+        Assert.Contains("stroke-dasharray: 5 3", css);
+        // Young-repo first-commit accent + caption (never color-only).
+        Assert.Contains(".heatmap-first-commit-mark", css);
+        Assert.Contains(".heatmap-first-commit", css);
+        Assert.Contains("fill: var(--rust)", css);
+    }
+
     // ---- Story 9.11: follow-up detail page --------------------------------
 
     [Fact]

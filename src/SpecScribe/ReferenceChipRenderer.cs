@@ -15,13 +15,16 @@ namespace SpecScribe;
 public static class ReferenceChipRenderer
 {
     // Splits already-rendered HTML into alternating [plain, protected, plain, protected, ...] segments. Only
-    // even indices (plain prose) are matched below; a whole <a>/<code>/<pre>/<svg> span, or any other standalone
-    // tag, is carried through untouched — same discipline as AbbreviationExpander.ProtectedSplit. <svg> matters
-    // here specifically: chart tooltips (e.g. the sunburst's <title> text) carry raw, unrendered task text
-    // inside an SVG subtree, where injected <span> markup would show as literal visible text (SVG <title> has
-    // no HTML sub-parsing) rather than a styled chip — so the whole subtree is skipped, not just individual tags.
+    // even indices (plain prose) are matched below; a whole <a>/<code>/<pre>/<svg>/<script>/<style>/<head>
+    // span, or any other standalone tag, is carried through untouched — same discipline as
+    // AbbreviationExpander.ProtectedSplit (including <script>/<style>/<head>, since ApplyReferenceLinks runs
+    // over the full page HTML). <svg> matters specifically: chart tooltips (e.g. the sunburst's <title> text)
+    // carry raw, unrendered task text inside an SVG subtree, where injected <span> markup would show as
+    // literal visible text (SVG <title> has no HTML sub-parsing) rather than a styled chip — so the whole
+    // subtree is skipped, not just individual tags.
     private static readonly Regex ProtectedSplit = new(
-        "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<svg\\b[^>]*>.*?</svg>|<[^>]*>)",
+        "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<svg\\b[^>]*>.*?</svg>"
+        + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>|<[^>]*>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
     // Three shapes in one alternation (leftmost-match-wins, tried in listed order at each position):

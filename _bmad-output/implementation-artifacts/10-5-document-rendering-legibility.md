@@ -4,7 +4,7 @@ baseline_commit: d08e19c3fec5b162baad8622ddcd91fb0056661c
 
 # Story 10.5: Document Rendering Legibility
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -140,6 +140,16 @@ The notice is an authored **HTML comment**, currently peeled as the next story's
   - [x] `dotnet run` a full generate: open a long page (PRD or story 3.7) → the "On this page" TOC groups subsections under collapsible parents and is still present; open a story/doc with prose containing `[[…]]`/`file:line`/`[ASSUMPTION: …]` → all render as chips/annotations, no raw brackets; open the **epic-3** page → the Story 3.4 retirement notice is in a collapsed "Retired" section, **not** pinned above an active story.
   - [x] Confirm `specscribe webview` (CSP — the `<details>` disclosures must work with **no** JS) and `--spa` render the same (they ride the shared TOC/adapter seams).
 
+### Review Findings
+
+- [x] [Review][Decision] Retirement-keyword false-positive tolerance — Decision resolved (option 1): keep the tolerant `\b(retired|superseded|deprecated)\b` matcher as designed; accept incidental-mention risk over inventing a stricter authoring schema (NFR8). No code change.
+- [x] [Review][Patch] Align `ReferenceChipRenderer.ProtectedSplit` with `AbbreviationExpander` — also skip `<script>`/`<style>`/`<head>` spans [`src/SpecScribe/ReferenceChipRenderer.cs:23`]
+- [x] [Review][Patch] After anchor-dedupe drops a duplicate level-2, its following level-3 children group under the previous parent [`src/SpecScribe/Toc.cs:31`]
+- [x] [Review][Patch] Restrict `HoistBetweenStoryRetiredComments` to true between-story placement (next non-blank is a story heading or EOF) so mid-narrative / mid-AC keyword comments are not blanked [`src/SpecScribe/EpicsParser.cs:656`]
+- [x] [Review][Patch] Add TOC regression for orphaned h3s after a duplicate level-2 is deduped [`tests/SpecScribe.Tests/TocTests.cs`]
+- [x] [Review][Defer] `<kbd>`/`<samp>` inner text not protected by chip ProtectedSplit [`src/SpecScribe/ReferenceChipRenderer.cs:23`] — deferred, pre-existing; same open-tag-only split pattern as sibling post-processors
+- [x] [Review][Defer] Retirement comments in the epic preamble (before the first story) are never hoisted [`src/SpecScribe/EpicsParser.cs:755`] — deferred, pre-existing scope; AC3 targets leading-comment and between-story shapes (F6), not preamble goal text
+
 ## Dev Notes
 
 ### Architecture patterns & constraints (must follow)
@@ -256,3 +266,4 @@ Claude (Sonnet 5), via the `bmad-dev-story` workflow.
 ## Change Log
 
 - 2026-07-18: dev-story — implemented all three ACs (`ReferenceChipRenderer` chips/annotations, grouped collapsible TOC, collapsed epic Retired section); discovered and fixed two real-repo-only gaps beyond the design doc's simplified examples: (1) the actual Story 3.4 retirement notice sits BETWEEN two stories, not as either story's leading comment — added `EpicsParser.HoistBetweenStoryRetiredComments`; (2) `ReferenceChipRenderer` needed to skip `<svg>...</svg>` subtrees so chart-tooltip text (SVG `<title>`, no HTML sub-parsing) never gets literal `<span>` markup injected. Golden fingerprint regenerated (confirmed baseline green first). 1612/1612 tests green. Verified end-to-end via `dotnet run generate`, `--spa`, and `webview` against this repo's own `epics/epic-3.html` and `story-10-5.html`. Status → review.
+- 2026-07-20: code-review — adversarial review (Blind/Edge/Acceptance); decision kept tolerant retirement matcher; applied 4 patches (script/style/head protect, TOC orphan-after-dedupe, between-story hoist guard, regression tests). Status → done.

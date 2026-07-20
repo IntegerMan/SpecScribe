@@ -94,6 +94,31 @@ public class TocTests
     }
 
     [Fact]
+    public void RenderSidebar_OrphanedLevel3AfterDuplicateLevel2Dedupe_DoesNotAttachToPreviousParent()
+    {
+        // Story 10.5 review patch: when a duplicate level-2 is dropped by anchor-dedupe, its level-3 children
+        // must degrade to plain stray links — not silently regroup under the previous surviving parent.
+        var html = Toc.RenderSidebar(new[]
+        {
+            new Toc.Entry(2, "First Parent", "sec-shared"),
+            new Toc.Entry(3, "Child Of First", "sec-child-1"),
+            new Toc.Entry(2, "Duplicate Parent", "sec-shared"),
+            new Toc.Entry(3, "Child Of Duplicate", "sec-child-2"),
+        });
+
+        Assert.Equal(1, html.Split("<details class=\"toc-group\"").Length - 1);
+        Assert.Contains("<summary><a class=\"toc-link\" href=\"#sec-shared\">First Parent</a></summary>", html);
+        Assert.Contains("<a class=\"toc-link toc-h3\" href=\"#sec-child-1\">Child Of First</a>", html);
+        // Orphaned child is outside the group (plain link), not nested under First Parent.
+        Assert.Contains("<a class=\"toc-link toc-h3\" href=\"#sec-child-2\">Child Of Duplicate</a>", html);
+        Assert.DoesNotContain("Duplicate Parent", html);
+        // The orphaned link must appear AFTER the closing </details>, not inside the group.
+        var groupEnd = html.IndexOf("</details>", StringComparison.Ordinal);
+        var orphanIdx = html.IndexOf("sec-child-2", StringComparison.Ordinal);
+        Assert.True(groupEnd >= 0 && orphanIdx > groupEnd);
+    }
+
+    [Fact]
     public void WrapWithSidebar_NoEntriesReturnsContentUnwrapped()
     {
         const string main = "<article>content</article>";

@@ -448,6 +448,56 @@ public class EpicsParserTests
         Assert.Contains("rows reorder", block);
     }
 
+    private const string MidBlockRetirementCommentEpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Goal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: First story
+
+        As a maintainer, I want the first story, so that work starts.
+
+        **Acceptance Criteria:**
+
+        **Given** a list page
+        <!-- Story 9.9 retired mid-block — must NOT hoist -->
+        **When** I sort
+        **Then** rows reorder
+
+        ### Story 1.2: Second story
+
+        As a maintainer, I want the second story, so that work continues.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** it builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_RetirementComment_MidGivenWhenThenBlock_IsNotHoistedToRetiredSection()
+    {
+        // Story 10.5 review patch: a retirement-keyword comment sitting MID an AC Given/When/Then sequence
+        // is not true between-story placement — HoistBetweenStoryRetiredComments must leave it alone
+        // (ParseStory's mid-block degrade owns that shape).
+        var epic = EpicsParser.Parse(MidBlockRetirementCommentEpicsMd).Epics[0];
+
+        Assert.Empty(epic.RetiredNoticesHtml);
+        var story = epic.Stories.Single(s => s.Id == "1.1");
+        Assert.Empty(story.TrailingNotesHtml);
+        var block = Assert.Single(story.AcBlocksHtml);
+        Assert.Contains("a list page", block);
+        Assert.Contains("I sort", block);
+        Assert.Contains("rows reorder", block);
+    }
+
     private const string MultipleTrailingNotesEpicsMd = """
         # Epics
 

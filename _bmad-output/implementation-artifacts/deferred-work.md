@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 10-5-document-rendering-legibility.md (2026-07-20)
+
+- source_spec: `10-5-document-rendering-legibility.md`
+  summary: `ReferenceChipRenderer.ProtectedSplit` does not shield inner text of `<kbd>`/`<samp>` (open-tag-only catch-all); chip patterns inside those elements can be rewritten.
+  evidence: Blind Hunter. Pre-existing post-processor split pattern shared with sibling linkifiers/expanders; revisit if a dedicated inline-code-like protect list is introduced.
+- source_spec: `10-5-document-rendering-legibility.md`
+  summary: Retirement HTML comments in an epic preamble (before the first `### Story` heading) are never scanned by `HoistBetweenStoryRetiredComments` and stay in goal/meta text.
+  evidence: Edge Case Hunter. Outside AC3’s leading-comment + between-story shapes (F6); revisit if preamble retirement notices appear in real artifacts.
+
 ## Deferred from: code review of 10-4-consistent-dates-and-event-sequencing.md (2026-07-20)
 
 - source_spec: `10-4-consistent-dates-and-event-sequencing.md`

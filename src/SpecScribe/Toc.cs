@@ -28,31 +28,54 @@ public static class Toc
         // namespace; keep only the first entry per AnchorId so we never render two links to the same anchor
         // (a browser jumps to the first matching id, making the later link a silent dead end). Dedupe BEFORE
         // grouping so a parent's child count reflects only entries that will actually render.
-        var seen = new HashSet<string>();
-        var deduped = new List<Entry>();
-        foreach (var e in entries)
+        //
+        // Assign each level-3 entry its logical level-2 parent from the ORIGINAL list first. When a duplicate
+        // level-2 is dropped, its children must NOT attach to the previous surviving parent — they degrade to
+        // plain (stray) links instead.
+        var parentOf = new int[entries.Count];
+        var currentParent = -1;
+        for (var i = 0; i < entries.Count; i++)
         {
-            if (seen.Add(e.AnchorId)) deduped.Add(e);
+            if (entries[i].Level < 3)
+            {
+                currentParent = i;
+                parentOf[i] = -1;
+            }
+            else
+            {
+                parentOf[i] = currentParent;
+            }
+        }
+
+        var seen = new HashSet<string>();
+        var surviving = new List<(Entry Entry, int OriginalIndex)>();
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (!seen.Add(entries[i].AnchorId)) continue;
+            surviving.Add((entries[i], i));
         }
 
         var sb = new StringBuilder();
         sb.Append("<nav class=\"toc-sidebar\" aria-label=\"On this page\">\n");
         sb.Append("  <span class=\"toc-label\">On this page</span>\n");
 
-        for (var i = 0; i < deduped.Count; i++)
+        for (var i = 0; i < surviving.Count; i++)
         {
-            var e = deduped[i];
+            var (e, origIdx) = surviving[i];
             if (e.Level >= 3)
             {
-                sb.Append(RenderLink(e)); // stray leading h3 — degrade to a plain link, never drop it.
+                sb.Append(RenderLink(e)); // stray leading/orphaned h3 — degrade to a plain link, never drop it.
                 continue;
             }
 
             var children = new List<Entry>();
             var j = i + 1;
-            while (j < deduped.Count && deduped[j].Level >= 3)
+            while (j < surviving.Count && surviving[j].Entry.Level >= 3)
             {
-                children.Add(deduped[j]);
+                // Only group children whose original parent is THIS level-2 — orphans from a deduped-away
+                // sibling parent stop the run and render as stray links on the next iteration.
+                if (parentOf[surviving[j].OriginalIndex] != origIdx) break;
+                children.Add(surviving[j].Entry);
                 j++;
             }
 

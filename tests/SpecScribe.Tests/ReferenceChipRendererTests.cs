@@ -72,6 +72,18 @@ public class ReferenceChipRendererTests
     }
 
     [Fact]
+    public void BareFileLine_InsideScriptOrStyle_IsUntouched()
+    {
+        // ApplyReferenceLinks runs over full page HTML; chip rewriting must not corrupt script/style bodies
+        // (same protect set as AbbreviationExpander).
+        var script = "<script>var path = 'src/SpecScribe/Foo.cs:42';</script>";
+        var style = "<style>/* see [[wiki-link]] and Foo.cs:42 */</style>";
+
+        Assert.Equal(script, ReferenceChipRenderer.Render(script));
+        Assert.Equal(style, ReferenceChipRenderer.Render(style));
+    }
+
+    [Fact]
     public void BareFileLine_InsideExistingAnchor_IsNotDoubleWrapped()
     {
         // Models Story 7.2's resolved output: CodeReferenceLinkifier already turned this into a real link.

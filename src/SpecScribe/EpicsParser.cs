@@ -648,11 +648,13 @@ public static class EpicsParser
     /// after Story 3.3's last Acceptance-Criteria line and before the "### Story 3.5" heading, not inside
     /// either story's own region). A comment sitting immediately after a "### Story" heading is a DIFFERENT
     /// shape — a story marked retired via its own leading comment — and is left untouched here;
-    /// <see cref="ParseStory"/>'s leading-comment peel already classifies that case. Blanks the matched
-    /// comment's own lines in place (to empty strings) so they degrade to the blank lines the existing AC-block
-    /// parser already skips, rather than being swept in as literal AC-block text (today's quirk). An
-    /// unterminated <c>&lt;!--</c> or a comment that doesn't match a retirement keyword is left completely
-    /// untouched (NFR8 — no behavior change for ordinary between-story content).</summary>
+    /// <see cref="ParseStory"/>'s leading-comment peel already classifies that case. Only comments whose
+    /// next non-blank line is a story heading (or EOF of the epic body) are hoisted — mid-narrative / mid-AC
+    /// comments that merely contain a retirement keyword are left alone. Blanks the matched comment's own
+    /// lines in place (to empty strings) so they degrade to the blank lines the existing AC-block parser
+    /// already skips, rather than being swept in as literal AC-block text (today's quirk). An unterminated
+    /// <c>&lt;!--</c> or a comment that doesn't match a retirement keyword is left completely untouched
+    /// (NFR8 — no behavior change for ordinary between-story content).</summary>
     private static List<string> HoistBetweenStoryRetiredComments(
         string[] lines, int scanStart, int scanEnd, IReadOnlyList<(int Index, int EpicNum, int StoryNum, string Title)> storyStarts)
     {
@@ -674,7 +676,17 @@ public static class EpicsParser
 
             var precedingNonBlank = PrecedingNonBlankLineIndex(lines, startLine);
             var isLeadingCommentOfAStory = precedingNonBlank >= 0 && headingLines.Contains(precedingNonBlank);
-            if (!isLeadingCommentOfAStory)
+            // True between-story placement: the next non-blank line is a story heading, or we're at EOF of
+            // the epic body. Mid-narrative / mid-AC comments that happen to contain a retirement keyword
+            // must NOT be blanked here — ParseStory's own leading-comment peel (and AC mid-block degrade)
+            // own those shapes.
+            var nextNonBlank = -1;
+            for (var k = closeLine + 1; k < scanEnd; k++)
+            {
+                if (lines[k].Trim().Length > 0) { nextNonBlank = k; break; }
+            }
+            var followedByStoryOrEof = nextNonBlank < 0 || headingLines.Contains(nextNonBlank);
+            if (!isLeadingCommentOfAStory && followedByStoryOrEof)
             {
                 var commentText = string.Join("\n", lines[startLine..(closeLine + 1)]);
                 if (RetirementKeyword.IsMatch(commentText))

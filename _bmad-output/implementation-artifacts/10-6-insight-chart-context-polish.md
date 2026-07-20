@@ -4,7 +4,7 @@ baseline_commit: 26cc545dbd159a5ef6548f74dd68abccc8a7c2c3
 
 # Story 10.6: Insight-Chart Context Polish
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -132,6 +132,12 @@ If `ChartMeta`/`Framed` exist at implement time, route panel-level notes through
 - [x] **Task 6 — Verify end-to-end (shine check)** (AC: 1, 2)
   - [x] `--deep-git` and without; webview + SPA; eyeball finished for a non-expert reader.
 
+### Review Findings
+
+- [x] [Review][Patch] Clamp young-repo heatmap start when firstCommit is future-dated so start cannot exceed end (prevents negative/zero weeks and broken SVG; also keeps first-commit caption paired with the accent mark) [Charts.cs:1138]
+- [x] [Review][Patch] Update CommitHeatmap XML summary — still claims "~8 week" pad; young-repo trim is now ~1 week lead-in [Charts.cs:1111]
+- [x] [Review][Patch] Pin new 10.6 chrome classes in StylesheetTests (Task 5 claimed coverage; `.chart-frame-note`, `.coupling-kind*`, `.process-edge`, `.heatmap-first-commit*`) [StylesheetTests.cs]
+
 ## Dev Notes
 
 ### Architecture patterns & constraints (must follow)
@@ -215,4 +221,5 @@ Golden fingerprint regenerated and documented (`48f2ed0d…`, replacing 10.5's `
 
 ## Change Log
 
+- 2026-07-20: code-review — 3 patches applied (future-dated firstCommit heatmap clamp + paired caption/mark gate; CommitHeatmap XML docs; StylesheetTests chrome pins). 14 findings dismissed (owner-locked classifier / by-design chrome). Status → done.
 - 2026-07-19: dev-story — implemented both ACs. AC1: `GitMetrics.ClassifyCoupling`/`IsProcessPath` (pattern/extension-only, NFR8) + Kind badge on `CouplingTable` + dashed edges on `CouplingGraph` + a new `Charts.ChartMeta.Note` frame slot carrying `DeepAnalyticsTemplater`'s explanatory note when any process pair is present — verified live against this repo, where `sprint-status.yaml ↔ specscribe.css` (the story's own example) renders marked "Process". AC2a: `CommitHeatmap`'s young-repo branch trims the dead-zone pad from a full 15-week floor to `firstCommit - 7 days` (week-snapped), old-repo branch untouched, plus a first-commit SVG accent + text caption (never color-only) — verified live, since this repo is itself ~15 days old and now renders a real 4-week grid with the marker on all three surfaces sharing the builder (dashboard, Git Insights, commit-day timeline). AC2b: `GitInsightsTemplater` rewords "People to talk to" → "Sole contributor:" on `TotalContributors <= 1` and softens the hub-wide unselected prompt on `ContributorCount == 1` — covered by new fixtures since this repo has 2 contributors. Golden fingerprint regenerated (baseline confirmed green first). 1649/1649 tests green (37 new). Verified end-to-end via `dotnet run generate --deep-git` against this repo's own history, browsed in-app. Status → review.
