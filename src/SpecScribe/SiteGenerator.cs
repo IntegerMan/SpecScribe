@@ -961,23 +961,18 @@ public sealed class SiteGenerator
         {
             var day = days[i];
             var sw = Stopwatch.StartNew();
-            var outputRelative = PathUtil.NormalizeSlashes($"commits/{Charts.D(day)}.html");
+            var outputRelative = DayPageOutputPath(day);
             try
             {
                 var dayCommits = commitsByDay.TryGetValue(day, out var c) ? c : Array.Empty<CommitInfo>();
                 var dayArtifacts = artifactsByDay.TryGetValue(day, out var a) ? a : Array.Empty<(string, string)>();
                 var prefix = PathUtil.RelativePrefix(outputRelative);
-                var pager = EntityPager.FromSequence(days, i,
-                    d => prefix + PathUtil.NormalizeSlashes($"commits/{Charts.D(d)}.html"),
-                    Charts.DReadable);
+                var pager = EntityPager.FromSequence(days, i, d => prefix + DayPageOutputPath(d), Charts.DReadable);
                 // Story 10.10: the white sub-header band's local context — the SAME day family already built
                 // above for the pager, not a second query.
                 var dayLocalContext = new NavLocalContext(
                     "Recent activity",
-                    days.Select(d => new NavLocalItem(
-                        Charts.DReadable(d),
-                        prefix + PathUtil.NormalizeSlashes($"commits/{Charts.D(d)}.html"),
-                        d == day)).ToList());
+                    days.Select(d => new NavLocalItem(Charts.DReadable(d), prefix + DayPageOutputPath(d), d == day)).ToList());
                 var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, pager, nav, commitHref, dayLocalContext);
 
                 WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
@@ -1333,6 +1328,30 @@ public sealed class SiteGenerator
     /// page is trivial.</summary>
     private string? DayHref(DateOnly date) =>
         _commitDays.FirstOrDefault(e => e.Date == date)?.OutputRelativePath;
+
+    /// <summary>The single formula for a day's output path — shared by <see cref="GenerateDatePagesInternal"/> and
+    /// <see cref="ChangeLogDayHref"/> so the two can never drift apart. [date links]</summary>
+    private static string DayPageOutputPath(DateOnly date) => PathUtil.NormalizeSlashes($"commits/{Charts.D(date)}.html");
+
+    /// <summary>Guarded date→href resolver for a story's Change Log entries, usable BEFORE
+    /// <see cref="GenerateDatePagesInternal"/> runs (story pages render earlier in the pipeline than date pages, so
+    /// <see cref="DayHref"/>/<see cref="_commitDays"/> aren't populated yet). Calls
+    /// <see cref="Charts.LinkedCommitDays"/> directly — the same commit-day computation
+    /// <see cref="GenerateDatePagesInternal"/> uses as ONE HALF of its actual day set (the other half,
+    /// <c>artifactsByDay</c>, needs <see cref="_docs"/>/<see cref="_referenceMap"/>/<see cref="_adrs"/> populated,
+    /// which isn't true yet at story-render time). This is therefore a PROVABLE SUBSET, never a superset, of the
+    /// real day set: it can safely under-link (degrade to plain text — the same accepted behavior as "no page
+    /// exists") on the rare artifact-only-day case where a commit touched a recognized artifact but nothing in the
+    /// shallow pulse's day series, but it can never claim a date is linkable when the eventual page won't exist —
+    /// i.e. it can never dead-link. Two earlier review loops tried narrower per-condition checks (an early
+    /// git-only day-set forecast, then a two-condition shallow-or-deep-git check) and both introduced real dead-link
+    /// gaps that this subset approach structurally avoids — see the "review loop 1/2/3" Design Notes in
+    /// spec-change-log-date-links.md. [date links]</summary>
+    private string? ChangeLogDayHref(DateOnly date) =>
+        _progress?.Git is { } git &&
+        Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now)).Contains(date)
+            ? DayPageOutputPath(date)
+            : null;
 
     /// <summary>The guarded code-page resolver for a commit's changed-file path (Story 7.1/7.5): a repo-relative
     /// source path → its <c>code/…html</c> page, output-relative, when that file has an in-portal page — i.e. it is
@@ -2050,11 +2069,14 @@ public sealed class SiteGenerator
         var acceptanceCriteria = EpicsParser.ExtractAcceptanceCriteria(artifactRaw);
         var devAgentRecord = EpicsParser.ExtractDevAgentRecord(artifactRaw);
         var reviewFindingsHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Review Findings");
-        var changeLogHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Change Log");
 
         // Turn "[Source: _bmad-output/path.md]" citations into real links to the generated page. Only drafted
         // stories reach here (both callers guard on ArtifactOutputPath before resolving the artifact path).
         var storyPrefix = PathUtil.RelativePrefix(story.ArtifactOutputPath!);
+
+        // Change Log entry dates link through the same guarded DayHref-style resolver the code page's History tab
+        // uses — plain text when there's no known commit on that date. [date links]
+        var changeLogHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Change Log", ChangeLogDayHref, storyPrefix);
         blurbHtml = SourceLinkifier.Linkify(blurbHtml, referenceMap, storyPrefix);
         remainderHtml = SourceLinkifier.Linkify(remainderHtml, referenceMap, storyPrefix);
         reviewFindingsHtml = SourceLinkifier.Linkify(reviewFindingsHtml, referenceMap, storyPrefix);

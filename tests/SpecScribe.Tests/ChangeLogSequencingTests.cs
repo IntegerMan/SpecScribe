@@ -77,4 +77,44 @@ public class ChangeLogSequencingTests
         var firstIdx = result.IndexOf("First", StringComparison.Ordinal);
         Assert.True(thirdIdx < firstIdx, "the pass must annotate order, never reorder entries");
     }
+
+    [Fact]
+    public void DayHref_Resolved_LinksTheDate()
+    {
+        var slice = "- 2026-07-06: Something happened.";
+        var result = EpicsParser.SequenceChangeLog(slice, date => $"commits/{date:yyyy-MM-dd}.html", "../");
+
+        Assert.Contains("- [Jul 6, 2026](../commits/2026-07-06.html): Something happened.", result);
+    }
+
+    [Fact]
+    public void DayHref_Null_LeavesDatePlainText()
+    {
+        var slice = "- 2026-07-06: Something happened.";
+        var result = EpicsParser.SequenceChangeLog(slice, _ => null, "../");
+
+        Assert.Contains("- Jul 6, 2026: Something happened.", result);
+        Assert.DoesNotContain("[Jul 6, 2026]", result);
+    }
+
+    [Fact]
+    public void DayHref_SameDateRun_BothEntriesLink()
+    {
+        var slice = "- 2026-07-06: First.\n- 2026-07-06: Second.";
+        var result = EpicsParser.SequenceChangeLog(slice, date => $"commits/{date:yyyy-MM-dd}.html", "");
+
+        Assert.Contains("- [Jul 6, 2026](commits/2026-07-06.html) (1 of 2): First.", result);
+        Assert.Contains("- [Jul 6, 2026](commits/2026-07-06.html) (2 of 2): Second.", result);
+    }
+
+    [Fact]
+    public void DayHref_UnrecognizedShape_NeverConsulted()
+    {
+        var table = "| Date | Change |\n|------|--------|\n| 2026-07-12 | Implemented the feature. |";
+        var called = false;
+        var result = EpicsParser.SequenceChangeLog(table, _ => { called = true; return "commits/x.html"; }, "");
+
+        Assert.Equal(table, result);
+        Assert.False(called, "an unrecognized shape must never consult the resolver");
+    }
 }

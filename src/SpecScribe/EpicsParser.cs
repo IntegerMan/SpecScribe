@@ -402,8 +402,11 @@ public static class EpicsParser
     /// <summary>Renders a named "## Heading" section of a raw story artifact to block HTML (heading itself
     /// excluded, up to the next H2), with "[Source: ...]" citation brackets stripped as in the remainder.
     /// Returns "" when the section is absent. Used to surface Review Findings and Change Log as their own
-    /// panels on the story page.</summary>
-    public static string ExtractNamedSectionHtml(string raw, string exactHeading)
+    /// panels on the story page. <paramref name="changeLogDayHref"/> is only consulted for the "## Change Log"
+    /// heading — a guarded date→output-relative-path resolver (null when no day page is known for that date),
+    /// prefixed with <paramref name="hrefPrefix"/> before linking. [date links]</summary>
+    public static string ExtractNamedSectionHtml(
+        string raw, string exactHeading, Func<DateOnly, string?>? changeLogDayHref = null, string hrefPrefix = "")
     {
         var lines = raw.Replace("\r\n", "\n").Split('\n');
         var (start, end) = FindSection(lines, exactHeading, 0, lines.Length);
@@ -414,7 +417,7 @@ public static class EpicsParser
         // The Change Log gets a tolerant pass that reformats its dates through PortalDates and adds an ordinal cue
         // to same-day runs so events sharing a date read in order (Story 10.4 AC2). Any unrecognized shape (a
         // table, free prose) passes through untouched — never reordered, never dropped (NFR8).
-        if (exactHeading == "## Change Log") slice = SequenceChangeLog(slice);
+        if (exactHeading == "## Change Log") slice = SequenceChangeLog(slice, changeLogDayHref, hrefPrefix);
         return MarkdownConverter.RenderBlock(slice);
     }
 
@@ -455,8 +458,11 @@ public static class EpicsParser
     /// otherwise differ only in prose. Single-date items get no marker (unique days stay uncluttered). Continuation
     /// lines and any non-list shape (a table, free prose) are left exactly as authored — this annotates existing
     /// order, it never reorders or drops content (NFR8). Pure + repo-free so the rule is unit-testable. Degrades to
-    /// the input unchanged when no dated list item is present.</summary>
-    public static string SequenceChangeLog(string slice)
+    /// the input unchanged when no dated list item is present.
+    /// <paramref name="dayHref"/> is an optional guarded date→output-relative-path resolver (null → no known day
+    /// page for that date); when it resolves, the reformatted date becomes a markdown link to
+    /// <paramref name="hrefPrefix"/> + that path instead of plain text. [date links]</summary>
+    public static string SequenceChangeLog(string slice, Func<DateOnly, string?>? dayHref = null, string hrefPrefix = "")
     {
         var lines = slice.Replace("\r\n", "\n").Split('\n');
 
@@ -497,12 +503,16 @@ public static class EpicsParser
             }
         }
 
-        // Pass 2: rewrite each item-start line — reformat the date, insert the marker before the colon.
+        // Pass 2: rewrite each item-start line — reformat the date (linked when a day page is known for it), insert
+        // the marker before the colon.
         for (var idx = 0; idx < items.Count; idx++)
         {
             var (lineIndex, date) = items[idx];
             var m = ChangeLogDatedItem.Match(lines[lineIndex]);
-            lines[lineIndex] = $"{m.Groups["bullet"].Value}{PortalDates.Day(date)}{marker[idx] ?? string.Empty}:{m.Groups["rest"].Value}";
+            var dateText = PortalDates.Day(date);
+            var target = dayHref?.Invoke(date);
+            var dateToken = target is { Length: > 0 } ? $"[{dateText}]({hrefPrefix}{target})" : dateText;
+            lines[lineIndex] = $"{m.Groups["bullet"].Value}{dateToken}{marker[idx] ?? string.Empty}:{m.Groups["rest"].Value}";
         }
 
         return string.Join("\n", lines);
