@@ -159,6 +159,34 @@ public sealed class ModuleContext
         @"^\s*-\s*name:\s*(?<name>[A-Za-z0-9_-]+)",
         RegexOptions.Multiline | RegexOptions.Compiled);
 
+    /// <summary>Independent presence check: true when the BMad Method module is installed (manifest entry
+    /// or on-disk <c>module-help.csv</c>). Does NOT rely on the single-winner <see cref="Detect"/> — a
+    /// dual-install repo reports both Method and GDS as Present simultaneously. [SDD help page]</summary>
+    public static bool IsMethodPresent(string repoRoot) => IsModulePresent(repoRoot, "bmm");
+
+    /// <summary>Independent presence check: true when the Game Dev Studio module is installed (manifest
+    /// entry or on-disk <c>module-help.csv</c>). Does NOT rely on the single-winner <see cref="Detect"/>
+    /// — a dual-install repo reports both Method and GDS as Present simultaneously. [SDD help page]</summary>
+    public static bool IsGdsPresent(string repoRoot) => IsModulePresent(repoRoot, "gds");
+
+    /// <summary>True when <paramref name="moduleName"/> is listed in the installed-module manifest
+    /// <em>or</em> its <c>module-help.csv</c> exists on disk (OR semantics). Never throws.</summary>
+    private static bool IsModulePresent(string repoRoot, string moduleName)
+    {
+        try
+        {
+            var bmadRoot = Path.Combine(repoRoot, "_bmad");
+            if (!Directory.Exists(bmadRoot)) return false;
+
+            var installed = ReadInstalledModules(bmadRoot);
+            if (installed.Any(n => string.Equals(n, moduleName, StringComparison.OrdinalIgnoreCase)))
+                return true;
+
+            return File.Exists(Path.Combine(bmadRoot, moduleName, "module-help.csv"));
+        }
+        catch { return false; }
+    }
+
     /// <summary>Detects the primary methodology module for a repo. Prefers the installed-module registry,
     /// falls back to whatever <c>module-help.csv</c> files exist, and uses source-artifact shape only to
     /// break ties when more than one methodology module is installed. Never throws — an undetectable module

@@ -2,11 +2,10 @@ using SpecScribe;
 
 namespace SpecScribe.Tests;
 
-/// <summary>Generation-level coverage for Story 10.3: the "How to read this portal" orientation page is
-/// written on every full run, its reading order only lists pages that actually exist, its glossary comes
-/// from the detected module (AC2 — never hard-coded), Home's Explore Key Views leads with it, and the
-/// first-use &lt;abbr&gt; expander wraps bare acronyms on content pages. Follows the temp-dir fixture style
-/// of <see cref="SiteGeneratorOutlineTests"/>.</summary>
+/// <summary>Generation-level coverage for the Spec-Driven Development orientation page (how-to-read.html):
+/// framework tabs (always rendered, colored by presence), static command lists, Mermaid methodology diagrams,
+/// install CTAs for absent frameworks, Coming Soon stubs for planned frameworks, plus the preserved reading
+/// order and glossary sections. Follows the temp-dir fixture style of <see cref="SiteGeneratorOutlineTests"/>.</summary>
 public class SiteGeneratorHowToReadTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("specscribe-howtoread-").FullName;
@@ -51,6 +50,12 @@ public class SiteGeneratorHowToReadTests : IDisposable
         module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
         BMad Method,_meta,,,,,,,,,false,url,
         BMad Method,bmad-create-story,Create Story,CS,Prepare the next story,create,,4-implementation,,,true,implementation_artifacts,story
+        """;
+
+    private const string GdsCsv = """
+        module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
+        Game Dev Studio,_meta,,,,,,,,,false,url,
+        Game Dev Studio,gds-create-story,Create Story,CS,Prepare the next story,create,,4-implementation,,,true,implementation_artifacts,story
         """;
 
     public SiteGeneratorHowToReadTests()
@@ -100,15 +105,87 @@ public class SiteGeneratorHowToReadTests : IDisposable
         var howToReadPath = Path.Combine(Site, "how-to-read.html");
         Assert.True(File.Exists(howToReadPath));
 
-        // Story 10.1 (shipped ahead of this story) replaced the old flat "Explore Key Views" quick-link grid
-        // with a journey-organized top nav shared by every page, Home included — so reachability from Home
-        // now runs through the shared nav bar's Project group rather than a dashboard card. It leads that
-        // group, ahead of Readme.
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
         var howToReadIdx = index.IndexOf("href=\"how-to-read.html\"", StringComparison.Ordinal);
         var readmeIdx = index.IndexOf("href=\"readme.html\"", StringComparison.Ordinal);
         Assert.True(howToReadIdx >= 0, "Home's nav bar should link to how-to-read.html");
         Assert.True(readmeIdx < 0 || howToReadIdx < readmeIdx, "how-to-read should lead the Project nav group");
+    }
+
+    [Fact]
+    public void HowToRead_NavAndQuickLinksLabeledSpecDrivenDevelopment()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        Assert.Contains("<h1>Spec-Driven Development</h1>", html);
+        Assert.Contains("Spec-Driven Development", html);
+        // The nav bar should carry the new label (not the old one)
+        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        Assert.Contains("Spec-Driven Development", index);
+        Assert.DoesNotContain("How to read this portal", index);
+    }
+
+    [Fact]
+    public void HowToRead_MethodPresent_ShowsCommandsAndMermaidDiagram()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // Method tab should be present-styled
+        Assert.Contains("sdd-badge--present", html);
+        Assert.Contains("/bmad-help", html);
+        Assert.Contains("/bmad-product-brief", html);
+        Assert.Contains("/bmad-prd", html);
+        Assert.Contains("/bmad-create-epics-and-stories", html);
+        Assert.Contains("/bmad-create-story", html);
+        Assert.Contains("/bmad-dev-story", html);
+        Assert.Contains("/bmad-code-review", html);
+        Assert.Contains("/bmad-retrospective", html);
+        // Mermaid diagram block
+        Assert.Contains("class=\"mermaid\"", html);
+        Assert.Contains("Brief", html);
+        Assert.Contains("Retrospective", html);
+        // Mermaid init script present because page has diagram
+        Assert.Contains("mermaid.esm.min.mjs", html);
+    }
+
+    [Fact]
+    public void HowToRead_GdsAbsent_ShowsInstallCta()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        Assert.Contains("npx bmad-method install --modules gds", html);
+        Assert.Contains("https://github.com/bmad-code-org/bmad-module-game-dev-studio", html);
+        Assert.Contains("BMad Game Dev Studio is not installed", html);
+    }
+
+    [Fact]
+    public void HowToRead_PlannedFrameworks_ShowComingSoonOnly()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        Assert.Contains("Spec Kit — Coming Soon", html);
+        Assert.Contains("GSD — Coming Soon", html);
+        Assert.Contains("GSD-Pi — Coming Soon", html);
+        Assert.Contains("Superpowers — Coming Soon", html);
+        Assert.Contains("sdd-badge--coming-soon", html);
+    }
+
+    [Fact]
+    public void HowToRead_AllTabsAlwaysRendered()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        Assert.Contains("sdd-tab--method", html);
+        Assert.Contains("sdd-tab--gds", html);
+        Assert.Contains("sdd-tab--speckit", html);
+        Assert.Contains("sdd-tab--gsd", html);
+        Assert.Contains("sdd-tab--gsd-pi", html);
+        Assert.Contains("sdd-tab--superpowers", html);
     }
 
     [Fact]
@@ -205,23 +282,8 @@ public class SiteGeneratorHowToReadTests : IDisposable
     }
 
     [Fact]
-    public void HowToRead_EmptySections_DoesNotPromiseContentBelow()
+    public void HowToRead_NoBmadFolder_TabsStillRendered_MethodAndGdsAbsent()
     {
-        // Undetected module + no reading-order gates → every Append* is a no-op; the intro must not lie.
-        var nav = SiteNav.Build(Array.Empty<string>(), "Empty Project");
-        var html = HowToReadTemplater.RenderPage(
-            nav, Array.Empty<ModuleDoc>(), Array.Empty<GlossaryTerm>(), CommandCatalog.Empty);
-
-        Assert.Contains("No reading-order pages or glossary terms are available for this project yet.", html);
-        Assert.DoesNotContain("sections below", html);
-        Assert.DoesNotContain("Start with the reading order and glossary below", html);
-    }
-
-    [Fact]
-    public void UndetectedModule_GlossarySectionOmitted_AndAbbreviationExpanderIsNoOp()
-    {
-        // No _bmad folder at all — ModuleContext.Detect degrades to None, so the glossary section is
-        // omitted (not empty-but-present) and content pages render byte-unchanged with respect to FR/AC/ADR.
         var undetectedRoot = Directory.CreateTempSubdirectory("specscribe-howtoread-nomod-").FullName;
         try
         {
@@ -233,17 +295,122 @@ public class SiteGeneratorHowToReadTests : IDisposable
             new SiteGenerator(ForgeOptions.Resolve(source: source, output: output, projectName: "SpecScribe", includeReadme: false)).GenerateAll();
 
             var howToRead = File.ReadAllText(Path.Combine(output, "how-to-read.html"));
-            Assert.DoesNotContain("Glossary", howToRead);
-            Assert.DoesNotContain("<dl", howToRead);
+            // Tabs always rendered — never omitted.
+            Assert.Contains("sdd-tab--method", howToRead);
+            Assert.Contains("sdd-tab--gds", howToRead);
+            // Both are absent
+            Assert.Contains("npx bmad-method install</code>", howToRead);
+            Assert.Contains("npx bmad-method install --modules gds", howToRead);
+            // Page still exists
             Assert.True(File.Exists(Path.Combine(output, "how-to-read.html")));
-
-            var epics = File.ReadAllText(Path.Combine(output, "epics.html"));
-            Assert.DoesNotContain("<abbr", epics);
+            // Planned tabs are Coming Soon
+            Assert.Contains("Spec Kit — Coming Soon", howToRead);
         }
         finally
         {
             Directory.Delete(undetectedRoot, recursive: true);
         }
+    }
+
+    [Fact]
+    public void HowToRead_DualInstall_BothPresent()
+    {
+        // Install GDS alongside BMM.
+        var gdsDir = Path.Combine(_root, "_bmad", "gds");
+        Directory.CreateDirectory(gdsDir);
+        File.WriteAllText(Path.Combine(gdsDir, "module-help.csv"), GdsCsv);
+        // Update manifest.
+        File.WriteAllText(Path.Combine(_root, "_bmad", "_config", "manifest.yaml"),
+            "modules:\n  - name: core\n    version: 6.0.0\n  - name: bmm\n    version: 6.0.0\n  - name: gds\n    version: 6.0.0");
+
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // Both tabs should be present
+        Assert.Contains("sdd-tab-state--present", html);
+        // Method commands
+        Assert.Contains("/bmad-help", html);
+        // GDS commands
+        Assert.Contains("/bmgd-gdd", html);
+        // GDS methodology diagram nodes
+        Assert.Contains("GDD", html);
+        Assert.Contains("Narrative Design", html);
+        Assert.Contains("Prototype", html);
+        // No install CTAs for either
+        Assert.DoesNotContain("BMad Method is not installed", html);
+        Assert.DoesNotContain("BMad Game Dev Studio is not installed", html);
+    }
+
+    [Fact]
+    public void HowToRead_DefaultTabIsMethod_WhenMethodPresent()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // Method radio should be checked
+        var methodTabSection = html.Substring(
+            html.IndexOf("sdd-tab--method", StringComparison.Ordinal),
+            200);
+        Assert.Contains("checked", methodTabSection);
+    }
+
+    [Fact]
+    public void HowToRead_DefaultTabIsGds_WhenOnlyGdsPresent()
+    {
+        // Remove BMM, install only GDS.
+        Directory.Delete(Path.Combine(_root, "_bmad", "bmm"), recursive: true);
+        var gdsDir = Path.Combine(_root, "_bmad", "gds");
+        Directory.CreateDirectory(gdsDir);
+        File.WriteAllText(Path.Combine(gdsDir, "module-help.csv"), GdsCsv);
+        File.WriteAllText(Path.Combine(_root, "_bmad", "_config", "manifest.yaml"),
+            "modules:\n  - name: core\n    version: 6.0.0\n  - name: gds\n    version: 6.0.0");
+
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // GDS radio should be checked as default (Method absent, GDS present)
+        var gdsTabSection = html.Substring(
+            html.IndexOf("sdd-tab--gds", StringComparison.Ordinal),
+            200);
+        Assert.Contains("checked", gdsTabSection);
+    }
+
+    [Fact]
+    public void HowToRead_MermaidInitScriptOmittedWhenNoDiagram()
+    {
+        // Render with both absent — no Mermaid diagram rendered.
+        var nav = SiteNav.Build(Array.Empty<string>(), "Empty Project");
+        var html = HowToReadTemplater.RenderPage(
+            nav, Array.Empty<ModuleDoc>(), Array.Empty<GlossaryTerm>(), CommandCatalog.Empty,
+            methodPresent: false, gdsPresent: false);
+
+        Assert.DoesNotContain("mermaid.esm.min.mjs", html);
+        Assert.DoesNotContain("class=\"mermaid\"", html);
+    }
+
+    [Fact]
+    public void HowToRead_BypassesApplyReferenceLinks()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // Must not contain <abbr> tags (page defines the glossary, mustn't self-expand).
+        Assert.DoesNotContain("<abbr", html);
+    }
+
+    [Fact]
+    public void HowToRead_KeyboardAccessibleTabs()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // Radio inputs are keyboard-focusable (native radio group navigation).
+        Assert.Contains("type=\"radio\"", html);
+        Assert.Contains("name=\"sdd-framework\"", html);
+        // Presence not conveyed by color alone — badge text states Present/Absent/Coming Soon.
+        Assert.Contains(">Present</span>", html);
+        Assert.Contains(">Absent</span>", html);
+        Assert.Contains(">Coming Soon</span>", html);
     }
 
     private static int CountOccurrences(string haystack, string needle)

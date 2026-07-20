@@ -57,8 +57,8 @@ public static class Icons
             "Git Insights" => Svg("<path d=\"M2.8 11.2V8.4l2.4-4 2.4 2.4 2.4-3.2 2.4 4.8v3.2\"/><path d=\"M2.8 11.2h10.4\"/>"),
             "Deep Analytics" => Svg("<circle cx=\"4\" cy=\"8\" r=\"1.7\"/><circle cx=\"12\" cy=\"4.2\" r=\"1.7\"/><circle cx=\"12\" cy=\"11.8\" r=\"1.7\"/><path d=\"M5.5 7.2 10.5 4.8M5.5 8.8 10.5 11.2\"/>"),
             "Deferred Work" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.6 5.6 10.4 10.4M10.4 5.6 5.6 10.4\"/>"),
-            // A compass rose — orientation, distinct from Readme's page glyph. [Story 10.3]
-            "How to read this portal" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.3\"/><path d=\"M10.2 5.8 8.7 8.7 5.8 10.2 7.3 7.3Z\"/>"),
+            // A compass rose — orientation, distinct from Readme's page glyph. [Story 10.3; SDD rebrand]
+            "Spec-Driven Development" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.3\"/><path d=\"M10.2 5.8 8.7 8.7 5.8 10.2 7.3 7.3Z\"/>"),
             "Readme" => Svg("<path d=\"M3 2.8h10v10.4H3Z\"/><path d=\"M5.2 5.6h5.6M5.2 8h5.6M5.2 10.4h3.4\"/>"),
             "PRD" => Svg("<path d=\"M4 2.5h6.2L12.5 4.8V13.5H4Z\"/><path d=\"M6 7h4M6 9.4h4M6 11.8h2.6\"/>"),
             "Product Brief" => Svg("<path d=\"M3.2 4.8h9.6v8.4H3.2Z\"/><path d=\"M5.6 4.8V3.2h4.8v1.6\"/><path d=\"M5.6 8h4.8\"/>"),

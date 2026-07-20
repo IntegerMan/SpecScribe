@@ -595,7 +595,10 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Regenerated 2026-07-20 (spec-10-4-deferred-debt-cleanup): linked Code Map treemap cells move tip/aria
         // onto the wrapping <a> and drop nested tabindex on the <rect>; review patches also update colorize JS
         // labelHost + CSS :focus-within ring for the same Tile pattern (shared asset delta).
-        const string expected = "06c44fa7269b8da419051f4290c6c72343258dcce6912b33118dde60854b0301";
+        // Regenerated for SDD help page: nav/QuickLinks label "How to read this portal" → "Spec-Driven Development"
+        // on every page; how-to-read.html gained framework tabs (SDD tabstrip + panels + Mermaid init); Icons concept
+        // key renamed; specscribe.css gained .sdd-tabs* styles. Verified stable across 2 runs before locking in.
+        const string expected = "fc964817bd43ec57b286ff3da3c455c18aceda058362fd6ae7d218f4d4c41968";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

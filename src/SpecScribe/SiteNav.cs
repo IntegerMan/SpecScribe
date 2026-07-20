@@ -138,8 +138,8 @@ public sealed class SiteNav
         // designed against — so unlike About/Diagnostics, how-to-read rides the Project group (below) AND
         // the quick-link band (site-nav-key-views, shown on non-Home pages) so a first-time visitor reaches
         // it from Home's nav bar without prior BMAD fluency. [Story 10.3]
-        project.Add(("How to read this portal", HowToReadOutputPath));
-        quickLinks.Add(("How to read this portal", HowToReadOutputPath, "New here? Start with the reading order and glossary.", "Project"));
+        project.Add(("Spec-Driven Development", HowToReadOutputPath));
+        quickLinks.Add(("Spec-Driven Development", HowToReadOutputPath, "Orientation for spec-driven development: frameworks, commands, and methodology.", "Project"));
 
         // The README is the project's front-door narrative — Project group, first among module docs.
         if (hasReadme)

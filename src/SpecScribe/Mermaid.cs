@@ -62,6 +62,27 @@ public static class Mermaid
     /// diagram, mirroring the <c>HasMermaid</c>-gated injection on full pages.</summary>
     public static bool ContainsBlock(string html) => html.Contains(BlockMarker, StringComparison.Ordinal);
 
+    /// <summary>Static Mermaid flowchart for the BMad Method SDD methodology sequence:
+    /// brief → PRD → epics/stories → develop → review → retrospective. [SDD help page]</summary>
+    public static string SddMethodDiagram() => """
+        flowchart LR
+          A["Brief"] --> B["PRD"]
+          B --> C["Epics & Stories"]
+          C --> D["Develop"]
+          D --> E["Review"]
+          E --> F["Retrospective"]
+        """;
+
+    /// <summary>Static Mermaid flowchart for the Game Dev Studio SDD methodology sequence —
+    /// a shorter GDS-oriented spine. [SDD help page]</summary>
+    public static string SddGdsDiagram() => """
+        flowchart LR
+          A["GDD"] --> B["Narrative Design"]
+          B --> C["Prototype"]
+          C --> D["Develop"]
+          D --> E["Review"]
+        """;
+
     public static string InitScript() => """
         <script type="module">
           import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';

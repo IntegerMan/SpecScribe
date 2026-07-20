@@ -23,7 +23,7 @@ public class SiteNavTests
         Assert.Equal("Insights", groupByLabel["Code Map"]);
         Assert.Equal("Follow-ups", groupByLabel["Action Items"]);
         Assert.Equal("Follow-ups", groupByLabel["Deferred Work"]);
-        Assert.Equal("Project", groupByLabel["How to read this portal"]);
+        Assert.Equal("Project", groupByLabel["Spec-Driven Development"]);
         Assert.Equal("Project", groupByLabel["Readme"]);
         Assert.Equal("Project", groupByLabel["ADRs"]);
     }
@@ -34,7 +34,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
         // How-to-read always rides the Project group (Story 10.3); a lone Project child collapses flat.
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "How to read this portal" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Spec-Driven Development" }, nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class SiteNavTests
         // Journey order: Home → Delivery (Epics/Requirements) → Project (how-to-read + module docs + ADRs).
         // [Story 10.1; how-to-read leads Project per Story 10.3]
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "How to read this portal", "GDD", "Narrative", "Game Architecture", "ADRs" },
+            new[] { "Home", "Epics", "Requirements", "Spec-Driven Development", "GDD", "Narrative", "Game Architecture", "ADRs" },
             nav.Items.Select(i => i.Label).ToArray());
     }
 
@@ -61,7 +61,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: true);
 
         // Readme sits in Project (after Delivery), not immediately after Home; how-to-read leads Project. [Story 10.1; 10.3]
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "How to read this portal", "Readme" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Spec-Driven Development", "Readme" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.ReadmeOutputPath, nav.Items.First(i => i.Label == "Readme").OutputRelativePath);
         Assert.True(nav.HasReadme);
     }
@@ -81,7 +81,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
         // Project (how-to-read only here) follows Delivery in group order. [Story 10.3]
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Sprint", "How to read this portal" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Sprint", "Spec-Driven Development" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.SprintOutputPath, nav.Items.First(i => i.Label == "Sprint").OutputRelativePath);
         Assert.True(nav.HasSprint);
 
@@ -100,7 +100,7 @@ public class SiteNavTests
         Assert.DoesNotContain("Sprint", nav.Items.Select(i => i.Label));
         Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Sprint");
         Assert.False(nav.HasSprint);
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "How to read this portal" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Spec-Driven Development" }, nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public class SiteNavTests
 
         // Single Insights child collapses to a flat top-level link (empty group label). [Story 10.1]
         // Project (how-to-read only here) follows Insights in group order. [Story 10.3]
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Code Map", "How to read this portal" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Code Map", "Spec-Driven Development" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.CodeMapOutputPath, nav.Items.First(i => i.Label == "Code Map").OutputRelativePath);
         Assert.True(nav.HasCodeMap);
         Assert.DoesNotContain(nav.Groups, g => g.Label == "Insights");
@@ -195,7 +195,7 @@ public class SiteNavTests
         // Delivery before Project; how-to-read leads Project, then PRD + Architecture; brief/UX stay
         // quick-links only. [Story 10.1; how-to-read Story 10.3]
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "How to read this portal", "PRD", "Architecture" },
+            new[] { "Home", "Epics", "Requirements", "Spec-Driven Development", "PRD", "Architecture" },
             nav.Items.Select(i => i.Label).ToArray());
 
         var quickLabels = nav.QuickLinks.Select(q => q.Label).ToArray();
@@ -222,7 +222,7 @@ public class SiteNavTests
         // Spec rides the Project group in the top nav (Story 10.1) and stays a quick-link too.
         Assert.Contains("Spec", nav.Items.Select(i => i.Label));
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "How to read this portal", "PRD", "Architecture", "Spec" },
+            new[] { "Home", "Epics", "Requirements", "Spec-Driven Development", "PRD", "Architecture", "Spec" },
             nav.Items.Select(i => i.Label).ToArray());
     }
 

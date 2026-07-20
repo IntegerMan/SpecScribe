@@ -3133,15 +3133,18 @@ public sealed class SiteGenerator
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutOutputPath, sw.Elapsed);
     }
 
-    /// <summary>Writes <c>how-to-read.html</c> — the first-time-visitor orientation page (reading order +
-    /// glossary), sourced from <see cref="_module"/> (adapter-supplied vocabulary, AC2). Static (no run
-    /// dependency); written on every full run alongside About/Diagnostics so its Home quick-link never 404s.
-    /// Deliberately NOT run through <see cref="ApplyReferenceLinks"/> — it defines the glossary terms, so it
-    /// must not self-expand them into nested &lt;abbr&gt;. [Story 10.3]</summary>
+    /// <summary>Writes <c>how-to-read.html</c> — the Spec-Driven Development orientation page (framework
+    /// tabs, reading order, glossary), sourced from <see cref="_module"/> (adapter-supplied vocabulary, AC2)
+    /// plus independent presence flags for tab coloring. Static (no run dependency); written on every full
+    /// run alongside About/Diagnostics so its Home quick-link never 404s. Deliberately NOT run through
+    /// <see cref="ApplyReferenceLinks"/> — it defines the glossary terms, so it must not self-expand them
+    /// into nested &lt;abbr&gt;. [Story 10.3; SDD help page]</summary>
     private GenerationEvent WriteHowToRead(SiteNav nav)
     {
         var sw = Stopwatch.StartNew();
-        var html = HowToReadTemplater.RenderPage(nav, _module.Docs, _module.Glossary, _module.Commands);
+        var methodPresent = ModuleContext.IsMethodPresent(_options.RepoRoot);
+        var gdsPresent = ModuleContext.IsGdsPresent(_options.RepoRoot);
+        var html = HowToReadTemplater.RenderPage(nav, _module.Docs, _module.Glossary, _module.Commands, methodPresent, gdsPresent);
         WriteOutput(SiteNav.HowToReadOutputPath, html);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.HowToReadOutputPath, sw.Elapsed);
     }

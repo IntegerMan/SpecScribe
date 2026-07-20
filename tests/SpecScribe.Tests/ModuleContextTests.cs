@@ -149,6 +149,68 @@ public class ModuleContextTests : IDisposable
         Assert.Equal(BmadModule.BmadMethod, ctx.Module);
         Assert.Equal("/bmad-code-review", ctx.Commands.Command("code-review"));
     }
+
+    // ---- SDD help page: independent presence helpers ------------------------------------------------
+
+    [Fact]
+    public void IsMethodPresent_TrueWhenBmmInstalled()
+    {
+        WriteModule("bmm", BmmCsv, "core", "bmm");
+        Assert.True(ModuleContext.IsMethodPresent(_repo));
+    }
+
+    [Fact]
+    public void IsMethodPresent_FalseWhenNoBmadFolder()
+    {
+        Assert.False(ModuleContext.IsMethodPresent(_repo));
+    }
+
+    [Fact]
+    public void IsGdsPresent_TrueWhenGdsInstalled()
+    {
+        WriteModule("gds", GdsCsv, "core", "gds");
+        Assert.True(ModuleContext.IsGdsPresent(_repo));
+    }
+
+    [Fact]
+    public void IsGdsPresent_FalseWhenNoBmadFolder()
+    {
+        Assert.False(ModuleContext.IsGdsPresent(_repo));
+    }
+
+    [Fact]
+    public void DualInstall_BothPresent()
+    {
+        WriteModule("bmm", BmmCsv, "core", "bmm", "gds");
+        var gdsDir = Path.Combine(_repo, "_bmad", "gds");
+        Directory.CreateDirectory(gdsDir);
+        File.WriteAllText(Path.Combine(gdsDir, "module-help.csv"), GdsCsv);
+
+        Assert.True(ModuleContext.IsMethodPresent(_repo));
+        Assert.True(ModuleContext.IsGdsPresent(_repo));
+    }
+
+    [Fact]
+    public void MethodPresent_GdsAbsent_OnlyMethodTrue()
+    {
+        WriteModule("bmm", BmmCsv, "core", "bmm");
+        Assert.True(ModuleContext.IsMethodPresent(_repo));
+        Assert.False(ModuleContext.IsGdsPresent(_repo));
+    }
+
+    [Fact]
+    public void IsMethodPresent_TrueWhenManifestListsBmmWithoutCsv()
+    {
+        // Manifest-only OR signal: module listed but module-help.csv missing.
+        var bmadRoot = Path.Combine(_repo, "_bmad");
+        Directory.CreateDirectory(Path.Combine(bmadRoot, "_config"));
+        Directory.CreateDirectory(Path.Combine(bmadRoot, "bmm"));
+        File.WriteAllText(Path.Combine(bmadRoot, "_config", "manifest.yaml"),
+            "modules:\n  - name: core\n    version: 6.0.0\n  - name: bmm\n    version: 6.0.0");
+
+        Assert.True(ModuleContext.IsMethodPresent(_repo));
+        Assert.False(ModuleContext.IsGdsPresent(_repo));
+    }
 }
 
 public class BmadCommandsTests
