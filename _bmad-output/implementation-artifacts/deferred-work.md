@@ -28,9 +28,15 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 10-3-glossary-and-in-place-vocabulary.md (2026-07-20)
 
-- source_spec: `10-3-glossary-and-in-place-vocabulary.md`
+- ~~source_spec: `10-3-glossary-and-in-place-vocabulary.md`
   summary: `AbbreviationExpander`'s `\bADR\b` word-boundary match expands mid-reference in real "ADR-0005"/"ADR 0005" story-page prose (verified present in committed story files, e.g. `6-3-vs-code-integration-spike.md`, `6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics.md`) — no earlier linkifier protects bare "ADR" + number text, so the first such occurrence per page gets wrapped in `<abbr>`, landing the tooltip on the bare acronym adjacent to its number.
-  evidence: Blind Hunter, on the diff adding `AbbreviationExpander`. Arguably the intended first-use-expansion behavior working as designed, just cosmetically odd when adjacent to a numbered reference; no functional break. No test currently pins the desired behavior either way.
+  evidence: Blind Hunter, on the diff adding `AbbreviationExpander`. Arguably the intended first-use-expansion behavior working as designed, just cosmetically odd when adjacent to a numbered reference; no functional break. No test currently pins the desired behavior either way.~~ **RESOLVED 2026-07-20** (`spec-abbreviation-expander-skip-numbered-refs`): acronym match now uses `(?![\s\-\u2013\u2014]*\d{2,})` after the trailing word boundary so "ADR-0005"/"ADR 0005"/en-dash forms stay plain; bare "ADR", "ADR-driven", and "ADR 5 years" still expand on first use. Pinned in `AbbreviationExpanderTests`. [`AbbreviationExpander.cs`]
+
+## Deferred from: code review of spec-abbreviation-expander-skip-numbered-refs.md (2026-07-20)
+
+- source_spec: `spec-abbreviation-expander-skip-numbered-refs.md`
+  summary: `AbbreviationExpander` still wraps bare acronyms mid-reference when the separator is punctuation other than space/hyphen/en/em-dash (e.g. `ADR.0005`, `ADR:0005`, `ADR/0005`).
+  evidence: Blind Hunter on the numbered-ref skip fix; ASCII hyphen/space and en/em-dash forms are handled, but other citation styles are not.
 
 ## Deferred from: code review of spec-3-7-deferred-debt-cleanup.md (2026-07-19)
 

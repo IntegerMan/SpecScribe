@@ -6,9 +6,10 @@ public class AbbreviationExpanderTests
 {
     private static readonly GlossaryTerm Fr = new("FR", "Functional Requirement", "A specific capability.", IsAcronym: true);
     private static readonly GlossaryTerm Nfr = new("NFR", "Non-Functional Requirement", "A quality attribute.", IsAcronym: true);
+    private static readonly GlossaryTerm Adr = new("ADR", "Architecture Decision Record", "A decision record.", IsAcronym: true);
     private static readonly GlossaryTerm SpecKernel = new("spec kernel", "spec kernel", "The distilled contract.", IsAcronym: false);
 
-    private static readonly IReadOnlyList<GlossaryTerm> Glossary = new[] { Fr, Nfr, SpecKernel };
+    private static readonly IReadOnlyList<GlossaryTerm> Glossary = new[] { Fr, Nfr, Adr, SpecKernel };
 
     [Fact]
     public void Expand_WrapsFirstOccurrence_LeavesLaterOccurrencesPlain()
@@ -59,6 +60,57 @@ public class AbbreviationExpanderTests
         var html = AbbreviationExpander.Expand("<p>ACTION and heACHe and FRee stay plain.</p>", Glossary);
 
         Assert.DoesNotContain("<abbr", html);
+    }
+
+    [Fact]
+    public void Expand_SkipsNumberedReferences_HyphenOrSpaceThenDigits()
+    {
+        // Real story prose cites "ADR-0005" / "ADR 0005"; `\b` alone would wrap the bare acronym mid-ref.
+        var hyphen = AbbreviationExpander.Expand("<p>See ADR-0005 for the decision.</p>", Glossary);
+        Assert.Equal("<p>See ADR-0005 for the decision.</p>", hyphen);
+
+        var spaced = AbbreviationExpander.Expand("<p>See ADR 0005 for the decision.</p>", Glossary);
+        Assert.Equal("<p>See ADR 0005 for the decision.</p>", spaced);
+
+        var enDash = AbbreviationExpander.Expand("<p>See ADR\u20130005 for the decision.</p>", Glossary);
+        Assert.Equal("<p>See ADR\u20130005 for the decision.</p>", enDash);
+
+        // Policy is glossary-wide, not ADR-only.
+        var fr = AbbreviationExpander.Expand("<p>See FR-0001 next.</p>", Glossary);
+        Assert.Equal("<p>See FR-0001 next.</p>", fr);
+    }
+
+    [Fact]
+    public void Expand_SingleDigitAfterSpace_StillExpands()
+    {
+        // ≥2-digit lookahead: "ADR 5 years" is prose, not a padded citation id.
+        var html = AbbreviationExpander.Expand("<p>An ADR 5 years ago.</p>", Glossary);
+
+        Assert.Equal(
+            "<p>An <abbr title=\"Architecture Decision Record\">ADR</abbr> 5 years ago.</p>",
+            html);
+    }
+
+    [Fact]
+    public void Expand_NumberedReferenceDoesNotConsumeFirstUse_BareAcronymStillExpands()
+    {
+        var html = AbbreviationExpander.Expand(
+            "<p>See ADR-0005. An ADR records the decision.</p>", Glossary);
+
+        Assert.Equal(
+            "<p>See ADR-0005. An <abbr title=\"Architecture Decision Record\">ADR</abbr> records the decision.</p>",
+            html);
+    }
+
+    [Fact]
+    public void Expand_StillWrapsAcronymBeforeHyphenatedWord()
+    {
+        // "ADR-driven" is not a numbered ref — digit lookahead must not fire on a letter after the hyphen.
+        var html = AbbreviationExpander.Expand("<p>An ADR-driven approach.</p>", Glossary);
+
+        Assert.Equal(
+            "<p>An <abbr title=\"Architecture Decision Record\">ADR</abbr>-driven approach.</p>",
+            html);
     }
 
     [Fact]
