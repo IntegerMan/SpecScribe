@@ -621,7 +621,13 @@ public class SiteGeneratorAdapterTests : IDisposable
         // and HtmlRenderAdapter.Render's TOC-detection substring now matches the full <nav class="toc-sidebar"
         // aria-label="On this page"> opening tag instead of just the class attribute (shared script/detection
         // delta on every TOC-bearing page). Verified stable across 2 repeated runs before locking in.
-        const string expected = "ac437891e48842a22a966cf84b13a0dcf17a63259791158514526d2ae5df5ab1";
+        // Regenerated 2026-07-20 (Story 10.11, sticky-section-nav rework): the prev/next entity Pager is
+        // RETIRED from EpicPageView/StoryPageView/StoryPlaceholderView (dropped from EpicsViewBuilder's build
+        // methods entirely) — every epic/story/placeholder page header loses its "‹ Prev / Next ›" pager markup,
+        // superseded by this story's sticky section nav + breadcrumb coherence. FollowUpRow also gains the
+        // data-sort-status-rank attribute (StatusStyles.CanonicalRank) alongside data-sort-status, bringing it to
+        // parity with ListRow's existing Story 10.9 convention.
+        const string expected = "e969ace6b9f42c88e10fecdaaa01f4ca5e2e351374d26b28de64ac07b7c14103";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
