@@ -97,7 +97,14 @@ public static class Charts
     {
         if (level is < 0 or > 4) throw new ArgumentOutOfRangeException(nameof(level), level, "Heat level must be 0..4.");
         if (level == 0) return "0";
-        if (maxCount <= 1)
+        if (maxCount <= 0)
+        {
+            // No visible cell carries any count above zero (e.g. every commit is future-dated and suppressed
+            // from the grid) — level-1 can never render either, so it must degrade like the other unused levels
+            // rather than claiming "1" for a bucket no cell will ever show. [Story 10.2 review]
+            return "—";
+        }
+        if (maxCount == 1)
         {
             // Uniform/sparse history: HeatLevel only ever paints nonzero cells as level-1 — levels 2–4 are unused.
             return level == 1 ? "1" : "\u2014";
@@ -1273,6 +1280,10 @@ public static class Charts
         sb.Append("<div class=\"heatmap-legend\">");
         for (var l = 0; l <= 4; l++)
         {
+            // Skip levels no cell can ever render at this maxCount (Story 10.2 review) — otherwise a small
+            // maxCount collapses several levels together and the legend shows duplicate, indistinguishable "—"
+            // swatches for buckets that are all equally (and identically) unused.
+            if (IsHeatLevelUnreachable(l, maxCount)) continue;
             sb.Append($"<span class=\"heatmap-legend-item\"><span class=\"heatmap-legend-swatch level-{l}\"></span>" +
                       $"<span class=\"heatmap-legend-label\">{Html(HeatLevelRange(l, maxCount))}</span></span>");
         }
@@ -2561,16 +2572,29 @@ public static class Charts
         // ends. Each column's weights sum to n, so the tallest column (most gaps) fills usableH; others center.
         const double width = 760, topPad = 46, usableH = 320, gap = 14, nodeW = 15;
         const double defX = 60, epicX = 372, stateX = 628;
-        var height = topPad + usableH + 26;
 
         var maxNodes = Math.Max(1, Math.Max(l1Keys.Count, stateKeys.Count));
         var unitH = Math.Max(2.0, (usableH - gap * (maxNodes - 1)) / n);
+
+        // Once `n` is large enough to hit unitH's 2px floor, a column's actual plotted height can exceed
+        // usableH — grow the canvas to the tallest column instead of letting it overflow the fixed viewBox
+        // (previously the SVG height stayed pinned at usableH regardless of n). [Story 3.7 follow-up]
+        double ColumnHeight(int nodeCount, double weightSum) =>
+            weightSum * unitH + gap * Math.Max(0, nodeCount - 1);
+        var plotH = new[]
+        {
+            usableH,
+            ColumnHeight(1, n),
+            ColumnHeight(l1Keys.Count, l1Keys.Sum(L1Throughput)),
+            ColumnHeight(stateKeys.Count, stateKeys.Sum(k => (double)stateCount[k])),
+        }.Max();
+        var height = topPad + plotH + 26;
 
         // Lay a column out: ordered node weights → their (top y, height), the whole stack vertically centered.
         (double Y, double H)[] LayoutColumn(IReadOnlyList<double> weights)
         {
             var totalH = weights.Sum() * unitH + gap * Math.Max(0, weights.Count - 1);
-            var y = topPad + (usableH - totalH) / 2;
+            var y = topPad + (plotH - totalH) / 2;
             var result = new (double, double)[weights.Count];
             for (var i = 0; i < weights.Count; i++)
             {
@@ -2693,6 +2717,51 @@ public static class Charts
         return sb.ToString();
     }
 
+    /// <summary>The per-epic × per-status breakdown a sighted user gets by hovering <see cref="RequirementFlow"/>'s
+    /// epic-coverage/state ribbons, as a visually-hidden text list — the dashboard requirements panel previously
+    /// exposed only the whole-diagram aria total and per-requirement tile tooltips, with no epic-level split for
+    /// screen-reader users (unlike requirements.html's requirement cards, grouped by covering epic). Counts are
+    /// the same DISTINCT-requirement integers behind each epic node's title (a multi-epic requirement is listed
+    /// under every covering epic, not split fractionally). Empty string when there is nothing to chart.
+    /// [Story 3.7 follow-up]</summary>
+    public static string RequirementFlowTextEquivalent(RequirementsModel reqs, EpicsModel epics)
+    {
+        var all = reqs.All.ToList();
+        if (all.Count == 0) return string.Empty;
+
+        const int Sentinel = -1;
+        static bool NoCoverage(RequirementInfo r) => r.CoverageEpicNumbers.Count == 0;
+
+        var epicKeys = all.SelectMany(r => r.CoverageEpicNumbers).Distinct().OrderBy(k => k).ToList();
+        if (all.Any(NoCoverage)) epicKeys.Add(Sentinel);
+        if (epicKeys.Count == 0) return string.Empty;
+
+        // Same epic-title lookup RequirementFlow's node tooltips use, so the sr-only reading names the epic
+        // the way a sighted user sees it on hover, not just its bare number.
+        var epicTitleByNumber = epics.Epics.ToDictionary(e => e.Number, e => PathUtil.StripHtmlTags(e.Title));
+        string L1Label(int key) => key == Sentinel
+            ? "No coverage"
+            : epicTitleByNumber.TryGetValue(key, out var title) ? $"Epic {key} ({title})" : $"Epic {key}";
+        IEnumerable<RequirementInfo> ForKey(int key) => key == Sentinel
+            ? all.Where(NoCoverage)
+            : all.Where(r => r.CoverageEpicNumbers.Contains(key));
+
+        var sb = new StringBuilder();
+        sb.Append("<ul class=\"req-flow-breakdown sr-only\">\n");
+        foreach (var key in epicKeys)
+        {
+            var members = ForKey(key).ToList();
+            // Canonical FlowStates order (done → deferred) so the reading matches the Sankey's state column order.
+            var byState = FlowStates
+                .Select(s => (s.Word, Count: members.Count(m => FlowStateKey(m) == s.Css)))
+                .Where(t => t.Count > 0)
+                .Select(t => $"{t.Count} {t.Word}");
+            sb.Append($"  <li>{Html(L1Label(key))}: {members.Count} {Plural(members.Count, "requirement", "requirements")} — {Html(string.Join(", ", byState))}</li>\n");
+        }
+        sb.Append("</ul>\n");
+        return sb.ToString();
+    }
+
     /// <summary>A filled Sankey ribbon (smooth band) joining a vertical span on a source node's right edge to a
     /// vertical span on a target node's left edge, with horizontal cubic control points at the midpoint so the
     /// band eases between the two columns. Pure geometry — the fill/opacity come from the CSS class.</summary>
@@ -2719,6 +2788,24 @@ public static class Charts
         var t2 = Math.Max(t1, (int)Math.Floor(0.5 * maxCount));
         var t3 = Math.Max(t2, (int)Math.Floor(0.75 * maxCount));
         return (t1, t2, t3);
+    }
+
+    /// <summary>True when no cell can ever render <paramref name="level"/> at this <paramref name="maxCount"/> \u2014
+    /// used to skip duplicate "\u2014" swatches in the legend rather than showing several indistinguishable unused
+    /// entries side by side. Level 0 is always reachable (it's the "no commits" bucket). [Story 10.2 review]</summary>
+    private static bool IsHeatLevelUnreachable(int level, int maxCount)
+    {
+        if (level == 0) return false;
+        if (maxCount <= 0) return true;
+        if (maxCount == 1) return level != 1;
+
+        var (t1, t2, t3) = HeatThresholds(maxCount);
+        return level switch
+        {
+            2 => t1 + 1 > t2,
+            3 => t2 + 1 > t3,
+            _ => false,
+        };
     }
 
     private static string FormatHeatRange(int lo, int hi, bool openEnded = false)

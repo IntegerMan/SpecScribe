@@ -1,3 +1,4 @@
+using System.Globalization;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -2144,6 +2145,57 @@ public class ChartsTests
         var svg = Charts.RequirementFlow(reqs, epics);
         Assert.DoesNotContain("NaN", svg);
         Assert.Contains("role=\"img\"", svg);
+    }
+
+    [Fact]
+    public void RequirementFlow_LargeRequirementCount_GrowsCanvasInsteadOfOverflowing()
+    {
+        // 200 requirements against a single epic hits unitH's 2px floor at the default usableH=320/gap=14 geometry
+        // (~150+ threshold) — the SVG height must grow to fit, not stay pinned at the small-project constant.
+        // [Story 3.7 follow-up]
+        var epics = new EpicsModel { OverviewHtml = "", RequirementsInventoryHtml = "", Epics = Array.Empty<EpicInfo>() };
+        var many = Enumerable.Range(1, 200)
+            .Select(i => Req(RequirementKind.Functional, i, RequirementStatus.Done, false, 1))
+            .ToArray();
+        var reqs = new RequirementsModel { Functional = many, NonFunctional = Array.Empty<RequirementInfo>(), Design = Array.Empty<RequirementInfo>() };
+
+        var svg = Charts.RequirementFlow(reqs, epics);
+        Assert.DoesNotContain("NaN", svg);
+
+        var heightMatch = System.Text.RegularExpressions.Regex.Match(svg, "height=\"([\\d.]+)\"");
+        Assert.True(heightMatch.Success);
+        var height = double.Parse(heightMatch.Groups[1].Value, CultureInfo.InvariantCulture);
+
+        // Small-project height (26 reqs) stays at the 320-tall default; 200 reqs must exceed it.
+        var smallSvg = Charts.RequirementFlow(FlowFixture().Reqs, FlowFixture().Epics);
+        var smallHeightMatch = System.Text.RegularExpressions.Regex.Match(smallSvg, "height=\"([\\d.]+)\"");
+        var smallHeight = double.Parse(smallHeightMatch.Groups[1].Value, CultureInfo.InvariantCulture);
+
+        Assert.True(height > smallHeight, $"expected large-N height ({height}) > small-N height ({smallHeight})");
+    }
+
+    [Fact]
+    public void RequirementFlowTextEquivalent_ListsPerEpicPerStatusBreakdown_AsSrOnly()
+    {
+        var (reqs, epics) = FlowFixture();
+        var html = Charts.RequirementFlowTextEquivalent(reqs, epics);
+
+        Assert.Contains("class=\"req-flow-breakdown sr-only\"", html);
+        // FR1 done under Epic 1; FR2 splits Epics 1 & 2; FR3 deferred / FR4 unmapped / NFR1 uncovered → No coverage.
+        // Epic titles ("Foundation"/"Expansion") must appear too — the same naming a sighted user gets hovering
+        // RequirementFlow's epic-node tooltip, not just the bare number.
+        Assert.Contains("Epic 1 (Foundation): 2 requirements", html);
+        Assert.Contains("Epic 2 (Expansion): 1 requirement", html);
+        Assert.Contains("No coverage: 3 requirements", html);
+    }
+
+    [Fact]
+    public void RequirementFlowTextEquivalent_EmptyRequirements_ReturnsEmptyString()
+    {
+        var epics = new EpicsModel { OverviewHtml = "", RequirementsInventoryHtml = "", Epics = Array.Empty<EpicInfo>() };
+        var reqs = new RequirementsModel { Functional = Array.Empty<RequirementInfo>(), NonFunctional = Array.Empty<RequirementInfo>(), Design = Array.Empty<RequirementInfo>() };
+
+        Assert.Equal(string.Empty, Charts.RequirementFlowTextEquivalent(reqs, epics));
     }
 
     // ---- Story 7.8: ReferenceGraph second (related-file) population ----

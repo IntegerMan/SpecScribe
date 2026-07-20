@@ -360,6 +360,10 @@ public sealed partial class HtmlRenderAdapter
                 sb.Append("<div class=\"req-view req-view-grid\">");
                 sb.Append(Charts.RequirementStatusGrid(requirements.All.ToList(), prefix: string.Empty));
                 sb.Append("</div>\n");
+                // Outside both toggled panes so it stays in the a11y tree regardless of which tab is visually
+                // selected — the per-epic/per-status text-equivalent requirements.html's requirement cards give
+                // sighted users, that the dashboard previously lacked. [Story 3.7 follow-up]
+                sb.Append(Charts.RequirementFlowTextEquivalent(requirements, epicsModel));
             }
         }
         else
