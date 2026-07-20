@@ -389,12 +389,16 @@ public class SiteNavTests
     }
 
     [Fact]
-    public void RenderNavBar_OpensActiveGroupAndMarksActiveLeaf()
+    public void RenderNavBar_MarksActiveGroupAndLeaf_ButDoesNotForceGroupOpen()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
         var html = nav.RenderNavBar(SiteNav.SprintOutputPath);
 
-        Assert.Contains("site-nav-group has-active family-epics\" open", html);
+        // The containing group carries has-active (a summary highlight) and its leaf is marked active, but the
+        // <details> is NOT forced open — a menu that springs open on page load (and stays open through a
+        // refresh) reads as stuck. [Story 10.10 review: auto-open removed]
+        Assert.Contains("<details class=\"site-nav-group has-active family-epics\">", html);
+        Assert.DoesNotContain("has-active family-epics\" open", html);
         Assert.Contains("class=\"site-menu-item active\" aria-current=\"page\"", html);
         Assert.Contains(">Sprint</a>", html);
     }

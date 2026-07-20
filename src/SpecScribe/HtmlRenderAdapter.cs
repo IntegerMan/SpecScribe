@@ -113,7 +113,11 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     /// <summary>Renders the dark-bar journey menu from <see cref="NavigationView.Groups"/>: flat top-level
     /// links (empty group label — Home, or a single-child collapse) as <c>&lt;a class="site-menu-link"&gt;</c>;
     /// multi-child groups as native <c>&lt;details class="site-nav-group"&gt;</c> disclosures (no JS — webview CSP
-    /// + SPA innerHTML swaps). Active leaf marked; containing group opens when a child is current. [Story 10.1]</summary>
+    /// + SPA innerHTML swaps). The active leaf is marked and its containing group carries <c>has-active</c> (a
+    /// summary highlight so the reader sees which section they are in), but the group is NOT forced
+    /// <c>open</c> — a disclosure that springs open on every page load (and stays open through a refresh, since
+    /// the state is baked into the HTML) reads as a stuck menu covering the page. It opens on hover/focus/click
+    /// like the others. [Story 10.1; auto-open removed Story 10.10 review]</summary>
     private void AppendNavMenu(StringBuilder sb, NavigationView nav, string prefix, string current)
     {
         string LinkHtml(string cls, NavItem item)
@@ -140,8 +144,7 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
                 string.Equals(PathUtil.NormalizeSlashes(c.OutputRelativePath), current, StringComparison.OrdinalIgnoreCase));
             var groupCls = hasActive ? "site-nav-group has-active" : "site-nav-group";
             var family = QuickLinkFamily(group.Label);
-            var openAttr = hasActive ? " open" : "";
-            sb.Append($"      <details class=\"{groupCls} {family}\"{openAttr}>\n");
+            sb.Append($"      <details class=\"{groupCls} {family}\">\n");
             sb.Append($"        <summary class=\"site-nav-group-summary\">{Icons.ForConcept(group.ConceptKey)}{PathUtil.Html(group.Label)}<span class=\"site-menu-caret\" aria-hidden=\"true\">&#9662;</span></summary>\n");
             sb.Append("        <div class=\"site-nav-group-panel\">\n");
             foreach (var child in group.Children)
@@ -215,6 +218,22 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     /// several lines and dominates the header. [Story 10.10]</summary>
     private const int LocalContextInlineLimit = 8;
 
+    /// <summary>Max characters shown on an inline local-context pill / an overflow-panel item before the label
+    /// is ellipsised. A follow-up summary or a long ADR title would otherwise stretch a single pill across most
+    /// of the bar (or wrap it onto several lines); the full text always rides a native <c>title</c> tooltip so
+    /// nothing is lost. Panel rows get a little more room since they stack vertically. [Story 10.10 review]</summary>
+    private const int LocalContextPillLabelMax = 28;
+    private const int LocalContextPanelLabelMax = 44;
+
+    /// <summary>Ellipsise <paramref name="label"/> to <paramref name="max"/> chars when it's longer, returning
+    /// the display text plus the full text to surface as a <c>title</c> tooltip (null when no truncation
+    /// happened, so an untruncated label gets no redundant tooltip). [Story 10.10 review]</summary>
+    private static (string Display, string? Tooltip) TruncateNavLabel(string label, int max)
+    {
+        if (label.Length <= max) return (label, null);
+        return (label[..(max - 1)].TrimEnd() + "…", label);
+    }
+
     /// <summary>The white sub-header band's page-type-specific local-context branch: a small title label + a pill
     /// per <see cref="NavLocalItem"/> (the active one marked), reusing the <c>.quick-link-pill</c> visual
     /// language under a distinct CSS family (<c>.site-nav-local-context</c>/<c>.local-context-pill</c>) so it can
@@ -263,7 +282,9 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
             sb.Append($"        <div class=\"key-view-panel\" id=\"{panelId}\">\n");
             foreach (var item in overflow)
             {
-                sb.Append($"          <a class=\"key-view-item\" href=\"{PathUtil.Html(item.Href)}\">{PathUtil.Html(item.Label)}</a>\n");
+                var (display, tooltip) = TruncateNavLabel(item.Label, LocalContextPanelLabelMax);
+                var titleAttr = tooltip is null ? "" : $" title=\"{PathUtil.Html(tooltip)}\"";
+                sb.Append($"          <a class=\"key-view-item\" href=\"{PathUtil.Html(item.Href)}\"{titleAttr}>{PathUtil.Html(display)}</a>\n");
             }
             sb.Append("        </div>\n      </div>\n");
         }
@@ -272,15 +293,19 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     }
 
     /// <summary>One local-context pill: the active item as plain text (never a self-link — the same rule
-    /// <see cref="RenderBreadcrumb"/>'s last crumb already follows), everything else as a real link.</summary>
+    /// <see cref="RenderBreadcrumb"/>'s last crumb already follows), everything else as a real link. Long
+    /// labels are ellipsised to <see cref="LocalContextPillLabelMax"/> with the full text on a <c>title</c>
+    /// tooltip, so a verbose follow-up summary or ADR title can't stretch the band. [Story 10.10]</summary>
     private static void AppendLocalContextPill(StringBuilder sb, NavLocalItem item)
     {
+        var (display, tooltip) = TruncateNavLabel(item.Label, LocalContextPillLabelMax);
+        var titleAttr = tooltip is null ? "" : $" title=\"{PathUtil.Html(tooltip)}\"";
         if (item.IsActive)
         {
-            sb.Append($"      <span class=\"local-context-pill active\" aria-current=\"page\">{PathUtil.Html(item.Label)}</span>\n");
+            sb.Append($"      <span class=\"local-context-pill active\" aria-current=\"page\"{titleAttr}>{PathUtil.Html(display)}</span>\n");
             return;
         }
-        sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"local-context-pill\">{PathUtil.Html(item.Label)}</a>\n");
+        sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"local-context-pill\"{titleAttr}>{PathUtil.Html(display)}</a>\n");
     }
 
     /// <summary>Home-only white-bar work-stage strip: pure-CSS radios + labels (icons + words) that toggle

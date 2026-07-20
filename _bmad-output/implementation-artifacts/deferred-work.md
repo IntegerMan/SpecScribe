@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 10-3-glossary-and-in-place-vocabulary.md (2026-07-20)
+
+- source_spec: `10-3-glossary-and-in-place-vocabulary.md`
+  summary: `AbbreviationExpander`'s `\bADR\b` word-boundary match expands mid-reference in real "ADR-0005"/"ADR 0005" story-page prose (verified present in committed story files, e.g. `6-3-vs-code-integration-spike.md`, `6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics.md`) — no earlier linkifier protects bare "ADR" + number text, so the first such occurrence per page gets wrapped in `<abbr>`, landing the tooltip on the bare acronym adjacent to its number.
+  evidence: Blind Hunter, on the diff adding `AbbreviationExpander`. Arguably the intended first-use-expansion behavior working as designed, just cosmetically odd when adjacent to a numbered reference; no functional break. No test currently pins the desired behavior either way.
+
 ## Deferred from: code review of spec-3-7-deferred-debt-cleanup.md (2026-07-19)
 
 - ~~source_spec: `spec-3-7-deferred-debt-cleanup.md`

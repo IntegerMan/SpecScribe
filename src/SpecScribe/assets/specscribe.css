@@ -399,6 +399,7 @@ body {
   border-left: 3px solid var(--border);
   border-radius: 999px;
   padding: 0.28rem 0.8rem;
+  white-space: nowrap;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .local-context-pill:hover { box-shadow: 0 2px 8px var(--shadow); transform: translateY(-1px); color: var(--ink); }

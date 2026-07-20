@@ -1250,6 +1250,29 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
+    public void RenderNav_LocalContext_LongLabel_IsEllipsisedWithFullTextOnTitleTooltip()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        const string longLabel = "Carry forward: formalize visual-intent elicitation in the create-story process";
+        var localContext = new NavLocalContext("Epic 9 follow-ups", new[]
+        {
+            new NavLocalItem(longLabel, "follow-ups/action-carry-forward.html", IsActive: false),
+            new NavLocalItem("Short one", "follow-ups/action-short.html", IsActive: false),
+        });
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("follow-ups/action-x.html", localContext));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        // The full label never appears as visible pill text (it's ellipsised), but rides a title tooltip intact.
+        Assert.DoesNotContain($">{longLabel}</a>", keyViews);
+        Assert.Contains("…</a>", keyViews);
+        Assert.Contains($"title=\"{longLabel}\"", keyViews);
+        // A short label under the cap is untouched — no ellipsis, no redundant tooltip.
+        Assert.Contains(">Short one</a>", keyViews);
+        Assert.DoesNotContain("title=\"Short one\"", keyViews);
+    }
+
+    [Fact]
     public void RenderDashboardBody_JourneySegments_DoNotDuplicateStatTiles()
     {
         var view = DashboardWithRequirements(withEpics: true) with

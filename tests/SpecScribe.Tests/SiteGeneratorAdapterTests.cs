@@ -577,7 +577,15 @@ public class SiteGeneratorAdapterTests : IDisposable
         // .git-pulse-files-title CSS rule, added .heatmap-window { white-space: normal; }, Timeline's heatmap
         // now gets a chart-frame-why sentence, and the heatmap legend skips levels no cell can reach at the
         // current maxCount (so small/young repos no longer show duplicate "—" swatches).
-        const string expected = "f1d3e1db53541697b73e70b7b95dd0e09df1945822e689c54ad8bcca3e9589fa";
+        // Regenerated for Story 10.10 review round 2: (1) dark-bar journey dropdowns no longer render `open` on
+        // page load when a child is active (they stayed open through a refresh, reading as a stuck menu) — the
+        // active group keeps has-active for its summary highlight but the <details> stays collapsed; every
+        // fixture page whose active leaf lives in a multi-child group loses its baked-in " open" attribute.
+        // (2) local-context pills + overflow-panel rows now ellipsise long labels (>28 inline / >44 panel chars)
+        // with the full text on a native title tooltip, and .local-context-pill gained white-space:nowrap — this
+        // fixture's local-context labels (Story N.M, FR1, NFR1) are all short so no truncation fires here; the
+        // byte delta is the removed " open" attrs + the one CSS declaration. Verified stable across 3 runs.
+        const string expected = "f81ae96dc1ed234032f983f596d3bd032dc88012554d96edcc2a43232012eb77";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
