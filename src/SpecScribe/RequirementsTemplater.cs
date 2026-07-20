@@ -633,16 +633,18 @@ public static class RequirementsTemplater
     private static NavLocalContext BuildRequirementLocalContext(RequirementInfo req, string prefix, RequirementsModel requirements)
     {
         var groupLabel = RequirementGroupLabel(req);
-        var siblings = requirements.Everything.Where(r => RequirementGroupLabel(r) == groupLabel).ToList();
+        var siblings = requirements.Everything.Where(r => string.Equals(RequirementGroupLabel(r), groupLabel, StringComparison.OrdinalIgnoreCase)).ToList();
         var items = siblings
             .Select(r => new NavLocalItem(r.Id, prefix + $"requirements/{r.Slug}.html", string.Equals(r.Id, req.Id, StringComparison.OrdinalIgnoreCase)))
             .ToList();
         return new NavLocalContext($"{groupLabel}", items);
     }
 
-    /// <summary>The category grouping a requirement belongs to — mirrors <see cref="RenderIndex"/>'s group-key
-    /// construction (functional: <c>Category ?? "Functional Requirements"</c>; all NFRs: one group), extended
-    /// with a Design fallback so UX-DR detail pages also resolve a group. [Story 10.10]</summary>
+    /// <summary>The category grouping a requirement belongs to — extends <see cref="RenderIndex"/>'s group-key
+    /// construction (functional: <c>Category ?? "Functional Requirements"</c>; all NFRs: one group) with a new
+    /// Design/UX-DR fallback that <see cref="RenderIndex"/> itself has no counterpart for (its own navigator only
+    /// ever groups Functional and NonFunctional requirements), so UX-DR detail pages also resolve a group.
+    /// [Story 10.10]</summary>
     private static string RequirementGroupLabel(RequirementInfo req) => req.Kind switch
     {
         RequirementKind.NonFunctional => "Non-Functional Requirements",

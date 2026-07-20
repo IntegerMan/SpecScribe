@@ -81,17 +81,20 @@ public class TimelineTemplaterTests
     [Fact]
     public void RenderPage_Rows_ShareTheListRowMetaGrammar()
     {
-        // Story 10.8: badge-less path onto the shared list-row anatomy — the row keeps its own
-        // timeline-row/timeline-date/timeline-summary classes but nests the summary inside .list-row-scan/
-        // .list-row-meta so it reads the same visual system as every other index.
+        // Story 10.8 (review): day rows render THROUGH ListRow.Render (not just borrowing its CSS names) — the
+        // date link is the primary label (summary slot), the commit/artifact tally is the right-side metadata,
+        // badge-less, and .timeline-row adds no accent modifier so the row keeps the neutral default accent. The
+        // timeline-date/timeline-summary classes are preserved so their type styles still apply in the shell.
         var d1 = new DateOnly(2026, 7, 4);
         var git = PulseFor((d1, 1));
 
         var html = TimelineTemplater.RenderPage(git, new[] { d1 }, git.CommitsByDay, NoArtifacts, Nav());
 
-        Assert.Contains("<li class=\"timeline-row\">", html);
+        Assert.Contains("<li class=\"list-row timeline-row\">", html);
         Assert.Contains("<div class=\"list-row-scan\">", html);
+        Assert.Contains("<span class=\"list-row-summary\"><a class=\"timeline-date\"", html);
         Assert.Contains("<div class=\"list-row-meta\">", html);
+        Assert.Contains("<span class=\"timeline-summary\">1 commit</span>", html);
     }
 
     [Fact]

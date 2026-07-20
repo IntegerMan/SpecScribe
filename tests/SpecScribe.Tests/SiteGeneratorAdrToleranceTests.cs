@@ -59,6 +59,26 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_AdrPage_LocalContextBand_ListsOtherAdrsWithCurrentMarkedActive()
+    {
+        // [Story 10.10 review — patch] no direct test previously exercised the ADR NavLocalContext builder.
+        Directory.CreateDirectory(Adrs);
+        File.WriteAllText(Path.Combine(Adrs, "0001-first.md"), "# First Decision\n\n**Status:** Accepted\n\nBody.\n");
+        File.WriteAllText(Path.Combine(Adrs, "0002-second.md"), "# Second Decision\n\n**Status:** Accepted\n\nBody.\n");
+
+        var events = new SiteGenerator(Options()).GenerateAll();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(Path.Combine(Site, "adrs", "0001-first.html"));
+        Assert.Contains("site-nav-local-context", html);
+        Assert.Contains("ADRs", html);
+        Assert.Contains("local-context-pill active", html);
+        // The sibling ADR is a real link; the current one never self-links.
+        Assert.Matches(new System.Text.RegularExpressions.Regex("<a[^>]*class=\"local-context-pill\"[^>]*>[^<]*Second Decision"), html);
+        Assert.DoesNotMatch(new System.Text.RegularExpressions.Regex("<a[^>]*class=\"local-context-pill\"[^>]*>[^<]*First Decision"), html);
+    }
+
+    [Fact]
     public void GenerateAll_StatusDerivesFromBoldLineHeadingOrFrontmatter()
     {
         Directory.CreateDirectory(Adrs);
@@ -221,6 +241,9 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         var landing = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
         // Story 10.9: js-listable opts the synthesized landing into the client sort/group/filter enhancement.
         Assert.Contains("<ul class=\"adr-landing-list list-rows-list js-listable\">", landing);
+        // Story 10.8 (review): the row's left accent reflects the record's real status — "Accepted" → the "done"
+        // stage accent — instead of the follow-up family's fixed review color.
+        Assert.Contains("<li class=\"list-row list-row-accent-done\"", landing);
         Assert.Contains("<strong>ADR 0001: Use Widgets</strong>", landing);
         Assert.Contains("We chose widgets because they scale well.", landing);
         // "Accepted" isn't a recognized lifecycle word, so it degrades to the slugged pill (never color-only).

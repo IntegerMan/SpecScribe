@@ -90,6 +90,22 @@ public class SiteGeneratorCodePagesTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_CodeFilePage_LocalContextBand_ListsSiblingFilesWithCurrentMarkedActive()
+    {
+        // [Story 10.10 review — patch] no direct test previously exercised the code-file NavLocalContext builder;
+        // Referenced.cs and Linked.cs are siblings in the same src/Lib directory (Unreferenced.cs has no page).
+        Generate();
+
+        var html = File.ReadAllText(ReferencedPage);
+        Assert.Contains("site-nav-local-context", html);
+        Assert.Contains("Files in", html);
+        Assert.Contains("local-context-pill active", html);
+        // The sibling file is a real link; the current file never self-links.
+        Assert.Matches(new System.Text.RegularExpressions.Regex("<a[^>]*class=\"local-context-pill\"[^>]*>[^<]*Linked\\.cs"), html);
+        Assert.DoesNotMatch(new System.Text.RegularExpressions.Regex("<a[^>]*class=\"local-context-pill\"[^>]*>[^<]*Referenced\\.cs"), html);
+    }
+
+    [Fact]
     public void GenerateAll_ResolvesMarkdownLinkCitationRelativeToArtifactDir()
     {
         Generate();

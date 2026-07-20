@@ -867,9 +867,15 @@ public sealed class SiteGenerator
                         ? new[] { ListRow.Chip(PathUtil.Html(PortalDates.Day(date))) }
                         : Array.Empty<string>();
                     var primaryLink = ListRow.PrimaryLink(PathUtil.Html(href), "View record");
+                    // The left accent bar reflects each record's real status (Accepted → done, Superseded →
+                    // deferred, …) instead of the follow-up family's fixed review color; unknown states keep the
+                    // neutral default. [Story 10.8 review]
+                    var accentToken = StatusStyles.AdrAccentToken(adr.Status);
+                    var accentClass = accentToken is null ? null : $"list-row-accent-{accentToken}";
 
                     ListRow.Render(
                         body, summaryHtml, badgeHtml, chips, primaryLink,
+                        extraRowClass: accentClass,
                         sortName: adr.Title,
                         sortDate: adr.Date is { } sortDate ? PortalDates.IsoDay(sortDate) : null,
                         sortStatus: !string.IsNullOrWhiteSpace(adr.Status) ? StatusStyles.ForSprint(adr.Status) : null);
@@ -3389,7 +3395,9 @@ public sealed class SiteGenerator
     /// <see cref="FollowUpGroupSpec"/> membership Story 9.13's filtered group pages already enumerate,
     /// looked up by this item's own detail href. Null when the item isn't a member of any enumerated group
     /// (shouldn't happen in practice — every action/deferred item lands on either the Follow-ups orphan or an
-    /// epic-N group) or when that group has only one member (NFR8 — falls back to the generic band). [Story 10.10]</summary>
+    /// epic-N group). A group with only one member is still returned here — the NFR8 "falls back to the
+    /// generic band" rule for that case is enforced centrally by <see cref="HtmlRenderAdapter"/>'s
+    /// <c>Items.Any(i =&gt; !i.IsActive)</c> guard, not by this method. [Story 10.10]</summary>
     private static NavLocalContext? BuildFollowUpGroupLocalContext(
         IReadOnlyDictionary<string, FollowUpGroupSpec> groupByHref, string outputRelative)
     {

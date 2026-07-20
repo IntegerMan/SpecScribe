@@ -4027,15 +4027,9 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 /* The timeline page: a heatmap panel over a newest-first dated list. */
 .timeline-heatmap { overflow-x: auto; } /* a wide heatmap scrolls inside its own container, never the page body */
 .timeline-list { list-style: none; margin: 1.2rem 0 0; padding: 0; }
-.timeline-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.3rem 0.9rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
-}
-.timeline-row:last-child { border-bottom: none; }
+/* Story 10.8 (review): timeline day rows now render through ListRow (<li class="list-row timeline-row">), so the
+   shared .list-row card shell + .list-row-scan flex own the layout — the old bespoke .timeline-row flex/padding/
+   border-bottom rules were removed to avoid doubling the card border. The date/summary keep their own type styles. */
 .timeline-date { color: var(--teal); text-decoration: none; font-weight: bold; font-size: 0.92rem; }
 .timeline-date:hover { color: var(--rust); text-decoration: underline; }
 .timeline-date:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
@@ -5943,9 +5937,18 @@ body:has(.followup-group-wrap) .doc-header {
 .followup-row,
 .list-row {
   background: var(--warm-white); border: 1px solid var(--border);
-  border-left: 3px solid var(--status-review); border-radius: 6px;
+  border-radius: 6px;
   padding: 0.7rem 1rem; margin-bottom: 0.55rem;
 }
+/* Follow-up rows are always open/in-review items, so their left accent is fixed to the review stage. The
+   generalized .list-row also hosts NON-lifecycle lists (ADR landing, timeline), so it defaults to a NEUTRAL
+   accent; a caller that wants a status accent adds a .list-row-accent-<token> modifier — never the sole signal,
+   the row's badge still carries the word (UX-DR17). [Story 10.8 review] */
+.followup-row { border-left: 3px solid var(--status-review); }
+.list-row { border-left: 3px solid var(--list-row-accent, var(--border)); }
+.list-row-accent-done { --list-row-accent: var(--status-done); }
+.list-row-accent-pending { --list-row-accent: var(--status-pending); }
+.list-row-accent-deferred { --list-row-accent: var(--status-deferred); }
 .followup-row.resolved,
 .list-row.resolved {
   border-left-color: var(--status-done);
@@ -6155,20 +6158,20 @@ a.deferred-item-resolving:hover { color: var(--rust); }
   letter-spacing: 0.03em;
   margin-left: 0.35rem;
 }
-.sdd-detected {
+.sdd-support-yes {
   background: var(--emerald-bg, #e8f0e4);
   color: var(--emerald-deep, #3d6b35);
 }
-.sdd-support-yes {
-  background: var(--parchment);
-  color: var(--ink-light);
-  border: 1px solid var(--border);
+.sdd-detected {
+  background: #e4eef6;
+  color: var(--teal-deep, #2a6b6b);
 }
 .sdd-support-soon {
   background: var(--border);
   color: var(--ink-light);
 }
 .sdd-detected-banner { margin: 0 0 1rem; }
+.sdd-detected-banner .sdd-detected { margin-left: 0; margin-right: 0.25rem; }
 .sdd-framework-links { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0 1rem; }
 .sdd-framework-links li { margin: 0.35rem 0; }
 .sdd-commands {

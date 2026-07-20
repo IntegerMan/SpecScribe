@@ -155,8 +155,11 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
 
     /// <summary>The white sub-header band. On Home it is the Driver work-stage toggle strip
     /// (Overview · Requirements · Plan · Develop · Review · Track) — pure-CSS radios that show/hide
-    /// stage-tagged dashboard panels. On every other page it keeps the Docs / Architecture / Work
-    /// key-views chips. Omits the band when there is nothing to show. [home welcome key-views; Story 9.8]</summary>
+    /// stage-tagged dashboard panels. Off Home, a page-type-specific <see cref="NavLocalContext"/>
+    /// (epic's stories, code file siblings, ADR family, ...) takes over when one is available and has
+    /// a navigable (non-active) item; otherwise it falls back to the generic Docs / Architecture / Work
+    /// key-views chips. Omits the band when there is nothing to show. [home welcome key-views; Story 9.8;
+    /// local-context branch: Story 10.10]</summary>
     private void AppendKeyViewsBand(StringBuilder sb, NavigationView nav, string prefix, string current)
     {
         var onHome = string.Equals(current, SiteNav.HomeOutputPath, StringComparison.OrdinalIgnoreCase);
@@ -260,9 +263,12 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         NavLocalItem? pinnedActive = null;
         if (overflow.Count > 0 && !visible.Any(i => i.IsActive))
         {
-            pinnedActive = overflow.FirstOrDefault(i => i.IsActive);
-            if (pinnedActive is not null)
-                overflow = overflow.Where(i => i != pinnedActive).ToList();
+            var pinnedIndex = overflow.FindIndex(i => i.IsActive);
+            if (pinnedIndex >= 0)
+            {
+                pinnedActive = overflow[pinnedIndex];
+                overflow.RemoveAt(pinnedIndex);
+            }
         }
 
         foreach (var item in visible)
@@ -282,9 +288,7 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
             sb.Append($"        <div class=\"key-view-panel\" id=\"{panelId}\">\n");
             foreach (var item in overflow)
             {
-                var (display, tooltip) = TruncateNavLabel(item.Label, LocalContextPanelLabelMax);
-                var titleAttr = tooltip is null ? "" : $" title=\"{PathUtil.Html(tooltip)}\"";
-                sb.Append($"          <a class=\"key-view-item\" href=\"{PathUtil.Html(item.Href)}\"{titleAttr}>{PathUtil.Html(display)}</a>\n");
+                AppendLocalContextPill(sb, item, "key-view-item", LocalContextPanelLabelMax);
             }
             sb.Append("        </div>\n      </div>\n");
         }
@@ -294,18 +298,20 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
 
     /// <summary>One local-context pill: the active item as plain text (never a self-link — the same rule
     /// <see cref="RenderBreadcrumb"/>'s last crumb already follows), everything else as a real link. Long
-    /// labels are ellipsised to <see cref="LocalContextPillLabelMax"/> with the full text on a <c>title</c>
-    /// tooltip, so a verbose follow-up summary or ADR title can't stretch the band. [Story 10.10]</summary>
-    private static void AppendLocalContextPill(StringBuilder sb, NavLocalItem item)
+    /// labels are ellipsised to <paramref name="labelMax"/> with the full text on a <c>title</c> tooltip, so
+    /// a verbose follow-up summary or ADR title can't stretch the band. Shared by both the inline pill row
+    /// and the "More" overflow panel (<paramref name="cssClass"/> swaps the visual family) so the panel gets
+    /// the same self-link guard instead of hand-rendering its own anchor. [Story 10.10]</summary>
+    private static void AppendLocalContextPill(StringBuilder sb, NavLocalItem item, string cssClass = "local-context-pill", int labelMax = LocalContextPillLabelMax)
     {
-        var (display, tooltip) = TruncateNavLabel(item.Label, LocalContextPillLabelMax);
+        var (display, tooltip) = TruncateNavLabel(item.Label, labelMax);
         var titleAttr = tooltip is null ? "" : $" title=\"{PathUtil.Html(tooltip)}\"";
         if (item.IsActive)
         {
-            sb.Append($"      <span class=\"local-context-pill active\" aria-current=\"page\"{titleAttr}>{PathUtil.Html(display)}</span>\n");
+            sb.Append($"      <span class=\"{cssClass} active\" aria-current=\"page\"{titleAttr}>{PathUtil.Html(display)}</span>\n");
             return;
         }
-        sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"local-context-pill\"{titleAttr}>{PathUtil.Html(display)}</a>\n");
+        sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"{cssClass}\"{titleAttr}>{PathUtil.Html(display)}</a>\n");
     }
 
     /// <summary>Home-only white-bar work-stage strip: pure-CSS radios + labels (icons + words) that toggle

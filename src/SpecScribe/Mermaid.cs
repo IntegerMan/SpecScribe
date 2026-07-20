@@ -63,31 +63,55 @@ public static class Mermaid
     public static bool ContainsBlock(string html) => html.Contains(BlockMarker, StringComparison.Ordinal);
 
     /// <summary>Static Mermaid vertical state diagram for the BMad Method SDD methodology sequence.
-    /// Nodes use workflow stage names that map to common slash commands. [About SDD]</summary>
+    /// Planning outputs are explicit state labels; a Sprint composite shows the create → develop → review
+    /// story loop (with optional correct-course); retrospective closes the epic. [About SDD]</summary>
     public static string SddMethodDiagram() => """
         stateDiagram-v2
           direction TB
-          [*] --> Brief: /bmad-product-brief
-          Brief --> PRD: /bmad-prd
-          PRD --> EpicsStories: /bmad-create-epics-and-stories
-          EpicsStories --> Develop: /bmad-dev-story
-          Develop --> Review: /bmad-code-review
-          Review --> Retrospective: /bmad-retrospective
-          Retrospective --> [*]
-          EpicsStories: Epics & Stories
+          [*] --> ProductBriefCreated: /bmad-product-brief
+          ProductBriefCreated --> PrdCreated: /bmad-prd
+          PrdCreated --> EpicsAndStoriesDefined: /bmad-create-epics-and-stories
+          EpicsAndStoriesDefined --> Sprint
+
+          state "In a Sprint" as Sprint {
+            [*] --> StoryReadyForDev: /bmad-create-story
+            StoryReadyForDev --> StoryImplemented: /bmad-dev-story
+            StoryImplemented --> StoryReviewed: /bmad-code-review
+            StoryReviewed --> StoryReadyForDev: next story
+            StoryImplemented --> CourseCorrected: /bmad-correct-course
+            StoryReviewed --> CourseCorrected: /bmad-correct-course
+            CourseCorrected --> StoryReadyForDev
+            StoryReviewed --> [*]
+          }
+
+          Sprint --> EpicRetrospectiveComplete: /bmad-retrospective
+          EpicRetrospectiveComplete --> [*]
+
+          ProductBriefCreated: Product Brief Created
+          PrdCreated: PRD Created
+          EpicsAndStoriesDefined: Epics & Stories Defined
+          StoryReadyForDev: Story Ready for Dev
+          StoryImplemented: Story Implemented
+          StoryReviewed: Story Reviewed
+          CourseCorrected: Course Corrected
+          EpicRetrospectiveComplete: Epic Retrospective Complete
         """;
 
     /// <summary>Static Mermaid vertical state diagram for Game Dev Studio workflows. [About SDD]</summary>
     public static string SddGdsDiagram() => """
         stateDiagram-v2
           direction TB
-          [*] --> GDD: /bmgd-gdd
-          GDD --> Narrative: /bmgd-narrative
-          Narrative --> Prototype: /bmgd-quick-dev
-          Prototype --> Develop
-          Develop --> Review
-          Review --> [*]
-          Narrative: Narrative Design
+          [*] --> GddCreated: /bmgd-gdd
+          GddCreated --> NarrativeDesigned: /bmgd-narrative
+          NarrativeDesigned --> PrototypeBuilt: /bmgd-quick-dev
+          PrototypeBuilt --> Developed
+          Developed --> Reviewed
+          Reviewed --> [*]
+          GddCreated: GDD Created
+          NarrativeDesigned: Narrative Designed
+          PrototypeBuilt: Prototype Built
+          Developed: Developed
+          Reviewed: Reviewed
         """;
 
     public static string InitScript() => """

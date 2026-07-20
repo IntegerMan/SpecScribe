@@ -44,20 +44,25 @@ public static class ListRow
         sb.Append(">\n");
         sb.Append("    <div class=\"list-row-scan\">\n");
         sb.Append($"      <span class=\"list-row-summary\">{summaryHtml}</span>\n");
-        sb.Append("      <div class=\"list-row-meta\">\n");
-        if (badgeHtml is { Length: > 0 })
+        // Only emit the metadata cluster when something fills it — a badge, a chip, or the primary link — so a
+        // bare content-less row never carries an empty-but-present <div class="list-row-meta"> (NFR8). [Story 10.8 review]
+        if (badgeHtml is { Length: > 0 } || chipsHtml.Count > 0 || primaryLinkHtml is { Length: > 0 })
         {
-            sb.Append($"        {badgeHtml}\n");
+            sb.Append("      <div class=\"list-row-meta\">\n");
+            if (badgeHtml is { Length: > 0 })
+            {
+                sb.Append($"        {badgeHtml}\n");
+            }
+            foreach (var chip in chipsHtml)
+            {
+                sb.Append($"        {chip}\n");
+            }
+            if (primaryLinkHtml is { Length: > 0 })
+            {
+                sb.Append($"        {primaryLinkHtml}\n");
+            }
+            sb.Append("      </div>\n");
         }
-        foreach (var chip in chipsHtml)
-        {
-            sb.Append($"        {chip}\n");
-        }
-        if (primaryLinkHtml is { Length: > 0 })
-        {
-            sb.Append($"        {primaryLinkHtml}\n");
-        }
-        sb.Append("      </div>\n");
         sb.Append("    </div>\n");
         sb.Append("  </li>\n");
     }

@@ -203,6 +203,36 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_EpicPage_LocalContextBand_ListsAllStoriesWithNoneActive()
+    {
+        // [Story 10.10 review — patch] no direct test previously exercised EpicsTemplater.BuildStoriesLocalContext.
+        GenerateSite();
+
+        var html = File.ReadAllText(EpicPage);
+        Assert.Contains("site-nav-local-context", html);
+        Assert.Contains("Stories in this epic", html);
+        Assert.Contains("Story 1.1", html);
+        Assert.Contains("Story 1.2", html);
+        // No single story is "current" on the epic page itself — nothing marked active.
+        Assert.DoesNotContain("local-context-pill active", html);
+    }
+
+    [Fact]
+    public void GenerateAll_StoryPage_LocalContextBand_ListsSiblingsWithCurrentMarkedActiveAndNotSelfLinked()
+    {
+        // [Story 10.10 review — patch] no direct test previously exercised the story-page local context.
+        GenerateSite();
+
+        var html = File.ReadAllText(DraftedStoryPage);
+        Assert.Contains("site-nav-local-context", html);
+        Assert.Contains("Stories in <a class=\"epic-ref\" href=\"../epics/epic-1.html\">Epic 1</a>", html);
+        // The current story (1.1) renders as plain text, never a self-link.
+        Assert.Contains("<span class=\"local-context-pill active\" aria-current=\"page\">Story 1.1</span>", html);
+        // The sibling (1.2) is a real navigable link.
+        Assert.Contains("<a href=\"../epics/story-1-2.html\" class=\"local-context-pill\">Story 1.2</a>", html);
+    }
+
+    [Fact]
     public void GenerateAll_MultipleUndraftedStories_ConsolidatesHintsIntoOneBanner()
     {
         // 2+ undrafted → one banner + plain card notes (count-only without a module catalog). [Story 8.6]

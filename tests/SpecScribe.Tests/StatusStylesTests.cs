@@ -436,4 +436,38 @@ public class StatusStylesTests
         Assert.Contains("Superseded by ADR 2", badge);
         Assert.DoesNotContain("status-superseded-by", badge);
     }
+
+    [Fact]
+    public void FreeTextBadge_TrailingPunctuation_StillRoutesAndSlugsCleanly()
+    {
+        // Story 10.8 review: a trailing sentence mark on an authored status must not defeat the canonical match
+        // ("Done." → green badge, not a grey pill) or leak a dotted CSS class ("Accepted." → status-accepted).
+        var known = StatusStyles.FreeTextBadge("Done.");
+        Assert.Contains("status-badge done", known);
+        Assert.DoesNotContain("pill status-", known);
+
+        var unknown = StatusStyles.FreeTextBadge("Accepted.");
+        Assert.Contains("class=\"pill status-accepted\"", unknown);
+        Assert.DoesNotContain("status-accepted.", unknown);
+    }
+
+    [Theory]
+    [InlineData("Accepted", "done")]
+    [InlineData("approved", "done")]
+    [InlineData("Proposed", "pending")]
+    [InlineData("Superseded by ADR 2", "deferred")]
+    [InlineData("Deprecated.", "deferred")]
+    public void AdrAccentToken_MapsStatusToStageAccent(string status, string expected)
+    {
+        Assert.Equal(expected, StatusStyles.AdrAccentToken(status));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("Draftedish")]
+    public void AdrAccentToken_UnknownOrEmpty_ReturnsNullForNeutralAccent(string? status)
+    {
+        Assert.Null(StatusStyles.AdrAccentToken(status));
+    }
 }

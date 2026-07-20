@@ -146,6 +146,28 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_CommitDetailPage_LocalContextBand_ListsSiblingCommitsWithCurrentMarkedActive()
+    {
+        // [Story 10.10 review — patch] no direct test previously exercised the commit-page NavLocalContext
+        // builder; only the generic seam mechanics were covered.
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the commit local-context band; install git rather than silently skipping this test");
+
+        var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
+        AssertNoErrors(events);
+
+        var pages = Directory.GetFiles(CommitDir, "*.html");
+        var olderPage = pages.Single(p => Regex.Match(File.ReadAllText(p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("foundation"));
+        var olderHtml = File.ReadAllText(olderPage);
+
+        Assert.Contains("site-nav-local-context", olderHtml);
+        Assert.Contains("Recent commits", olderHtml);
+        // The current commit renders as an inactive-safe <span>, never a self-link, while the sibling commit
+        // is a real link — same "current page never self-links" rule the pager and breadcrumb already follow.
+        Assert.Contains("local-context-pill active", olderHtml);
+        Assert.Matches(new Regex("<a[^>]*class=\"local-context-pill\"[^>]*>[^<]*Second commit"), olderHtml);
+    }
+
+    [Fact]
     public void GenerateAll_FlagOnWithHistory_LightsUpDayPageAndHubHashLinks()
     {
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise gated hash-link wiring; install git rather than silently skipping this test");

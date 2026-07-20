@@ -164,8 +164,17 @@ public class SiteGeneratorHowToReadTests : IDisposable
         var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
 
         Assert.Contains("sdd-detected", hub);
-        Assert.Contains("Detected in this project", hub);
-        Assert.Contains("Detected in this project", bmad);
+        Assert.Contains(">Detected<", hub);
+        Assert.Contains("sdd-support-yes", hub);
+        Assert.Contains(">Supported<", hub);
+        Assert.Contains(">Detected<", bmad);
+        Assert.DoesNotContain("In this project</th>", hub);
+        Assert.Contains("Epics &amp; Stories", hub);
+        Assert.Contains("Requirements", hub);
+        Assert.Contains(">Sprint<", hub);
+        Assert.Contains(">Retros<", hub);
+        Assert.Contains("Planning docs", hub);
+        Assert.Contains(">Commands<", hub);
         Assert.Contains("/bmad-help", bmad);
         Assert.Contains("/bmad-product-brief", bmad);
         Assert.Contains("/bmad-prd", bmad);
@@ -173,9 +182,13 @@ public class SiteGeneratorHowToReadTests : IDisposable
         Assert.Contains("/bmad-create-story", bmad);
         Assert.Contains("/bmad-dev-story", bmad);
         Assert.Contains("/bmad-code-review", bmad);
+        Assert.Contains("/bmad-correct-course", bmad);
         Assert.Contains("/bmad-retrospective", bmad);
         Assert.Contains("class=\"mermaid\"", bmad);
         Assert.Contains("stateDiagram-v2", bmad);
+        Assert.Contains("Product Brief Created", bmad);
+        Assert.Contains("In a Sprint", bmad);
+        Assert.Contains("the official documentation", bmad);
         Assert.Contains("mermaid.esm.min.mjs", bmad);
         Assert.DoesNotContain("BMad is not detected", bmad);
     }
@@ -188,6 +201,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
 
         Assert.Contains("npx bmad-method install --modules gds", html);
         Assert.Contains("https://github.com/bmad-code-org/bmad-module-game-dev-studio", html);
+        Assert.Contains("the official documentation", html);
         Assert.Contains("BMad GDS is not detected", html);
         Assert.Contains("class=\"mermaid\"", html);
         Assert.Contains("stateDiagram-v2", html);
@@ -352,7 +366,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
 
             var hub = File.ReadAllText(Path.Combine(output, "about-sdd.html"));
             Assert.Contains("Coming soon", hub);
-            Assert.DoesNotContain("Detected in this project", hub);
+            Assert.DoesNotContain("sdd-detected", hub);
         }
         finally
         {
@@ -375,7 +389,8 @@ public class SiteGeneratorHowToReadTests : IDisposable
         var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
         var gds = File.ReadAllText(Path.Combine(Site, "about-sdd-gds.html"));
 
-        Assert.Contains("Detected in this project", hub);
+        Assert.Contains("sdd-detected", hub);
+        Assert.Contains(">Detected<", hub);
         Assert.Contains("/bmad-help", bmad);
         Assert.Contains("/bmgd-gdd", gds);
         Assert.Contains("GDD", gds);

@@ -627,7 +627,18 @@ public class SiteGeneratorAdapterTests : IDisposable
         // superseded by this story's sticky section nav + breadcrumb coherence. FollowUpRow also gains the
         // data-sort-status-rank attribute (StatusStyles.CanonicalRank) alongside data-sort-status, bringing it to
         // parity with ListRow's existing Story 10.9 convention.
-        const string expected = "e969ace6b9f42c88e10fecdaaa01f4ca5e2e351374d26b28de64ac07b7c14103";
+        // Regenerated for About SDD matrix: ArtifactBundle family columns (Epics & Stories, Requirements,
+        // Sprint, Retros, Planning docs, Commands); Supported (green) + Detected (blue) badges; dropped
+        // "In this project" matrix column.
+        // Regenerated for About SDD BMad methodology: vertical state diagram gains "In a Sprint" composite
+        // (create → develop → review loop + optional /bmad-correct-course), explicit output labels
+        // ("Product Brief Created", etc.), and get-started copy places the official-docs sentence after install.
+        // Regenerated 2026-07-20 (Story 10.10 code-review patches): the local-context band's "More" overflow
+        // panel now reuses AppendLocalContextPill (self-link guard) instead of hand-rendering its own <a> —
+        // cosmetic indentation (10sp → 6sp) and attribute-order (class/href → href/class) delta on every
+        // panel row, shared markup so the byte-parity gate moves. Verified stable across 3 repeated runs
+        // before locking in.
+        const string expected = "e524740cac8b3a5915a8d1db57305cab2edb69439ef3df767f34e56131a5d0dd";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

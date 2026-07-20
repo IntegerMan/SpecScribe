@@ -4,7 +4,7 @@ baseline_commit: 27d37b69456526e2d89ca8111a3bf9cbc645f4dc
 
 # Story 10.10: Context-Aware Navigation Bar
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -157,6 +157,16 @@ Serves FR27–29 / UX-DR25,27–30 (Epic 10's onboarding + legibility mission) a
   - [x] `dotnet run --project src/SpecScribe -- generate --deep-git` against this repo; open an epic page, a story page, a code file page, an ADR page, a commit page, a requirement page, a follow-up detail page, and an insight page (git-insights/deep-analytics/code-map) — confirm each white band shows the expected page-type context with the active item marked.
   - [x] Confirm Home is unchanged (still the work-mode strip) and confirm a page kind you deliberately left on the fallback (e.g. `action-items.html`) still shows the generic quick-links band, not an empty one.
   - [x] Confirm `--spa` and the webview both render the same contextual band (open the SPA in the preview browser; confirm the webview theme bridge covers the new pill class).
+
+### Review Findings
+
+- [x] [Review][Patch] Missing per-page-kind unit tests for 7 of 8 `NavLocalContext` builders [tests/SpecScribe.Tests] — added 8 tests (epic/story, code file, ADR, commit detail, requirement, follow-up detail)
+- [x] [Review][Patch] `overflow.Where(i => i != pinnedActive)` uses record structural equality instead of positional removal [src/SpecScribe/HtmlRenderAdapter.cs:265] — switched to `FindIndex`/`RemoveAt`
+- [x] [Review][Patch] "More" overflow panel bypasses `AppendLocalContextPill`'s self-link guard by hand-rendering `<a href>` [src/SpecScribe/HtmlRenderAdapter.cs:283] — panel loop now calls `AppendLocalContextPill(sb, item, "key-view-item", LocalContextPanelLabelMax)`
+- [x] [Review][Patch] `RequirementGroupLabel` grouping uses ordinal case-sensitive comparison on free-text `Category` [src/SpecScribe/RequirementsTemplater.cs:636] — switched to `OrdinalIgnoreCase`
+- [x] [Review][Patch] Stale/misleading doc comments on `AppendKeyViewsBand`, `BuildFollowUpGroupLocalContext`, `RequirementGroupLabel` [src/SpecScribe/HtmlRenderAdapter.cs, src/SpecScribe/SiteGenerator.cs, src/SpecScribe/RequirementsTemplater.cs] — all three updated
+- [x] [Review][Defer] `groupByHref` built with unguarded last-write-wins indexer assignment [src/SpecScribe/SiteGenerator.cs] — deferred, pre-existing pattern, currently unreachable given disjoint group membership by construction
+- [x] [Review][Defer] `counts`/`geometry`/`FollowUpGroupPages.Enumerate` now run unconditionally even with zero follow-up items [src/SpecScribe/SiteGenerator.cs] — deferred, wasted computation only, no correctness impact
 
 ## Dev Notes
 

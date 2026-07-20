@@ -227,6 +227,32 @@ public class FollowUpSurfacesTests : IDisposable
     }
 
     [Fact]
+    public void FollowUpDetailPage_LocalContextBand_MatchesOwningGroupPageMembership()
+    {
+        // [Story 10.10 review — patch] no direct test previously exercised BuildFollowUpGroupLocalContext;
+        // Epic 1 has 2 action items ("Route Epic 1's deferred tech debt..." and "Schedule retros promptly").
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), SprintWithDupes);
+        Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var followUpsDir = Path.Combine(Site, "follow-ups");
+        // The item's own detail page is the one whose file name matches its slug — several pages in this
+        // group MENTION "Schedule retros promptly" (as a local-context sibling link), so match on the
+        // generated slug rather than a raw text search across all pages.
+        var schedulePage = File.ReadAllText(Path.Combine(followUpsDir, "action-schedule-retros-promptly.html"));
+
+        Assert.Contains("site-nav-local-context", schedulePage);
+        Assert.Contains("Epic 1 follow-ups", schedulePage);
+        // The current item ("Schedule retros promptly") renders as plain text, never a self-link.
+        Assert.Contains("<span class=\"local-context-pill active\" aria-current=\"page\">Schedule retros promptly</span>", schedulePage);
+        // The other Epic 1 action item is a real sibling link in the same band (label ellipsised past
+        // LocalContextPillLabelMax, with the full text on the title tooltip).
+        Assert.Matches(new Regex("<a[^>]*class=\"local-context-pill\"[^>]*title=\"Route Epic 1&#39;s deferred tech debt"), schedulePage);
+        // Epic 2's action item ("Triage Epic 1's deferred heatmap tech debt...") is NOT a member of Epic 1's group.
+        var band = schedulePage.Substring(schedulePage.IndexOf("site-nav-local-context", StringComparison.Ordinal), 400);
+        Assert.DoesNotContain("Triage", band);
+    }
+
+    [Fact]
     public void FollowUpDetailTemplater_ActionPage_RawDataCopy_NoLinkifyInAttribute()
     {
         // Unit-level: e2e fixtures often have an empty CommandCatalog (no module-help), so pin

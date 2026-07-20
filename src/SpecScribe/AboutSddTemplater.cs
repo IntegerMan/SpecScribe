@@ -29,7 +29,7 @@ public static class AboutSddTemplater
         sb.Append("  <p>Use the matrix below for a quick support snapshot, then open a framework page for ");
         sb.Append("orientation, install steps, and what SpecScribe can show today.</p>\n");
 
-        AppendSupportMatrix(sb, methodPresent, gdsPresent);
+        AppendSupportMatrix(sb);
 
         sb.Append("  <h2 id=\"frameworks\">Framework guides</h2>\n");
         sb.Append("  <ul class=\"sdd-framework-links\">\n");
@@ -44,9 +44,15 @@ public static class AboutSddTemplater
             sb.Append("    <li>");
             sb.Append($"<a href=\"{PathUtil.Html(fw.OutputPath)}\">{PathUtil.Html(fw.Label)}</a>");
             if (fw.Supported)
-                sb.Append(detected ? " <span class=\"sdd-detected\">Detected in this project</span>" : " <span class=\"sdd-support-yes\">Supported</span>");
+            {
+                sb.Append(" <span class=\"sdd-support-yes\">Supported</span>");
+                if (detected)
+                    sb.Append(" <span class=\"sdd-detected\">Detected</span>");
+            }
             else
+            {
                 sb.Append(" <span class=\"sdd-support-soon\">Coming soon</span>");
+            }
             sb.Append("</li>\n");
         }
         sb.Append("  </ul>\n");
@@ -68,7 +74,7 @@ public static class AboutSddTemplater
             $"About {fw.Label} for Spec-Driven Development — orientation, SpecScribe support, and getting started.");
 
         if (detected)
-            sb.Append("  <p class=\"sdd-detected-banner\" role=\"status\"><span class=\"sdd-detected\">Detected in this project</span></p>\n");
+            sb.Append("  <p class=\"sdd-detected-banner\" role=\"status\"><span class=\"sdd-detected\">Detected</span> in this project</p>\n");
 
         switch (frameworkId)
         {
@@ -84,34 +90,64 @@ public static class AboutSddTemplater
         }
     }
 
-    private static void AppendSupportMatrix(StringBuilder sb, bool methodPresent, bool gdsPresent)
+    /// <summary>Checkbox matrix columns mirror <see cref="ArtifactBundle"/> projection families
+    /// (Epics/Stories, Requirements, Sprint, Retros, Module planning docs) plus next-step Commands from
+    /// <see cref="ModuleContext"/> — the nouns the adapter contract already uses. [About SDD]</summary>
+    private static void AppendSupportMatrix(StringBuilder sb)
     {
         sb.Append("  <h2 id=\"support-matrix\">SpecScribe support</h2>\n");
-        sb.Append("  <p>A brief checkbox view of what SpecScribe covers today. Empty cells mean not yet ");
-        sb.Append("supported — placeholders for future framework epics.</p>\n");
+        sb.Append("  <p>Checkbox view of which artifact families SpecScribe can project today ");
+        sb.Append("(the same nouns as the shared adapter contract). Empty cells are placeholders for ");
+        sb.Append("future framework adapters.</p>\n");
         sb.Append("  <table class=\"sdd-support-matrix\">\n");
-        sb.Append("    <thead><tr><th>Framework</th><th>Portal</th><th>Artifacts</th><th>Commands</th><th>In this project</th></tr></thead>\n");
+        sb.Append("    <thead><tr>");
+        sb.Append("<th>Framework</th>");
+        sb.Append("<th>Epics &amp; Stories</th>");
+        sb.Append("<th>Requirements</th>");
+        sb.Append("<th>Sprint</th>");
+        sb.Append("<th>Retros</th>");
+        sb.Append("<th>Planning docs</th>");
+        sb.Append("<th>Commands</th>");
+        sb.Append("</tr></thead>\n");
         sb.Append("    <tbody>\n");
-        AppendMatrixRow(sb, "BMad", true, true, true, methodPresent, SiteNav.AboutSddBmadOutputPath);
-        AppendMatrixRow(sb, "BMad GDS", true, true, true, gdsPresent, SiteNav.AboutSddGdsOutputPath);
-        AppendMatrixRow(sb, "Spec Kit", false, false, false, false, SiteNav.AboutSddSpecKitOutputPath);
-        AppendMatrixRow(sb, "GSD", false, false, false, false, SiteNav.AboutSddGsdOutputPath);
-        AppendMatrixRow(sb, "GSD-Pi", false, false, false, false, SiteNav.AboutSddGsdPiOutputPath);
-        AppendMatrixRow(sb, "Superpowers", false, false, false, false, SiteNav.AboutSddSuperpowersOutputPath);
+        // BMad / BMad GDS both ride BmadArtifactAdapter → full ArtifactBundle + CommandCatalog.
+        AppendMatrixRow(sb, "BMad", SiteNav.AboutSddBmadOutputPath, true);
+        AppendMatrixRow(sb, "BMad GDS", SiteNav.AboutSddGdsOutputPath, true);
+        AppendMatrixRow(sb, "Spec Kit", SiteNav.AboutSddSpecKitOutputPath, false);
+        AppendMatrixRow(sb, "GSD", SiteNav.AboutSddGsdOutputPath, false);
+        AppendMatrixRow(sb, "GSD-Pi", SiteNav.AboutSddGsdPiOutputPath, false);
+        AppendMatrixRow(sb, "Superpowers", SiteNav.AboutSddSuperpowersOutputPath, false);
         sb.Append("    </tbody>\n  </table>\n");
     }
 
-    private static void AppendMatrixRow(StringBuilder sb, string label, bool portal, bool artifacts, bool commands, bool detected, string href)
+    private static void AppendMatrixRow(StringBuilder sb, string label, string href, bool supported)
     {
         sb.Append("      <tr>");
         sb.Append($"<th scope=\"row\"><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(label)}</a></th>");
-        sb.Append($"<td>{Check(portal)}</td><td>{Check(artifacts)}</td><td>{Check(commands)}</td><td>{Check(detected)}</td>");
+        for (var i = 0; i < 6; i++)
+            sb.Append($"<td>{Check(supported)}</td>");
         sb.Append("</tr>\n");
     }
 
     private static string Check(bool yes) => yes
         ? "<span class=\"sdd-check\" aria-label=\"Yes\">✓</span>"
         : "<span class=\"sdd-check sdd-check--no\" aria-label=\"No\">—</span>";
+
+    private static void AppendFamilySupportTable(StringBuilder sb, bool supported)
+    {
+        sb.Append("  <table class=\"sdd-support-matrix sdd-support-matrix--compact\">\n");
+        sb.Append("    <tbody>\n");
+        AppendCompactRow(sb, "Epics &amp; Stories", supported);
+        AppendCompactRow(sb, "Requirements", supported);
+        AppendCompactRow(sb, "Sprint", supported);
+        AppendCompactRow(sb, "Retros", supported);
+        AppendCompactRow(sb, "Planning docs", supported);
+        AppendCompactRow(sb, "Commands", supported);
+        sb.Append("    </tbody>\n  </table>\n");
+    }
+
+    private static void AppendCompactRow(StringBuilder sb, string label, bool supported) =>
+        sb.Append($"      <tr><th scope=\"row\">{label}</th><td>{Check(supported)}</td></tr>\n");
 
     private static void AppendBmadBody(StringBuilder sb, bool detected)
     {
@@ -122,20 +158,16 @@ public static class AboutSddTemplater
 
         sb.Append("  <h2 id=\"get-started\">Get started</h2>\n");
         sb.Append("  <p>Install into a repo, then run the help skill to pick your next step:</p>\n");
-        sb.Append("  <p><a href=\"https://github.com/bmad-code-org/BMAD-METHOD\">BMad Method documentation</a></p>\n");
         sb.Append("  <pre class=\"sdd-install\"><code>npx bmad-method install</code></pre>\n");
+        sb.Append("  <p>See <a href=\"https://github.com/bmad-code-org/BMAD-METHOD\">the official documentation</a> ");
+        sb.Append("for more information and installation options.</p>\n");
         if (!detected)
             sb.Append("  <p class=\"sdd-absent-info\">BMad is not detected in this repository yet (_bmad/bmm).</p>\n");
 
         sb.Append("  <h2 id=\"specscribe-support\">SpecScribe support</h2>\n");
-        sb.Append("  <p>SpecScribe fully supports BMad today: planning docs, epics/stories, sprint status, ");
-        sb.Append("ADRs, next-step commands, glossary, and dashboard insights when those artifacts exist.</p>\n");
-        sb.Append("  <table class=\"sdd-support-matrix sdd-support-matrix--compact\">\n");
-        sb.Append("    <tbody>\n");
-        sb.Append("      <tr><th scope=\"row\">Portal pages</th><td><span class=\"sdd-check\" aria-label=\"Yes\">✓</span></td></tr>\n");
-        sb.Append("      <tr><th scope=\"row\">Core artifacts</th><td><span class=\"sdd-check\" aria-label=\"Yes\">✓</span></td></tr>\n");
-        sb.Append("      <tr><th scope=\"row\">Next-step commands</th><td><span class=\"sdd-check\" aria-label=\"Yes\">✓</span></td></tr>\n");
-        sb.Append("    </tbody>\n  </table>\n");
+        sb.Append("  <p>SpecScribe projects BMad through the shared adapter contract: epics &amp; stories, ");
+        sb.Append("requirements, sprint, retros, planning docs, and next-step commands when those artifacts exist.</p>\n");
+        AppendFamilySupportTable(sb, supported: true);
 
         sb.Append("  <h2 id=\"commands\">Common commands</h2>\n");
         sb.Append("  <ul class=\"sdd-commands\">\n");
@@ -146,11 +178,13 @@ public static class AboutSddTemplater
         sb.Append("    <li><code>/bmad-create-story</code> — story ready for dev</li>\n");
         sb.Append("    <li><code>/bmad-dev-story</code> / <code>/bmad-quick-dev</code> — implement</li>\n");
         sb.Append("    <li><code>/bmad-code-review</code> — review</li>\n");
+        sb.Append("    <li><code>/bmad-correct-course</code> — adjust mid-sprint when scope shifts</li>\n");
         sb.Append("    <li><code>/bmad-retrospective</code> — epic retrospective</li>\n");
         sb.Append("  </ul>\n");
 
         sb.Append("  <h2 id=\"methodology\">Methodology</h2>\n");
-        sb.Append("  <p>Typical progression through BMad workflows:</p>\n");
+        sb.Append("  <p>Typical progression: plan once, then loop create → develop → review for each story ");
+        sb.Append("inside a sprint (with optional course correction), and close with a retrospective.</p>\n");
         sb.Append(Mermaid.Block(Mermaid.SddMethodDiagram()));
     }
 
@@ -163,20 +197,16 @@ public static class AboutSddTemplater
 
         sb.Append("  <h2 id=\"get-started\">Get started</h2>\n");
         sb.Append("  <p>Add the GDS module during BMad install (or to an existing install):</p>\n");
-        sb.Append("  <p><a href=\"https://github.com/bmad-code-org/bmad-module-game-dev-studio\">BMad Game Dev Studio documentation</a></p>\n");
         sb.Append("  <pre class=\"sdd-install\"><code>npx bmad-method install --modules gds</code></pre>\n");
+        sb.Append("  <p>See <a href=\"https://github.com/bmad-code-org/bmad-module-game-dev-studio\">the official documentation</a> ");
+        sb.Append("for more information and installation options.</p>\n");
         if (!detected)
             sb.Append("  <p class=\"sdd-absent-info\">BMad GDS is not detected in this repository yet (_bmad/gds).</p>\n");
 
         sb.Append("  <h2 id=\"specscribe-support\">SpecScribe support</h2>\n");
-        sb.Append("  <p>SpecScribe supports BMad GDS today: GDD / narrative / architecture docs, module ");
-        sb.Append("vocabulary, and GDS-oriented next-step commands when the module is installed.</p>\n");
-        sb.Append("  <table class=\"sdd-support-matrix sdd-support-matrix--compact\">\n");
-        sb.Append("    <tbody>\n");
-        sb.Append("      <tr><th scope=\"row\">Portal pages</th><td><span class=\"sdd-check\" aria-label=\"Yes\">✓</span></td></tr>\n");
-        sb.Append("      <tr><th scope=\"row\">Core artifacts</th><td><span class=\"sdd-check\" aria-label=\"Yes\">✓</span></td></tr>\n");
-        sb.Append("      <tr><th scope=\"row\">Next-step commands</th><td><span class=\"sdd-check\" aria-label=\"Yes\">✓</span></td></tr>\n");
-        sb.Append("    </tbody>\n  </table>\n");
+        sb.Append("  <p>SpecScribe projects BMad GDS through the same adapter families as BMad — including ");
+        sb.Append("GDD / narrative / architecture planning docs and GDS-oriented commands when installed.</p>\n");
+        AppendFamilySupportTable(sb, supported: true);
 
         sb.Append("  <h2 id=\"commands\">Common commands</h2>\n");
         sb.Append("  <ul class=\"sdd-commands\">\n");
@@ -197,12 +227,7 @@ public static class AboutSddTemplater
         sb.Append($"  <p>{PathUtil.Html(label)} support in SpecScribe is planned. This page is a placeholder ");
         sb.Append("so the framework roster stays honest while adapters land in later epics.</p>\n");
         sb.Append("  <h2 id=\"specscribe-support\">SpecScribe support</h2>\n");
-        sb.Append("  <table class=\"sdd-support-matrix sdd-support-matrix--compact\">\n");
-        sb.Append("    <tbody>\n");
-        sb.Append("      <tr><th scope=\"row\">Portal pages</th><td><span class=\"sdd-check sdd-check--no\" aria-label=\"No\">—</span></td></tr>\n");
-        sb.Append("      <tr><th scope=\"row\">Core artifacts</th><td><span class=\"sdd-check sdd-check--no\" aria-label=\"No\">—</span></td></tr>\n");
-        sb.Append("      <tr><th scope=\"row\">Next-step commands</th><td><span class=\"sdd-check sdd-check--no\" aria-label=\"No\">—</span></td></tr>\n");
-        sb.Append("    </tbody>\n  </table>\n");
+        AppendFamilySupportTable(sb, supported: false);
     }
 
     private static StringBuilder Begin(SiteNav nav, string outputPath, string title, string description)

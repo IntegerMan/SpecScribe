@@ -195,6 +195,58 @@ public static class StatusStyles
         return Badge(cssClass, RequirementLabel(req.Status), iconClass);
     }
 
+    /// <summary>Badge for a free-text status word/phrase that isn't a known lifecycle stage's own vocabulary
+    /// (e.g. an ADR's "Accepted" / "Superseded by ADR 2" line): known lifecycle words route through
+    /// <see cref="ForSprint"/>'s canonical badge; anything else degrades to a slugged <c>.pill.status-*</c>
+    /// span so the word still carries the meaning (never color-only). The CSS class uses the <b>first word</b>
+    /// only so multi-word ADR states like "Superseded by ADR 2" land on <c>.pill.status-superseded</c> (and the
+    /// existing strikethrough/muted rule) rather than a longer slug that never matches; the full phrase stays
+    /// as the visible label. Trailing sentence punctuation on an authored status ("Accepted.", "Done!") is
+    /// stripped the same way <see cref="ForStatus"/> does so it can't defeat the canonical match or leak a
+    /// dotted CSS class. Re-homed from <c>HtmlTemplater.AppendStatusPill</c> so any surface with a free-text
+    /// status field can call the same rule. [Story 10.8; Story 10.4 AC2]</summary>
+    public static string FreeTextBadge(string status)
+    {
+        // Match ForStatus's tolerance for a trailing sentence-punctuation mark on an authored status line, so a
+        // real lifecycle word ("Done.") still routes to its canonical badge and an unrecognized one ("Accepted.")
+        // slugs to "status-accepted", never "status-accepted." (a class no CSS rule can match). [Story 10.8 review]
+        var cleaned = status.Trim().TrimEnd('.', '!', '?', ':', ',');
+        if (cleaned.Length == 0) cleaned = status.Trim();
+
+        var token = ForSprint(cleaned);
+        if (token != "unrecognized")
+        {
+            return Badge(token, SprintLabel(cleaned));
+        }
+
+        var parts = cleaned.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries);
+        var firstWord = parts.Length > 0 ? parts[0] : cleaned;
+        var cls = "status-" + firstWord.ToLowerInvariant();
+        return $"<span class=\"pill {PathUtil.Html(cls)}\">{PathUtil.Html(status)}</span>";
+    }
+
+    /// <summary>Maps an ADR's free-text status word onto a canonical stage token for the list-row LEFT ACCENT
+    /// bar (a <c>.list-row-accent-*</c> modifier) — never the sole signal, the row's status badge still carries
+    /// the word (UX-DR17). Accepted/approved decisions read <c>done</c> (settled), proposals/drafts read
+    /// <c>pending</c>, and superseded/deprecated/rejected records read <c>deferred</c> (shelved history).
+    /// Anything else returns null so the row keeps the neutral default accent rather than inventing a color.
+    /// [Story 10.8 review]</summary>
+    public static string? AdrAccentToken(string? status)
+    {
+        var n = Normalize(status).TrimEnd('.', '!', '?', ':', ',');
+        if (n.Length == 0) return null;
+
+        var parts = n.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries);
+        var first = parts.Length > 0 ? parts[0] : n;
+        return first switch
+        {
+            "accepted" or "approved" or "adopted" => "done",
+            "proposed" or "draft" or "proposal" or "pending" => "pending",
+            "superseded" or "deprecated" or "rejected" or "retired" or "obsolete" => "deferred",
+            _ => null,
+        };
+    }
+
     /// <summary>Maps a <c>sprint-status.yaml</c> lifecycle value onto the SAME six-stage color vocabulary as
     /// stories/epics — the yaml is the authoritative <em>tracking</em> ledger (distinct from the derived
     /// artifact status), but a reader who learned the colors on the sunburst must read the sprint page for
@@ -203,27 +255,6 @@ public static class StatusStyles
     /// <para><b>Absent vs. unmapped (Story 8.2 AC #3):</b> null/empty → <c>pending</c> (unchanged). A non-empty
     /// string matching no known value → <c>unrecognized</c> (preserves the word via <see cref="SprintLabel"/>,
     /// never invents a lifecycle color).</para> [Story 2.3 Task 2; Story 8.2]</summary>
-    /// <summary>Badge for a free-text status word/phrase that isn't a known lifecycle stage's own vocabulary
-    /// (e.g. an ADR's "Accepted" / "Superseded by ADR 2" line): known lifecycle words route through
-    /// <see cref="ForSprint"/>'s canonical badge; anything else degrades to a slugged <c>.pill.status-*</c>
-    /// span so the word still carries the meaning (never color-only). The CSS class uses the <b>first word</b>
-    /// only so multi-word ADR states like "Superseded by ADR 2" land on <c>.pill.status-superseded</c> (and the
-    /// existing strikethrough/muted rule) rather than a longer slug that never matches; the full phrase stays
-    /// as the visible label. Re-homed from <c>HtmlTemplater.AppendStatusPill</c> so any surface with a free-text
-    /// status field can call the same rule. [Story 10.8; Story 10.4 AC2]</summary>
-    public static string FreeTextBadge(string status)
-    {
-        var token = ForSprint(status);
-        if (token != "unrecognized")
-        {
-            return Badge(token, SprintLabel(status));
-        }
-
-        var firstWord = status.Trim().Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries)[0];
-        var cls = "status-" + firstWord.ToLowerInvariant();
-        return $"<span class=\"pill {PathUtil.Html(cls)}\">{PathUtil.Html(status)}</span>";
-    }
-
     public static string ForSprint(string? status)
     {
         // Spaced aliases ("in progress", "ready for dev") normalize to kebab so they match the yaml forms.

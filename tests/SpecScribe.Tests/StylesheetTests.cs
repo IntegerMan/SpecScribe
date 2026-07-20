@@ -198,7 +198,10 @@ public class StylesheetTests
         // only (never --status-*, activity is not a lifecycle state). [Review][Patch] no companion test existed.
         var css = ReadStylesheet();
         Assert.Contains(".timeline-list", css);
-        Assert.Contains(".timeline-row", css);
+        // Story 10.8 (review): day rows now render through ListRow (<li class="list-row timeline-row">), so the
+        // bespoke .timeline-row rule was retired — the date/summary keep their own type styles inside the shell.
+        Assert.Contains(".timeline-date", css);
+        Assert.Contains(".timeline-summary", css);
         Assert.Contains(".timeline-heatmap", css);
         Assert.Contains(".artifacts-updated", css);
         Assert.Contains(".artifact-update-list", css);
@@ -739,6 +742,11 @@ public class StylesheetTests
         // Shared visual rules, never a competing duplicate of followup-row's own declarations.
         Assert.Contains(".followup-row,", css);
         Assert.Contains(".list-row {", css);
+        // Story 10.8 (review): .list-row's left accent is NEUTRAL by default (it hosts non-lifecycle lists like
+        // ADRs/timeline); status accents are opt-in via .list-row-accent-* modifiers driven off real status.
+        Assert.Contains("var(--list-row-accent", css);
+        Assert.Contains(".list-row-accent-done", css);
+        Assert.Contains(".list-row-accent-deferred", css);
     }
 
     // ---- Story 10.6: insight-chart context polish chrome -----------------------------------------------
