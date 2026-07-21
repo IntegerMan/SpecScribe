@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Markdig;
+using Markdig.Extensions.EmphasisExtras;
 using Markdig.Renderers;
 using Markdig.Renderers.Html;
 using Markdig.Syntax;
@@ -12,10 +13,23 @@ namespace SpecScribe;
 /// <summary>Converts a single BMad markdown file (frontmatter + body) into a <see cref="DocModel"/>. Never opens files exclusively — BMad tooling may still be writing them.</summary>
 public static class MarkdownConverter
 {
-    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
-        .Use(new DocumentRendererWrappersExtension())
-        .Build();
+    private static readonly MarkdownPipeline Pipeline = BuildPipeline();
+
+    /// <summary>Advanced extensions minus single-tilde Subscript: BMad prose uses a bare <c>~</c> for
+    /// "approximately" (e.g. <c>~7 ms</c>) constantly, and Subscript's single-tilde delimiter steals those
+    /// characters from the emphasis-parsing stack — breaking unrelated <c>~~strikethrough~~</c> pairs
+    /// (e.g. resolved-deferred-item markers) elsewhere on the same line. Subscript has no legitimate use
+    /// in this project's authored content.</summary>
+    private static MarkdownPipeline BuildPipeline()
+    {
+        var builder = new MarkdownPipelineBuilder()
+            .UseAdvancedExtensions()
+            .Use(new DocumentRendererWrappersExtension());
+        builder.Extensions.ReplaceOrAdd<EmphasisExtraExtension>(new EmphasisExtraExtension(
+            EmphasisExtraOptions.Strikethrough | EmphasisExtraOptions.Superscript
+            | EmphasisExtraOptions.Inserted | EmphasisExtraOptions.Marked));
+        return builder.Build();
+    }
 
     private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder()
         .WithNamingConvention(CamelCaseNamingConvention.Instance)

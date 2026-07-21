@@ -44,9 +44,17 @@ public class CodeMapTemplaterTests
         Assert.Contains("value=\"cochange\"", html);          // "Files changed together" colorize dimension
         Assert.Contains("value=\"churn\"", html);              // round 2: churn is a colorize option
         Assert.Contains(">Churn</option>", html);
+        // Story 7.9: "File type" is a 7th option, unselected — the sequential default (change frequency) is
+        // unchanged (AC #3), and its ramp legend ships visible while the discrete legend ships pre-rendered hidden.
+        Assert.Contains("value=\"filetype\">File type</option>", html);
+        Assert.Contains("class=\"codemap-legend codemap-legend-ramp\">", html);
+        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\" hidden>", html);
 
-        // The text table gains a "Together" column carrying the per-file average co-changed file count.
+        // The text table gains a "Together" column carrying the per-file average co-changed file count, and an
+        // always-present "Type" column (Story 7.9).
         Assert.Contains(">Together</th>", html);
+        Assert.Contains(">Type</th>", html);
+        Assert.Contains(">C#</td>", html);                    // src/A.cs classifies as C#
         Assert.Contains(">3.4</td>", html);                   // src/A.cs's average co-changed files
 
         // First/Last dates render via the portal's human-readable token, not raw ISO.
@@ -69,16 +77,27 @@ public class CodeMapTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_WithoutMetrics_ShowsNoticeAndOmitsControlsAndLegend()
+    public void RenderPage_WithoutMetrics_ShowsSecondaryNoticeButKeepsAWorkingFileTypeDimension()
     {
+        // Story 7.9: file type needs no git data, so the controls/legend are no longer fully hidden when
+        // hasMetrics is false — only the six git-derived dimensions are unavailable, which the (now secondary)
+        // notice explains.
         var html = CodeMapTemplater.RenderPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav());
 
-        Assert.Contains("Git change data is unavailable", html); // graceful degradation notice (AC #2)
-        Assert.DoesNotContain("codemap-dim-select", html);       // no colorize dropdown without git data
-        Assert.DoesNotContain("codemap-legend", html);           // no ramp legend without git data
-        // The text table still lists the file (sized-by-LOC is always meaningful).
+        Assert.Contains("Git change data is unavailable", html);           // secondary graceful-degradation notice (AC #2)
+        Assert.Contains("codemap-notice-secondary", html);                 // demoted from a full-replacement block
+        Assert.Contains("codemap-dim-select", html);                       // colorize dropdown IS present (file type works)
+        Assert.Contains("value=\"filetype\" selected", html);              // and it's the sole, baked-in default option
+        Assert.DoesNotContain("value=\"changes\"", html);                  // the six git-derived options are absent
+        Assert.Contains("codemap-legend-discrete", html);                  // discrete legend renders (visible, not hidden)
+        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\">", html);
+        Assert.Contains("class=\"codemap-legend codemap-legend-ramp\" hidden>", html); // ramp legend pre-rendered but hidden
+
+        // The text table still lists the file (sized-by-LOC is always meaningful) with its Type column populated.
         Assert.Contains("codemap-table", html);
         Assert.Contains("src/A.cs", html);
+        Assert.Contains(">Type</th>", html);
+        Assert.Contains(">C#</td>", html); // src/A.cs classifies as C#
     }
 
     [Fact]

@@ -4,7 +4,7 @@ baseline_commit: b87a47eadf8ef499888f62d4bf0b8597ca3ea9a5
 
 # Story 7.9: Code Map File-Type Colorize (Discrete Palette)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -246,60 +246,86 @@ Test framework: **xUnit** (`net10.0`). Model tests are pure (no IO, following `C
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — New bounded file-type classifier (AC: #1, #2)**
-  - [ ] Add a pure `CodeFileType.Classify(string repoRelativePath) -> (string Key, string Label)` (or equivalent record) to `CodeMap.cs`, following the `IsSpecDevPath`/`IsTestPath` pattern: normalized, case-insensitive extension matching, never throws.
-  - [ ] Bounded ~6-category set (C# · TypeScript/JavaScript · Styles · Markup & Docs · Config & Data · Other), "Other" as the deterministic catch-all for anything unrecognized or extensionless.
-  - [ ] Thread the classification onto every `CodeMapNode` file leaf in `Build`/`BuildChildren`, always populated (no git dependency).
-- [ ] **Task 2 — Render the discrete dimension in the SVG + tooltip + table (AC: #1, #2)**
-  - [ ] `Charts.CodeTreemap`/`AppendTreemapFile`: emit `data-filetype`/`data-filetype-label` on every file rect, unconditionally.
-  - [ ] Bake `type-<key>` as the default fill class when `hasMetrics` is false (replacing the current flat `level-none`); keep `hasMetrics=true`'s default (change frequency) byte-identical.
-  - [ ] `BuildTreemapCard`: add a "Type" row (human label) for every file.
-  - [ ] `AppendFileTable`: add an always-present "Type" column.
-- [ ] **Task 3 — Colorize dropdown + discrete legend (AC: #1, #3)**
-  - [ ] `AppendVariantPanel`/`AppendColorizeControls`: loosen the `hasMetrics` gate — dropdown renders whenever the variant has files; `hasMetrics=true` gets a 7th "File type" option (existing six unchanged, unchanged default); `hasMetrics=false` gets only "File type" (and it's the default).
-  - [ ] New discrete-legend renderer: swatch + human label per category **present in this variant** (not every possible category); keep the existing ramp legend for the sequential default unchanged.
-  - [ ] Demote the "git data unavailable" notice to a secondary note when `hasMetrics` is false (controls are no longer fully hidden).
-- [ ] **Task 4 — Client-side dimension switch (AC: #1, #3)**
-  - [ ] `specscribe.js`: `DIM_LABELS` gets `filetype: "file type"`; new `recolor()` branch reading `data-filetype`/`data-filetype-label` (no `bucket()`/min-max scan), setting `type-<key>` classes.
-  - [ ] Fix class-clearing symmetry: strip `type-*` when applying a numeric dimension, strip `level-*`/`level-none` when applying file type.
-  - [ ] Legend content swap on dimension change (swap to/from the discrete legend shape) — pick and document the mechanism (DOM rewrite vs. pre-rendered/toggled shapes).
-- [ ] **Task 5 — CSS: new discrete palette (AC: #1, #2)**
-  - [ ] `.codemap-cell.type-*` + `.codemap-legend-swatch.type-*` for each real category, using new/existing non-`--status-*`, non-ramp tokens.
-  - [ ] Distinct, honest "Other" treatment (muted/hatched, not an arbitrary 6th hue competing with the real categories).
-  - [ ] Verify legibility against the existing gold ramp (no confusable overlap when both dimensions' colors could appear near each other in review).
-- [ ] **Task 6 — AC #3 coherence check (AC: #3)**
-  - [ ] Confirm `GitMetrics.ClassifyCoupling`/Story 10.6 code is untouched (grep diff before finishing).
-  - [ ] Confirm the six sequential dimensions still produce byte-identical output to pre-7.9 for the same inputs.
-  - [ ] Determine and record whether `code-map.html` is captured by the SPA consolidation and/or included in the VS Code webview surface; ensure the new markup/CSS/JS is coherent there if so.
-- [ ] **Task 7 — Tests (AC: #1, #2, #3)**
-  - [ ] Classifier unit tests (category coverage, Other fallback, no-git independence, determinism, never-throws).
-  - [ ] `Charts`/`CodeTreemap` tests (data attrs always present, baked-default behavior split by `hasMetrics`, tooltip Type row, escaping).
-  - [ ] `CodeMapTemplaterTests` (dropdown option counts per `hasMetrics` state, discrete legend content, table Type column).
-  - [ ] Generation-level tests (`SiteGeneratorCodeMapTests`): baseline default-is-filetype, deep-git default-unchanged, determinism, SPA/webview coherence per Task 6's finding.
-  - [ ] Regenerate the golden content fingerprint; confirm inventory unaffected.
-- [ ] **Task 8 — Full generation pass + manual verify (AC: #1, #2, #3)**
-  - [ ] `dotnet test` green.
-  - [ ] Baseline generate (no `--deep-git`) → file-type colorized by default, discrete legend, Type column populated.
-  - [ ] Deep generate (`--deep-git`) → default unchanged, File type selectable as 7th option, clean switch both directions (no stale classes), sequential dimensions unchanged.
+- [x] **Task 1 — New bounded file-type classifier (AC: #1, #2)**
+  - [x] Add a pure `CodeFileType.Classify(string repoRelativePath) -> (string Key, string Label)` (or equivalent record) to `CodeMap.cs`, following the `IsSpecDevPath`/`IsTestPath` pattern: normalized, case-insensitive extension matching, never throws.
+  - [x] Bounded ~6-category set (C# · TypeScript/JavaScript · Styles · Markup & Docs · Config & Data · Other), "Other" as the deterministic catch-all for anything unrecognized or extensionless.
+  - [x] Thread the classification onto every `CodeMapNode` file leaf in `Build`/`BuildChildren`, always populated (no git dependency).
+- [x] **Task 2 — Render the discrete dimension in the SVG + tooltip + table (AC: #1, #2)**
+  - [x] `Charts.CodeTreemap`/`AppendTreemapFile`: emit `data-filetype`/`data-filetype-label` on every file rect, unconditionally.
+  - [x] Bake `type-<key>` as the default fill class when `hasMetrics` is false (replacing the current flat `level-none`); keep `hasMetrics=true`'s default (change frequency) byte-identical.
+  - [x] `BuildTreemapCard`: add a "Type" row (human label) for every file.
+  - [x] `AppendFileTable`: add an always-present "Type" column.
+- [x] **Task 3 — Colorize dropdown + discrete legend (AC: #1, #3)**
+  - [x] `AppendVariantPanel`/`AppendColorizeControls`: loosen the `hasMetrics` gate — dropdown renders whenever the variant has files; `hasMetrics=true` gets a 7th "File type" option (existing six unchanged, unchanged default); `hasMetrics=false` gets only "File type" (and it's the default).
+  - [x] New discrete-legend renderer: swatch + human label per category **present in this variant** (not every possible category); keep the existing ramp legend for the sequential default unchanged.
+  - [x] Demote the "git data unavailable" notice to a secondary note when `hasMetrics` is false (controls are no longer fully hidden).
+- [x] **Task 4 — Client-side dimension switch (AC: #1, #3)**
+  - [x] `specscribe.js`: `DIM_LABELS` gets `filetype: "file type"`; new `recolor()` branch reading `data-filetype`/`data-filetype-label` (no `bucket()`/min-max scan), setting `type-<key>` classes.
+  - [x] Fix class-clearing symmetry: strip `type-*` when applying a numeric dimension, strip `level-*`/`level-none` when applying file type.
+  - [x] Legend content swap on dimension change (swap to/from the discrete legend shape) — pick and document the mechanism (DOM rewrite vs. pre-rendered/toggled shapes).
+- [x] **Task 5 — CSS: new discrete palette (AC: #1, #2)**
+  - [x] `.codemap-cell.type-*` + `.codemap-legend-swatch.type-*` for each real category, using new/existing non-`--status-*`, non-ramp tokens.
+  - [x] Distinct, honest "Other" treatment (muted/hatched, not an arbitrary 6th hue competing with the real categories).
+  - [x] Verify legibility against the existing gold ramp (no confusable overlap when both dimensions' colors could appear near each other in review).
+- [x] **Task 6 — AC #3 coherence check (AC: #3)**
+  - [x] Confirm `GitMetrics.ClassifyCoupling`/Story 10.6 code is untouched (grep diff before finishing).
+  - [x] Confirm the six sequential dimensions still produce byte-identical output to pre-7.9 for the same inputs.
+  - [x] Determine and record whether `code-map.html` is captured by the SPA consolidation and/or included in the VS Code webview surface; ensure the new markup/CSS/JS is coherent there if so.
+- [x] **Task 7 — Tests (AC: #1, #2, #3)**
+  - [x] Classifier unit tests (category coverage, Other fallback, no-git independence, determinism, never-throws).
+  - [x] `Charts`/`CodeTreemap` tests (data attrs always present, baked-default behavior split by `hasMetrics`, tooltip Type row, escaping).
+  - [x] `CodeMapTemplaterTests` (dropdown option counts per `hasMetrics` state, discrete legend content, table Type column).
+  - [x] Generation-level tests (`SiteGeneratorCodeMapTests`): baseline default-is-filetype, deep-git default-unchanged, determinism, SPA/webview coherence per Task 6's finding.
+  - [x] Regenerate the golden content fingerprint; confirm inventory unaffected.
+- [x] **Task 8 — Full generation pass + manual verify (AC: #1, #2, #3)**
+  - [x] `dotnet test` green.
+  - [x] Baseline generate (no `--deep-git`) → file-type colorized by default, discrete legend, Type column populated.
+  - [x] Deep generate (`--deep-git`) → default unchanged, File type selectable as 7th option, clean switch both directions (no stale classes), sequential dimensions unchanged.
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-_(filled by dev-story)_
+Claude Sonnet 5 (claude-sonnet-5)
 
 ### Debug Log References
 
-_(filled by dev-story)_
+- `dotnet build src/SpecScribe/SpecScribe.csproj` — clean, 0 warnings/errors, at each checkpoint.
+- `dotnet test tests/SpecScribe.Tests/SpecScribe.Tests.csproj` — full suite green at 1874/1874 after the final pass (2 pre-existing failures observed mid-session — `SiteGeneratorAdapterTests` golden fingerprint, expected/regenerated, and `MarkdownConverterTests.SCRATCH_DiagnoseTildeBug` — both traced to a **concurrent session actively editing the same shared `main` working tree** (uncommitted `MarkdownConverter.cs` tilde-parsing fix + `sprint-status.yaml` Epic 13/14/15 create-story entries); confirmed via `git status`/`git diff` that neither belongs to this story, left both untouched, and the scratch test resolved itself once the concurrent session's fix landed in the shared working tree — no action taken on my part).
+- Golden content fingerprint regenerated after 2 repeated runs confirmed stability: `a7787135415317347850153750453ddc657adb1defd6515412337de5c22e6b35`.
+- Manual verify: `dotnet run --project src/SpecScribe -- generate --output <tmp>` (no `--deep-git`) confirmed file-type is the baked default (all 6 categories present, discrete legend visible, ramp legend hidden, secondary notice, Type column) and again with `--deep-git` confirmed the sequential default is unchanged (`value="changes" selected`, ramp legend visible, discrete legend pre-rendered hidden, `filetype` a 7th unselected option, `level-*` classes still baked, zero stray secondary notices).
 
 ### Completion Notes List
 
-_(filled by dev-story)_
+- New `CodeFileCategory` record + `CodeFileType` static classifier (6 bounded categories: C#, TypeScript/JavaScript, Styles, Markup & Docs, Config & Data, Other) added to `CodeMap.cs`, following the file's `IsSpecDevPath`/`IsTestPath` pure-helper discipline. `CodeMapNode` gained a `Category` field (always populated for files, always `null` for directories) — a positional-record parameter addition, so both existing construction sites (`BuildChildren`, `BuildDir`) were updated in place.
+- `Charts.CodeTreemap`/`AppendTreemapFile` now emit `data-filetype`/`data-filetype-label` unconditionally and bake `type-<key>` as the default fill class when `hasMetrics` is false (replacing the old flat `level-none`); the `hasMetrics: true` path is byte-identical to pre-7.9 (AC #3 regression guard, test-covered). `BuildTreemapCard` gained an always-present "Type" row.
+- `CodeMapTemplater.AppendVariantPanel`'s gating was loosened exactly as scoped: the colorize dropdown + BOTH legend shapes now render whenever the variant has files; when `hasMetrics` is false the dropdown offers only "File type" (the baked default), the discrete legend ships visible and the ramp legend ships pre-rendered `hidden`, and the "git data unavailable" notice is demoted to `.codemap-notice-secondary`. When `hasMetrics` is true, nothing about the six existing options/default changed — "File type" is purely appended as a 7th option, and the ramp legend stays visible with the discrete legend pre-rendered hidden. `AppendFileTable` gained an always-present "Type" column.
+- Chose the **pre-render-both-legends-and-toggle-visibility** design (the story's suggested simpler alternative to JS DOM surgery): both legend shapes are static once rendered — the discrete legend's category list never changes at runtime — so `specscribe.js`'s `swapLegend()` only flips two `hidden` booleans, never rewrites content.
+- `recolor()` gained a structurally separate `"filetype"` branch (no `bucket()`/min-max scan — categorical, not scaled) and a shared `clearFillClasses()` helper that strips BOTH `level-*` and `type-*` before applying either family, fixing the class-clearing symmetry bug called out in the story (previously only `level-*` was cleared, so a cell colorized by file type would carry a stale `type-*` class forever after switching to a numeric dimension).
+- New CSS palette avoids the gold-ramp hues entirely (uses `--teal-deep`/`--teal`/`--rust`/`--rust-light`/`--moss` for the 5 real categories, muted `--parchment-dark` + `stroke-dasharray` for "Other") so the categorical dimension can never be visually confused with the sequential ramp even side by side. No new custom properties were needed — all existing non-`--status-*` accent tokens.
+- **AC #3 coherence (Task 6) confirmed by direct code reading, not assumption**: `GitMetrics.cs`/`ClassifyCoupling` has zero diff (`git diff --stat` confirms). `code-map.html` IS captured for SPA/webview — `SiteGenerator.cs`'s deliberate exclusion set (owner decision 2026-07-12) only covers code *pages*, commit-day pages, and `commit/` detail pages (things that scale with the target repo's git history), not the Code Map itself — added `SiteGeneratorWebviewTests.CapturePages_IncludesCodeMapAsACapturedSurface` to make this explicit and prove the new markup renders coherently there (no `<script>` in captured regions, same as every other captured surface — the JS enhancement simply doesn't run there, matching the page's existing pure-SVG-with-progressive-enhancement design).
+- The **owner-directed `hasMetrics` gating change** (file type becomes the baked default when git metrics are absent) reads well in manual verify — a no-`--deep-git` Code Map is no longer flat/inert, and the demoted secondary notice still honestly explains why the six git-derived dimensions specifically are missing. No conflict found with the locked design; not flagging for re-confirmation.
+- Test suite additions land across `CodeMapTests.cs` (classifier unit tests), `ChartsTests.cs` (SVG/tooltip/data-attribute coverage split by `hasMetrics`), `CodeMapTemplaterTests.cs` (dropdown/legend/table rewrites for both `hasMetrics` states), `SiteGeneratorCodeMapTests.cs` (2 new generation-level tests: no-deep-git default + determinism, plus a new `--deep-git` real-repo fixture proving the sequential default is unchanged and file type is a selectable 7th option), and `SiteGeneratorWebviewTests.cs` (1 new SPA/webview coherence test). 1874/1874 green.
+- **Shared-main note**: a concurrent session was actively editing this same working tree during implementation (uncommitted `MarkdownConverter.cs` + `sprint-status.yaml` changes for Epics 13–15, unrelated to Story 7.9). Verified via `git diff`/`git status` at multiple checkpoints that none of my edits were lost or clobbered and that I did not touch or revert the other session's in-flight work. [[shared-main-concurrent-edit-loss-verify-after-edit]]
 
 ### File List
 
-_(filled by dev-story)_
+- `src/SpecScribe/CodeMap.cs` — new `CodeFileCategory` record + `CodeFileType` static classifier; `CodeMapNode.Category` field; threaded through `Build`/`BuildChildren`/`BuildDir`.
+- `src/SpecScribe/Charts.cs` — `CodeTreemap`/`AppendTreemapFile`: `data-filetype`/`data-filetype-label` always emitted; `type-<key>` baked default when `!hasMetrics`; `BuildTreemapCard`: always-present "Type" row.
+- `src/SpecScribe/CodeMapTemplater.cs` — `AppendVariantPanel` gating loosened; `AppendColorizeControls` gained the `hasMetrics` parameter + "File type" option; `AppendLegend` + new `AppendDiscreteLegend` (both pre-rendered, one hidden); `AppendFileTable` gained an always-present "Type" column.
+- `src/SpecScribe/assets/specscribe.js` — `DIM_LABELS.filetype`; new `recolor()` `"filetype"` branch; new `clearFillClasses()`/`swapLegend()` helpers; `legendDim` scoped to the ramp legend specifically.
+- `src/SpecScribe/assets/specscribe.css` — new `.codemap-cell.type-*`/`.codemap-legend-swatch.type-*` discrete palette; `.codemap-legend[hidden]`; `.codemap-legend-discrete`/`.codemap-legend-label`; `.codemap-notice-secondary`.
+- `tests/SpecScribe.Tests/CodeMapTests.cs` — classifier unit tests (category coverage, Other fallback, case-insensitivity, determinism, never-throws, no-git independence, directories carry no category).
+- `tests/SpecScribe.Tests/ChartsTests.cs` — file-type data-attribute/baked-default/tooltip coverage split by `hasMetrics`; updated 2 pre-existing tests whose asserted fill class changed from `level-none` to `type-csharp` under the new `hasMetrics: false` default.
+- `tests/SpecScribe.Tests/CodeMapTemplaterTests.cs` — rewrote the `hasMetrics: false` test for the new (no-longer-fully-hidden) controls/legend behavior; extended the `hasMetrics: true` test for the 7th option + pre-rendered legend pair + Type column.
+- `tests/SpecScribe.Tests/SiteGeneratorCodeMapTests.cs` — 2 new generation-level tests (no-deep-git default-is-filetype + determinism) plus a new real-git-repo `--deep-git` fixture/test (sequential default unchanged, file type selectable as 7th option) with its own `TryCreateGitHistory`/`RunGit`/`Commit` helpers.
+- `tests/SpecScribe.Tests/SiteGeneratorWebviewTests.cs` — 1 new SPA/webview coherence test proving `code-map.html` is captured and renders the new markup correctly.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden content fingerprint constant regenerated (CSS/JS-only shift for this non-git fixture; documented in the existing changelog-comment convention).
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — `7-9-code-map-file-type-colorize-discrete-palette` → `review`.
+- `_bmad-output/implementation-artifacts/7-9-code-map-file-type-colorize-discrete-palette.md` — this story file (frontmatter/tasks/Dev Agent Record/Change Log only).
 
 ## Change Log
 
-_(filled by dev-story)_
+| Date | Change |
+|------|--------|
+| 2026-07-20 | Story implemented: new bounded `CodeFileType` classifier (Task 1); SVG/tooltip/table rendering of the file-type dimension (Task 2); loosened `hasMetrics` gate + dropdown/discrete-legend (Task 3); client-side `recolor()` filetype branch + class-clearing symmetry fix (Task 4); new discrete CSS palette (Task 5); AC #3 coherence confirmed — `ClassifyCoupling` untouched, sequential dimensions byte-identical, `code-map.html` confirmed captured for SPA/webview with a new coherence test (Task 6); full test coverage added across classifier/chart/templater/generation/webview layers, golden fingerprint regenerated (Task 7); `dotnet test` green (1874/1874) + manual baseline and `--deep-git` generation passes verified (Task 8). Status → review. |

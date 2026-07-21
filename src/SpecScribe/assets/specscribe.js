@@ -797,7 +797,8 @@
       created: "recency of first change",
       avgchange: "average change size",
       cochange: "files changed together",
-      churn: "churn"
+      churn: "churn",
+      filetype: "file type"
     };
 
     // Capture each cell's server-baked base label/tooltip once, before any recolor, so repeated dimension
@@ -816,9 +817,47 @@
       }
     });
 
-    var legendDim = panel.querySelector(".codemap-legend-dim");
+    // Scoped to the ramp legend specifically — the discrete (file-type) legend's caption is static (there is only
+    // ever one categorical dimension, so its text never needs rewriting on a dimension switch).
+    var legendDim = panel.querySelector(".codemap-legend-ramp .codemap-legend-dim");
+    var legendRamp = panel.querySelector(".codemap-legend-ramp");
+    var legendDiscrete = panel.querySelector(".codemap-legend-discrete");
+
+    // Both legend shapes are pre-rendered server-side (one hidden, matching whichever dimension is baked as the
+    // default); a dimension switch only toggles which one is visible, never rewrites either one's content.
+    function swapLegend(showDiscrete) {
+      if (legendRamp) legendRamp.hidden = showDiscrete;
+      if (legendDiscrete) legendDiscrete.hidden = !showDiscrete;
+    }
+
+    // Strips BOTH class families before applying the new one — a cell last colorized by file type must not carry
+    // a stale type-* class after switching to a numeric dimension, and vice versa (the two are mutually exclusive
+    // fill vocabularies, never combined).
+    function clearFillClasses(c) {
+      for (var l = 0; l <= 4; l++) c.classList.remove("level-" + l);
+      c.classList.remove("level-none");
+      Array.prototype.slice.call(c.classList).forEach(function (cls) {
+        if (cls.indexOf("type-") === 0) c.classList.remove(cls);
+      });
+    }
 
     function recolor(dim) {
+      var dimLabel = DIM_LABELS[dim] || dim;
+
+      if (dim === "filetype") {
+        // Categorical, not scaled — no bucket()/min-max scan (that machinery is for the numeric dimensions only).
+        cells.forEach(function (c) {
+          clearFillClasses(c);
+          var key = c.getAttribute("data-filetype");
+          var label = c.getAttribute("data-filetype-label") || key || "";
+          if (key) c.classList.add("type-" + key);
+          var baseLabel = c.getAttribute("data-base-label") || "";
+          labelHost(c).setAttribute("aria-label", baseLabel + " — " + dimLabel + ": " + label);
+        });
+        swapLegend(true);
+        return;
+      }
+
       // Dates are huge absolute day numbers, so they must be scaled against the file set's own [min,max]
       // window; counts/averages scale against max (min 0), matching the server's default (change-frequency) fill.
       var isDate = dim === "last" || dim === "created";
@@ -830,10 +869,8 @@
         if (v < min) min = v;
       });
       var range = isDate ? (max - min) : max;
-      var dimLabel = DIM_LABELS[dim] || dim;
       cells.forEach(function (c) {
-        for (var l = 0; l <= 4; l++) c.classList.remove("level-" + l);
-        c.classList.remove("level-none");
+        clearFillClasses(c);
         var v = metricFor(c, dim);
         var baseLabel = c.getAttribute("data-base-label") || "";
         var host = labelHost(c);
@@ -850,6 +887,7 @@
         host.setAttribute("aria-label", baseLabel + " — " + dimLabel + ": " + levelText);
       });
       if (legendDim) legendDim.textContent = "Colorized by " + dimLabel;
+      swapLegend(false);
     }
 
     // Reveal the colorize dropdown (hidden in the server HTML so no inert control ships in the no-JS page).

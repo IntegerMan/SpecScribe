@@ -117,14 +117,16 @@ public static class CodeMapTemplater
         sb.Append("      </ol>\n");
         sb.Append("    </nav>\n");
 
-        if (hasMetrics)
+        // File type is the one colorize dimension that needs no git data, so the dropdown + a legend always
+        // render once the variant has files — the "git data unavailable" state is no longer a fully-inert
+        // controls block, just a smaller supplementary note below a WORKING (file-type) colorize dimension.
+        // [Story 7.9 owner-directed design decision]
+        AppendColorizeControls(sb, hasMetrics);
+        AppendLegend(sb, hasMetrics);
+        AppendDiscreteLegend(sb, files, hasMetrics);
+        if (!hasMetrics)
         {
-            AppendColorizeControls(sb);
-            AppendLegend(sb);
-        }
-        else
-        {
-            sb.Append("    <p class=\"codemap-notice\" role=\"note\">Git change data is unavailable (run with <code>--deep-git</code> in a git repository to colorize by change activity). The treemap is still sized by lines of code.</p>\n");
+            sb.Append("    <p class=\"codemap-notice codemap-notice-secondary\" role=\"note\">Git change data is unavailable (run with <code>--deep-git</code> in a git repository to colorize by the six git-derived dimensions). The treemap is colorized by file type instead.</p>\n");
         }
 
         sb.Append("    <div class=\"codemap-viewport\">\n");
@@ -137,22 +139,33 @@ public static class CodeMapTemplater
         sb.Append("</div>\n\n");
     }
 
-    /// <summary>The dimension-switch control — a dropdown, keyboard-operable and present only when git metrics
-    /// exist. Emitted <c>hidden</c>; the enhancement script reveals it (scoped to this panel) and re-fills the rects
-    /// on change. With JS off the treemap keeps its baked-in default (change frequency), so an inert control never
-    /// shows. A <c>&lt;select&gt;</c> rather than a radio group (round 2) — six dimensions read better as one compact
-    /// dropdown than a six-item radio list. [Subtask 5.2]</summary>
-    private static void AppendColorizeControls(StringBuilder sb)
+    /// <summary>The dimension-switch control — a dropdown, keyboard-operable, present whenever the variant has
+    /// files (Story 7.9 loosened this from "only when git metrics exist" — file type needs no git data). Emitted
+    /// <c>hidden</c>; the enhancement script reveals it (scoped to this panel) and re-fills the rects on change.
+    /// With JS off the treemap keeps its server-baked default, so an inert control never shows. When
+    /// <paramref name="hasMetrics"/> is true, "File type" is a 7th option appended after the six unchanged
+    /// git-derived ones (unchanged baked default: change frequency); when false, it's the ONLY option and the
+    /// baked default. A <c>&lt;select&gt;</c> rather than a radio group (round 2) — reads better as one compact
+    /// dropdown than a many-item radio list. [Subtask 5.2; Story 7.9]</summary>
+    private static void AppendColorizeControls(StringBuilder sb, bool hasMetrics)
     {
         sb.Append("    <div class=\"codemap-controls\" hidden>\n");
         sb.Append("      <label class=\"codemap-controls-label\">Colorize by\n");
         sb.Append("        <select class=\"codemap-dim-select\" aria-label=\"Colorize the treemap by\">\n");
-        AppendOption(sb, "changes", "Change frequency", true);
-        AppendOption(sb, "last", "Recently changed", false);
-        AppendOption(sb, "created", "First changed", false);
-        AppendOption(sb, "avgchange", "Avg change size", false);
-        AppendOption(sb, "churn", "Churn", false);
-        AppendOption(sb, "cochange", "Files changed together", false);
+        if (hasMetrics)
+        {
+            AppendOption(sb, "changes", "Change frequency", true);
+            AppendOption(sb, "last", "Recently changed", false);
+            AppendOption(sb, "created", "First changed", false);
+            AppendOption(sb, "avgchange", "Avg change size", false);
+            AppendOption(sb, "churn", "Churn", false);
+            AppendOption(sb, "cochange", "Files changed together", false);
+            AppendOption(sb, "filetype", "File type", false);
+        }
+        else
+        {
+            AppendOption(sb, "filetype", "File type", true);
+        }
         sb.Append("        </select>\n");
         sb.Append("      </label>\n");
         sb.Append("    </div>\n");
@@ -164,11 +177,13 @@ public static class CodeMapTemplater
         sb.Append($"          <option value=\"{value}\"{sel}>{PathUtil.Html(label)}</option>\n");
     }
 
-    /// <summary>The sequential-ramp legend ("Less … More") — always visible (it explains the baked-in default
-    /// colors), reusing the commit-heatmap ramp levels (a non-<c>--status-*</c> scale). [Subtask 4.3]</summary>
-    private static void AppendLegend(StringBuilder sb)
+    /// <summary>The sequential-ramp legend ("Less … More") — reuses the commit-heatmap ramp levels (a non-
+    /// <c>--status-*</c> scale). Server-baked visible only when it explains the baked-in default (git metrics
+    /// present); otherwise pre-rendered <c>hidden</c> so the client-side dimension switch can reveal it without a
+    /// DOM rewrite when the user picks a numeric dimension from the dropdown. [Subtask 4.3; Story 7.9]</summary>
+    private static void AppendLegend(StringBuilder sb, bool hasMetrics)
     {
-        sb.Append("    <div class=\"codemap-legend\">");
+        sb.Append("    <div class=\"codemap-legend codemap-legend-ramp\"").Append(hasMetrics ? "" : " hidden").Append(">");
         sb.Append("<span class=\"codemap-legend-dim\">Colorized by change frequency</span> ");
         sb.Append("<span aria-hidden=\"true\">Less ");
         for (var l = 0; l <= 4; l++)
@@ -176,6 +191,27 @@ public static class CodeMapTemplater
             sb.Append($"<span class=\"codemap-legend-swatch level-{l}\"></span>");
         }
         sb.Append(" More</span></div>\n");
+    }
+
+    /// <summary>The discrete (categorical) legend for the "File type" dimension — a swatch + human label per
+    /// category actually present in this variant's file set (never every possible category, so a repo with no
+    /// config files doesn't show an unused "Config &amp; Data" swatch). Pre-rendered alongside
+    /// <see cref="AppendLegend"/>: whichever legend explains the currently-baked default ships visible, the other
+    /// <c>hidden</c>, and the client-side dimension switch simply toggles which one is shown rather than rewriting
+    /// either one's content (both are static once rendered — this variant's category set never changes at
+    /// runtime). [Story 7.9]</summary>
+    private static void AppendDiscreteLegend(StringBuilder sb, IReadOnlyList<CodeMapNode> files, bool hasMetrics)
+    {
+        var present = CodeFileType.AllCategories.Where(cat => files.Any(f => f.Category == cat)).ToList();
+
+        sb.Append("    <div class=\"codemap-legend codemap-legend-discrete\"").Append(hasMetrics ? " hidden" : "").Append(">");
+        sb.Append("<span class=\"codemap-legend-dim\">Colorized by file type</span> ");
+        foreach (var cat in present)
+        {
+            sb.Append($"<span class=\"codemap-legend-swatch type-{cat.Key}\"></span>");
+            sb.Append($"<span class=\"codemap-legend-label\">{PathUtil.Html(cat.Label)}</span> ");
+        }
+        sb.Append("</div>\n");
     }
 
     /// <summary>The text-equivalent table — the no-JS truth of the visualization and the screen-reader listing:
@@ -199,7 +235,7 @@ public static class CodeMapTemplater
         sb.Append("      <h3>All files</h3>\n");
         sb.Append($"      <p class=\"chart-lead\">Every file in the treemap, listed as text{(hasMetrics ? ", ordered by change frequency" : ", ordered by size")}.</p>\n");
         sb.Append("      <table class=\"codemap-table\">\n");
-        sb.Append("        <thead><tr><th scope=\"col\">File</th><th scope=\"col\" class=\"num\">Lines</th>");
+        sb.Append("        <thead><tr><th scope=\"col\">File</th><th scope=\"col\" class=\"num\">Lines</th><th scope=\"col\">Type</th>");
         if (hasMetrics)
         {
             sb.Append("<th scope=\"col\" class=\"num\">Changes</th><th scope=\"col\" class=\"num\">Churn</th><th scope=\"col\" class=\"num\">Avg</th><th scope=\"col\" class=\"num\">Together</th><th scope=\"col\">First</th><th scope=\"col\">Last</th>");
@@ -215,6 +251,8 @@ public static class CodeMapTemplater
 
             sb.Append("          <tr><th scope=\"row\">").Append(pathCell).Append("</th>");
             sb.Append($"<td class=\"num\">{file.Lines.ToString("N0", CultureInfo.InvariantCulture)}</td>");
+            // Always present, independent of hasMetrics — the categorical dimension's text equivalent. [Story 7.9]
+            sb.Append($"<td>{PathUtil.Html((file.Category ?? CodeFileType.Other).Label)}</td>");
             if (hasMetrics)
             {
                 if (file.Metrics is { } m)

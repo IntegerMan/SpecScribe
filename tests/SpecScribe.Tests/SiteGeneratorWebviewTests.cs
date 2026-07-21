@@ -407,6 +407,26 @@ public class SiteGeneratorWebviewTests : IDisposable
     }
 
     [Fact]
+    public void CapturePages_IncludesCodeMapAsACapturedSurface()
+    {
+        // Story 7.9, AC #3 "HTML + webview + SPA stay coherent": code-map.html is a WriteOutput-synthesized page
+        // (like the other long-tail pages), NOT one of the deliberate exclusions (code PAGES / commit-day pages /
+        // commit/ detail pages — those scale with the target repo's history, unlike the treemap itself), so it
+        // IS captured for the webview/SPA surface set and must render the new file-type dimension coherently there.
+        Directory.CreateDirectory(Path.Combine(_root, "src", "Lib"));
+        File.WriteAllText(Path.Combine(_root, "src", "Lib", "Widget.cs"), "namespace Lib;\npublic class Widget { }\n");
+
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+        var codeMap = bundle.Surfaces.SingleOrDefault(s => s.OutputRelativePath == "code-map.html");
+
+        Assert.NotNull(codeMap);
+        Assert.Contains("codemap-cell type-csharp", codeMap!.ContentHtml);
+        Assert.Contains("codemap-legend-discrete", codeMap.ContentHtml);
+        Assert.Contains("<nav class=\"site-nav\"", codeMap.ContentHtml); // carries the shared chrome like every surface
+        Assert.DoesNotContain("<script", codeMap.ContentHtml);          // captured regions never carry the scoped enhancement
+    }
+
+    [Fact]
     public void CapturePages_EveryEntryNavLink_ResolvesToABundledSurface()
     {
         // The user-facing acceptance: no header nav link may dead-end. Every .html href in the ENTRY surface's

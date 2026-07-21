@@ -3601,6 +3601,19 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-cell.level-3 { fill: var(--gold-light); }
 .codemap-cell.level-4 { fill: var(--gold); }
 .codemap-cell.level-none { fill: var(--parchment-dark); fill-opacity: 0.55; }
+
+/* File-type DISCRETE (categorical) palette — Story 7.9's "File type" colorize dimension. Deliberately its own
+   fixed hue set, not a slice of the sequential gold ramp above (level-0..4): the two dimensions are never the
+   same kind of scale, and reusing gold-family hues here would make the categorical dimension read as another
+   step of the ramp. Also deliberately off the --status-* lifecycle tokens (file type is not a lifecycle signal).
+   "Other" gets the same honest muted-neutral treatment as level-none plus a dashed stroke, mirroring
+   --status-unrecognized-hatch's "the unknown bucket looks distinct, not like a 6th invented hue" precedent. */
+.codemap-cell.type-csharp { fill: var(--teal-deep); }
+.codemap-cell.type-script { fill: var(--teal); }
+.codemap-cell.type-styles { fill: var(--rust); }
+.codemap-cell.type-markup { fill: var(--rust-light); }
+.codemap-cell.type-config { fill: var(--moss); }
+.codemap-cell.type-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
 .codemap-cell:hover { stroke: var(--rust); stroke-width: 1.5; }
 /* SVG focus: default outlines render unreliably around SVG rects, so express focus on the rect itself (teal, the
    shared ring) — never outline:none without a visible replacement. Matches the heatmap/sunburst convention.
@@ -3670,6 +3683,19 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-legend-swatch.level-3 { background: var(--gold-light); }
 .codemap-legend-swatch.level-4 { background: var(--gold); }
 
+/* Discrete legend (Story 7.9): pre-rendered alongside the ramp legend above, one hidden — the client-side
+   dimension switch only toggles visibility between the two shapes, never rewrites either one's content (see
+   specscribe.js's swapLegend). Same swatch tokens as .codemap-cell.type-*. */
+.codemap-legend[hidden] { display: none; }
+.codemap-legend-discrete { flex-wrap: wrap; }
+.codemap-legend-label { margin-right: 0.6rem; }
+.codemap-legend-swatch.type-csharp { background: var(--teal-deep); }
+.codemap-legend-swatch.type-script { background: var(--teal); }
+.codemap-legend-swatch.type-styles { background: var(--rust); }
+.codemap-legend-swatch.type-markup { background: var(--rust-light); }
+.codemap-legend-swatch.type-config { background: var(--moss); }
+.codemap-legend-swatch.type-other { background: var(--parchment-dark); opacity: 0.55; }
+
 /* Drill breadcrumb (revealed by script). Reuses the button/crumb vocabulary; separators via ::before. */
 .codemap-drill { margin: 0.5rem 0 0.2rem; }
 .codemap-breadcrumb { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; margin: 0; padding: 0; font-size: 0.8rem; }
@@ -3688,6 +3714,10 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-crumb[aria-current="true"] { color: var(--ink); cursor: default; text-decoration: none; }
 
 .codemap-notice { color: var(--ink-light); font-size: 0.85rem; margin: 0.6rem 0; }
+/* Story 7.9: demoted from the full-replacement notice pre-7.9 to a smaller supplementary line — the colorize
+   controls are no longer hidden when git metrics are unavailable (file type still works), so this note now only
+   explains why the OTHER six dimensions are missing, not why the whole control block is gone. */
+.codemap-notice-secondary { font-size: 0.78rem; margin: 0.4rem 0 0; }
 
 /* The text-equivalent table: the no-JS truth of the visualization. Numeric columns right-align. */
 .codemap-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }

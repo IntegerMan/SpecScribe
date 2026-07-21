@@ -1873,8 +1873,9 @@ public class ChartsTests
         Assert.Contains("class=\"js-tip\"", linked);
         Assert.DoesNotContain("role=\"link\"", linked);
         // Linked rect: geometry + fill class only — no tabindex, no js-tip, no role, no aria-label on the rect.
-        Assert.Contains("<rect class=\"codemap-cell level-none\"", linked);
-        Assert.DoesNotContain("<rect class=\"codemap-cell level-none js-tip\" tabindex=\"0\"", linked);
+        // hasMetrics: false → the baked default fill is the categorical file-type class (Story 7.9), not level-none.
+        Assert.Contains("<rect class=\"codemap-cell type-csharp\"", linked);
+        Assert.DoesNotContain("<rect class=\"codemap-cell type-csharp js-tip\" tabindex=\"0\"", linked);
         Assert.DoesNotContain("role=\"img\" aria-label=\"A.cs", linked);
         // Tip + name live on the wrapping <a>.
         Assert.Matches(@"<a class=""js-tip"" href=""code/src/A\.cs\.html"" aria-label=""[^""]+"" data-tip-html=", linked);
@@ -1901,16 +1902,27 @@ public class ChartsTests
     }
 
     [Fact]
-    public void CodeTreemap_MetriclessFilesAreNeutralWithNoGitDataAttributes()
+    public void CodeTreemap_MetriclessFilesCarryNoPerFileGitDataAttributes()
     {
-        // Git data unavailable (empty metric dict) → every file is sized-by-LOC with a neutral fill and no
-        // per-file git data-* (per-file graceful degradation, AC #2).
+        // Git data unavailable (empty metric dict, hasMetrics: false) → every file is sized-by-LOC with no
+        // per-file git data-* (per-file graceful degradation, AC #2). Story 7.9: the fill itself is no longer a
+        // flat neutral in this state — it's now the categorical file-type fill (see the BakesTypeKey test above).
         var map = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
         var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
 
-        Assert.Contains("level-none", svg);
         Assert.DoesNotContain("data-changes", svg);
         Assert.DoesNotContain("data-churn", svg);
+    }
+
+    [Fact]
+    public void CodeTreemap_WhenHasMetricsIsTrue_AMetriclessFileWithinAMixedSetIsStillLevelNone()
+    {
+        // AC #3 regression guard: level-none (the sequential dimension's "no data" fill) is untouched when git
+        // metrics genuinely exist for the variant but not for this particular file.
+        var map = TreemapWithMetrics(); // src/A.cs has metrics, src/B.cs does not
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
+
+        Assert.Contains("codemap-cell level-none", svg);
     }
 
     [Fact]
@@ -1973,6 +1985,60 @@ public class ChartsTests
     {
         var svg = Charts.CodeTreemap(Array.Empty<TreemapRect>(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
         Assert.Contains("chart-empty", svg);
+    }
+
+    // ---- File-type colorize dimension (Story 7.9) ----
+
+    [Fact]
+    public void CodeTreemap_AlwaysEmitsFileTypeDataAttributesRegardlessOfHasMetrics()
+    {
+        var withMetrics = TreemapWithMetrics();
+        var withMetricsSvg = Charts.CodeTreemap(withMetrics.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
+        Assert.Contains("data-filetype=\"csharp\"", withMetricsSvg);
+        Assert.Contains("data-filetype-label=\"C#\"", withMetricsSvg);
+
+        var noMetrics = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
+        var noMetricsSvg = Charts.CodeTreemap(noMetrics.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+        Assert.Contains("data-filetype=\"csharp\"", noMetricsSvg);
+        Assert.Contains("data-filetype-label=\"C#\"", noMetricsSvg);
+    }
+
+    [Fact]
+    public void CodeTreemap_WhenHasMetricsIsFalse_BakesTypeKeyAsTheDefaultFillInsteadOfLevelNone()
+    {
+        // Deliberate behavior change from pre-7.9: a no-git-data file used to bake "level-none"; now it bakes the
+        // categorical "type-<key>" fill since file type is always available (AC #1/#2 regression guard).
+        var map = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+
+        Assert.Contains("codemap-cell type-csharp", svg);
+        Assert.DoesNotContain("level-none", svg);
+    }
+
+    [Fact]
+    public void CodeTreemap_WhenHasMetricsIsTrue_TheSequentialDefaultFillIsUnchangedByFileType()
+    {
+        // AC #3 regression guard: adding the file-type dimension must not touch the existing sequential default.
+        var map = TreemapWithMetrics();
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
+
+        Assert.Contains("codemap-cell level-4 js-tip", svg); // A.cs is still the busiest file → level-4, not type-csharp
+        Assert.DoesNotContain("codemap-cell type-", svg);
+    }
+
+    [Fact]
+    public void CodeTreemap_TooltipCardAlwaysIncludesATypeRow()
+    {
+        // The card is double-escaped for the data-tip-html attribute (real tags → &lt;dt&gt;…), so assert on the
+        // human-readable label text carried inside it, matching the existing tooltip test's convention.
+        var withMetrics = TreemapWithMetrics();
+        var withMetricsSvg = Charts.CodeTreemap(withMetrics.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
+        Assert.Contains("Type", withMetricsSvg);
+        Assert.Contains("C#", withMetricsSvg);
+
+        var noMetrics = CodeMap.Build(new[] { ("src/foo.ts", 10L) }, new Dictionary<string, CodeFileMetrics>());
+        var noMetricsSvg = Charts.CodeTreemap(noMetrics.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+        Assert.Contains("TypeScript/JavaScript", noMetricsSvg);
     }
 
     // ==================== Story 3.7: requirement status-block grid + requirements flow ====================

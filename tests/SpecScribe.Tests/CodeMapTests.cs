@@ -388,4 +388,84 @@ public class CodeMapTests
         Assert.Equal(4, variants.Count);
         Assert.All(variants, v => Assert.True(v.Map.IsEmpty));
     }
+
+    // ---- File-type classifier (Story 7.9, Task 1) ----
+
+    [Theory]
+    [InlineData("src/Foo.cs", "csharp")]
+    [InlineData("src/Foo.csx", "csharp")]
+    [InlineData("src/foo.ts", "script")]
+    [InlineData("src/foo.tsx", "script")]
+    [InlineData("src/foo.js", "script")]
+    [InlineData("src/foo.jsx", "script")]
+    [InlineData("src/foo.mjs", "script")]
+    [InlineData("src/foo.cjs", "script")]
+    [InlineData("src/foo.css", "styles")]
+    [InlineData("src/foo.scss", "styles")]
+    [InlineData("docs/readme.md", "markup")]
+    [InlineData("index.html", "markup")]
+    [InlineData("src/foo.xaml", "markup")]
+    [InlineData("src/foo.csproj", "markup")]
+    [InlineData("config.json", "config")]
+    [InlineData("config.yaml", "config")]
+    [InlineData("config.yml", "config")]
+    [InlineData("config.toml", "config")]
+    public void CodeFileType_Classify_MapsRepresentativeExtensionsToTheirBoundedCategory(string path, string expectedKey)
+    {
+        Assert.Equal(expectedKey, CodeFileType.Classify(path).Key);
+    }
+
+    [Theory]
+    [InlineData("src/Foo.rs")]      // recognized elsewhere (LanguageClass) but not one of this story's ~6 buckets
+    [InlineData("Dockerfile")]      // extensionless, name-based special case elsewhere — still falls to Other here
+    [InlineData("src/noext")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void CodeFileType_Classify_UnrecognizedOrExtensionlessPathsFallToOtherNeverANewCategory(string path)
+    {
+        Assert.Same(CodeFileType.Other, CodeFileType.Classify(path));
+    }
+
+    [Fact]
+    public void CodeFileType_Classify_IsCaseInsensitiveOnExtension()
+    {
+        Assert.Equal(CodeFileType.CSharp, CodeFileType.Classify("Foo.CS"));
+        Assert.Equal(CodeFileType.CSharp, CodeFileType.Classify("Foo.Cs"));
+    }
+
+    [Fact]
+    public void CodeFileType_Classify_IsDeterministic()
+    {
+        Assert.Equal(CodeFileType.Classify("src/Foo.ts"), CodeFileType.Classify("src/Foo.ts"));
+    }
+
+    [Fact]
+    public void CodeFileType_Classify_NeverThrowsOnPathologicalInput()
+    {
+        Assert.Same(CodeFileType.Other, CodeFileType.Classify("trailing-dot."));
+        Assert.Same(CodeFileType.Other, CodeFileType.Classify("/"));
+        Assert.Same(CodeFileType.Other, CodeFileType.Classify(@"windows\style\.hidden"));
+    }
+
+    [Fact]
+    public void Build_EveryFileLeafCarriesAFileTypeCategoryIndependentOfGitMetrics()
+    {
+        // NoMetrics (empty git-metric dict) is the "no git data at all" case — classification must still be
+        // populated for every file, unlike Metrics which stays null. [AC #2 / owner-directed design decision]
+        var map = Build(("src/A.cs", 10), ("src/b.unknownext", 5));
+
+        var files = map.Files();
+        Assert.All(files, f => Assert.NotNull(f.Category));
+        Assert.Equal(CodeFileType.CSharp, files.Single(f => f.Label == "A.cs").Category);
+        Assert.Equal(CodeFileType.Other, files.Single(f => f.Label == "b.unknownext").Category);
+    }
+
+    [Fact]
+    public void Build_DirectoriesCarryNoFileTypeCategory()
+    {
+        var map = Build(("src/A.cs", 10));
+        var dir = Assert.Single(map.Roots);
+        Assert.True(dir.IsDirectory);
+        Assert.Null(dir.Category);
+    }
 }

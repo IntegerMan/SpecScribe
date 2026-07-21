@@ -654,7 +654,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // byte differed, file size unchanged) and via stash-bisection isolating the hash shift to this fix alone
         // (unrelated to this pass's actual production changes, none of which touch the non-git fixture's static
         // HTML path). Restoring the intended space changes the hash input, not any rendered page.
-        const string expected = "f1711be2dd12e0f2f72a583e418bdd817d9c0bb6291918ac152d43fa0ffcefe8";
+        // Regenerated for Story 7.9: this fixture is not a git repo (no --deep-git), so code-map.html never
+        // renders here — only specscribe.css/.js shifted the hash (the new .codemap-cell.type-*/.codemap-legend-
+        // swatch.type-* discrete palette + .codemap-legend-discrete/.codemap-notice-secondary rules; the JS
+        // recolor()'s new "filetype" branch, swapLegend, and clearFillClasses helper). The file-type classifier
+        // itself and its rendering (data-filetype/data-filetype-label, the Type tooltip row/table column, the
+        // loosened hasMetrics gate) are covered by CodeMap/Charts/CodeMapTemplater tests, not this fixture.
+        // Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        const string expected = "a7787135415317347850153750453ddc657adb1defd6515412337de5c22e6b35";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

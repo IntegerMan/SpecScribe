@@ -9,14 +9,75 @@ namespace SpecScribe;
 /// <see cref="Lines"/> is the treemap SIZE key: a file's own line count, a directory's rolled-up Σ of descendant
 /// file lines. <see cref="Metrics"/> carries the per-file git-derived colorize dimensions — <c>null</c> for every
 /// directory and for any file with no git record (outside the analyzed window, or <c>--deep-git</c> off), which the
-/// renderer draws with a neutral fill (per-file graceful degradation, AC #2). [Story 7.6]</summary>
+/// renderer draws with a neutral fill (per-file graceful degradation, AC #2). <see cref="Category"/> carries the
+/// file-type classification (<see cref="CodeFileType.Classify"/>) — ALWAYS populated for a file (pure function of
+/// its path, no git dependency) and always <c>null</c> for a directory; the load-bearing difference from
+/// <see cref="Metrics"/> is that this field never degrades to "unavailable". [Story 7.6; Story 7.9]</summary>
 public sealed record CodeMapNode(
     string Label,
     string RepoRelativePath,
     bool IsDirectory,
     long Lines,
     CodeFileMetrics? Metrics,
+    CodeFileCategory? Category,
     IReadOnlyList<CodeMapNode> Children);
+
+/// <summary>One bounded file-type category a source file classifies into (<see cref="CodeFileType.Classify"/>):
+/// <see cref="Key"/> is the CSS class suffix / <c>data-filetype</c> attribute value (e.g. <c>"csharp"</c>),
+/// <see cref="Label"/> the human-readable name shown in the legend, tooltip, and text table (e.g. <c>"C#"</c>).
+/// [Story 7.9]</summary>
+public sealed record CodeFileCategory(string Key, string Label);
+
+/// <summary>A pure, bounded, categorical (NOT sequential) classifier mapping a repo-relative source path to a
+/// small fixed set of file-type categories by extension — the Code Map's "File type" colorize dimension (Story
+/// 7.9, AC #1/#2). Deliberately NOT a reuse of <see cref="CodeFileTemplater"/>'s private <c>LanguageClass</c>
+/// (a fine-grained, ~25-bucket Prism-grammar map living in the wrong layer, a templater rather than the pure
+/// model) — this classifier is intentionally coarse and bounded so the discrete palette/legend never grows
+/// unbounded. Extension groupings are kept consistent with <c>LanguageClass</c>'s families (same <c>.ts</c>/
+/// <c>.tsx</c> → script, same <c>.json</c>/<c>.yaml</c>/<c>.toml</c> → config) so a file never reads as one
+/// language on its code page and a different family on the map, without literally sharing code. Every
+/// unrecognized or extensionless path — including a pathological empty/malformed one — falls into
+/// <see cref="Other"/> rather than inventing a new category (AC #2). Pure, case-insensitive, never throws
+/// (NFR2), mirroring <see cref="CodeMap.IsSpecDevPath"/>/<see cref="CodeMap.IsTestPath"/>'s discipline.</summary>
+public static class CodeFileType
+{
+    public static readonly CodeFileCategory CSharp = new("csharp", "C#");
+    public static readonly CodeFileCategory Script = new("script", "TypeScript/JavaScript");
+    public static readonly CodeFileCategory Styles = new("styles", "Styles");
+    public static readonly CodeFileCategory Markup = new("markup", "Markup & Docs");
+    public static readonly CodeFileCategory Config = new("config", "Config & Data");
+    public static readonly CodeFileCategory Other = new("other", "Other");
+
+    /// <summary>The fixed, ordered category set — this order drives the discrete legend's swatch ordering
+    /// (real categories before the "Other" catch-all) so the legend reads the same way across every generation
+    /// run regardless of which files happen to be present.</summary>
+    public static readonly IReadOnlyList<CodeFileCategory> AllCategories =
+        new[] { CSharp, Script, Styles, Markup, Config, Other };
+
+    /// <summary>Classifies a repo-relative source path into its bounded file-type category by extension.
+    /// Normalizes via <see cref="PathUtil.NormalizeSlashes"/>; case-insensitive extension matching; an
+    /// extensionless name, an empty/whitespace path, or any extension outside the fixed groupings below all
+    /// fall to <see cref="Other"/>. Never throws.</summary>
+    public static CodeFileCategory Classify(string repoRelativePath)
+    {
+        if (string.IsNullOrWhiteSpace(repoRelativePath)) return Other;
+        var norm = PathUtil.NormalizeSlashes(repoRelativePath);
+        var name = norm[(norm.LastIndexOf('/') + 1)..];
+        var dot = name.LastIndexOf('.');
+        if (dot < 0 || dot == name.Length - 1) return Other;
+
+        return name[(dot + 1)..].ToLowerInvariant() switch
+        {
+            "cs" or "csx" => CSharp,
+            "ts" or "tsx" or "js" or "jsx" or "mjs" or "cjs" => Script,
+            "css" or "scss" => Styles,
+            "html" or "htm" or "md" or "markdown" or "xml" or "svg" or "xaml"
+                or "csproj" or "props" or "targets" => Markup,
+            "json" or "json5" or "yaml" or "yml" or "toml" or "ini" => Config,
+            _ => Other,
+        };
+    }
+}
 
 /// <summary>One positioned rectangle in the squarified treemap layout: the <see cref="Node"/> it draws, its
 /// position/size within the fixed viewBox (<see cref="X"/>/<see cref="Y"/>/<see cref="W"/>/<see cref="H"/>), and
@@ -84,9 +145,10 @@ public sealed class CodeMap
         public Dictionary<string, FileLeaf> Files { get; } = new(StringComparer.Ordinal);
     }
 
-    /// <summary>A file leaf captured during the trie build: its full repo-relative path, line count, and the
-    /// optional per-file git metrics (null when the file has no git record).</summary>
-    private sealed record FileLeaf(string RepoRelativePath, long Lines, CodeFileMetrics? Metrics);
+    /// <summary>A file leaf captured during the trie build: its full repo-relative path, line count, the
+    /// optional per-file git metrics (null when the file has no git record), and its always-populated file-type
+    /// category (Story 7.9 — never null, no git dependency).</summary>
+    private sealed record FileLeaf(string RepoRelativePath, long Lines, CodeFileMetrics? Metrics, CodeFileCategory Category);
 
     /// <summary>The path prefixes that hold this repo's own spec-driven-development scaffolding (BMad Method
     /// agents/skills/workflows and their generated planning/implementation artifacts) rather than product source.
@@ -178,7 +240,8 @@ public sealed class CodeMap
             // the inputs somehow imply it, keep the directory and drop the file rather than throw (NFR2).
             if (cur.Dirs.ContainsKey(fileName)) continue;
             var metric = metricLookup.TryGetValue(norm, out var m) ? m : null;
-            cur.Files[fileName] = new FileLeaf(norm, Math.Max(lines, 0), metric);
+            var category = CodeFileType.Classify(norm);
+            cur.Files[fileName] = new FileLeaf(norm, Math.Max(lines, 0), metric, category);
         }
 
         var fileCount = 0;
@@ -259,7 +322,7 @@ public sealed class CodeMap
         foreach (var file in parent.Files.OrderBy(f => f.Key, StringComparer.OrdinalIgnoreCase))
         {
             var leaf = file.Value;
-            nodes.Add(new CodeMapNode(file.Key, leaf.RepoRelativePath, IsDirectory: false, leaf.Lines, leaf.Metrics, Array.Empty<CodeMapNode>()));
+            nodes.Add(new CodeMapNode(file.Key, leaf.RepoRelativePath, IsDirectory: false, leaf.Lines, leaf.Metrics, leaf.Category, Array.Empty<CodeMapNode>()));
         }
         return nodes;
     }
@@ -287,7 +350,7 @@ public sealed class CodeMap
 
         var children = BuildChildren(cur, path);
         var lines = children.Sum(c => c.Lines);
-        return new CodeMapNode(label, path, IsDirectory: true, lines, Metrics: null, children);
+        return new CodeMapNode(label, path, IsDirectory: true, lines, Metrics: null, Category: null, children);
     }
 
     private static string Join(string parentPath, string segment) =>

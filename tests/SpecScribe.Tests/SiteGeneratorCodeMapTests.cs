@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using SpecScribe;
 
@@ -144,6 +145,40 @@ public class SiteGeneratorCodeMapTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_WithoutDeepGit_FileTypeIsTheDefaultColorizeDimensionWithADiscreteLegend()
+    {
+        // Story 7.9: this fixture is a non-git temp repo (no --deep-git), so hasMetrics is false; file type needs
+        // no git data, so it becomes the baked-in default colorize dimension instead of a flat neutral fill.
+        GenerateSite();
+
+        var html = File.ReadAllText(CodeMapPage);
+        Assert.Contains("value=\"filetype\" selected", html);
+        Assert.Contains("codemap-legend-discrete", html);
+        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\">", html); // visible (not hidden)
+        Assert.DoesNotContain("codemap-cell level-none", html); // no flat-neutral fallback in this state anymore
+        Assert.Contains("codemap-cell type-", html);
+        Assert.Contains(">Type</th>", html); // always-present text-table column
+        Assert.Contains(">C#</td>", html);   // src/Sample/Widget.cs classifies as C#
+
+        // The secondary (demoted) notice explains only the six git-derived dimensions are unavailable — the
+        // controls are no longer a fully-hidden block.
+        Assert.Contains("codemap-notice-secondary", html);
+    }
+
+    [Fact]
+    public void GenerateAll_DeterministicAcrossTwoRuns()
+    {
+        GenerateSite();
+        var first = File.ReadAllText(CodeMapPage);
+
+        Directory.Delete(Site, recursive: true);
+        GenerateSite();
+        var second = File.ReadAllText(CodeMapPage);
+
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
     public void GenerateAll_OversizedTextFile_StillAppearsOnCodeMap()
     {
         // >1MB text must still contribute LOC to the treemap (streamed count); the 1MB cap is render-only.
@@ -157,6 +192,68 @@ public class SiteGeneratorCodeMapTests : IDisposable
         var html = File.ReadAllText(CodeMapPage);
         Assert.Contains("src/Sample/Huge.cs", html);
         Assert.Contains("src/Sample/Widget.cs", html);
+    }
+
+    [Fact]
+    public void GenerateAll_WithDeepGit_DefaultDimensionIsUnchangedAndFileTypeIsASelectable7thOption()
+    {
+        // AC #3 regression guard: when real git metrics ARE available, the baked-in default colorize dimension
+        // stays change frequency exactly as pre-7.9 — file type is added as a 7th dropdown option, not a
+        // replacement default.
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise --deep-git generation; install git rather than silently skipping this test");
+
+        var gen = new SiteGenerator(ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(CodeMapPage);
+        Assert.Contains("value=\"changes\" selected", html);   // unchanged sequential default (AC #3)
+        Assert.Contains("value=\"filetype\">File type</option>", html); // 7th option, not selected
+        Assert.Contains("class=\"codemap-legend codemap-legend-ramp\">", html); // ramp legend visible by default
+        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\" hidden>", html); // discrete legend pre-rendered, hidden
+        Assert.Contains(">Type</th>", html); // Type column always present regardless of hasMetrics
+    }
+
+    /// <summary>Initializes a real git repo in the fixture root with one commit, so <c>hasMetrics</c> is true —
+    /// mirrors <see cref="SiteGeneratorCodeInsightsTests"/>'s fixture. Returns false (test no-ops) when the git
+    /// CLI is unavailable.</summary>
+    private bool TryCreateGitHistory()
+    {
+        if (!RunGit("init")) return false;
+        if (!RunGit("add .")) return false;
+        return Commit("Seed the repo");
+    }
+
+    private bool Commit(string message) => RunGit(
+        $"-c user.name=\"CodeMap Tester\" -c user.email=codemap@example.com -c commit.gpgsign=false commit -m \"{message}\"");
+
+    private bool RunGit(string arguments)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = arguments,
+                WorkingDirectory = _root,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi);
+            if (process is null) return false;
+            if (!process.WaitForExit(15000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+                return false;
+            }
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Every local (non-anchor, non-scheme) href on the page resolves to a file that was actually

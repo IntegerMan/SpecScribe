@@ -2164,7 +2164,9 @@ public static class Charts
     /// <summary>Renders the source-code treemap as pure, server-computed SVG (Story 7.6). One <c>&lt;rect&gt;</c>
     /// per node from the precomputed squarified <paramref name="layout"/>: directory rects draw group boundaries +
     /// a clipped label, file rects are the leaves — sized by lines of code, filled by the default colorize
-    /// dimension (change frequency when git metrics exist, else a neutral fill). Unlinked file rects are focusable
+    /// dimension (change frequency when git metrics exist, else the categorical file-type dimension — Story 7.9;
+    /// file type needs no git data, so it replaces the old flat neutral fill as the no-metrics baked default).
+    /// Unlinked file rects are focusable
     /// (<c>tabindex="0"</c>) with a descriptive <c>aria-label</c> (name + active metric); linked cells put tip + name
     /// on the wrapping <c>&lt;a&gt;</c> (no nested tabindex on the geometry child). Every file rect carries metrics as
     /// <c>data-*</c> attributes so the scoped JS enhancement re-fills it without a round-trip and the tooltip (the
@@ -2233,14 +2235,22 @@ public static class Charts
         if (rect.W <= 0 || rect.H <= 0) return;
         var node = rect.Node;
         var metrics = node.Metrics;
+        var category = node.Category ?? CodeFileType.Other; // a file leaf is always classified; Other is the NFR2 fallback
 
-        // Level for the default (change-frequency) dimension; a file with no git record is neutral (level-none).
-        var levelClass = metrics is { } m0 ? $"level-{Bucket(m0.Changes, maxChanges)}" : "level-none";
+        // The BAKED-IN default fill class: change frequency (the sequential ramp) when git metrics exist — exactly
+        // as pre-7.9, byte-identical — else the categorical file-type fill, since that's the one dimension that
+        // never needs --deep-git (Story 7.9 owner-directed design decision). Never a ramp class when hasMetrics is
+        // false: the ramp math (Bucket/level-N) has nothing to quantize without git data.
+        var levelClass = hasMetrics
+            ? (metrics is { } m0 ? $"level-{Bucket(m0.Changes, maxChanges)}" : "level-none")
+            : $"type-{category.Key}";
 
-        // Machine-readable data-* for the JS re-fill + text derivation (always path + lines; git metrics only when
-        // present so the enhancement treats a metric-less file as neutral).
+        // Machine-readable data-* for the JS re-fill + text derivation (always path + lines + file type; git
+        // metrics only when present so the enhancement treats a metric-less file as neutral). data-filetype is the
+        // ONE pair that is always present regardless of hasMetrics — classification has no git dependency.
         var data = new StringBuilder();
         data.Append($" data-path=\"{Html(node.RepoRelativePath)}\" data-lines=\"{node.Lines.ToString(CultureInfo.InvariantCulture)}\"");
+        data.Append($" data-filetype=\"{Html(category.Key)}\" data-filetype-label=\"{Html(category.Label)}\"");
         if (metrics is { } m)
         {
             data.Append($" data-changes=\"{m.Changes.ToString(CultureInfo.InvariantCulture)}\"");
@@ -2299,6 +2309,9 @@ public static class Charts
         sb.Append("<code class='codemap-card-path'>").Append(Html(node.RepoRelativePath)).Append("</code>");
         sb.Append("<dl class='codemap-card-metrics'>");
         Row(sb, "Lines", node.Lines.ToString("N0", CultureInfo.InvariantCulture));
+        // Always present — file type has no git dependency, unlike every row below (AC #1 "color is never the
+        // sole signal": the categorical dimension gets a text row exactly like the sequential ones do). [Story 7.9]
+        Row(sb, "Type", (node.Category ?? CodeFileType.Other).Label);
         if (node.Metrics is { } m)
         {
             Row(sb, "Changes", m.Changes.ToString("N0", CultureInfo.InvariantCulture));
