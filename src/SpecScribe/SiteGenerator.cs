@@ -1750,10 +1750,14 @@ public sealed class SiteGenerator
     /// <summary>Resolves a code file's citing artifacts (captured by <see cref="DiscoverCodeReferences"/>) to the
     /// output-relative URLs of their generated pages + a display title — the "Referenced by" back-navigation on the
     /// code page (Story 7.2, AC #2). Routing reuses the epics render pass's <see cref="_referenceMap"/> (which maps
-    /// every source file, story artifacts included, to its page). [Review][Patch] A citer missing from
-    /// <see cref="_referenceMap"/> is OMITTED rather than guessed via a naive extension swap — never link to a page
-    /// we can't confirm was actually mapped. Order is deterministic (reverse-map insertion follows the sorted source
-    /// walk).</summary>
+    /// every story/drafted artifact to its non-naive page). A citer missing from <see cref="_referenceMap"/> falls
+    /// back to <see cref="PathUtil.ToOutputRelative"/>'s naive extension swap rather than being omitted — an
+    /// "omit rather than guess" patch was tried during the Story 7.2 review and reverted: without an
+    /// <c>epics.md</c>, <see cref="_referenceMap"/> is never populated, and the naive formula is exactly correct
+    /// for ordinary docs in that case (identical to <see cref="GenerateOneInternal"/>'s own output-path
+    /// computation), so omitting would have thrown away legitimate back-links. The guess is only unreliable for
+    /// entities with a non-naive output path, and those are always overridden in <see cref="_referenceMap"/> when
+    /// present. Order is deterministic (reverse-map insertion follows the sorted source walk).</summary>
     private IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)> BuildReferencedBy(string repoRelative)
     {
         if (!_codeReverseMap.TryGetValue(repoRelative, out var citers) || citers.Count == 0)

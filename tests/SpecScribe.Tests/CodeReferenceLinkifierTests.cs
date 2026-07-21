@@ -208,4 +208,68 @@ public class CodeReferenceLinkifierTests
 
         Assert.Equal("Missing.cs", result);
     }
+
+    // ---- Story 7.2 deferred-work cleanup: extensionless allow-list + percent-decoding ----
+
+    [Fact]
+    public void ExtensionlessAllowListedHref_ResolvesToPage()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Dockerfile"] = "code/Dockerfile.html",
+        };
+        var html = "<a href=\"../../Dockerfile\">Dockerfile</a>";
+
+        var result = CodeReferenceLinkifier.Linkify(html, map, null, "", "/repo", "/repo/_bmad-output");
+
+        Assert.Equal("<a href=\"code/Dockerfile.html\">Dockerfile</a>", result);
+    }
+
+    [Fact]
+    public void ExtensionlessNonAllowListedHref_IsLeftUntouched()
+    {
+        var html = "<a href=\"../../overview\">overview</a>";
+
+        Assert.Equal(html, InPortal(html));
+    }
+
+    [Fact]
+    public void PercentEncodedHref_ResolvesAgainstDecodedKey()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["src/My File.cs"] = "code/src/My File.cs.html",
+        };
+        var html = "<a href=\"../../src/My%20File.cs\">My File.cs</a>";
+
+        var result = CodeReferenceLinkifier.Linkify(html, map, null, "", "/repo", "/repo/_bmad-output");
+
+        Assert.Equal("<a href=\"code/src/My File.cs.html\">My File.cs</a>", result);
+    }
+
+    [Fact]
+    public void PercentEncodedInlineCitation_ResolvesAgainstDecodedKey()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["src/My File.cs"] = "code/src/My File.cs.html",
+        };
+        var html = "[Source: src/My%20File.cs:5]";
+
+        var result = CodeReferenceLinkifier.Linkify(html, map, null, "", "/repo", "/repo/_bmad-output");
+
+        Assert.Equal("[Source: <a href=\"code/src/My File.cs.html#L5\">src/My%20File.cs:5</a>]", result);
+    }
+
+    [Fact]
+    public void MalformedPercentSequence_DoesNotThrowAndDegradesToPlainText()
+    {
+        // "%zz" and a lone trailing "%" are not valid escape sequences; Uri.UnescapeDataString passes them
+        // through unchanged rather than throwing, and an unresolvable candidate degrades to plain text as usual.
+        var html = "<a href=\"../../src/Weird%zzFile.cs\">Weird%zzFile.cs</a>";
+
+        var result = InPortal(html);
+
+        Assert.Equal("Weird%zzFile.cs", result);
+    }
 }

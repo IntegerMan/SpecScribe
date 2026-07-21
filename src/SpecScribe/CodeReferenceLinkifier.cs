@@ -44,6 +44,19 @@ public static class CodeReferenceLinkifier
         "\\[Source:\\s*(?<inner>(?:<code>)?`?(?<path>[^\\[\\]`)\\r\\n<]+?)`?(?:</code>)?)\\s*\\]",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    // Conventional repo filenames with no extension — a citation to one of these is still a genuine code
+    // reference, so IsRelativeCodeHref's "must look like a file" heuristic allows them through by name rather
+    // than requiring a dot in the last path segment. [Story 7.2 deferred-work cleanup] The comparer is
+    // case-insensitive only for this ALLOW-LIST gate (so "makefile"/"Makefile" both qualify as a candidate);
+    // final resolution still runs through codePages/repo-file lookup, which is case-sensitive like every other
+    // citation — a citation whose case doesn't match the real file's case degrades to plain text exactly as it
+    // already does for extensioned citations, unrelated to this change.
+    private static readonly HashSet<string> ExtensionlessAllowList = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Dockerfile", "Makefile", "Rakefile", "Gemfile", "Procfile", "Vagrantfile",
+        "LICENSE", "README", "CHANGELOG", "CONTRIBUTING", "NOTICE",
+    };
+
     /// <summary>Rewrites both citation shapes on one rendered page.</summary>
     /// <param name="html">Already-rendered page HTML.</param>
     /// <param name="codePages">Story 7.1's forward map: repo-relative source path (forward slashes) → code-page
@@ -79,7 +92,9 @@ public static class CodeReferenceLinkifier
     {
         return AnchorPattern.Replace(html, m =>
         {
-            var href = m.Groups["href"].Value;
+            // Decode first so a citation to a path with encoded characters (e.g. "%20" for a space) matches its
+            // real codePages/repo-file key instead of silently failing to resolve. [Story 7.2 deferred-work cleanup]
+            var href = SafeUnescape(m.Groups["href"].Value);
             var label = m.Groups["label"].Value;
 
             // Only relative, non-page hrefs are candidate view-source links. Absolute URLs, in-page fragments,
@@ -111,7 +126,7 @@ public static class CodeReferenceLinkifier
             parts[i] = InlineCitation.Replace(parts[i], m =>
             {
                 var inner = m.Groups["inner"].Value;
-                var rawPath = m.Groups["path"].Value.Trim();
+                var rawPath = SafeUnescape(m.Groups["path"].Value.Trim());
                 var pathPart = CodeReferenceScanner.StripLocator(rawPath, out var line);
                 if (pathPart.Length == 0) return m.Value;
 
@@ -175,11 +190,19 @@ public static class CodeReferenceLinkifier
         if (bare.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) return false;
 
         // A code reference names a file: require an extension on the last path segment so extension-less relative
-        // links (e.g. "../overview") are left alone.
+        // links (e.g. "../overview") are left alone — UNLESS it's one of the conventional no-extension repo
+        // filenames (Dockerfile, Makefile, LICENSE, …), which are still genuine code citations. [Story 7.2
+        // deferred-work cleanup]
         var lastSlash = bare.LastIndexOfAny(new[] { '/', '\\' });
         var lastSegment = lastSlash >= 0 ? bare[(lastSlash + 1)..] : bare;
-        return lastSegment.Contains('.');
+        return lastSegment.Contains('.') || ExtensionlessAllowList.Contains(lastSegment);
     }
+
+    /// <summary>Percent-decodes a citation path/href so it matches its real codePages/repo-file key (which is
+    /// never itself percent-encoded). <see cref="Uri.UnescapeDataString"/> does not throw for malformed <c>%</c>
+    /// sequences (verified: it passes them through unchanged), so no try/catch is needed here — a malformed
+    /// candidate simply comes back unresolvable and degrades to plain text like any other unresolved citation.</summary>
+    private static string SafeUnescape(string value) => Uri.UnescapeDataString(value);
 
     /// <summary>Strips a run of leading <c>./</c> / <c>../</c> segments, recovering the repo-relative tail a
     /// well-formed view-source href climbs to. In-portal membership / external existence is the real gate, so an
