@@ -2392,12 +2392,13 @@ public sealed class SiteGenerator
                                     f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
                                     _module.Commands, epicRetroPath, StoryPager(model, story), followUps);
                             }
-                            catch (IOException)
+                            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                             {
-                                // The artifact was deleted (or otherwise became unreadable) in the sub-second window
-                                // between GenerateAll() and RenderWebviewSurfaces() — degrade this ONE story to a
-                                // placeholder rather than aborting the entire webview bundle, mirroring
-                                // RenderEpicsPages' resilience on the HTML path. [Deferred item, Story 6.4 review]
+                                // The artifact was deleted, ACL-denied, or otherwise became unreadable in the
+                                // sub-second window between GenerateAll() and RenderWebviewSurfaces() — degrade
+                                // this ONE story to a placeholder rather than aborting the entire webview bundle,
+                                // mirroring RenderEpicsPages' resilience on the HTML path. [Deferred item, Story
+                                // 6.4 review]
                                 storySourcePath = null;
                                 storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
                             }

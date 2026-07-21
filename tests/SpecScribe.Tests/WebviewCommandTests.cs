@@ -106,4 +106,34 @@ public class WebviewCommandTests
 
         Assert.Equal("../..", WebviewCommand.ResolveRepoRootOffset(RootedOptions(repoRoot), workingDirectory));
     }
+
+    // ===== Deferred item, Story 6.4 review: the scratch-dir key folds case only where the OS filesystem does ======
+
+    [Fact]
+    public void ScratchKey_IsStableForTheSameRepoRoot()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "specscribe-scratch-stable");
+        Assert.Equal(WebviewCommand.ScratchKey(repoRoot), WebviewCommand.ScratchKey(repoRoot));
+    }
+
+    [Fact]
+    public void ScratchKey_CaseDifferingRepoRoots_MatchTheOsFilesystemsOwnCaseSensitivity()
+    {
+        // On Windows (case-INSENSITIVE filesystem, this project's primary target OS) two path casings of the
+        // SAME physical repo (a workspace-folder URI vs. a manually-typed cwd, or drive-letter casing) must fold
+        // to the SAME stable scratch dir — a blanket no-fold would silently reintroduce the "successive spawns
+        // accumulate instead of overwrite" bug this key exists to prevent. On a case-sensitive filesystem
+        // (Linux) two such paths ARE distinct repos and must not collide. [Review][Patch]
+        var lower = "/home/dev/myrepo";
+        var upper = "/home/dev/MYREPO";
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal(WebviewCommand.ScratchKey(lower), WebviewCommand.ScratchKey(upper));
+        }
+        else
+        {
+            Assert.NotEqual(WebviewCommand.ScratchKey(lower), WebviewCommand.ScratchKey(upper));
+        }
+    }
 }

@@ -380,6 +380,23 @@ public class WebviewRenderAdapterTests
         Assert.Contains("<div id=\"specscribe-surface\" data-path=\"epics/epic-1.html\" data-source=\"\">", doc);
     }
 
+    // ----- Deferred item, Story 6.4 review: nav-toggle keyboard/focus parity -----------------------------------
+
+    [Fact]
+    public void Render_NavToggleBridge_HasKeyboardAndFocusParityWithTheHtmlScript()
+    {
+        // The HTML surface's inline NavToggleScript is CSP-blocked here, so the bridge script must reimplement
+        // its keyboard/focus affordances rather than just class-toggle + aria-expanded (the gap the 6.4 parallel
+        // adversarial review flagged and routed to a follow-up).
+        var doc = WebviewRenderAdapter.Shared.Render(EpicPage(Nav())).Content;
+
+        // Opening focuses the first nav link.
+        Assert.Contains("firstLink.focus()", doc);
+        // Escape closes the open nav and returns focus to its toggle button.
+        Assert.Contains("e.key !== 'Escape'", doc);
+        Assert.Contains("toggleBtn.focus()", doc);
+    }
+
     // ----- Registry hygiene (AC #4: every entry justified, none blanket) --------------------------------------
 
     [Fact]

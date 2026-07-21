@@ -171,11 +171,22 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
             }
 
             // Nav toggle: the HTML surface's inline toggle script is CSP-blocked here, so the same collapse
-            // behavior is delegated (narrow editor panels are the norm, so this matters more, not less).
+            // behavior is delegated (narrow editor panels are the norm, so this matters more, not less). Keyboard
+            // and focus parity with HtmlRenderAdapter.NavToggleScript: opening focuses the first nav link;
+            // Escape-close + focus-return is wired via the document-level keydown listener below (deferred item,
+            // Story 6.4 review).
             var toggle = t.closest('.site-nav-toggle');
             if (toggle) {
               var nav = toggle.closest('.site-nav');
-              if (nav) toggle.setAttribute('aria-expanded', String(nav.classList.toggle('site-nav-open')));
+              if (nav) {
+                var opening = !nav.classList.contains('site-nav-open');
+                nav.classList.toggle('site-nav-open');
+                toggle.setAttribute('aria-expanded', String(opening));
+                if (opening) {
+                  var firstLink = nav.querySelector('.site-nav-links a');
+                  if (firstLink) firstLink.focus();
+                }
+              }
               return;
             }
 
@@ -220,6 +231,19 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
             if (hash >= 0) { fragment = target.slice(hash + 1); target = target.slice(0, hash); }
             var current = surface ? (surface.getAttribute('data-path') || '') : '';
             vscode.postMessage({ type: 'navigate', target: resolve(target, current), fragment: fragment });
+          });
+
+          // Nav-toggle Escape-close + focus-return (deferred item, Story 6.4 review): a document-level listener
+          // (not per-nav, since content swaps replace the nav element without re-running this script) closes
+          // whichever `.site-nav` is currently open and returns focus to its toggle button.
+          document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            var openNav = document.querySelector('.site-nav.site-nav-open');
+            if (!openNav) return;
+            e.preventDefault();
+            openNav.classList.remove('site-nav-open');
+            var toggleBtn = openNav.querySelector('.site-nav-toggle');
+            if (toggleBtn) { toggleBtn.setAttribute('aria-expanded', 'false'); toggleBtn.focus(); }
           });
 
           // Host push (AD-8): both in-webview navigation and live refresh arrive as one message shape and are

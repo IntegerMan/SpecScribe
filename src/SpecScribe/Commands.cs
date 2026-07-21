@@ -87,12 +87,77 @@ public sealed class WebviewCommand : Command<SiteSettings>
         var bundle = generator.RenderWebviewSurfaces();
         // Resolved roots come from the PRE-redirect `resolved` (the project's real roots), never the scratch-redirected
         // `options`, exactly like configuredOutputRoot. [Story 6.11]
-        Console.Out.Write(SerializePayload(
+        var payload = SerializePayload(
             bundle,
             ResolveConfiguredOutputRoot(resolved),
             ResolveSourceRoot(resolved),
             ResolveAdrRoot(resolved),
-            ResolveRepoRootOffset(resolved)));
+            ResolveRepoRootOffset(resolved));
+
+        if (!settings.Serve)
+        {
+            Console.Out.Write(payload);
+            return 0;
+        }
+
+        // Persistent mode (deferred item, Story 6.4 review — ADR 0005 §3's "scoped re-render" follow-up): stream
+        // one NDJSON payload line per debounced incremental regen instead of exiting after a single render, by
+        // reusing the EXACT debounce/RegenerateEpics() incremental path `specscribe watch` already relies on
+        // (FileWatcherService). The extension keeps this one process alive for the panel's lifetime instead of
+        // spawning a fresh `specscribe webview` process — and therefore a fresh full GenerateAll() — on every save.
+        Console.Out.WriteLine(payload);
+        Console.Out.Flush();
+        return RunServeLoop(options, resolved, generator);
+    }
+
+    /// <summary>The persistent-mode loop: rewrites and re-streams the webview payload after every debounced
+    /// incremental regen, then blocks until the process is torn down (Ctrl+C in an interactive shell, or the host
+    /// simply killing the process — the same lifecycle <see cref="WatchCommand.RunWatchLoop"/> uses). One JSON
+    /// object per line on stdout, same shape as the one-shot path's <see cref="SerializePayload"/> output, so the
+    /// extension's parser needs no branch on which mode produced it. [Deferred item, Story 6.4 review]</summary>
+    private static int RunServeLoop(ForgeOptions options, ForgeOptions resolved, SiteGenerator generator)
+    {
+        // FileWatcherService fires one debounce Timer PER distinct changed path, each on its own thread-pool
+        // thread — two files touched inside the same debounce window can invoke this callback concurrently.
+        // `_pushLock` serializes the whole read-render-write sequence so two regens can never interleave their
+        // writes into the single NDJSON stdout stream. [Review][Patch]
+        var pushLock = new object();
+        using var watcher = new FileWatcherService(options, generator, ev =>
+        {
+            lock (pushLock)
+            {
+                var notices = DiagnosticNotice.FromEvents(new[] { ev });
+                Console.Error.Write(SerializeDiagnostics(notices, resolved));
+                if (ev.Outcome is GenerationOutcome.Error or GenerationOutcome.Skipped)
+                {
+                    // Error: the generator's in-memory state is unchanged — nothing to re-render or stream, the
+                    // notice above already surfaced the failure. Skipped: an admitted-but-unrecognized touch (or
+                    // watcher noise) produced no site delta — re-rendering would just waste the exact per-push
+                    // cost this mode exists to eliminate and flicker the panel with an unchanged payload.
+                    // [Review][Patch]
+                    return;
+                }
+                var bundle = generator.RenderWebviewSurfaces();
+                var payload = SerializePayload(
+                    bundle,
+                    ResolveConfiguredOutputRoot(resolved),
+                    ResolveSourceRoot(resolved),
+                    ResolveAdrRoot(resolved),
+                    ResolveRepoRootOffset(resolved));
+                Console.Out.WriteLine(payload);
+                Console.Out.Flush();
+            }
+        });
+        watcher.Start();
+
+        using var exitSignal = new ManualResetEventSlim(false);
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            exitSignal.Set();
+        };
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => exitSignal.Set();
+        exitSignal.Wait();
         return 0;
     }
 
@@ -244,20 +309,60 @@ public sealed class WebviewCommand : Command<SiteSettings>
     public static string ResolveRepoRootOffset(ForgeOptions resolved, string? workingDirectory = null)
         => Path.GetRelativePath(workingDirectory ?? Directory.GetCurrentDirectory(), resolved.RepoRoot).Replace('\\', '/');
 
+    /// <summary>The stable per-project scratch-dir key: a hash of the repo root, folded to a canonical case only
+    /// on a case-INSENSITIVE filesystem (Windows — this project's primary target OS) so the same physical repo
+    /// referenced with two different path casings (a workspace-folder URI vs. a manually-typed cwd, or drive-letter
+    /// casing) still maps to the SAME stable dir there; left verbatim on a case-sensitive filesystem (Linux) so two
+    /// genuinely distinct repo paths differing only by case never collide. Matches the OS's own path-comparison
+    /// semantics rather than this codebase's git-path Ordinal convention (Epic 8 / Story 7.1), which addresses a
+    /// different problem (git's own case-sensitive object model) and would reintroduce the Windows regression a
+    /// blanket Ordinal hash here would cause. [Review][Patch]</summary>
+    internal static string ScratchKey(string repoRoot)
+    {
+        var folded = OperatingSystem.IsWindows() ? repoRoot.ToUpperInvariant() : repoRoot;
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(folded)))[..16].ToLowerInvariant();
+    }
+
+    /// <summary>Held for the life of the process once a scratch-dir lock is acquired — a static field roots the
+    /// <see cref="FileStream"/> so the GC can never finalize (and thereby silently release) the exclusive lock
+    /// before the process actually exits; a discarded local has no such root. [Review][Patch]</summary>
+    private static FileStream? _scratchLock;
+
     /// <summary>Clones the resolved options with the output root moved to a stable per-project temp scratch
-    /// directory (keyed by a hash of the repo root so concurrent projects never collide, stable so successive
-    /// spawns overwrite rather than accumulate).</summary>
+    /// directory (keyed by <see cref="ScratchKey"/>, stable so sequential spawns for the same repo overwrite
+    /// rather than accumulate). A same-repo spawn that finds the stable dir already exclusively locked by a
+    /// still-running concurrent spawn (two VS Code windows, or a manual CLI run alongside the extension) falls
+    /// back to a process-id-suffixed sibling dir instead of racing its writes — deliberately NOT stable (each
+    /// concurrent spawn gets its own), which is fine since concurrency here is rare and each spawn's scratch
+    /// output is read back once (via <see cref="SiteGenerator.RenderWebviewSurfaces"/>) and then abandoned.
+    /// [Deferred item, Story 6.4 review]</summary>
     private static ForgeOptions RedirectOutputToScratch(ForgeOptions options)
     {
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-            options.RepoRoot.ToUpperInvariant())))[..16].ToLowerInvariant();
+        var key = ScratchKey(options.RepoRoot);
+        var stableRoot = Path.Combine(Path.GetTempPath(), "specscribe-webview", key);
+        Directory.CreateDirectory(stableRoot);
+        var outputRoot = stableRoot;
+        try
+        {
+            // Rooted in a static field (not discarded) so the GC can't finalize/close it early — the lock must
+            // survive for the whole process, including the (potentially long-lived) --serve mode. DeleteOnClose
+            // removes the lock marker itself on release, whether that's a clean process exit or an explicit
+            // Dispose — no separate cleanup path needed. [Review][Patch]
+            _scratchLock = new FileStream(
+                Path.Combine(stableRoot, ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None,
+                bufferSize: 1, FileOptions.DeleteOnClose);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            outputRoot = Path.Combine(Path.GetTempPath(), "specscribe-webview", $"{key}-{Environment.ProcessId}");
+        }
         return new ForgeOptions
         {
             RepoRoot = options.RepoRoot,
             SourceRoot = options.SourceRoot,
             AdrSourceRoot = options.AdrSourceRoot,
             AdrSourceExplicit = options.AdrSourceExplicit,
-            OutputRoot = Path.Combine(Path.GetTempPath(), "specscribe-webview", key),
+            OutputRoot = outputRoot,
             SiteTitle = options.SiteTitle,
             IncludeReadme = options.IncludeReadme,
             DeepGitAnalytics = options.DeepGitAnalytics,

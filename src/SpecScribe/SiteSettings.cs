@@ -38,6 +38,10 @@ public class SiteSettings : CommandSettings
     [Description("Base URL for source-file links (e.g. https://github.com/owner/repo/blob/main). Adds a 'view source online' link to each in-portal code page (the pages are always generated). Default: unset, and auto-detected from the git remote or GitHub Pages context when available.")]
     public string? CodeUrl { get; set; }
 
+    [CommandOption("--serve")]
+    [Description("`webview` only: stay resident and stream one JSON payload per line (NDJSON) on stdout after every incremental regen, instead of rendering once and exiting. Reuses the same debounced file-watch/incremental-regen path as `specscribe watch`, so a live-push no longer reruns a full generation from scratch. Default: off (render once and exit).")]
+    public bool Serve { get; set; }
+
     /// <summary>Resolves these settings into absolute paths. Throws <see cref="DirectoryNotFoundException"/>
     /// with an actionable message when auto-discovery fails. This is the CLI entry path, so it opts into git-remote /
     /// CI auto-detection of the external source base when <c>--code-url</c> is not given (library/test callers use

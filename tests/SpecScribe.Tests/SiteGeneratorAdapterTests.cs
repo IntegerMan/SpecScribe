@@ -647,7 +647,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // retirement-comment scan, AbbreviationExpander punctuation separators, SiteGenerator groupByHref
         // assert) — none of those touch this non-git fixture's content; only Charts.cs shifted the hash.
         // Verified stable across 3 repeated runs before locking in.
-        const string expected = "5bac4208dcef7163f4acc2dedb64ad535962582b76e3bb2dee80d9b7848ca5e8";
+        // Regenerated 2026-07-20 (Story 6.4 deferred-work cleanup, not a rendering change): the file-separator
+        // literal `"\n \n"` above had a single byte corrupted to a NUL in this repo's on-disk source (this
+        // working tree's shared-main concurrent-write gotcha — same class of issue documented above for
+        // Stories 10.9/10.10/10.1) — confirmed via a raw byte compare against the last-good commit (exactly one
+        // byte differed, file size unchanged) and via stash-bisection isolating the hash shift to this fix alone
+        // (unrelated to this pass's actual production changes, none of which touch the non-git fixture's static
+        // HTML path). Restoring the intended space changes the hash input, not any rendered page.
+        const string expected = "f1711be2dd12e0f2f72a583e418bdd817d9c0bb6291918ac152d43fa0ffcefe8";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -675,7 +682,7 @@ public class SiteGeneratorAdapterTests : IDisposable
             .OrderBy(p => p, StringComparer.Ordinal))
         {
             sb.Append(FoldToday(rel)).Append('\n')
-              .Append(NormalizeVolatile(File.ReadAllText(Path.Combine(root, rel)))).Append("\n \n");
+              .Append(NormalizeVolatile(File.ReadAllText(Path.Combine(root, rel)))).Append("\n \n");
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
     }

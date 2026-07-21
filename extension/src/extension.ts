@@ -22,6 +22,7 @@
 
 import * as vscode from 'vscode';
 import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -512,26 +513,26 @@ class SpecScribeStore {
    * render never looks inert (Goal B). [spec-vscode-any-workspace-and-processing-indicators] */
   get isLoading(): boolean { return this.loading !== undefined; }
 
+  /** A live `specscribe webview --serve` connection, once one has started successfully. Undefined before the first
+   * attempt, after a permanent fallback ({@link persistentUnavailable}), or after {@link dispose}.
+   * [Deferred item, Story 6.4 review — scoped re-render] */
+  private persistent: PersistentRenderer | undefined;
+  /** Set permanently once a `--serve` attempt exits before its first payload (older core without the flag, or a
+   * crash) — every subsequent {@link load} falls back to the one-shot spawn-per-call path instead of retrying
+   * `--serve` on every call. */
+  private persistentUnavailable = false;
+
   /** Spawn (or join an in-flight spawn) and update the shared cache. Fires the fan-out on every settle: on success
    * the cache + configured-output-root refresh and the error clears; on failure the LAST-GOOD cache is retained
    * (so the tree keeps showing data) and the error is recorded for the stale indicator. The promise still rejects
-   * so a manual Refresh can surface a toast — auto (watcher) callers swallow it and rely on the stale UI. */
+   * so a manual Refresh can surface a toast — auto (watcher) callers swallow it and rely on the stale UI.
+   * <p>Prefers the persistent `--serve` connection ({@link loadViaPersistent}) so a live edit updates the panel via
+   * an already-running process instead of a fresh full-regen spawn (ADR 0005 §3's scoped re-render); falls back to
+   * the original per-call spawn ({@link loadViaSpawn}) permanently once `--serve` proves unavailable.</p> */
   load(): Promise<WebviewPayload> {
     if (this.loading) return this.loading;
-    this.loading = runRenderer(this.context, this.folder.uri.fsPath)
-      .then(({ payload, diagnostics }) => {
-        this.cache = payload;
-        this.error = undefined;
-        lastConfiguredOutputRoot = payload.configuredOutputRoot ?? lastConfiguredOutputRoot;
-        // Resolve the absolute repo root ONCE (workspace folder + core-emitted offset) and share it for the watchers
-        // AND the reveal-source join, then (re)build the watchers from the payload's resolved roots. [Story 6.11]
-        lastRepoRoot = path.resolve(this.folder.uri.fsPath, payload.repoRoot ?? '.');
-        this.rebuildWatchersFromRoots(payload);
-        // Rebuild the Problems panel from this run's notices (clearing any a later run resolved). Only on success —
-        // a failed load leaves the collection as last-good, mirroring the tree/status-bar stale behavior. [Story 6.12]
-        publishDiagnostics(this.folder, diagnostics);
-        return payload;
-      })
+    const attempt = this.persistentUnavailable ? this.loadViaSpawn() : this.loadViaPersistent();
+    this.loading = attempt
       .catch((err) => {
         this.error = err; // keep this.cache as the last-good snapshot
         throw err;
@@ -545,6 +546,79 @@ class SpecScribeStore {
     // panel/tree/status bar already subscribe to — no new plumbing. [spec-vscode-any-workspace-and-processing-indicators]
     dataChanged.fire();
     return this.loading;
+  }
+
+  /** Applies one settled payload (from either path) to the shared cache/roots/diagnostics — the single place both
+   * loading strategies converge, so a live-pushed `--serve` payload and a one-shot spawn payload are indistinguishable
+   * to every downstream consumer (tree/status bar/panel). */
+  private applyPayload(payload: WebviewPayload, diagnostics: RawDiagnostic[]): WebviewPayload {
+    this.cache = payload;
+    this.error = undefined;
+    lastConfiguredOutputRoot = payload.configuredOutputRoot ?? lastConfiguredOutputRoot;
+    // Resolve the absolute repo root ONCE (workspace folder + core-emitted offset) and share it for the watchers
+    // AND the reveal-source join, then (re)build the watchers from the payload's resolved roots. [Story 6.11]
+    lastRepoRoot = path.resolve(this.folder.uri.fsPath, payload.repoRoot ?? '.');
+    this.rebuildWatchersFromRoots(payload);
+    // Rebuild the Problems panel from this run's notices (clearing any a later run resolved). Only on success —
+    // a failed load leaves the collection as last-good, mirroring the tree/status-bar stale behavior. [Story 6.12]
+    publishDiagnostics(this.folder, diagnostics);
+    return payload;
+  }
+
+  /** The original behavior: one spawn, one payload, process exits. Used whenever `--serve` is unavailable. */
+  private loadViaSpawn(): Promise<WebviewPayload> {
+    return runRenderer(this.context, this.folder.uri.fsPath)
+      .then(({ payload, diagnostics }) => this.applyPayload(payload, diagnostics));
+  }
+
+  /** Starts (or reuses) the persistent `--serve` connection. The returned promise settles on the FIRST payload
+   * only — every later push from the same long-lived process updates the cache and fires {@link dataChanged}
+   * directly, outside this promise, exactly like a watcher-driven reload used to trigger a fresh {@link load}
+   * call. If the process exits before ever producing a payload (older core, or a crash), this call — and every
+   * `load()` after it — permanently falls back to {@link loadViaSpawn}. [Deferred item, Story 6.4 review]</p> */
+  private loadViaPersistent(): Promise<WebviewPayload> {
+    if (this.persistent) {
+      // Already running: a running `--serve` connection only pushes on its OWN debounce; there is no
+      // "give me the current state now" request in the NDJSON protocol, so a manual reload while persistent
+      // mode is live just re-resolves the last-pushed cache (or the last error, if none has landed yet).
+      return this.cache ? Promise.resolve(this.cache) : Promise.reject(this.error ?? new Error('SpecScribe --serve has not produced a payload yet.'));
+    }
+    return new Promise<WebviewPayload>((resolve, reject) => {
+      let initialSettled = false;
+      const renderer: PersistentRenderer = new PersistentRenderer(
+        this.context,
+        this.folder.uri.fsPath,
+        (payload, diagnostics) => {
+          this.applyPayload(payload, diagnostics);
+          if (!initialSettled) {
+            initialSettled = true;
+            resolve(payload);
+          } else {
+            // A later live-push, not the call that started this promise — fan out directly.
+            dataChanged.fire();
+          }
+        },
+        (err, hadPayload) => {
+          this.persistent = undefined;
+          if (!initialSettled) {
+            // Never produced a payload — `--serve` is unsupported (older core) or failed immediately; stop
+            // retrying it for the rest of this session and fall back to the proven one-shot spawn-per-save path.
+            this.persistentUnavailable = true;
+            initialSettled = true;
+            this.loadViaSpawn().then(resolve, reject);
+          } else {
+            // Died after already streaming at least one payload — likely transient (crash, disk hiccup), not
+            // "unsupported"; `persistentUnavailable` stays false so the next load() retries `--serve`. This
+            // call's own promise already resolved, so recover by triggering a fresh load() now instead of
+            // leaving the panel silently stale until an unrelated save/manual refresh. [Review][Patch]
+            this.error = err;
+            void this.load().catch(() => { /* stale UI covers it */ });
+          }
+        },
+      );
+      this.persistent = renderer;
+      renderer.start();
+    });
   }
 
   /** Bootstrap the watchers on the literal fallback globs (anchored to the workspace folder) so an edit BEFORE the
@@ -616,6 +690,8 @@ class SpecScribeStore {
 
   dispose(): void {
     this.disposeWatchers();
+    this.persistent?.dispose();
+    this.persistent = undefined;
   }
 }
 
@@ -1087,6 +1163,22 @@ function toolCommandLine(tool: ResolvedTool, sub?: string): string {
   return parts.map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(' ');
 }
 
+/** Kills a renderer process, escalating to SIGKILL after a grace period if it hasn't exited — a bare SIGTERM
+ * (`proc.kill()`'s default) is not reliably honored by the `dotnet` host on Windows, which can otherwise leave
+ * an orphaned process behind. [Deferred item, Story 6.4 review] */
+function killWithEscalation(proc: ChildProcess): void {
+  proc.kill();
+  const escalate = setTimeout(() => {
+    if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGKILL');
+  }, 5_000);
+  proc.once('close', () => clearTimeout(escalate));
+}
+
+/** A generous ceiling well above this repo's observed ~8 MB whole-site webview payload — guards against a
+ * runaway or looping renderer accumulating unbounded memory in the extension host, not normal output.
+ * [Deferred item, Story 6.4 review] */
+const MAX_RENDERER_STDOUT_BYTES = 256 * 1024 * 1024;
+
 /** Spawn the SpecScribe tool's `webview` command and parse its stdout JSON — the extension↔core data path
  * ADR 0005 ratified. Tool resolution is shared with the terminal handoff via {@link resolveTool}. */
 function runRenderer(context: vscode.ExtensionContext, cwd: string): Promise<RendererResult> {
@@ -1096,24 +1188,46 @@ function runRenderer(context: vscode.ExtensionContext, cwd: string): Promise<Ren
 
   return new Promise<RendererResult>((resolve, reject) => {
     const proc = spawn(command, args, { cwd });
+    // Set once the process is being force-aborted (timeout or stdout-size cap) — guards against the timeout
+    // firing after the size cap already aborted (or vice versa) and overwriting the real reason, and against
+    // 'close' treating an aborted run as a plain non-zero exit. [Review][Patch]
+    let abortReason: string | undefined;
+
+    // Rejects IMMEDIATELY on abort rather than waiting for the killed process's 'close' event — the original
+    // behavior before SIGKILL escalation was added, which this preserves: the error toast must not wait on
+    // however long the (possibly unresponsive) process takes to actually die. [Review][Patch]
+    const abort = (reason: string) => {
+      if (abortReason) return; // first abort wins
+      abortReason = reason;
+      killWithEscalation(proc);
+      reject(new Error(reason));
+    };
+
     // A renderer that never returns must not hang forever (cold spawns measured ~3.5 s; 60 s is a generous
     // ceiling for very large repos).
-    const timer = setTimeout(() => {
-      proc.kill();
-      reject(new Error('SpecScribe renderer timed out after 60s.'));
-    }, 60_000);
+    const timer = setTimeout(() => abort('SpecScribe renderer timed out after 60s.'), 60_000);
 
     let out = '';
     let errText = '';
+    let outBytes = 0;
     // Decode as a UTF-8 stream, not per Buffer chunk: a multibyte char (em-dashes are pervasive in the payload)
     // split across a chunk boundary would otherwise decode to replacement chars and corrupt the content.
     proc.stdout.setEncoding('utf8');
     proc.stderr.setEncoding('utf8');
-    proc.stdout.on('data', (d) => (out += d));
+    proc.stdout.on('data', (d: string) => {
+      if (abortReason) return;
+      outBytes += Buffer.byteLength(d, 'utf8');
+      if (outBytes > MAX_RENDERER_STDOUT_BYTES) {
+        abort('SpecScribe renderer output exceeded the size ceiling; process killed.');
+        return;
+      }
+      out += d;
+    });
     proc.stderr.on('data', (d) => (errText += d));
-    proc.on('error', (e) => { clearTimeout(timer); reject(e); });
+    proc.on('error', (e) => { clearTimeout(timer); if (!abortReason) reject(e); });
     proc.on('close', (code) => {
       clearTimeout(timer);
+      if (abortReason) return; // already rejected via abort() — this is just the (possibly delayed) process death
       // A non-zero exit is a real crash whose stderr is a .NET stack trace, not our notice lines (notices are
       // non-fatal, exit 0), so the error toast keeps using errText verbatim — no diagnostics parsed here.
       if (code !== 0) return reject(new Error(`SpecScribe renderer exited ${code}: ${errText || '(no stderr)'}`));
@@ -1146,6 +1260,92 @@ function parseDiagnostics(errText: string): RawDiagnostic[] {
     }
   }
   return records;
+}
+
+/** A long-lived `specscribe webview --serve` connection: spawns once and calls `onPayload` for every NDJSON line
+ * on stdout (the initial render AND every subsequent incremental live-push), instead of the one-shot
+ * spawn-per-save `runRenderer` path re-running a full generation on every save. Reuses `SerializePayload`'s exact
+ * wire shape (one `WebviewPayload` per line) — the same JSON.parse this file already does for the one-shot path,
+ * just applied per-line instead of once to the whole stdout buffer. If the process exits before ever producing a
+ * payload (an older core without `--serve`, or a crash), `onUnavailable` fires once so the caller can fall back to
+ * the one-shot path. [Deferred item, Story 6.4 review — ADR 0005 §3 scoped re-render]</p> */
+class PersistentRenderer implements vscode.Disposable {
+  private proc: ChildProcess | undefined;
+  private buffer = '';
+  private errText = '';
+  private gotFirstPayload = false;
+  private torndown = false;
+
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly cwd: string,
+    private readonly onPayload: (payload: WebviewPayload, diagnostics: RawDiagnostic[]) => void,
+    // `hadPayload` distinguishes "never produced a payload" (caller must synchronously fall back to resolve its
+    // pending initial-load promise) from "died after already streaming at least one" (the initial promise is
+    // long settled — the caller must instead trigger a fresh recovery load). Fires exactly once per connection,
+    // regardless of when in its lifetime it dies — the previous "only if !gotFirstPayload" gate left a
+    // post-first-payload death undetected forever, permanently staling the panel with no fallback. [Review][Patch]
+    private readonly onUnavailable: (err: unknown, hadPayload: boolean) => void,
+  ) {}
+
+  start(): void {
+    const tool = resolveTool(this.context);
+    const args = [...tool.prefixArgs, 'webview', '--serve'];
+    const proc = spawn(tool.command, args, { cwd: this.cwd });
+    this.proc = proc;
+    proc.stdout.setEncoding('utf8');
+    proc.stderr.setEncoding('utf8');
+    proc.stdout.on('data', (d: string) => this.onStdoutChunk(d));
+    // stderr in serve mode carries one Problems-notice batch per push, same JSON-lines shape as the one-shot path
+    // (Story 6.12) — accumulated and attributed to whichever payload line completes next, a best-effort pairing
+    // since stdout/stderr are separate streams (notices are advisory, never load-bearing for correctness).
+    proc.stderr.on('data', (d: string) => (this.errText += d));
+    proc.on('error', (e) => this.teardown(e));
+    proc.on('close', (code) => this.teardown(new Error(`specscribe webview --serve exited ${code}`)));
+  }
+
+  private teardown(err: unknown): void {
+    if (this.torndown) return; // 'error' and 'close' can both fire for the same spawn failure — report once
+    this.torndown = true;
+    this.onUnavailable(err, this.gotFirstPayload);
+  }
+
+  private onStdoutChunk(chunk: string): void {
+    this.buffer += chunk;
+    // Same rationale as the one-shot path's MAX_RENDERER_STDOUT_BYTES cap, applied to the unterminated-line
+    // buffer here — this connection is explicitly designed to run far longer (indefinitely) than the bounded
+    // one-shot spawn, making an unbounded buffer the MORE likely place to leak memory, not less. [Review][Patch]
+    if (Buffer.byteLength(this.buffer, 'utf8') > MAX_RENDERER_STDOUT_BYTES) {
+      if (this.proc) killWithEscalation(this.proc);
+      this.teardown(new Error('specscribe webview --serve line buffer exceeded the size ceiling; connection killed.'));
+      return;
+    }
+    let newlineIndex: number;
+    while ((newlineIndex = this.buffer.indexOf('\n')) >= 0) {
+      const line = this.buffer.slice(0, newlineIndex);
+      this.buffer = this.buffer.slice(newlineIndex + 1);
+      if (line.trim().length === 0) continue;
+      let payload: WebviewPayload;
+      try {
+        payload = JSON.parse(line) as WebviewPayload;
+      } catch {
+        continue; // a stray non-JSON line on stdout — ignore rather than tear down the connection
+      }
+      this.gotFirstPayload = true;
+      const diagnostics = parseDiagnostics(this.errText);
+      this.errText = '';
+      this.onPayload(payload, diagnostics);
+    }
+  }
+
+  dispose(): void {
+    // Mark torn-down FIRST: killWithEscalation's SIGTERM/SIGKILL still fires an async 'close' event on this
+    // process, which must NOT re-invoke onUnavailable — this is a deliberate, owner-initiated teardown (panel
+    // closed, falling back after an earlier failure), not an unexpected death. [Review][Patch]
+    this.torndown = true;
+    if (this.proc) killWithEscalation(this.proc);
+    this.proc = undefined;
+  }
 }
 
 /** Publish the file-anchored notices into the Problems panel, grouped by file. Clears first so notices a later

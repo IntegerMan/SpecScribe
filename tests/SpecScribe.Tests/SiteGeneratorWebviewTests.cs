@@ -1,3 +1,4 @@
+using System.Text.Json;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -206,6 +207,26 @@ public class SiteGeneratorWebviewTests : IDisposable
         // And the placeholder page renders for the undrafted story rather than a dead link target.
         var placeholder = bundle.Surfaces.Single(s => s.OutputRelativePath == "epics/story-1-2.html");
         Assert.Contains("Story 1.2", placeholder.Title);
+    }
+
+    [Fact]
+    public void RenderWebviewSurfaces_StoryArtifactDeletedMidRender_DegradesThatStoryOnly()
+    {
+        // Simulates the sub-second window between GenerateAll() and RenderWebviewSurfaces() where a drafted
+        // story's .md vanishes (e.g. a rename/delete mid-save). The bundle must still complete, with ONLY that
+        // one story degraded to a placeholder — not the entire webview bundle aborting. [Deferred item, Story 6.4
+        // review]
+        var gen = GeneratedSite();
+        File.Delete(Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"));
+
+        var bundle = gen.RenderWebviewSurfaces();
+
+        var degraded = bundle.Surfaces.Single(s => s.OutputRelativePath == "epics/story-1-1.html");
+        Assert.Contains("Story 1.1", degraded.Title);
+
+        // The rest of the bundle is unaffected — Story 2.1's artifact still exists and still renders in full.
+        var untouched = bundle.Surfaces.Single(s => s.OutputRelativePath == "epics/story-2-1.html");
+        Assert.Contains("It ships", untouched.ContentHtml);
     }
 
     [Fact]
@@ -615,5 +636,35 @@ public class SiteGeneratorWebviewTests : IDisposable
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
+    }
+
+    // ===== Deferred item, Story 6.4 review: scoped re-render payload-shape parity ==================================
+
+    [Fact]
+    public void SerializePayload_AfterIncrementalRegen_HasTheSameShapeAsTheInitialRender()
+    {
+        // The persistent `--serve` mode streams a payload after an INCREMENTAL RegenerateEpics() (not a fresh
+        // GenerateAll()) on every debounced live edit — both go through the exact same SerializePayload call as
+        // the one-shot path, so the extension's parser needs no branch on which mode produced a given line. This
+        // pins that the two payloads share the same top-level JSON shape, and that the incremental path actually
+        // carries the live edit forward (not a stale snapshot). [Deferred item, Story 6.4 review]
+        var gen = GeneratedSite();
+        var initialPayload = WebviewCommand.SerializePayload(gen.RenderWebviewSurfaces(), "SpecScribeOutput");
+
+        File.WriteAllText(
+            Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"),
+            Story11Md.Replace("I want the foundation.", "I want the foundation, freshly edited."));
+        Assert.Equal(GenerationOutcome.Updated, gen.RegenerateEpics().Outcome);
+        var pushedPayload = WebviewCommand.SerializePayload(gen.RenderWebviewSurfaces(), "SpecScribeOutput");
+
+        using var initialDoc = JsonDocument.Parse(initialPayload);
+        using var pushedDoc = JsonDocument.Parse(pushedPayload);
+        var initialKeys = initialDoc.RootElement.EnumerateObject().Select(p => p.Name).OrderBy(k => k, StringComparer.Ordinal).ToList();
+        var pushedKeys = pushedDoc.RootElement.EnumerateObject().Select(p => p.Name).OrderBy(k => k, StringComparer.Ordinal).ToList();
+        Assert.Equal(initialKeys, pushedKeys);
+
+        // The incremental regen actually reached the pushed payload — not a stale copy of the initial one.
+        Assert.Contains("freshly edited", pushedPayload);
+        Assert.DoesNotContain("freshly edited", initialPayload);
     }
 }
