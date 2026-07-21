@@ -667,6 +667,14 @@ public sealed class SiteGenerator
     {
         var events = new List<GenerationEvent>();
 
+        // Every ADR-family output path actually WRITTEN during this pass — records AND non-records (README,
+        // template scaffolding) AND the synthesized landing when it fires — so the end-of-method _spaCapture
+        // prune (below) can tell a page that's still live from one that's genuinely gone, without conflating
+        // "record" (which is all _adrs ever holds) with "renders a page" (which also includes non-records).
+        // [deferred-work: story-6-7 watch-mode _spaCapture drift; review-patch: pruning by _adrs alone evicted
+        // non-record pages — README/template — the SAME pass that (re)wrote them]
+        var writtenAdrPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         var adrOutputDir = Path.Combine(_options.OutputRoot, ForgeOptions.AdrOutputSubdir);
         if (Directory.Exists(adrOutputDir))
         {
@@ -743,6 +751,7 @@ public sealed class SiteGenerator
                 else
                 {
                     WriteOutput(outputRelative, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+                    writtenAdrPaths.Add(PathUtil.NormalizeSlashes(outputRelative));
                     if (string.Equals(outputRelative, SiteNav.AdrsLandingOutputPath, StringComparison.OrdinalIgnoreCase))
                     {
                         landingPathAlreadyWritten = true;
@@ -812,6 +821,7 @@ public sealed class SiteGenerator
                         prefix + e.OutputRelativePath,
                         string.Equals(e.OutputRelativePath, entry.OutputRelativePath, StringComparison.OrdinalIgnoreCase))).ToList());
                 WriteOutput(entry.OutputRelativePath, ApplyReferenceLinks(HtmlTemplater.RenderPage(recordDoc, nav, pager, localContext: adrLocalContext), entry.OutputRelativePath));
+                writtenAdrPaths.Add(PathUtil.NormalizeSlashes(entry.OutputRelativePath));
                 // A record occupying the landing slot (e.g. an `index.md`) must, on successful write, suppress the
                 // synthesized landing below so it isn't clobbered — same "only on a successful write" rule the
                 // non-record branch above follows. [Prev/next navigation]
@@ -888,6 +898,7 @@ public sealed class SiteGenerator
                 };
                 WriteOutput(SiteNav.AdrsLandingOutputPath,
                     ApplyReferenceLinks(HtmlTemplater.RenderPage(landing, nav), SiteNav.AdrsLandingOutputPath));
+                writtenAdrPaths.Add(PathUtil.NormalizeSlashes(SiteNav.AdrsLandingOutputPath));
                 events.Add(new GenerationEvent(GenerationOutcome.Generated,
                     $"{ForgeOptions.AdrOutputSubdir}/index.html (synthesized landing)", sw.Elapsed));
             }
@@ -896,6 +907,24 @@ public sealed class SiteGenerator
                 events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.AdrsLandingOutputPath, sw.Elapsed, ex.Message));
             }
         }
+
+        // Prune stale SPA-capture entries for any ADR-family page NOT actually (re)written this pass — a
+        // renamed/deleted record, README, or template file, OR a landing page that no longer has anything to
+        // write it (the last ADR was removed and no record occupies the landing slot). The physical adrs/
+        // OUTPUT DIRECTORY is wiped and rebuilt above (self-healing the static site), but _spaCapture is a
+        // separate in-memory map that pass 2 only OVERWRITES for pages still present — using writtenAdrPaths
+        // (every WriteOutput call above, not just _adrs/record entries) rather than _adrs alone avoids evicting
+        // a still-live non-record page (README/template) the SAME pass just wrote it.
+        // [deferred-work: story-6-7 watch-mode _spaCapture drift]
+        if (_spaCapture is { } captureAfterAdrs)
+        {
+            var stalePrefix = ForgeOptions.AdrOutputSubdir + "/";
+            var staleKeys = captureAfterAdrs.Keys
+                .Where(k => k.StartsWith(stalePrefix, StringComparison.OrdinalIgnoreCase) && !writtenAdrPaths.Contains(k))
+                .ToList();
+            foreach (var key in staleKeys) captureAfterAdrs.Remove(key);
+        }
+
         return events;
     }
 

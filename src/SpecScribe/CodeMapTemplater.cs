@@ -160,7 +160,10 @@ public static class CodeMapTemplater
         }
 
         sb.Append("    <div class=\"codemap-viewport\">\n");
-        sb.Append(Charts.CodeTreemap(variant.Layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics, fileHref, prefix));
+        // totalFileCount passed explicitly (variant.Map.FileCount, the SAME source AppendFileTable's `files` come
+        // from) so the treemap's detail cap and the table's row cap agree on whether the cap trips even on the
+        // rare repo deep enough that Layout() omits a file nested past its own recursion cap. [Review][Patch]
+        sb.Append(Charts.CodeTreemap(variant.Layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics, fileHref, prefix, variant.Map.FileCount));
         sb.Append("    </div>\n");
         sb.Append("  </section>\n\n");
 
@@ -255,15 +258,25 @@ public static class CodeMapTemplater
     /// row family gets rewired onto <see cref="ListRow"/>.</para></summary>
     private static void AppendFileTable(StringBuilder sb, IReadOnlyList<CodeMapNode> files, bool hasMetrics, Func<string, string?>? fileHref, string prefix)
     {
-        var ordered = files
-            .OrderByDescending(f => f.Metrics?.Changes ?? -1)
-            .ThenByDescending(f => f.Lines)
-            .ThenBy(f => f.RepoRelativePath, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        // Ordering is the SAME Charts.OrderBySignificance the treemap's detail cap uses — shared, not a second
+        // hand-rolled copy, so the two text-equivalents of the visualization can never silently disagree on which
+        // files count as "most significant." [Review][Patch: DRY]
+        var ordered = Charts.OrderBySignificance(files).ToList();
+
+        // Deferred item (at-scale SPA perf pass): capped at very large scale, the SAME cap+ordering the treemap's
+        // rich tooltips use, so a file with a table row also has a tooltip and vice versa. Below the cap (every
+        // real project so far — Epic-7 scale is ~1,060 files) this is a no-op: `shown` == `ordered`,
+        // byte-identical to before.
+        var cap = Charts.MaxDetailedCodeMapFiles;
+        var shown = ordered.Count > cap ? ordered.Take(cap).ToList() : ordered;
+        var omittedCount = ordered.Count - shown.Count;
 
         sb.Append("    <section class=\"chart-panel\">\n");
         sb.Append("      <h3>All files</h3>\n");
-        sb.Append($"      <p class=\"chart-lead\">Every file in the treemap, listed as text{(hasMetrics ? ", ordered by change frequency" : ", ordered by size")}.</p>\n");
+        var leadScope = omittedCount > 0
+            ? $"The {cap.ToString("N0", CultureInfo.InvariantCulture)} most significant files in the treemap"
+            : "Every file in the treemap";
+        sb.Append($"      <p class=\"chart-lead\">{leadScope}, listed as text{(hasMetrics ? ", ordered by change frequency" : ", ordered by size")}.</p>\n");
         sb.Append("      <table class=\"codemap-table\">\n");
         sb.Append("        <thead><tr><th scope=\"col\">File</th><th scope=\"col\" class=\"num\">Lines</th><th scope=\"col\">Type</th>");
         if (hasMetrics)
@@ -272,7 +285,7 @@ public static class CodeMapTemplater
         }
         sb.Append("</tr></thead>\n        <tbody>\n");
 
-        foreach (var file in ordered)
+        foreach (var file in shown)
         {
             var href = fileHref?.Invoke(file.RepoRelativePath);
             var pathCell = href is { Length: > 0 } target
@@ -303,6 +316,14 @@ public static class CodeMapTemplater
                 }
             }
             sb.Append("</tr>\n");
+        }
+
+        if (omittedCount > 0)
+        {
+            var colspan = hasMetrics ? 9 : 3;
+            sb.Append($"          <tr class=\"codemap-table-truncated\"><td colspan=\"{colspan}\">+{omittedCount.ToString("N0", CultureInfo.InvariantCulture)} more ")
+              .Append(Charts.Plural(omittedCount, "file", "files"))
+              .Append(" not shown in this table — each still has its own colored, focusable rectangle in the treemap above.</td></tr>\n");
         }
 
         sb.Append("        </tbody>\n      </table>\n");

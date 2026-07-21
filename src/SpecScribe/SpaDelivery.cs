@@ -36,6 +36,25 @@ public static class SpaDelivery
     /// bounding the largest at Epic-7 scale.</summary>
     public const int MaxPagesPerChunk = 75;
 
+    /// <summary>The per-chunk UTF-8 byte budget — a second, independent split trigger alongside
+    /// <see cref="MaxPagesPerChunk"/> (deferred item, Story 6.7 at-scale perf pass: the count-only cap "cannot"
+    /// bound the largest chunk, per its own doc comment, once one PAGE in a group is itself huge — a single
+    /// multi-tens-of-MB page like a large-repo code-map dragged its entire top-level group's chunk to 112.9 MB,
+    /// since 17 ordinary neighbors shared the file with it). A group starts a new batch as soon as either cap
+    /// would be exceeded, and any single page whose OWN content already exceeds this budget is isolated into its
+    /// own dedicated chunk (see <see cref="BuildDataFiles"/>) rather than dragging neighbors along or being
+    /// split itself (a page's content region is atomic). 2 MB comfortably covers this repo's largest real chunk
+    /// (the epics group, low single-digit MB across ~90+ pages) without ever tripping at normal/Epic-7 scale, so
+    /// default generation is unaffected — it exists purely to isolate the pathological long tail.
+    /// <para><b>Approximation, not an exact output-file ceiling:</b> this budgets each page's raw UTF-8
+    /// <see cref="SpaPage.ContentHtml"/> bytes, not the eventual JSON-serialized size — the chunk is written with
+    /// default HTML-safe JSON escaping, so <c>&lt;</c>/<c>&gt;</c>/<c>&amp;</c> each balloon to a 6-byte
+    /// <c>\uXXXX</c> escape, plus per-page key/quote overhead, on top of this number. That's an accepted
+    /// trade-off — the goal is BOUNDING the pathological case (one page dozens of MB, isolated alone regardless
+    /// of exact inflation) rather than hitting 2 MB precisely on every chunk; a page just under the raw budget
+    /// can land as a somewhat larger real file, never as the same problem this fix exists to prevent.</para></summary>
+    public const int MaxChunkBytes = 2_000_000;
+
     // JSON is fetched and JSON.parse'd by the client (never inlined into a <script>), so default (HTML-safe)
     // escaping is used — <, >, & become \uXXXX in the payload and decode back to the exact HTML on parse. Compact
     // (no indentation) because this is a delivery payload, not a hand-edited file.
@@ -150,21 +169,41 @@ public static class SpaDelivery
             .ThenBy(p => p.OutputRelativePath, StringComparer.Ordinal)
             .ToList();
 
-        // Assign each page to a chunk file. Group by top-level segment; split oversized groups into numbered files.
+        // Assign each page to a chunk file. Group by top-level segment; split oversized groups into numbered files
+        // whenever EITHER the page-count cap or the byte-size budget would be exceeded — two independent triggers,
+        // since a group can go bad on either axis (too many small pages, or one huge one). A page whose own content
+        // already exceeds MaxChunkBytes always gets a fresh, dedicated batch: it never joins a non-empty batch (so
+        // it can't inflate an otherwise-normal neighbor's fetch), and the batch after it starts fresh too (so it
+        // never inflates the NEXT page's chunk either). Batch state is per top-level group, walked in the same
+        // deterministic `ordered` sequence used everywhere else in this method.
         var pathToChunk = new Dictionary<string, string>(StringComparer.Ordinal);
         var chunkContents = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
-        var groupCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var groupBatches = new Dictionary<string, GroupBatchState>(StringComparer.Ordinal);
 
         foreach (var page in ordered)
         {
             var key = ChunkKey(page.OutputRelativePath);
-            var count = groupCounts.TryGetValue(key, out var c) ? c : 0;
-            var batch = count / MaxPagesPerChunk + 1;
-            groupCounts[key] = count + 1;
+            var pageBytes = Encoding.UTF8.GetByteCount(page.ContentHtml);
+            if (!groupBatches.TryGetValue(key, out var state))
+            {
+                state = new GroupBatchState();
+                groupBatches[key] = state;
+            }
 
-            var chunkFile = batch == 1
+            if (state.PageCount > 0 &&
+                (state.PageCount >= MaxPagesPerChunk || state.Bytes + pageBytes > MaxChunkBytes))
+            {
+                state.Batch++;
+                state.PageCount = 0;
+                state.Bytes = 0;
+            }
+
+            state.PageCount++;
+            state.Bytes += pageBytes;
+
+            var chunkFile = state.Batch == 1
                 ? $"{ChunkDir}/pages-{key}.json"
-                : $"{ChunkDir}/pages-{key}-{batch}.json";
+                : $"{ChunkDir}/pages-{key}-{state.Batch}.json";
 
             pathToChunk[page.OutputRelativePath] = chunkFile;
             if (!chunkContents.TryGetValue(chunkFile, out var map))
@@ -213,6 +252,17 @@ public static class SpaDelivery
         }
 
         return files;
+    }
+
+    /// <summary>Mutable running state for the CURRENT (last) batch of one top-level chunk group, walked once
+    /// per <see cref="BuildDataFiles"/> call — never reused across calls. <see cref="Batch"/> is the 1-based
+    /// numbered-file suffix (1 = the bare <c>pages-{key}.json</c>, no suffix); <see cref="PageCount"/>/
+    /// <see cref="Bytes"/> reset to 0 whenever a new batch starts.</summary>
+    private sealed class GroupBatchState
+    {
+        public int Batch = 1;
+        public int PageCount;
+        public long Bytes;
     }
 
     /// <summary>The top-level output segment a page belongs to (its chunk group): the first path segment, or

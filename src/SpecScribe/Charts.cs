@@ -2193,13 +2193,57 @@ public static class Charts
     /// link; when linked, <paramref name="prefix"/> is prepended to match the text table's link discipline
     /// (<see cref="CodeMapTemplater"/>). No <c>&lt;script&gt;</c> is required for this baseline to be correct.
     /// Every label/path is HTML-escaped. [Story 7.6]</summary>
+    /// <summary>Above this many file leaves, the treemap stops paying for a rich per-file tooltip card on every
+    /// rectangle (deferred item, at-scale SPA perf pass: at large-repo/<c>--deep-git</c> scale a single
+    /// <c>code-map.html</c> reached ~82.5 MB, because every file rect carries a multi-row HTML card doubly
+    /// HTML-escaped into a <c>data-tip-html</c> attribute — the single biggest per-rect cost). Every file still
+    /// gets its own correctly sized, correctly colored, keyboard-focusable rectangle with a real
+    /// <c>aria-label</c> either way — a long-tail file's label additionally carries the SAME metrics (type,
+    /// changes, churn, avg size, co-change, first/last) the card would have shown, as compact inline text instead
+    /// of an HTML card, so AC #4 ("color never the sole signal") holds in TEXT form too, not just geometry+color
+    /// (see <see cref="AppendTreemapFile"/>'s non-detailed branch) — only the CONVENIENCE hover popup is capped for
+    /// the long tail, selected by the same "most significant first" ordering the file table already uses
+    /// (<see cref="CodeMapTemplater"/>, via the shared <see cref="OrderBySignificance"/>). 4000 comfortably covers
+    /// every real project this generator has been run against (Epic-7 scale is ~1,060 files) without ever
+    /// tripping — default generation is byte-identical.</summary>
+    public const int MaxDetailedCodeMapFiles = 4000;
+
+    /// <summary>The ONE "most significant first" ordering both the treemap's detail cap and
+    /// <see cref="CodeMapTemplater"/>'s file table sort by (change frequency descending, then size descending,
+    /// then path for determinism) — shared so the two text-equivalents of the code-map visualization can never
+    /// silently drift apart on which files count as "most significant."</summary>
+    internal static IEnumerable<CodeMapNode> OrderBySignificance(IEnumerable<CodeMapNode> files) => files
+        .OrderByDescending(f => f.Metrics?.Changes ?? -1)
+        .ThenByDescending(f => f.Lines)
+        .ThenBy(f => f.RepoRelativePath, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The set of file <see cref="CodeMapNode.RepoRelativePath"/>s that get the full rich tooltip card —
+    /// every file when <paramref name="totalFileCount"/> is at or under <see cref="MaxDetailedCodeMapFiles"/>
+    /// (returns <c>null</c>, the "no cap" sentinel so the byte-identical default-scale path skips the
+    /// <see cref="OrderBySignificance"/> sort/take entirely — it still does one linear pass over <paramref
+    /// name="files"/> to materialize the list), otherwise the top <see cref="MaxDetailedCodeMapFiles"/> by
+    /// <see cref="OrderBySignificance"/>. <paramref name="totalFileCount"/> is passed explicitly (rather than
+    /// inferred from <paramref name="files"/>'s own count) so the treemap and the file table always agree on
+    /// WHETHER the cap trips even when their file lists come from different sources
+    /// (<see cref="CodeMap.Layout"/> can omit a file nested past its own <c>MaxDepth</c>, while
+    /// <see cref="CodeMap.Files"/> — the table's source — never does).</summary>
+    internal static HashSet<string>? SelectDetailedCodeMapFiles(IReadOnlyList<CodeMapNode> files, int totalFileCount)
+    {
+        if (totalFileCount <= MaxDetailedCodeMapFiles) return null;
+        return OrderBySignificance(files)
+            .Take(MaxDetailedCodeMapFiles)
+            .Select(f => f.RepoRelativePath)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     public static string CodeTreemap(
         IReadOnlyList<TreemapRect> layout,
         double width,
         double height,
         bool hasMetrics,
         Func<string, string?>? fileHref,
-        string prefix = "")
+        string prefix = "",
+        int? totalFileCount = null)
     {
         if (layout.Count == 0) return "<div class=\"chart-empty\">No source files to map.</div>";
 
@@ -2210,6 +2254,12 @@ public static class Charts
         {
             if (!r.Node.IsDirectory && r.Node.Metrics is { } m && m.Changes > maxChanges) maxChanges = m.Changes;
         }
+
+        var layoutFiles = layout.Where(r => !r.Node.IsDirectory).Select(r => r.Node).ToList();
+        // totalFileCount defaults to the layout's own file-rect count (existing callers/tests that don't pass it
+        // explicitly) — CodeMapTemplater's real call site passes the true CodeMap.FileCount so the cap-trigger
+        // agrees with the file table's, even on the rare repo deep enough that Layout() omits a nested file.
+        var detailedFiles = SelectDetailedCodeMapFiles(layoutFiles, totalFileCount ?? layoutFiles.Count);
 
         var sb = new StringBuilder();
         // No `id` — the page can render up to four of these (one per filter combination, Story 7.6 round 2), and
@@ -2228,7 +2278,8 @@ public static class Charts
             }
             else
             {
-                AppendTreemapFile(sb, rect, maxChanges, hasMetrics, fileHref, prefix);
+                var isDetailed = detailedFiles is null || detailedFiles.Contains(rect.Node.RepoRelativePath);
+                AppendTreemapFile(sb, rect, maxChanges, hasMetrics, fileHref, prefix, isDetailed);
             }
         }
 
@@ -2248,7 +2299,7 @@ public static class Charts
           .Append($"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" aria-hidden=\"true\"></rect>\n");
     }
 
-    private static void AppendTreemapFile(StringBuilder sb, TreemapRect rect, double maxChanges, bool hasMetrics, Func<string, string?>? fileHref, string prefix)
+    private static void AppendTreemapFile(StringBuilder sb, TreemapRect rect, double maxChanges, bool hasMetrics, Func<string, string?>? fileHref, string prefix, bool isDetailed = true)
     {
         if (rect.W <= 0 || rect.H <= 0) return;
         var node = rect.Node;
@@ -2288,34 +2339,79 @@ public static class Charts
                 ? $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, {ma.Changes} {Plural(ma.Changes, "change", "changes")}"
                 : $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}")
             : $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, {category.Label}";
+        if (!isDetailed)
+        {
+            // Past MaxDetailedCodeMapFiles, the rich HTML card (below) is skipped, but the exact same metrics it
+            // would have shown are folded into the accessible name as compact plain text instead — AC #4 ("color
+            // never the sole signal") must hold in text form for every file, not just the cards' worth this
+            // generator can afford to render at scale. [Review][Patch: the earlier "aria-label already carries
+            // everything" claim was false for hasMetrics files — churn/avg/co-change/dates lived ONLY in the card]
+            ariaLabel += CompactMetricsTail(node, category, hasMetrics);
+        }
 
         // Rich, stylized tooltip: a server-built HTML card served through the shared body-level js-tip node (never a
         // clipped ::after on the rect). The card markup is escaped ONCE more for the attribute so getAttribute →
         // innerHTML round-trips it back to real markup (its dynamic parts are already Html-escaped inside the card).
-        var card = BuildTreemapCard(node);
-
+        // Skipped past MaxDetailedCodeMapFiles (isDetailed=false): the card (a multi-row HTML `<dl>`, doubly
+        // escaped into the attribute) is the single biggest per-rect cost and purely a hover CONVENIENCE — the
+        // SAME information now always rides in aria-label (compact text, above), so nothing accessible is lost,
+        // only the pretty popup.
         var href = fileHref?.Invoke(node.RepoRelativePath);
         var isLink = href is { Length: > 0 };
         // Tip + accessible name live on the interactive element that owns focus. Linked cells: the <a> (Tile
         // pattern — natively focusable, no nested tabindex on the geometry child). Unlinked: the rect itself
         // with role="img". Metric data-* / .codemap-cell stay on the rect for the colorize JS either way.
         // [Story 10.4 deferred-debt; nested focusable inside <a>]
-        var tipAttrs = $"aria-label=\"{Html(ariaLabel)}\" data-tip-html=\"{Html(card)}\"";
+        var tipAttrs = isDetailed
+            ? $"aria-label=\"{Html(ariaLabel)}\" data-tip-html=\"{Html(BuildTreemapCard(node))}\""
+            : $"aria-label=\"{Html(ariaLabel)}\"";
         if (isLink)
         {
             var rectMarkup =
                 $"<rect class=\"codemap-cell {levelClass}\"{data} " +
                 $"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\"></rect>";
-            sb.Append($"  <a class=\"js-tip\" href=\"{Html(prefix + href)}\" {tipAttrs}>{rectMarkup}</a>\n");
+            var aClass = isDetailed ? " class=\"js-tip\"" : string.Empty;
+            sb.Append($"  <a{aClass} href=\"{Html(prefix + href)}\" {tipAttrs}>{rectMarkup}</a>\n");
         }
         else
         {
+            var cellClass = isDetailed ? $"{levelClass} js-tip" : levelClass;
             var rectMarkup =
-                $"<rect class=\"codemap-cell {levelClass} js-tip\" tabindex=\"0\"{data} " +
+                $"<rect class=\"codemap-cell {cellClass}\" tabindex=\"0\"{data} " +
                 $"x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" " +
                 $"role=\"img\" {tipAttrs}></rect>";
             sb.Append("  ").Append(rectMarkup).Append('\n');
         }
+    }
+
+    /// <summary>The rich tooltip card's metric rows, folded into compact comma-joined PLAIN TEXT for a file's
+    /// <c>aria-label</c> when it's past <see cref="MaxDetailedCodeMapFiles"/> and doesn't get the card itself —
+    /// the same underlying data (<see cref="BuildTreemapCard"/>'s rows), just without the HTML/escaping cost.
+    /// Type is included only when <paramref name="hasMetrics"/> (the base aria-label already carries it
+    /// otherwise); every metric row is included only when present, mirroring the card's own per-row guards.
+    /// Empty (no leading comma) when there is nothing to add beyond the base label.</summary>
+    private static string CompactMetricsTail(CodeMapNode node, CodeFileCategory category, bool hasMetrics)
+    {
+        var parts = new List<string>();
+        if (hasMetrics) parts.Add(category.Label);
+        if (node.Metrics is { } m)
+        {
+            parts.Add($"{m.TotalChurn.ToString("N0", CultureInfo.InvariantCulture)} churn");
+            if (m.Changes > 0)
+            {
+                var avg = (double)m.TotalChurn / m.Changes;
+                parts.Add($"avg change size {avg.ToString("N0", CultureInfo.InvariantCulture)}");
+            }
+            if (m.AvgCoChanged is { } co)
+            {
+                parts.Add($"{co.ToString("0.#", CultureInfo.InvariantCulture)} files changed together");
+            }
+            if (m.FirstDate is { } fd && m.LastDate is { } ld)
+            {
+                parts.Add($"{DReadable(fd)} to {DReadable(ld)}");
+            }
+        }
+        return parts.Count == 0 ? string.Empty : ", " + string.Join(", ", parts);
     }
 
     /// <summary>Builds the stylized HTML tooltip card for a treemap file rect (served through the shared body-level

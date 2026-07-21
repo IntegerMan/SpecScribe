@@ -197,4 +197,28 @@ public class CodeMapTemplaterTests
         var plain = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(), fileHref: null);
         Assert.DoesNotContain("<a href=\"code/src/A.cs.html\">", plain);
     }
+
+    /// <summary>Deferred item (at-scale SPA perf pass): past <see cref="Charts.MaxDetailedCodeMapFiles"/>, the
+    /// text-equivalent table caps at the same significance-ordered set the treemap's rich tooltips use, with an
+    /// honest "+N more" row rather than silently truncating (or ballooning the page). Built as a single
+    /// hand-assembled <see cref="CodeMapVariant"/> (not <see cref="CodeMap.BuildVariants"/>'s four combinations)
+    /// to keep this test's file count manageable while still exceeding the real cap.</summary>
+    [Fact]
+    public void RenderPage_AboveTheDetailCap_TableTruncatesWithAnHonestCountAndUpdatedLead()
+    {
+        var cap = Charts.MaxDetailedCodeMapFiles;
+        var fileCount = cap + 7;
+        var files = Enumerable.Range(1, fileCount).Select(i => ($"src/file-{i:00000}.cs", (long)i)).ToArray();
+        var map = CodeMap.Build(files, NoMetrics);
+        var variant = new CodeMapVariant("full", ExcludesSpecDev: false, ExcludesTests: false, map, map.Layout());
+
+        var html = CodeMapTemplater.RenderPage(new[] { variant }, Nav());
+
+        Assert.Contains($"The {cap:N0} most significant files in the treemap", html);
+        Assert.Contains("+7 more files not shown in this table", html);
+        Assert.Contains("still has its own colored, focusable rectangle in the treemap above", html);
+        // The smallest file (never in the top-`cap` by size, the significance order when metrics are absent)
+        // has no table row at all — the cap actually removed rows, not just appended a note.
+        Assert.DoesNotContain("src/file-00001.cs<", html);
+    }
 }

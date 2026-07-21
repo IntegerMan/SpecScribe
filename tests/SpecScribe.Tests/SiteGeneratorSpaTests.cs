@@ -308,6 +308,94 @@ public class SiteGeneratorSpaTests : IDisposable
     }
 
     [Fact]
+    public void RegenerateAdrs_PrunesTheRenamedOrDeletedRecordFromTheSpaCapture()
+    {
+        // Deferred item (Story 6.7 review): _spaCapture entries were only explicitly removed on a doc DELETE
+        // going through the generic RemoveFor path — an ADR rename/delete goes through RegenerateAdrs instead
+        // (IsAdr routes there, never through RemoveFor), which wipes+rebuilds the physical adrs/ directory but
+        // left the in-memory _spaCapture key for the vanished record dangling, so the NEXT SPA bundle carried
+        // an orphaned page no longer part of the static site. This pins the fix: RegenerateAdrs must prune it.
+        File.WriteAllText(Path.Combine(Adrs, "0002-second-decision.md"), "# ADR 0002: Second Decision\n\n**Status:** Accepted\n\nBody.\n");
+
+        var gen = GeneratedSite();
+        Assert.Contains(gen.RenderSpaBundle().Pages, p => p.OutputRelativePath == "adrs/0002-second-decision.html");
+        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0002-second-decision.html")));
+
+        // Simulate a watch-mode delete (or an equivalent rename, which the same wipe+rebuild path handles
+        // identically): the source record vanishes, then RegenerateAdrs runs — the real dispatch route ANY
+        // ADR-directory change takes, per IsAdr/RegenerateAdrs, never RemoveFor.
+        File.Delete(Path.Combine(Adrs, "0002-second-decision.md"));
+        gen.RegenerateAdrs();
+
+        Assert.False(File.Exists(Path.Combine(Site, "adrs", "0002-second-decision.html")));
+        var bundle = gen.RenderSpaBundle();
+        Assert.DoesNotContain(bundle.Pages, p => p.OutputRelativePath == "adrs/0002-second-decision.html");
+        // The surviving ADR (from the constructor fixture) is untouched.
+        Assert.Contains(bundle.Pages, p => p.OutputRelativePath == "adrs/0001-a-decision.html");
+    }
+
+    [Fact]
+    public void RegenerateAdrs_PrunesTheOldKey_OnAnActualRename_NotJustADelete()
+    {
+        // Review follow-up: the test above only exercised File.Delete; a real watch-mode RENAME (File.Move) also
+        // leaves the OLD source file gone and a NEW one present in the SAME RegenerateAdrs pass — confirming the
+        // old output-path key is pruned AND the new one appears, not just that delete-then-nothing is handled.
+        File.WriteAllText(Path.Combine(Adrs, "0002-old-name.md"), "# ADR 0002: Old Name\n\n**Status:** Accepted\n\nBody.\n");
+        var gen = GeneratedSite();
+        Assert.Contains(gen.RenderSpaBundle().Pages, p => p.OutputRelativePath == "adrs/0002-old-name.html");
+
+        File.Move(Path.Combine(Adrs, "0002-old-name.md"), Path.Combine(Adrs, "0002-new-name.md"));
+        gen.RegenerateAdrs();
+
+        var bundle = gen.RenderSpaBundle();
+        Assert.DoesNotContain(bundle.Pages, p => p.OutputRelativePath == "adrs/0002-old-name.html");
+        Assert.Contains(bundle.Pages, p => p.OutputRelativePath == "adrs/0002-new-name.html");
+    }
+
+    [Fact]
+    public void RegenerateAdrs_NeverPrunesANonRecordPage_ThatStillRendersEveryPass()
+    {
+        // Review follow-up: the fix's live-path set previously came from _adrs alone, which ONLY ever holds
+        // record entries (IsAdrRecordFile) — a template scaffold file and a nested (non-root) README both render
+        // real pages via the plain WriteOutput branch but are deliberately never records, so they'd be pruned as
+        // "stale" the SAME pass that just (re)wrote them. Pins that a template + nested README both survive
+        // across a second RegenerateAdrs pass (where the pruning actually runs and could evict them).
+        File.WriteAllText(Path.Combine(Adrs, "0000-template.md"), "# ADR Template\n\nFill this in.\n");
+        Directory.CreateDirectory(Path.Combine(Adrs, "notes"));
+        File.WriteAllText(Path.Combine(Adrs, "notes", "README.md"), "# Notes\n\nContext for this subfolder.\n");
+
+        var gen = GeneratedSite();
+        var firstBundle = gen.RenderSpaBundle();
+        Assert.Contains(firstBundle.Pages, p => p.OutputRelativePath == "adrs/0000-template.html");
+        Assert.Contains(firstBundle.Pages, p => p.OutputRelativePath == "adrs/notes/README.html");
+
+        // A second pass is where the prune actually executes against a NON-EMPTY prior capture.
+        gen.RegenerateAdrs();
+
+        var bundle = gen.RenderSpaBundle();
+        Assert.Contains(bundle.Pages, p => p.OutputRelativePath == "adrs/0000-template.html");
+        Assert.Contains(bundle.Pages, p => p.OutputRelativePath == "adrs/notes/README.html");
+    }
+
+    [Fact]
+    public void RegenerateAdrs_PrunesTheLandingPage_WhenTheLastAdrIsRemoved()
+    {
+        // Review follow-up: unconditionally protecting the landing path from pruning was itself a staleness bug —
+        // when the LAST record (and the root README) are both gone, nothing writes adrs/index.html this pass
+        // (the synthesized-landing fallback is gated on _adrs.Count > 0), so a stale capture entry for it must
+        // be pruned too, not kept alive just because it's "the landing page."
+        File.WriteAllText(Path.Combine(Adrs, "0002-only-other.md"), "# ADR 0002: Only Other\n\n**Status:** Accepted\n\nBody.\n");
+        var gen = GeneratedSite();
+        Assert.Contains(gen.RenderSpaBundle().Pages, p => p.OutputRelativePath == "adrs/index.html");
+
+        File.Delete(Path.Combine(Adrs, "0001-a-decision.md"));
+        File.Delete(Path.Combine(Adrs, "0002-only-other.md"));
+        gen.RegenerateAdrs();
+
+        Assert.DoesNotContain(gen.RenderSpaBundle().Pages, p => p.OutputRelativePath == "adrs/index.html");
+    }
+
+    [Fact]
     public void WithoutSpa_EmitsNoSpaFilesAtAll()
     {
         GeneratedSite(spa: false);

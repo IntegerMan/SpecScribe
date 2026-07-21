@@ -2065,6 +2065,53 @@ public class ChartsTests
         Assert.Contains("TypeScript/JavaScript", noMetricsSvg);
     }
 
+    [Fact]
+    public void CodeTreemap_BelowTheDetailCap_EveryFileKeepsItsRichTooltipCard()
+    {
+        // Sanity/byte-identity guard: a normal-scale map (far below Charts.MaxDetailedCodeMapFiles) is a complete
+        // no-op for the at-scale cap — every file rect still carries data-tip-html + js-tip, exactly as before.
+        var map = TreemapWithMetrics();
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
+
+        Assert.Equal(2, CountOf(svg, "data-tip-html="));
+        Assert.Equal(2, CountOf(svg, " js-tip"));
+    }
+
+    /// <summary>Deferred item (at-scale SPA perf pass): a single large-repo <c>code-map.html</c> reached ~82.5 MB
+    /// because every file rect carries a multi-row HTML tooltip card doubly HTML-escaped into a
+    /// <c>data-tip-html</c> attribute. Past <see cref="Charts.MaxDetailedCodeMapFiles"/>, the long tail keeps its
+    /// geometry, color, and a real <c>aria-label</c> (AC #4: color is never the sole signal) but loses the
+    /// expensive card — pinned here at a deliberately small cap override... no: the constant is fixed, so this
+    /// builds a map just past the REAL 4000-file cap. Kept file-count minimal beyond the boundary (cap + 5) to
+    /// keep the test fast while still proving the split is real, not an off-by-a-lot.</summary>
+    [Fact]
+    public void CodeTreemap_AboveTheDetailCap_LongTailFilesLoseTheCard_ButKeepGeometryColorAndAccessibleName()
+    {
+        var cap = Charts.MaxDetailedCodeMapFiles;
+        var fileCount = cap + 5;
+        var files = Enumerable.Range(1, fileCount).Select(i => ($"src/file-{i:00000}.cs", (long)i)).ToArray();
+        var map = CodeMap.Build(files, new Dictionary<string, CodeFileMetrics>());
+
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+
+        // Every file still gets its own rect with tabindex + aria-label (never dropped, never merged) — the SVG
+        // root itself carries one more aria-label (the whole-chart description), hence the +1.
+        Assert.Equal(fileCount, CountOf(svg, "tabindex=\"0\""));
+        Assert.Equal(fileCount + 1, CountOf(svg, "aria-label=\""));
+        // … but only the top `cap` most-significant files (by size, since hasMetrics is false here) still pay for
+        // the rich hover card — the split is real, not just present.
+        Assert.Equal(cap, CountOf(svg, "data-tip-html="));
+        Assert.Equal(cap, CountOf(svg, " js-tip"));
+
+        // The biggest file (the highest line count) is unambiguously in the detailed set — each rect is emitted
+        // on its own line, so isolating that one line proves ITS rect specifically carries the card.
+        var biggestFileLine = svg.Split('\n').Single(l => l.Contains($"data-path=\"src/file-{fileCount:00000}.cs\"", StringComparison.Ordinal));
+        Assert.Contains("data-tip-html=", biggestFileLine);
+        // …and the smallest file (line count 1, first in doc order — never in the top-`cap` by size) lost it.
+        var smallestFileLine = svg.Split('\n').Single(l => l.Contains("data-path=\"src/file-00001.cs\"", StringComparison.Ordinal));
+        Assert.DoesNotContain("data-tip-html=", smallestFileLine);
+    }
+
     // ---- Refactor-target risk quadrant SVG (Story 7.10) -----------------------------------
 
     /// <summary>Six metric-bearing files with a clear high-size/high-churn outlier (BigHot.cs — both the largest
