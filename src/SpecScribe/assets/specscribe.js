@@ -333,6 +333,68 @@
 
     function rows() { return Array.prototype.slice.call(tbody.rows); }
 
+    // ---- Pagination -----------------------------------------------------------------------
+    // Client-side paging over the CURRENT row set (post sort/filter), so a long table (e.g. the
+    // Git Insights file list) doesn't dump every row on one huge page. Filter hiding uses its own
+    // "gi-filtered-out" marker class (rather than gi-row-hidden directly) so the two reasons a row
+    // can be hidden — filtered out vs. off the current page — compose instead of fighting each other.
+    var PAGE_SIZE = 20;
+    var currentPage = 1;
+    var pager = null, pagerStatus = null, pagerPrev = null, pagerNext = null;
+
+    function matchingRows() {
+      return rows().filter(function (row) { return !row.classList.contains("gi-filtered-out"); });
+    }
+
+    function createPager() {
+      pager = document.createElement("div");
+      pager.className = "gi-pager";
+      pagerPrev = document.createElement("button");
+      pagerPrev.type = "button";
+      pagerPrev.className = "gi-pager-prev";
+      pagerPrev.textContent = "Prev";
+      pagerPrev.addEventListener("click", function () { currentPage--; paginate(); });
+      pagerStatus = document.createElement("span");
+      pagerStatus.className = "gi-pager-status";
+      pagerStatus.setAttribute("aria-live", "polite");
+      pagerNext = document.createElement("button");
+      pagerNext.type = "button";
+      pagerNext.className = "gi-pager-next";
+      pagerNext.textContent = "Next";
+      pagerNext.addEventListener("click", function () { currentPage++; paginate(); });
+      pager.appendChild(pagerPrev);
+      pager.appendChild(pagerStatus);
+      pager.appendChild(pagerNext);
+      var host = table.closest(".table-scroll") || table;
+      host.parentNode.insertBefore(pager, host.nextSibling);
+    }
+
+    function paginate() {
+      var matching = matchingRows();
+      if (matching.length <= PAGE_SIZE) {
+        rows().forEach(function (row) { row.classList.toggle("gi-row-hidden", row.classList.contains("gi-filtered-out")); });
+        if (pager) pager.hidden = true;
+        return;
+      }
+
+      var totalPages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      var start = (currentPage - 1) * PAGE_SIZE;
+      var end = start + PAGE_SIZE;
+      matching.forEach(function (row, i) { row.classList.toggle("gi-row-hidden", i < start || i >= end); });
+      rows().forEach(function (row) {
+        if (row.classList.contains("gi-filtered-out")) row.classList.add("gi-row-hidden");
+      });
+
+      if (!pager) createPager();
+      pager.hidden = false;
+      pagerStatus.textContent = "Page " + currentPage + " of " + totalPages;
+      pagerPrev.disabled = currentPage <= 1;
+      pagerNext.disabled = currentPage >= totalPages;
+    }
+
     function cellKey(row, index, numeric) {
       var cell = row.cells[index];
       if (!cell) return numeric ? -Infinity : "";
@@ -360,6 +422,10 @@
         var glyph = h.querySelector(".gi-sort-glyph");
         if (glyph) glyph.textContent = h === th ? (dir === "ascending" ? "▲" : "▼") : "";
       });
+      // A re-sort changes what "page 1" means, so land back on it rather than stranding the
+      // reader on a page whose rows just scattered elsewhere in the new order.
+      currentPage = 1;
+      paginate();
     }
 
     Array.prototype.forEach.call(headers, function (th) {
@@ -407,12 +473,17 @@
         var shown = 0;
         all.forEach(function (row) {
           var match = !q || row.textContent.toLowerCase().indexOf(q) >= 0;
-          row.classList.toggle("gi-row-hidden", !match);
+          row.classList.toggle("gi-filtered-out", !match);
           if (match) shown++;
         });
         count.textContent = q ? shown + " of " + all.length + " rows" : "";
+        // A new filter query changes which rows are in play, so page count restarts at 1.
+        currentPage = 1;
+        paginate();
       });
     }
+
+    paginate();
   }
 
   Array.prototype.forEach.call(document.querySelectorAll("table.js-sortable"), function (table) {
@@ -738,6 +809,54 @@
 
   Array.prototype.forEach.call(document.querySelectorAll(".js-listable"), function (list) {
     try { enhanceListRows(list); } catch (err) { /* degrade silently — the server-ordered list stands */ }
+  });
+
+  // ---- Risk-quadrant elevated-files grid: client-side pagination [Story 7.10] ---------------
+  // Progressive enhancement ONLY. The server ships every elevated-risk file as a plain <li> inside the
+  // ".risk-grid", already in rank order — the complete, correct, no-JS truth. This only chunks that already-
+  // complete list into pages once there's more than one page's worth, revealing a Prev/Next pager (emitted
+  // `hidden` by the server) rather than leaving a static "N of M" control with nothing to do.
+  function initRiskGridPager(grid) {
+    var pager = grid.previousElementSibling;
+    if (!pager || !pager.classList.contains("risk-pager")) return;
+    var items = Array.prototype.slice.call(grid.querySelectorAll(".risk-grid-item"));
+    var pageSize = parseInt(grid.getAttribute("data-page-size"), 10) || 12;
+    if (items.length <= pageSize) return; // everything already fits on one screen — leave the pager hidden
+
+    var prevBtn = pager.querySelector(".risk-pager-prev");
+    var nextBtn = pager.querySelector(".risk-pager-next");
+    var status = pager.querySelector(".risk-pager-status");
+    var totalPages = Math.ceil(items.length / pageSize);
+    var page = 0;
+
+    function render() {
+      items.forEach(function (item, i) {
+        item.hidden = Math.floor(i / pageSize) !== page;
+      });
+      status.textContent = "Page " + (page + 1) + " of " + totalPages;
+      prevBtn.disabled = page === 0;
+      nextBtn.disabled = page === totalPages - 1;
+    }
+
+    prevBtn.addEventListener("click", function () {
+      if (page === 0) return;
+      page--;
+      render();
+      grid.scrollIntoView({ block: "nearest" });
+    });
+    nextBtn.addEventListener("click", function () {
+      if (page === totalPages - 1) return;
+      page++;
+      render();
+      grid.scrollIntoView({ block: "nearest" });
+    });
+
+    pager.hidden = false;
+    render();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".risk-grid"), function (grid) {
+    try { initRiskGridPager(grid); } catch (err) { /* degrade silently — the full server-ordered grid stands */ }
   });
 
   // ---- Source-code treemap: dimension switch + directory zoom [Story 7.6, round 2] ---------

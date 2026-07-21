@@ -133,9 +133,13 @@ public class CommitDayTemplaterTests
 
         Assert.Contains("<section class=\"artifacts-updated\">", html);
         Assert.Contains("<h2>Artifacts updated</h2>", html);
-        // Output-root-relative hrefs get the nested page's ../ prefix; labels are escaped.
-        Assert.Contains("<li><a href=\"../epics.html\">Epics &amp; Stories</a></li>", html);
-        Assert.Contains("<li><a href=\"../planning-artifacts/PRD.html\">PRD</a></li>", html);
+        // Output-root-relative hrefs get the nested page's ../ prefix; labels are escaped. Each entry also carries
+        // a muted, unprefixed href line beneath the label so two same-titled artifacts stay distinguishable
+        // (spec-7-3-deferred-debt-cleanup).
+        Assert.Contains("<li><a href=\"../epics.html\">Epics &amp; Stories</a>"
+            + "<span class=\"artifact-update-path\">epics.html</span></li>", html);
+        Assert.Contains("<li><a href=\"../planning-artifacts/PRD.html\">PRD</a>"
+            + "<span class=\"artifact-update-path\">planning-artifacts/PRD.html</span></li>", html);
         // Both a commit pill and an artifacts pill are present when the day has both.
         Assert.Contains("1 commit</span>", html);
         Assert.Contains("2 artifacts updated</span>", html);

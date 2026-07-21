@@ -63,8 +63,6 @@ public static class CodeMapTemplater
             AppendVariantPanel(sb, variant, fileHref, prefix);
         }
 
-        AppendRiskQuadrantSection(sb, map.Files(), fileHref);
-
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
@@ -279,54 +277,5 @@ public static class CodeMapTemplater
 
         sb.Append("        </tbody>\n      </table>\n");
         sb.Append("    </section>\n\n");
-    }
-
-    /// <summary>Refactor-target risk quadrant (Story 7.10): a size × churn-frequency scatter sourced from the
-    /// unfiltered "full" variant's <see cref="CodeMap.Files()"/> — the same unfiltered set the page's headline
-    /// stats already use, matching how <see cref="Charts.CodeTreemap"/> itself is per-variant but this chart is
-    /// not (the epic AC has no per-filter requirement). Always wrapped in <see cref="Charts.Framed"/> so the
-    /// section's title/why sentence render whether the chart itself is a live scatter or its below-threshold
-    /// empty state — mirroring how <c>DeepAnalyticsTemplater</c> frames <see cref="Charts.CouplingGraph"/> even
-    /// when there is no coupling to show. The section never disappears outright; only its body changes.</summary>
-    private static void AppendRiskQuadrantSection(StringBuilder sb, IReadOnlyList<CodeMapNode> files, Func<string, string?>? fileHref)
-    {
-        var body = new StringBuilder();
-        body.Append(Charts.RiskQuadrant(files, fileHref: fileHref));
-        body.Append(BuildRiskQuadrantList(Charts.RiskQuadrantElevatedFiles(files), fileHref));
-
-        sb.Append(Charts.Framed(
-            new Charts.ChartMeta(
-                Title: "Refactor-Target Risk Quadrant",
-                Why: Charts.WhyText(Charts.ChartMetric.RefactorRisk)),
-            body.ToString()));
-    }
-
-    /// <summary>The mandatory text equivalent of the risk quadrant's shaded corner (this project pairs every
-    /// chart with a text/table equivalent, never an SVG-only signal): a ranked list of the elevated-risk
-    /// quadrant's files, guarded-linked the same way the file table is. An empty quadrant says so plainly rather
-    /// than omitting the list silently, matching AC #1's framing requirement.</summary>
-    private static string BuildRiskQuadrantList(IReadOnlyList<CodeMapNode> elevated, Func<string, string?>? fileHref)
-    {
-        var sb = new StringBuilder();
-        if (elevated.Count == 0)
-        {
-            sb.Append("    <p class=\"risk-quadrant-empty\">No files currently fall in the high-churn, high-size quadrant.</p>\n");
-            return sb.ToString();
-        }
-
-        sb.Append("    <ol class=\"risk-quadrant-list\">\n");
-        foreach (var file in elevated)
-        {
-            var href = fileHref?.Invoke(file.RepoRelativePath);
-            var pathCell = href is { Length: > 0 } target
-                ? $"<a href=\"{PathUtil.Html(target)}\">{PathUtil.Html(file.RepoRelativePath)}</a>"
-                : PathUtil.Html(file.RepoRelativePath);
-            var lines = file.Lines.ToString("N0", CultureInfo.InvariantCulture);
-            var changes = (file.Metrics?.Changes ?? 0).ToString("N0", CultureInfo.InvariantCulture);
-            sb.Append("      <li>").Append(pathCell)
-              .Append($" <span class=\"risk-quadrant-list-meta\">{lines} lines &middot; {changes} changes</span></li>\n");
-        }
-        sb.Append("    </ol>\n");
-        return sb.ToString();
     }
 }

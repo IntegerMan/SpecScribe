@@ -211,6 +211,111 @@ public class SiteGeneratorTimelineTests : IDisposable
         Assert.DoesNotContain("commit-day-nav", html);
     }
 
+    [Fact]
+    public void GenerateOne_RefreshesDatePagesAndTimeline_WithoutFullRegenerate()
+    {
+        // spec-7-3-deferred-debt-cleanup: previously only GenerateAll ran the date-pages/timeline block, so a
+        // watch-mode single-file edit left both surfaces stale until the next full generate. Prove the fix by
+        // clobbering both outputs with a sentinel after the initial full generate, then confirming a plain
+        // GenerateOne on an unrelated doc (not epics.md, not under implementation-artifacts) rewrites them.
+        var notesPath = Path.Combine(Source, "planning-artifacts", "notes.md");
+        File.WriteAllText(notesPath, "# Notes\n\nSome notes.\n");
+        Assert.True(TryCommitArtifact(), "git CLI unavailable on this host — cannot exercise git-derived artifact days; install git rather than silently skipping this test");
+
+        var gen = new SiteGenerator(Options(deepGit: true));
+        AssertNoErrors(gen.GenerateAll());
+        Assert.True(File.Exists(Timeline));
+        var dayPage = Directory.GetFiles(CommitsDayDir, "*.html").First(p => File.ReadAllText(p).Contains("artifacts-updated"));
+
+        File.WriteAllText(dayPage, "STALE-SENTINEL");
+        File.WriteAllText(Timeline, "STALE-SENTINEL");
+
+        var ev = gen.GenerateOne(notesPath);
+
+        Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
+        Assert.DoesNotContain("STALE-SENTINEL", File.ReadAllText(dayPage));
+        Assert.Contains("artifacts-updated", File.ReadAllText(dayPage));
+        Assert.DoesNotContain("STALE-SENTINEL", File.ReadAllText(Timeline));
+    }
+
+    [Fact]
+    public void RegenerateEpics_RefreshesDatePagesAndTimeline_WithoutFullRegenerate()
+    {
+        // spec-7-3-deferred-debt-cleanup: RegenerateEpics (the watch-mode route for epics.md / implementation-
+        // artifacts changes) had the same staleness gap as GenerateOne — same sentinel-clobber proof.
+        Assert.True(TryCommitArtifact(), "git CLI unavailable on this host — cannot exercise git-derived artifact days; install git rather than silently skipping this test");
+
+        var gen = new SiteGenerator(Options(deepGit: true));
+        AssertNoErrors(gen.GenerateAll());
+        Assert.True(File.Exists(Timeline));
+        var dayPage = Directory.GetFiles(CommitsDayDir, "*.html").First(p => File.ReadAllText(p).Contains("artifacts-updated"));
+
+        File.WriteAllText(dayPage, "STALE-SENTINEL");
+        File.WriteAllText(Timeline, "STALE-SENTINEL");
+
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), EpicsMd + "\n");
+        var ev = gen.RegenerateEpics();
+
+        Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
+        Assert.DoesNotContain("STALE-SENTINEL", File.ReadAllText(dayPage));
+        Assert.Contains("artifacts-updated", File.ReadAllText(dayPage));
+        Assert.DoesNotContain("STALE-SENTINEL", File.ReadAllText(Timeline));
+    }
+
+    [Fact]
+    public void GenerateOne_ArtifactLabelReadFailure_FallsBackToStem_ThenRecoversOnceUnlocked()
+    {
+        // spec-7-3-deferred-debt-cleanup: an unreadable artifact must degrade to the filename stem rather than
+        // abort (never throws), and self-heal once the file becomes readable again. A fresh full generate can't
+        // exercise this path — the same read failure that would hit ArtifactLabel also fails the doc's OWN page
+        // render first, so it never reaches _docs and ArtifactLabel is never called for it. GenerateOne, though,
+        // preserves the last-good _docs entry across a failed re-read (existing "file busy, will retry" contract),
+        // so a SECOND GenerateOne call while locked reaches ArtifactLabel's independent read and exercises the
+        // fallback for real.
+        var notesPath = Path.Combine(Source, "planning-artifacts", "notes.md");
+        File.WriteAllText(notesPath, "# Notes\n\nSome notes.\n");
+        Assert.True(TryCommitArtifact(), "git CLI unavailable on this host — cannot exercise git-derived artifact days; install git rather than silently skipping this test");
+
+        var gen = new SiteGenerator(Options(deepGit: true));
+        AssertNoErrors(gen.GenerateAll());
+        var dayPage = Directory.GetFiles(CommitsDayDir, "*.html").First(p => File.ReadAllText(p).Contains("artifacts-updated"));
+        Assert.Contains(">Notes<", File.ReadAllText(dayPage));
+
+        using (new FileStream(notesPath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            gen.GenerateOne(notesPath);
+            var lockedHtml = File.ReadAllText(dayPage);
+            Assert.Contains(">notes<", lockedHtml); // falls back to the filename stem, never throws
+            Assert.DoesNotContain(">Notes<", lockedHtml);
+        }
+
+        gen.GenerateOne(notesPath);
+        Assert.Contains(">Notes<", File.ReadAllText(dayPage)); // recovers once the lock is released
+    }
+
+    [Fact]
+    public void GenerateAll_TwoArtifactsSameTitle_DatePageShowsDistinguishingHrefs()
+    {
+        // spec-7-3-deferred-debt-cleanup: two artifacts sharing a generic title (e.g. two docs both titled
+        // "Overview") must render as visually distinguishable entries — each shows its own (unique) href.
+        Directory.CreateDirectory(Path.Combine(Source, "planning-artifacts", "sub"));
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", "notes.md"), "# Overview\n\nRoot notes.\n");
+        File.WriteAllText(Path.Combine(Source, "planning-artifacts", "sub", "notes.md"), "# Overview\n\nSub notes.\n");
+        Assert.True(TryCommitArtifact(), "git CLI unavailable on this host — cannot exercise git-derived artifact days; install git rather than silently skipping this test");
+
+        var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
+        AssertNoErrors(events);
+
+        var dayPage = Directory.GetFiles(CommitsDayDir, "*.html").First(p => File.ReadAllText(p).Contains("artifacts-updated"));
+        var html = File.ReadAllText(dayPage);
+
+        var pathSpans = Regex.Matches(html, "<span class=\"artifact-update-path\">([^<]+)</span>")
+            .Select(m => m.Groups[1].Value)
+            .ToList();
+        Assert.True(pathSpans.Count >= 2, "expected at least two disambiguating href spans");
+        Assert.Equal(pathSpans.Count, pathSpans.Distinct(StringComparer.Ordinal).Count());
+    }
+
     /// <summary>Initializes a git repo and commits on three distinct, backdated days (author AND committer date
     /// pinned so day-grouping is deterministic regardless of which git date drives it). Returns false (test no-ops)
     /// when the git CLI is unavailable.</summary>

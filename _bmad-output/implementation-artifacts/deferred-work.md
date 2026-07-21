@@ -238,18 +238,18 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of story-7-3 (2026-07-13)
 
-- source_spec: `7-3-activity-timeline-and-date-pages.md`
+- ~~source_spec: `7-3-activity-timeline-and-date-pages.md`
   summary: Watch-mode (`GenerateOne`) never refreshes the timeline/date-page signal — editing an artifact's mtime in watch mode doesn't recompute `BuildArtifactsByDay`/date pages/timeline, only the next full generate does.
-  evidence: Acceptance Auditor. Owner decision (2026-07-13): accept documented staleness for now; revisit alongside other watch-mode work. [SiteGenerator.cs:337-351](../../src/SpecScribe/SiteGenerator.cs)
-- source_spec: `7-3-activity-timeline-and-date-pages.md`
+  evidence: Acceptance Auditor. Owner decision (2026-07-13): accept documented staleness for now; revisit alongside other watch-mode work.~~ **RESOLVED 2026-07-21** (`spec-7-3-deferred-debt-cleanup`): extracted shared `RefreshDatePagesAndTimeline` (mirrors `RefreshFollowUpSurfaces`'s shape); `GenerateOne` and both `RegenerateEpics` branches now call it, reusing already-cached `_progress` (no new git calls). [`SiteGenerator.cs`]
+- ~~source_spec: `7-3-activity-timeline-and-date-pages.md`
   summary: `ArtifactLabel` silently swallows read failures (permission/I-O errors) into a bare filename stem with no `GenerationEvent`/diagnostic, unlike most other per-item failure paths in the same file.
-  evidence: Blind Hunter. Pre-existing degrade-silently pattern extended here, low impact. [SiteGenerator.cs:853-864](../../src/SpecScribe/SiteGenerator.cs)
-- source_spec: `7-3-activity-timeline-and-date-pages.md`
+  evidence: Blind Hunter. Pre-existing degrade-silently pattern extended here, low impact.~~ **RESOLVED 2026-07-21** (`spec-7-3-deferred-debt-cleanup`): `ArtifactLabel` catches `IOException`/`UnauthorizedAccessException` specifically and records one Skipped `GenerationEvent` before falling back to the stem. [`SiteGenerator.cs`]
+- ~~source_spec: `7-3-activity-timeline-and-date-pages.md`
   summary: `ActivityModel.GroupArtifactsByDay` sorts/dedups by `(Label, Href)` text only; two distinct artifacts sharing a generic title (e.g. two docs both titled "Overview") render as adjacent, visually indistinguishable list entries with no path/type disambiguation.
-  evidence: Edge Case Hunter + Blind Hunter (independently flagged). Cosmetic edge case, low likelihood. [ActivityModel.cs:9-36](../../src/SpecScribe/ActivityModel.cs)
+  evidence: Edge Case Hunter + Blind Hunter (independently flagged). Cosmetic edge case, low likelihood.~~ **RESOLVED 2026-07-21** (`spec-7-3-deferred-debt-cleanup`): each date-page artifact-update `<li>` now shows a muted secondary line with its (already-unique) href beneath the label; dedup/grouping rules in `ActivityModel` unchanged. [`CommitDayTemplater.cs`]
 - source_spec: `7-3-activity-timeline-and-date-pages.md`
   summary: The unbounded `GitPulse.CommitsByDay` used for date pages/timeline (unlike the 300-commit-capped `_commitPages`/deep-git correlation from Story 7.5) means date pages beyond that window can never resolve their commit hashes to a detail page — degrades safely to plain `<code>`.
-  evidence: Blind Hunter. Completeness gap inherited from 7.5's cap, extended (not introduced) by this story. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
+  evidence: Blind Hunter. Completeness gap inherited from 7.5's cap, extended (not introduced) by this story. **Accepted 2026-07-21** (`spec-7-3-deferred-debt-cleanup`): widening the 300-commit `_commitPages` cap to match the unbounded base pulse would reopen the exact page-count/perf risk Story 7.5 deliberately closed; the existing plain-`<code>` degrade is the correct behavior, not a bug. No code change; revisit only if the 300-commit cap itself is deliberately raised. [SiteGenerator.cs](../../src/SpecScribe/SiteGenerator.cs)
 
 ## Deferred from: code review of story-7-7 (2026-07-13)
 
@@ -641,9 +641,12 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 
 ## Deferred from: code review of 7-5-per-commit-detail-pages (2026-07-13)
 
-- source_spec: `7-5-per-commit-detail-pages.md`
-- **Git-dependent generation tests hard-fail instead of skipping when git is unavailable on the host.** `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs` (`Assert.True(TryCreateGitHistory(), ...)`) — pre-existing repo-wide test convention mirrored from `SiteGeneratorGitInsightsTests`/`SiteGeneratorTimelineTests`/`SiteGeneratorCodeInsightsTests`, not introduced by this story. A CI runner or dev machine without git on PATH gets outright failures rather than skips.
-- **Determinism test's footer-stripping regex hardcodes a signed UTC offset shape (`UTC[+-]\d{2}:\d{2}`).** `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs:167` — same regex duplicated verbatim in 3 sibling test files; if the actual offset is ever rendered without a sign (e.g. `+00:00` shown as `00:00`) or `PortalDates`' footer format shifts slightly, the "determinism" test degrades into comparing two un-normalized strings. Pre-existing convention, not introduced by this story.
+- ~~source_spec: `7-5-per-commit-detail-pages.md`
+  summary: Git-dependent generation tests hard-fail instead of skipping when git is unavailable on the host. `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs` (`Assert.True(TryCreateGitHistory(), ...)`) — pre-existing repo-wide test convention mirrored from `SiteGeneratorGitInsightsTests`/`SiteGeneratorTimelineTests`/`SiteGeneratorCodeInsightsTests`, not introduced by this story. A CI runner or dev machine without git on PATH gets outright failures rather than skips.
+  evidence: Blind Hunter, code review of 7-5-per-commit-detail-pages.~~ **RESOLVED 2026-07-21** (`spec-7-5-deferred-debt-cleanup`): the git-gated `[Fact]`s in `SiteGeneratorCommitDetailsTests.cs` are now `[SkippableFact]` with `Skip.IfNot(TryCreateGitHistory(), ...)`, reporting Skipped instead of Failed when git is unavailable; scoped to this file only, the sibling files' identical pattern is a separate, still-open instance of the same debt. [`SiteGeneratorCommitDetailsTests.cs`]
+- ~~source_spec: `7-5-per-commit-detail-pages.md`
+  summary: Determinism test's footer-stripping regex hardcodes a signed UTC offset shape (`UTC[+-]\d{2}:\d{2}`). `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs:167` — same regex duplicated verbatim in 3 sibling test files; if the actual offset is ever rendered without a sign (e.g. `+00:00` shown as `00:00`) or `PortalDates`' footer format shifts slightly, the "determinism" test degrades into comparing two un-normalized strings. Pre-existing convention, not introduced by this story.
+  evidence: Blind Hunter, code review of 7-5-per-commit-detail-pages.~~ **RESOLVED 2026-07-21** (`spec-7-5-deferred-debt-cleanup`): the footer-strip regex now matches the zone token generically (`\S+` instead of `UTC[+-]\d{2}:\d{2}`), so the check stays robust to any future `PortalDates.LocalZoneLabel` shape change; the 3 sibling files' duplicated regex are a separate, still-open instance of the same debt. [`SiteGeneratorCommitDetailsTests.cs`]
 
 ## Deferred from: code review of spec-entity-prev-next-navigation (2026-07-13)
 

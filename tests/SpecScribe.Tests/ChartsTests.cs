@@ -2077,7 +2077,7 @@ public class ChartsTests
         var svg = Charts.RiskQuadrant(RiskFiles());
 
         Assert.Contains("<svg class=\"risk-quadrant\"", svg);
-        Assert.Contains("BigHot.cs", svg); // present in a <title> tooltip
+        Assert.Contains("BigHot.cs", svg); // present in the aria-label + rich tooltip card
         Assert.DoesNotContain("NoGit.cs", svg); // no metrics → not plotted at all
         // One <circle> per metric-bearing file (6), none for the metric-less one.
         Assert.Equal(6, System.Text.RegularExpressions.Regex.Matches(svg, "<circle class=\"risk-point").Count);
@@ -2091,12 +2091,27 @@ public class ChartsTests
         // The quadrant background is shaded AND labeled...
         Assert.Contains("<rect class=\"risk-quadrant-elevated\"", svg);
         Assert.Contains("Elevated risk", svg);
-        // ...and the flagged point ALSO carries a distinguishing class — never color/position alone.
-        Assert.Contains("class=\"risk-point risk-point-elevated\"", svg);
+        // ...and the flagged point ALSO carries a distinguishing class (on top of its gradient level class) —
+        // never color/position alone.
+        Assert.Matches(new System.Text.RegularExpressions.Regex("class=\"risk-point level-\\d risk-point-elevated"), svg);
         // BigHot.cs is unambiguously the largest+busiest file, so it must be the flagged one.
         var elevatedIndex = svg.IndexOf("risk-point-elevated", StringComparison.Ordinal);
         var bigHotIndex = svg.IndexOf("BigHot.cs", StringComparison.Ordinal);
-        Assert.True(Math.Abs(elevatedIndex - bigHotIndex) < 200, "the elevated point should be BigHot.cs's circle");
+        Assert.True(Math.Abs(elevatedIndex - bigHotIndex) < 400, "the elevated point should be BigHot.cs's circle");
+    }
+
+    [Fact]
+    public void RiskQuadrant_PointsCarryAGradientLevelClassIndependentOfTheElevatedFlag()
+    {
+        // Not every point shares the same combined-position bucket, so the ramp should show more than one level
+        // across a spread-out set of files (a pure gradient signal, distinct from the binary elevated flag).
+        var svg = Charts.RiskQuadrant(RiskFiles());
+
+        var levels = System.Text.RegularExpressions.Regex.Matches(svg, "risk-point level-(\\d)")
+            .Select(m => m.Groups[1].Value)
+            .Distinct()
+            .ToList();
+        Assert.True(levels.Count > 1, "expected more than one gradient level across a spread-out file set");
     }
 
     [Fact]
@@ -2105,19 +2120,26 @@ public class ChartsTests
         var files = RiskFiles();
 
         var linked = Charts.RiskQuadrant(files, fileHref: p => p == "src/BigHot.cs" ? "code/src/BigHot.cs.html" : null);
-        Assert.Contains("<a class=\"risk-point-link\" href=\"code/src/BigHot.cs.html\">", linked);
+        Assert.Contains("<a class=\"risk-point-link js-tip\" href=\"code/src/BigHot.cs.html\"", linked);
 
         var plain = Charts.RiskQuadrant(files, fileHref: null);
-        Assert.DoesNotContain("<a class=\"risk-point-link\"", plain);
+        Assert.DoesNotContain("<a class=\"risk-point-link", plain);
         Assert.Contains("<circle class=\"risk-point", plain); // tooltip/point still render, never a dead link
+        Assert.Contains("tabindex=\"0\"", plain); // unlinked points stay keyboard-focusable
     }
 
     [Fact]
-    public void RiskQuadrant_TooltipIncludesFullPathLinesAndChanges()
+    public void RiskQuadrant_PointsCarryAnAccessibleLabelAndARichTooltipCard()
     {
+        // The native <title> tooltip was replaced with the SAME rich data-tip-html card the treemap's cells use
+        // (review pass) — an always-present aria-label carries the plain-text accessible name, and data-tip-html
+        // carries the fuller stylized card (served through the shared body-level tooltip, same as the treemap).
         var svg = Charts.RiskQuadrant(RiskFiles());
 
-        Assert.Contains("src/BigHot.cs — 5,000 lines, 50 changes", svg);
+        Assert.Contains("aria-label=\"src/BigHot.cs, 5,000 lines, 50 changes\"", svg);
+        Assert.Contains("data-tip-html=", svg);
+        Assert.Contains("js-tip", svg);
+        Assert.DoesNotContain("<title>", svg); // replaced, not duplicated
     }
 
     [Fact]
@@ -3463,6 +3485,38 @@ public class ChartsTests
         Assert.DoesNotContain("class=\"heatmap-first-commit\"", svg);
         // The window text still opens at the true first commit — old-repo history is never trimmed.
         Assert.Contains(Charts.DReadable(firstCommit), svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_YoungRepoCapsRenderedWidthBelowStylesheetCeiling()
+    {
+        // A short grid (well under the 15-week floor) must not be stretched to the stylesheet's
+        // full 460px cap — that's what turns a handful of weeks into huge, disproportionate tiles.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var firstCommit = today.AddDays(-10);
+        var series = new (DateOnly Day, int Count)[] { (firstCommit, 2) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        var viewBox = System.Text.RegularExpressions.Regex.Match(svg, "viewBox=\"0 0 (\\d+) ");
+        Assert.True(viewBox.Success);
+        var width = int.Parse(viewBox.Groups[1].Value);
+        var expectedCap = Math.Min(460, (int)Math.Round(width * 1.8));
+        Assert.True(expectedCap < 460, $"expected the short grid's cap to be below 460px, got {expectedCap}");
+        Assert.Contains($"style=\"max-width:{expectedCap}px\"", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_OldRepoStillHitsTheFull460pxCap()
+    {
+        // A grid already at/over the natural size the 460px ceiling was designed for renders unchanged.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var firstCommit = today.AddDays(-200);
+        var series = new (DateOnly Day, int Count)[] { (firstCommit, 1), (today.AddDays(-1), 3) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        Assert.Contains("style=\"max-width:460px\"", svg);
     }
 
     [Fact]

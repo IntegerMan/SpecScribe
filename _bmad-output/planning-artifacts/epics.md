@@ -20,6 +20,7 @@ inputDocuments:
   - docs/UserJourneys.md
 ---
 <!-- 2026-07-09 extension run: FR20–FR31, NFR8, UX-DR21–UX-DR30 extracted from the site-wide UX review; Epics 8–10 with Stories 8.2–8.8, 9.1–9.6, 10.1–10.6 created; final validation in progress. -->
+<!-- 2026-07-21 extension run: Epic 22 (Stories 22.1–22.6) and Epic 23 (Stories 23.1–23.5) formalized from the SCP 2026-07-20 "candidate stories" prose into full ### Story sections with Given/When/Then ACs, so SpecScribe's UI story parser resolves them. Both epics remain backlog/unscheduled/spike-first per ADR 0008/0009; no new FRs/NFRs; sprint-status.yaml already had matching backlog slugs. -->
 
 # SpecScribe - Epic Breakdown
 
@@ -3186,6 +3187,152 @@ Elevate the serialized JSON data-layer from an optional output adapter (Story 6.
 
 **Cross-references:** Epic 20 (Interactive Explorer — SpecScribe's first client-JS surface) and Epic 21 (Value & Correlation viz) are natural IR consumers; the IR schema (22.2) should be informed by their data needs, but neither blocks nor is blocked by Epic 22. The presentation-layer follow-on is **Epic 23** (Vue + Nuxt over the IR — [ADR 0009](../../docs/adrs/0009-frontend-framework-for-projection-layer.md)), which sequences after this epic.
 
+<!-- 2026-07-21: formal Story 22.1-22.6 sections added (bmad-create-epics-and-stories continuation run) so the SpecScribe UI's story parser sees this backlog epic's stories; the prose "Candidate stories" bullets above are now superseded by these but left in place for the SCP-provenance narrative. Epic stays backlog/unscheduled — these stories carry no status until Epic 22 is kicked off. -->
+
+### Story 22.1: Spike — Incremental Recompute + IR-Delta Transport
+
+As a maintainer evaluating whether incremental, event-driven generation is viable,
+I want a measurement spike that recomputes only the changed scope and measures IR-delta transport,
+So that Epic 22's implementation stories are scoped by real numbers rather than assumption (mirroring Story 6.6).
+
+**Acceptance Criteria:**
+
+1.
+**Given** this repo's full history and current artifact set
+**When** the spike recomputes a single-file/single-artifact change
+**Then** it measures and reports recompute correctness (including AD-5 topology-change invalidation cases) and wall-clock latency versus a full-regeneration baseline
+**And** results are captured in a spike report artifact, mirroring Story 6.6's report.
+
+2.
+**Given** the spike explores an IR-delta transport
+**When** a simulated change event is processed
+**Then** delta payload size and latency are measured for at least one topology-change scenario (rename/delete) and one content-only change
+**And** the report states whether incremental correctness holds without a full-rebuild fallback.
+
+3.
+**Given** the spike is a measurement exercise
+**When** it completes
+**Then** no production code changes ship from this story
+**And** its findings gate whether Stories 22.2–22.6 proceed as scoped or are re-scoped.
+
+### Story 22.2: Canonical IR Schema + Versioning
+
+As a maintainer building surfaces on top of a stable data contract,
+I want the AD-2 view models and pre-rendered SVG chart fragments serialized into a versioned canonical IR,
+So that static HTML, SPA, and webview can all project from one durable, chunked representation.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the existing AD-2 host-neutral view models
+**When** they are serialized to the canonical IR
+**Then** the IR includes a schema version
+**And** pre-rendered SVG chart fragments are embedded rather than regenerated per-surface.
+
+2.
+**Given** the Story 6.6 at-scale finding that `pages-root.json` reached 112.9 MB and `code-map.html` 82.5 MB at 1,461 pages
+**When** the IR is chunked
+**Then** chunking is byte-bounded (not page-count-bounded) so no single chunk exceeds a defined size ceiling.
+
+3.
+**Given** the existing `SectionViewModelSerializationTests` round-trip pattern
+**When** the IR is round-tripped through serialize/deserialize
+**Then** output is byte-identical, or documented-equivalent, to the source view models
+**And** this becomes the IR's golden boundary test.
+
+### Story 22.3: Static HTML Rendered from the IR
+
+As a maintainer relying on the JS-optional static HTML baseline,
+I want static HTML rendered as a projection of the canonical IR rather than directly from the core pipeline,
+So that NFR6's accessibility baseline is preserved while unifying all surfaces on one source of truth.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a project generated today via the direct `HtmlRenderAdapter` path
+**When** the same project is generated via the IR-projection path
+**Then** output is byte-identical to the existing golden baseline, or the diff is enumerated and justified.
+
+2.
+**Given** the IR-projection path is now available
+**When** a full generation run executes
+**Then** performance stays within Story 22.1's measured acceptable range, with no regression beyond the spike's stated tolerance.
+
+3.
+**Given** NFR6 (JS-optional baseline)
+**When** static HTML is produced from the IR
+**Then** it renders and is fully navigable without JavaScript, identical in this respect to the pre-IR baseline.
+
+### Story 22.4: SPA + Webview as IR Consumers
+
+As a maintainer of the SPA and VS Code webview surfaces,
+I want both surfaces to consume the canonical IR instead of their own duplicate data paths,
+So that Story 6.7's SPA adapter and the webview stay consistent with static HTML by construction.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the Story 6.7 SPA adapter's current whole-site consolidation
+**When** it is migrated to consume the IR
+**Then** output remains byte-identical to its pre-migration golden baseline, per Story 6.7's own parity bar.
+
+2.
+**Given** the VS Code webview's existing view-model contract (Story 6.1)
+**When** it is migrated to consume the IR
+**Then** webview rendering remains read-only and unchanged in observable behavior.
+
+3.
+**Given** duplicate data paths existed before this story
+**When** migration completes
+**Then** the duplicate, non-IR data paths for SPA and webview are retired.
+
+### Story 22.5: Incremental Event-Driven Regeneration Engine
+
+As a maintainer running watch mode on a large or actively-changing repository,
+I want generation to recompute only the changed scope and emit IR deltas,
+So that AD-5's changed-scope principle is fully operationalized rather than partially honored.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a single-file content change during watch mode
+**When** regeneration runs
+**Then** only the affected IR scope is recomputed and re-emitted, consistent with the correctness bar established by Story 22.1's spike.
+
+2.
+**Given** a topology change (rename, delete, or structural move)
+**When** regeneration runs
+**Then** rebuild scope escalates as needed for coherence, per the existing Story 5.3 principle
+**And** no stale or orphaned IR fragments remain.
+
+3.
+**Given** the incremental engine is active
+**When** compared to full regeneration
+**Then** output is equivalent, byte-identical or documented-equivalent, to what a full regeneration would produce for the same source state.
+
+### Story 22.6: (Spike-gated) Client-Server Delta Channel
+
+As a maintainer wanting live-updating consumers of SpecScribe output,
+I want an optional watch server that pushes IR deltas to connected consumers,
+So that a future client/server model becomes possible without committing to it now.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Story 22.1's spike found IR-delta transport viable
+**When** this story is scheduled
+**Then** a watch server pushes deltas conformant with AD-8's transport-is-adapter-specific principle.
+
+2.
+**Given** this capability is optional
+**When** it is not enabled
+**Then** baseline generation and existing watch mode behavior are entirely unaffected.
+
+3.
+**Given** this story is explicitly spike-gated
+**When** Story 22.1 does not establish viability
+**Then** this story remains deferred/unscheduled rather than implemented on assumption.
+
 ## Epic 23: Front-End Framework for the Projection Layer — Vue + Nuxt (SSR) over the IR
 
 Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters; chart-SVG generation stays in C#) with a component-oriented **Vue + Nuxt 3 (universal/SSR)** front end that renders from the Epic 22 canonical IR. Motivation is **presentation-layer maintainability** — scoped, component-local CSS (ending the monolithic-stylesheet fragility class, e.g. the `*/`-comment silent-truncation incident), smaller and more modular files, and a **single renderer** (removing the C#-template↔framework drift hazard). This re-opens ADR 0006's **axis B (rendering language) only** — analysis and the IR production stay in C# (ADR 0006 axis C not reopened; charts stay pre-rendered SVG *in* the IR).
@@ -3202,3 +3349,101 @@ Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters; ch
 - **Story 23.3 — Migrate baseline surfaces (dashboard, epics) to Vue/Nuxt over the IR**, proving parity with the golden output.
 - **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR).
 - **Story 23.5 — Packaging reconciliation** — Node build step in distribution (Epic 16 touchpoint); resolve the self-contained-binary vs. Node-toolchain story.
+
+<!-- 2026-07-21: formal Story 23.1-23.5 sections added (bmad-create-epics-and-stories continuation run), same rationale as the Epic 22 note above. Epic stays backlog/unscheduled/spike-first, sequenced after Epic 22. -->
+
+### Story 23.1: Spike — Nuxt-over-IR Feasibility
+
+As a maintainer evaluating whether Vue + Nuxt 3 can replace the C# presentation layer,
+I want a feasibility spike proving the riskiest technical assumptions before committing to migration,
+So that Epic 23's implementation stories are scoped by evidence, mirroring Story 6.6/22.1's spike discipline.
+
+**Acceptance Criteria:**
+
+1.
+**Given** ADR 0009's universal/SSR direction
+**When** the spike builds a representative Nuxt prerender of one existing surface
+**Then** it proves the NFR6 JS-optional baseline holds — the prerendered route is fully navigable without JavaScript.
+
+2.
+**Given** the spike migrates one representative surface to scoped-CSS Vue components, chart-SVG injection from the IR, and Markdig-derived prose
+**When** the migrated surface is compared to the existing golden output
+**Then** it verifies visual and functional parity for that surface.
+
+3.
+**Given** the VS Code webview's CSP constraints (Stories 6.5, 6.12)
+**When** the spike evaluates hydration
+**Then** it reports whether a hydration nonce survives the webview's CSP
+**And** it reports the cost and impact of adding a Node build step to the generation pipeline against the self-contained-binary distribution model (ADR 0005/0006).
+
+### Story 23.2: Component Library + Design-Token Bridge
+
+As a maintainer preserving the antiquarian design system during the Vue/Nuxt migration,
+I want the shared presentation tokens ported into scoped Vue components,
+So that visual consistency — status/motion tokens, AD-7 — survives the framework change.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the existing `--status-*` and `--motion-*` token families
+**When** they are ported to Vue
+**Then** components consume the same token values, with no duplicated or drifted color/motion definitions.
+
+2.
+**Given** AD-7's presentation-token architecture
+**When** the component library is established
+**Then** CSS module/scoped-SFC conventions are documented for future component authors.
+
+### Story 23.3: Migrate Baseline Surfaces (Dashboard, Epics) to Vue/Nuxt over the IR
+
+As a maintainer validating the migration approach on real surfaces,
+I want the dashboard and epics pages rendered via Vue/Nuxt from the canonical IR,
+So that migration risk is proven on high-traffic surfaces before the remaining pages migrate.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the existing dashboard and epics golden output
+**When** the Vue/Nuxt versions render from the IR
+**Then** output achieves parity — byte-identical or documented-equivalent — with the pre-migration golden baseline.
+
+2.
+**Given** accessibility and reduced-motion conventions (Stories 1.4, 1.5, 3.5)
+**When** the migrated surfaces render
+**Then** those conventions are preserved without regression.
+
+### Story 23.4: Migrate Remaining Surfaces + Retire the C# HtmlRenderAdapter for Content
+
+As a maintainer completing the presentation-layer migration,
+I want all remaining surfaces migrated to Vue/Nuxt and the C# `HtmlRenderAdapter` retired for content rendering,
+So that SpecScribe has a single renderer and no drift hazard between two templating systems.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Stories 23.2–23.3 established the pattern
+**When** all remaining surfaces (requirements, ADRs, code pages, insight pages, and similar) are migrated
+**Then** each achieves parity with its pre-migration golden baseline.
+
+2.
+**Given** migration is complete
+**When** the C# `HtmlRenderAdapter` is retired for content rendering
+**Then** chart SVG generation remains in C#, per ADR 0009's non-goal, and continues to be embedded in the IR.
+
+### Story 23.5: Packaging Reconciliation
+
+As a maintainer responsible for SpecScribe's distribution,
+I want the Node build step required by Nuxt reconciled with the existing self-contained-binary distribution model,
+So that Epic 16's packaging/release story isn't broken by the presentation-layer migration.
+
+**Acceptance Criteria:**
+
+1.
+**Given** ADR 0005/0006's self-contained-binary distribution and Epic 16's release pipeline
+**When** the Node/Nuxt build step is introduced
+**Then** a documented packaging strategy resolves how and when the Node toolchain runs — build-time only vs. runtime dependency.
+
+2.
+**Given** the npx channel (Story 16.8) and VS Code Marketplace packaging (Story 16.5/FR33)
+**When** packaging is reconciled
+**Then** both existing distribution channels continue to function without new runtime dependencies for end users.

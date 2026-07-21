@@ -1170,6 +1170,12 @@ public static class Charts
         const int topGutter = 16;
         var width = leftGutter + weeks * (cell + gap);
         var height = topGutter + 7 * (cell + gap);
+        // The stylesheet's .heatmap rule stretches the SVG to fill up to 460px of panel width — great for an
+        // old repo's many-week grid, but a young repo's short grid (e.g. 5 weeks) gets blown up into huge,
+        // disproportionate tiles when scaled to the same cap. Bound the stretch to a multiple of the grid's own
+        // natural size instead, so short grids stay near their natural ~11-14px cells; a grid already near/over
+        // 460px at 1.8x hits the same 460px ceiling as before. Inline style wins over the stylesheet class.
+        var maxRenderWidth = Math.Min(460, (int)Math.Round(width * 1.8));
 
         // Whole-chart accessible name so the per-cell <title> tooltips (pointer-only) aren't the sole way to
         // read the heatmap: total commits, active days, and the date span. [Story 1.4 AC #1, UXO E6/H3]
@@ -1203,7 +1209,7 @@ public static class Charts
         // role="group" only when the day-page links exist (an img role would hide them from assistive
         // tech); a link-free render keeps role="img" so AT treats it as one named graphic.
         var role = linkedDays.Count > 0 ? "group" : "img";
-        sb.Append($"<svg class=\"heatmap\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" role=\"{role}\" aria-label=\"{Html(heatAria)}\">\n");
+        sb.Append($"<svg class=\"heatmap\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" style=\"max-width:{maxRenderWidth}px\" role=\"{role}\" aria-label=\"{Html(heatAria)}\">\n");
 
         // Axis labels are aria-hidden: under role="group" they'd otherwise be announced as stray text;
         // the whole-chart aria-label plus per-link names carry the accessible reading. Same for month labels.
@@ -2441,10 +2447,15 @@ public static class Charts
     /// cyclomatic-complexity analyzer; a real complexity metric is out of scope and would need its own story (AC
     /// #2). Both axes are median-split into four quadrants; the high-size/high-churn quadrant is flagged as
     /// elevated risk by BOTH a shaded background rect AND a distinguishing point class
-    /// (<c>risk-point-elevated</c>) — never color alone, mirroring Story 7.8's shape+edge a11y discipline. Points
-    /// route to their in-portal code page only when the guarded <paramref name="fileHref"/> resolver
-    /// (<c>CodeItemHref</c>, the Story 7.2 seam) returns a target; otherwise a plain, still-tooltipped point —
-    /// never a dead link. Below <see cref="RiskQuadrantMinFiles"/> metric-bearing files, degrades to the shared
+    /// (<c>risk-point-elevated</c>) — never color alone, mirroring Story 7.8's shape+edge a11y discipline. Every
+    /// point ALSO carries a <c>level-0..4</c> gradient class (the shared gold intensity ramp — Bucket — reused
+    /// from a combined size+churn position) as an additional, non-load-bearing visual signal; the elevated flag
+    /// remains the accessible, never-color-alone one. Points carry the SAME rich <c>data-tip-html</c> card the
+    /// treemap's cells use (<see cref="BuildTreemapCard"/>) via the shared body-level tooltip, plus a plain-text
+    /// <c>aria-label</c>. Points route to their in-portal code page only when the guarded
+    /// <paramref name="fileHref"/> resolver (<c>CodeItemHref</c>, the Story 7.2 seam) returns a target;
+    /// otherwise a plain, still-tooltipped, focusable point — never a dead link. Below
+    /// <see cref="RiskQuadrantMinFiles"/> metric-bearing files, degrades to the shared
     /// <c>chart-empty</c> notice rather than plotting an axis of one or two dots (AC #2, NFR8). Deterministic:
     /// identical input always produces byte-identical output (no wall-clock, no randomness), so golden/parity
     /// fixtures stay stable (FR31). [Story 7.10]</summary>
@@ -2519,22 +2530,39 @@ public static class Charts
             var node = point.Node;
             var cx = PlotX(point.LogSize);
             var cy = PlotY(point.Changes);
-            var pointClass = point.Elevated ? "risk-point risk-point-elevated" : "risk-point";
+
+            // Gradation (owner request, review pass): fill intensity reflects the file's COMBINED size+churn
+            // position (0..1 average of its normalized X/Y), bucketed onto the SAME 5-level gold ramp the
+            // treemap/heatmap already use (Bucket — the one shared "intensity" palette this project has; never a
+            // new hue). This is purely an additional gradient signal — the elevated flag (shading + the
+            // `risk-point-elevated` stroke below) stays the load-bearing, never-color-alone flag per Story 7.8's
+            // shape+edge discipline; the gradient alone never carries the elevated/not-elevated distinction.
+            var normX = (point.LogSize - minX) / (maxX - minX);
+            var normY = (point.Changes - minY) / (maxY - minY);
+            var level = Bucket((normX + normY) / 2.0, 1.0);
+            var pointClass = point.Elevated ? $"risk-point level-{level} risk-point-elevated" : $"risk-point level-{level}";
+
             var lines = node.Lines.ToString("N0", CultureInfo.InvariantCulture);
             var changesStr = point.Changes.ToString("N0", CultureInfo.InvariantCulture);
-            var title = $"{Html(node.RepoRelativePath)} — {lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, " +
-                        $"{changesStr} {Plural(point.Changes, "change", "changes")}";
+            var ariaLabel = $"{node.RepoRelativePath}, {lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, " +
+                            $"{changesStr} {Plural(point.Changes, "change", "changes")}";
+            // Richer tooltip (owner request, review pass): the SAME stylized HTML card the treemap's cells use
+            // (BuildTreemapCard — lines, type, changes, churn, avg change size, files changed together,
+            // first/last change dates whenever each metric exists), served through the shared body-level js-tip
+            // node exactly like the treemap, instead of a plain native <title>.
+            var card = BuildTreemapCard(node);
+            var tipAttrs = $"aria-label=\"{Html(ariaLabel)}\" data-tip-html=\"{Html(card)}\"";
 
             var href = fileHref?.Invoke(node.RepoRelativePath);
             var linked = href is { Length: > 0 };
             if (linked)
             {
-                sb.Append($"  <a class=\"risk-point-link\" href=\"{Html(href!)}\">");
-                sb.Append($"<circle class=\"{pointClass}\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\"><title>{title}</title></circle></a>\n");
+                sb.Append($"  <a class=\"risk-point-link js-tip\" href=\"{Html(href!)}\" {tipAttrs}>");
+                sb.Append($"<circle class=\"{pointClass}\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\"></circle></a>\n");
             }
             else
             {
-                sb.Append($"  <circle class=\"{pointClass}\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\"><title>{title}</title></circle>\n");
+                sb.Append($"  <circle class=\"{pointClass} js-tip\" tabindex=\"0\" role=\"img\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\" {tipAttrs}></circle>\n");
             }
         }
 

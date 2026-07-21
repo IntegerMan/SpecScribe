@@ -21,6 +21,7 @@ public class SiteNavTests
         Assert.Equal("Delivery", groupByLabel["Requirements"]);
         Assert.Equal("Delivery", groupByLabel["Sprint"]);
         Assert.Equal("Insights", groupByLabel["Code Map"]);
+        Assert.Equal("Insights", groupByLabel["Risk Quadrant"]);
         Assert.Equal("Follow-ups", groupByLabel["Action Items"]);
         Assert.Equal("Follow-ups", groupByLabel["Deferred Work"]);
         Assert.Equal("Help", groupByLabel["How to use SpecScribe"]);
@@ -106,27 +107,36 @@ public class SiteNavTests
     }
 
     [Fact]
-    public void Build_AddsCodeMapUnderInsights_CollapsesWhenAlone()
+    public void Build_AddsCodeMapAndRiskQuadrantUnderInsights()
     {
+        // Story 7.10 review: Risk Quadrant rides the SAME gating signal as Code Map (hasCodeMap) as a sibling
+        // Insights surface over the identical source-code walk, so the group now has two children (no longer
+        // collapses to a flat link) whenever hasCodeMap is true.
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasCodeMap: true);
 
-        // Single Insights child collapses to a flat top-level link (empty group label). [Story 10.1]
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Code Map", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
-        Assert.Equal(SiteNav.CodeMapOutputPath, nav.Items.First(i => i.Label == "Code Map").OutputRelativePath);
+        Assert.Equal(
+            new[] { "Home", "Epics", "Requirements", "Code Map", "Risk Quadrant", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            nav.Items.Select(i => i.Label).ToArray());
         Assert.True(nav.HasCodeMap);
-        Assert.DoesNotContain(nav.Groups, g => g.Label == "Insights");
 
-        var quick = Assert.Single(nav.QuickLinks, q => q.Label == "Code Map");
-        Assert.Equal(SiteNav.CodeMapOutputPath, quick.OutputRelativePath);
+        var insights = Assert.Single(nav.Groups, g => g.Label == "Insights");
+        Assert.Equal(new[] { "Code Map", "Risk Quadrant" }, insights.Children.Select(c => c.Label).ToArray());
+        Assert.Equal(SiteNav.CodeMapOutputPath, insights.Children[0].OutputRelativePath);
+        Assert.Equal(SiteNav.RiskQuadrantOutputPath, insights.Children[1].OutputRelativePath);
+
+        Assert.Single(nav.QuickLinks, q => q.Label == "Code Map" && q.OutputRelativePath == SiteNav.CodeMapOutputPath);
+        Assert.Single(nav.QuickLinks, q => q.Label == "Risk Quadrant" && q.OutputRelativePath == SiteNav.RiskQuadrantOutputPath);
     }
 
     [Fact]
-    public void Build_OmitsCodeMapWhenNotAvailable()
+    public void Build_OmitsCodeMapAndRiskQuadrantWhenNotAvailable()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasCodeMap: false);
 
         Assert.DoesNotContain("Code Map", nav.Items.Select(i => i.Label));
+        Assert.DoesNotContain("Risk Quadrant", nav.Items.Select(i => i.Label));
         Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Code Map");
+        Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Risk Quadrant");
         Assert.False(nav.HasCodeMap);
     }
 
@@ -466,7 +476,7 @@ public class SiteNavTests
 
         Assert.NotNull(localContext);
         Assert.Equal("Insights", localContext!.Title);
-        Assert.Equal(new[] { "Git Insights", "Deep Analytics", "Code Map" }, localContext.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Git Insights", "Deep Analytics", "Code Map", "Risk Quadrant" }, localContext.Items.Select(i => i.Label).ToArray());
         Assert.True(localContext.Items.Single(i => i.Label == "Git Insights").IsActive);
         Assert.False(localContext.Items.Single(i => i.Label == "Deep Analytics").IsActive);
     }

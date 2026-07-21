@@ -299,24 +299,8 @@ public sealed class SiteGenerator
 
             // Date pages + activity timeline (Story 7.3). Runs BEFORE the code pages so _commitDays is populated
             // when those render the History tab's date links (mirrors the commit-detail pages' ordering above, for
-            // the same reason). Date pages are generated for the UNION of the git commit days and the days any
-            // recognized artifact was last edited (filesystem mtime), so an artifact-only day (a doc edited with no
-            // commit) still gets a page for the timeline to link to. Both surfaces derive their day set from
-            // ActivityModel.UnionDays, so no link can point at a missing page. The commit-detail resolver lights up
-            // each day's hash as a link into commit/ when a per-commit page exists (Story 7.5, plain otherwise).
-            // Everything degrades non-fatally: no git AND no artifacts → no pages, no timeline, no dashboard link,
-            // no error, the rest of the site still generates (AC #2).
-            _timelinePath = null;
-            var artifactsByDay = BuildArtifactsByDay();
-            var gitPulse = _progress?.Git;
-            if (gitPulse is not null || artifactsByDay.Count > 0)
-            {
-                reporter?.BeginPhase(GenerationPhase.CommitDays);
-                events.AddRange(GenerateDatePagesInternal(gitPulse, artifactsByDay, nav, CommitHref));
-                reporter?.EndPhase(GenerationPhase.CommitDays);
-
-                GenerateTimelineInternal(gitPulse, artifactsByDay, nav, events, reporter);
-            }
+            // the same reason).
+            RefreshDatePagesAndTimeline(nav, events, reporter);
 
             // In-portal code file pages for source files referenced by planning/implementation artifacts (Story 7.1,
             // FR15) plus the git-analytics file sets (see DiscoverCodeReferences). Additive: a page class under code/,
@@ -382,6 +366,11 @@ public sealed class SiteGenerator
             // metrics, so it's written after the pages/git phases — like WriteSprint, gated on the same source-code
             // signal as its nav item. Replaced the retired Story 3.4 structure tree. [Story 7.6]
             WriteCodeMap(nav);
+            // The refactor-target risk quadrant (Story 7.10) — split out to its own Insights nav entry (review
+            // pass) so it isn't buried at the bottom of the (already long) Code Map page. Same data source and
+            // gating signal as WriteCodeMap; written right after it for the same reason (deep-git metrics must
+            // already be populated).
+            WriteRiskQuadrant(nav);
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
             RefreshFollowUpSurfaces(nav, workInventory);
@@ -420,6 +409,7 @@ public sealed class SiteGenerator
             var ev = GenerateOneInternal(sourceFullPath, nav);
             RefreshCoverage();
             var inventory = RefreshFollowUpSurfaces(nav);
+            RefreshDatePagesAndTimeline(nav, new List<GenerationEvent>());
             WriteIndex(nav, inventory);
             // Keep the opt-in SPA form in sync in watch mode: _spaCapture already holds the fresh page (captured by
             // GenerateOneInternal's WriteOutput), so re-emitting rebuilds the manifest/chunks from current state.
@@ -530,6 +520,7 @@ public sealed class SiteGenerator
                 // Still refresh deferred/follow-up HTML — deferred-work.md is under implementation-artifacts/
                 // and routes here, not GenerateOne. [spec-epic9-watch-followup-surface-refresh]
                 var skippedInventory = RefreshFollowUpSurfaces(nav, sourceFiles: files);
+                RefreshDatePagesAndTimeline(nav, new List<GenerationEvent>());
                 WriteIndex(nav, skippedInventory);
                 if (_options.EmitSpa) EmitSpaSite(nav);
                 var skippedMsg = $"{BmadArtifactAdapter.EpicsFileName} not found";
@@ -571,6 +562,7 @@ public sealed class SiteGenerator
             // path's events (GenerateAll already emitted via AppendCountDivergenceNotice). [spec-epic8-deferred-debt-cleanup]
             if (_counts is not null)
                 AppendCountDivergenceNotice(epicsEvents, _counts);
+            RefreshDatePagesAndTimeline(nav, epicsEvents);
             WriteIndex(nav, followUpInventory);
             if (_options.EmitSpa) EmitSpaSite(nav);
 
@@ -1014,7 +1006,8 @@ public sealed class SiteGenerator
     /// three page families (not just <see cref="_referenceMap"/>, which only exists when <c>epics.md</c> renders)
     /// means a docs/ADR-only project still gets the signal (Review finding: was silently epics.md-gated). Never
     /// throws (AD-4); empty without deep-git data or any recognized page. [Story 7.3 / 10.4]</summary>
-    private IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> BuildArtifactsByDay()
+    private IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> BuildArtifactsByDay(
+        List<GenerationEvent>? events = null)
     {
         try
         {
@@ -1079,7 +1072,7 @@ public sealed class SiteGenerator
 
                         if (!labelCache.TryGetValue(art.SourceRel, out var label))
                         {
-                            labelCache[art.SourceRel] = label = ArtifactLabel(art.SourceRel, art.FullPath);
+                            labelCache[art.SourceRel] = label = ArtifactLabel(art.SourceRel, art.FullPath, events);
                         }
                         items.Add((day, label, art.Href));
                     }
@@ -1102,16 +1095,20 @@ public sealed class SiteGenerator
     /// <summary>A human-readable name for an artifact in the "Artifacts updated" list: its Markdown H1 title
     /// (a cheap single-line read, like the existing <see cref="ExtractArtifactTitle"/> uses), falling back to the
     /// file-name stem when the doc has no heading or can't be read — never a raw source path where a title
-    /// exists. [Story 7.3]</summary>
-    private static string ArtifactLabel(string sourceRelative, string fullPath)
+    /// exists. A read failure (permission/I-O) records one <see cref="GenerationOutcome.Skipped"/> event on
+    /// <paramref name="events"/> when non-null, matching most other per-item failure paths in this file instead of
+    /// swallowing it silently. [Story 7.3; spec-7-3-deferred-debt-cleanup]</summary>
+    private static string ArtifactLabel(string sourceRelative, string fullPath, List<GenerationEvent>? events)
     {
         var stem = Path.GetFileNameWithoutExtension(sourceRelative);
         try
         {
             return ExtractArtifactTitle(MarkdownConverter.ReadAllTextShared(fullPath), stem);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            events?.Add(new GenerationEvent(GenerationOutcome.Skipped, sourceRelative, TimeSpan.Zero,
+                $"artifact title read failed, using filename: {ex.Message}"));
             return stem;
         }
     }
@@ -2989,6 +2986,35 @@ public sealed class SiteGenerator
         WriteOutput(SiteNav.CodeMapOutputPath, ApplyReferenceLinks(html, SiteNav.CodeMapOutputPath));
     }
 
+    /// <summary>Writes <c>risk-quadrant.html</c> — the refactor-target risk quadrant (Story 7.10). Builds a plain
+    /// (unfiltered) <see cref="CodeMap"/> over the same cached source-code walk (<see cref="_codeFiles"/>) joined
+    /// to the same deep-git per-file metrics <see cref="WriteCodeMap"/> uses (empty when <c>--deep-git</c> is
+    /// off → the chart's own below-threshold empty state, not a broken page). Gated on the identical source-code
+    /// signal as its nav item (shared with Code Map — <see cref="SiteNav.RiskQuadrantOutputPath"/>'s doc
+    /// comment), so a link is never emitted to a page that wasn't produced. Wrapped never-throw → any failure
+    /// degrades to "surface omitted, generation still succeeds" (AD-4 / NFR2), matching <see cref="WriteCodeMap"/>.</summary>
+    private void WriteRiskQuadrant(SiteNav nav)
+    {
+        if (_codeFiles.Count == 0) return;
+
+        CodeMap map;
+        try
+        {
+            var metrics = _progress?.DeepGit?.CodeMapMetrics
+                ?? (IReadOnlyDictionary<string, CodeFileMetrics>)new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal);
+            map = CodeMap.Build(_codeFiles, metrics);
+        }
+        catch (Exception)
+        {
+            map = CodeMap.Empty;
+        }
+
+        if (map.IsEmpty) return;
+
+        var html = RiskQuadrantTemplater.RenderPage(map, nav, fileHref: CodeItemHref);
+        WriteOutput(SiteNav.RiskQuadrantOutputPath, ApplyReferenceLinks(html, SiteNav.RiskQuadrantOutputPath));
+    }
+
     /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the
     /// sprint page's "Retros" link. [Story 2.3 polish #5]</summary>
     private void WriteRetroIndex(SiteNav nav)
@@ -3019,6 +3045,28 @@ public sealed class SiteGenerator
             open, EpicRetroMap, _module.Commands, nav, deferredHref, counts, _epicsModel, hrefMap,
             allActionItemsForSlugs: _sprint?.ActionItems);
         WriteOutput(SiteNav.ActionItemsOutputPath, html);
+    }
+
+    /// <summary>Rebuilds and rewrites the date pages + activity timeline (Story 7.3) from current
+    /// on-disk/git state. Shared by <see cref="GenerateAll"/>, <see cref="GenerateOne"/>, and
+    /// <see cref="RegenerateEpics"/> — previously only <see cref="GenerateAll"/> ran this block, so a watch-mode
+    /// edit left the timeline/date pages stale until the next full generate. Reuses whatever <see cref="_progress"/>
+    /// already holds (never re-runs git); date pages are generated for the UNION of the git commit days and the
+    /// days any recognized artifact was last touched, so an artifact-only day still gets a page for the timeline to
+    /// link to (<see cref="ActivityModel.UnionDays"/>). Everything degrades non-fatally: no git AND no artifacts →
+    /// no pages, no timeline, no dashboard link, no error (AC #2). [spec-7-3-deferred-debt-cleanup]</summary>
+    private void RefreshDatePagesAndTimeline(SiteNav nav, List<GenerationEvent> events, IGenerationReporter? reporter = null)
+    {
+        _timelinePath = null;
+        var artifactsByDay = BuildArtifactsByDay(events);
+        var gitPulse = _progress?.Git;
+        if (gitPulse is null && artifactsByDay.Count == 0) return;
+
+        reporter?.BeginPhase(GenerationPhase.CommitDays);
+        events.AddRange(GenerateDatePagesInternal(gitPulse, artifactsByDay, nav, CommitHref));
+        reporter?.EndPhase(GenerationPhase.CommitDays);
+
+        GenerateTimelineInternal(gitPulse, artifactsByDay, nav, events, reporter);
     }
 
     /// <summary>Rewrites deferred list + follow-up detail/group pages + quick-dev chrome from current

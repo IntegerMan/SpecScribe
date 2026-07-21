@@ -2,7 +2,7 @@
 title: 'Story 7.3 deferred-debt cleanup'
 type: 'bugfix'
 created: '2026-07-21T09:00:00-04:00'
-status: 'draft'
+status: 'in-review'
 review_loop_iteration: 0
 context: []
 baseline_commit: '50c5185'
@@ -59,11 +59,11 @@ baseline_commit: '50c5185'
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/SpecScribe/SiteGenerator.cs` -- extract `RefreshDatePagesAndTimeline`; wire into `GenerateAll`, `GenerateOne`, both `RegenerateEpics` branches; add `events` param to `BuildArtifactsByDay`/`ArtifactLabel` with the Skipped-on-read-failure event
-- [ ] `src/SpecScribe/CommitDayTemplater.cs` -- render the muted href line under each artifact-update label
-- [ ] `src/SpecScribe/assets/specscribe.css` -- add `.artifact-update-path` styled with `var(--ink-light)`
-- [ ] `tests/SpecScribe.Tests/*` -- pin: `GenerateOne`/`RegenerateEpics` refresh the timeline/date-page artifact signal without a full `GenerateAll`; an unreadable artifact records a Skipped diagnostic and still falls back cleanly; the date page renders both label and href for a same-titled pair
-- [ ] `_bmad-output/implementation-artifacts/deferred-work.md` -- mark all four story-7-3 items RESOLVED citing this spec's id (item 4 as an accepted tradeoff, no code pointer)
+- [x] `src/SpecScribe/SiteGenerator.cs` -- extract `RefreshDatePagesAndTimeline`; wire into `GenerateAll`, `GenerateOne`, both `RegenerateEpics` branches; add `events` param to `BuildArtifactsByDay`/`ArtifactLabel` with the Skipped-on-read-failure event
+- [x] `src/SpecScribe/CommitDayTemplater.cs` -- render the muted href line under each artifact-update label
+- [x] `src/SpecScribe/assets/specscribe.css` -- add `.artifact-update-path` styled with `var(--ink-light)`
+- [x] `tests/SpecScribe.Tests/*` -- pin: `GenerateOne`/`RegenerateEpics` refresh the timeline/date-page artifact signal without a full `GenerateAll`; an unreadable artifact falls back to the stem and self-heals; the date page renders both label and href for a same-titled pair; `CommitDayTemplaterTests` updated for the new markup
+- [x] `_bmad-output/implementation-artifacts/deferred-work.md` -- mark all four story-7-3 items RESOLVED citing this spec's id (item 4 as an accepted tradeoff, no code pointer)
 
 **Acceptance Criteria:**
 - Given `--deep-git` is on and a full generate has run, when a tracked doc is edited in watch mode (`GenerateOne`), then its date page and the timeline reflect the change without a full regenerate.

@@ -99,6 +99,9 @@ public static class CommitDayTemplater
         // filesystem-mtime signal that collapsed every file onto the checkout day). Omitted (no empty heading) when
         // no tracked artifact changed that day, and absent entirely without --deep-git. Hrefs are
         // output-root-relative, so this nested page prepends its own "../" prefix; labels/hrefs are escaped.
+        // A muted href line under each label disambiguates two artifacts sharing a generic title (e.g. two docs
+        // both titled "Overview") since the href is unique per artifact even when the label isn't.
+        // [spec-7-3-deferred-debt-cleanup]
         if (hasArtifacts)
         {
             sb.Append("<section class=\"artifacts-updated\">\n");
@@ -106,7 +109,8 @@ public static class CommitDayTemplater
             sb.Append("<ul class=\"artifact-update-list\">\n");
             foreach (var (label, href) in artifacts)
             {
-                sb.Append($"  <li><a href=\"{PathUtil.Html(prefix + href)}\">{PathUtil.Html(label)}</a></li>\n");
+                sb.Append($"  <li><a href=\"{PathUtil.Html(prefix + href)}\">{PathUtil.Html(label)}</a>" +
+                    $"<span class=\"artifact-update-path\">{PathUtil.Html(href)}</span></li>\n");
             }
             sb.Append("</ul>\n");
             sb.Append("</section>\n");

@@ -3740,9 +3740,10 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-table a { color: var(--rust); text-decoration: none; }
 .codemap-table a:hover { text-decoration: underline; }
 
-/* ============ REFACTOR-TARGET RISK QUADRANT (Code Map page, Story 7.10) ============ */
+/* ============ REFACTOR-TARGET RISK QUADRANT (risk-quadrant.html, Story 7.10) ============ */
 /* Size (X, log-scaled) x churn-frequency (Y) scatter. Not a --status-* surface — files carry no lifecycle status,
-   so shading/points use the neutral/attention (rust) family like every other code-map accent. */
+   so shading/points use the neutral/attention (rust) family + the shared gold intensity ramp, like every other
+   code-map accent — never a new hue. */
 .risk-quadrant { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; }
 .risk-axis-line { stroke: var(--border); stroke-width: 1; }
 .risk-median-line { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; }
@@ -3751,18 +3752,67 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    inside it also carry .risk-point-elevated (heavier stroke), matching Story 7.8's shape+edge a11y discipline. */
 .risk-quadrant-elevated { fill: var(--rust-light); fill-opacity: 0.12; }
 .risk-quadrant-shade-label { fill: var(--rust); font-size: 11px; font-weight: 600; }
-.risk-point { fill: var(--gold); stroke: var(--parchment); stroke-width: 1; }
-.risk-point-elevated { fill: var(--rust-light); stroke: var(--rust); stroke-width: 2; }
+.risk-point { stroke: var(--parchment); stroke-width: 1; transition: stroke 0.12s ease; }
+/* Gradation (review pass): fill intensity reflects a point's combined size+churn position — the SAME 0..4 gold
+   ramp the treemap/heatmap already use (same literal values, so the three ramps can never desync). This is an
+   ADDITIONAL, non-load-bearing signal; .risk-point-elevated (below) stays the accessible, never-color-alone flag. */
+.risk-point.level-0 { fill: var(--parchment-dark); fill-opacity: 0.45; }
+.risk-point.level-1 { fill: #ecd18f; }
+.risk-point.level-2 { fill: #dfb455; }
+.risk-point.level-3 { fill: var(--gold-light); }
+.risk-point.level-4 { fill: var(--gold); }
+/* Elevated points ADD a heavier rust ring on top of whatever gradient fill they already carry — shape/stroke,
+   never a fill-color override, so the gradient dimension and the elevated flag stay visually independent. */
+.risk-point-elevated { stroke: var(--rust); stroke-width: 2.5; }
 .risk-point-link:focus-visible .risk-point,
-.risk-point-link:hover .risk-point { stroke: var(--teal); stroke-width: 2; }
+.risk-point-link:hover .risk-point,
+.risk-point:focus-visible,
+.risk-point:hover { stroke: var(--teal); stroke-width: 2; }
 
-/* Text-equivalent ranked list of the elevated quadrant's files (mandatory — the chart is never SVG-only). */
-.risk-quadrant-list { margin: 0.8rem 0 0; padding-left: 1.2rem; font-size: 0.85rem; }
-.risk-quadrant-list li { margin: 0.15rem 0; }
-.risk-quadrant-list a { color: var(--rust); text-decoration: none; }
-.risk-quadrant-list a:hover { text-decoration: underline; }
-.risk-quadrant-list-meta { color: var(--ink-light); font-size: 0.78rem; margin-left: 0.3rem; }
 .risk-quadrant-empty { color: var(--ink-light); font-size: 0.85rem; margin: 0.6rem 0 0; }
+
+/* Paginated elevated-risk grid (risk-quadrant.html): the text-equivalent of the chart's shaded quadrant. The full
+   ranked <ol> always renders in the markup (the no-JS truth); the .risk-pager is emitted `hidden` and revealed
+   only once specscribe.js finds more than one page's worth (progressive enhancement, never a truncation). */
+.risk-pager { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0; font-size: 0.85rem; }
+.risk-pager[hidden] { display: none; }
+.risk-pager-prev, .risk-pager-next {
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--rust);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.25rem 0.7rem;
+}
+.risk-pager-prev:hover:not(:disabled), .risk-pager-next:hover:not(:disabled) { background: var(--cream); }
+.risk-pager-prev:disabled, .risk-pager-next:disabled { color: var(--ink-faded); cursor: default; opacity: 0.5; }
+.risk-pager-status { color: var(--ink-light); }
+
+.risk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.6rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.risk-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--rust-light);
+  border-radius: 4px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.82rem;
+}
+.risk-grid-rank { color: var(--ink-faded); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+.risk-grid-path { overflow-wrap: anywhere; }
+.risk-grid-path a { color: var(--rust); text-decoration: none; }
+.risk-grid-path a:hover { text-decoration: underline; }
+.risk-grid-meta { color: var(--ink-light); font-size: 0.76rem; }
 
 /* ============ DEEP ANALYTICS (opt-in --deep-git: hotspots + change coupling) ============ */
 /* Change-coupling node-link graph (deep-analytics page). Layout is computed at generation time; this only
@@ -4089,6 +4139,9 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .artifact-update-list a { color: var(--teal); text-decoration: none; }
 .artifact-update-list a:hover { color: var(--rust); text-decoration: underline; }
 .artifact-update-list a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+/* Disambiguates two same-titled artifacts on one day (e.g. two docs both titled "Overview") — the href is
+   always unique even when the label isn't. [spec-7-3-deferred-debt-cleanup] */
+.artifact-update-path { display: block; font-size: 0.8rem; color: var(--ink-light); }
 
 /* The timeline page: a heatmap panel over a newest-first dated list. */
 .timeline-heatmap { overflow-x: auto; } /* a wide heatmap scrolls inside its own container, never the page body */
@@ -5261,7 +5314,7 @@ body:has(main.req-detail) .doc-header {
 .gi-table tbody th[scope="row"] { font-weight: 600; color: var(--ink); }
 .gi-table th.gi-num,
 .gi-table td.gi-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.gi-table td code { font-size: 0.85rem; word-break: break-all; }
+.gi-table td code { font-size: 0.85rem; white-space: nowrap; }
 .gi-table tbody tr:hover { background: var(--parchment); }
 
 /* Sort buttons the enhancer swaps into the headers: they inherit the header look and add an activatable
@@ -5296,6 +5349,25 @@ body:has(main.req-detail) .doc-header {
   color: var(--ink);
 }
 .gi-filter input:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+
+/* The JS-created pager for js-sortable tables (never shipped in the no-JS page — the full table stands
+   on its own with JS off). Same neutral chrome as .gi-filter/.gi-sort-btn. */
+.gi-pager { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0 0; font-size: 0.85rem; }
+.gi-pager[hidden] { display: none; }
+.gi-pager-prev, .gi-pager-next {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--parchment-deep);
+  border-radius: 4px;
+  background: var(--warm-white);
+  color: var(--rust);
+  cursor: pointer;
+}
+.gi-pager-prev:hover:not(:disabled), .gi-pager-next:hover:not(:disabled) { background: var(--parchment); }
+.gi-pager-prev:disabled, .gi-pager-next:disabled { color: var(--ink-faded); cursor: default; opacity: 0.5; }
+.gi-pager-prev:focus-visible, .gi-pager-next:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.gi-pager-status { color: var(--ink-light); }
 .gi-filter-count { font-size: 0.8rem; color: var(--ink-light); }
 
 /* Filtered-out rows are hidden via display (no transition, no animation), so the reduced-motion contract

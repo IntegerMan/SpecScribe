@@ -42,6 +42,13 @@ public sealed class SiteNav
     /// retired Story 3.4 artifact structure tree. [Story 7.6]</summary>
     public const string CodeMapOutputPath = "code-map.html";
 
+    /// <summary>The refactor-target risk quadrant page (files plotted by size × churn frequency). Rides the SAME
+    /// gating signal as <see cref="CodeMapOutputPath"/> (the cached source-code walk being non-empty) — it is a
+    /// sibling insight surface over the identical data, not an independently-gated one, so a link is never
+    /// emitted to a page that wasn't produced. Shared between the generator (writes the file) and the
+    /// templater/nav (link to it) so the two can't disagree. [Story 7.10]</summary>
+    public const string RiskQuadrantOutputPath = "risk-quadrant.html";
+
     /// <summary>The generation diagnostics (run-log) page: the run's non-fatal notices (unsupported/malformed/
     /// skipped artifacts + render-time errors) plus the effective configuration and detection results. Written on
     /// EVERY full run (the zero-notice case renders an all-clear state), so — unlike the git pages — its link can
@@ -225,6 +232,10 @@ public sealed class SiteNav
         {
             insights.Add(("Code Map", CodeMapOutputPath));
             quickLinks.Add(("Code Map", CodeMapOutputPath, "Explore the codebase by size and change activity.", "Insights"));
+            // Risk Quadrant is a sibling surface over the same source-code walk (Story 7.10) — reuses the Code
+            // Map's own gating signal rather than a second flag, so the two can never dangle independently.
+            insights.Add(("Risk Quadrant", RiskQuadrantOutputPath));
+            quickLinks.Add(("Risk Quadrant", RiskQuadrantOutputPath, "Spot high-churn, high-size refactor targets.", "Insights"));
         }
 
         // Follow-ups: open retro action items + deferred-work note (NFR8 — omit when absent). Also added to
