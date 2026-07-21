@@ -1422,6 +1422,20 @@ public sealed class SiteGenerator
     /// output root, so the href is used as-is (no page prefix to apply).</summary>
     private string? CodeItemHref(string repoRelativePath)
     {
+        // BMad artifact source files that already have a MORE MEANINGFUL rendered page than the generic
+        // code/…html syntax view route there FIRST (Story 7.10 review: sprint-status.yaml and other BMad
+        // markdown sources were routing high-churn hits on the risk quadrant to a raw-text code page instead of
+        // the actual sprint board / epic / doc / ADR page that already exists for them). Checked before
+        // CodePageHref so a file that is BOTH a recognized source-code-walk entry (this repo's own _bmad-output
+        // is itself version-controlled, so its yaml/markdown shows up in every git-analytics surface) AND a
+        // rendered artifact never routes to the less useful raw view.
+        if (_sprint is not null && BmadArtifactAdapter.IsSprintStatusFile(repoRelativePath))
+            return SiteNav.SprintOutputPath;
+        if (_epicsModel is not null && BmadArtifactAdapter.IsEpicsFile(repoRelativePath))
+            return SiteNav.EpicsOutputPath;
+        if (ArtifactHrefByRepoRel().TryGetValue(PathUtil.NormalizeSlashes(repoRelativePath), out var artifactHref))
+            return artifactHref;
+
         var page = CodePageHref(repoRelativePath);
         if (page is not null) return page;
         // Existence-gate the external fallback: TopChangedFiles/Hotspots rank over a history window, so a deleted
@@ -1429,6 +1443,52 @@ public sealed class SiteGenerator
         // has no code page but is a real on-disk file, so it keeps its external link.
         var full = Path.GetFullPath(Path.Combine(_options.RepoRoot, repoRelativePath.Replace('/', Path.DirectorySeparatorChar)));
         return File.Exists(full) ? BuildExternalSourceUrl(repoRelativePath) : null;
+    }
+
+    // Lazily built + cached: repo-relative source path → the already-generated portal page it renders as, for
+    // every recognized BMad artifact (epic/story pages via _referenceMap, standalone docs via _docs, ADRs via
+    // _adrs). Mirrors BuildArtifactsByDay's Track helper (same three sources, same root-reconciliation logic) —
+    // deliberately NOT unified into one shared field since that method's dictionary also carries the resolved
+    // full path for its own commit-walk join, a different value shape than this one needs. Built once per
+    // generation run (all three sources are done changing by the time code pages/git-analytics surfaces render),
+    // not per-lookup — cheap, but no reason to redo it per file. [Story 7.10 review]
+    private Dictionary<string, string>? _artifactHrefByRepoRel;
+
+    private IReadOnlyDictionary<string, string> ArtifactHrefByRepoRel()
+    {
+        if (_artifactHrefByRepoRel is { } cached) return cached;
+
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        void Track(string sourceRel, string href, string root)
+        {
+            try
+            {
+                var full = Path.GetFullPath(Path.Combine(root, sourceRel.Replace('/', Path.DirectorySeparatorChar)));
+                var repoRel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.RepoRoot, full));
+                if (repoRel.StartsWith("..", StringComparison.Ordinal)) return; // outside the repo
+                // TryAdd (not an overwriting indexer): the first artifact found for a given repo-relative path
+                // keeps the mapping rather than silently losing it to whichever source iterates last.
+                map.TryAdd(repoRel, PathUtil.NormalizeSlashes(href));
+            }
+            catch
+            {
+                // A single malformed source path contributes no mapping — never aborts generation (AD-4).
+            }
+        }
+
+        foreach (var (sourceRel, href) in _referenceMap) Track(sourceRel, href, _options.SourceRoot);
+        foreach (var doc in _docs.Values) Track(doc.SourceRelativePath, doc.OutputRelativePath, _options.SourceRoot);
+        foreach (var adr in _adrs)
+        {
+            var adrPrefix = ForgeOptions.AdrOutputSubdir + "/";
+            var relativeToAdrRoot = adr.SourceRelativePath.StartsWith(adrPrefix, StringComparison.Ordinal)
+                ? adr.SourceRelativePath[adrPrefix.Length..]
+                : adr.SourceRelativePath;
+            Track(relativeToAdrRoot, adr.OutputRelativePath, _options.AdrSourceRoot);
+        }
+
+        _artifactHrefByRepoRel = map;
+        return map;
     }
 
     // Above this size a referenced source file is treated as too large to render inline and degraded to a

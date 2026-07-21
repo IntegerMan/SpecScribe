@@ -829,4 +829,15 @@ public class StylesheetTests
         Assert.Contains(".followup-detail-back", css);
         Assert.Contains("body:has(main.followup-detail)", css);
     }
+
+    // ---- Story 7.10 review: risk-quadrant grid pagination -----------------
+
+    [Fact]
+    public void Stylesheet_RiskGridItem_HasAnExplicitHiddenOverride()
+    {
+        // Regression guard: .risk-grid-item sets its own `display: flex`, which — without this override — beats
+        // the UA stylesheet's attribute-only `[hidden] { display: none }`, so specscribe.js's pager hid items via
+        // the `hidden` attribute but every page kept showing all of them anyway.
+        Assert.Contains(".risk-grid-item[hidden] { display: none; }", ReadStylesheet());
+    }
 }

@@ -86,6 +86,9 @@ public static class Icons
             // A folder outline — the shared glyph for the code-map surface (nav item + dashboard quick link both
             // reuse this ONE key). Re-keyed from the retired Story 3.4 "Structure" surface. [Story 7.6]
             "Code Map" => Svg("<path d=\"M2.5 4.2H6l1.2 1.4h6.3v6.9a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1Z\"/>"),
+            // A scatter of dots against crossed axes — the shared glyph for the refactor-target risk quadrant
+            // surface (nav item + dashboard quick link both reuse this ONE key). [Story 7.10]
+            "Risk Quadrant" => Svg("<path d=\"M3 2.6v10.8h10.4\"/><circle cx=\"6.2\" cy=\"9.6\" r=\"0.9\"/><circle cx=\"8.4\" cy=\"7.2\" r=\"0.9\"/><circle cx=\"11.2\" cy=\"4.6\" r=\"1.1\"/>"),
             "Planning Artifacts" => Svg("<path d=\"M8 2.6v1.8M8 11.6v1.8M2.6 8h1.8M11.6 8h1.8\"/><circle cx=\"8\" cy=\"8\" r=\"3.4\"/>"),
             "Spec Kernel" => Svg("<path d=\"M4.2 7.2h7.6v6H4.2Z\"/><path d=\"M5.8 7.2V5.4a2.2 2.2 0 0 1 4.4 0v1.8\"/>"),
             "Implementation Artifacts" => Svg("<path d=\"M9.6 2.9a3 3 0 0 1 3.5 3.5l-5.4 5.4-3.9.9.9-3.9Z\"/>"),

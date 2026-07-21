@@ -187,6 +187,10 @@ public class SiteGeneratorAdapterTests : IDisposable
             // Story 7.6: code-map.html replaced the retired Story 3.4 structure.html (source-code treemap; the
             // fixture's repo-root walk finds its markdown files, so the surface generates).
             "code-map.html",
+            // Story 7.10 (review pass): the refactor-target risk quadrant moved off code-map.html onto its own
+            // Insights page — rides the same source-code-walk gating signal, so it generates whenever code-map.html
+            // does.
+            "risk-quadrant.html",
             // Story 7.3 bug fix: timeline.html + commits/ date pages are git-derived now, so this non-git fixture
             // emits none of them (previously the mtime signal produced a today-stamped date page + timeline here).
             "diagnostics.html",
@@ -698,7 +702,15 @@ public class SiteGeneratorAdapterTests : IDisposable
         // --ink-light) in specscribe.css. The Dockerfile/.editorconfig classifier consistency fix and the
         // Classify-call-site trailing-slash fix are pure classification logic with no effect on this fixture's
         // file set. Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
-        const string expected = "d68934f0058d26841e29d24fd8a56ea1c3fcb5c3ffaefd848f7de32218c91ba1";
+        // Regenerated for Story 7.10's review-feedback bug-fix pass: risk-quadrant.html joined the inventory (new
+        // page, gated on the same signal as code-map.html — the fixture's own markdown files, so it generates
+        // here too); CodeItemHref now routes recognized BMad artifact source files (sprint-status.yaml → the
+        // sprint page, epics.md → the epics page, other docs/ADRs → their own pages) ahead of the generic
+        // code/…html view, which changes href targets on code-map.html's treemap cells/table wherever this
+        // fixture's own _bmad-output/docs files rank; specscribe.css also gained the `.risk-grid-item[hidden]`
+        // pager-visibility fix and the "Risk Quadrant" nav icon reinstatement in Icons.cs affects every page's
+        // nav markup. Verified stable across repeated runs before locking in.
+        const string expected = "48fa9b12e870a252cae827e9ce5471a8188cd97c81b734ca93683361f9003b67";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

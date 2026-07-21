@@ -267,6 +267,51 @@ public class SiteGeneratorCodeMapTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_WithDeepGitAndEnoughFiles_RoutesSprintStatusAndEpicsLinksToTheirOwnPagesNotACodePage()
+    {
+        // Story 7.10 review: sprint-status.yaml and epics.md are BOTH walked as ordinary source-code-walk files
+        // (this fixture's own _bmad-output is under the temp repo root) AND already have a dedicated rendered
+        // page (sprint.html / epics.html) — CodeItemHref must prefer that page over the generic code/…html view.
+        Directory.CreateDirectory(Path.Combine(Source, "implementation-artifacts"));
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), """
+            last_updated: 2026-07-16T12:00:00-04:00
+            development_status:
+              epic-1: done
+              1-1-foundation-story: done
+            """);
+
+        for (var i = 0; i < 6; i++)
+        {
+            File.WriteAllText(Path.Combine(_root, "src", "Sample", $"File{i}.cs"),
+                $"namespace Sample;\npublic sealed class File{i} {{ public int Value => {i}; }}\n");
+        }
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise --deep-git generation; install git rather than silently skipping this test");
+        // Touch sprint-status.yaml + epics.md across a few more commits so both accumulate real churn and rank
+        // on the risk quadrant / code-map table alongside the plain source files.
+        for (var touch = 0; touch < 3; touch++)
+        {
+            File.AppendAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), $"# touch {touch}\n");
+            File.AppendAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), $"\n<!-- touch {touch} -->\n");
+            Assert.True(RunGit("add ."));
+            Assert.True(Commit($"Touch sprint + epics {touch}"));
+        }
+
+        var gen = new SiteGenerator(ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var codeMapHtml = File.ReadAllText(CodeMapPage);
+        // The text-equivalent table links each file's row header — sprint-status.yaml and epics.md must route to
+        // their real rendered pages, never a code/…html raw view.
+        Assert.Contains("<a href=\"sprint.html\">", codeMapHtml);
+        Assert.Contains("<a href=\"epics.html\">", codeMapHtml);
+        Assert.DoesNotContain("code/_bmad-output/implementation-artifacts/sprint-status.yaml.html", codeMapHtml);
+        Assert.DoesNotContain("code/_bmad-output/planning-artifacts/epics.md.html", codeMapHtml);
+
+        AssertNoBrokenLocalLinks(CodeMapPage);
+    }
+
+    [Fact]
     public void GenerateAll_WithoutDeepGit_FreshnessSunburstStillRendersAllNeutral()
     {
         // Story 7.12 AC #2: non-git/non-deep-git repos degrade to an all-neutral render rather than omitting

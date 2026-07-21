@@ -3852,6 +3852,10 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   padding: 0.5rem 0.7rem;
   font-size: 0.82rem;
 }
+/* The pager (specscribe.js initRiskGridPager) hides off-page items via the `hidden` attribute — without this
+   override, .risk-grid-item's own `display: flex` (a class selector) beats the UA stylesheet's attribute-only
+   `[hidden] { display: none }`, so a "hidden" item kept rendering anyway and every page showed all N items. */
+.risk-grid-item[hidden] { display: none; }
 .risk-grid-rank { color: var(--ink-faded); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
 .risk-grid-path { overflow-wrap: anywhere; }
 .risk-grid-path a { color: var(--rust); text-decoration: none; }
