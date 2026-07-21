@@ -157,4 +157,57 @@ public class CodeMapTemplaterTests
 
         Assert.Contains("No files match this filter.", html);
     }
+
+    // ---- Refactor-target risk quadrant section (Story 7.10) -------------------------------
+
+    private static IReadOnlyList<CodeMapVariant> VariantsForRiskQuadrant() => CodeMap.BuildVariants(
+        new[]
+        {
+            ("src/BigHot.cs", 5000L), ("src/B.cs", 200L), ("src/C.cs", 180L),
+            ("src/D.cs", 150L), ("src/E.cs", 120L), ("src/F.cs", 100L),
+        },
+        new Dictionary<string, CodeFileMetrics>
+        {
+            ["src/BigHot.cs"] = new CodeFileMetrics(50, 900, null, null),
+            ["src/B.cs"] = new CodeFileMetrics(1, 10, null, null),
+            ["src/C.cs"] = new CodeFileMetrics(2, 20, null, null),
+            ["src/D.cs"] = new CodeFileMetrics(3, 30, null, null),
+            ["src/E.cs"] = new CodeFileMetrics(4, 40, null, null),
+            ["src/F.cs"] = new CodeFileMetrics(5, 50, null, null),
+        });
+
+    [Fact]
+    public void RenderPage_AboveThreshold_RendersTheRiskQuadrantChartAndTheElevatedRiskList()
+    {
+        var html = CodeMapTemplater.RenderPage(VariantsForRiskQuadrant(), Nav());
+
+        Assert.Contains("Refactor-Target Risk Quadrant", html);
+        Assert.Contains("<svg class=\"risk-quadrant\"", html);
+        Assert.Contains("class=\"risk-quadrant-list\"", html);
+        Assert.Contains("src/BigHot.cs", html);
+        // The Story 10.2 chrome (why sentence) renders through Charts.Framed.
+        Assert.Contains("chart-frame-why", html);
+    }
+
+    [Fact]
+    public void RenderPage_BelowThreshold_ShowsTheDesignedEmptyStateNotALiveAxisOfOneOrTwoDots()
+    {
+        var html = CodeMapTemplater.RenderPage(VariantsWithoutMetrics(("src/A.cs", 10L), ("src/B.cs", 20L)), Nav());
+
+        // The section itself still renders (title + why sentence) but its body is the shared chart-empty notice
+        // — rest of the page (treemap panels, table) is unaffected.
+        Assert.Contains("Refactor-Target Risk Quadrant", html);
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<svg class=\"risk-quadrant\"", html);
+        Assert.Contains("codemap-table", html); // rest of the page still renders
+    }
+
+    [Fact]
+    public void RenderPage_RiskListLinksAFileOnlyWhenTheResolverReturnsATarget()
+    {
+        var linked = CodeMapTemplater.RenderPage(VariantsForRiskQuadrant(), Nav(),
+            fileHref: p => p == "src/BigHot.cs" ? "code/src/BigHot.cs.html" : null);
+
+        Assert.Contains("<a href=\"code/src/BigHot.cs.html\">src/BigHot.cs</a>", linked);
+    }
 }

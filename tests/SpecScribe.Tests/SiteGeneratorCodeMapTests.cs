@@ -195,6 +195,46 @@ public class SiteGeneratorCodeMapTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_WithDeepGitAndEnoughFiles_ProducesTheRiskQuadrantSectionWithAPointLinkingToItsCodePage()
+    {
+        // Needs at least Charts.RiskQuadrantMinFiles (6) distinct files with git history, so extend the fixture
+        // beyond its single Widget.cs before creating history.
+        for (var i = 0; i < 6; i++)
+        {
+            File.WriteAllText(Path.Combine(_root, "src", "Sample", $"File{i}.cs"),
+                $"namespace Sample;\npublic sealed class File{i} {{ public int Value => {i}; }}\n");
+        }
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise --deep-git generation; install git rather than silently skipping this test");
+        // A second commit touching one file so at least one file has more than one change (varied churn signal).
+        File.AppendAllText(Path.Combine(_root, "src", "Sample", "File0.cs"), "// touched again\n");
+        Assert.True(RunGit("add ."));
+        Assert.True(Commit("Touch File0 again"));
+
+        var gen = new SiteGenerator(ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(CodeMapPage);
+        Assert.Contains("Refactor-Target Risk Quadrant", html);
+        Assert.Contains("<svg class=\"risk-quadrant\"", html);
+        AssertNoBrokenLocalLinks(CodeMapPage);
+    }
+
+    [Fact]
+    public void GenerateAll_WithoutDeepGitOrTooFewFiles_TheRiskQuadrantSectionDegradesCleanlyWithNoException()
+    {
+        // Non-git temp repo (no --deep-git in this test) → zero metric-bearing files → below-threshold degrade.
+        GenerateSite();
+
+        var html = File.ReadAllText(CodeMapPage);
+        Assert.Contains("Refactor-Target Risk Quadrant", html);
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<svg class=\"risk-quadrant\"", html);
+        // Rest of the page still renders fine.
+        Assert.Contains("codemap-table", html);
+    }
+
+    [Fact]
     public void GenerateAll_WithDeepGit_DefaultDimensionIsUnchangedAndFileTypeIsASelectable7thOption()
     {
         // AC #3 regression guard: when real git metrics ARE available, the baked-in default colorize dimension

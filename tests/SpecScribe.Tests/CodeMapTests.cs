@@ -416,14 +416,28 @@ public class CodeMapTests
     }
 
     [Theory]
-    [InlineData("src/Foo.rs")]      // recognized elsewhere (LanguageClass) but not one of this story's ~6 buckets
     [InlineData("Dockerfile")]      // extensionless, name-based special case elsewhere — still falls to Other here
     [InlineData("src/noext")]
+    [InlineData("data.csv")]        // recognized data shape elsewhere, but not one of this story's bounded buckets
     [InlineData("")]
     [InlineData("   ")]
     public void CodeFileType_Classify_UnrecognizedOrExtensionlessPathsFallToOtherNeverANewCategory(string path)
     {
         Assert.Same(CodeFileType.Other, CodeFileType.Classify(path));
+    }
+
+    [Theory]
+    [InlineData("src/foo.rs", "other-lang")]   // Rust
+    [InlineData("src/foo.go", "other-lang")]   // Go
+    [InlineData("src/Foo.java", "other-lang")] // Java
+    [InlineData("src/foo.rb", "other-lang")]   // Ruby
+    [InlineData("scripts/foo.sh", "other-lang")]
+    [InlineData("scripts/foo.ps1", "other-lang")]
+    [InlineData("src/foo.py", "python")]
+    [InlineData("src/foo.pyi", "python")]
+    public void CodeFileType_Classify_RecognizesOtherPopularLanguagesWithoutInventingAOneOffCategoryEach(string path, string expectedKey)
+    {
+        Assert.Equal(expectedKey, CodeFileType.Classify(path).Key);
     }
 
     [Fact]

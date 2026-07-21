@@ -18,6 +18,8 @@ public static class Charts
         FileChurn,
         /// <summary>Change coupling between files (hidden-dependency framing).</summary>
         ChangeCoupling,
+        /// <summary>Refactor-target risk: files that are both large and frequently changed (Story 7.10).</summary>
+        RefactorRisk,
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
@@ -42,6 +44,8 @@ public static class Charts
             "Files that change most often are where defects tend to cluster.",
         ChartMetric.ChangeCoupling =>
             "Files that change together often may hide a dependency worth a second look.",
+        ChartMetric.RefactorRisk =>
+            "Files that are both large and frequently changed are the costliest place for a defect to hide — refactoring them tends to pay off fastest.",
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
 
@@ -2351,6 +2355,187 @@ public static class Charts
             <= 0.75 => 3,
             _ => 4,
         };
+    }
+
+    // ---- Refactor-target risk quadrant (Story 7.10) ----------------------------------------
+
+    /// <summary>Minimum number of metric-bearing (<c>Metrics is not null</c>) files required before the risk
+    /// quadrant renders as a live chart (AC #2). Below this, a scatter of one or two points on live axes would
+    /// overstate confidence, so the chart degrades to the shared empty-chart notice instead. There is no existing
+    /// NFR8 "too few files to be meaningful" threshold anywhere else in this codebase to reuse (confirmed at
+    /// create-story time) — this is this story's own small, locally-documented constant, not a shared one.</summary>
+    public const int RiskQuadrantMinFiles = 6;
+
+    /// <summary>One plotted file's precomputed geometry — shared by <see cref="RiskQuadrant"/> (the SVG) and
+    /// <see cref="RiskQuadrantElevatedFiles"/> (the text-equivalent ranked list) so both derive from exactly the
+    /// SAME median split and can never disagree about which files are flagged.</summary>
+    private readonly record struct RiskPoint(CodeMapNode Node, double LogSize, int Changes, bool Elevated);
+
+    /// <summary>Computes the plotted points and their elevated-risk flag once: X = <c>Math.Log(Math.Max(Lines,
+    /// 1))</c> (size, log-scaled — file sizes are heavy-tailed; the <c>Max(.., 1)</c> guard avoids
+    /// <c>-Infinity</c>/NaN on a zero-line file), Y = <c>Metrics.Changes</c> (churn FREQUENCY, not
+    /// <see cref="CodeFileMetrics.TotalChurn"/> volume — the AC asks for change-frequency specifically). A file
+    /// is "elevated risk" when it is strictly above BOTH axis medians (the high-size/high-churn quadrant, AC #1).
+    /// Pure function of already-computed <see cref="CodeMapNode"/> data — no new git call, no new parse
+    /// (<c>CodeMap.Files()</c> is the one and only source for both axes). Deterministic: same input, same
+    /// output, ordered by repo-relative path so point emission order never varies between runs.</summary>
+    private static IReadOnlyList<RiskPoint> BuildRiskPoints(IReadOnlyList<CodeMapNode> files)
+    {
+        var plottable = files
+            .Where(f => !f.IsDirectory && f.Metrics is not null)
+            .OrderBy(f => f.RepoRelativePath, StringComparer.Ordinal)
+            .ToList();
+        if (plottable.Count == 0) return Array.Empty<RiskPoint>();
+
+        var logSizes = plottable.Select(f => Math.Log(Math.Max(f.Lines, 1))).ToList();
+        var changes = plottable.Select(f => f.Metrics!.Changes).ToList();
+        var medianLogSize = Median(logSizes);
+        var medianChanges = Median(changes.Select(c => (double)c).ToList());
+
+        var points = new List<RiskPoint>(plottable.Count);
+        for (var i = 0; i < plottable.Count; i++)
+        {
+            var elevated = logSizes[i] > medianLogSize && changes[i] > medianChanges;
+            points.Add(new RiskPoint(plottable[i], logSizes[i], changes[i], elevated));
+        }
+        return points;
+    }
+
+    /// <summary>The sorted-list median (average of the two middle values on an even count) — adequate for this
+    /// story's small in-memory per-file lists; no statistics package needed. Does not mutate the caller's list.</summary>
+    private static double Median(List<double> values)
+    {
+        if (values.Count == 0) return 0;
+        var sorted = values.OrderBy(v => v).ToList();
+        var n = sorted.Count;
+        return n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+    }
+
+    /// <summary>The elevated-risk quadrant's files as a ranked list (busiest first) — the mandatory text
+    /// equivalent of <see cref="RiskQuadrant"/>'s shaded quadrant (this project pairs every chart with a text
+    /// equivalent, never an SVG-only signal). Below <see cref="RiskQuadrantMinFiles"/> metric-bearing files this
+    /// returns empty, matching the chart's own below-threshold degrade — callers should render "no files flagged"
+    /// copy for an empty result the same way they would for a genuinely empty risk quadrant, since a below-
+    /// threshold repo has neither a chart nor a list to show. [Story 7.10 AC #1, AC #2]</summary>
+    public static IReadOnlyList<CodeMapNode> RiskQuadrantElevatedFiles(IReadOnlyList<CodeMapNode> files)
+    {
+        var points = BuildRiskPoints(files);
+        if (points.Count < RiskQuadrantMinFiles) return Array.Empty<CodeMapNode>();
+
+        return points
+            .Where(p => p.Elevated)
+            .OrderByDescending(p => p.Changes)
+            .ThenByDescending(p => p.Node.Lines)
+            .ThenBy(p => p.Node.RepoRelativePath, StringComparer.OrdinalIgnoreCase)
+            .Select(p => p.Node)
+            .ToList();
+    }
+
+    /// <summary>Renders the refactor-target risk quadrant as pure, server-computed SVG (Story 7.10): one point per
+    /// metric-bearing source file, X = size (lines of code, log-scaled) and Y = churn frequency (commits touching
+    /// the file, linear). "Size" is a LINES-OF-CODE PROXY ONLY — this is not, and must never silently become, a
+    /// cyclomatic-complexity analyzer; a real complexity metric is out of scope and would need its own story (AC
+    /// #2). Both axes are median-split into four quadrants; the high-size/high-churn quadrant is flagged as
+    /// elevated risk by BOTH a shaded background rect AND a distinguishing point class
+    /// (<c>risk-point-elevated</c>) — never color alone, mirroring Story 7.8's shape+edge a11y discipline. Points
+    /// route to their in-portal code page only when the guarded <paramref name="fileHref"/> resolver
+    /// (<c>CodeItemHref</c>, the Story 7.2 seam) returns a target; otherwise a plain, still-tooltipped point —
+    /// never a dead link. Below <see cref="RiskQuadrantMinFiles"/> metric-bearing files, degrades to the shared
+    /// <c>chart-empty</c> notice rather than plotting an axis of one or two dots (AC #2, NFR8). Deterministic:
+    /// identical input always produces byte-identical output (no wall-clock, no randomness), so golden/parity
+    /// fixtures stay stable (FR31). [Story 7.10]</summary>
+    public static string RiskQuadrant(
+        IReadOnlyList<CodeMapNode> files,
+        int width = 640,
+        int height = 420,
+        Func<string, string?>? fileHref = null)
+    {
+        var points = BuildRiskPoints(files);
+        if (points.Count < RiskQuadrantMinFiles)
+        {
+            return "<div class=\"chart-empty\">Not enough files with change history yet to plot a refactor-risk " +
+                   $"quadrant (needs at least {RiskQuadrantMinFiles.ToString(CultureInfo.InvariantCulture)}).</div>\n";
+        }
+
+        var minX = points.Min(p => p.LogSize);
+        var maxX = points.Max(p => p.LogSize);
+        double minY = points.Min(p => p.Changes);
+        double maxY = points.Max(p => p.Changes);
+        // A degenerate axis (every file the exact same size or churn) still needs a non-zero span to place points
+        // and the median split without dividing by zero.
+        if (maxX <= minX) { minX -= 0.5; maxX += 0.5; }
+        if (maxY <= minY) { minY -= 0.5; maxY += 0.5; }
+
+        const double marginLeft = 58, marginBottom = 44, marginTop = 14, marginRight = 14;
+        var plotW = width - marginLeft - marginRight;
+        var plotH = height - marginTop - marginBottom;
+
+        double PlotX(double x) => marginLeft + (x - minX) / (maxX - minX) * plotW;
+        double PlotY(double y) => marginTop + plotH - (y - minY) / (maxY - minY) * plotH; // SVG Y grows downward
+
+        var medianLogSize = Median(points.Select(p => p.LogSize).ToList());
+        var medianChanges = Median(points.Select(p => (double)p.Changes).ToList());
+        var quadX = PlotX(medianLogSize);
+        var quadY = PlotY(medianChanges);
+
+        var elevatedCount = points.Count(p => p.Elevated);
+        var aria = $"Refactor-target risk quadrant: {points.Count} {Plural(points.Count, "file", "files")} " +
+                   $"plotted by size and change frequency; {elevatedCount} {Plural(elevatedCount, "file", "files")} flagged as elevated risk.";
+
+        var sb = new StringBuilder();
+        sb.Append($"<svg class=\"risk-quadrant\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
+
+        // Elevated-risk quadrant shading (top-right: high size, high churn) drawn FIRST so points render on top.
+        // Always shaded + labeled even when currently empty — the median split itself doesn't move with the
+        // contents of the quadrant, and an empty shaded region is still an honest "nothing here right now".
+        var elevatedX = quadX;
+        var elevatedY = marginTop;
+        var elevatedW = marginLeft + plotW - quadX;
+        var elevatedH = quadY - marginTop;
+        if (elevatedW > 0 && elevatedH > 0)
+        {
+            sb.Append($"  <rect class=\"risk-quadrant-elevated\" x=\"{F(elevatedX)}\" y=\"{F(elevatedY)}\" width=\"{F(elevatedW)}\" height=\"{F(elevatedH)}\" aria-hidden=\"true\"></rect>\n");
+            sb.Append($"  <text class=\"risk-quadrant-shade-label\" x=\"{F(elevatedX + elevatedW - 6)}\" y=\"{F(elevatedY + 14)}\" text-anchor=\"end\" aria-hidden=\"true\">Elevated risk</text>\n");
+        }
+
+        // Axis lines + median split lines (dashed, distinct class) so the quadrant boundary reads even where the
+        // shading is very light.
+        sb.Append($"  <line class=\"risk-axis-line\" x1=\"{F(marginLeft)}\" y1=\"{F(marginTop)}\" x2=\"{F(marginLeft)}\" y2=\"{F(marginTop + plotH)}\"></line>\n");
+        sb.Append($"  <line class=\"risk-axis-line\" x1=\"{F(marginLeft)}\" y1=\"{F(marginTop + plotH)}\" x2=\"{F(marginLeft + plotW)}\" y2=\"{F(marginTop + plotH)}\"></line>\n");
+        sb.Append($"  <line class=\"risk-median-line\" x1=\"{F(quadX)}\" y1=\"{F(marginTop)}\" x2=\"{F(quadX)}\" y2=\"{F(marginTop + plotH)}\"></line>\n");
+        sb.Append($"  <line class=\"risk-median-line\" x1=\"{F(marginLeft)}\" y1=\"{F(quadY)}\" x2=\"{F(marginLeft + plotW)}\" y2=\"{F(quadY)}\"></line>\n");
+
+        // Axis labels (Story 10.2-adjacent framing; the panel's own Why sentence is added by the caller via
+        // Charts.Framed, not hand-rolled here).
+        sb.Append($"  <text class=\"risk-axis-label\" x=\"{F(marginLeft + plotW / 2)}\" y=\"{F(height - 4)}\" text-anchor=\"middle\">Lines of code (log scale)</text>\n");
+        sb.Append($"  <text class=\"risk-axis-label risk-axis-label-y\" x=\"12\" y=\"{F(marginTop + plotH / 2)}\" text-anchor=\"middle\" transform=\"rotate(-90 12 {F(marginTop + plotH / 2)})\">Changes in the analyzed window</text>\n");
+
+        foreach (var point in points)
+        {
+            var node = point.Node;
+            var cx = PlotX(point.LogSize);
+            var cy = PlotY(point.Changes);
+            var pointClass = point.Elevated ? "risk-point risk-point-elevated" : "risk-point";
+            var lines = node.Lines.ToString("N0", CultureInfo.InvariantCulture);
+            var changesStr = point.Changes.ToString("N0", CultureInfo.InvariantCulture);
+            var title = $"{Html(node.RepoRelativePath)} — {lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, " +
+                        $"{changesStr} {Plural(point.Changes, "change", "changes")}";
+
+            var href = fileHref?.Invoke(node.RepoRelativePath);
+            var linked = href is { Length: > 0 };
+            if (linked)
+            {
+                sb.Append($"  <a class=\"risk-point-link\" href=\"{Html(href!)}\">");
+                sb.Append($"<circle class=\"{pointClass}\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\"><title>{title}</title></circle></a>\n");
+            }
+            else
+            {
+                sb.Append($"  <circle class=\"{pointClass}\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\"><title>{title}</title></circle>\n");
+            }
+        }
+
+        sb.Append("</svg>\n");
+        return sb.ToString();
     }
 
     /// <summary>Proportional bar over the four readings (Satisfied · In flight · Deferred · Unmapped), each

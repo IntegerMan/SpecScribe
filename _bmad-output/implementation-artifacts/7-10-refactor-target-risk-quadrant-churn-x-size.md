@@ -4,7 +4,7 @@ baseline_commit: b87a47eadf8ef499888f62d4bf0b8597ca3ea9a5
 
 # Story 7.10: Refactor-Target Risk Quadrant (Churn × Size)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -231,28 +231,28 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Add the `RiskQuadrant` SVG builder to `Charts.cs` (AC: #1, #2)**
-  - [ ] Signature roughly `public static string RiskQuadrant(IReadOnlyList<CodeMapNode> files, int width = ..., int height = ..., Func<string, string?>? fileHref = null)` (or an equivalent tuple-based input) — consume `.Lines`/`.Metrics.Changes` directly, filter to `Metrics is not null`.
-  - [ ] Below the documented `RiskQuadrantMinFiles` threshold (new constant — pick and document a value; no existing threshold to reuse) → return the `chart-empty` degrade markup.
-  - [ ] Log-scale X (size), linear Y (churn frequency = `Changes`); median-split both axes into four quadrants.
-  - [ ] Shade the high/high quadrant's background rect + give its points a distinguishing class (never color-only).
-  - [ ] Per-point: `<a>`-wrap when `fileHref(path)` resolves, plain otherwise (never a dead link); rich `<title>` = path + lines + changes.
-  - [ ] `role="img"` SVG with a summary `aria-label` (files plotted, files flagged elevated-risk).
-  - [ ] Add the new `ChartMetric` case (e.g. `RefactorRisk`) + its `WhyText` (framework-neutral, NFR8).
-- [ ] **Task 2 — Wire the new section into `CodeMapTemplater.RenderPage` (AC: #1, #2)**
-  - [ ] Add the section after the four filtered variant panels, sourced from the unfiltered `"full"` variant's `Files()`.
-  - [ ] Wrap in `Charts.Framed` with the new `ChartMeta`.
-  - [ ] Add the text-equivalent ranked list of elevated-risk-quadrant files (path, size, churn; guarded link); empty risk quadrant → say so plainly, don't omit silently.
-  - [ ] Below-threshold / no metrics → omit the section or render its designed empty state (pick one, be consistent, document the choice).
-- [ ] **Task 3 — Styling (AC: #1)**
-  - [ ] Add point/quadrant-shading/legend classes to `specscribe.css` (existing neutral/attention/heat-ramp token families only). Verify the elevated-risk distinction reads without relying on color. Update `StylesheetTests` if it asserts class presence.
-- [ ] **Task 4 — Tests (AC: #1, #2)**
-  - [ ] `ChartsTests.cs`: point placement, quadrant flagging + distinguishing class, guarded link, rich tooltip, below-threshold/zero-metrics degrade, escaping, determinism.
-  - [ ] `CodeMapTemplaterTests.cs`: populated section render, below-threshold omission/empty-state, risk-list contents.
-  - [ ] `SiteGeneratorCodeMapTests.cs`: opt-in-with-enough-data, opt-out/thin-repo degrade, determinism.
-  - [ ] Regenerate the golden content fingerprint; confirm the diff is scoped to `code-map.html`/CSS.
-- [ ] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green. Baseline generate (no `--deep-git`) → section omitted/empty-stated. Deep generate (`--deep-git`) → real scatter of this repo's files, elevated-risk quadrant shaded + shape/label-distinguished, guarded links, tooltips, text-equivalent list, Story 10.2 chrome, no JS, escaped content.
+- [x] **Task 1 — Add the `RiskQuadrant` SVG builder to `Charts.cs` (AC: #1, #2)**
+  - [x] Signature roughly `public static string RiskQuadrant(IReadOnlyList<CodeMapNode> files, int width = ..., int height = ..., Func<string, string?>? fileHref = null)` (or an equivalent tuple-based input) — consume `.Lines`/`.Metrics.Changes` directly, filter to `Metrics is not null`.
+  - [x] Below the documented `RiskQuadrantMinFiles` threshold (new constant — pick and document a value; no existing threshold to reuse) → return the `chart-empty` degrade markup.
+  - [x] Log-scale X (size), linear Y (churn frequency = `Changes`); median-split both axes into four quadrants.
+  - [x] Shade the high/high quadrant's background rect + give its points a distinguishing class (never color-only).
+  - [x] Per-point: `<a>`-wrap when `fileHref(path)` resolves, plain otherwise (never a dead link); rich `<title>` = path + lines + changes.
+  - [x] `role="img"` SVG with a summary `aria-label` (files plotted, files flagged elevated-risk).
+  - [x] Add the new `ChartMetric` case (e.g. `RefactorRisk`) + its `WhyText` (framework-neutral, NFR8).
+- [x] **Task 2 — Wire the new section into `CodeMapTemplater.RenderPage` (AC: #1, #2)**
+  - [x] Add the section after the four filtered variant panels, sourced from the unfiltered `"full"` variant's `Files()`.
+  - [x] Wrap in `Charts.Framed` with the new `ChartMeta`.
+  - [x] Add the text-equivalent ranked list of elevated-risk-quadrant files (path, size, churn; guarded link); empty risk quadrant → say so plainly, don't omit silently.
+  - [x] Below-threshold / no metrics → omit the section or render its designed empty state (pick one, be consistent, document the choice). **Decision: always render the section (title + Why sentence via `Charts.Framed`), swapping only the body between the live scatter and the `chart-empty` note — mirrors `DeepAnalyticsTemplater`'s framed `CouplingGraph` precedent.**
+- [x] **Task 3 — Styling (AC: #1)**
+  - [x] Add point/quadrant-shading/legend classes to `specscribe.css` (existing neutral/attention/heat-ramp token families only). Verify the elevated-risk distinction reads without relying on color. Update `StylesheetTests` if it asserts class presence. (No existing `StylesheetTests` assertions touched these new classes; none needed updating.)
+- [x] **Task 4 — Tests (AC: #1, #2)**
+  - [x] `ChartsTests.cs`: point placement, quadrant flagging + distinguishing class, guarded link, rich tooltip, below-threshold/zero-metrics degrade, escaping, determinism.
+  - [x] `CodeMapTemplaterTests.cs`: populated section render, below-threshold omission/empty-state, risk-list contents.
+  - [x] `SiteGeneratorCodeMapTests.cs`: opt-in-with-enough-data, opt-out/thin-repo degrade, determinism.
+  - [x] Regenerate the golden content fingerprint; confirm the diff is scoped to `code-map.html`/CSS.
+- [x] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green. Baseline generate (no `--deep-git`) → section omitted/empty-stated. Deep generate (`--deep-git`) → real scatter of this repo's files, elevated-risk quadrant shaded + shape/label-distinguished, guarded links, tooltips, text-equivalent list, Story 10.2 chrome, no JS, escaped content.
 
 ## Dev Notes
 
@@ -288,10 +288,34 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+None — no failing builds/tests required debugging beyond one expected `int`/`double` cast compile error (fixed inline) and one test-fixture rebalance (an anti-correlated churn/size fixture was needed so exactly one file, not two, sat above both axis medians).
 
 ### Completion Notes List
 
+- Added `Charts.RiskQuadrant` (the SVG scatter builder) and `Charts.RiskQuadrantElevatedFiles` (the shared median-split computation reused by the text-equivalent list) plus `Charts.RiskQuadrantMinFiles = 6` (this story's own documented "too few files" threshold — no existing one to reuse). Both derive from one private `BuildRiskPoints`/`Median` pair so the SVG and the ranked list can never disagree about which files are flagged.
+- X = `Math.Log(Math.Max(Lines, 1))` (log-scaled size, zero/near-zero guarded), Y = `Metrics.Changes` (churn frequency, deliberately not `TotalChurn`). Median-split both axes; the high/high quadrant is shaded (`.risk-quadrant-elevated`, a light `--rust-light` wash) AND its points carry a second class (`.risk-point-elevated`, heavier stroke) — never a color-only flag, per Story 7.8's shape+edge precedent.
+- Points are guarded-linked via the existing `CodeItemHref`/`fileHref` resolver (never a dead link); every point carries a rich `<title>` tooltip (path + lines + changes); the whole SVG carries `role="img"` with a summary `aria-label`.
+- Wired a new "Refactor-Target Risk Quadrant" section into `CodeMapTemplater.RenderPage`, sourced from the unfiltered `"full"` variant's `Files()` (no per-filter-variant duplication, matching the epic AC). Always wrapped in `Charts.Framed` with a new `ChartMetric.RefactorRisk` case + `WhyText` — the section's title/why sentence render even at the below-threshold empty state, mirroring `DeepAnalyticsTemplater`'s framed `CouplingGraph`.
+- Added CSS for the points, quadrant shading, axis/median lines, and the text-equivalent list — reusing the `--rust`/`--rust-light`/`--gold`/`--teal` token families already used elsewhere on the Code Map page; no new hues, no `--status-*` tokens (files carry no lifecycle status).
+- No new git call, no complexity analyzer — consumed `CodeMap.Files()`/`CodeFileMetrics` exactly as they already existed.
+- Golden content fingerprint regenerated (verified stable across 2 repeated runs before locking in): the non-git fixture has too few files, so only `specscribe.css` + the section's `chart-empty` body shifted the hash — no live scatter renders in that fixture.
+- Manual verification: baseline generate (no `--deep-git`) shows the section with the `chart-empty` degrade note; `--deep-git` generate against this repo itself produces a live 976-point scatter, 250 files flagged elevated-risk (shaded quadrant + `.risk-point-elevated` class), guarded links to real code pages, rich tooltips, and a 250-item ranked text-equivalent list — confirmed live in-browser via DOM inspection (the code-map page's full DOM is too large for a full-page screenshot capture to complete, so verification used `read_page`/`javascript_tool` queries instead of a screenshot).
+- Full suite: 1893 tests green (1889 in this story's own scope + 4 from an unrelated concurrent session's `CodeReferenceLinkifierTests.cs` additions already present in this shared, non-worktree `main` — confirmed via `git diff --stat` that none of those files were touched by this story's changes).
+
 ### File List
 
+- `src/SpecScribe/Charts.cs` — new `ChartMetric.RefactorRisk` case + `WhyText`; new `RiskQuadrantMinFiles` constant; new `RiskPoint`/`BuildRiskPoints`/`Median`/`RiskQuadrant`/`RiskQuadrantElevatedFiles`.
+- `src/SpecScribe/CodeMapTemplater.cs` — new `AppendRiskQuadrantSection`/`BuildRiskQuadrantList` private methods; wired into `RenderPage`.
+- `src/SpecScribe/assets/specscribe.css` — new `.risk-quadrant`/`.risk-point`/`.risk-quadrant-elevated`/`.risk-quadrant-list` (and related) rules.
+- `tests/SpecScribe.Tests/ChartsTests.cs` — `RiskQuadrant`/`RiskQuadrantElevatedFiles` test coverage.
+- `tests/SpecScribe.Tests/CodeMapTemplaterTests.cs` — section-render/below-threshold/guarded-link coverage.
+- `tests/SpecScribe.Tests/SiteGeneratorCodeMapTests.cs` — generation-level opt-in/degrade coverage.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — regenerated golden content fingerprint constant + documenting comment.
+
 ## Change Log
+
+- 2026-07-20: Story 7.10 implemented — refactor-target risk quadrant (size × churn-frequency scatter) added to the Code Map page. 1893 tests green; golden fingerprint regenerated; manually verified against this repo's own `--deep-git` history.

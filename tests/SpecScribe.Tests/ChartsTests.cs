@@ -2041,6 +2041,170 @@ public class ChartsTests
         Assert.Contains("TypeScript/JavaScript", noMetricsSvg);
     }
 
+    // ---- Refactor-target risk quadrant SVG (Story 7.10) -----------------------------------
+
+    /// <summary>Six metric-bearing files with a clear high-size/high-churn outlier (BigHot.cs — both the largest
+    /// and the most-changed file) so it's unambiguously above both medians, plus one file with no git record
+    /// (excluded from the plot entirely). Six is exactly <see cref="Charts.RiskQuadrantMinFiles"/> — the minimum
+    /// for the chart to render live.</summary>
+    private static IReadOnlyList<CodeMapNode> RiskFiles() => CodeMap.Build(
+        new[]
+        {
+            ("src/BigHot.cs", 5000L),
+            ("src/B.cs", 200L),
+            ("src/C.cs", 180L),
+            ("src/D.cs", 150L),
+            ("src/E.cs", 120L),
+            ("src/F.cs", 100L),
+            ("src/NoGit.cs", 90L),
+        },
+        new Dictionary<string, CodeFileMetrics>
+        {
+            ["src/BigHot.cs"] = new CodeFileMetrics(50, 900, null, null),
+            // The other five files are deliberately anti-correlated (largest of the five has the FEWEST changes,
+            // smallest has the most) so no file besides BigHot.cs sits above both axis medians at once.
+            ["src/B.cs"] = new CodeFileMetrics(1, 10, null, null),
+            ["src/C.cs"] = new CodeFileMetrics(2, 20, null, null),
+            ["src/D.cs"] = new CodeFileMetrics(3, 30, null, null),
+            ["src/E.cs"] = new CodeFileMetrics(4, 40, null, null),
+            ["src/F.cs"] = new CodeFileMetrics(5, 50, null, null),
+            // src/NoGit.cs deliberately has no metrics entry — excluded from the plot.
+        }).Files();
+
+    [Fact]
+    public void RiskQuadrant_PlotsEveryMetricBearingFileAndExcludesFilesWithNoGitRecord()
+    {
+        var svg = Charts.RiskQuadrant(RiskFiles());
+
+        Assert.Contains("<svg class=\"risk-quadrant\"", svg);
+        Assert.Contains("BigHot.cs", svg); // present in a <title> tooltip
+        Assert.DoesNotContain("NoGit.cs", svg); // no metrics → not plotted at all
+        // One <circle> per metric-bearing file (6), none for the metric-less one.
+        Assert.Equal(6, System.Text.RegularExpressions.Regex.Matches(svg, "<circle class=\"risk-point").Count);
+    }
+
+    [Fact]
+    public void RiskQuadrant_FlagsTheHighSizeHighChurnOutlierAsElevatedWithAShadedQuadrantAndADistinguishingClass()
+    {
+        var svg = Charts.RiskQuadrant(RiskFiles());
+
+        // The quadrant background is shaded AND labeled...
+        Assert.Contains("<rect class=\"risk-quadrant-elevated\"", svg);
+        Assert.Contains("Elevated risk", svg);
+        // ...and the flagged point ALSO carries a distinguishing class — never color/position alone.
+        Assert.Contains("class=\"risk-point risk-point-elevated\"", svg);
+        // BigHot.cs is unambiguously the largest+busiest file, so it must be the flagged one.
+        var elevatedIndex = svg.IndexOf("risk-point-elevated", StringComparison.Ordinal);
+        var bigHotIndex = svg.IndexOf("BigHot.cs", StringComparison.Ordinal);
+        Assert.True(Math.Abs(elevatedIndex - bigHotIndex) < 200, "the elevated point should be BigHot.cs's circle");
+    }
+
+    [Fact]
+    public void RiskQuadrant_LinksAPointOnlyWhenTheResolverReturnsATarget()
+    {
+        var files = RiskFiles();
+
+        var linked = Charts.RiskQuadrant(files, fileHref: p => p == "src/BigHot.cs" ? "code/src/BigHot.cs.html" : null);
+        Assert.Contains("<a class=\"risk-point-link\" href=\"code/src/BigHot.cs.html\">", linked);
+
+        var plain = Charts.RiskQuadrant(files, fileHref: null);
+        Assert.DoesNotContain("<a class=\"risk-point-link\"", plain);
+        Assert.Contains("<circle class=\"risk-point", plain); // tooltip/point still render, never a dead link
+    }
+
+    [Fact]
+    public void RiskQuadrant_TooltipIncludesFullPathLinesAndChanges()
+    {
+        var svg = Charts.RiskQuadrant(RiskFiles());
+
+        Assert.Contains("src/BigHot.cs — 5,000 lines, 50 changes", svg);
+    }
+
+    [Fact]
+    public void RiskQuadrant_BelowMinimumFiles_DegradesToChartEmptyRatherThanAnAxisOfOneOrTwoDots()
+    {
+        var tooFew = CodeMap.Build(
+            new[] { ("src/A.cs", 100L), ("src/B.cs", 50L) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/A.cs"] = new CodeFileMetrics(5, 50, null, null),
+                ["src/B.cs"] = new CodeFileMetrics(2, 20, null, null),
+            }).Files();
+
+        var html = Charts.RiskQuadrant(tooFew);
+
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<svg", html);
+    }
+
+    [Fact]
+    public void RiskQuadrant_ZeroMetricBearingFiles_DegradesToChartEmpty()
+    {
+        var noGit = CodeMap.Build(
+            new[] { ("src/A.cs", 100L), ("src/B.cs", 50L) },
+            new Dictionary<string, CodeFileMetrics>()).Files();
+
+        var html = Charts.RiskQuadrant(noGit);
+
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<svg", html);
+    }
+
+    [Fact]
+    public void RiskQuadrant_EscapesPathsInTooltips()
+    {
+        var files = CodeMap.Build(
+            new[]
+            {
+                ("src/a&b<c>.cs", 100L), ("src/B.cs", 90L), ("src/C.cs", 80L),
+                ("src/D.cs", 70L), ("src/E.cs", 60L), ("src/F.cs", 50L),
+            },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/a&b<c>.cs"] = new CodeFileMetrics(5, 50, null, null),
+                ["src/B.cs"] = new CodeFileMetrics(4, 40, null, null),
+                ["src/C.cs"] = new CodeFileMetrics(3, 30, null, null),
+                ["src/D.cs"] = new CodeFileMetrics(2, 20, null, null),
+                ["src/E.cs"] = new CodeFileMetrics(1, 10, null, null),
+                ["src/F.cs"] = new CodeFileMetrics(1, 10, null, null),
+            }).Files();
+
+        var svg = Charts.RiskQuadrant(files);
+
+        Assert.Contains("a&amp;b&lt;c&gt;.cs", svg);
+        Assert.DoesNotContain("<c>", svg);
+    }
+
+    [Fact]
+    public void RiskQuadrant_DeterministicAcrossRepeatedCalls()
+    {
+        var files = RiskFiles();
+        Assert.Equal(Charts.RiskQuadrant(files), Charts.RiskQuadrant(files));
+    }
+
+    [Fact]
+    public void RiskQuadrantElevatedFiles_ReturnsTheHighSizeHighChurnFilesRankedByChurnDescending()
+    {
+        var elevated = Charts.RiskQuadrantElevatedFiles(RiskFiles());
+
+        Assert.Single(elevated);
+        Assert.Equal("src/BigHot.cs", elevated[0].RepoRelativePath);
+    }
+
+    [Fact]
+    public void RiskQuadrantElevatedFiles_BelowMinimumFiles_ReturnsEmpty()
+    {
+        var tooFew = CodeMap.Build(
+            new[] { ("src/A.cs", 100L), ("src/B.cs", 50L) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/A.cs"] = new CodeFileMetrics(5, 50, null, null),
+                ["src/B.cs"] = new CodeFileMetrics(2, 20, null, null),
+            }).Files();
+
+        Assert.Empty(Charts.RiskQuadrantElevatedFiles(tooFew));
+    }
+
     // ==================== Story 3.7: requirement status-block grid + requirements flow ====================
 
     private static RequirementInfo Req(

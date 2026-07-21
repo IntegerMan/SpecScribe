@@ -42,17 +42,24 @@ public sealed record CodeFileCategory(string Key, string Label);
 public static class CodeFileType
 {
     public static readonly CodeFileCategory CSharp = new("csharp", "C#");
+    public static readonly CodeFileCategory Python = new("python", "Python");
     public static readonly CodeFileCategory Script = new("script", "TypeScript/JavaScript");
     public static readonly CodeFileCategory Styles = new("styles", "Styles");
     public static readonly CodeFileCategory Markup = new("markup", "Markup & Docs");
     public static readonly CodeFileCategory Config = new("config", "Config & Data");
+    // Every OTHER recognized general-purpose/scripting language this repo (or a typical polyglot repo) is likely
+    // to contain, grouped rather than given one bucket each — the bounded-palette discipline (AC #2) means real
+    // language variety competes for a fixed small hue budget, so anything past the languages with genuinely
+    // heavy representation here (C#, Python, TS/JS) shares one "still code, just not one of the above" bucket
+    // instead of either vanishing into the unrecognized "Other" catch-all or blowing the category count open.
+    public static readonly CodeFileCategory OtherLanguages = new("other-lang", "Other Languages");
     public static readonly CodeFileCategory Other = new("other", "Other");
 
     /// <summary>The fixed, ordered category set — this order drives the discrete legend's swatch ordering
     /// (real categories before the "Other" catch-all) so the legend reads the same way across every generation
     /// run regardless of which files happen to be present.</summary>
     public static readonly IReadOnlyList<CodeFileCategory> AllCategories =
-        new[] { CSharp, Script, Styles, Markup, Config, Other };
+        new[] { CSharp, Python, Script, Styles, Markup, Config, OtherLanguages, Other };
 
     /// <summary>Classifies a repo-relative source path into its bounded file-type category by extension.
     /// Normalizes via <see cref="PathUtil.NormalizeSlashes"/>; case-insensitive extension matching; an
@@ -69,11 +76,15 @@ public static class CodeFileType
         return name[(dot + 1)..].ToLowerInvariant() switch
         {
             "cs" or "csx" => CSharp,
+            "py" or "pyi" or "pyw" => Python,
             "ts" or "tsx" or "js" or "jsx" or "mjs" or "cjs" => Script,
             "css" or "scss" => Styles,
             "html" or "htm" or "md" or "markdown" or "xml" or "svg" or "xaml"
                 or "csproj" or "props" or "targets" => Markup,
             "json" or "json5" or "yaml" or "yml" or "toml" or "ini" => Config,
+            "sh" or "bash" or "zsh" or "ps1" or "psm1" or "psd1" or "rb" or "go" or "rs"
+                or "java" or "kt" or "kts" or "php" or "c" or "h" or "cpp" or "cc" or "cxx"
+                or "hpp" or "hxx" or "sql" => OtherLanguages,
             _ => Other,
         };
     }

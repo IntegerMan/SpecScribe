@@ -661,7 +661,27 @@ public class SiteGeneratorAdapterTests : IDisposable
         // itself and its rendering (data-filetype/data-filetype-label, the Type tooltip row/table column, the
         // loosened hasMetrics gate) are covered by CodeMap/Charts/CodeMapTemplater tests, not this fixture.
         // Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
-        const string expected = "a7787135415317347850153750453ddc657adb1defd6515412337de5c22e6b35";
+        // Regenerated for Story 7.10: this fixture is not a git repo (no --deep-git) and has too few files, so
+        // the new refactor-target risk quadrant section always renders below Charts.RiskQuadrantMinFiles here —
+        // only specscribe.css gained the .risk-quadrant/.risk-point/.risk-quadrant-list rules; the section's
+        // "Refactor-Target Risk Quadrant" heading + chart-empty body appear on code-map.html itself (a content
+        // change, not CSS-only, since the section is always framed even at zero data), and the live scatter is
+        // covered by Charts/CodeMapTemplater/SiteGeneratorCodeMap tests, not this fixture. Verified stable
+        // across 2 repeated runs before locking in.
+        // Regenerated for a Story 7.9 review-feedback follow-up (layered on top of the Story 7.10 change above,
+        // which was concurrently in-flight on this shared working tree): the file-type classifier gained Python
+        // (its own category — 20 real files live under this repo's .agents/.claude/_bmad scaffolding) and a
+        // bounded "Other Languages" catch-all (Rust/Go/Java/Ruby/PHP/C/C++/shell/PowerShell/SQL) so a polyglot
+        // repo's real language variety shows up as more than one undifferentiated "Other" swatch; the two
+        // exclude-filter checkboxes' label also gained a left-margin gap (was flush against its checkbox). This
+        // non-git fixture cites no real repo files, so only specscribe.css shifted the hash (two new
+        // .codemap-cell.type-*/.codemap-legend-swatch.type-* rules + the checkbox-label spacing fix). Verified
+        // stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        // Regenerated again: a concurrent session's commit (5331d11 "fix: Story 7.2 deferred-work cleanup
+        // (code-reference resolution hardening)") landed on this shared main working tree after the Story 7.9
+        // follow-up hash above was locked, shifting this fixture's rendered output independent of any Story 7.9
+        // change. Verified stable across 2 repeated runs before locking in.
+        const string expected = "0c0aad5e928d2e62d81c76554e999cdad3b08b2c96ecb5b455f9b1a009fbeeca";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

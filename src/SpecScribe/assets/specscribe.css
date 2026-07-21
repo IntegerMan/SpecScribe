@@ -3609,10 +3609,12 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    "Other" gets the same honest muted-neutral treatment as level-none plus a dashed stroke, mirroring
    --status-unrecognized-hatch's "the unknown bucket looks distinct, not like a 6th invented hue" precedent. */
 .codemap-cell.type-csharp { fill: var(--teal-deep); }
+.codemap-cell.type-python { fill: var(--moss-light); }
 .codemap-cell.type-script { fill: var(--teal); }
 .codemap-cell.type-styles { fill: var(--rust); }
 .codemap-cell.type-markup { fill: var(--rust-light); }
 .codemap-cell.type-config { fill: var(--moss); }
+.codemap-cell.type-other-lang { fill: var(--ink-light); }
 .codemap-cell.type-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
 .codemap-cell:hover { stroke: var(--rust); stroke-width: 1.5; }
 /* SVG focus: default outlines render unreliably around SVG rects, so express focus on the rect itself (teal, the
@@ -3651,7 +3653,15 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    needs them at the same nesting level as the .codemap-view panels they control. */
 .codemap-filter-checkbox { margin: 0.5rem 0 0 0.1rem; vertical-align: middle; cursor: pointer; }
 .codemap-filter-checkbox:first-of-type { margin-left: 0; }
-.codemap-filter-label { font-size: 0.85rem; color: var(--ink-light); margin-right: 1.25rem; cursor: pointer; }
+.codemap-filter-label {
+  font-size: 0.85rem;
+  color: var(--ink-light);
+  /* Gap on both sides: left so the label text doesn't sit flush against its checkbox, right so it doesn't crowd
+     the next checkbox in the row. */
+  margin: 0 1.25rem 0 0.4rem;
+  vertical-align: middle;
+  cursor: pointer;
+}
 
 /* Four precomputed filter-combination panels (round 2): exactly one is visible at a time, picked by the two
    checkboxes' :checked state via plain CSS sibling combinators — no JavaScript is needed for filtering to work,
@@ -3690,10 +3700,12 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-legend-discrete { flex-wrap: wrap; }
 .codemap-legend-label { margin-right: 0.6rem; }
 .codemap-legend-swatch.type-csharp { background: var(--teal-deep); }
+.codemap-legend-swatch.type-python { background: var(--moss-light); }
 .codemap-legend-swatch.type-script { background: var(--teal); }
 .codemap-legend-swatch.type-styles { background: var(--rust); }
 .codemap-legend-swatch.type-markup { background: var(--rust-light); }
 .codemap-legend-swatch.type-config { background: var(--moss); }
+.codemap-legend-swatch.type-other-lang { background: var(--ink-light); }
 .codemap-legend-swatch.type-other { background: var(--parchment-dark); opacity: 0.55; }
 
 /* Drill breadcrumb (revealed by script). Reuses the button/crumb vocabulary; separators via ::before. */
@@ -3727,6 +3739,30 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-table thead th { color: var(--ink-light); font-weight: 600; }
 .codemap-table a { color: var(--rust); text-decoration: none; }
 .codemap-table a:hover { text-decoration: underline; }
+
+/* ============ REFACTOR-TARGET RISK QUADRANT (Code Map page, Story 7.10) ============ */
+/* Size (X, log-scaled) x churn-frequency (Y) scatter. Not a --status-* surface — files carry no lifecycle status,
+   so shading/points use the neutral/attention (rust) family like every other code-map accent. */
+.risk-quadrant { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; }
+.risk-axis-line { stroke: var(--border); stroke-width: 1; }
+.risk-median-line { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; }
+.risk-axis-label { fill: var(--ink-light); font-size: 11px; }
+/* The elevated (high-size/high-churn) quadrant: a light rust wash + a text label — never the sole flag, points
+   inside it also carry .risk-point-elevated (heavier stroke), matching Story 7.8's shape+edge a11y discipline. */
+.risk-quadrant-elevated { fill: var(--rust-light); fill-opacity: 0.12; }
+.risk-quadrant-shade-label { fill: var(--rust); font-size: 11px; font-weight: 600; }
+.risk-point { fill: var(--gold); stroke: var(--parchment); stroke-width: 1; }
+.risk-point-elevated { fill: var(--rust-light); stroke: var(--rust); stroke-width: 2; }
+.risk-point-link:focus-visible .risk-point,
+.risk-point-link:hover .risk-point { stroke: var(--teal); stroke-width: 2; }
+
+/* Text-equivalent ranked list of the elevated quadrant's files (mandatory — the chart is never SVG-only). */
+.risk-quadrant-list { margin: 0.8rem 0 0; padding-left: 1.2rem; font-size: 0.85rem; }
+.risk-quadrant-list li { margin: 0.15rem 0; }
+.risk-quadrant-list a { color: var(--rust); text-decoration: none; }
+.risk-quadrant-list a:hover { text-decoration: underline; }
+.risk-quadrant-list-meta { color: var(--ink-light); font-size: 0.78rem; margin-left: 0.3rem; }
+.risk-quadrant-empty { color: var(--ink-light); font-size: 0.85rem; margin: 0.6rem 0 0; }
 
 /* ============ DEEP ANALYTICS (opt-in --deep-git: hotspots + change coupling) ============ */
 /* Change-coupling node-link graph (deep-analytics page). Layout is computed at generation time; this only
