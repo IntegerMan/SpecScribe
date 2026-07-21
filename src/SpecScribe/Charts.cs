@@ -2278,10 +2278,16 @@ public static class Charts
             if (m.AvgCoChanged is { } co) data.Append($" data-cochanged=\"{co.ToString("0.###", CultureInfo.InvariantCulture)}\"");
         }
 
-        // Accessible name (name + the active metric value) — color is never the sole signal (AC #4).
-        var ariaLabel = metrics is { } ma
-            ? $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, {ma.Changes} {Plural(ma.Changes, "change", "changes")}"
-            : $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}";
+        // Accessible name (name + the active metric value) — color is never the sole signal (AC #4). When
+        // hasMetrics is false, file type IS the baked-in active dimension (see levelClass above) and the dropdown
+        // offers no other option to switch away from, so the category must be baked into the name here — the
+        // client-side recolor() enhancement never runs for a select whose value can never change. [Story 7.9
+        // review-feedback: hasMetrics: true path below is untouched/byte-identical, matching AC #3.]
+        var ariaLabel = hasMetrics
+            ? (metrics is { } ma
+                ? $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, {ma.Changes} {Plural(ma.Changes, "change", "changes")}"
+                : $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}")
+            : $"{node.Label}, {node.Lines} {Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}, {category.Label}";
 
         // Rich, stylized tooltip: a server-built HTML card served through the shared body-level js-tip node (never a
         // clipped ::after on the rect). The card markup is escaped ONCE more for the attribute so getAttribute →

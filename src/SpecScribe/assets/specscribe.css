@@ -26,6 +26,11 @@
   --moss-light: #6b8f62;
   --teal-deep: #1e4a5a;
   --teal: #2e6b7a;
+  /* A genuinely distinct 4th accent hue (violet), not a lightness variant of rust/moss/teal — added for the
+     Code Map's file-type "Other Languages" bucket (Story 7.9 review), which previously reused --ink-light (a
+     muted text token elsewhere) and risked reading as de-emphasized rather than as a real, equally-weighted
+     category. */
+  --violet: #6a4a7a;
   --gold: #b8860b;
   --gold-light: #d4a017;
   --border: #d4c4a8;
@@ -3614,7 +3619,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-cell.type-styles { fill: var(--rust); }
 .codemap-cell.type-markup { fill: var(--rust-light); }
 .codemap-cell.type-config { fill: var(--moss); }
-.codemap-cell.type-other-lang { fill: var(--ink-light); }
+.codemap-cell.type-other-lang { fill: var(--violet); }
 .codemap-cell.type-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
 .codemap-cell:hover { stroke: var(--rust); stroke-width: 1.5; }
 /* SVG focus: default outlines render unreliably around SVG rects, so express focus on the rect itself (teal, the
@@ -3705,7 +3710,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-legend-swatch.type-styles { background: var(--rust); }
 .codemap-legend-swatch.type-markup { background: var(--rust-light); }
 .codemap-legend-swatch.type-config { background: var(--moss); }
-.codemap-legend-swatch.type-other-lang { background: var(--ink-light); }
+.codemap-legend-swatch.type-other-lang { background: var(--violet); }
 .codemap-legend-swatch.type-other { background: var(--parchment-dark); opacity: 0.55; }
 
 /* Drill breadcrumb (revealed by script). Reuses the button/crumb vocabulary; separators via ::before. */

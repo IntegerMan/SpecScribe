@@ -691,7 +691,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // own markdown files, so code-map.html DOES render here — both the new markup and the CSS shift the hash
         // (all-neutral wedges, since this fixture is not a git repo). Verified stable across 2 repeated runs
         // before locking in. [golden-diff-normalization-gotchas]
-        const string expected = "70875a6f54cc9e5b434eec491dabcfece0d677659b8a8df296db596c893ccdf5";
+        // Regenerated for Story 7.9 code-review patches: the SSR-baked aria-label on a hasMetrics:false treemap
+        // cell now includes the file-type category (color is never the sole signal, AC #1) — a content change on
+        // code-map.html since this fixture's repo-root walk renders it; plus a new --violet custom property and
+        // two rule value changes (.codemap-cell.type-other-lang/.codemap-legend-swatch.type-other-lang moved off
+        // --ink-light) in specscribe.css. The Dockerfile/.editorconfig classifier consistency fix and the
+        // Classify-call-site trailing-slash fix are pure classification logic with no effect on this fixture's
+        // file set. Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        const string expected = "d68934f0058d26841e29d24fd8a56ea1c3fcb5c3ffaefd848f7de32218c91ba1";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

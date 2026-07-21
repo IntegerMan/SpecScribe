@@ -416,7 +416,6 @@ public class CodeMapTests
     }
 
     [Theory]
-    [InlineData("Dockerfile")]      // extensionless, name-based special case elsewhere — still falls to Other here
     [InlineData("src/noext")]
     [InlineData("data.csv")]        // recognized data shape elsewhere, but not one of this story's bounded buckets
     [InlineData("")]
@@ -424,6 +423,23 @@ public class CodeMapTests
     public void CodeFileType_Classify_UnrecognizedOrExtensionlessPathsFallToOtherNeverANewCategory(string path)
     {
         Assert.Same(CodeFileType.Other, CodeFileType.Classify(path));
+    }
+
+    [Theory]
+    [InlineData("Dockerfile")]       // name-based special case, consistent with CodeFileTemplater.LanguageClass
+    [InlineData("Dockerfile.dev")]
+    [InlineData("dockerfile")]       // case-insensitive
+    public void CodeFileType_Classify_RecognizesDockerfileByNameConsistentlyWithLanguageClass(string path)
+    {
+        Assert.Same(CodeFileType.Markup, CodeFileType.Classify(path));
+    }
+
+    [Theory]
+    [InlineData(".editorconfig", "config")]
+    [InlineData("app.cfg", "config")]
+    public void CodeFileType_Classify_RecognizesEditorconfigAndCfgConsistentlyWithLanguageClass(string path, string expectedKey)
+    {
+        Assert.Equal(expectedKey, CodeFileType.Classify(path).Key);
     }
 
     [Theory]
@@ -481,5 +497,18 @@ public class CodeMapTests
         var dir = Assert.Single(map.Roots);
         Assert.True(dir.IsDirectory);
         Assert.Null(dir.Category);
+    }
+
+    [Fact]
+    public void Build_ClassifiesOffTheAlreadySplitFileNameNotTheRawTrailingSlashPath()
+    {
+        // A raw source path with a trailing slash is placed in the tree under its correct file name (Split with
+        // RemoveEmptyEntries drops the trailing empty segment) — Classify must be given that same already-correct
+        // name, not re-derive it from the untrimmed raw path, or it sees an empty final segment and misclassifies
+        // a real .cs file to Other.
+        var map = Build(("src/A.cs/", 10));
+
+        var file = Assert.Single(map.Files());
+        Assert.Equal(CodeFileType.CSharp, file.Category);
     }
 }

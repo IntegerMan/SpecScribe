@@ -4,7 +4,7 @@ baseline_commit: b87a47eadf8ef499888f62d4bf0b8597ca3ea9a5
 
 # Story 7.9: Code Map File-Type Colorize (Discrete Palette)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -281,6 +281,14 @@ Test framework: **xUnit** (`net10.0`). Model tests are pure (no IO, following `C
   - [x] `dotnet test` green.
   - [x] Baseline generate (no `--deep-git`) → file-type colorized by default, discrete legend, Type column populated.
   - [x] Deep generate (`--deep-git`) → default unchanged, File type selectable as 7th option, clean switch both directions (no stale classes), sequential dimensions unchanged.
+
+### Review Findings
+
+- [x] [Review][Patch] SSR-baked `aria-label` never includes the file-type category, even in the `hasMetrics: false` state where file type IS the baked-in default fill — and this state can never self-correct via JS, since the dropdown offers only one option so `change` never fires. [src/SpecScribe/Charts.cs:2282] — fixed: `ariaLabel` now appends `category.Label` when `hasMetrics` is false; the `hasMetrics: true` path is untouched (test-covered, AC #3 regression guard).
+- [x] [Review][Patch] `Dockerfile`/`Dockerfile.*` and `.cfg`/`.editorconfig` fall to the generic "Other" bucket in `CodeFileType.Classify`, contradicting the classifier's own doc comment (and the story's DO list) claiming consistency with `CodeFileTemplater.LanguageClass`'s families, which maps both to real categories. [src/SpecScribe/CodeMap.cs:76-89] — fixed: added a name-based Dockerfile special case (→ Markup) mirroring `LanguageClass`, and added `cfg`/`editorconfig` to the Config arm.
+- [x] [Review][Patch] `CodeFileType.Classify` re-derives the filename independently via `norm.LastIndexOf('/')` instead of reusing the already-correctly-split `fileName` from `Build`; a source path with a trailing slash is placed correctly in the tree but misclassified to "Other" regardless of its real extension. [src/SpecScribe/CodeMap.cs:254] — fixed: `Build` now calls `CodeFileType.Classify(fileName)` instead of `Classify(norm)`.
+- [x] [Review][Patch] ~~A dotfile whose name is exactly `.<token>`... misclassifies into a real category instead of "Other".~~ **Corrected during patch application**: this is not actually a bug. `CodeFileTemplater.LanguageClass` (the consistency target for this exact finding's sibling patch above) uses the identical `dot < 0` guard and therefore already treats a leading dot the same way (e.g. it classifies a literal `.editorconfig` file as `"ini"`) — excluding `dot == 0` would have made `.editorconfig`/`.cfg` unreachable by the switch statement, directly breaking the Dockerfile/editorconfig consistency fix above. Guard left as originally shipped (`dot < 0 || dot == name.Length - 1`); no code change.
+- [x] [Review][Patch] Three of the eight categories pair by lightness within the same hue (CSharp/Script teal-deep/teal, Styles/Markup rust/rust-light, Config/Python moss/moss-light), narrowing distinguishability for colorblind users scanning by color alone; "Other Languages" also uses `--ink-light`, a token elsewhere reserved for muted/secondary text, which risks the category visually reading as de-emphasized. [src/SpecScribe/assets/specscribe.css:3609-3620] — partially fixed: added a new `--violet` accent token (a genuinely distinct 4th hue) and moved "Other Languages" onto it, off `--ink-light`. The three same-hue lightness pairs (CSharp/Script, Styles/Markup, Config/Python) are left as-is — this codebase's non-status, non-ramp accent budget is only 3 hue families (teal/rust/moss; gold is reserved for the sequential ramp), so fully eliminating all pairing would need 2+ more new tokens, a larger design call than this low-severity, text-mitigated cosmetic finding warrants without owner sign-off.
 
 ## Dev Agent Record
 

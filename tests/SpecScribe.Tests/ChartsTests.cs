@@ -2016,6 +2016,30 @@ public class ChartsTests
     }
 
     [Fact]
+    public void CodeTreemap_WhenHasMetricsIsFalse_TheAccessibleNameIncludesTheFileTypeCategory()
+    {
+        // Code review finding: file type IS the baked-in default fill in this state, and the dropdown offers no
+        // other option to switch away from — so recolor() (which is what sets a category-aware aria-label for the
+        // hasMetrics: true path) never runs here. The SSR-baked name itself must carry the category, or color is
+        // the sole signal for every keyboard/screen-reader user on this state (AC #1).
+        var map = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>());
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
+
+        Assert.Contains("aria-label=\"A.cs, 10 lines, C#\"", svg);
+    }
+
+    [Fact]
+    public void CodeTreemap_WhenHasMetricsIsTrue_TheAccessibleNameIsUnchangedByFileType()
+    {
+        // AC #3 regression guard: the sequential default's accessible name (aria-label) must stay byte-identical
+        // to pre-7.9 — even though data-filetype/data-filetype-label are now always emitted alongside it.
+        var map = TreemapWithMetrics();
+        var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: true, fileHref: null);
+
+        Assert.Contains("aria-label=\"A.cs, 100 lines, 5 changes\"", svg);
+    }
+
+    [Fact]
     public void CodeTreemap_WhenHasMetricsIsTrue_TheSequentialDefaultFillIsUnchangedByFileType()
     {
         // AC #3 regression guard: adding the file-type dimension must not touch the existing sequential default.

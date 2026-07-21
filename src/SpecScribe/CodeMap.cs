@@ -70,6 +70,15 @@ public static class CodeFileType
         if (string.IsNullOrWhiteSpace(repoRelativePath)) return Other;
         var norm = PathUtil.NormalizeSlashes(repoRelativePath);
         var name = norm[(norm.LastIndexOf('/') + 1)..];
+
+        // Name-based special case, mirroring CodeFileTemplater.LanguageClass's own Dockerfile handling (no real
+        // extension to key off, but a real, common file kind that shouldn't fall to the generic Other bucket).
+        if (name.Equals("Dockerfile", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Dockerfile.", StringComparison.OrdinalIgnoreCase))
+        {
+            return Markup;
+        }
+
         var dot = name.LastIndexOf('.');
         if (dot < 0 || dot == name.Length - 1) return Other;
 
@@ -81,7 +90,7 @@ public static class CodeFileType
             "css" or "scss" => Styles,
             "html" or "htm" or "md" or "markdown" or "xml" or "svg" or "xaml"
                 or "csproj" or "props" or "targets" => Markup,
-            "json" or "json5" or "yaml" or "yml" or "toml" or "ini" => Config,
+            "json" or "json5" or "yaml" or "yml" or "toml" or "ini" or "cfg" or "editorconfig" => Config,
             "sh" or "bash" or "zsh" or "ps1" or "psm1" or "psd1" or "rb" or "go" or "rs"
                 or "java" or "kt" or "kts" or "php" or "c" or "h" or "cpp" or "cc" or "cxx"
                 or "hpp" or "hxx" or "sql" => OtherLanguages,
@@ -251,7 +260,10 @@ public sealed class CodeMap
             // the inputs somehow imply it, keep the directory and drop the file rather than throw (NFR2).
             if (cur.Dirs.ContainsKey(fileName)) continue;
             var metric = metricLookup.TryGetValue(norm, out var m) ? m : null;
-            var category = CodeFileType.Classify(norm);
+            // Classify off the already-correctly-split fileName, not norm itself — norm can carry a trailing
+            // slash (or other artifact) that would make Classify's own internal name re-derivation see an empty
+            // final segment and misclassify a real file to Other.
+            var category = CodeFileType.Classify(fileName);
             cur.Files[fileName] = new FileLeaf(norm, Math.Max(lines, 0), metric, category);
         }
 
