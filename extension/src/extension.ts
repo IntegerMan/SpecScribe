@@ -115,13 +115,16 @@ interface WebviewPayload {
 
 /** One core-emitted generation notice, parsed from a JSON line on the `webview` command's stderr. The core owns
  * WHAT the notice says and WHICH file; the shim only decides that VS Code shows the file-anchored ones in the
- * Problems panel (constraint #1). Unknown fields are ignored and a record missing `path`/`severity` is skipped, so
- * a future core field never breaks an older shim. [Story 6.12] */
+ * Problems panel (constraint #1). Unknown fields are ignored and a record missing a string `path`/`message` or
+ * carrying a `severity` other than `'error'`/`'warning'` is dropped by `parseDiagnostics`, so a future core field
+ * never breaks an older shim. [Story 6.12] [Story 6.11 deferred-work cleanup: message/severity now validated too] */
 interface RawDiagnostic {
   path: string;
-  severity: string;
   /** `'error'` and `'warning'` map to VS Code's Problems severities — this is the Problems domain, NOT the six
-   * `--status-*` lifecycle stages (constraint #5), which never collapse onto host severities. */
+   * `--status-*` lifecycle stages (constraint #5), which never collapse onto host severities. `parseDiagnostics`
+   * only admits these two literal values — any other value is dropped rather than silently coerced into
+   * `'warning'` (see its doc comment). */
+  severity: 'error' | 'warning';
   message: string;
   fileAnchored?: boolean;
 }
@@ -1244,9 +1247,14 @@ function runRenderer(context: vscode.ExtensionContext, cwd: string): Promise<Ren
 }
 
 /** Parse the `webview` command's stderr into notice records: split on newlines and `JSON.parse` each non-empty
- * line, skipping any that don't parse or lack `path`/`severity`. Tolerant by design — an older core's human
+ * line, skipping any that don't parse or lack a string `path`/`message`, or whose `severity` isn't one of the two
+ * values `publishDiagnostics` understands (`'error'`/`'warning'`). Tolerant by design — an older core's human
  * `[specscribe webview] …` line, a future field, or a stray .NET log line must never throw or produce a partial
- * record. [Story 6.12] */
+ * record — but a record that DOES parse as JSON is validated field-by-field rather than admitted on a `path`/
+ * `severity`-type check alone: an unrecognized `severity` is dropped here (explicit, visible) instead of silently
+ * falling through to `publishDiagnostics`'s `=== 'error' ? Error : Warning` ternary, which would otherwise recolor
+ * it as `'warning'` with no signal that the value was unrecognized; a non-string `message` is dropped too, since
+ * `vscode.Diagnostic`'s constructor requires one. [Story 6.12] [Story 6.11 deferred-work cleanup] */
 function parseDiagnostics(errText: string): RawDiagnostic[] {
   const records: RawDiagnostic[] = [];
   for (const line of errText.split('\n')) {
@@ -1254,7 +1262,13 @@ function parseDiagnostics(errText: string): RawDiagnostic[] {
     if (trimmed.length === 0) continue;
     try {
       const rec = JSON.parse(trimmed) as RawDiagnostic;
-      if (typeof rec.path === 'string' && typeof rec.severity === 'string') records.push(rec);
+      if (
+        typeof rec.path === 'string' &&
+        (rec.severity === 'error' || rec.severity === 'warning') &&
+        typeof rec.message === 'string'
+      ) {
+        records.push(rec);
+      }
     } catch {
       // Not one of our JSON notice lines — ignore it (backward/forward compatibility).
     }

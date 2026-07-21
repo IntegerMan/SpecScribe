@@ -471,7 +471,10 @@ public sealed class SiteGenerator
     /// <summary>True when <paramref name="path"/> is <c>_bmad/config.toml</c>: the config file NAME under a
     /// <c>_bmad</c> directory SEGMENT (any depth, either slash style) — the same location-tolerant, segment-based
     /// discipline <see cref="BmadArtifactAdapter.IsUnderImplementationArtifacts"/> uses, so a stray <c>config.toml</c>
-    /// elsewhere isn't mistaken for the project config. [Story 6.11]</summary>
+    /// elsewhere isn't mistaken for the project config. <b>Classification only</b> — <see cref="FileWatcherService"/>
+    /// does not watch every <c>_bmad</c> segment this matches; it watches the repo-root <c>_bmad</c> dir only (one
+    /// per project in practice), so a nested <c>_bmad</c> dir elsewhere would classify here but never actually fire
+    /// a watch event. [Story 6.11] [Story 6.11 deferred-work cleanup: narrowed this comment's "any depth" claim]</summary>
     private static bool IsProjectConfigFile(string path)
     {
         if (!string.Equals(Path.GetFileName(path), ForgeOptions.ConfigFileName, StringComparison.OrdinalIgnoreCase))

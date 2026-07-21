@@ -18,6 +18,16 @@ public sealed class FileWatcherService : IDisposable
     private readonly Action<GenerationEvent> _onEvent;
     private readonly List<FileSystemWatcher> _watchers = new();
     private readonly ConcurrentDictionary<string, Timer> _pending = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _watchersLock = new();
+    private bool _started;
+    private bool _disposed;
+    private bool _configWatcherRegistered;
+    private FileSystemWatcher? _configDirDetector;
+
+    /// <summary>Number of live <see cref="FileSystemWatcher"/> instances — test seam only, so the dynamic
+    /// <c>_bmad</c>-dir registration (<see cref="OnConfigDirCreated"/>) can be asserted deterministically without
+    /// waiting on real FS-event timing.</summary>
+    internal int WatcherCount { get { lock (_watchersLock) { return _watchers.Count; } } }
 
     public FileWatcherService(ForgeOptions options, SiteGenerator generator, Action<GenerationEvent> onEvent)
     {
@@ -41,6 +51,100 @@ public sealed class FileWatcherService : IDisposable
         if (Directory.Exists(configDir))
         {
             _watchers.Add(CreateWatcher(configDir, ForgeOptions.ConfigFileName));
+            _configWatcherRegistered = true;
+        }
+        else
+        {
+            // _bmad doesn't exist yet at construction time. Without this fallback, a project scaffolded (or a repo
+            // cloned) AFTER `specscribe watch` starts would never get its config.toml watched for the rest of that
+            // watch session — the gap the 6.11 review deferred. Watch the repo root (non-recursive, directory-name
+            // events only) for `_bmad` appearing, then register the real config watcher on demand. This narrows the
+            // original gap but does not eliminate every race (the window between construction and Start(), and a
+            // delete-then-recreate of `_bmad`, are accepted residual limitations — see deferred-work.md).
+            // [Story 6.11 deferred-work cleanup]
+            _configDirDetector = CreateConfigDirWatcher(options.RepoRoot);
+            _watchers.Add(_configDirDetector);
+        }
+    }
+
+    private FileSystemWatcher CreateConfigDirWatcher(string repoRoot)
+    {
+        var watcher = new FileSystemWatcher(repoRoot)
+        {
+            IncludeSubdirectories = false,
+            NotifyFilter = NotifyFilters.DirectoryName,
+            InternalBufferSize = 65536,
+        };
+        watcher.Filters.Add(ForgeOptions.ConfigDirName);
+        watcher.Created += (_, e) => OnConfigDirCreated(e.FullPath);
+        watcher.Renamed += (_, e) => OnConfigDirCreated(e.FullPath);
+        // Tagged distinctly from CreateWatcher's generic "<watcher>" label so a failure of this specific fallback
+        // watcher (repo-root, directory-name events) is distinguishable from the source/ADR/config watchers'
+        // errors in the emitted GenerationEvent. [Story 6.11 deferred-work cleanup]
+        watcher.Error += (_, e) =>
+            _onEvent(new GenerationEvent(GenerationOutcome.Error, "<bmad-dir-watcher>", TimeSpan.Zero, e.GetException().Message));
+        return watcher;
+    }
+
+    /// <summary>Fires when the repo-root watcher observes something named <c>_bmad</c> appear. Registers the real
+    /// config-dir watcher exactly once (idempotent — a Created and an echoing Renamed for the same directory must
+    /// not double-register; also a no-op after <see cref="Dispose"/>, so a queued event arriving just after teardown
+    /// can't leak a live, never-disposed watcher). The registration flag is set only AFTER the watcher construction
+    /// succeeds — if <c>_bmad</c> is deleted between the existence check below and construction (a real, if narrow,
+    /// TOCTOU window), the failure is reported as a <see cref="GenerationOutcome.Error"/> event rather than crashing
+    /// the watcher thread, and the flag stays clear so a later re-creation of <c>_bmad</c> can still succeed. Once
+    /// registered, the repo-root fallback watcher that called this is retired (disabled + disposed) — its job is
+    /// done and nothing should keep polling directory-name events for the rest of the session. Internal so the test
+    /// suite can drive it deterministically instead of racing a real FileSystemWatcher event.
+    /// [Story 6.11 deferred-work cleanup]</summary>
+    internal void OnConfigDirCreated(string fullPath)
+    {
+        if (!string.Equals(Path.GetFileName(fullPath), ForgeOptions.ConfigDirName, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!Directory.Exists(fullPath))
+        {
+            return;
+        }
+
+        lock (_watchersLock)
+        {
+            if (_disposed || _configWatcherRegistered)
+            {
+                return;
+            }
+
+            FileSystemWatcher watcher;
+            try
+            {
+                watcher = CreateWatcher(fullPath, ForgeOptions.ConfigFileName);
+            }
+            catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or IOException)
+            {
+                // _bmad vanished again between the Directory.Exists check above and here — leave the flag clear so
+                // a future re-creation can retry; report the miss instead of crashing the watcher-event thread.
+                _onEvent(new GenerationEvent(GenerationOutcome.Error, "<bmad-dir-watcher>", TimeSpan.Zero, ex.Message));
+                return;
+            }
+
+            _configWatcherRegistered = true;
+            _watchers.Add(watcher);
+            if (_started)
+            {
+                watcher.EnableRaisingEvents = true;
+            }
+
+            // The fallback detector has done its job — retire it so it isn't left running indefinitely just to hit
+            // the _configWatcherRegistered early-return on every future _bmad-adjacent directory event.
+            if (_configDirDetector is { } detector)
+            {
+                _watchers.Remove(detector);
+                detector.EnableRaisingEvents = false;
+                detector.Dispose();
+                _configDirDetector = null;
+            }
         }
     }
 
@@ -74,12 +178,20 @@ public sealed class FileWatcherService : IDisposable
 
     public void Start()
     {
-        foreach (var w in _watchers) w.EnableRaisingEvents = true;
+        lock (_watchersLock)
+        {
+            _started = true;
+            foreach (var w in _watchers) w.EnableRaisingEvents = true;
+        }
     }
 
     public void Stop()
     {
-        foreach (var w in _watchers) w.EnableRaisingEvents = false;
+        lock (_watchersLock)
+        {
+            _started = false;
+            foreach (var w in _watchers) w.EnableRaisingEvents = false;
+        }
     }
 
     private void Debounce(string fullPath)
@@ -134,7 +246,14 @@ public sealed class FileWatcherService : IDisposable
 
     public void Dispose()
     {
-        foreach (var w in _watchers) w.Dispose();
+        lock (_watchersLock)
+        {
+            // Set BEFORE disposing so a _bmad-creation event already queued on the ThreadPool, which acquires this
+            // same lock inside OnConfigDirCreated after Dispose released it, is a no-op instead of constructing and
+            // enabling a new watcher that would never be torn down (a leaked OS watch handle). [Story 6.11 deferred-work cleanup]
+            _disposed = true;
+            foreach (var w in _watchers) w.Dispose();
+        }
         foreach (var kv in _pending)
         {
             kv.Value.Dispose();

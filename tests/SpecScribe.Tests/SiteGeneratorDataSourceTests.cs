@@ -143,4 +143,34 @@ public class SiteGeneratorDataSourceTests : IDisposable
         watcher.Start();
         watcher.Stop();
     }
+
+    [Fact]
+    public void FileWatcherService_ConfigDirCreatedAfterConstruction_DynamicallyRegistersConfigWatcher()
+    {
+        // _bmad does NOT exist at construction time — the review-deferred gap: without the fallback watcher, a
+        // project scaffolded (or a repo cloned) after `specscribe watch` starts would never get config.toml
+        // watched for the rest of that session. Drives the internal callback directly (test seam) rather than
+        // waiting on a real FileSystemWatcher event, matching this fixture's "no reliance on real FS-event
+        // timing" convention. Started FIRST so `_started == true` when the callback fires — the realistic state
+        // in production, where Start() runs immediately after construction (see Commands.cs). [Story 6.11
+        // deferred-work cleanup]
+        var gen = GeneratedSite();
+        using var watcher = new FileWatcherService(Options(), gen, _ => { });
+        watcher.Start();
+        var before = watcher.WatcherCount;
+
+        var configDir = Path.Combine(_root, "_bmad");
+        Directory.CreateDirectory(configDir);
+        File.WriteAllText(Path.Combine(configDir, "config.toml"), "project_name = \"SpecScribe\"\n");
+        watcher.OnConfigDirCreated(configDir);
+
+        // The fallback repo-root detector is retired (removed + disposed) once the real config watcher registers,
+        // so the net count is unchanged — not the naive "+1" a reader might expect from "a watcher got added".
+        Assert.Equal(before, watcher.WatcherCount);
+
+        // Idempotent — an echoing Renamed event for the same directory must not re-register or throw (the fallback
+        // detector is already gone by this point).
+        watcher.OnConfigDirCreated(configDir);
+        Assert.Equal(before, watcher.WatcherCount);
+    }
 }
