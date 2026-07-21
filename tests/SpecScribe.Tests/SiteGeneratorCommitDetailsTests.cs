@@ -101,7 +101,8 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     [SkippableFact]
     public void GenerateAll_FlagOnWithHistory_EmitsBoundedCommitPagesAndSubjectAndAuthor()
     {
-        Skip.IfNot(TryCreateGitHistory(), "git CLI unavailable on this host — skipping tests that exercise gated commit-page generation");
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise gated commit-page generation (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
 
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
@@ -121,7 +122,8 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     public void GenerateAll_CommitDetailPager_IsChronological_PrevIsEarlierCommit_NextIsLater()
     {
         // Two commits, oldest first: "Implement Story 1.1 foundation" then "Second commit". [Prev/next navigation]
-        Skip.IfNot(TryCreateGitHistory(), "git CLI unavailable on this host — skipping tests that exercise the commit pager");
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise the commit pager (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
 
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
         AssertNoErrors(events);
@@ -150,7 +152,8 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     {
         // [Story 10.10 review — patch] no direct test previously exercised the commit-page NavLocalContext
         // builder; only the generic seam mechanics were covered.
-        Skip.IfNot(TryCreateGitHistory(), "git CLI unavailable on this host — skipping tests that exercise the commit local-context band");
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise the commit local-context band (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
 
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
         AssertNoErrors(events);
@@ -170,7 +173,8 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     [SkippableFact]
     public void GenerateAll_FlagOnWithHistory_LightsUpDayPageAndHubHashLinks()
     {
-        Skip.IfNot(TryCreateGitHistory(), "git CLI unavailable on this host — skipping tests that exercise gated hash-link wiring");
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise gated hash-link wiring (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
 
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
         AssertNoErrors(events);
@@ -190,7 +194,8 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     [SkippableFact]
     public void GenerateAll_FlagOnWithHistory_LinkifiesReferencesInCommitMessages()
     {
-        Skip.IfNot(TryCreateGitHistory(), "git CLI unavailable on this host — skipping tests that exercise reference linkification");
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise reference linkification (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
 
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
         AssertNoErrors(events);
@@ -203,7 +208,8 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     [SkippableFact]
     public void GenerateAll_TwoRunsProduceIdenticalCommitMarkup()
     {
-        Skip.IfNot(TryCreateGitHistory(), "git CLI unavailable on this host — skipping tests that exercise determinism");
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise determinism (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
 
         var site2 = Path.Combine(_root, "site2");
         var events1 = new SiteGenerator(Options(deepGit: true)).GenerateAll();
@@ -212,11 +218,12 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         AssertNoErrors(events2);
 
         // Strip the human-friendly footer timestamp (24h + zone, Story 10.4), then every commit page must be
-        // byte-identical run to run. The zone token is matched generically (any non-whitespace run) rather than
-        // hardcoding PortalDates.LocalZoneLabel's current "UTC±HH:MM" shape, so this stays a real determinism
-        // check instead of degrading into an un-normalized string compare if that shape ever changes.
+        // byte-identical run to run. Only the trailing zone-label token is matched generically (word chars plus
+        // +/-/: rather than PortalDates.LocalZoneLabel's current signed "UTC±HH:MM" shape) so a zone-label format
+        // change doesn't degrade this into an un-normalized compare; the date/time portion still assumes
+        // PortalDates.Day's current wording and is not shape-proofed by this change.
         static string Stable(string html) =>
-            Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} \S+", "on <t>");
+            Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} [\w+\-:]+", "on <t>");
 
         var pages1 = Directory.GetFiles(CommitDir, "*.html").OrderBy(p => p, StringComparer.Ordinal).ToList();
         var pages2 = Directory.GetFiles(Path.Combine(site2, "commit"), "*.html").OrderBy(p => p, StringComparer.Ordinal).ToList();
@@ -227,10 +234,16 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         }
     }
 
+    /// <summary>Probes for a usable git CLI on PATH, independent of fixture setup — callers use this to decide
+    /// Skip (environment gap) vs. Assert.True/fail (a real regression) on <see cref="TryCreateGitHistory"/>, so a
+    /// broken `git init`/`git commit` on a host that DOES have git surfaces as a genuine test failure rather than
+    /// being silently swallowed into the same Skip path.</summary>
+    private bool GitAvailable() => RunGit("--version");
+
     /// <summary>Initializes a real git repo in the fixture root with two commits by a known author — the first
-    /// referencing Story 1.1 (for the linkification check). Returns false (tests no-op) when the git CLI is
-    /// unavailable or refuses; identity and signing are forced via -c overrides so a host's global config can't
-    /// break the fixture.</summary>
+    /// referencing Story 1.1 (for the linkification check). Only call after confirming <see cref="GitAvailable"/>;
+    /// a false return here means the fixture setup itself failed, not that git is missing. Identity and signing
+    /// are forced via -c overrides so a host's global config can't break the fixture.</summary>
     private bool TryCreateGitHistory()
     {
         if (!RunGit("init")) return false;
