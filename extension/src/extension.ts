@@ -184,6 +184,17 @@ let store: SpecScribeStore | undefined;
  * tree, and the open panel each subscribe once; the store fires it on every load settle (success OR failure). */
 const dataChanged = new vscode.EventEmitter<void>();
 
+/** Terminals currently mid-command via shell integration (`onDidStartTerminalShellExecution` →
+ * `onDidEndTerminalShellExecution`), consulted by {@link getOrCreateTerminal} so a busy "SpecScribe" terminal is
+ * never reused for a new staged command. A `WeakSet` so a disposed/closed terminal is never kept alive by this
+ * bookkeeping alone. */
+const busyTerminals = new WeakSet<vscode.Terminal>();
+
+/** Whether a multi-root "SpecScribe only watches the first folder" notice has already been shown this session —
+ * multi-root support itself stays out of scope (Story 6.11), but the user should be told once, not left to guess
+ * why a non-first SpecScribe folder is silently ignored. */
+let multiRootNoticeShown = false;
+
 let statusBar: vscode.StatusBarItem | undefined;
 let treeProvider: OutlineTreeProvider | undefined;
 /** The outline TreeView handle — kept at module scope (not just pushed to subscriptions) so the visibility-aware
@@ -247,6 +258,17 @@ export function activate(context: vscode.ExtensionContext) {
   // All three consumers subscribe ONCE to the fan-out; the store fires it on every (re)load.
   context.subscriptions.push(dataChanged.event(() => { renderStatusBar(); treeProvider?.refresh(); }));
 
+  // Terminal busy-tracking for getOrCreateTerminal's reuse guard. Feature-detected, NOT assumed present: this API
+  // graduated to stable after the `engines.vscode` floor this extension declares, so an older-but-still-satisfying
+  // host may not expose it — calling an absent event constructor would throw and crash the whole activation.
+  // Absent → busyTerminals simply stays empty and reuse behaves exactly as it did before this fix.
+  if (typeof vscode.window.onDidStartTerminalShellExecution === 'function') {
+    context.subscriptions.push(
+      vscode.window.onDidStartTerminalShellExecution((e) => busyTerminals.add(e.terminal)),
+      vscode.window.onDidEndTerminalShellExecution((e) => busyTerminals.delete(e.terminal)),
+    );
+  }
+
   // Bind the shared store to folder[0] and re-bind when the folder set changes (a late-added SpecScribe folder
   // flips detection without a reload). Path existence only.
   bindWorkspace(context);
@@ -266,6 +288,19 @@ function bindWorkspace(context: vscode.ExtensionContext) {
   // [spec-vscode-any-workspace-and-processing-indicators]
   folderOpen = !!folder;
   void vscode.commands.executeCommand('setContext', 'specscribe.available', folderOpen);
+
+  // Multi-root support stays out of scope, but a silent folder[0]-only pick is confusing when there's more than
+  // one root — tell the user once per session which folder is bound instead of leaving them to guess. Purely
+  // informational (no "open as single-folder" imperative): folder[0] may already be exactly the project they
+  // want watched, so this only ever names the binding, never implies something is wrong.
+  // [deferred item, Story 6.9 review]
+  if (!multiRootNoticeShown && (vscode.workspace.workspaceFolders?.length ?? 0) > 1) {
+    multiRootNoticeShown = true;
+    void vscode.window.showInformationMessage(
+      `SpecScribe: this is a multi-root workspace, so only the first folder ("${folder?.name ?? ''}") is watched ` +
+      '— multi-root support isn’t available yet. Reorder folders, or open a single-folder window, if you ' +
+      'need a different one watched.');
+  }
 
   if (folder) {
     store = new SpecScribeStore(context, folder);
@@ -1053,13 +1088,30 @@ async function openGeneratedSite() {
   const indexPath = path.isAbsolute(root)
     ? path.join(root, 'index.html')
     : path.join(folder.uri.fsPath, root, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    void vscode.env.openExternal(vscode.Uri.file(indexPath));
+  const resolved = resolveOpenableFile(indexPath);
+  if (resolved) {
+    void vscode.env.openExternal(vscode.Uri.file(resolved));
     return;
   }
   void vscode.window.showInformationMessage(
     `SpecScribe: no generated site found at ${root}/index.html. ` +
     'Run “SpecScribe: Generate Full Site” first, then try again.');
+}
+
+/** Resolves to the REAL (symlink-followed) path only if `p` exists and is a regular file — same
+ * doesn't-trust-a-stale-payload rigor `resolveWorkspacePath` applies (Story 17.2 posture), without a repo-root
+ * containment check, which would break the deliberate out-of-repo `configuredOutputRoot`/`--output` case this
+ * command already supports on purpose (Story 6.8 AC #3, R2.4). A broader "should this be contained at all" policy
+ * is Epic 17.2's remit, not a narrow deferred-item fix. Callers must open the RETURNED real path, not `p` — opening
+ * `p` itself would re-admit the symlink this validated against. Any exception (permission error, symlink cycle)
+ * degrades to "not found", the same generic-failure convention `resolveWorkspacePath` already uses. */
+function resolveOpenableFile(p: string): string | undefined {
+  try {
+    const real = fs.realpathSync(p);
+    return fs.statSync(real).isFile() ? real : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Stage `<tool> generate` / `<tool> watch` at a fresh terminal prompt WITHOUT executing it (`sendText(cmd,
@@ -1072,15 +1124,29 @@ function stageTerminalCommand(context: vscode.ExtensionContext, sub: 'generate' 
     void vscode.window.showErrorMessage('SpecScribe: open a project folder first.');
     return;
   }
-  const terminal = getOrCreateTerminal(folder);
+  stageCommandLine(getOrCreateTerminal(folder), toolCommandLine(resolveTool(context), sub));
+}
+
+/** Show the terminal and stage `commandLine` at its prompt, WITHOUT executing it (`sendText(cmd, false)`) — the
+ * user presses Enter. Marks the terminal busy immediately, before shell integration's own start event (which only
+ * fires once the user actually presses Enter): otherwise two staged-but-unrun invocations in quick succession
+ * would both see the terminal as idle and the second `sendText` would land on top of the first's still-unrun
+ * line. This is the letter of AD-6/ADR 0003: SpecScribe never runs a write to the project output; the explicit
+ * choice stays with the user. */
+function stageCommandLine(terminal: vscode.Terminal, commandLine: string): void {
   terminal.show();
-  terminal.sendText(toolCommandLine(resolveTool(context), sub), false); // staged, not executed
+  busyTerminals.add(terminal);
+  terminal.sendText(commandLine, false); // staged, not executed
 }
 
 /** Reuse the one "SpecScribe" terminal across repeated Generate/Watch/Setup invocations instead of piling up a
- * fresh terminal tab each time. */
+ * fresh terminal tab each time — but not while it's mid-`watch` (or any other command): staging text into a
+ * terminal that's currently consuming stdin would land as confusing garbage. `busyTerminals` is populated only
+ * via shell integration ({@link busyTerminals}); a terminal without shell integration (some remotes/shells)
+ * never appears there, so this degrades to the prior always-reuse behavior — never worse than before. */
 function getOrCreateTerminal(folder: vscode.WorkspaceFolder): vscode.Terminal {
-  const existing = vscode.window.terminals.find((t) => t.name === 'SpecScribe' && t.exitStatus === undefined);
+  const existing = vscode.window.terminals.find((t) =>
+    t.name === 'SpecScribe' && t.exitStatus === undefined && !busyTerminals.has(t));
   return existing ?? vscode.window.createTerminal({ name: 'SpecScribe', cwd: folder.uri.fsPath });
 }
 
@@ -1103,9 +1169,7 @@ async function openProjectSettings(context: vscode.ExtensionContext) {
     'interactive setup and choose “Configure paths” to write it.',
     'Open Setup in Terminal');
   if (choice === 'Open Setup in Terminal') {
-    const terminal = getOrCreateTerminal(folder);
-    terminal.show();
-    terminal.sendText(toolCommandLine(resolveTool(context)), false); // bare tool → interactive menu; staged
+    stageCommandLine(getOrCreateTerminal(folder), toolCommandLine(resolveTool(context))); // bare tool → interactive menu
   }
 }
 
@@ -1157,13 +1221,25 @@ function resolveTool(context: vscode.ExtensionContext): ResolvedTool {
     : { command: tool, prefixArgs: [] };
 }
 
-/** A shell command line for the staged terminal handoff. Tokens containing whitespace are double-quoted; the
- * common resolved forms (`dotnet <dll> generate`, `specscribe generate`) need no quoting and run as-is in every
- * shell. Omit `sub` for the bare interactive invocation. */
+/** A shell command line for the staged terminal handoff. Tokens containing whitespace OR a double quote are
+ * double-quoted, with any embedded `"` escaped as `\"`; the common resolved forms (`dotnet <dll> generate`,
+ * `specscribe generate`) need no quoting and run as-is in every shell. Staged only (`sendText(cmd, false)`) —
+ * the user reviews the line and presses Enter, so this is a display nicety, not a command-injection boundary.
+ * Omit `sub` for the bare interactive invocation. */
 function toolCommandLine(tool: ResolvedTool, sub?: string): string {
   const parts = [tool.command, ...tool.prefixArgs];
   if (sub) parts.push(sub);
-  return parts.map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(' ');
+  return parts.map(quoteCommandArg).join(' ');
+}
+
+/** POSIX/bash-style quoting (`\"` for an embedded quote) — better than the prior whitespace-only quoting, which
+ * didn't escape an embedded `"` at all, but NOT a universally shell-correct quoter: PowerShell doesn't treat `\`
+ * as an escape character inside a double-quoted string, and a token ending in `\` immediately before the closing
+ * quote is still the classic Windows argv ambiguity. Both are pre-existing-class gaps a `toolPath`/prefix-arg
+ * would need to hit in combination with an embedded `"` to trigger — narrow enough, and low-severity enough (the
+ * line is staged, never auto-run), to accept rather than build a per-shell quoting engine for. */
+function quoteCommandArg(a: string): string {
+  return /[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a;
 }
 
 /** Kills a renderer process, escalating to SIGKILL after a grace period if it hasn't exited — a bare SIGTERM
