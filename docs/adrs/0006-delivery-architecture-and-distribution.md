@@ -4,6 +4,7 @@
 **Date:** 2026-07-10
 **Deciders:** Matt Eland
 **Amends:** [ADR 0005 — VS Code Webview Runtime and Packaging](0005-vs-code-webview-runtime-and-packaging.md) (re-affirmed, not superseded — see Decision)
+**Extended by:** [ADR 0008 — JSON IR as Canonical Representation](0008-json-ir-canonical-and-incremental-generation.md) (promotes this ADR's optional JSON/SPA form to the canonical IR + incremental generation, 2026-07-20) and [ADR 0009 — Front-End Framework](0009-frontend-framework-for-projection-layer.md) (re-opens **axis B / rendering-language only**, for maintainability — Proposed)
 
 ## Context
 

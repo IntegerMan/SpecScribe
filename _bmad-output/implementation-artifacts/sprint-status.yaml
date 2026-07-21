@@ -1,5 +1,5 @@
 # generated: 2026-07-05T22:16:50-04:00
-# last_updated: "2026-07-20" # 19.2 ready-for-dev; Epic 19 create-story action done
+# last_updated: "2026-07-20" # 11.1 create-story (Spec Kit Integration Spike, ready-for-dev); Epic 11 in-progress; 19.2 ready-for-dev; Epic 19 create-story action done
 # project: SpecScribe
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-05T22:16:50-04:00
-last_updated: "2026-07-20" # epic-10 retrospective done (2 action items: shared-main concurrent-edit convention, ADR-creation trigger + backfill); next epic = Epic 7 reopened scope (7.9-7.12), not a numeric successor; prior: 5.6 create-story done (How to use SpecScribe CLI guidance); prior: 10.8 code review done (2 owner decisions + 6 patches applied, 4 dismissed; commit efe6e34); prior: 10.10 code review done (5 patches applied, 2 deferred); prior: 5.5 create-story done (configurable date-page "today" policy); prior: 10.11 code review done (5 patches applied, 2 deferred); prior: 10.9 code review done (3 patches applied); prior: 10.7 code review done; 10.5/10.6/10.3/10.1/10.2 reviews
+last_updated: "2026-07-20" # 12.1 create-story done (GSD and GSD-Pi Integration Spike seeded, ready-for-dev; Epic 12 → in-progress, second per-framework spike-led epic; covers TWO frameworks + mandatory coverage tiers + the .gsd/ SQLite-authoritative-vs-markdown-projection wrinkle; shares 11.1's registry gap — coordinate one ADR); prior: 11.1 create-story done (Spec Kit Integration Spike seeded, ready-for-dev; Epic 11 → in-progress, first of the five per-framework spike-led epics to start); prior: epic-10 retrospective done (2 action items: shared-main concurrent-edit convention, ADR-creation trigger + backfill); next epic = Epic 7 reopened scope (7.9-7.12), not a numeric successor; prior: 5.6 create-story done (How to use SpecScribe CLI guidance); prior: 10.8 code review done (2 owner decisions + 6 patches applied, 4 dismissed; commit efe6e34); prior: 10.10 code review done (5 patches applied, 2 deferred); prior: 5.5 create-story done (configurable date-page "today" policy); prior: 10.11 code review done (5 patches applied, 2 deferred); prior: 10.9 code review done (3 patches applied); prior: 10.7 code review done; 10.5/10.6/10.3/10.1/10.2 reviews
 project: SpecScribe
 project_key: NOKEY
 tracking_system: file-system
@@ -218,13 +218,13 @@ development_status:
   # Epics 11–15 added 2026-07-10: per-framework coverage (Stories 4.3–4.7) extracted into spike-led epics
   # (append-only, no renumber). Each epic's X.1 is a Framework Integration Spike; X.2 is the migrated
   # baseline coverage. All backlog; run create-story per story when scheduled.
-  epic-11: backlog
-  11-1-spec-kit-integration-spike: backlog
+  epic-11: in-progress
+  11-1-spec-kit-integration-spike: ready-for-dev # create-story 2026-07-20: pure-tracing spike (no code) mirroring Story 19.1's shape, not 6.3/6.6's ADR-producing shape — deliverable is a coverage map in Completion Notes. Surfaces the load-bearing gap that no IArtifactAdapter registry exists yet (SiteGenerator.cs hardcodes BmadArtifactAdapter); Task 5 requires naming this as an explicit Story 11.2 prerequisite finding, escalating via ADR only if it's a genuine fork. Also flags that BMad's "host-neutral" models (EpicsModel/RequirementsModel/SprintStatus/RetroModel) bake in BMad-specific vocabulary (VerticalSlice/FurtherDevelopment sections, FR/NFR numbering, sprint-status.yaml shape) with no Spec Kit analog — expect Sprint=null/Retros=empty/Requirements=null-or-lesser as honest NFR8 absence, not gaps. Live-verified 2026-07-20 against github/spec-kit: .specify/ marker + specs/<NNN>-slug/{spec,plan,tasks}.md, current /speckit.* slash commands, no sprint/retro/FR-numbering convention — treated as a hypothesis to reconfirm against a real repo, not settled fact.
   11-2-spec-kit-baseline-adapter-coverage: backlog
   epic-11-retrospective: optional
 
-  epic-12: backlog
-  12-1-gsd-and-gsd-pi-integration-spike: backlog
+  epic-12: in-progress # → in-progress 2026-07-20 (first story 12.1 created; second of the five per-framework spike-led epics to start, after Epic 11)
+  12-1-gsd-and-gsd-pi-integration-spike: ready-for-dev # create-story 2026-07-20: pure-tracing spike (no code), sibling of 11.1 — deliverable is a coverage map in Completion Notes. Differs from 11.1 in FOUR load-bearing ways: (1) covers TWO frameworks (GSD + GSD-Pi) — Task 3 must decide if they share ONE adapter surface or diverge (GSD-Pi is GSD's successor sharing .gsd/ + SQLite-authoritative + Milestone→Slice→Task); (2) coverage tiers are MANDATORY (AC#1 "declared coverage tier"; FR-4 vocab = rendered/summarized/unsupported), unlike 11.1's optional-tier note; (3) GSD is NOT markdown-native — .gsd/gsd.db SQLite is authoritative + gitignored, .gsd/*.md are DB-refreshed projections that may be stale/absent (SpecScribe reads md never DB — drives a reliability tier/diagnostic finding); (4) GSD ships REQUIREMENTS.md + STATE.md + slice SUMMARY.md, so do NOT copy Spec Kit's Sprint/Requirements/Retros=null table — re-derive per family. Warns of the GSD (Get Shit Done) vs BMad GDS (Game Dev Studio, already supported via BmadArtifactAdapter) near-anagram trap. Shares 11.1's adapter-registry gap (SiteGenerator.cs hardcodes BmadArtifactAdapter) — coordinate ONE shared registry decision, do not propose a second GSD-specific ADR. GSD .gsd/ layout live-verified vs gsd-build/gsd-2 + docs.opengsd.net 2026-07-20; GSD-Pi exact filenames unresolved at create-study → dev must fetch docs.opengsd.net/pi/concepts/project-structure.md. Treat all tables as hypotheses to reconfirm against real repos of BOTH frameworks.
   12-2-gsd-and-gsd-pi-baseline-adapter-coverage: backlog
   epic-12-retrospective: optional
 
@@ -307,6 +307,23 @@ development_status:
   21-2-delivery-cadence-and-story-cycle-time: backlog
   21-3-planning-code-impact-map: backlog
   epic-21-retrospective: optional
+
+  epic-22: backlog # delivery evolution: JSON IR canonical + incremental event-driven generation (SCP 2026-07-20, correct-course); design-locked by ADR 0008; opens with spike 22.1; does not disturb Epic 7
+  22-1-spike-incremental-recompute-and-ir-delta-transport: backlog
+  22-2-canonical-ir-schema-and-versioning: backlog
+  22-3-static-html-rendered-from-the-ir: backlog
+  22-4-spa-and-webview-as-ir-consumers: backlog
+  22-5-incremental-event-driven-regeneration-engine: backlog
+  22-6-client-server-delta-channel: backlog # optional, spike-gated
+  epic-22-retrospective: optional
+
+  epic-23: backlog # front-end framework for the projection layer — Vue + Nuxt 3 (universal/SSR) over the IR (SCP 2026-07-20); ADR 0009 ACCEPTED; spike-first; depends on Epic 22's IR; does not disturb Epic 7
+  23-1-spike-nuxt-over-ir-feasibility: backlog
+  23-2-component-library-and-design-token-bridge: backlog
+  23-3-migrate-baseline-surfaces-dashboard-epics: backlog
+  23-4-migrate-remaining-surfaces-retire-c-sharp-html-adapter: backlog
+  23-5-packaging-reconciliation-node-build-step: backlog
+  epic-23-retrospective: optional
 
 action_items:
   - epic: 1

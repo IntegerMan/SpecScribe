@@ -288,6 +288,14 @@ Turn the static remaining-work sunburst into a fluid, explorable map: click a we
 High-impact displays that make product value legible and reveal correlations across work items and code: a traceability coverage matrix, delivery cadence / cycle-time, and a planning↔code impact map — all generation-time-derived.
 **FRs covered:** FR39 (seat in PRD when convenient)
 
+### Epic 22: Delivery Evolution — JSON IR + Incremental Event-Driven Generation
+Make the serialized JSON data-layer the **canonical intermediate representation (IR)** all surfaces project from, and move generation to an **incremental, event-driven model** — without porting the C# analysis core. Design-locked by [ADR 0008](../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md); **backlog / unscheduled** (design-now, build-later).
+**Status:** backlog · **NFRs:** NFR4, NFR6, NFR9
+
+### Epic 23: Front-End Framework for the Projection Layer — Vue + Nuxt (SSR) over the IR
+Replace the C# presentation/templating layer with a component-oriented **Vue + Nuxt 3 (universal/SSR)** front end that consumes the Epic 22 IR — for CSS modularity (scoped SFC styling), smaller/more-modular files, and a single renderer. NFR6 baseline preserved by Nuxt prerender; analysis stays in C# (ADR 0006 axis C not reopened). Design-locked by [ADR 0009](../../docs/adrs/0009-frontend-framework-for-projection-layer.md); **backlog / unscheduled**, spike-first, sequences **after** Epic 22.
+**Status:** backlog · **NFRs:** NFR6 · **Depends on:** Epic 22 (the IR it consumes)
+
 <!-- Epics 17–18 added 2026-07-11 (SCP 2026-07-11, correct-course): Epic 17 = pre-publication hardening (NFR10), gates Epic 16's cut; Epic 18 = BMad-native module exploration (FR36), distinct from framework Epics 11–15. Append-only, no renumber. Run create-story per story when scheduled (17.1 / 18.1 spike first). -->
 <!-- Epic 19 added 2026-07-17: directed work-graph visualization + query across reviews/stories/epics/deferred/code. Exploratory insight surface; spike-led. -->
 <!-- Epics 20–21 added 2026-07-19 (SCP 2026-07-19, correct-course): Epic 20 = interactive drill-in sunburst explorer + related-work pane (first rich client-interactive surface, enhances static Story 10.7); Epic 21 = value & correlation insights (traceability matrix, cadence/cycle-time, planning↔code map). Same SCP also added Stories 7.10–7.12 (code risk/ownership/freshness insights) and 10.8–10.11 (unified list grammar + client-light sort/filter + context-aware white-bar nav + sticky section nav). Append-only; the contextual-nav cluster folded into Epic 10 rather than a new epic, freeing 21 for the insights epic. -->
@@ -3156,3 +3164,41 @@ So that "what did this work change" becomes visible instead of inferred.
 **When** the correlation can't be built
 **Then** the surface is omitted cleanly
 **And** it never re-counts open items against ProjectCounts.
+
+## Epic 22: Delivery Evolution — JSON IR + Incremental Event-Driven Generation
+
+Elevate the serialized JSON data-layer from an optional output adapter (Story 6.7) to the **canonical intermediate representation (IR)** of a SpecScribe project — the durable, serialized form of the AD-2 host-neutral view models plus pre-rendered SVG chart fragments. Static HTML, the SPA, and the VS Code webview become **co-equal projections** of that IR (static HTML stays the JS-optional NFR6 baseline — a projection, not a `<noscript>` afterthought). Generation moves to an **incremental, event-driven model** that recomputes only the changed scope (operationalizing AD-5) and emits IR deltas suitable for a future watch / client-server transport (AD-8). Does **not** port the C# analysis core (ADR 0006 stands); charts stay pre-rendered SVG *in* the IR.
+
+**Status:** backlog · unscheduled · design-locked by [ADR 0008](../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md) · **NFRs:** NFR4 (additive), NFR6 (accessibility baseline preserved), NFR9 (reproducible CI) · **Source:** SCP 2026-07-20.
+
+<!-- 2026-07-20 (correct-course, SCP 2026-07-20): Epic 22 seated backlog per ADR 0008 (design-now, build-later). Candidate Epic 23 — Front-End Framework for the Projection Layer (ADR 0009 — Proposed) — is spike-gated, sequences AFTER Epic 22's IR exists, and is NOT seated as a full epic until ADR 0009's rendering-topology (NFR6) choice is ratified. Epic 7 (7.9–7.12) is untouched. -->
+
+**Disposition:** design-now/build-later. **Epic 22 opens with a measurement spike (22.1)** mirroring Story 6.6 — no implementation story is seated until the spike de-risks incremental-recompute correctness and IR-delta transport by numbers. This epic does **not** disturb the in-flight Epic 7 work.
+
+**Candidate stories (illustrative — finalized at kickoff, not committed here):**
+
+- **Story 22.1 — Spike: incremental recompute + IR-delta transport.** Measure changed-scope recompute correctness (incl. AD-5 topology-change invalidation) and delta latency against this repo; gates everything below.
+- **Story 22.2 — Canonical IR schema + versioning.** Serialize the AD-2 view models + pre-rendered SVG fragments into a versioned IR; generalize the `SectionViewModelSerializationTests` round-trip into an IR golden boundary. **Known constraint:** the existing SPA path has a **byte-blind chunker** (Story 6.6 at-scale measure: `pages-root.json` reached 112.9 MB at 1,461 pages; `code-map.html` 82.5 MB) — the IR schema must chunk by **bytes**, not page count, so large repos don't ship monolithic payloads.
+- **Story 22.3 — Static HTML rendered from the IR.** Prove byte/behaviour parity with today's golden output when static HTML is a projection of the IR rather than a direct render.
+- **Story 22.4 — SPA + webview as IR consumers.** Fold the Story 6.7 SPA adapter and the webview onto the canonical IR; retire duplicate data paths.
+- **Story 22.5 — Incremental event-driven regeneration engine.** Operationalize AD-5 over the IR — recompute only changed scope, emit deltas.
+- **Story 22.6 — (Optional, spike-gated) client-server delta channel.** A watch server that pushes IR deltas to connected consumers; the "updates only on new events" future.
+
+**Cross-references:** Epic 20 (Interactive Explorer — SpecScribe's first client-JS surface) and Epic 21 (Value & Correlation viz) are natural IR consumers; the IR schema (22.2) should be informed by their data needs, but neither blocks nor is blocked by Epic 22. The presentation-layer follow-on is **Epic 23** (Vue + Nuxt over the IR — [ADR 0009](../../docs/adrs/0009-frontend-framework-for-projection-layer.md)), which sequences after this epic.
+
+## Epic 23: Front-End Framework for the Projection Layer — Vue + Nuxt (SSR) over the IR
+
+Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters; chart-SVG generation stays in C#) with a component-oriented **Vue + Nuxt 3 (universal/SSR)** front end that renders from the Epic 22 canonical IR. Motivation is **presentation-layer maintainability** — scoped, component-local CSS (ending the monolithic-stylesheet fragility class, e.g. the `*/`-comment silent-truncation incident), smaller and more modular files, and a **single renderer** (removing the C#-template↔framework drift hazard). This re-opens ADR 0006's **axis B (rendering language) only** — analysis and the IR production stay in C# (ADR 0006 axis C not reopened; charts stay pre-rendered SVG *in* the IR).
+
+**Status:** backlog · unscheduled · spike-first · design-locked by [ADR 0009](../../docs/adrs/0009-frontend-framework-for-projection-layer.md) · **Depends on:** Epic 22 (consumes the IR) · **NFRs:** NFR6 (baseline preserved by Nuxt prerender), NFR4.
+
+<!-- 2026-07-20 (correct-course, SCP 2026-07-20): ADR 0009 ratified — topology = universal/SSR, framework = Vue + Nuxt 3, C#-rendering north star relaxed for the presentation layer. Epic 23 seated backlog; sequences AFTER Epic 22's IR. Epic 7 untouched. -->
+
+**Ratified direction (ADR 0009):** universal/SSR via **Nuxt 3** — prerender every route to static HTML at build (NFR6 baseline by construction) + minimal client hydration for interactivity; **Vue** with current modern layers (Vite, Nitro, TypeScript, scoped-SFC CSS). Client-only rendering was rejected (would break NFR6 + re-introduce dual-renderer drift).
+
+**Candidate stories (illustrative — finalized at kickoff):**
+- **Story 23.1 — Spike: Nuxt-over-IR feasibility.** Prove Nuxt SSG/prerender NFR6 baseline, scoped-CSS migration of one representative surface, chart-SVG injection, webview-CSP survival under a hydration nonce, Markdig-prose fidelity, and the cost of adding Node to the generation pipeline (reconcile with the ADR 0005/0006 self-contained-binary distribution).
+- **Story 23.2 — Component library + design-token bridge.** Port the shared presentation tokens (status/motion families, AD-7) into scoped Vue components; establish the CSS module conventions.
+- **Story 23.3 — Migrate baseline surfaces (dashboard, epics) to Vue/Nuxt over the IR**, proving parity with the golden output.
+- **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR).
+- **Story 23.5 — Packaging reconciliation** — Node build step in distribution (Epic 16 touchpoint); resolve the self-contained-binary vs. Node-toolchain story.
