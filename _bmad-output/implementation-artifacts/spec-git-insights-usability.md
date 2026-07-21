@@ -2,7 +2,7 @@
 title: 'Git Insights page usability: narrow columns, no paging, oversized heatmap'
 type: 'bugfix'
 created: '2026-07-21'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 context: []
 baseline_commit: '34d681b21dab4e49ca647d5ff24d6fe553323ec1'
@@ -71,3 +71,40 @@ baseline_commit: '34d681b21dab4e49ca647d5ff24d6fe553323ec1'
 
 **Manual checks (if no CLI):**
 - Run `specscribe generate --deep-git` (or the project's existing generate command) against this repo, open `git-insights.html` in a browser: confirm file paths no longer wrap character-by-character, the file table paginates once JS runs, and the Activity Over Time heatmap tiles render at a reasonable size (not the current oversized tiles seen for this repo's short history).
+
+## Suggested Review Order
+
+**Table pagination (specscribe.js)**
+
+- Entry point: the pagination state machine composing with sort and filter.
+  [`specscribe.js:336`](../../src/SpecScribe/assets/specscribe.js#L336)
+
+- `matchingRows`/`paginate` separate "filtered out" from "off current page" via two classes so they compose.
+  [`specscribe.js:345`](../../src/SpecScribe/assets/specscribe.js#L345)
+
+- Sort re-derives page 1 since re-sorting scatters rows across pages.
+  [`specscribe.js:425`](../../src/SpecScribe/assets/specscribe.js#L425)
+
+- Filter input resets to page 1 and reclassifies rows via `gi-filtered-out`.
+  [`specscribe.js:478`](../../src/SpecScribe/assets/specscribe.js#L478)
+
+- `.gi-pager` styling matches the existing `.gi-filter`/`.gi-sort-btn` chrome; hidden by default (no dead control in no-JS).
+  [`specscribe.css:5394`](../../src/SpecScribe/assets/specscribe.css#L5394)
+
+**Heatmap width cap (Charts.cs)**
+
+- The capped inline `max-width` computed from the grid's own natural size, overriding the stylesheet's flat 460px ceiling.
+  [`Charts.cs:1182`](../../src/SpecScribe/Charts.cs#L1182)
+
+- Where the cap lands on the emitted `<svg>` tag.
+  [`Charts.cs:1216`](../../src/SpecScribe/Charts.cs#L1216)
+
+**File-path wrap fix (specscribe.css)**
+
+- `word-break: break-all` → `white-space: nowrap`, falling back to the existing `.table-scroll` horizontal scroll.
+  [`specscribe.css:5356`](../../src/SpecScribe/assets/specscribe.css#L5356)
+
+**Tests**
+
+- Heatmap cap tests assert bounds (not a re-derivation of the production formula) plus a near-boundary case.
+  [`ChartsTests.cs:3656`](../../tests/SpecScribe.Tests/ChartsTests.cs#L3656)

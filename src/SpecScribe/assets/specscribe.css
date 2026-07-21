@@ -3740,6 +3740,45 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-table a { color: var(--rust); text-decoration: none; }
 .codemap-table a:hover { text-decoration: underline; }
 
+/* ============ CODE FRESHNESS SUNBURST (code-map.html, Story 7.12) ============ */
+/* A brand-new recursive angular-partition chart — NOT the fixed 3-ring epic/story .sunburst. File wedges reuse
+   the SAME level-0..4 fill values as .codemap-cell/.heatmap-cell (never a new palette); directory wedges stay
+   neutral/unlabeled, matching the treemap's own directory-boundary convention. */
+.freshness-sunburst-wrap { display: flex; justify-content: center; }
+.freshness-sunburst { display: block; width: 100%; max-width: 420px; height: auto; }
+.freshness-wedge { stroke: var(--parchment); stroke-width: 0.5; transition: stroke 0.12s ease; }
+.freshness-wedge.level-1 { fill: #ecd18f; }
+.freshness-wedge.level-2 { fill: #dfb455; }
+.freshness-wedge.level-3 { fill: var(--gold-light); }
+.freshness-wedge.level-4 { fill: var(--gold); }
+.freshness-wedge.level-none { fill: var(--parchment-dark); fill-opacity: 0.55; }
+.freshness-wedge:hover,
+.freshness-wedge:focus-visible { outline: none; stroke: var(--rust); stroke-width: 1.5; }
+.freshness-sunburst a:focus-visible .freshness-wedge { outline: none; stroke: var(--teal); stroke-width: 2; }
+/* Directory wedges: same neutral guide-rule tone as .codemap-dir — no fill, no label, identity in the tooltip. */
+.freshness-wedge-dir { fill: none; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
+
+.freshness-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  margin-top: 0.4rem;
+  justify-content: center;
+}
+.freshness-legend-dim { font-weight: 600; margin-right: 0.4rem; }
+.freshness-legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.freshness-legend-swatch.level-1 { background: #ecd18f; }
+.freshness-legend-swatch.level-2 { background: #dfb455; }
+.freshness-legend-swatch.level-3 { background: var(--gold-light); }
+.freshness-legend-swatch.level-4 { background: var(--gold); }
+.freshness-legend-swatch.level-none { background: var(--parchment-dark); opacity: 0.55; }
+.freshness-legend-label { margin-right: 0.6rem; }
+.freshness-legend-empty { color: var(--ink-light); font-size: 0.8rem; margin: 0.6rem 0; text-align: center; }
+.freshness-caption { text-align: center; font-size: 0.8rem; }
+
 /* ============ REFACTOR-TARGET RISK QUADRANT (risk-quadrant.html, Story 7.10) ============ */
 /* Size (X, log-scaled) x churn-frequency (Y) scatter. Not a --status-* surface — files carry no lifecycle status,
    so shading/points use the neutral/attention (rust) family + the shared gold intensity ramp, like every other

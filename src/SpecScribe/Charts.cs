@@ -22,6 +22,8 @@ public static class Charts
         RefactorRisk,
         /// <summary>Author concentration / bus-factor: how much of a file's history sits with one person (Story 7.11).</summary>
         AuthorConcentration,
+        /// <summary>Code freshness: how recently each part of the codebase last changed (Story 7.12).</summary>
+        CodeFreshness,
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
@@ -50,6 +52,8 @@ public static class Charts
             "Files that are both large and frequently changed are the costliest place for a defect to hide — refactoring them tends to pay off fastest.",
         ChartMetric.AuthorConcentration =>
             "Files with a single dominant author are a knowledge-silo risk if that person leaves or moves on.",
+        ChartMetric.CodeFreshness =>
+            "Recently-changed code is where current effort is concentrated; long-untouched code may be stable — or simply forgotten.",
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
 
@@ -2567,6 +2571,269 @@ public static class Charts
         }
 
         sb.Append("</svg>\n");
+        return sb.ToString();
+    }
+
+    // ---- Code freshness / age map (Story 7.12) ----------------------------------------------
+
+    /// <summary>Recursion-cap on the freshness sunburst's ring count: a node at tree depth D renders in ring
+    /// <c>min(D, FreshnessSunburstMaxDepth - 1)</c>, so a pathologically deep directory tree still produces a
+    /// fixed, bounded number of rings rather than an unbounded one — deeper nodes keep subdividing angularly but
+    /// saturate into the outermost ring radially. Small enough to stay legible; real repos are shallower than
+    /// their raw path depth suggests because <see cref="CodeMap.Build"/> already collapses single-child directory
+    /// chains. Not shared with the unrelated fixed 3-ring <see cref="Sunburst"/> (a different hierarchy).</summary>
+    public const int FreshnessSunburstMaxDepth = 6;
+
+    /// <summary>Angular gap (radians) between adjacent wedges — the same discipline <see cref="InsetStart"/>/
+    /// <see cref="InsetEnd"/> apply to the epic/story sunburst, reused here at a smaller value since this chart's
+    /// wedges are typically far more numerous.</summary>
+    private const double FreshnessWedgePad = 0.0025;
+
+    /// <summary>Defensive recursion-depth guard distinct from <see cref="FreshnessSunburstMaxDepth"/>'s visual ring
+    /// cap: stops walking a pathologically deep tree outright rather than risking a deep call stack (NFR2,
+    /// never-throw), mirroring <see cref="CodeMap"/>'s own <c>MaxDepth</c> layout guard.</summary>
+    private const int FreshnessRecursionGuard = 256;
+
+    /// <summary>Renders the directory-structure freshness sunburst (Story 7.12): a brand-new recursive angular
+    /// partition (NOT <see cref="Sunburst"/>'s fixed 3-ring epic/story layout) walking <paramref name="roots"/>
+    /// (<see cref="CodeMap.Roots"/>) exactly as given — no new tree-walk or git call. Each node's angular span is
+    /// proportional to its <see cref="CodeMapNode.Lines"/> weight (the same "size" convention the treemap uses),
+    /// recursively subdivided among its <see cref="CodeMapNode.Children"/>; ring radius is keyed by tree depth,
+    /// saturating at <see cref="FreshnessSunburstMaxDepth"/> so deeper nodes keep subdividing angularly but stop
+    /// growing new rings. Only file-leaf wedges are colored by recency (<see cref="FreshnessLevel"/>, most-recent =
+    /// hottest); directory wedges stay neutral/unlabeled with a hairline stroke, matching the treemap's
+    /// no-directory-label convention. A file wedge with no git record renders <c>level-none</c> (dim neutral,
+    /// still occupying its angular slice so siblings don't visually inflate). File wedges wrap in a guarded
+    /// <c>&lt;a&gt;</c> only when <paramref name="fileHref"/> resolves (never a dead link); directory wedges are
+    /// never links (no drill-down/zoom — this is a static, one-shot chart). Every wedge carries a rich native
+    /// <c>&lt;title&gt;</c> tooltip (no JS). Degrades to the shared <c>chart-empty</c> notice only when there are
+    /// no source files at all; a tree with zero metric-bearing files still renders in full, all-neutral (AC #2).
+    /// Deterministic: same input always produces byte-identical output (FR31) — no wall-clock, all geometry and
+    /// coloring derive from already-fetched git timestamps. [Story 7.12]</summary>
+    public static string CodeFreshnessSunburst(
+        IReadOnlyList<CodeMapNode> roots,
+        int size = 480,
+        Func<string, string?>? fileHref = null)
+    {
+        if (roots.Count == 0)
+        {
+            return "<div class=\"chart-empty\">No source files to chart yet.</div>\n";
+        }
+
+        var fileCount = 0;
+        var dirCount = 0;
+        DateOnly? mostRecent = null;
+        DateOnly? oldest = null;
+        CollectFreshnessStats(roots, ref fileCount, ref dirCount, ref mostRecent, ref oldest);
+
+        var maxDaysAgo = mostRecent is { } mr0 && oldest is { } od0 ? mr0.DayNumber - od0.DayNumber : 0;
+
+        var c = size / 2.0;
+        var innerR = size * 0.06;
+        var outerR = size * 0.48;
+        var ringWidth = (outerR - innerR) / FreshnessSunburstMaxDepth;
+
+        var aria = new StringBuilder(
+            $"Code freshness sunburst: directory structure sized by lines of code and colored by recency of " +
+            $"last change; {fileCount} {Plural(fileCount, "file", "files")} across {dirCount} {Plural(dirCount, "directory", "directories")}.");
+        if (mostRecent is { } mrDate && oldest is { } odDate)
+        {
+            aria.Append($" Most recently changed file: {DReadable(mrDate)}. Longest untouched: {DReadable(odDate)}.");
+        }
+
+        var sb = new StringBuilder();
+        sb.Append($"<svg class=\"freshness-sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria.ToString())}\">\n");
+        WalkFreshnessWedges(roots, -Math.PI / 2, -Math.PI / 2 + (2 * Math.PI), 0, c, innerR, ringWidth, mostRecent, maxDaysAgo, fileHref, sb);
+        sb.Append("</svg>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Tallies file/directory counts and the most-recent/oldest <see cref="CodeFileMetrics.LastDate"/>
+    /// across the whole tree in one pass — the shared basis for the sunburst's <c>aria-label</c> summary and the
+    /// per-file recency bucketing (both need the SAME most-recent date so a wedge's color and the chart's own
+    /// summary text can never disagree).</summary>
+    private static void CollectFreshnessStats(
+        IReadOnlyList<CodeMapNode> nodes, ref int fileCount, ref int dirCount, ref DateOnly? mostRecent, ref DateOnly? oldest)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.IsDirectory)
+            {
+                dirCount++;
+                CollectFreshnessStats(node.Children, ref fileCount, ref dirCount, ref mostRecent, ref oldest);
+            }
+            else
+            {
+                fileCount++;
+                if (node.Metrics?.LastDate is { } d)
+                {
+                    if (mostRecent is not { } mrVal || d > mrVal) mostRecent = d;
+                    if (oldest is not { } odVal || d < odVal) oldest = d;
+                }
+            }
+        }
+    }
+
+    /// <summary>Number of file leaves under a node (itself, if a file) — the directory wedge tooltip's descendant
+    /// count.</summary>
+    private static int CountFreshnessFiles(CodeMapNode node)
+    {
+        if (!node.IsDirectory) return 1;
+        var count = 0;
+        foreach (var child in node.Children) count += CountFreshnessFiles(child);
+        return count;
+    }
+
+    /// <summary>Recursively lays out and emits one ring band of wedges, then recurses into each directory's
+    /// children for the next ring — the entire angular-partition algorithm (Story 7.12 "Latest Technical
+    /// Information"): a node's span is <c>weight / totalWeight</c> of its parent's allotted <c>[angleStart,
+    /// angleEnd)</c> range. Ring radius is keyed by <paramref name="depth"/>, saturating at
+    /// <see cref="FreshnessSunburstMaxDepth"/> so a node deeper than the cap renders flush in the outermost ring
+    /// while its own children continue subdividing that same ring's angular space (bounded ring COUNT, not
+    /// bounded tree depth). Reuses <see cref="AnnularSector"/>/<see cref="InsetStart"/>/<see cref="InsetEnd"/> —
+    /// the SAME wedge-path math the epic/story sunburst uses — rather than a second hand-rolled arc formula.</summary>
+    private static void WalkFreshnessWedges(
+        IReadOnlyList<CodeMapNode> nodes, double angleStart, double angleEnd, int depth,
+        double c, double innerR, double ringWidth, DateOnly? mostRecent, int maxDaysAgo,
+        Func<string, string?>? fileHref, StringBuilder sb)
+    {
+        if (nodes.Count == 0 || angleEnd <= angleStart || depth > FreshnessRecursionGuard) return;
+
+        var totalWeight = nodes.Sum(n => Math.Max(n.Lines, 1));
+        if (totalWeight <= 0) return;
+
+        var ringIndex = Math.Min(depth, FreshnessSunburstMaxDepth - 1);
+        var rInner = innerR + (ringIndex * ringWidth);
+        var rOuter = rInner + ringWidth;
+        var span = angleEnd - angleStart;
+
+        var angle = angleStart;
+        foreach (var node in nodes)
+        {
+            var weight = Math.Max(node.Lines, 1);
+            var sweep = span * weight / totalWeight;
+            var a0 = InsetStart(angle, sweep, FreshnessWedgePad);
+            var a1 = InsetEnd(angle, sweep, FreshnessWedgePad);
+            var path = AnnularSector(c, rInner, rOuter, a0, a1);
+
+            if (node.IsDirectory)
+            {
+                var descendants = CountFreshnessFiles(node);
+                var dirTitle = $"{node.RepoRelativePath} — {descendants} {Plural(descendants, "file", "files")}";
+                sb.Append($"  <path class=\"freshness-wedge-dir\" d=\"{path}\"><title>{Html(dirTitle)}</title></path>\n");
+                WalkFreshnessWedges(node.Children, angle, angle + sweep, depth + 1, c, innerR, ringWidth, mostRecent, maxDaysAgo, fileHref, sb);
+            }
+            else
+            {
+                string cls;
+                string title;
+                if (node.Metrics?.LastDate is { } lastDate && mostRecent is { } mr)
+                {
+                    var daysAgo = mr.DayNumber - lastDate.DayNumber;
+                    var level = FreshnessLevel(daysAgo, maxDaysAgo);
+                    cls = $"freshness-wedge level-{level}";
+                    title = $"{node.RepoRelativePath} — last changed {PortalDates.Day(lastDate)}";
+                }
+                else
+                {
+                    cls = "freshness-wedge level-none";
+                    title = $"{node.RepoRelativePath} — no git history";
+                }
+
+                var href = fileHref?.Invoke(node.RepoRelativePath);
+                if (href is { Length: > 0 })
+                {
+                    sb.Append($"  <a href=\"{Html(href)}\"><path class=\"{cls}\" d=\"{path}\"><title>{Html(title)}</title></path></a>\n");
+                }
+                else
+                {
+                    sb.Append($"  <path class=\"{cls}\" tabindex=\"0\" role=\"img\" d=\"{path}\"><title>{Html(title)}</title></path>\n");
+                }
+            }
+
+            angle += sweep;
+        }
+    }
+
+    /// <summary>Quantizes a file's staleness ("days since the most-recent last-changed date in the set") onto the
+    /// SAME 0..4 shape <see cref="HeatThresholds"/> already provides for commit counts — inverted, since here the
+    /// SMALLEST value (0 days ago) is hottest: most-recent = level 4, oldest = level 1. A uniform set (every
+    /// metric-bearing file changed the same day, <paramref name="maxDaysAgo"/> == 0) reads all level 4 rather than
+    /// collapsing to level 1, matching <see cref="HeatLevel"/>'s identical "uniform single-value history reads
+    /// light/active, not maxed-vs-zero" discipline. [Story 7.12]</summary>
+    private static int FreshnessLevel(int daysAgo, int maxDaysAgo)
+    {
+        if (maxDaysAgo <= 0) return 4;
+        var (t1, t2, t3) = HeatThresholds(maxDaysAgo);
+        if (daysAgo <= t1) return 4;
+        if (daysAgo <= t2) return 3;
+        if (daysAgo <= t3) return 2;
+        return 1;
+    }
+
+    /// <summary>Real-value ("N days ago") legend range for a freshness level, derived from the SAME
+    /// <see cref="HeatThresholds"/> call <see cref="FreshnessLevel"/> uses, so swatch and text can never disagree
+    /// — the level-0..4 analog of <see cref="HeatLevelRange"/>, mirrored for dates instead of counts. Never the
+    /// literal "Less"/"More" placeholder text (Story 10.2). [Story 7.12]</summary>
+    private static string FreshnessLevelRange(int level, int maxDaysAgo)
+    {
+        if (level is < 1 or > 4) throw new ArgumentOutOfRangeException(nameof(level), level, "Freshness level must be 1..4.");
+        if (maxDaysAgo <= 0) return level == 4 ? "same day" : "—";
+
+        var (t1, t2, t3) = HeatThresholds(maxDaysAgo);
+        return level switch
+        {
+            4 => FormatDaysAgoRange(0, t1),
+            3 => FormatDaysAgoRange(t1 + 1, t2),
+            2 => FormatDaysAgoRange(t2 + 1, t3),
+            1 => FormatDaysAgoRange(t3 + 1, maxDaysAgo, openEnded: true),
+            _ => "—",
+        };
+    }
+
+    private static string FormatDaysAgoRange(int lo, int hi, bool openEnded = false)
+    {
+        if (lo > hi) return "—";
+        string Fmt(int n) => n == 0 ? "today" : $"{n.ToString(CultureInfo.InvariantCulture)} {Plural(n, "day", "days")} ago";
+        if (lo == hi) return Fmt(lo);
+        if (openEnded) return $"{lo.ToString(CultureInfo.InvariantCulture)}+ {Plural(lo, "day", "days")} ago";
+        return lo == 0
+            ? $"today–{hi.ToString(CultureInfo.InvariantCulture)} {Plural(hi, "day", "days")} ago"
+            : $"{lo.ToString(CultureInfo.InvariantCulture)}–{hi.ToString(CultureInfo.InvariantCulture)} {Plural(hi, "day", "days")} ago";
+    }
+
+    /// <summary>The freshness sunburst's real-value legend (Story 10.2 AC — never the treemap's "Less … More"
+    /// placeholder): one swatch + actual day-count range per reachable level, hottest (most-recent) first, plus a
+    /// trailing "no git history" swatch whenever at least one file has no metrics. When NO file in the set carries
+    /// git metrics at all, the numeric ramp is meaningless (every wedge is <c>level-none</c>), so this degrades to
+    /// a plain note instead of a legend nobody's wedges can ever match (AC #2 graceful degradation).</summary>
+    public static string FreshnessLegend(IReadOnlyList<CodeMapNode> files)
+    {
+        var withMetrics = files.Where(f => f.Metrics?.LastDate is not null).ToList();
+        if (withMetrics.Count == 0)
+        {
+            return "<p class=\"freshness-legend-empty\">Git change data is unavailable (run with <code>--deep-git</code> " +
+                   "in a git repository to colorize by recency) — every file renders neutral.</p>\n";
+        }
+
+        var mostRecent = withMetrics.Max(f => f.Metrics!.LastDate!.Value);
+        var maxDaysAgo = withMetrics.Max(f => mostRecent.DayNumber - f.Metrics!.LastDate!.Value.DayNumber);
+        var hasUnmetriced = files.Count != withMetrics.Count;
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"freshness-legend\">");
+        sb.Append("<span class=\"freshness-legend-dim\">Colorized by recency of last change</span> ");
+        for (var l = 4; l >= 1; l--)
+        {
+            sb.Append($"<span class=\"freshness-legend-swatch level-{l}\"></span>");
+            sb.Append($"<span class=\"freshness-legend-label\">{Html(FreshnessLevelRange(l, maxDaysAgo))}</span> ");
+        }
+        if (hasUnmetriced)
+        {
+            sb.Append("<span class=\"freshness-legend-swatch level-none\"></span>");
+            sb.Append("<span class=\"freshness-legend-label\">No git history</span>");
+        }
+        sb.Append("</div>\n");
         return sb.ToString();
     }
 

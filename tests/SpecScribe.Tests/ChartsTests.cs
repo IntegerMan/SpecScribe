@@ -2227,6 +2227,171 @@ public class ChartsTests
         Assert.Empty(Charts.RiskQuadrantElevatedFiles(tooFew));
     }
 
+    // ---- Code freshness sunburst (Story 7.12) ----------------------------------------------
+
+    /// <summary>A small nested tree (single directory, three files) with a clear most-recent file, a clear
+    /// oldest file, and one file with no git record at all — enough to exercise recency coloring, the
+    /// <c>level-none</c> no-data case, and directory neutrality in one shared fixture.</summary>
+    private static IReadOnlyList<CodeMapNode> FreshnessRoots() => CodeMap.Build(
+        new[]
+        {
+            ("src/dir/Recent.cs", 100L),
+            ("src/dir/Old.cs", 80L),
+            ("src/dir/NoGit.cs", 60L),
+        },
+        new Dictionary<string, CodeFileMetrics>
+        {
+            ["src/dir/Recent.cs"] = new CodeFileMetrics(5, 50, new DateOnly(2026, 1, 1), new DateOnly(2026, 7, 20)),
+            ["src/dir/Old.cs"] = new CodeFileMetrics(2, 20, new DateOnly(2020, 1, 1), new DateOnly(2020, 1, 1)),
+            // src/dir/NoGit.cs deliberately has no metrics entry.
+        }).Roots;
+
+    [Fact]
+    public void CodeFreshnessSunburst_RendersOneWedgePerFileAndOnePerDirectory()
+    {
+        var svg = Charts.CodeFreshnessSunburst(FreshnessRoots());
+
+        Assert.Contains("<svg class=\"freshness-sunburst\"", svg);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"freshness-wedge level-").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(svg, "class=\"freshness-wedge-dir\""));
+    }
+
+    [Fact]
+    public void CodeFreshnessSunburst_ColorsFileLeavesByRecencyAndNoDataAsLevelNone()
+    {
+        var svg = Charts.CodeFreshnessSunburst(FreshnessRoots());
+
+        Assert.Contains("freshness-wedge level-4", svg); // Recent.cs — most-recent last-changed date
+        Assert.Contains("freshness-wedge level-1", svg); // Old.cs — oldest last-changed date
+        Assert.Contains("freshness-wedge level-none", svg); // NoGit.cs — no git record at all
+    }
+
+    [Fact]
+    public void CodeFreshnessSunburst_DirectoryWedgesAreNeutralAndUnlabeled()
+    {
+        var svg = Charts.CodeFreshnessSunburst(FreshnessRoots());
+
+        // The directory wedge never carries a level-* class (recency coloring is file-leaves only) and the
+        // chart has no on-wedge <text> at any depth (identity lives in the tooltip only).
+        Assert.DoesNotContain("freshness-wedge-dir level-", svg);
+        Assert.DoesNotContain("<text", svg);
+    }
+
+    [Fact]
+    public void CodeFreshnessSunburst_DepthBeyondTheCapFlattensIntoTheOutermostRingRatherThanGrowingRingsUnbounded()
+    {
+        // Each directory below also carries its own file, so CodeMap.Build's single-child-chain collapse never
+        // fires — every level is a genuinely separate CodeMapNode, giving a real tree depth of 8 (well past
+        // Charts.FreshnessSunburstMaxDepth = 6).
+        var deep = CodeMap.Build(
+            new[]
+            {
+                ("a/x.cs", 10L),
+                ("a/b/x.cs", 10L),
+                ("a/b/c/x.cs", 10L),
+                ("a/b/c/d/x.cs", 10L),
+                ("a/b/c/d/e/x.cs", 10L),
+                ("a/b/c/d/e/f/x.cs", 10L),
+                ("a/b/c/d/e/f/g/x.cs", 10L),
+                ("a/b/c/d/e/f/g/h/x.cs", 10L),
+            },
+            new Dictionary<string, CodeFileMetrics>()).Roots;
+
+        var svg = Charts.CodeFreshnessSunburst(deep);
+
+        // Every emitted arc radius ("A r r 0 ...") is one of at most 2*MaxDepth distinct values (inner+outer per
+        // ring) — a pathologically deep tree must not grow a new ring per level.
+        var radii = System.Text.RegularExpressions.Regex.Matches(svg, @"A ([\d.]+) \1 0")
+            .Select(m => m.Groups[1].Value)
+            .Distinct()
+            .ToList();
+        Assert.True(radii.Count <= 2 * Charts.FreshnessSunburstMaxDepth,
+            $"expected at most {2 * Charts.FreshnessSunburstMaxDepth} distinct ring radii, found {radii.Count}");
+    }
+
+    [Fact]
+    public void CodeFreshnessSunburst_LinksAFileWedgeOnlyWhenTheResolverReturnsATarget()
+    {
+        var roots = FreshnessRoots();
+
+        var linked = Charts.CodeFreshnessSunburst(roots, fileHref: p => p == "src/dir/Recent.cs" ? "code/src/dir/Recent.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/dir/Recent.cs.html\">", linked);
+
+        var plain = Charts.CodeFreshnessSunburst(roots, fileHref: null);
+        Assert.DoesNotContain("<a href=", plain);
+        Assert.Contains("tabindex=\"0\"", plain); // unlinked file wedges stay keyboard-focusable
+    }
+
+    [Fact]
+    public void CodeFreshnessSunburst_FileWedgesCarryARichTooltipWithPathAndExactDate()
+    {
+        var svg = Charts.CodeFreshnessSunburst(FreshnessRoots());
+
+        Assert.Contains("src/dir/Recent.cs — last changed", svg);
+        Assert.Contains("src/dir/NoGit.cs — no git history", svg);
+    }
+
+    [Fact]
+    public void CodeFreshnessSunburst_EmptyTree_DegradesToChartEmpty()
+    {
+        var html = Charts.CodeFreshnessSunburst(Array.Empty<CodeMapNode>());
+
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<svg", html);
+    }
+
+    [Fact]
+    public void CodeFreshnessSunburst_EscapesPathsInTooltips()
+    {
+        var roots = CodeMap.Build(
+            new[] { ("src/a&b<c>.cs", 100L) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/a&b<c>.cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 1)),
+            }).Roots;
+
+        var svg = Charts.CodeFreshnessSunburst(roots);
+
+        Assert.Contains("a&amp;b&lt;c&gt;.cs", svg);
+        Assert.DoesNotContain("<c>", svg);
+    }
+
+    [Fact]
+    public void CodeFreshnessSunburst_DeterministicAcrossRepeatedCalls()
+    {
+        var roots = FreshnessRoots();
+        Assert.Equal(Charts.CodeFreshnessSunburst(roots), Charts.CodeFreshnessSunburst(roots));
+    }
+
+    [Fact]
+    public void FreshnessLegend_CarriesRealValueDayCountTextNeverLessOrMore()
+    {
+        var files = FreshnessRoots().SelectMany(FlattenFreshnessFiles).ToList();
+
+        var legend = Charts.FreshnessLegend(files);
+
+        Assert.DoesNotContain("Less", legend);
+        Assert.DoesNotContain("More", legend);
+        Assert.Contains("ago", legend); // real day-count phrasing (e.g. "N days ago"/"today")
+        Assert.Contains("No git history", legend); // NoGit.cs has no metrics — the trailing swatch note
+    }
+
+    [Fact]
+    public void FreshnessLegend_NoMetricBearingFiles_DegradesToAPlainNoteRatherThanAMeaninglessRamp()
+    {
+        var files = CodeMap.Build(
+            new[] { ("src/A.cs", 100L), ("src/B.cs", 50L) },
+            new Dictionary<string, CodeFileMetrics>()).Files();
+
+        var legend = Charts.FreshnessLegend(files);
+
+        Assert.Contains("freshness-legend-empty", legend);
+        Assert.DoesNotContain("freshness-legend-swatch level-4", legend);
+    }
+
+    private static IEnumerable<CodeMapNode> FlattenFreshnessFiles(CodeMapNode node) =>
+        node.IsDirectory ? node.Children.SelectMany(FlattenFreshnessFiles) : new[] { node };
+
     // ==================== Story 3.7: requirement status-block grid + requirements flow ====================
 
     private static RequirementInfo Req(
@@ -3492,6 +3657,9 @@ public class ChartsTests
     {
         // A short grid (well under the 15-week floor) must not be stretched to the stylesheet's
         // full 460px cap — that's what turns a handful of weeks into huge, disproportionate tiles.
+        // Asserted as bounds (not a re-derivation of the production formula): the cap must still allow
+        // SOME enlargement over the grid's raw pixel size (readable, not shrunk), but must land strictly
+        // under the 460px ceiling a short grid has no business reaching.
         var today = DateOnly.FromDateTime(DateTime.Now);
         var firstCommit = today.AddDays(-10);
         var series = new (DateOnly Day, int Count)[] { (firstCommit, 2) };
@@ -3501,9 +3669,11 @@ public class ChartsTests
         var viewBox = System.Text.RegularExpressions.Regex.Match(svg, "viewBox=\"0 0 (\\d+) ");
         Assert.True(viewBox.Success);
         var width = int.Parse(viewBox.Groups[1].Value);
-        var expectedCap = Math.Min(460, (int)Math.Round(width * 1.8));
-        Assert.True(expectedCap < 460, $"expected the short grid's cap to be below 460px, got {expectedCap}");
-        Assert.Contains($"style=\"max-width:{expectedCap}px\"", svg);
+        var styleMatch = System.Text.RegularExpressions.Regex.Match(svg, "style=\"max-width:(\\d+)px\"");
+        Assert.True(styleMatch.Success, "expected an inline max-width style on the heatmap svg");
+        var cap = int.Parse(styleMatch.Groups[1].Value);
+        Assert.True(cap > width, $"expected some enlargement over the raw {width}px grid, got cap {cap}");
+        Assert.True(cap < 460, $"expected the short grid's cap to be below 460px, got {cap}");
     }
 
     [Fact]
@@ -3517,6 +3687,29 @@ public class ChartsTests
         var svg = Charts.CommitHeatmap(series);
 
         Assert.Contains("style=\"max-width:460px\"", svg);
+    }
+
+    [Fact]
+    public void CommitHeatmap_NearBoundaryGrid_CapNeverExceedsStylesheetCeiling()
+    {
+        // A grid near the point where 1.8x its natural width would cross 460px (~14-15 weeks: natural
+        // width ~222-236px) — regardless of exactly which side of the boundary it lands on, the emitted
+        // cap must never exceed the stylesheet's 460px ceiling, and never shrink the grid below its own
+        // natural pixel size.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var firstCommit = today.AddDays(-7 * 14);
+        var series = new (DateOnly Day, int Count)[] { (firstCommit, 1), (today.AddDays(-1), 2) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        var viewBox = System.Text.RegularExpressions.Regex.Match(svg, "viewBox=\"0 0 (\\d+) ");
+        Assert.True(viewBox.Success);
+        var width = int.Parse(viewBox.Groups[1].Value);
+        var styleMatch = System.Text.RegularExpressions.Regex.Match(svg, "style=\"max-width:(\\d+)px\"");
+        Assert.True(styleMatch.Success);
+        var cap = int.Parse(styleMatch.Groups[1].Value);
+        Assert.True(cap <= 460, $"cap must never exceed the 460px ceiling, got {cap}");
+        Assert.True(cap >= width, $"cap must never shrink the grid below its own natural width {width}px, got {cap}");
     }
 
     [Fact]

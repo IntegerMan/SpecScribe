@@ -157,4 +157,44 @@ public class CodeMapTemplaterTests
 
         Assert.Contains("No files match this filter.", html);
     }
+
+    // ---- Code freshness sunburst section (Story 7.12) -------------------------------------
+
+    [Fact]
+    public void RenderPage_WithMetrics_RendersTheFreshnessSunburstSectionWithARealValueLegendAndATableCaption()
+    {
+        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+
+        Assert.Contains("Code Freshness", html);
+        Assert.Contains("freshness-sunburst", html);
+        Assert.Contains("freshness-legend", html);
+        Assert.DoesNotContain("Less …", html);
+        // The caption points at the existing Last-column table rather than duplicating it.
+        Assert.Contains("<strong>Last</strong>", html);
+        // The freshness section appears before the treemap panels, so its "below" caption is honest.
+        Assert.True(html.IndexOf("Code Freshness", StringComparison.Ordinal) < html.IndexOf("data-view=\"full\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RenderPage_WithoutMetrics_StillRendersTheFreshnessSunburstAllNeutral()
+    {
+        var html = CodeMapTemplater.RenderPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav());
+
+        Assert.Contains("Code Freshness", html);
+        Assert.Contains("freshness-wedge level-none", html);
+        Assert.Contains("freshness-legend-empty", html);
+    }
+
+    [Fact]
+    public void RenderPage_FreshnessSunburstLinksAFileWedgeOnlyWhenTheResolverReturnsATarget()
+    {
+        // Regression guard: the freshness section's fileHref must be the SAME guarded resolver every other
+        // Code Map surface (the treemap, the file table) already threads through — not silently dropped.
+        var linked = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(),
+            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/A.cs.html\"><path class=\"freshness-wedge", linked);
+
+        var plain = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(), fileHref: null);
+        Assert.DoesNotContain("<a href=\"code/src/A.cs.html\">", plain);
+    }
 }

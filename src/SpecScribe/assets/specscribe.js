@@ -356,7 +356,8 @@
       pagerPrev.addEventListener("click", function () { currentPage--; paginate(); });
       pagerStatus = document.createElement("span");
       pagerStatus.className = "gi-pager-status";
-      pagerStatus.setAttribute("aria-live", "polite");
+      // No aria-live here: the filter input's own aria-live count already announces on every keystroke,
+      // and re-typing a query would otherwise re-announce "Page 1 of N" on top of it — noise, not help.
       pagerNext = document.createElement("button");
       pagerNext.type = "button";
       pagerNext.className = "gi-pager-next";
@@ -366,7 +367,7 @@
       pager.appendChild(pagerStatus);
       pager.appendChild(pagerNext);
       var host = table.closest(".table-scroll") || table;
-      host.parentNode.insertBefore(pager, host.nextSibling);
+      if (host.parentNode) host.parentNode.insertBefore(pager, host.nextSibling);
     }
 
     function paginate() {

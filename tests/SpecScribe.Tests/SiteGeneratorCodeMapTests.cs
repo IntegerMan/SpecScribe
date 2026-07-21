@@ -109,6 +109,30 @@ public class SiteGeneratorCodeMapTests : IDisposable
     }
 
     [Fact]
+    public void GenerateAll_WithSourceCode_ProducesRiskQuadrantPageWithNavItemAndChartEmptyState()
+    {
+        // Story 7.10 review: the risk quadrant moved off code-map.html onto its own Insights page — it still
+        // writes (source files exist) even in this non-git fixture, but below Charts.RiskQuadrantMinFiles the
+        // chart itself degrades to its empty state (only 1 file here).
+        GenerateSite();
+
+        Assert.True(File.Exists(RiskQuadrantPage), "risk-quadrant.html should be generated when readable source files exist");
+        var html = File.ReadAllText(RiskQuadrantPage);
+
+        Assert.Contains("<main id=\"main-content\"", html);
+        Assert.Contains("class=\"breadcrumb\"", html);
+        Assert.Contains("Refactor-Target Risk Quadrant", html);
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<svg class=\"risk-quadrant\"", html);
+
+        var index = File.ReadAllText(IndexPage);
+        Assert.Contains("href=\"risk-quadrant.html\"", index);
+        Assert.Contains(">Risk Quadrant</a>", index);
+
+        AssertNoBrokenLocalLinks(RiskQuadrantPage);
+    }
+
+    [Fact]
     public void GenerateAll_WithCodeSourceBaseUrlConfigured_LinksTreemapCellsAndTableRowsToSource()
     {
         // Story 7.6 review: fileHref is now wired via the same guarded CodeItemHref resolver every other
@@ -139,8 +163,10 @@ public class SiteGeneratorCodeMapTests : IDisposable
         GenerateSite();
 
         Assert.False(File.Exists(CodeMapPage), "no code-map.html without any readable source files");
+        Assert.False(File.Exists(RiskQuadrantPage), "no risk-quadrant.html without any readable source files (shared gating signal)");
         var index = File.ReadAllText(IndexPage);
         Assert.DoesNotContain("href=\"code-map.html\"", index);
+        Assert.DoesNotContain("href=\"risk-quadrant.html\"", index);
 
         AssertNoBrokenLocalLinks(IndexPage);
     }
@@ -213,6 +239,63 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.Contains("class=\"codemap-legend codemap-legend-ramp\">", html); // ramp legend visible by default
         Assert.Contains("class=\"codemap-legend codemap-legend-discrete\" hidden>", html); // discrete legend pre-rendered, hidden
         Assert.Contains(">Type</th>", html); // Type column always present regardless of hasMetrics
+    }
+
+    [Fact]
+    public void GenerateAll_WithDeepGitAndEnoughFiles_ProducesALiveRiskQuadrantWithAPointLinkingToItsCodePage()
+    {
+        // Needs at least Charts.RiskQuadrantMinFiles (6) distinct files with git history.
+        for (var i = 0; i < 6; i++)
+        {
+            File.WriteAllText(Path.Combine(_root, "src", "Sample", $"File{i}.cs"),
+                $"namespace Sample;\npublic sealed class File{i} {{ public int Value => {i}; }}\n");
+        }
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise --deep-git generation; install git rather than silently skipping this test");
+        // A second commit touching one file so at least one file has more than one change (varied churn signal).
+        File.AppendAllText(Path.Combine(_root, "src", "Sample", "File0.cs"), "// touched again\n");
+        Assert.True(RunGit("add ."));
+        Assert.True(Commit("Touch File0 again"));
+
+        var gen = new SiteGenerator(ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(RiskQuadrantPage);
+        Assert.Contains("<svg class=\"risk-quadrant\"", html);
+        Assert.Contains("risk-point", html);
+        AssertNoBrokenLocalLinks(RiskQuadrantPage);
+    }
+
+    [Fact]
+    public void GenerateAll_WithoutDeepGit_FreshnessSunburstStillRendersAllNeutral()
+    {
+        // Story 7.12 AC #2: non-git/non-deep-git repos degrade to an all-neutral render rather than omitting
+        // the surface — the Code Map page itself is already gated on there being source files at all.
+        GenerateSite();
+
+        var html = File.ReadAllText(CodeMapPage);
+        Assert.Contains("Code Freshness", html);
+        Assert.Contains("freshness-sunburst", html);
+        Assert.Contains("freshness-wedge level-none", html);
+        Assert.Contains("freshness-legend-empty", html);
+        AssertNoBrokenLocalLinks(CodeMapPage);
+    }
+
+    [Fact]
+    public void GenerateAll_WithDeepGit_FreshnessSunburstRendersARealWedgeLinkingToItsOwnCodePage()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise --deep-git generation; install git rather than silently skipping this test");
+
+        var gen = new SiteGenerator(ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(CodeMapPage);
+        Assert.Contains("Code Freshness", html);
+        Assert.Matches(new Regex("freshness-wedge level-[1-4]"), html); // real git history → a colored (not level-none) wedge
+        Assert.Contains("freshness-legend", html);
+        Assert.DoesNotContain("freshness-legend-empty", html);
+        AssertNoBrokenLocalLinks(CodeMapPage);
     }
 
     /// <summary>Initializes a real git repo in the fixture root with one commit, so <c>hasMetrics</c> is true —

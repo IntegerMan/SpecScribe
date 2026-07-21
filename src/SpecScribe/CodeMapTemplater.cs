@@ -58,6 +58,11 @@ public static class CodeMapTemplater
         AppendFilterCheckbox(sb, "cm-exclude-spec", "Exclude spec-driven development directories");
         AppendFilterCheckbox(sb, "cm-exclude-tests", "Exclude tests");
 
+        // Sourced from the unfiltered "full" variant only (no per-filter-variant duplication) — placed ahead of
+        // the treemap panels so its "see the Last column below" caption points at content that is genuinely below
+        // it on the page. [Story 7.12]
+        AppendFreshnessSunburstSection(sb, full, fileHref);
+
         foreach (var variant in variants)
         {
             AppendVariantPanel(sb, variant, fileHref, prefix);
@@ -67,6 +72,31 @@ public static class CodeMapTemplater
         sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
+    }
+
+    /// <summary>The directory-structure freshness sunburst section (Story 7.12): a second new chart on this page,
+    /// sourced from the unfiltered <paramref name="full"/> variant's <c>Roots</c> — the same tree + per-file
+    /// git-derived last-changed date <see cref="CodeMap.Build"/> already joins for the treemap, so there is no
+    /// new fetch here. Wrapped in the Story 10.2 <see cref="Charts.Framed"/> chrome with a real-value legend
+    /// (never the treemap's own pre-existing "Less … More" legend) and a caption pointing at the existing
+    /// <see cref="AppendFileTable"/> "Last" column as the accessible text equivalent, rather than a second table.</summary>
+    private static void AppendFreshnessSunburstSection(StringBuilder sb, CodeMapVariant full, Func<string, string?>? fileHref)
+    {
+        var files = full.Map.Files();
+
+        var body = new StringBuilder();
+        body.Append("  <div class=\"freshness-sunburst-wrap\">\n");
+        body.Append(Charts.CodeFreshnessSunburst(full.Map.Roots, fileHref: fileHref));
+        body.Append(Charts.FreshnessLegend(files));
+        body.Append("  </div>\n");
+        body.Append("  <p class=\"chart-lead freshness-caption\">See the <strong>Last</strong> column in the file table below for every file's exact last-changed date.</p>\n");
+
+        sb.Append(Charts.Framed(
+            new Charts.ChartMeta(
+                Title: "Code Freshness",
+                Why: Charts.WhyText(Charts.ChartMetric.CodeFreshness)),
+            body.ToString()));
+        sb.Append("\n");
     }
 
     private static void AppendFilterCheckbox(StringBuilder sb, string id, string label)

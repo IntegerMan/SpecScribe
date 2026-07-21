@@ -685,7 +685,13 @@ public class SiteGeneratorAdapterTests : IDisposable
         // (git-insights.html), no other page affected. This fixture is not a git repo (no --deep-git), so
         // git-insights.html is never generated here — the shift comes purely from specscribe.css's two new
         // .gi-risk-badge/.gi-solo-repo-note rules. Verified stable across 2 repeated runs before locking in.
-        const string expected = "7201d38135f7c76d2ad7f454ae309ffb5c9900d4cd0fd0275321473b56f140c2";
+        // Regenerated for Story 7.12 (Code Freshness / Age Map): a new "Code Freshness" section (server-rendered
+        // sunburst + legend + caption) landed on code-map.html, plus specscribe.css gained the
+        // .freshness-sunburst/.freshness-wedge*/.freshness-legend* rules. This fixture's repo-root walk finds its
+        // own markdown files, so code-map.html DOES render here — both the new markup and the CSS shift the hash
+        // (all-neutral wedges, since this fixture is not a git repo). Verified stable across 2 repeated runs
+        // before locking in. [golden-diff-normalization-gotchas]
+        const string expected = "70875a6f54cc9e5b434eec491dabcfece0d677659b8a8df296db596c893ccdf5";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

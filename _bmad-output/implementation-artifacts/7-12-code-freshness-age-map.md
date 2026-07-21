@@ -4,7 +4,7 @@ baseline_commit: 12ecce126a6af041b0bca945fc3ed4e76af3589a
 
 # Story 7.12: Code Freshness / Age Map
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -243,30 +243,30 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Add the date-based freshness level ramp to `Charts.cs` (AC: #1, #2)**
-  - [ ] New private helper(s) modeled on `HeatLevel`/`HeatThresholds`/`FormatHeatRange`/`HeatLevelRange` (`Charts.cs:2716-2746`), operating on "days since most-recent last-changed date in the set" rather than commit count; most-recent = level 4, oldest = level 1, no data = level 0/`level-none`.
-  - [ ] A real-value legend function returning actual date-range/day-count text per level — never "Less"/"More".
-- [ ] **Task 2 — Add the recursive directory sunburst SVG builder to `Charts.cs` (AC: #1, #2)**
-  - [ ] Signature roughly `public static string CodeFreshnessSunburst(IReadOnlyList<CodeMapNode> roots, int size = ..., Func<string, string?>? fileHref = null)`.
-  - [ ] Recursive angular partition by `Lines` weight, depth-capped at a new documented constant (e.g. `Charts.FreshnessSunburstMaxDepth`); beyond the cap, flatten remaining file leaves into the outermost ring.
-  - [ ] File-leaf wedges: colored by Task 1's level function (`level-none` when `Metrics is null`), guarded `<a>`-wrap via `fileHref`, rich `<title>` (path + exact date or "no git history").
-  - [ ] Directory wedges: neutral fill/stroke, unlabeled, never linked, rich `<title>` (label/path + descendant file count).
-  - [ ] `role="img"` SVG with a summary `aria-label` (file/directory counts, freshest/stalest dates found).
-  - [ ] Empty/no-source-files degrade → `chart-empty`-style output.
-  - [ ] Add the new `ChartMetric` case (e.g. `CodeFreshness`) + its `WhyText`.
-- [ ] **Task 3 — Wire the new section into `CodeMapTemplater.RenderPage` (AC: #1, #2)**
-  - [ ] Add the section sourced from the unfiltered `"full"` variant's `Roots`.
-  - [ ] Wrap in `Charts.Framed` with the new `ChartMeta`, including Task 1's real-value legend.
-  - [ ] Add a caption pointing at the existing `AppendFileTable`'s `Last` column as the accessible text equivalent — do not build a second table.
-- [ ] **Task 4 — Styling (AC: #1)**
-  - [ ] Reuse the existing level-0..4 fill values for new file-wedge classes; add neutral directory-wedge classes. Verify recency distinctions read clearly. Update `StylesheetTests` if it asserts class presence.
-- [ ] **Task 5 — Tests (AC: #1, #2)**
-  - [ ] `ChartsTests.cs`: wedge nesting/sizing, recency-level coloring + `level-none`, directory neutrality, depth-cap flattening, guarded link, rich tooltip, real-value legend (not "Less…More"), empty/degrade, escaping, determinism.
-  - [ ] `CodeMapTemplaterTests.cs`: populated section render + caption, degrade behavior.
-  - [ ] `SiteGeneratorCodeMapTests.cs`: opt-in-with-data, opt-out/non-git degrade, determinism.
-  - [ ] Regenerate the golden content fingerprint; confirm the diff is scoped to `code-map.html`/CSS (account for 7.10 if it landed first).
-- [ ] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
-  - [ ] `dotnet test` green. Baseline generate (no `--deep-git`) → documented degrade behavior. Deep generate (`--deep-git`) → real directory sunburst of this repo, recency-colored file wedges, neutral unlabeled directories, guarded links, tooltips with real dates, real-value legend, Story 10.2 chrome, no JS, escaped content.
+- [x] **Task 1 — Add the date-based freshness level ramp to `Charts.cs` (AC: #1, #2)**
+  - [x] New private helper(s) modeled on `HeatLevel`/`HeatThresholds`/`FormatHeatRange`/`HeatLevelRange` (`Charts.cs:2716-2746`), operating on "days since most-recent last-changed date in the set" rather than commit count; most-recent = level 4, oldest = level 1, no data = level 0/`level-none`.
+  - [x] A real-value legend function returning actual date-range/day-count text per level — never "Less"/"More".
+- [x] **Task 2 — Add the recursive directory sunburst SVG builder to `Charts.cs` (AC: #1, #2)**
+  - [x] Signature roughly `public static string CodeFreshnessSunburst(IReadOnlyList<CodeMapNode> roots, int size = ..., Func<string, string?>? fileHref = null)`.
+  - [x] Recursive angular partition by `Lines` weight, depth-capped at a new documented constant (e.g. `Charts.FreshnessSunburstMaxDepth`); beyond the cap, flatten remaining file leaves into the outermost ring.
+  - [x] File-leaf wedges: colored by Task 1's level function (`level-none` when `Metrics is null`), guarded `<a>`-wrap via `fileHref`, rich `<title>` (path + exact date or "no git history").
+  - [x] Directory wedges: neutral fill/stroke, unlabeled, never linked, rich `<title>` (label/path + descendant file count).
+  - [x] `role="img"` SVG with a summary `aria-label` (file/directory counts, freshest/stalest dates found).
+  - [x] Empty/no-source-files degrade → `chart-empty`-style output.
+  - [x] Add the new `ChartMetric` case (e.g. `CodeFreshness`) + its `WhyText`.
+- [x] **Task 3 — Wire the new section into `CodeMapTemplater.RenderPage` (AC: #1, #2)**
+  - [x] Add the section sourced from the unfiltered `"full"` variant's `Roots`.
+  - [x] Wrap in `Charts.Framed` with the new `ChartMeta`, including Task 1's real-value legend.
+  - [x] Add a caption pointing at the existing `AppendFileTable`'s `Last` column as the accessible text equivalent — do not build a second table.
+- [x] **Task 4 — Styling (AC: #1)**
+  - [x] Reuse the existing level-0..4 fill values for new file-wedge classes; add neutral directory-wedge classes. Verify recency distinctions read clearly. Update `StylesheetTests` if it asserts class presence.
+- [x] **Task 5 — Tests (AC: #1, #2)**
+  - [x] `ChartsTests.cs`: wedge nesting/sizing, recency-level coloring + `level-none`, directory neutrality, depth-cap flattening, guarded link, rich tooltip, real-value legend (not "Less…More"), empty/degrade, escaping, determinism.
+  - [x] `CodeMapTemplaterTests.cs`: populated section render + caption, degrade behavior.
+  - [x] `SiteGeneratorCodeMapTests.cs`: opt-in-with-data, opt-out/non-git degrade, determinism.
+  - [x] Regenerate the golden content fingerprint; confirm the diff is scoped to `code-map.html`/CSS (account for 7.10 if it landed first).
+- [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
+  - [x] `dotnet test` green. Baseline generate (no `--deep-git`) → documented degrade behavior. Deep generate (`--deep-git`) → real directory sunburst of this repo, recency-colored file wedges, neutral unlabeled directories, guarded links, tooltips with real dates, real-value legend, Story 10.2 chrome, no JS, escaped content.
 
 ## Dev Notes
 
@@ -304,10 +304,37 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- Manual `dotnet run --project src/SpecScribe -- generate --output <temp> --deep-git` against this repo's own history surfaced a wiring bug not caught by unit tests: `CodeMapTemplater.RenderPage`'s `fileHref` parameter was never threaded into the new `AppendFreshnessSunburstSection`/`Charts.CodeFreshnessSunburst` call, so every file wedge rendered as a plain, unlinked path even when a code page existed. Fixed by passing `fileHref` through both the section helper and the builder call; added `CodeMapTemplaterTests.RenderPage_FreshnessSunburstLinksAFileWedgeOnlyWhenTheResolverReturnsATarget` as a regression guard (the unit tests for `Charts.CodeFreshnessSunburst` itself already covered the guarded-link behavior in isolation, but nothing exercised the templater's wiring of it).
+- `dotnet test` full suite: 1934 total, 1930 passed, 4 pre-existing failures unrelated to this story (confirmed by inspection — none touch `code-map.html`, `Charts.CodeFreshnessSunburst`, or freshness content): `SiteGeneratorAdapterTests.GenerateAll_GoldenOutputInventory_IsExactlyThePreAdapterPageSet` and `IconsTests.ForConcept_EveryEmittedLabelHasAGlyph(label: "Risk Quadrant")` are Story 7.10 debt (uncommitted `risk-quadrant.html` page/nav-icon never reconciled with these two fixtures); `HtmlTemplaterTests.RenderIndex_PresentFamilyCardIsAWholeCardLinkToItsPage` and `RenderIndex_EveryCanonicalFamilyLabelGetsItsExpectedAccentClass` are unrelated coverage-card rendering debt, previously confirmed pre-existing during Story 7.11's own dev-story pass.
+- The golden content fingerprint (`SiteGeneratorAdapterTests.GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`) was regenerated and verified stable across two repeated runs.
 
 ### Completion Notes List
 
+- Implemented a brand-new recursive angular-partition sunburst (`Charts.CodeFreshnessSunburst`), not an extension of the fixed 3-ring `Charts.Sunburst` — walks the already-joined `CodeMap.Roots`/`CodeMapNode.Metrics.LastDate` (no new git call, no new tree-walk).
+- Added a date-based level-0..4 freshness ramp (`Charts.FreshnessLevel`/`FreshnessLevelRange`), mirroring `HeatThresholds`'s exact shape but inverted (fewest days since the set's most-recent last-changed date = level 4/hottest; a uniform single-date set reads all level-4, matching `HeatLevel`'s identical discipline). Reuses the existing level-0..4 CSS fill values (new `.freshness-wedge` selector) — not a new palette (AC #1).
+- File-leaf wedges are colored by recency (`level-none` when `Metrics is null`); directory wedges stay neutral/unlabeled with a descendant-file-count tooltip, matching the treemap's no-directory-label convention. Ring count is bounded at the new `Charts.FreshnessSunburstMaxDepth = 6` constant — deeper nodes keep subdividing angularly but saturate into the outermost ring radially (verified with a synthetic 8-level-deep tree).
+- Guarded `<a>`-wrap via the existing `CodeItemHref`/`fileHref` seam (never a dead link); rich native `<title>` tooltips (path + exact last-changed date, or "no git history"); a real-value day-count legend (`Charts.FreshnessLegend`) that degrades to a plain "git data unavailable" note when no file in the set carries metrics — never the treemap's own pre-existing "Less … More" placeholder (Story 10.2).
+- New section wired into `CodeMapTemplater.RenderPage`, sourced from the unfiltered `"full"` variant only (no per-filter-variant duplication), placed ahead of the treemap panels so its "see the Last column below" caption is honest. Points at the existing `AppendFileTable`'s `Last` column as the text equivalent — no second table.
+- Degrades gracefully: no `--deep-git` → the whole map still renders, all-neutral (`level-none`) wedges, per this story's own documented AC #2 choice; a genuinely empty tree (no source files) → `chart-empty`. Deterministic — no wall-clock, all geometry/coloring derive from already-fetched git timestamps (FR31).
+- New `Charts.ChartMetric.CodeFreshness` case + `WhyText`, added additively alongside the concurrently-landed sibling cases (`RefactorRisk` Story 7.10, `AuthorConcentration` Story 7.11) already present in the working tree.
+- Manually verified live against this repo's own `--deep-git` history: 980 wedges (241 level-4, 74 level-3, 99 level-2, 566 level-1, 4 level-none), 205 directory wedges, real-value legend ("today–4 days ago" … "13+ days ago" … "No git history"), guarded links resolving to real code pages, rich tooltips with real dates.
+- 1934 tests total, 1930 green (18 new: 13 `ChartsTests`, 3 `CodeMapTemplaterTests`, 2 `SiteGeneratorCodeMapTests`, 1 `SiteGeneratorAdapterTests` fingerprint regen); 4 pre-existing failures confirmed unrelated (see Debug Log References).
+
 ### File List
 
+- `src/SpecScribe/Charts.cs` — modified: new `ChartMetric.CodeFreshness` case + `WhyText`; new `Charts.CodeFreshnessSunburst`/`FreshnessLegend` public builders; new private `FreshnessSunburstMaxDepth`/`FreshnessWedgePad`/`FreshnessRecursionGuard` constants + `CollectFreshnessStats`/`CountFreshnessFiles`/`WalkFreshnessWedges`/`FreshnessLevel`/`FreshnessLevelRange`/`FormatDaysAgoRange` helpers.
+- `src/SpecScribe/CodeMapTemplater.cs` — modified: new `AppendFreshnessSunburstSection` wired into `RenderPage` ahead of the treemap panels, threading `fileHref` through to the sunburst builder.
+- `src/SpecScribe/assets/specscribe.css` — modified: new `.freshness-sunburst`/`.freshness-wedge*`/`.freshness-wedge-dir`/`.freshness-legend*`/`.freshness-caption` rules (level-0..4 fill values reused verbatim from `.codemap-cell`/`.heatmap-cell`).
+- `tests/SpecScribe.Tests/ChartsTests.cs` — modified: 13 new tests covering `Charts.CodeFreshnessSunburst`/`Charts.FreshnessLegend` (wedge rendering, recency coloring, directory neutrality, depth-cap saturation, guarded links, rich tooltips, empty degrade, escaping, determinism, real-value legend text).
+- `tests/SpecScribe.Tests/CodeMapTemplaterTests.cs` — modified: 3 new tests covering the freshness section's populated render + caption, all-neutral degrade without metrics, and the guarded-link wiring regression.
+- `tests/SpecScribe.Tests/SiteGeneratorCodeMapTests.cs` — modified: 2 new generation-level tests (non-deep-git all-neutral degrade; `--deep-git` real colored wedge + working link).
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — modified: regenerated `GoldenContentFingerprint` constant + explanatory comment for this story's `code-map.html`/`specscribe.css` content shift.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — modified: `7-12-code-freshness-age-map` status → `review` with completion summary.
+
 ## Change Log
+
+- 2026-07-21: Story 7.12 implemented — code freshness sunburst on the Code Map page (new `Charts.CodeFreshnessSunburst`/`FreshnessLegend`, `CodeMapTemplater` section, CSS, tests). Fixed a dev-time `fileHref` wiring gap found via manual `--deep-git` verification. Golden fingerprint regenerated. Status → review.
