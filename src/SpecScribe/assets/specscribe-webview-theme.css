@@ -124,6 +124,34 @@
       reviewable rather than relying on lazy var() substitution.
    ============================================================================================================ */
 
+/* ---- Regular LIGHT theme (editor bg ≈ #ffffff, lighter than the site's own #f5f0e8 cream): pin the same
+   warm-light accent values the base sheet already ships, explicitly, instead of leaving them as an unstated
+   var()-inheritance from the base sheet. This changes NO rendered color (byte-identical to :root's values) — it
+   only makes the mapping auditable, matching the other three scopes below. The actual contrast claims (which
+   tokens clear which WCAG floor, against a white host canvas) are COMPUTED, not eyeballed, in
+   StylesheetTests.VscodeLightBlock_MatchesRootValues_AndRealTextTokensClearWcagAA — see that test for the real
+   numbers rather than restating them here where they'd drift unchecked.
+   [Deferred-work: Story 6.5 review — "no dedicated .vscode-light contrast-tuning block"] ---- */
+.vscode-light {
+  --status-pending: #b8b2a8;
+  --status-drafted: #e8d9a8;
+  --status-ready: #d4a017;
+  --status-active: #2e6b7a;
+  --status-review: #1e4a5a;
+  --status-done: #6b8f62;
+  --status-deferred: #7a6250;
+  --status-unrecognized: #5c6570;
+
+  --teal: #2e6b7a;
+  --teal-deep: #1e4a5a;
+  --gold: #b8860b;
+  --gold-light: #d4a017;
+  --moss: #4a6741;
+  --moss-light: #6b8f62;
+  --rust: #8b3a1a;
+  --rust-light: #c4622d;
+}
+
 /* ---- Regular DARK theme (editor bg ≈ #1e1e1e): lift the darker teals/greens/rusts off the background ---- */
 .vscode-dark {
   --status-pending: #cbc4b6;

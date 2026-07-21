@@ -9,6 +9,12 @@ namespace SpecScribe;
 /// than the thin TS shim) makes the read-only contract unit-testable and keeps the shim brainless. [Story 6.5]</summary>
 public static class WebviewHelpers
 {
+    /// <summary>The read-only instruction every helper prompt must carry (AD-6/NFR-5): asks for a text-only review
+    /// and explicitly forbids file edits. Named so tests can assert the CONTRACT (this sentence is present) without
+    /// duplicating its exact wording as a second literal — a copy-edit here can't silently desync from the test
+    /// that pins it. [Story 6.5 deferred-work cleanup]</summary>
+    public const string ReadOnlyDirective = "Do NOT modify any files — produce the review as text only.";
+
     /// <summary>FR-17's canonical example helper: a code-review prompt the user can paste into an AI assistant
     /// (or issue tracker) to review the project's current changes. It is deliberately GENERIC and read-only in its
     /// own instructions — it asks for a text review, and explicitly tells the reviewer not to modify files — so the
@@ -28,6 +34,6 @@ public static class WebviewHelpers
             "  - Adherence to the project's existing architecture, patterns, and conventions\n" +
             "  - Test coverage for the changed behavior\n\n" +
             "Report findings grouped by severity (High / Medium / Low), each with a file:line reference and a " +
-            "concrete suggested fix. Do NOT modify any files — produce the review as text only.";
+            "concrete suggested fix. " + ReadOnlyDirective;
     }
 }

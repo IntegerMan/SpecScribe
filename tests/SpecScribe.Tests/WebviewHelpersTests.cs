@@ -26,8 +26,23 @@ public class WebviewHelpersTests
         // explicitly forbids file edits, so the helper can never become a write path even transitively.
         var prompt = WebviewHelpers.CodeReviewPrompt("SpecScribe");
 
-        Assert.Contains("Do NOT modify any files", prompt, StringComparison.Ordinal);
-        Assert.Contains("text only", prompt, StringComparison.OrdinalIgnoreCase);
+        // Structural check: the prompt actually carries the directive (catches "forgot to append it" bugs) —
+        // asserted against the named constant, not a duplicated literal, so a copy-edit to the wording can't
+        // desync this from the constant it's built from. [deferred-work]
+        Assert.Contains(WebviewHelpers.ReadOnlyDirective, prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReadOnlyDirective_ActuallySaysReadOnly()
+    {
+        // Semantic check on the constant ITSELF (not the composed prompt): the directive genuinely forbids writes
+        // and asks for text only. Deliberately loose (case-insensitive keywords, not the exact sentence) so a
+        // copy-edit survives, but this can still fail if the directive were ever emptied or replaced with text that
+        // no longer conveys the read-only contract — unlike asserting the constant against itself. [deferred-work,
+        // review patch: the constant-vs-constant check above alone is tautological and can never catch that]
+        Assert.Contains("not", WebviewHelpers.ReadOnlyDirective, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("modify", WebviewHelpers.ReadOnlyDirective, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("text only", WebviewHelpers.ReadOnlyDirective, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

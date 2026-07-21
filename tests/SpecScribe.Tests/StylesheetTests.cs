@@ -628,6 +628,40 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void VscodeLightBlock_MatchesRootValues_AndRealTextTokensClearWcagAA()
+    {
+        // Deferred-work (Story 6.5 review): ".vscode-light has no dedicated contrast-tuning block" — the dark/HC/
+        // HC-light scopes each pin an explicit literal block; .vscode-light silently relied on unstated var()
+        // inheritance from :root. It is now the FIRST .vscode-* scope in the bridge, so TokenValue's first-match
+        // lookup below resolves to ITS value, not a later theme's. Two things are computed rather than eyeballed:
+        // (1) it introduces NO drift from :root's shipped light-theme values — this reuses, not retunes, today's
+        // palette; (2) the tokens actually used as body TEXT `color:` directly against the general page canvas in
+        // specscribe.css (teal/teal-deep/moss/rust — confirmed by grep) clear normal-text AA on VS Code's default
+        // Light+ editor background (#ffffff, lighter than the site's own --cream). moss-light/gold/gold-light/
+        // rust-light are deliberately NOT contrast-asserted here: every usage of those pairs the token with its
+        // OWN literal badge background (e.g. border-color: var(--gold-light) alongside background: #f5ecd4), so
+        // "vs the page canvas" isn't the adjacent surface WCAG 1.4.11 actually cares about for them, and computing
+        // it against the wrong surface would assert a number that means nothing (e.g. --gold-light measures only
+        // ~2.4:1 vs a bare white canvas — misleading in isolation, since it never sits directly against one).
+        var root = ReadStylesheet();
+        var bridge = ReadThemeBridge();
+        const string white = "#ffffff";
+
+        foreach (var token in new[]
+        {
+            "--teal", "--teal-deep", "--gold", "--gold-light", "--moss", "--moss-light", "--rust", "--rust-light",
+            "--status-pending", "--status-drafted", "--status-deferred", "--status-unrecognized",
+        })
+            Assert.Equal(TokenValue(root, token), TokenValue(bridge, token));
+
+        foreach (var textToken in new[] { "--teal", "--teal-deep", "--moss", "--rust" })
+        {
+            var value = TokenValue(bridge, textToken);
+            Assert.True(ContrastRatio(value, white) >= 4.5, $"{textToken} {value} vs {white} must be >= 4.5:1 (used as text color)");
+        }
+    }
+
+    [Fact]
     public void SiteNavMark_HasSizingRule_AndInheritsCurrentColor()
     {
         // The Scribe's Nib header mark: sized relative to the wordmark and colored ONLY via currentColor

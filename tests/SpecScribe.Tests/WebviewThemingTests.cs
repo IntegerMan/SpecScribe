@@ -71,6 +71,7 @@ public class WebviewThemingTests
         Assert.True(second > first && first >= 0, "expected two <style> blocks (production sheet + theme bridge)");
 
         // The bridge's signature: it keys off every VS Code body-class scope and reads host variables.
+        Assert.Contains(".vscode-light", doc);
         Assert.Contains(".vscode-dark", doc);
         Assert.Contains(".vscode-high-contrast", doc);
         Assert.Contains(".vscode-high-contrast-light", doc);
@@ -114,6 +115,11 @@ public class WebviewThemingTests
         Assert.Contains("border-left-color: var(--gold)", bridge);
         Assert.Contains("border-left-color: var(--gold-light)", bridge);
     }
+
+    // Deferred-work (Story 6.5 review): the ".vscode-light has no dedicated contrast-tuning block" gap is verified
+    // by computed WCAG contrast + drift-from-:root checks in StylesheetTests.VscodeLightBlock_MatchesRootValues_
+    // AndRealTextTokensClearWcagAA (reusing that file's existing ContrastRatio/TokenValue helpers) — not here, so
+    // there is exactly one place that owns the "is it really safe" claim instead of two divergent assertions.
 
     // ----- Webview-only: the theme can never leak into the generated HTML surface (byte-parity guardrail) -------
 
@@ -161,8 +167,9 @@ public class WebviewThemingTests
 
         // The bridge's helper branch posts a copy message and nothing else — a pure text handoff (AD-6/NFR-5).
         Assert.Contains("copyHelperText", doc);
-        // The embedded prompt is the read-only code-review prompt, attribute-escaped into the button.
-        Assert.Contains("Do NOT modify any files", doc);
+        // The embedded prompt is the read-only code-review prompt, attribute-escaped into the button. Asserts
+        // against the named constant so a copy-edit to the directive's wording can't desync this test. [deferred-work]
+        Assert.Contains(WebviewHelpers.ReadOnlyDirective, doc);
     }
 
     [Fact]
@@ -176,6 +183,20 @@ public class WebviewThemingTests
 
         Assert.Contains("&quot;", doc);
         Assert.DoesNotContain("data-ss-prompt=\"Please perform a thorough code review of the current uncommitted changes in Ac\"me", doc);
+    }
+
+    [Fact]
+    public void Render_EscapesTheHelperPrompt_WhenTheSiteTitleContainsAngleBrackets()
+    {
+        // A project title carrying `<`/`>` (e.g. a stray HTML fragment in a repo name) must not let a raw tag
+        // reach the data attribute — the same PathUtil.Html path that the quote case relies on must also
+        // neutralize markup-injection characters, not just quotes. [deferred-work]
+        var page = EpicPage();
+        var tagged = page with { Nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "Ac<script>me", hasAdrs: true, hasReadme: true).ToNavigationView("epics/epic-1.html") };
+        var doc = WebviewRenderAdapter.Shared.Render(tagged).Content;
+
+        Assert.Contains("&lt;script&gt;", doc);
+        Assert.DoesNotContain("<script>me", doc);
     }
 
     // ----- Parity is unchanged: theming re-values tokens, not facts (AC #1/#2, Task 5) -------------------------

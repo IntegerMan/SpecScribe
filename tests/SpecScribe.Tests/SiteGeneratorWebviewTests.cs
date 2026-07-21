@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using SpecScribe;
 
@@ -359,13 +360,19 @@ public class SiteGeneratorWebviewTests : IDisposable
             Directory.EnumerateFiles(Source, "*", SearchOption.AllDirectories)
                 .Concat(Directory.EnumerateFiles(docsRoot, "*", SearchOption.AllDirectories))
                 .OrderBy(p => p, StringComparer.Ordinal).ToArray();
-        var before = SourceFiles().ToDictionary(p => p, File.GetLastWriteTimeUtc);
+        // Content hash, not just mtime: a write that preserves LastWriteTimeUtc (e.g. a same-tick rewrite on a
+        // coarse-resolution filesystem) would pass an mtime-only guard undetected. Snapshot BOTH mtime and hash
+        // from the SAME single file listing per phase (not two separate SourceFiles() calls) so the two
+        // dictionaries can never disagree on which files exist. [deferred-work, review patch]
+        static (DateTime Time, string Hash) Snapshot(string path) =>
+            (File.GetLastWriteTimeUtc(path), Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))));
+        var before = SourceFiles().ToDictionary(p => p, Snapshot);
 
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
         gen.RenderWebviewSurfaces();
 
-        var after = SourceFiles().ToDictionary(p => p, File.GetLastWriteTimeUtc);
+        var after = SourceFiles().ToDictionary(p => p, Snapshot);
         Assert.Equal(before.Keys.OrderBy(k => k), after.Keys.OrderBy(k => k));
         Assert.All(before, kv => Assert.Equal(kv.Value, after[kv.Key]));
     }
