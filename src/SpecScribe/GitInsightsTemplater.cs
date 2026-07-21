@@ -57,6 +57,7 @@ public static class GitInsightsTemplater
         sb.Append("  </div>\n</header>\n\n");
 
         AppendFilesAndContributorsSection(sb, insights, fileHref, commitHref);
+        AppendOwnershipSection(sb, insights, fileHref);
         AppendActivitySection(sb, insights, git);
 
         sb.Append("</main>\n\n");
@@ -159,6 +160,80 @@ public static class GitInsightsTemplater
         sb.Append("      </div>\n");
         sb.Append("    </div>\n");
 
+        sb.Append("  </div>\n");
+        sb.Append("</section>\n\n");
+    }
+
+    /// <summary>Ownership &amp; bus-factor — a ranked table over the SAME <see cref="GitInsightsData.Files"/> list
+    /// the master-detail above already shows (no re-fetch, no re-sort): each file's dominant-author share and
+    /// true contributor count, with single-author files flagged as bus-factor risks using the exact
+    /// "Sole contributor:" vocabulary the contributor panel already established (Story 10.6). In a solo-maintainer
+    /// repo (<c>insights.ContributorCount == 1</c>) a table where every row is flagged would be noise, not signal
+    /// — the section reframes honestly instead (AC #2, NFR8). [Story 7.11]</summary>
+    private static void AppendOwnershipSection(StringBuilder sb, GitInsightsData insights, Func<string, string?>? fileHref)
+    {
+        var files = insights.Files;
+
+        sb.Append("<section class=\"deep-page-section git-insights-section\">\n");
+        sb.Append("  <div class=\"chart-frame-head\"><h2>Ownership &amp; Bus-Factor</h2></div>\n");
+        sb.Append(Charts.FrameWhySlot(Charts.WhyText(Charts.ChartMetric.AuthorConcentration)));
+
+        if (files.Count == 0)
+        {
+            sb.Append("  <div class=\"chart-panel\"><div class=\"chart-empty\">No file change data available.</div></div>\n");
+            sb.Append("</section>\n\n");
+            return;
+        }
+
+        if (insights.ContributorCount == 1)
+        {
+            // AC #2: the common single-maintainer OSS case. Every file would trivially show "Sole contributor:"
+            // here, so a table of all-red risk flags is noise rather than signal — say so plainly instead.
+            sb.Append("  <div class=\"chart-panel\">\n");
+            sb.Append("    <p class=\"gi-solo-repo-note\">Single-maintainer project — one person has authored everything analyzed here, so a per-file ownership breakdown would flag every file as a bus-factor risk without adding any new information.</p>\n");
+            sb.Append("  </div>\n");
+            sb.Append("</section>\n\n");
+            return;
+        }
+
+        sb.Append("  <div class=\"chart-panel\">\n");
+        sb.Append("    <div class=\"table-scroll\">\n");
+        sb.Append("    <table class=\"gi-table\">\n");
+        sb.Append("      <caption>Dominant-author share and contributor count per file, most-changed first. Single-contributor files are flagged as bus-factor risks.</caption>\n");
+        sb.Append("      <thead>\n        <tr>\n");
+        sb.Append("          <th scope=\"col\">File</th>\n");
+        sb.Append("          <th scope=\"col\" class=\"gi-num\">Dominant author share</th>\n");
+        sb.Append("          <th scope=\"col\" class=\"gi-num\">Contributors</th>\n");
+        sb.Append("          <th scope=\"col\">Risk</th>\n");
+        sb.Append("        </tr>\n      </thead>\n      <tbody>\n");
+        foreach (var file in files)
+        {
+            if (file.Contributors.Count == 0) continue;
+
+            var pathHtml = PathUtil.Html(file.Path);
+            var dominant = file.Contributors[0];
+            var share = file.Changes > 0 ? (double)dominant.Commits / file.Changes : 0.0;
+            var sharePct = (share * 100).ToString("0", CultureInfo.InvariantCulture);
+
+            sb.Append("        <tr>\n");
+            sb.Append("          <td class=\"gi-file\">");
+            var nameHref = fileHref?.Invoke(file.Path);
+            sb.Append(nameHref is { Length: > 0 }
+                ? $"<a href=\"{PathUtil.Html(nameHref)}\"><code>{pathHtml}</code></a>"
+                : $"<code>{pathHtml}</code>");
+            sb.Append("</td>\n");
+            sb.Append($"          <td class=\"gi-num\">{sharePct}% ({PathUtil.Html(dominant.Name)})</td>\n");
+            sb.Append($"          <td class=\"gi-num\">{N(file.TotalContributors)}</td>\n");
+            sb.Append("          <td>");
+            if (file.TotalContributors <= 1)
+            {
+                sb.Append("<span class=\"gi-risk-badge\">Sole contributor:</span> single point of failure");
+            }
+            sb.Append("</td>\n");
+            sb.Append("        </tr>\n");
+        }
+        sb.Append("      </tbody>\n    </table>\n");
+        sb.Append("    </div>\n");
         sb.Append("  </div>\n");
         sb.Append("</section>\n\n");
     }

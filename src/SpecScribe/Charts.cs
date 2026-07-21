@@ -20,6 +20,8 @@ public static class Charts
         ChangeCoupling,
         /// <summary>Refactor-target risk: files that are both large and frequently changed (Story 7.10).</summary>
         RefactorRisk,
+        /// <summary>Author concentration / bus-factor: how much of a file's history sits with one person (Story 7.11).</summary>
+        AuthorConcentration,
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
@@ -46,6 +48,8 @@ public static class Charts
             "Files that change together often may hide a dependency worth a second look.",
         ChartMetric.RefactorRisk =>
             "Files that are both large and frequently changed are the costliest place for a defect to hide — refactoring them tends to pay off fastest.",
+        ChartMetric.AuthorConcentration =>
+            "Files with a single dominant author are a knowledge-silo risk if that person leaves or moves on.",
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
 

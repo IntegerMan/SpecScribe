@@ -293,4 +293,78 @@ public class GitInsightsTemplaterTests
         Assert.DoesNotContain("gi-master-detail", html); // no broken/empty master-detail
         Assert.DoesNotContain("<tbody>", html);
     }
+
+    // ---- Story 7.11: Ownership & Bus-Factor section ----
+
+    [Fact]
+    public void RenderPage_OwnershipSectionShowsDominantShareContributorCountAndSoleContributorFlag()
+    {
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
+
+        Assert.Contains(">Ownership &amp; Bus-Factor</h2>", html);
+        Assert.Contains(Charts.WhyText(Charts.ChartMetric.AuthorConcentration), html);
+
+        // Charts.cs: 9 changes, Alice dominant with 7 commits -> 78% share, 2 contributors, multi-author (no flag).
+        Assert.Contains("78% (Alice)", html);
+        // HtmlTemplater.cs: 4 changes, Bob 4 commits -> 100% share, 1 contributor -> sole-contributor bus-factor flag.
+        Assert.Contains("100% (Bob)", html);
+        Assert.Contains("<span class=\"gi-risk-badge\">Sole contributor:</span>", html);
+    }
+
+    [Fact]
+    public void RenderPage_OwnershipRowsLinkViaFileHrefResolver()
+    {
+        var html = GitInsightsTemplater.RenderPage(
+            SampleInsights(), SamplePulse(), Nav(),
+            fileHref: path => path == "src/SpecScribe/Charts.cs" ? "code/src/SpecScribe/Charts.cs.html" : null);
+
+        Assert.Contains("<a href=\"code/src/SpecScribe/Charts.cs.html\"><code>src/SpecScribe/Charts.cs</code></a>", html);
+        // The unresolved file stays plain <code>, never a dead link.
+        Assert.Contains("<code>src/SpecScribe/HtmlTemplater.cs</code>", html);
+        Assert.DoesNotContain("<a href=\"\">", html);
+    }
+
+    [Fact]
+    public void RenderPage_SoloRepoOwnershipReframesInsteadOfAnAllFlaggedTable()
+    {
+        var insights = new GitInsightsData(
+            Files: new[]
+            {
+                new FileChangeStat("src/A.cs", 5, 10, 2, "abc1234def", new DateOnly(2026, 7, 1),
+                    new[] { new FileContributor("Alice", 5, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
+                new FileChangeStat("src/B.cs", 3, 4, 1, "def5678aaa", new DateOnly(2026, 7, 2),
+                    new[] { new FileContributor("Alice", 3, new DateOnly(2026, 7, 2)) }, TotalContributors: 1),
+            },
+            Activity: Array.Empty<(DateOnly, int)>(),
+            CommitCount: 8,
+            ContributorCount: 1,
+            TotalFilesTouched: 2);
+
+        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
+
+        Assert.Contains("Single-maintainer project", html);
+        Assert.Contains("gi-solo-repo-note", html);
+        // No per-file risk table in the solo case — that would be an all-red table, noise not signal.
+        Assert.DoesNotContain("gi-risk-badge", html);
+        Assert.DoesNotContain("Dominant-author share and contributor count per file", html);
+    }
+
+    [Fact]
+    public void RenderPage_OwnershipSectionDegradesToFriendlyNoteWhenNoFiles()
+    {
+        var empty = new GitInsightsData(
+            Files: Array.Empty<FileChangeStat>(),
+            Activity: Array.Empty<(DateOnly, int)>(),
+            CommitCount: 0,
+            ContributorCount: 0,
+            TotalFilesTouched: 0);
+
+        var html = GitInsightsTemplater.RenderPage(empty, null, Nav());
+
+        // The Ownership section carries its own empty state — never an empty table.
+        var ownershipIndex = html.IndexOf(">Ownership &amp; Bus-Factor</h2>", StringComparison.Ordinal);
+        Assert.True(ownershipIndex >= 0);
+        var afterOwnership = html[ownershipIndex..];
+        Assert.Contains("No file change data available.", afterOwnership);
+    }
 }

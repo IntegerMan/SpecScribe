@@ -487,6 +487,20 @@ public class StylesheetTests
         Assert.Contains(".gi-contributor-list", css);
     }
 
+    // ---- Story 7.11: Ownership & Bus-Factor risk badge + solo-repo statement ----------------------------
+
+    [Fact]
+    public void Stylesheet_HasOwnershipBusFactorStyles()
+    {
+        var css = ReadStylesheet();
+        Assert.Contains(".gi-risk-badge", css);
+        Assert.Contains(".gi-solo-repo-note", css);
+        // The bus-factor flag reuses the coupling-kind "at-risk" tone (rust, dashed border) — not a new hue,
+        // and it carries its own "Sole contributor:" text so the flag is never color-only.
+        Assert.Matches(new Regex(@"\.gi-risk-badge\s*\{[^}]*color:\s*var\(--rust\)"), css);
+        Assert.Matches(new Regex(@"\.gi-risk-badge\s*\{[^}]*border:\s*1px dashed var\(--rust-light\)"), css);
+    }
+
     [Fact]
     public void Script_HasTableSortFilterEnhancer()
     {

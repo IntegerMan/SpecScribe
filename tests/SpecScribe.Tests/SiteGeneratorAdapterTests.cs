@@ -681,7 +681,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // (code-reference resolution hardening)") landed on this shared main working tree after the Story 7.9
         // follow-up hash above was locked, shifting this fixture's rendered output independent of any Story 7.9
         // change. Verified stable across 2 repeated runs before locking in.
-        const string expected = "0c0aad5e928d2e62d81c76554e999cdad3b08b2c96ecb5b455f9b1a009fbeeca";
+        // Regenerated for Story 7.11 (Ownership & Bus-Factor Insights): a new section on the Git Insights hub
+        // (git-insights.html), no other page affected. This fixture is not a git repo (no --deep-git), so
+        // git-insights.html is never generated here — the shift comes purely from specscribe.css's two new
+        // .gi-risk-badge/.gi-solo-repo-note rules. Verified stable across 2 repeated runs before locking in.
+        const string expected = "7201d38135f7c76d2ad7f454ae309ffb5c9900d4cd0fd0275321473b56f140c2";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

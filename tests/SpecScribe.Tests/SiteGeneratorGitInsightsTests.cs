@@ -96,6 +96,7 @@ public class SiteGeneratorGitInsightsTests : IDisposable
 
         var hub = File.ReadAllText(HubPage);
         Assert.Contains(">Files &amp; Contributors</h2>", hub);
+        Assert.Contains(">Ownership &amp; Bus-Factor</h2>", hub); // Story 7.11: renders whenever the hub does — no separate gate
         Assert.Contains(">Activity Over Time</h2>", hub);
         Assert.Contains("tracked.txt", hub);          // a known committed file appears in the frequency table
         Assert.Contains("id=\"gi-file-0\"", hub);      // its contributor drill-down panel is present

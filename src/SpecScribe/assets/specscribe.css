@@ -5404,6 +5404,22 @@ a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2
 .gi-contributor-name { font-weight: 600; color: var(--ink); }
 .gi-contributor-meta { color: var(--ink-light); font-size: 0.82rem; white-space: nowrap; }
 
+/* Story 7.11 — Ownership & Bus-Factor section. Risk badge reuses the coupling-kind attention tone (rust,
+   dashed) — an existing "elevated"/at-risk accent, not a 7th --status-* lifecycle token, and it carries its own
+   "Sole contributor:" text so the flag is never color-only. */
+.gi-risk-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--rust);
+  border: 1px dashed var(--rust-light);
+  border-radius: 3px;
+  padding: 0.08rem 0.35rem;
+  margin-right: 0.35rem;
+}
+.gi-solo-repo-note { color: var(--ink-light); font-style: italic; }
+
 /* Stack the master and detail on narrow screens; the sticky detail becomes normal flow below the table. */
 @media (max-width: 720px) {
   .gi-master-detail { grid-template-columns: 1fr; }
