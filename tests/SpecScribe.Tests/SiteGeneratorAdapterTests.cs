@@ -758,7 +758,19 @@ public class SiteGeneratorAdapterTests : IDisposable
         // so the new aria-label shifts the hash there too, even though this story's own ownership sunburst only
         // renders on git-insights.html (ungated in this fixture). Verified stable across 2 repeated runs before
         // locking in. [golden-diff-normalization-gotchas]
-        const string expected = "754c2aaeb4682f8b714d1424d6ce34c4b228ea3ee0f2d54baf6e753ad8a0eaf6";
+        // Regenerated again: a concurrent session's commit (4a107ad "7.11") landed on this shared main working
+        // tree during this Story 7.10 code-review pass, shifting this fixture's rendered output independent of
+        // this review's own patches. Verified directly: stashing this review's 4 patched files (Charts.cs,
+        // SiteGenerator.cs, ChartsTests.cs, SiteGeneratorAdapterTests.cs) and re-running against bare HEAD alone
+        // reproduces the SAME hash below — confirming the shift is 100% attributable to the concurrent 7.11
+        // commit. This review's own patches (RiskQuadrant's new MaxDetailedCodeMapFiles rich-tooltip-card cap,
+        // deterministic jitter for exactly-coincident points, the Ordinal/OrdinalIgnoreCase comparer fix, and
+        // WriteCodeMap/WriteRiskQuadrant's redundant-CodeMap.Build dedup) are all no-ops on this fixture: it is
+        // not a git repo (no --deep-git), so risk-quadrant.html's live chart never renders here at all — only the
+        // page's own below-threshold empty state does, unaffected by any of the four patches. Verified stable
+        // across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        // [[shared-main-concurrent-edit-loss-verify-after-edit]]
+        const string expected = "23d27619b2587c2ef54b58d65917a0b014f6563057cd70d02c2c620ce7969614";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

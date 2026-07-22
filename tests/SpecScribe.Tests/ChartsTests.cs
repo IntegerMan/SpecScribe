@@ -2357,6 +2357,65 @@ public class ChartsTests
         Assert.Empty(Charts.RiskQuadrantElevatedFiles(tooFew));
     }
 
+    /// <summary>[Review][Patch] Mirrors <see cref="CodeTreemap_AboveTheDetailCap_LongTailFilesLoseTheCard_ButKeepGeometryColorAndAccessibleName"/>:
+    /// past <see cref="Charts.MaxDetailedCodeMapFiles"/>, the long tail keeps its point, position, and a real
+    /// aria-label (compact-text metrics folded in, AC #4: never color/gradient alone) — only the expensive
+    /// <c>data-tip-html</c> card (the same per-node cost that once bloated code-map.html to ~82.5MB) is skipped.</summary>
+    [Fact]
+    public void RiskQuadrant_AboveTheDetailCap_LongTailPointsLoseTheCard_ButKeepAccessibleName()
+    {
+        var cap = Charts.MaxDetailedCodeMapFiles;
+        var fileCount = cap + 5;
+        var files = Enumerable.Range(1, fileCount).Select(i => ($"src/file-{i:00000}.cs", (long)i)).ToArray();
+        var metrics = new Dictionary<string, CodeFileMetrics>();
+        foreach (var (path, lines) in files)
+        {
+            metrics[path] = new CodeFileMetrics((int)lines, (int)lines * 10, null, null);
+        }
+        var map = CodeMap.Build(files, metrics).Files();
+
+        var svg = Charts.RiskQuadrant(map);
+
+        // Every file still gets its own circle with an accessible name (never dropped) — +1 for the whole-chart
+        // <svg> aria-label.
+        Assert.Equal(fileCount, CountOf(svg, "<circle"));
+        Assert.Equal(fileCount + 1, CountOf(svg, "aria-label=\""));
+        // …but only the top `cap` most-significant files still pay for the rich hover card.
+        Assert.Equal(cap, CountOf(svg, "data-tip-html="));
+        Assert.Equal(cap, CountOf(svg, " js-tip"));
+    }
+
+    /// <summary>[Review][Patch] Two files sharing the exact same (Lines, Changes) pair previously plotted at the
+    /// identical (cx, cy), fully overlapping so only the last-drawn circle stayed mouse/hover-reachable. They now
+    /// get a small deterministic jitter so every point's screen position is unique.</summary>
+    [Fact]
+    public void RiskQuadrant_CoincidentPoints_GetDeterministicJitterSoEveryCircleStaysReachable()
+    {
+        var files = CodeMap.Build(
+            new[]
+            {
+                ("src/Twin1.cs", 300L), ("src/Twin2.cs", 300L),
+                ("src/C.cs", 200L), ("src/D.cs", 150L), ("src/E.cs", 100L), ("src/F.cs", 80L),
+            },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/Twin1.cs"] = new CodeFileMetrics(25, 250, null, null),
+                ["src/Twin2.cs"] = new CodeFileMetrics(25, 250, null, null),
+                ["src/C.cs"] = new CodeFileMetrics(20, 200, null, null),
+                ["src/D.cs"] = new CodeFileMetrics(15, 150, null, null),
+                ["src/E.cs"] = new CodeFileMetrics(10, 100, null, null),
+                ["src/F.cs"] = new CodeFileMetrics(5, 50, null, null),
+            }).Files();
+
+        var svg = Charts.RiskQuadrant(files);
+
+        var circles = System.Text.RegularExpressions.Regex.Matches(svg, "<circle[^>]*cx=\"([\\d.]+)\"[^>]*cy=\"([\\d.]+)\"")
+            .Select(m => (X: double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture), Y: double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)))
+            .ToList();
+        Assert.Equal(6, circles.Count);
+        Assert.Equal(6, circles.Distinct().Count()); // no two points share a screen position anymore
+    }
+
     // ---- Code freshness sunburst (Story 7.12) ----------------------------------------------
 
     /// <summary>A small nested tree (single directory, three files) with a clear most-recent file, a clear

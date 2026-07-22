@@ -365,12 +365,11 @@ public sealed class SiteGenerator
             // The source-code treemap reads the cached source-code walk + the (now-populated) deep-git per-file
             // metrics, so it's written after the pages/git phases — like WriteSprint, gated on the same source-code
             // signal as its nav item. Replaced the retired Story 3.4 structure tree. [Story 7.6]
-            WriteCodeMap(nav);
+            var fullCodeMap = WriteCodeMap(nav);
             // The refactor-target risk quadrant (Story 7.10) — split out to its own Insights nav entry (review
-            // pass) so it isn't buried at the bottom of the (already long) Code Map page. Same data source and
-            // gating signal as WriteCodeMap; written right after it for the same reason (deep-git metrics must
-            // already be populated).
-            WriteRiskQuadrant(nav);
+            // pass) so it isn't buried at the bottom of the (already long) Code Map page. Reuses WriteCodeMap's
+            // already-built unfiltered map (Story 7.10 review-fix) instead of re-walking _codeFiles a second time.
+            WriteRiskQuadrant(nav, fullCodeMap);
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
             RefreshFollowUpSurfaces(nav, workInventory);
@@ -3062,10 +3061,12 @@ public sealed class SiteGenerator
     /// produced. Wrapped never-throw → any failure degrades to "surface omitted, generation still succeeds"
     /// (AD-4 / NFR2), matching the old <c>WriteStructure</c> and every insight provider. Files route to their
     /// in-portal code page via the same guarded <see cref="CodeItemHref"/> resolver the deep-analytics and
-    /// git-insights surfaces use. [Story 7.6]</summary>
-    private void WriteCodeMap(SiteNav nav)
+    /// git-insights surfaces use. Returns the unfiltered ("full") variant's <see cref="CodeMap"/> (or
+    /// <c>null</c> when the page was omitted) so <see cref="WriteRiskQuadrant"/> can reuse the exact same built
+    /// map instead of re-walking <see cref="_codeFiles"/> a second time. [Story 7.6; Story 7.10 review-fix]</summary>
+    private CodeMap? WriteCodeMap(SiteNav nav)
     {
-        if (_codeFiles.Count == 0) return;
+        if (_codeFiles.Count == 0) return null;
 
         IReadOnlyList<CodeMapVariant> variants;
         try
@@ -3083,38 +3084,26 @@ public sealed class SiteGenerator
         // underlying source walk, not a second independent surface, so they share one nav/page gate (AC parity
         // with every other insight provider's single-signal gate).
         var full = variants.FirstOrDefault(v => v.Key == "full");
-        if (full is null || full.Map.IsEmpty) return;
+        if (full is null || full.Map.IsEmpty) return null;
 
         var html = CodeMapTemplater.RenderPage(variants, nav, fileHref: CodeItemHref);
         WriteOutput(SiteNav.CodeMapOutputPath, ApplyReferenceLinks(html, SiteNav.CodeMapOutputPath));
+        return full.Map;
     }
 
-    /// <summary>Writes <c>risk-quadrant.html</c> — the refactor-target risk quadrant (Story 7.10). Builds a plain
-    /// (unfiltered) <see cref="CodeMap"/> over the same cached source-code walk (<see cref="_codeFiles"/>) joined
-    /// to the same deep-git per-file metrics <see cref="WriteCodeMap"/> uses (empty when <c>--deep-git</c> is
-    /// off → the chart's own below-threshold empty state, not a broken page). Gated on the identical source-code
-    /// signal as its nav item (shared with Code Map — <see cref="SiteNav.RiskQuadrantOutputPath"/>'s doc
-    /// comment), so a link is never emitted to a page that wasn't produced. Wrapped never-throw → any failure
-    /// degrades to "surface omitted, generation still succeeds" (AD-4 / NFR2), matching <see cref="WriteCodeMap"/>.</summary>
-    private void WriteRiskQuadrant(SiteNav nav)
+    /// <summary>Writes <c>risk-quadrant.html</c> — the refactor-target risk quadrant (Story 7.10). Takes the
+    /// SAME unfiltered <see cref="CodeMap"/> <see cref="WriteCodeMap"/> already built (rather than re-walking
+    /// <see cref="_codeFiles"/> + rejoining deep-git metrics a second time — a Story 7.10 review-fix; the two
+    /// pages share one source-code walk, not two). <c>null</c>/empty (no source files, or <c>--deep-git</c> off
+    /// enough that <see cref="WriteCodeMap"/> itself omitted) → this page omits too, never a broken link (shared
+    /// with Code Map — <see cref="SiteNav.RiskQuadrantOutputPath"/>'s doc comment). Never-throw by construction:
+    /// the only fallible step (building the map) already happened, and failed there, inside
+    /// <see cref="WriteCodeMap"/>'s own try/catch (AD-4 / NFR2).</summary>
+    private void WriteRiskQuadrant(SiteNav nav, CodeMap? fullMap)
     {
-        if (_codeFiles.Count == 0) return;
+        if (fullMap is null || fullMap.IsEmpty) return;
 
-        CodeMap map;
-        try
-        {
-            var metrics = _progress?.DeepGit?.CodeMapMetrics
-                ?? (IReadOnlyDictionary<string, CodeFileMetrics>)new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal);
-            map = CodeMap.Build(_codeFiles, metrics);
-        }
-        catch (Exception)
-        {
-            map = CodeMap.Empty;
-        }
-
-        if (map.IsEmpty) return;
-
-        var html = RiskQuadrantTemplater.RenderPage(map, nav, fileHref: CodeItemHref);
+        var html = RiskQuadrantTemplater.RenderPage(fullMap, nav, fileHref: CodeItemHref);
         WriteOutput(SiteNav.RiskQuadrantOutputPath, ApplyReferenceLinks(html, SiteNav.RiskQuadrantOutputPath));
     }
 

@@ -2549,7 +2549,7 @@ public static class Charts
             .Where(p => p.Elevated)
             .OrderByDescending(p => p.Changes)
             .ThenByDescending(p => p.Node.Lines)
-            .ThenBy(p => p.Node.RepoRelativePath, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(p => p.Node.RepoRelativePath, StringComparer.Ordinal)
             .Select(p => p.Node)
             .ToList();
     }
@@ -2622,6 +2622,30 @@ public static class Charts
         var aria = $"Refactor-target risk quadrant: {points.Count} {Plural(points.Count, "file", "files")} " +
                    $"plotted by size and change frequency; {elevatedCount} {Plural(elevatedCount, "file", "files")} flagged as elevated risk.";
 
+        // Same rich-card detail cap the sibling CodeTreemap uses (Story 7.9 review-fix) — past
+        // MaxDetailedCodeMapFiles, BuildTreemapCard's doubly-escaped HTML `<dl>` is the single biggest per-point
+        // cost and is skipped for the long tail (this is exactly what previously bloated code-map.html to ~82.5MB
+        // before the cap existed). Every point still gets a real aria-label either way; long-tail points fold the
+        // card's own metrics into that label as compact text instead (CompactMetricsTail), so nothing accessible
+        // is lost, only the pretty popup. totalFileCount = points.Count since every plotted point here already
+        // comes straight from the same list being capped (no treemap-style Layout()-vs-Files() mismatch).
+        var detailedFiles = SelectDetailedCodeMapFiles(points.Select(p => p.Node).ToList(), points.Count);
+
+        // Coincident points (identical Lines AND Changes — plausible once Math.Max(_, 1) floors near-zero values)
+        // would otherwise render at the exact same (cx, cy) and fully occlude one another, leaving only the
+        // last-drawn circle mouse/hover-reachable. Group by the shared plotting key and give same-key points a
+        // small deterministic (path-order, not random) radial offset so every one stays independently reachable —
+        // purely a rendering nicety, never applied to the underlying LogSize/LogChanges used for the median split
+        // or the elevated flag. [Review][Patch]
+        var coincidentGroups = new Dictionary<(double LogSize, double LogChanges), List<int>>();
+        for (var i = 0; i < points.Count; i++)
+        {
+            var key = (points[i].LogSize, points[i].LogChanges);
+            if (!coincidentGroups.TryGetValue(key, out var group)) coincidentGroups[key] = group = new List<int>();
+            group.Add(i);
+        }
+        const double jitterRadius = 4.0;
+
         var sb = new StringBuilder();
         sb.Append($"<svg class=\"risk-quadrant\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
 
@@ -2664,11 +2688,23 @@ public static class Charts
         sb.Append($"  <text class=\"risk-median-tick-label\" x=\"{F(quadX)}\" y=\"{F(marginTop + plotH + 30)}\" text-anchor=\"middle\">median {Html(RealUnit(medianLogSize))}</text>\n");
         sb.Append($"  <text class=\"risk-median-tick-label\" x=\"{F(marginLeft - 6)}\" y=\"{F(quadY - 5)}\" text-anchor=\"end\">median {Html(RealUnit(medianLogChanges))}</text>\n");
 
-        foreach (var point in points)
+        for (var i = 0; i < points.Count; i++)
         {
+            var point = points[i];
             var node = point.Node;
             var cx = PlotX(point.LogSize);
             var cy = PlotY(point.LogChanges);
+
+            // Deterministic jitter for exactly-coincident points (same LogSize+LogChanges) — see the
+            // coincidentGroups comment above. Untouched (offset 0) for the overwhelmingly common non-colliding case.
+            var group = coincidentGroups[(point.LogSize, point.LogChanges)];
+            if (group.Count > 1)
+            {
+                var slot = group.IndexOf(i);
+                var angle = 2 * Math.PI * slot / group.Count;
+                cx += jitterRadius * Math.Cos(angle);
+                cy += jitterRadius * Math.Sin(angle);
+            }
 
             // Gradation (owner request, review pass): fill intensity reflects the file's COMBINED size+churn
             // position (0..1 average of its normalized X/Y), bucketed onto the SAME 5-level gold ramp the
@@ -2688,20 +2724,34 @@ public static class Charts
             // Richer tooltip (owner request, review pass): the SAME stylized HTML card the treemap's cells use
             // (BuildTreemapCard — lines, type, changes, churn, avg change size, files changed together,
             // first/last change dates whenever each metric exists), served through the shared body-level js-tip
-            // node exactly like the treemap, instead of a plain native <title>.
-            var card = BuildTreemapCard(node);
-            var tipAttrs = $"aria-label=\"{Html(ariaLabel)}\" data-tip-html=\"{Html(card)}\"";
+            // node exactly like the treemap, instead of a plain native <title>. Past MaxDetailedCodeMapFiles
+            // (isDetailed=false), the card is skipped — same long-tail cap CodeTreemap uses — and its metrics fold
+            // into the aria-label as compact text instead (CompactMetricsTail), so nothing accessible is lost.
+            var isDetailed = detailedFiles is null || detailedFiles.Contains(node.RepoRelativePath);
+            string tipAttrs;
+            if (isDetailed)
+            {
+                var card = BuildTreemapCard(node);
+                tipAttrs = $"aria-label=\"{Html(ariaLabel)}\" data-tip-html=\"{Html(card)}\"";
+            }
+            else
+            {
+                var category = node.Category ?? CodeFileType.Other;
+                tipAttrs = $"aria-label=\"{Html(ariaLabel + CompactMetricsTail(node, category, hasMetrics: true))}\"";
+            }
 
             var href = fileHref?.Invoke(node.RepoRelativePath);
             var linked = href is { Length: > 0 };
             if (linked)
             {
-                sb.Append($"  <a class=\"risk-point-link js-tip\" href=\"{Html(href!)}\" {tipAttrs}>");
+                var aClass = isDetailed ? "risk-point-link js-tip" : "risk-point-link";
+                sb.Append($"  <a class=\"{aClass}\" href=\"{Html(href!)}\" {tipAttrs}>");
                 sb.Append($"<circle class=\"{pointClass}\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\"></circle></a>\n");
             }
             else
             {
-                sb.Append($"  <circle class=\"{pointClass} js-tip\" tabindex=\"0\" role=\"img\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\" {tipAttrs}></circle>\n");
+                var circleClass = isDetailed ? $"{pointClass} js-tip" : pointClass;
+                sb.Append($"  <circle class=\"{circleClass}\" tabindex=\"0\" role=\"img\" cx=\"{F(cx)}\" cy=\"{F(cy)}\" r=\"5\" {tipAttrs}></circle>\n");
             }
         }
 
