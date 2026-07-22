@@ -793,7 +793,23 @@ public class SiteGeneratorAdapterTests : IDisposable
         // <svg>. This non-git fixture renders code-map.html, so the new sunburst markup + CSS shift the hash
         // (file-type-colored wedges, non-git fixture). Verified stable across 2 repeated runs before locking in.
         // [golden-diff-normalization-gotchas]
-        const string expected = "b97e1cc5a450c81b3cd33b3ed13e8942d5042f077dc6f50d610c16556fa61395";
+        // Regenerated for Story 7.11's second design-correction pass (owner feedback): every ownership file
+        // wedge/cell now carries a rich .codemap-card hover tooltip (data-tip-html/js-tip, reusing
+        // BuildTreemapCard's own convention) in place of a plain <title>; the sunburst/treemap toggle's active
+        // tab now has a visible pressed state; the discrete top-author palette was reduced from a bespoke
+        // 12-hue set to the SAME 7-hue categorical palette Story 7.9's file-type legend already uses (also
+        // reduces the BuildTopAuthors roster passed from SiteGenerator to Charts.OwnershipTopAuthorPaletteSize);
+        // the collapsible text-equivalent tree was removed entirely (not demoted); and the legend area now
+        // renders ONE shared instance with four mode-specific blocks (share/top/spotlight/staleness, the last of
+        // which previously had no "fresh" swatch at all) instead of a single static share-% legend duplicated
+        // per toggled view. This non-git fixture never renders git-insights.html itself (no --deep-git), so the
+        // hash only shifts via the global specscribe.css/specscribe.js asset changes (both embedded on every
+        // page this fixture DOES render, code-map.html included) — no markup on this fixture's own pages
+        // changed. Manually verified live in a real browser: tooltips show the rich card, the active tab
+        // visibly indicates the current view, the discrete palette's colors match the file-type legend exactly,
+        // and all four legend blocks show/hide correctly per mode. Verified stable across 2 repeated runs
+        // before locking in. [golden-diff-normalization-gotchas]
+        const string expected = "19a53cbc8cd629a7fba919b16d8ed84739324fb1a8cd71246bb2f6220324c9ea";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

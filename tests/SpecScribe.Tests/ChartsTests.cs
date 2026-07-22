@@ -2652,7 +2652,7 @@ public class ChartsTests
         var roots = OwnershipRoots();
 
         var linked = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>(), fileHref: p => p == "src/dir/Dominant.cs" ? "code/src/dir/Dominant.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\">", linked);
+        Assert.Contains("<a class=\"js-tip\" href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\"", linked);
 
         var plain = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>(), fileHref: null);
         Assert.DoesNotContain("<a href=", plain);
@@ -2679,7 +2679,7 @@ public class ChartsTests
         var roots = OwnershipRoots();
 
         var linked = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>(), fileHref: p => p == "src/dir/Dominant.cs" ? "code/src/dir/Dominant.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\">", linked);
+        Assert.Contains("<a class=\"js-tip\" href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\"", linked);
 
         var plain = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>(), fileHref: null);
         Assert.Contains("aria-label=\"src/dir/Dominant.cs\"", plain);
@@ -2769,7 +2769,8 @@ public class ChartsTests
 
         var linked = Charts.CodeOwnershipTreemap(layout, Array.Empty<string>(),
             fileHref: p => p == "src/dir/Dominant.cs" ? "code/src/dir/Dominant.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\"><rect class=\"ownership-cell", linked);
+        Assert.Contains("<a class=\"js-tip\" href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\"", linked);
+        Assert.Contains("<rect class=\"ownership-cell", linked);
 
         var plain = Charts.CodeOwnershipTreemap(layout, Array.Empty<string>(), fileHref: null);
         Assert.DoesNotContain("<a href=", plain);
@@ -2852,75 +2853,13 @@ public class ChartsTests
     }
 
     [Fact]
-    public void CodeOwnershipTree_RendersOneListItemPerFileAndOneDisclosurePerDirectory()
-    {
-        var html = Charts.CodeOwnershipTree(OwnershipRoots());
-
-        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(html, "class=\"ownership-tree-file\"").Count);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "class=\"ownership-tree-dir\""));
-    }
-
-    [Fact]
-    public void CodeOwnershipTree_AgreesWithTheSunburstOnEveryFilesShareLevel()
-    {
-        var roots = OwnershipRoots();
-        var svg = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>());
-        var tree = Charts.CodeOwnershipTree(roots);
-
-        Assert.Contains("ownership-wedge level-4", svg);
-        Assert.Contains("ownership-tree-dot level-4", tree);
-        Assert.Contains("ownership-wedge level-none", svg);
-        Assert.Contains("ownership-tree-dot level-none", tree);
-    }
-
-    [Fact]
-    public void CodeOwnershipTree_ShowsDominantAuthorShareContributorsAndLastActiveOrNoGitHistory()
-    {
-        var html = Charts.CodeOwnershipTree(OwnershipRoots());
-
-        Assert.Contains("Alice 80%", html);
-        Assert.Contains("2 contributors", html);
-        Assert.Contains("last active", html);
-        Assert.Contains("no git history", html);
-    }
-
-    [Fact]
-    public void CodeOwnershipTree_LinksAFileOnlyWhenTheResolverReturnsATarget()
-    {
-        var roots = OwnershipRoots();
-
-        var linked = Charts.CodeOwnershipTree(roots, fileHref: p => p == "src/dir/Dominant.cs" ? "code/src/dir/Dominant.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/dir/Dominant.cs.html\">", linked);
-
-        var plain = Charts.CodeOwnershipTree(roots, fileHref: null);
-        Assert.DoesNotContain("<a href=", plain);
-    }
-
-    [Fact]
-    public void CodeOwnershipTree_EmptyTree_DegradesToChartEmpty()
-    {
-        var html = Charts.CodeOwnershipTree(Array.Empty<CodeMapNode>());
-
-        Assert.Contains("chart-empty", html);
-        Assert.DoesNotContain("<ul", html);
-    }
-
-    [Fact]
-    public void CodeOwnershipTree_DeterministicAcrossRepeatedCalls()
-    {
-        var roots = OwnershipRoots();
-        Assert.Equal(Charts.CodeOwnershipTree(roots), Charts.CodeOwnershipTree(roots));
-    }
-
-    [Fact]
     public void CodeOwnershipSunburst_NeverRendersALeaderboardOrRankingVocabulary()
     {
         // FR-10: descriptive attribution only, never a cross-repo people ranking.
         var svg = Charts.CodeOwnershipSunburst(OwnershipRoots(), new[] { "Alice", "Bob" });
         var treemap = Charts.CodeOwnershipTreemap(OwnershipLayout(), new[] { "Alice", "Bob" });
-        var tree = Charts.CodeOwnershipTree(OwnershipRoots());
 
-        foreach (var html in new[] { svg, treemap, tree })
+        foreach (var html in new[] { svg, treemap })
         {
             Assert.DoesNotContain("leaderboard", html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("rank", html, StringComparison.OrdinalIgnoreCase);

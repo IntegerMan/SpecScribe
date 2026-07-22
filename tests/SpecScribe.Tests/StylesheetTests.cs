@@ -493,32 +493,51 @@ public class StylesheetTests
     public void Stylesheet_HasOwnershipTreemapToggleStyles()
     {
         // Owner feedback: sunburst/treemap TOGGLE (mirroring Story 7.12's Code Freshness toggle), not a chart
-        // plus a permanently-visible second view. The pure-CSS :has() toggle, the treemap's own SVG/cell/dir
-        // classes, and the collapsed text-equivalent disclosure must all resolve.
+        // plus a permanently-visible second view. The pure-CSS :has() toggle, its active-tab pressed state, and
+        // the treemap's own SVG/cell/dir classes must all resolve.
         var css = ReadStylesheet();
         Assert.Contains(".ownership-panel .board-tabs", css);
         Assert.Contains(".ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-sunburst", css);
         Assert.Contains(".ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-treemap", css);
+        Assert.Contains("#ownership-view-sunburst:checked ~ .board-tabbar label[for=\"ownership-view-sunburst\"]", css);
         Assert.Contains(".ownership-treemap-wrap", css);
         Assert.Contains(".ownership-treemap {", css);
         Assert.Contains(".ownership-cell.level-4", css);
         Assert.Contains(".ownership-cell-dir", css);
-        Assert.Contains(".ownership-tree-details", css);
+    }
+
+    [Fact]
+    public void Stylesheet_DoesNotHaveTheRemovedOwnershipTextEquivalentTree()
+    {
+        // Owner feedback: the collapsible text-equivalent tree was removed entirely (not just demoted) — the
+        // two chart forms plus their rich per-file tooltips are the surface now. (Note: ".ownership-tree" alone
+        // isn't checked — it's a substring of the still-live ".ownership-treemap"/".ownership-tree-*-radio".)
+        var css = ReadStylesheet();
+        Assert.DoesNotContain(".ownership-tree-details", css);
+        Assert.DoesNotContain(".ownership-tree-file", css);
+        Assert.DoesNotContain(".ownership-tree-dot", css);
+        Assert.DoesNotContain(".ownership-tree-dir", css);
+        Assert.DoesNotContain(".ownership-tree-count", css);
+        Assert.DoesNotContain(".ownership-tree-detail ", css);
+        Assert.DoesNotContain(".ownership-tree, ", css);
     }
 
     [Fact]
     public void Stylesheet_HasOwnershipDiscreteTopAuthorPalette()
     {
-        // The discrete top-N-author mode needs its OWN bounded categorical palette (Task 2.4) — not a reuse of
-        // --status-* (non-lifecycle data) or the Story 7.9 file-type palette. Every top-author swatch class (0-11)
-        // must resolve for BOTH the sunburst wedge and treemap cell class families (the live mode switcher
-        // recolors whichever view is toggled visible), plus the honestly-muted "other" overflow bucket.
+        // The discrete top-N-author mode reuses the SAME 7-hue categorical palette Story 7.9's file-type legend
+        // already established (owner feedback) — not a bespoke set. Every top-author swatch class (0-6) must
+        // resolve for BOTH the sunburst wedge and treemap cell class families (the live mode switcher recolors
+        // whichever view is toggled visible), plus the honestly-muted "other" overflow bucket, and the SAME
+        // swatch colors must also resolve in the legend.
         var css = ReadStylesheet();
-        for (var i = 0; i < 12; i++)
+        for (var i = 0; i < Charts.OwnershipTopAuthorPaletteSize; i++)
         {
             Assert.Contains($".ownership-wedge.owner-author-{i}, .ownership-cell.owner-author-{i} {{", css);
+            Assert.Contains($".ownership-legend-swatch.owner-author-{i} {{", css);
         }
         Assert.Contains(".ownership-wedge.owner-author-other, .ownership-cell.owner-author-other", css);
+        Assert.DoesNotContain(".ownership-wedge.owner-author-7,", css);
     }
 
     [Fact]

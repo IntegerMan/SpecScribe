@@ -38,6 +38,92 @@ public class PathUtilTests
         => Assert.Equal(expected, PathUtil.EscapesRepoRoot(relativePath));
 
     [Fact]
+    public void ResolveRealPath_NoSymlinksInvolved_ReturnsTheFullNormalizedPath()
+    {
+        var dir = Directory.CreateTempSubdirectory("specscribe-realpath-");
+        try
+        {
+            var nested = Directory.CreateDirectory(Path.Combine(dir.FullName, "a", "b")).FullName;
+            var file = Path.Combine(nested, "f.txt");
+            File.WriteAllText(file, "x");
+
+            Assert.Equal(Path.GetFullPath(file), PathUtil.ResolveRealPath(file));
+            // A path that doesn't exist yet has nothing to resolve against — degrades to the plain lexical form.
+            Assert.Equal(Path.GetFullPath(Path.Combine(nested, "missing.txt")), PathUtil.ResolveRealPath(Path.Combine(nested, "missing.txt")));
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [SkippableFact]
+    public void ResolveRealPath_ChasesASymlinkedAncestorDirectory_ToItsRealTarget()
+    {
+        var dir = Directory.CreateTempSubdirectory("specscribe-realpath-symlink-");
+        try
+        {
+            var real = Directory.CreateDirectory(Path.Combine(dir.FullName, "real")).FullName;
+            File.WriteAllText(Path.Combine(real, "f.txt"), "x");
+            var link = Path.Combine(dir.FullName, "link");
+
+            try
+            {
+                Directory.CreateSymbolicLink(link, real);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Creating a directory symlink needs elevation/Developer Mode on some Windows hosts — 6-10's own
+                // deferred item hit the same "can't reproduce in every CI environment" wall for the sibling
+                // different-drive branch. Skipped, not failed. [6-10-deferred-debt-cleanup]
+                throw new SkipException("Creating a symbolic link isn't permitted on this host — skipped, not failed.");
+            }
+
+            var resolved = PathUtil.ResolveRealPath(Path.Combine(link, "f.txt"));
+
+            Assert.Equal(Path.GetFullPath(Path.Combine(real, "f.txt")), resolved);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [SkippableFact]
+    public void ResolveRealPath_ChasesASymlinkPartwayDownTheTree_NotJustAtTheLeadingSegment()
+    {
+        // Blind Hunter (spec-epic6 review): the sibling symlink test above only covers "the queried path's FIRST
+        // segment is itself the link" — this one puts a real, non-symlinked ancestor ("outer") ahead of the link,
+        // and a real nested subdirectory ("nested") after it, matching the doc comment's own "an artifact path
+        // that traverses a symlink" claim more literally than a root-is-the-link shape does.
+        var dir = Directory.CreateTempSubdirectory("specscribe-realpath-symlink-nested-");
+        try
+        {
+            var outer = Directory.CreateDirectory(Path.Combine(dir.FullName, "outer")).FullName;
+            var real = Directory.CreateDirectory(Path.Combine(dir.FullName, "real", "nested")).FullName;
+            File.WriteAllText(Path.Combine(real, "f.txt"), "x");
+            var link = Path.Combine(outer, "link");
+
+            try
+            {
+                Directory.CreateSymbolicLink(link, real);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new SkipException("Creating a symbolic link isn't permitted on this host — skipped, not failed.");
+            }
+
+            var resolved = PathUtil.ResolveRealPath(Path.Combine(outer, "link", "f.txt"));
+
+            Assert.Equal(Path.GetFullPath(Path.Combine(real, "f.txt")), resolved);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public void Html_EncodesMarkupCharacters()
         => Assert.Equal("&lt;b&gt;bold &amp; brash&lt;/b&gt;", PathUtil.Html("<b>bold & brash</b>"));
 

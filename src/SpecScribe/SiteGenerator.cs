@@ -2189,7 +2189,11 @@ public sealed class SiteGenerator
             // sunburst) plus the bounded, deterministic top-author roster for the discrete-palette mode.
             var codeMapMetrics = _progress.DeepGit.CodeMapMetrics;
             var codeMap = CodeMap.Build(_codeFiles, codeMapMetrics);
-            var topAuthors = GitMetrics.BuildTopAuthors(_progress.DeepGit.Commits);
+            // capN matches Charts.OwnershipTopAuthorPaletteSize, not the default GitMetrics.CodeMapFileContributorCap —
+            // this roster feeds a fixed-color discrete PALETTE (owner feedback: must draw from the SAME 7-hue
+            // categorical scheme Story 7.9's file-type legend uses), a different bound than "how many contributors
+            // show up per file."
+            var topAuthors = GitMetrics.BuildTopAuthors(_progress.DeepGit.Commits, capN: Charts.OwnershipTopAuthorPaletteSize);
             var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref);
             WriteOutput(SiteNav.GitInsightsOutputPath, ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
@@ -2419,12 +2423,26 @@ public sealed class SiteGenerator
     /// leading <c>..</c> would still escape the repo the TS-side <c>resolveWorkspacePath</c> containment guard
     /// enforces. Every caller already treats a null source path as "no reveal-source affordance," the same
     /// degrade the dashboard's aggregate pages use, so an escape now surfaces as an honestly hidden button
-    /// instead of silently shipping a path the host guard would reject anyway. [Story 6.10 deferred-work fix]</summary>
+    /// instead of silently shipping a path the host guard would reject anyway. [Story 6.10 deferred-work fix]
+    /// Both sides are resolved through <see cref="PathUtil.ResolveRealPath"/> before the relative-path math, so a
+    /// symlinked <c>RepoRoot</c> or an artifact path whose own resolution traverses a symlink no longer computes a
+    /// misleading (or falsely-escaping) relative path from THIS method's own lexical-only comparison — the same
+    /// symlink-aware INPUT resolution the TS-side <c>resolveWorkspacePath</c> containment guard already applies
+    /// via <c>fs.realpathSync</c> (Story 6.9). This does not by itself guarantee the two sides compose correctly
+    /// for every symlink topology end-to-end: the TS side re-joins the computed relative string onto the NOMINAL
+    /// (non-realpath'd) workspace root, not the real one, so a topology with an additional symlink hop partway
+    /// down the artifact's own path (rather than only at the repo root) is not covered by this fix or its tests —
+    /// tracked as a follow-up. [6-10-deferred-debt-cleanup; Blind Hunter, spec-epic6 review]</summary>
     private string? RepoRelative(string absolutePath)
     {
-        var rel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.RepoRoot, absolutePath));
+        _realRepoRoot ??= PathUtil.ResolveRealPath(_options.RepoRoot);
+        var rel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_realRepoRoot, PathUtil.ResolveRealPath(absolutePath)));
         return PathUtil.EscapesRepoRoot(rel) ? null : rel;
     }
+
+    /// <summary>Cached real (symlink-resolved) repo root — computed once per generator instance since
+    /// <see cref="ForgeOptions.RepoRoot"/> never changes after construction. [6-10-deferred-debt-cleanup]</summary>
+    private string? _realRepoRoot;
 
     /// <summary>Renders the webview's navigable surface set — dashboard, epics index, every epic page, and every
     /// story page/placeholder (the five Story 6.2 surface families) — through the

@@ -179,21 +179,49 @@ public class GitInsightsTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_TextEquivalentTreeCarriesEveryFilesDominantAuthorShareContributorsAndLastActive()
+    public void RenderPage_HasNoSeparateTextEquivalentTree()
     {
+        // Owner feedback: the collapsible text-equivalent tree was removed entirely (not demoted) — the two
+        // chart forms plus their rich per-file tooltips are the surface now.
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        // The tree sits behind ONE outer collapsed disclosure — a fallback beside the toggle, not a third
-        // permanently-visible view (owner feedback).
-        Assert.Contains("<details class=\"ownership-tree-details\">", html);
-        Assert.Contains("<summary>Full file list", html);
-        Assert.Contains("<ul class=\"ownership-tree\">", html);
-        Assert.Contains("ownership-tree-file", html);
-        Assert.Contains("Alice 78%", html);
-        Assert.Contains("Bob 100%", html);
-        Assert.Contains("2 contributors", html);
-        Assert.Contains("1 contributor", html);
-        Assert.Contains("last active", html);
+        Assert.DoesNotContain("ownership-tree-details", html);
+        Assert.DoesNotContain("ownership-tree-file", html);
+        Assert.DoesNotContain("Full file list", html);
+    }
+
+    [Fact]
+    public void RenderPage_EachFileWedgeCarriesARichHoverCardInsteadOfAPlainTooltip()
+    {
+        // Owner feedback: enhance the tooltips — every file wedge/cell gets the same rich .codemap-card hover
+        // card BuildTreemapCard/RiskQuadrant already established, not a bare native <title>.
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+
+        Assert.Contains("js-tip", html);
+        Assert.Contains("data-tip-html=", html);
+        Assert.Contains("codemap-card", html);
+        Assert.Contains("Dominant author", html);
+        Assert.Contains("Alice (78%)", html);
+        Assert.Contains("By commits", html);
+    }
+
+    [Fact]
+    public void RenderPage_HasOneSharedLegendAreaWithAllFourModeSpecificBlocks()
+    {
+        // Owner feedback: the legend must always match what's actually colored — one shared legend area (not
+        // duplicated per view) with four mode-specific blocks; the live JS switcher shows exactly one at a time.
+        // Only the share-% block is visible without JS; the rest ship hidden (their mode selector is too).
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+
+        Assert.Contains("class=\"ownership-legend ownership-legend-share\">", html);
+        Assert.Contains("class=\"ownership-legend ownership-legend-top\" hidden>", html);
+        Assert.Contains("class=\"ownership-legend ownership-legend-spotlight\" hidden>", html);
+        Assert.Contains("class=\"ownership-legend ownership-legend-staleness\" hidden>", html);
+        // The staleness legend's own "fresh" swatch — previously missing from every legend (owner feedback).
+        Assert.Contains("ownership-legend-swatch owner-fresh", html);
+        Assert.Contains("Touched within the threshold", html);
+        // Exactly ONE instance of each — not duplicated per toggled view.
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "ownership-legend-share"));
     }
 
     [Fact]

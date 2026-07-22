@@ -33,6 +33,48 @@ public static class PathUtil
         || normalizedRelativePath == ".."
         || normalizedRelativePath.StartsWith("../", StringComparison.Ordinal);
 
+    /// <summary>Resolves every symlinked path SEGMENT to its real target — the C#-side equivalent of the TS
+    /// containment guard's <c>fs.realpathSync</c> (Story 6.9's <c>resolveWorkspacePath</c>), so a symlinked repo
+    /// root or an artifact path that traverses a symlink can't compute a misleading relative path that dodges
+    /// <see cref="EscapesRepoRoot"/>. <see cref="FileSystemInfo.ResolveLinkTarget"/> only resolves an entry that
+    /// IS itself a link, not the whole chain of ancestor directories in one call, so this walks the path
+    /// root-to-leaf and resolves each existing segment in turn. A segment that doesn't exist yet degrades to its
+    /// lexical form with no attempt to resolve it (nothing on disk to resolve against) — a genuinely BROKEN
+    /// symlink segment (link exists, target doesn't) hits this same "doesn't exist" branch via
+    /// <see cref="Directory.Exists"/>/<see cref="File.Exists"/>, which already follows and fails a dangling link,
+    /// so it never reaches <see cref="FileSystemInfo.ResolveLinkTarget"/> at all. The catch blocks below instead
+    /// cover a link that DOES exist but whose resolution itself throws (e.g. a permission error reading reparse
+    /// data, or a resolution cycle) — same generic degrade-to-lexical <c>resolveWorkspacePath</c> uses rather than
+    /// failing the whole call. [6-10-deferred-debt-cleanup]</summary>
+    public static string ResolveRealPath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(full) ?? string.Empty;
+        var segments = full[root.Length..].Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
+
+        var current = root;
+        foreach (var segment in segments)
+        {
+            var next = Path.Combine(current, segment);
+            try
+            {
+                if (Directory.Exists(next))
+                {
+                    next = Directory.ResolveLinkTarget(next, returnFinalTarget: true)?.FullName ?? next;
+                }
+                else if (File.Exists(next))
+                {
+                    next = File.ResolveLinkTarget(next, returnFinalTarget: true)?.FullName ?? next;
+                }
+            }
+            catch (IOException) { /* existing link whose resolution itself failed — keep the lexical segment */ }
+            catch (UnauthorizedAccessException) { /* permission error reading reparse data — keep the lexical segment */ }
+            current = next;
+        }
+        return current;
+    }
+
     /// <summary>True for working files no pipeline stage should touch — editor temps (<c>~$…</c>,
     /// <c>*.tmp</c>, <c>*.crswap</c>) and dotfiles (e.g. <c>.memlog.md</c>). One predicate shared by the
     /// generator's source enumeration and the framework adapters' ingest, so ignored files are neither

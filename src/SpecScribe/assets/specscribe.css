@@ -5472,6 +5472,16 @@ body:has(main.req-detail) .doc-header {
 .ownership-view-treemap { display: none; }
 .ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-sunburst { display: none; }
 .ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-treemap { display: block; }
+/* The active tab's own pressed look (owner feedback: it wasn't clear which view was current) — the SAME
+   background/box-shadow the sprint board's/requirements panel's own .board-tabbar toggles already use. */
+#ownership-view-sunburst:checked ~ .board-tabbar label[for="ownership-view-sunburst"],
+#ownership-view-treemap:checked ~ .board-tabbar label[for="ownership-view-treemap"] {
+  background: var(--warm-white);
+  color: var(--ink);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+#ownership-view-sunburst:focus-visible ~ .board-tabbar label[for="ownership-view-sunburst"],
+#ownership-view-treemap:focus-visible ~ .board-tabbar label[for="ownership-view-treemap"] { outline: 2px solid var(--teal); outline-offset: 2px; }
 
 .ownership-sunburst-wrap,
 .ownership-treemap-wrap { display: flex; flex-direction: column; align-items: center; }
@@ -5498,22 +5508,19 @@ body:has(main.req-detail) .doc-header {
    annular gaps), so — matching .codemap-dir — they stay unfilled, not washed. */
 .ownership-cell-dir { fill: none; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.4; }
 
-/* Discrete top-author palette (JS-only mode): 12 distinct hues built from the existing accent-token set plus
-   a few color-mix blends — deliberately a NEW small categorical palette (Task 2.4), not a reuse of --status-*
-   (non-lifecycle data) or the Story 7.9 file-type palette (a different dimension). "Other" (below the bounded
-   top-N roster) reads honestly muted + dashed, matching the file-type legend's own overflow-bucket treatment. */
+/* Discrete top-author palette (JS-only mode): the SAME 7-hue categorical palette Story 7.9's file-type legend
+   already established (owner feedback: author colors must draw from the one discrete color scheme this codebase
+   uses elsewhere, not a bespoke set) — same hues, same order (.codemap-cell.type-csharp/python/script/styles/
+   markup/config/other-lang). Charts.OwnershipTopAuthorPaletteSize bounds the roster to exactly these 7 slots.
+   "Other" (below the bounded top-N roster) reads honestly muted + dashed, matching the file-type legend's own
+   overflow-bucket treatment (also identical). */
 .ownership-wedge.owner-author-0, .ownership-cell.owner-author-0 { fill: var(--teal-deep); }
-.ownership-wedge.owner-author-1, .ownership-cell.owner-author-1 { fill: var(--rust); }
-.ownership-wedge.owner-author-2, .ownership-cell.owner-author-2 { fill: var(--moss); }
-.ownership-wedge.owner-author-3, .ownership-cell.owner-author-3 { fill: var(--violet); }
-.ownership-wedge.owner-author-4, .ownership-cell.owner-author-4 { fill: var(--gold); }
-.ownership-wedge.owner-author-5, .ownership-cell.owner-author-5 { fill: var(--teal); }
-.ownership-wedge.owner-author-6, .ownership-cell.owner-author-6 { fill: var(--rust-light); }
-.ownership-wedge.owner-author-7, .ownership-cell.owner-author-7 { fill: var(--moss-light); }
-.ownership-wedge.owner-author-8, .ownership-cell.owner-author-8 { fill: var(--gold-light); }
-.ownership-wedge.owner-author-9, .ownership-cell.owner-author-9 { fill: color-mix(in srgb, var(--teal-deep) 60%, var(--rust) 40%); }
-.ownership-wedge.owner-author-10, .ownership-cell.owner-author-10 { fill: color-mix(in srgb, var(--moss) 60%, var(--violet) 40%); }
-.ownership-wedge.owner-author-11, .ownership-cell.owner-author-11 { fill: color-mix(in srgb, var(--gold) 60%, var(--teal) 40%); }
+.ownership-wedge.owner-author-1, .ownership-cell.owner-author-1 { fill: var(--moss-light); }
+.ownership-wedge.owner-author-2, .ownership-cell.owner-author-2 { fill: var(--teal); }
+.ownership-wedge.owner-author-3, .ownership-cell.owner-author-3 { fill: var(--rust); }
+.ownership-wedge.owner-author-4, .ownership-cell.owner-author-4 { fill: var(--rust-light); }
+.ownership-wedge.owner-author-5, .ownership-cell.owner-author-5 { fill: var(--moss); }
+.ownership-wedge.owner-author-6, .ownership-cell.owner-author-6 { fill: var(--violet); }
 .ownership-wedge.owner-author-other, .ownership-cell.owner-author-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
 
 /* Individual-author spotlight (JS-only mode): distinguished by more than hue — a stroke/opacity change too
@@ -5527,6 +5534,11 @@ body:has(main.req-detail) .doc-header {
 .ownership-wedge.owner-fresh, .ownership-cell.owner-fresh { fill: var(--moss-light); }
 .ownership-wedge.owner-stale, .ownership-cell.owner-stale { fill: var(--rust); stroke-dasharray: 2 1; }
 
+/* ONE shared legend area below the toggle (not duplicated per view — colors mean the same thing in both charts).
+   Four mode-specific blocks; the live JS mode switcher shows exactly one at a time (owner feedback: the visible
+   legend must always match what's actually colored — this replaces a single static share-% legend that stayed
+   frozen once JS switched to any other mode). Only .ownership-legend-share ships visible; the rest ship `hidden`
+   (their mode selector is itself hidden without JS). */
 .ownership-legend {
   display: flex;
   flex-wrap: wrap;
@@ -5545,33 +5557,21 @@ body:has(main.req-detail) .doc-header {
 .ownership-legend-swatch.level-none { background: var(--parchment-dark); opacity: 0.55; }
 .ownership-legend-label { margin-right: 0.6rem; }
 .ownership-legend-empty { color: var(--ink-light); font-size: 0.8rem; margin: 0.6rem 0; text-align: center; }
-
-/* The whole text-equivalent tree sits behind ONE outer collapsed disclosure (AC #3 fallback, not a third
-   permanently-visible view beside the sunburst/treemap toggle — owner feedback); its own directory nodes stay
-   independently collapsible inside once opened. */
-.ownership-tree-details { font-size: 0.85rem; }
-.ownership-tree-details > summary { cursor: pointer; color: var(--ink-light); padding: 0.3rem 0; }
-.ownership-tree-details > summary:hover { color: var(--ink); }
-.ownership-tree-details[open] > summary { color: var(--ink); margin-bottom: 0.3rem; }
-
-/* Text-equivalent collapsible tree (AC #3) — its own class prefix per this component (deliberate small CSS
-   duplication, matching this codebase's existing per-component level-N convention rather than cross-story class
-   coupling). */
-.ownership-tree, .ownership-tree ul { list-style: none; margin: 0; padding-left: 1.1rem; }
-.ownership-tree { padding-left: 0; font-size: 0.82rem; max-height: 420px; overflow-y: auto; }
-.ownership-tree-dir > details > summary { cursor: pointer; color: var(--ink-light); padding: 0.15rem 0; }
-.ownership-tree-dir > details > summary:hover { color: var(--ink); }
-.ownership-tree-count { font-size: 0.75rem; color: var(--ink-faded); }
-.ownership-tree-file { display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0; flex-wrap: wrap; }
-.ownership-tree-file a { color: var(--rust); text-decoration: none; }
-.ownership-tree-file a:hover { text-decoration: underline; }
-.ownership-tree-detail { font-size: 0.75rem; color: var(--ink-faded); margin-left: auto; white-space: nowrap; }
-.ownership-tree-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
-.ownership-tree-dot.level-1 { background: #ecd18f; }
-.ownership-tree-dot.level-2 { background: #dfb455; }
-.ownership-tree-dot.level-3 { background: var(--gold-light); }
-.ownership-tree-dot.level-4 { background: var(--gold); }
-.ownership-tree-dot.level-none { background: var(--parchment-dark); opacity: 0.55; }
+/* Top-contributors legend swatches — the SAME 7-hue palette + "Other" the wedges/cells themselves use. */
+.ownership-legend-swatch.owner-author-0 { background: var(--teal-deep); }
+.ownership-legend-swatch.owner-author-1 { background: var(--moss-light); }
+.ownership-legend-swatch.owner-author-2 { background: var(--teal); }
+.ownership-legend-swatch.owner-author-3 { background: var(--rust); }
+.ownership-legend-swatch.owner-author-4 { background: var(--rust-light); }
+.ownership-legend-swatch.owner-author-5 { background: var(--moss); }
+.ownership-legend-swatch.owner-author-6 { background: var(--violet); }
+.ownership-legend-swatch.owner-author-other { background: var(--parchment-dark); opacity: 0.55; }
+/* Spotlight legend swatches. */
+.ownership-legend-swatch.owner-spotlight-on { background: var(--rust); }
+.ownership-legend-swatch.owner-spotlight-off { background: var(--parchment-dark); opacity: 0.35; }
+/* Staleness legend swatches — the "fresh" green this legend previously never listed at all (owner feedback). */
+.ownership-legend-swatch.owner-fresh { background: var(--moss-light); }
+.ownership-legend-swatch.owner-stale { background: var(--rust); }
 
 /* The Git Pulse panel header can now carry two "View …" links (hub + deep analytics); keep them on one
    tidy right-aligned line with breathing room between. */

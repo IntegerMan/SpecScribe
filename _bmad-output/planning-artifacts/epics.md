@@ -3038,6 +3038,20 @@ Turn the static remaining-work sunburst into a fluid, explorable map of the whol
 
 **FRs covered:** FR38 (sync into PRD when convenient) · **NFRs:** NFR8 · **Depends on:** Epic 19 (work-graph edges) as its relationship source, the existing `Charts.Sunburst`/`EpicSunburst` + `FollowUpGeometry` weights as its hierarchy source, and Story 6.7 (SPA adapter) as prior art for a JS delivery surface. Story 10.7 is the static baseline this enhances — not retired.
 
+<!-- Owner request logged 2026-07-22 (Story 7.11 design-feedback session, git-insights.html's Code Ownership
+     sunburst): "click and drill into a directory and filter down to that level — at least in the sunburst. You
+     can do this via Plotly and it's amazing." NOT implemented as part of 7.11 — explicitly deferred there and
+     cross-referenced here because it's the same class of interaction this epic is scoping (click-to-drill,
+     zoom, filter-by-selection on a sunburst), just requested against a DIFFERENT sunburst family: the code-
+     structure/git-analytics sunbursts Epic 7 owns (Story 7.11's ownership sunburst, Story 7.12's freshness
+     sunburst) rather than this epic's epic/story/follow-up remaining-work sunburst (Story 10.7). Two open
+     questions for Story 20.1's spike to fold in when it names the interactivity budget/engine: (1) should that
+     budget/engine generalize across BOTH sunburst families, or does Epic 7's family get its own follow-on story
+     instead of piggybacking on this epic's scope; (2) the owner named Plotly specifically as the desired
+     interaction model — a real charting-library dependency, which is a bigger departure than this codebase's
+     current zero-dependency JS posture (ADR 0010) and would need its own dependency-budget decision at spike
+     time, not an assumed yes. See Story 7.11's Change Log/Dev Agent Record for the full owner-feedback context. -->
+
 ### Story 20.1: Interactive Explorer Architecture Spike
 
 As a maintainer introducing the project's first rich client-interactive surface,

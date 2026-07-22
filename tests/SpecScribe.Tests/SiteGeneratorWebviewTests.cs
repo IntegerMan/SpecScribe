@@ -337,6 +337,56 @@ public class SiteGeneratorWebviewTests : IDisposable
         Assert.Equal(JsonValueKind.Null, src.ValueKind);
     }
 
+    [SkippableFact]
+    public void RepoRelative_SymlinkedRepoRootAliasingTheArtifactsRealPath_StillComputesTheTrueRelativePath()
+    {
+        // 6-10-deferred-debt-cleanup: RepoRelative used to compare RepoRoot and each artifact's absolute path
+        // purely lexically. Here RepoRoot is configured via a symlink ALIAS of the real fixture root while the
+        // discovered story artifact sits at its real (non-aliased) absolute path — exactly the "RepoRoot
+        // symlinked, or an artifact path traversing a symlink" mismatch the deferred item warned about. Before
+        // the fix, GetRelativePath's lexical comparison between two differently-named sibling directories finds
+        // no common literal prefix and climbs out with a "../"-prefixed string, which EscapesRepoRoot degrades
+        // to null — an honest-but-wrong "reveal button hidden" false negative on a perfectly valid in-repo
+        // artifact, not the true relative path the TS-side real-path-based containment guard would recognize.
+        var options = Options();
+        var link = Path.Combine(Path.GetDirectoryName(_root)!, "link-" + Path.GetFileName(_root));
+        try
+        {
+            Directory.CreateSymbolicLink(link, _root);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new SkipException("Creating a symbolic link isn't permitted on this host (e.g. non-elevated Windows without Developer Mode) — skipped, not failed.");
+        }
+
+        try
+        {
+            var aliased = new ForgeOptions
+            {
+                RepoRoot = link,
+                SourceRoot = options.SourceRoot,
+                AdrSourceRoot = options.AdrSourceRoot,
+                AdrSourceExplicit = options.AdrSourceExplicit,
+                OutputRoot = options.OutputRoot,
+                SiteTitle = options.SiteTitle,
+                IncludeReadme = options.IncludeReadme,
+                DeepGitAnalytics = options.DeepGitAnalytics,
+            };
+
+            var gen = new SiteGenerator(aliased);
+            Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+            var bundle = gen.RenderWebviewSurfaces();
+
+            Assert.Equal(
+                "_bmad-output/implementation-artifacts/1-1-foundation.md",
+                bundle.Surfaces.Single(s => s.OutputRelativePath == "epics/story-1-1.html").SourcePath);
+        }
+        finally
+        {
+            Directory.Delete(link);
+        }
+    }
+
     [Fact]
     public void SerializePayload_EmitsSourcePathPerSurface_CamelCase_NullForDashboard()
     {

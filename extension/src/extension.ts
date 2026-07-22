@@ -190,10 +190,12 @@ const dataChanged = new vscode.EventEmitter<void>();
  * bookkeeping alone. */
 const busyTerminals = new WeakSet<vscode.Terminal>();
 
-/** Whether a multi-root "SpecScribe only watches the first folder" notice has already been shown this session —
- * multi-root support itself stays out of scope (Story 6.11), but the user should be told once, not left to guess
- * why a non-first SpecScribe folder is silently ignored. */
-let multiRootNoticeShown = false;
+/** The bound folder's URI string the multi-root notice was last shown for — re-shown whenever the ACTUALLY-BOUND
+ * folder identity changes while still multi-root (not merely "already shown once this session"), and reset when
+ * the workspace drops back to single-root so a later re-expansion notifies again for whichever folder binds then.
+ * Multi-root support itself stays out of scope (Story 6.11); this only keeps the notice from going stale about
+ * which folder is currently watched. [spec-6-9-deferred-debt-cleanup review] */
+let multiRootNoticeShownForFolder: string | undefined;
 
 let statusBar: vscode.StatusBarItem | undefined;
 let treeProvider: OutlineTreeProvider | undefined;
@@ -275,6 +277,17 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => bindWorkspace(context)));
 }
 
+/** `fs.realpathSync`, degrading to `undefined` (never throwing) on a vanished path or a permission error — the
+ * same generic degrade {@link resolveWorkspacePath} and {@link resolveOpenableFile} already use for symlink
+ * resolution. [spec-epic6-deferred-debt-cleanup review] */
+function tryRealpath(p: string): string | undefined {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return undefined;
+  }
+}
+
 /** (Re)bind the shared store + watchers to the current folder[0], refresh the availability context key, and update
  * the native surfaces. Disposes any prior store so a folder change never leaks watchers. [Story 6.9] */
 function bindWorkspace(context: vscode.ExtensionContext) {
@@ -290,16 +303,25 @@ function bindWorkspace(context: vscode.ExtensionContext) {
   void vscode.commands.executeCommand('setContext', 'specscribe.available', folderOpen);
 
   // Multi-root support stays out of scope, but a silent folder[0]-only pick is confusing when there's more than
-  // one root — tell the user once per session which folder is bound instead of leaving them to guess. Purely
-  // informational (no "open as single-folder" imperative): folder[0] may already be exactly the project they
-  // want watched, so this only ever names the binding, never implies something is wrong.
-  // [deferred item, Story 6.9 review]
-  if (!multiRootNoticeShown && (vscode.workspace.workspaceFolders?.length ?? 0) > 1) {
-    multiRootNoticeShown = true;
+  // one root — tell the user which folder is bound instead of leaving them to guess. Purely informational (no
+  // "open as single-folder" imperative): folder[0] may already be exactly the project they want watched, so this
+  // only ever names the binding, never implies something is wrong. Re-fires whenever the BOUND folder identity
+  // changes (folders added/removed/reordered so a different folder becomes [0]), not just once per session, so
+  // the notice never goes stale about which folder is now actually watched — and resets once the workspace drops
+  // back to single-root, so a later re-expansion notifies again. [spec-6-9-deferred-debt-cleanup review]
+  const isMultiRoot = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
+  // realpath-normalized so two folders that are actually the same directory reached via different paths (one
+  // through a symlink) read as the same bound identity, not two — the same rigor this pass gave the C#-side
+  // RepoRelative. Falls back to the raw URI string if realpath fails (folder vanished, permission error).
+  const folderKey = folder && (tryRealpath(folder.uri.fsPath) ?? folder.uri.toString());
+  if (isMultiRoot && folderKey !== undefined && multiRootNoticeShownForFolder !== folderKey) {
+    multiRootNoticeShownForFolder = folderKey;
     void vscode.window.showInformationMessage(
       `SpecScribe: this is a multi-root workspace, so only the first folder ("${folder?.name ?? ''}") is watched ` +
       '— multi-root support isn’t available yet. Reorder folders, or open a single-folder window, if you ' +
       'need a different one watched.');
+  } else if (!isMultiRoot) {
+    multiRootNoticeShownForFolder = undefined;
   }
 
   if (folder) {
@@ -1232,14 +1254,32 @@ function toolCommandLine(tool: ResolvedTool, sub?: string): string {
   return parts.map(quoteCommandArg).join(' ');
 }
 
-/** POSIX/bash-style quoting (`\"` for an embedded quote) — better than the prior whitespace-only quoting, which
- * didn't escape an embedded `"` at all, but NOT a universally shell-correct quoter: PowerShell doesn't treat `\`
- * as an escape character inside a double-quoted string, and a token ending in `\` immediately before the closing
- * quote is still the classic Windows argv ambiguity. Both are pre-existing-class gaps a `toolPath`/prefix-arg
- * would need to hit in combination with an embedded `"` to trigger — narrow enough, and low-severity enough (the
- * line is staged, never auto-run), to accept rather than build a per-shell quoting engine for. */
+/** Best-effort shell-family detection for {@link quoteCommandArg}. On Windows, `process.platform` alone can't
+ * tell PowerShell (doesn't treat `\` as a string escape — needs doubled `""`) apart from a bash-family profile
+ * (Git Bash/WSL, both common non-default Windows terminal profiles) where adjacent quoted strings just
+ * CONCATENATE — `""` silently drops the embedded quote instead of escaping it, worse than the backslash form it
+ * would replace. Reads the user's configured `terminal.integrated.defaultProfile.windows` and only claims
+ * PowerShell/cmd-style (doubled-quote) escaping for a profile that doesn't look bash-like; an unset/auto-detected
+ * profile defaults to PowerShell-style, matching VS Code's own out-of-the-box Windows default. Non-Windows always
+ * uses POSIX escaping. [Blind Hunter + Edge Case Hunter, spec-epic6-deferred-debt-cleanup review] */
+function usesPosixStyleQuoting(): boolean {
+  if (process.platform !== 'win32') return true;
+  const profile = vscode.workspace.getConfiguration('terminal.integrated').get<string>('defaultProfile.windows');
+  return typeof profile === 'string' && /git bash|bash|wsl|sh$/i.test(profile);
+}
+
+/** Shell-aware quoting: doubles an embedded `"` (`""`) for a PowerShell/cmd-style profile, backslash-escapes it
+ * (`\"`) for a POSIX-style one (see {@link usesPosixStyleQuoting}). PowerShell does not treat `\` as an escape
+ * character inside a double-quoted string, so backslash-escaping alone (correct for POSIX shells) could stage a
+ * line that mis-parses there; doubling the quote is the form PowerShell string literals (`"a""b"` → `a"b`) and
+ * cmd.exe's own line parser recognize — NOT the Win32 `CommandLineToArgvW`/CRT argv-parsing convention used when a
+ * program is spawned directly rather than typed at a shell prompt, which backslash-escapes instead. A token
+ * ending in `\` immediately before the closing quote is still the classic Windows argv ambiguity — untouched by
+ * either escaping choice, and rare enough in combination with an embedded `"` (staged only, never auto-run) to
+ * accept rather than build a full per-shell quoting engine for. [spec-6-9-deferred-debt-cleanup review] */
 function quoteCommandArg(a: string): string {
-  return /[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a;
+  if (!/[\s"]/.test(a)) return a;
+  return usesPosixStyleQuoting() ? `"${a.replace(/"/g, '\\"')}"` : `"${a.replace(/"/g, '""')}"`;
 }
 
 /** Kills a renderer process, escalating to SIGKILL after a grace period if it hasn't exited — a bare SIGTERM

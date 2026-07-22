@@ -12,12 +12,12 @@ namespace SpecScribe;
 /// markdown source), so it builds its own shell the way <see cref="CommitDayTemplater"/> does rather than
 /// going through <see cref="HtmlTemplater.RenderPage"/>.
 /// <para>Progressive enhancement contract (NFR-5, reinterpreted by ADR 0010 for this opt-in surface): a real,
-/// useful default-mode chart (dominant-author share %) plus its full text-equivalent tree render and work with
-/// JS off; JS only adds the live mode selector (top contributors / individual-author spotlight / staleness
-/// threshold) on top — see <c>specscribe.js</c>'s <c>initOwnershipSunburst</c>. Author information stays
-/// descriptive attribution in every mode, never a cross-repo ranked scoreboard (FR-10). Outgoing file links are
-/// guarded on target existence via the <c>fileHref</c> resolver (Stories 7.1/7.4 seam): no resolver or no
-/// target → plain escaped text, never a dead link. [Story 3.8; Story 7.11 rewrite]</para></summary>
+/// useful default-mode chart (dominant-author share %) renders and works with JS off; JS only adds the live mode
+/// selector (top contributors / individual-author spotlight / staleness threshold) on top — see
+/// <c>specscribe.js</c>'s <c>initOwnershipSunburst</c>. Author information stays descriptive attribution in every
+/// mode, never a cross-repo ranked scoreboard (FR-10). Outgoing file links are guarded on target existence via the
+/// <c>fileHref</c> resolver (Stories 7.1/7.4 seam): no resolver or no target → plain escaped text, never a dead
+/// link. [Story 3.8; Story 7.11 rewrite]</para></summary>
 public static class GitInsightsTemplater
 {
     public static string RenderPage(
@@ -69,17 +69,20 @@ public static class GitInsightsTemplater
     /// <summary>Code ownership &amp; bus-factor (Story 7.11 rewrite — replaces the earlier files-and-contributors
     /// master-detail table AND the earlier plain ranked ownership table; see this file's Change Log): a
     /// whole-tree, interactive sunburst/treemap TOGGLE (owner feedback — mirrors Story 7.12's own Sunburst/
-    /// Treemap pure-CSS radio toggle rather than showing the sunburst with a second view stacked below it) over
-    /// EVERY source file (not a top-N subset — <paramref name="codeMap"/> comes from the same uncapped
-    /// <see cref="CodeMap.Build"/> walk the Code Map and Risk Quadrant pages use), pre-colored server-side by
-    /// dominant-author commit share % (the required no-JS default, ADR 0010) with a client-side mode selector for
-    /// top contributors / an individual-author spotlight / a configurable staleness threshold that recolors
-    /// WHICHEVER view is toggled visible (<c>specscribe.js</c>'s <c>initOwnershipSunburst</c> queries both
-    /// <c>.ownership-wedge</c> and <c>.ownership-cell</c>). The SAME per-file data is also available as a
-    /// collapsed, no-JS text-equivalent tree (<see cref="Charts.CodeOwnershipTree"/> — AC #3's accessible
-    /// fallback, a secondary disclosure below the toggle rather than a third permanently-visible view). In a
-    /// solo-maintainer repo (<c>insights.ContributorCount == 1</c>) every mode would trivially read "one person,
-    /// everywhere", so the section reframes honestly instead (AC #4, NFR8).</summary>
+    /// Treemap pure-CSS radio toggle) over EVERY source file (not a top-N subset — <paramref name="codeMap"/>
+    /// comes from the same uncapped <see cref="CodeMap.Build"/> walk the Code Map and Risk Quadrant pages use),
+    /// pre-colored server-side by dominant-author commit share % (the required no-JS default, ADR 0010) with a
+    /// client-side mode selector for top contributors / an individual-author spotlight / a configurable staleness
+    /// threshold that recolors WHICHEVER view is toggled visible (<c>specscribe.js</c>'s
+    /// <c>initOwnershipSunburst</c> queries both <c>.ownership-wedge</c> and <c>.ownership-cell</c>). Every file
+    /// wedge/cell carries a rich hover card (<see cref="Charts.CodeOwnershipSunburst"/>'s <c>data-tip-html</c>,
+    /// owner feedback) in place of a plain tooltip. ONE shared legend area follows the toggle with all four
+    /// mode-specific blocks — the live switcher shows exactly one at a time so the legend can never disagree with
+    /// what's actually colored (owner feedback: colors and legend must always match up, including a "fresh"
+    /// swatch for staleness mode, which was previously missing). No separate accessible text-equivalent table
+    /// ships here (owner feedback: removed entirely — the two chart forms plus their rich per-file tooltips are
+    /// the surface now). In a solo-maintainer repo (<c>insights.ContributorCount == 1</c>) every mode would
+    /// trivially read "one person, everywhere", so the section reframes honestly instead (AC #4, NFR8).</summary>
     private static void AppendOwnershipSection(
         StringBuilder sb,
         GitInsightsData insights,
@@ -134,6 +137,7 @@ public static class GitInsightsTemplater
         // Sunburst/Treemap view toggle: a pure-CSS radio pair mirroring the sprint board's .board-tabs component
         // and Story 7.12's own Code Freshness toggle exactly — both views render from the SAME codeMap/topAuthors
         // so either is instantly available with no re-fetch, and the live mode switcher recolors both together.
+        // The active tab carries a visible pressed state (owner feedback: it wasn't clear which view was current).
         sb.Append("    <div class=\"board-tabs\">\n");
         sb.Append("      <input type=\"radio\" id=\"ownership-view-sunburst\" name=\"ownership-view\" class=\"board-tab-radio\" checked>\n");
         sb.Append("      <input type=\"radio\" id=\"ownership-view-treemap\" name=\"ownership-view\" class=\"board-tab-radio ownership-treemap-radio\">\n");
@@ -146,23 +150,22 @@ public static class GitInsightsTemplater
         sb.Append("    <div class=\"ownership-view ownership-view-sunburst\">\n");
         sb.Append("      <div class=\"ownership-sunburst-wrap\">\n");
         sb.Append("        ").Append(Charts.CodeOwnershipSunburst(codeMap.Roots, topAuthors, fileHref: fileHref));
-        sb.Append(Charts.OwnershipLegend(codeMap.Files()));
         sb.Append("      </div>\n");
         sb.Append("    </div>\n");
         sb.Append("    <div class=\"ownership-view ownership-view-treemap\">\n");
         sb.Append("      <div class=\"ownership-treemap-wrap\">\n");
         sb.Append("        ").Append(Charts.CodeOwnershipTreemap(codeMap.Layout(), topAuthors, fileHref: fileHref));
-        sb.Append(Charts.OwnershipLegend(codeMap.Files()));
         sb.Append("      </div>\n");
         sb.Append("    </div>\n");
 
-        // Accessible text-equivalent (AC #3): the SAME per-file data the sunburst/treemap's wedges/cells carry,
-        // as a collapsed directory-tree disclosure below the toggle — a fallback a reader can open, not a third
-        // permanently-visible view competing with the two chart forms (owner feedback).
-        sb.Append("    <details class=\"ownership-tree-details\">\n");
-        sb.Append("      <summary>Full file list (every file's dominant author, share, contributors, last active)</summary>\n");
-        sb.Append(Charts.CodeOwnershipTree(codeMap.Roots, fileHref));
-        sb.Append("    </details>\n");
+        // ONE shared legend area (not duplicated per view — the colors mean the same thing in both charts):
+        // four mode-specific blocks, the live switcher shows exactly one so the visible legend can never
+        // disagree with what's actually colored (owner feedback).
+        var files = codeMap.Files();
+        sb.Append(Charts.OwnershipLegend(files));
+        sb.Append(Charts.OwnershipTopAuthorsLegend(topAuthors));
+        sb.Append(Charts.OwnershipSpotlightLegend());
+        sb.Append(Charts.OwnershipStalenessLegend());
 
         sb.Append("  </div>\n");
         sb.Append("</section>\n\n");

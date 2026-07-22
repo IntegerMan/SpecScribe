@@ -1239,6 +1239,22 @@
       FILL_CLASSES.forEach(function (cls) { w.classList.remove(cls); });
     }
 
+    // Four mode-specific legend blocks (Charts.OwnershipLegend/-TopAuthorsLegend/-SpotlightLegend/
+    // -StalenessLegend) — show exactly the one matching the active mode so the visible legend can never disagree
+    // with what's actually colored (owner feedback: colors and legend must always match up).
+    var legendShare = Array.prototype.slice.call(panel.querySelectorAll(".ownership-legend-share"));
+    var legendTop = Array.prototype.slice.call(panel.querySelectorAll(".ownership-legend-top"));
+    var legendSpotlight = Array.prototype.slice.call(panel.querySelectorAll(".ownership-legend-spotlight"));
+    var legendStaleness = Array.prototype.slice.call(panel.querySelectorAll(".ownership-legend-staleness"));
+
+    function swapLegend(mode) {
+      function setHidden(list, hidden) { list.forEach(function (el) { el.hidden = hidden; }); }
+      setHidden(legendShare, mode !== "share");
+      setHidden(legendTop, mode !== "top");
+      setHidden(legendSpotlight, mode !== "spotlight");
+      setHidden(legendStaleness, mode !== "staleness");
+    }
+
     function labelHost(w) {
       var a = w.closest && w.closest("a");
       return a || w;
@@ -1310,6 +1326,7 @@
       var mode = modeSelect.value;
       authorWrap.hidden = mode !== "spotlight";
       thresholdWrap.hidden = mode !== "staleness";
+      swapLegend(mode);
       if (mode === "top") recolorTopAuthors();
       else if (mode === "spotlight") recolorSpotlight(authorSelect.value || roster[0]);
       else if (mode === "staleness") {

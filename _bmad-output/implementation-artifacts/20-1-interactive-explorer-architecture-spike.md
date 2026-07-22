@@ -187,6 +187,7 @@ Use tables, not prose walls (mirror 19.1):
 - **Epic 19 not yet done.** The related-edge half of the payload leans on a contract that ships in Epic 19; the spike must not assume shipped edges.
 - **Story 10.7 in active dev.** The static sunburst markup the explorer enhances is itself moving (density/collapse work — see [[story-10-7-sunburst-navigability-project-scale-review]]); the enhancement contract must key off stable seams (`.sb-seg`, wedge links) not in-flight details.
 - **Charts render pure SVG + links today** ([[charting-is-pure-svg-no-js]]) — the drill-in is the first chart that *needs* JS to function beyond tooltips; that is the line being crossed, and the spike names the terms.
+- **A second sunburst family has now asked for the same interaction.** Owner feedback logged 2026-07-22 during Story 7.11's (Code Ownership & Bus-Factor Insights) design-review session: "click and drill into a directory and filter down to that level — at least in the sunburst. You can do this via Plotly and it's amazing." That's against `git-insights.html`'s Code Ownership sunburst (Epic 7's code-structure/git-analytics family, not this epic's epic/story/follow-up remaining-work sunburst) — explicitly NOT actioned as part of 7.11, deferred and cross-referenced back to this epic (also noted in `epics.md`'s Epic 20 section). The spike should fold in two questions this raises: whether the interactivity boundary/JS budget this story names is meant to generalize across BOTH sunburst families (this epic's + Epic 7's) or whether Epic 7's family gets its own follow-on story instead of piggybacking on Epic 20's budget; and that the owner named **Plotly** specifically — a real charting-library dependency, a materially bigger departure from the zero-runtime-dependency default (Dev Notes table above, and ADR 0010's existing zero-dep JS posture for Epic 7's own opt-in analytics surfaces) than anything else considered here, so it should be weighed explicitly rather than assumed in or out.
 
 ### Anti-patterns to prevent
 
@@ -219,6 +220,7 @@ Use tables, not prose walls (mirror 19.1):
 - [Source: `_bmad-output/implementation-artifacts/8-1-integration-spike-cross-surface-status-verification.md` — spike deliverable convention (findings in Completion Notes)]
 - [Source: `_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md` — shared core, graceful degrade, insight/interactive providers]
 - [Source: epics.md NFR8 (degrade to absent/static) + NFR5 (progressive enhancement); NFR8 named in Epic 20 header]
+- [Source: `_bmad-output/implementation-artifacts/7-11-code-ownership-and-bus-factor-insights.md` — Change Log / Dev Agent Record, 2026-07-22 entries: the owner's click-to-drill/filter-by-directory request against the Code Ownership sunburst, explicitly deferred to this epic, Plotly named as the desired interaction model]
 
 ### Previous story intelligence
 
