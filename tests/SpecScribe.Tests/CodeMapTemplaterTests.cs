@@ -158,86 +158,77 @@ public class CodeMapTemplaterTests
         Assert.Contains("No files match this filter.", html);
     }
 
-    // ---- Code freshness sunburst section (Story 7.12) -------------------------------------
+    // ---- Merged shape (Treemap/Sunburst) x dimension toggle (Story 7.12 review) ------------
 
     [Fact]
-    public void RenderPage_WithMetrics_RendersTheFreshnessSunburstSectionWithARealValueLegendAndATableCaption()
+    public void RenderPage_WithMetrics_RendersBothShapesInOnePanelWithAViewAsToggle()
     {
         var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
 
-        Assert.Contains("Code Freshness", html);
-        Assert.Contains("freshness-sunburst", html);
-        Assert.Contains("freshness-legend", html);
-        Assert.DoesNotContain("Less …", html);
-        // The caption points at the existing Last-column table rather than duplicating it.
-        Assert.Contains("<strong>Last</strong>", html);
-        // The section lives INSIDE each filtered .codemap-view panel (not once ahead of all four), so it
-        // re-filters along with the treemap/table when a checkbox is toggled.
-        var fullPanelStart = html.IndexOf("data-view=\"full\"", StringComparison.Ordinal);
-        var nextPanelStart = html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal);
-        var freshnessInFullPanel = html.IndexOf("Code Freshness", StringComparison.Ordinal);
-        Assert.InRange(freshnessInFullPanel, fullPanelStart, nextPanelStart);
+        Assert.Contains("class=\"codemap-shape codemap-shape-treemap\"", html);
+        Assert.Contains("class=\"codemap-shape codemap-shape-sunburst\"", html);
+        Assert.Contains("class=\"codemap-sunburst\"", html);
+        Assert.Contains(">Treemap</label>", html);
+        Assert.Contains(">Sunburst</label>", html);
+        // Only ONE "Colorize by" dropdown per panel — it governs both shapes, not a second copy per shape.
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(
+            html[html.IndexOf("data-view=\"full\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal)],
+            "class=\"codemap-controls\""));
     }
 
     [Fact]
-    public void RenderPage_EachFilterPanelGetsItsOwnFreshnessSunburstSoTheCheckboxesActuallyReFilterIt()
+    public void RenderPage_EachFilterPanelGetsItsOwnSunburstSoTheCheckboxesActuallyReFilterIt()
     {
-        // Owner feedback: a single sunburst sourced only from the unfiltered tree looked "frozen" next to a
-        // treemap/table that visibly changed when a checkbox was toggled. Each of the four precomputed panels
-        // must carry its OWN filtered sunburst, exactly like the treemap already does.
+        // Owner feedback: a separate freshness-only section sourced from the unfiltered tree looked "frozen" next
+        // to a treemap/table that visibly changed when a checkbox was toggled. Both shapes must now come from the
+        // SAME per-variant Roots/Layout as everything else in the panel.
         var variants = CodeMap.BuildVariants(
             new[] { ("tests/OnlyTests/FooTests.cs", 10L), ("src/A.cs", 20L) }, NoMetrics);
 
         var html = CodeMapTemplater.RenderPage(variants, Nav());
 
-        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(html, "Code Freshness").Count);
-        // The "no-tests" panel excludes the test file, so its sunburst has one fewer file wedge than "full"'s.
         var fullSection = html[html.IndexOf("data-view=\"full\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal)];
         var noTestsSection = html[html.IndexOf("data-view=\"no-tests\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec-no-tests\"", StringComparison.Ordinal)];
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(fullSection, "class=\"freshness-wedge level-").Count);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(noTestsSection, "class=\"freshness-wedge level-"));
+        // Each panel renders BOTH shapes (treemap rects + sunburst wedges), so "full"'s 2 files appear 4 times
+        // (2 files x 2 shapes); the "no-tests" panel excludes the test file, leaving only 1 file x 2 shapes = 2.
+        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(fullSection, "class=\"codemap-cell type-").Count);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(noTestsSection, "class=\"codemap-cell type-").Count);
     }
 
     [Fact]
-    public void RenderPage_RendersASunburstTreemapViewTogglePerPanelWithUniqueRadioIdsAcrossAllFourPanels()
+    public void RenderPage_RendersAShapeTogglePerPanelWithUniqueRadioIdsAcrossAllFourPanels()
     {
-        // Owner feedback: a "view as treemap" alternative to the sunburst (owner correction: "Tree" means the
-        // size-by-area treemap shape, not a folder-list view). The pure-CSS radio pair must have variant-unique
-        // ids/names (all four panels' markup coexists in the DOM) so toggling one panel's Sunburst/Treemap
-        // radios can never affect another panel.
+        // The pure-CSS radio pair must have variant-unique ids/names (all four panels' markup coexists in the
+        // DOM) so toggling one panel's Treemap/Sunburst radios can never affect another panel.
         var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
 
-        Assert.Contains("id=\"cf-sunburst-full\"", html);
-        Assert.Contains("id=\"cf-treemap-full\"", html);
-        Assert.Contains("id=\"cf-sunburst-no-spec\"", html);
-        Assert.Contains("id=\"cf-treemap-no-spec\"", html);
-        Assert.Contains(">Sunburst</label>", html);
-        Assert.Contains(">Treemap</label>", html);
-        Assert.Contains("class=\"freshness-treemap\"", html); // the treemap view itself renders (always in the DOM, CSS-hidden by default)
+        Assert.Contains("id=\"cs-treemap-full\"", html);
+        Assert.Contains("id=\"cs-sunburst-full\"", html);
+        Assert.Contains("id=\"cs-treemap-no-spec\"", html);
+        Assert.Contains("id=\"cs-sunburst-no-spec\"", html);
         // Every radio name is unique per panel — no two panels' toggles can cross-wire.
-        var names = System.Text.RegularExpressions.Regex.Matches(html, "name=\"(cf-view-[^\"]+)\"")
+        var names = System.Text.RegularExpressions.Regex.Matches(html, "name=\"(cs-shape-[^\"]+)\"")
             .Select(m => m.Groups[1].Value).Distinct().ToList();
         Assert.Equal(4, names.Count);
     }
 
     [Fact]
-    public void RenderPage_WithoutMetrics_StillRendersTheFreshnessSunburstAllNeutral()
+    public void RenderPage_WithoutMetrics_SunburstColorsByFileTypeLikeTheTreemapDoes()
     {
         var html = CodeMapTemplater.RenderPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav());
 
-        Assert.Contains("Code Freshness", html);
-        Assert.Contains("freshness-wedge level-none", html);
-        Assert.Contains("freshness-legend-empty", html);
+        Assert.Contains("class=\"codemap-sunburst\"", html);
+        Assert.Contains("codemap-cell type-csharp", html);
     }
 
     [Fact]
-    public void RenderPage_FreshnessSunburstLinksAFileWedgeOnlyWhenTheResolverReturnsATarget()
+    public void RenderPage_SunburstLinksAFileWedgeOnlyWhenTheResolverReturnsATarget()
     {
-        // Regression guard: the freshness section's fileHref must be the SAME guarded resolver every other
-        // Code Map surface (the treemap, the file table) already threads through — not silently dropped.
+        // Regression guard: the sunburst's fileHref must be the SAME guarded resolver every other Code Map
+        // surface (the treemap, the file table) already threads through — not silently dropped.
         var linked = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(),
             fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/A.cs.html\" aria-label=\"src/A.cs\"><path class=\"freshness-wedge", linked);
+        Assert.Contains("<a href=\"code/src/A.cs.html\" aria-label=\"src/A.cs\"><path class=\"codemap-cell", linked);
 
         var plain = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(), fileHref: null);
         Assert.DoesNotContain("<a href=\"code/src/A.cs.html\">", plain);

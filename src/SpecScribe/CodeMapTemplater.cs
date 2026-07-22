@@ -50,9 +50,9 @@ public static class CodeMapTemplater
         // deliberately NOT wrapped in a .chart-panel card: the two filter checkboxes right below need to be plain,
         // unwrapped siblings of the four .codemap-view panels (the CSS sibling-combinator toggle needs them at the
         // same nesting level as their targets), so nothing here can be a common ancestor of both.
-        sb.Append("<h3>Source Code Treemap</h3>\n");
-        sb.Append("<p class=\"chart-lead\">Each rectangle is a file, sized by its lines of code and nested inside its directory. ");
-        sb.Append("Color shows a git-derived change signal when available — use the dropdown to recolor by another dimension, and select a directory to zoom in. Filter what's shown with the checkboxes below.</p>\n\n");
+        sb.Append("<h3>Source Code Map</h3>\n");
+        sb.Append("<p class=\"chart-lead\">Every file, sized by its lines of code and nested inside its directory. ");
+        sb.Append("Use \"View as\" to switch between a Treemap and a Sunburst, and \"Colorize by\" to switch what the color encodes — a git-derived change signal when available, or file type. Select a directory to zoom in (Treemap only). Filter what's shown with the checkboxes below.</p>\n\n");
 
         // Pure CSS: no JavaScript is needed for filtering to work (round 2).
         AppendFilterCheckbox(sb, "cm-exclude-spec", "Exclude spec-driven development directories");
@@ -69,75 +69,29 @@ public static class CodeMapTemplater
         return sb.ToString();
     }
 
-    /// <summary>The directory-structure freshness sunburst section (Story 7.12): a second new chart on this page,
-    /// rendered per-variant (owner feedback: the exclude-filter checkboxes must re-filter every surface on the
-    /// page, not just the treemap — a section sourced only from the unfiltered "full" tree looked broken, since
-    /// toggling a checkbox visibly changed the treemap/table below it but left this section frozen). Sourced from
-    /// <paramref name="variant"/>'s own <c>Roots</c> — the same tree + per-file git-derived last-changed date
-    /// <see cref="CodeMap.Build"/> already joins for the treemap, so there is no new fetch here. Wrapped in the
-    /// Story 10.2 <see cref="Charts.Framed"/> chrome with a real-value legend (never the treemap's own
-    /// pre-existing "Less … More" legend) and a caption pointing at the existing <see cref="AppendFileTable"/>
-    /// "Last" column as the accessible text equivalent, rather than a second table. Owner feedback also asked for
-    /// a "view as treemap" alternative to the polar sunburst — a pure-CSS radio pair (mirroring the sprint
-    /// board's <c>.board-tabs</c> view toggle) swaps between <see cref="Charts.CodeFreshnessSunburst"/> and
-    /// <see cref="Charts.CodeFreshnessTreemap"/> (the SAME squarified <paramref name="variant"/>.Layout the
-    /// page's other treemap draws from, colored by recency instead), both rendered from the SAME variant so
-    /// either view is instantly available with no re-fetch/re-filter. Radio ids are suffixed with
-    /// <paramref name="variant"/>'s key so all four filter-combination panels can carry their own toggle without
-    /// id/name collisions.</summary>
-    private static void AppendFreshnessSunburstSection(StringBuilder sb, CodeMapVariant variant, Func<string, string?>? fileHref)
-    {
-        var files = variant.Map.Files();
-        var sunburstId = $"cf-sunburst-{variant.Key}";
-        var treemapId = $"cf-treemap-{variant.Key}";
-
-        var body = new StringBuilder();
-        body.Append("    <div class=\"freshness-panel\">\n");
-        body.Append("      <div class=\"board-tabs\">\n");
-        body.Append($"        <input type=\"radio\" id=\"{sunburstId}\" name=\"cf-view-{variant.Key}\" class=\"board-tab-radio\" checked>\n");
-        body.Append($"        <input type=\"radio\" id=\"{treemapId}\" name=\"cf-view-{variant.Key}\" class=\"board-tab-radio cf-treemap-radio\">\n");
-        body.Append("        <div class=\"board-tabbar\">\n");
-        body.Append($"          <label for=\"{sunburstId}\" class=\"board-tab\">Sunburst</label>\n");
-        body.Append($"          <label for=\"{treemapId}\" class=\"board-tab\">Treemap</label>\n");
-        body.Append("        </div>\n");
-        body.Append("      </div>\n");
-        body.Append("      <div class=\"freshness-view freshness-view-sunburst\">\n");
-        body.Append("        <div class=\"freshness-sunburst-wrap\">\n");
-        body.Append(Charts.CodeFreshnessSunburst(variant.Map.Roots, fileHref: fileHref));
-        body.Append(Charts.FreshnessLegend(files));
-        body.Append("        </div>\n");
-        body.Append("      </div>\n");
-        body.Append("      <div class=\"freshness-view freshness-view-treemap\">\n");
-        body.Append("        <div class=\"freshness-treemap-wrap\">\n");
-        body.Append(Charts.CodeFreshnessTreemap(variant.Layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, fileHref: fileHref));
-        body.Append(Charts.FreshnessLegend(files));
-        body.Append("        </div>\n");
-        body.Append("      </div>\n");
-        body.Append("    </div>\n");
-        body.Append("    <p class=\"chart-lead freshness-caption\">See the <strong>Last</strong> column in the file table below for every file's exact last-changed date.</p>\n");
-
-        sb.Append(Charts.Framed(
-            new Charts.ChartMeta(
-                Title: "Code Freshness",
-                Why: Charts.WhyText(Charts.ChartMetric.CodeFreshness)),
-            body.ToString()));
-        sb.Append("\n");
-    }
-
     private static void AppendFilterCheckbox(StringBuilder sb, string id, string label)
     {
         sb.Append($"  <input type=\"checkbox\" id=\"{id}\" class=\"codemap-filter-checkbox\">");
         sb.Append($"<label for=\"{id}\" class=\"codemap-filter-label\">{PathUtil.Html(label)}</label>\n");
     }
 
-    /// <summary>Renders one precomputed filter combination as a self-contained panel: its own drill breadcrumb,
-    /// colorize dropdown, legend/notice, SVG treemap, and text-equivalent table. The treemap card and the table card
-    /// are SIBLING <c>.chart-panel</c>s inside the (unstyled) <c>.codemap-view</c> wrapper — never one nested inside
-    /// the other, matching how every other chart on this site pairs a visual + its text-equivalent table as two
-    /// top-level cards. Nothing here carries an <c>id</c>: all four panels share the same markup shape and the JS
-    /// enhancement scopes every lookup to whichever panel it is currently wiring (class selectors, not
-    /// <c>getElementById</c>). Exactly one panel is visible at a time via the pure-CSS checkbox toggle; the others
-    /// are <c>display:none</c> (and therefore out of the accessibility tree) until selected.</summary>
+    /// <summary>Renders one precomputed filter combination as a self-contained panel: a "View as" shape toggle
+    /// (Treemap/Sunburst) crossed with a shared "Colorize by" dimension dropdown, the drill breadcrumb (Treemap
+    /// zoom only), the shared legend/notice, both chart shapes, and the text-equivalent table. Owner feedback,
+    /// Story 7.12 review round 2: this used to be TWO separate panels — a general multi-dimension Treemap and a
+    /// recency-only Sunburst — which felt like "what to view" and "how to view it" were artificially split across
+    /// different surfaces. They're now ONE panel: <see cref="AppendColorizeControls"/>/<see cref="AppendLegend"/>/
+    /// <see cref="AppendDiscreteLegend"/> govern BOTH shapes (the client-side <c>recolor()</c> enhancement in
+    /// <c>specscribe.js</c> now queries <c>.codemap-cell</c> across the whole panel, not just the treemap's own
+    /// <c>&lt;svg&gt;</c>, so a dimension switch recolors whichever shape is showing — and the other, off-screen
+    /// one, so neither can drift stale). The treemap card and the table card are SIBLING <c>.chart-panel</c>s
+    /// inside the (unstyled) <c>.codemap-view</c> wrapper — never one nested inside the other, matching how every
+    /// other chart on this site pairs a visual + its text-equivalent table as two top-level cards. Nothing here
+    /// carries an <c>id</c> except the per-shape toggle radios (suffixed with <paramref name="variant"/>'s key so
+    /// all four filter-combination panels' toggles can coexist without collision): every other lookup is scoped
+    /// with class selectors (not <c>getElementById</c>). Exactly one panel is visible at a time via the pure-CSS
+    /// checkbox toggle; the others are <c>display:none</c> (and therefore out of the accessibility tree) until
+    /// selected.</summary>
     private static void AppendVariantPanel(StringBuilder sb, CodeMapVariant variant, Func<string, string?>? fileHref, string prefix)
     {
         sb.Append($"<div class=\"codemap-view\" data-view=\"{PathUtil.Html(variant.Key)}\">\n");
@@ -152,9 +106,6 @@ public static class CodeMapTemplater
         var files = variant.Map.Files();
         var hasMetrics = files.Any(f => f.Metrics is not null);
 
-        // Re-filters with the rest of this panel (owner feedback — see AppendFreshnessSunburstSection). [Story 7.12]
-        AppendFreshnessSunburstSection(sb, variant, fileHref);
-
         sb.Append("  <section class=\"chart-panel codemap-panel\">\n");
 
         if (variant.ExcludesSpecDev || variant.ExcludesTests)
@@ -167,13 +118,9 @@ public static class CodeMapTemplater
             sb.Append($"    <p class=\"codemap-view-note\">{Charts.Plural(variant.Map.FileCount, "file", "files")} shown — {excluded}.</p>\n");
         }
 
-        // The drill breadcrumb is JS-driven (zoom requires script); emit it hidden so a no-JS visitor never sees an
-        // inert control. The enhancement script reveals it on init, scoped to this panel.
-        sb.Append("    <nav class=\"codemap-drill\" aria-label=\"Treemap zoom\" hidden>\n");
-        sb.Append("      <ol class=\"codemap-breadcrumb\">\n");
-        sb.Append("        <li><button type=\"button\" class=\"codemap-crumb\" data-path=\"\" aria-current=\"true\">All files</button></li>\n");
-        sb.Append("      </ol>\n");
-        sb.Append("    </nav>\n");
+        // "How to view it" — a pure-CSS radio pair swapping between the Treemap and Sunburst shapes, both driven
+        // by the SAME colorize dimension below. [Story 7.12 review]
+        AppendShapeToggle(sb, variant.Key);
 
         // File type is the one colorize dimension that needs no git data, so the dropdown + a legend always
         // render once the variant has files — the "git data unavailable" state is no longer a fully-inert
@@ -184,20 +131,56 @@ public static class CodeMapTemplater
         AppendDiscreteLegend(sb, files, hasMetrics);
         if (!hasMetrics)
         {
-            sb.Append("    <p class=\"codemap-notice codemap-notice-secondary\" role=\"note\">Git change data is unavailable (run with <code>--deep-git</code> in a git repository to colorize by the six git-derived dimensions). The treemap is colorized by file type instead.</p>\n");
+            sb.Append("    <p class=\"codemap-notice codemap-notice-secondary\" role=\"note\">Git change data is unavailable (run with <code>--deep-git</code> in a git repository to colorize by the six git-derived dimensions). The map is colorized by file type instead.</p>\n");
         }
 
-        sb.Append("    <div class=\"codemap-viewport\">\n");
+        sb.Append("    <div class=\"codemap-shape codemap-shape-treemap\">\n");
+        // The drill breadcrumb is JS-driven (zoom requires script) and Treemap-only (a polar sunburst has no
+        // rectangular viewBox to zoom into); emit it hidden so a no-JS visitor never sees an inert control. The
+        // enhancement script reveals it on init, scoped to this panel.
+        sb.Append("      <nav class=\"codemap-drill\" aria-label=\"Treemap zoom\" hidden>\n");
+        sb.Append("        <ol class=\"codemap-breadcrumb\">\n");
+        sb.Append("          <li><button type=\"button\" class=\"codemap-crumb\" data-path=\"\" aria-current=\"true\">All files</button></li>\n");
+        sb.Append("        </ol>\n");
+        sb.Append("      </nav>\n");
+        sb.Append("      <div class=\"codemap-viewport\">\n");
         // totalFileCount passed explicitly (variant.Map.FileCount, the SAME source AppendFileTable's `files` come
         // from) so the treemap's detail cap and the table's row cap agree on whether the cap trips even on the
         // rare repo deep enough that Layout() omits a file nested past its own recursion cap. [Review][Patch]
         sb.Append(Charts.CodeTreemap(variant.Layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics, fileHref, prefix, variant.Map.FileCount));
+        sb.Append("      </div>\n");
         sb.Append("    </div>\n");
+
+        sb.Append("    <div class=\"codemap-shape codemap-shape-sunburst\">\n");
+        sb.Append("      <div class=\"codemap-sunburst-wrap\">\n");
+        sb.Append(Charts.CodeMapSunburst(variant.Map.Roots, hasMetrics, fileHref: fileHref));
+        sb.Append("      </div>\n");
+        sb.Append("    </div>\n");
+
         sb.Append("  </section>\n\n");
 
         AppendFileTable(sb, files, hasMetrics, fileHref, prefix);
 
         sb.Append("</div>\n\n");
+    }
+
+    /// <summary>The "View as: Treemap | Sunburst" pure-CSS toggle (a panel-scoped clone of the sprint board's
+    /// <c>.board-tabs</c> radio toggle) — the "how to view it" axis, orthogonal to the "what to view" colorize
+    /// dropdown below it (both apply to whichever shape is showing). Radio ids/names are suffixed with
+    /// <paramref name="variantKey"/> since all four filter-combination panels' markup coexists in the DOM.
+    /// [Story 7.12 review]</summary>
+    private static void AppendShapeToggle(StringBuilder sb, string variantKey)
+    {
+        var treemapId = $"cs-treemap-{variantKey}";
+        var sunburstId = $"cs-sunburst-{variantKey}";
+        sb.Append("    <div class=\"board-tabs codemap-shape-tabs\">\n");
+        sb.Append($"      <input type=\"radio\" id=\"{treemapId}\" name=\"cs-shape-{variantKey}\" class=\"board-tab-radio\" checked>\n");
+        sb.Append($"      <input type=\"radio\" id=\"{sunburstId}\" name=\"cs-shape-{variantKey}\" class=\"board-tab-radio cs-sunburst-radio\">\n");
+        sb.Append("      <div class=\"board-tabbar\">\n");
+        sb.Append($"        <label for=\"{treemapId}\" class=\"board-tab\">Treemap</label>\n");
+        sb.Append($"        <label for=\"{sunburstId}\" class=\"board-tab\">Sunburst</label>\n");
+        sb.Append("      </div>\n");
+        sb.Append("    </div>\n");
     }
 
     /// <summary>The dimension-switch control — a dropdown, keyboard-operable, present whenever the variant has

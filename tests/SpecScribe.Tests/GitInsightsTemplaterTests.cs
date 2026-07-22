@@ -89,6 +89,11 @@ public class GitInsightsTemplaterTests
         Assert.Contains(Charts.WhyText(Charts.ChartMetric.ActivityCadence), html);
         Assert.DoesNotContain("deep-page-lead", html);
         Assert.Contains("crumb-current", html); // breadcrumb trail back home
+
+        // Owner feedback: Activity Over Time is the page's most immediately orienting chart, so it leads —
+        // Code Ownership follows below it.
+        Assert.True(html.IndexOf(">Activity Over Time</h2>", StringComparison.Ordinal)
+            < html.IndexOf(">Code Ownership &amp; Bus-Factor</h2>", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -127,6 +132,24 @@ public class GitInsightsTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_OwnershipHasASunburstTreemapToggleNotAThirdStackedView()
+    {
+        // Owner feedback: sunburst OR treemap via a toggle (mirroring Story 7.12's own Code Freshness toggle) —
+        // not the sunburst with a permanently-visible text tree stacked below it.
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+
+        Assert.Contains("<div class=\"board-tabs\">", html);
+        Assert.Contains("id=\"ownership-view-sunburst\"", html);
+        Assert.Contains("id=\"ownership-view-treemap\"", html);
+        Assert.Contains("<label for=\"ownership-view-sunburst\" class=\"board-tab\">Sunburst</label>", html);
+        Assert.Contains("<label for=\"ownership-view-treemap\" class=\"board-tab\">Treemap</label>", html);
+        Assert.Contains("<div class=\"ownership-view ownership-view-sunburst\">", html);
+        Assert.Contains("<div class=\"ownership-view ownership-view-treemap\">", html);
+        Assert.Contains("<svg class=\"ownership-treemap\"", html);
+        Assert.Contains("ownership-cell", html);
+    }
+
+    [Fact]
     public void RenderPage_SunburstEmbedsGenerationTimeDataForTheLiveModeSwitcher()
     {
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
@@ -160,6 +183,10 @@ public class GitInsightsTemplaterTests
     {
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
+        // The tree sits behind ONE outer collapsed disclosure — a fallback beside the toggle, not a third
+        // permanently-visible view (owner feedback).
+        Assert.Contains("<details class=\"ownership-tree-details\">", html);
+        Assert.Contains("<summary>Full file list", html);
         Assert.Contains("<ul class=\"ownership-tree\">", html);
         Assert.Contains("ownership-tree-file", html);
         Assert.Contains("Alice 78%", html);

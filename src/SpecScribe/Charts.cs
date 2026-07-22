@@ -23,8 +23,6 @@ public static class Charts
         /// <summary>Code ownership / bus-factor: how concentrated authorship is across the codebase — dominant-author
         /// share, top contributors, an individual-author spotlight, and staleness (Story 7.11).</summary>
         CodeOwnership,
-        /// <summary>Code freshness: how recently each part of the codebase last changed (Story 7.12).</summary>
-        CodeFreshness,
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
@@ -53,8 +51,6 @@ public static class Charts
             "Files that are both large and frequently changed are the costliest place for a defect to hide — refactoring them tends to pay off fastest.",
         ChartMetric.CodeOwnership =>
             "Files with a single dominant author are a knowledge-silo risk if that person leaves or moves on.",
-        ChartMetric.CodeFreshness =>
-            "Recently-changed code is where current effort is concentrated; long-untouched code may be stable — or simply forgotten.",
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
 
@@ -2759,14 +2755,16 @@ public static class Charts
         return sb.ToString();
     }
 
-    // ---- Code freshness / age map (Story 7.12) ----------------------------------------------
+    // ---- Code map sunburst (Story 7.12 review — merged into the Code Map's own colorize system) ------
 
-    /// <summary>Recursion-cap on the freshness sunburst's ring count: a node at tree depth D renders in ring
+    /// <summary>Recursion-cap on a sunburst's ring count: a node at tree depth D renders in ring
     /// <c>min(D, FreshnessSunburstMaxDepth - 1)</c>, so a pathologically deep directory tree still produces a
     /// fixed, bounded number of rings rather than an unbounded one — deeper nodes keep subdividing angularly but
     /// saturate into the outermost ring radially. Small enough to stay legible; real repos are shallower than
     /// their raw path depth suggests because <see cref="CodeMap.Build"/> already collapses single-child directory
-    /// chains. Not shared with the unrelated fixed 3-ring <see cref="Sunburst"/> (a different hierarchy).</summary>
+    /// chains. Not shared with the unrelated fixed 3-ring <see cref="Sunburst"/> (a different hierarchy). Shared
+    /// by both the Code Map's own sunburst (<see cref="CodeMapSunburst"/>, Story 7.12) and the ownership sunburst
+    /// (Story 7.11) via <see cref="BuildSunburstSvg"/> — the naming predates the generalization.</summary>
     public const int FreshnessSunburstMaxDepth = 6;
 
     /// <summary>Angular gap (radians) between adjacent wedges — the same discipline <see cref="InsetStart"/>/
@@ -2779,24 +2777,22 @@ public static class Charts
     /// never-throw), mirroring <see cref="CodeMap"/>'s own <c>MaxDepth</c> layout guard.</summary>
     private const int FreshnessRecursionGuard = 256;
 
-    /// <summary>Renders the directory-structure freshness sunburst (Story 7.12): a brand-new recursive angular
-    /// partition (NOT <see cref="Sunburst"/>'s fixed 3-ring epic/story layout) walking <paramref name="roots"/>
-    /// (<see cref="CodeMap.Roots"/>) exactly as given — no new tree-walk or git call. Each node's angular span is
-    /// proportional to its <see cref="CodeMapNode.Lines"/> weight (the same "size" convention the treemap uses),
-    /// recursively subdivided among its <see cref="CodeMapNode.Children"/>; ring radius is keyed by tree depth,
-    /// saturating at <see cref="FreshnessSunburstMaxDepth"/> so deeper nodes keep subdividing angularly but stop
-    /// growing new rings. Only file-leaf wedges are colored by recency (<see cref="FreshnessLevel"/>, most-recent =
-    /// hottest); directory wedges stay neutral/unlabeled with a hairline stroke, matching the treemap's
-    /// no-directory-label convention. A file wedge with no git record renders <c>level-none</c> (dim neutral,
-    /// still occupying its angular slice so siblings don't visually inflate). File wedges wrap in a guarded
-    /// <c>&lt;a&gt;</c> only when <paramref name="fileHref"/> resolves (never a dead link); directory wedges are
-    /// never links (no drill-down/zoom — this is a static, one-shot chart). Every wedge carries a rich native
-    /// <c>&lt;title&gt;</c> tooltip (no JS). Degrades to the shared <c>chart-empty</c> notice only when there are
-    /// no source files at all; a tree with zero metric-bearing files still renders in full, all-neutral (AC #2).
-    /// Deterministic: same input always produces byte-identical output (FR31) — no wall-clock, all geometry and
-    /// coloring derive from already-fetched git timestamps. [Story 7.12]</summary>
-    public static string CodeFreshnessSunburst(
+    /// <summary>Renders the Code Map's directory-structure sunburst (Story 7.12 review): the "how to view it"
+    /// shape sibling of <see cref="CodeTreemap"/> — both driven by the SAME "what to view" colorize dimension
+    /// (owner feedback: the freshness-only sunburst and the multi-dimension treemap used to be two separate
+    /// panels; they're now one panel with an orthogonal shape toggle and dimension dropdown). Colors ONLY file
+    /// wedges via <see cref="DescribeCodeMapCell"/> — the SAME baked-in default (change frequency when
+    /// <paramref name="hasMetrics"/>, else file type) AND the SAME <c>data-*</c> attributes
+    /// <see cref="AppendTreemapFile"/> writes, so the EXISTING client-side colorize-dimension switch
+    /// (<c>specscribe.js</c>'s <c>recolor()</c>, which already scopes its cell query to the whole panel) recolors
+    /// both shapes together with no new JS mode-switcher. Directory wedges stay neutral/unlabeled
+    /// (<c>codemap-dir-sunburst</c> — a distinct class from <see cref="AppendTreemapDir"/>'s <c>codemap-dir</c> so
+    /// the treemap's own directory-zoom enhancement can never mistake a wedge for a zoomable rect). Degrades to
+    /// the shared <c>chart-empty</c> notice only when there are no source files at all. Deterministic (FR31):
+    /// same input, byte-identical output. [Story 7.12]</summary>
+    public static string CodeMapSunburst(
         IReadOnlyList<CodeMapNode> roots,
+        bool hasMetrics,
         int size = 480,
         Func<string, string?>? fileHref = null)
     {
@@ -2806,21 +2802,72 @@ public static class Charts
         DateOnly? oldest = null;
         CollectFreshnessStats(roots, ref fileCount, ref dirCount, ref mostRecent, ref oldest);
 
-        var maxDaysAgo = mostRecent is { } mr0 && oldest is { } od0 ? mr0.DayNumber - od0.DayNumber : 0;
+        double maxChanges = 0;
+        CollectMaxChanges(roots, ref maxChanges);
 
-        var aria = new StringBuilder(
-            $"Code freshness sunburst: directory structure sized by lines of code and colored by recency of " +
-            $"last change; {fileCount} {Plural(fileCount, "file", "files")} across {dirCount} {Plural(dirCount, "directory", "directories")}.");
-        if (mostRecent is { } mrDate && oldest is { } odDate)
+        var aria = $"Source-code sunburst: directory structure sized by lines of code, nested by directory, " +
+                   $"colorable by the same dimensions as the treemap above; {fileCount} {Plural(fileCount, "file", "files")} " +
+                   $"across {dirCount} {Plural(dirCount, "directory", "directories")}.";
+
+        return BuildSunburstSvg(roots, size, "codemap-sunburst", aria, "codemap-dir-sunburst", node =>
         {
-            aria.Append($" Most recently changed file: {DReadable(mrDate)}. Longest untouched: {DReadable(odDate)}.");
+            var info = DescribeCodeMapCell(node, maxChanges, hasMetrics);
+            var href = fileHref?.Invoke(node.RepoRelativePath);
+            return new SunburstWedgeInfo($"codemap-cell {info.LevelClass}", info.AriaLabel, href is { Length: > 0 } ? href : null, info.DataAttrs);
+        });
+    }
+
+    /// <summary>Sums lines-of-code-weighted max change count across the whole tree — the SAME denominator
+    /// <see cref="AppendTreemapFile"/>'s baked-in default (<see cref="Bucket"/> over <see cref="CodeFileMetrics.Changes"/>)
+    /// uses for the treemap, computed once here so <see cref="CodeMapSunburst"/>'s wedges bucket identically.</summary>
+    private static void CollectMaxChanges(IReadOnlyList<CodeMapNode> nodes, ref double maxChanges)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.IsDirectory) { CollectMaxChanges(node.Children, ref maxChanges); continue; }
+            if (node.Metrics is { } m && m.Changes > maxChanges) maxChanges = m.Changes;
+        }
+    }
+
+    /// <summary>One file leaf's baked-in colorize state — the SAME computation <see cref="AppendTreemapFile"/>
+    /// inlines for the treemap's rects, extracted so <see cref="CodeMapSunburst"/>'s wedges start from an
+    /// identical default (change-frequency ramp when <paramref name="hasMetrics"/>, else file-type) and carry the
+    /// identical <c>data-*</c> attributes the shared client-side colorize-dimension switch reads. Deliberately a
+    /// separate, freestanding helper rather than a refactor of <see cref="AppendTreemapFile"/> itself — that
+    /// function is stable/golden-fixture-sensitive and this story doesn't need to touch its behavior, only mirror
+    /// it for a second shape.</summary>
+    private readonly record struct CodeMapCellData(string LevelClass, string DataAttrs, string AriaLabel);
+
+    private static CodeMapCellData DescribeCodeMapCell(CodeMapNode node, double maxChanges, bool hasMetrics)
+    {
+        var metrics = node.Metrics;
+        var category = node.Category ?? CodeFileType.Other;
+
+        var levelClass = hasMetrics
+            ? (metrics is { } m0 ? $"level-{Bucket(m0.Changes, maxChanges)}" : "level-none")
+            : $"type-{category.Key}";
+
+        var data = new StringBuilder();
+        data.Append($"data-path=\"{Html(node.RepoRelativePath)}\" data-lines=\"{node.Lines.ToString(CultureInfo.InvariantCulture)}\"");
+        data.Append($" data-filetype=\"{Html(category.Key)}\" data-filetype-label=\"{Html(category.Label)}\"");
+        if (metrics is { } m)
+        {
+            data.Append($" data-changes=\"{m.Changes.ToString(CultureInfo.InvariantCulture)}\"");
+            data.Append($" data-churn=\"{m.TotalChurn.ToString(CultureInfo.InvariantCulture)}\"");
+            if (m.FirstDate is { } fd) data.Append($" data-first=\"{fd.DayNumber.ToString(CultureInfo.InvariantCulture)}\"");
+            if (m.LastDate is { } ld) data.Append($" data-last=\"{ld.DayNumber.ToString(CultureInfo.InvariantCulture)}\"");
+            if (m.AvgCoChanged is { } co) data.Append($" data-cochanged=\"{co.ToString("0.###", CultureInfo.InvariantCulture)}\"");
         }
 
-        return BuildSunburstSvg(roots, size, "freshness-sunburst", aria.ToString(), "freshness-wedge-dir", node =>
-        {
-            var info = DescribeFreshnessFile(node, mostRecent, maxDaysAgo, fileHref);
-            return new SunburstWedgeInfo($"freshness-wedge {info.LevelClass}", info.Title, info.Href, null);
-        });
+        var lines = node.Lines.ToString("N0", CultureInfo.InvariantCulture);
+        var lineWord = Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines");
+        var ariaLabel = hasMetrics
+            ? (metrics is { } ma
+                ? $"{node.RepoRelativePath}, {lines} {lineWord}, {ma.Changes} {Plural(ma.Changes, "change", "changes")}"
+                : $"{node.RepoRelativePath}, {lines} {lineWord}")
+            : $"{node.RepoRelativePath}, {lines} {lineWord}, {category.Label}";
+
+        return new CodeMapCellData(levelClass, data.ToString(), ariaLabel);
     }
 
     /// <summary>One file leaf's rendered wedge shape: its full CSS class (component prefix + level/state class,
@@ -2964,179 +3011,6 @@ public static class Charts
 
             angle += sweep;
         }
-    }
-
-    /// <summary>A file leaf's recency description — the SAME logic <see cref="CodeFreshnessSunburst"/>'s wedge
-    /// writer and <see cref="CodeFreshnessTree"/>'s list writer both need, extracted once so the two views can
-    /// never disagree about a file's level/title/link. <see cref="Href"/> is the already-guarded resolved target
-    /// (null when unresolved — never a dead link).</summary>
-    private readonly record struct FreshnessFileInfo(string LevelClass, string Title, string? Href);
-
-    private static FreshnessFileInfo DescribeFreshnessFile(
-        CodeMapNode node, DateOnly? mostRecent, int maxDaysAgo, Func<string, string?>? fileHref)
-    {
-        string cls;
-        string title;
-        if (node.Metrics?.LastDate is { } lastDate && mostRecent is { } mr)
-        {
-            var daysAgo = mr.DayNumber - lastDate.DayNumber;
-            var level = FreshnessLevel(daysAgo, maxDaysAgo);
-            cls = $"level-{level}";
-            title = $"{node.RepoRelativePath} — last changed {PortalDates.Day(lastDate)}";
-        }
-        else
-        {
-            cls = "level-none";
-            title = $"{node.RepoRelativePath} — no git history";
-        }
-
-        var href = fileHref?.Invoke(node.RepoRelativePath);
-        return new FreshnessFileInfo(cls, title, href is { Length: > 0 } ? href : null);
-    }
-
-    /// <summary>Renders the SAME per-file recency data as <see cref="CodeFreshnessSunburst"/>, as a squarified
-    /// TREEMAP — the sunburst's toggle sibling (owner correction, review pass: "Tree" must mean the familiar
-    /// size-by-area treemap shape already used elsewhere on this page, not a hierarchical folder list). Reuses
-    /// <paramref name="layout"/> as-is — the SAME precomputed <see cref="CodeMap.Layout"/> geometry
-    /// <see cref="CodeTreemap"/> draws from (<c>CodeMapVariant.Layout</c>), so there is no second squarify pass
-    /// and the two treemaps can never silently diverge in shape. Colors ONLY file rects via the SAME
-    /// <see cref="DescribeFreshnessFile"/> the sunburst's wedges use (one shared source — the two views can never
-    /// disagree about a file's level); directory rects stay neutral/unlabeled, matching
-    /// <see cref="AppendTreemapDir"/>'s own no-label convention. Deliberately a SEPARATE class family
-    /// (<c>freshness-cell</c>, not <c>codemap-cell</c>) from the page's other treemap so the existing colorize-
-    /// dropdown/zoom JS enhancement — which scopes its lookups to the enclosing panel — can never mistake these
-    /// cells for its own. Guarded clickthrough + native <c>&lt;title&gt;</c> tooltip, degrades to the shared
-    /// <c>chart-empty</c> notice only when the layout is empty (AC #2). Deterministic (FR31): same input,
-    /// byte-identical output. [Story 7.12 review]</summary>
-    public static string CodeFreshnessTreemap(
-        IReadOnlyList<TreemapRect> layout, double width, double height, Func<string, string?>? fileHref = null)
-    {
-        if (layout.Count == 0)
-        {
-            return "<div class=\"chart-empty\">No source files to chart yet.</div>\n";
-        }
-
-        DateOnly? mostRecent = null, oldest = null;
-        foreach (var rect in layout)
-        {
-            if (rect.Node.IsDirectory) continue;
-            if (rect.Node.Metrics?.LastDate is not { } d) continue;
-            if (mostRecent is not { } mr || d > mr) mostRecent = d;
-            if (oldest is not { } od || d < od) oldest = d;
-        }
-        var maxDaysAgo = mostRecent is { } mr0 && oldest is { } od0 ? mr0.DayNumber - od0.DayNumber : 0;
-
-        var sb = new StringBuilder();
-        sb.Append($"<svg class=\"freshness-treemap\" viewBox=\"0 0 {F(width)} {F(height)}\" width=\"{F(width)}\" height=\"{F(height)}\" ")
-          .Append("role=\"img\" aria-label=\"Code freshness treemap: each rectangle is a file sized by lines of code and colored by recency of last change.\" preserveAspectRatio=\"xMidYMid meet\">\n");
-
-        foreach (var rect in layout)
-        {
-            if (rect.W <= 0 || rect.H <= 0) continue;
-
-            if (rect.Node.IsDirectory)
-            {
-                sb.Append($"  <rect class=\"freshness-cell-dir\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" aria-hidden=\"true\"></rect>\n");
-                continue;
-            }
-
-            var info = DescribeFreshnessFile(rect.Node, mostRecent, maxDaysAgo, fileHref);
-            var cls = $"freshness-cell {info.LevelClass}";
-            var titleHtml = $"<title>{Html(info.Title)}</title>";
-            if (info.Href is { } href)
-            {
-                sb.Append($"  <a href=\"{Html(href)}\"><rect class=\"{cls}\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\">{titleHtml}</rect></a>\n");
-            }
-            else
-            {
-                sb.Append($"  <rect class=\"{cls}\" tabindex=\"0\" role=\"img\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\">{titleHtml}</rect>\n");
-            }
-        }
-
-        sb.Append("</svg>\n");
-        return sb.ToString();
-    }
-
-    /// <summary>Quantizes a file's staleness ("days since the most-recent last-changed date in the set") onto the
-    /// SAME 0..4 shape <see cref="HeatThresholds"/> already provides for commit counts — inverted, since here the
-    /// SMALLEST value (0 days ago) is hottest: most-recent = level 4, oldest = level 1. A uniform set (every
-    /// metric-bearing file changed the same day, <paramref name="maxDaysAgo"/> == 0) reads all level 4 rather than
-    /// collapsing to level 1, matching <see cref="HeatLevel"/>'s identical "uniform single-value history reads
-    /// light/active, not maxed-vs-zero" discipline. [Story 7.12]</summary>
-    private static int FreshnessLevel(int daysAgo, int maxDaysAgo)
-    {
-        if (maxDaysAgo <= 0) return 4;
-        var (t1, t2, t3) = HeatThresholds(maxDaysAgo);
-        if (daysAgo <= t1) return 4;
-        if (daysAgo <= t2) return 3;
-        if (daysAgo <= t3) return 2;
-        return 1;
-    }
-
-    /// <summary>Real-value ("N days ago") legend range for a freshness level, derived from the SAME
-    /// <see cref="HeatThresholds"/> call <see cref="FreshnessLevel"/> uses, so swatch and text can never disagree
-    /// — the level-0..4 analog of <see cref="HeatLevelRange"/>, mirrored for dates instead of counts. Never the
-    /// literal "Less"/"More" placeholder text (Story 10.2). [Story 7.12]</summary>
-    private static string FreshnessLevelRange(int level, int maxDaysAgo)
-    {
-        if (level is < 1 or > 4) throw new ArgumentOutOfRangeException(nameof(level), level, "Freshness level must be 1..4.");
-        if (maxDaysAgo <= 0) return level == 4 ? "same day" : "—";
-
-        var (t1, t2, t3) = HeatThresholds(maxDaysAgo);
-        return level switch
-        {
-            4 => FormatDaysAgoRange(0, t1),
-            3 => FormatDaysAgoRange(t1 + 1, t2),
-            2 => FormatDaysAgoRange(t2 + 1, t3),
-            1 => FormatDaysAgoRange(t3 + 1, maxDaysAgo, openEnded: true),
-            _ => "—",
-        };
-    }
-
-    private static string FormatDaysAgoRange(int lo, int hi, bool openEnded = false)
-    {
-        if (lo > hi) return "—";
-        string Fmt(int n) => n == 0 ? "today" : $"{n.ToString(CultureInfo.InvariantCulture)} {Plural(n, "day", "days")} ago";
-        if (lo == hi) return Fmt(lo);
-        if (openEnded) return $"{lo.ToString(CultureInfo.InvariantCulture)}+ {Plural(lo, "day", "days")} ago";
-        return lo == 0
-            ? $"today–{hi.ToString(CultureInfo.InvariantCulture)} {Plural(hi, "day", "days")} ago"
-            : $"{lo.ToString(CultureInfo.InvariantCulture)}–{hi.ToString(CultureInfo.InvariantCulture)} {Plural(hi, "day", "days")} ago";
-    }
-
-    /// <summary>The freshness sunburst's real-value legend (Story 10.2 AC — never the treemap's "Less … More"
-    /// placeholder): one swatch + actual day-count range per reachable level, hottest (most-recent) first, plus a
-    /// trailing "no git history" swatch whenever at least one file has no metrics. When NO file in the set carries
-    /// git metrics at all, the numeric ramp is meaningless (every wedge is <c>level-none</c>), so this degrades to
-    /// a plain note instead of a legend nobody's wedges can ever match (AC #2 graceful degradation).</summary>
-    public static string FreshnessLegend(IReadOnlyList<CodeMapNode> files)
-    {
-        var withMetrics = files.Where(f => f.Metrics?.LastDate is not null).ToList();
-        if (withMetrics.Count == 0)
-        {
-            return "<p class=\"freshness-legend-empty\">Git change data is unavailable (run with <code>--deep-git</code> " +
-                   "in a git repository to colorize by recency) — every file renders neutral.</p>\n";
-        }
-
-        var mostRecent = withMetrics.Max(f => f.Metrics!.LastDate!.Value);
-        var maxDaysAgo = withMetrics.Max(f => mostRecent.DayNumber - f.Metrics!.LastDate!.Value.DayNumber);
-        var hasUnmetriced = files.Count != withMetrics.Count;
-
-        var sb = new StringBuilder();
-        sb.Append("<div class=\"freshness-legend\">");
-        sb.Append("<span class=\"freshness-legend-dim\">Colorized by recency of last change</span> ");
-        for (var l = 4; l >= 1; l--)
-        {
-            sb.Append($"<span class=\"freshness-legend-swatch level-{l}\"></span>");
-            sb.Append($"<span class=\"freshness-legend-label\">{Html(FreshnessLevelRange(l, maxDaysAgo))}</span> ");
-        }
-        if (hasUnmetriced)
-        {
-            sb.Append("<span class=\"freshness-legend-swatch level-none\"></span>");
-            sb.Append("<span class=\"freshness-legend-label\">No git history</span>");
-        }
-        sb.Append("</div>\n");
-        return sb.ToString();
     }
 
     // ---- Code ownership / bus-factor sunburst (Story 7.11) ----------------------------------
@@ -3291,13 +3165,80 @@ public static class Charts
         }, extraAttrs);
     }
 
+    /// <summary>Renders the SAME per-file ownership data as <see cref="CodeOwnershipSunburst"/>, as a squarified
+    /// TREEMAP — the sunburst's toggle sibling (owner correction, mirroring Story 7.12's own sunburst/treemap
+    /// toggle: "Tree" means the familiar size-by-area treemap already used elsewhere on this codebase, not a
+    /// hierarchical folder list). Reuses <paramref name="layout"/> as-is — the SAME precomputed
+    /// <see cref="CodeMap.Layout"/> geometry the Code Map's own treemap and <see cref="CodeFreshnessTreemap"/>
+    /// draw from — so there is no second squarify pass. Colors file rects via the SAME
+    /// <see cref="DescribeOwnershipFile"/>/<see cref="BuildOwnershipDataAttrs"/> the sunburst's wedges use (one
+    /// shared source — the two views, and the live JS mode switcher, can never disagree about a file's level,
+    /// dominant author, or embedded data); directory rects stay neutral/unlabeled, matching
+    /// <see cref="CodeFreshnessTreemap"/>'s own convention. A DELIBERATELY separate class family
+    /// (<c>ownership-cell</c>, not <c>ownership-wedge</c> or <c>codemap-cell</c>/<c>freshness-cell</c>) so no
+    /// other panel's colorize/zoom enhancement can ever mistake these cells for its own — the live ownership mode
+    /// switcher (<c>specscribe.js</c>'s <c>initOwnershipSunburst</c>) explicitly queries both
+    /// <c>.ownership-wedge</c> and <c>.ownership-cell</c> together so a mode switch recolors whichever view is
+    /// currently toggled visible (and the other, off-screen one, so neither can drift stale). Guarded clickthrough
+    /// + native <c>&lt;title&gt;</c> tooltip + baked <c>aria-label</c> (the live mode switcher's "base label"
+    /// snapshot target — see <see cref="WalkSunburstWedges"/>), degrades to the shared <c>chart-empty</c> notice
+    /// only when the layout is empty. Deterministic (FR31): same input, byte-identical output. [Story 7.11]</summary>
+    public static string CodeOwnershipTreemap(
+        IReadOnlyList<TreemapRect> layout,
+        IReadOnlyList<string> topAuthors,
+        double width = CodeMap.DefaultWidth,
+        double height = CodeMap.DefaultHeight,
+        Func<string, string?>? fileHref = null)
+    {
+        if (layout.Count == 0)
+        {
+            return "<div class=\"chart-empty\">No source files to chart yet.</div>\n";
+        }
+
+        var sb = new StringBuilder();
+        sb.Append($"<svg class=\"ownership-treemap\" viewBox=\"0 0 {F(width)} {F(height)}\" width=\"{F(width)}\" height=\"{F(height)}\" ")
+          .Append("role=\"img\" aria-label=\"Code ownership treemap: each rectangle is a file sized by lines of code and colored by dominant-author commit share.\" preserveAspectRatio=\"xMidYMid meet\">\n");
+
+        foreach (var rect in layout)
+        {
+            if (rect.W <= 0 || rect.H <= 0) continue;
+
+            if (rect.Node.IsDirectory)
+            {
+                sb.Append($"  <rect class=\"ownership-cell-dir\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" aria-hidden=\"true\"></rect>\n");
+                continue;
+            }
+
+            var info = DescribeOwnershipFile(rect.Node, fileHref);
+            var cls = $"ownership-cell {info.LevelClass}";
+            var dataAttrs = info.DataAttrs is { Length: > 0 } ? " " + info.DataAttrs : string.Empty;
+            var baseLabel = Html(rect.Node.RepoRelativePath);
+            var titleHtml = $"<title>{Html(info.Title)}</title>";
+            if (info.Href is { } href)
+            {
+                sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{baseLabel}\"><rect class=\"{cls}\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\"{dataAttrs}>{titleHtml}</rect></a>\n");
+            }
+            else
+            {
+                sb.Append($"  <rect class=\"{cls}\" tabindex=\"0\" role=\"img\" aria-label=\"{baseLabel}\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\"{dataAttrs}>{titleHtml}</rect>\n");
+            }
+        }
+
+        sb.Append("</svg>\n");
+        return sb.ToString();
+    }
+
     /// <summary>Renders the SAME per-file ownership data as <see cref="CodeOwnershipSunburst"/>, as a nested,
-    /// no-JS-collapsible text tree (mirrors <see cref="CodeFreshnessTree"/>'s established pattern for a whole-tree
-    /// text equivalent at this scale, rather than one giant flat table) — the accessible text-equivalent AC #3
-    /// requires: every file's dominant author, share %, contributor count, and last-active date, always present
-    /// regardless of JS. One shared source (<see cref="DescribeOwnershipFile"/>) with the sunburst's wedges, so
-    /// the two views can never disagree. Degrades to the shared <c>chart-empty</c> notice only when there are no
-    /// source files at all. Deterministic (FR31): same input, byte-identical output. [Story 7.11]</summary>
+    /// no-JS-collapsible text tree — the accessible text-equivalent AC #3 requires: every file's dominant author,
+    /// share %, contributor count, and last-active date, always present regardless of JS. Presented as a
+    /// secondary, collapsed <c>&lt;details&gt;</c> disclosure below the sunburst/treemap toggle (rather than a
+    /// third permanently-visible view alongside them — owner feedback: the toggle IS the two chart forms; this is
+    /// the plain-text fallback the toggle's own accessible name can point readers at, mirroring how
+    /// <see cref="CodeFreshnessTreemap"/>'s caption points at the Code Map's existing file table instead of
+    /// duplicating one). One shared source (<see cref="DescribeOwnershipFile"/>) with the sunburst/treemap's
+    /// wedges/cells, so all three views can never disagree. Degrades to the shared <c>chart-empty</c> notice only
+    /// when there are no source files at all. Deterministic (FR31): same input, byte-identical output.
+    /// [Story 7.11]</summary>
     public static string CodeOwnershipTree(IReadOnlyList<CodeMapNode> roots, Func<string, string?>? fileHref = null)
     {
         if (roots.Count == 0)

@@ -482,7 +482,7 @@ public class StylesheetTests
         var css = ReadStylesheet();
         Assert.Contains(".gi-solo-repo-note", css);
         Assert.Contains(".ownership-sunburst", css);
-        Assert.Contains(".ownership-wedge.level-4", css);
+        Assert.Contains(".ownership-wedge.level-4,", css);
         Assert.Contains(".ownership-wedge-dir", css);
         Assert.Contains(".ownership-legend", css);
         Assert.Contains(".ownership-tree", css);
@@ -490,27 +490,46 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_HasOwnershipTreemapToggleStyles()
+    {
+        // Owner feedback: sunburst/treemap TOGGLE (mirroring Story 7.12's Code Freshness toggle), not a chart
+        // plus a permanently-visible second view. The pure-CSS :has() toggle, the treemap's own SVG/cell/dir
+        // classes, and the collapsed text-equivalent disclosure must all resolve.
+        var css = ReadStylesheet();
+        Assert.Contains(".ownership-panel .board-tabs", css);
+        Assert.Contains(".ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-sunburst", css);
+        Assert.Contains(".ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-treemap", css);
+        Assert.Contains(".ownership-treemap-wrap", css);
+        Assert.Contains(".ownership-treemap {", css);
+        Assert.Contains(".ownership-cell.level-4", css);
+        Assert.Contains(".ownership-cell-dir", css);
+        Assert.Contains(".ownership-tree-details", css);
+    }
+
+    [Fact]
     public void Stylesheet_HasOwnershipDiscreteTopAuthorPalette()
     {
         // The discrete top-N-author mode needs its OWN bounded categorical palette (Task 2.4) — not a reuse of
         // --status-* (non-lifecycle data) or the Story 7.9 file-type palette. Every top-author swatch class (0-11)
-        // must resolve, plus the honestly-muted "other" overflow bucket.
+        // must resolve for BOTH the sunburst wedge and treemap cell class families (the live mode switcher
+        // recolors whichever view is toggled visible), plus the honestly-muted "other" overflow bucket.
         var css = ReadStylesheet();
         for (var i = 0; i < 12; i++)
         {
-            Assert.Contains($".ownership-wedge.owner-author-{i} {{", css);
+            Assert.Contains($".ownership-wedge.owner-author-{i}, .ownership-cell.owner-author-{i} {{", css);
         }
-        Assert.Contains(".ownership-wedge.owner-author-other", css);
+        Assert.Contains(".ownership-wedge.owner-author-other, .ownership-cell.owner-author-other", css);
     }
 
     [Fact]
     public void Stylesheet_OwnershipSpotlightAndStalenessAreDistinguishedByMoreThanColor()
     {
         // "Color is never the sole signal" (this project's convention) — the JS-only spotlight and staleness
-        // modes must each carry a stroke/dash change alongside their fill, not a hue swap alone.
+        // modes must each carry a stroke/dash change alongside their fill, not a hue swap alone, for both the
+        // sunburst wedge and treemap cell class families.
         var css = ReadStylesheet();
-        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-spotlight-on\s*\{[^}]*stroke:"), css);
-        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-stale\s*\{[^}]*stroke-dasharray:"), css);
+        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-spotlight-on,\s*\.ownership-cell\.owner-spotlight-on\s*\{[^}]*stroke:"), css);
+        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-stale,\s*\.ownership-cell\.owner-stale\s*\{[^}]*stroke-dasharray:"), css);
     }
 
     [Fact]

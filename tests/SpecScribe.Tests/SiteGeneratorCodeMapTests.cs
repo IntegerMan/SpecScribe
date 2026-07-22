@@ -312,22 +312,21 @@ public class SiteGeneratorCodeMapTests : IDisposable
     }
 
     [Fact]
-    public void GenerateAll_WithoutDeepGit_FreshnessSunburstStillRendersAllNeutral()
+    public void GenerateAll_WithoutDeepGit_SunburstStillRendersColorizedByFileType()
     {
-        // Story 7.12 AC #2: non-git/non-deep-git repos degrade to an all-neutral render rather than omitting
-        // the surface — the Code Map page itself is already gated on there being source files at all.
+        // Story 7.12 review: the sunburst is now the treemap's "how to view it" shape sibling, sharing the SAME
+        // colorize dimension — with no --deep-git data, that baked-in default is file type (AC #2 parity with
+        // the treemap's own non-git degrade), never omitted.
         GenerateSite();
 
         var html = File.ReadAllText(CodeMapPage);
-        Assert.Contains("Code Freshness", html);
-        Assert.Contains("freshness-sunburst", html);
-        Assert.Contains("freshness-wedge level-none", html);
-        Assert.Contains("freshness-legend-empty", html);
+        Assert.Contains("class=\"codemap-sunburst\"", html);
+        Assert.Contains("codemap-cell type-", html);
         AssertNoBrokenLocalLinks(CodeMapPage);
     }
 
     [Fact]
-    public void GenerateAll_WithDeepGit_FreshnessSunburstRendersARealWedgeLinkingToItsOwnCodePage()
+    public void GenerateAll_WithDeepGit_SunburstRendersARealColoredWedgeLinkingToItsOwnCodePage()
     {
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise --deep-git generation; install git rather than silently skipping this test");
 
@@ -336,10 +335,8 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
         var html = File.ReadAllText(CodeMapPage);
-        Assert.Contains("Code Freshness", html);
-        Assert.Matches(new Regex("freshness-wedge level-[1-4]"), html); // real git history → a colored (not level-none) wedge
-        Assert.Contains("freshness-legend", html);
-        Assert.DoesNotContain("freshness-legend-empty", html);
+        Assert.Contains("class=\"codemap-sunburst\"", html);
+        Assert.Matches(new Regex("codemap-cell level-[1-4]"), html); // real git history → a colored (not level-none) wedge
         AssertNoBrokenLocalLinks(CodeMapPage);
     }
 

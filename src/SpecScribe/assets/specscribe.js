@@ -915,7 +915,12 @@
     var svg = panel.querySelector(".codemap");
     if (!svg) return;
 
-    var cells = Array.prototype.slice.call(svg.querySelectorAll(".codemap-cell"));
+    // Story 7.12 review: the panel now hosts TWO shapes (Treemap + Sunburst) behind a "View as" toggle, both
+    // colorized by the SAME dimension dropdown — so the cell query spans the whole panel, not just the treemap's
+    // own <svg>, and a dimension switch recolors whichever shape is showing (and the other, off-screen one, so
+    // neither can drift stale). Directory-zoom below stays scoped to `svg` (.codemap-dir only exists there — the
+    // sunburst's directory wedges carry the unrelated, non-zoomable .codemap-dir-sunburst class).
+    var cells = Array.prototype.slice.call(panel.querySelectorAll(".codemap-cell"));
     var baseViewBox = svg.getAttribute("viewBox");
     var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -1179,11 +1184,15 @@
   });
 
   function initOwnershipSunburst(panel) {
+    // data-top-authors/data-asof are panel-wide (both views share one dataset), so they're only ever read off
+    // the sunburst SVG root — but wedges/cells are gathered across BOTH views (sunburst .ownership-wedge paths
+    // AND treemap .ownership-cell rects) so a mode switch recolors whichever view the reader has toggled to,
+    // and the other, currently-hidden one never goes stale for when they toggle back.
     var svg = panel.querySelector(".ownership-sunburst");
     var controls = panel.querySelector(".ownership-controls");
     if (!svg || !controls) return;
 
-    var wedges = Array.prototype.slice.call(svg.querySelectorAll(".ownership-wedge"));
+    var wedges = Array.prototype.slice.call(panel.querySelectorAll(".ownership-wedge, .ownership-cell"));
     if (wedges.length === 0) return;
 
     var topAuthors = [];

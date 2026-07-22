@@ -770,7 +770,30 @@ public class SiteGeneratorAdapterTests : IDisposable
         // page's own below-threshold empty state does, unaffected by any of the four patches. Verified stable
         // across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
         // [[shared-main-concurrent-edit-loss-verify-after-edit]]
-        const string expected = "23d27619b2587c2ef54b58d65917a0b014f6563057cd70d02c2c620ce7969614";
+        // Regenerated for Story 7.11's design-correction pass (owner feedback after the rewrite's first review):
+        // the Code Ownership section is now a genuine sunburst/treemap TOGGLE (a pure-CSS .board-tabs radio pair
+        // mirroring Story 7.12's own Code Freshness toggle exactly — new Charts.CodeOwnershipTreemap, new
+        // .ownership-view-sunburst/.ownership-view-treemap/.ownership-cell CSS), not the sunburst with the
+        // text-equivalent tree permanently stacked below it; that tree now sits behind one collapsed
+        // <details class="ownership-tree-details"> disclosure instead. Activity Over Time also now renders
+        // BEFORE Code Ownership (was after) — owner feedback that it's the page's most immediately orienting
+        // chart. This non-git fixture never renders git-insights.html itself (no --deep-git), so none of that
+        // markup reordering/restructuring is live here; the hash still shifts because specscribe.css and
+        // specscribe.js are global assets embedded on every page this fixture DOES render (code-map.html
+        // included), and both files gained new content (the toggle/cell CSS; the live mode switcher's wedge
+        // query broadened to `.ownership-wedge, .ownership-cell`) regardless of which page renders the markup
+        // that uses it. Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        // Regenerated for the Story 7.12 review's third round: the separate "Code Freshness" panel merged into
+        // the Code Map's own multi-dimension panel (owner feedback — "what to view" and "how to view it" should
+        // be one orthogonal pair of controls, not two panels). The sunburst is now Charts.CodeMapSunburst,
+        // colored by the SAME baked-in default as the treemap (change frequency, or file type without
+        // --deep-git) via the shared BuildSunburstSvg shell, sharing ONE colorize dropdown/legend with a new
+        // "View as: Treemap | Sunburst" toggle (CodeMapTemplater); the client-side recolor() in specscribe.js
+        // now queries .codemap-cell across the whole panel (both shapes) instead of just the treemap's own
+        // <svg>. This non-git fixture renders code-map.html, so the new sunburst markup + CSS shift the hash
+        // (file-type-colored wedges, non-git fixture). Verified stable across 2 repeated runs before locking in.
+        // [golden-diff-normalization-gotchas]
+        const string expected = "b97e1cc5a450c81b3cd33b3ed13e8942d5042f077dc6f50d610c16556fa61395";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -2416,62 +2416,88 @@ public class ChartsTests
         Assert.Equal(6, circles.Distinct().Count()); // no two points share a screen position anymore
     }
 
-    // ---- Code freshness sunburst (Story 7.12) ----------------------------------------------
+    // ---- Code map sunburst (Story 7.12 review — merged shape/dimension toggle) ------------
 
-    /// <summary>A small nested tree (single directory, three files) with a clear most-recent file, a clear
-    /// oldest file, and one file with no git record at all — enough to exercise recency coloring, the
+    /// <summary>A small nested tree (single directory, three files) with a clear busiest file, a clear quiet
+    /// file, and one file with no git record at all — enough to exercise change-frequency bucketing, the
     /// <c>level-none</c> no-data case, and directory neutrality in one shared fixture.</summary>
-    private static IReadOnlyList<CodeMapNode> FreshnessRoots() => CodeMap.Build(
+    private static IReadOnlyList<CodeMapNode> CodeMapSunburstRoots() => CodeMap.Build(
         new[]
         {
-            ("src/dir/Recent.cs", 100L),
-            ("src/dir/Old.cs", 80L),
+            ("src/dir/Busy.cs", 100L),
+            ("src/dir/Quiet.cs", 80L),
             ("src/dir/NoGit.cs", 60L),
         },
         new Dictionary<string, CodeFileMetrics>
         {
-            ["src/dir/Recent.cs"] = new CodeFileMetrics(5, 50, new DateOnly(2026, 1, 1), new DateOnly(2026, 7, 20)),
-            ["src/dir/Old.cs"] = new CodeFileMetrics(2, 20, new DateOnly(2020, 1, 1), new DateOnly(2020, 1, 1)),
+            ["src/dir/Busy.cs"] = new CodeFileMetrics(20, 50, new DateOnly(2026, 1, 1), new DateOnly(2026, 7, 20)),
+            ["src/dir/Quiet.cs"] = new CodeFileMetrics(1, 20, new DateOnly(2020, 1, 1), new DateOnly(2020, 1, 1)),
             // src/dir/NoGit.cs deliberately has no metrics entry.
         }).Roots;
 
     [Fact]
-    public void CodeFreshnessSunburst_RendersOneWedgePerFileAndOnePerDirectory()
+    public void CodeMapSunburst_RendersOneWedgePerFileAndOnePerDirectory()
     {
-        var svg = Charts.CodeFreshnessSunburst(FreshnessRoots());
+        var svg = Charts.CodeMapSunburst(CodeMapSunburstRoots(), hasMetrics: true);
 
-        Assert.Contains("<svg class=\"freshness-sunburst\"", svg);
-        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"freshness-wedge level-").Count);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(svg, "class=\"freshness-wedge-dir\""));
+        Assert.Contains("<svg class=\"codemap-sunburst\"", svg);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"codemap-cell level-").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(svg, "class=\"codemap-dir-sunburst\""));
     }
 
     [Fact]
-    public void CodeFreshnessSunburst_ColorsFileLeavesByRecencyAndNoDataAsLevelNone()
+    public void CodeMapSunburst_ColorsFileLeavesByChangeFrequencyAndNoDataAsLevelNone()
     {
-        var svg = Charts.CodeFreshnessSunburst(FreshnessRoots());
+        var svg = Charts.CodeMapSunburst(CodeMapSunburstRoots(), hasMetrics: true);
 
-        Assert.Contains("freshness-wedge level-4", svg); // Recent.cs — most-recent last-changed date
-        Assert.Contains("freshness-wedge level-1", svg); // Old.cs — oldest last-changed date
-        Assert.Contains("freshness-wedge level-none", svg); // NoGit.cs — no git record at all
+        Assert.Contains("codemap-cell level-4", svg); // Busy.cs — most changes
+        Assert.Contains("codemap-cell level-1", svg); // Quiet.cs — fewest changes
+        Assert.Contains("codemap-cell level-none", svg); // NoGit.cs — no git record at all
     }
 
     [Fact]
-    public void CodeFreshnessSunburst_DirectoryWedgesAreNeutralAndUnlabeled()
+    public void CodeMapSunburst_WithoutMetrics_ColorsByFileType()
     {
-        var svg = Charts.CodeFreshnessSunburst(FreshnessRoots());
+        var svg = Charts.CodeMapSunburst(CodeMapSunburstRoots(), hasMetrics: false);
 
-        // The directory wedge never carries a level-* class (recency coloring is file-leaves only) and the
+        Assert.Contains("codemap-cell type-csharp", svg);
+        Assert.DoesNotContain("codemap-cell level-", svg);
+    }
+
+    [Fact]
+    public void CodeMapSunburst_CarriesTheSameDataAttributesTheTreemapCellsUse()
+    {
+        // The shared client-side colorize-dimension switch (specscribe.js recolor()) reads these data-* pairs
+        // regardless of which shape a cell belongs to — the sunburst's wedges must carry the identical set
+        // AppendTreemapFile writes for the treemap's rects.
+        var svg = Charts.CodeMapSunburst(CodeMapSunburstRoots(), hasMetrics: true);
+
+        Assert.Contains("data-path=\"src/dir/Busy.cs\"", svg);
+        Assert.Contains("data-lines=\"100\"", svg);
+        Assert.Contains("data-filetype=\"csharp\"", svg);
+        Assert.Contains("data-changes=\"20\"", svg);
+        Assert.Contains("data-churn=\"50\"", svg);
+        Assert.Contains("data-last=\"", svg);
+    }
+
+    [Fact]
+    public void CodeMapSunburst_DirectoryWedgesAreNeutralAndUnlabeled()
+    {
+        var svg = Charts.CodeMapSunburst(CodeMapSunburstRoots(), hasMetrics: true);
+
+        // The directory wedge never carries a level-*/type-* class (coloring is file-leaves only) and the
         // chart has no on-wedge <text> at any depth (identity lives in the tooltip only).
-        Assert.DoesNotContain("freshness-wedge-dir level-", svg);
+        Assert.DoesNotContain("codemap-dir-sunburst level-", svg);
+        Assert.DoesNotContain("codemap-dir-sunburst type-", svg);
         Assert.DoesNotContain("<text", svg);
     }
 
     [Fact]
-    public void CodeFreshnessSunburst_DepthBeyondTheCapFlattensIntoTheOutermostRingRatherThanGrowingRingsUnbounded()
+    public void CodeMapSunburst_DepthBeyondTheCapFlattensIntoTheOutermostRingRatherThanGrowingRingsUnbounded()
     {
         // Each directory below also carries its own file, so CodeMap.Build's single-child-chain collapse never
         // fires — every level is a genuinely separate CodeMapNode, giving a real tree depth of 8 (well past
-        // Charts.FreshnessSunburstMaxDepth = 6).
+        // Charts.FreshnessSunburstMaxDepth = 6, the shared ring cap).
         var deep = CodeMap.Build(
             new[]
             {
@@ -2486,7 +2512,7 @@ public class ChartsTests
             },
             new Dictionary<string, CodeFileMetrics>()).Roots;
 
-        var svg = Charts.CodeFreshnessSunburst(deep);
+        var svg = Charts.CodeMapSunburst(deep, hasMetrics: false);
 
         // Every emitted arc radius ("A r r 0 ...") is one of at most 2*MaxDepth distinct values (inner+outer per
         // ring) — a pathologically deep tree must not grow a new ring per level.
@@ -2499,38 +2525,29 @@ public class ChartsTests
     }
 
     [Fact]
-    public void CodeFreshnessSunburst_LinksAFileWedgeOnlyWhenTheResolverReturnsATarget()
+    public void CodeMapSunburst_LinksAFileWedgeOnlyWhenTheResolverReturnsATarget()
     {
-        var roots = FreshnessRoots();
+        var roots = CodeMapSunburstRoots();
 
-        var linked = Charts.CodeFreshnessSunburst(roots, fileHref: p => p == "src/dir/Recent.cs" ? "code/src/dir/Recent.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/dir/Recent.cs.html\" aria-label=\"src/dir/Recent.cs\">", linked);
+        var linked = Charts.CodeMapSunburst(roots, hasMetrics: true, fileHref: p => p == "src/dir/Busy.cs" ? "code/src/dir/Busy.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/dir/Busy.cs.html\" aria-label=\"src/dir/Busy.cs\">", linked);
 
-        var plain = Charts.CodeFreshnessSunburst(roots, fileHref: null);
+        var plain = Charts.CodeMapSunburst(roots, hasMetrics: true, fileHref: null);
         Assert.DoesNotContain("<a href=", plain);
         Assert.Contains("tabindex=\"0\"", plain); // unlinked file wedges stay keyboard-focusable
     }
 
     [Fact]
-    public void CodeFreshnessSunburst_FileWedgesCarryARichTooltipWithPathAndExactDate()
+    public void CodeMapSunburst_EmptyTree_DegradesToChartEmpty()
     {
-        var svg = Charts.CodeFreshnessSunburst(FreshnessRoots());
-
-        Assert.Contains("src/dir/Recent.cs — last changed", svg);
-        Assert.Contains("src/dir/NoGit.cs — no git history", svg);
-    }
-
-    [Fact]
-    public void CodeFreshnessSunburst_EmptyTree_DegradesToChartEmpty()
-    {
-        var html = Charts.CodeFreshnessSunburst(Array.Empty<CodeMapNode>());
+        var html = Charts.CodeMapSunburst(Array.Empty<CodeMapNode>(), hasMetrics: true);
 
         Assert.Contains("chart-empty", html);
         Assert.DoesNotContain("<svg", html);
     }
 
     [Fact]
-    public void CodeFreshnessSunburst_EscapesPathsInTooltips()
+    public void CodeMapSunburst_EscapesPathsInTooltips()
     {
         var roots = CodeMap.Build(
             new[] { ("src/a&b<c>.cs", 100L) },
@@ -2539,141 +2556,21 @@ public class ChartsTests
                 ["src/a&b<c>.cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 1)),
             }).Roots;
 
-        var svg = Charts.CodeFreshnessSunburst(roots);
+        var svg = Charts.CodeMapSunburst(roots, hasMetrics: true);
 
         Assert.Contains("a&amp;b&lt;c&gt;.cs", svg);
         Assert.DoesNotContain("<c>", svg);
     }
 
     [Fact]
-    public void CodeFreshnessSunburst_DeterministicAcrossRepeatedCalls()
+    public void CodeMapSunburst_DeterministicAcrossRepeatedCalls()
     {
-        var roots = FreshnessRoots();
-        Assert.Equal(Charts.CodeFreshnessSunburst(roots), Charts.CodeFreshnessSunburst(roots));
+        var roots = CodeMapSunburstRoots();
+        Assert.Equal(Charts.CodeMapSunburst(roots, hasMetrics: true), Charts.CodeMapSunburst(roots, hasMetrics: true));
     }
 
-    [Fact]
-    public void FreshnessLegend_CarriesRealValueDayCountTextNeverLessOrMore()
-    {
-        var files = FreshnessRoots().SelectMany(FlattenFreshnessFiles).ToList();
-
-        var legend = Charts.FreshnessLegend(files);
-
-        Assert.DoesNotContain("Less", legend);
-        Assert.DoesNotContain("More", legend);
-        Assert.Contains("ago", legend); // real day-count phrasing (e.g. "N days ago"/"today")
-        Assert.Contains("No git history", legend); // NoGit.cs has no metrics — the trailing swatch note
-    }
-
-    [Fact]
-    public void FreshnessLegend_NoMetricBearingFiles_DegradesToAPlainNoteRatherThanAMeaninglessRamp()
-    {
-        var files = CodeMap.Build(
-            new[] { ("src/A.cs", 100L), ("src/B.cs", 50L) },
-            new Dictionary<string, CodeFileMetrics>()).Files();
-
-        var legend = Charts.FreshnessLegend(files);
-
-        Assert.Contains("freshness-legend-empty", legend);
-        Assert.DoesNotContain("freshness-legend-swatch level-4", legend);
-    }
-
-    private static IEnumerable<CodeMapNode> FlattenFreshnessFiles(CodeMapNode node) =>
-        node.IsDirectory ? node.Children.SelectMany(FlattenFreshnessFiles) : new[] { node };
-
-    // ---- Code freshness treemap view (Story 7.12 review — sunburst/treemap toggle) --------
-
-    private static IReadOnlyList<TreemapRect> FreshnessLayout() => CodeMap.Build(
-        new[]
-        {
-            ("src/dir/Recent.cs", 100L),
-            ("src/dir/Old.cs", 80L),
-            ("src/dir/NoGit.cs", 60L),
-        },
-        new Dictionary<string, CodeFileMetrics>
-        {
-            ["src/dir/Recent.cs"] = new CodeFileMetrics(5, 50, new DateOnly(2026, 1, 1), new DateOnly(2026, 7, 20)),
-            ["src/dir/Old.cs"] = new CodeFileMetrics(2, 20, new DateOnly(2020, 1, 1), new DateOnly(2020, 1, 1)),
-        }).Layout();
-
-    [Fact]
-    public void CodeFreshnessTreemap_RendersOneCellPerFileAndOneRectPerDirectory()
-    {
-        var svg = Charts.CodeFreshnessTreemap(FreshnessLayout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight);
-
-        Assert.Contains("<svg class=\"freshness-treemap\"", svg);
-        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"freshness-cell level-").Count);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(svg, "class=\"freshness-cell-dir\""));
-    }
-
-    [Fact]
-    public void CodeFreshnessTreemap_AgreesWithTheSunburstOnEveryFilesRecencyLevel()
-    {
-        // The two views share DescribeFreshnessFile — they must never disagree about which files are hottest,
-        // coldest, or have no git record.
-        var svg = Charts.CodeFreshnessTreemap(FreshnessLayout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight);
-
-        Assert.Contains("freshness-cell level-4", svg); // Recent.cs
-        Assert.Contains("freshness-cell level-1", svg); // Old.cs
-        Assert.Contains("freshness-cell level-none", svg); // NoGit.cs
-    }
-
-    [Fact]
-    public void CodeFreshnessTreemap_LinksAFileOnlyWhenTheResolverReturnsATarget()
-    {
-        var layout = FreshnessLayout();
-
-        var linked = Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight,
-            fileHref: p => p == "src/dir/Recent.cs" ? "code/src/dir/Recent.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/dir/Recent.cs.html\"><rect class=\"freshness-cell", linked);
-
-        var plain = Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, fileHref: null);
-        Assert.DoesNotContain("<a href=", plain);
-        Assert.Contains("tabindex=\"0\"", plain);
-    }
-
-    [Fact]
-    public void CodeFreshnessTreemap_TooltipShowsExactLastChangedDateOrNoGitHistory()
-    {
-        var svg = Charts.CodeFreshnessTreemap(FreshnessLayout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight);
-
-        Assert.Contains("last changed", svg);
-        Assert.Contains("no git history", svg);
-    }
-
-    [Fact]
-    public void CodeFreshnessTreemap_EmptyLayout_DegradesToChartEmpty()
-    {
-        var svg = Charts.CodeFreshnessTreemap(Array.Empty<TreemapRect>(), CodeMap.DefaultWidth, CodeMap.DefaultHeight);
-
-        Assert.Contains("chart-empty", svg);
-        Assert.DoesNotContain("<svg", svg);
-    }
-
-    [Fact]
-    public void CodeFreshnessTreemap_EscapesPathsInTooltips()
-    {
-        var layout = CodeMap.Build(
-            new[] { ("src/a&b<c>.cs", 100L) },
-            new Dictionary<string, CodeFileMetrics>
-            {
-                ["src/a&b<c>.cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 1)),
-            }).Layout();
-
-        var svg = Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight);
-
-        Assert.Contains("a&amp;b&lt;c&gt;.cs", svg);
-        Assert.DoesNotContain("<c>", svg);
-    }
-
-    [Fact]
-    public void CodeFreshnessTreemap_DeterministicAcrossRepeatedCalls()
-    {
-        var layout = FreshnessLayout();
-        Assert.Equal(
-            Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight),
-            Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight));
-    }
+    private static IEnumerable<CodeMapNode> FlattenCodeMapFiles(CodeMapNode node) =>
+        node.IsDirectory ? node.Children.SelectMany(FlattenCodeMapFiles) : new[] { node };
 
     // ---- Code ownership sunburst (Story 7.11) -----------------------------------------------
 
@@ -2816,10 +2713,124 @@ public class ChartsTests
         Assert.Equal(Charts.CodeOwnershipSunburst(roots, topAuthors), Charts.CodeOwnershipSunburst(roots, topAuthors));
     }
 
+    // ---- Code ownership treemap (Story 7.11 — sunburst/treemap toggle, owner feedback) -----
+
+    private static IReadOnlyList<TreemapRect> OwnershipLayout() => CodeMap.Build(
+        new[]
+        {
+            ("src/dir/Dominant.cs", 100L),
+            ("src/dir/Split.cs", 80L),
+            ("src/dir/NoGit.cs", 60L),
+        },
+        new Dictionary<string, CodeFileMetrics>
+        {
+            ["src/dir/Dominant.cs"] = new CodeFileMetrics(10, 50, new DateOnly(2026, 1, 1), new DateOnly(2026, 7, 20),
+                Contributors: new[]
+                {
+                    new FileContributor("Alice", 8, new DateOnly(2026, 7, 20)),
+                    new FileContributor("Bob", 2, new DateOnly(2026, 7, 1)),
+                }, TotalContributors: 2),
+            ["src/dir/Split.cs"] = new CodeFileMetrics(4, 20, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1),
+                Contributors: new[]
+                {
+                    new FileContributor("Alice", 2, new DateOnly(2026, 6, 1)),
+                    new FileContributor("Bob", 2, new DateOnly(2026, 5, 1)),
+                }, TotalContributors: 2),
+        }).Layout();
+
+    [Fact]
+    public void CodeOwnershipTreemap_RendersOneCellPerFileAndOneRectPerDirectory()
+    {
+        var svg = Charts.CodeOwnershipTreemap(OwnershipLayout(), Array.Empty<string>());
+
+        Assert.Contains("<svg class=\"ownership-treemap\"", svg);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"ownership-cell level-").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(svg, "class=\"ownership-cell-dir\""));
+    }
+
+    [Fact]
+    public void CodeOwnershipTreemap_AgreesWithTheSunburstOnEveryFilesShareLevel()
+    {
+        // The sunburst and treemap share DescribeOwnershipFile — they must never disagree about which files are
+        // dominant, split, or have no git record, since the live JS mode switcher recolors both views together.
+        var sunburst = Charts.CodeOwnershipSunburst(OwnershipRoots(), Array.Empty<string>());
+        var treemap = Charts.CodeOwnershipTreemap(OwnershipLayout(), Array.Empty<string>());
+
+        Assert.Contains("ownership-wedge level-4", sunburst);
+        Assert.Contains("ownership-cell level-4", treemap); // Dominant.cs: Alice 80%
+        Assert.Contains("ownership-wedge level-none", sunburst);
+        Assert.Contains("ownership-cell level-none", treemap); // NoGit.cs
+    }
+
+    [Fact]
+    public void CodeOwnershipTreemap_LinksAFileOnlyWhenTheResolverReturnsATarget()
+    {
+        var layout = OwnershipLayout();
+
+        var linked = Charts.CodeOwnershipTreemap(layout, Array.Empty<string>(),
+            fileHref: p => p == "src/dir/Dominant.cs" ? "code/src/dir/Dominant.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\"><rect class=\"ownership-cell", linked);
+
+        var plain = Charts.CodeOwnershipTreemap(layout, Array.Empty<string>(), fileHref: null);
+        Assert.DoesNotContain("<a href=", plain);
+        Assert.Contains("tabindex=\"0\"", plain);
+    }
+
+    [Fact]
+    public void CodeOwnershipTreemap_EmbedsTheSameGenerationTimeDataAsTheSunburst()
+    {
+        // The live mode switcher's clearFillClasses/recolor* functions run identically over sunburst wedges and
+        // treemap cells — that only works if both carry the SAME data-share/data-dominant/data-owner attrs.
+        var svg = Charts.CodeOwnershipTreemap(OwnershipLayout(), new[] { "Alice", "Bob" });
+
+        Assert.Contains("data-share=\"80\"", svg);
+        Assert.Contains("data-dominant=\"Alice\"", svg);
+        Assert.Contains("data-contributors=\"2\"", svg);
+        Assert.Contains("data-owner=\"[[&quot;Alice&quot;,8,", svg);
+    }
+
+    [Fact]
+    public void CodeOwnershipTreemap_EmptyLayout_DegradesToChartEmpty()
+    {
+        var svg = Charts.CodeOwnershipTreemap(Array.Empty<TreemapRect>(), Array.Empty<string>());
+
+        Assert.Contains("chart-empty", svg);
+        Assert.DoesNotContain("<svg", svg);
+    }
+
+    [Fact]
+    public void CodeOwnershipTreemap_EscapesPathsAndAuthorNamesInTooltipsAndDataAttrs()
+    {
+        var layout = CodeMap.Build(
+            new[] { ("src/a&b<c>.cs", 100L) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/a&b<c>.cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 1),
+                    Contributors: new[] { new FileContributor("<b>Eve</b>", 1, new DateOnly(2026, 1, 1)) }, TotalContributors: 1),
+            }).Layout();
+
+        var svg = Charts.CodeOwnershipTreemap(layout, new[] { "<b>Eve</b>" });
+
+        Assert.Contains("a&amp;b&lt;c&gt;.cs", svg);
+        Assert.DoesNotContain("<c>", svg);
+        Assert.Contains("&lt;b&gt;Eve&lt;/b&gt;", svg);
+        Assert.DoesNotContain("<b>Eve</b>", svg);
+    }
+
+    [Fact]
+    public void CodeOwnershipTreemap_DeterministicAcrossRepeatedCalls()
+    {
+        var layout = OwnershipLayout();
+        var topAuthors = new[] { "Alice", "Bob" };
+        Assert.Equal(
+            Charts.CodeOwnershipTreemap(layout, topAuthors),
+            Charts.CodeOwnershipTreemap(layout, topAuthors));
+    }
+
     [Fact]
     public void OwnershipLegend_CarriesRealValuePercentRangesNeverLessOrMore()
     {
-        var files = OwnershipRoots().SelectMany(FlattenFreshnessFiles).ToList();
+        var files = OwnershipRoots().SelectMany(FlattenCodeMapFiles).ToList();
 
         var legend = Charts.OwnershipLegend(files);
 
@@ -2906,9 +2917,10 @@ public class ChartsTests
     {
         // FR-10: descriptive attribution only, never a cross-repo people ranking.
         var svg = Charts.CodeOwnershipSunburst(OwnershipRoots(), new[] { "Alice", "Bob" });
+        var treemap = Charts.CodeOwnershipTreemap(OwnershipLayout(), new[] { "Alice", "Bob" });
         var tree = Charts.CodeOwnershipTree(OwnershipRoots());
 
-        foreach (var html in new[] { svg, tree })
+        foreach (var html in new[] { svg, treemap, tree })
         {
             Assert.DoesNotContain("leaderboard", html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("rank", html, StringComparison.OrdinalIgnoreCase);
