@@ -48,6 +48,14 @@ public static class DeferredWorkParser
         @"^(?:[-*+][ \t]|\d+[.)][ \t])",
         RegexOptions.Compiled);
 
+    // A bulleted line whose ENTIRE content is a source_spec token (or nothing after the colon at all),
+    // nothing else — pure group-provenance metadata (already captured by SourceSpecFileFromText over the
+    // whole section), not a real finding. Any trailing prose on the same line disqualifies it (kept as a
+    // real item — false negatives preferred over silently dropping authored content).
+    private static readonly Regex BareSourceSpecLine = new(
+        @"^source_spec:\s*(`?[^`\s]+`?)?\s*$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     /// <summary>Parses <paramref name="markdown"/> into a structured model. On any failure or when no
     /// Deferred-from headings exist, returns <c>IsStructured = false</c> with an optional plain-body
     /// fallback (rendered from <paramref name="fallbackBodyHtml"/> when supplied).</summary>
@@ -129,6 +137,17 @@ public static class DeferredWorkParser
                 return;
             }
 
+            // Bare `source_spec: X` header bullet with no summary/evidence continuation — pre-list
+            // provenance metadata that shouldn't become a phantom always-open item. Blank lines between
+            // this bullet and the next top-level marker (a common "loose list" CommonMark style) still
+            // count as "no continuation" here; only NON-blank continuation lines promote it to the
+            // standard multi-line source_spec/summary/evidence schema below.
+            if (BareSourceSpecLine.IsMatch(first.Trim()) && current.Skip(1).All(string.IsNullOrWhiteSpace))
+            {
+                current.Clear();
+                return;
+            }
+
             var md = first;
             if (current.Count > 1)
                 md = first + "\n" + string.Join("\n", current.Skip(1));
@@ -184,8 +203,9 @@ public static class DeferredWorkParser
                 }
                 current.Add(line);
             }
-            // Pre-list prose (e.g. a bare source_spec line) is ignored as an item — group provenance
-            // already captured it via SourceSpecFileFromText on the whole section.
+            // Prose before any top-level bullet has appeared (current.Count == 0) is ignored outright —
+            // distinct from the bulleted bare-source_spec case, which Flush() handles above once a
+            // top-level marker has started an item.
         }
         Flush();
         return items;

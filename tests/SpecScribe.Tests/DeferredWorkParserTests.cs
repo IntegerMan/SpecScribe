@@ -28,6 +28,10 @@ public class DeferredWorkParserTests
         var group = Assert.Single(model.Groups);
         Assert.Null(group.SourceStoryId);
         Assert.Equal("spec-home-next-steps-label-and-code-review", group.SourceKey);
+        // The bare `source_spec:` header bullet must not surface as its own phantom item alongside
+        // the real "Residual..." bullet.
+        Assert.Single(group.Items);
+        Assert.Contains("Residual", group.Items[0].BodyHtml);
     }
 
     [Fact]
@@ -276,6 +280,9 @@ public class DeferredWorkParserTests
         var group = Assert.Single(model.Groups);
         Assert.Equal("8.8", group.SourceStoryId);
         Assert.Equal("epics/story-8-8.html", group.SourceStoryHref);
+        // The bare `source_spec:` header bullet must not surface as its own phantom item.
+        Assert.Single(group.Items);
+        Assert.Contains("Open path-map casing mismatch", group.Items[0].BodyHtml);
     }
 
     [Fact]
@@ -324,6 +331,115 @@ public class DeferredWorkParserTests
         Assert.False(item.Resolved);
         Assert.Null(item.ResolvingRef);
         Assert.Null(item.ResolvingHref);
+    }
+
+    [Fact]
+    public void Parse_BareSourceSpecHeaderBullet_DoesNotBecomePhantomItem()
+    {
+        var md = """
+            ## Deferred from: code review of story-4-8 (2026-07-10)
+
+            - source_spec: `4-8-generation-diagnostics-and-configuration-log-page.md`
+            - ~~**Well-known folder set omits adrs/retros.**~~ **Resolved 2026-07-18 as misdiagnosed**: no change needed.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+
+        Assert.True(model.IsStructured);
+        var group = Assert.Single(model.Groups);
+        Assert.Equal("4.8", group.SourceStoryId);
+        Assert.Equal("epics/story-4-8.html", group.SourceStoryHref);
+        var item = Assert.Single(group.Items);
+        Assert.True(item.Resolved);
+        Assert.Contains("Well-known folder set", item.BodyHtml);
+    }
+
+    [Fact]
+    public void Parse_VerbatimStory4_8Section_YieldsOnlyTheResolvedItem()
+    {
+        // Verbatim (trimmed) text from this repo's own deferred-work.md, story-4-8 section — the
+        // exact real-world fixture that motivated this fix, not just a hand-simplified stand-in.
+        var md = """
+            ## Deferred from: code review of story-4-8 (2026-07-10)
+
+            - source_spec: `4-8-generation-diagnostics-and-configuration-log-page.md`
+            - ~~**`UnrecognizedTopLevelFolders`'s well-known-folder set omits `adrs`/`retros`.**~~ **Resolved 2026-07-18 as misdiagnosed** (`spec-close-known-index-groups-misdiagnosis`). `UnrecognizedTopLevelFolders` walks `SourceRoot` only; ADRs live on separate `AdrSourceRoot` (`docs/adrs`) and never enter `sourceRelatives`; retros live under already-well-known `implementation-artifacts/`. Adding `adrs`/`retros` to `KnownIndexGroups` would be a no-op for normal BMad layout and would not unlock Story 4.8 all-clear.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+
+        Assert.True(model.IsStructured);
+        var group = Assert.Single(model.Groups);
+        Assert.Equal("4.8", group.SourceStoryId);
+        var item = Assert.Single(group.Items);
+        Assert.True(item.Resolved);
+    }
+
+    [Fact]
+    public void Parse_BareSourceSpecBulletSeparatedByBlankLine_StillDoesNotBecomePhantomItem()
+    {
+        // Loose-list CommonMark style: a blank line between the bare header bullet and the next
+        // top-level bullet must not resurrect the phantom item (regression for the original fix,
+        // which only checked current.Count == 1 and missed this case).
+        var md = """
+            ## Deferred from: code review of story-4-8 (2026-07-10)
+
+            - source_spec: `4-8-generation-diagnostics-and-configuration-log-page.md`
+
+            - ~~**Well-known folder set omits adrs/retros.**~~ **Resolved 2026-07-18 as misdiagnosed**: no change needed.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        var group = Assert.Single(model.Groups);
+        var item = Assert.Single(group.Items);
+        Assert.True(item.Resolved);
+    }
+
+    [Fact]
+    public void Parse_BareSourceSpecOnlyBullet_NoOtherItems_FallsBackToUnstructured()
+    {
+        var md = """
+            # Deferred Work
+
+            ## Deferred from: code review of story-9-9 (2026-07-21)
+
+            - source_spec: `9-9-hypothetical.md`
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        Assert.False(model.IsStructured);
+        Assert.Empty(model.Groups);
+    }
+
+    [Fact]
+    public void Parse_BareSourceSpecLineWithNoFileToken_DoesNotBecomeItem()
+    {
+        var md = """
+            ## Deferred from: review of 1-1-foundation.md
+
+            - source_spec:
+            - Real finding stays.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        var item = Assert.Single(model.Groups[0].Items);
+        Assert.Contains("Real finding stays", item.BodyHtml);
+    }
+
+    [Fact]
+    public void Parse_BareSourceSpecLineWithTrailingProse_StillBecomesItem()
+    {
+        var md = """
+            ## Deferred from: review of 1-1-foundation.md
+
+            - source_spec: `1-1-foundation.md` — legacy note, keep as-is.
+            """;
+
+        var model = DeferredWorkParser.Parse(md);
+        Assert.True(model.IsStructured);
+        var item = Assert.Single(Assert.Single(model.Groups).Items);
+        Assert.False(item.Resolved);
+        Assert.Contains("legacy note", item.BodyHtml);
     }
 
     [Fact]
