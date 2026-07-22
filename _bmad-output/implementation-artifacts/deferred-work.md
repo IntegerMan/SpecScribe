@@ -2,6 +2,27 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 7-11-code-ownership-and-bus-factor-insights + 7-12-code-freshness-age-map (2026-07-22)
+
+- source_spec: `7-11-code-ownership-and-bus-factor-insights.md`
+  summary: `GitInsightsTemplater`'s solo-repo reframe gate only special-cases `insights.ContributorCount == 1`, not `== 0` (a repo with source files but zero attributable git authors) — falls through to a full ownership sunburst/treemap render with an empty author roster.
+  evidence: Edge Case Hunter. Narrow, untested precondition; no reproduction found beyond the theoretical path. [`GitInsightsTemplater.cs:104`]
+- source_spec: `7-11-code-ownership-and-bus-factor-insights.md`
+  summary: The new per-author accumulator assigns into a `Dictionary<string,...>` via indexer (`a.Authors[commit.Author] = author`); a null `commit.Author` would throw `ArgumentNullException` and abort generation.
+  evidence: Edge Case Hunter. `CommitInfo.Author` is a non-nullable `string` by type (`record CommitInfo(string ShortHash, string Subject, string Author, string Time)`), so this is a defensive gap rather than a proven live path through the existing git-log parser. [`GitMetrics.cs:981`]
+- source_spec: `7-11-code-ownership-and-bus-factor-insights.md`
+  summary: `SiteGeneratorCommitDetailsTests` now skips (`SkippableFact`) when the `git` CLI is absent, while `SiteGeneratorCodeMapTests`'s new deep-git tests hard-fail (`Assert.True(..., "install git rather than silently skipping")`) — two different policies for the identical environmental gap, now living in sibling test files this same story pair touches.
+  evidence: Blind Hunter. CI-ergonomics policy call (skip vs. fail on missing tooling), not a shipped-code defect — revisit as a single cross-suite policy decision rather than a one-off patch.
+- source_spec: `7-11-code-ownership-and-bus-factor-insights.md`
+  summary: Staleness mode's fixed 30-day "month" bucketing is inconsistent with the sibling spotlight-recency ramp's real day-count cutoffs on the same chart — not incorrect, just two different units of elapsed time coexisting.
+  evidence: Blind Hunter. [`specscribe.js` recolorStaleness]
+- source_spec: `7-12-code-freshness-age-map.md`
+  summary: `Charts.CodeMapSunburst` and `Charts.CodeTreemap` derive `maxChanges` from different denominators (`CollectMaxChanges` walks the full tree; the treemap's own post-`Layout()` traversal can omit deeply-nested files past the layout's own cap) — the same file could render at a different color level depending on which shape is toggled visible.
+  evidence: Edge Case Hunter. Only manifests on trees deeper than the depth cap; no reproduction found on this repo's own tree.
+- source_spec: `7-12-code-freshness-age-map.md`
+  summary: Directory wedges can become visually occluded by descendant file wedges once ring depth saturates at `FreshnessSunburstMaxDepth`, making their tooltip effectively unreachable in pathologically deep trees.
+  evidence: Edge Case Hunter. Pathologically deep trees only; bounded in practice by `CodeMap`'s own max-depth collapsing.
+
 ## Deferred from: code review of spec-epic6-deferred-debt-cleanup (2026-07-22)
 
 - source_spec: `spec-epic6-deferred-debt-cleanup.md`

@@ -4,7 +4,7 @@ baseline_commit: 50c5185d6f5858bee285de9eb2a0690fc421a6c1
 
 # Story 7.11: Code Ownership & Bus-Factor Insights
 
-Status: review
+Status: done
 
 <!-- RE-SCOPED 2026-07-21 via correct-course (see sprint-change-proposal-2026-07-21-git-insights-ownership-view.md).
      The story was previously implemented as a plain ranked HTML table (see Change Log) and shipped to "review".
@@ -55,6 +55,14 @@ non-broken
 accessible text-equivalent table alongside the chart (the same "chart pairs with a text list" convention every
 other chart on this page already follows) — disabling JS must not remove information, only the live mode
 controls (NFR-5).
+
+**AMENDED 2026-07-22 per code review (owner-confirmed final):** the accessible text-equivalent table described
+above was built, then removed entirely during design-correction passes (see Change Log) in favor of each wedge's
+`aria-label` (bare file path) plus a rich JS-only hover/tap card for dominant author, share %, contributor count,
+and last-active date. With JavaScript disabled, that per-file detail is **not** available as text — only the
+bare path and the color-coded wedge. This is a real, owner-accepted walk-back of this AC's literal
+"text-equivalent table" and "disabling JS must not remove information" wording; the accepted design is
+color + rich JS tooltip only, with no no-JS text fallback for per-file ownership detail.
 
 4.
 **Given** a solo-maintainer repo (the common OSS case, NFR8)
@@ -129,6 +137,29 @@ new gating decision needed beyond the existing page-level gate.
   - [x] Subtask 6.3: `ChartsTests.cs` coverage for the new/generalized sunburst builder (geometry correctness at various tree shapes/depths, mirroring `CodeFreshnessSunburst`'s existing test conventions) and the new `ChartMetric` case (the existing `WhyText_IsMetricGenericAndDefinedOnce` enum-iteration test picks it up automatically).
   - [x] Subtask 6.4: JS behavior needs its own test strategy — this codebase has no browser/DOM-execution test harness today. Decide and document an approach (e.g. a lightweight Node-based test against the extracted recolor logic, or an explicit "manually verified in a real browser, not covered by the automated suite" disclosure) rather than silently shipping untested client logic; flag this choice for review.
   - [x] Subtask 6.5: Regenerate the golden content fingerprint (`SiteGeneratorAdapterTests.cs`) — confirm the diff is scoped to this story's HTML/CSS/JS-asset changes, verified stable across 2 repeated runs, per [Golden-diff normalization gotchas].
+
+### Review Findings
+
+_Code review 2026-07-22, run jointly with Story 7.12 (their sunburst engines merged mid-flight — see [7-12's Review Findings](7-12-code-freshness-age-map.md#review-findings) for the shared-engine side of this)._ Diff scope: `12ecce1..HEAD` on this story's File List, whitespace-normalized, split into an engine/styling chunk and a page-wiring chunk, each run through Blind Hunter + Edge Case Hunter + Acceptance Auditor.
+
+- [x] [Review][Patch] AC#3's accessible text-equivalent table was removed entirely; with JS off, a file wedge's only accessible name is its bare path (`Charts.cs` `WalkSunburstWedges`), with dominant author/share %/contributor count/last-active date available only via the JS-only `js-tip` card. **Resolved 2026-07-22:** owner confirmed the earlier walk-back stands as final — no text-equivalent ships; color + rich JS tooltip is the accepted design. AC#3's wording updated to reflect this accepted tradeoff.
+
+- [x] [Review][Patch] `.ownership-controls` is missing the `[hidden]` CSS override, so it renders visible on the no-JS page [specscribe.css:5451] — fixed with `.ownership-controls[hidden] { display: none; }`; verified via `getComputedStyle` (not just the DOM property, per this story's own prior near-miss on the identical bug class)
+- [x] [Review][Patch] `CodeOwnershipSunburst`/`CodeOwnershipTreemap` never thread a `MaxDetailedCodeMapFiles` detail cap, unlike every sibling chart [GitInsightsTemplater.cs:152,157] — both now accept `detailedFiles`, computed once in `AppendOwnershipSection` from the same file list both views share; past the cap the rich `data-tip-html` card is skipped in favor of the existing lighter native `<title>`, `data-*` recolor attributes stay uncapped so live mode-switching still works for every file
+- [x] [Review][Patch] Solo-repo reframe gate reads a different (and divergeable) contributor count than the chart it gates [GitInsightsTemplater.cs:104] — gate now derives its count from the SAME `codeMap.Files()`-derived per-file `Contributors` union the chart itself colors from, not the separate global `insights.ContributorCount`
+- [x] [Review][Patch] `spotlightRecencyLevel(null)` fabricates a "180+ days ago" recency claim for an unknown date [specscribe.js] — an unknown last-touch date now renders `level-none` + "date unknown" instead of being coerced into the oldest recency bucket
+- [x] [Review][Patch] Staleness-mode copy mislabels a file-level metric as contributor-specific ("no current contributor for N+ months") [specscribe.js] — relabeled to describe the file's own last-touch date (JS label + `Charts.OwnershipStalenessLegend`'s server-rendered text both updated)
+- [x] [Review][Patch] `sharePct` has no upper clamp and can print >100% [Charts.cs DescribeOwnershipFile] — clamped to 100
+- [x] [Review][Patch] `initOwnershipSunburst` never calls `applyMode()` at init, so a restored non-default mode selection can desync from the rendered colors [specscribe.js] — now calls `applyMode()` once after wiring listeners
+- [x] [Review][Patch] `CodeOwnershipSunburst_NeverRendersALeaderboardOrRankingVocabulary`'s `DoesNotContain("rank", ...)` is an overly broad substring assertion [ChartsTests.cs] — switched to a `\brank\w*\b` word-boundary regex match
+- [x] [Review][Patch] `recolorSpotlight` can mislabel a real, spotlighted contributor as "hasn't worked on this file" when a file has >12 contributors and they rank below the per-file cap [specscribe.js] — softened to "is not among this file's most-active tracked contributors" (JS label + `Charts.OwnershipSpotlightLegend` both updated, plus a new `level-none` legend entry for the "touched, date unknown" state the spotlight-null fix above introduces)
+- [x] [Review][Patch] Ownership shape-toggle uses fixed element IDs instead of the scoped marker-class pattern its sibling Code Map toggle deliberately uses [GitInsightsTemplater.cs] — **verified on inspection, no change made**: the view-*switching* CSS (`:has(.ownership-treemap-radio:checked)`) already correctly uses a marker class, exactly like the Code Map toggle. The finding conflated that with the *pressed-tab-state* styling, which uses fixed IDs (`#ownership-view-sunburst`/`#ownership-view-treemap`) — but that's the SAME established pattern every other single-instance `.board-tabs` component on this site uses (the sprint board's `#sv-*`, the requirements view's `#rv-*`), since `git-insights.html` (unlike Code Map's up-to-four-variant-panels page) only ever renders one ownership panel. No collision risk; changing this would make it inconsistent with its real siblings, not more consistent.
+- [x] [Review][Patch] Dangling `<see cref="FreshnessLegend"/>` inside `OwnershipLegend`'s doc-comment — the symbol no longer exists after the freshness→ownership rename [Charts.cs:3289] — cref replaced with prose pointing at `CodeMapChangeLevelRange`
+
+- [x] [Review][Defer] Solo-repo gate only special-cases `ContributorCount == 1`, not `== 0` [GitInsightsTemplater.cs:104] — deferred, narrow/untested precondition
+- [x] [Review][Defer] New per-author accumulator assigns into a `Dictionary` by indexer; a null `commit.Author` would throw, though `Author` is a non-nullable `string` by type [GitMetrics.cs:981] — deferred, pre-existing type discipline makes this unlikely to be live
+- [x] [Review][Defer] `SiteGeneratorCommitDetailsTests` skips when `git` is absent while `SiteGeneratorCodeMapTests`'s new deep-git tests hard-fail — two policies for the same gap, now in sibling files this story pair touches — deferred, CI-ergonomics policy call, not a shipped-code defect
+- [x] [Review][Defer] Staleness mode's fixed 30-day "month" bucketing is inconsistent with the sibling spotlight-recency ramp's real day-count cutoffs on the same chart — deferred, inconsistent units, not incorrect
 
 ## Dev Notes
 

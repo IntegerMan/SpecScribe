@@ -822,7 +822,20 @@ public class SiteGeneratorAdapterTests : IDisposable
         // visibility now matches the active mode exactly (computed `display` checked, not just the DOM
         // property), and spotlight mode colors + labels files by real day-counts since the chosen contributor's
         // last touch. Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
-        const string expected = "260d5b3124c15253cdb8195175857e793cf13ddf1f03100f964ccd399f525cb0";
+        // Regenerated for the 2026-07-22 code review of Stories 7.11/7.12: real-value legend for the Code Map's
+        // change-frequency ramp (replacing the "Less … More" placeholder the merged sunburst had regressed to);
+        // AppendColorizeControls' aria-label now covers both chart shapes; a real .ownership-controls[hidden] CSS
+        // override (the mode-selector dropdown previously rendered visible with JS off — the same specificity bug
+        // already once fixed for .ownership-legend); ownership sunburst/treemap now respect the SAME
+        // MaxDetailedCodeMapFiles detail cap the Code Map treemap already applies; softened/corrected copy in the
+        // spotlight and staleness legends and their live JS labels (no more fabricated "180+ days ago" for an
+        // unknown date, no more "no current contributor" language for a file-level metric, no more "has not
+        // worked on this file" for a contributor who's merely outside a file's own capped roster). This non-git
+        // fixture never renders git-insights.html (no --deep-git), so the hash shifts via the global
+        // specscribe.css/specscribe.js/Charts.cs asset and markup changes reflected on the pages it DOES render
+        // (code-map.html included, via the legend change). Verified stable across 2 repeated runs before locking
+        // in. [golden-diff-normalization-gotchas]
+        const string expected = "5768f66f2ec511dfdce076f2d1886851296f90c0bdd789e05023f3ed33dec759";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -1302,8 +1302,10 @@
     // Fixed real-unit day cutoffs (owner feedback: not a binary touched/not-touched flag — a recency spectrum,
     // "days since THIS contributor last touched the file"). Mirrors OwnershipShareLevel's fixed-cutoff
     // reasoning (meaningful on its own scale, never a moving target) rather than a per-render quartile split.
+    // Only called with a real, known day-count — an unknown last-touch date is a distinct "unknown" state
+    // handled by the caller, never silently coerced into the oldest bucket (that would fabricate a "long ago"
+    // claim the embedded data never actually supports). [Review 2026-07-22]
     function spotlightRecencyLevel(daysAgo) {
-      if (daysAgo === null) return 1; // touched, but their own last-touch date wasn't embedded — oldest bucket
       if (daysAgo <= 30) return 4;
       if (daysAgo <= 90) return 3;
       if (daysAgo <= 180) return 2;
@@ -1314,12 +1316,23 @@
       wedges.forEach(function (w) {
         clearFillClasses(w);
         var entry = ownerData(w).filter(function (e) { return e[0] === name; })[0];
-        if (!entry) { w.classList.add("owner-spotlight-off"); setLabel(w, name + " has not worked on this file"); return; }
+        // Absence here means "not among this file's own embedded (capped) contributor list," not proven "never
+        // touched this file" — a file with more contributors than the per-file cap could have a real, spotlighted
+        // contributor who simply ranks below it for THIS file. Wording says "not among the tracked contributors,"
+        // never the stronger (and sometimes false) "has not worked on this file." [Review 2026-07-22]
+        if (!entry) { w.classList.add("owner-spotlight-off"); setLabel(w, name + " is not among this file's most-active tracked contributors"); return; }
         var lastDay = entry[2];
         var daysAgo = (lastDay === null || lastDay === undefined || isNaN(asof)) ? null : (asof - lastDay);
+        if (daysAgo === null) {
+          // Touched, but their own last-touch date wasn't embedded — an honest "unknown," never coerced into a
+          // recency bucket the data doesn't actually support. [Review 2026-07-22]
+          w.classList.add("level-none", "spotlight-touched");
+          setLabel(w, name + " worked on this file (date unknown)");
+          return;
+        }
         var level = spotlightRecencyLevel(daysAgo);
         w.classList.add("level-" + level, "spotlight-touched");
-        setLabel(w, name + " worked on this file" + (daysAgo === null ? "" : " (" + daysAgo + (daysAgo === 1 ? " day" : " days") + " ago)"));
+        setLabel(w, name + " worked on this file (" + daysAgo + (daysAgo === 1 ? " day" : " days") + " ago)");
       });
     }
 
@@ -1331,8 +1344,11 @@
         var monthsAgo = (asof - parseInt(raw, 10)) / 30;
         var stale = monthsAgo >= months;
         w.classList.add(stale ? "owner-stale" : "owner-fresh");
+        // Measures the FILE's own last-touch date, not anything contributor-specific — the label said "no
+        // current contributor" before, which claimed more than the data (data-last has no author attached).
+        // [Review 2026-07-22]
         setLabel(w, stale
-          ? "no current contributor for " + Math.round(monthsAgo) + "+ months"
+          ? "not touched in " + Math.round(monthsAgo) + "+ months"
           : "touched within the last " + months + " months");
       });
     }
@@ -1355,5 +1371,9 @@
     modeSelect.addEventListener("change", applyMode);
     authorSelect.addEventListener("change", applyMode);
     thresholdInput.addEventListener("input", applyMode);
+    // Sync once at init: relying on the server-baked default (share mode) matching modeSelect's own default
+    // option is fragile — a bfcache/back-navigation restore of a non-default select value would otherwise leave
+    // the chart showing stale colors until the next manual interaction. [Review 2026-07-22]
+    applyMode();
   }
 })();

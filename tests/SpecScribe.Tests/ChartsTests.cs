@@ -2859,10 +2859,14 @@ public class ChartsTests
         var svg = Charts.CodeOwnershipSunburst(OwnershipRoots(), new[] { "Alice", "Bob" });
         var treemap = Charts.CodeOwnershipTreemap(OwnershipLayout(), new[] { "Alice", "Bob" });
 
+        // Word-boundary regex (Review 2026-07-22, was a bare substring DoesNotContain("rank", ...)): a plain
+        // substring check would false-fail on any unrelated word containing "rank" (e.g. a "Frank.cs" fixture
+        // file, or the codebase's own unrelated "data-sort-status-rank" attribute from a different subsystem) —
+        // \brank only matches "rank"/"ranking"/"ranked" as whole-word ranking vocabulary.
         foreach (var html in new[] { svg, treemap })
         {
             Assert.DoesNotContain("leaderboard", html, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("rank", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotMatch(@"(?i)\brank\w*\b", html);
             Assert.DoesNotContain("top performer", html, StringComparison.OrdinalIgnoreCase);
         }
     }

@@ -101,7 +101,22 @@ public static class GitInsightsTemplater
             return;
         }
 
-        if (insights.ContributorCount == 1)
+        var files = codeMap.Files();
+
+        // The solo-repo reframe gate must read the SAME contributor population the chart itself colors from
+        // (codeMap's own per-file Contributors) — NOT insights.ContributorCount, which counts every author across
+        // ALL commits repo-wide, including commits that only touch files outside codeMap's current source-file
+        // walk (deleted files, excluded paths). Those two counts can diverge: a second author whose only commits
+        // touch such files would make insights.ContributorCount == 2 while the chart still renders 100%-dominant-
+        // by-one-author coloring for every wedge — exactly the "flags everything at-risk, noise not signal" state
+        // this reframe exists to prevent (AC #4). [Review 2026-07-22]
+        var codeMapContributorCount = files
+            .SelectMany(f => f.Metrics?.Contributors ?? Array.Empty<FileContributor>())
+            .Select(c => c.Name)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+
+        if (codeMapContributorCount == 1)
         {
             // AC #4: the common single-maintainer OSS case. Every mode would trivially read "one person,
             // everywhere" here, so a sunburst flagging every wedge at-risk is noise rather than signal — say so
@@ -147,21 +162,26 @@ public static class GitInsightsTemplater
         sb.Append("      </div>\n");
         sb.Append("    </div>\n");
 
+        // Detail cap (same MaxDetailedCodeMapFiles discipline the Code Map treemap already applies, [Review][Patch]
+        // 2026-07-22): computed once here from the SAME file list both views render from (already fetched above
+        // for the solo-repo gate), so the sunburst and the treemap can never disagree on which files get the rich
+        // hover card past the cap.
+        var detailedFiles = Charts.SelectDetailedCodeMapFiles(files, codeMap.FileCount);
+
         sb.Append("    <div class=\"ownership-view ownership-view-sunburst\">\n");
         sb.Append("      <div class=\"ownership-sunburst-wrap\">\n");
-        sb.Append("        ").Append(Charts.CodeOwnershipSunburst(codeMap.Roots, topAuthors, fileHref: fileHref));
+        sb.Append("        ").Append(Charts.CodeOwnershipSunburst(codeMap.Roots, topAuthors, fileHref: fileHref, detailedFiles: detailedFiles));
         sb.Append("      </div>\n");
         sb.Append("    </div>\n");
         sb.Append("    <div class=\"ownership-view ownership-view-treemap\">\n");
         sb.Append("      <div class=\"ownership-treemap-wrap\">\n");
-        sb.Append("        ").Append(Charts.CodeOwnershipTreemap(codeMap.Layout(), topAuthors, fileHref: fileHref));
+        sb.Append("        ").Append(Charts.CodeOwnershipTreemap(codeMap.Layout(), topAuthors, fileHref: fileHref, detailedFiles: detailedFiles));
         sb.Append("      </div>\n");
         sb.Append("    </div>\n");
 
         // ONE shared legend area (not duplicated per view — the colors mean the same thing in both charts):
         // four mode-specific blocks, the live switcher shows exactly one so the visible legend can never
         // disagree with what's actually colored (owner feedback).
-        var files = codeMap.Files();
         sb.Append(Charts.OwnershipLegend(files));
         sb.Append(Charts.OwnershipTopAuthorsLegend(topAuthors));
         sb.Append(Charts.OwnershipSpotlightLegend());

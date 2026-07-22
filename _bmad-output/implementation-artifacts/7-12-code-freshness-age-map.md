@@ -4,7 +4,7 @@ baseline_commit: 12ecce126a6af041b0bca945fc3ed4e76af3589a
 
 # Story 7.12: Code Freshness / Age Map
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -19,7 +19,7 @@ so that I can tell load-bearing hot code from stable or possibly-dead corners.
 1.
 **Given** each file's last-commit date from the deep-git path
 **When** the freshness map renders
-**Then** files are shaded by recency of last change, reusing the `--status-*` / heat token system (not a new palette) with a real-value legend per the Story 10.2 chart-metadata standard
+**Then** files can be shaded by recency of last change as one of the Code Map's colorize dimensions (selectable via the existing colorize control, alongside change-frequency and file-type; **AMENDED 2026-07-22 per code review**: this sunburst was later merged into the Code Map's general colorize system as a shape-toggle sibling of the treemap — the no-JS baked default is change-frequency, matching the treemap, with recency reachable via the same JS colorize dropdown both shapes already share), reusing the level-0..4 heat token system (not a new palette) with a real-value legend per the Story 10.2 chart-metadata standard
 **And** color is never the sole signal (path + date remain available as text / tooltip). [Source: epics.md#Story 7.12 (lines 1519-1523); FR19]
 
 2.
@@ -83,7 +83,7 @@ The four highest risks are: **(1)** re-deriving the directory tree or the per-fi
   - **Retrofitting the treemap's own "Less … More" legend.** Out of scope for this story — flag it as a follow-up if you want, but don't touch `CodeMapTemplater.AppendLegend`'s existing behavior.
   - **A second file text-equivalent table.** Reuse the existing `Last` column in `AppendFileTable`.
   - **Extending `Charts.Sunburst`/`EpicSunburst`.** Those are a different hierarchy and a different color scheme (epic/story status). Write a new, separate builder.
-  - **Per-filter-variant duplication** (exclude-spec-dev / exclude-tests) — source from the unfiltered `"full"` variant only, matching 7.10's identical scope call.
+  - ~~**Per-filter-variant duplication** (exclude-spec-dev / exclude-tests) — source from the unfiltered `"full"` variant only, matching 7.10's identical scope call.~~ **SUPERSEDED 2026-07-22 per code review**: once merged into the Code Map's shape-toggle system, the sunburst DOES render once per filter-variant panel (owner-confirmed intentional) — the exclude-filter checkboxes must re-filter every visible surface, matching the treemap's own per-variant behavior, not just the treemap.
   - Stories 7.10 (risk quadrant) and 7.11 (ownership) — sibling stories in the same batch, rendering elsewhere. Only coordinate on the shared `ChartMetric` enum if landing concurrently.
 
 ---
@@ -111,11 +111,11 @@ The four highest risks are: **(1)** re-deriving the directory tree or the per-fi
 
 - **DON'T add a git call, change the fetch format, or re-parse.** Consume `CodeMap.Roots`/`CodeMapNode.Metrics`. [[deep-git-single-numstat-path]]
 - **DON'T use `--status-*` lifecycle tokens for the freshness ramp.** Files don't carry a workflow status; the level-0..4 heat ramp is the correct, already-established precedent. [[specscribe-status-token-system]]
-- **DON'T literally render "Less … More."** Real-value date/day-count ranges per level, per Story 10.2 and this repo's own stated intent for that standard.
+- **DON'T literally render "Less … More."** Real-value date/day-count ranges per level, per Story 10.2 and this repo's own stated intent for that standard. **(Re-affirmed 2026-07-22 per code review — the merged sunburst had regressed to this exact placeholder; fixed with a real-value legend.)**
 - **DON'T extend `Charts.Sunburst`/`EpicSunburst`.** Different hierarchy, different color model (epic/story status vs. file recency), fixed 3-ring vs. arbitrary depth. Write a new builder.
 - **DON'T add JavaScript or reach for Epic 20's interactive/zoom pattern.** This chart is static, matching every other chart on the site.
 - **DON'T build a second file/date table.** `AppendFileTable`'s `Last` column already exists.
-- **DON'T duplicate the chart per filter variant** (exclude-spec-dev/exclude-tests). Source from `"full"` only.
+- ~~**DON'T duplicate the chart per filter variant** (exclude-spec-dev/exclude-tests). Source from `"full"` only.~~ **SUPERSEDED 2026-07-22 per code review** — see the Scope boundary note above.
 - **DON'T invent a second code-page resolver.** Thread the existing `fileHref`/`CodeItemHref` delegate through.
 - **DON'T force the Core/Adapters package split** — extend `Charts`/`CodeMapTemplater`/`specscribe.css` in place. [Source: ARCHITECTURE-SPINE.md#Seed, Not Invariant]
 - **DON'T use `--output docs/live`** in any manual-verify step — vestigial/gitignored; default is `SpecScribeOutput/`. [[generate-output-dir-is-specscribeoutput]]
@@ -267,6 +267,21 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
   - [x] Regenerate the golden content fingerprint; confirm the diff is scoped to `code-map.html`/CSS (account for 7.10 if it landed first).
 - [x] **Task 6 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green. Baseline generate (no `--deep-git`) → documented degrade behavior. Deep generate (`--deep-git`) → real directory sunburst of this repo, recency-colored file wedges, neutral unlabeled directories, guarded links, tooltips with real dates, real-value legend, Story 10.2 chrome, no JS, escaped content.
+
+### Review Findings
+
+_Code review 2026-07-22, run jointly with Story 7.11 (their sunburst engines merged mid-flight — see [7-11's Review Findings](7-11-code-ownership-and-bus-factor-insights.md#review-findings) for the shared-engine side of this). IMPORTANT for future readers: this story's own Dev Agent Record / Completion Notes / File List above describe an earlier, abandoned design — a standalone `Charts.CodeFreshnessSunburst` and `AppendFreshnessSunburstSection`. That is not what shipped. The real implementation was renamed/merged into `Charts.CodeMapSunburst`, exposed via a "View as: Treemap \| Sunburst" toggle inside `CodeMapTemplater.AppendVariantPanel`, sharing its geometry engine with Story 7.11's ownership sunburst. The Dev Agent Record above should be treated as historical/superseded, not as a description of current code — the findings below audit what's actually shipped._ Diff scope: `12ecce1..HEAD` on this story's File List, whitespace-normalized, split into an engine/styling chunk and a page-wiring chunk, each run through Blind Hunter + Edge Case Hunter + Acceptance Auditor.
+
+- [x] [Review][Patch] AC#1 says "shaded by recency of last change," but the no-JS default shades by change frequency (or file type) — recency is a JS-only colorize option. **Resolved 2026-07-22:** owner confirmed this is accepted; AC#1's wording updated to describe the shipped behavior (recency as one colorize dimension among several, not the no-JS default).
+- [x] [Review][Patch] Sunburst legend is the literal "Less … More" placeholder AC#1 explicitly forbids (`CodeMapTemplater.AppendLegend`) — no real-value legend exists for the merged chart. **Resolved 2026-07-22:** owner wants a real fix — built. New `Charts.CodeMapChangeLevelRange`/`ComputeMaxChanges`/`IsCodeMapChangeLevelUnreachable` derive real change-count ranges per level from the EXACT SAME `Bucket()` thresholds the wedges/cells color by (so legend and color can never disagree); `AppendLegend` now renders them instead of "Less … More". Verified live in-browser.
+- [x] [Review][Patch] Sunburst renders once per each of the 4 filter-variant panels, reversing the explicit "source from `full` only" DON'T (`CodeMapTemplater.AppendVariantPanel` via `RenderPage_EachFilterPanelGetsItsOwnSunburstSoTheCheckboxesActuallyReFilterIt`). **Resolved 2026-07-22:** owner confirmed this is intentional (exclude-filter checkboxes must re-filter every visible surface) — the DON'T guardrail text (and AC#1) updated to reflect the reversal and its rationale.
+
+- [x] [Review][Patch] `AppendColorizeControls`'s `<select>` keeps `aria-label="Colorize the treemap by"` even though it now also governs the sunburst view [CodeMapTemplater.cs] — updated to "Colorize the treemap and sunburst by"
+- [x] [Review][Patch] A `<summary>` doc-comment belonging to `CodeTreemap` is immediately followed by an undelimited second `<summary>` for the new `MaxDetailedCodeMapFiles` constant, leaving `CodeTreemap` itself undocumented [Charts.cs:~2179-2205] — the `CodeTreemap` summary moved back to directly precede its method
+- [x] [Review][Patch] `CountFreshnessFiles`/`CollectFreshnessStats`/`CollectMaxChanges` recurse the shared tree with no depth guard, unlike the sibling `WalkSunburstWedges`'s `FreshnessRecursionGuard` [Charts.cs] — all three now take an optional `depth` parameter and bail out past `FreshnessRecursionGuard`, matching `WalkSunburstWedges`'s own discipline
+
+- [x] [Review][Defer] `CodeMapSunburst` and `CodeTreemap` derive `maxChanges` from different denominators, which can color the same file differently depending on which shape is toggled [Charts.cs] — deferred, only manifests on trees deeper than the depth cap
+- [x] [Review][Defer] Directory wedges can become visually occluded by descendant file wedges once ring depth saturates at `FreshnessSunburstMaxDepth` [Charts.cs] — deferred, pathologically deep trees only
 
 ## Dev Notes
 

@@ -257,14 +257,22 @@ public class GitInsightsTemplaterTests
             new (string, long)[] { ("src/<weird> & \"odd\".cs", 10) },
             new Dictionary<string, CodeFileMetrics>
             {
+                // TWO contributors on the same file (Review 2026-07-22: was one contributor here plus a
+                // deliberately-inconsistent insights.ContributorCount of 2 to bypass the solo-repo gate — but the
+                // gate now reads the SAME codeMap-derived contributor population the chart itself colors from, so
+                // the fixture's own data must genuinely have >1 contributor for the section under test to render).
                 ["src/<weird> & \"odd\".cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1),
-                    Contributors: new[] { new FileContributor("<b>Eve</b> & Co", 1, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
+                    Contributors: new[]
+                    {
+                        new FileContributor("<b>Eve</b> & Co", 1, new DateOnly(2026, 7, 1)),
+                        new FileContributor("Second Contributor", 1, new DateOnly(2026, 6, 1)),
+                    }, TotalContributors: 2),
             });
         var insights = new GitInsightsData(
             Files: Array.Empty<FileChangeStat>(),
             Activity: Array.Empty<(DateOnly, int)>(),
             CommitCount: 1,
-            ContributorCount: 2, // >1 so the solo-repo reframe doesn't short-circuit the section under test
+            ContributorCount: 2,
             TotalFilesTouched: 1);
 
         var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, Array.Empty<string>());

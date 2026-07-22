@@ -126,8 +126,10 @@ public static class CodeMapTemplater
         // render once the variant has files — the "git data unavailable" state is no longer a fully-inert
         // controls block, just a smaller supplementary note below a WORKING (file-type) colorize dimension.
         // [Story 7.9 owner-directed design decision]
+        var maxChanges = Charts.ComputeMaxChanges(variant.Map.Roots);
+
         AppendColorizeControls(sb, hasMetrics);
-        AppendLegend(sb, hasMetrics);
+        AppendLegend(sb, hasMetrics, maxChanges);
         AppendDiscreteLegend(sb, files, hasMetrics);
         if (!hasMetrics)
         {
@@ -195,7 +197,7 @@ public static class CodeMapTemplater
     {
         sb.Append("    <div class=\"codemap-controls\" hidden>\n");
         sb.Append("      <label class=\"codemap-controls-label\">Colorize by\n");
-        sb.Append("        <select class=\"codemap-dim-select\" aria-label=\"Colorize the treemap by\">\n");
+        sb.Append("        <select class=\"codemap-dim-select\" aria-label=\"Colorize the treemap and sunburst by\">\n");
         if (hasMetrics)
         {
             AppendOption(sb, "changes", "Change frequency", true);
@@ -221,20 +223,25 @@ public static class CodeMapTemplater
         sb.Append($"          <option value=\"{value}\"{sel}>{PathUtil.Html(label)}</option>\n");
     }
 
-    /// <summary>The sequential-ramp legend ("Less … More") — reuses the commit-heatmap ramp levels (a non-
-    /// <c>--status-*</c> scale). Server-baked visible only when it explains the baked-in default (git metrics
-    /// present); otherwise pre-rendered <c>hidden</c> so the client-side dimension switch can reveal it without a
-    /// DOM rewrite when the user picks a numeric dimension from the dropdown. [Subtask 4.3; Story 7.9]</summary>
-    private static void AppendLegend(StringBuilder sb, bool hasMetrics)
+    /// <summary>The sequential-ramp legend for the change-frequency dimension — reuses the commit-heatmap ramp
+    /// levels (a non-<c>--status-*</c> scale). Server-baked visible only when it explains the baked-in default
+    /// (git metrics present); otherwise pre-rendered <c>hidden</c> so the client-side dimension switch can reveal
+    /// it without a DOM rewrite when the user picks a numeric dimension from the dropdown. Each swatch carries a
+    /// real change-count range from <see cref="Charts.CodeMapChangeLevelRange"/> — never the literal "Less … More"
+    /// placeholder, per AC #1 of Story 7.12 (which this ramp's sunburst sibling also shares). [Subtask 4.3;
+    /// Story 7.9; Review 2026-07-22]</summary>
+    private static void AppendLegend(StringBuilder sb, bool hasMetrics, double maxChanges)
     {
         sb.Append("    <div class=\"codemap-legend codemap-legend-ramp\"").Append(hasMetrics ? "" : " hidden").Append(">");
         sb.Append("<span class=\"codemap-legend-dim\">Colorized by change frequency</span> ");
-        sb.Append("<span aria-hidden=\"true\">Less ");
         for (var l = 0; l <= 4; l++)
         {
+            if (l > 0 && Charts.IsCodeMapChangeLevelUnreachable(l, maxChanges)) continue;
+            var label = l == 0 ? "0 changes" : Charts.CodeMapChangeLevelRange(l, maxChanges);
             sb.Append($"<span class=\"codemap-legend-swatch level-{l}\"></span>");
+            sb.Append($"<span class=\"codemap-legend-label\">{PathUtil.Html(label)}</span> ");
         }
-        sb.Append(" More</span></div>\n");
+        sb.Append("</div>\n");
     }
 
     /// <summary>The discrete (categorical) legend for the "File type" dimension — a swatch + human label per

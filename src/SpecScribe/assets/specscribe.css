@@ -5449,6 +5449,9 @@ body:has(main.req-detail) .doc-header {
 /* Mode-selector controls: hidden in the server HTML (NFR-5/ADR 0010 — no inert control ships with JS off),
    revealed by specscribe.js's initOwnershipSunburst. Reuses the Code Map colorize-dropdown's visual language. */
 .ownership-controls { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1rem; font-size: 0.85rem; color: var(--ink-faded); }
+/* [hidden]'s specificity ties with the rule above, and author CSS always wins that tie — without this override the
+   controls render visible with JS off, the same bug once found and fixed for .ownership-legend. [Review 2026-07-22] */
+.ownership-controls[hidden] { display: none; }
 .ownership-controls select,
 .ownership-controls input {
   font: inherit;
