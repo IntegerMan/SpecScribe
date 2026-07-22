@@ -101,13 +101,28 @@ public class RiskQuadrantTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_GridItemsCarryRankAndMetaText()
+    public void RenderPage_GridItemsCarryMetaTextButNoRankNumber()
     {
+        // Review-pass owner feedback: the numeric rank isn't valuable information — dropped entirely.
         var html = RiskQuadrantTemplater.RenderPage(MapAboveThreshold(), Nav());
 
-        Assert.Contains("class=\"risk-grid-rank\">1</span>", html);
+        Assert.DoesNotContain("risk-grid-rank", html);
         Assert.Contains("5,000 lines", html);
         Assert.Contains("50 changes", html);
         Assert.Contains("900 churn", html);
+    }
+
+    [Fact]
+    public void RenderPage_PagerFollowsTheGridInDocumentOrder()
+    {
+        // Review-pass owner feedback: pager controls belong at the bottom of the list they page, not floating
+        // above it. specscribe.js's initRiskGridPager locates the pager via grid.nextElementSibling, so document
+        // order is load-bearing, not just cosmetic.
+        var html = RiskQuadrantTemplater.RenderPage(MapAboveThreshold(), Nav());
+
+        var gridIndex = html.IndexOf("class=\"risk-grid\"", StringComparison.Ordinal);
+        var pagerIndex = html.IndexOf("class=\"risk-pager\"", StringComparison.Ordinal);
+        Assert.True(gridIndex >= 0 && pagerIndex >= 0, "both the grid and the pager should render");
+        Assert.True(gridIndex < pagerIndex, "the grid must come before the pager in document order");
     }
 }

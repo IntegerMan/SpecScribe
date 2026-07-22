@@ -58,11 +58,6 @@ public static class CodeMapTemplater
         AppendFilterCheckbox(sb, "cm-exclude-spec", "Exclude spec-driven development directories");
         AppendFilterCheckbox(sb, "cm-exclude-tests", "Exclude tests");
 
-        // Sourced from the unfiltered "full" variant only (no per-filter-variant duplication) — placed ahead of
-        // the treemap panels so its "see the Last column below" caption points at content that is genuinely below
-        // it on the page. [Story 7.12]
-        AppendFreshnessSunburstSection(sb, full, fileHref);
-
         foreach (var variant in variants)
         {
             AppendVariantPanel(sb, variant, fileHref, prefix);
@@ -75,21 +70,46 @@ public static class CodeMapTemplater
     }
 
     /// <summary>The directory-structure freshness sunburst section (Story 7.12): a second new chart on this page,
-    /// sourced from the unfiltered <paramref name="full"/> variant's <c>Roots</c> — the same tree + per-file
-    /// git-derived last-changed date <see cref="CodeMap.Build"/> already joins for the treemap, so there is no
-    /// new fetch here. Wrapped in the Story 10.2 <see cref="Charts.Framed"/> chrome with a real-value legend
-    /// (never the treemap's own pre-existing "Less … More" legend) and a caption pointing at the existing
-    /// <see cref="AppendFileTable"/> "Last" column as the accessible text equivalent, rather than a second table.</summary>
-    private static void AppendFreshnessSunburstSection(StringBuilder sb, CodeMapVariant full, Func<string, string?>? fileHref)
+    /// rendered per-variant (owner feedback: the exclude-filter checkboxes must re-filter every surface on the
+    /// page, not just the treemap — a section sourced only from the unfiltered "full" tree looked broken, since
+    /// toggling a checkbox visibly changed the treemap/table below it but left this section frozen). Sourced from
+    /// <paramref name="variant"/>'s own <c>Roots</c> — the same tree + per-file git-derived last-changed date
+    /// <see cref="CodeMap.Build"/> already joins for the treemap, so there is no new fetch here. Wrapped in the
+    /// Story 10.2 <see cref="Charts.Framed"/> chrome with a real-value legend (never the treemap's own
+    /// pre-existing "Less … More" legend) and a caption pointing at the existing <see cref="AppendFileTable"/>
+    /// "Last" column as the accessible text equivalent, rather than a second table. Owner feedback also asked for
+    /// a "view as tree" alternative to the polar sunburst — a pure-CSS radio pair (mirroring the sprint board's
+    /// <c>.board-tabs</c> view toggle) swaps between <see cref="Charts.CodeFreshnessSunburst"/> and
+    /// <see cref="Charts.CodeFreshnessTree"/>, both rendered from the SAME variant so either view is instantly
+    /// available with no re-fetch/re-filter. Radio ids are suffixed with <paramref name="variant"/>'s key so all
+    /// four filter-combination panels can carry their own toggle without id/name collisions.</summary>
+    private static void AppendFreshnessSunburstSection(StringBuilder sb, CodeMapVariant variant, Func<string, string?>? fileHref)
     {
-        var files = full.Map.Files();
+        var files = variant.Map.Files();
+        var sunburstId = $"cf-sunburst-{variant.Key}";
+        var treeId = $"cf-tree-{variant.Key}";
 
         var body = new StringBuilder();
-        body.Append("  <div class=\"freshness-sunburst-wrap\">\n");
-        body.Append(Charts.CodeFreshnessSunburst(full.Map.Roots, fileHref: fileHref));
+        body.Append("    <div class=\"freshness-panel\">\n");
+        body.Append("      <div class=\"board-tabs\">\n");
+        body.Append($"        <input type=\"radio\" id=\"{sunburstId}\" name=\"cf-view-{variant.Key}\" class=\"board-tab-radio\" checked>\n");
+        body.Append($"        <input type=\"radio\" id=\"{treeId}\" name=\"cf-view-{variant.Key}\" class=\"board-tab-radio cf-tree-radio\">\n");
+        body.Append("        <div class=\"board-tabbar\">\n");
+        body.Append($"          <label for=\"{sunburstId}\" class=\"board-tab\">Sunburst</label>\n");
+        body.Append($"          <label for=\"{treeId}\" class=\"board-tab\">Tree</label>\n");
+        body.Append("        </div>\n");
+        body.Append("      </div>\n");
+        body.Append("      <div class=\"freshness-view freshness-view-sunburst\">\n");
+        body.Append("        <div class=\"freshness-sunburst-wrap\">\n");
+        body.Append(Charts.CodeFreshnessSunburst(variant.Map.Roots, fileHref: fileHref));
         body.Append(Charts.FreshnessLegend(files));
-        body.Append("  </div>\n");
-        body.Append("  <p class=\"chart-lead freshness-caption\">See the <strong>Last</strong> column in the file table below for every file's exact last-changed date.</p>\n");
+        body.Append("        </div>\n");
+        body.Append("      </div>\n");
+        body.Append("      <div class=\"freshness-view freshness-view-tree\">\n");
+        body.Append(Charts.CodeFreshnessTree(variant.Map.Roots, fileHref: fileHref));
+        body.Append("      </div>\n");
+        body.Append("    </div>\n");
+        body.Append("    <p class=\"chart-lead freshness-caption\">See the <strong>Last</strong> column in the file table below for every file's exact last-changed date.</p>\n");
 
         sb.Append(Charts.Framed(
             new Charts.ChartMeta(
@@ -126,6 +146,9 @@ public static class CodeMapTemplater
 
         var files = variant.Map.Files();
         var hasMetrics = files.Any(f => f.Metrics is not null);
+
+        // Re-filters with the rest of this panel (owner feedback — see AppendFreshnessSunburstSection). [Story 7.12]
+        AppendFreshnessSunburstSection(sb, variant, fileHref);
 
         sb.Append("  <section class=\"chart-panel codemap-panel\">\n");
 

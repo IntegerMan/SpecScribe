@@ -2484,17 +2484,23 @@ public static class Charts
 
     /// <summary>One plotted file's precomputed geometry — shared by <see cref="RiskQuadrant"/> (the SVG) and
     /// <see cref="RiskQuadrantElevatedFiles"/> (the text-equivalent ranked list) so both derive from exactly the
-    /// SAME median split and can never disagree about which files are flagged.</summary>
-    private readonly record struct RiskPoint(CodeMapNode Node, double LogSize, int Changes, bool Elevated);
+    /// SAME median split and can never disagree about which files are flagged. <see cref="Changes"/> is kept as
+    /// the raw (un-logged) count for ranking/display; <see cref="LogChanges"/> is the log-scaled plotting
+    /// coordinate.</summary>
+    private readonly record struct RiskPoint(CodeMapNode Node, double LogSize, double LogChanges, int Changes, bool Elevated);
 
     /// <summary>Computes the plotted points and their elevated-risk flag once: X = <c>Math.Log(Math.Max(Lines,
     /// 1))</c> (size, log-scaled — file sizes are heavy-tailed; the <c>Max(.., 1)</c> guard avoids
-    /// <c>-Infinity</c>/NaN on a zero-line file), Y = <c>Metrics.Changes</c> (churn FREQUENCY, not
-    /// <see cref="CodeFileMetrics.TotalChurn"/> volume — the AC asks for change-frequency specifically). A file
-    /// is "elevated risk" when it is strictly above BOTH axis medians (the high-size/high-churn quadrant, AC #1).
-    /// Pure function of already-computed <see cref="CodeMapNode"/> data — no new git call, no new parse
-    /// (<c>CodeMap.Files()</c> is the one and only source for both axes). Deterministic: same input, same
-    /// output, ordered by repo-relative path so point emission order never varies between runs.</summary>
+    /// <c>-Infinity</c>/NaN on a zero-line file), Y = <c>Math.Log(Math.Max(Metrics.Changes, 1))</c> (churn
+    /// FREQUENCY, not <see cref="CodeFileMetrics.TotalChurn"/> volume — the AC asks for change-frequency
+    /// specifically; also log-scaled — a real-repo pass showed churn is JUST as heavy-tailed as size, so a linear
+    /// Y axis crushed nearly every point against the baseline and made the median cutoff line look arbitrary
+    /// (review-pass owner feedback)). A file is "elevated risk" when it is strictly above BOTH axis medians (the
+    /// high-size/high-churn quadrant, AC #1) — computed in the SAME log space the axes plot in, so the boundary
+    /// and the visual spread of points agree. Pure function of already-computed <see cref="CodeMapNode"/> data —
+    /// no new git call, no new parse (<c>CodeMap.Files()</c> is the one and only source for both axes).
+    /// Deterministic: same input, same output, ordered by repo-relative path so point emission order never
+    /// varies between runs.</summary>
     private static IReadOnlyList<RiskPoint> BuildRiskPoints(IReadOnlyList<CodeMapNode> files)
     {
         var plottable = files
@@ -2504,15 +2510,15 @@ public static class Charts
         if (plottable.Count == 0) return Array.Empty<RiskPoint>();
 
         var logSizes = plottable.Select(f => Math.Log(Math.Max(f.Lines, 1))).ToList();
-        var changes = plottable.Select(f => f.Metrics!.Changes).ToList();
+        var logChanges = plottable.Select(f => Math.Log(Math.Max(f.Metrics!.Changes, 1))).ToList();
         var medianLogSize = Median(logSizes);
-        var medianChanges = Median(changes.Select(c => (double)c).ToList());
+        var medianLogChanges = Median(logChanges);
 
         var points = new List<RiskPoint>(plottable.Count);
         for (var i = 0; i < plottable.Count; i++)
         {
-            var elevated = logSizes[i] > medianLogSize && changes[i] > medianChanges;
-            points.Add(new RiskPoint(plottable[i], logSizes[i], changes[i], elevated));
+            var elevated = logSizes[i] > medianLogSize && logChanges[i] > medianLogChanges;
+            points.Add(new RiskPoint(plottable[i], logSizes[i], logChanges[i], plottable[i].Metrics!.Changes, elevated));
         }
         return points;
     }
@@ -2549,7 +2555,11 @@ public static class Charts
 
     /// <summary>Renders the refactor-target risk quadrant as pure, server-computed SVG (Story 7.10): one point per
     /// metric-bearing source file, X = size (lines of code, log-scaled) and Y = churn frequency (commits touching
-    /// the file, linear). "Size" is a LINES-OF-CODE PROXY ONLY — this is not, and must never silently become, a
+    /// the file, ALSO log-scaled — see <see cref="BuildRiskPoints"/>). Both axes carry real-unit tick labels at
+    /// their extremes, and the two median cutoff lines carry their own real-unit label right where they meet the
+    /// axis — a log-scaled/quadrant chart with unlabeled axes and an unlabeled cutoff line reads as arbitrary
+    /// (review-pass owner feedback: "the Y axis feels unclear... not sure about the cutoff"). "Size" is a
+    /// LINES-OF-CODE PROXY ONLY — this is not, and must never silently become, a
     /// cyclomatic-complexity analyzer; a real complexity metric is out of scope and would need its own story (AC
     /// #2). Both axes are median-split into four quadrants; the high-size/high-churn quadrant is flagged as
     /// elevated risk by BOTH a shaded background rect AND a distinguishing point class
@@ -2578,26 +2588,34 @@ public static class Charts
                    $"quadrant (needs at least {RiskQuadrantMinFiles.ToString(CultureInfo.InvariantCulture)}).</div>\n";
         }
 
-        var minX = points.Min(p => p.LogSize);
-        var maxX = points.Max(p => p.LogSize);
-        double minY = points.Min(p => p.Changes);
-        double maxY = points.Max(p => p.Changes);
+        // Raw (unpadded) extremes are kept separately from the plotting extremes below — tick labels must show
+        // the TRUE min/max, never a value inflated by the degenerate-axis padding.
+        var rawMinX = points.Min(p => p.LogSize);
+        var rawMaxX = points.Max(p => p.LogSize);
+        var rawMinY = points.Min(p => p.LogChanges);
+        var rawMaxY = points.Max(p => p.LogChanges);
+        var minX = rawMinX;
+        var maxX = rawMaxX;
+        var minY = rawMinY;
+        var maxY = rawMaxY;
         // A degenerate axis (every file the exact same size or churn) still needs a non-zero span to place points
         // and the median split without dividing by zero.
         if (maxX <= minX) { minX -= 0.5; maxX += 0.5; }
         if (maxY <= minY) { minY -= 0.5; maxY += 0.5; }
 
-        const double marginLeft = 58, marginBottom = 44, marginTop = 14, marginRight = 14;
+        const double marginLeft = 64, marginBottom = 50, marginTop = 14, marginRight = 14;
         var plotW = width - marginLeft - marginRight;
         var plotH = height - marginTop - marginBottom;
 
         double PlotX(double x) => marginLeft + (x - minX) / (maxX - minX) * plotW;
         double PlotY(double y) => marginTop + plotH - (y - minY) / (maxY - minY) * plotH; // SVG Y grows downward
+        // The log-scaled coordinate's real-world unit (whole lines / whole changes) — the tick/cutoff labels below.
+        static string RealUnit(double logValue) => Math.Round(Math.Exp(logValue)).ToString("N0", CultureInfo.InvariantCulture);
 
         var medianLogSize = Median(points.Select(p => p.LogSize).ToList());
-        var medianChanges = Median(points.Select(p => (double)p.Changes).ToList());
+        var medianLogChanges = Median(points.Select(p => p.LogChanges).ToList());
         var quadX = PlotX(medianLogSize);
-        var quadY = PlotY(medianChanges);
+        var quadY = PlotY(medianLogChanges);
 
         var elevatedCount = points.Count(p => p.Elevated);
         var aria = $"Refactor-target risk quadrant: {points.Count} {Plural(points.Count, "file", "files")} " +
@@ -2626,16 +2644,30 @@ public static class Charts
         sb.Append($"  <line class=\"risk-median-line\" x1=\"{F(quadX)}\" y1=\"{F(marginTop)}\" x2=\"{F(quadX)}\" y2=\"{F(marginTop + plotH)}\"></line>\n");
         sb.Append($"  <line class=\"risk-median-line\" x1=\"{F(marginLeft)}\" y1=\"{F(quadY)}\" x2=\"{F(marginLeft + plotW)}\" y2=\"{F(quadY)}\"></line>\n");
 
-        // Axis labels (Story 10.2-adjacent framing; the panel's own Why sentence is added by the caller via
+        // Axis titles (Story 10.2-adjacent framing; the panel's own Why sentence is added by the caller via
         // Charts.Framed, not hand-rolled here).
         sb.Append($"  <text class=\"risk-axis-label\" x=\"{F(marginLeft + plotW / 2)}\" y=\"{F(height - 4)}\" text-anchor=\"middle\">Lines of code (log scale)</text>\n");
-        sb.Append($"  <text class=\"risk-axis-label risk-axis-label-y\" x=\"12\" y=\"{F(marginTop + plotH / 2)}\" text-anchor=\"middle\" transform=\"rotate(-90 12 {F(marginTop + plotH / 2)})\">Changes in the analyzed window</text>\n");
+        sb.Append($"  <text class=\"risk-axis-label risk-axis-label-y\" x=\"12\" y=\"{F(marginTop + plotH / 2)}\" text-anchor=\"middle\" transform=\"rotate(-90 12 {F(marginTop + plotH / 2)})\">Changes in the analyzed window (log scale)</text>\n");
+
+        // Real-unit tick labels at each axis's extremes — without these, a log-scaled axis gives no sense of
+        // actual magnitude (review-pass owner feedback: "the Y axis feels unclear").
+        sb.Append($"  <text class=\"risk-tick-label\" x=\"{F(marginLeft)}\" y=\"{F(marginTop + plotH + 16)}\" text-anchor=\"start\">{Html(RealUnit(rawMinX))}</text>\n");
+        sb.Append($"  <text class=\"risk-tick-label\" x=\"{F(marginLeft + plotW)}\" y=\"{F(marginTop + plotH + 16)}\" text-anchor=\"end\">{Html(RealUnit(rawMaxX))}</text>\n");
+        sb.Append($"  <text class=\"risk-tick-label\" x=\"{F(marginLeft - 6)}\" y=\"{F(marginTop + plotH + 3)}\" text-anchor=\"end\">{Html(RealUnit(rawMinY))}</text>\n");
+        sb.Append($"  <text class=\"risk-tick-label\" x=\"{F(marginLeft - 6)}\" y=\"{F(marginTop + 8)}\" text-anchor=\"end\">{Html(RealUnit(rawMaxY))}</text>\n");
+
+        // The two median cutoff lines get their OWN real-unit label right where they meet the axis — the direct
+        // fix for "not sure about the cutoff": the dashed line is no longer an unlabeled, seemingly arbitrary
+        // boundary, it reads as "median = N lines" / "median = N changes". Distinct (bold/rust) class from the
+        // plain min/max ticks above so the cutoff value stands out as the one that actually matters.
+        sb.Append($"  <text class=\"risk-median-tick-label\" x=\"{F(quadX)}\" y=\"{F(marginTop + plotH + 30)}\" text-anchor=\"middle\">median {Html(RealUnit(medianLogSize))}</text>\n");
+        sb.Append($"  <text class=\"risk-median-tick-label\" x=\"{F(marginLeft - 6)}\" y=\"{F(quadY - 5)}\" text-anchor=\"end\">median {Html(RealUnit(medianLogChanges))}</text>\n");
 
         foreach (var point in points)
         {
             var node = point.Node;
             var cx = PlotX(point.LogSize);
-            var cy = PlotY(point.Changes);
+            var cy = PlotY(point.LogChanges);
 
             // Gradation (owner request, review pass): fill intensity reflects the file's COMBINED size+churn
             // position (0..1 average of its normalized X/Y), bucketed onto the SAME 5-level gold ramp the
@@ -2644,7 +2676,7 @@ public static class Charts
             // `risk-point-elevated` stroke below) stays the load-bearing, never-color-alone flag per Story 7.8's
             // shape+edge discipline; the gradient alone never carries the elevated/not-elevated distinction.
             var normX = (point.LogSize - minX) / (maxX - minX);
-            var normY = (point.Changes - minY) / (maxY - minY);
+            var normY = (point.LogChanges - minY) / (maxY - minY);
             var level = Bucket((normX + normY) / 2.0, 1.0);
             var pointClass = point.Elevated ? $"risk-point level-{level} risk-point-elevated" : $"risk-point level-{level}";
 
@@ -2827,33 +2859,107 @@ public static class Charts
             }
             else
             {
-                string cls;
-                string title;
-                if (node.Metrics?.LastDate is { } lastDate && mostRecent is { } mr)
+                var info = DescribeFreshnessFile(node, mostRecent, maxDaysAgo, fileHref);
+                var cls = $"freshness-wedge {info.LevelClass}";
+                if (info.Href is { } href)
                 {
-                    var daysAgo = mr.DayNumber - lastDate.DayNumber;
-                    var level = FreshnessLevel(daysAgo, maxDaysAgo);
-                    cls = $"freshness-wedge level-{level}";
-                    title = $"{node.RepoRelativePath} — last changed {PortalDates.Day(lastDate)}";
+                    sb.Append($"  <a href=\"{Html(href)}\"><path class=\"{cls}\" d=\"{path}\"><title>{Html(info.Title)}</title></path></a>\n");
                 }
                 else
                 {
-                    cls = "freshness-wedge level-none";
-                    title = $"{node.RepoRelativePath} — no git history";
-                }
-
-                var href = fileHref?.Invoke(node.RepoRelativePath);
-                if (href is { Length: > 0 })
-                {
-                    sb.Append($"  <a href=\"{Html(href)}\"><path class=\"{cls}\" d=\"{path}\"><title>{Html(title)}</title></path></a>\n");
-                }
-                else
-                {
-                    sb.Append($"  <path class=\"{cls}\" tabindex=\"0\" role=\"img\" d=\"{path}\"><title>{Html(title)}</title></path>\n");
+                    sb.Append($"  <path class=\"{cls}\" tabindex=\"0\" role=\"img\" d=\"{path}\"><title>{Html(info.Title)}</title></path>\n");
                 }
             }
 
             angle += sweep;
+        }
+    }
+
+    /// <summary>A file leaf's recency description — the SAME logic <see cref="CodeFreshnessSunburst"/>'s wedge
+    /// writer and <see cref="CodeFreshnessTree"/>'s list writer both need, extracted once so the two views can
+    /// never disagree about a file's level/title/link. <see cref="Href"/> is the already-guarded resolved target
+    /// (null when unresolved — never a dead link).</summary>
+    private readonly record struct FreshnessFileInfo(string LevelClass, string Title, string? Href);
+
+    private static FreshnessFileInfo DescribeFreshnessFile(
+        CodeMapNode node, DateOnly? mostRecent, int maxDaysAgo, Func<string, string?>? fileHref)
+    {
+        string cls;
+        string title;
+        if (node.Metrics?.LastDate is { } lastDate && mostRecent is { } mr)
+        {
+            var daysAgo = mr.DayNumber - lastDate.DayNumber;
+            var level = FreshnessLevel(daysAgo, maxDaysAgo);
+            cls = $"level-{level}";
+            title = $"{node.RepoRelativePath} — last changed {PortalDates.Day(lastDate)}";
+        }
+        else
+        {
+            cls = "level-none";
+            title = $"{node.RepoRelativePath} — no git history";
+        }
+
+        var href = fileHref?.Invoke(node.RepoRelativePath);
+        return new FreshnessFileInfo(cls, title, href is { Length: > 0 } ? href : null);
+    }
+
+    /// <summary>Renders the SAME directory tree/per-file recency data as <see cref="CodeFreshnessSunburst"/>, as a
+    /// nested, no-JS-collapsible text tree (native <c>&lt;details&gt;/&lt;summary&gt;</c>) — an alternate,
+    /// purely textual reading of the identical data, toggled alongside the sunburst via a pure-CSS view radio
+    /// pair (owner feedback: a polar chart isn't the easiest way for everyone to scan a codebase; a familiar
+    /// folder tree is a lower-friction alternative). Directories collapse to a closed-by-default disclosure (a
+    /// real repo's tree is usually too deep to show fully expanded); files are list items carrying the SAME
+    /// level-0..4 recency dot + exact last-changed date + guarded clickthrough as the sunburst's wedges
+    /// (<see cref="DescribeFreshnessFile"/> — one shared source, so the two views can never disagree). Degrades
+    /// to the shared <c>chart-empty</c> notice only when there are no source files at all (AC #2). Deterministic
+    /// (FR31): same input, byte-identical output. [Story 7.12 review]</summary>
+    public static string CodeFreshnessTree(IReadOnlyList<CodeMapNode> roots, Func<string, string?>? fileHref = null)
+    {
+        if (roots.Count == 0)
+        {
+            return "<div class=\"chart-empty\">No source files to chart yet.</div>\n";
+        }
+
+        int fileCount = 0, dirCount = 0;
+        DateOnly? mostRecent = null, oldest = null;
+        CollectFreshnessStats(roots, ref fileCount, ref dirCount, ref mostRecent, ref oldest);
+        var maxDaysAgo = mostRecent is { } mr0 && oldest is { } od0 ? mr0.DayNumber - od0.DayNumber : 0;
+
+        var sb = new StringBuilder();
+        sb.Append("<ul class=\"freshness-tree\">\n");
+        AppendFreshnessTreeNodes(roots, mostRecent, maxDaysAgo, fileHref, 0, sb);
+        sb.Append("</ul>\n");
+        return sb.ToString();
+    }
+
+    private static void AppendFreshnessTreeNodes(
+        IReadOnlyList<CodeMapNode> nodes, DateOnly? mostRecent, int maxDaysAgo,
+        Func<string, string?>? fileHref, int depth, StringBuilder sb)
+    {
+        if (depth > FreshnessRecursionGuard) return;
+
+        foreach (var node in nodes)
+        {
+            if (node.IsDirectory)
+            {
+                var descendants = CountFreshnessFiles(node);
+                sb.Append("  <li class=\"freshness-tree-dir\"><details><summary>");
+                sb.Append(Html(node.Label));
+                sb.Append($" <span class=\"freshness-tree-count\">({descendants} {Plural(descendants, "file", "files")})</span>");
+                sb.Append("</summary>\n    <ul>\n");
+                AppendFreshnessTreeNodes(node.Children, mostRecent, maxDaysAgo, fileHref, depth + 1, sb);
+                sb.Append("    </ul>\n  </details></li>\n");
+            }
+            else
+            {
+                var info = DescribeFreshnessFile(node, mostRecent, maxDaysAgo, fileHref);
+                var dot = $"<span class=\"freshness-tree-dot {info.LevelClass}\" aria-hidden=\"true\"></span>";
+                var text = info.Href is { } href
+                    ? $"<a href=\"{Html(href)}\">{Html(node.Label)}</a>"
+                    : Html(node.Label);
+                var dateText = node.Metrics?.LastDate is { } d ? $"last changed {PortalDates.Day(d)}" : "no git history";
+                sb.Append($"  <li class=\"freshness-tree-file\">{dot}{text} <span class=\"freshness-tree-date\">{Html(dateText)}</span></li>\n");
+            }
         }
     }
 

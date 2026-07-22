@@ -1179,6 +1179,43 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
+    public void RenderNav_LocalContextPill_CarriesTheSameIconTheDarkBarInsightsDropdownUses()
+    {
+        // Owner feedback (Story 7.12 review): the white-bar Insights sub-nav pills looked inconsistent with the
+        // dark-bar "Insights ▾" dropdown, which already shows an Icons.ForConcept glyph per item. A curated label
+        // (Code Map/Risk Quadrant) should now carry that SAME icon here too.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var localContext = new NavLocalContext("Insights", new[]
+        {
+            new NavLocalItem("Code Map", "code-map.html", IsActive: false),
+            new NavLocalItem("Risk Quadrant", "risk-quadrant.html", IsActive: true),
+        });
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("git-insights.html", localContext));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.Contains($"<a href=\"code-map.html\" class=\"local-context-pill\">{Icons.ForConcept("Code Map")}Code Map</a>", keyViews);
+        Assert.Contains(Icons.ForConcept("Risk Quadrant"), keyViews);
+    }
+
+    [Fact]
+    public void RenderNav_LocalContextPill_UncuratedLabel_RendersNoIconGracefully()
+    {
+        // A per-epic story pager (or any other local-context family without a curated Icons.ForConcept case)
+        // must render exactly as before — no icon, no broken markup.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var localContext = new NavLocalContext("Stories in this epic", new[]
+        {
+            new NavLocalItem("Story 1.1", "story-1-1.html", IsActive: false),
+        });
+
+        var html = HtmlRenderAdapter.Shared.RenderNav(nav.ToNavigationView("epics/epic-1.html", localContext));
+        var keyViews = html[html.IndexOf("site-nav-key-views", StringComparison.Ordinal)..];
+
+        Assert.Contains("<a href=\"story-1-1.html\" class=\"local-context-pill\">Story 1.1</a>", keyViews);
+    }
+
+    [Fact]
     public void RenderNav_OffHome_EmptyLocalContext_FallsBackToGenericQuickLinksBand()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);

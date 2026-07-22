@@ -301,17 +301,22 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     /// labels are ellipsised to <paramref name="labelMax"/> with the full text on a <c>title</c> tooltip, so
     /// a verbose follow-up summary or ADR title can't stretch the band. Shared by both the inline pill row
     /// and the "More" overflow panel (<paramref name="cssClass"/> swaps the visual family) so the panel gets
-    /// the same self-link guard instead of hand-rendering its own anchor. [Story 10.10]</summary>
+    /// the same self-link guard instead of hand-rendering its own anchor. Carries the SAME <see cref="Icons.ForConcept"/>
+    /// glyph the dark-bar Insights dropdown already shows for this exact label (owner feedback: the white-bar
+    /// Insights pills — Git Insights/Deep Analytics/Code Map/Risk Quadrant — looked inconsistent without one);
+    /// an un-curated label (e.g. a per-epic story pager item) gracefully renders no icon, unchanged from before.
+    /// [Story 10.10; icon: Story 7.12 review]</summary>
     private static void AppendLocalContextPill(StringBuilder sb, NavLocalItem item, string cssClass = "local-context-pill", int labelMax = LocalContextPillLabelMax)
     {
         var (display, tooltip) = TruncateNavLabel(item.Label, labelMax);
         var titleAttr = tooltip is null ? "" : $" title=\"{PathUtil.Html(tooltip)}\"";
+        var icon = Icons.ForConcept(item.Label);
         if (item.IsActive)
         {
-            sb.Append($"      <span class=\"{cssClass} active\" aria-current=\"page\"{titleAttr}>{PathUtil.Html(display)}</span>\n");
+            sb.Append($"      <span class=\"{cssClass} active\" aria-current=\"page\"{titleAttr}>{icon}{PathUtil.Html(display)}</span>\n");
             return;
         }
-        sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"{cssClass}\"{titleAttr}>{PathUtil.Html(display)}</a>\n");
+        sb.Append($"      <a href=\"{PathUtil.Html(item.Href)}\" class=\"{cssClass}\"{titleAttr}>{icon}{PathUtil.Html(display)}</a>\n");
     }
 
     /// <summary>Home-only white-bar work-stage strip: pure-CSS radios + labels (icons + words) that toggle

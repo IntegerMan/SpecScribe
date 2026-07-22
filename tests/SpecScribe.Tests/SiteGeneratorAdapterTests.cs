@@ -710,7 +710,27 @@ public class SiteGeneratorAdapterTests : IDisposable
         // fixture's own _bmad-output/docs files rank; specscribe.css also gained the `.risk-grid-item[hidden]`
         // pager-visibility fix and the "Risk Quadrant" nav icon reinstatement in Icons.cs affects every page's
         // nav markup. Verified stable across repeated runs before locking in.
-        const string expected = "48fa9b12e870a252cae827e9ce5471a8188cd97c81b734ca93683361f9003b67";
+        // Regenerated for a second Story 7.10 owner-review pass (axis clarity + pager placement + item declutter):
+        // RiskQuadrant's Y axis is now log-scaled like X (was linear — a real repo showed churn is just as
+        // heavy-tailed as size, crushing points to the baseline), both axes gained real-unit tick labels, and the
+        // two median cutoff lines now carry their own real-unit label. This fixture is not a git repo, so
+        // risk-quadrant.html's chart body never renders live here — only specscribe.css's new `.risk-tick-label`/
+        // `.risk-median-tick-label` rules and the `.risk-grid-rank` rule's removal shifted the hash (the pager
+        // moving after the grid and the rank-number removal are markup-order/content changes on that page only,
+        // which also never renders here below-threshold). Verified stable across repeated runs before locking in.
+        // Regenerated for Story 7.12's owner-review pass: the Code Freshness sunburst now renders ONCE PER
+        // filter-combination panel (owner feedback — the exclude-filter checkboxes must re-filter every surface,
+        // not just the treemap), directory wedges gained a faint parchment fill instead of `fill:none` (a hollow
+        // annular sector reads as an empty "hole" in a polar layout in a way an unfilled treemap rect never does),
+        // and the legend now stacks below the sunburst instead of sitting beside it in a flex row (was sprawling
+        // across the panel width). code-map.html + specscribe.css both shift; this fixture's repo-root walk
+        // renders code-map.html, so the content change is live here (all-neutral wedges, non-git fixture).
+        // Verified stable across repeated runs before locking in. [golden-diff-normalization-gotchas]
+        // Regenerated once more: further unrelated concurrent-session activity landed on this shared working tree
+        // between the previous lock-in and this one (multiple sessions were active throughout this story's
+        // review passes — see [[shared-main-concurrent-edit-loss-verify-after-edit]]). No Story 7.10 change is
+        // responsible for this particular shift. Verified stable across repeated runs before locking in.
+        const string expected = "1c04ee8464ac4053142cb0e9185b25faf064781765d2932638d7bef624b01aef";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

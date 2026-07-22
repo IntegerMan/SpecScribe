@@ -2276,6 +2276,65 @@ public class ChartsTests
     }
 
     [Fact]
+    public void RiskQuadrant_BothAxesCarryRealUnitTickLabelsAndTheMedianCutoffLinesAreLabeled()
+    {
+        // Review-pass owner feedback: an unlabeled log-scaled axis + an unlabeled cutoff line both read as
+        // arbitrary. RiskFiles(): sizes 100..5,000 lines, changes 1..50 — the raw (un-logged) extremes.
+        var svg = Charts.RiskQuadrant(RiskFiles());
+
+        Assert.Contains("class=\"risk-tick-label\"", svg);
+        Assert.Contains(">100</text>", svg);    // min lines (X)
+        Assert.Contains(">5,000</text>", svg);  // max lines (X)
+        Assert.Contains(">1</text>", svg);      // min changes (Y)
+        Assert.Contains(">50</text>", svg);     // max changes (Y)
+
+        // The median cutoff lines get their own real-unit label, distinct class from the plain min/max ticks.
+        Assert.Contains("class=\"risk-median-tick-label\"", svg);
+        Assert.Contains(">median ", svg);
+    }
+
+    [Fact]
+    public void RiskQuadrant_YAxisIsLogScaledLikeXSoAHeavyTailedChurnDistributionDoesNotCrushEveryPointToTheBaseline()
+    {
+        // Regression guard for the review-pass fix: Y used to be linear, which — on a real repo where churn is
+        // just as heavy-tailed as size — bunched nearly every point against the bottom edge and made the median
+        // cutoff line look arbitrary. Two files an order of magnitude apart in raw changes (2 vs 40) should NOT
+        // land twenty times further apart vertically; log-scaling compresses that gap.
+        var files = CodeMap.Build(
+            new[]
+            {
+                ("src/A.cs", 200L), ("src/B.cs", 190L), ("src/C.cs", 180L),
+                ("src/D.cs", 170L), ("src/E.cs", 160L), ("src/F.cs", 150L),
+            },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                // A pure doubling series (2, 4, 8, 16, 32, 64) — perfectly even spacing in log space.
+                ["src/A.cs"] = new CodeFileMetrics(2, 20, null, null),
+                ["src/B.cs"] = new CodeFileMetrics(4, 40, null, null),
+                ["src/C.cs"] = new CodeFileMetrics(8, 80, null, null),
+                ["src/D.cs"] = new CodeFileMetrics(16, 160, null, null),
+                ["src/E.cs"] = new CodeFileMetrics(32, 320, null, null),
+                ["src/F.cs"] = new CodeFileMetrics(64, 640, null, null),
+            }).Files();
+
+        var svg = Charts.RiskQuadrant(files, height: 420);
+
+        // Extract every <circle cy="..."> — under log scaling these doubling-changes files should land at
+        // roughly EVEN vertical spacing (a geometric progression maps to an arithmetic one in log space),
+        // not the increasingly-compressed-toward-the-bottom spacing linear scaling would produce.
+        var cyValues = System.Text.RegularExpressions.Regex.Matches(svg, "cy=\"([\\d.]+)\"")
+            .Select(m => double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture))
+            .OrderBy(y => y)
+            .ToList();
+        Assert.Equal(6, cyValues.Count);
+        var gaps = cyValues.Zip(cyValues.Skip(1), (a, b) => b - a).ToList();
+        // Every consecutive gap should be within a tight band of the average gap — a linear-scale plot of a
+        // doubling series would instead show gaps shrinking sharply as changes grow.
+        var avgGap = gaps.Average();
+        Assert.All(gaps, g => Assert.True(Math.Abs(g - avgGap) < avgGap * 0.35, $"gap {g} strayed too far from the average {avgGap} — Y no longer reads as log-scaled"));
+    }
+
+    [Fact]
     public void RiskQuadrantElevatedFiles_ReturnsTheHighSizeHighChurnFilesRankedByChurnDescending()
     {
         var elevated = Charts.RiskQuadrantElevatedFiles(RiskFiles());
@@ -2462,6 +2521,86 @@ public class ChartsTests
 
     private static IEnumerable<CodeMapNode> FlattenFreshnessFiles(CodeMapNode node) =>
         node.IsDirectory ? node.Children.SelectMany(FlattenFreshnessFiles) : new[] { node };
+
+    // ---- Code freshness tree view (Story 7.12 review — sunburst/tree toggle) --------------
+
+    [Fact]
+    public void CodeFreshnessTree_RendersOneListItemPerFileAndOneDisclosurePerDirectory()
+    {
+        var html = Charts.CodeFreshnessTree(FreshnessRoots());
+
+        Assert.Contains("<ul class=\"freshness-tree\">", html);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(html, "class=\"freshness-tree-file\"").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "class=\"freshness-tree-dir\""));
+        Assert.Contains("<details>", html);
+    }
+
+    [Fact]
+    public void CodeFreshnessTree_AgreesWithTheSunburstOnEveryFilesRecencyLevel()
+    {
+        // The two views share DescribeFreshnessFile — they must never disagree about which files are hottest,
+        // coldest, or have no git record.
+        var roots = FreshnessRoots();
+        var tree = Charts.CodeFreshnessTree(roots);
+
+        Assert.Contains("freshness-tree-dot level-4", tree); // Recent.cs
+        Assert.Contains("freshness-tree-dot level-1", tree); // Old.cs
+        Assert.Contains("freshness-tree-dot level-none", tree); // NoGit.cs
+    }
+
+    [Fact]
+    public void CodeFreshnessTree_LinksAFileOnlyWhenTheResolverReturnsATarget()
+    {
+        var roots = FreshnessRoots();
+
+        var linked = Charts.CodeFreshnessTree(roots, fileHref: p => p == "src/dir/Recent.cs" ? "code/src/dir/Recent.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/dir/Recent.cs.html\">Recent.cs</a>", linked);
+
+        var plain = Charts.CodeFreshnessTree(roots, fileHref: null);
+        Assert.DoesNotContain("<a href=", plain);
+        Assert.Contains("Recent.cs", plain);
+    }
+
+    [Fact]
+    public void CodeFreshnessTree_ShowsExactLastChangedDateOrNoGitHistory()
+    {
+        var html = Charts.CodeFreshnessTree(FreshnessRoots());
+
+        Assert.Contains("last changed", html);
+        Assert.Contains("no git history", html);
+    }
+
+    [Fact]
+    public void CodeFreshnessTree_EmptyTree_DegradesToChartEmpty()
+    {
+        var html = Charts.CodeFreshnessTree(Array.Empty<CodeMapNode>());
+
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<ul", html);
+    }
+
+    [Fact]
+    public void CodeFreshnessTree_EscapesPathsAndLabels()
+    {
+        var roots = CodeMap.Build(
+            new[] { ("src/a&b<c>.cs", 100L) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/a&b<c>.cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 1)),
+            }).Roots;
+
+        var html = Charts.CodeFreshnessTree(roots);
+
+        Assert.Contains("a&amp;b&lt;c&gt;.cs", html);
+        Assert.DoesNotContain("<c>", html);
+    }
+
+    [Fact]
+    public void CodeFreshnessTree_DeterministicAcrossRepeatedCalls()
+    {
+        var roots = FreshnessRoots();
+        Assert.Equal(Charts.CodeFreshnessTree(roots), Charts.CodeFreshnessTree(roots));
+    }
 
     // ==================== Story 3.7: requirement status-block grid + requirements flow ====================
 

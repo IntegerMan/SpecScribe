@@ -78,16 +78,7 @@ public static class RiskQuadrantTemplater
 
         sb.Append($"  <p class=\"chart-lead\">{elevated.Count.ToString("N0", CultureInfo.InvariantCulture)} {Charts.Plural(elevated.Count, "file is", "files are")} both large and frequently changed, ranked by change frequency.</p>\n");
 
-        // The pager is emitted hidden — with JS off it never appears and the full grid below stands as the
-        // complete, correctly-ordered no-JS truth. [Subtask: progressive-enhancement pagination]
-        sb.Append("  <div class=\"risk-pager\" hidden>\n");
-        sb.Append("    <button type=\"button\" class=\"risk-pager-prev\" aria-label=\"Previous page of elevated-risk files\">&lsaquo; Prev</button>\n");
-        sb.Append("    <span class=\"risk-pager-status\" aria-live=\"polite\"></span>\n");
-        sb.Append("    <button type=\"button\" class=\"risk-pager-next\" aria-label=\"Next page of elevated-risk files\">Next &rsaquo;</button>\n");
-        sb.Append("  </div>\n");
-
         sb.Append("  <ol class=\"risk-grid\" data-page-size=\"12\">\n");
-        var rank = 1;
         foreach (var file in elevated)
         {
             var href = fileHref?.Invoke(file.RepoRelativePath);
@@ -99,13 +90,21 @@ public static class RiskQuadrantTemplater
             var churn = file.Metrics is { } m ? m.TotalChurn.ToString("N0", CultureInfo.InvariantCulture) : "—";
 
             sb.Append("    <li class=\"risk-grid-item\">\n");
-            sb.Append($"      <span class=\"risk-grid-rank\">{rank.ToString(CultureInfo.InvariantCulture)}</span>\n");
             sb.Append($"      <span class=\"risk-grid-path\">{pathCell}</span>\n");
             sb.Append($"      <span class=\"risk-grid-meta\">{lines} lines &middot; {changes} changes &middot; {churn} churn</span>\n");
             sb.Append("    </li>\n");
-            rank++;
         }
         sb.Append("  </ol>\n");
+
+        // The pager sits AFTER the grid (review-pass owner feedback: controls belong at the bottom of the list
+        // they page, not floating above it) and is emitted hidden — with JS off it never appears and the grid
+        // above stands as the complete, correctly-ordered no-JS truth. [Subtask: progressive-enhancement pagination]
+        sb.Append("  <div class=\"risk-pager\" hidden>\n");
+        sb.Append("    <button type=\"button\" class=\"risk-pager-prev\" aria-label=\"Previous page of elevated-risk files\">&lsaquo; Prev</button>\n");
+        sb.Append("    <span class=\"risk-pager-status\" aria-live=\"polite\"></span>\n");
+        sb.Append("    <button type=\"button\" class=\"risk-pager-next\" aria-label=\"Next page of elevated-risk files\">Next &rsaquo;</button>\n");
+        sb.Append("  </div>\n");
+
         sb.Append("</section>\n\n");
     }
 }

@@ -4,140 +4,187 @@ baseline_commit: 50c5185d6f5858bee285de9eb2a0690fc421a6c1
 
 # Story 7.11: Code Ownership & Bus-Factor Insights
 
-Status: review
+Status: ready-for-dev
 
-<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
+<!-- RE-SCOPED 2026-07-21 via correct-course (see sprint-change-proposal-2026-07-21-git-insights-ownership-view.md).
+     The story was previously implemented as a plain ranked HTML table (see Change Log) and shipped to "review".
+     The owner found that display underwhelming and redirected it toward a graphical, interactive sunburst. This
+     rewrite REPLACES the AC/Tasks/Dev Notes below wholesale — do not treat the old table-based sections as
+     "done, extend them"; the first task is to REMOVE them. ADR 0010 (client-side charting JS for opt-in
+     deep-analytics surfaces) was ratified alongside this rescope and governs the JS approach this story now
+     requires — read it before starting. -->
 
 ## Story
 
 As a maintainer assessing project resilience,
-I want to see how concentrated authorship is across the codebase,
-so that knowledge silos ("only one person has touched this") become visible before they become a risk.
+I want to see how concentrated authorship is across the codebase as an interactive, graphical map — not a list —
+so that knowledge silos, orphaned areas nobody active understands, and who is active where all become visible at a
+glance, before they become a risk.
 
 ## Acceptance Criteria
 
 1.
-**Given** deep-git author attribution
-**When** the ownership view renders
-**Then** each file or area shows its dominant-author share and contributor count, and single-author concentrations are flagged as bus-factor risks using the existing sole-contributor vocabulary (`GitInsightsTemplater`)
-**And** entries link to their code page (Story 7.2 seam).
+**Given** deep-git author attribution across every source file (not just a top-N subset)
+**When** the Git Insights hub renders
+**Then** it shows ONE interactive sunburst over the full source-code tree (same hierarchy/geometry family as the
+Story 7.12 `Charts.CodeFreshnessSunburst` engine — reused or generalized, not reinvented) in place of BOTH the
+prior "Files & Contributors" master-detail table and the prior "Ownership & Bus-Factor" ranked table, which this
+story removes
+**And** file-leaf wedges are sized/positioned by the same tree the Code Map uses, so directory structure reads
+identically across pages.
 
 2.
+**Given** the sunburst is rendered
+**When** the reader chooses a coloring mode
+**Then** they can switch between at least: (a) dominant-author commit share % on a sequential ramp, (b) top-N
+authors on a discrete/categorical palette with a bounded "Others" bucket, (c) an individual-author spotlight that
+highlights every file a chosen contributor has touched (any contributor, not just a capped top-N — per ADR 0010,
+this needs live client-side JS, not a pre-rendered fixed set), and (d) a staleness view recoloring by "months
+since any current contributor last committed to this file," with a configurable threshold (not just 3 fixed
+options)
+**And** switching modes never triggers a page navigation or reload (client-side recolor of the already-rendered
+sunburst).
+
+3.
+**Given** ADR 0010's ratified constraint that these opt-in analytics surfaces need a real no-JS baseline, not a
+blanket exemption
+**When** JavaScript is disabled
+**Then** the sunburst still renders, pre-colored in the default mode (dominant-author share %), fully legible and
+non-broken
+**And** every file's dominant author, share %, contributor count, and last-active date remain available as an
+accessible text-equivalent table alongside the chart (the same "chart pairs with a text list" convention every
+other chart on this page already follows) — disabling JS must not remove information, only the live mode
+controls (NFR-5).
+
+4.
 **Given** a solo-maintainer repo (the common OSS case, NFR8)
-**When** ownership would trivially be "one person everywhere"
-**Then** the surface reframes honestly (e.g., "single-maintainer project") rather than flagging every file as a bus-factor risk
-**And** the classification is generation-time deterministic (FR31).
+**When** ownership would trivially be "one person everywhere" in every mode
+**Then** the surface reframes honestly (e.g., a "single-maintainer project" statement) rather than rendering a
+sunburst where every wedge is flagged as at-risk in the same color
+**And** the classification underlying every mode is generation-time deterministic (FR31) — no wall-clock "now" or
+per-visitor state; whatever "current" means for the staleness mode is computed once at generation time from git
+timestamps, embedded, and never re-derived client-side from live repository state.
+
+5.
+**Given** entries in any mode
+**When** a reader wants to inspect a specific file
+**Then** wedges link to their code page via the existing Story 7.2 seam (guarded — no resolver/no target renders
+plain, never a dead link), exactly as the prior table-based rows did.
+
+6.
+**Given** FR-10's explicit "no per-author productivity ranking or leaderboard" constraint
+**When** any mode renders (including the individual-author spotlight)
+**Then** author information stays descriptive attribution — share of commits on a file, last-active date, "how
+much of this area they've touched" — never a cross-repo ranked list of people by output; the spotlight highlights
+where ONE chosen person's work lives, it does not rank people against each other.
+
+7.
+**Given** a shallow or non-git repository (NFR8)
+**When** `--deep-git` is off or produced no usable history
+**Then** the whole Git Insights hub (and this section with it) is omitted exactly as today — no partial render, no
+new gating decision needed beyond the existing page-level gate.
 
 ## Tasks / Subtasks
 
-- [x] Task 1 — Add a `ChartMetric.AuthorConcentration` case + `WhyText` framing sentence (AC: #1)
-  - [x] Subtask 1.1: In [Charts.cs](src/SpecScribe/Charts.cs:13) add `AuthorConcentration` to the `ChartMetric` enum (alongside `ActivityCadence`/`FileChurn`/`ChangeCoupling`).
-  - [x] Subtask 1.2: Add its `WhyText` case (~[Charts.cs:37](src/SpecScribe/Charts.cs:37)) — one generic, framework-neutral sentence, e.g. "Files with a single dominant author are a knowledge-silo risk if that person leaves or moves on." (NFR8: no project-specific wording.)
+- [ ] Task 0 — Remove the superseded implementation (AC: #1)
+  - [ ] Subtask 0.1: Remove `GitInsightsTemplater.AppendFilesAndContributorsSection` (the master-detail file→contributor table) and `AppendOwnershipSection` (the ranked ownership table shipped by the prior pass of this story) and their call sites in `RenderPage`.
+  - [ ] Subtask 0.2: Remove `Charts.ChartMetric.AuthorConcentration` and its `WhyText` case (superseded by whatever new `ChartMetric` case the sunburst needs — decide the replacement name as part of Task 2, don't leave both).
+  - [ ] Subtask 0.3: Remove the now-dead `.gi-risk-badge`/`.gi-solo-repo-note`/`.gi-master-detail`/`.gi-table`/`.gi-contributors-panel` CSS and their `StylesheetTests` guards ONLY if nothing else on the page still uses them — check first (some `.gi-*` classes may be shared scaffolding worth keeping for the new section's own table/legend markup).
+  - [ ] Subtask 0.4: Remove or rewrite the test fixtures in `GitInsightsTemplaterTests.cs`/`SiteGeneratorGitInsightsTests.cs` that assert on the removed sections' markup (e.g. `RenderPage_WholeRowSelectsThePerFileContributorPanel`, the Story 7.11 ownership-table tests) — replace with tests against the new sunburst section (Task 6).
+  - [ ] Subtask 0.5: Confirm via `git log`/`git diff` against `baseline_commit` in this file's frontmatter exactly what the prior pass touched (Charts.cs, GitInsightsTemplater.cs, specscribe.css, GitInsightsTemplaterTests.cs, SiteGeneratorGitInsightsTests.cs, StylesheetTests.cs, SiteGeneratorAdapterTests.cs) before starting, so nothing from that diff is missed.
 
-- [x] Task 2 — Render the "Ownership & Bus-Factor" section on the Git Insights hub (AC: #1, #2)
-  - [x] Subtask 2.1: In [GitInsightsTemplater.cs](src/SpecScribe/GitInsightsTemplater.cs), add a third section (after `AppendFilesAndContributorsSection`, before or after `AppendActivitySection` — pick one placement and be consistent) rendered via a new private `AppendOwnershipSection(StringBuilder sb, GitInsightsData insights, Func<string,string?>? fileHref)` method, called from `RenderPage` alongside the other two `Append*Section` calls.
-  - [x] Subtask 2.2: Build a ranked table over `insights.Files` (already the top-N `FileChangeStat` list, change-count desc — reuse this ordering, do not recompute or re-fetch). For each file with `Contributors.Count > 0`: dominant share = `Contributors[0].Commits / (double)file.Changes` (Contributors is already sorted commits-desc — see [GitMetrics.cs:718-723](src/SpecScribe/GitMetrics.cs:718)), contributor count = `TotalContributors` (the full distinct-author count, not the capped `Contributors.Count` — mirrors the truncation-safe pattern already used at [GitInsightsTemplater.cs:208](src/SpecScribe/GitInsightsTemplater.cs:208) and [GitInsightsTemplater.cs:223](src/SpecScribe/GitInsightsTemplater.cs:223)).
-  - [x] Subtask 2.3: Flag single-author files (`TotalContributors <= 1`) as bus-factor risks, reusing the exact "Sole contributor:" wording convention already established at [GitInsightsTemplater.cs:208](src/SpecScribe/GitInsightsTemplater.cs:208) — do not invent new risk copy that duplicates it.
-  - [x] Subtask 2.4: AC #2 solo-repo reframe — gate on `insights.ContributorCount == 1` (the SAME global distinct-author check already used for the Story 10.6 hub-wide softening at [GitInsightsTemplater.cs:154](src/SpecScribe/GitInsightsTemplater.cs:154)). When true, render one honest "single-maintainer project" statement for the whole section instead of a table where every row is flagged as at-risk (a table of all-red risk flags in a solo repo is noise, not signal).
-  - [x] Subtask 2.5: Each row's file name links via the existing `fileHref` resolver already threaded into `RenderPage` (bound to `CodeItemHref` at the [SiteGenerator.cs:1911](src/SpecScribe/SiteGenerator.cs:1911) call site — Story 7.2/7.1 seam) using the same guarded-link-or-plain-text discipline as the rest of this file (`GuardedLink`, [GitInsightsTemplater.cs:275](src/SpecScribe/GitInsightsTemplater.cs:275)) — no new resolver, no dead links.
-  - [x] Subtask 2.6: Wrap the section in `Charts.Framed` with a `ChartMeta` using the new `AuthorConcentration` `WhyText` (Story 10.2 standard — match the `Title`/`Window`/`Ranking` slot usage already in `AppendFilesAndContributorsSection`).
-  - [x] Subtask 2.7: Empty state — `insights.Files.Count == 0` → the same `chart-empty` pattern used elsewhere on this page (e.g. [GitInsightsTemplater.cs:101](src/SpecScribe/GitInsightsTemplater.cs:101)), never an empty table.
+- [ ] Task 1 — Full-tree per-file author data (AC: #1, #2)
+  - [ ] Subtask 1.1: `GitInsightsData.Files`/`FileChangeStat` is TOP-N-CAPPED (`topFiles` parameter of `GitMetrics.BuildInsights`, default 50) — insufficient for a whole-tree sunburst, which needs EVERY file. Extend `GitMetrics.BuildCodeMapMetrics` (the uncapped per-file accumulator already feeding `CodeMapNode.Metrics` for every file, [GitMetrics.cs:918](src/SpecScribe/GitMetrics.cs:918)) to also tally per-author commit counts and each author's last-commit date for that file, mirroring the accumulator shape `GitMetrics.BuildInsights`'s private `FileAccum`/`Authors` dictionary already uses ([GitMetrics.cs:762](src/SpecScribe/GitMetrics.cs:762)) — do not duplicate the numstat parse, extend the existing single accumulation pass.
+  - [ ] Subtask 1.2: Decide the join shape: either add optional fields to `CodeFileMetrics` (`Changes, TotalChurn, FirstDate, LastDate, AvgCoChanged` today, [GitMetrics.cs:98](src/SpecScribe/GitMetrics.cs:98)) — e.g. `IReadOnlyList<FileContributor>? Contributors, int TotalContributors` — so `CodeMapNode.Metrics` carries author data by construction with no new lookup dictionary, OR thread a second `IReadOnlyDictionary<string, ...>` author lookup alongside `gitMetrics` into `CodeMap.Build` ([CodeMap.cs:226](src/SpecScribe/CodeMap.cs:226)). Prefer extending `CodeFileMetrics` (one record, one join, matches how `Category` was added in Story 7.9) unless that record is already unreasonably wide.
+  - [ ] Subtask 1.3: Reuse `FileContributor` ([GitMetrics.cs:120](src/SpecScribe/GitMetrics.cs:120)) for the per-file per-author shape — don't invent a parallel record for the same (name, commits, last-commit-date) triple `GitInsightsData` already uses.
+  - [ ] Subtask 1.4: Compute, once at generation time, the repo-wide top-N author roster (bounded, e.g. top 12 by total commits across the analyzed window) used for the discrete-palette mode's fixed color assignment — the individual-author spotlight mode is NOT bounded to this roster (any contributor can be spotlighted per AC #2c), but the discrete *palette* mode's fixed colors are (AC #2b's "Others" bucket exists precisely because that mode IS bounded).
 
-- [x] Task 3 — NFR8 shallow/non-git degrade (AC: #2)
-  - [x] Subtask 3.1: Confirm (and add a test proving) that when `--deep-git` is off — `git-insights.html` is not generated at all (existing gate) — this new section never partially renders. No new gating logic should be needed; this is a regression check, not new code.
+- [ ] Task 2 — Sunburst engine: reuse or generalize `Charts.CodeFreshnessSunburst` (AC: #1)
+  - [ ] Subtask 2.1: Read `Charts.CodeFreshnessSunburst` ([Charts.cs:2747](src/SpecScribe/Charts.cs:2747)) and its ring-geometry/depth-saturation helpers (`FreshnessSunburstMaxDepth`, [Charts.cs:2719](src/SpecScribe/Charts.cs:2719); the recursive wedge-walk ~[Charts.cs:2825](src/SpecScribe/Charts.cs:2825)) in full before writing anything — this is the ONE existing angular-partition tree-walk in the codebase and this story's chart is geometrically identical (same `CodeMapNode` tree, same ring-per-depth model), differing only in per-leaf color source.
+  - [ ] Subtask 2.2: Refactor the geometry/recursion into a shared, color-source-agnostic builder (e.g. `Charts.TreeSunburst(roots, colorSelector, fileHref, ...)` or similar) that `CodeFreshnessSunburst` becomes a thin wrapper over, and this story's new builder becomes a second thin wrapper over — do not fork/copy-paste the recursive wedge math into a second near-duplicate function. If a clean generalization isn't achievable without distorting 7.12's already-shipped, tested code, document why in Completion Notes and build a sibling instead, but attempt the shared extraction first.
+  - [ ] Subtask 2.3: New `ChartMetric` case (name it for what it frames, e.g. `ChartMetric.CodeOwnership` — replaces the removed `AuthorConcentration`) + its `WhyText` (framework-neutral, NFR8).
+  - [ ] Subtask 2.4: The share-% sequential ramp and the discrete top-author palette are two DIFFERENT color models over the same wedges — reuse the level-bucketing pattern `FreshnessLevel`/`HeatLevel` already establish for "map a continuous value to N discrete visual buckets with a real-value legend," rather than a bespoke gradient. The discrete-author palette needs its OWN bounded categorical color set (distinct hues per top-N author + a neutral "Others"/no-data fill) — this is a new, small palette, not a reuse of `--status-*` (non-lifecycle data) or the file-type palette (Story 7.9, different dimension).
 
-- [x] Task 4 — CSS (only if new markup classes are introduced)
-  - [x] Subtask 4.1: Reuse existing `.gi-*` table/row classes where the shape matches the Files & Contributors table; add new classes only for the risk-flag badge/pill and the solo-repo statement, following the existing `--status-*` token system ([Story: specscribe-status-token-system]) — do NOT invent a 7th ad-hoc color; a risk flag should read via an existing status tone (e.g. the "at-risk"/attention tone already used elsewhere), not a bespoke hue.
-  - [x] Subtask 4.2: Add/extend `StylesheetTests` assertions for any new CSS selector, scoped narrowly (mirror the pattern at [GitInsightsTemplaterTests.cs](tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs) and sibling `StylesheetTests` files — a scoped regex/selector match, not a repo-wide substring).
+- [ ] Task 3 — Render all pre-rendered (no-JS) modes server-side (AC: #3, #4, #7)
+  - [ ] Subtask 3.1: Thread the already-built `CodeMap`/`CodeMap.Roots` (or the author-annotated equivalent from Task 1) into `GitInsightsTemplater.RenderPage` — it isn't currently a parameter; `SiteGenerator` already builds a `CodeMap` once for the Code Map page ([SiteGenerator.cs] — locate the existing `CodeMap.Build`/`CodeMap.BuildVariants` call site), so this is passing an already-computed value to a second call site, not a new build.
+  - [ ] Subtask 3.2: The DEFAULT server-rendered mode (share % sequential) must be a complete, legible, real chart — not a degraded placeholder that only "works" once JS runs. This is the no-JS baseline ADR 0010 requires.
+  - [ ] Subtask 3.3: Build the accessible text-equivalent table (file, dominant author, share %, contributor count, last-active date) alongside the chart, following this page's existing pattern of pairing every chart with a text/table equivalent — this table is what AC #3 relies on to prove "disabling JS removes no information."
+  - [ ] Subtask 3.4: Solo-repo reframe (AC #4) — reuse the existing `insights.ContributorCount == 1` global check (Story 10.6 precedent, previously at [GitInsightsTemplater.cs:154](src/SpecScribe/GitInsightsTemplater.cs:154) before Task 0's removal) for whichever section now needs it; render the honest single-maintainer statement instead of an all-one-color sunburst.
+  - [ ] Subtask 3.5: Empty/degrade states — no files, no git data — reuse the existing `chart-empty` convention (never a broken or empty sunburst).
 
-- [x] Task 5 — Tests (AC: #1, #2)
-  - [x] Subtask 5.1: `GitInsightsTemplaterTests.cs` — extend `SampleInsights()` or add a second fixture with a mix of single- and multi-contributor files; assert the ownership section renders dominant-author share, contributor count, the "Sole contributor:" risk flag on the single-author file, and a guarded link when `fileHref` resolves (mirror the existing guarded-link test pattern in this file).
-  - [x] Subtask 5.2: Add a solo-repo fixture (`ContributorCount: 1`, every file `TotalContributors: 1`) and assert the section renders the single-maintainer reframe statement, NOT a table of all-flagged rows.
-  - [x] Subtask 5.3: Add a zero-files fixture and assert the empty state (no `<table>` markup) per Subtask 2.7.
-  - [x] Subtask 5.4: `Charts.cs` — if a `ChartsTests.cs`/`WhyTextTests` convention exists, add coverage that `WhyText(ChartMetric.AuthorConcentration)` returns non-empty, framework-neutral text.
-  - [x] Subtask 5.5: Regenerate the golden content fingerprint (git-insights.html body changes) — locate the current assertion in `SiteGeneratorAdapterTests.cs` (search `GoldenContentFingerprint`/`git-insights`) and update the expected hash; confirm the diff is CSS/HTML-only, no unrelated drift, per [Golden-diff normalization gotchas].
+- [ ] Task 4 — Client-side JS controls, per ADR 0010 (AC: #2, #3, #6)
+  - [ ] Subtask 4.1: Read [ADR 0010](docs/adrs/0010-client-side-charting-js-for-opt-in-analytics-surfaces.md) in full before writing any JS — it sets the constraints this task must satisfy (opt-in-page-only script, generation-time-embedded bounded data, no-JS baseline stays real, one shared engine across 7.11/7.12).
+  - [ ] Subtask 4.2: Embed the per-file author data needed for live recoloring (bounded — every file's already-capped `Contributors` list + `TotalContributors`, from Task 1) once at generation time as inline JSON or `data-*` attributes on each wedge — never a live git call or client-side recomputation. Determinism (FR31): identical repo state must produce byte-identical embedded data across regenerations.
+  - [ ] Subtask 4.3: Decide the shared script's home (new `specscribe-analytics.js`, loaded only on opt-in deep-git pages, vs. adding to the existing `specscribe.js`) — per ADR 0010 §6, this must be ONE module other opt-in-analytics stories (7.12, and later Epic 20) can build on, not a one-off. Document the choice in Completion Notes since it's the first exercise of that shared-engine decision.
+  - [ ] Subtask 4.4: Build the mode selector + per-mode contextual options (individual-author picker populated from the full contributor roster present in the embedded data, not just the bounded top-N; staleness threshold input) and the client-side recolor logic (walk the embedded per-file data, recompute each wedge's fill + its `aria-label`/title text so the text-equivalent and tooltip stay in sync with the active mode — this is new a11y surface ADR 0010 flags as a real cost, don't let the visual recolor drift out of sync with its accessible text).
+  - [ ] Subtask 4.5: Keep the JS additive per NFR-5/AC #3 — verify the page still passes with JS disabled (no console-error-driven blank states, the pre-rendered default mode and text table are what a no-JS reader sees).
+
+- [ ] Task 5 — CSS (AC: #1, #2, #3)
+  - [ ] Subtask 5.1: Sunburst wedge/legend styling — reuse `CodeFreshnessSunburst`'s existing `.freshness-*` CSS as a base where the shape matches (ring/wedge geometry is shared); add new classes only for the discrete-author palette swatches, the mode-selector control strip, and the individual-author-spotlight highlight treatment (distinguished by more than color alone — e.g. a stroke/opacity change on non-spotlighted wedges, not just a hue swap, matching this project's color-is-never-the-sole-signal convention).
+  - [ ] Subtask 5.2: `StylesheetTests` coverage for every new selector, scoped narrowly (mirror existing patterns in that file) — same discipline the removed Task 4 of the prior pass followed.
+
+- [ ] Task 6 — Tests (AC: all)
+  - [ ] Subtask 6.1: Server-rendered (no-JS) coverage in `GitInsightsTemplaterTests.cs`: default-mode sunburst renders over a multi-file/multi-author fixture, the text-equivalent table carries every file's dominant author/share/contributor-count/last-active date, code-page links are guarded (mirror the existing guarded-link test pattern), solo-repo reframe fires on `ContributorCount == 1`, empty-file-list degrades to `chart-empty`.
+  - [ ] Subtask 6.2: `GitMetrics`-level unit tests for the Task 1 per-file author accumulation (mirrors existing `BuildCodeMapMetrics`/`BuildInsights` test conventions) — confirm it covers ALL files, not just a top-N subset, and that determinism holds (same input commits → byte-identical output across repeated calls).
+  - [ ] Subtask 6.3: `ChartsTests.cs` coverage for the new/generalized sunburst builder (geometry correctness at various tree shapes/depths, mirroring `CodeFreshnessSunburst`'s existing test conventions) and the new `ChartMetric` case (the existing `WhyText_IsMetricGenericAndDefinedOnce` enum-iteration test picks it up automatically).
+  - [ ] Subtask 6.4: JS behavior needs its own test strategy — this codebase has no browser/DOM-execution test harness today. Decide and document an approach (e.g. a lightweight Node-based test against the extracted recolor logic, or an explicit "manually verified in a real browser, not covered by the automated suite" disclosure) rather than silently shipping untested client logic; flag this choice for review.
+  - [ ] Subtask 6.5: Regenerate the golden content fingerprint (`SiteGeneratorAdapterTests.cs`) — confirm the diff is scoped to this story's HTML/CSS/JS-asset changes, verified stable across 2 repeated runs, per [Golden-diff normalization gotchas].
 
 ## Dev Notes
 
-**Where this renders — already decided, do not re-litigate the surface.** The Git Insights hub (`git-insights.html`, `GitInsightsTemplater.RenderPage`) is the correct and only home for this feature. It already computes exactly the data this story needs — `GitInsightsData.Files` is a `List<FileChangeStat>`, each carrying `Contributors` (sorted commits-desc, capped) and `TotalContributors` (the true distinct-author count) — via `GitMetrics.BuildInsights` ([GitMetrics.cs:660](src/SpecScribe/GitMetrics.cs:660)). **No new git call, no new data model, no new page.** This is purely a new rendering section over data that already exists and is already threaded through the `RenderPage(insights, git, nav, fileHref, commitHref)` call at [SiteGenerator.cs:1911](src/SpecScribe/SiteGenerator.cs:1911).
+**This is a full rewrite, not an extension.** The prior pass of this story shipped a plain ranked table (`GitInsightsTemplater.AppendOwnershipSection` + `Charts.ChartMetric.AuthorConcentration`) that is being entirely replaced, along with the OLDER "Files & Contributors" master-detail table that predates this story. Task 0 removes both. Do not treat any of that prior code as reusable scaffolding beyond what's explicitly called out below (e.g. `FileContributor`, the `insights.ContributorCount == 1` solo-repo check, the guarded-link discipline).
 
-**Do not build a second contributor-attribution pass.** `FileInsight` (used by the Story 7.4 "Advanced coverage" section on code pages, [GitMetrics.cs:148](src/SpecScribe/GitMetrics.cs:148)) is a *different* per-file record computed by a *different* method (`ComputeFileInsights`) for a *different* surface. This story uses `GitInsightsData.Files` / `FileChangeStat`, not `FileInsight`. Don't conflate the two or add a redundant computation.
+**Read ADR 0010 first.** [docs/adrs/0010-client-side-charting-js-for-opt-in-analytics-surfaces.md](docs/adrs/0010-client-side-charting-js-for-opt-in-analytics-surfaces.md) is the ratified decision that makes Task 4 possible at all — it supersedes this codebase's long-standing "pure SVG + CSS, no charting JS" default, but ONLY for opt-in deep-analytics pages, and ONLY with a real no-JS baseline preserved (AC #3). Every constraint in Tasks 3–4 traces back to that ADR; re-read it if a task seems to be asking for two contradictory things (pre-rendered AND client-JS) — that's intentional layering, not a mistake.
 
-**Dominant-author share math:** `Contributors` is already `OrderByDescending(commits).ThenBy(name)` at generation time ([GitMetrics.cs:718-723](src/SpecScribe/GitMetrics.cs:718)), so `Contributors[0]` IS the dominant author whenever the list is non-empty — no re-sort needed. Share = `Contributors[0].Commits / (double)file.Changes`. This is accurate even though `Contributors` is capped (top 12 by default) because `file.Changes` counts all commits touching the file regardless of the cap, and the dominant author is definitionally in the top slot.
+**The top-N cap problem is real and easy to miss.** `GitInsightsData.Files` (what the removed sections used) is capped at `topFiles` (default 50) — fine for a ranked list, wrong for a whole-tree sunburst, which must cover every file the Code Map does. This is why Task 1 extends `BuildCodeMapMetrics` (the UNCAPPED per-file accumulator) rather than reusing `BuildInsights`'s output.
 
-**Reuse, don't rephrase, the sole-contributor vocabulary.** The epic AC explicitly calls out reusing `GitInsightsTemplater`'s existing wording. "Sole contributor:" already exists at [GitInsightsTemplater.cs:208](src/SpecScribe/GitInsightsTemplater.cs:208) for the per-file contributor panel. Use the same string for the bus-factor flag rather than inventing "Bus factor: 1" or similar — consistency of vocabulary across the page matters more than novelty.
+**Reuse `Charts.CodeFreshnessSunburst`'s geometry — don't refork it.** Story 7.12 just built the one recursive angular-partition tree-walk this codebase has, over the exact same `CodeMapNode`/`CodeMap.Roots` tree this story needs. The only real difference is *what colors each file wedge* — recency (7.12) vs. author concentration/spotlight/staleness (this story). Task 2 asks for a genuine attempt at extracting the shared math before falling back to a sibling function; a second independent angular-partition implementation would be a real maintenance liability (any geometry bug would need fixing twice).
 
-**Solo-repo reframe reuses an existing pattern, not new detection logic.** `insights.ContributorCount == 1` (global distinct authors across the whole analyzed window) already gates a hub-wide copy change at [GitInsightsTemplater.cs:154](src/SpecScribe/GitInsightsTemplater.cs:154) (Story 10.6 AC2b). Reuse that exact condition for AC #2 — do not compute a separate "is this a solo repo" check.
+**FR-10 still applies, in every mode.** "No per-author productivity ranking or leaderboard" doesn't stop applying just because the surface got more interactive. The individual-author spotlight mode answers "where has this person worked," not "who has contributed the most" — never render authors in a ranked list against each other, even as a UI convenience for picking who to spotlight (an alphabetical or most-recently-active list is fine; a "top contributors" leaderboard is not).
 
-**Story 10.2 chart-metadata standard:** every framed chart/section carries `Charts.ChartMeta` (Title/Window/Ranking/Why/Note) via `Charts.Framed` or the `FrameWindowSlot`/`FrameRankingSlot`/`FrameWhySlot` helpers — see how `AppendFilesAndContributorsSection` uses `Charts.FrameWhySlot(Charts.WhyText(Charts.ChartMetric.FileChurn))` ([GitInsightsTemplater.cs:97](src/SpecScribe/GitInsightsTemplater.cs:97)). This story needs its own `ChartMetric` case (`AuthorConcentration`) since none of the existing three (`ActivityCadence`/`FileChurn`/`ChangeCoupling`) fit "author concentration" framing.
+**FR31 determinism spans both the server and client halves now.** The old story only had to worry about server-side determinism. Now: (1) the embedded per-file author JSON must be generation-time computed and byte-identical across regenerations of the same repo state (server half), and (2) the client JS must never fetch live data or use wall-clock `Date.now()` to decide what "stale" means — the staleness comparison basis (e.g. "months since generation time" or "months since the file's last commit," whichever the design lands on) must itself be embedded at generation time, not computed in the browser at view time.
 
-**Story 7.2 code-page link seam:** the guarded-link discipline is already fully established in this file — `GuardedLink` ([GitInsightsTemplater.cs:275](src/SpecScribe/GitInsightsTemplater.cs:275)) and the `fileHref?.Invoke(file.Path)` pattern used at [GitInsightsTemplater.cs:131-134](src/SpecScribe/GitInsightsTemplater.cs:131) and [GitInsightsTemplater.cs:232-236](src/SpecScribe/GitInsightsTemplater.cs:232). Copy this pattern exactly: resolver returns a target → real `<a>`; no resolver/no target → plain escaped text. Never emit a dead link.
+**NFR8 degrade is unchanged in shape.** `git-insights.html` is still only generated when `--deep-git` produced data (the existing page-level gate). This story doesn't add a new gating decision — Task 3's solo-repo/empty-state branches are rendering choices within an already-gated page, exactly as before.
 
-**NFR8 degrade:** `git-insights.html` is only generated when `--deep-git` produced data (existing gate at the `SiteGenerator.cs:1911` call site's enclosing `if`). This story adds a section to an already-gated page — no new gating decision needed for the shallow/non-git case (Task 3 is a regression check, not new logic). The only new degrade case this story introduces is the solo-maintainer reframe (AC #2), which is a rendering branch, not an omission.
+**Solo-repo (Story 10.6) and guarded-link (Story 7.2) precedents survive Task 0's removal as PATTERNS, not code.** The `insights.ContributorCount == 1` check and the resolver-returns-target-or-plain-text link discipline are still the right approach — they just need to be re-applied inside the NEW section rather than assumed still-present in code that Task 0 deletes.
 
-**FR31 (generation-time determinism):** because everything here derives from the already-fetched, already-sorted `GitInsightsData` (itself built once per generation run from git log output), the classification is deterministic by construction — no wall-clock "now", no per-visitor state. Nothing extra is required to satisfy FR31 beyond not introducing any of those.
+### Previous Story Intelligence (Story 7.12, most recently completed sibling in this trio)
 
-### Previous Story Intelligence (Story 7.8, most recent completed Epic 7 story)
+Story 7.12 (Code Freshness / Age Map, done/review) is the single most relevant precedent: it built `Charts.CodeFreshnessSunburst` from scratch over `CodeMap.Roots`, with a bounded ring-depth (`FreshnessSunburstMaxDepth`), a real-value legend (never "Less…More"), guarded code-page links, and a from-scratch dev-time bug it found and fixed (a missed `fileHref` threading site that left wedges silently unlinked) — worth deliberately re-checking for the equivalent mistake here (this story threads `CodeMap`/`fileHref` into a DIFFERENT page, `git-insights.html`, for the first time; the exact same "forgot to thread the resolver into the new call site" mistake is plausible here too).
 
-Story 7.8 (`7-8-related-files-in-the-reference-graph.md`, done) is on a different surface (the code-page reference graph, not the Git Insights hub) but its review carried two generally-applicable lessons:
-- A rendering-only, no-new-git-call story like this one should NOT move the golden fingerprint's HTML/CSS shape unpredictably — regenerate it deliberately at the end (Task 5.5) and verify the diff is scoped to the new section, not a stray reformat.
-- Keep new visual affordances (chips/badges/pills) distinguished by more than color alone (shape/text), consistent with this project's a11y convention — the "Sole contributor:" bus-factor flag should carry text, not just a colored dot.
+The owner has separately noted (this correct-course session) that Story 7.12 is "also going" toward client-side JS controls — implying a follow-on symmetry pass on 7.12 is likely, but that is NOT part of this story's scope; don't touch 7.12's code as part of this story unless the shared-engine extraction (Task 2.2/4.3) requires touching `CodeFreshnessSunburst` itself.
 
-### Git Intelligence (recent commits)
+### Git Intelligence
 
-Recent Epic 7/10 work (`d274cee`, `1edc996`, `f0f30bd`) has been small, surgical diffs to individual templater files plus paired golden-fingerprint regeneration and targeted `*Tests.cs` additions — no large refactors. Follow the same shape: touch `Charts.cs` + `GitInsightsTemplater.cs` + their test files + the golden fixture, nothing else.
+The prior pass of this exact story (now being removed) touched: `src/SpecScribe/Charts.cs`, `src/SpecScribe/GitInsightsTemplater.cs`, `src/SpecScribe/assets/specscribe.css`, `tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs`, `tests/SpecScribe.Tests/SiteGeneratorGitInsightsTests.cs`, `tests/SpecScribe.Tests/StylesheetTests.cs`, `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — all still sitting as UNCOMMITTED working-tree changes as of this rewrite (nothing from that pass has been committed). Task 0 works against that live working-tree state, not a prior commit — there is no separate "revert commit" to make.
 
 ### Project Structure Notes
 
-- No new files expected. Modified: [src/SpecScribe/Charts.cs](src/SpecScribe/Charts.cs) (new `ChartMetric` case + `WhyText`), [src/SpecScribe/GitInsightsTemplater.cs](src/SpecScribe/GitInsightsTemplater.cs) (new section), possibly `src/SpecScribe/wwwroot`/stylesheet source for new CSS classes (check where the `.gi-*` CSS currently lives — likely one shared stylesheet source file, not `GitInsightsTemplater.cs` itself).
-- Tests: [tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs](tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs) (primary), the `StylesheetTests` file covering `.gi-*`/chart classes, and the `SiteGeneratorAdapterTests.cs` golden-fingerprint assertion.
-- No conflicts with the concurrent Stories 7.10 (risk quadrant) and 7.12 (freshness map) — those are separate epics-note-grouped stories extending the same `GitMetrics` deep-git path but rendering elsewhere/differently; nothing in this story's file list should overlap theirs. If either lands first and touches `Charts.ChartMetric` or `GitInsightsTemplater.cs`, re-check for enum/section-ordering conflicts before finalizing this diff.
+- Expected touch points: `src/SpecScribe/GitMetrics.cs` (Task 1 — per-file author accumulation), `src/SpecScribe/CodeMap.cs` (Task 1 — `CodeFileMetrics`/`CodeMapNode` join), `src/SpecScribe/Charts.cs` (Task 2 — sunburst generalization + new `ChartMetric`), `src/SpecScribe/GitInsightsTemplater.cs` (Task 3 — new section, `CodeMap` threaded in), `src/SpecScribe/SiteGenerator.cs` (Task 3.1 — pass the already-built `CodeMap` to the `GitInsightsTemplater.RenderPage` call site), `src/SpecScribe/assets/specscribe.css` (Task 5), a new or extended JS asset (Task 4 — decide new file vs. extending `specscribe.js`, per ADR 0010 §6).
+- Tests: `GitMetricsTests.cs` (or equivalent) for Task 1, `ChartsTests.cs` for Task 2, `GitInsightsTemplaterTests.cs`/`SiteGeneratorGitInsightsTests.cs` for Task 3/6, `StylesheetTests.cs` for Task 5, `SiteGeneratorAdapterTests.cs` golden fingerprint for Task 6.5.
+- Coordinate with Story 7.12 if its own JS follow-on is scheduled concurrently (per the owner's note above) — the shared JS module (Task 4.3) and any `CodeFreshnessSunburst` generalization (Task 2.2) are the two places a collision is likely.
 
 ### References
 
-- [Source: _bmad-output/planning-artifacts/epics.md#Story 7.11: Code Ownership & Bus-Factor Insights] (lines ~1491-1509)
-- [Source: _bmad-output/planning-artifacts/epics.md#Stories 7.10–7.12 grouping note] (lines ~1466-1469) — shared constraints: extend `GitMetrics.TryComputeDeep`/`ParseNumstatLog`, reuse Story 7.2 code-page link seam + Story 10.2 chart-metadata standard, degrade on shallow/non-git/solo repos (NFR8)
-- [Source: src/SpecScribe/GitMetrics.cs#FileChangeStat, GitInsightsData, BuildInsights] (lines 120-171, 660-738)
-- [Source: src/SpecScribe/GitInsightsTemplater.cs] — existing hub page, sole-contributor vocabulary (line 208), solo-repo softening precedent (line 154), guarded-link pattern (line 275)
-- [Source: src/SpecScribe/Charts.cs#ChartMetric, ChartMeta, WhyText, Framed] (lines 13-92)
-- [Source: src/SpecScribe/SiteGenerator.cs#GitInsightsTemplater.RenderPage call site] (line 1911) — confirms `fileHref: CodeItemHref` already wired
-- [Source: tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs] — existing fixture/assertion conventions to extend
+- [Sprint Change Proposal 2026-07-21 — Git Insights Ownership View](_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-21-git-insights-ownership-view.md) — the correct-course record that produced this rewrite.
+- [ADR 0010 — Client-Side Charting JS for Opt-In Deep-Analytics Surfaces](docs/adrs/0010-client-side-charting-js-for-opt-in-analytics-surfaces.md) — governs Task 4 in full.
+- [Source: _bmad-output/planning-artifacts/epics.md#Story 7.11: Code Ownership & Bus-Factor Insights] — original epic-level AC language (largely superseded by the ACs above; epics.md itself is not being edited by this correct-course, per the checklist's Section 2 finding that no epic-level change is needed).
+- [Source: src/SpecScribe/Charts.cs#CodeFreshnessSunburst, FreshnessSunburstMaxDepth, FreshnessLevel, FreshnessLegend] (~lines 2714-2965) — the engine to reuse/generalize.
+- [Source: src/SpecScribe/CodeMap.cs#CodeMapNode, CodeFileMetrics, CodeMap.Build] (lines 16-30, 226+) — the tree and per-file metrics record Task 1 extends.
+- [Source: src/SpecScribe/GitMetrics.cs#FileContributor, CodeFileMetrics, BuildCodeMapMetrics, BuildInsights] (lines 98-137, 660-738, 918-967) — existing per-file author and metrics computation this story extends/reuses.
+- [Source: tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs] — fixture/assertion conventions to adapt for the new section.
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-Claude Sonnet 5 (claude-sonnet-5)
-
 ### Debug Log References
-
-None — no failures requiring a debug log; implementation went green on first full run beyond the two pre-existing, unrelated `HtmlTemplaterTests` failures confirmed present on baseline (`git stash` verified) before this story's changes.
 
 ### Completion Notes List
 
-- Added `Charts.ChartMetric.AuthorConcentration` + its framework-neutral `WhyText` sentence (Task 1). The existing `ChartsTests.WhyText_IsMetricGenericAndDefinedOnce` test iterates all enum values, so it picked up the new case automatically — no new test needed there.
-- Added `GitInsightsTemplater.AppendOwnershipSection`, called from `RenderPage` between the existing Files & Contributors and Activity Over Time sections. Reuses `insights.Files`/`FileChangeStat.Contributors`/`TotalContributors` exactly as computed by `GitMetrics.BuildInsights` — no new git call, no new data model (Task 2).
-- Dominant-author share = `Contributors[0].Commits / (double)file.Changes` (Contributors already sorted commits-desc); contributor count uses `TotalContributors` (the true distinct-author count), not the capped `Contributors.Count`.
-- Single-author files (`TotalContributors <= 1`) get the exact `"Sole contributor:"` badge text already established on the per-file contributor panel — no new risk vocabulary invented (AC #1).
-- AC #2 solo-repo reframe: gated on the same `insights.ContributorCount == 1` global check already used for the Story 10.6 hub-wide softening. Renders one honest "Single-maintainer project…" statement instead of an all-flagged table.
-- File names link via the existing `fileHref` resolver (bound to `CodeItemHref`, Story 7.2 seam) with the same guarded-link-or-plain-text discipline as the rest of the file — never a dead link.
-- Empty state (`insights.Files.Count == 0`) reuses the same `chart-empty` pattern as the other two sections — never an empty table.
-- Task 3 (NFR8 shallow/non-git degrade) required no new code: the existing `SiteGeneratorGitInsightsTests` gate (flag off / no git history → no hub at all) already proves the new section can never partially render, since it lives inside the same gated `RenderPage`. Extended `GenerateAll_FlagOnWithHistory_EmitsHubAndDashboardLink` with an assertion that the new heading appears when the hub IS generated.
-- CSS: reused all existing `.gi-*` table/master-detail classes; added exactly two new classes — `.gi-risk-badge` (rust/dashed, mirrors the existing `.coupling-kind-badge` "at-risk" tone rather than inventing a 7th `--status-*` token, and carries its own "Sole contributor:" text so the flag is never color-only) and `.gi-solo-repo-note`.
-- Tests added: 4 new `GitInsightsTemplaterTests` (dominant share/contributor count/risk flag, guarded link, solo-repo reframe, empty-state), 1 new `StylesheetTests` (`.gi-risk-badge`/`.gi-solo-repo-note` presence + rust-tone regex), 1 extended `SiteGeneratorGitInsightsTests` assertion.
-- Golden content fingerprint regenerated (`SiteGeneratorAdapterTests.cs`): the non-git fixture never generates `git-insights.html`, so the shift is purely from the two new CSS rules; verified stable across 2 repeated runs before locking in the new hash, per [[golden-diff-normalization-gotchas]].
-- Full suite: 1905/1907 passing. The 2 red tests (`HtmlTemplaterTests.RenderIndex_PresentFamilyCardIsAWholeCardLinkToItsPage`, `RenderIndex_EveryCanonicalFamilyLabelGetsItsExpectedAccentClass`) were confirmed pre-existing and unrelated via `git stash` (fail identically on baseline `50c5185`, on code this story never touches) — out of scope for this story.
-
 ### File List
-
-- src/SpecScribe/Charts.cs (modified — new `ChartMetric.AuthorConcentration` case + `WhyText`)
-- src/SpecScribe/GitInsightsTemplater.cs (modified — new `AppendOwnershipSection` + call site)
-- src/SpecScribe/assets/specscribe.css (modified — `.gi-risk-badge` + `.gi-solo-repo-note`)
-- tests/SpecScribe.Tests/GitInsightsTemplaterTests.cs (modified — 4 new tests)
-- tests/SpecScribe.Tests/StylesheetTests.cs (modified — 1 new test)
-- tests/SpecScribe.Tests/SiteGeneratorGitInsightsTests.cs (modified — 1 extended assertion)
-- tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs (modified — golden content fingerprint regenerated)
 
 ## Change Log
 
-- 2026-07-21: Story 7.11 implemented — Ownership & Bus-Factor section added to the Git Insights hub (AC #1, #2). New `ChartMetric.AuthorConcentration`; new `GitInsightsTemplater.AppendOwnershipSection` over existing `GitInsightsData.Files`/`FileChangeStat` data (no new git call); solo-maintainer reframe reuses the Story 10.6 `ContributorCount == 1` gate; risk flag reuses the "Sole contributor:" vocabulary and the coupling-kind rust/dashed "at-risk" tone (no 7th `--status-*` token). 6 new/extended tests; golden content fingerprint regenerated and verified stable.
+- 2026-07-21: Story re-scoped via `correct-course` before its prior implementation reached "done" — the shipped plain-table design (Change Log entry below) is superseded wholesale by an interactive sunburst with a client-JS mode selector (share %, top-authors, individual-author spotlight, staleness), per owner direction and [ADR 0010](docs/adrs/0010-client-side-charting-js-for-opt-in-analytics-surfaces.md). Status reset to `ready-for-dev`; AC/Tasks/Dev Notes rewritten in full; prior implementation's Dev Agent Record entry preserved below for history only — its content no longer describes what this story does.
+- 2026-07-21 (superseded): Story 7.11 implemented as a ranked HTML table — `ChartMetric.AuthorConcentration`; `GitInsightsTemplater.AppendOwnershipSection` over `GitInsightsData.Files`/`FileChangeStat` (top-N capped, no new git call); solo-maintainer reframe reused the Story 10.6 `ContributorCount == 1` gate; risk flag reused the "Sole contributor:" vocabulary and the coupling-kind rust/dashed "at-risk" tone. 6 new/extended tests; golden content fingerprint regenerated. This entire implementation is removed by Task 0 of the rewrite above.

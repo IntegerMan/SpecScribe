@@ -171,8 +171,52 @@ public class CodeMapTemplaterTests
         Assert.DoesNotContain("Less …", html);
         // The caption points at the existing Last-column table rather than duplicating it.
         Assert.Contains("<strong>Last</strong>", html);
-        // The freshness section appears before the treemap panels, so its "below" caption is honest.
-        Assert.True(html.IndexOf("Code Freshness", StringComparison.Ordinal) < html.IndexOf("data-view=\"full\"", StringComparison.Ordinal));
+        // The section lives INSIDE each filtered .codemap-view panel (not once ahead of all four), so it
+        // re-filters along with the treemap/table when a checkbox is toggled.
+        var fullPanelStart = html.IndexOf("data-view=\"full\"", StringComparison.Ordinal);
+        var nextPanelStart = html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal);
+        var freshnessInFullPanel = html.IndexOf("Code Freshness", StringComparison.Ordinal);
+        Assert.InRange(freshnessInFullPanel, fullPanelStart, nextPanelStart);
+    }
+
+    [Fact]
+    public void RenderPage_EachFilterPanelGetsItsOwnFreshnessSunburstSoTheCheckboxesActuallyReFilterIt()
+    {
+        // Owner feedback: a single sunburst sourced only from the unfiltered tree looked "frozen" next to a
+        // treemap/table that visibly changed when a checkbox was toggled. Each of the four precomputed panels
+        // must carry its OWN filtered sunburst, exactly like the treemap already does.
+        var variants = CodeMap.BuildVariants(
+            new[] { ("tests/OnlyTests/FooTests.cs", 10L), ("src/A.cs", 20L) }, NoMetrics);
+
+        var html = CodeMapTemplater.RenderPage(variants, Nav());
+
+        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(html, "Code Freshness").Count);
+        // The "no-tests" panel excludes the test file, so its sunburst has one fewer file wedge than "full"'s.
+        var fullSection = html[html.IndexOf("data-view=\"full\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal)];
+        var noTestsSection = html[html.IndexOf("data-view=\"no-tests\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec-no-tests\"", StringComparison.Ordinal)];
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(fullSection, "class=\"freshness-wedge level-").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(noTestsSection, "class=\"freshness-wedge level-"));
+    }
+
+    [Fact]
+    public void RenderPage_RendersASunburstTreeViewTogglePerPanelWithUniqueRadioIdsAcrossAllFourPanels()
+    {
+        // Owner feedback: a "view as tree" alternative to the sunburst. The pure-CSS radio pair must have
+        // variant-unique ids/names (all four panels' markup coexists in the DOM) so toggling one panel's
+        // Sunburst/Tree radios can never affect another panel.
+        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+
+        Assert.Contains("id=\"cf-sunburst-full\"", html);
+        Assert.Contains("id=\"cf-tree-full\"", html);
+        Assert.Contains("id=\"cf-sunburst-no-spec\"", html);
+        Assert.Contains("id=\"cf-tree-no-spec\"", html);
+        Assert.Contains(">Sunburst</label>", html);
+        Assert.Contains(">Tree</label>", html);
+        Assert.Contains("class=\"freshness-tree\"", html); // the tree view itself renders (always in the DOM, CSS-hidden by default)
+        // Every radio name is unique per panel — no two panels' toggles can cross-wire.
+        var names = System.Text.RegularExpressions.Regex.Matches(html, "name=\"(cf-view-[^\"]+)\"")
+            .Select(m => m.Groups[1].Value).Distinct().ToList();
+        Assert.Equal(4, names.Count);
     }
 
     [Fact]

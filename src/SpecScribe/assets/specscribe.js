@@ -816,9 +816,10 @@
   // Progressive enhancement ONLY. The server ships every elevated-risk file as a plain <li> inside the
   // ".risk-grid", already in rank order — the complete, correct, no-JS truth. This only chunks that already-
   // complete list into pages once there's more than one page's worth, revealing a Prev/Next pager (emitted
-  // `hidden` by the server) rather than leaving a static "N of M" control with nothing to do.
+  // `hidden` by the server, positioned AFTER the grid — review-pass owner feedback: controls belong at the
+  // bottom of the list they page) rather than leaving a static "N of M" control with nothing to do.
   function initRiskGridPager(grid) {
-    var pager = grid.previousElementSibling;
+    var pager = grid.nextElementSibling;
     if (!pager || !pager.classList.contains("risk-pager")) return;
     var items = Array.prototype.slice.call(grid.querySelectorAll(".risk-grid-item"));
     var pageSize = parseInt(grid.getAttribute("data-page-size"), 10) || 12;
