@@ -171,7 +171,7 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     }
 
     [SkippableFact]
-    public void GenerateAll_FlagOnWithHistory_LightsUpDayPageAndHubHashLinks()
+    public void GenerateAll_FlagOnWithHistory_LightsUpDayPageHashLinks()
     {
         Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise gated hash-link wiring (skipped, not failed)");
         Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
@@ -185,10 +185,10 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         var anyDayLinks = dayPages.Any(p => File.ReadAllText(p).Contains("class=\"commit-hash-link\" href=\"../commit/"));
         Assert.True(anyDayLinks, "a day page's hash should link into commit/ when a per-commit page exists");
 
-        // The Git Insights hub's "latest {hash}" link resolves to a commit/ page (hub is at root → commit/…).
+        // The Git Insights hub no longer carries a commit-hash link (Story 7.11 rewrite removed the
+        // per-file "latest {hash}" line along with the master-detail panel it lived in) — it still exists,
+        // just gated on the same deep-git signal.
         Assert.True(File.Exists(HubPage));
-        var hub = File.ReadAllText(HubPage);
-        Assert.Contains("href=\"commit/", hub);
     }
 
     [SkippableFact]

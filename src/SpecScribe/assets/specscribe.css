@@ -3746,6 +3746,25 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-table a { color: var(--rust); text-decoration: none; }
 .codemap-table a:hover { text-decoration: underline; }
 
+/* Paginated file table (owner feedback, Story 7.12 review): a clone of risk-quadrant.html's .risk-pager — the
+   full server-ordered table always renders in the markup (the no-JS truth); .codemap-table-pager is emitted
+   `hidden` and revealed only once specscribe.js finds more than one page's worth (progressive enhancement,
+   never a truncation). */
+.codemap-table-pager { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0 0; font-size: 0.85rem; }
+.codemap-table-pager[hidden] { display: none; }
+.codemap-table-pager-prev, .codemap-table-pager-next {
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--rust);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.25rem 0.7rem;
+}
+.codemap-table-pager-prev:hover:not(:disabled), .codemap-table-pager-next:hover:not(:disabled) { background: var(--cream); }
+.codemap-table-pager-prev:disabled, .codemap-table-pager-next:disabled { color: var(--ink-faded); cursor: default; opacity: 0.5; }
+.codemap-table-pager-status { color: var(--ink-light); }
+
 /* ============ CODE FRESHNESS SUNBURST (code-map.html, Story 7.12) ============ */
 /* A brand-new recursive angular-partition chart — NOT the fixed 3-ring epic/story .sunburst. File wedges reuse
    the SAME level-0..4 fill values as .codemap-cell/.heatmap-cell (never a new palette); directory wedges stay
@@ -3789,33 +3808,31 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .freshness-legend-empty { color: var(--ink-light); font-size: 0.8rem; margin: 0.6rem 0; text-align: center; }
 .freshness-caption { text-align: center; font-size: 0.8rem; }
 
-/* Sunburst/Tree view toggle (owner feedback): a panel-scoped clone of the sprint board's .board-tabs pure-CSS
+/* Sunburst/Treemap view toggle (owner feedback): a panel-scoped clone of the sprint board's .board-tabs pure-CSS
    radio toggle. Each of the four filter-combination panels renders its own copy with variant-suffixed ids, so
-   :has() is scoped to THIS .freshness-panel instance and a shared .cf-tree-radio marker class (rather than a
+   :has() is scoped to THIS .freshness-panel instance and a shared .cf-treemap-radio marker class (rather than a
    per-variant id list) picks the toggle state regardless of which variant it belongs to. */
 .freshness-panel .board-tabs { display: flex; justify-content: center; margin-bottom: 0.6rem; }
-.freshness-view-tree { display: none; }
-.freshness-panel:has(.cf-tree-radio:checked) .freshness-view-sunburst { display: none; }
-.freshness-panel:has(.cf-tree-radio:checked) .freshness-view-tree { display: block; }
+.freshness-view-treemap { display: none; }
+.freshness-panel:has(.cf-treemap-radio:checked) .freshness-view-sunburst { display: none; }
+.freshness-panel:has(.cf-treemap-radio:checked) .freshness-view-treemap { display: block; }
 
-/* The tree view: a familiar nested folder disclosure — the SAME per-file recency data as the sunburst, reusing
-   its exact level-0..4 dot colors (never a new palette) and its guarded clickthrough. Native <details>/<summary>
-   (no JS); closed by default since a real repo's tree is usually too deep to show fully expanded. */
-.freshness-tree, .freshness-tree ul { list-style: none; margin: 0; padding-left: 1.1rem; }
-.freshness-tree { padding-left: 0; font-size: 0.82rem; max-height: 420px; overflow-y: auto; }
-.freshness-tree-dir > details > summary { cursor: pointer; color: var(--ink-light); padding: 0.15rem 0; }
-.freshness-tree-dir > details > summary:hover { color: var(--ink); }
-.freshness-tree-count { font-size: 0.75rem; color: var(--ink-faded); }
-.freshness-tree-file { display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0; }
-.freshness-tree-file a { color: var(--rust); text-decoration: none; }
-.freshness-tree-file a:hover { text-decoration: underline; }
-.freshness-tree-date { font-size: 0.75rem; color: var(--ink-faded); margin-left: auto; white-space: nowrap; }
-.freshness-tree-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
-.freshness-tree-dot.level-1 { background: #ecd18f; }
-.freshness-tree-dot.level-2 { background: #dfb455; }
-.freshness-tree-dot.level-3 { background: var(--gold-light); }
-.freshness-tree-dot.level-4 { background: var(--gold); }
-.freshness-tree-dot.level-none { background: var(--parchment-dark); opacity: 0.55; }
+/* The treemap view: the SAME squarified layout (CodeMapVariant.Layout) the page's other treemap draws from,
+   colored by recency instead — a familiar size-by-area alternative to the polar sunburst (owner correction:
+   "Tree" means treemap, not a folder-list view). File cells reuse the exact level-0..4 fill values; directory
+   cells stay neutral/unlabeled, matching .codemap-dir. A DELIBERATELY separate class family from .codemap-cell
+   so the existing colorize-dropdown/zoom enhancement script — panel-scoped — never mistakes these for its own. */
+.freshness-treemap-wrap { display: flex; flex-direction: column; align-items: center; }
+.freshness-treemap { display: block; width: 100%; max-width: 640px; height: auto; }
+.freshness-cell { stroke: var(--parchment); stroke-width: 0.5; transition: stroke 0.12s ease; }
+.freshness-cell.level-1 { fill: #ecd18f; }
+.freshness-cell.level-2 { fill: #dfb455; }
+.freshness-cell.level-3 { fill: var(--gold-light); }
+.freshness-cell.level-4 { fill: var(--gold); }
+.freshness-cell.level-none { fill: var(--parchment-dark); fill-opacity: 0.55; }
+.freshness-cell:hover, .freshness-cell:focus-visible { outline: none; stroke: var(--rust); stroke-width: 1.5; }
+.freshness-treemap a:focus-visible .freshness-cell { outline: none; stroke: var(--teal); stroke-width: 2; }
+.freshness-cell-dir { fill: none; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
 
 /* ============ REFACTOR-TARGET RISK QUADRANT (risk-quadrant.html, Story 7.10) ============ */
 /* Size (X, log-scaled) x churn-frequency (Y) scatter. Not a --status-* surface — files carry no lifecycle status,
@@ -5371,36 +5388,6 @@ body:has(main.req-detail) .doc-header {
    forces the whole page wider than a narrow viewport instead of scrolling here. */
 .table-scroll { overflow-x: auto; contain: inline-size; }
 
-.gi-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.gi-table caption {
-  caption-side: top;
-  text-align: left;
-  color: var(--ink-light);
-  font-size: 0.82rem;
-  font-style: italic;
-  padding-bottom: 0.5rem;
-}
-.gi-table th,
-.gi-table td {
-  padding: 0.4rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: baseline;
-}
-.gi-table thead th {
-  border-bottom: 2px solid var(--parchment-deep);
-  color: var(--ink-faded);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-}
-.gi-table tbody th[scope="row"] { font-weight: 600; color: var(--ink); }
-.gi-table th.gi-num,
-.gi-table td.gi-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.gi-table td code { font-size: 0.85rem; white-space: nowrap; }
-.gi-table tbody tr:hover { background: var(--parchment); }
-
 /* Sort buttons the enhancer swaps into the headers: they inherit the header look and add an activatable
    affordance. Sort direction is carried by the glyph + aria-sort, never color alone. */
 .gi-sort-btn {
@@ -5496,91 +5483,111 @@ body:has(main.req-detail) .doc-header {
 .list-row-group-heading:first-child { margin-top: 0; }
 .list-row-group-heading h3 { margin: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faded); }
 
-/* ---- Files & Contributors master-detail (Story 3.8 redesign) ----
-   File table on the left; selecting a file reveals its contributor panel on the right. The reveal is pure
-   CSS :target (same no-JS mechanism as the commit-heatmap drill-down and the coupling lightbox) — clicking a
-   row's stretched .gi-row-link sets the fragment, CSS shows the matching #gi-file-N panel, and a general-
-   sibling rule hides the default prompt. No JS is involved in the drill-down; the sort/filter enhancer above
-   is independent. */
-.gi-master-detail {
-  display: grid;
-  /* A FIXED-width detail column so revealing or swapping a contributor panel never reflows either column.
-     The earlier fractional (fr) split let the panel's changing content nudge both tracks on every selection —
-     the jarring width shift. A fixed rem width is content-independent: the detail stays put and the master
-     (1fr) fills the constant remainder, so selecting rows only changes the panel's contents, not the layout. */
-  grid-template-columns: minmax(0, 1fr) 20rem;
-  gap: 1.25rem;
-  align-items: start;
-}
-/* The detail column tracks the file table as it scrolls, so a selected file's people stay in view. */
-.gi-detail { position: sticky; top: calc(var(--nav-offset) + 0.75rem); }
-
-/* Whole-row selection (stretched-link pattern): an invisible anchor in the first cell stretches its ::after
-   across the whole row (the row is the positioned containing block), so a click anywhere on the row reveals
-   that file's contributors via :target — no JS, no reliance on the file name. */
-.gi-table tbody tr { position: relative; }
-.gi-table tbody tr:hover { cursor: pointer; }
-.gi-row-link::after { content: ""; position: absolute; inset: 0; z-index: 0; }
-.gi-row-link:focus-visible::after {
-  outline: 2px solid var(--teal);
-  outline-offset: -2px;
-  border-radius: 3px;
-}
-/* The file name is reserved for navigating to the file's own page (7.1/7.4). When it is a real link it rides
-   above the row overlay (z-index) so it navigates; as plain text it sits below, and the overlay selects. */
-a.gi-file-name { position: relative; z-index: 1; color: var(--teal-deep); text-decoration: none; }
-a.gi-file-name:hover { text-decoration: underline; }
-a.gi-file-name:hover code { color: var(--rust); }
-a.gi-file-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
-
-/* Every file's panel is in the HTML; only the :target one shows (so the drill-down works with JS off), and
-   the default prompt hides once any panel is targeted. scroll-margin clears the sticky nav on the jump. */
-.gi-contributors-panel { display: none; scroll-margin-top: var(--nav-offset); }
-.gi-contributors-panel:target { display: block; }
-.gi-contributors-panel:target ~ .gi-detail-default { display: none; }
-
-.gi-detail-head { border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.6rem; }
-.gi-detail-title { font-size: 0.95rem; margin: 0; }
-.gi-detail-title code { word-break: break-all; }
-.gi-detail-sub { font-size: 0.8rem; color: var(--ink-light); margin: 0.25rem 0 0; }
-.gi-detail-lead { font-size: 0.85rem; color: var(--ink-faded); margin: 0 0 0.4rem; }
-.gi-detail-prompt { color: var(--ink-light); font-style: italic; }
-.gi-detail-filelink { display: inline-block; margin-top: 0.6rem; }
-
-.gi-contributor-list { list-style: none; margin: 0; padding: 0; }
-.gi-contributor-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--border);
-}
-.gi-contributor-list li:last-child { border-bottom: none; }
-.gi-contributor-name { font-weight: 600; color: var(--ink); }
-.gi-contributor-meta { color: var(--ink-light); font-size: 0.82rem; white-space: nowrap; }
-
-/* Story 7.11 — Ownership & Bus-Factor section. Risk badge reuses the coupling-kind attention tone (rust,
-   dashed) — an existing "elevated"/at-risk accent, not a 7th --status-* lifecycle token, and it carries its own
-   "Sole contributor:" text so the flag is never color-only. */
-.gi-risk-badge {
-  display: inline-block;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--rust);
-  border: 1px dashed var(--rust-light);
-  border-radius: 3px;
-  padding: 0.08rem 0.35rem;
-  margin-right: 0.35rem;
-}
+/* ---- Code ownership & bus-factor sunburst (Story 7.11 rewrite) ----
+   Replaces the earlier files-and-contributors master-detail (:target drill-down) and the earlier plain ranked
+   ownership table with ONE whole-tree sunburst + collapsible text-equivalent tree. .gi-solo-repo-note is
+   shared with the single-maintainer reframe (unchanged from the prior pass). */
 .gi-solo-repo-note { color: var(--ink-light); font-style: italic; }
 
-/* Stack the master and detail on narrow screens; the sticky detail becomes normal flow below the table. */
-@media (max-width: 720px) {
-  .gi-master-detail { grid-template-columns: 1fr; }
-  .gi-detail { position: static; }
+.ownership-panel { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* Mode-selector controls: hidden in the server HTML (NFR-5/ADR 0010 — no inert control ships with JS off),
+   revealed by specscribe.js's initOwnershipSunburst. Reuses the Code Map colorize-dropdown's visual language. */
+.ownership-controls { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1rem; font-size: 0.85rem; color: var(--ink-faded); }
+.ownership-controls select,
+.ownership-controls input {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--parchment-deep);
+  border-radius: 4px;
+  background: var(--warm-white);
+  color: var(--ink);
+  margin-left: 0.4rem;
 }
+.ownership-controls input[type="number"] { width: 4.5rem; }
+.ownership-controls select:focus-visible,
+.ownership-controls input:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+
+.ownership-sunburst-wrap { display: flex; flex-direction: column; align-items: center; }
+.ownership-sunburst { display: block; width: 100%; max-width: 420px; height: auto; }
+.ownership-wedge { stroke: var(--parchment); stroke-width: 0.5; transition: stroke 0.12s ease; }
+.ownership-wedge.level-1 { fill: #ecd18f; }
+.ownership-wedge.level-2 { fill: #dfb455; }
+.ownership-wedge.level-3 { fill: var(--gold-light); }
+.ownership-wedge.level-4 { fill: var(--gold); }
+.ownership-wedge.level-none { fill: var(--parchment-dark); fill-opacity: 0.55; }
+.ownership-wedge:hover,
+.ownership-wedge:focus-visible { outline: none; stroke: var(--rust); stroke-width: 1.5; }
+.ownership-sunburst a:focus-visible .ownership-wedge { outline: none; stroke: var(--teal); stroke-width: 2; }
+.ownership-wedge-dir { fill: var(--parchment-dark); fill-opacity: 0.18; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
+
+/* Discrete top-author palette (JS-only mode): 12 distinct hues built from the existing accent-token set plus
+   a few color-mix blends — deliberately a NEW small categorical palette (Task 2.4), not a reuse of --status-*
+   (non-lifecycle data) or the Story 7.9 file-type palette (a different dimension). "Other" (below the bounded
+   top-N roster) reads honestly muted + dashed, matching the file-type legend's own overflow-bucket treatment. */
+.ownership-wedge.owner-author-0 { fill: var(--teal-deep); }
+.ownership-wedge.owner-author-1 { fill: var(--rust); }
+.ownership-wedge.owner-author-2 { fill: var(--moss); }
+.ownership-wedge.owner-author-3 { fill: var(--violet); }
+.ownership-wedge.owner-author-4 { fill: var(--gold); }
+.ownership-wedge.owner-author-5 { fill: var(--teal); }
+.ownership-wedge.owner-author-6 { fill: var(--rust-light); }
+.ownership-wedge.owner-author-7 { fill: var(--moss-light); }
+.ownership-wedge.owner-author-8 { fill: var(--gold-light); }
+.ownership-wedge.owner-author-9 { fill: color-mix(in srgb, var(--teal-deep) 60%, var(--rust) 40%); }
+.ownership-wedge.owner-author-10 { fill: color-mix(in srgb, var(--moss) 60%, var(--violet) 40%); }
+.ownership-wedge.owner-author-11 { fill: color-mix(in srgb, var(--gold) 60%, var(--teal) 40%); }
+.ownership-wedge.owner-author-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
+
+/* Individual-author spotlight (JS-only mode): distinguished by more than hue — a stroke/opacity change too
+   (this project's "color is never the sole signal" convention), so the highlighted set reads clearly even
+   under a color-vision deficiency. */
+.ownership-wedge.owner-spotlight-on { fill: var(--rust); stroke: var(--ink); stroke-width: 1.2; }
+.ownership-wedge.owner-spotlight-off { fill: var(--parchment-dark); fill-opacity: 0.35; }
+
+/* Staleness mode (JS-only): a binary cutoff at the reader's chosen threshold, dashed stroke on the stale side
+   so the flag is never color-only. */
+.ownership-wedge.owner-fresh { fill: var(--moss-light); }
+.ownership-wedge.owner-stale { fill: var(--rust); stroke-dasharray: 2 1; }
+
+.ownership-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  margin: 0.6rem 0 0;
+}
+.ownership-legend-dim { font-weight: 600; margin-right: 0.4rem; }
+.ownership-legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.ownership-legend-swatch.level-1 { background: #ecd18f; }
+.ownership-legend-swatch.level-2 { background: #dfb455; }
+.ownership-legend-swatch.level-3 { background: var(--gold-light); }
+.ownership-legend-swatch.level-4 { background: var(--gold); }
+.ownership-legend-swatch.level-none { background: var(--parchment-dark); opacity: 0.55; }
+.ownership-legend-label { margin-right: 0.6rem; }
+.ownership-legend-empty { color: var(--ink-light); font-size: 0.8rem; margin: 0.6rem 0; text-align: center; }
+
+/* Text-equivalent collapsible tree (AC #3) — same structural shape as Story 7.12's .freshness-tree, its own
+   class prefix per this component (deliberate small CSS duplication, matching this codebase's existing
+   per-component level-N convention rather than cross-story class coupling). */
+.ownership-tree, .ownership-tree ul { list-style: none; margin: 0; padding-left: 1.1rem; }
+.ownership-tree { padding-left: 0; font-size: 0.82rem; max-height: 420px; overflow-y: auto; }
+.ownership-tree-dir > details > summary { cursor: pointer; color: var(--ink-light); padding: 0.15rem 0; }
+.ownership-tree-dir > details > summary:hover { color: var(--ink); }
+.ownership-tree-count { font-size: 0.75rem; color: var(--ink-faded); }
+.ownership-tree-file { display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0; flex-wrap: wrap; }
+.ownership-tree-file a { color: var(--rust); text-decoration: none; }
+.ownership-tree-file a:hover { text-decoration: underline; }
+.ownership-tree-detail { font-size: 0.75rem; color: var(--ink-faded); margin-left: auto; white-space: nowrap; }
+.ownership-tree-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.ownership-tree-dot.level-1 { background: #ecd18f; }
+.ownership-tree-dot.level-2 { background: #dfb455; }
+.ownership-tree-dot.level-3 { background: var(--gold-light); }
+.ownership-tree-dot.level-4 { background: var(--gold); }
+.ownership-tree-dot.level-none { background: var(--parchment-dark); opacity: 0.55; }
 
 /* The Git Pulse panel header can now carry two "View …" links (hub + deep analytics); keep them on one
    tidy right-aligned line with breathing room between. */

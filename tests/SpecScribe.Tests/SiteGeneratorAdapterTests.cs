@@ -730,7 +730,35 @@ public class SiteGeneratorAdapterTests : IDisposable
         // between the previous lock-in and this one (multiple sessions were active throughout this story's
         // review passes — see [[shared-main-concurrent-edit-loss-verify-after-edit]]). No Story 7.10 change is
         // responsible for this particular shift. Verified stable across repeated runs before locking in.
-        const string expected = "1c04ee8464ac4053142cb0e9185b25faf064781765d2932638d7bef624b01aef";
+        // Regenerated for the "Misc changes" commit: the Code Freshness sunburst/tree section now renders once
+        // PER filter-combination panel instead of only the unfiltered one (CodeMapTemplater — owner feedback: the
+        // exclude-filter checkboxes must re-filter every surface, not leave the freshness section frozen) and
+        // gained a Sunburst/Tree view toggle; the Risk Quadrant elevated-files pager moved after the grid and the
+        // per-row rank number was dropped (RiskQuadrantTemplater + specscribe.js); the risk-quadrant Y axis label
+        // notes it is log-scaled; and every page's local-context pill (about-sdd sub-nav) now carries the same
+        // Icons.ForConcept glyph the dark-bar Insights dropdown already shows for that label (HtmlRenderAdapter,
+        // Story 10.10 / icon: Story 7.12 review) — all content changes, plus matching specscribe.css rules.
+        // Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        // Regenerated for the Story 7.12 review pass's second round: owner correction — "Tree" now means the
+        // squarified TREEMAP (Charts.CodeFreshnessTreemap, reusing CodeMapVariant.Layout colored by recency), not
+        // a folder-list view; the file table gained client-side pagination (CodeMapTemplater/specscribe.js/.css:
+        // .codemap-table-row/.codemap-table-pager, mirroring the risk-grid pager). This non-git fixture renders
+        // code-map.html, so both changes shift the hash (all-neutral wedges/cells, no pager reveal below the
+        // fixture's small file count). Verified stable across 2 repeated runs before locking in.
+        // [golden-diff-normalization-gotchas]
+        // Regenerated for Story 7.11's rewrite completion pass: the dead `.gi-table` CSS (nothing has rendered
+        // that class since Task 0 removed the old master-detail/ranked-table sections) was dropped, and
+        // BuildSunburstSvg's shared file-wedge writer (used by both CodeFreshnessSunburst and
+        // CodeOwnershipSunburst) now bakes a real `aria-label="{RepoRelativePath}"` onto each file wedge's
+        // accessible-name host (the `<a>` when linked, else the `<path>` itself) — a dev-time bug found via
+        // manual browser verification: specscribe.js's live mode-switcher snapshots this attribute ONCE as the
+        // wedge's "base label" before its first recolor, and with no aria-label ever baked, that snapshot
+        // silently captured "" and every subsequent mode switch permanently dropped the file path from the
+        // wedge's accessible name/title. This non-git fixture renders code-map.html (Code Freshness sunburst),
+        // so the new aria-label shifts the hash there too, even though this story's own ownership sunburst only
+        // renders on git-insights.html (ungated in this fixture). Verified stable across 2 repeated runs before
+        // locking in. [golden-diff-normalization-gotchas]
+        const string expected = "754c2aaeb4682f8b714d1424d6ce34c4b228ea3ee0f2d54baf6e753ad8a0eaf6";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

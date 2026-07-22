@@ -903,6 +903,108 @@ public class GitMetricsTests
         Assert.Null(map["X.cs"].AvgCoChanged);
     }
 
+    // ---- BuildCodeMapMetrics per-file author attribution [Story 7.11] ----
+
+    [Fact]
+    public void BuildCodeMapMetrics_AccumulatesPerFileAuthorsOncePerCommitPerFile()
+    {
+        // A.cs listed twice in one commit by Alice must count as ONE commit for Alice on A.cs (mirrors the
+        // Changes counting discipline), plus a second commit by Bob.
+        var commits = new[]
+        {
+            new DeepCommit("h2", "Alice", new DateTime(2026, 7, 5, 10, 0, 0), "s", "", new[]
+            {
+                new DeepFileChange("A.cs", 3, 1),
+                new DeepFileChange("A.cs", 1, 0), // same file twice in one commit -> one commit credited
+            }),
+            Commit("h1", "Bob", "2026-07-01T10:00", ("A.cs", 2, 0)),
+        };
+
+        var a = GitMetrics.BuildCodeMapMetrics(commits)["A.cs"];
+
+        Assert.Equal(2, a.TotalContributors);
+        Assert.NotNull(a.Contributors);
+        var alice = a.Contributors!.Single(c => c.Name == "Alice");
+        Assert.Equal(1, alice.Commits);
+        Assert.Equal(new DateOnly(2026, 7, 5), alice.LastCommitDate);
+        var bob = a.Contributors!.Single(c => c.Name == "Bob");
+        Assert.Equal(1, bob.Commits);
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_OrdersContributorsByCommitsDescThenNameAsc()
+    {
+        var commits = new[]
+        {
+            Commit("h3", "Carol", "2026-07-03T10:00", ("A.cs", 1, 0)),
+            Commit("h2", "Alice", "2026-07-02T10:00", ("A.cs", 1, 0)),
+            Commit("h1b", "Alice", "2026-07-01T09:00", ("A.cs", 1, 0)),
+            Commit("h1", "Bob", "2026-07-01T10:00", ("A.cs", 1, 0)),
+        };
+
+        var a = GitMetrics.BuildCodeMapMetrics(commits)["A.cs"];
+
+        Assert.Equal(new[] { "Alice", "Bob", "Carol" }, a.Contributors!.Select(c => c.Name)); // Alice=2 commits first, Bob/Carol tie at 1 -> name-asc
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_ContributorsAreCappedAtCodeMapFileContributorCap()
+    {
+        var commits = Enumerable.Range(0, GitMetrics.CodeMapFileContributorCap + 5)
+            .Select(i => Commit($"h{i}", $"Author{i:00}", "2026-07-01T10:00", ("A.cs", 1, 0)))
+            .ToArray();
+
+        var a = GitMetrics.BuildCodeMapMetrics(commits)["A.cs"];
+
+        Assert.Equal(GitMetrics.CodeMapFileContributorCap, a.Contributors!.Count);
+        Assert.Equal(GitMetrics.CodeMapFileContributorCap + 5, a.TotalContributors); // the true count survives the cap
+    }
+
+    [Fact]
+    public void BuildCodeMapMetrics_FileWithNoCommitsHasNoEntry()
+    {
+        // BuildCodeMapMetrics only produces entries for files that appear in the window at all; there is no
+        // separate "zero contributors" state to assert on a file that was never touched.
+        var map = GitMetrics.BuildCodeMapMetrics(Array.Empty<DeepCommit>());
+        Assert.Empty(map);
+    }
+
+    // ---- BuildTopAuthors [Story 7.11] ----
+
+    [Fact]
+    public void BuildTopAuthors_RanksByTotalCommitsAcrossAllFilesOncePerCommit()
+    {
+        // A single sweeping commit touching many files must count once for its author, not once per file.
+        var commits = new[]
+        {
+            Commit("h3", "Alice", "2026-07-03T10:00", ("A.cs", 1, 0), ("B.cs", 1, 0), ("C.cs", 1, 0)),
+            Commit("h2", "Bob", "2026-07-02T10:00", ("A.cs", 1, 0)),
+            Commit("h1", "Bob", "2026-07-01T10:00", ("B.cs", 1, 0)),
+        };
+
+        var top = GitMetrics.BuildTopAuthors(commits);
+
+        Assert.Equal(new[] { "Bob", "Alice" }, top); // Bob: 2 commits, Alice: 1 commit (not 3, despite 3 files)
+    }
+
+    [Fact]
+    public void BuildTopAuthors_TieBreaksByNameAscAndCapsAtCapN()
+    {
+        var names = new[] { "AuthorE", "AuthorD", "AuthorC", "AuthorB", "AuthorA" };
+        var commits = names.Select((name, i) => Commit($"h{i}", name, "2026-07-01T10:00", ("A.cs", 1, 0))).ToArray();
+
+        var top = GitMetrics.BuildTopAuthors(commits, capN: 3);
+
+        Assert.Equal(3, top.Count);
+        Assert.Equal(new[] { "AuthorA", "AuthorB", "AuthorC" }, top); // all tied at 1 commit -> name-ascending
+    }
+
+    [Fact]
+    public void BuildTopAuthors_EmptyInputYieldsEmptyList()
+    {
+        Assert.Empty(GitMetrics.BuildTopAuthors(Array.Empty<DeepCommit>()));
+    }
+
     [Fact]
     public void ParseNumstatLog_CarriesTheCodeMapMetricsFromTheSameParse()
     {

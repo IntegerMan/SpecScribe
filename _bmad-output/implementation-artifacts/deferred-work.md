@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 7-10-refactor-target-risk-quadrant-churn-x-size (2026-07-21)
+
+- source_spec: `7-10-refactor-target-risk-quadrant-churn-x-size.md`
+  summary: Degenerate single-value axis (every plotted file shares the exact same `Lines`, or the same `Changes`) makes `rawMinX`/`rawMaxX` (or the Y equivalent) equal, so the min-tick, max-tick, and median-cutoff labels all render the identical real-unit number at three different positions on the same axis — reads as a copy-paste labeling glitch rather than genuine axis structure.
+  evidence: Edge Case Hunter. Requires every plotted file to be byte-identical in size or change count — rare on real repos, cosmetic only, no functional impact. [`Charts.cs:2655-2665`]
+- source_spec: `7-10-refactor-target-risk-quadrant-churn-x-size.md`
+  summary: `ChartMetric.RefactorRisk`'s framing sentence ("...the costliest place for a defect to hide — refactoring them tends to pay off fastest") is shown for every file in the elevated quadrant, but the underlying `CodeMap.Files()` source includes any git-tracked file, not just source code — a heavily-churned `epics.md` or `sprint-status.yaml` can legitimately land in the elevated-risk quadrant with "refactoring" copy that doesn't fit a non-code artifact.
+  evidence: Blind Hunter. Pre-existing scope (which files `CodeMap` walks) was set by Story 7.6, not introduced by 7.10 — only the new framing copy surfaces the mismatch. Fixing would mean either filtering the quadrant to source files only or softening the copy, both product/copy decisions out of scope for a narrow patch. [`Charts.cs:52-53`]
+
 ## Deferred from: code review of spec-6-9-deferred-debt-cleanup (2026-07-21)
 
 - source_spec: `spec-6-9-deferred-debt-cleanup.md`

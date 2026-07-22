@@ -2,11 +2,11 @@ using SpecScribe;
 
 namespace SpecScribe.Tests;
 
-/// <summary>Coverage for the aggregate Git Insights hub page (Story 3.8): the site a11y contract, the
-/// accessible server-sorted file table, the file→contributors master-detail (each file links to its
-/// contributor panel; the panel answers "who do I talk to about this file?" rather than presenting a global
-/// ranking), escaping of repo-derived text, the guarded detail links (link when a resolver produces a target,
-/// plain text when not — never a dead link), and friendly empty states.</summary>
+/// <summary>Coverage for the aggregate Git Insights hub page: the site a11y contract, the whole-tree code-ownership
+/// sunburst + its accessible text-equivalent tree (Story 7.11 rewrite — replaces the earlier files-and-contributors
+/// master-detail table AND the earlier plain ranked ownership table), escaping of repo-derived text, the guarded
+/// file links (link when a resolver produces a target, plain text when not — never a dead link), the solo-repo
+/// reframe, and friendly empty states.</summary>
 public class GitInsightsTemplaterTests
 {
     private static SiteNav Nav() =>
@@ -33,6 +33,30 @@ public class GitInsightsTemplaterTests
         ContributorCount: 2,
         TotalFilesTouched: 2);
 
+    /// <summary>The whole-tree CodeMap the ownership sunburst/tree render from — mirrors what
+    /// <c>CodeMap.Build(_codeFiles, DeepGitPulse.CodeMapMetrics)</c> produces in the generator. Charts.cs: 9
+    /// changes, Alice 7 -> 78% dominant share, 2 contributors (multi-author). HtmlTemplater.cs: 4 changes, Bob
+    /// 4 -> 100% dominant share, 1 contributor (sole).</summary>
+    private static CodeMap SampleCodeMap() => CodeMap.Build(
+        new (string RepoRelativePath, long Lines)[]
+        {
+            ("src/SpecScribe/Charts.cs", 100),
+            ("src/SpecScribe/HtmlTemplater.cs", 50),
+        },
+        new Dictionary<string, CodeFileMetrics>
+        {
+            ["src/SpecScribe/Charts.cs"] = new CodeFileMetrics(9, 160, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 6),
+                Contributors: new[]
+                {
+                    new FileContributor("Alice", 7, new DateOnly(2026, 7, 6)),
+                    new FileContributor("Bob", 2, new DateOnly(2026, 7, 2)),
+                }, TotalContributors: 2),
+            ["src/SpecScribe/HtmlTemplater.cs"] = new CodeFileMetrics(4, 45, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 3),
+                Contributors: new[] { new FileContributor("Bob", 4, new DateOnly(2026, 7, 3)) }, TotalContributors: 1),
+        });
+
+    private static IReadOnlyList<string> SampleTopAuthors() => new[] { "Alice", "Bob" };
+
     private static GitPulse SamplePulse()
     {
         var day = new DateOnly(2026, 7, 6);
@@ -52,27 +76,26 @@ public class GitInsightsTemplaterTests
     [Fact]
     public void RenderPage_HasSiteChromeAndBothSections()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
         // Full page shell: skip link + single main landmark + breadcrumb, like the other synthesized pages.
         Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
         Assert.Contains("<main id=\"main-content\" class=\"deep-page git-insights\">", html);
         Assert.Contains("Git Insights</h1>", html);
-        Assert.Contains(">Files &amp; Contributors</h2>", html);
+        Assert.Contains(">Code Ownership &amp; Bus-Factor</h2>", html);
         Assert.Contains(">Activity Over Time</h2>", html);
-        Assert.Contains("by commit count", html);
         Assert.Contains("chart-frame-why", html);
-        Assert.Contains(Charts.WhyText(Charts.ChartMetric.FileChurn), html);
+        Assert.Contains(Charts.WhyText(Charts.ChartMetric.CodeOwnership), html);
         Assert.Contains(Charts.WhyText(Charts.ChartMetric.ActivityCadence), html);
         Assert.DoesNotContain("deep-page-lead", html);
         Assert.Contains("crumb-current", html); // breadcrumb trail back home
     }
 
     [Fact]
-    public void RenderPage_DisclosesWhenFilesAndContributorsAreTruncated()
+    public void RenderPage_DisclosesWhenTheFileCountPillIsTruncated()
     {
-        // TotalFilesTouched/TotalContributors exceed what's actually shown, so the page must say so rather
-        // than presenting the capped counts as if they were the full totals. [Review fix 2026-07-09]
+        // Insights.TotalFilesTouched exceeds Files.Count, so the header pill must say so rather than presenting
+        // the capped count as the full total. [Review fix 2026-07-09, still load-bearing after the 7.11 rewrite]
         var insights = new GitInsightsData(
             Files: new[]
             {
@@ -84,72 +107,85 @@ public class GitInsightsTemplaterTests
             ContributorCount: 5,
             TotalFilesTouched: 60);
 
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
+        var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), SampleCodeMap(), SampleTopAuthors());
 
         Assert.Contains("top 1 of 60 files by commit count", html);
-        Assert.Contains("and 4 more contributors", html);
     }
 
     [Fact]
-    public void RenderPage_FileTableIsAccessibleAndServerSorted()
+    public void RenderPage_RendersTheWholeTreeSunburstAndItsRealValueLegend()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        // Accessible-table contract: a <caption> and <th scope="col"> (EXPERIENCE.md:234).
-        Assert.Contains("<caption>Files by change frequency", html);
-        Assert.Contains("<th scope=\"col\">File</th>", html);
-        // The generation-time sort is announced and is the no-JS reading order: most-changed file first.
-        Assert.Contains("aria-sort=\"descending\"", html);
-        var charts = html.IndexOf("src/SpecScribe/Charts.cs", StringComparison.Ordinal);
-        var templater = html.IndexOf("src/SpecScribe/HtmlTemplater.cs", StringComparison.Ordinal);
-        Assert.True(charts >= 0 && templater >= 0 && charts < templater, "files must render change-count desc");
-        // The table opts into the client-side enhancement and lives in its own scroll container.
-        Assert.Contains("js-sortable", html);
-        Assert.Contains("table-scroll", html);
+        Assert.Contains("<svg class=\"ownership-sunburst\"", html);
+        Assert.Contains("ownership-wedge", html);
+        // Real-value legend (Story 10.2) — never the literal "Less … More" placeholder.
+        Assert.Contains("ownership-legend", html);
+        Assert.Contains("76–100%", html);
+        Assert.DoesNotContain("Less", html);
+        Assert.DoesNotContain("…More", html);
     }
 
     [Fact]
-    public void RenderPage_WholeRowSelectsThePerFileContributorPanel()
+    public void RenderPage_SunburstEmbedsGenerationTimeDataForTheLiveModeSwitcher()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        // The whole row is the :target select trigger (stretched-link pattern) — not the file name, which is
-        // reserved for eventual file-page navigation. The invisible row link covers the row.
-        Assert.Contains("<a class=\"gi-row-link\" href=\"#gi-file-0\" aria-label=\"Show contributors for src/SpecScribe/Charts.cs\"></a>", html);
-        Assert.Contains("<a class=\"gi-row-link\" href=\"#gi-file-1\"", html);
-        // With no file-page resolver, the file name is plain text (the row overlay's click selects it).
-        Assert.Contains("<span class=\"gi-file-name\"><code>src/SpecScribe/Charts.cs</code></span>", html);
-        Assert.DoesNotContain("gi-file-link", html); // the old file-name-as-drill-link is gone
+        // ADR 0010 Task 4: every mode's data is embedded once at generation time — share/dominant/contributors/
+        // last/owner per wedge, plus the bounded top-author roster and the whole-tree "as of" day on the SVG root.
+        Assert.Contains("data-share=\"78\"", html); // Charts.cs: Alice 7/9 -> 78%
+        Assert.Contains("data-share=\"100\"", html); // HtmlTemplater.cs: Bob 4/4 -> 100%
+        Assert.Contains("data-dominant=\"Alice\"", html);
+        Assert.Contains("data-dominant=\"Bob\"", html);
+        Assert.Contains("data-contributors=\"2\"", html);
+        Assert.Contains("data-owner=", html);
+        Assert.Contains("data-top-authors=", html);
+        Assert.Contains("data-asof=", html);
+    }
 
-        Assert.Contains("<div class=\"gi-contributors-panel chart-panel\" id=\"gi-file-0\"", html);
-        Assert.Contains("<div class=\"gi-contributors-panel chart-panel\" id=\"gi-file-1\"", html);
-        // The panel names the people to talk to about that file, with per-file counts.
-        Assert.Contains("People to talk to about this file:", html);
-        Assert.Contains("<span class=\"gi-contributor-name\">Alice</span>", html);
-        Assert.Contains("<span class=\"gi-contributor-name\">Bob</span>", html);
-        // A default prompt covers the "nothing selected yet" state.
-        Assert.Contains("gi-detail-default", html);
-        Assert.Contains("Select a file to see who has been working on it", html);
+    [Fact]
+    public void RenderPage_ModeSelectorControlsShipHiddenForTheNoJsBaseline()
+    {
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+
+        // NFR-5/ADR 0010: no inert control ships in the no-JS page — specscribe.js reveals it.
+        Assert.Contains("<div class=\"ownership-controls\" hidden>", html);
+        Assert.Contains("ownership-mode-select", html);
+        Assert.Contains("<label class=\"ownership-author-wrap\" hidden>", html);
+        Assert.Contains("<label class=\"ownership-threshold-wrap\" hidden>", html);
+    }
+
+    [Fact]
+    public void RenderPage_TextEquivalentTreeCarriesEveryFilesDominantAuthorShareContributorsAndLastActive()
+    {
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+
+        Assert.Contains("<ul class=\"ownership-tree\">", html);
+        Assert.Contains("ownership-tree-file", html);
+        Assert.Contains("Alice 78%", html);
+        Assert.Contains("Bob 100%", html);
+        Assert.Contains("2 contributors", html);
+        Assert.Contains("1 contributor", html);
+        Assert.Contains("last active", html);
     }
 
     [Fact]
     public void RenderPage_IsNotFramedAsARankingOrScoreboard()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        // The redesign is explicitly file-scoped attribution, not a global people ranking.
+        // FR-10: descriptive attribution only, never a cross-repo people ranking — in every mode, including
+        // the spotlight (recolorSpotlight answers "where has this person worked", never "who did the most").
         Assert.DoesNotContain("leaderboard", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("top performer", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("productivity", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">Rank<", html);
-        // No standalone "Contributor Attribution" section heading anymore — contributors live per file.
-        Assert.DoesNotContain(">Contributor Attribution</h2>", html);
     }
 
     [Fact]
     public void RenderPage_ReusesTheCommitHeatmapForActivity()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
         // Activity over time = the existing accessible heatmap (whose active days link to per-day pages).
         // The headline is derived from the SAME pulse data as the heatmap (not insights.Activity), so the
@@ -162,18 +198,21 @@ public class GitInsightsTemplaterTests
     [Fact]
     public void RenderPage_EscapesRepoDerivedText()
     {
-        var insights = new GitInsightsData(
-            Files: new[]
+        var codeMap = CodeMap.Build(
+            new (string, long)[] { ("src/<weird> & \"odd\".cs", 10) },
+            new Dictionary<string, CodeFileMetrics>
             {
-                new FileChangeStat("src/<weird> & \"odd\".cs", 1, 1, 0, "beef123", new DateOnly(2026, 7, 1),
-                    new[] { new FileContributor("<b>Eve</b> & Co", 1, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
-            },
+                ["src/<weird> & \"odd\".cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1),
+                    Contributors: new[] { new FileContributor("<b>Eve</b> & Co", 1, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
+            });
+        var insights = new GitInsightsData(
+            Files: Array.Empty<FileChangeStat>(),
             Activity: Array.Empty<(DateOnly, int)>(),
             CommitCount: 1,
-            ContributorCount: 1,
+            ContributorCount: 2, // >1 so the solo-repo reframe doesn't short-circuit the section under test
             TotalFilesTouched: 1);
 
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
+        var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, Array.Empty<string>());
 
         Assert.Contains("src/&lt;weird&gt; &amp; &quot;odd&quot;.cs", html);
         Assert.Contains("&lt;b&gt;Eve&lt;/b&gt; &amp; Co", html);
@@ -182,175 +221,57 @@ public class GitInsightsTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_GuardsDetailLinksOnTargetExistence()
+    public void RenderPage_GuardsFileLinksOnTargetExistence()
     {
         var insights = SampleInsights();
+        var codeMap = SampleCodeMap();
 
-        // No resolvers (7.1/7.4/7.5 unmerged): the file's latest-change hash renders as plain text and no
-        // "view file page" link appears — no dead links.
-        var unresolved = GitInsightsTemplater.RenderPage(insights, null, Nav());
+        // No resolver: every file link stays plain text/no href — no dead links.
+        var unresolved = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, SampleTopAuthors());
         Assert.DoesNotContain("href=\"code/", unresolved);
-        Assert.DoesNotContain("href=\"commit/", unresolved);
-        Assert.DoesNotContain("View file page", unresolved);
-        Assert.Contains("<code>abc1234</code>", unresolved); // latest-change short hash, plain
 
-        // The file name is plain text (a span) until a file-page resolver gives it a target.
-        Assert.Contains("<span class=\"gi-file-name\">", unresolved);
-        Assert.DoesNotContain("<a class=\"gi-file-name\"", unresolved);
-
-        // With resolvers, the file name becomes a navigation link (above the row overlay), the latest-change
-        // hash links to its commit page, and the panel gains its own file-page link.
+        // With a resolver, the resolved file's wedge/tree entry becomes a real link; the unresolved file stays
+        // plain text — per-entry guarding, not all-or-nothing.
         var resolved = GitInsightsTemplater.RenderPage(
-            insights, null, Nav(),
-            fileHref: path => path == "src/SpecScribe/Charts.cs" ? "code/src/SpecScribe/Charts.cs.html" : null,
-            commitHref: hash => hash == "abc1234def" ? "commit/abc1234.html" : null);
-        Assert.Contains("<a class=\"gi-file-name\" href=\"code/src/SpecScribe/Charts.cs.html\"><code>src/SpecScribe/Charts.cs</code></a>", resolved);
-        Assert.Contains("<a href=\"commit/abc1234.html\"><code>abc1234</code></a>", resolved);
-        Assert.Contains("<a class=\"view-epic-link gi-detail-filelink\" href=\"code/src/SpecScribe/Charts.cs.html\">", resolved);
-        // The unresolved second file's name stays a plain span — per-entry guarding, not all-or-nothing.
-        Assert.Contains("<span class=\"gi-file-name\"><code>src/SpecScribe/HtmlTemplater.cs</code></span>", resolved);
-        Assert.DoesNotContain("href=\"commit/fff9999", resolved);
-    }
-
-    // ---- Story 10.6 AC2b: sole-contributor phrasing ----
-
-    [Fact]
-    public void RenderPage_SoleContributorFileRewordsPanelLeadButMultiContributorFileDoesNot()
-    {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
-
-        // SampleInsights: Charts.cs has TotalContributors 2 (multi, unchanged), HtmlTemplater.cs has 1 (solo).
-        Assert.Contains("People to talk to about this file:", html);
-        Assert.Contains("Sole contributor:", html);
-    }
-
-    [Fact]
-    public void RenderPage_SoleContributorUsesTotalContributorsNotTheCappedList()
-    {
-        // A file whose Contributors list is truncated (shown 1) but TotalContributors is really 3 must NOT
-        // read as solo — the plural lead stays, with the honest "and N more" disclosure.
-        var insights = new GitInsightsData(
-            Files: new[]
-            {
-                new FileChangeStat("src/A.cs", 5, 10, 2, "abc1234def", new DateOnly(2026, 7, 1),
-                    new[] { new FileContributor("Alice", 3, new DateOnly(2026, 7, 1)) }, TotalContributors: 3),
-            },
-            Activity: Array.Empty<(DateOnly, int)>(),
-            CommitCount: 5,
-            ContributorCount: 3,
-            TotalFilesTouched: 1);
-
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
-
-        Assert.Contains("People to talk to about this file:", html);
-        Assert.DoesNotContain("Sole contributor:", html);
-        Assert.Contains("and 2 more contributors", html);
-    }
-
-    [Fact]
-    public void RenderPage_SoleRepoContributorSoftensTheUnselectedPrompt()
-    {
-        var insights = new GitInsightsData(
-            Files: new[]
-            {
-                new FileChangeStat("src/A.cs", 5, 10, 2, "abc1234def", new DateOnly(2026, 7, 1),
-                    new[] { new FileContributor("Alice", 5, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
-            },
-            Activity: Array.Empty<(DateOnly, int)>(),
-            CommitCount: 5,
-            ContributorCount: 1,
-            TotalFilesTouched: 1);
-
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
-
-        Assert.Contains("Select a file to see who has been working on it — the person to talk to about that area.", html);
-        Assert.DoesNotContain("the people to talk to about that area.", html);
-    }
-
-    [Fact]
-    public void RenderPage_MultiContributorRepoKeepsThePluralUnselectedPrompt()
-    {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
-
-        // SampleInsights has ContributorCount: 2 — plural prompt stays.
-        Assert.Contains("Select a file to see who has been working on it — the people to talk to about that area.", html);
-    }
-
-    [Fact]
-    public void RenderPage_EmptyFilesDegradesToFriendlyNoteWithNoMasterDetail()
-    {
-        var empty = new GitInsightsData(
-            Files: Array.Empty<FileChangeStat>(),
-            Activity: Array.Empty<(DateOnly, int)>(),
-            CommitCount: 0,
-            ContributorCount: 0,
-            TotalFilesTouched: 0);
-
-        var html = GitInsightsTemplater.RenderPage(empty, null, Nav());
-
-        Assert.Contains("No file change data available.", html);
-        Assert.Contains("No activity data available.", html);
-        Assert.DoesNotContain("gi-master-detail", html); // no broken/empty master-detail
-        Assert.DoesNotContain("<tbody>", html);
-    }
-
-    // ---- Story 7.11: Ownership & Bus-Factor section ----
-
-    [Fact]
-    public void RenderPage_OwnershipSectionShowsDominantShareContributorCountAndSoleContributorFlag()
-    {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav());
-
-        Assert.Contains(">Ownership &amp; Bus-Factor</h2>", html);
-        Assert.Contains(Charts.WhyText(Charts.ChartMetric.AuthorConcentration), html);
-
-        // Charts.cs: 9 changes, Alice dominant with 7 commits -> 78% share, 2 contributors, multi-author (no flag).
-        Assert.Contains("78% (Alice)", html);
-        // HtmlTemplater.cs: 4 changes, Bob 4 commits -> 100% share, 1 contributor -> sole-contributor bus-factor flag.
-        Assert.Contains("100% (Bob)", html);
-        Assert.Contains("<span class=\"gi-risk-badge\">Sole contributor:</span>", html);
-    }
-
-    [Fact]
-    public void RenderPage_OwnershipRowsLinkViaFileHrefResolver()
-    {
-        var html = GitInsightsTemplater.RenderPage(
-            SampleInsights(), SamplePulse(), Nav(),
+            insights, null, Nav(), codeMap, SampleTopAuthors(),
             fileHref: path => path == "src/SpecScribe/Charts.cs" ? "code/src/SpecScribe/Charts.cs.html" : null);
-
-        Assert.Contains("<a href=\"code/src/SpecScribe/Charts.cs.html\"><code>src/SpecScribe/Charts.cs</code></a>", html);
-        // The unresolved file stays plain <code>, never a dead link.
-        Assert.Contains("<code>src/SpecScribe/HtmlTemplater.cs</code>", html);
-        Assert.DoesNotContain("<a href=\"\">", html);
+        Assert.Contains("href=\"code/src/SpecScribe/Charts.cs.html\"", resolved);
+        Assert.Contains("src/SpecScribe/HtmlTemplater.cs", resolved);
+        Assert.DoesNotContain("href=\"code/src/SpecScribe/HtmlTemplater.cs", resolved);
     }
 
+    // ---- Story 7.11: solo-repo reframe (AC #4) ----
+
     [Fact]
-    public void RenderPage_SoloRepoOwnershipReframesInsteadOfAnAllFlaggedTable()
+    public void RenderPage_SoloRepoOwnershipReframesInsteadOfAnAllFlaggedSunburst()
     {
-        var insights = new GitInsightsData(
-            Files: new[]
+        var codeMap = CodeMap.Build(
+            new (string, long)[] { ("src/A.cs", 10), ("src/B.cs", 5) },
+            new Dictionary<string, CodeFileMetrics>
             {
-                new FileChangeStat("src/A.cs", 5, 10, 2, "abc1234def", new DateOnly(2026, 7, 1),
-                    new[] { new FileContributor("Alice", 5, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
-                new FileChangeStat("src/B.cs", 3, 4, 1, "def5678aaa", new DateOnly(2026, 7, 2),
-                    new[] { new FileContributor("Alice", 3, new DateOnly(2026, 7, 2)) }, TotalContributors: 1),
-            },
+                ["src/A.cs"] = new CodeFileMetrics(5, 10, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1),
+                    Contributors: new[] { new FileContributor("Alice", 5, new DateOnly(2026, 7, 1)) }, TotalContributors: 1),
+                ["src/B.cs"] = new CodeFileMetrics(3, 4, new DateOnly(2026, 7, 2), new DateOnly(2026, 7, 2),
+                    Contributors: new[] { new FileContributor("Alice", 3, new DateOnly(2026, 7, 2)) }, TotalContributors: 1),
+            });
+        var insights = new GitInsightsData(
+            Files: Array.Empty<FileChangeStat>(),
             Activity: Array.Empty<(DateOnly, int)>(),
             CommitCount: 8,
             ContributorCount: 1,
             TotalFilesTouched: 2);
 
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav());
+        var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, new[] { "Alice" });
 
         Assert.Contains("Single-maintainer project", html);
         Assert.Contains("gi-solo-repo-note", html);
-        // No per-file risk table in the solo case — that would be an all-red table, noise not signal.
-        Assert.DoesNotContain("gi-risk-badge", html);
-        Assert.DoesNotContain("Dominant-author share and contributor count per file", html);
+        // No sunburst/mode-selector in the solo case — that would flag every wedge at-risk, noise not signal.
+        Assert.DoesNotContain("ownership-sunburst", html);
+        Assert.DoesNotContain("ownership-controls", html);
     }
 
     [Fact]
-    public void RenderPage_OwnershipSectionDegradesToFriendlyNoteWhenNoFiles()
+    public void RenderPage_OwnershipSectionDegradesToFriendlyNoteWhenCodeMapIsEmpty()
     {
         var empty = new GitInsightsData(
             Files: Array.Empty<FileChangeStat>(),
@@ -359,12 +280,11 @@ public class GitInsightsTemplaterTests
             ContributorCount: 0,
             TotalFilesTouched: 0);
 
-        var html = GitInsightsTemplater.RenderPage(empty, null, Nav());
+        var html = GitInsightsTemplater.RenderPage(empty, null, Nav(), CodeMap.Empty, Array.Empty<string>());
 
-        // The Ownership section carries its own empty state — never an empty table.
-        var ownershipIndex = html.IndexOf(">Ownership &amp; Bus-Factor</h2>", StringComparison.Ordinal);
-        Assert.True(ownershipIndex >= 0);
-        var afterOwnership = html[ownershipIndex..];
-        Assert.Contains("No file change data available.", afterOwnership);
+        Assert.Contains("No file change data available.", html);
+        Assert.Contains("No activity data available.", html);
+        Assert.DoesNotContain("ownership-sunburst", html);
+        Assert.DoesNotContain("<tbody>", html);
     }
 }

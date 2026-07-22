@@ -78,25 +78,27 @@ public static class CodeMapTemplater
     /// Story 10.2 <see cref="Charts.Framed"/> chrome with a real-value legend (never the treemap's own
     /// pre-existing "Less … More" legend) and a caption pointing at the existing <see cref="AppendFileTable"/>
     /// "Last" column as the accessible text equivalent, rather than a second table. Owner feedback also asked for
-    /// a "view as tree" alternative to the polar sunburst — a pure-CSS radio pair (mirroring the sprint board's
-    /// <c>.board-tabs</c> view toggle) swaps between <see cref="Charts.CodeFreshnessSunburst"/> and
-    /// <see cref="Charts.CodeFreshnessTree"/>, both rendered from the SAME variant so either view is instantly
-    /// available with no re-fetch/re-filter. Radio ids are suffixed with <paramref name="variant"/>'s key so all
-    /// four filter-combination panels can carry their own toggle without id/name collisions.</summary>
+    /// a "view as treemap" alternative to the polar sunburst — a pure-CSS radio pair (mirroring the sprint
+    /// board's <c>.board-tabs</c> view toggle) swaps between <see cref="Charts.CodeFreshnessSunburst"/> and
+    /// <see cref="Charts.CodeFreshnessTreemap"/> (the SAME squarified <paramref name="variant"/>.Layout the
+    /// page's other treemap draws from, colored by recency instead), both rendered from the SAME variant so
+    /// either view is instantly available with no re-fetch/re-filter. Radio ids are suffixed with
+    /// <paramref name="variant"/>'s key so all four filter-combination panels can carry their own toggle without
+    /// id/name collisions.</summary>
     private static void AppendFreshnessSunburstSection(StringBuilder sb, CodeMapVariant variant, Func<string, string?>? fileHref)
     {
         var files = variant.Map.Files();
         var sunburstId = $"cf-sunburst-{variant.Key}";
-        var treeId = $"cf-tree-{variant.Key}";
+        var treemapId = $"cf-treemap-{variant.Key}";
 
         var body = new StringBuilder();
         body.Append("    <div class=\"freshness-panel\">\n");
         body.Append("      <div class=\"board-tabs\">\n");
         body.Append($"        <input type=\"radio\" id=\"{sunburstId}\" name=\"cf-view-{variant.Key}\" class=\"board-tab-radio\" checked>\n");
-        body.Append($"        <input type=\"radio\" id=\"{treeId}\" name=\"cf-view-{variant.Key}\" class=\"board-tab-radio cf-tree-radio\">\n");
+        body.Append($"        <input type=\"radio\" id=\"{treemapId}\" name=\"cf-view-{variant.Key}\" class=\"board-tab-radio cf-treemap-radio\">\n");
         body.Append("        <div class=\"board-tabbar\">\n");
         body.Append($"          <label for=\"{sunburstId}\" class=\"board-tab\">Sunburst</label>\n");
-        body.Append($"          <label for=\"{treeId}\" class=\"board-tab\">Tree</label>\n");
+        body.Append($"          <label for=\"{treemapId}\" class=\"board-tab\">Treemap</label>\n");
         body.Append("        </div>\n");
         body.Append("      </div>\n");
         body.Append("      <div class=\"freshness-view freshness-view-sunburst\">\n");
@@ -105,8 +107,11 @@ public static class CodeMapTemplater
         body.Append(Charts.FreshnessLegend(files));
         body.Append("        </div>\n");
         body.Append("      </div>\n");
-        body.Append("      <div class=\"freshness-view freshness-view-tree\">\n");
-        body.Append(Charts.CodeFreshnessTree(variant.Map.Roots, fileHref: fileHref));
+        body.Append("      <div class=\"freshness-view freshness-view-treemap\">\n");
+        body.Append("        <div class=\"freshness-treemap-wrap\">\n");
+        body.Append(Charts.CodeFreshnessTreemap(variant.Layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, fileHref: fileHref));
+        body.Append(Charts.FreshnessLegend(files));
+        body.Append("        </div>\n");
         body.Append("      </div>\n");
         body.Append("    </div>\n");
         body.Append("    <p class=\"chart-lead freshness-caption\">See the <strong>Last</strong> column in the file table below for every file's exact last-changed date.</p>\n");
@@ -300,7 +305,7 @@ public static class CodeMapTemplater
             ? $"The {cap.ToString("N0", CultureInfo.InvariantCulture)} most significant files in the treemap"
             : "Every file in the treemap";
         sb.Append($"      <p class=\"chart-lead\">{leadScope}, listed as text{(hasMetrics ? ", ordered by change frequency" : ", ordered by size")}.</p>\n");
-        sb.Append("      <table class=\"codemap-table\">\n");
+        sb.Append($"      <table class=\"codemap-table\" data-page-size=\"{CodeMapTablePageSize.ToString(CultureInfo.InvariantCulture)}\">\n");
         sb.Append("        <thead><tr><th scope=\"col\">File</th><th scope=\"col\" class=\"num\">Lines</th><th scope=\"col\">Type</th>");
         if (hasMetrics)
         {
@@ -315,7 +320,7 @@ public static class CodeMapTemplater
                 ? $"<a href=\"{PathUtil.Html(prefix + target)}\">{PathUtil.Html(file.RepoRelativePath)}</a>"
                 : PathUtil.Html(file.RepoRelativePath);
 
-            sb.Append("          <tr><th scope=\"row\">").Append(pathCell).Append("</th>");
+            sb.Append("          <tr class=\"codemap-table-row\"><th scope=\"row\">").Append(pathCell).Append("</th>");
             sb.Append($"<td class=\"num\">{file.Lines.ToString("N0", CultureInfo.InvariantCulture)}</td>");
             // Always present, independent of hasMetrics — the categorical dimension's text equivalent. [Story 7.9]
             sb.Append($"<td>{PathUtil.Html((file.Category ?? CodeFileType.Other).Label)}</td>");
@@ -350,6 +355,29 @@ public static class CodeMapTemplater
         }
 
         sb.Append("        </tbody>\n      </table>\n");
+        AppendCodeMapTablePager(sb);
         sb.Append("    </section>\n\n");
+    }
+
+    /// <summary>The number of rows the file table shows per page once client-side pagination kicks in — mirrors
+    /// <see cref="RiskQuadrantTemplater"/>'s elevated-risk grid pager, sized larger since a table row is far
+    /// denser than a card. Owner feedback (Story 7.12 review): the "All files" table could run to hundreds/
+    /// thousands of rows on a real repo with no way to page through it.</summary>
+    private const int CodeMapTablePageSize = 30;
+
+    /// <summary>The client-side pager control for the file table (progressive enhancement ONLY — every row
+    /// always renders in the markup, in order, as the complete no-JS truth; specscribe.js's
+    /// <c>initCodemapTablePager</c> only reveals this control and hides off-page rows once there's more than one
+    /// page's worth). Mirrors <see cref="RiskQuadrantTemplater"/>'s <c>.risk-pager</c> exactly — same shape, new
+    /// class family so the two pagers can never cross-wire. Emitted <c>hidden</c>; sits immediately after the
+    /// table (not before it) so a no-JS visitor never sees inert controls, matching the risk grid's own
+    /// "controls belong at the bottom of the list they page" precedent.</summary>
+    private static void AppendCodeMapTablePager(StringBuilder sb)
+    {
+        sb.Append("      <div class=\"codemap-table-pager\" hidden>\n");
+        sb.Append("        <button type=\"button\" class=\"codemap-table-pager-prev\" aria-label=\"Previous page of files\">&lsaquo; Prev</button>\n");
+        sb.Append("        <span class=\"codemap-table-pager-status\" aria-live=\"polite\"></span>\n");
+        sb.Append("        <button type=\"button\" class=\"codemap-table-pager-next\" aria-label=\"Next page of files\">Next &rsaquo;</button>\n");
+        sb.Append("      </div>\n");
     }
 }

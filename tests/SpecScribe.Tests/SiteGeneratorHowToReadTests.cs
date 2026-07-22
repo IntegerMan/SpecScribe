@@ -228,9 +228,11 @@ public class SiteGeneratorHowToReadTests : IDisposable
         var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
         var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
 
-        // Hub: Overview is the active pill (span, not a self-link); frameworks are links.
+        // Hub: Overview is the active pill (span, not a self-link); frameworks are links. Overview carries the
+        // same Icons.ForConcept glyph the dark-bar Insights dropdown shows for this label (Story 10.10; icon:
+        // Story 7.12 review); the framework labels are uncurated so they render no icon.
         Assert.Contains("site-nav-local-context", hub);
-        Assert.Contains("local-context-pill active\" aria-current=\"page\">Overview</span>", hub);
+        Assert.Contains($"local-context-pill active\" aria-current=\"page\">{Icons.ForConcept("Overview")}Overview</span>", hub);
         Assert.Contains("href=\"about-sdd-bmad.html\" class=\"local-context-pill\">BMad</a>", hub);
         Assert.Contains("href=\"about-sdd-gds.html\" class=\"local-context-pill\">BMad GDS</a>", hub);
         Assert.Contains("href=\"about-sdd-speckit.html\" class=\"local-context-pill\">Spec Kit</a>", hub);
@@ -239,7 +241,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
         Assert.Contains("href=\"about-sdd-superpowers.html\" class=\"local-context-pill\">Superpowers</a>", hub);
 
         // Framework page: Overview is a link back to the hub; BMad is the active pill.
-        Assert.Contains("href=\"about-sdd.html\" class=\"local-context-pill\">Overview</a>", bmad);
+        Assert.Contains($"href=\"about-sdd.html\" class=\"local-context-pill\">{Icons.ForConcept("Overview")}Overview</a>", bmad);
         Assert.Contains("local-context-pill active\" aria-current=\"page\">BMad</span>", bmad);
     }
 

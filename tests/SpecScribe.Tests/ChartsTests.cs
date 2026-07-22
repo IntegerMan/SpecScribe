@@ -2445,7 +2445,7 @@ public class ChartsTests
         var roots = FreshnessRoots();
 
         var linked = Charts.CodeFreshnessSunburst(roots, fileHref: p => p == "src/dir/Recent.cs" ? "code/src/dir/Recent.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/dir/Recent.cs.html\">", linked);
+        Assert.Contains("<a href=\"code/src/dir/Recent.cs.html\" aria-label=\"src/dir/Recent.cs\">", linked);
 
         var plain = Charts.CodeFreshnessSunburst(roots, fileHref: null);
         Assert.DoesNotContain("<a href=", plain);
@@ -2522,84 +2522,339 @@ public class ChartsTests
     private static IEnumerable<CodeMapNode> FlattenFreshnessFiles(CodeMapNode node) =>
         node.IsDirectory ? node.Children.SelectMany(FlattenFreshnessFiles) : new[] { node };
 
-    // ---- Code freshness tree view (Story 7.12 review — sunburst/tree toggle) --------------
+    // ---- Code freshness treemap view (Story 7.12 review — sunburst/treemap toggle) --------
+
+    private static IReadOnlyList<TreemapRect> FreshnessLayout() => CodeMap.Build(
+        new[]
+        {
+            ("src/dir/Recent.cs", 100L),
+            ("src/dir/Old.cs", 80L),
+            ("src/dir/NoGit.cs", 60L),
+        },
+        new Dictionary<string, CodeFileMetrics>
+        {
+            ["src/dir/Recent.cs"] = new CodeFileMetrics(5, 50, new DateOnly(2026, 1, 1), new DateOnly(2026, 7, 20)),
+            ["src/dir/Old.cs"] = new CodeFileMetrics(2, 20, new DateOnly(2020, 1, 1), new DateOnly(2020, 1, 1)),
+        }).Layout();
 
     [Fact]
-    public void CodeFreshnessTree_RendersOneListItemPerFileAndOneDisclosurePerDirectory()
+    public void CodeFreshnessTreemap_RendersOneCellPerFileAndOneRectPerDirectory()
     {
-        var html = Charts.CodeFreshnessTree(FreshnessRoots());
+        var svg = Charts.CodeFreshnessTreemap(FreshnessLayout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight);
 
-        Assert.Contains("<ul class=\"freshness-tree\">", html);
-        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(html, "class=\"freshness-tree-file\"").Count);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "class=\"freshness-tree-dir\""));
-        Assert.Contains("<details>", html);
+        Assert.Contains("<svg class=\"freshness-treemap\"", svg);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"freshness-cell level-").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(svg, "class=\"freshness-cell-dir\""));
     }
 
     [Fact]
-    public void CodeFreshnessTree_AgreesWithTheSunburstOnEveryFilesRecencyLevel()
+    public void CodeFreshnessTreemap_AgreesWithTheSunburstOnEveryFilesRecencyLevel()
     {
         // The two views share DescribeFreshnessFile — they must never disagree about which files are hottest,
         // coldest, or have no git record.
-        var roots = FreshnessRoots();
-        var tree = Charts.CodeFreshnessTree(roots);
+        var svg = Charts.CodeFreshnessTreemap(FreshnessLayout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight);
 
-        Assert.Contains("freshness-tree-dot level-4", tree); // Recent.cs
-        Assert.Contains("freshness-tree-dot level-1", tree); // Old.cs
-        Assert.Contains("freshness-tree-dot level-none", tree); // NoGit.cs
+        Assert.Contains("freshness-cell level-4", svg); // Recent.cs
+        Assert.Contains("freshness-cell level-1", svg); // Old.cs
+        Assert.Contains("freshness-cell level-none", svg); // NoGit.cs
     }
 
     [Fact]
-    public void CodeFreshnessTree_LinksAFileOnlyWhenTheResolverReturnsATarget()
+    public void CodeFreshnessTreemap_LinksAFileOnlyWhenTheResolverReturnsATarget()
     {
-        var roots = FreshnessRoots();
+        var layout = FreshnessLayout();
 
-        var linked = Charts.CodeFreshnessTree(roots, fileHref: p => p == "src/dir/Recent.cs" ? "code/src/dir/Recent.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/dir/Recent.cs.html\">Recent.cs</a>", linked);
+        var linked = Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight,
+            fileHref: p => p == "src/dir/Recent.cs" ? "code/src/dir/Recent.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/dir/Recent.cs.html\"><rect class=\"freshness-cell", linked);
 
-        var plain = Charts.CodeFreshnessTree(roots, fileHref: null);
+        var plain = Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, fileHref: null);
         Assert.DoesNotContain("<a href=", plain);
-        Assert.Contains("Recent.cs", plain);
+        Assert.Contains("tabindex=\"0\"", plain);
     }
 
     [Fact]
-    public void CodeFreshnessTree_ShowsExactLastChangedDateOrNoGitHistory()
+    public void CodeFreshnessTreemap_TooltipShowsExactLastChangedDateOrNoGitHistory()
     {
-        var html = Charts.CodeFreshnessTree(FreshnessRoots());
+        var svg = Charts.CodeFreshnessTreemap(FreshnessLayout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight);
 
-        Assert.Contains("last changed", html);
+        Assert.Contains("last changed", svg);
+        Assert.Contains("no git history", svg);
+    }
+
+    [Fact]
+    public void CodeFreshnessTreemap_EmptyLayout_DegradesToChartEmpty()
+    {
+        var svg = Charts.CodeFreshnessTreemap(Array.Empty<TreemapRect>(), CodeMap.DefaultWidth, CodeMap.DefaultHeight);
+
+        Assert.Contains("chart-empty", svg);
+        Assert.DoesNotContain("<svg", svg);
+    }
+
+    [Fact]
+    public void CodeFreshnessTreemap_EscapesPathsInTooltips()
+    {
+        var layout = CodeMap.Build(
+            new[] { ("src/a&b<c>.cs", 100L) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/a&b<c>.cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 1)),
+            }).Layout();
+
+        var svg = Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight);
+
+        Assert.Contains("a&amp;b&lt;c&gt;.cs", svg);
+        Assert.DoesNotContain("<c>", svg);
+    }
+
+    [Fact]
+    public void CodeFreshnessTreemap_DeterministicAcrossRepeatedCalls()
+    {
+        var layout = FreshnessLayout();
+        Assert.Equal(
+            Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight),
+            Charts.CodeFreshnessTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight));
+    }
+
+    // ---- Code ownership sunburst (Story 7.11) -----------------------------------------------
+
+    /// <summary>A small nested tree: one file with a clear dominant author (Alice 8/10 -> 80% share), one
+    /// evenly-split file (no single dominant share above 50%), and one file with no git record at all — enough
+    /// to exercise share-% bucketing, the <c>level-none</c> no-data case, and directory neutrality.</summary>
+    private static IReadOnlyList<CodeMapNode> OwnershipRoots() => CodeMap.Build(
+        new[]
+        {
+            ("src/dir/Dominant.cs", 100L),
+            ("src/dir/Split.cs", 80L),
+            ("src/dir/NoGit.cs", 60L),
+        },
+        new Dictionary<string, CodeFileMetrics>
+        {
+            ["src/dir/Dominant.cs"] = new CodeFileMetrics(10, 50, new DateOnly(2026, 1, 1), new DateOnly(2026, 7, 20),
+                Contributors: new[]
+                {
+                    new FileContributor("Alice", 8, new DateOnly(2026, 7, 20)),
+                    new FileContributor("Bob", 2, new DateOnly(2026, 7, 1)),
+                }, TotalContributors: 2),
+            ["src/dir/Split.cs"] = new CodeFileMetrics(4, 20, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1),
+                Contributors: new[]
+                {
+                    new FileContributor("Alice", 2, new DateOnly(2026, 6, 1)),
+                    new FileContributor("Bob", 2, new DateOnly(2026, 5, 1)),
+                }, TotalContributors: 2),
+            // src/dir/NoGit.cs deliberately has no metrics entry.
+        }).Roots;
+
+    [Fact]
+    public void CodeOwnershipSunburst_RendersOneWedgePerFileAndOnePerDirectory()
+    {
+        var svg = Charts.CodeOwnershipSunburst(OwnershipRoots(), new[] { "Alice", "Bob" });
+
+        Assert.Contains("<svg class=\"ownership-sunburst\"", svg);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"ownership-wedge level-").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(svg, "class=\"ownership-wedge-dir\""));
+    }
+
+    [Fact]
+    public void CodeOwnershipSunburst_ColorsFileLeavesByDominantShareAndNoDataAsLevelNone()
+    {
+        var svg = Charts.CodeOwnershipSunburst(OwnershipRoots(), new[] { "Alice", "Bob" });
+
+        Assert.Contains("ownership-wedge level-4", svg); // Dominant.cs — 80% share
+        Assert.Contains("ownership-wedge level-2", svg); // Split.cs — 50% share
+        Assert.Contains("ownership-wedge level-none", svg); // NoGit.cs — no git record at all
+    }
+
+    [Fact]
+    public void CodeOwnershipSunburst_EmbedsGenerationTimeDataForTheLiveModeSwitcher()
+    {
+        var svg = Charts.CodeOwnershipSunburst(OwnershipRoots(), new[] { "Alice", "Bob" });
+
+        Assert.Contains("data-share=\"80\"", svg);
+        Assert.Contains("data-dominant=\"Alice\"", svg);
+        Assert.Contains("data-contributors=\"2\"", svg);
+        Assert.Contains("data-last=\"", svg);
+        Assert.Contains("data-owner=\"[[&quot;Alice&quot;,8,", svg);
+        Assert.Contains("data-top-authors=\"[&quot;Alice&quot;,&quot;Bob&quot;]\"", svg);
+        Assert.Contains("data-asof=\"", svg);
+        // The no-data file carries no recolor payload at all — nothing for the client to misread as real data.
+        Assert.DoesNotContain("no git history\" data-share", svg);
+    }
+
+    [Fact]
+    public void CodeOwnershipSunburst_DirectoryWedgesAreNeutralAndUnlabeled()
+    {
+        var svg = Charts.CodeOwnershipSunburst(OwnershipRoots(), Array.Empty<string>());
+
+        Assert.DoesNotContain("ownership-wedge-dir level-", svg);
+        Assert.DoesNotContain("<text", svg);
+    }
+
+    [Fact]
+    public void CodeOwnershipSunburst_LinksAFileWedgeOnlyWhenTheResolverReturnsATarget()
+    {
+        var roots = OwnershipRoots();
+
+        var linked = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>(), fileHref: p => p == "src/dir/Dominant.cs" ? "code/src/dir/Dominant.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\">", linked);
+
+        var plain = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>(), fileHref: null);
+        Assert.DoesNotContain("<a href=", plain);
+        Assert.Contains("tabindex=\"0\"", plain); // unlinked file wedges stay keyboard-focusable
+    }
+
+    [Fact]
+    public void CodeOwnershipSunburst_EmptyTree_DegradesToChartEmpty()
+    {
+        var html = Charts.CodeOwnershipSunburst(Array.Empty<CodeMapNode>(), Array.Empty<string>());
+
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<svg", html);
+    }
+
+    [Fact]
+    public void CodeOwnershipSunburst_BakesTheFilePathAsAriaLabelOnWhicheverElementIsTheAccessibleNameHost()
+    {
+        // specscribe.js's initOwnershipSunburst snapshots each wedge's "base label" ONCE, before any live mode
+        // switch, by reading aria-label off the <a> (or the wedge itself when unlinked) — never the <title>.
+        // Without a real baked aria-label here, that snapshot silently captures "" and every subsequent mode
+        // switch permanently drops the file path from the wedge's accessible name (an a11y regression the JS
+        // itself can never detect, since it only ever reads what the server gave it).
+        var roots = OwnershipRoots();
+
+        var linked = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>(), fileHref: p => p == "src/dir/Dominant.cs" ? "code/src/dir/Dominant.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/dir/Dominant.cs.html\" aria-label=\"src/dir/Dominant.cs\">", linked);
+
+        var plain = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>(), fileHref: null);
+        Assert.Contains("aria-label=\"src/dir/Dominant.cs\"", plain);
+        Assert.DoesNotContain("<a href=", plain);
+    }
+
+    [Fact]
+    public void CodeOwnershipSunburst_EscapesPathsAndAuthorNamesInTooltipsAndDataAttrs()
+    {
+        var roots = CodeMap.Build(
+            new[] { ("src/a&b<c>.cs", 100L) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                ["src/a&b<c>.cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 1),
+                    Contributors: new[] { new FileContributor("<b>Eve</b>", 1, new DateOnly(2026, 1, 1)) }, TotalContributors: 1),
+            }).Roots;
+
+        var svg = Charts.CodeOwnershipSunburst(roots, new[] { "<b>Eve</b>" });
+
+        Assert.Contains("a&amp;b&lt;c&gt;.cs", svg);
+        Assert.DoesNotContain("<c>", svg);
+        Assert.Contains("&lt;b&gt;Eve&lt;/b&gt;", svg);
+        Assert.DoesNotContain("<b>Eve</b>", svg);
+    }
+
+    [Fact]
+    public void CodeOwnershipSunburst_DeterministicAcrossRepeatedCalls()
+    {
+        var roots = OwnershipRoots();
+        var topAuthors = new[] { "Alice", "Bob" };
+        Assert.Equal(Charts.CodeOwnershipSunburst(roots, topAuthors), Charts.CodeOwnershipSunburst(roots, topAuthors));
+    }
+
+    [Fact]
+    public void OwnershipLegend_CarriesRealValuePercentRangesNeverLessOrMore()
+    {
+        var files = OwnershipRoots().SelectMany(FlattenFreshnessFiles).ToList();
+
+        var legend = Charts.OwnershipLegend(files);
+
+        Assert.DoesNotContain("Less", legend);
+        Assert.DoesNotContain("More", legend);
+        Assert.Contains("76–100%", legend);
+        Assert.Contains("No git history", legend); // NoGit.cs has no contributor data — the trailing swatch note
+    }
+
+    [Fact]
+    public void OwnershipLegend_NoMetricBearingFiles_DegradesToAPlainNoteRatherThanAMeaninglessRamp()
+    {
+        var files = CodeMap.Build(new[] { ("src/A.cs", 10L) }, new Dictionary<string, CodeFileMetrics>()).Files();
+
+        var legend = Charts.OwnershipLegend(files);
+
+        Assert.Contains("unavailable", legend);
+        Assert.DoesNotContain("ownership-legend-swatch level-4", legend);
+    }
+
+    [Fact]
+    public void CodeOwnershipTree_RendersOneListItemPerFileAndOneDisclosurePerDirectory()
+    {
+        var html = Charts.CodeOwnershipTree(OwnershipRoots());
+
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(html, "class=\"ownership-tree-file\"").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "class=\"ownership-tree-dir\""));
+    }
+
+    [Fact]
+    public void CodeOwnershipTree_AgreesWithTheSunburstOnEveryFilesShareLevel()
+    {
+        var roots = OwnershipRoots();
+        var svg = Charts.CodeOwnershipSunburst(roots, Array.Empty<string>());
+        var tree = Charts.CodeOwnershipTree(roots);
+
+        Assert.Contains("ownership-wedge level-4", svg);
+        Assert.Contains("ownership-tree-dot level-4", tree);
+        Assert.Contains("ownership-wedge level-none", svg);
+        Assert.Contains("ownership-tree-dot level-none", tree);
+    }
+
+    [Fact]
+    public void CodeOwnershipTree_ShowsDominantAuthorShareContributorsAndLastActiveOrNoGitHistory()
+    {
+        var html = Charts.CodeOwnershipTree(OwnershipRoots());
+
+        Assert.Contains("Alice 80%", html);
+        Assert.Contains("2 contributors", html);
+        Assert.Contains("last active", html);
         Assert.Contains("no git history", html);
     }
 
     [Fact]
-    public void CodeFreshnessTree_EmptyTree_DegradesToChartEmpty()
+    public void CodeOwnershipTree_LinksAFileOnlyWhenTheResolverReturnsATarget()
     {
-        var html = Charts.CodeFreshnessTree(Array.Empty<CodeMapNode>());
+        var roots = OwnershipRoots();
+
+        var linked = Charts.CodeOwnershipTree(roots, fileHref: p => p == "src/dir/Dominant.cs" ? "code/src/dir/Dominant.cs.html" : null);
+        Assert.Contains("<a href=\"code/src/dir/Dominant.cs.html\">", linked);
+
+        var plain = Charts.CodeOwnershipTree(roots, fileHref: null);
+        Assert.DoesNotContain("<a href=", plain);
+    }
+
+    [Fact]
+    public void CodeOwnershipTree_EmptyTree_DegradesToChartEmpty()
+    {
+        var html = Charts.CodeOwnershipTree(Array.Empty<CodeMapNode>());
 
         Assert.Contains("chart-empty", html);
         Assert.DoesNotContain("<ul", html);
     }
 
     [Fact]
-    public void CodeFreshnessTree_EscapesPathsAndLabels()
+    public void CodeOwnershipTree_DeterministicAcrossRepeatedCalls()
     {
-        var roots = CodeMap.Build(
-            new[] { ("src/a&b<c>.cs", 100L) },
-            new Dictionary<string, CodeFileMetrics>
-            {
-                ["src/a&b<c>.cs"] = new CodeFileMetrics(1, 10, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 1)),
-            }).Roots;
-
-        var html = Charts.CodeFreshnessTree(roots);
-
-        Assert.Contains("a&amp;b&lt;c&gt;.cs", html);
-        Assert.DoesNotContain("<c>", html);
+        var roots = OwnershipRoots();
+        Assert.Equal(Charts.CodeOwnershipTree(roots), Charts.CodeOwnershipTree(roots));
     }
 
     [Fact]
-    public void CodeFreshnessTree_DeterministicAcrossRepeatedCalls()
+    public void CodeOwnershipSunburst_NeverRendersALeaderboardOrRankingVocabulary()
     {
-        var roots = FreshnessRoots();
-        Assert.Equal(Charts.CodeFreshnessTree(roots), Charts.CodeFreshnessTree(roots));
+        // FR-10: descriptive attribution only, never a cross-repo people ranking.
+        var svg = Charts.CodeOwnershipSunburst(OwnershipRoots(), new[] { "Alice", "Bob" });
+        var tree = Charts.CodeOwnershipTree(OwnershipRoots());
+
+        foreach (var html in new[] { svg, tree })
+        {
+            Assert.DoesNotContain("leaderboard", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("rank", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("top performer", html, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     // ==================== Story 3.7: requirement status-block grid + requirements flow ====================

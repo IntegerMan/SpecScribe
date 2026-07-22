@@ -469,36 +469,48 @@ public class StylesheetTests
         // sort/filter controls the enhancer creates have on-brand, focus-visible styling.
         var css = ReadStylesheet();
         Assert.Contains(".table-scroll { overflow-x: auto; contain: inline-size; }", css);
-        Assert.Contains(".gi-table", css);
         Assert.Contains(".gi-sort-btn:focus-visible", css);
         Assert.Contains(".gi-filter", css);
         Assert.Contains(".gi-row-hidden { display: none; }", css);
     }
 
+    // ---- Story 7.11 rewrite: code ownership sunburst + solo-repo statement ----------------------------
+
     [Fact]
-    public void Stylesheet_HasGitInsightsMasterDetailStyles()
+    public void Stylesheet_HasOwnershipSunburstStyles()
     {
-        // The file→contributors drill-down is pure-CSS :target (no JS): guard the master-detail grid, the
-        // whole-row stretched select link, and the :target reveal so the no-JS interaction can't regress.
         var css = ReadStylesheet();
-        Assert.Contains(".gi-master-detail", css);
-        Assert.Contains(".gi-row-link::after", css);
-        Assert.Contains(".gi-contributors-panel:target", css);
-        Assert.Contains(".gi-contributor-list", css);
+        Assert.Contains(".gi-solo-repo-note", css);
+        Assert.Contains(".ownership-sunburst", css);
+        Assert.Contains(".ownership-wedge.level-4", css);
+        Assert.Contains(".ownership-wedge-dir", css);
+        Assert.Contains(".ownership-legend", css);
+        Assert.Contains(".ownership-tree", css);
+        Assert.Contains(".ownership-controls", css);
     }
 
-    // ---- Story 7.11: Ownership & Bus-Factor risk badge + solo-repo statement ----------------------------
+    [Fact]
+    public void Stylesheet_HasOwnershipDiscreteTopAuthorPalette()
+    {
+        // The discrete top-N-author mode needs its OWN bounded categorical palette (Task 2.4) — not a reuse of
+        // --status-* (non-lifecycle data) or the Story 7.9 file-type palette. Every top-author swatch class (0-11)
+        // must resolve, plus the honestly-muted "other" overflow bucket.
+        var css = ReadStylesheet();
+        for (var i = 0; i < 12; i++)
+        {
+            Assert.Contains($".ownership-wedge.owner-author-{i} {{", css);
+        }
+        Assert.Contains(".ownership-wedge.owner-author-other", css);
+    }
 
     [Fact]
-    public void Stylesheet_HasOwnershipBusFactorStyles()
+    public void Stylesheet_OwnershipSpotlightAndStalenessAreDistinguishedByMoreThanColor()
     {
+        // "Color is never the sole signal" (this project's convention) — the JS-only spotlight and staleness
+        // modes must each carry a stroke/dash change alongside their fill, not a hue swap alone.
         var css = ReadStylesheet();
-        Assert.Contains(".gi-risk-badge", css);
-        Assert.Contains(".gi-solo-repo-note", css);
-        // The bus-factor flag reuses the coupling-kind "at-risk" tone (rust, dashed border) — not a new hue,
-        // and it carries its own "Sole contributor:" text so the flag is never color-only.
-        Assert.Matches(new Regex(@"\.gi-risk-badge\s*\{[^}]*color:\s*var\(--rust\)"), css);
-        Assert.Matches(new Regex(@"\.gi-risk-badge\s*\{[^}]*border:\s*1px dashed var\(--rust-light\)"), css);
+        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-spotlight-on\s*\{[^}]*stroke:"), css);
+        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-stale\s*\{[^}]*stroke-dasharray:"), css);
     }
 
     [Fact]
@@ -510,6 +522,24 @@ public class StylesheetTests
         Assert.Contains("js-sortable", js);
         Assert.Contains("aria-sort", js);
         Assert.Contains("data-filter-label", js);
+    }
+
+    [Fact]
+    public void Script_HasOwnershipSunburstModeSwitcher()
+    {
+        // ADR 0010 Task 4/4.3: ONE shared charting-JS engine lives in the existing sanctioned specscribe.js
+        // (no second opt-in-only asset) and reads only generation-time-embedded data — never fetches live git
+        // state or reads wall-clock time to decide staleness.
+        var js = ReadScript();
+        Assert.Contains("initOwnershipSunburst", js);
+        Assert.Contains(".ownership-panel", js);
+        Assert.Contains("data-top-authors", js);
+        Assert.Contains("data-asof", js);
+        Assert.Contains("recolorShare", js);
+        Assert.Contains("recolorTopAuthors", js);
+        Assert.Contains("recolorSpotlight", js);
+        Assert.Contains("recolorStaleness", js);
+        Assert.DoesNotContain("Date.now()", js);
     }
 
     /// <summary>The body of the single <c>@media (prefers-reduced-motion: no-preference)</c> block.</summary>

@@ -305,19 +305,6 @@
     for (var i = 0; i < open.length; i++) open[i].removeAttribute("open");
   });
 
-  // ---- Focus management for :target-revealed panels [Deferred, Story 3.8] -----------------
-  // Pure-CSS :target reveals the Git Insights file-contributors panel, but never moves focus there — a
-  // keyboard/AT user's focus stays on the link they just activated even though the visible panel changed.
-  // Progressive enhancement only: with JS off, :target still reveals the panel, just without this focus jump.
-  function focusHashTarget() {
-    var id = location.hash.slice(1);
-    if (!id) return;
-    var el = document.getElementById(id);
-    if (el && el.classList.contains("gi-contributors-panel")) el.focus();
-  }
-  window.addEventListener("hashchange", focusHashTarget);
-  if (location.hash) focusHashTarget();
-
   // ---- Sortable / filterable tables (Git Insights hub) [Story 3.8] -------------------------
   // Progressive enhancement ONLY (NFR-5): every table.js-sortable arrives complete and server-sorted, so
   // with JS off the page already reads correctly and this block simply never runs. When it does run it
@@ -861,6 +848,54 @@
     try { initRiskGridPager(grid); } catch (err) { /* degrade silently — the full server-ordered grid stands */ }
   });
 
+  // ---- Code Map file table: client-side pagination [Story 7.12 review] -----------------------
+  // Progressive enhancement ONLY, mirroring initRiskGridPager above (same shape, its own class family so the
+  // two pagers can never cross-wire). The server ships every file as a plain <tr> inside ".codemap-table",
+  // already in significance order — the complete, correct, no-JS truth. Up to four independent tables can exist
+  // on one page (one per exclude-filter combination), so each is paginated independently by its own state.
+  function initCodemapTablePager(table) {
+    var pager = table.nextElementSibling;
+    if (!pager || !pager.classList.contains("codemap-table-pager")) return;
+    var rows = Array.prototype.slice.call(table.querySelectorAll(".codemap-table-row"));
+    var pageSize = parseInt(table.getAttribute("data-page-size"), 10) || 30;
+    if (rows.length <= pageSize) return; // everything already fits on one screen — leave the pager hidden
+
+    var prevBtn = pager.querySelector(".codemap-table-pager-prev");
+    var nextBtn = pager.querySelector(".codemap-table-pager-next");
+    var status = pager.querySelector(".codemap-table-pager-status");
+    var totalPages = Math.ceil(rows.length / pageSize);
+    var page = 0;
+
+    function render() {
+      rows.forEach(function (row, i) {
+        row.hidden = Math.floor(i / pageSize) !== page;
+      });
+      status.textContent = "Page " + (page + 1) + " of " + totalPages;
+      prevBtn.disabled = page === 0;
+      nextBtn.disabled = page === totalPages - 1;
+    }
+
+    prevBtn.addEventListener("click", function () {
+      if (page === 0) return;
+      page--;
+      render();
+      table.scrollIntoView({ block: "nearest" });
+    });
+    nextBtn.addEventListener("click", function () {
+      if (page === totalPages - 1) return;
+      page++;
+      render();
+      table.scrollIntoView({ block: "nearest" });
+    });
+
+    pager.hidden = false;
+    render();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".codemap-table"), function (table) {
+    try { initCodemapTablePager(table); } catch (err) { /* degrade silently — the full server-ordered table stands */ }
+  });
+
   // ---- Source-code treemap: dimension switch + directory zoom [Story 7.6, round 2] ---------
   // Progressive enhancement ONLY. The server ships up to four self-contained ".codemap-view" panels (one per
   // exclude-spec-dev / exclude-tests filter combination — Story 7.6 round 2), each with a correct, sized-by-LOC
@@ -1127,5 +1162,157 @@
     }
     window.addEventListener("popstate", applyHash);
     applyHash();
+  }
+
+  // ---- Code ownership sunburst: live mode selector [Story 7.11, ADR 0010] ------------------
+  // Progressive enhancement ONLY (NFR-5, reinterpreted by ADR 0010 for this opt-in surface): the server ships
+  // a complete, correct sunburst pre-colored in the default share-% mode plus its full text-equivalent tree; with
+  // JS off this block never runs and both stand on their own. Every wedge carries its generation-time-embedded
+  // per-file data (data-share/data-dominant/data-contributors/data-last/data-owner) and the SVG root carries the
+  // bounded top-author roster (data-top-authors) and the whole-tree "as of" day (data-asof) — nothing here ever
+  // fetches live data or reads wall-clock time, so a mode switch is a pure re-read of already-embedded values
+  // (FR31). The individual-author picker is built from the UNION of every wedge's own data-owner list (the full
+  // roster present in the data), not just the bounded top-author palette — an alphabetical list, never a "top
+  // contributors" ranking (FR-10).
+  Array.prototype.forEach.call(document.querySelectorAll(".ownership-panel"), function (panel) {
+    try { initOwnershipSunburst(panel); } catch (err) { /* degrade — the server-rendered share-% mode stands */ }
+  });
+
+  function initOwnershipSunburst(panel) {
+    var svg = panel.querySelector(".ownership-sunburst");
+    var controls = panel.querySelector(".ownership-controls");
+    if (!svg || !controls) return;
+
+    var wedges = Array.prototype.slice.call(svg.querySelectorAll(".ownership-wedge"));
+    if (wedges.length === 0) return;
+
+    var topAuthors = [];
+    try { topAuthors = JSON.parse(svg.getAttribute("data-top-authors") || "[]"); } catch (err) { topAuthors = []; }
+    var asofRaw = svg.getAttribute("data-asof");
+    var asof = asofRaw === null ? NaN : parseInt(asofRaw, 10);
+
+    function ownerData(w) {
+      var raw = w.getAttribute("data-owner");
+      if (!raw) return [];
+      try { var parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : []; } catch (err) { return []; }
+    }
+
+    // Full contributor roster (alphabetical, union of every wedge's own bounded list) — the spotlight picker's
+    // source. Never capped to the top-author palette (AC #2c: any contributor, not just a bounded top-N).
+    var rosterSet = {};
+    wedges.forEach(function (w) {
+      ownerData(w).forEach(function (entry) {
+        if (entry && typeof entry[0] === "string") rosterSet[entry[0]] = true;
+      });
+    });
+    var roster = Object.keys(rosterSet).sort(function (a, b) { return a.localeCompare(b); });
+    if (roster.length === 0) return; // no embedded contributor data at all — nothing to switch modes over
+
+    var modeSelect = controls.querySelector(".ownership-mode-select");
+    var authorSelect = controls.querySelector(".ownership-author-select");
+    var authorWrap = controls.querySelector(".ownership-author-wrap");
+    var thresholdInput = controls.querySelector(".ownership-threshold-input");
+    var thresholdWrap = controls.querySelector(".ownership-threshold-wrap");
+    if (!modeSelect || !authorSelect || !authorWrap || !thresholdInput || !thresholdWrap) return;
+
+    roster.forEach(function (name) {
+      var opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      authorSelect.appendChild(opt);
+    });
+
+    var FILL_CLASSES = ["level-0", "level-1", "level-2", "level-3", "level-4", "level-none",
+      "owner-author-other", "owner-spotlight-on", "owner-spotlight-off", "owner-fresh", "owner-stale"];
+    topAuthors.forEach(function (name, i) { FILL_CLASSES.push("owner-author-" + i); });
+
+    function clearFillClasses(w) {
+      FILL_CLASSES.forEach(function (cls) { w.classList.remove(cls); });
+    }
+
+    function labelHost(w) {
+      var a = w.closest && w.closest("a");
+      return a || w;
+    }
+
+    // Snapshot each wedge's server-baked base label ONCE, before any recolor, so repeated mode switches append
+    // to the ORIGINAL text rather than stacking suffixes (mirrors the Code Map dimension switch's own pattern).
+    wedges.forEach(function (w) {
+      if (!w.hasAttribute("data-base-label")) {
+        w.setAttribute("data-base-label", labelHost(w).getAttribute("aria-label") || "");
+      }
+    });
+
+    function setLabel(w, suffix) {
+      var base = w.getAttribute("data-base-label") || "";
+      var text = base + " — " + suffix;
+      labelHost(w).setAttribute("aria-label", text);
+      var title = w.querySelector("title");
+      if (title) title.textContent = text;
+    }
+
+    function recolorShare() {
+      wedges.forEach(function (w) {
+        clearFillClasses(w);
+        var raw = w.getAttribute("data-share");
+        if (raw === null) { w.classList.add("level-none"); setLabel(w, "no git history"); return; }
+        var pct = parseInt(raw, 10);
+        var level = pct <= 25 ? 1 : pct <= 50 ? 2 : pct <= 75 ? 3 : 4;
+        w.classList.add("level-" + level);
+        setLabel(w, pct + "% dominant-author share");
+      });
+    }
+
+    function recolorTopAuthors() {
+      wedges.forEach(function (w) {
+        clearFillClasses(w);
+        var dominant = w.getAttribute("data-dominant");
+        if (!dominant) { w.classList.add("level-none"); setLabel(w, "no git history"); return; }
+        var idx = topAuthors.indexOf(dominant);
+        if (idx >= 0) { w.classList.add("owner-author-" + idx); } else { w.classList.add("owner-author-other"); }
+        setLabel(w, "dominant contributor: " + dominant);
+      });
+    }
+
+    function recolorSpotlight(name) {
+      wedges.forEach(function (w) {
+        clearFillClasses(w);
+        var touched = ownerData(w).some(function (entry) { return entry[0] === name; });
+        w.classList.add(touched ? "owner-spotlight-on" : "owner-spotlight-off");
+        setLabel(w, touched ? name + " has worked on this file" : name + " has not worked on this file");
+      });
+    }
+
+    function recolorStaleness(months) {
+      wedges.forEach(function (w) {
+        clearFillClasses(w);
+        var raw = w.getAttribute("data-last");
+        if (raw === null || isNaN(asof)) { w.classList.add("level-none"); setLabel(w, "no git history"); return; }
+        var monthsAgo = (asof - parseInt(raw, 10)) / 30;
+        var stale = monthsAgo >= months;
+        w.classList.add(stale ? "owner-stale" : "owner-fresh");
+        setLabel(w, stale
+          ? "no current contributor for " + Math.round(monthsAgo) + "+ months"
+          : "touched within the last " + months + " months");
+      });
+    }
+
+    function applyMode() {
+      var mode = modeSelect.value;
+      authorWrap.hidden = mode !== "spotlight";
+      thresholdWrap.hidden = mode !== "staleness";
+      if (mode === "top") recolorTopAuthors();
+      else if (mode === "spotlight") recolorSpotlight(authorSelect.value || roster[0]);
+      else if (mode === "staleness") {
+        var months = parseInt(thresholdInput.value, 10);
+        recolorStaleness(isNaN(months) || months < 1 ? 6 : months);
+      }
+      else recolorShare();
+    }
+
+    controls.hidden = false;
+    modeSelect.addEventListener("change", applyMode);
+    authorSelect.addEventListener("change", applyMode);
+    thresholdInput.addEventListener("input", applyMode);
   }
 })();

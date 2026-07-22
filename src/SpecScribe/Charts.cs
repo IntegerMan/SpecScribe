@@ -20,8 +20,9 @@ public static class Charts
         ChangeCoupling,
         /// <summary>Refactor-target risk: files that are both large and frequently changed (Story 7.10).</summary>
         RefactorRisk,
-        /// <summary>Author concentration / bus-factor: how much of a file's history sits with one person (Story 7.11).</summary>
-        AuthorConcentration,
+        /// <summary>Code ownership / bus-factor: how concentrated authorship is across the codebase — dominant-author
+        /// share, top contributors, an individual-author spotlight, and staleness (Story 7.11).</summary>
+        CodeOwnership,
         /// <summary>Code freshness: how recently each part of the codebase last changed (Story 7.12).</summary>
         CodeFreshness,
     }
@@ -50,7 +51,7 @@ public static class Charts
             "Files that change together often may hide a dependency worth a second look.",
         ChartMetric.RefactorRisk =>
             "Files that are both large and frequently changed are the costliest place for a defect to hide — refactoring them tends to pay off fastest.",
-        ChartMetric.AuthorConcentration =>
+        ChartMetric.CodeOwnership =>
             "Files with a single dominant author are a knowledge-silo risk if that person leaves or moves on.",
         ChartMetric.CodeFreshness =>
             "Recently-changed code is where current effort is concentrated; long-untouched code may be stable — or simply forgotten.",
@@ -2749,11 +2750,6 @@ public static class Charts
         int size = 480,
         Func<string, string?>? fileHref = null)
     {
-        if (roots.Count == 0)
-        {
-            return "<div class=\"chart-empty\">No source files to chart yet.</div>\n";
-        }
-
         var fileCount = 0;
         var dirCount = 0;
         DateOnly? mostRecent = null;
@@ -2761,11 +2757,6 @@ public static class Charts
         CollectFreshnessStats(roots, ref fileCount, ref dirCount, ref mostRecent, ref oldest);
 
         var maxDaysAgo = mostRecent is { } mr0 && oldest is { } od0 ? mr0.DayNumber - od0.DayNumber : 0;
-
-        var c = size / 2.0;
-        var innerR = size * 0.06;
-        var outerR = size * 0.48;
-        var ringWidth = (outerR - innerR) / FreshnessSunburstMaxDepth;
 
         var aria = new StringBuilder(
             $"Code freshness sunburst: directory structure sized by lines of code and colored by recency of " +
@@ -2775,9 +2766,48 @@ public static class Charts
             aria.Append($" Most recently changed file: {DReadable(mrDate)}. Longest untouched: {DReadable(odDate)}.");
         }
 
+        return BuildSunburstSvg(roots, size, "freshness-sunburst", aria.ToString(), "freshness-wedge-dir", node =>
+        {
+            var info = DescribeFreshnessFile(node, mostRecent, maxDaysAgo, fileHref);
+            return new SunburstWedgeInfo($"freshness-wedge {info.LevelClass}", info.Title, info.Href, null);
+        });
+    }
+
+    /// <summary>One file leaf's rendered wedge shape: its full CSS class (component prefix + level/state class,
+    /// already composed by the caller), native <c>&lt;title&gt;</c> tooltip text, guarded clickthrough target
+    /// (null → no link, never a dead one), and any pre-escaped <c>data-*</c> attribute string a live-JS mode
+    /// switcher needs to recolor this wedge later (null when the chart has no client-side modes, e.g. freshness).
+    /// The ONE shape <see cref="WalkSunburstWedges"/> needs from either sunburst family. [Story 7.11]</summary>
+    private readonly record struct SunburstWedgeInfo(string CssClass, string Title, string? Href, string? DataAttrs);
+
+    /// <summary>Renders one whole angular-partition sunburst SVG — the shared shell both
+    /// <see cref="CodeFreshnessSunburst"/> (Story 7.12) and <see cref="CodeOwnershipSunburst"/> (Story 7.11) build
+    /// on, so the one recursive tree-walk this codebase has for this hierarchy is never independently reforked.
+    /// <paramref name="dirWedgeClass"/> and <paramref name="describeFile"/> carry every difference between the two
+    /// families (freshness recolors by recency, ownership by author concentration) — the geometry itself
+    /// (radius/ring/angle math) is identical. <paramref name="extraSvgAttrs"/> is an optional pre-built,
+    /// pre-escaped attribute string appended to the root <c>&lt;svg&gt;</c> tag (e.g. Story 7.11's embedded
+    /// generation-time <c>data-asof</c>/<c>data-top-authors</c> for its live JS mode switcher — never used by the
+    /// freshness chart, which has none). Degrades to the shared <c>chart-empty</c> notice only when there are no
+    /// source files at all. Deterministic (FR31): same input, byte-identical output.</summary>
+    private static string BuildSunburstSvg(
+        IReadOnlyList<CodeMapNode> roots, int size, string svgClass, string ariaLabel, string dirWedgeClass,
+        Func<CodeMapNode, SunburstWedgeInfo> describeFile, string? extraSvgAttrs = null)
+    {
+        if (roots.Count == 0)
+        {
+            return "<div class=\"chart-empty\">No source files to chart yet.</div>\n";
+        }
+
+        var c = size / 2.0;
+        var innerR = size * 0.06;
+        var outerR = size * 0.48;
+        var ringWidth = (outerR - innerR) / FreshnessSunburstMaxDepth;
+
+        var extra = extraSvgAttrs is { Length: > 0 } ? " " + extraSvgAttrs : string.Empty;
         var sb = new StringBuilder();
-        sb.Append($"<svg class=\"freshness-sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria.ToString())}\">\n");
-        WalkFreshnessWedges(roots, -Math.PI / 2, -Math.PI / 2 + (2 * Math.PI), 0, c, innerR, ringWidth, mostRecent, maxDaysAgo, fileHref, sb);
+        sb.Append($"<svg class=\"{svgClass}\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(ariaLabel)}\"{extra}>\n");
+        WalkSunburstWedges(roots, -Math.PI / 2, -Math.PI / 2 + (2 * Math.PI), 0, c, innerR, ringWidth, dirWedgeClass, describeFile, sb);
         sb.Append("</svg>\n");
         return sb.ToString();
     }
@@ -2819,17 +2849,21 @@ public static class Charts
     }
 
     /// <summary>Recursively lays out and emits one ring band of wedges, then recurses into each directory's
-    /// children for the next ring — the entire angular-partition algorithm (Story 7.12 "Latest Technical
-    /// Information"): a node's span is <c>weight / totalWeight</c> of its parent's allotted <c>[angleStart,
-    /// angleEnd)</c> range. Ring radius is keyed by <paramref name="depth"/>, saturating at
+    /// children for the next ring — the ONE angular-partition tree-walk this codebase has for a
+    /// <see cref="CodeMapNode"/> hierarchy (Story 7.12; generalized for Story 7.11 rather than reforked — see
+    /// <see cref="BuildSunburstSvg"/>): a node's span is <c>weight / totalWeight</c> of its parent's allotted
+    /// <c>[angleStart, angleEnd)</c> range. Ring radius is keyed by <paramref name="depth"/>, saturating at
     /// <see cref="FreshnessSunburstMaxDepth"/> so a node deeper than the cap renders flush in the outermost ring
     /// while its own children continue subdividing that same ring's angular space (bounded ring COUNT, not
     /// bounded tree depth). Reuses <see cref="AnnularSector"/>/<see cref="InsetStart"/>/<see cref="InsetEnd"/> —
-    /// the SAME wedge-path math the epic/story sunburst uses — rather than a second hand-rolled arc formula.</summary>
-    private static void WalkFreshnessWedges(
+    /// the SAME wedge-path math the epic/story sunburst uses — rather than a second hand-rolled arc formula. Every
+    /// difference between the freshness and ownership sunbursts lives in <paramref name="dirWedgeClass"/> (the
+    /// component-scoped directory-wedge CSS class) and <paramref name="describeFile"/> (the file-leaf's class/
+    /// title/href/data-attrs) — the geometry below is identical for both.</summary>
+    private static void WalkSunburstWedges(
         IReadOnlyList<CodeMapNode> nodes, double angleStart, double angleEnd, int depth,
-        double c, double innerR, double ringWidth, DateOnly? mostRecent, int maxDaysAgo,
-        Func<string, string?>? fileHref, StringBuilder sb)
+        double c, double innerR, double ringWidth, string dirWedgeClass,
+        Func<CodeMapNode, SunburstWedgeInfo> describeFile, StringBuilder sb)
     {
         if (nodes.Count == 0 || angleEnd <= angleStart || depth > FreshnessRecursionGuard) return;
 
@@ -2854,20 +2888,27 @@ public static class Charts
             {
                 var descendants = CountFreshnessFiles(node);
                 var dirTitle = $"{node.RepoRelativePath} — {descendants} {Plural(descendants, "file", "files")}";
-                sb.Append($"  <path class=\"freshness-wedge-dir\" d=\"{path}\"><title>{Html(dirTitle)}</title></path>\n");
-                WalkFreshnessWedges(node.Children, angle, angle + sweep, depth + 1, c, innerR, ringWidth, mostRecent, maxDaysAgo, fileHref, sb);
+                sb.Append($"  <path class=\"{dirWedgeClass}\" d=\"{path}\"><title>{Html(dirTitle)}</title></path>\n");
+                WalkSunburstWedges(node.Children, angle, angle + sweep, depth + 1, c, innerR, ringWidth, dirWedgeClass, describeFile, sb);
             }
             else
             {
-                var info = DescribeFreshnessFile(node, mostRecent, maxDaysAgo, fileHref);
-                var cls = $"freshness-wedge {info.LevelClass}";
+                var info = describeFile(node);
+                var dataAttrs = info.DataAttrs is { Length: > 0 } ? " " + info.DataAttrs : string.Empty;
+                // aria-label carries just the file path (not info.Title's mode-specific suffix) on whichever
+                // element is the accessible-name host (the <a> when linked, else the <path> itself) — this is
+                // the "server-baked base label" the live JS mode switcher snapshots once before its first
+                // recolor (specscribe.js's labelHost/data-base-label pattern, mirroring the Code Map colorize
+                // dimension switch's own convention). Without it, that snapshot reads an absent attribute as ""
+                // and every subsequent mode switch permanently drops the path from the wedge's accessible name.
+                var baseLabel = Html(node.RepoRelativePath);
                 if (info.Href is { } href)
                 {
-                    sb.Append($"  <a href=\"{Html(href)}\"><path class=\"{cls}\" d=\"{path}\"><title>{Html(info.Title)}</title></path></a>\n");
+                    sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{baseLabel}\"><path class=\"{info.CssClass}\" d=\"{path}\"{dataAttrs}><title>{Html(info.Title)}</title></path></a>\n");
                 }
                 else
                 {
-                    sb.Append($"  <path class=\"{cls}\" tabindex=\"0\" role=\"img\" d=\"{path}\"><title>{Html(info.Title)}</title></path>\n");
+                    sb.Append($"  <path class=\"{info.CssClass}\" tabindex=\"0\" role=\"img\" aria-label=\"{baseLabel}\" d=\"{path}\"{dataAttrs}><title>{Html(info.Title)}</title></path>\n");
                 }
             }
 
@@ -2903,64 +2944,67 @@ public static class Charts
         return new FreshnessFileInfo(cls, title, href is { Length: > 0 } ? href : null);
     }
 
-    /// <summary>Renders the SAME directory tree/per-file recency data as <see cref="CodeFreshnessSunburst"/>, as a
-    /// nested, no-JS-collapsible text tree (native <c>&lt;details&gt;/&lt;summary&gt;</c>) — an alternate,
-    /// purely textual reading of the identical data, toggled alongside the sunburst via a pure-CSS view radio
-    /// pair (owner feedback: a polar chart isn't the easiest way for everyone to scan a codebase; a familiar
-    /// folder tree is a lower-friction alternative). Directories collapse to a closed-by-default disclosure (a
-    /// real repo's tree is usually too deep to show fully expanded); files are list items carrying the SAME
-    /// level-0..4 recency dot + exact last-changed date + guarded clickthrough as the sunburst's wedges
-    /// (<see cref="DescribeFreshnessFile"/> — one shared source, so the two views can never disagree). Degrades
-    /// to the shared <c>chart-empty</c> notice only when there are no source files at all (AC #2). Deterministic
-    /// (FR31): same input, byte-identical output. [Story 7.12 review]</summary>
-    public static string CodeFreshnessTree(IReadOnlyList<CodeMapNode> roots, Func<string, string?>? fileHref = null)
+    /// <summary>Renders the SAME per-file recency data as <see cref="CodeFreshnessSunburst"/>, as a squarified
+    /// TREEMAP — the sunburst's toggle sibling (owner correction, review pass: "Tree" must mean the familiar
+    /// size-by-area treemap shape already used elsewhere on this page, not a hierarchical folder list). Reuses
+    /// <paramref name="layout"/> as-is — the SAME precomputed <see cref="CodeMap.Layout"/> geometry
+    /// <see cref="CodeTreemap"/> draws from (<c>CodeMapVariant.Layout</c>), so there is no second squarify pass
+    /// and the two treemaps can never silently diverge in shape. Colors ONLY file rects via the SAME
+    /// <see cref="DescribeFreshnessFile"/> the sunburst's wedges use (one shared source — the two views can never
+    /// disagree about a file's level); directory rects stay neutral/unlabeled, matching
+    /// <see cref="AppendTreemapDir"/>'s own no-label convention. Deliberately a SEPARATE class family
+    /// (<c>freshness-cell</c>, not <c>codemap-cell</c>) from the page's other treemap so the existing colorize-
+    /// dropdown/zoom JS enhancement — which scopes its lookups to the enclosing panel — can never mistake these
+    /// cells for its own. Guarded clickthrough + native <c>&lt;title&gt;</c> tooltip, degrades to the shared
+    /// <c>chart-empty</c> notice only when the layout is empty (AC #2). Deterministic (FR31): same input,
+    /// byte-identical output. [Story 7.12 review]</summary>
+    public static string CodeFreshnessTreemap(
+        IReadOnlyList<TreemapRect> layout, double width, double height, Func<string, string?>? fileHref = null)
     {
-        if (roots.Count == 0)
+        if (layout.Count == 0)
         {
             return "<div class=\"chart-empty\">No source files to chart yet.</div>\n";
         }
 
-        int fileCount = 0, dirCount = 0;
         DateOnly? mostRecent = null, oldest = null;
-        CollectFreshnessStats(roots, ref fileCount, ref dirCount, ref mostRecent, ref oldest);
+        foreach (var rect in layout)
+        {
+            if (rect.Node.IsDirectory) continue;
+            if (rect.Node.Metrics?.LastDate is not { } d) continue;
+            if (mostRecent is not { } mr || d > mr) mostRecent = d;
+            if (oldest is not { } od || d < od) oldest = d;
+        }
         var maxDaysAgo = mostRecent is { } mr0 && oldest is { } od0 ? mr0.DayNumber - od0.DayNumber : 0;
 
         var sb = new StringBuilder();
-        sb.Append("<ul class=\"freshness-tree\">\n");
-        AppendFreshnessTreeNodes(roots, mostRecent, maxDaysAgo, fileHref, 0, sb);
-        sb.Append("</ul>\n");
-        return sb.ToString();
-    }
+        sb.Append($"<svg class=\"freshness-treemap\" viewBox=\"0 0 {F(width)} {F(height)}\" width=\"{F(width)}\" height=\"{F(height)}\" ")
+          .Append("role=\"img\" aria-label=\"Code freshness treemap: each rectangle is a file sized by lines of code and colored by recency of last change.\" preserveAspectRatio=\"xMidYMid meet\">\n");
 
-    private static void AppendFreshnessTreeNodes(
-        IReadOnlyList<CodeMapNode> nodes, DateOnly? mostRecent, int maxDaysAgo,
-        Func<string, string?>? fileHref, int depth, StringBuilder sb)
-    {
-        if (depth > FreshnessRecursionGuard) return;
-
-        foreach (var node in nodes)
+        foreach (var rect in layout)
         {
-            if (node.IsDirectory)
+            if (rect.W <= 0 || rect.H <= 0) continue;
+
+            if (rect.Node.IsDirectory)
             {
-                var descendants = CountFreshnessFiles(node);
-                sb.Append("  <li class=\"freshness-tree-dir\"><details><summary>");
-                sb.Append(Html(node.Label));
-                sb.Append($" <span class=\"freshness-tree-count\">({descendants} {Plural(descendants, "file", "files")})</span>");
-                sb.Append("</summary>\n    <ul>\n");
-                AppendFreshnessTreeNodes(node.Children, mostRecent, maxDaysAgo, fileHref, depth + 1, sb);
-                sb.Append("    </ul>\n  </details></li>\n");
+                sb.Append($"  <rect class=\"freshness-cell-dir\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\" aria-hidden=\"true\"></rect>\n");
+                continue;
+            }
+
+            var info = DescribeFreshnessFile(rect.Node, mostRecent, maxDaysAgo, fileHref);
+            var cls = $"freshness-cell {info.LevelClass}";
+            var titleHtml = $"<title>{Html(info.Title)}</title>";
+            if (info.Href is { } href)
+            {
+                sb.Append($"  <a href=\"{Html(href)}\"><rect class=\"{cls}\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\">{titleHtml}</rect></a>\n");
             }
             else
             {
-                var info = DescribeFreshnessFile(node, mostRecent, maxDaysAgo, fileHref);
-                var dot = $"<span class=\"freshness-tree-dot {info.LevelClass}\" aria-hidden=\"true\"></span>";
-                var text = info.Href is { } href
-                    ? $"<a href=\"{Html(href)}\">{Html(node.Label)}</a>"
-                    : Html(node.Label);
-                var dateText = node.Metrics?.LastDate is { } d ? $"last changed {PortalDates.Day(d)}" : "no git history";
-                sb.Append($"  <li class=\"freshness-tree-file\">{dot}{text} <span class=\"freshness-tree-date\">{Html(dateText)}</span></li>\n");
+                sb.Append($"  <rect class=\"{cls}\" tabindex=\"0\" role=\"img\" x=\"{F(rect.X)}\" y=\"{F(rect.Y)}\" width=\"{F(rect.W)}\" height=\"{F(rect.H)}\">{titleHtml}</rect>\n");
             }
         }
+
+        sb.Append("</svg>\n");
+        return sb.ToString();
     }
 
     /// <summary>Quantizes a file's staleness ("days since the most-recent last-changed date in the set") onto the
@@ -3040,6 +3084,247 @@ public static class Charts
         {
             sb.Append("<span class=\"freshness-legend-swatch level-none\"></span>");
             sb.Append("<span class=\"freshness-legend-label\">No git history</span>");
+        }
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    // ---- Code ownership / bus-factor sunburst (Story 7.11) ----------------------------------
+
+    /// <summary>A file leaf's ownership description — the SAME logic <see cref="CodeOwnershipSunburst"/>'s wedge
+    /// writer and <see cref="CodeOwnershipTree"/>'s list writer both need, extracted once so the two views (and
+    /// the embedded per-wedge JSON a live JS mode switch reads) can never disagree. <see cref="Href"/> is the
+    /// already-guarded resolved target (null when unresolved — never a dead link). <see cref="DominantName"/>/
+    /// <see cref="SharePct"/>/<see cref="TotalContributors"/>/<see cref="LastDate"/> are null/0/unknown together
+    /// exactly when the file carries no git contributor record at all. [Story 7.11]</summary>
+    private readonly record struct OwnershipFileInfo(
+        string LevelClass, string Title, string? Href, string? DataAttrs,
+        string? DominantName, int? SharePct, int TotalContributors, DateOnly? LastDate);
+
+    /// <summary>Buckets a dominant-author commit share percentage (0–100, an inherently bounded real unit, unlike
+    /// freshness's unbounded day-count) onto a fixed real-value 1–4 ramp — deliberately fixed cut points rather
+    /// than a data-relative quartile split (<see cref="HeatThresholds"/>'s approach): a share percentage is
+    /// already meaningful on its own scale, so "76–100%" means the same thing on every repo's chart, never a
+    /// moving target. [Story 7.11]</summary>
+    private static int OwnershipShareLevel(int sharePct) => sharePct switch
+    {
+        <= 25 => 1,
+        <= 50 => 2,
+        <= 75 => 3,
+        _ => 4,
+    };
+
+    private static OwnershipFileInfo DescribeOwnershipFile(CodeMapNode node, Func<string, string?>? fileHref)
+    {
+        var href = fileHref?.Invoke(node.RepoRelativePath);
+        var resolvedHref = href is { Length: > 0 } ? href : null;
+        var contributors = node.Metrics?.Contributors ?? Array.Empty<FileContributor>();
+
+        if (node.Metrics is null || contributors.Count == 0)
+        {
+            var noneTitle = $"{node.RepoRelativePath} — no git history";
+            return new OwnershipFileInfo("level-none", noneTitle, resolvedHref, null, null, null, 0, null);
+        }
+
+        var dominant = contributors[0];
+        var sharePct = node.Metrics.Changes > 0
+            ? (int)Math.Round(100.0 * dominant.Commits / node.Metrics.Changes, MidpointRounding.AwayFromZero)
+            : 0;
+        var level = OwnershipShareLevel(sharePct);
+        var title = $"{node.RepoRelativePath} — {dominant.Name} {sharePct}% ({node.Metrics.TotalContributors} " +
+                    $"{Plural(node.Metrics.TotalContributors, "contributor", "contributors")})";
+        var dataAttrs = BuildOwnershipDataAttrs(sharePct, dominant.Name, node.Metrics.TotalContributors, node.Metrics.LastDate, contributors);
+        return new OwnershipFileInfo($"level-{level}", title, resolvedHref, dataAttrs, dominant.Name, sharePct, node.Metrics.TotalContributors, node.Metrics.LastDate);
+    }
+
+    /// <summary>Every generation-time-computed value the live JS mode switcher (Story 7.11 Task 4, ADR 0010) needs
+    /// to recolor this ONE wedge for any of the four modes, without a live git call or client-side re-derivation
+    /// (FR31): <c>data-share</c>/<c>data-dominant</c>/<c>data-contributors</c> feed the share-% and top-author
+    /// modes, <c>data-last</c> (day-number, matching <c>data-asof</c> on the SVG root) feeds staleness, and
+    /// <c>data-owner</c> — a compact bounded JSON array of <c>[name, commits, lastDayNumberOrNull]</c> triples,
+    /// already capped at <see cref="GitMetrics.CodeMapFileContributorCap"/> — feeds BOTH the individual-author
+    /// spotlight (does this file's contributor list contain the chosen name?) and the client-built full-roster
+    /// author picker (the union of every wedge's own list). Every value is HTML-escaped once here so the caller
+    /// can splice the whole attribute string directly into the wedge's opening tag.</summary>
+    private static string BuildOwnershipDataAttrs(
+        int sharePct, string dominant, int totalContributors, DateOnly? lastDate, IReadOnlyList<FileContributor> contributors)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"data-share=\"{sharePct.ToString(CultureInfo.InvariantCulture)}\" ");
+        sb.Append($"data-dominant=\"{Html(dominant)}\" ");
+        sb.Append($"data-contributors=\"{totalContributors.ToString(CultureInfo.InvariantCulture)}\"");
+        if (lastDate is { } d)
+        {
+            sb.Append($" data-last=\"{d.DayNumber.ToString(CultureInfo.InvariantCulture)}\"");
+        }
+        sb.Append($" data-owner=\"{Html(BuildOwnerJson(contributors))}\"");
+        return sb.ToString();
+    }
+
+    /// <summary>Hand-rolled compact JSON for a file's capped contributor list — small and fixed enough in shape
+    /// (a flat array of 3-element tuples) that pulling in a general serializer would be pure overhead. Escapes
+    /// only what JSON string literals require (<c>"</c>, <c>\</c>, control chars); the caller HTML-escapes the
+    /// whole result afterwards for safe attribute embedding.</summary>
+    private static string BuildOwnerJson(IReadOnlyList<FileContributor> contributors)
+    {
+        var sb = new StringBuilder("[");
+        for (var i = 0; i < contributors.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            var c = contributors[i];
+            sb.Append('[').Append(JsonStringLiteral(c.Name)).Append(',').Append(c.Commits.ToString(CultureInfo.InvariantCulture));
+            sb.Append(',').Append(c.LastCommitDate is { } d ? d.DayNumber.ToString(CultureInfo.InvariantCulture) : "null");
+            sb.Append(']');
+        }
+        sb.Append(']');
+        return sb.ToString();
+    }
+
+    private static string JsonStringLiteral(string s)
+    {
+        var sb = new StringBuilder("\"");
+        foreach (var ch in s)
+        {
+            switch (ch)
+            {
+                case '"': sb.Append("\\\""); break;
+                case '\\': sb.Append("\\\\"); break;
+                default:
+                    if (ch < 0x20) sb.Append("\\u").Append(((int)ch).ToString("x4", CultureInfo.InvariantCulture));
+                    else sb.Append(ch);
+                    break;
+            }
+        }
+        sb.Append('"');
+        return sb.ToString();
+    }
+
+    /// <summary>Renders the whole-tree code-ownership sunburst (Story 7.11 AC #1): the same
+    /// <see cref="BuildSunburstSvg"/> shell <see cref="CodeFreshnessSunburst"/> (Story 7.12) uses, colored by
+    /// dominant-author commit share on a fixed 1–4 ramp — the required pre-rendered no-JS default mode (AC #3).
+    /// Every file wedge also carries the embedded generation-time data (<see cref="BuildOwnershipDataAttrs"/>) the
+    /// live JS mode switcher (ADR 0010, Task 4) recolors from for the other three modes, and the SVG root carries
+    /// <c>data-top-authors</c> (the bounded discrete-palette roster, <see cref="GitMetrics.BuildTopAuthors"/>) and
+    /// <c>data-asof</c> (the whole-tree most-recent commit day, the staleness mode's fixed "now" — generation-time
+    /// computed, never wall-clock, per FR31). Deterministic: same input, byte-identical output. [Story 7.11]</summary>
+    public static string CodeOwnershipSunburst(
+        IReadOnlyList<CodeMapNode> roots,
+        IReadOnlyList<string> topAuthors,
+        int size = 480,
+        Func<string, string?>? fileHref = null)
+    {
+        var fileCount = 0;
+        var dirCount = 0;
+        DateOnly? mostRecent = null;
+        DateOnly? oldest = null;
+        CollectFreshnessStats(roots, ref fileCount, ref dirCount, ref mostRecent, ref oldest);
+
+        var aria = $"Code ownership sunburst: directory structure sized by lines of code and colored by " +
+                   $"dominant-author commit share; {fileCount} {Plural(fileCount, "file", "files")} across " +
+                   $"{dirCount} {Plural(dirCount, "directory", "directories")}.";
+
+        var topAuthorsJson = new StringBuilder("[");
+        for (var i = 0; i < topAuthors.Count; i++)
+        {
+            if (i > 0) topAuthorsJson.Append(',');
+            topAuthorsJson.Append(JsonStringLiteral(topAuthors[i]));
+        }
+        topAuthorsJson.Append(']');
+
+        var extraAttrs = $"data-top-authors=\"{Html(topAuthorsJson.ToString())}\"";
+        if (mostRecent is { } mr) extraAttrs += $" data-asof=\"{mr.DayNumber.ToString(CultureInfo.InvariantCulture)}\"";
+
+        return BuildSunburstSvg(roots, size, "ownership-sunburst", aria, "ownership-wedge-dir", node =>
+        {
+            var info = DescribeOwnershipFile(node, fileHref);
+            return new SunburstWedgeInfo($"ownership-wedge {info.LevelClass}", info.Title, info.Href, info.DataAttrs);
+        }, extraAttrs);
+    }
+
+    /// <summary>Renders the SAME per-file ownership data as <see cref="CodeOwnershipSunburst"/>, as a nested,
+    /// no-JS-collapsible text tree (mirrors <see cref="CodeFreshnessTree"/>'s established pattern for a whole-tree
+    /// text equivalent at this scale, rather than one giant flat table) — the accessible text-equivalent AC #3
+    /// requires: every file's dominant author, share %, contributor count, and last-active date, always present
+    /// regardless of JS. One shared source (<see cref="DescribeOwnershipFile"/>) with the sunburst's wedges, so
+    /// the two views can never disagree. Degrades to the shared <c>chart-empty</c> notice only when there are no
+    /// source files at all. Deterministic (FR31): same input, byte-identical output. [Story 7.11]</summary>
+    public static string CodeOwnershipTree(IReadOnlyList<CodeMapNode> roots, Func<string, string?>? fileHref = null)
+    {
+        if (roots.Count == 0)
+        {
+            return "<div class=\"chart-empty\">No source files to chart yet.</div>\n";
+        }
+
+        var sb = new StringBuilder();
+        sb.Append("<ul class=\"ownership-tree\">\n");
+        AppendOwnershipTreeNodes(roots, fileHref, 0, sb);
+        sb.Append("</ul>\n");
+        return sb.ToString();
+    }
+
+    private static void AppendOwnershipTreeNodes(
+        IReadOnlyList<CodeMapNode> nodes, Func<string, string?>? fileHref, int depth, StringBuilder sb)
+    {
+        if (depth > FreshnessRecursionGuard) return;
+
+        foreach (var node in nodes)
+        {
+            if (node.IsDirectory)
+            {
+                var descendants = CountFreshnessFiles(node);
+                sb.Append("  <li class=\"ownership-tree-dir\"><details><summary>");
+                sb.Append(Html(node.Label));
+                sb.Append($" <span class=\"ownership-tree-count\">({descendants} {Plural(descendants, "file", "files")})</span>");
+                sb.Append("</summary>\n    <ul>\n");
+                AppendOwnershipTreeNodes(node.Children, fileHref, depth + 1, sb);
+                sb.Append("    </ul>\n  </details></li>\n");
+            }
+            else
+            {
+                var info = DescribeOwnershipFile(node, fileHref);
+                var dot = $"<span class=\"ownership-tree-dot {info.LevelClass}\" aria-hidden=\"true\"></span>";
+                var text = info.Href is { } href
+                    ? $"<a href=\"{Html(href)}\">{Html(node.Label)}</a>"
+                    : Html(node.Label);
+                var detail = info.DominantName is { } name
+                    ? $"{Html(name)} {info.SharePct}% &middot; {info.TotalContributors} " +
+                      $"{Plural(info.TotalContributors, "contributor", "contributors")} &middot; last active " +
+                      (info.LastDate is { } d ? Html(PortalDates.Day(d)) : "unknown")
+                    : "no git history";
+                sb.Append($"  <li class=\"ownership-tree-file\">{dot}{text} <span class=\"ownership-tree-detail\">{detail}</span></li>\n");
+            }
+        }
+    }
+
+    /// <summary>The ownership sunburst's real-value legend (Story 10.2 AC — never "Less … More"): one swatch +
+    /// its fixed share-percentage range per level, highest-concentration first, plus a trailing "no git history"
+    /// swatch whenever at least one file has no contributor record. Degrades to a plain note (AC #2 graceful
+    /// degradation) when NO file in the set carries any contributor data at all, mirroring
+    /// <see cref="FreshnessLegend"/>'s identical discipline.</summary>
+    public static string OwnershipLegend(IReadOnlyList<CodeMapNode> files)
+    {
+        var withMetrics = files.Where(f => f.Metrics?.Contributors is { Count: > 0 }).ToList();
+        if (withMetrics.Count == 0)
+        {
+            return "<p class=\"ownership-legend-empty\">Git contributor data is unavailable (run with <code>--deep-git</code> " +
+                   "in a git repository to colorize by ownership) — every file renders neutral.</p>\n";
+        }
+
+        var hasUnmetriced = files.Count != withMetrics.Count;
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"ownership-legend\">");
+        sb.Append("<span class=\"ownership-legend-dim\">Colorized by dominant-author commit share</span> ");
+        (int Level, string Label)[] ranges = { (4, "76–100%"), (3, "51–75%"), (2, "26–50%"), (1, "0–25%") };
+        foreach (var (level, label) in ranges)
+        {
+            sb.Append($"<span class=\"ownership-legend-swatch level-{level}\"></span>");
+            sb.Append($"<span class=\"ownership-legend-label\">{label}</span> ");
+        }
+        if (hasUnmetriced)
+        {
+            sb.Append("<span class=\"ownership-legend-swatch level-none\"></span>");
+            sb.Append("<span class=\"ownership-legend-label\">No git history</span>");
         }
         sb.Append("</div>\n");
         return sb.ToString();

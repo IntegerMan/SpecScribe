@@ -94,8 +94,22 @@ public sealed record DeepGitPulse(
 /// <paramref name="AvgCoChanged"/> = the average number of <b>other</b> files touched in the same commits as this file
 /// (its typical "blast radius" per change), averaged over the non-bulk commits touching it — a commit whose distinct
 /// file set exceeds <see cref="GitMetrics.CouplingFileSetCap"/> is excluded as sweeping noise (matching the coupling
-/// view), while a solo commit contributes 0. Null when no non-bulk commit touched the file. [Story 7.6; co-change dimension]</summary>
-public sealed record CodeFileMetrics(int Changes, int TotalChurn, DateOnly? FirstDate, DateOnly? LastDate, double? AvgCoChanged = null);
+/// view), while a solo commit contributes 0. Null when no non-bulk commit touched the file.
+/// <paramref name="Contributors"/> is this file's per-author attribution (commits touching THIS file + their latest
+/// such commit's day), ordered commits-desc/name-asc and capped at <see cref="GitMetrics.CodeMapFileContributorCap"/>
+/// — the whole-tree analog of <see cref="FileChangeStat.Contributors"/>, computed by the SAME uncapped per-file walk
+/// as every other field here (unlike <see cref="GitInsightsData.Files"/>, never top-N-file-truncated). Null (never an
+/// empty non-null list) when the file has no git record. <paramref name="TotalContributors"/> is the file's full
+/// distinct-author count before that cap, so a truncated list can be disclosed as truncated. [Story 7.6; co-change
+/// dimension; Story 7.11 author attribution]</summary>
+public sealed record CodeFileMetrics(
+    int Changes,
+    int TotalChurn,
+    DateOnly? FirstDate,
+    DateOnly? LastDate,
+    double? AvgCoChanged = null,
+    IReadOnlyList<FileContributor>? Contributors = null,
+    int TotalContributors = 0);
 
 /// <summary>One file's numstat row within a commit. <paramref name="Added"/>/<paramref name="Deleted"/> are
 /// null for binary files (git prints <c>-</c> for both counts) — the path still counts as a change. [Story 3.8]</summary>
@@ -901,7 +915,18 @@ public static class GitMetrics
         public DateOnly? LastDate;  // newest day seen (records are newest-first, so the FIRST non-null day is latest)
         public long CoChangedTotal;  // Σ over non-bulk commits touching this file of (other files in that commit)
         public int CoChangeCommits;  // count of those non-bulk commits (the co-change average's denominator)
+        // Author -> (commits by that author touching this file, their latest such commit's day) — the SAME shape
+        // FileAccum.Authors uses, so BuildInsights and this whole-tree walk can never disagree on what "a commit
+        // by this author touching this file" means. [Story 7.11]
+        public readonly Dictionary<string, (int Commits, DateOnly? LastDate)> Authors = new(StringComparer.Ordinal);
     }
+
+    /// <summary>Per-file contributors kept in <see cref="CodeFileMetrics.Contributors"/> — the whole-tree analog of
+    /// <see cref="BuildInsights"/>'s <c>topContributorsPerFile</c> default (12). A file with more distinct authors
+    /// than this is vanishingly rare in practice; when it happens, an author ranked below the cap on EVERY file
+    /// they've ever touched cannot be found by the individual-author spotlight (Story 7.11 AC #2c) — an accepted,
+    /// documented bound rather than an unbounded per-file list. [Story 7.11]</summary>
+    public const int CodeMapFileContributorCap = 12;
 
     /// <summary>Builds the untruncated per-file treemap metric map (Story 7.6) from the SAME parsed records the
     /// hotspot/coupling/hub/per-file views consume — one fetch, one parse, several views; no extra git call. Unlike
@@ -948,6 +973,12 @@ public static class GitMetrics
                         a.CoChangedTotal += distinctCount - 1;
                         a.CoChangeCommits++;
                     }
+                    // Author attribution, gated the SAME once-per-commit-per-file way as Changes above (mirrors
+                    // FileAccum's Authors update in BuildInsights). [Story 7.11]
+                    var author = a.Authors.GetValueOrDefault(commit.Author);
+                    author.Commits++;
+                    author.LastDate ??= day; // newest-first: the first date seen for this author+file is latest
+                    a.Authors[commit.Author] = author;
                 }
 
                 // Dates: records are newest-first. The first non-null day seen is the file's latest; keep
@@ -964,10 +995,37 @@ public static class GitMetrics
         foreach (var (path, a) in accum)
         {
             double? avgCoChanged = a.CoChangeCommits > 0 ? (double)a.CoChangedTotal / a.CoChangeCommits : null;
-            result[path] = new CodeFileMetrics(a.Changes, a.TotalChurn, a.FirstDate, a.LastDate, avgCoChanged);
+            var contributors = a.Authors
+                .OrderByDescending(kv => kv.Value.Commits)
+                .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+                .Take(CodeMapFileContributorCap)
+                .Select(kv => new FileContributor(kv.Key, kv.Value.Commits, kv.Value.LastDate))
+                .ToList();
+            result[path] = new CodeFileMetrics(a.Changes, a.TotalChurn, a.FirstDate, a.LastDate, avgCoChanged, contributors, a.Authors.Count);
         }
 
         return result;
+    }
+
+    /// <summary>The bounded, deterministic top-author roster used for the whole-tree ownership sunburst's discrete
+    /// top-N palette mode (Story 7.11 AC #2b) — ranked by TOTAL commits across the analyzed window (once per
+    /// commit, not per file-touch, so a single sweeping commit doesn't inflate an author's rank), tie-broken by
+    /// name for a stable order. Deliberately NOT the same thing as the individual-author spotlight roster (AC #2c),
+    /// which is unbounded and comes from the per-file <see cref="CodeFileMetrics.Contributors"/> union instead —
+    /// this is only the fixed palette-assignment list, never rendered as a ranked "top contributors" leaderboard
+    /// (FR-10; the sunburst spotlight framing stays "where has this person worked", not "who did the most").
+    /// Pure and repo-free; empty input yields an empty list. [Story 7.11]</summary>
+    public static IReadOnlyList<string> BuildTopAuthors(IReadOnlyList<DeepCommit> commits, int capN = CodeMapFileContributorCap)
+    {
+        if (commits.Count == 0) return Array.Empty<string>();
+        return commits
+            .GroupBy(c => c.Author, StringComparer.Ordinal)
+            .Select(g => (Author: g.Key, Commits: g.Count()))
+            .OrderByDescending(a => a.Commits)
+            .ThenBy(a => a.Author, StringComparer.Ordinal)
+            .Take(Math.Max(capN, 0))
+            .Select(a => a.Author)
+            .ToList();
     }
 
     /// <summary>Resolves a `--numstat` path field to the file's current path, collapsing git's rename/move

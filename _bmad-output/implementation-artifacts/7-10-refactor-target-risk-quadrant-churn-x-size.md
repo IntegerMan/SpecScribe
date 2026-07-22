@@ -254,6 +254,15 @@ No external libraries or APIs are introduced — nothing to version-check. Platf
 - [x] **Task 5 — Full generation pass + manual verify (AC: #1, #2)**
   - [x] `dotnet test` green. Baseline generate (no `--deep-git`) → section omitted/empty-stated. Deep generate (`--deep-git`) → real scatter of this repo's files, elevated-risk quadrant shaded + shape/label-distinguished, guarded links, tooltips, text-equivalent list, Story 10.2 chrome, no JS, escaped content.
 
+### Review Findings
+
+- [ ] [Review][Patch] Coincident points fully occlude each other with no way to reach the covered ones — When two or more files share the exact same `(Lines, Changes)` pair, their SVG circles render at the identical `(cx, cy)`; only the last-drawn (alphabetically-last) circle is reachable by mouse hover/click. **Owner decision: add small deterministic jitter** (keyed on path, not random) to separate exactly-coincident points so every circle stays independently hoverable/clickable. [`Charts.cs:2667-2706`]
+- [ ] [Review][Patch] `RiskQuadrant` has no detail-cap on rich tooltip cards, unlike its sibling `CodeTreemap` [`Charts.cs:2692`, cf. `Charts.cs:2210-2235`]
+- [ ] [Review][Patch] `WriteRiskQuadrant` redundantly rebuilds the whole `CodeMap` instead of reusing `WriteCodeMap`'s already-built "full" variant [`SiteGenerator.cs:3099-3113`, cf. `SiteGenerator.cs:3066-3090`]
+- [ ] [Review][Patch] Inconsistent path comparer between the plot sort order (`Ordinal`) and the ranked-list tie-break (`OrdinalIgnoreCase`) on the same field [`Charts.cs:2509`, `Charts.cs:2552`]
+- [x] [Review][Defer] Degenerate single-value axis shows the identical real-unit number at both tick extremes and the median label [`Charts.cs:2655-2665`] — deferred, pre-existing (cosmetic, rare — requires every plotted file to share an identical size or change count)
+- [x] [Review][Defer] "Refactoring pays off" framing copy applies uniformly even to non-code tracked artifacts (e.g. `epics.md`, `sprint-status.yaml`) that can land in the elevated-risk quadrant [`Charts.cs:52-53`] — deferred, pre-existing (the underlying `CodeMap.Files()` scope — walking all git-tracked files, not just source — was set by Story 7.6, not this story; only the new framing copy surfaces the mismatch)
+
 ## Dev Notes
 
 - **This is a new-chart-type rendering story — no git work, no complexity analyzer.** Both axes' data already exist and are already joined per-file on `CodeMapNode` via `CodeMap.Files()`. If you find yourself editing `GitMetrics` or measuring code complexity, stop — both are explicitly out of scope. [[deep-git-single-numstat-path]]

@@ -554,7 +554,8 @@ public class HtmlTemplaterTests
 
         var html = HtmlTemplater.RenderIndex(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
-            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage);
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage,
+            today: new DateOnly(2026, 7, 8));
 
         // The whole present card is an anchor to the artifact's page, carries its family accent + a rich
         // js-tip tooltip, and its one-line description renders.
@@ -629,7 +630,8 @@ public class HtmlTemplaterTests
 
         var html = HtmlTemplater.RenderIndex(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
-            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage);
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage,
+            today: new DateOnly(2026, 7, 8));
 
         foreach (var label in labels)
         {

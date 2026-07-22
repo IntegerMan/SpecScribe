@@ -95,12 +95,11 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         Assert.True(File.Exists(HubPage), "git-insights.html must be generated when --deep-git has data");
 
         var hub = File.ReadAllText(HubPage);
-        Assert.Contains(">Files &amp; Contributors</h2>", hub);
-        Assert.Contains(">Ownership &amp; Bus-Factor</h2>", hub); // Story 7.11: renders whenever the hub does — no separate gate
+        Assert.Contains(">Code Ownership &amp; Bus-Factor</h2>", hub); // Story 7.11: renders whenever the hub does — no separate gate
         Assert.Contains(">Activity Over Time</h2>", hub);
-        Assert.Contains("tracked.txt", hub);          // a known committed file appears in the frequency table
-        Assert.Contains("id=\"gi-file-0\"", hub);      // its contributor drill-down panel is present
-        Assert.Contains("Insight Tester", hub);        // the committing author appears as a file contributor
+        Assert.Contains("tracked.txt", hub);           // a known committed file appears in the ownership tree/sunburst
+        Assert.Contains("ownership-sunburst", hub);     // the whole-tree sunburst renders
+        Assert.Contains("Insight Tester", hub);         // the committing author appears as a file contributor (data-owner/tree)
 
         var index = File.ReadAllText(IndexPage);
         Assert.Contains("href=\"git-insights.html\"", index);
@@ -144,21 +143,24 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         Assert.Equal(first, second);
     }
 
-    /// <summary>Initializes a real git repo in the fixture root with two commits by a known author. Returns
-    /// false (tests no-op) when the git CLI is unavailable or refuses — identity and signing are forced via
-    /// -c overrides so a host's global config can't break the fixture.</summary>
+    /// <summary>Initializes a real git repo in the fixture root with commits by TWO known authors (so
+    /// <c>ContributorCount &gt; 1</c> and the ownership sunburst renders instead of the solo-repo reframe).
+    /// Returns false (tests no-op) when the git CLI is unavailable or refuses — identity and signing are forced
+    /// via -c overrides so a host's global config can't break the fixture.</summary>
     private bool TryCreateGitHistory()
     {
         if (!RunGit("init")) return false;
         File.WriteAllText(Path.Combine(_root, "tracked.txt"), "one\n");
         if (!RunGit("add .")) return false;
-        if (!Commit("First commit")) return false;
+        if (!Commit("First commit", "Insight Tester", "insights@example.com")) return false;
         File.WriteAllText(Path.Combine(_root, "tracked.txt"), "one\ntwo\n");
-        return RunGit("add .") && Commit("Second commit");
+        if (!RunGit("add .") || !Commit("Second commit", "Insight Tester", "insights@example.com")) return false;
+        File.WriteAllText(Path.Combine(_root, "other.txt"), "three\n");
+        return RunGit("add .") && Commit("Third commit", "Second Author", "second@example.com");
     }
 
-    private bool Commit(string message) => RunGit(
-        $"-c user.name=\"Insight Tester\" -c user.email=insights@example.com -c commit.gpgsign=false commit -m \"{message}\"");
+    private bool Commit(string message, string authorName, string authorEmail) => RunGit(
+        $"-c user.name=\"{authorName}\" -c user.email={authorEmail} -c commit.gpgsign=false commit -m \"{message}\"");
 
     private bool RunGit(string arguments)
     {

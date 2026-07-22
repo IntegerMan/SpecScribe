@@ -2185,10 +2185,13 @@ public sealed class SiteGenerator
         var sw = Stopwatch.StartNew();
         try
         {
-            // Wire the guarded commit-detail resolver (Story 7.5): the hub's "latest {hash}" links light up as
-            // links into commit/ when a per-commit page exists, plain otherwise. The hub sits at the output root,
-            // so the resolver's root-relative path is used as-is (the templater applies no prefix there).
-            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, fileHref: CodeItemHref, commitHref: CommitHref);
+            // Story 7.11 rewrite: the hub's ownership section needs the SAME uncapped whole-tree CodeMap the
+            // Code Map/Risk Quadrant pages build (GitInsightsData.Files is top-N-capped — wrong for a whole-tree
+            // sunburst) plus the bounded, deterministic top-author roster for the discrete-palette mode.
+            var codeMapMetrics = _progress.DeepGit.CodeMapMetrics;
+            var codeMap = CodeMap.Build(_codeFiles, codeMapMetrics);
+            var topAuthors = GitMetrics.BuildTopAuthors(_progress.DeepGit.Commits);
+            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref);
             WriteOutput(SiteNav.GitInsightsOutputPath, ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
         }

@@ -199,20 +199,21 @@ public class CodeMapTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_RendersASunburstTreeViewTogglePerPanelWithUniqueRadioIdsAcrossAllFourPanels()
+    public void RenderPage_RendersASunburstTreemapViewTogglePerPanelWithUniqueRadioIdsAcrossAllFourPanels()
     {
-        // Owner feedback: a "view as tree" alternative to the sunburst. The pure-CSS radio pair must have
-        // variant-unique ids/names (all four panels' markup coexists in the DOM) so toggling one panel's
-        // Sunburst/Tree radios can never affect another panel.
+        // Owner feedback: a "view as treemap" alternative to the sunburst (owner correction: "Tree" means the
+        // size-by-area treemap shape, not a folder-list view). The pure-CSS radio pair must have variant-unique
+        // ids/names (all four panels' markup coexists in the DOM) so toggling one panel's Sunburst/Treemap
+        // radios can never affect another panel.
         var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
 
         Assert.Contains("id=\"cf-sunburst-full\"", html);
-        Assert.Contains("id=\"cf-tree-full\"", html);
+        Assert.Contains("id=\"cf-treemap-full\"", html);
         Assert.Contains("id=\"cf-sunburst-no-spec\"", html);
-        Assert.Contains("id=\"cf-tree-no-spec\"", html);
+        Assert.Contains("id=\"cf-treemap-no-spec\"", html);
         Assert.Contains(">Sunburst</label>", html);
-        Assert.Contains(">Tree</label>", html);
-        Assert.Contains("class=\"freshness-tree\"", html); // the tree view itself renders (always in the DOM, CSS-hidden by default)
+        Assert.Contains(">Treemap</label>", html);
+        Assert.Contains("class=\"freshness-treemap\"", html); // the treemap view itself renders (always in the DOM, CSS-hidden by default)
         // Every radio name is unique per panel — no two panels' toggles can cross-wire.
         var names = System.Text.RegularExpressions.Regex.Matches(html, "name=\"(cf-view-[^\"]+)\"")
             .Select(m => m.Groups[1].Value).Distinct().ToList();
@@ -236,7 +237,7 @@ public class CodeMapTemplaterTests
         // Code Map surface (the treemap, the file table) already threads through — not silently dropped.
         var linked = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(),
             fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
-        Assert.Contains("<a href=\"code/src/A.cs.html\"><path class=\"freshness-wedge", linked);
+        Assert.Contains("<a href=\"code/src/A.cs.html\" aria-label=\"src/A.cs\"><path class=\"freshness-wedge", linked);
 
         var plain = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(), fileHref: null);
         Assert.DoesNotContain("<a href=\"code/src/A.cs.html\">", plain);
@@ -264,5 +265,29 @@ public class CodeMapTemplaterTests
         // The smallest file (never in the top-`cap` by size, the significance order when metrics are absent)
         // has no table row at all — the cap actually removed rows, not just appended a note.
         Assert.DoesNotContain("src/file-00001.cs<", html);
+    }
+
+    // ---- File table pagination (owner feedback, Story 7.12 review) ------------------------
+
+    [Fact]
+    public void RenderPage_FileTableCarriesAPageSizeAndAHiddenPagerControlForClientSidePagination()
+    {
+        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+
+        Assert.Contains($"<table class=\"codemap-table\" data-page-size=\"{Reflect_CodeMapTablePageSize()}\">", html);
+        Assert.Contains("class=\"codemap-table-row\"", html);
+        // Emitted hidden — progressive enhancement only reveals it once there's more than one page's worth.
+        Assert.Contains("<div class=\"codemap-table-pager\" hidden>", html);
+        Assert.Contains("codemap-table-pager-prev", html);
+        Assert.Contains("codemap-table-pager-next", html);
+        Assert.Contains("codemap-table-pager-status", html);
+    }
+
+    /// <summary>The page-size constant is private; reading it via reflection keeps this test honest about the
+    /// ACTUAL emitted attribute value rather than hard-coding a duplicate literal that could silently drift.</summary>
+    private static string Reflect_CodeMapTablePageSize()
+    {
+        var field = typeof(CodeMapTemplater).GetField("CodeMapTablePageSize", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        return field.GetValue(null)!.ToString()!;
     }
 }
