@@ -23,6 +23,20 @@ public class PathUtilTests
     public void ToOutputRelative_SwapsExtensionToHtml()
         => Assert.Equal("docs/spec.html", PathUtil.ToOutputRelative("docs/spec.md"));
 
+    [Theory]
+    [InlineData("C:/Dev/SpecScribe/file.md", true)] // rooted — the "no common root" GetRelativePath fallback
+    [InlineData("/etc/passwd", true)] // rooted on POSIX
+    [InlineData("..", true)]
+    [InlineData("../sibling/file.md", true)]
+    [InlineData("../../file.md", true)]
+    [InlineData("foo/bar.md", false)]
+    [InlineData("file.md", false)]
+    // A real in-repo path merely NAMED like an up-level segment must not be misclassified as an escape — a bare
+    // "..".StartsWith substring check would wrongly flag this. [Story 6.10 deferred-work fix]
+    [InlineData("..cache/notes.md", false)]
+    public void EscapesRepoRoot_ChecksTheLeadingSegment_NotABareSubstring(string relativePath, bool expected)
+        => Assert.Equal(expected, PathUtil.EscapesRepoRoot(relativePath));
+
     [Fact]
     public void Html_EncodesMarkupCharacters()
         => Assert.Equal("&lt;b&gt;bold &amp; brash&lt;/b&gt;", PathUtil.Html("<b>bold & brash</b>"));

@@ -2410,9 +2410,19 @@ public sealed class SiteGenerator
 
     /// <summary>Expresses an absolute path relative to the repo root with forward slashes — the ONE source-path
     /// convention the VS Code host joins to the workspace folder (matching <c>configuredOutputRoot</c>), so no
-    /// <c>_bmad-output</c> or other path-structure literal is ever duplicated host-side (Story 6.10 AC #1). [Story 6.10]</summary>
-    private string RepoRelative(string absolutePath) =>
-        PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.RepoRoot, absolutePath));
+    /// <c>_bmad-output</c> or other path-structure literal is ever duplicated host-side (Story 6.10 AC #1).
+    /// Returns null when <paramref name="absolutePath"/> doesn't resolve to somewhere inside the repo root:
+    /// <c>Path.GetRelativePath</c> silently returns the input unchanged (still absolute) when there's no common
+    /// root — e.g. a misconfigured <see cref="ForgeOptions.RepoRoot"/> or a different drive on Windows — and a
+    /// leading <c>..</c> would still escape the repo the TS-side <c>resolveWorkspacePath</c> containment guard
+    /// enforces. Every caller already treats a null source path as "no reveal-source affordance," the same
+    /// degrade the dashboard's aggregate pages use, so an escape now surfaces as an honestly hidden button
+    /// instead of silently shipping a path the host guard would reject anyway. [Story 6.10 deferred-work fix]</summary>
+    private string? RepoRelative(string absolutePath)
+    {
+        var rel = PathUtil.NormalizeSlashes(Path.GetRelativePath(_options.RepoRoot, absolutePath));
+        return PathUtil.EscapesRepoRoot(rel) ? null : rel;
+    }
 
     /// <summary>Renders the webview's navigable surface set — dashboard, epics index, every epic page, and every
     /// story page/placeholder (the five Story 6.2 surface families) — through the
@@ -2601,14 +2611,12 @@ public sealed class SiteGenerator
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // Never ship a sourcePath that escapes the repo root: RepoRelative degrades to an absolute path when
-        // the source lives outside RepoRoot (known deferred quirk), and the host containment guard would
-        // reject it anyway — omitting the entry (button hidden) is the honest degrade.
+        // RepoRelative itself returns null for a source that escapes the repo root; omitting the entry
+        // (button hidden) is the honest degrade — the host containment guard would reject it anyway.
         void Add(string outputRelative, string sourceFullPath)
         {
-            var rel = RepoRelative(sourceFullPath);
-            if (Path.IsPathRooted(rel) || rel.StartsWith("..", StringComparison.Ordinal)) return;
-            map[PathUtil.NormalizeSlashes(outputRelative)] = PathUtil.NormalizeSlashes(rel);
+            if (RepoRelative(sourceFullPath) is not { } rel) return;
+            map[PathUtil.NormalizeSlashes(outputRelative)] = rel;
         }
 
         foreach (var doc in _docs.Values)

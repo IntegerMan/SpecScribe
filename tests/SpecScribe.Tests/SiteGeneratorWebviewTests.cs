@@ -295,6 +295,49 @@ public class SiteGeneratorWebviewTests : IDisposable
     }
 
     [Fact]
+    public void EscapedRepoRoot_DegradesSourcePathToNull_InsteadOfShippingAnAbsolutePath()
+    {
+        // Deferred-work regression (6-10-editor-artifact-bridges-reveal-source.md): a misconfigured RepoRoot
+        // that doesn't actually contain the source artifacts must never ship an absolute (or ".."-escaping)
+        // sourcePath — Path.GetRelativePath silently returns such input unchanged, which would otherwise
+        // violate the "always repo-relative" contract the TS-side resolveWorkspacePath containment guard
+        // depends on. The honest degrade is the same "button hidden" null every aggregate page already uses.
+        var options = ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false);
+        var escaped = new ForgeOptions
+        {
+            RepoRoot = Path.Combine(_root, "not-the-real-root"),
+            SourceRoot = options.SourceRoot,
+            AdrSourceRoot = options.AdrSourceRoot,
+            AdrSourceExplicit = options.AdrSourceExplicit,
+            OutputRoot = options.OutputRoot,
+            SiteTitle = options.SiteTitle,
+            IncludeReadme = options.IncludeReadme,
+            DeepGitAnalytics = options.DeepGitAnalytics,
+        };
+        Directory.CreateDirectory(escaped.RepoRoot);
+
+        // CapturePages=true also exercises BuildCapturedSourceMap's Add — the third RepoRelative call site
+        // (alongside _epicsSourcePath/storySourcePath below) — so all three degrade identically, not just the
+        // two reached by the plain epics/story family.
+        var gen = new SiteGenerator(escaped) { CapturePages = true };
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        var bundle = gen.RenderWebviewSurfaces();
+
+        Assert.Null(bundle.Surfaces.Single(s => s.OutputRelativePath == "epics/story-1-1.html").SourcePath);
+        Assert.Null(bundle.Surfaces.Single(s => s.OutputRelativePath == "epics.html").SourcePath);
+        var docPage = bundle.Surfaces.Single(s => s.OutputRelativePath == "planning-artifacts/prd.html");
+        Assert.Null(docPage.SourcePath);
+
+        // The escape must degrade all the way through JSON serialization too, not just the in-memory property.
+        var json = WebviewCommand.SerializePayload(bundle, "SpecScribeOutput");
+        using var doc = JsonDocument.Parse(json);
+        var storySurface = doc.RootElement.GetProperty("surfaces").GetProperty("epics/story-1-1.html");
+        Assert.True(storySurface.TryGetProperty("sourcePath", out var src));
+        Assert.Equal(JsonValueKind.Null, src.ValueKind);
+    }
+
+    [Fact]
     public void SerializePayload_EmitsSourcePathPerSurface_CamelCase_NullForDashboard()
     {
         var bundle = GeneratedSite().RenderWebviewSurfaces();

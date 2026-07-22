@@ -22,6 +22,17 @@ public static class PathUtil
 
     public static string ToOutputRelative(string sourceRelativePath) => Path.ChangeExtension(sourceRelativePath, ".html");
 
+    /// <summary>True when <paramref name="normalizedRelativePath"/> — a forward-slash-normalized value as
+    /// <see cref="Path.GetRelativePath"/> could return it — does NOT actually stay inside the base directory it
+    /// was computed against: either the "no common root" fallback (still rooted/absolute, e.g. a different
+    /// drive on Windows) or a genuine leading up-level segment. Checks the leading path SEGMENT, not a bare
+    /// substring, so an in-repo path merely NAMED like an up-level segment (e.g. <c>..cache/notes.md</c>, legal
+    /// on POSIX filesystems) is never misclassified as an escape. [Story 6.10 deferred-work fix]</summary>
+    public static bool EscapesRepoRoot(string normalizedRelativePath) =>
+        Path.IsPathRooted(normalizedRelativePath)
+        || normalizedRelativePath == ".."
+        || normalizedRelativePath.StartsWith("../", StringComparison.Ordinal);
+
     /// <summary>True for working files no pipeline stage should touch — editor temps (<c>~$…</c>,
     /// <c>*.tmp</c>, <c>*.crswap</c>) and dotfiles (e.g. <c>.memlog.md</c>). One predicate shared by the
     /// generator's source enumeration and the framework adapters' ingest, so ignored files are neither
