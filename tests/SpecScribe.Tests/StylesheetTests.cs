@@ -507,6 +507,29 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_OwnershipLegendHiddenAttributeActuallyHidesIt()
+    {
+        // Regression (owner-reported): `.ownership-legend { display: flex; }` has the same specificity as the
+        // browser's default `[hidden] { display: none }` UA rule, so author CSS silently won that tie and all
+        // four mode-specific legend blocks rendered simultaneously regardless of the live JS switcher's `hidden`
+        // property. A dedicated `[hidden]` override with higher specificity is required.
+        var css = ReadStylesheet();
+        Assert.Contains(".ownership-legend[hidden] { display: none; }", css);
+    }
+
+    [Fact]
+    public void Stylesheet_OwnershipSpotlightRecencyRampReusesTheShareLevelSwatches()
+    {
+        // Owner feedback: spotlight mode is a recency SPECTRUM (days since the chosen contributor last touched
+        // the file), not a binary touched/not-touched flag — it reuses the SAME level-1..4 fill ramp share-%
+        // mode uses (Charts.OwnershipSpotlightLegend), layered with its own .spotlight-touched stroke marker.
+        var css = ReadStylesheet();
+        Assert.Contains(".ownership-wedge.spotlight-touched, .ownership-cell.spotlight-touched", css);
+        Assert.Contains(".ownership-legend-swatch.owner-spotlight-off", css);
+        Assert.DoesNotContain("owner-spotlight-on", css);
+    }
+
+    [Fact]
     public void Stylesheet_DoesNotHaveTheRemovedOwnershipTextEquivalentTree()
     {
         // Owner feedback: the collapsible text-equivalent tree was removed entirely (not just demoted) — the
@@ -545,9 +568,10 @@ public class StylesheetTests
     {
         // "Color is never the sole signal" (this project's convention) — the JS-only spotlight and staleness
         // modes must each carry a stroke/dash change alongside their fill, not a hue swap alone, for both the
-        // sunburst wedge and treemap cell class families.
+        // sunburst wedge and treemap cell class families. Spotlight's recency ramp gets its stroke via the
+        // separate .spotlight-touched marker class (layered on top of the reused level-1..4 fill classes).
         var css = ReadStylesheet();
-        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-spotlight-on,\s*\.ownership-cell\.owner-spotlight-on\s*\{[^}]*stroke:"), css);
+        Assert.Matches(new Regex(@"\.ownership-wedge\.spotlight-touched,\s*\.ownership-cell\.spotlight-touched\s*\{[^}]*stroke:"), css);
         Assert.Matches(new Regex(@"\.ownership-wedge\.owner-stale,\s*\.ownership-cell\.owner-stale\s*\{[^}]*stroke-dasharray:"), css);
     }
 
@@ -577,6 +601,7 @@ public class StylesheetTests
         Assert.Contains("recolorTopAuthors", js);
         Assert.Contains("recolorSpotlight", js);
         Assert.Contains("recolorStaleness", js);
+        Assert.Contains("spotlightRecencyLevel", js);
         Assert.DoesNotContain("Date.now()", js);
     }
 

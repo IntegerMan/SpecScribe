@@ -3343,19 +3343,27 @@ public static class Charts
         return sb.ToString();
     }
 
-    /// <summary>The individual-author-spotlight legend (JS-only mode): the chosen contributor's own files vs.
-    /// every other file — distinguished by more than hue alone (a stroke/opacity change too), matching the
-    /// wedges'/cells' own <c>owner-spotlight-on</c>/<c>owner-spotlight-off</c> treatment. Ships <c>hidden</c>,
-    /// one of <see cref="OwnershipLegend"/>'s four mode-specific siblings.</summary>
+    /// <summary>The individual-author-spotlight legend (JS-only mode): NOT a binary "has worked on this file"
+    /// flag (owner feedback) — files the chosen contributor touched are colored on the SAME level-1..4 ramp
+    /// share-% mode uses (reused, not a new gradient — mirrors this codebase's existing level-bucketing
+    /// convention), by how recently THAT contributor last touched the file, using fixed real-unit day cutoffs
+    /// (meaningful on their own scale, matching <see cref="OwnershipShareLevel"/>'s "never a moving target"
+    /// reasoning — every repo's "≤30 days" means the same thing). Files they never touched stay the distinct
+    /// muted <c>owner-spotlight-off</c> state — that's not a recency value, so it can't sit on the ramp. Ships
+    /// <c>hidden</c>, one of <see cref="OwnershipLegend"/>'s four mode-specific siblings.</summary>
     public static string OwnershipSpotlightLegend()
     {
         var sb = new StringBuilder();
         sb.Append("<div class=\"ownership-legend ownership-legend-spotlight\" hidden>");
-        sb.Append("<span class=\"ownership-legend-dim\">Colorized by whether the chosen contributor has worked on each file</span> ");
-        sb.Append("<span class=\"ownership-legend-swatch owner-spotlight-on\"></span>");
-        sb.Append("<span class=\"ownership-legend-label\">Has worked on this file</span> ");
+        sb.Append("<span class=\"ownership-legend-dim\">Colorized by how recently the chosen contributor last worked on each file</span> ");
+        (int Level, string Label)[] ranges = { (4, "≤30 days ago"), (3, "31–90 days ago"), (2, "91–180 days ago"), (1, "180+ days ago") };
+        foreach (var (level, label) in ranges)
+        {
+            sb.Append($"<span class=\"ownership-legend-swatch level-{level}\"></span>");
+            sb.Append($"<span class=\"ownership-legend-label\">{label}</span> ");
+        }
         sb.Append("<span class=\"ownership-legend-swatch owner-spotlight-off\"></span>");
-        sb.Append("<span class=\"ownership-legend-label\">Has not</span>");
+        sb.Append("<span class=\"ownership-legend-label\">Has not worked on this file</span>");
         sb.Append("</div>\n");
         return sb.ToString();
     }

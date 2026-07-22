@@ -1232,7 +1232,7 @@
     });
 
     var FILL_CLASSES = ["level-0", "level-1", "level-2", "level-3", "level-4", "level-none",
-      "owner-author-other", "owner-spotlight-on", "owner-spotlight-off", "owner-fresh", "owner-stale"];
+      "owner-author-other", "spotlight-touched", "owner-spotlight-off", "owner-fresh", "owner-stale"];
     topAuthors.forEach(function (name, i) { FILL_CLASSES.push("owner-author-" + i); });
 
     function clearFillClasses(w) {
@@ -1299,12 +1299,27 @@
       });
     }
 
+    // Fixed real-unit day cutoffs (owner feedback: not a binary touched/not-touched flag — a recency spectrum,
+    // "days since THIS contributor last touched the file"). Mirrors OwnershipShareLevel's fixed-cutoff
+    // reasoning (meaningful on its own scale, never a moving target) rather than a per-render quartile split.
+    function spotlightRecencyLevel(daysAgo) {
+      if (daysAgo === null) return 1; // touched, but their own last-touch date wasn't embedded — oldest bucket
+      if (daysAgo <= 30) return 4;
+      if (daysAgo <= 90) return 3;
+      if (daysAgo <= 180) return 2;
+      return 1;
+    }
+
     function recolorSpotlight(name) {
       wedges.forEach(function (w) {
         clearFillClasses(w);
-        var touched = ownerData(w).some(function (entry) { return entry[0] === name; });
-        w.classList.add(touched ? "owner-spotlight-on" : "owner-spotlight-off");
-        setLabel(w, touched ? name + " has worked on this file" : name + " has not worked on this file");
+        var entry = ownerData(w).filter(function (e) { return e[0] === name; })[0];
+        if (!entry) { w.classList.add("owner-spotlight-off"); setLabel(w, name + " has not worked on this file"); return; }
+        var lastDay = entry[2];
+        var daysAgo = (lastDay === null || lastDay === undefined || isNaN(asof)) ? null : (asof - lastDay);
+        var level = spotlightRecencyLevel(daysAgo);
+        w.classList.add("level-" + level, "spotlight-touched");
+        setLabel(w, name + " worked on this file" + (daysAgo === null ? "" : " (" + daysAgo + (daysAgo === 1 ? " day" : " days") + " ago)"));
       });
     }
 

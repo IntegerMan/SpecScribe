@@ -5523,10 +5523,13 @@ body:has(main.req-detail) .doc-header {
 .ownership-wedge.owner-author-6, .ownership-cell.owner-author-6 { fill: var(--violet); }
 .ownership-wedge.owner-author-other, .ownership-cell.owner-author-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
 
-/* Individual-author spotlight (JS-only mode): distinguished by more than hue — a stroke/opacity change too
-   (this project's "color is never the sole signal" convention), so the highlighted set reads clearly even
-   under a color-vision deficiency. */
-.ownership-wedge.owner-spotlight-on, .ownership-cell.owner-spotlight-on { fill: var(--rust); stroke: var(--ink); stroke-width: 1.2; }
+/* Individual-author spotlight (JS-only mode, owner feedback): NOT a binary touched/not-touched flag — files the
+   chosen contributor touched reuse the SAME level-1..4 fill ramp share-% mode uses (Charts.OwnershipSpotlightLegend),
+   recolored by how recently THAT contributor last touched the file, layered with .spotlight-touched's own
+   stroke so the highlighted set still reads clearly beyond hue alone (color is never the sole signal). Files
+   they never touched stay the distinct muted owner-spotlight-off state — not a recency value, so it can't sit
+   on the ramp. */
+.ownership-wedge.spotlight-touched, .ownership-cell.spotlight-touched { stroke: var(--ink); stroke-width: 1.2; }
 .ownership-wedge.owner-spotlight-off, .ownership-cell.owner-spotlight-off { fill: var(--parchment-dark); fill-opacity: 0.35; }
 
 /* Staleness mode (JS-only): a binary cutoff at the reader's chosen threshold, dashed stroke on the stale side
@@ -5548,6 +5551,11 @@ body:has(main.req-detail) .doc-header {
   color: var(--ink-light);
   margin: 0.6rem 0 0;
 }
+/* Bug fix: the `display: flex` rule above has the same specificity as the browser's default
+   `[hidden] { display: none }` UA rule, and author CSS always wins that tie — so the three JS-only legend
+   blocks' `hidden` attribute was being silently overridden and all four legends rendered at once regardless of
+   mode (owner-reported). This selector's extra specificity (class + attribute) restores real hiding. */
+.ownership-legend[hidden] { display: none; }
 .ownership-legend-dim { font-weight: 600; margin-right: 0.4rem; }
 .ownership-legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .ownership-legend-swatch.level-1 { background: #ecd18f; }
@@ -5566,8 +5574,8 @@ body:has(main.req-detail) .doc-header {
 .ownership-legend-swatch.owner-author-5 { background: var(--moss); }
 .ownership-legend-swatch.owner-author-6 { background: var(--violet); }
 .ownership-legend-swatch.owner-author-other { background: var(--parchment-dark); opacity: 0.55; }
-/* Spotlight legend swatches. */
-.ownership-legend-swatch.owner-spotlight-on { background: var(--rust); }
+/* Spotlight legend's "never touched by this contributor" swatch — the recency ramp itself reuses the
+   .ownership-legend-swatch.level-1..4 rules already defined above (share-% legend). */
 .ownership-legend-swatch.owner-spotlight-off { background: var(--parchment-dark); opacity: 0.35; }
 /* Staleness legend swatches — the "fresh" green this legend previously never listed at all (owner feedback). */
 .ownership-legend-swatch.owner-fresh { background: var(--moss-light); }

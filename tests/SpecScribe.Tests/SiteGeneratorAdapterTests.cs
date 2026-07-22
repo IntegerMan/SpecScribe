@@ -809,7 +809,20 @@ public class SiteGeneratorAdapterTests : IDisposable
         // visibly indicates the current view, the discrete palette's colors match the file-type legend exactly,
         // and all four legend blocks show/hide correctly per mode. Verified stable across 2 repeated runs
         // before locking in. [golden-diff-normalization-gotchas]
-        const string expected = "19a53cbc8cd629a7fba919b16d8ed84739324fb1a8cd71246bb2f6220324c9ea";
+        // Regenerated for Story 7.11's third design-feedback pass (owner-reported bug + enhancement): fixed a
+        // real CSS specificity bug where `.ownership-legend { display: flex; }` silently beat the browser's
+        // default `[hidden] { display: none }` UA rule, so all four mode-specific legend blocks rendered
+        // simultaneously regardless of the live JS switcher's `hidden` property (a new `.ownership-legend[hidden]`
+        // override fixes it); and changed the individual-author-spotlight mode from a binary touched/not-touched
+        // flag to a recency spectrum (days since that specific contributor last touched the file, fixed-cutoff
+        // buckets reusing the SAME level-1..4 fill ramp share-% mode uses, distinguished with a new
+        // `.spotlight-touched` stroke marker in place of the removed `owner-spotlight-on`). This non-git fixture
+        // never renders git-insights.html (no --deep-git), so the hash only shifts via the global
+        // specscribe.css/specscribe.js asset changes. Manually verified live in a real browser: legend
+        // visibility now matches the active mode exactly (computed `display` checked, not just the DOM
+        // property), and spotlight mode colors + labels files by real day-counts since the chosen contributor's
+        // last touch. Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        const string expected = "260d5b3124c15253cdb8195175857e793cf13ddf1f03100f964ccd399f525cb0";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
