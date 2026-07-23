@@ -65,6 +65,14 @@ public static class ChangeSurface
                 continue;
             }
 
+            // Fallback: a bare line that is ENTIRELY backtick-wrapped path token(s), e.g. `src/Foo.cs`.
+            // Guard against prose — an italic disclaimer that happens to embed inline code (like
+            // `src/**` or `baseline_commit`) must not turn those words into phantom touched files. Only
+            // harvest when nothing but code spans and separators remain after removing the backtick runs.
+            var residual = FileListBacktick.Replace(line, " ");
+            if (residual.Any(c => !char.IsWhiteSpace(c) && c is not (',' or ';' or '·' or '|')))
+                continue;
+
             foreach (Match m in FileListBacktick.Matches(line))
             {
                 var rawPath = m.Groups[1].Value.Trim();

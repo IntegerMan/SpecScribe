@@ -118,4 +118,40 @@ public class ChangeSurfaceTests
     [Fact]
     public void NormalizeFileListPath_StripsParentheticalAnnotation()
         => Assert.Equal("src/Foo.cs", ChangeSurface.NormalizeFileListPath("src/Foo.cs (new)"));
+
+    [Fact]
+    public void ExtractFileList_IgnoresInlineCodeInProse()
+    {
+        // A spike's File List often opens with an italic disclaimer that embeds inline code
+        // (`src/**`, `baseline_commit`). Those are prose, not touched files — only the bullets count.
+        var raw = """
+            ## Dev Agent Record
+            ### File List
+
+            _Spike — no `src/**` or `tests/**` changes (Task 6). Only frontmatter `baseline_commit` and `sprint-status.yaml` status were updated._
+
+            - `_bmad-output/implementation-artifacts/19-1-work-graph-model-and-coverage-spike.md`
+            - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+            """;
+        var files = ChangeSurface.ExtractFileList(raw);
+        Assert.Equal(2, files.Count);
+        Assert.Contains("_bmad-output/implementation-artifacts/19-1-work-graph-model-and-coverage-spike.md", files);
+        Assert.Contains("_bmad-output/implementation-artifacts/sprint-status.yaml", files);
+        Assert.DoesNotContain("src/**", files);
+        Assert.DoesNotContain("baseline_commit", files);
+    }
+
+    [Fact]
+    public void ExtractFileList_StillParsesBareBacktickPathLine()
+    {
+        // The backtick fallback must still catch a genuine bullet-less path line.
+        var raw = """
+            ## Dev Agent Record
+            ### File List
+            `src/SpecScribe/ChangeSurface.cs`
+            """;
+        var files = ChangeSurface.ExtractFileList(raw);
+        Assert.Single(files);
+        Assert.Equal("src/SpecScribe/ChangeSurface.cs", files[0]);
+    }
 }
