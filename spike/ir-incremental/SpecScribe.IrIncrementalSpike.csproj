@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Story 22.1 INCREMENTAL-RECOMPUTE + IR-DELTA SPIKE — THROWAWAY. Quarantined under spike/ and excluded from the
+       shipped `specscribe` tool's build/pack: the repo's solution (SpecScribe.slnx) lists ONLY src/SpecScribe +
+       tests/SpecScribe.Tests and never references this project, and `dotnet build src/SpecScribe` never sees it.
+       It drives the REAL SiteGenerator (GenerateAll = full-regen oracle; RegenerateEpics / GenerateOne / RemoveFor /
+       RegenerateAdrs / RegenerateFromDataSource = the shipped watch-mode incremental routes) against a mutable copy
+       of this repo's own artifacts, then diffs the incremental output tree byte-for-byte (normalized with the SAME
+       per-run/per-build noise folding the GoldenContentFingerprint gate uses) against a full regenerate of the
+       identical post-change source tree. It measures: (1) changed-scope recompute CORRECTNESS per change class incl.
+       AD-5 topology cases, (2) full-vs-incremental LATENCY, (3) IR-delta payload size via the shipped SpaDelivery
+       chunk form. No .md re-model, no .html scrape — it serializes what the core already produces (AD-1/AD-2).
+       Delete with the branch; the durable output is 22-1-spike-report.md (NOT an ADR — ADR 0008 already decided). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>specscribe-ir-incremental-spike</AssemblyName>
+    <RootNamespace>SpecScribe.IrIncrementalSpike</RootNamespace>
+    <!-- The referenced SpecScribe project is PackAsTool; suppress the transitive pack-tool warning for the spike. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SpecScribe\SpecScribe.csproj" />
+  </ItemGroup>
+
+</Project>
