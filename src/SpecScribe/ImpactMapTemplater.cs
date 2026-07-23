@@ -46,15 +46,20 @@ public static class ImpactMapTemplater
                 Ranking: ranking,
                 Why: Charts.WhyText(Charts.ChartMetric.PlanningCodeImpact),
                 Note: Charts.PlanningCodeImpactNote),
-            BuildInteractiveBody(epics, data)));
+            BuildInteractiveBody(epics, data, prefix)));
 
         // The epic-grouped text list is the accessible text-equivalent + no-JS fallback (it IS the whole content
         // with the script off). Open by default so a no-JS visitor sees it; the script collapses it once the
-        // treemap is live (still one click away). [Story 21.3; a11y text-twin discipline]
-        sb.Append("<details class=\"chart-panel impact-fallback\" id=\"impact-fallback\" open>\n");
-        sb.Append("  <summary>All touched files, grouped by epic</summary>\n");
-        sb.Append(Charts.ImpactMapBody(epics, data, prefix));
-        sb.Append("</details>\n\n");
+        // treemap is live (still one click away). Omitted entirely when there is nothing to list — the Framed
+        // body above already renders the honest empty note, and a second copy of the identical message in this
+        // wrapper was pure duplication. [Story 21.3; a11y text-twin discipline] [Review][Patch]
+        if (data.HasAnyFiles)
+        {
+            sb.Append("<details class=\"chart-panel impact-fallback\" id=\"impact-fallback\" open>\n");
+            sb.Append("  <summary>All touched files, grouped by epic</summary>\n");
+            sb.Append(Charts.ImpactMapBody(epics, data, prefix));
+            sb.Append("</details>\n\n");
+        }
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter());
@@ -65,7 +70,7 @@ public static class ImpactMapTemplater
     /// <summary>The framed body: the interactive controls (epic multi-select + legend) the script reveals, the
     /// treemap mount point the script fills, and the embedded JSON payload it reads. All progressive-enhancement —
     /// emitted <c>hidden</c> / empty so a no-JS visitor sees nothing broken here and falls through to the text list.</summary>
-    private static string BuildInteractiveBody(EpicsModel epics, PlanningCodeImpactData data)
+    private static string BuildInteractiveBody(EpicsModel epics, PlanningCodeImpactData data, string prefix)
     {
         var attributedEpics = epics.Epics
             .Where(e => data.FilesByEpic.ContainsKey(e.Number))
@@ -133,11 +138,10 @@ public static class ImpactMapTemplater
             epics = attributedEpics.Select(e => new
             {
                 n = e.Number,
-                t = PathUtil.StripHtmlTags(e.Title),
                 f = data.FilesByEpic[e.Number].Select(file => new
                 {
                     p = file.Path,
-                    h = file.CodePageHref,
+                    h = file.CodePageHref is { Length: > 0 } href ? prefix + href : file.CodePageHref,
                     c = file.Churn,
                     k = file.Commits,
                 }),

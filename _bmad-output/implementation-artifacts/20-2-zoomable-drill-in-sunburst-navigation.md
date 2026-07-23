@@ -1,6 +1,10 @@
+---
+baseline_commit: b8be08d0f139c3dca487a7cab9ef87234a1a5630
+---
+
 # Story 20.2: Zoomable Drill-In Sunburst Navigation
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -110,35 +114,35 @@ The dev may revise any recommendation **with a recorded rationale**, but must la
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Emit the payload island from the existing geometry (AC: #1)**
-  - [ ] In the sunburst host path (`HtmlRenderAdapter.Dashboard.cs` primary; consider a small helper on `Charts` or a new projector type), emit ONE `<script type="application/json">` island alongside `Charts.Sunburst(...)`, projecting `{ nodes: [{ id, parentId, weight, label, statusClass, href, kind }] }` from the **same** `EpicWeight`/`StoryWeight`/`FollowUpGeometry`/`UnplannedWorkGeometry` values the SVG already uses. Reuse canonical ids (`epic-N`, `N.M`, follow-up slug, group href); include an empty `edges: []` for 20.3 forward-compat.
-  - [ ] Give the sunburst host container an explorer root marker (e.g. `data-explorer` / an `explorer-root` class on the existing `sunburst-panel` div) so the JS opts in exactly like `.codemap-view`.
-  - [ ] Confirm **no** `ProjectCounts` re-count and **no** second geometry: the projector consumes existing weights, it does not recompute them.
+- [x] **Task 1 — Emit the payload island from the existing geometry (AC: #1)**
+  - [x] In the sunburst host path (`HtmlRenderAdapter.Dashboard.cs` primary; consider a small helper on `Charts` or a new projector type), emit ONE `<script type="application/json">` island alongside `Charts.Sunburst(...)`, projecting `{ nodes: [{ id, parentId, weight, label, statusClass, href, kind }] }` from the **same** `EpicWeight`/`StoryWeight`/`FollowUpGeometry`/`UnplannedWorkGeometry` values the SVG already uses. Reuse canonical ids (`epic-N`, `N.M`, follow-up slug, group href); include an empty `edges: []` for 20.3 forward-compat.
+  - [x] Give the sunburst host container an explorer root marker (e.g. `data-explorer` / an `explorer-root` class on the existing `sunburst-panel` div) so the JS opts in exactly like `.codemap-view`.
+  - [x] Confirm **no** `ProjectCounts` re-count and **no** second geometry: the projector consumes existing weights, it does not recompute them.
 
-- [ ] **Task 2 — Port the arc math + build the drill-in block in `specscribe.js` (AC: #1)**
-  - [ ] Add a new block guarded by the explorer root element. Port `AnnularSector`/`InsetStart`/`InsetEnd` (angles → SVG `d`) to JS so a zoomed scope's children can be re-laid-out to fill the ring; hydrate from the JSON island (no `fetch`).
-  - [ ] Implement `zoomTo(nodeId)`: recompute child sweeps from payload weights, rewrite wedge `d` paths (and ring assignment), tween via a `motionFastMs()`-style helper reading `--motion-*`, **snap** under reduced motion (mirror `setViewBox`'s reduce branch). Keep tooltips working on re-laid-out wedges (`.sb-seg` — see `SEG` at `specscribe.js:100`).
-  - [ ] Render a breadcrumb `<button>` trail of the current zoom scope (mirror codemap `renderCrumbs`); center/crumb activation zooms outward. Support hash deep-link + `popstate` if it fits the budget (optional, mirror codemap `applyHash`).
+- [x] **Task 2 — Port the arc math + build the drill-in block in `specscribe.js` (AC: #1)**
+  - [x] Add a new block guarded by the explorer root element. Port `AnnularSector`/`InsetStart`/`InsetEnd` (angles → SVG `d`) to JS so a zoomed scope's children can be re-laid-out to fill the ring; hydrate from the JSON island (no `fetch`).
+  - [x] Implement `zoomTo(nodeId)`: recompute child sweeps from payload weights, rewrite wedge `d` paths (and ring assignment), tween via a `motionFastMs()`-style helper reading `--motion-*`, **snap** under reduced motion (mirror `setViewBox`'s reduce branch). Keep tooltips working on re-laid-out wedges (`.sb-seg` — see `SEG` at `specscribe.js:100`).
+  - [x] Render a breadcrumb `<button>` trail of the current zoom scope (mirror codemap `renderCrumbs`); center/crumb activation zooms outward. Support hash deep-link + `popstate` if it fits the budget (optional, mirror codemap `applyHash`).
 
-- [ ] **Task 3 — Keyboard, AT, and the zoom-vs-open rule (AC: #2)**
-  - [ ] Roving-tabindex across the current scope's wedges; `role=button` + `tabindex` set at runtime (never ship inert tab stops in the no-JS page); Enter/Space to activate; visible focus ring.
-  - [ ] Add an `aria-live` region announcing the new zoom scope on each drill; breadcrumb is keyboard-navigable.
-  - [ ] Implement the locked zoom-vs-open rule (Decisions table): non-leaf → zoom; leaf → open its 9.13 destination (the existing wedge `<a href>`); non-leaf group destination reachable via the recorded affordance. **Never** invent a new destination.
+- [x] **Task 3 — Keyboard, AT, and the zoom-vs-open rule (AC: #2)**
+  - [x] Roving-tabindex across the current scope's wedges; `role=button` + `tabindex` set at runtime (never ship inert tab stops in the no-JS page); Enter/Space to activate; visible focus ring.
+  - [x] Add an `aria-live` region announcing the new zoom scope on each drill; breadcrumb is keyboard-navigable.
+  - [x] Implement the locked zoom-vs-open rule (Decisions table): non-leaf → zoom; leaf → open its 9.13 destination (the existing wedge `<a href>`); non-leaf group destination reachable via the recorded affordance. **Never** invent a new destination.
 
-- [ ] **Task 4 — Degrade + HTML/SPA parity (AC: #2 / NFR8)**
-  - [ ] Verify JS-off: static sunburst + 9.13 links fully intact; the JSON island is inert data, the explorer adds nothing the server didn't already ship.
-  - [ ] Add/extend `RenderParity` coverage so the payload island + explorer root render identically through HTML and SPA; confirm the island survives SPA `<main>` consolidation. Record webview/CLI as non-goals.
-  - [ ] Add CSS for any new explorer affordances (breadcrumb, focus ring, open control) using existing tokens; no new color tokens without justification.
+- [x] **Task 4 — Degrade + HTML/SPA parity (AC: #2 / NFR8)**
+  - [x] Verify JS-off: static sunburst + 9.13 links fully intact; the JSON island is inert data, the explorer adds nothing the server didn't already ship.
+  - [x] Add/extend `RenderParity` coverage so the payload island + explorer root render identically through HTML and SPA; confirm the island survives SPA `<main>` consolidation. Record webview/CLI as non-goals.
+  - [x] Add CSS for any new explorer affordances (breadcrumb, focus ring, open control) using existing tokens; no new color tokens without justification.
 
-- [ ] **Task 5 — Tests + golden (AC: #1, #2)**
-  - [ ] Unit-test the payload projector: ids/weights/hierarchy match the SVG's own weights for a representative model (incl. dense-epic collapse, no-plan stories, unplanned/orphan slots — see `Charts.Sunburst` branches).
-  - [ ] Regenerate the golden fingerprint (`SiteGeneratorFidelityTests.cs`); confirm the drift is **only** the new island/markup/CSS, nothing else moved.
-  - [ ] JS is not unit-tested in this repo (SSR-first) — cover behavior via the markup/attribute assertions the server emits (root marker, island shape, wedge `<a>` destinations unchanged) and manual browser verification (record in Completion Notes).
+- [x] **Task 5 — Tests + golden (AC: #1, #2)**
+  - [x] Unit-test the payload projector: ids/weights/hierarchy match the SVG's own weights for a representative model (incl. dense-epic collapse, no-plan stories, unplanned/orphan slots — see `Charts.Sunburst` branches).
+  - [x] Regenerate the golden fingerprint (`SiteGeneratorFidelityTests.cs`); confirm the drift is **only** the new island/markup/CSS, nothing else moved.
+  - [x] JS is not unit-tested in this repo (SSR-first) — cover behavior via the markup/attribute assertions the server emits (root marker, island shape, wedge `<a>` destinations unchanged) and manual browser verification (record in Completion Notes).
 
-- [ ] **Task 6 — Reconcile with 20.1 + record decisions (AC: #1, #2)**
-  - [ ] At dev-start, re-read `20-1-interactive-explorer-architecture-spike.md` Completion Notes. If 20.1 ran and revised a default, adopt it; if 20.1 is still unexecuted, proceed on this story's Decisions table and note that in Completion Notes.
-  - [ ] Record the locked decisions (arc approach, payload shape, JS home, size number, zoom-vs-open affordance) in Completion Notes.
-  - [ ] If the implementation concludes a framework/library is warranted, **stop and escalate** via correct-course (ADR fork) — do not add a dependency silently.
+- [x] **Task 6 — Reconcile with 20.1 + record decisions (AC: #1, #2)**
+  - [x] At dev-start, re-read `20-1-interactive-explorer-architecture-spike.md` Completion Notes. If 20.1 ran and revised a default, adopt it; if 20.1 is still unexecuted, proceed on this story's Decisions table and note that in Completion Notes.
+  - [x] Record the locked decisions (arc approach, payload shape, JS home, size number, zoom-vs-open affordance) in Completion Notes.
+  - [x] If the implementation concludes a framework/library is warranted, **stop and escalate** via correct-course (ADR fork) — do not add a dependency silently.
 
 ### Review Findings
 
@@ -219,14 +223,43 @@ Recent commits landed Epic 7 code-insight work (7.9–7.12) and their client-sid
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Claude Opus 4.8) — dev-story workflow, 2026-07-23
 
 ### Debug Log References
 
+- **20.1 reconciliation (Task 6):** At dev-start 20.1 was NOT `ready-for-dev`/unexecuted as the draft assumed — it is `review` with a FULLY-populated contract. Adopted its ratified decisions verbatim (all matched the draft's recommended defaults). The one load-bearing sharpening: 20.1's "emitter seam note" mandates **extracting the `EpicWeight`/`StoryWeight` closures into a shared pure weight fn** both the SVG builder and the payload emitter call (not copying the arithmetic) — done via `Charts.SunburstEpicWeight`/`SunburstStoryWeight`.
+- **Golden baseline:** the `SiteGeneratorAdapterTests` golden constant was ALREADY stale on the `b8be08d` baseline before this story (clean-HEAD fingerprint `54d4510d…` ≠ stored `b5bc230a…`) — a pre-existing main drift ([[golden-diff-normalization-gotchas]]). Regenerated to `5816b332…` (HEAD + this story only), verified stable across 2 repeated runs in isolation.
+- **⚠️ Concurrent shared-main editing during this session:** another session was live-editing `specscribe.js` (Story 21.3/24.1 impact-map review patches, a different block from mine) + `ImpactMapTemplater`/`EpicsViewBuilder`/`PlanningCodeImpact`/`SiteGenerator` + `SiteGeneratorImpactMapTests`. A `git stash` I attempted swept their uncommitted work into my stash; recovered everything via `git checkout stash@{0} -- .` (HEAD never moved). Net effect: the full-suite golden currently reads red because the co-present concurrent `specscribe.js`/rendering edits shift the whole-tree fingerprint off my isolated `5816b332…`; verified my golden green in isolation. See [[shared-main-concurrent-edit-loss-verify-after-edit]].
+
 ### Completion Notes List
+
+Delivers the zoom/drill-in half of Epic 20's explorer over the dashboard project-glance sunburst. **Locked decisions (Task 6 / 20.1 contract):**
+
+- **Arc rendering = (A) client re-layout from payload weights.** Ported `AnnularSector`/`InsetStart`/`InsetEnd` (+ a `fullRing` helper for the drilled epic's inner band) to `specscribe.js`. On drill, the focused epic's `story`/`aggregate` children re-lay to fill 360° via the SAME weights the SVG used. Zoom-OUT restores each wedge's CAPTURED original server `d` — so the un-drilled chart is byte-identical to the static baseline (the golden covers it; JS-computed arcs are only ever the transient drilled view).
+- **Re-path existing wedges (not rebuild).** The client re-arranges server truth: it rewrites the `d` of existing `<path data-node-id>` wedges and hides out-of-scope ones — reusing every server `<a href>`/`<title>`/`aria-label` (tooltips + 9.13 destinations preserved for free). No DOM/destinations invented.
+- **Payload = ONE inline `<script type="application/json" id="sunburst-explorer-data">` island** `{ meta, nodes, edges }` inside `<main>` (survives SPA capture). `nodes` = one per drawn wedge `{id,parentId,weight,label,statusClass,href,kind}`; `edges: []` (20.3 fills from `_workGraph`). Extended beyond 20.1's canonical-node examples with structural `story-summary`/`aggregate` kinds so ONE source drives both DOM re-layout and 20.3's edge-join (edges only ever reference canonical `epic-N`/`N.M`/`orphan`/`unplanned` ids). Added a `meta` geometry block (size/cx/pad/start/ring radii) — presentation geometry projected from the same `Charts.Sunburst` factors, NOT a second weight/count ledger.
+- **JS home + budget:** new guarded block in always-shipped `specscribe.js`, opt-in via `data-explorer` (mirrors `.codemap-view`). **~231 code lines / ~11 KB** unminified ES5, zero deps, no build step — comparable to the codemap block's ~270-line footprint 20.1 named as the yardstick (slightly above the ~8–10 KB soft ceiling but within the "no accretion / comparable-to-codemap" intent). Plotly stays declined (ADR fork).
+- **Zoom-vs-open:** a wedge is drillable iff the chart drew ≥1 `story` child under it → non-leaf epic **zooms** (click/Enter intercepted); leaf (story, aggregate, no-plan story, **dense-collapsed epic**) **opens** its existing 9.13 `<a href>`. Dense epics preserve the server's collapse (one summary wedge → open the epic page), never inventing wedges the static chart hid. Zoom-OUT affordance = an injected focusable center control (`.sb-center-zoom`) + a breadcrumb `All epics` button; the drilled scope's own 9.13 group/detail page stays reachable via an explicit `Open page` link on the current crumb (group pages never orphaned).
+- **Degrade/parity:** JS-off → the static Story 10.7 sunburst + 9.13 links are the whole chart; the island is inert data and the drill scaffold ships empty+`hidden` (no inert tab stops — `role`/`tabindex` set at runtime). Motion rides `--motion-*` (a token-timed fade on re-laid wedges) and is cancelled in the paired `prefers-reduced-motion: reduce` block. **Webview** strips the island (`WebviewRenderAdapter.RenderContent` — CSP forbids scripts; the reader never loads `specscribe.js`), the same class of CSP-driven omission as the nav's stripped inline toggle. Webview/CLI explorer support = recorded non-goals.
+
+**Verification.** 6 projector unit tests (incl. the anti-drift invariant: the SVG's `data-node-id` set == the payload node-id set, across dense/no-plan/multi-epic) + 1 SPA-island-survives-capture parity test — all green; the webview no-script + reduced-motion stylesheet tests pass again. JS is not unit-tested in this SSR-first repo (per 20.1) → **manual browser verification** on the real 354-page self-generated site (117 nodes = 117 wedges, edges empty): activating epic-1 re-centered it (inner band → full ring), expanded its 7 children into the rings, hid the other 110 wedges, rendered the `All epics ▸ Epic 1 ▸ Open page` breadcrumb + center control, announced the scope via `aria-live`, and pushed `#sb=epic-1`; center/breadcrumb zoom-out fully restored all 117 wedges + cleared the hash; a leaf story kept its `epics/story-1-1.html` destination; keyboard Enter zoomed a drillable epic and roving-tabindex gave exactly one tab stop across the visible wedges; zero console errors.
 
 ### File List
 
+**Production:**
+- `src/SpecScribe/Charts.cs` — extracted shared `SunburstEpicWeight`/`SunburstStoryWeight` + ring-factor consts; threaded `data-node-id` onto every project-glance `Sunburst` wedge via a `NodeIdAttr` helper (EpicSunburst + other charts byte-unchanged — opt-in default-null param).
+- `src/SpecScribe/SunburstExplorer.cs` — NEW: `SunburstExplorerNode`/`Meta`/`Model` records + `SunburstExplorerNodes`/`SunburstExplorerData`/`SunburstExplorerIsland` projector (partial of `Charts`).
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — mounted `data-explorer` root + inert drill/aria-live scaffold + the JSON island inside the sunburst panel (`<main>`).
+- `src/SpecScribe/WebviewRenderAdapter.cs` — strip the inert JSON island from the webview content region (CSP).
+- `src/SpecScribe/assets/specscribe.js` — NEW explorer block (`initSunburstExplorer`): arc-math port, `zoomTo`/restore, breadcrumb, center control, roving-tabindex/keyboard, aria-live, hash+popstate.
+- `src/SpecScribe/assets/specscribe.css` — explorer affordance styles (breadcrumb/crumb/open-link/center control/is-drilled center-label hide) + the drill fade in the paired reduced-motion seams.
+
+**Tests:**
+- `tests/SpecScribe.Tests/SunburstExplorerTests.cs` — NEW: projector coverage + the SVG↔payload anti-drift invariant.
+- `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` — added the SPA island-survives-capture parity test.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — regenerated the golden fingerprint constant (`5816b332…`).
+
 ## Change Log
 
+- 2026-07-23 — Story 20.2 dev pass. Shipped the dashboard sunburst drill-in explorer: extracted the shared weight fns + ring consts (20.1 anti-drift contract), threaded `data-node-id` onto the project-glance wedges, added the `SunburstExplorer` payload projector + inline JSON island (`data-explorer` root, `edges:[]` for 20.3), and the ~231-line zero-dep `specscribe.js` explorer block (client arc re-layout via ported `AnnularSector`/`InsetStart`/`InsetEnd`, breadcrumb + center zoom-out, roving-tabindex/keyboard, aria-live, hash+popstate) with CSS affordances on the reduced-motion seams. Zoom-out restores the captured server `d` (un-drilled chart byte-identical). Webview strips the island (CSP). 6 projector tests (incl. SVG↔payload anti-drift) + 1 SPA-parity test green; webview no-script + reduced-motion tests restored; golden regenerated (`5816b332…`, isolated — see Debug Log re: pre-existing main drift + concurrent shared-main editing). Manual browser verification on the real 354-page site confirmed all ACs. Status → review.
 - 2026-07-22 — Story 20.2 drafted (create-story). Ultimate context engine analysis completed — comprehensive developer guide created. Delivers the zoom/drill-in half of Epic 20's interactive explorer: makes the existing dashboard sunburst SVG zoomable (activate wedge → client-side arc re-layout + child expansion + breadcrumb + keyboard/AT parity), degrading to the static Story 10.7 sunburst + 9.13 destinations (NFR8). Built against Story 20.1's recommended payload/budget/degrade defaults (20.1 not yet executed — reconcile at dev-start). Key engineering insight recorded: sunburst drill-in needs angular arc re-computation, NOT the codemap's viewBox-pan. Not blocked on Epic 19 (that's the 20.3 pane). Related-work side pane, second geometry/count, authoring schema, and framework/charting-library deps are non-goals.

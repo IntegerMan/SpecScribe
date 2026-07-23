@@ -155,6 +155,28 @@ public class SiteGeneratorSpaTests : IDisposable
     }
 
     [Fact]
+    public void SunburstExplorerIsland_SurvivesSpaContentRegionCapture()
+    {
+        // Story 20.2 AC #2 / parity: the dashboard's explorer root marker + inline JSON island are mounted INSIDE
+        // <main id="main-content">, so the SPA content-region slice must carry them byte-for-byte — the client
+        // drill-in enhances the SAME markup through both the static HTML and the SPA surface.
+        var gen = GeneratedSite();
+
+        var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
+        Assert.Contains("data-explorer", staticIndex);
+        Assert.Contains("id=\"sunburst-explorer-data\"", staticIndex);
+        Assert.Contains("data-node-id=\"epic-1\"", staticIndex);
+
+        var spaIndex = gen.RenderSpaBundle().Pages.Single(p => p.OutputRelativePath == "index.html").ContentHtml;
+        Assert.Contains("data-explorer", spaIndex);
+        Assert.Contains("id=\"sunburst-explorer-data\"", spaIndex);
+        Assert.Contains("data-node-id=\"epic-1\"", spaIndex);
+        // The island is INSIDE the captured <main> region (not stranded before it).
+        var mainStart = spaIndex.IndexOf("<main id=\"main-content\"", StringComparison.Ordinal);
+        Assert.True(mainStart >= 0 && spaIndex.IndexOf("id=\"sunburst-explorer-data\"", StringComparison.Ordinal) > mainStart);
+    }
+
+    [Fact]
     public void GenerateWithSpa_EmitsABoundedFewFiles_FarFewerThanPages()
     {
         GeneratedSite();

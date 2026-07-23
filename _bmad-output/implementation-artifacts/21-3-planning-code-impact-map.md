@@ -4,7 +4,7 @@ baseline_commit: 7d8882e1b7ac0c24a9fcca3103bbd7db254ffa0a
 
 # Story 21.3: Planning ↔ Code Impact Map
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -110,6 +110,27 @@ This repo's own commits and branches were inspected while writing this story, an
 - [x] **Task 6 — Verify end-to-end on this repo (AC: #1, #2)**
   - [x] `dotnet run --deep-git` a full generate to `SpecScribeOutput/` (never `--output docs/live` — memory `generate-output-dir-is-specscribeoutput`). Open `impact-map.html`: confirm at least a few of this repo's own real epics (e.g. Epic 6, 7, 3 — the ones with clean `Story N.M`-style commit subjects observed above) show correctly attributed files linking to real code pages; confirm the "N of M commits correlated" caveat renders real, non-zero numbers; confirm the Tier-2 backfill visibly attributes at least one merge-adjacent commit correctly (spot-check e.g. the `worktree-bmad-dev-story-6-4` merge's own single commit, which is already self-identifying via Tier 1, so also spot-check a case where Tier 2 actually does the work — look for a merge branch with a validated number whose immediately-following commit(s) in the log lack their own number). Open an epic page and a story page with attribution: confirm the widget shows and links correctly. Run `dotnet run` **without** `--deep-git`: confirm no `impact-map.html`, no nav entry, no widget on any epic/story page (the combined gate holding). Confirm the page renders in `specscribe webview` and `--spa`.
   - [x] Explicitly confirm the "never re-counts against ProjectCounts" clause (AC #2) by inspection: the new builder/templater/widgets touch no `ProjectCounts` field and add no parallel completion tally.
+
+### Review Findings
+
+_Code review 2026-07-23 (bmad-code-review) — diff scoped to this story's own File List against baseline `7d8882e`. Note: the constructed diff also carries unrelated bundled changes from sibling Stories 19.2/21.1/21.2 (same commit `b9582a4`); findings below are limited to code that is actually this story's own File List. Two out-of-scope observations in sibling-story code were found and routed to `deferred-work.md` instead, not attributed here._
+
+- [x] [Review][Patch] "Code Areas Touched" widget caps by alphabetical path order, not churn, unlike the page's own text list [`src/SpecScribe/EpicsViewBuilder.cs:261-267`, `src/SpecScribe/PlanningCodeImpact.cs:248`]
+- [x] [Review][Patch] `_planningImpact`/`impact-map.html` never refresh during incremental/watch regeneration (sibling `_workGraph` was just fixed for the same class of staleness in this diff) [`src/SpecScribe/SiteGenerator.cs:289-291,612-615`]
+- [x] [Review][Patch] Treemap renders a blank unexplained SVG for a real zero-churn-selection case (e.g. binary-only attribution); sunburst already guards it [`src/SpecScribe/assets/specscribe.js:1470-1533`]
+- [x] [Review][Patch] "No commits could be correlated…" empty-state message is duplicated verbatim on the same page in the zero-attribution case [`src/SpecScribe/ImpactMapTemplater.cs:75-79`, `src/SpecScribe/Charts.cs:92-95`]
+- [x] [Review][Patch] Task 5's own required negative-case widget test ("one with none shows nothing") is not actually exercised — only the attributed epic/story is asserted [`tests/SpecScribe.Tests/SiteGeneratorImpactMapTests.cs:165-178`]
+- [x] [Review][Patch] Sunburst never re-renders on Treemap|Sunburst toggle switch — first reveal uses a hardcoded 640px fallback instead of the real container width [`src/SpecScribe/assets/specscribe.js:1613`]
+- [x] [Review][Patch] Sunburst per-file angular-span division can produce NaN path data for a zero-churn directory group (currently harmless — the group already renders zero-width) [`src/SpecScribe/assets/specscribe.js:1571`]
+- [x] [Review][Patch] `codePageResolver` call has no try/catch, contradicting the class's documented "never throws" contract (unreachable today; landmine for a future resolver) [`src/SpecScribe/PlanningCodeImpact.cs:259`]
+- [x] [Review][Patch] `MergeSubject.IsMatch(commit.Subject)` has no null-guard, unlike the sibling extraction call one line earlier (unreachable today; `DeepCommit.Subject` is always populated) [`src/SpecScribe/PlanningCodeImpact.cs:204`]
+- [x] [Review][Patch] `mergedFiles`/`groupByDir` key plain `{}` objects directly by repo path strings — a path segment literally named `__proto__` would collide with the prototype setter [`src/SpecScribe/assets/specscribe.js:1431,1448`]
+- [x] [Review][Patch] Dead JSON payload field: each epic's `t` (title) is serialized but never read client-side [`src/SpecScribe/ImpactMapTemplater.cs` (`BuildInteractiveBody`), `src/SpecScribe/assets/specscribe.js` (`mergedFiles`)]
+- [x] [Review][Patch] `BuildInteractiveBody`'s JSON payload emits `CodePageHref` with no `prefix` applied, unlike the sibling server-rendered `Charts.ImpactMapBody` on the same page (harmless today only because `impact-map.html`'s prefix is always `""`) [`src/SpecScribe/ImpactMapTemplater.cs`, `src/SpecScribe/Charts.cs`]
+- [x] [Review][Defer] `MergeSubject` regex only matches git's default "Merge …" phrasing; GitHub's "Squash and merge" default gets zero Tier-2 backfill with no caveat naming this specific gap — deferred, pre-existing design limitation [`src/SpecScribe/PlanningCodeImpact.cs:77-78`]
+- [x] [Review][Defer] Bare `N.M`/`N-M` regex mining can attribute a coincidental numeric match (e.g. a dependency-version bump) to a real roster id — inherent to the owner-chosen "mine what already exists" heuristic — deferred, accepted tradeoff [`src/SpecScribe/PlanningCodeImpact.cs` (`WorkPair`)]
+- [x] [Review][Defer] Tier-2 merge/branch backfill window is unbounded across a long run of un-merged mainline commits — deferred, explicit disclosed approximation per this story's own guardrails
+- [x] [Review][Defer] "See the full impact map" widget link isn't scoped/anchored to the originating epic — deferred, usability polish not required by AC1
 
 ## Dev Notes
 

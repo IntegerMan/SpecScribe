@@ -905,3 +905,27 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `19-2-directed-graph-visualization-and-path-query.md`
   summary: The `work-graph.html` scope-picker `<select>` renders unconditionally for JS-off users, who see a "Show:" control that visibly does nothing when changed (every section already renders without JS, so nothing is actually broken functionally — just a mildly misleading affordance with no `<noscript>` alternative pointing at the in-page anchors that already exist).
   evidence: Blind Hunter.
+
+## Deferred from: code review of 21-3-planning-code-impact-map (2026-07-23)
+
+- source_spec: `21-3-planning-code-impact-map.md`
+  summary: `MergeSubject` regex (`^Merge\b`) only matches git's default "Merge branch/pull request" phrasing — GitHub's "Squash and merge" default (commit subject = PR title, no "Merge" prefix) gets zero Tier-2 backfill, silently degrading correlation quality for that very common hosting workflow. The rendered caveat only names the linear-window approximation, not this specific coverage gap.
+  evidence: Blind Hunter. [`src/SpecScribe/PlanningCodeImpact.cs:77-78`]
+- source_spec: `21-3-planning-code-impact-map.md`
+  summary: Bare `N.M`/`N-M` regex mining (`WorkPair`) can attribute a coincidental numeric match to a REAL roster id — e.g. a dependency-bump commit body containing "4.17.21" would collide with a real Epic 4/Story 4.17 if one exists. Roster validation only filters non-existent ids, not accidental collisions with real ones. Inherent to the owner-chosen "mine what already exists, no new authoring convention" design; not a spec violation.
+  evidence: Blind Hunter. [`src/SpecScribe/PlanningCodeImpact.cs` `WorkPair`]
+- source_spec: `21-3-planning-code-impact-map.md`
+  summary: Tier-2 merge/branch backfill window is unbounded — a long run of un-merged mainline commits between two merges (a pattern already present in this repo's own history, e.g. "Overnight work"/"Plan work" direct-to-main commits) all get swept into the earlier merge's attribution with no cap. Already an explicit, disclosed, owner-accepted approximation per this story's own guardrails ("Tier 2 is a stated approximation, not real ancestry").
+  evidence: Blind Hunter + Edge Case Hunter.
+- source_spec: `21-3-planning-code-impact-map.md`
+  summary: The epic/story "Code Areas Touched" widget's "See the full impact map →" link lands on the unscoped `impact-map.html` (all epics shown by default) rather than pre-filtered/anchored to the originating epic — a real usability gap but not something AC1 strictly requires.
+  evidence: Blind Hunter.
+
+## Deferred (incidental, found while reviewing 21-3-planning-code-impact-map, belongs to sibling stories bundled in the same commit)
+
+- source_spec: `19-2-directed-graph-visualization-and-path-query.md`
+  summary: `initWorkGraphScope`'s `apply()` hides every `.work-graph-section` unconditionally when `sel.value` matches neither `"__all__"` nor any current section id (e.g. a bfcache-restored stale selection, or a value referencing a section id removed by regeneration) — every section vanishes with no visible fallback.
+  evidence: Edge Case Hunter, found incidentally while reviewing Story 21.3's diff (bundled into the same commit). [`src/SpecScribe/assets/specscribe.js` `initWorkGraphScope`]
+- source_spec: `21-1-traceability-coverage-matrix.md`
+  summary: The "dangling coverage" badge (`Charts.cs` ~4239-4258) only fires when NONE of a requirement's named epics resolve (`resolvable = req.CoverageEpicNumbers.Any(epicsByNumber.ContainsKey)`) — a requirement naming both a real epic and a phantom/typo'd one gets no caution badge at all, since at least one reference resolves.
+  evidence: Edge Case Hunter, found incidentally while reviewing Story 21.3's diff (bundled into the same commit). [`src/SpecScribe/Charts.cs:4239-4258`]

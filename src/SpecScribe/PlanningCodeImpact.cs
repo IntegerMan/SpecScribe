@@ -201,7 +201,7 @@ public static class PlanningCodeImpact
         {
             var tier1 = Validate(TryExtractWorkItemRefs(commit.Subject + "\n" + commit.Body));
 
-            if (MergeSubject.IsMatch(commit.Subject))
+            if (MergeSubject.IsMatch(commit.Subject ?? string.Empty))
             {
                 // A merge is a window boundary: its branch-name refs govern the following unattributed commits.
                 activeMergeRefs = tier1;
@@ -256,7 +256,12 @@ public static class PlanningCodeImpact
                 }
                 else
                 {
-                    var href = codePageResolver(path);
+                    // Never-throw contract (class doc comment): a pathological path must not abort the whole
+                    // build over one resolver call — treat an exception the same as a null/no-page result and
+                    // drop the file, exactly like an unresolved path already degrades. [Review][Patch]
+                    string? href;
+                    try { href = codePageResolver(path); }
+                    catch { href = null; }
                     if (href is { Length: > 0 }) files.Add(new ImpactFile(path, href, churn, commits));
                 }
             }

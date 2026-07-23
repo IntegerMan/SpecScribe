@@ -1426,9 +1426,12 @@
 
     // Merge the checked epics' files into one path -> {churn, commits, href} map.
     function mergedFiles() {
-      var sel = {};
+      var sel = Object.create(null);
       boxes.forEach(function (cb) { if (cb.checked) sel[cb.value] = true; });
-      var byPath = {};
+      // A prototype-less map: repo file paths are attacker/repo-controlled strings, and a path literally named
+      // "__proto__" would otherwise collide with the prototype setter on a plain {} and silently vanish.
+      // [Review][Patch]
+      var byPath = Object.create(null);
       payload.epics.forEach(function (ep) {
         if (!sel[String(ep.n)]) return;
         ep.f.forEach(function (f) {
@@ -1445,7 +1448,7 @@
     // Group the merged files into a shared directory hierarchy (one directory level, then files within). Both the
     // group nodes AND the file nodes carry `.value` (churn) so the layout algorithms can size them.
     function groupByDir(files) {
-      var map = {};
+      var map = Object.create(null);
       files.forEach(function (f) {
         f.value = f.c;
         var d = dirOf(f.p);
@@ -1470,7 +1473,7 @@
     function squarify(nodes, x, y, w, h) {
       var items = nodes.filter(function (n) { return n.value > 0; });
       var total = 0; items.forEach(function (n) { total += n.value; });
-      if (total <= 0 || w <= 0 || h <= 0) return;
+      if (total <= 0 || w <= 0 || h <= 0) return false;
       var scale = (w * h) / total;
       var areas = items.map(function (n) { return { n: n, a: n.value * scale }; });
       var cx = x, cy = y, cw = w, ch = h, i = 0;
@@ -1499,6 +1502,12 @@
 
     function renderTreemap(container, groups, levelOf) {
       container.textContent = "";
+      // A non-empty selection can still sum to zero total churn (e.g. binary-only attribution, which
+      // legitimately counts as an attributed file with zero churn) — mirror renderSunburst's guard so the
+      // treemap shows the same honest message instead of a blank SVG. [Review][Patch]
+      var total = 0; groups.forEach(function (g) { total += g.value; });
+      if (total <= 0) { emptyNote(container); return; }
+
       var W = Math.max(container.clientWidth || 640, 320);
       var H = Math.max(Math.min(Math.round(W * 0.6), 620), 360);
       var svg = el("svg", { "class": "impact-tm", viewBox: "0 0 " + W + " " + H, width: "100%", height: H, preserveAspectRatio: "xMidYMid meet" });
@@ -1568,7 +1577,9 @@
 
         var fang = ang;
         grp.files.forEach(function (f) {
-          var fspan = (f.c / grp.value) * gspan;
+          // grp.value can be 0 (a group whose only files are zero-churn) while other groups keep total > 0;
+          // 0/0 would be NaN here even though gspan is already 0 for this group. [Review][Patch]
+          var fspan = grp.value > 0 ? (f.c / grp.value) * gspan : 0;
           var fEnd = fang + fspan;
           var host = f.h ? el("a", { href: f.h, "class": "impact-sb-link" }) : el("g", {});
           var seg = el("path", { "class": "impact-arc impact-level-" + levelOf(f.k), d: arcPath(rDir, rFile, fang, fEnd) });
@@ -1616,6 +1627,13 @@
     if (allBtn) allBtn.addEventListener("click", function () { boxes.forEach(function (c) { c.checked = true; }); render(); });
     if (noneBtn) noneBtn.addEventListener("click", function () { boxes.forEach(function (c) { c.checked = false; }); render(); });
 
+    // Re-render on Treemap|Sunburst toggle too — the shape being revealed was hidden (0 clientWidth) at the last
+    // render, so its layout used the hardcoded fallback width instead of its real, now-visible container size.
+    // [Review][Patch]
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="impact-view"]'), function (r) {
+      r.addEventListener("change", render);
+    });
+
     // Re-layout on resize (debounced) so both shapes track the container width.
     var resizeTimer = null;
     window.addEventListener("resize", function () {
@@ -1643,5 +1661,279 @@
     }
     sel.addEventListener("change", apply);
     apply(); // honor a restored (bfcache) selection on load
+  }
+
+  // ---- Remaining-work sunburst explorer: click-to-zoom drill-in [Story 20.2] ----------------
+  // Progressive enhancement ONLY (NFR8). The server ships the complete static Story 10.7 sunburst (every wedge an
+  // <a> to its Story 9.13 destination) PLUS one inline JSON island of the SAME weights/hierarchy the SVG drew. With
+  // JS off this block never runs: the static chart + its links are the whole, correct experience, and the island is
+  // inert data. This block adds, over that EXACT markup: activate a non-leaf wedge (epic with drawn stories) to zoom
+  // in — its children re-lay to fill the rings via client arc RE-LAYOUT (the codemap's viewBox-pan does NOT transfer
+  // to a sunburst; children must expand angularly, so we port Charts.AnnularSector/InsetStart/InsetEnd here) — with a
+  // breadcrumb + center control to zoom back out. A LEAF wedge keeps its native link (opens the 9.13 destination the
+  // server put on the <a> — never a parallel scheme). Zoom-out always restores each wedge's ORIGINAL server `d`, so
+  // the un-drilled chart is byte-for-byte the static baseline. Presentation math only — no counts, no fetch. [Story 20.2]
+  Array.prototype.forEach.call(document.querySelectorAll("[data-explorer]"), function (root) {
+    try { initSunburstExplorer(root); } catch (err) { /* degrade: static sunburst + 9.13 links stand */ }
+  });
+
+  function initSunburstExplorer(root) {
+    var svg = root.querySelector("svg.sunburst");
+    var dataEl = root.querySelector('script[type="application/json"]');
+    if (!svg || !dataEl) return;
+    var data;
+    try { data = JSON.parse(dataEl.textContent); } catch (e) { return; }
+    var meta = data && data.meta, nodes = (data && data.nodes) || [];
+    if (!meta || !nodes.length) return;
+
+    var byId = {}, childrenOf = {};
+    nodes.forEach(function (n) {
+      byId[n.id] = n;
+      if (n.parentId) { (childrenOf[n.parentId] = childrenOf[n.parentId] || []).push(n); }
+    });
+
+    // Join each payload node to its wedge <path> + wrapping <a>, and CAPTURE the original `d` so zoom-out restores
+    // the exact server geometry (keeping the un-drilled chart identical to the golden baseline).
+    var wedges = {};
+    Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
+      var id = p.getAttribute("data-node-id");
+      wedges[id] = { path: p, link: p.closest("a"), d0: p.getAttribute("d") };
+    });
+
+    var TWO_PI = Math.PI * 2;
+    var scope = null; // null = root (all epics)
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var live = root.querySelector(".sb-explorer-live");
+    var drill = root.querySelector(".sb-explorer-drill");
+    var crumbs = root.querySelector(".sb-explorer-breadcrumb");
+    var centerBtn = null, animTimer = null;
+
+    function ring(kind) {
+      if (kind === "story" || kind === "story-summary") return [meta.storyInner, meta.storyOuter];
+      if (kind === "aggregate") return [meta.aggInner, meta.aggOuter];
+      return [meta.epicInner, meta.epicOuter]; // epic / follow-up / unplanned roots
+    }
+    // A wedge zooms only if the chart actually DREW child stories under it (a dense-collapsed epic has just a
+    // story-summary child and stays a leaf that opens its epic page — we never invent wedges the static chart hid).
+    function drillable(id) {
+      var ch = childrenOf[id] || [];
+      for (var i = 0; i < ch.length; i++) { if (ch[i].kind === "story") return true; }
+      return false;
+    }
+
+    // Ported presentation math (Charts.cs F()/AnnularSector/InsetStart/InsetEnd) — angles → SVG `d`. Not byte-exact
+    // with the server (drilled arcs are a fresh view); the un-drilled restore uses the captured server `d`.
+    function f(v) { return (Math.round(v * 100) / 100).toString(); }
+    function annular(c, rI, rO, a0, a1) {
+      if (a1 <= a0) a1 = a0 + 0.0001;
+      var la = (a1 - a0) > Math.PI ? 1 : 0;
+      var x1 = c + rO * Math.cos(a0), y1 = c + rO * Math.sin(a0),
+        x2 = c + rO * Math.cos(a1), y2 = c + rO * Math.sin(a1),
+        x3 = c + rI * Math.cos(a1), y3 = c + rI * Math.sin(a1),
+        x4 = c + rI * Math.cos(a0), y4 = c + rI * Math.sin(a0);
+      return "M " + f(x1) + " " + f(y1) + " A " + f(rO) + " " + f(rO) + " 0 " + la + " 1 " + f(x2) + " " + f(y2) +
+        " L " + f(x3) + " " + f(y3) + " A " + f(rI) + " " + f(rI) + " 0 " + la + " 0 " + f(x4) + " " + f(y4) + " Z";
+    }
+    // A full annulus (the drilled epic's own inner band): outer circle CW + inner circle CCW so the non-zero winding
+    // leaves the center hole open for the zoom-out control.
+    function fullRing(c, rI, rO) {
+      return "M " + f(c + rO) + " " + f(c) + " A " + f(rO) + " " + f(rO) + " 0 1 1 " + f(c - rO) + " " + f(c) +
+        " A " + f(rO) + " " + f(rO) + " 0 1 1 " + f(c + rO) + " " + f(c) + " Z" +
+        " M " + f(c + rI) + " " + f(c) + " A " + f(rI) + " " + f(rI) + " 0 1 0 " + f(c - rI) + " " + f(c) +
+        " A " + f(rI) + " " + f(rI) + " 0 1 0 " + f(c + rI) + " " + f(c) + " Z";
+    }
+    function insetStart(a, s, pad) { return a + Math.min(pad, Math.max(0, s) / 2); }
+    function insetEnd(a, s, pad) { return a + s - Math.min(pad, Math.max(0, s) / 2); }
+
+    // Lay a set of sibling nodes across [a0, a0+total] on their ring, sized by weight (per-slot pad inset).
+    function layRing(kids, a0, total) {
+      var sum = 0;
+      kids.forEach(function (k) { sum += Math.max(0, k.weight) || 0; });
+      if (sum <= 0) return;
+      var per = total / sum, ang = a0;
+      kids.forEach(function (k) {
+        var sw = (Math.max(0, k.weight) || 0) * per, r = ring(k.kind), w = wedges[k.id];
+        if (w) w.path.setAttribute("d", annular(meta.cx, r[0], r[1], insetStart(ang, sw, meta.pad), insetEnd(ang, sw, meta.pad)));
+        ang += sw;
+      });
+    }
+
+    function motionFastMs() {
+      try {
+        var raw = getComputedStyle(document.documentElement).getPropertyValue("--motion-fast").trim();
+        var ms = raw.indexOf("ms") >= 0 ? parseFloat(raw) : parseFloat(raw) * 1000;
+        return ms > 0 ? ms : 240;
+      } catch (e) { return 240; }
+    }
+    // The "tween": a brief token-timed fade on the re-laid wedges. Snaps under reduced motion (no class → no anim).
+    function pulse() {
+      if (reduce) return;
+      svg.classList.add("is-anim");
+      if (animTimer) clearTimeout(animTimer);
+      animTimer = setTimeout(function () { svg.classList.remove("is-anim"); }, motionFastMs());
+    }
+    function announce(msg) { if (live) live.textContent = msg; }
+
+    function restoreAll() {
+      for (var id in wedges) {
+        if (!wedges.hasOwnProperty(id)) continue;
+        var w = wedges[id];
+        w.path.setAttribute("d", w.d0);
+        (w.link || w.path).style.display = "";
+      }
+    }
+
+    function drawScope(id) {
+      var keep = {}; keep[id] = true;
+      var kids = childrenOf[id] || [];
+      kids.forEach(function (k) { keep[k.id] = true; });
+      for (var wid in wedges) {
+        if (!wedges.hasOwnProperty(wid)) continue;
+        (wedges[wid].link || wedges[wid].path).style.display = keep[wid] ? "" : "none";
+      }
+      var er = ring("epic"), ew = wedges[id];
+      if (ew) ew.path.setAttribute("d", fullRing(meta.cx, er[0], er[1]));
+      layRing(kids.filter(function (k) { return k.kind === "story" || k.kind === "story-summary"; }), meta.start, TWO_PI);
+      layRing(kids.filter(function (k) { return k.kind === "aggregate"; }), meta.start, TWO_PI);
+    }
+
+    // The zoom-out control: a focusable center hit-area, present only while drilled. "center → zoom out" (AC #1).
+    function ensureCenter(show) {
+      if (show) {
+        if (!centerBtn) {
+          centerBtn = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          centerBtn.setAttribute("class", "sb-center-zoom");
+          centerBtn.setAttribute("cx", f(meta.cx));
+          centerBtn.setAttribute("cy", f(meta.cx));
+          centerBtn.setAttribute("r", f(meta.epicInner));
+          centerBtn.setAttribute("role", "button");
+          centerBtn.setAttribute("tabindex", "0");
+          centerBtn.setAttribute("aria-label", "Zoom out to all epics");
+          var out = document.createElementNS("http://www.w3.org/2000/svg", "title");
+          out.textContent = "Zoom out to all epics";
+          centerBtn.appendChild(out);
+          centerBtn.addEventListener("click", function () { zoomTo(null, true); focusScope(); });
+          centerBtn.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoomTo(null, true); focusScope(); }
+          });
+          svg.appendChild(centerBtn);
+        }
+        centerBtn.style.display = "";
+      } else if (centerBtn) {
+        centerBtn.style.display = "none";
+      }
+    }
+
+    function renderCrumbs() {
+      if (!crumbs) return;
+      crumbs.innerHTML = "";
+      var trail = [{ id: null, label: "All epics" }];
+      if (scope) { var n = byId[scope]; trail.push({ id: scope, label: n ? n.label : scope }); }
+      trail.forEach(function (t, idx) {
+        var li = document.createElement("li"), last = idx === trail.length - 1;
+        if (last) {
+          var span = document.createElement("span");
+          span.className = "sb-crumb-current";
+          span.setAttribute("aria-current", "true");
+          span.textContent = t.label;
+          li.appendChild(span);
+          // The drilled scope's OWN 9.13 group/detail page stays reachable via an explicit "open" link so a group
+          // page is never orphaned by the zoom interaction (AC #2).
+          if (t.id) {
+            var w = wedges[t.id], href = w && w.link ? w.link.getAttribute("href") : null;
+            if (href) {
+              var a = document.createElement("a");
+              a.className = "sb-crumb-open";
+              a.href = href;
+              a.textContent = "Open page";
+              li.appendChild(a);
+            }
+          }
+        } else {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "sb-crumb";
+          btn.textContent = t.label;
+          btn.addEventListener("click", function () { zoomTo(t.id || null, true); focusScope(); });
+          li.appendChild(btn);
+        }
+        crumbs.appendChild(li);
+      });
+      if (drill) drill.hidden = !scope; // the bar shows only when there's somewhere to zoom back to
+    }
+
+    // Roving tabindex over the CURRENT scope's visible wedges (one tab stop; arrows move). Rebuilt on every zoom so
+    // the tab order always matches what's on screen; never ships in the no-JS page (set at runtime only).
+    function roveLinks() {
+      var out = [];
+      Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
+        var a = p.closest("a");
+        if (a && a.style.display !== "none") out.push(a);
+      });
+      return out;
+    }
+    function setRoving() {
+      roveLinks().forEach(function (a, i) {
+        a.setAttribute("tabindex", i === 0 ? "0" : "-1");
+        a.setAttribute("data-sb-rove", "1");
+      });
+    }
+    function focusScope() { var l = roveLinks(); if (l.length) l[0].focus(); }
+    root.addEventListener("keydown", function (e) {
+      var a = e.target.closest ? e.target.closest("a[data-sb-rove]") : null;
+      if (!a) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); rove(a, 1); }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); rove(a, -1); }
+      else if (e.key === " ") { e.preventDefault(); a.click(); } // links ignore Space by default
+    });
+    function rove(a, d) {
+      var l = roveLinks(), i = l.indexOf(a);
+      if (i < 0) return;
+      var n = (i + d + l.length) % l.length;
+      l.forEach(function (x) { x.setAttribute("tabindex", "-1"); });
+      l[n].setAttribute("tabindex", "0");
+      l[n].focus();
+    }
+
+    function applyState(animate) {
+      restoreAll();
+      if (scope) { drawScope(scope); svg.classList.add("is-drilled"); ensureCenter(true); }
+      else { svg.classList.remove("is-drilled"); ensureCenter(false); }
+      renderCrumbs();
+      setRoving();
+      if (animate) pulse();
+    }
+
+    function zoomTo(id, pushHash) {
+      if (id && !byId[id]) id = null;
+      if (id && !drillable(id)) return; // leaf: let the native <a> open its 9.13 destination
+      scope = id || null;
+      applyState(true);
+      announce(scope ? ("Zoomed into " + (byId[scope] ? byId[scope].label : scope)) : "Showing all epics");
+      if (pushHash && window.history && history.pushState) {
+        if (scope) history.pushState({ sb: scope }, "", "#sb=" + encodeURIComponent(scope));
+        else history.pushState({ sb: "" }, "", location.pathname + location.search);
+      }
+    }
+
+    // Intercept activation on drillable wedges → zoom (Enter + click). Leaves keep their native link untouched.
+    Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
+      var id = p.getAttribute("data-node-id"), link = p.closest("a");
+      if (!link || !drillable(id)) return;
+      link.addEventListener("click", function (e) { e.preventDefault(); zoomTo(id, true); });
+      link.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); zoomTo(id, true); } });
+      var base = link.getAttribute("aria-label") || "";
+      link.setAttribute("aria-label", base + " — activate to zoom in");
+    });
+
+    function applyHash() {
+      var m = /[#&]sb=([^&]+)/.exec(location.hash);
+      var id = m ? decodeURIComponent(m[1]) : null;
+      if (id && (!byId[id] || !drillable(id))) id = null;
+      scope = id;
+      applyState(false); // snap on load / back-forward (no entrance animation)
+    }
+    window.addEventListener("popstate", applyHash);
+    applyHash();
   }
 })();

@@ -22,6 +22,7 @@ public class SiteGeneratorImpactMapTests : IDisposable
     private string EpicsPage => Path.Combine(Site, "epics.html");
     private string Epic1Page => Path.Combine(Site, "epics", "epic-1.html");
     private string Story11Page => Path.Combine(Site, "epics", "story-1-1.html");
+    private string Story13Page => Path.Combine(Site, "epics", "story-1-3.html");
 
     private const string EpicsMd = """
         # Epics
@@ -41,6 +42,10 @@ public class SiteGeneratorImpactMapTests : IDisposable
         ### Story 1.2: Second Story
 
         As a maintainer, I want more.
+
+        ### Story 1.3: Untouched Story
+
+        As a maintainer, I want a story the fixture commit never mentions.
         """;
 
     private const string Story11Md = """
@@ -55,6 +60,19 @@ public class SiteGeneratorImpactMapTests : IDisposable
         ## Tasks / Subtasks
 
         - [x] Task 1: Build the widget.
+        """;
+
+    // Has its own artifact (so its page is generated) but the fixture commit's subject never names it — the
+    // negative case Task 5 requires: an attributable story with zero attribution shows no widget at all
+    // (absent, not an empty panel). [Review][Patch]
+    private const string Story13Md = """
+        # Story 1.3: Untouched Story
+
+        Status: ready-for-dev
+
+        ## Story
+
+        As a maintainer, I want a story the fixture commit never mentions.
         """;
 
     private const string WidgetCs = """
@@ -76,6 +94,7 @@ public class SiteGeneratorImpactMapTests : IDisposable
 
         File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), EpicsMd);
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-foundation-story.md"), Story11Md);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-3-untouched-story.md"), Story13Md);
         File.WriteAllText(Path.Combine(_root, "src", "Sample", "Widget.cs"), WidgetCs);
         File.WriteAllText(Path.Combine(Adrs, "README.md"), "# ADR Index\n\nRecords.\n");
     }
@@ -175,6 +194,11 @@ public class SiteGeneratorImpactMapTests : IDisposable
         var storyHtml = File.ReadAllText(Story11Page);
         Assert.Contains("Code Areas Touched", storyHtml);
         Assert.Contains("code/src/Sample/Widget.cs.html", storyHtml);
+
+        // Negative case (Task 5): a story with its own artifact/page but zero commit attribution shows no
+        // widget at all — absent, not an empty panel (NFR8). [Review][Patch]
+        Assert.True(File.Exists(Story13Page), "Story 1.3 has its own artifact and should still get a page");
+        Assert.DoesNotContain("Code Areas Touched", File.ReadAllText(Story13Page));
     }
 
     // ---- Without --deep-git: combined gate holds (hasEpics alone is NOT sufficient) ----

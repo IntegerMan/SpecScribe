@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SpecScribe;
 
@@ -64,9 +65,19 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         var sb = new StringBuilder();
         sb.Append(HtmlRenderAdapter.Shared.RenderNavMarkup(page.Nav));
         sb.Append(HtmlRenderAdapter.Shared.RenderWayfinding(page.OutputRelativePath, page.Breadcrumb, page.Pager));
-        sb.Append(page.BodyHtml);
+        // Drop any inline JSON data island (e.g. the Story 20.2 sunburst-explorer payload): the webview CSP forbids
+        // scripts and the always-shipped specscribe.js that would read it never loads here, so the island is dead
+        // data — the same class of CSP-driven omission as the nav's stripped inline toggle script (registered in
+        // HostRenderExceptions). The body's static SVG chart + its Story 9.13 links remain fully intact. [Story 20.2]
+        sb.Append(JsonDataIsland.Replace(page.BodyHtml, string.Empty));
         return sb.ToString();
     }
+
+    /// <summary>Matches an inline <c>&lt;script type="application/json"&gt;…&lt;/script&gt;</c> data island (with its
+    /// trailing newline) so the webview region ships none — inert data the CSP would block anyway. [Story 20.2]</summary>
+    private static readonly Regex JsonDataIsland = new(
+        "<script type=\"application/json\"[^>]*>.*?</script>\\n?",
+        RegexOptions.Compiled | RegexOptions.Singleline);
 
     /// <summary>Wraps an already-rendered content region in the webview document shell: CSP meta (script-src
     /// nonce-locked; style-src 'unsafe-inline' for the render's inline style attributes — ADR 0005's measured,

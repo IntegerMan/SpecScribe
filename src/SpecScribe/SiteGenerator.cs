@@ -610,8 +610,17 @@ public sealed class SiteGenerator
                 // partial-failure caching rule as elsewhere in this method: only refreshed when the re-ingest
                 // actually produced a usable model.
                 _workGraph = BuildWorkGraphModel(epicsModel, progress, requirementsModel, files);
+                // Refresh the planning<->code impact correlation on every incremental pass too (Story 21.3
+                // review) — same staleness class as _workGraph above: it was previously built ONCE per full
+                // GenerateAll() and never touched again here, so the epic/story "Code areas touched" widgets
+                // rendered by RenderEpicsPages below (and impact-map.html) could keep showing a stale snapshot
+                // after a watch-mode edit. [Review][Patch]
+                _planningImpact = progress.DeepGit?.Commits is { Count: > 0 } impactCommits
+                    ? PlanningCodeImpact.Build(epicsModel, impactCommits, CodePageHref)
+                    : PlanningCodeImpactData.Empty;
                 epicsEvents.AddRange(RenderEpicsPages(ingest.SourceFullPath, files, ingest.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
                 WriteWorkGraph(nav);
+                WriteImpactMap(nav);
             }
             RefreshCoverage();
             var followUpInventory = RefreshFollowUpSurfaces(nav, sourceFiles: files);

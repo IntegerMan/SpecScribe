@@ -258,16 +258,20 @@ public static class EpicsViewBuilder
         sb.Append("  <p class=\"chart-lead\">Best-effort correlation from commit and branch naming.</p>\n");
         sb.Append("  <ul class=\"impact-file-list\">\n");
 
-        var shown = Math.Min(files.Count, CodeAreasWidgetCap);
+        // Rank by churn (the same significance signal the treemap's tile size conveys and Charts.ImpactMapBody's
+        // text-equivalent leads with) rather than the incoming alphabetical order, so the capped teaser surfaces
+        // the most-impactful files instead of whichever happen to sort first by path. [Story 21.3 review]
+        var ranked = files.OrderByDescending(f => f.Churn).ThenBy(f => f.Path, StringComparer.Ordinal).ToList();
+        var shown = Math.Min(ranked.Count, CodeAreasWidgetCap);
         for (var i = 0; i < shown; i++)
         {
-            var file = files[i];
+            var file = ranked[i];
             var href = prefix + file.CodePageHref;
             sb.Append($"    <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(file.Path)}</a></li>\n");
         }
         sb.Append("  </ul>\n");
 
-        var overflow = files.Count - shown;
+        var overflow = ranked.Count - shown;
         if (overflow > 0)
         {
             sb.Append($"  <p class=\"impact-more\">+{overflow} more {(overflow == 1 ? "file" : "files")}</p>\n");

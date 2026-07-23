@@ -42,9 +42,18 @@ public sealed partial class HtmlRenderAdapter
         // Sunburst — Overview pulse.
         if (view.Epics is { } epicsForSunburst)
         {
-            sb.Append("<div class=\"chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track\">\n");
+            // The Story 20.2 explorer opts in exactly like the Code Map's `.codemap-view` root: the JS block runs
+            // only when it finds `data-explorer`. The drill bar (breadcrumb) + aria-live region ship as an inert,
+            // empty scaffold that specscribe.js reveals and populates at runtime — with JS off they hold nothing and
+            // the static Story 10.7 sunburst below is the whole, correct chart (NFR8). The inline JSON island is the
+            // client's only data source (no fetch); placed INSIDE <main id="main-content"> so it survives the SPA
+            // content-region capture (Story 6.7 parity). [Story 20.2]
+            sb.Append("<div class=\"chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track\" data-explorer>\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
+            sb.Append("<div class=\"sb-explorer-drill\" hidden><ol class=\"sb-explorer-breadcrumb\" aria-label=\"Zoom scope\"></ol></div>\n");
             sb.Append(Charts.Sunburst(epicsForSunburst, followUps: view.FollowUps, unplanned: view.UnplannedWork));
+            sb.Append("<div class=\"sb-explorer-live sr-only\" aria-live=\"polite\"></div>\n");
+            sb.Append(Charts.SunburstExplorerIsland(epicsForSunburst, followUps: view.FollowUps, unplanned: view.UnplannedWork));
             sb.Append("</div>\n\n");
 
             // Remaining Work by Epic — its own panel (Story 10.7 AC1 follow-up: owner asked for a distinct,

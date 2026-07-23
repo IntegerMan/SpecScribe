@@ -903,7 +903,15 @@ public class SiteGeneratorAdapterTests : IDisposable
         // (owner feedback): Impact Map nav icon (Icons.cs), the epic multi-select reworked to the sprint-epic-filter
         // dropdown, and a Treemap|Sunburst board-tabs toggle + JS sunburst renderer — again CSS + JS asset-byte deltas
         // only for this non-git fixture (no impact nav/icon renders). Verified stable across 2 repeated runs. [golden-diff-normalization-gotchas]
-        const string expected = "b5bc230a7a4ccf3f3c3d284ca99106fddfbb88f4e626873ebbeb5e182e464d20";
+        // Regenerated for Story 20.2 (zoomable drill-in sunburst explorer): the project-glance Charts.Sunburst
+        // wedges gained `data-node-id` join hooks, the dashboard sunburst panel gained the `data-explorer` root +
+        // the inert drill/aria-live scaffold + the inline JSON explorer island, and specscribe.js/.css gained the
+        // explorer block + affordance styles. The non-git fixture renders the dashboard + epics sunbursts (both
+        // carry the new data-node-id) so index.html/epics.html + the two shared embedded assets shifted; drill
+        // behavior itself is JS and not exercised here. NOTE: the previous constant (b5bc230a…) was already stale
+        // on main before this story (a pre-existing golden drift), so this value folds that in too. Verified stable
+        // across 2 repeated runs. [Story 20.2; golden-diff-normalization-gotchas]
+        const string expected = "5816b3322b2c8cfe58ca9d0027580cc5eed6c4ad59be6174f70c4ff78c61b7cc";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
