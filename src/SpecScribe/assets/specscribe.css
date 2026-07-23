@@ -1556,6 +1556,204 @@ a.ref-file-node:focus-visible {
   stroke-dasharray: 5 2 1 2;
 }
 
+/* ========================================================================
+   Work graph (Story 19.2) — the epic-scoped provenance subgraph. A layered
+   DIRECTED graph (Epic · Stories · Follow-ups · Origins), distinct from the
+   hub-and-spoke reference graph above. Node kind is carried by SHAPE, edge
+   kind by STYLE — never colour alone (NFR6/UX-DR16). Neutral / gold / border
+   / ink tokens only (never --status-*); the distinction holds in both themes.
+   ======================================================================== */
+.work-graph-intro {
+  color: var(--ink-light);
+  max-width: 62ch;
+  margin: 0 0 1rem;
+}
+
+.work-graph-wrap {
+  overflow-x: auto;        /* wide graphs scroll inside their own box, never the page body */
+  text-align: center;
+}
+
+.work-graph {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Decorative arrowhead — matches the neutral edge stroke. */
+.work-arrow path { fill: var(--ink-light); }
+
+.work-edge {
+  stroke: var(--border);
+  stroke-width: 1.5;
+  stroke-opacity: 0.85;
+}
+
+/* The soft, heuristic "also raised in" cross-link — dashed so it reads apart from the solid provenance edges. */
+.work-edge-soft {
+  stroke: var(--ink-light);
+  stroke-dasharray: 4 3;
+  stroke-opacity: 0.7;
+}
+
+.work-node-epic {
+  fill: var(--ink);
+  stroke: var(--gold);
+  stroke-width: 1.5;
+}
+
+.work-epic-label {
+  fill: var(--parchment);
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+}
+
+.work-node-story {
+  fill: var(--gold);
+  stroke: var(--parchment);
+  stroke-width: 1.5;
+}
+
+/* Deferred item = neutral diamond; action item = neutral triangle. Both parchment-filled, distinguished from each
+   other by SHAPE (not fill), and from the gold story circle by both shape and fill. */
+.work-node-deferred {
+  fill: var(--parchment);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.work-node-action {
+  fill: var(--parchment);
+  stroke: var(--ink-light);
+  stroke-width: 1.5;
+}
+
+/* Provenance sources / resolvers = small neutral rect. */
+.work-node-spec {
+  fill: var(--parchment);
+  stroke: var(--ink-light);
+  stroke-width: 1.3;
+}
+
+/* Retrospective (soft raised-in target) = muted dashed rect, echoing its dashed inbound edge. */
+.work-node-retro {
+  fill: var(--border);
+  stroke: var(--ink-light);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 2;
+}
+
+.work-label {
+  fill: var(--ink);
+  font-family: system-ui, sans-serif;
+}
+
+.work-node { cursor: pointer; }
+.work-node--chip { cursor: default; }
+
+a.work-node:hover .work-node-story,
+a.work-node:focus-visible .work-node-story { fill: var(--ink); }
+
+a.work-node:hover .work-label,
+a.work-node:focus-visible .work-label {
+  fill: var(--gold-dark, var(--gold));
+  text-decoration: underline;
+}
+
+a.work-node:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Scope picker — the "jump to one epic at a time" affordance (AC #1). Plain anchor pills, no JS. */
+.work-graph-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 1.5rem;
+}
+
+.work-graph-scope-label {
+  color: var(--ink-light);
+  font-size: 0.9rem;
+}
+
+.work-graph-scope-chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.work-graph-scope-chip:hover,
+.work-graph-scope-chip:focus-visible {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
+
+.work-graph-section {
+  margin: 2rem 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.work-graph-overflow,
+.work-graph-empty {
+  color: var(--ink-light);
+  font-style: italic;
+}
+
+/* Circular-provenance query result — a bordered callout below each epic's graph. Static HTML (works JS-off). */
+.work-graph-query {
+  margin-top: 1rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--gold);
+  background: color-mix(in srgb, var(--gold) 6%, transparent);
+}
+
+.work-graph-query h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+.work-graph-cycles { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+
+/* Visual legend for the graph vocabulary (aria-hidden — the sr-only per-epic lists are the accessible equivalent). */
+.work-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  align-items: center;
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+  color: var(--ink-light);
+}
+
+.work-graph-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.wg-key {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.wg-key-epic { background: var(--ink); border: 1.5px solid var(--gold); border-radius: 3px; }
+.wg-key-story { background: var(--gold); border: 1.5px solid var(--parchment); border-radius: 50%; }
+.wg-key-deferred { background: var(--parchment); border: 1.5px solid var(--border); transform: rotate(45deg); }
+.wg-key-action {
+  width: 0; height: 0; background: none;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 12px solid var(--ink-light);
+}
+.wg-key-spec { background: var(--parchment); border: 1.3px solid var(--ink-light); border-radius: 2px; }
+.wg-key-edge { width: 18px; height: 0; border-top: 2px solid var(--border); }
+.wg-key-edge-soft { width: 18px; height: 0; border-top: 2px dashed var(--ink-light); }
+
 /* Source is secondary supporting detail — the right column. min-width:0 lets the <pre> shrink and scroll internally
    (see .code-layout) instead of forcing the whole grid wider. */
 .code-source-section {

@@ -64,6 +64,14 @@ public sealed class SiteNav
     /// templater/nav (link to it) so the two can't disagree. [Story 7.10]</summary>
     public const string RiskQuadrantOutputPath = "risk-quadrant.html";
 
+    /// <summary>The epic-scoped work-graph page (a directed provenance subgraph per epic + a circular-provenance
+    /// query). Written only when at least one epic carries a graph signal — an attributed deferred item or an open
+    /// action item; the nav entry gates on the SAME signal (surfaced by the caller, since it needs the parsed
+    /// deferred/sprint data the *.md source list doesn't reveal) so the link can never dangle. Rides the Insights
+    /// nav group. Shared between the generator (writes the file) and nav (links to it) so the two can't disagree.
+    /// [Story 19.2]</summary>
+    public const string WorkGraphOutputPath = "work-graph.html";
+
     /// <summary>The generation diagnostics (run-log) page: the run's non-fatal notices (unsupported/malformed/
     /// skipped artifacts + render-time errors) plus the effective configuration and detection results. Written on
     /// EVERY full run (the zero-notice case renders an all-clear state), so — unlike the git pages — its link can
@@ -125,6 +133,8 @@ public sealed class SiteNav
 
     public bool HasCodeMap => Items.Any(i => i.Label == "Code Map");
 
+    public bool HasWorkGraph => Items.Any(i => i.Label == "Work Graph");
+
     /// <summary>Assembles the journey-organized top nav (Home · Delivery · Insights · Follow-ups · Project).
     /// Every child is added only when its availability signal is true; an empty group is omitted; a group with
     /// exactly one available child collapses to a flat top-level link. [Story 10.1]</summary>
@@ -149,6 +159,7 @@ public sealed class SiteNav
         bool hasDeepAnalytics = false,
         bool hasActionItems = false,
         bool hasDeferredWork = false,
+        bool hasWorkGraph = false,
         string? deferredWorkOutputPath = null,
         List<AdapterDiagnostic>? diagnostics = null)
     {
@@ -259,6 +270,14 @@ public sealed class SiteNav
             // Map's own gating signal rather than a second flag, so the two can never dangle independently.
             insights.Add(("Risk Quadrant", RiskQuadrantOutputPath));
             quickLinks.Add(("Risk Quadrant", RiskQuadrantOutputPath, "Spot high-churn, high-size refactor targets.", "Insights"));
+        }
+
+        // The epic-scoped work graph (Story 19.2) — its own signal (a graph-bearing epic), independent of the
+        // source-code walk, so it gates separately from Code Map. Ordered last in Insights.
+        if (hasWorkGraph)
+        {
+            insights.Add(("Work Graph", WorkGraphOutputPath));
+            quickLinks.Add(("Work Graph", WorkGraphOutputPath, "Trace where each epic's follow-up work came from.", "Insights"));
         }
 
         // Follow-ups: open retro action items + deferred-work note (NFR8 — omit when absent). Also added to

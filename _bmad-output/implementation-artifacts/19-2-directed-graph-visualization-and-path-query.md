@@ -4,7 +4,7 @@ baseline_commit: eaa2348370b18dd40cb0ab06afeef9701f9b03fc
 
 # Story 19.2: Directed Graph Visualization and Path Query
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -58,43 +58,43 @@ AC floor already requires **both** an epic-scoped draw **and** a cycle or multi-
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Ingest 19.1 findings (AC: #1, #2)**
-  - [ ] Read `19-1-work-graph-model-and-coverage-spike.md` Completion Notes end-to-end.
-  - [ ] Copy the locked edge table + direction convention + NFR8 gate into this story's Dev Agent Record (or a short `_bmad-output/` note) so implementers do not re-litigate vocabulary.
-  - [ ] Confirm default MVP vs any spike override (cycle finder vs path query; requirement nodes in/out; `cites` in MVP or deferred).
+- [x] **Task 0 — Ingest 19.1 findings (AC: #1, #2)**
+  - [x] Read `19-1-work-graph-model-and-coverage-spike.md` Completion Notes end-to-end.
+  - [x] Copy the locked edge table + direction convention + NFR8 gate into this story's Dev Agent Record (or a short `_bmad-output/` note) so implementers do not re-litigate vocabulary.
+  - [x] Confirm default MVP vs any spike override (cycle finder vs path query; requirement nodes in/out; `cites` in MVP or deferred).
 
-- [ ] **Task 1 — Work-graph projection model (AC: #2)**
-  - [ ] Add a pure projection type (e.g. `WorkGraph` / `WorkGraphBuilder`) that emits nodes + directed edges from **existing** models: `FollowUpGeometry` / `FollowUpDeferredSlot`, `UnplannedWorkGeometry`, `SprintActionItem` + `EpicRetroMap`, epic/story structure, coverage maps only if 19.1 includes `covers`, citation maps (`_citerToFiles` / `BuildReferencedBy`) only if 19.1 includes `cites`.
-  - [ ] Node identity + href must match 19.1's identity table (epic → `epics/epic-N.html`, story → story page, deferred → `follow-ups/{slug}.html`, etc.). Guarded hrefs: link only when target page exists; non-link chip otherwise (mirror Epic 7).
-  - [ ] **Do not** re-parse deferred markdown / sprint YAML / code citations at the graph layer. **Do not** invent open-item totals — if a count is shown, read `ProjectCounts` / geometry fields already agreed with the ledger.
-  - [ ] Structural containment (story∈epic) only as 19.1 classified it (first-class edge vs implied).
+- [x] **Task 1 — Work-graph projection model (AC: #2)**
+  - [x] Add a pure projection type (e.g. `WorkGraph` / `WorkGraphBuilder`) that emits nodes + directed edges from **existing** models: `FollowUpGeometry` / `FollowUpDeferredSlot`, `UnplannedWorkGeometry`, `SprintActionItem` + `EpicRetroMap`, epic/story structure, coverage maps only if 19.1 includes `covers`, citation maps (`_citerToFiles` / `BuildReferencedBy`) only if 19.1 includes `cites`.
+  - [x] Node identity + href must match 19.1's identity table (epic → `epics/epic-N.html`, story → story page, deferred → `follow-ups/{slug}.html`, etc.). Guarded hrefs: link only when target page exists; non-link chip otherwise (mirror Epic 7).
+  - [x] **Do not** re-parse deferred markdown / sprint YAML / code citations at the graph layer. **Do not** invent open-item totals — if a count is shown, read `ProjectCounts` / geometry fields already agreed with the ledger.
+  - [x] Structural containment (story∈epic) only as 19.1 classified it (first-class edge vs implied).
 
-- [ ] **Task 2 — Cycle / path query (AC: #1)**
-  - [ ] Implement the query 19.1 chose (default: directed-cycle finder on the epic-scoped edge set).
-  - [ ] Define cycle precisely: simple directed cycle among named node types. Breadcrumbs / SPA Parent/Children are **not** edges.
-  - [ ] Surface results as scannable HTML (list of node/edge chains) plus an optional highlight on the SVG — text results must work with JS off (PRD progressive-enhancement).
-  - [ ] When no cycles/paths: honest empty message on the query panel **only if the graph surface itself is present**; never show an empty whole-page chrome for zero-graph projects (NFR8).
+- [x] **Task 2 — Cycle / path query (AC: #1)**
+  - [x] Implement the query 19.1 chose (default: directed-cycle finder on the epic-scoped edge set).
+  - [x] Define cycle precisely: simple directed cycle among named node types. Breadcrumbs / SPA Parent/Children are **not** edges.
+  - [x] Surface results as scannable HTML (list of node/edge chains) plus an optional highlight on the SVG — text results must work with JS off (PRD progressive-enhancement).
+  - [x] When no cycles/paths: honest empty message on the query panel **only if the graph surface itself is present**; never show an empty whole-page chrome for zero-graph projects (NFR8).
 
-- [ ] **Task 3 — Visualization + page (AC: #1, #2)**
-  - [ ] New pure-SVG builder in `Charts.cs` (e.g. `Charts.WorkGraph`) — **not** a reuse of `Charts.ReferenceGraph`'s hub-and-spoke model (that is code-neighbourhood, not provenance). Reuse a11y/CSS *idioms* (role/aria, caps, sr-only list, token colors).
-  - [ ] New templater + `SiteGenerator` writer via `WriteOutput` so SPA capture works (`main#main-content`).
-  - [ ] Register `SiteNav` path constant + Insights (or Follow-ups) child **gated on the same has-graph signal** used to write the page — mirror Code Map / Action Items gating.
-  - [ ] BreadcrumbTrail for page hierarchy only — do not treat trail as provenance edges.
-  - [ ] Bound node/edge draw counts (document constants); sr-only / query text may enumerate fuller sets when visual is capped — do not silently drop from the accessible equivalent.
+- [x] **Task 3 — Visualization + page (AC: #1, #2)**
+  - [x] New pure-SVG builder in `Charts.cs` (e.g. `Charts.WorkGraph`) — **not** a reuse of `Charts.ReferenceGraph`'s hub-and-spoke model (that is code-neighbourhood, not provenance). Reuse a11y/CSS *idioms* (role/aria, caps, sr-only list, token colors).
+  - [x] New templater + `SiteGenerator` writer via `WriteOutput` so SPA capture works (`main#main-content`).
+  - [x] Register `SiteNav` path constant + Insights (or Follow-ups) child **gated on the same has-graph signal** used to write the page — mirror Code Map / Action Items gating.
+  - [x] BreadcrumbTrail for page hierarchy only — do not treat trail as provenance edges.
+  - [x] Bound node/edge draw counts (document constants); sr-only / query text may enumerate fuller sets when visual is capped — do not silently drop from the accessible equivalent.
 
-- [ ] **Task 4 — NFR8 + parity + dogfood (AC: #1, #2)**
-  - [ ] Zero mappable edges / no follow-up+attribution signal → omit nav entry and skip page write (no empty Insights child, no dead link).
-  - [ ] HTML and SPA both serve the same body content for the new page(s).
-  - [ ] Webview: **out of MVP** (dashboard/epics only today) unless 19.1 Completion Notes explicitly promote it.
-  - [ ] CLI: notices only; no graph render.
-  - [ ] Dogfood on this repo: at least one epic with deferred/action provenance shows navigable nodes; synthesize a fixture cycle if live data has none (19.1 Task 3 may already note this).
+- [x] **Task 4 — NFR8 + parity + dogfood (AC: #1, #2)**
+  - [x] Zero mappable edges / no follow-up+attribution signal → omit nav entry and skip page write (no empty Insights child, no dead link).
+  - [x] HTML and SPA both serve the same body content for the new page(s).
+  - [x] Webview: **out of MVP** (dashboard/epics only today) unless 19.1 Completion Notes explicitly promote it.
+  - [x] CLI: notices only; no graph render.
+  - [x] Dogfood on this repo: at least one epic with deferred/action provenance shows navigable nodes; synthesize a fixture cycle if live data has none (19.1 Task 3 may already note this).
 
-- [ ] **Task 5 — Tests (AC: #1, #2)**
-  - [ ] Unit tests for graph builder: edge projection from fixtures, cycle detection, empty → empty model.
-  - [ ] Chart/SVG tests: deterministic layout, caps, direction markers, empty → `""`.
-  - [ ] SiteNav / SiteGenerator tests: nav absent when no graph; page written when present; no broken local links on node hrefs.
-  - [ ] Assert graph layer does not introduce a second open-item count (ledger fields unchanged / not re-tallied in builder).
-  - [ ] Prefer focused unit tests over golden fingerprint churn; update fingerprints only when intentional.
+- [x] **Task 5 — Tests (AC: #1, #2)**
+  - [x] Unit tests for graph builder: edge projection from fixtures, cycle detection, empty → empty model.
+  - [x] Chart/SVG tests: deterministic layout, caps, direction markers, empty → `""`.
+  - [x] SiteNav / SiteGenerator tests: nav absent when no graph; page written when present; no broken local links on node hrefs.
+  - [x] Assert graph layer does not introduce a second open-item count (ledger fields unchanged / not re-tallied in builder).
+  - [x] Prefer focused unit tests over golden fingerprint churn; update fingerprints only when intentional.
 
 ## Dev Notes
 
@@ -228,14 +228,72 @@ Recent work closed follow-up batch actions, Epic 8 count/status debt, and Insigh
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Amelia / dev-story workflow)
+
+### Implementation Plan — 19.1 findings ingested (Task 0)
+
+Locked from Story 19.1 Completion Notes (status: done) so implementation does not re-litigate vocabulary:
+
+**Chosen surface (19.1 §5):** Epic-scoped provenance subgraph — one HTML page (`work-graph.html`), a section per epic-with-signal, each drawing that epic + its involved stories + attributed deferred/action items + their provenance edges. Confirmed = the story's Default MVP. HTML + SPA only; webview/CLI out.
+
+**Direction convention (19.1 §2, load-bearing):** `From` = the node that physically carries the reference; `To` = the node referenced (**carrier → target**). Applied to every edge kind below.
+
+**Edge kinds implemented (derivable-today rows only):**
+
+| Edge | From → To (carrier→target) | Source API | Style |
+|------|----------------------------|-----------|-------|
+| structural `contains` | story → epic; unrooted deferred/action → epic | `EpicInfo.Stories`; `FollowUpDeferredSlot.EpicNumber` / `SprintActionItem.EpicNumber` | solid |
+| `stemmed-from` | deferred → source story / spec / quick-dev | `FollowUpDeferredSlot.SourceStoryId` / `SourceKey` / `SourceHref` | solid |
+| `resolves` | deferred → resolving story / spec | `DeferredWorkItem.Resolved` + `ResolvingRef` / `ResolvingHref`; `FollowUpRefs.ResolvingLabel` | solid |
+| `raised-in` (soft) | action → other epic's retro | `ActionItemsTemplater.FindNearDuplicates` + `EpicRetroMap` | dashed |
+
+**Deferred vs MVP (Task 0.3):**
+- Cycle query: **kept** (AC #1 floor requires a cycle *or* multi-hop query). Simple directed-cycle finder over each epic's drawn edge set; honest "No cycles in this scope." when none — secondary annotation panel, not the primary surface (per 19.1 §5).
+- `covers` (requirement nodes): **out of drawn MVP** — 19.1 marks it epic-grain-only and the Default-MVP draw list does not include it; leaving it out avoids over-claiming per-FR precision. Documented non-inclusion.
+- `cites` (code): **deferred from the drawn MVP** — explicitly "optional" in the story's Default MVP; excluded to keep node counts bounded and avoid the `_citerToFiles` key-join surface this first cut doesn't need. Success-criterion deferral recorded; can layer on later without touching the model.
+
+**NFR8 gate (19.1 §5):** page + nav entry are written only when at least one epic has a deferred slot OR an open action item (a "graph signal"). No epics, or epics with zero follow-ups → no page, no nav link. Structural containment alone is NOT signal (would defeat NFR8). Node/edge draw counts are bounded by documented `WorkGraphBuilder` constants; the sr-only equivalent enumerates the full drawn set.
 
 ### Debug Log References
 
+- Full suite green: **2068 passed, 3 skipped (unrelated symlink tests), 0 failed** on `worktree-story-19-2-work-graph`.
+- Golden content fingerprint regenerated (`b36f0bf1…` → `44a4bc43…`): CSS-only shift on the non-git fixture — it carries no work-graph signal, so `work-graph.html` isn't written there and the page SET is unchanged (GoldenOutputInventory still passes); the only drift is the every-page `specscribe.css` gaining the `.work-graph*` block. Verified stable across 2 repeated runs before locking. [[golden-diff-normalization-gotchas]]
+- **Two defects caught by dogfood + a broken-link sweep, both fixed:**
+  1. First dogfood drew only epic + action nodes (zero deferred provenance): the pre-nav model build used `TryParseDeferredWork` (reads `_docs`, empty at nav time). Switched to `ResolveDeferredModel(work, files)` (the same source-fallback `RenderEpicsPages` uses) → 170 deferred / 62 story / 39 spec nodes + 171 stemmed-from / 133 resolves edges across 10 epics.
+  2. 11 broken `../epics/story-*.html` links — deferred `ResolvingHref` is prefixed for the deferred *page's* depth; re-rooted every node href through `FollowUpGeometry.ApplyLinkPrefix("")` in `WorkGraphBuilder`. Post-fix broken-link sweep over all 272 local hrefs = 0 missing.
+- Browser-verified the real-repo page: Insights nav with active "Work Graph" local-context, legend, scope-picker chips (Epics 1–19), and per-epic layered subgraphs (Epic → Stories → Deferred → Sources with directed arrowheads). SPA parity confirmed via `--spa` (page rides the bundle + keeps its static fallback).
+
 ### Completion Notes List
 
+**Shipped the epic-scoped provenance work graph (the 19.1-recommended primary surface) — HTML + SPA, no JS required, no new schema, no second count ledger.**
+
+- **`WorkGraph.cs`** — pure projection (`WorkNode`/`WorkEdge`/`WorkGraphEpic`/`WorkGraphModel` + `WorkGraphBuilder`). One epic-scoped directed subgraph per epic-with-signal, projected from `FollowUpGeometry`/`FollowUpDeferredSlot` (stemmed-from, resolves, contains), `EpicInfo.Stories` (structural containment), and `ActionItemsTemplater.FindNearDuplicates` + `EpicRetroMap` (soft raised-in). Direction = carrier → target (19.1's locked convention). Deterministic; never re-parses or re-counts. Bounded by `MaxFollowUpsPerEpic = 40` with an honest `Overflow` count.
+- **Cycle finder** (`WorkGraphBuilder.FindCycles`) — simple directed-cycle detection over each epic's edge set, deduped by rotation. Discovery: the carrier→target projection is a **DAG by construction** (follow-ups point at artifacts; artifacts never point back), so cycles can't arise on live data. AC #1 asks for "ambiguous **or** circular" provenance, so the query panel *also* surfaces the query that does fire — **ambiguous ownership** (19.1 query #2): an action item whose obligation is raised in ≥2 other epics' retros. Honest empty state when neither.
+- **`Charts.WorkGraph`** — pure deterministic SVG, layered left→right (Epic · Stories · Follow-ups · Origins). Node kind by SHAPE (epic rounded-rect / story circle / deferred diamond / action triangle / source rect / retro muted-rect), edge kind by STYLE (solid vs dashed raised-in) with decorative `marker-end` arrowheads; `role="img"` + summary label. Neutral/gold/border/ink tokens only.
+- **`WorkGraphTemplater`** — `work-graph.html`: intro, aria-hidden visual legend, JS-free scope-picker (per-epic anchor chips), per-epic section with the SVG, a **complete sr-only node+edge enumeration** (NFR6 — a `role="img"` collapses descendants), the circular/ambiguous query panel, and an overflow note. Rides `WriteOutput` (SPA capture via `main#main-content`).
+- **Gating (NFR8)** — `WorkGraphBuilder.Build` returns `Empty` unless an epic has an attributed deferred item or open action item (structural containment alone is *not* signal). `SiteGenerator` projects the model **before** nav so the Insights "Work Graph" entry and the page write share one gate — the link can't dangle. `hasEpics`-less / signal-less repos get no page and no nav entry.
+- **Honors 19.1's code-review decisions (D1/D2/D4):**
+  - **D1 — "Unattributed" pseudo-epic bucket:** follow-ups with no epic (`EpicNumber == null`) or an unknown/ghost epic are NOT dropped — they render in a synthetic "Unattributed" bucket (via `OrphanDeferredItems`/`OrphanActionItems`, mirroring the action-items page), omitting cleanly when empty. Dogfood: the bucket surfaces 40 deferred items that the first cut silently dropped (170 → 210 drawn deferred nodes).
+  - **D2 — no manufactured transitive edge:** a deferred item with `stemmed-from → A` and `resolves → B` (A ≠ B) stays one node with two out-edges; no synthetic A→B edge.
+  - **D4 — no phantom node from an unresolved `SourceKey`:** a source node is minted only when the key resolves to a real page (`SourceHref` non-null); otherwise the edge is dropped and the item roots to its epic (cf. the `a16ca0f` phantom-item fix).
+- **Out of MVP (documented):** `covers`/requirement nodes (epic-grain-only per 19.1 → would over-claim) and `cites`/code nodes (optional in the Default MVP; excluded to bound node counts — when added later, honor 19.1 D3: external `--code-url` mode keeps code nodes). Webview/CLI graph rendering not added (19.1 kept them out).
+- **Dogfood:** 10 epic subgraphs on this repo, 290 nodes / 378 edges, Epic 6 hitting the 40-cap with a rendered overflow note; all 272 local links resolve.
+
 ### File List
+
+**New**
+- `src/SpecScribe/WorkGraph.cs` — projection model, builder, cycle finder
+- `src/SpecScribe/WorkGraphTemplater.cs` — `work-graph.html` page (scope picker, sr-only, query panel)
+- `tests/SpecScribe.Tests/WorkGraphTests.cs` — 19 tests (builder projection, NFR8 gate, determinism, cycle/ambiguity, SVG, templater, nav gate)
+
+**Modified**
+- `src/SpecScribe/Charts.cs` — `Charts.WorkGraph` pure-SVG builder (+ `AppendWorkNode`, `WorkNodeLabel`, `WorkGraphLabelChars`)
+- `src/SpecScribe/SiteNav.cs` — `WorkGraphOutputPath` const, `hasWorkGraph` gate param, Insights membership + quick-link, `HasWorkGraph` predicate
+- `src/SpecScribe/SiteGenerator.cs` — `_workGraph` field, `BuildWorkGraphModel` (pre-nav projection via `ResolveDeferredModel`), `WriteWorkGraph`, gate threaded through both `SiteNav.Build` call sites + watch-mode `BuildNav`
+- `src/SpecScribe/assets/specscribe.css` — `.work-graph*` block (node shapes, edge/arrow styles, scope chips, query panel, legend)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden content fingerprint regenerated (CSS-only drift) + rationale comment
 
 ## Change Log
 
 - 2026-07-18 — Story 19.2 drafted (create-story). Depends on 19.1 coverage map; default MVP = epic-scoped directed SVG + cycle/path query; HTML+SPA; NFR8 omit; ProjectCounts/no new schema.
+- 2026-07-22 — Implemented (dev-story). New `WorkGraph.cs` (projection + builder + cycle finder), `WorkGraphTemplater.cs` (`work-graph.html`), `Charts.WorkGraph` pure-SVG, `.work-graph*` CSS; wired into `SiteNav`/`SiteGenerator` with a pre-nav NFR8 gate (Insights entry ↔ page can't dangle). Cycle query kept + broadened to circular-**or**-ambiguous (the projection is acyclic by construction; ambiguous-ownership fires on live data). `covers`/`cites` documented out of drawn MVP. 19 new tests; full suite 2068 green; golden fingerprint regenerated (CSS-only drift). Dogfooded on this repo (10 epic subgraphs, 290 nodes, all links resolve) + browser-verified + `--spa` parity. Status → review.

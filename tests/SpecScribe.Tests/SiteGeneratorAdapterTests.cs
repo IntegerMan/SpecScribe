@@ -849,6 +849,13 @@ public class SiteGeneratorAdapterTests : IDisposable
         // own links. Non-git fixture doesn't render sprint.html/traceability.html itself in every variant, but
         // the shared nav-bar markup change reflects on every page this fixture DOES render. Verified stable
         // across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        // Regenerated for Story 19.2: specscribe.css gained the `.work-graph*` block (the epic-scoped work-graph
+        // page's node shapes, edge styles, scope-picker chips, query panel, and legend). This fixture carries no
+        // work-graph SIGNAL (no epic has an attributed deferred item or open action item), so work-graph.html is
+        // NOT written here and the "Work Graph" Insights nav entry is omitted — the page SET is unchanged (the
+        // GoldenOutputInventory test still passes) and the only shift is the every-page stylesheet content. The
+        // page/markup itself is dogfood-verified on the real repo, not this fixture. Verified stable across 2
+        // repeated runs before locking in. [golden-diff-normalization-gotchas]
         // Regenerated for Story 21.2: new cadence.html page (delivery-cadence heatmap + cycle-time histogram) +
         // its "Cadence" Delivery nav entry (shifts every rendered page's nav markup) + the new
         // Icons.ForConcept("Cadence") glyph + new specscribe.css cadence rules. This fixture is NOT a git repo and

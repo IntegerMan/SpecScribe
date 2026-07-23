@@ -2461,6 +2461,162 @@ public static class Charts
         return sb.ToString();
     }
 
+    /// <summary>Max characters for a drawn work-graph node label (the full label stays in the node tooltip +
+    /// the templater's sr-only list). [Story 19.2]</summary>
+    private const int WorkGraphLabelChars = 18;
+
+    /// <summary>Renders one epic's provenance subgraph as pure, deterministic SVG (Story 19.2). A left→right
+    /// LAYERED directed layout — Epic · Stories · Follow-ups (deferred/action) · Origins &amp; outcomes
+    /// (sources/resolvers/retros) — NOT the hub-and-spoke <see cref="ReferenceGraph"/> model. Node kind is shown
+    /// by SHAPE (epic = rounded rect, story = circle, deferred = diamond, action = triangle, spec/source = small
+    /// rect, retro = muted rect) — never a lifecycle colour; edge kind by STYLE (solid for structural /
+    /// stemmed-from / resolves, dashed for the soft <c>raised-in</c>) with decorative <c>marker-end</c> arrowheads.
+    /// Nodes with an href are <c>&lt;a&gt;</c> (navigation needs no JS); href-less nodes are non-link chips (guarded,
+    /// mirroring Epic 7). The SVG is <c>role="img"</c> with a summary label; the caller
+    /// (<see cref="WorkGraphTemplater"/>) supplies the complete sr-only node/edge enumeration (NFR6 — a
+    /// <c>role="img"</c> collapses its descendants for assistive tech). Empty input → <c>""</c>. Every label is
+    /// HTML-escaped. [Story 19.2; a11y idiom from Story 7.8]</summary>
+    public static string WorkGraph(WorkGraphEpic epic)
+    {
+        if (epic.Nodes.Count == 0) return string.Empty;
+
+        var epicNodeId = epic.Nodes.FirstOrDefault(n => n.Kind == WorkNodeKind.Epic)?.Id;
+        // In-epic stories are the carriers of a Contains edge into the epic root; any other story node is an
+        // external provenance source and belongs in the right-hand origins layer.
+        var inEpicStories = new HashSet<string>(
+            epic.Edges
+                .Where(e => e.Kind == WorkEdgeKind.Contains && string.Equals(e.ToId, epicNodeId, StringComparison.Ordinal))
+                .Select(e => e.FromId),
+            StringComparer.Ordinal);
+
+        int Layer(WorkNode n) => n.Kind switch
+        {
+            WorkNodeKind.Epic => 0,
+            WorkNodeKind.Story => inEpicStories.Contains(n.Id) ? 1 : 3,
+            WorkNodeKind.Deferred or WorkNodeKind.Action => 2,
+            _ => 3, // Spec sources/resolvers, Retro
+        };
+
+        // Bucket nodes into their four layers, preserving builder (insertion) order for determinism.
+        var columns = new List<WorkNode>[4];
+        for (var i = 0; i < 4; i++) columns[i] = new List<WorkNode>();
+        foreach (var n in epic.Nodes) columns[Layer(n)].Add(n);
+
+        const double marginY = 40, rowGap = 58, nodeR = 9;
+        var colX = new[] { 95.0, 320.0, 545.0, 770.0 };
+        const double width = 865;
+        var maxRows = Math.Max(1, columns.Max(c => c.Count));
+        var height = Math.Max(150.0, marginY * 2 + (maxRows - 1) * rowGap);
+
+        // Deterministic centred position per node: column x, evenly spaced y within the column.
+        var pos = new Dictionary<string, (double X, double Y)>(StringComparer.Ordinal);
+        for (var col = 0; col < 4; col++)
+        {
+            var list = columns[col];
+            if (list.Count == 0) continue;
+            var span = (list.Count - 1) * rowGap;
+            var top = (height - span) / 2.0;
+            for (var k = 0; k < list.Count; k++)
+                pos[list[k].Id] = (colX[col], top + k * rowGap);
+        }
+
+        var idToNode = epic.Nodes.ToDictionary(n => n.Id, n => n, StringComparer.Ordinal);
+
+        var aria = epic.Cycles.Count > 0
+            ? $"Work graph for {epic.DisplayName}: {epic.Nodes.Count} work items, {epic.Edges.Count} provenance links, {epic.Cycles.Count} circular {Plural(epic.Cycles.Count, "chain", "chains")}. The list below enumerates every node and link."
+            : $"Work graph for {epic.DisplayName}: {epic.Nodes.Count} work items and {epic.Edges.Count} provenance links, no circular provenance. The list below enumerates every node and link.";
+
+        var sb = new StringBuilder();
+        sb.Append($"<svg class=\"work-graph\" viewBox=\"0 0 {F(width)} {F(height)}\" width=\"{F(width)}\" height=\"{F(height)}\" role=\"img\" aria-label=\"{Html(aria)}\" preserveAspectRatio=\"xMidYMid meet\">\n");
+        // Decorative arrowhead marker (aria-hidden — the accessible equivalent is the sr-only edge list).
+        sb.Append("  <defs aria-hidden=\"true\">\n");
+        sb.Append("    <marker id=\"work-arrow\" class=\"work-arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" /></marker>\n");
+        sb.Append("  </defs>\n");
+
+        // Edges first so nodes sit on top. Pull the target end back to the node boundary so the arrowhead reads.
+        foreach (var e in epic.Edges)
+        {
+            if (!pos.TryGetValue(e.FromId, out var a) || !pos.TryGetValue(e.ToId, out var b)) continue;
+            var dx = b.X - a.X;
+            var dy = b.Y - a.Y;
+            var len = Math.Sqrt(dx * dx + dy * dy);
+            var (bx, by) = len > 0.001 ? (b.X - dx / len * (nodeR + 6), b.Y - dy / len * (nodeR + 6)) : (b.X, b.Y);
+            var cls = e.Kind == WorkEdgeKind.RaisedIn ? "work-edge work-edge-soft" : "work-edge";
+            sb.Append($"  <line class=\"{cls}\" x1=\"{F(a.X)}\" y1=\"{F(a.Y)}\" x2=\"{F(bx)}\" y2=\"{F(by)}\" marker-end=\"url(#work-arrow)\" />\n");
+        }
+
+        foreach (var n in epic.Nodes)
+        {
+            if (!pos.TryGetValue(n.Id, out var p)) continue;
+            AppendWorkNode(sb, n, p.X, p.Y, nodeR);
+        }
+
+        sb.Append("</svg>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Draws one work-graph node: a kind-specific shape (never colour-as-sole-signal) plus a label
+    /// beneath it (epic label sits inside its box). Linked nodes wrap in <c>&lt;a&gt;</c>; href-less nodes are a
+    /// non-link <c>&lt;g&gt;</c> chip. The full label rides <c>&lt;title&gt;</c> + <c>aria-label</c>. [Story 19.2]</summary>
+    private static void AppendWorkNode(StringBuilder sb, WorkNode n, double x, double y, double r)
+    {
+        var full = string.IsNullOrEmpty(n.Title) ? n.Label : $"{n.Label} — {n.Title}";
+        // Epic/Story/Retro labels are already self-describing ("Epic 7", "Story 7.11", "Epic 3 retro",
+        // "Unattributed") — only the summary/key labels of the other kinds need a kind-word prefix.
+        var tip = n.Kind switch
+        {
+            WorkNodeKind.Deferred => $"Deferred item: {full}",
+            WorkNodeKind.Action => $"Action item: {full}",
+            WorkNodeKind.Spec => $"Source: {full}",
+            _ => full,
+        };
+        var shortLabel = Shorten(n.Label, WorkGraphLabelChars);
+
+        string glyph;
+        switch (n.Kind)
+        {
+            case WorkNodeKind.Epic:
+            {
+                var w = Math.Max(84.0, Shorten(n.Label, 16).Length * 8 + 20);
+                glyph = $"<rect class=\"work-node-epic\" x=\"{F(x - w / 2)}\" y=\"{F(y - 15)}\" width=\"{F(w)}\" height=\"30\" rx=\"7\" />"
+                      + $"<text class=\"work-epic-label\" x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"14\">{Html(shortLabel)}</text>";
+                break;
+            }
+            case WorkNodeKind.Story:
+                glyph = $"<circle class=\"work-node-story\" cx=\"{F(x)}\" cy=\"{F(y)}\" r=\"{F(r)}\" />"
+                      + WorkNodeLabel(x, y, shortLabel);
+                break;
+            case WorkNodeKind.Deferred:
+                glyph = $"<polygon class=\"work-node-deferred\" points=\"{F(x)},{F(y - r)} {F(x + r)},{F(y)} {F(x)},{F(y + r)} {F(x - r)},{F(y)}\" />"
+                      + WorkNodeLabel(x, y, shortLabel);
+                break;
+            case WorkNodeKind.Action:
+                glyph = $"<polygon class=\"work-node-action\" points=\"{F(x)},{F(y - r)} {F(x + r)},{F(y + r * 0.85)} {F(x - r)},{F(y + r * 0.85)}\" />"
+                      + WorkNodeLabel(x, y, shortLabel);
+                break;
+            case WorkNodeKind.Retro:
+                glyph = $"<rect class=\"work-node-retro\" x=\"{F(x - r)}\" y=\"{F(y - r * 0.8)}\" width=\"{F(r * 2)}\" height=\"{F(r * 1.6)}\" rx=\"2\" />"
+                      + WorkNodeLabel(x, y, shortLabel);
+                break;
+            default: // Spec / source / resolver
+                glyph = $"<rect class=\"work-node-spec\" x=\"{F(x - r)}\" y=\"{F(y - r * 0.8)}\" width=\"{F(r * 2)}\" height=\"{F(r * 1.6)}\" rx=\"3\" />"
+                      + WorkNodeLabel(x, y, shortLabel);
+                break;
+        }
+
+        if (n.Href is { Length: > 0 })
+        {
+            sb.Append($"  <a class=\"work-node\" href=\"{Html(n.Href)}\" aria-label=\"{Html(tip)}\"><title>{Html(tip)}</title>{glyph}</a>\n");
+        }
+        else
+        {
+            sb.Append($"  <g class=\"work-node work-node--chip\" role=\"img\" aria-label=\"{Html(tip)}\"><title>{Html(tip)}</title>{glyph}</g>\n");
+        }
+    }
+
+    private static string WorkNodeLabel(double x, double y, string shortLabel) =>
+        $"<text class=\"work-label\" x=\"{F(x)}\" y=\"{F(y + 20)}\" text-anchor=\"middle\" font-size=\"12\">{Html(shortLabel)}</text>";
+
     /// <summary>The last path segment (filename) of a forward-slash path — compact graph labels while the full
     /// path stays in the node's tooltip.</summary>
     private static string Basename(string path)
