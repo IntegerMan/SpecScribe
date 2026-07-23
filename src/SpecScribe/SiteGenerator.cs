@@ -56,6 +56,11 @@ public sealed class SiteGenerator
     private ProgressModel? _progress;
     private RequirementsModel? _requirements;
     private List<AdrEntry> _adrs = new();
+
+    // The epic-scoped work graph (Story 19.2), projected once BEFORE nav.Build so the Insights "Work Graph" entry
+    // and the page write share one gate (a non-empty model) — the link never dangles. Cached so the written page
+    // is byte-identical to what the gate saw; watch-mode BuildNav reuses last full run's model like _progress.
+    private WorkGraphModel _workGraph = WorkGraphModel.Empty;
     private List<CommitDayEntry> _commitDays = new();
 
     // Story 7.5: full %H commit hash -> per-commit detail page output-relative path (commit/{shortHash}.html).
@@ -185,6 +190,11 @@ public sealed class SiteGenerator
             var hasActionItems = _sprint?.OpenActionItems.Count > 0;
             var deferredWorkPath = SiteNav.FindDeferredWorkOutputPath(sourceRelatives, navDiagnostics);
             var hasDeferredWork = deferredWorkPath is not null;
+            // Project the epic-scoped work graph now (Story 19.2) — BEFORE nav — so the Insights entry and the page
+            // write share one gate (a non-empty model). Reads deferred/quick-dev from source (via ResolveFollowUpWork)
+            // since _docs isn't populated yet; cached in _workGraph and reused verbatim by WriteWorkGraph.
+            _workGraph = BuildWorkGraphModel(bundle.Epics, progress, bundle.Requirements, files);
+            var hasWorkGraph = !_workGraph.IsEmpty;
             var nav = SiteNav.Build(
                 sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable,
                 hasCodeMap: _codeFiles.Count > 0,
@@ -192,6 +202,7 @@ public sealed class SiteGenerator
                 hasDeepAnalytics: hasDeepAnalytics,
                 hasActionItems: hasActionItems,
                 hasDeferredWork: hasDeferredWork,
+                hasWorkGraph: hasWorkGraph,
                 deferredWorkOutputPath: deferredWorkPath,
                 diagnostics: navDiagnostics);
             _nav = nav;
@@ -210,6 +221,7 @@ public sealed class SiteGenerator
                         hasSprint: SprintAvailable, hasCodeMap: _codeFiles.Count > 0,
                         hasGitInsights: hasGitInsights, hasDeepAnalytics: hasDeepAnalytics,
                         hasActionItems: hasActionItems, hasDeferredWork: hasDeferredWork,
+                        hasWorkGraph: hasWorkGraph,
                         deferredWorkOutputPath: deferredWorkPath, diagnostics: navDiagnostics);
                     _nav = nav;
                 }
@@ -373,6 +385,9 @@ public sealed class SiteGenerator
             // The requirement traceability matrix (Story 21.1) — shares Requirements' hasEpics gate; needs
             // _counts (built just above) for its ledger-sourced legend/ranking caption.
             WriteTraceability(nav);
+            // The epic-scoped work graph (Story 19.2) — the model was projected + gated before nav; writing the
+            // SAME cached instance keeps the Insights entry and the page in lockstep.
+            WriteWorkGraph(nav);
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
             RefreshFollowUpSurfaces(nav, workInventory);
@@ -3140,6 +3155,47 @@ public sealed class SiteGenerator
         WriteOutput(SiteNav.TraceabilityOutputPath, ApplyReferenceLinks(html, SiteNav.TraceabilityOutputPath));
     }
 
+    /// <summary>Projects the epic-scoped work graph (Story 19.2) from already-parsed models. Reads
+    /// deferred/quick-dev from <see cref="ResolveFollowUpWork"/> (source-backed, since <c>_docs</c> may be empty at
+    /// nav-build time) and builds the same ledger-backed <see cref="FollowUpGeometry"/> the sunburst uses — never a
+    /// second parse or count. Returns <see cref="WorkGraphModel.Empty"/> on any failure so a malformed note never
+    /// fails generation (AD-4 / NFR2). Called once, before nav, so the gate and the write agree.</summary>
+    private WorkGraphModel BuildWorkGraphModel(
+        EpicsModel? epics, ProgressModel? progress, RequirementsModel? requirements, IReadOnlyList<string> files)
+    {
+        if (epics is null || epics.Epics.Count == 0) return WorkGraphModel.Empty;
+        try
+        {
+            var work = ResolveFollowUpWork(files);
+            var counts = ProjectCounts.Build(progress ?? ProgressModel.Empty, _sprint, work, epics, requirements);
+            // ResolveDeferredModel (not TryParseDeferredWork) so the deferred note is parsed from SOURCE when _docs
+            // isn't populated yet — this runs before the pages loop, so without it the graph would see zero deferred
+            // provenance and draw only action items. [Story 19.2]
+            var deferredModel = ResolveDeferredModel(work, files);
+            var geometry = FollowUpGeometry.From(
+                _sprint?.ActionItems ?? Array.Empty<SprintActionItem>(),
+                counts, work, linkPrefix: "", deferredModel, epics, _retros);
+            return WorkGraphBuilder.Build(epics, geometry, _epicRetroMap);
+        }
+        catch
+        {
+            return WorkGraphModel.Empty;
+        }
+    }
+
+    /// <summary>Writes <c>work-graph.html</c> — the epic-scoped provenance subgraph page (Story 19.2) — from the
+    /// <see cref="_workGraph"/> model already projected + gated before nav. Empty model → no page (NFR8; the nav
+    /// entry was omitted on the same gate). NOT reference-linkified: the SVG carries deferred/action summaries in
+    /// <c>aria-label</c>/<c>title</c> attributes that may name "Epic N"/"Story N.M", which the linkifier would wrap
+    /// in <c>&lt;a&gt;</c> INSIDE the attribute and corrupt (same reason <see cref="WriteActionItems"/> skips it) —
+    /// the graph's own node links already carry navigation. Rides <see cref="WriteOutput"/> so SPA capture is
+    /// automatic.</summary>
+    private void WriteWorkGraph(SiteNav nav)
+    {
+        if (_workGraph.IsEmpty) return;
+        WriteOutput(SiteNav.WorkGraphOutputPath, WorkGraphTemplater.RenderPage(_workGraph, nav));
+    }
+
     /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the
     /// sprint page's "Retros" link. [Story 2.3 polish #5]</summary>
     private void WriteRetroIndex(SiteNav nav)
@@ -4014,6 +4070,9 @@ public sealed class SiteGenerator
             hasDeepAnalytics: _progress?.DeepGit is not null,
             hasActionItems: _sprint?.OpenActionItems.Count > 0,
             hasDeferredWork: deferredWorkPath is not null,
+            // Reuse the last full run's projected model (the treemap/insights gates reuse last-run signals the same
+            // way); the work graph only re-projects on a full rebuild. [Story 19.2]
+            hasWorkGraph: !_workGraph.IsEmpty,
             deferredWorkOutputPath: deferredWorkPath,
             diagnostics: diagnostics);
     }

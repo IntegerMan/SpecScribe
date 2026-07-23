@@ -293,7 +293,7 @@ development_status:
   # epics/stories/quick-dev/deferred/reviews/code. Spike-led (19.1). Exploratory — not release-blocking.
   epic-19: in-progress
   19-1-work-graph-model-and-coverage-spike: done
-  19-2-directed-graph-visualization-and-path-query: ready-for-dev
+  19-2-directed-graph-visualization-and-path-query: review
   epic-19-retrospective: optional
 
   epic-20: in-progress # interactive project explorer (SCP 2026-07-19, correct-course); spike-led; enhances static Story 10.7 sunburst

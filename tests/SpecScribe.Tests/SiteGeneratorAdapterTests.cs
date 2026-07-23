@@ -848,7 +848,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // own links. Non-git fixture doesn't render sprint.html/traceability.html itself in every variant, but
         // the shared nav-bar markup change reflects on every page this fixture DOES render. Verified stable
         // across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
-        const string expected = "b36f0bf1fc9ec6b0d55d86e9d9858cc5e8ececab00b5b182e3bd3d89b745e395";
+        // Regenerated for Story 19.2: specscribe.css gained the `.work-graph*` block (the epic-scoped work-graph
+        // page's node shapes, edge styles, scope-picker chips, query panel, and legend). This fixture carries no
+        // work-graph SIGNAL (no epic has an attributed deferred item or open action item), so work-graph.html is
+        // NOT written here and the "Work Graph" Insights nav entry is omitted — the page SET is unchanged (the
+        // GoldenOutputInventory test still passes) and the only shift is the every-page stylesheet content. The
+        // page/markup itself is dogfood-verified on the real repo, not this fixture. Verified stable across 2
+        // repeated runs before locking in. [golden-diff-normalization-gotchas]
+        const string expected = "44a4bc43cd3025e096beeddd0e7003473f75f0c8dda735e35343ff72e8533057";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
