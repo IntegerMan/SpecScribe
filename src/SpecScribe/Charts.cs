@@ -3679,7 +3679,15 @@ public static class Charts
         {
             var rowClass = req.Deferred ? "deferred" : req.CoverageEpicNumbers.Count == 0 ? "unmapped" : string.Empty;
             sb.Append(rowClass.Length > 0 ? $"      <tr class=\"{rowClass}\">\n" : "      <tr>\n");
-            sb.Append($"        <th scope=\"row\" class=\"trace-row-head\"><a href=\"{prefix}requirements/{req.Slug}.html\">{Html(req.Id)}</a>");
+            var kindLabel = req.Kind switch
+            {
+                RequirementKind.Functional => "Functional",
+                RequirementKind.NonFunctional => "Non-functional",
+                _ => "UX Design",
+            };
+            var snippet = Shorten(PathUtil.StripHtmlTags(req.TextHtml).Trim(), 96);
+            var rowTip = Html($"{req.Id} · {kindLabel}\n{snippet}");
+            sb.Append($"        <th scope=\"row\" class=\"trace-row-head\"><a class=\"js-tip\" href=\"{prefix}requirements/{req.Slug}.html\" data-tip=\"{rowTip}\" title=\"{rowTip}\">{Html(req.Id)}</a>");
             if (req.Deferred)
             {
                 sb.Append(' ').Append(StatusStyles.Badge("deferred", "Deferred"));

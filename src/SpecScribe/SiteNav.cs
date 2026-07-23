@@ -440,6 +440,28 @@ public sealed class SiteNav
         return new NavLocalContext("Insights", items);
     }
 
+    /// <summary>Builds the white sub-header band's local context for a Delivery-group index page (<c>epics.html</c>,
+    /// <c>requirements.html</c>, <c>traceability.html</c>, <c>sprint.html</c>) from THIS SAME Delivery nav group's
+    /// membership — mirrors <see cref="BuildInsightsLocalContext"/> exactly. Without this, these pages fell back to
+    /// the generic quick-links band, which just re-lists the same Delivery/Insights/Follow-ups/Project/Help groups
+    /// already in the dark bar above — redundant chrome rather than useful page-type wayfinding. Null when the
+    /// Delivery group doesn't exist or collapsed to a single flat link (NFR8). [Story 21.1 follow-up]</summary>
+    public NavLocalContext? BuildDeliveryLocalContext(string activeOutputRelativePath)
+    {
+        var group = Groups.FirstOrDefault(g => string.Equals(g.Label, "Delivery", StringComparison.Ordinal));
+        if (group.Children is null || group.Children.Count < 2) return null;
+
+        var prefix = PathUtil.RelativePrefix(activeOutputRelativePath);
+        var current = PathUtil.NormalizeSlashes(activeOutputRelativePath);
+        var items = group.Children
+            .Select(c => new NavLocalItem(
+                c.Label,
+                prefix + c.OutputRelativePath,
+                string.Equals(PathUtil.NormalizeSlashes(c.OutputRelativePath), current, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        return new NavLocalContext("Delivery", items);
+    }
+
     /// <summary>White-bar local context for About Spec-Driven Development hub + framework sub-pages —
     /// Overview plus every framework guide. Always meaningful (7+ items). [About SDD]</summary>
     public NavLocalContext BuildSddLocalContext(string activeOutputRelativePath)

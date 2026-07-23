@@ -32,7 +32,7 @@ public static class EpicsTemplater
             Kind = PageKind.Epics,
             OutputRelativePath = outputPath,
             Title = $"Epics & Stories — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath),
+            Nav = nav.ToNavigationView(outputPath, nav.BuildDeliveryLocalContext(outputPath)),
             Breadcrumb = breadcrumb,
             Assets = new AssetManifest
             {

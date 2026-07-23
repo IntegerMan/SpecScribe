@@ -188,21 +188,32 @@ None — no failing runs requiring a debug log; `dotnet build`/`dotnet test` gre
 
 ### File List
 
-- `src/SpecScribe/Charts.cs` — `ChartMetric.RequirementTraceability` + `WhyText` case; `TraceabilityMatrix`, `CoveredCellTip`, `TraceabilityChips`, `TraceabilityLegend`, `TraceabilityStrip`
+- `src/SpecScribe/Charts.cs` — `ChartMetric.RequirementTraceability` + `WhyText` case; `TraceabilityMatrix` (incl. row-header tooltip), `CoveredCellTip`, `TraceabilityChips`, `TraceabilityLegend`, `TraceabilityStrip`
 - `src/SpecScribe/TraceabilityTemplater.cs` — new; `RenderPage`
-- `src/SpecScribe/SiteNav.cs` — `TraceabilityOutputPath` const + Delivery nav entry inside the `hasEpics` block
+- `src/SpecScribe/SiteNav.cs` — `TraceabilityOutputPath` const + Delivery nav entry inside the `hasEpics` block; `BuildDeliveryLocalContext`
 - `src/SpecScribe/SiteGenerator.cs` — `WriteTraceability` + call site in `GenerateAll`
-- `src/SpecScribe/RequirementsTemplater.cs` — `AppendTraceabilityStripSection` + call site in `RenderIndex`
+- `src/SpecScribe/RequirementsTemplater.cs` — `AppendTraceabilityStripSection` + call site in `RenderIndex`; `RenderNavBar` now passes `BuildDeliveryLocalContext`
+- `src/SpecScribe/EpicsTemplater.cs` — `BuildIndexPage`'s `Nav` now passes `BuildDeliveryLocalContext`
+- `src/SpecScribe/SprintTemplater.cs` — `RenderNavBar` now passes `BuildDeliveryLocalContext`
 - `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — `AppendTraceabilityPanel` + call site in `AppendDashboardSection`
 - `src/SpecScribe/Icons.cs` — `Icons.ForConcept("Traceability")` glyph
 - `src/SpecScribe/assets/specscribe.css` — matrix/legend/strip styles (`.trace-*`), `--status-*` tokens only
 - `tests/SpecScribe.Tests/ChartsTraceabilityTests.cs` — new
 - `tests/SpecScribe.Tests/SiteGeneratorTraceabilityMatrixTests.cs` — new
 - `tests/SpecScribe.Tests/SiteGeneratorWebviewTests.cs` — new SPA/webview coherence test
-- `tests/SpecScribe.Tests/SiteNavTests.cs` — updated expected nav-item lists (new "Traceability" entry)
+- `tests/SpecScribe.Tests/SiteNavTests.cs` — updated expected nav-item lists (new "Traceability" entry); new `BuildDeliveryLocalContext_*` tests
 - `tests/SpecScribe.Tests/RenderParityTests.cs` — updated expected nav-item lists
-- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — updated golden output inventory + regenerated golden content fingerprint
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — updated golden output inventory + regenerated golden content fingerprint (twice)
+
+### Post-review owner feedback (same session)
+
+- Added a rich `js-tip`/`data-tip` tooltip to each row header (requirement id + kind + text snippet), mirroring `RequirementStatusGrid`'s tooltip pattern, so hovering a bare "FR1" reveals what it actually is.
+- Made `.trace-matrix-wrap` scroll vertically too (`max-height: calc(100vh - 16rem); overflow-y: auto`, alongside the existing `overflow-x: auto`) so the sticky `<thead>` column headers stay visible while paging through a long requirement list, instead of only working within a viewport-height page scroll.
+- Confirmed the row-header (requirement id) column was already frozen via `.trace-row-head { position: sticky; left: 0 }` — verified live that it still holds during simultaneous horizontal + vertical scroll after the above change.
+- New `SiteNav.BuildDeliveryLocalContext` (mirrors `BuildInsightsLocalContext`): the white sub-header band on the four Delivery-group index pages (`epics.html`, `requirements.html`, `traceability.html`, `sprint.html`) previously fell back to the generic full quick-links band — a near-duplicate of the dark nav bar's own Delivery/Insights/Follow-ups/Project/Help links sitting right below it. Wired into all four templaters' nav-bar call sites so the white band now shows just the Delivery family (Epics/Requirements/Traceability/Sprint) with the current page marked active, matching the existing Insights-page precedent.
+- New tests: `SiteNavTests.BuildDeliveryLocalContext_*` (2), `ChartsTraceabilityTests.TraceabilityMatrix_RowHeader_CarriesARichTooltipNamingTheRequirement`. Golden fingerprint regenerated again (nav-bar markup shift on every page) and reconfirmed stable across repeated runs. Full suite: 2049 passed / 3 skipped (pre-existing). Verified live: row tooltip text, `overflow-y:auto`/`max-height` computed styles, sticky-row-head-during-scroll, and the Delivery white band on both `traceability.html` and `epics.html`.
 
 ## Change Log
 
 - 2026-07-22: Implemented the requirement traceability coverage matrix (dedicated `traceability.html` + dashboard/requirements.html teaser strips) per the story's owner-elicited design directions. All 6 tasks complete; full test suite green (2043 passed / 3 skipped, unrelated pre-existing skips); verified live against this repo. Status → review.
+- 2026-07-22 (same session, owner feedback): Added row-header requirement tooltips, made the matrix scroll vertically (not just horizontally) with the epic-column header staying pinned, confirmed the requirement-id column stays frozen through both scroll axes, and replaced the generic repeated-nav white band on all four Delivery-group pages with a proper `BuildDeliveryLocalContext`. Golden fingerprint regenerated again; full suite green (2049 passed / 3 skipped).

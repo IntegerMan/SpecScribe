@@ -91,7 +91,7 @@ public static class SprintTemplater
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
             $"Sprint delivery status for {nav.SiteTitle} — a board of every epic and story by lifecycle stage."));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, nav.BuildDeliveryLocalContext(outputPath)));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Sprint Status", null) }));
 
         var epicCount = ledger.EpicsTracked;

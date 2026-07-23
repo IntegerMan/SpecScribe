@@ -841,7 +841,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // index.html and requirements.html + the new Icons.ForConcept("Traceability") glyph + new specscribe.css
         // rules for the matrix/strip. Verified stable across 2 repeated runs before locking in.
         // [golden-diff-normalization-gotchas]
-        const string expected = "6346a9918c04fa1834566e4415134896d0dd557eec579905ea3dd21c8323f3f2";
+        // Regenerated again for Story 21.1 owner feedback: row-header tooltips on the traceability matrix
+        // (requirement id + kind + text snippet) + a new SiteNav.BuildDeliveryLocalContext white-band local
+        // context for the Delivery-group index pages (epics.html/requirements.html/traceability.html/
+        // sprint.html), replacing the generic full-quick-links fallback that just repeated the dark nav bar's
+        // own links. Non-git fixture doesn't render sprint.html/traceability.html itself in every variant, but
+        // the shared nav-bar markup change reflects on every page this fixture DOES render. Verified stable
+        // across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        const string expected = "b36f0bf1fc9ec6b0d55d86e9d9858cc5e8ececab00b5b182e3bd3d89b745e395";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

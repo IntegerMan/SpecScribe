@@ -504,6 +504,32 @@ public class SiteNavTests
         Assert.Null(localContext);
     }
 
+    // ---- Story 21.1 follow-up: Delivery local-context helper (replaces the generic repeated-nav fallback) ----
+
+    [Fact]
+    public void BuildDeliveryLocalContext_MultipleDeliveryPages_ReturnsGroupMembershipWithActiveMarked()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var localContext = nav.BuildDeliveryLocalContext(SiteNav.RequirementsOutputPath);
+
+        Assert.NotNull(localContext);
+        Assert.Equal("Delivery", localContext!.Title);
+        Assert.Equal(new[] { "Epics", "Requirements", "Traceability", "Sprint" }, localContext.Items.Select(i => i.Label).ToArray());
+        Assert.True(localContext.Items.Single(i => i.Label == "Requirements").IsActive);
+        Assert.False(localContext.Items.Single(i => i.Label == "Epics").IsActive);
+    }
+
+    [Fact]
+    public void BuildDeliveryLocalContext_NoEpics_ReturnsNull()
+    {
+        var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe");
+
+        var localContext = nav.BuildDeliveryLocalContext(SiteNav.HomeOutputPath);
+
+        Assert.Null(localContext);
+    }
+
     [Fact]
     public void ToNavigationView_ThreadsLocalContextOntoNavigationView()
     {

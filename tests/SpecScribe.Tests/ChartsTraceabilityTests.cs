@@ -87,6 +87,16 @@ public class ChartsTraceabilityTests
     }
 
     [Fact]
+    public void TraceabilityMatrix_RowHeader_CarriesARichTooltipNamingTheRequirement()
+    {
+        var (reqs, epics) = Fixture();
+        var html = Charts.TraceabilityMatrix(reqs, epics, prefix: string.Empty);
+
+        Assert.Contains("<th scope=\"row\" class=\"trace-row-head\"><a class=\"js-tip\" href=\"requirements/fr1.html\" data-tip=\"FR1 &#183; Functional", html);
+        Assert.Contains("Done requirement covered by epic 1", html);
+    }
+
+    [Fact]
     public void TraceabilityMatrix_NonCoveringCell_RendersBlankNeutralCell()
     {
         var (reqs, epics) = Fixture();

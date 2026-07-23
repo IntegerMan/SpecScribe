@@ -23,7 +23,7 @@ public static class TraceabilityTemplater
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
             $"Requirement-to-epic traceability matrix for {nav.SiteTitle} — every FR, NFR, and UX design requirement plotted against the epics that cover it."));
-        sb.Append(nav.RenderNavBar(outputPath));
+        sb.Append(nav.RenderNavBar(outputPath, nav.BuildDeliveryLocalContext(outputPath)));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Traceability", null) }));
 
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");

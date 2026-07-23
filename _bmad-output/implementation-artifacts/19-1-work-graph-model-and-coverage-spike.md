@@ -4,7 +4,7 @@ baseline_commit: c5b93734d56d618a7a117060a1f4a3917d2745aa
 
 # Story 19.1: Work-Graph Model and Coverage Spike
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -150,7 +150,31 @@ If the recommendation needs a true surface-coverage gate before 19.2, say so exp
 
 ### Review Findings
 
-_(populated during code-review)_
+_Code review 2026-07-22 (3 parallel layers: Blind Hunter / Edge Case Hunter / Acceptance Auditor; all claims re-verified against source at HEAD `cec0932`). Auditor verdict: **PASS on both ACs and all spike constraints** — the coverage map's core conclusions (fully derivable, no new schema, epic-scoped subgraph) hold. Findings below are refinements to make the map trustworthy for 19.2. No `src/**` fix is implied — every patch edits this document._
+
+**Decision-needed (owner call required before 19.2 build):**
+
+- [x] [Review][Decision] Epic-scoped surface has no host for Unplanned / unattributed (epic = null) nodes — The chosen §5 surface is strictly per-epic, and its NFR8 rules only cover "empty epic" and "no epics." But unattributed action items (`SprintActionItem.EpicNumber == null` → "Unattributed" bucket, `ActionItemsTemplater.cs:93,256`; also skipped by `FindNearDuplicates` at `:135`) and Unplanned quick-dev (`ResolveQuickDevEpic` → null → `UnplannedWorkGeometry`) carry real `stemmed-from`/`resolves`/`cites` edges yet belong to no epic page. As written, exactly the work with the most orphaned provenance silently vanishes from the graph. Decide: give Unplanned an "Unattributed" pseudo-epic bucket (mirroring the action-items page), or explicitly declare it out-of-scope for the MVP and say so in §5.
+
+- [x] [Review][Decision] Collapse / cycle-model semantics under-specified for distinct endpoints — MVP "cycle" is defined over *collapsed node identities* (§3), but the only fixture (ex. 1) demonstrates collapse solely for the self-loop case A == B. For a deferred item with `stemmed-from → A` and `resolves → B`, A ≠ B, the collapse transform is undefined: does it manufacture a transitive A→B edge (which would fabricate cycles the authored provenance never had) or keep the item as its own node with two out-edges (safe, but then real resolver-loops need the item retained)? Also, ex. 1's causal story over-narrates — the self-loop arises purely from the `stemmed-from` self-reference (`source_spec == heading`, `deferred-work.md:26-37`); the `resolves` edge is not needed to close it. Confirm the collapse rule and correct the fixture narration so 19.2's cycle finder is built on a precise definition.
+
+**Patch (unambiguous doc corrections):**
+
+- [x] [Review][Patch] External-code-mode NFR8 rule is factually wrong [19-1-…spike.md §5 NFR8 + Nodes "code file" row] — Doc claims "external-only code mode → in-portal code nodes simply absent." But `_codePages` is populated **unconditionally** (Story 7.7 made `--code-url` additive; `SiteGenerator.cs:255-258`), so in-portal code pages/nodes exist even in external mode — only the render-time link target differs. The doc appears to have relied on the stale "empty in external mode" comment at `SiteGenerator.cs:86`, which describes `_codeReferenced` (a different set). Correct the rule so 19.2 doesn't code an "external ⇒ suppress code nodes" absence path that drops real nodes.
+
+- [x] [Review][Patch] Harden the unresolved-`SourceKey` caveat into an explicit anti-phantom guardrail [19-1-…spike.md known-seam caveats / §4] — The map flags "path-prefixed SourceKey join gaps" as an ambiguity case but never states what the graph *does* with an unresolvable key (`FindQuickDev` null + no epic + no story). Given this repo just fixed a phantom-item bug of exactly this shape (commit `a16ca0f`, "DeferredWorkParser treating bare source_spec bullets as phantom items"), add a guardrail: an unresolved `SourceKey` must **never** mint a node from the raw string — drop the edge or attach to a single "unresolved" sink.
+
+- [x] [Review][Patch] Add a code-file node cap; scale-exclusion is inconsistent [19-1-…spike.md §1 exclusions + §5 "bounded"] — §1 excludes commit/date/group pages because they "scale with the target repo, not planning artifacts," yet §1 *keeps* code-file nodes whose `cites` targets scale with the target repo identically, and §5 calls the subgraph "bounded" with no cap. The `Charts.ReferenceGraph` `+N more` cap the doc already cites (feed-forward stub) must be promoted into a real §1/§5 node rule so an epic citing hundreds of files can't explode the graph.
+
+- [x] [Review][Patch] Fix stale line-number citations in the Task-3 ambiguity example [19-1-…spike.md §3 example 2] — Cites `sprint-status.yaml` lines 330/338/358; actual are 338/346/366 (+8, from the Epic 24 block inserted after the trace). Content/quotes are correct; only the anchors drifted.
+
+**Deferred (real, but belongs to a later story — not fixable in this spike):**
+
+- [x] [Review][Defer] Consider a short ADR for the carrier→target direction convention [19-1-…spike.md §2] — deferred, revisit at 19.2 / Epic 24 create-story. The spike consciously decided no fork appeared (defensible for a single not-yet-built surface), but the convention is load-bearing and Epic 24 now inherits it; repo memory records a standing "agents under-propose ADRs" lesson. Escalate to an ADR if/when the convention spreads beyond Epic 19.
+
+**Dismissed (1):** multi-epic requirement duplicating its `covers` edge across per-epic subgraphs — for a deliberately per-epic surface, showing a shared requirement in each covering epic's subgraph is expected behavior, not a defect.
+
+**Resolution (2026-07-22):** Both decisions resolved by owner — D1 → render Unplanned/unattributed in an "Unattributed" pseudo-epic bucket; D2 → keep distinct-endpoint items as their own node (no manufactured transitive edge). All 6 patches applied to the Completion Notes above (§1 code-file node row, §3 cycle example + collapse rule, §5 NFR8 rules, feed-forward guardrails). No `src/**` changes. Spike deliverable amended in place; conclusions unchanged.
 
 ## Dev Notes
 
@@ -250,7 +274,7 @@ Live examples pulled from this repo's own `_bmad-output/implementation-artifacts
 | deferred item | `FollowUpSlug` slug / `FollowUpDeferredSlot` | `FollowUpDeferredSlot.DetailHref` (9.11 detail or list fallback) | no `deferred-work.md` → `work.Deferred is null` → zero slots |
 | action item | `SprintActionItem` (Action+Epic; ref-equality keyed) | `FollowUpGeometry.HrefFor` / `FollowUpSlug.OutputPath` | no `action_items:` → `WriteActionItems` early-returns |
 | retro | epic number → retro page | `EpicRetroMap[epic]` (soft: keyed by epic, **not** a per-item retro id) | no retros → `EpicRetroMap` empty; action→retro edges downgrade to plain `<span>` (see `AppendCrossLinks`) |
-| code file | repo-relative path (Ordinal-cased) | `code/<path>.html` (`_codePages`) or external `#L{n}` (`--code-url`) | external-only or no citations → in-portal node absent; edge still resolvable to external URL |
+| code file | repo-relative path (Ordinal-cased) | `code/<path>.html` (`_codePages`) or external `#L{n}` (`--code-url`) | no citations (and not git-widget-surfaced) → in-portal node absent. **External `--code-url` mode does NOT remove the node** — `_codePages` is populated unconditionally (Story 7.7 made `--code-url` additive; only the render-time link target changes). Per-epic code nodes capped (`+N more`, see §5). [code-review 2026-07-22] |
 | requirement (FR/NFR/UX-DR) | `RequirementInfo.Id` | requirements detail page | **IN MVP as node, but only for epic-grain `covers` edges** — see Task 1 decision below |
 
 **Extra node types discovered (Task 1.3 classification):**
@@ -296,11 +320,11 @@ This is the *honest, implementation-aligned* rule — it matches which side actu
 
 **Task 3 — live examples from this repo (not synthesized):**
 
-1. **Cyclic-looking (self-loop when items collapse to source node):** In `deferred-work.md`, the `spec-6-9-deferred-debt-cleanup` items are **`RESOLVED … (spec-epic6-deferred-debt-cleanup)`** → a `resolves` edge to node `spec-epic6-deferred-debt-cleanup`. That very spec *also* appears as a Deferred-from heading (`## Deferred from: code review of spec-epic6-deferred-debt-cleanup`) whose items carry `source_spec: spec-epic6-deferred-debt-cleanup` → a `stemmed-from` edge **to the same node**. When deferred items are collapsed onto their source/resolver node, `spec-epic6-deferred-debt-cleanup` has both an inbound `resolves` and outbound `stemmed-from` touching itself — a **resolver-that-also-spawns** self-loop. MVP "cycle" = a simple directed cycle over collapsed node identities; this is the canonical first fixture.
-2. **Ambiguous reverse-link (multi-epic obligation):** the Epic 1 heatmap-debt action recurs at `epic: 1` (line 330), `epic: 2` (line 338, *"carried unaddressed across two retrospectives"*), and `epic: 3` (line 358, *"resolved via spec-epic1-heatmap-debt-triage but left open"*). `FindNearDuplicates` already emits `also raised in Epic N retrospective` cross-links between these. "Which retro owns this obligation?" has **no unique answer** — that is the ambiguity, not a bug.
+1. **Cyclic-looking (self-loop when items collapse to source node):** In `deferred-work.md`, the `spec-6-9-deferred-debt-cleanup` items are **`RESOLVED … (spec-epic6-deferred-debt-cleanup)`** → a `resolves` edge to node `spec-epic6-deferred-debt-cleanup`. That very spec *also* appears as a Deferred-from heading (`## Deferred from: code review of spec-epic6-deferred-debt-cleanup`) whose items carry `source_spec: spec-epic6-deferred-debt-cleanup` → a `stemmed-from` edge **to the same node**. When deferred items are collapsed onto their source node, `spec-epic6-deferred-debt-cleanup` is both source and target of a `stemmed-from` edge — a direct self-loop arising from the source-equals-heading self-reference **alone** (the separate `resolves` edge from the `spec-6-9` items is not required to close it; the earlier "resolver-that-also-spawns" framing over-narrated a single-edge self-loop). [code-review D2, 2026-07-22] MVP "cycle" = a simple directed cycle over collapsed node identities; this is the canonical first fixture.
+2. **Ambiguous reverse-link (multi-epic obligation):** the Epic 1 heatmap-debt action recurs at `epic: 1` (line 338), `epic: 2` (line 346, *"carried unaddressed across two retrospectives"*), and `epic: 3` (line 366, *"resolved via spec-epic1-heatmap-debt-triage but left open"*). `FindNearDuplicates` already emits `also raised in Epic N retrospective` cross-links between these. "Which retro owns this obligation?" has **no unique answer** — that is the ambiguity, not a bug.
 3. **Multi-hop path:** deferred item `source_spec: 7-11-code-ownership-and-bus-factor-insights.md` → (`stemmed-from`) story **7.11** → (structural) **Epic 7** → (`covers`⁻¹) the FR(s) whose `CoverageEpicNumbers` include 7. One visit answers "what requirement is ultimately behind this open debt item?"
 
-**MVP cycle definition:** a simple directed cycle among the named node types over the carrier→target edge set (deferred/action/quick-dev/story/epic/spec/code). **NOT a cycle:** a `BreadcrumbTrail` up-link or SPA `Manifest.Parent/Children` (page hierarchy, not provenance); a reverse panel viewed alongside its own forward edge (same edge, two renderings).
+**MVP cycle definition:** a simple directed cycle among the named node types over the carrier→target edge set (deferred/action/quick-dev/story/epic/spec/code). **NOT a cycle:** a `BreadcrumbTrail` up-link or SPA `Manifest.Parent/Children` (page hierarchy, not provenance); a reverse panel viewed alongside its own forward edge (same edge, two renderings). **Collapse rule (distinct endpoints, code-review D2):** collapse merges only *identical* node identities; a single deferred item with `stemmed-from → A` and `resolves → B`, A ≠ B, is **kept as its own node with two out-edges** — 19.2 must NOT manufacture a transitive `A → B` edge (that would fabricate cycles the authored provenance never had). Collapse-to-source is safe only where source == resolver (the self-loop in example 1).
 
 #### 4. Out of scope — edge/node | rationale
 
@@ -329,7 +353,9 @@ This is the *honest, implementation-aligned* rule — it matches which side actu
 **NFR8 absence rules (mirror shipping patterns):**
 - Zero follow-ups AND zero citations for an epic → **omit the graph section entirely** (no empty chrome), mirroring `WriteActionItems` early-return and `UnplannedWorkGeometry.HasUnplanned`/`GroupRootHref == null`.
 - No epics at all → **no nav entry, no page** (same `hasEpics` gate the Delivery/Traceability nav group already uses).
-- External-only code mode → `cites` edges still resolve (to external `#L{n}`); in-portal code nodes simply absent — no dead links.
+- **Unplanned / unattributed nodes (epic = null)** → render in a synthetic **"Unattributed" pseudo-epic bucket** (action items with `EpicNumber == null`; quick-dev with no resolvable epic → `UnplannedWorkGeometry`), mirroring the action-items page's trailing Unattributed group (`ActionItemsTemplater.GroupByEpic`). These **MUST NOT be silently dropped** — orphaned provenance is a primary trace target — but the bucket omits cleanly when empty, same rule as an empty epic. [code-review D1, 2026-07-22]
+- **Code-file node cap** → `cites` targets scale with the *target repo*, not planning artifacts (the same property that keeps commit/date pages out of §1). Bound per-epic code-file nodes with the `Charts.ReferenceGraph` `+N more` cap (house style) so an epic citing many files can't explode the subgraph. [code-review, 2026-07-22]
+- External code mode → `cites` edges still resolve (to external `#L{n}`); **in-portal code nodes are STILL present** — `_codePages` is populated unconditionally (Story 7.7 additive; only the link target is chosen at render time), so 19.2 must **not** suppress code nodes in external mode. No dead links either way. [code-review, 2026-07-22 — corrects the original "nodes absent" claim]
 - Retros absent → `raised-in` edges downgrade to non-link labels (already how `AppendCrossLinks` behaves).
 
 **Parsers 19.2 MUST reuse (call, never fork):** `DeferredWorkParser` → `DeferredWorkModel`; `FollowUpGeometry.From/.ForEpic` (+ `FollowUpDeferredSlot` as the proto-edge record — project from it, do not invent a parallel type); `UnplannedWorkGeometry`; `FollowUpRefs` (all ref resolution); `ActionItemsTemplater.FindNearDuplicates` (`raised-in`); `RequirementsParser.StoriesFor` / `CoverageEpicNumbers` (`covers`); `_codeReverseMap` + `_citerToFiles` + `BuildReferencedBy` (`cites` both directions); `EpicRetroMap`. Counts stay on `ProjectCounts` — **no recount.**
@@ -344,7 +370,7 @@ This is the *honest, implementation-aligned* rule — it matches which side actu
 - **Data source:** project `FollowUpDeferredSlot` + reversed `_citerToFiles`/`_codeReverseMap` into an in-memory `{nodes, edges}` per epic; edge direction = carrier → target (§2).
 - **Visual:** static SVG (pure-SVG house style, cf. `Charts.ReferenceGraph` a11y precedent — sr-only node/edge lists, node caps + "+N more") — **not** the Epic 20 interactive explorer.
 - **Placement:** dedicated page under the Delivery/Insights nav group on the shared `hasEpics` gate; per-epic section or epic filter.
-- **Guardrails:** no new schema, no second count ledger, epic-grain `covers` only, cycle detection as a secondary annotation (not the primary surface), NFR8 omit-on-empty.
+- **Guardrails:** no new schema, no second count ledger, epic-grain `covers` only, cycle detection as a secondary annotation (not the primary surface), NFR8 omit-on-empty; **unresolved `SourceKey` must never mint a phantom node from the raw string** (drop the edge or attach to a single "unresolved" sink — cf. the `a16ca0f` phantom-item fix); Unplanned/unattributed (epic = null) nodes go in an "Unattributed" pseudo-epic bucket (D1); distinct-endpoint items are not collapsed into a transitive edge (D2).
 
 ### File List
 

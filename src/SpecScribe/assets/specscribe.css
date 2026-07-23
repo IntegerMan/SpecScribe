@@ -4737,8 +4737,11 @@ a.satisfaction-chip:hover { filter: brightness(0.97); }
 .trace-strip-link { white-space: nowrap; }
 
 /* The grid itself always scrolls inside its own container — the page body never scrolls horizontally, even
-   with ~22 epic columns. contain: inline-size mirrors the git-insights .table-scroll pattern. */
-.trace-matrix-wrap { margin-top: 0.4rem; }
+   with ~22 epic columns. contain: inline-size mirrors the git-insights .table-scroll pattern. Bounded to the
+   viewport height (minus the chrome above it) with its own vertical scrollbar too, so a long requirement list
+   scrolls internally with the epic-column header staying pinned in view, instead of the reader having to scroll
+   all the way back up the page to see which column they're looking at. */
+.trace-matrix-wrap { margin-top: 0.4rem; max-height: calc(100vh - 16rem); overflow-y: auto; }
 .trace-matrix {
   border-collapse: separate;
   border-spacing: 0;
