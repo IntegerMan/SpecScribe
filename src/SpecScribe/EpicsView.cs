@@ -164,6 +164,13 @@ public sealed record EpicPageView
     /// when the module exposes no command).</summary>
     public required string NextStepsHtml { get; init; }
 
+    /// <summary>The pre-rendered "Code areas touched" widget HTML (Story 21.3) — a capped list of code-page links
+    /// for the code files this epic's commits touched, correlated best-effort from commit/branch naming, plus a
+    /// link to the full impact map. Built once in <see cref="EpicsViewBuilder.BuildEpic"/> and consumed identically
+    /// across HTML/SPA/webview. Empty (absent, not an empty panel) when this epic has no attributed linkable files,
+    /// or when <c>--deep-git</c> didn't run (NFR8). [Story 21.3]</summary>
+    public string CodeAreasHtml { get; init; } = string.Empty;
+
     /// <summary>The pre-rendered retrospective-affordance HTML (named opaque fragment; empty when nothing shows).</summary>
     public required string RetroAffordanceHtml { get; init; }
 
@@ -284,6 +291,13 @@ public sealed record StoryPageView
 
     /// <summary>The change-log HTML (named opaque fragment; empty when absent).</summary>
     public required string ChangeLogHtml { get; init; }
+
+    /// <summary>The pre-rendered "Code areas touched" widget HTML (Story 21.3) — a capped list of code-page links
+    /// for the code files this story's commits touched, correlated best-effort from commit/branch naming, plus a
+    /// link to the full impact map. Built once in <see cref="EpicsViewBuilder.BuildStory"/> and consumed identically
+    /// across HTML/SPA/webview. Empty (absent, not an empty panel) when this story has no attributed linkable files,
+    /// or when <c>--deep-git</c> didn't run (NFR8). [Story 21.3]</summary>
+    public string CodeAreasHtml { get; init; } = string.Empty;
 
     /// <summary>Deferred-work items whose provenance names this story (reverse index). Empty → panel omitted
     /// (NFR8). [artifact-review-nav-and-deferred]</summary>

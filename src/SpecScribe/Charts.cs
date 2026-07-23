@@ -30,6 +30,9 @@ public static class Charts
         /// cycle-time. Distinct from <see cref="ActivityCadence"/> — that's raw commit activity; this is
         /// story-completion rhythm (Story 21.2).</summary>
         DeliveryCadence,
+        /// <summary>Planning ↔ code impact: which code areas an epic's/story's commits actually touched, correlated
+        /// best-effort from commit-message and merge-branch naming (Story 21.3).</summary>
+        PlanningCodeImpact,
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
@@ -62,8 +65,56 @@ public static class Charts
             "A requirement with no delivering epic is a coverage gap; one that is deferred is a deliberate choice — the two look different so neither hides.",
         ChartMetric.DeliveryCadence =>
             "How often stories reach done reveals the project's real delivery rhythm — steady drips and bursts both tell you something commit activity alone doesn't.",
+        ChartMetric.PlanningCodeImpact =>
+            "Seeing which code areas an epic's commits actually touched turns “what did this work change” from a guess into a fact — even a best-effort one.",
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
+
+    /// <summary>The impact map's provenance caveat (Story 21.3): the correlation is mined best-effort from commit
+    /// and merge-branch naming that already exists in the repo — never a tracked or authoritative mapping, and the
+    /// merge backfill is a linear approximation of branch membership, not exact ancestry. Pattern-generic (NFR8):
+    /// names no specific repo's branches or commits. Rendered in the frame's <see cref="ChartMeta.Note"/> slot.</summary>
+    public const string PlanningCodeImpactNote =
+        "This is a best-effort correlation mined from commit messages and merge-branch names — not a tracked or " +
+        "authoritative mapping. Commits that don’t name a story or epic are left out, and merge attribution " +
+        "is approximate (a linear window of a branch’s commits, not exact ancestry).";
+
+    /// <summary>The dedicated impact-map page body (Story 21.3): one epic-grouped section per epic that has at
+    /// least one linkable touched file, each a plain semantic list of code-page links — a list, never a chart the
+    /// data can't support. Epics render in roster order; files arrive already ordinal-sorted + link-gated from
+    /// <see cref="PlanningCodeImpact"/> so nothing here can emit a dead link. <paramref name="prefix"/> is the
+    /// consuming page's relative prefix ("" for the root <c>impact-map.html</c>), applied to both the epic-page
+    /// and code-page hrefs. Degrades to the shared <c>chart-empty</c> note when nothing correlated (AC #2 — an
+    /// honest empty state, never a misleading empty grid). Wrap in <see cref="Framed"/> with the
+    /// <see cref="PlanningCodeImpactNote"/> caveat.</summary>
+    public static string ImpactMapBody(EpicsModel epics, PlanningCodeImpactData data, string prefix)
+    {
+        if (!data.HasAnyFiles)
+        {
+            return "<div class=\"chart-empty\">No commits could be correlated to a story or epic yet.</div>\n";
+        }
+
+        var sb = new StringBuilder();
+        foreach (var epic in epics.Epics.OrderBy(e => e.Number))
+        {
+            if (!data.FilesByEpic.TryGetValue(epic.Number, out var files) || files.Count == 0) continue;
+
+            var epicHref = prefix + $"epics/epic-{epic.Number}.html";
+            sb.Append("<section class=\"impact-epic\">\n");
+            // epic.Title is already-projected inline HTML (rendered raw, as the epic chips do).
+            sb.Append($"  <h4 class=\"impact-epic-head\"><a href=\"{Html(epicHref)}\">Epic {epic.Number} &middot; {epic.Title}</a></h4>\n");
+            sb.Append($"  <p class=\"chart-lead\">{files.Count.ToString("N0", CultureInfo.InvariantCulture)} {Plural(files.Count, "code file", "code files")} touched.</p>\n");
+            sb.Append("  <ul class=\"impact-file-list\">\n");
+            foreach (var f in files)
+            {
+                var href = prefix + f.CodePageHref;
+                sb.Append($"    <li><a href=\"{Html(href)}\">{Html(f.Path)}</a></li>\n");
+            }
+            sb.Append("  </ul>\n");
+            sb.Append("</section>\n");
+        }
+        return sb.ToString();
+    }
 
     /// <summary>The change-coupling panel's process-vs-code explanatory note (Story 10.6, AC1): shown once,
     /// only when at least one coupled pair classifies as <see cref="GitMetrics.CouplingKind.Process"/>, so a
@@ -1451,12 +1502,13 @@ public static class Charts
                 }
                 else if (multi)
                 {
-                    // Rich hover tooltip listing every story that day, via the shared body-level js-tip node
-                    // (pre-line plain text) — never a clipped CSS ::after. The completion log below is the
-                    // no-JS / screen-reader equivalent, so the cell itself stays aria-hidden like the zero cells.
-                    var tip = titleText + "\n" + string.Join("\n", stories.Select(s => $"Story {s.Id} — {s.Title}"));
-                    sb.Append($"  <rect aria-hidden=\"true\" x=\"{x}\" y=\"{y}\" width=\"{cell}\" height=\"{cell}\" rx=\"2\" class=\"heatmap-cell level-{level} js-tip\" data-tip=\"{Html(tip)}\" style=\"--col:{w}\">");
-                    sb.Append($"<title>{Html(titleText)}</title></rect>\n");
+                    // Every story that day listed in ONE native <title> (no clip, no second overlapping tooltip):
+                    // deliberately NOT a js-tip here, so a cell shows a single, consistent tooltip like every other
+                    // cell. The collapsed completion log below carries the linked/rich version; the cell stays
+                    // aria-hidden like the zero cells, with the log as its screen-reader / no-JS twin.
+                    var titleFull = titleText + "\n" + string.Join("\n", stories.Select(s => $"Story {s.Id} — {s.Title}"));
+                    sb.Append($"  <rect aria-hidden=\"true\" x=\"{x}\" y=\"{y}\" width=\"{cell}\" height=\"{cell}\" rx=\"2\" class=\"heatmap-cell level-{level}\" style=\"--col:{w}\">");
+                    sb.Append($"<title>{Html(titleFull)}</title></rect>\n");
                 }
                 else
                 {
@@ -1493,6 +1545,9 @@ public static class Charts
         var windowText = $"{weeks.ToString(CultureInfo.InvariantCulture)} {Plural(weeks, "week", "weeks")} · {DReadable(firstDay)} – {DReadable(lastDay)}";
         sb.Append("<div class=\"heatmap-meta\">\n");
         sb.Append("<div class=\"heatmap-legend\">");
+        // Unit label so the shade ramp isn't misread as commits-per-day (this is a story-completion heatmap, a
+        // sparser signal than commit activity). [Story 21.2 review]
+        sb.Append("<span class=\"heatmap-legend-caption\">Stories completed / day</span>");
         for (var l = 0; l <= 4; l++)
         {
             if (IsHeatLevelUnreachable(l, maxCount)) continue;
@@ -1512,8 +1567,10 @@ public static class Charts
     }
 
     /// <summary>The newest-first text log paired with <see cref="DeliveryCadenceHeatmap"/> (its accessible twin).
-    /// Only active days on/before <paramref name="today"/> appear; each lists the stories completed that day,
-    /// linked when a page resolves.</summary>
+    /// Collapsed into a <c>&lt;details&gt;</c> so the tile grid stays the primary view (owner feedback) while the
+    /// full list remains one click away — and still reachable by screen readers / with JS off (never lost). Only
+    /// active days on/before <paramref name="today"/> appear; each lists the stories completed that day, linked
+    /// when a page resolves. [Story 21.2 review]</summary>
     private static void AppendCadenceLog(
         StringBuilder sb,
         IReadOnlyList<(DateOnly Day, int Count)> series,
@@ -1527,6 +1584,8 @@ public static class Charts
             .ToList();
         if (activeDays.Count == 0) return;
 
+        sb.Append("<details class=\"cadence-log-details\">\n");
+        sb.Append($"  <summary class=\"cadence-log-summary\">Completion log — {activeDays.Count.ToString(CultureInfo.InvariantCulture)} active {Plural(activeDays.Count, "day", "days")}</summary>\n");
         sb.Append("<ol class=\"cadence-log\">\n");
         foreach (var (day, count) in activeDays)
         {
@@ -1554,6 +1613,7 @@ public static class Charts
             sb.Append("  </li>\n");
         }
         sb.Append("</ol>\n");
+        sb.Append("</details>\n");
     }
 
     /// <summary>The story cycle-time distribution as a bucketed bar chart (Story 21.2) — modeled on

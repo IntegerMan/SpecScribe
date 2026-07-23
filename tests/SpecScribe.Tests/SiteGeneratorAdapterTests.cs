@@ -873,7 +873,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // selector to out-specificity .table-scroll's later same-property rule). CSS-only change; shifts the
         // embedded specscribe.css bytes on every page. Verified stable across repeated runs before locking in.
         // [golden-diff-normalization-gotchas]
-        const string expected = "7acbd7bd78c1d646ae9ec2363c23f715776f0fac7e74c18f80c8d67480dba2ea";
+        // Regenerated for Story 21.2 review feedback: cadence.html gained an orientation lede (rendered even in
+        // the empty state) + external reference links, and specscribe.css gained the cadence lede / legend-caption /
+        // collapsible-log rules and recolored the cycle-time bars off rust. Still wall-clock-independent (the
+        // fixture's lone done story has no Change Log date → empty-state cadence, no date-derived grid). Verified
+        // stable across 2 repeated runs. [golden-diff-normalization-gotchas]
+        const string expected = "f1be8a66f73eae07b7d0c30cbe864137b4aa54157c3c2622874eaf1860e5808c";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

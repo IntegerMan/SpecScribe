@@ -120,6 +120,12 @@ public sealed class SiteGenerator
     // after ProgressCalculator has filled each story's LastUpdatedDate, then shared by WriteCadence and the
     // dashboard strip so the (bounded, per-done-story) first-touch git lookups run only once. Null until built.
     private DeliveryCadenceData? _cadence;
+    // Story 21.3: planning ↔ code impact correlation (epic/story → touched code files), built ONCE after code
+    // references are discovered (so the code-page link gate is populated) and before the epics pages render (so
+    // the epic/story "Code areas touched" widgets share the SAME instance the dedicated impact-map.html page uses).
+    // Empty when --deep-git didn't run (no commits to mine) or nothing correlated. Reused verbatim by
+    // RenderEpicsPages / RenderWebviewSurfaces / RenderSpaBundle and WriteImpactMap so every surface agrees.
+    private PlanningCodeImpactData _planningImpact = PlanningCodeImpactData.Empty;
     private List<RetroModel> _retros = new();
     private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
 
@@ -274,6 +280,16 @@ public sealed class SiteGenerator
             // so _codePages is populated even with an external base set — the link mode is chosen at render time.
             DiscoverCodeReferences(files);
 
+            // Story 21.3: correlate epics/stories with the code files their commits touched, mined from the SAME
+            // bounded --deep-git numstat fetch (no second git call). Built HERE — after DiscoverCodeReferences so
+            // the code-page link gate (CodePageHref) is populated, and before RenderEpicsPages so the epic/story
+            // "Code areas touched" widgets consume the same instance the dedicated impact-map.html page later reuses.
+            // Empty (never null) when --deep-git didn't run: DeepGit is null → no commits → an honest empty result,
+            // so the widgets and page all omit/degrade cleanly (AC #2). Never-throw by the builder's own contract.
+            _planningImpact = _epicsModel is { } impactEpics && progress?.DeepGit?.Commits is { Count: > 0 } impactCommits
+                ? PlanningCodeImpact.Build(impactEpics, impactCommits, CodePageHref)
+                : PlanningCodeImpactData.Empty;
+
             // Render the epic/story/requirements pages only when the whole ingest chain produced its models —
             // the exact set of writes the previous single try/catch performed after a successful parse.
             if (epicsSourceFile is not null && bundle is { Epics: { } epicsModel, Requirements: { } requirementsModel } && progress is not null)
@@ -389,6 +405,10 @@ public sealed class SiteGenerator
             // The requirement traceability matrix (Story 21.1) — shares Requirements' hasEpics gate; needs
             // _counts (built just above) for its ledger-sourced legend/ranking caption.
             WriteTraceability(nav);
+            // The planning ↔ code impact map (Story 21.3) — writes the SAME _planningImpact instance the epic/story
+            // widgets already consumed, so the page and widgets can never disagree. Gated on the combined
+            // hasEpics && hasDeepAnalytics signal the nav entry used (a deep-git run must have happened at all).
+            WriteImpactMap(nav);
             // The epic-scoped work graph (Story 19.2) — the model was projected + gated before nav; writing the
             // SAME cached instance keeps the Insights entry and the page in lockstep.
             WriteWorkGraph(nav);
@@ -2300,7 +2320,7 @@ public sealed class SiteGenerator
             foreach (var epic in model.Epics)
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
+                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
 
                 foreach (var story in epic.Stories)
                 {
@@ -2318,7 +2338,7 @@ public sealed class SiteGenerator
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                     var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps);
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact);
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
@@ -2515,7 +2535,7 @@ public sealed class SiteGenerator
                 foreach (var epic in model.Epics)
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned);
+                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact);
                     surfaces.Add(WebviewSurfaceFor(epicPage, _epicsSourcePath, skipEpicNumber: epic.Number));
 
                     var outlineStories = new List<OutlineStory>();
@@ -2540,7 +2560,7 @@ public sealed class SiteGenerator
                                 storyPage = EpicsTemplater.BuildStoryPage(
                                     epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                                     f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                                    _module.Commands, epicRetroPath, StoryPager(model, story), followUps);
+                                    _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact);
                             }
                             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                             {
@@ -2780,7 +2800,7 @@ public sealed class SiteGenerator
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
                 AddSpaSurface(pages, familyPaths,
-                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned),
+                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact),
                     skipEpicNumber: epic.Number);
 
                 foreach (var story in epic.Stories)
@@ -2798,7 +2818,7 @@ public sealed class SiteGenerator
                         EpicsTemplater.BuildStoryPage(
                             epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                             f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                            _module.Commands, epicRetroPath, StoryPager(model, story), followUps),
+                            _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact),
                         skipStoryId: story.Id);
                 }
             }
@@ -3162,6 +3182,21 @@ public sealed class SiteGenerator
 
         var html = TraceabilityTemplater.RenderPage(_requirements, _epicsModel, nav, _counts);
         WriteOutput(SiteNav.TraceabilityOutputPath, ApplyReferenceLinks(html, SiteNav.TraceabilityOutputPath));
+    }
+
+    /// <summary>Writes <c>impact-map.html</c> — the planning ↔ code impact map (Story 21.3). Rides the combined
+    /// <c>hasEpics &amp;&amp; hasDeepAnalytics</c> gate the nav entry uses: written when an epics roster exists AND
+    /// <c>--deep-git</c> ran (<c>_progress.DeepGit is not null</c>) — the structural condition, matching
+    /// <see cref="SiteNav.Build"/>'s combined gate exactly. The gate is deep-git having run at all, NOT whether
+    /// anything correlated: when it ran but nothing matched, the page still writes with <see cref="Charts.ImpactMapBody"/>'s
+    /// honest empty note (AC #2's data-thin degrade, the same split Traceability uses). Renders the SAME cached
+    /// <see cref="_planningImpact"/> the epic/story widgets consumed, so page and widgets can never disagree.</summary>
+    private void WriteImpactMap(SiteNav nav)
+    {
+        if (_epicsModel is null || _progress?.DeepGit is null) return;
+
+        var html = ImpactMapTemplater.RenderPage(_epicsModel, _planningImpact, nav);
+        WriteOutput(SiteNav.ImpactMapOutputPath, ApplyReferenceLinks(html, SiteNav.ImpactMapOutputPath));
     }
 
     /// <summary>Projects the epic-scoped work graph (Story 19.2) from already-parsed models. Reads

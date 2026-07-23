@@ -4273,7 +4273,7 @@ public class ChartsTests
     }
 
     [Fact]
-    public void DeliveryCadenceHeatmap_MultipleSameDayCompletions_RichTooltipListsAll()
+    public void DeliveryCadenceHeatmap_MultipleSameDayCompletions_ListsAllInASingleNativeTitle()
     {
         var day = new DateOnly(2026, 7, 20);
         var stories = new[] { Story("1.1", "Alpha", "done", 1, 1), Story("1.2", "Beta", "done", 1, 1) };
@@ -4283,11 +4283,13 @@ public class ChartsTests
             s => $"epics/story-{s.Id.Replace('.', '-')}.html",
             CadenceToday);
 
-        // The multi-completion cell carries a body-level js-tip rich tooltip listing every story that day.
-        Assert.Contains("js-tip", html);
-        Assert.Contains("data-tip=", html);
-        Assert.Contains("Story 1.1", html);
-        Assert.Contains("Story 1.2", html);
+        // The multi-completion cell lists every story in ONE native <title> — and NOT a second js-tip/data-tip
+        // tooltip, so a cell never shows two overlapping tooltips (Story 21.2 review). The rich linked version
+        // lives in the completion log below.
+        Assert.Contains("Jul 20, 2026: 2 stories completed", html);
+        Assert.Contains("Story 1.1 — Alpha", html);
+        Assert.Contains("Story 1.2 — Beta", html);
+        Assert.DoesNotContain("data-tip=", html);
     }
 
     [Fact]
@@ -4301,10 +4303,13 @@ public class ChartsTests
             s => $"epics/story-{s.Id.Replace('.', '-')}.html",
             CadenceToday);
 
-        // The accessible / no-JS twin below the SVG.
-        Assert.Contains("cadence-log", html);
+        // The accessible / no-JS twin below the SVG — collapsed into a <details> so the tile grid stays primary.
+        Assert.Contains("cadence-log-details", html);
+        Assert.Contains("<summary", html);
         Assert.Contains("cadence-log-date", html);
         Assert.Contains("1 story completed", html);
+        // The legend carries an explicit unit so the shade ramp isn't misread as commits/day.
+        Assert.Contains("Stories completed / day", html);
     }
 
     [Fact]

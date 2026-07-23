@@ -23,6 +23,15 @@ public sealed class SiteNav
     /// Shared between the generator (writes the file) and the templater/nav (link to it) so the two can never
     /// disagree. [Story 21.2]</summary>
     public const string CadenceOutputPath = "cadence.html";
+
+    /// <summary>The dedicated planning ↔ code impact map page (per-epic touched-file lists correlated from commit/
+    /// branch naming). Unlike <see cref="TraceabilityOutputPath"/>/<see cref="CadenceOutputPath"/>, this needs the
+    /// opt-in <c>--deep-git</c> commit/file data to exist at all, so it rides a COMBINED
+    /// <c>hasEpics &amp;&amp; hasDeepAnalytics</c> gate (a deliberate, justified departure from the two prior
+    /// stories' bare <c>hasEpics</c> gate — the correlation genuinely cannot be built without deep-git). Shared
+    /// between the generator (writes the file) and the templater/nav (link to it) so the two can never disagree.
+    /// [Story 21.3]</summary>
+    public const string ImpactMapOutputPath = "impact-map.html";
     public const string SprintOutputPath = "sprint.html";
     public const string RetrosOutputPath = "retros.html";
     public const string ActionItemsOutputPath = "action-items.html";
@@ -239,6 +248,16 @@ public sealed class SiteNav
             quickLinks.Add(("Requirements", RequirementsOutputPath, "Review FR/NFR coverage and status.", "Delivery"));
             quickLinks.Add(("Traceability", TraceabilityOutputPath, "See the full requirement-to-epic coverage matrix.", "Delivery"));
             quickLinks.Add(("Cadence", CadenceOutputPath, "See delivery cadence and story cycle-time.", "Delivery"));
+        }
+
+        // The planning ↔ code impact map (Story 21.3) rides the Delivery group but needs BOTH an epics roster to
+        // correlate against AND the opt-in --deep-git commit/file data to correlate from — a genuine new combined
+        // condition, not the bare hasEpics gate 21.1/21.2 share. Without deep-git there are no commits to mine, so
+        // gating on hasEpics alone would leave a nav entry/page that renders empty for every non-deep-git run.
+        if (hasEpics && hasDeepAnalytics)
+        {
+            delivery.Add(("Impact Map", ImpactMapOutputPath));
+            quickLinks.Add(("Impact Map", ImpactMapOutputPath, "See which code areas each epic's work touched.", "Delivery"));
         }
 
         // The sprint tracking file (sprint-status.yaml) is its own first-class delivery view, gated on the

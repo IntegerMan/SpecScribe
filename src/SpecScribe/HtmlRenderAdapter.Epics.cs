@@ -239,6 +239,13 @@ public sealed partial class HtmlRenderAdapter
             toc.Add(new Toc.Entry(2, "Retired", "sec-retired"));
         }
 
+        // The "Code areas touched" widget (Story 21.3) — a pre-rendered opaque fragment (empty → absent, NFR8).
+        if (view.CodeAreasHtml.Length > 0)
+        {
+            main.Append(view.CodeAreasHtml);
+            toc.Add(new Toc.Entry(2, "Code Areas Touched", "sec-code-areas"));
+        }
+
         var sb = new StringBuilder();
         sb.Append("<main id=\"main-content\">\n");
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
@@ -598,6 +605,13 @@ public sealed partial class HtmlRenderAdapter
             main.Append("<section class=\"chart-panel change-log\" id=\"sec-change-log\">\n<h3>Change Log</h3>\n");
             main.Append($"<div class=\"doc-body\">{view.ChangeLogHtml}</div>\n</section>\n\n");
             toc.Add(new Toc.Entry(2, "Change Log", "sec-change-log"));
+        }
+
+        // The "Code areas touched" widget (Story 21.3) — a pre-rendered opaque fragment (empty → absent, NFR8).
+        if (view.CodeAreasHtml.Length > 0)
+        {
+            main.Append(view.CodeAreasHtml);
+            toc.Add(new Toc.Entry(2, "Code Areas Touched", "sec-code-areas"));
         }
 
         var sb = new StringBuilder();

@@ -1,6 +1,10 @@
+---
+baseline_commit: 7d8882e1b7ac0c24a9fcca3103bbd7db254ffa0a
+---
+
 # Story 21.3: Planning ↔ Code Impact Map
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -57,7 +57,8 @@ public static class EpicsViewBuilder
         CommandCatalog commands,
         string? epicRetroPath,
         FollowUpGeometry? followUps = null,
-        UnplannedWorkGeometry? unplanned = null)
+        UnplannedWorkGeometry? unplanned = null,
+        PlanningCodeImpactData? impact = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var prefix = Prefix(outputPath);
@@ -123,6 +124,9 @@ public static class EpicsViewBuilder
             ProgressBars = bars,
             NextActionsPanelHtml = RenderNextActionsPanel(epic, prefix, commands, openDeferred),
             NextStepsHtml = BmadCommands.RenderEpicNextSteps(epic, commands, openDeferred),
+            CodeAreasHtml = RenderCodeAreas(
+                impact is not null && impact.FilesByEpic.TryGetValue(epic.Number, out var epicImpactFiles) ? epicImpactFiles : null,
+                prefix),
             RetroAffordanceHtml = RenderRetroAffordance(epic, epicClass, prefix, commands, epicRetroPath),
             UndraftedBannerHtml = consolidated ? RenderUndraftedBanner(epic, undrafted, commands) : string.Empty,
             Epic = epic,
@@ -188,7 +192,8 @@ public static class EpicsViewBuilder
         StoryChangeSurface changeSurface,
         CommandCatalog commands,
         string? epicRetroPath,
-        FollowUpGeometry? followUps = null)
+        FollowUpGeometry? followUps = null,
+        PlanningCodeImpactData? impact = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"BuildStory called for story {story.Id} with no resolved artifact.");
@@ -217,9 +222,55 @@ public static class EpicsViewBuilder
             ReviewFindingsHtml = reviewFindingsHtml,
             RemainderHtml = remainderHtml,
             ChangeLogHtml = changeLogHtml,
+            CodeAreasHtml = RenderCodeAreas(
+                impact is not null && impact.FilesByStory.TryGetValue(story.Id, out var storyImpactFiles) ? storyImpactFiles : null,
+                prefix),
             DeferredFromThis = deferred,
             DeferredListHref = deferredListHref,
         };
+    }
+
+    // ----- Code-areas widget (Story 21.3) -------------------------------------------------------------------
+
+    /// <summary>The cap on the epic/story "Code areas touched" widget's linked file list — over it, the honest
+    /// "+N more" chip surfaces the overflow and the "See the full impact map" link carries the visitor to the
+    /// complete per-epic listing. Mirrors <see cref="Charts.RefGraphArtifactNodeCap"/>'s honest-truncation
+    /// precedent (a widget is a teaser, the dedicated page is the whole set). [Story 21.3]</summary>
+    private const int CodeAreasWidgetCap = 8;
+
+    /// <summary>Renders the pre-rendered "Code areas touched" widget for an epic or story page from its slice of
+    /// the impact correlation — a capped, plain semantic list of code-page links (never a dead link: the files
+    /// arrive already link-gated), an honest "+N more" when truncated, and a link to the full impact map. Returns
+    /// "" when there is nothing to show, so the caller's field stays empty and the panel is absent, not empty
+    /// (NFR8). <paramref name="prefix"/> is the consuming epics-family page's relative prefix, applied to both the
+    /// code-page and impact-map hrefs. [Story 21.3]</summary>
+    private static string RenderCodeAreas(IReadOnlyList<ImpactFile>? files, string prefix)
+    {
+        if (files is null || files.Count == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.Append("<section class=\"chart-panel code-areas-panel\" id=\"sec-code-areas\">\n");
+        sb.Append("  <h3>Code Areas Touched</h3>\n");
+        sb.Append("  <p class=\"chart-lead\">Best-effort correlation from commit and branch naming.</p>\n");
+        sb.Append("  <ul class=\"impact-file-list\">\n");
+
+        var shown = Math.Min(files.Count, CodeAreasWidgetCap);
+        for (var i = 0; i < shown; i++)
+        {
+            var file = files[i];
+            var href = prefix + file.CodePageHref;
+            sb.Append($"    <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(file.Path)}</a></li>\n");
+        }
+        sb.Append("  </ul>\n");
+
+        var overflow = files.Count - shown;
+        if (overflow > 0)
+        {
+            sb.Append($"  <p class=\"impact-more\">+{overflow} more {(overflow == 1 ? "file" : "files")}</p>\n");
+        }
+        sb.Append($"  <a class=\"impact-map-link\" href=\"{PathUtil.Html(prefix + SiteNav.ImpactMapOutputPath)}\">See the full impact map &rarr;</a>\n");
+        sb.Append("</section>\n\n");
+        return sb.ToString();
     }
 
     // ----- Story placeholder --------------------------------------------------------------------------------

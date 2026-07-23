@@ -4939,11 +4939,22 @@ a.satisfaction-chip:hover { filter: brightness(0.97); }
 .cadence-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1.4rem; }
 .cadence-strip-link { white-space: nowrap; }
 
-/* The completion heatmap's text-equivalent log — the accessible/no-JS twin of the grid (every active day,
-   newest first, with links to the stories completed that day). */
+/* Page-intro lede under the H1 — what's measured + how to read it + links out to the ideas behind it. */
+.cadence-lede { max-width: 62ch; color: var(--ink-faded); line-height: 1.55; margin: 0 0 1.4rem; }
+
+/* Unit label leading the completion-heatmap legend, so the shade ramp isn't misread as commits/day. */
+.heatmap-legend-caption { font-size: 0.72rem; color: var(--ink-faded); margin-right: 0.15rem; }
+
+/* The completion log is collapsed by default (the tile grid is the primary view) but stays one click away and
+   fully reachable with JS off / by screen readers. */
+.cadence-log-details { margin-top: 0.9rem; }
+.cadence-log-summary { cursor: pointer; font-size: 0.82rem; color: var(--ink-faded); }
+.cadence-log-summary:hover { color: var(--ink); }
+
+/* The completion log itself — every active day, newest first, with links to the stories completed that day. */
 .cadence-log {
   list-style: none;
-  margin: 0.9rem 0 0;
+  margin: 0.6rem 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -4966,6 +4977,9 @@ a.satisfaction-chip:hover { filter: brightness(0.97); }
 /* The cycle-time histogram reuses the Git Pulse proportional bars; its bucket labels are prose, not file
    paths, so drop the monospace/ellipsis treatment so "0-3 days" reads naturally. */
 .cycle-time-histogram .git-pulse-bar-label { font-family: inherit; overflow: visible; text-overflow: clip; }
+/* Recolor the bars away from the rust/red the Git Pulse bars use: a short cycle-time is GOOD, so a red-reading
+   bar mislabels the healthiest bucket. Calm teal reads as a neutral distribution, not an alert. [Story 21.2 review] */
+.cycle-time-histogram .git-pulse-bar-fill { background: var(--teal); }
 
 /* The grid itself always scrolls inside its own container — the page body never scrolls horizontally, even
    with ~22 epic columns. contain: inline-size mirrors the git-insights .table-scroll pattern. Bounded to the
@@ -5031,6 +5045,32 @@ tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pendin
   color: var(--warm-white);
 }
 .trace-cell-link .ss-icon { width: 0.9rem; height: 0.9rem; }
+
+/* ====================== PLANNING <-> CODE IMPACT MAP (Story 21.3) ======================
+   The dedicated impact-map.html page groups touched code files by epic; the epic/story pages carry a compact
+   "Code areas touched" widget of the same links. Plain semantic lists of code-page links (never a chart the data
+   can't support), so styling is deliberately light. Links route through the shared --link tokens like the rest of
+   the portal. */
+.impact-epic { margin-bottom: 1.4rem; }
+.impact-epic:last-child { margin-bottom: 0; }
+.impact-epic-head { margin: 0 0 0.2rem; font-size: 1rem; }
+.impact-epic-head a { color: var(--ink); text-decoration: none; }
+.impact-epic-head a:hover { text-decoration: underline; }
+.impact-file-list {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+  columns: 2 22rem;
+  column-gap: 1.6rem;
+}
+.impact-file-list li {
+  break-inside: avoid;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.code-areas-panel .impact-file-list { columns: 1; }
+.impact-more { margin: 0.3rem 0 0; font-size: 0.8rem; color: var(--ink-light); font-style: italic; }
+.impact-map-link { display: inline-block; margin-top: 0.5rem; font-size: 0.85rem; font-weight: 600; }
 
 /* ====================== STATUS LEGEND (Story 8.2 — on-demand) ======================
    "?" disclosure next to status-bearing headers/badges. Opens a single-column popover.

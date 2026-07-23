@@ -39,6 +39,12 @@ public static class CadenceTemplater
         sb.Append("<h1>Delivery Cadence</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; how story completions have flowed over time</p>\n\n");
 
+        // A short orientation lede (owner feedback): what's measured, how to read it, and links out to the ideas
+        // behind it. Framework-neutral (NFR8) — never names a specific repo. External references open in a new tab.
+        sb.Append("<p class=\"doc-lede cadence-lede\">This page tracks <strong>when stories reach done</strong> — the project&rsquo;s delivery rhythm — and, where git history allows, <strong>how long each story took</strong> from its first commit to done. A regular cadence and short, consistent cycle-times generally point to healthy flow; long quiet gaps, or cycle-times that stretch out and vary widely, can signal work piling up or stories that stall. Read these as directional signals, not targets. More on the ideas behind them: "
+            + "<a href=\"https://en.wikipedia.org/wiki/Lead_time\" target=\"_blank\" rel=\"noopener noreferrer\">lead &amp; cycle time</a> and "
+            + "<a href=\"https://en.wikipedia.org/wiki/Little%27s_law\" target=\"_blank\" rel=\"noopener noreferrer\">Little&rsquo;s Law</a>.</p>\n\n");
+
         // Completion cadence — framed with the metric-generic why sentence; the heatmap builder emits its own
         // window + real-value legend + text-equivalent completion log.
         sb.Append(Charts.Framed(
