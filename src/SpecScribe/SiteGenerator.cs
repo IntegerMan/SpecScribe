@@ -370,6 +370,9 @@ public sealed class SiteGenerator
             // pass) so it isn't buried at the bottom of the (already long) Code Map page. Reuses WriteCodeMap's
             // already-built unfiltered map (Story 7.10 review-fix) instead of re-walking _codeFiles a second time.
             WriteRiskQuadrant(nav, fullCodeMap);
+            // The requirement traceability matrix (Story 21.1) — shares Requirements' hasEpics gate; needs
+            // _counts (built just above) for its ledger-sourced legend/ranking caption.
+            WriteTraceability(nav);
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
             RefreshFollowUpSurfaces(nav, workInventory);
@@ -3123,6 +3126,18 @@ public sealed class SiteGenerator
 
         var html = RiskQuadrantTemplater.RenderPage(fullMap, nav, fileHref: CodeItemHref);
         WriteOutput(SiteNav.RiskQuadrantOutputPath, ApplyReferenceLinks(html, SiteNav.RiskQuadrantOutputPath));
+    }
+
+    /// <summary>Writes <c>traceability.html</c> — the requirement × covering-epic traceability matrix (Story
+    /// 21.1). Shares <see cref="SiteNav.RequirementsOutputPath"/>'s <c>hasEpics</c> availability guard (both are
+    /// parsed out of epics.md), so this omits exactly when Requirements would. Needs <see cref="_counts"/> for
+    /// its ledger-sourced legend/ranking caption — called after <c>_counts</c> is built in <see cref="GenerateAll"/>.</summary>
+    private void WriteTraceability(SiteNav nav)
+    {
+        if (_epicsModel is null || _requirements is null || _counts is null) return;
+
+        var html = TraceabilityTemplater.RenderPage(_requirements, _epicsModel, nav, _counts);
+        WriteOutput(SiteNav.TraceabilityOutputPath, ApplyReferenceLinks(html, SiteNav.TraceabilityOutputPath));
     }
 
     /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the

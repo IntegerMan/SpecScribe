@@ -200,6 +200,7 @@ FR36: Epic 18 - BMad module/expansion coverage exploration and baseline via the 
 FR37: Epic 19 - Directed work graph across epics, stories, quick-dev, deferred work, reviews, and code (queryable provenance).
 FR38: Epic 20 - Interactive project explorer (drill-in zoomable sunburst + related-work side pane) as a progressive enhancement over the static Story 10.7 sunburst.
 FR39: Epic 21 - Value & correlation insights (traceability coverage matrix, delivery cadence / cycle-time, planning↔code impact map) derived at generation time.
+FR40: Epic 24 - File-level change-coupling intelligence (directional confidence/support/lift + cross-boundary emphasis) rendered as an accessible ranked list AND interactive multi-form relationship graphs (force-directed network, chord/arc, adjacency-matrix heatmap) at per-file and whole-repo scopes, derived at generation time from git history.
 NFR10: Epic 17 - Pre-publication code hardening and security/privacy review for public + private codebase readiness.
 
 ## Epic List
@@ -296,6 +297,26 @@ Make the serialized JSON data-layer the **canonical intermediate representation 
 ### Epic 23: Front-End Framework for the Projection Layer — Vue + Nuxt (SSR) over the IR
 Replace the C# presentation/templating layer with a component-oriented **Vue + Nuxt 3 (universal/SSR)** front end that consumes the Epic 22 IR — for CSS modularity (scoped SFC styling), smaller/more-modular files, and a single renderer. NFR6 baseline preserved by Nuxt prerender; analysis stays in C# (ADR 0006 axis C not reopened). Design-locked by [ADR 0009](../../docs/adrs/0009-frontend-framework-for-projection-layer.md); **backlog / unscheduled**, spike-first, sequences **after** Epic 22.
 **Status:** backlog · **NFRs:** NFR6 · **Depends on:** Epic 22 (the IR it consumes)
+
+### Epic 24: File Relationship & Change-Coupling Insights — Directional Metric + Multi-Form Coupling Graphs
+Turn "what changes alongside this file" from a flat co-change list into a rigorous, richly visual relationship surface: upgrade coupling from raw symmetric counts to **directional strength** (confidence / support / lift) with cross-boundary "surprising coupling" emphasis, and render the relationships as **polished, interactive graphs in three complementary forms** — force-directed network, chord/arc diagram, and adjacency-matrix heatmap — at **two scopes**: a per-file ego graph on code pages and a whole-repo coupling explorer. The upgraded ranked list is retained as the accessible text-twin. All metrics derive at generation time from the existing `--deep-git` numstat parse (no new git calls); every interactive graph degrades to static SVG + text when JavaScript is off (NFR8).
+**FRs covered:** FR40 (sync into PRD when convenient) · **UX-DRs:** UX-DR19, UX-DR20, UX-DR21 · **NFRs:** NFR8 · **Status:** backlog · unscheduled · **Source:** market research 2026-07-22 (git-activity file-level insights).
+
+<!-- Epic 24 added 2026-07-22 (owner-directed, from the git-activity file-level-insights market research —
+     _bmad-output/planning-artifacts/research/market-git-activity-analysis-tools-file-level-insights-research-2026-07-22.md).
+     The research found SpecScribe's file-level surfaces are already the right SHAPE (per-file contributors +
+     coupled-files exist; ownership/bus-factor already shipped in Story 7.11) but the COUPLING metric is naive:
+     raw symmetric co-change counts. Field standard (code-maat / CodeScene / association-rule research) is
+     DIRECTIONAL coupling strength — confidence(A→B)=shared/ChangeCount[A], plus support floor and lift — which
+     SpecScribe can compute from the CoChangePairs map it already builds (no new git call). Owner explicitly
+     overruled the research's "keep it a list, skip the global graph" recommendation: wants it "as graphical and
+     visual and polished as possible" — ALL THREE visual forms (force-directed network, chord/arc, adjacency
+     matrix) at BOTH scopes (per-file ego + whole-repo), with the list kept as the accessible twin. Seated as a
+     NEW epic (mirroring how Epics 19/20/21 were seated) because it's a coherent visual capability spanning
+     several stories. Distinct from Epic 20 (interactive remaining-work sunburst explorer) and Epic 19 (work-item
+     provenance graph): this is the CODE co-change relationship graph. Its interactive graphs build on Epic 20's
+     client-JS interactivity boundary (Story 20.1 spike) and ADR 0010's zero-dependency JS posture. Story 24.2/24.3
+     supersede/evolve the static Charts.ReferenceGraph seeded in Story 7.8. -->
 
 <!-- Epics 17–18 added 2026-07-11 (SCP 2026-07-11, correct-course): Epic 17 = pre-publication hardening (NFR10), gates Epic 16's cut; Epic 18 = BMad-native module exploration (FR36), distinct from framework Epics 11–15. Append-only, no renumber. Run create-story per story when scheduled (17.1 / 18.1 spike first). -->
 <!-- Epic 19 added 2026-07-17: directed work-graph visualization + query across reviews/stories/epics/deferred/code. Exploratory insight surface; spike-led. -->
@@ -3461,3 +3482,115 @@ So that Epic 16's packaging/release story isn't broken by the presentation-layer
 **Given** the npx channel (Story 16.8) and VS Code Marketplace packaging (Story 16.5/FR33)
 **When** packaging is reconciled
 **Then** both existing distribution channels continue to function without new runtime dependencies for end users.
+
+## Epic 24: File Relationship & Change-Coupling Insights — Directional Metric + Multi-Form Coupling Graphs
+
+Turn "what changes alongside this file" from a flat co-change list into a rigorous, richly visual relationship surface. Two threads: (1) upgrade the coupling **metric** from raw symmetric co-change counts to **directional coupling strength** — confidence(A→B) = shared-changes / A's-changes, plus a minimum-support floor and lift — with **cross-boundary "surprising coupling"** emphasis (a file coupled to one in a distant directory is an architectural smell) layered on the existing Code-vs-Process classifier; and (2) render those relationships as **polished, interactive graphs in three complementary forms** (force-directed network, chord/arc diagram, adjacency-matrix heatmap) at **two scopes** — a per-file **ego graph** on code pages and a **whole-repo coupling explorer** page. The upgraded ranked list survives as the accessible text-twin every graph shares. All metrics are computed at generation time from the single `--deep-git` numstat parse SpecScribe already runs (`GitMetrics` / `DeepGitPulse.CoChangePairs` + `FileInsight.ChangeCount`) — **no new git calls**. Every interactive graph is a progressive enhancement that degrades to static SVG + a readable table when JavaScript is unavailable (NFR8), and every chart carries a Story 10.2-compliant legend, analysis window, and framing sentence.
+
+**FRs covered:** FR40 (sync into PRD when convenient) · **UX-DRs:** UX-DR19 (rich hover/focus + non-color text equivalent of every metric), UX-DR20 (purposeful visual polish within perf/a11y limits), UX-DR21 (one primary representation per dataset, alternates behind a toggle; chart text-twins are contract) · **NFRs:** NFR8 · **Status:** backlog · unscheduled · **Source:** market research 2026-07-22 (git-activity file-level insights). · **Depends on:** the `--deep-git` numstat parse + `CoChangePairs` (Stories 3.2/3.8 — already built) as the data source; Stories 7.4/7.8 (per-file coupled-files list + static `Charts.ReferenceGraph`) as the surfaces it upgrades and evolves; **Epic 20's client-JS interactivity boundary (Story 20.1 spike)** and **ADR 0010's zero-dependency JS posture** as the foundation the interactive graphs (24.2–24.5) build on. Does not block Epic 20. Story 7.11 (Code Ownership & Bus-Factor) already shipped the "who changes this file" half — this epic is the "what changes alongside it" half, deliberately not re-doing ownership.
+
+### Story 24.1: Directional Coupling Metric Foundation (Confidence, Support, Lift, Cross-Boundary) + Upgraded List
+
+As a maintainer inspecting a file's relationships,
+I want the "changes with" data expressed as directional coupling strength rather than a raw shared-commit count,
+So that I can read "when I touch this file, I usually touch X" instead of an unnormalized, symmetric tally that makes always-churning files look coupled to everything.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the existing deep-git parse (`DeepGitPulse.CoChangePairs` + per-file `ChangeCount`)
+**When** coupling is computed
+**Then** each directed pair carries **confidence(A→B) = coChange(A,B) / ChangeCount[A]** (asymmetric — A→B and B→A may differ), **support** = shared-commit count with a configurable minimum-support floor that filters coincidental couples, and **lift** = confidence(A→B) ÷ (ChangeCount[B] ÷ analyzed-commits) so a file that changes every commit self-demotes
+**And** all three are derived from the SAME single `--deep-git` numstat parse with no additional git invocation, and the existing Code-vs-Process (`ClassifyCoupling`) noise classification is preserved.
+
+2.
+**Given** a coupled pair whose two files live in different top-level directories/modules
+**When** coupling is surfaced
+**Then** the pair is flagged as **cross-boundary ("surprising") coupling** (higher architectural signal), distinct from same-directory coupling, using only the file paths already in hand
+**And** this classification is available to every downstream surface (list and graphs) as a shared property, not recomputed per view.
+
+3.
+**Given** the per-file "Coupled files" list (Story 7.4 `FileInsight.CoupledFiles`) and the Git Insights hub coupling view (Story 3.8)
+**When** they render with the new metric
+**Then** each entry shows the directional confidence (e.g. "changes with **X** — 80%") and a one-sentence framing per Story 10.2, sorted by confidence (or lift) with the support floor applied, and cross-boundary couples visibly marked
+**And** the list remains fully readable and navigable without JavaScript — it is the canonical accessible text-twin the graph stories (24.2–24.5) reuse rather than replace.
+
+### Story 24.2: Per-File Ego Coupling Graph (Force-Directed) on Code Pages
+
+As a developer opening one file's page,
+I want an interactive node-link graph of that file and the files it changes with,
+So that the relationship reads as a picture I can explore — not a flat list — answering "what changes alongside THIS file" at a glance.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a code page for a file with coupling data and JavaScript available
+**When** the ego graph renders
+**Then** the focal file sits at the center with its coupled neighbors (bounded to a sensible degree, 1–2 hops) as a force-directed node-link graph, nodes sized by change frequency and edges weighted/colored by the Story 24.1 confidence (cross-boundary edges emphasized), with rich hover/focus tooltips (UX-DR19) and nodes linking to their own code pages
+**And** the graph reuses the Story 24.1 metric and the Epic 20 client-JS interactivity boundary rather than introducing a new engine or dependency (ADR 0010).
+
+2.
+**Given** a JavaScript-off, reduced-motion, or assistive-technology visitor (NFR8)
+**When** the ego graph cannot hydrate
+**Then** it degrades to a static SVG rendering (evolving the Story 7.8 `Charts.ReferenceGraph`) plus the Story 24.1 ranked list as the text equivalent, with every node/edge metric available as non-color text
+**And** a file with no qualifying couples shows a designed empty state, never a broken or misleading empty graph.
+
+### Story 24.3: Whole-Repo Coupling Explorer (Force-Directed Galaxy) — Dedicated Page
+
+As a tech lead assessing architectural entanglement,
+I want a dedicated page showing the whole repository's co-change network,
+So that I can see the project's hidden coupling structure and its worst cross-boundary offenders in one explorable map.
+
+**Acceptance Criteria:**
+
+1.
+**Given** deep-git coupling data and JavaScript available
+**When** the whole-repo explorer renders
+**Then** it draws the repo's file co-change network (node = file sized by change frequency, edge = coupling weighted/colored by confidence, cross-boundary couples emphasized), with interactive pan/zoom, hover/focus detail, node → code-page navigation, and clutter controls (minimum support/confidence threshold and directory grouping/collapse) informed by the code-map at-scale lessons
+**And** it carries a Story 10.2 legend + analysis window + framing sentence, and is reachable from the insight-pages nav (FR27) on the shared deep-git gate.
+
+2.
+**Given** a large repository or a JavaScript-off visitor (NFR8, performance)
+**When** the full network would be too dense or cannot hydrate
+**Then** the view stays legible via the threshold/grouping controls and degrades to a static, bounded SVG summary plus a readable coupled-pairs table (the Story 24.1 data) as the text equivalent
+**And** generation stays within the deep-git performance envelope and remains generation-time deterministic (FR31) — identical output on a from-scratch CI regen.
+
+### Story 24.4: Chord / Arc Diagram View of Coupling
+
+As a stakeholder who wants an elegant overview,
+I want the coupling relationships also presentable as a chord/arc diagram,
+So that a bounded set of files and their couplings reads as a single beautiful, symmetric figure.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the whole-repo explorer (and, where it fits, the per-file ego view)
+**When** I switch to the chord/arc representation
+**Then** files are arranged around a ring (or along an axis) with ribbons connecting coupled files, ribbon weight/color driven by the Story 24.1 confidence and cross-boundary couples emphasized, offered as a demoted **alternate view behind a toggle** beside the force-directed network per UX-DR21 (one primary representation per dataset)
+**And** the diagram uses a bounded, ranked subset (top couples by confidence/support) so the ring stays readable rather than a hairball.
+
+2.
+**Given** the accessibility contract (UX-DR21, NFR8)
+**When** the chord/arc view renders
+**Then** the shared coupled-pairs table (Story 24.1) remains present as its non-color text-twin and is never removed
+**And** with JavaScript off the surface falls back to that table plus, where feasible, a static SVG of the diagram.
+
+### Story 24.5: Adjacency-Matrix Heatmap View of Coupling
+
+As an analyst facing a densely-coupled area,
+I want an adjacency-matrix heatmap of coupling strength,
+So that dense relationships that overwhelm a node-link graph read unambiguously as a grid.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the whole-repo explorer's coupling data
+**When** I switch to the matrix representation
+**Then** files label both axes and each cell is shaded by the coupling strength (Story 24.1 confidence) between its row/column files, with cross-boundary cells emphasized and a row/column ordering that clusters coupled files together, offered as a demoted **alternate view behind a toggle** per UX-DR21
+**And** it carries a real-value legend and framing sentence per Story 10.2 (never a bare "low…high" gradient).
+
+2.
+**Given** the accessibility and scale constraints (UX-DR19, NFR8)
+**When** the matrix renders
+**Then** every cell's strength is available as non-color text (title/tooltip and the shared coupled-pairs table), the matrix is bounded to a readable set of the most-coupled files with an honest "+N more" disclosure, and it degrades to the readable table with JavaScript off
+**And** the surface stays within the deep-git performance envelope and is generation-time deterministic (FR31).

@@ -520,6 +520,21 @@ public class SiteGeneratorWebviewTests : IDisposable
     }
 
     [Fact]
+    public void CapturePages_IncludesTraceabilityAsACapturedSurface()
+    {
+        // Story 21.1, AC #1 "SPA/webview coherence": traceability.html is a WriteOutput-synthesized page like
+        // every other long-tail insight page, so it IS captured for the webview/SPA surface set. Mirrors Story
+        // 7.9's code-map.html coherence assertion.
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+        var traceability = bundle.Surfaces.SingleOrDefault(s => s.OutputRelativePath == "traceability.html");
+
+        Assert.NotNull(traceability);
+        Assert.Contains("class=\"trace-matrix\"", traceability!.ContentHtml);
+        Assert.Contains("<nav class=\"site-nav\"", traceability.ContentHtml); // carries the shared chrome like every surface
+        Assert.DoesNotContain("<script", traceability.ContentHtml);          // captured regions never carry the scoped enhancement
+    }
+
+    [Fact]
     public void CapturePages_EveryEntryNavLink_ResolvesToABundledSurface()
     {
         // The user-facing acceptance: no header nav link may dead-end. Every .html href in the ENTRY surface's

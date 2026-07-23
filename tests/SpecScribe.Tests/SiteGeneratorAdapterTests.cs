@@ -219,6 +219,7 @@ public class SiteGeneratorAdapterTests : IDisposable
             "specscribe.css",
             "specscribe.js",
             "sprint.html",
+            "traceability.html",
         }.OrderBy(p => p, StringComparer.Ordinal).ToList();
 
         Assert.Equal(expected, actual);
@@ -835,7 +836,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // specscribe.css/specscribe.js/Charts.cs asset and markup changes reflected on the pages it DOES render
         // (code-map.html included, via the legend change). Verified stable across 2 repeated runs before locking
         // in. [golden-diff-normalization-gotchas]
-        const string expected = "5768f66f2ec511dfdce076f2d1886851296f90c0bdd789e05023f3ed33dec759";
+        // Regenerated for Story 21.1: new traceability.html page (requirement x covering-epic matrix) + its
+        // Delivery nav entry (shifts every rendered page's nav markup) + new compact coverage-strip teasers on
+        // index.html and requirements.html + the new Icons.ForConcept("Traceability") glyph + new specscribe.css
+        // rules for the matrix/strip. Verified stable across 2 repeated runs before locking in.
+        // [golden-diff-normalization-gotchas]
+        const string expected = "6346a9918c04fa1834566e4415134896d0dd557eec579905ea3dd21c8323f3f2";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

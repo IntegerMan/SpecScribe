@@ -1,6 +1,10 @@
+---
+baseline_commit: c5b93734d56d618a7a117060a1f4a3917d2745aa
+---
+
 # Story 19.1: Work-Graph Model and Coverage Spike
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -110,39 +114,39 @@ If the recommendation needs a true surface-coverage gate before 19.2, say so exp
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Inventory node types against live code (AC: #1)**
-  - [ ] Trace each minimum node type to its identity + detail href builder (table above). Note null/absent cases (no deferred note, no action_items, external code mode, missing retro).
-  - [ ] Confirm requirement nodes: in or out of MVP vocabulary with rationale (covers edges are epic-granular per Story 9.1 honesty caveat).
-  - [ ] Record any extra node types discovered (ADR, commit, date page, follow-up *group* page) as in-scope, deferred, or out-of-scope.
+- [x] **Task 1 — Inventory node types against live code (AC: #1)**
+  - [x] Trace each minimum node type to its identity + detail href builder (table above). Note null/absent cases (no deferred note, no action_items, external code mode, missing retro).
+  - [x] Confirm requirement nodes: in or out of MVP vocabulary with rationale (covers edges are epic-granular per Story 9.1 honesty caveat).
+  - [x] Record any extra node types discovered (ADR, commit, date page, follow-up *group* page) as in-scope, deferred, or out-of-scope.
 
-- [ ] **Task 2 — Inventory directed edges: derivable vs new heuristic (AC: #1)**
-  - [ ] For each edge kind (`stemmed-from`, `resolves`, `covers`, `cites`, `raised-in` + structural containment), cite the concrete API (file + type/method) that already emits the relationship **or** mark "needs new heuristic" with what input would be required.
-  - [ ] Call out **direction convention** once (recommend: edge points from dependent → origin for `stemmed-from`, or document the opposite — pick one and stick to it for 19.2).
-  - [ ] Flag edges that today are **UI-only reverse panels** (e.g. code "Referenced by") vs **forward-authored** (Deferred-from) — both are graph edges; the spike names the asymmetry.
+- [x] **Task 2 — Inventory directed edges: derivable vs new heuristic (AC: #1)**
+  - [x] For each edge kind (`stemmed-from`, `resolves`, `covers`, `cites`, `raised-in` + structural containment), cite the concrete API (file + type/method) that already emits the relationship **or** mark "needs new heuristic" with what input would be required.
+  - [x] Call out **direction convention** once (recommend: edge points from dependent → origin for `stemmed-from`, or document the opposite — pick one and stick to it for 19.2).
+  - [x] Flag edges that today are **UI-only reverse panels** (e.g. code "Referenced by") vs **forward-authored** (Deferred-from) — both are graph edges; the spike names the asymmetry.
 
-- [ ] **Task 3 — Cycle & ambiguity queries (AC: #1)**
-  - [ ] From this repo's live `deferred-work.md` + `sprint-status.yaml` action_items, list 2–3 concrete ambiguous or cyclic-looking examples (or explicitly state "none found; synthesize fixture cases for 19.2 tests").
-  - [ ] Define what "cycle" means for MVP (simple directed cycle among named node types) and what is *not* a cycle (breadcrumb up-link ≠ graph edge).
+- [x] **Task 3 — Cycle & ambiguity queries (AC: #1)**
+  - [x] From this repo's live `deferred-work.md` + `sprint-status.yaml` action_items, list 2–3 concrete ambiguous or cyclic-looking examples (or explicitly state "none found; synthesize fixture cases for 19.2 tests").
+  - [x] Define what "cycle" means for MVP (simple directed cycle among named node types) and what is *not* a cycle (breadcrumb up-link ≠ graph edge).
 
-- [ ] **Task 4 — Out-of-scope edge list with rationale (AC: #1)**
-  - [ ] Start from the seed non-goals above; add any edges the inventory tempted you to invent (e.g. story→action-item parent, FR→individual story without epic grain).
-  - [ ] Each out-of-scope row needs one-sentence rationale tied to no-new-schema / honesty / NFR8.
+- [x] **Task 4 — Out-of-scope edge list with rationale (AC: #1)**
+  - [x] Start from the seed non-goals above; add any edges the inventory tempted you to invent (e.g. story→action-item parent, FR→individual story without epic grain).
+  - [x] Each out-of-scope row needs one-sentence rationale tied to no-new-schema / honesty / NFR8.
 
-- [ ] **Task 5 — Recommend one primary 19.2 surface + query path (AC: #2)**
-  - [ ] Choose **exactly one** primary visualization + query path among (or justify an equal alternative):
+- [x] **Task 5 — Recommend one primary 19.2 surface + query path (AC: #2)**
+  - [x] Choose **exactly one** primary visualization + query path among (or justify an equal alternative):
     1. Epic-scoped subgraph (nodes/edges for one epic + attributed follow-ups/code cites from its stories)
     2. Cycle finder (site-wide or epic-scoped)
     3. Path query "deferred → … → epic" (multi-hop from a follow-up detail)
-  - [ ] Write success criteria for that choice (what a Driver can answer in one visit).
-  - [ ] Write NFR8 absence rules: zero follow-up/code graph → omit surface cleanly (no empty chrome, no dead nav link). Mirror existing `WorkInventory.IsEmpty` / WriteActionItems early-return patterns.
-  - [ ] Affirm **no new authoring schema** for the MVP path; list which existing parsers 19.2 must call (not fork).
-  - [ ] Note HTML/SPA parity expectation and webview/CLI non-goals for the chosen surface.
-  - [ ] Optional: 2–3 sentence feed-forward into `19-2-*.md` Dev Notes once that story file exists (or leave a stub section here for create-story 19.2).
+  - [x] Write success criteria for that choice (what a Driver can answer in one visit).
+  - [x] Write NFR8 absence rules: zero follow-up/code graph → omit surface cleanly (no empty chrome, no dead nav link). Mirror existing `WorkInventory.IsEmpty` / WriteActionItems early-return patterns.
+  - [x] Affirm **no new authoring schema** for the MVP path; list which existing parsers 19.2 must call (not fork).
+  - [x] Note HTML/SPA parity expectation and webview/CLI non-goals for the chosen surface.
+  - [x] Optional: 2–3 sentence feed-forward into `19-2-*.md` Dev Notes once that story file exists (or leave a stub section here for create-story 19.2).
 
-- [ ] **Task 6 — Record findings; no production code (AC: #1, #2)**
-  - [ ] Write the coverage map + recommendation into this story's **Completion Notes** (same convention as Story 8.1).
-  - [ ] Do **not** land production `src/**` / `tests/**` changes from this story. Throwaway notes under `_bmad-output/` are OK if useful; prefer Completion Notes as the canonical deliverable.
-  - [ ] No new ADR unless a genuine architectural fork appears (escalate via `correct-course` rather than deciding silently). FR37 PRD sync remains "when convenient" — not a blocker for this spike.
+- [x] **Task 6 — Record findings; no production code (AC: #1, #2)**
+  - [x] Write the coverage map + recommendation into this story's **Completion Notes** (same convention as Story 8.1).
+  - [x] Do **not** land production `src/**` / `tests/**` changes from this story. Throwaway notes under `_bmad-output/` are OK if useful; prefer Completion Notes as the canonical deliverable.
+  - [x] No new ADR unless a genuine architectural fork appears (escalate via `correct-course` rather than deciding silently). FR37 PRD sync remains "when convenient" — not a blocker for this spike.
 
 ### Review Findings
 
@@ -224,14 +228,132 @@ Recent commits (as of create-story) closed Epic 2/3 deferred debt and follow-up 
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Amelia / dev-story workflow)
 
 ### Debug Log References
 
+Spike — tracing only, no build/test run required (Task 6 forbids `src/**` / `tests/**` changes). Seams confirmed by reading live code at baseline `c5b9373`:
+`DeferredWorkParser.cs`, `FollowUpRefs.cs`, `FollowUpGeometry.cs`, `UnplannedWorkGeometry.cs`, `ActionItemsTemplater.cs`, `SprintStatus.cs`, `RequirementsParser.cs` / `RequirementsModel.cs`, `SiteGenerator.cs` (`DiscoverCodeReferences` / `BuildReferencedBy` / `_codeReverseMap` / `_citerToFiles` / `EpicRetroMap`).
+Live examples pulled from this repo's own `_bmad-output/implementation-artifacts/deferred-work.md` and `sprint-status.yaml` `action_items`.
+
 ### Completion Notes List
 
+**SPIKE OUTCOME: coverage map complete, no production code landed.** The work graph is fully derivable from shipping parsers/geometry — **no new authoring schema is required for a first visualization (AC #2 satisfied).** The one proto-edge record that already exists (`FollowUpDeferredSlot`) is the recommended projection seed; do not invent a parallel graph type in 19.2.
+
+#### 1. Nodes — type | identity key | href builder | absent → omit?
+
+| Node type | Canonical identity (confirmed) | Href builder | Absent → omit? |
+|-----------|--------------------------------|--------------|----------------|
+| epic | `EpicInfo.Number` | `epics/epic-N.html` | no epics → no graph (whole surface omits) |
+| story | `StoryInfo.Id` (`N.M`) | `story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(id)` (`FollowUpRefs.BuildHrefMap`) | per-epic; empty epic still valid |
+| quick-dev / one-shot | `spec-*` stem of `QuickDevEntry.OutputPath` | `QuickDevEntry.OutputPath` (via `FollowUpGeometry.FindQuickDev` / `ResolveSourceHref`) | none present → node class empty, no Unplanned root (`UnplannedWorkGeometry.HasUnplanned == false`) |
+| deferred item | `FollowUpSlug` slug / `FollowUpDeferredSlot` | `FollowUpDeferredSlot.DetailHref` (9.11 detail or list fallback) | no `deferred-work.md` → `work.Deferred is null` → zero slots |
+| action item | `SprintActionItem` (Action+Epic; ref-equality keyed) | `FollowUpGeometry.HrefFor` / `FollowUpSlug.OutputPath` | no `action_items:` → `WriteActionItems` early-returns |
+| retro | epic number → retro page | `EpicRetroMap[epic]` (soft: keyed by epic, **not** a per-item retro id) | no retros → `EpicRetroMap` empty; action→retro edges downgrade to plain `<span>` (see `AppendCrossLinks`) |
+| code file | repo-relative path (Ordinal-cased) | `code/<path>.html` (`_codePages`) or external `#L{n}` (`--code-url`) | external-only or no citations → in-portal node absent; edge still resolvable to external URL |
+| requirement (FR/NFR/UX-DR) | `RequirementInfo.Id` | requirements detail page | **IN MVP as node, but only for epic-grain `covers` edges** — see Task 1 decision below |
+
+**Extra node types discovered (Task 1.3 classification):**
+- **ADR** — cites code the same as stories (`DiscoverCodeReferences` scans the ADR tree via `EnumerateAdrFiles`; ADR-only citations resolve through `_codeReverseMap`). **In-scope as a `cites` source node** for 19.2 (it already participates in the citation graph); not a distinct provenance origin beyond that.
+- **commit / date page** (Story 7.3/7.5) — **out of scope.** These scale with the *target* repo, not planning artifacts, and are already deliberately excluded from the SPA parity set (`SiteGenerator` owner-decision exclusion of `_codePages` ∪ `_commitDays` ∪ `commit/`). Treating them as graph nodes would explode node count unboundedly.
+- **follow-up *group* page** (`follow-ups/group-*.html`, Story 9.13) — **out of scope as a node**; it is a filtered *view* of deferred/unplanned members, not an identity. Its members are already nodes.
+
+**Task 1 requirement-node decision:** requirement nodes are **IN** the MVP vocabulary but carry **only epic-granular `covers` edges** (`RequirementInfo.CoverageEpicNumbers` → epic; `RequirementsParser.StoriesFor` expands to *every* story in the covering epic, not the specific stories for that FR — the Story 9.1/3.7 honesty caveat, documented verbatim on `RequirementInfo` and `StoriesFor`). 19.2 **must not** draw requirement→individual-story edges; that would fabricate per-FR precision the data does not have. Rationale: honesty over precision (Dev Notes constraint).
+
+#### 2. Edges — kind | from → to | derivable? (API) | new heuristic? | notes
+
+**Direction convention (Task 2, picked once, load-bearing for 19.2):**
+> **`From` = the node that physically carries the reference; `To` = the node referenced.** (carrier → target)
+
+This is the *honest, implementation-aligned* rule — it matches which side actually holds the pointer in the authored source, so no direction is inferred. Provenance ("where did this come from?") is answered by walking **out-edges** from a deferred/action node. It reads naturally for 4 of 5 kinds; `covers` is the one inversion (stored requirement→epic, labelled "covered-by") because the coverage line lives on the requirement.
+
+| Edge kind | From → To (carrier → target) | Derivable today? | Concrete API |
+|-----------|------------------------------|------------------|--------------|
+| `stemmed-from` | deferred item → source story/spec/quick-dev | ✅ derivable | `DeferredWorkGroup.SourceKey` / `SourceStoryId` / `SourceStoryHref`; `FollowUpRefs.SourceSpecFileFromText` + `StoryIdFromKey`; projected on `FollowUpDeferredSlot.SourceKey/SourceStoryId/SourceHref` |
+| `stemmed-from` (residual quick-dev parent) | deferred item → parent quick-dev | ✅ derivable | `FollowUpGeometry.FindQuickDev` + `EnrichQuickDevDeferredEpics`; `UnplannedWorkGeometry` resurfaced done parents |
+| `resolves` (is-resolved-by) | deferred item → resolving story/spec | ✅ derivable | `DeferredWorkItem.Resolved` + `ResolvingRef`/`ResolvingHref`; `FollowUpRefs.ResolvingStoryIdFromText` (`RESOLVED in N.M` / backtick token) |
+| `covers` (covered-by) | requirement → covering epic | ✅ derivable (**epic-grain only**) | `RequirementInfo.CoverageEpicNumbers`; `RequirementsParser.StoriesFor` (epic→its stories, honesty caveat) |
+| `cites` | citing artifact (story/doc/ADR) → code file | ✅ derivable (forward-authored) | `_citerToFiles` (forward), `CodeReferenceScanner` / `CodeReferenceLinkifier` |
+| `cites` (referenced-by) | code file ← citing artifact | ✅ derivable (**UI-only reverse panel today**) | `_codeReverseMap` + `SiteGenerator.BuildReferencedBy` — same data, reverse index; **asymmetry flagged below** |
+| `raised-in` | action item → other epic's retro | ⚠️ heuristic (already shipping) | `ActionItemsTemplater.FindNearDuplicates` (Jaccard ≥ 0.45 AND ≥ 6 shared tokens) + `EpicRetroMap`; conservative, false-negative-biased |
+| **structural**: story ∈ epic | story → epic | ✅ derivable (containment) | `EpicInfo.Stories` / `EpicFromStoryId` |
+| **structural**: action/deferred ∈ epic | item → epic | ✅ derivable (attribution) | `SprintActionItem.EpicNumber`; `FollowUpDeferredSlot.EpicNumber` (+ `ResolveQuickDevEpic` heuristic tiers) |
+| **structural**: item ∈ retro group | action item → epic-retro | ⚠️ soft | `EpicRetroMap[epic]` — epic-keyed, **not** a per-item retro id (see caveat) |
+
+**Task 2 asymmetry call-out (required):** graph edges come in two authorship shapes and 19.2 must treat both as first-class:
+- **Forward-authored** — the source data physically names the target: Deferred-from `source_spec:`, `RESOLVED in`, coverage map lines, in-body code citations. These are unambiguous.
+- **UI-only reverse panels** — the target aggregates its inbound edges at render time with **no authored back-pointer**: code "Referenced by" (`BuildReferencedBy` over `_codeReverseMap`), story/quick-dev "Deferred from this" (`FollowUpGeometry.DeferredForSource`). These are *inversions of forward edges*, not new edges — 19.2 should build them by reversing the forward index, not by a second parse.
+
+**`covers` structural note:** story↔epic containment and item↔epic attribution are **first-class graph edges** (they carry real identity joins), but retro membership is **implied containment via `EpicRetroMap`, not an authored per-item edge** — mark it soft; a retro node is epic-granular.
+
+#### 3. Queries — name | inputs | success signal | fixture idea
+
+| Query | Inputs | Success signal | Fixture idea |
+|-------|--------|----------------|--------------|
+| **Cycle finder** | node set + carrier→target out-edges | reports a directed cycle among named node types | see live self-loop below |
+| **Ambiguous reverse-link** | a target node | lists >1 plausible origin | Epic 1 heatmap-debt (below) |
+| **Multi-hop path** | a deferred/action node | walks deferred → source story → covering epic → FR | 7.11 chain (below) |
+
+**Task 3 — live examples from this repo (not synthesized):**
+
+1. **Cyclic-looking (self-loop when items collapse to source node):** In `deferred-work.md`, the `spec-6-9-deferred-debt-cleanup` items are **`RESOLVED … (spec-epic6-deferred-debt-cleanup)`** → a `resolves` edge to node `spec-epic6-deferred-debt-cleanup`. That very spec *also* appears as a Deferred-from heading (`## Deferred from: code review of spec-epic6-deferred-debt-cleanup`) whose items carry `source_spec: spec-epic6-deferred-debt-cleanup` → a `stemmed-from` edge **to the same node**. When deferred items are collapsed onto their source/resolver node, `spec-epic6-deferred-debt-cleanup` has both an inbound `resolves` and outbound `stemmed-from` touching itself — a **resolver-that-also-spawns** self-loop. MVP "cycle" = a simple directed cycle over collapsed node identities; this is the canonical first fixture.
+2. **Ambiguous reverse-link (multi-epic obligation):** the Epic 1 heatmap-debt action recurs at `epic: 1` (line 330), `epic: 2` (line 338, *"carried unaddressed across two retrospectives"*), and `epic: 3` (line 358, *"resolved via spec-epic1-heatmap-debt-triage but left open"*). `FindNearDuplicates` already emits `also raised in Epic N retrospective` cross-links between these. "Which retro owns this obligation?" has **no unique answer** — that is the ambiguity, not a bug.
+3. **Multi-hop path:** deferred item `source_spec: 7-11-code-ownership-and-bus-factor-insights.md` → (`stemmed-from`) story **7.11** → (structural) **Epic 7** → (`covers`⁻¹) the FR(s) whose `CoverageEpicNumbers` include 7. One visit answers "what requirement is ultimately behind this open debt item?"
+
+**MVP cycle definition:** a simple directed cycle among the named node types over the carrier→target edge set (deferred/action/quick-dev/story/epic/spec/code). **NOT a cycle:** a `BreadcrumbTrail` up-link or SPA `Manifest.Parent/Children` (page hierarchy, not provenance); a reverse panel viewed alongside its own forward edge (same edge, two renderings).
+
+#### 4. Out of scope — edge/node | rationale
+
+| Out-of-scope edge/node | One-sentence rationale |
+|------------------------|------------------------|
+| Story-parent for a retro action item (`epic:`-only) | Action items are epic/retro-scoped; fabricating a story node invents authored data that doesn't exist (no-new-schema / honesty). |
+| Requirement → individual story `covers` | `StoriesFor` is epic-grain (9.1 caveat); per-FR story edges would over-claim precision (honesty). |
+| Code co-change (`FileInsight.CoupledFiles` / `Charts.ReferenceGraph`) as `stemmed-from` | Evolutionary neighbourhood ≠ work provenance; conflating them mislabels correlation as causation (explicit vocabulary decision — **out for MVP**). |
+| commit / date / follow-up-group pages as nodes | Scale with the target repo, not planning artifacts; already excluded from SPA parity — unbounded node growth (NFR8 / perf). |
+| Second count ledger | `ProjectCounts` (`OpenActionItems` / `DeferredOpenItems` / `DirectChanges` / `RequirementsOverall`) is the single tally; a graph recount would drift (single-ledger invariant — `FollowUpGeometry` even `Debug.Assert`s this). |
+| New authoring schema (graph YAML / frontmatter / DSL) | Forbidden for MVP; every edge above already derives from shipping prose/parsers (Epic 9 principle, AC #2). |
+| Breadcrumb / SPA Parent-Children as provenance edges | Page-nav hierarchy, not work provenance (would pollute cycle detection). |
+| Promoting graph page to webview | Webview is dashboard/epics-only today; net-new surface reach needs its own decision, not silent expansion of this spike (Epic 6 Action #3). |
+
+#### 5. 19.2 recommendation — chosen surface | success criteria | NFR8 rules | parsers to reuse | surface reach
+
+**Chosen primary surface (exactly one): Epic-scoped provenance subgraph** — for a single epic, render its stories + attributed deferred/action items + their `stemmed-from` / `resolves` / `cites` edges out to source stories/specs/code, with the epic-scoped `raised-in` cross-links. Ships as a dedicated **HTML page** (one per epic, or one page filtered by epic) reusing the exact `FollowUpGeometry.ForEpic(n)` / `DeferredForEpicNumber` / `StoryChildDeferred` scoping that already exists.
+
+*Why this over the alternatives:* the **cycle finder** (alt 2) is a compelling *query* but a weak *first surface* — on a healthy repo it renders nearly empty (NFR8 risk), so it belongs as a secondary toggle/annotation on the subgraph, not the MVP page. The **path query** (alt 3) needs an interaction model (pick-a-node → trace) that pushes toward client JS — deliberately deferred to the Epic 20 interactive-explorer budget, not baked into 19.2. Epic-scoped subgraph is bounded (one epic's fan-out), reuses `ForEpic` scoping verbatim, degrades cleanly (an epic with no follow-ups/citations → no graph section), and answers real Driver questions statically. It also mirrors the placement pattern of every other standalone insight page (Traceability 21.1, Risk Quadrant, Code Map).
+
+**Success criteria (what a Driver answers in one visit to an epic's graph):**
+- "What open debt stemmed from this epic's stories, and did any of it get resolved (and by what)?"
+- "Which code files do this epic's stories cite, and which stories share files?" (via reversed `_citerToFiles`)
+- "Does any obligation here also live in another epic's retro?" (`raised-in`).
+
+**NFR8 absence rules (mirror shipping patterns):**
+- Zero follow-ups AND zero citations for an epic → **omit the graph section entirely** (no empty chrome), mirroring `WriteActionItems` early-return and `UnplannedWorkGeometry.HasUnplanned`/`GroupRootHref == null`.
+- No epics at all → **no nav entry, no page** (same `hasEpics` gate the Delivery/Traceability nav group already uses).
+- External-only code mode → `cites` edges still resolve (to external `#L{n}`); in-portal code nodes simply absent — no dead links.
+- Retros absent → `raised-in` edges downgrade to non-link labels (already how `AppendCrossLinks` behaves).
+
+**Parsers 19.2 MUST reuse (call, never fork):** `DeferredWorkParser` → `DeferredWorkModel`; `FollowUpGeometry.From/.ForEpic` (+ `FollowUpDeferredSlot` as the proto-edge record — project from it, do not invent a parallel type); `UnplannedWorkGeometry`; `FollowUpRefs` (all ref resolution); `ActionItemsTemplater.FindNearDuplicates` (`raised-in`); `RequirementsParser.StoriesFor` / `CoverageEpicNumbers` (`covers`); `_codeReverseMap` + `_citerToFiles` + `BuildReferencedBy` (`cites` both directions); `EpicRetroMap`. Counts stay on `ProjectCounts` — **no recount.**
+
+**Surface reach for 19.2 (confirming the story's table):** **HTML + SPA only.** HTML is the primary host; SPA parity comes free via the shared `<main id="main-content">` body seam + `RenderParity` (same as every other standalone page). **Webview and CLI are non-goals** — no reason found to promote the graph into the webview's dashboard/epics-only surface; if a true cross-surface webview gate is ever wanted it is a *separate* decision (Epic 6 Action #3), not an expansion of 19.1 or 19.2's MVP.
+
+**No new authoring schema affirmed.** No new ADR required — no architectural fork appeared; a future graph builder is a pure projection over existing models, consistent with ARCHITECTURE-SPINE AD-1/AD-2/AD-4. FR37 PRD sync remains "when convenient."
+
+#### Feed-forward stub for `19-2-*.md` create-story
+
+- **Title candidate:** Story 19.2 — Epic-Scoped Provenance Subgraph (directed work-graph visualization).
+- **Data source:** project `FollowUpDeferredSlot` + reversed `_citerToFiles`/`_codeReverseMap` into an in-memory `{nodes, edges}` per epic; edge direction = carrier → target (§2).
+- **Visual:** static SVG (pure-SVG house style, cf. `Charts.ReferenceGraph` a11y precedent — sr-only node/edge lists, node caps + "+N more") — **not** the Epic 20 interactive explorer.
+- **Placement:** dedicated page under the Delivery/Insights nav group on the shared `hasEpics` gate; per-epic section or epic filter.
+- **Guardrails:** no new schema, no second count ledger, epic-grain `covers` only, cycle detection as a secondary annotation (not the primary surface), NFR8 omit-on-empty.
+
 ### File List
+
+_Spike — no `src/**` or `tests/**` changes (Task 6). Only this story file's Dev Agent Record + frontmatter `baseline_commit` and `sprint-status.yaml` status were updated._
+
+- `_bmad-output/implementation-artifacts/19-1-work-graph-model-and-coverage-spike.md` (frontmatter, tasks, Dev Agent Record, status)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (status: ready-for-dev → in-progress → review)
 
 ## Change Log
 
 - 2026-07-18 — Story 19.1 drafted (create-story). Ultimate context engine analysis completed — comprehensive developer guide created. Spike-only: coverage map + 19.2 recommendation; no production code.
+- 2026-07-22 — Spike executed (dev-story). Coverage map (nodes/edges/queries/out-of-scope/recommendation) written to Completion Notes by tracing live code at baseline `c5b9373`. Direction convention fixed (carrier → target). 19.2 recommendation = epic-scoped provenance subgraph, HTML+SPA only, no new authoring schema, no new ADR. Live cycle/ambiguity/multi-hop examples sourced from this repo's own `deferred-work.md` + `sprint-status.yaml`. No `src/**`/`tests/**` changes. Status → review.

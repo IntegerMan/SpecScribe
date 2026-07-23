@@ -120,6 +120,7 @@ public sealed partial class HtmlRenderAdapter
         }
 
         AppendRequirementsPanel(sb, view.Requirements, view.Epics, view.Counts);
+        AppendTraceabilityPanel(sb, view.Requirements, view.Counts);
 
         // Progress by Epic mosaic — Plan.
         if (p.PerEpic.Count > 0)
@@ -379,6 +380,23 @@ public sealed partial class HtmlRenderAdapter
             }
         }
 
+        sb.Append("</div>\n\n");
+    }
+
+    /// <summary>The dashboard traceability teaser panel — Requirements work-stage, a compact preview of the
+    /// dedicated <c>traceability.html</c> matrix linking through to it. Shares the Requirements panel's presence
+    /// gate; NFR8-degrades to nothing when the strip itself has nothing to show. Routed through this ONE render
+    /// adapter (the sole concrete <see cref="IRenderAdapter"/> implementation, Story 6.1) so HTML/webview/SPA
+    /// stay parity-identical with no hand-appended HTML on any one surface. [Story 21.1]</summary>
+    private void AppendTraceabilityPanel(StringBuilder sb, RequirementsModel? requirements, ProjectCounts counts)
+    {
+        if (requirements is null || !requirements.Everything.Any()) return;
+        var strip = Charts.TraceabilityStrip(counts.RequirementsOverall, SiteNav.TraceabilityOutputPath);
+        if (strip.Length == 0) return;
+
+        sb.Append("<div class=\"chart-panel trace-panel wm-panel wm-show-requirements wm-show-track\">\n");
+        sb.Append("<h3>Traceability</h3>\n");
+        sb.Append(strip);
         sb.Append("</div>\n\n");
     }
 

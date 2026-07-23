@@ -72,6 +72,9 @@ public static class Icons
             "Architecture" => Svg("<path d=\"M3 13.5V6.2L8 2.7l5 3.5v7.3\"/><path d=\"M6 13.5V9h4v4.5\"/>"),
             "Epics" => Svg("<path d=\"M2.7 5.5 8 3l5.3 2.5L8 8Z\"/><path d=\"M2.7 8.7 8 11.2l5.3-2.5\"/>"),
             "Requirements" => Svg("<path d=\"M4 2.8h8v10.4H4Z\"/><path d=\"m5.8 6 1.1 1.1 1.8-2.1\"/><path d=\"M5.8 9.8h4.4\"/>"),
+            // A 3x3 grid — the requirement x covering-epic matrix (nav item + dashboard/requirements.html quick
+            // link all reuse this ONE key). [Story 21.1]
+            "Traceability" => Svg("<path d=\"M2.8 2.8h10.4v10.4H2.8Z\"/><path d=\"M2.8 6.5h10.4M2.8 10.2h10.4M6.5 2.8v10.4M10.2 2.8v10.4\"/>"),
             "ADRs" => Svg("<path d=\"M8 3v9.5\"/><path d=\"M8 4.2 4.6 4.2 3 7.3h3.6ZM8 4.2 11.4 4.2 13 7.3H9.4Z\"/><path d=\"M4.6 13h6.8\"/>"),
             "Spec" => Svg("<path d=\"M6 3.2 2.7 8l3.3 4.8\"/><path d=\"M10 3.2 13.3 8 10 12.8\"/>"),
             "Sprint" or "Sprint Status" => Svg("<path d=\"M3.5 3.6h9v9.8h-9Z\"/><path d=\"M3.5 6.4h9M5.8 2.4v2.4M10.2 2.4v2.4\"/>"),

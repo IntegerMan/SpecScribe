@@ -4723,6 +4723,72 @@ a.satisfaction-chip:hover { filter: brightness(0.97); }
 .donut-seg.unrecognized { stroke: var(--status-unrecognized); }
 .donut-legend .swatch.unrecognized { background: var(--status-unrecognized); }
 
+/* ====================== TRACEABILITY MATRIX (Story 21.1) ======================
+   The dedicated traceability.html page (requirement x covering-epic grid) plus its dashboard/requirements.html
+   teaser strip. Literal 3-state (covered/deferred/unmapped) via the shared --status-* tokens only. */
+
+/* The 3-swatch legend (real counts, same chips as the strip) sits directly above the table inside the same
+   framed panel — chart-intrinsic, not a separate hand-rolled caption. [Story 10.2 AC1] */
+.trace-legend { margin-bottom: 0.7rem; }
+
+/* The dashboard/requirements.html teaser: the same 3 chips + a link to the full matrix. */
+.trace-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.trace-strip-chips { gap: 0.4rem 0.6rem; }
+.trace-strip-link { white-space: nowrap; }
+
+/* The grid itself always scrolls inside its own container — the page body never scrolls horizontally, even
+   with ~22 epic columns. contain: inline-size mirrors the git-insights .table-scroll pattern. */
+.trace-matrix-wrap { margin-top: 0.4rem; }
+.trace-matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.trace-matrix th,
+.trace-matrix td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.55rem;
+  text-align: center;
+}
+.trace-matrix thead th {
+  position: sticky;
+  top: 0;
+  background: var(--parchment);
+  z-index: 2;
+  font-weight: 700;
+}
+.trace-matrix thead th a { color: inherit; text-decoration: none; }
+.trace-matrix thead th a:hover { text-decoration: underline; }
+/* The row-header column (requirement id) stays visible while the ~22-column grid scrolls sideways. */
+.trace-row-head {
+  position: sticky;
+  left: 0;
+  background: var(--warm-white);
+  text-align: left;
+  z-index: 1;
+}
+/* The corner cell needs BOTH stickiness axes and the higher z-index where they overlap. */
+.trace-matrix thead th.trace-corner { position: sticky; left: 0; top: 0; z-index: 3; text-align: left; }
+tr.deferred .trace-row-head { background: color-mix(in srgb, var(--status-deferred) 18%, var(--warm-white)); }
+tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pending) 30%, var(--warm-white)); }
+.trace-row-head a { color: var(--ink); text-decoration: none; font-family: 'Courier New', monospace; font-weight: 700; }
+.trace-row-head a:hover { text-decoration: underline; }
+.trace-row-head .status-badge { margin-left: 0.4rem; vertical-align: middle; }
+/* An empty cell is a plain neutral square — absence of coverage BY THIS EPIC is normal, never a gap signal. */
+.trace-cell { background: var(--parchment); }
+.trace-cell.covered { background: var(--status-done); padding: 0; }
+.trace-cell-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0.35rem 0.55rem;
+  color: var(--warm-white);
+}
+.trace-cell-link .ss-icon { width: 0.9rem; height: 0.9rem; }
+
 /* ====================== STATUS LEGEND (Story 8.2 — on-demand) ======================
    "?" disclosure next to status-bearing headers/badges. Opens a single-column popover.
    Native <details> → works with JS off and under webview CSP. // 10.3: vocabulary seam */

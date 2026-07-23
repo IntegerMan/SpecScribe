@@ -19,6 +19,7 @@ public class SiteNavTests
 
         Assert.Equal("Delivery", groupByLabel["Epics"]);
         Assert.Equal("Delivery", groupByLabel["Requirements"]);
+        Assert.Equal("Delivery", groupByLabel["Traceability"]);
         Assert.Equal("Delivery", groupByLabel["Sprint"]);
         Assert.Equal("Insights", groupByLabel["Code Map"]);
         Assert.Equal("Insights", groupByLabel["Risk Quadrant"]);
@@ -38,7 +39,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
         // Help is always present (How to use / About SDD / About / Logs); Project omits when empty.
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public class SiteNavTests
 
         // Journey order: Home → Delivery → Project → Help (How to use / About SDD / About / Logs).
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "GDD", "Narrative", "Game Architecture", "ADRs", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            new[] { "Home", "Epics", "Requirements", "Traceability", "GDD", "Narrative", "Game Architecture", "ADRs", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
             nav.Items.Select(i => i.Label).ToArray());
     }
 
@@ -64,7 +65,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: true);
 
         // Readme sits in Project (after Delivery); Help trails with How to use / About SDD / About / Logs.
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Readme", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Readme", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.ReadmeOutputPath, nav.Items.First(i => i.Label == "Readme").OutputRelativePath);
         Assert.True(nav.HasReadme);
     }
@@ -84,7 +85,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
         // Help (How to use / About SDD / About / Logs) follows Delivery in group order.
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Sprint", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Sprint", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.SprintOutputPath, nav.Items.First(i => i.Label == "Sprint").OutputRelativePath);
         Assert.True(nav.HasSprint);
 
@@ -92,7 +93,7 @@ public class SiteNavTests
         Assert.Equal(SiteNav.SprintOutputPath, sprintQuick.OutputRelativePath);
 
         var delivery = Assert.Single(nav.Groups, g => g.Label == "Delivery");
-        Assert.Equal(new[] { "Epics", "Requirements", "Sprint" }, delivery.Children.Select(c => c.Label).ToArray());
+        Assert.Equal(new[] { "Epics", "Requirements", "Traceability", "Sprint" }, delivery.Children.Select(c => c.Label).ToArray());
     }
 
     [Fact]
@@ -103,7 +104,7 @@ public class SiteNavTests
         Assert.DoesNotContain("Sprint", nav.Items.Select(i => i.Label));
         Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Sprint");
         Assert.False(nav.HasSprint);
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
@@ -115,7 +116,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasCodeMap: true);
 
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "Code Map", "Risk Quadrant", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            new[] { "Home", "Epics", "Requirements", "Traceability", "Code Map", "Risk Quadrant", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
             nav.Items.Select(i => i.Label).ToArray());
         Assert.True(nav.HasCodeMap);
 
@@ -205,7 +206,7 @@ public class SiteNavTests
 
         // Delivery before Project; Help trails with How to use / About SDD / About / Logs. Brief/UX stay quick-links only.
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "PRD", "Architecture", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            new[] { "Home", "Epics", "Requirements", "Traceability", "PRD", "Architecture", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
             nav.Items.Select(i => i.Label).ToArray());
 
         var quickLabels = nav.QuickLinks.Select(q => q.Label).ToArray();
@@ -232,7 +233,7 @@ public class SiteNavTests
         // Spec rides the Project group in the top nav (Story 10.1) and stays a quick-link too.
         Assert.Contains("Spec", nav.Items.Select(i => i.Label));
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "PRD", "Architecture", "Spec", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            new[] { "Home", "Epics", "Requirements", "Traceability", "PRD", "Architecture", "Spec", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
             nav.Items.Select(i => i.Label).ToArray());
     }
 

@@ -8,6 +8,13 @@ public sealed class SiteNav
     public const string HomeOutputPath = "index.html";
     public const string EpicsOutputPath = "epics.html";
     public const string RequirementsOutputPath = "requirements.html";
+
+    /// <summary>The dedicated requirement × covering-epic traceability matrix page. Requirements are parsed out
+    /// of epics.md, so this shares the SAME <c>hasEpics</c> gate as <see cref="RequirementsOutputPath"/> — no
+    /// dedicated flag — mirroring how <see cref="RiskQuadrantOutputPath"/> shares <see cref="CodeMapOutputPath"/>'s
+    /// gate. Shared between the generator (writes the file) and the templater/nav (link to it) so the two can
+    /// never disagree. [Story 21.1]</summary>
+    public const string TraceabilityOutputPath = "traceability.html";
     public const string SprintOutputPath = "sprint.html";
     public const string RetrosOutputPath = "retros.html";
     public const string ActionItemsOutputPath = "action-items.html";
@@ -203,8 +210,12 @@ public sealed class SiteNav
             delivery.Add(("Epics", EpicsOutputPath));
             // Requirements are parsed out of epics.md, so they share its availability guard.
             delivery.Add(("Requirements", RequirementsOutputPath));
+            // The traceability matrix is a sibling view over the same requirements + epics — shares this gate
+            // rather than a dedicated flag so the page and its nav item can never dangle independently. [Story 21.1]
+            delivery.Add(("Traceability", TraceabilityOutputPath));
             quickLinks.Add(("Epics", EpicsOutputPath, "Track epic and story delivery progress.", "Delivery"));
             quickLinks.Add(("Requirements", RequirementsOutputPath, "Review FR/NFR coverage and status.", "Delivery"));
+            quickLinks.Add(("Traceability", TraceabilityOutputPath, "See the full requirement-to-epic coverage matrix.", "Delivery"));
         }
 
         // The sprint tracking file (sprint-status.yaml) is its own first-class delivery view, gated on the

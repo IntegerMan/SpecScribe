@@ -23,6 +23,9 @@ public static class Charts
         /// <summary>Code ownership / bus-factor: how concentrated authorship is across the codebase — dominant-author
         /// share, top contributors, an individual-author spotlight, and staleness (Story 7.11).</summary>
         CodeOwnership,
+        /// <summary>Requirement-to-epic traceability: which requirements have a delivering epic, which are
+        /// deliberately deferred, and which are gaps (Story 21.1).</summary>
+        RequirementTraceability,
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
@@ -51,6 +54,8 @@ public static class Charts
             "Files that are both large and frequently changed are the costliest place for a defect to hide — refactoring them tends to pay off fastest.",
         ChartMetric.CodeOwnership =>
             "Files with a single dominant author are a knowledge-silo risk if that person leaves or moves on.",
+        ChartMetric.RequirementTraceability =>
+            "A requirement with no delivering epic is a coverage gap; one that is deferred is a deliberate choice — the two look different so neither hides.",
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
 
@@ -3619,6 +3624,153 @@ public static class Charts
                       $"<span class=\"req-block-icon\">{Icons.ForRequirementKind(req.Kind)}</span>" +
                       $"<span class=\"req-block-id\">{Html(req.Id)}</span></a>\n");
         }
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Max stories listed in a covered cell's tooltip before "+N more" — keeps a large epic's rollup
+    /// readable rather than dumping its whole story list into one tooltip. [Story 21.1]</summary>
+    private const int TraceabilityCellStoryCap = 8;
+
+    /// <summary>The requirement × covering-epic traceability matrix (Story 21.1): rows are every requirement
+    /// (<see cref="RequirementsModel.Everything"/> — FR + NFR + UX-DR, unlike <see cref="RequirementFlow"/>'s
+    /// FR+NFR-only <c>All</c> scope), columns are the bounded set of covering epics (reusing
+    /// <see cref="CoverageKeys"/>/<see cref="EpicTitlesByNumber"/>, the same epic-axis plumbing
+    /// <see cref="RequirementFlow"/> already computes), filtered to epic numbers that actually resolve in
+    /// <paramref name="epics"/> so a column never links to a page that doesn't exist. A cell is COVERED when the
+    /// column epic is one of the row's <see cref="RequirementInfo.CoverageEpicNumbers"/> (a marker glyph + a rich
+    /// tooltip naming the covering epic's own stories — "stories in the covering epic", never a per-requirement
+    /// claim); otherwise blank (absence of coverage BY THIS EPIC is normal, not a gap). A deferred row carries the
+    /// <c>deferred</c> treatment; a fully-unmapped row (zero covering epics, not deferred) carries
+    /// <c>unmapped</c>/"Not yet mapped" — both via <see cref="StatusStyles.Badge(string,string,string)"/> next to
+    /// the row header so the row reads even with every cell blank. A real HTML <c>&lt;table&gt;</c>
+    /// (<c>caption</c> + <c>th scope</c>) is itself the text equivalent — no separate sr-only list needed. Pure
+    /// generation-time HTML, no JS (memory: charting-is-pure-svg-no-js). Degrades to a <c>chart-empty</c> honest
+    /// note when there is nothing to chart or no requirement names a resolvable covering epic (NFR8; AC #2).</summary>
+    public static string TraceabilityMatrix(RequirementsModel reqs, EpicsModel epics, string prefix)
+    {
+        var all = reqs.Everything.ToList();
+        var epicsByNumber = epics.Epics.ToDictionary(e => e.Number);
+        var epicKeys = CoverageKeys(all)
+            .Where(k => k != NoCoverageKey && epicsByNumber.ContainsKey(k))
+            .ToList();
+
+        if (all.Count == 0 || epicKeys.Count == 0)
+        {
+            return "<div class=\"chart-empty\">Coverage not yet mapped — no requirement is yet tied to a delivering epic.</div>";
+        }
+
+        var epicTitleByNumber = EpicTitlesByNumber(epics);
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"table-scroll trace-matrix-wrap\">\n");
+        sb.Append("  <table class=\"trace-matrix\">\n");
+        sb.Append("    <caption class=\"sr-only\">Requirement traceability matrix: rows are requirements, columns are the epics that could cover them; a filled cell means the epic covers the requirement.</caption>\n");
+        sb.Append("    <thead>\n      <tr>\n        <th scope=\"col\" class=\"trace-corner\">Requirement</th>\n");
+        foreach (var epicNumber in epicKeys)
+        {
+            var title = epicTitleByNumber.GetValueOrDefault(epicNumber, string.Empty);
+            var tip = Html($"Epic {epicNumber} — {title}");
+            sb.Append($"        <th scope=\"col\"><a class=\"js-tip\" href=\"{prefix}epics/epic-{epicNumber}.html\" data-tip=\"{tip}\" title=\"{tip}\">Epic {epicNumber}</a></th>\n");
+        }
+        sb.Append("      </tr>\n    </thead>\n    <tbody>\n");
+
+        foreach (var req in all)
+        {
+            var rowClass = req.Deferred ? "deferred" : req.CoverageEpicNumbers.Count == 0 ? "unmapped" : string.Empty;
+            sb.Append(rowClass.Length > 0 ? $"      <tr class=\"{rowClass}\">\n" : "      <tr>\n");
+            sb.Append($"        <th scope=\"row\" class=\"trace-row-head\"><a href=\"{prefix}requirements/{req.Slug}.html\">{Html(req.Id)}</a>");
+            if (req.Deferred)
+            {
+                sb.Append(' ').Append(StatusStyles.Badge("deferred", "Deferred"));
+            }
+            else if (req.CoverageEpicNumbers.Count == 0)
+            {
+                sb.Append(' ').Append(StatusStyles.Badge("pending", "Not yet mapped", "unmapped"));
+            }
+            sb.Append("</th>\n");
+
+            foreach (var epicNumber in epicKeys)
+            {
+                if (req.CoverageEpicNumbers.Contains(epicNumber))
+                {
+                    var epic = epicsByNumber[epicNumber];
+                    var tip = Html(CoveredCellTip(req, epicNumber, epic));
+                    sb.Append($"        <td class=\"trace-cell covered\"><a class=\"trace-cell-link js-tip\" href=\"{prefix}epics/epic-{epicNumber}.html\" data-tip=\"{tip}\" title=\"{tip}\">{Icons.ForStatus("done")}<span class=\"sr-only\">Covered by Epic {epicNumber}</span></a></td>\n");
+                }
+                else
+                {
+                    sb.Append("        <td class=\"trace-cell\"></td>\n");
+                }
+            }
+
+            sb.Append("      </tr>\n");
+        }
+
+        sb.Append("    </tbody>\n  </table>\n</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The covered-cell rich tooltip: the requirement/epic pair plus the covering epic's OWN story
+    /// rollup — never a per-requirement mapping (the coverage map is epic-level; see <see cref="RequirementFlow"/>'s
+    /// doc comment for the same caveat). Capped at <see cref="TraceabilityCellStoryCap"/> so a large epic's
+    /// tooltip stays readable.</summary>
+    private static string CoveredCellTip(RequirementInfo req, int epicNumber, EpicInfo epic)
+    {
+        var header = $"{req.Id} · Epic {epicNumber}\nStories in Epic {epicNumber} (epic-level coverage):";
+        if (epic.Stories.Count == 0) return header + "\nNo stories drafted yet.";
+
+        var lines = epic.Stories
+            .Take(TraceabilityCellStoryCap)
+            .Select(s => $"{s.Id} ({StatusStyles.StoryLabel(StatusStyles.ForStory(s))}) — {PathUtil.StripHtmlTags(s.Title)}");
+        var body = string.Join("\n", lines);
+        if (epic.Stories.Count > TraceabilityCellStoryCap)
+        {
+            body += $"\n+{epic.Stories.Count - TraceabilityCellStoryCap} more";
+        }
+        return header + "\n" + body;
+    }
+
+    /// <summary>The three chips (Covered / Deferred on purpose / Not yet mapped) shared by
+    /// <see cref="TraceabilityLegend"/> and <see cref="TraceabilityStrip"/> — ONE source so the dedicated page's
+    /// legend and the dashboard/requirements teaser can never disagree with each other or with the matrix's own
+    /// cell classification (all three derive from the same <see cref="ProjectCounts.RequirementSatisfaction"/>
+    /// ledger — no local recount, AC #2). Reuses <see cref="AppendSatisfactionChip"/>'s exact markup, collapsed
+    /// from the four <see cref="RequirementSatisfactionChips"/> readings to three (Satisfied + In flight →
+    /// Covered) since the matrix is literal 3-state by owner decision.</summary>
+    private static string TraceabilityChips(ProjectCounts.RequirementSatisfaction sat)
+    {
+        var covered = sat.Satisfied + sat.InFlight;
+        var sb = new StringBuilder();
+        sb.Append("  <div class=\"satisfaction-chips trace-strip-chips\">\n");
+        AppendSatisfactionChip(sb, "Covered", covered, "done", "done",
+            "Has a delivering epic — done, in progress, or planned.", href: null);
+        AppendSatisfactionChip(sb, "Deferred on purpose", sat.Deferred, "deferred", "deferred",
+            StatusStyles.StageMeaning("deferred"), href: null);
+        AppendSatisfactionChip(sb, "Not yet mapped", sat.Unmapped, "pending", "unmapped",
+            StatusStyles.StageMeaning("unmapped"), href: null);
+        sb.Append("  </div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The dedicated traceability page's own real-value 3-swatch legend (Story 10.2 AC1) — chart-
+    /// intrinsic, prepended to <see cref="TraceabilityMatrix"/>'s body inside the same framed panel rather than a
+    /// separate hand-rolled caption. Counts come from the ledger (AC #2), never a recount over the matrix's own
+    /// rows. Empty ledger renders nothing (NFR8).</summary>
+    public static string TraceabilityLegend(ProjectCounts.RequirementSatisfaction sat) =>
+        sat.Total <= 0 ? string.Empty : $"<div class=\"trace-legend\">\n{TraceabilityChips(sat)}</div>\n";
+
+    /// <summary>The compact 3-state coverage-strip teaser (Story 21.1 Task 4): the SAME three chips as
+    /// <see cref="TraceabilityLegend"/> plus a link to the dedicated <c>traceability.html</c> page. Not a second
+    /// full matrix — a teaser. Empty ledger renders nothing (NFR8).</summary>
+    public static string TraceabilityStrip(ProjectCounts.RequirementSatisfaction sat, string traceabilityHref)
+    {
+        if (sat.Total <= 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"trace-strip\">\n");
+        sb.Append(TraceabilityChips(sat));
+        sb.Append($"  <a class=\"view-epic-link trace-strip-link\" href=\"{Html(traceabilityHref)}\">View full traceability matrix &rarr;</a>\n");
         sb.Append("</div>\n");
         return sb.ToString();
     }

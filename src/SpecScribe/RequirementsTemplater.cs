@@ -59,6 +59,10 @@ public static class RequirementsTemplater
         // Absent when no requirements (NFR8). Does not re-render or replace the FR+NFR grid/flow. [Story 9.9]
         AppendSatisfactionBand(sb, sat, model);
 
+        // Compact traceability teaser — additive, links to the dedicated matrix page. Never disturbs the
+        // byte-identical FR flow/grid/donuts below it. [Story 21.1]
+        AppendTraceabilityStripSection(sb, sat);
+
         sb.Append("<section class=\"dashboard\">\n<div class=\"chart-row\">\n");
         // Overall six-tier donut over Everything leads the row: same vocabulary as the Sankey / per-kind
         // donuts; fills the 2×2 fourth cell. Segments read the ProjectCounts ledger (not a local recount).
@@ -162,6 +166,20 @@ public static class RequirementsTemplater
             + $"{sat.Total} requirements — <strong>In flight</strong> groups partially implemented, ready for dev, and planned. "
             + "The donuts and flow below break the same requirements down tier by tier.</p>\n");
         sb.Append("</section>\n\n");
+    }
+
+    /// <summary>The compact traceability teaser section (Story 21.1 Task 4): a 3-chip coverage strip linking to
+    /// the dedicated <c>traceability.html</c> matrix. Omitted when the strip itself has nothing to show (NFR8 —
+    /// same guard <see cref="Charts.TraceabilityStrip"/> already applies).</summary>
+    private static void AppendTraceabilityStripSection(StringBuilder sb, ProjectCounts.RequirementSatisfaction sat)
+    {
+        var strip = Charts.TraceabilityStrip(sat, SiteNav.TraceabilityOutputPath);
+        if (strip.Length == 0) return;
+
+        sb.Append("<div class=\"section-divider\">Traceability</div>\n");
+        sb.Append("<div class=\"chart-panel\">\n");
+        sb.Append(strip);
+        sb.Append("</div>\n\n");
     }
 
     public static string RenderRequirement(RequirementInfo req, ProgressModel progress, SiteNav nav, EpicsModel epics,
