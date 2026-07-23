@@ -133,6 +133,13 @@ public static class Icons
         _ => string.Empty,
     };
 
+    /// <summary>A caution triangle with an exclamation — an advisory marker that is NOT a lifecycle
+    /// <c>--status-*</c> stage (so it lives outside <see cref="ForStatus"/>'s 1:1 token map). Flags a data problem
+    /// the status vocabulary doesn't cover, e.g. a requirement whose named covering epic no longer resolves.
+    /// Decorative like every icon — the accompanying word carries the meaning. [Story 21.1 review]</summary>
+    public static string Caution() =>
+        Svg("<path d=\"M8 2.6 14.4 13.4H1.6Z\"/><path d=\"M8 6.4v3.1\"/><circle cx=\"8\" cy=\"11.4\" r=\".7\" fill=\"currentColor\" stroke=\"none\"/>");
+
     /// <summary>Wraps glyph markup in the shared decorative-icon shell: <c>aria-hidden</c>/<c>focusable="false"</c>
     /// (the text label carries the meaning), the <c>ss-icon</c> css hook for sizing, and <c>currentColor</c>
     /// stroke/fill so every icon inherits the surrounding label/badge color — never a hard-coded hex.</summary>

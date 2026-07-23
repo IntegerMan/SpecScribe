@@ -17,7 +17,7 @@ public static class CadenceTemplater
     /// the heatmap grid and the strip's recent-window so a from-scratch regen on unchanged inputs is byte-identical.
     /// <paramref name="data"/> is <see cref="DeliveryCadenceData.Empty"/> (not null) when there is simply nothing to
     /// chart yet.</summary>
-    public static string RenderPage(EpicsModel epics, DeliveryCadenceData data, SiteNav nav, DateOnly today)
+    public static string RenderPage(DeliveryCadenceData data, SiteNav nav, DateOnly today)
     {
         var outputPath = SiteNav.CadenceOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — cadence.html is at the output root.
@@ -69,25 +69,11 @@ public static class CadenceTemplater
                 Ranking: cycleRanking,
                 Note: "Approximate: cycle-time here measures each story file's age in git — its first commit to its last touch while done — not a tracked ready→done workflow timestamp, so a story seeded early or reworked after first reaching done can over- or under-state the real effort.",
                 Why: Charts.WhyText(Charts.ChartMetric.DeliveryCadence)),
-            Charts.CycleTimeHistogram(data.CycleTimes, id => storyHref(FindStory(epics, id)))));
+            Charts.CycleTimeHistogram(data.CycleTimes)));
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter());
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
-
-    /// <summary>Resolves a story id back to its <see cref="StoryInfo"/> for the histogram's per-bar href (a
-    /// synthetic minimal StoryInfo when — impossibly, given the ids come straight from the roster — a match isn't
-    /// found, so the resolver stays total and never throws).</summary>
-    private static StoryInfo FindStory(EpicsModel epics, string storyId) =>
-        epics.Epics.SelectMany(e => e.Stories).FirstOrDefault(s => s.Id == storyId)
-        ?? new StoryInfo
-        {
-            Id = storyId,
-            EpicNumber = 0,
-            Title = storyId,
-            UserStoryHtml = string.Empty,
-            AcBlocksHtml = Array.Empty<string>(),
-        };
 }

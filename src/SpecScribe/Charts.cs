@@ -1402,10 +1402,18 @@ public static class Charts
     {
         if (series.Count == 0) return "<div class=\"chart-empty\">No completed stories to chart yet.</div>";
 
-        var byDay = series.ToDictionary(s => s.Day, s => s.Count);
-        var firstDay = series.Min(s => s.Day);
-        var lastDay = series.Max(s => s.Day);
         var todayValue = today ?? DateOnly.FromDateTime(DateTime.Now);
+        // Only completions on/before the run's "today" are ever drawn (the grid never extends past today). Bound
+        // EVERY summary derived below — firstDay/lastDay, the aria counts, the legend max, the window label — to
+        // that same visible set, so a story carrying a future-dated Change-Log date can't make the aria-label /
+        // window overstate what the cells actually render (the project's truthfulness invariant). GroupBy (not
+        // ToDictionary) also keeps this total on a duplicate-day series instead of throwing.
+        var visible = series.Where(s => s.Day <= todayValue).ToList();
+        if (visible.Count == 0) return "<div class=\"chart-empty\">No completed stories to chart yet.</div>";
+
+        var byDay = visible.GroupBy(s => s.Day).ToDictionary(g => g.Key, g => g.Sum(s => s.Count));
+        var firstDay = visible.Min(s => s.Day);
+        var lastDay = visible.Max(s => s.Day);
 
         // Same windowing math as CommitHeatmap: never past today, ~15-week floor, young-repo lead-in trim.
         var end = todayValue;
@@ -1418,7 +1426,7 @@ public static class Charts
 
         var totalDays = end.DayNumber - start.DayNumber + 1;
         var weeks = Math.Max(1, (int)Math.Ceiling(totalDays / 7.0));
-        var maxCount = series.Where(s => s.Day <= todayValue).Select(s => s.Count).DefaultIfEmpty(0).Max();
+        var maxCount = visible.Select(s => s.Count).DefaultIfEmpty(0).Max();
 
         const int cell = 11;
         const int gap = 3;
@@ -1428,8 +1436,8 @@ public static class Charts
         var height = topGutter + 7 * (cell + gap);
         var maxRenderWidth = Math.Min(460, (int)Math.Round(width * 1.8));
 
-        var totalCompletions = series.Sum(s => s.Count);
-        var activeDays = series.Count(s => s.Count > 0);
+        var totalCompletions = visible.Sum(s => s.Count);
+        var activeDays = visible.Count(s => s.Count > 0);
         var heatAria = $"Story completions: {totalCompletions} {Plural(totalCompletions, "story", "stories")} across {activeDays} active {Plural(activeDays, "day", "days")}, {DReadable(firstDay)} to {DReadable(lastDay)}";
 
         // A day is linked only when EXACTLY one story completed that day AND its page resolves — an unambiguous
@@ -1623,7 +1631,7 @@ public static class Charts
     /// cycle-time (a common, expected case for young/small projects — not an error). Cycle-time is
     /// APPROXIMATE (story-file age, not a tracked workflow timestamp) — the caller's frame carries that caveat.
     /// [Story 21.2]</summary>
-    public static string CycleTimeHistogram(IReadOnlyList<(string StoryId, int Days)> cycleTimes, Func<string, string?>? storyHref = null)
+    public static string CycleTimeHistogram(IReadOnlyList<(string StoryId, int Days)> cycleTimes)
     {
         if (cycleTimes.Count == 0)
             return "<div class=\"chart-empty\">No story has a derivable cycle-time yet.</div>\n";
@@ -4191,7 +4199,13 @@ public static class Charts
 
         if (all.Count == 0 || epicKeys.Count == 0)
         {
-            return "<div class=\"chart-empty\">Coverage not yet mapped — no requirement is yet tied to a delivering epic.</div>";
+            // Honest degrade — but keep the deferred/unmapped distinction the matrix exists to preserve: a project
+            // that has deliberately deferred every requirement is NOT the same as one with an unmapped-coverage gap.
+            var deferredCount = all.Count(r => r.Deferred);
+            var note = all.Count > 0 && deferredCount == all.Count
+                ? "Every requirement is deferred on purpose — none is currently tied to a delivering epic."
+                : "Coverage not yet mapped — no requirement is yet tied to a delivering epic.";
+            return $"<div class=\"chart-empty\">{note}</div>";
         }
 
         var epicTitleByNumber = EpicTitlesByNumber(epics);
@@ -4211,7 +4225,12 @@ public static class Charts
 
         foreach (var req in all)
         {
-            var rowClass = req.Deferred ? "deferred" : req.CoverageEpicNumbers.Count == 0 ? "unmapped" : string.Empty;
+            // A requirement can name covering epic(s) that no longer resolve (typo'd or since-removed number, e.g.
+            // the "Epic 99" phantom shape) — Count > 0 yet no epicKeys column matches, so every cell would be blank.
+            // Treat that as effectively unmapped for the ROW so it isn't a silent, unexplained blank row, and flag it
+            // with a caution marker (below) that names the dangling epic. [Story 21.1 review — owner option 2]
+            var resolvable = req.CoverageEpicNumbers.Any(epicsByNumber.ContainsKey);
+            var rowClass = req.Deferred ? "deferred" : !resolvable ? "unmapped" : string.Empty;
             sb.Append(rowClass.Length > 0 ? $"      <tr class=\"{rowClass}\">\n" : "      <tr>\n");
             var kindLabel = req.Kind switch
             {
@@ -4229,6 +4248,17 @@ public static class Charts
             else if (req.CoverageEpicNumbers.Count == 0)
             {
                 sb.Append(' ').Append(StatusStyles.Badge("pending", "Not yet mapped", "unmapped"));
+            }
+            else if (!resolvable)
+            {
+                // Named a covering epic that no longer resolves — reuse the tan "pending" swatch (no 7th token)
+                // but a caution glyph + distinct word so it never reads color-only and is legible next to the
+                // genuine "Not yet mapped" rows. The tooltip names the dangling epic(s). [Story 21.1 review]
+                var named = string.Join(", ", req.CoverageEpicNumbers.Select(n => $"Epic {n}"));
+                var danglingTip = Html($"Names {named}, which no longer resolves to a known epic — coverage is dangling.");
+                sb.Append(" <span class=\"status-badge pending js-tip\" data-tip=\"")
+                  .Append(danglingTip).Append("\" title=\"").Append(danglingTip).Append("\">")
+                  .Append(Icons.Caution()).Append("Coverage dangling</span>");
             }
             sb.Append("</th>\n");
 

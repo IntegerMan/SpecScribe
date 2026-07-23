@@ -127,6 +127,21 @@ public class ChartsTraceabilityTests
         Assert.DoesNotContain(">Epic 99<", html);
     }
 
+    [Fact]
+    public void TraceabilityMatrix_PhantomCoveredRow_IsFlaggedAsDanglingNotSilentlyBlank()
+    {
+        var (reqs, epics) = Fixture();
+        var html = Charts.TraceabilityMatrix(reqs, epics, prefix: string.Empty);
+
+        // FR3 names only Epic 99 (since removed): the ledger counts it "covered" (Planned), but no column
+        // resolves so every cell is blank. Rather than a silent, unexplained blank row, it must carry a caution
+        // marker that names the dangling epic — never color-only (icon + word). [Story 21.1 review — owner option 2]
+        Assert.Contains(">Coverage dangling</span>", html);
+        Assert.Contains("Names Epic 99, which no longer resolves", html);
+        // The caution word is paired with the caution glyph, not color alone.
+        Assert.Contains($"{Icons.Caution()}Coverage dangling", html);
+    }
+
     // ---- Row-level state (AC #1) ----
 
     [Fact]
@@ -236,6 +251,40 @@ public class ChartsTraceabilityTests
 
         Assert.Contains("chart-empty", html);
         Assert.DoesNotContain("<table", html);
+        // Every requirement here is deferred on purpose — the honest note must say so, not conflate it with an
+        // unmapped-coverage gap (the deferred/unmapped distinction the matrix exists to preserve). [21.1 review]
+        Assert.Contains("deferred on purpose", html);
+        Assert.DoesNotContain("Coverage not yet mapped", html);
+    }
+
+    [Fact]
+    public void TraceabilityMatrix_MixedDeferredAndUnmapped_WithNoCoverage_ReadsAsUnmappedGap()
+    {
+        // A deferred requirement AND a genuinely unmapped one, neither with resolvable coverage → epicKeys empty.
+        // Because not every requirement is deferred, the note stays the generic unmapped-gap wording. [21.1 review]
+        const string md = """
+            # Epics
+
+            ## Requirements Inventory
+
+            ### Functional Requirements
+
+            FR1: Deferred requirement
+            FR2: Unmapped requirement
+
+            ### FR Coverage Map
+
+            FR1: Deferred - shelved
+            """;
+        var epics = EpicsParser.Parse(md);
+        var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
+        var reqs = RequirementsParser.Parse(md, epics, progress);
+
+        var html = Charts.TraceabilityMatrix(reqs, epics, prefix: string.Empty);
+
+        Assert.Contains("chart-empty", html);
+        Assert.Contains("Coverage not yet mapped", html);
+        Assert.DoesNotContain("deferred on purpose", html);
     }
 
     // ---- WhyText ----

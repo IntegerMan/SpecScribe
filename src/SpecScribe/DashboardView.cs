@@ -125,4 +125,10 @@ public sealed record DashboardView
     /// adapter path (never hand-appended to one surface) so HTML/webview/SPA stay parity-identical (Story 6.2
     /// discipline). Named opaque fragment matching <see cref="NextStepsHtml"/>'s role. [Story 21.2]</summary>
     public string CadenceStripHtml { get; init; } = string.Empty;
+
+    /// <summary>Pre-rendered compact traceability coverage-strip teaser (<see cref="Charts.TraceabilityStrip"/>),
+    /// linking to the dedicated <c>traceability.html</c> page; empty when there are no requirements to show. Routed
+    /// through this one builder → adapter path (never hand-appended to one surface) so HTML/webview/SPA stay
+    /// parity-identical (Story 6.2 discipline). Mirrors <see cref="CadenceStripHtml"/>. [Story 21.1; review]</summary>
+    public string TraceabilityStripHtml { get; init; } = string.Empty;
 }

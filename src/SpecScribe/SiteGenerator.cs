@@ -3251,7 +3251,7 @@ public sealed class SiteGenerator
         if (_epicsModel is null || _cadence is null) return;
 
         var today = DateOnly.FromDateTime(DateTime.Now);
-        var html = CadenceTemplater.RenderPage(_epicsModel, _cadence, nav, today);
+        var html = CadenceTemplater.RenderPage(_cadence, nav, today);
         WriteOutput(SiteNav.CadenceOutputPath, ApplyReferenceLinks(html, SiteNav.CadenceOutputPath));
     }
     /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the

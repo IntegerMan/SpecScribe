@@ -878,7 +878,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // collapsible-log rules and recolored the cycle-time bars off rust. Still wall-clock-independent (the
         // fixture's lone done story has no Change Log date → empty-state cadence, no date-derived grid). Verified
         // stable across 2 repeated runs. [golden-diff-normalization-gotchas]
-        const string expected = "f1be8a66f73eae07b7d0c30cbe864137b4aa54157c3c2622874eaf1860e5808c";
+        // Regenerated for Story 21.3: specscribe.css gained the planning↔code impact-map styles (.impact-epic /
+        // .impact-file-list / .impact-more / .impact-map-link / .code-areas-panel). This non-git fixture has no
+        // --deep-git commit data, so no impact-map.html page, no "Impact Map" nav entry, and no "Code Areas Touched"
+        // widget render here — only the shared embedded stylesheet content shifted the hash (page/nav/widget behavior
+        // is covered by SiteGeneratorImpactMapTests). Verified stable across 2 repeated runs. [golden-diff-normalization-gotchas]
+        const string expected = "0d818a3fb42163ccc85231cb709e2b132bddb6f149b823262bb1976aef584c61";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

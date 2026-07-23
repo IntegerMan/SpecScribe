@@ -2,6 +2,21 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 21-1-traceability-coverage-matrix (2026-07-22)
+
+- source_spec: `21-1-traceability-coverage-matrix.md`
+  summary: `.trace-matrix-wrap { max-height: calc(100vh - 16rem) }` hard-codes an assumed ~16rem of header/legend/caption height above the grid; on a short or narrow viewport where the ledger caption and 3-chip legend wrap, the usable matrix height can collapse or push the sticky column header out of view.
+  evidence: Blind Hunter. Low-value responsive polish in the vertical-scroll addition. Owner already iterated this exact area live (the post-deploy `contain: layout inline-size` fix) and verified current viewports; no clearly-correct replacement constant. Revisit on a future responsive pass. [`src/SpecScribe/assets/specscribe.css` `.trace-matrix-wrap`]
+
+## Deferred from: code review of 21-2-delivery-cadence-and-story-cycle-time (2026-07-22)
+
+- source_spec: `21-2-delivery-cadence-and-story-cycle-time.md`
+  summary: First-touch git shell-out runs once per done story on every generation, not gated on `--deep-git` — `DeliveryCadence.Build(..., GitFirstTouchResolver(...))` spawns one `git log --follow` subprocess per done story with a resolvable done-date, so a mature repo (hundreds of done stories) spawns hundreds of subprocesses even without `--deep-git`.
+  evidence: Blind Hunter. Spec-accepted "bounded new git work"; `cadence.html` always renders the cycle-time histogram. Perf-pass candidate: gate the cycle-time half behind a git/deep-git signal. [`SiteGenerator.cs:418`]
+- source_spec: `21-2-delivery-cadence-and-story-cycle-time.md`
+  summary: Dashboard cadence strip reads its own wall clock (`DeliveryCadenceStrip` → `DateOnly.FromDateTime(DateTime.Now)`) instead of receiving the run's single `today`, so the strip's 8-week window and the page grid read the clock independently.
+  evidence: Acceptance Auditor. Byte-identical on a fixed clock (AC #2 holds); diverges only across a midnight-straddling run; matches the accepted `CommitHeatmap` per-call `DateTime.Now` precedent. Fix: thread the run's `today` into the strip. [`DashboardViewBuilder.cs:86`, `Charts.cs:1686`]
+
 ## Deferred from: code review of 7-11-code-ownership-and-bus-factor-insights + 7-12-code-freshness-age-map (2026-07-22)
 
 - source_spec: `7-11-code-ownership-and-bus-factor-insights.md`

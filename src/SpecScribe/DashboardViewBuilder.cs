@@ -85,6 +85,11 @@ public static class DashboardViewBuilder
             CadenceStripHtml = cadence is { IsEmpty: false } c
                 ? Charts.DeliveryCadenceStrip(c, SiteNav.CadenceOutputPath)
                 : string.Empty,
+            // Compact traceability teaser → traceability.html. Empty (omitted) when there are no requirements.
+            // Routed through the builder so every surface renders identical bytes (Story 6.2). [Story 21.1 review]
+            TraceabilityStripHtml = requirements is { } tr && tr.Everything.Any()
+                ? Charts.TraceabilityStrip(ledger.RequirementsOverall, SiteNav.TraceabilityOutputPath)
+                : string.Empty,
         };
     }
 

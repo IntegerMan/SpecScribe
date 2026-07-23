@@ -120,7 +120,7 @@ public sealed partial class HtmlRenderAdapter
         }
 
         AppendRequirementsPanel(sb, view.Requirements, view.Epics, view.Counts);
-        AppendTraceabilityPanel(sb, view.Requirements, view.Counts);
+        AppendTraceabilityPanel(sb, view.TraceabilityStripHtml);
 
         // Delivery cadence teaser — Track/Develop work-stage, a compact preview linking to cadence.html. Omitted
         // (no empty panel) when there's nothing to show. Fragment built by DashboardViewBuilder so all three
@@ -399,15 +399,17 @@ public sealed partial class HtmlRenderAdapter
     /// gate; NFR8-degrades to nothing when the strip itself has nothing to show. Routed through this ONE render
     /// adapter (the sole concrete <see cref="IRenderAdapter"/> implementation, Story 6.1) so HTML/webview/SPA
     /// stay parity-identical with no hand-appended HTML on any one surface. [Story 21.1]</summary>
-    private void AppendTraceabilityPanel(StringBuilder sb, RequirementsModel? requirements, ProjectCounts counts)
+    /// <summary>Renders the compact Home traceability teaser from its pre-built view-model fragment
+    /// (<see cref="DashboardView.TraceabilityStripHtml"/>) — the strip is composed once in
+    /// <see cref="DashboardViewBuilder"/> so every surface renders identical bytes, rather than re-computed in the
+    /// adapter. Empty fragment (no requirements) omits the panel (NFR8). [Story 21.1; review]</summary>
+    private void AppendTraceabilityPanel(StringBuilder sb, string stripHtml)
     {
-        if (requirements is null || !requirements.Everything.Any()) return;
-        var strip = Charts.TraceabilityStrip(counts.RequirementsOverall, SiteNav.TraceabilityOutputPath);
-        if (strip.Length == 0) return;
+        if (stripHtml.Length == 0) return;
 
         sb.Append("<div class=\"chart-panel trace-panel wm-panel wm-show-requirements wm-show-track\">\n");
         sb.Append("<h3>Traceability</h3>\n");
-        sb.Append(strip);
+        sb.Append(stripHtml);
         sb.Append("</div>\n\n");
     }
 
