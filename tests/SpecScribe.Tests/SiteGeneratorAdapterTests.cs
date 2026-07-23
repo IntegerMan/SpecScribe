@@ -856,6 +856,21 @@ public class SiteGeneratorAdapterTests : IDisposable
         // GoldenOutputInventory test still passes) and the only shift is the every-page stylesheet content. The
         // page/markup itself is dogfood-verified on the real repo, not this fixture. Verified stable across 2
         // repeated runs before locking in. [golden-diff-normalization-gotchas]
+        // Regenerated for Story 19.2 follow-up (owner-requested polish): specscribe.css gained the reusable
+        // `.ss-tabs` standard tab control + the scope-picker `<select>` styling + a full-width `.work-graph-intro`;
+        // specscribe.js gained the work-graph scope-filter enhancement; work-graph.html's scope chips became a
+        // dropdown; and epic/story pages gained an "Overview | Work Graph" tab WHEN they carry a provenance
+        // subgraph. This non-git fixture still carries no work-graph signal (GoldenOutputInventory unchanged — no
+        // work-graph.html, and its epic/story pages get no graph tab), so the ONLY shift is the every-page
+        // specscribe.css/specscribe.js asset content. Dogfood-verified on the real repo (epic/story tabs render,
+        // all links resolve). Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
+        // Regenerated for Story 19.2 owner follow-up: the "Overview | Work Graph" tab is now shown on EVERY epic
+        // page and EVERY drafted story page (owner decision — a consistent, discoverable control), with an honest
+        // "No provenance graph for this epic/story yet." empty state when the entity has no subgraph. So every
+        // epic/story page in this fixture now gains the tab wrapper (page SET unchanged — GoldenOutputInventory
+        // still passes; only per-page markup shifts). Undrafted story placeholders are deliberately excluded. Real-
+        // repo dogfood-verified (all epics + drafted stories carry the tab; balanced DOM). Verified stable across 2
+        // repeated runs before locking in. [golden-diff-normalization-gotchas]
         // Regenerated for Story 21.2: new cadence.html page (delivery-cadence heatmap + cycle-time histogram) +
         // its "Cadence" Delivery nav entry (shifts every rendered page's nav markup) + the new
         // Icons.ForConcept("Cadence") glyph + new specscribe.css cadence rules. This fixture is NOT a git repo and

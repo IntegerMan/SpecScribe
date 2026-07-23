@@ -246,9 +246,15 @@ public sealed partial class HtmlRenderAdapter
             toc.Add(new Toc.Entry(2, "Code Areas Touched", "sec-code-areas"));
         }
 
+        // The Work Graph tab shows on EVERY epic page (owner decision): its subgraph when present, an honest empty
+        // state otherwise.
+        var content = WrapMainInGraphTab(main.ToString(), view.WorkGraph, TabStrip.GroupName($"epic-{view.Number}", "wg"),
+            "Choose a view for this epic",
+            "This epic's deferred and open action items, traced back to the story, spec, or quick-dev they stemmed from — and forward to whatever resolved them.",
+            "No provenance graph for this epic yet — no deferred or action-item work is attributed to it.");
         var sb = new StringBuilder();
         sb.Append("<main id=\"main-content\">\n");
-        sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
+        sb.Append(Toc.WrapWithSidebar(content, toc));
         sb.Append("</main>\n\n");
         return sb.ToString();
     }
@@ -614,11 +620,42 @@ public sealed partial class HtmlRenderAdapter
             toc.Add(new Toc.Entry(2, "Code Areas Touched", "sec-code-areas"));
         }
 
+        // The Work Graph tab shows on EVERY drafted story page (owner decision): its story-scoped subgraph when
+        // present, an honest empty state otherwise.
+        var content = WrapMainInGraphTab(main.ToString(), view.WorkGraph, TabStrip.GroupName($"story-{view.Id}", "wg"),
+            "Choose a view for this story",
+            "Deferred work that stemmed from this story, and what resolved it.",
+            "No provenance graph for this story yet — nothing has been deferred from it.");
         var sb = new StringBuilder();
         sb.Append("<main id=\"main-content\">\n");
-        sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
+        sb.Append(Toc.WrapWithSidebar(content, toc));
         sb.Append("</main>\n\n");
         return sb.ToString();
+    }
+
+    /// <summary>Wraps a detail page's INNER main content (header + sections, BEFORE
+    /// <see cref="Toc.WrapWithSidebar"/> adds the page-shell/rail wrapper) in the standard
+    /// <see cref="TabStrip"/>: the header stays outside, the sections become the "Overview" panel, and the
+    /// "Work Graph" panel shows <paramref name="graph"/> — or <paramref name="emptyMessage"/> when it is null, so
+    /// the tab is a consistent, discoverable control on EVERY epic/story page (owner decision). Splits at the
+    /// FIRST <c>&lt;/header&gt;</c> — safe here because at this stage the header is a top-level sibling (no grid/
+    /// main wrapper to unbalance). If none is found, the content is returned unchanged. [Story 19.2]</summary>
+    private static string WrapMainInGraphTab(
+        string content, WorkGraphEpic? graph, string group, string legend, string leadIn, string emptyMessage)
+    {
+        const string marker = "</header>";
+        var idx = content.IndexOf(marker, StringComparison.Ordinal);
+        if (idx < 0) return content;
+        var split = idx + marker.Length;
+        var header = content[..split];
+        var overview = content[split..];
+        var tabs = TabStrip.Render(group, legend, new[]
+        {
+            new TabStrip.Tab("overview", "Overview", Icons.ForConcept("Overview"), overview),
+            new TabStrip.Tab("graph", "Work Graph", Icons.ForConcept("Work Graph"),
+                WorkGraphTemplater.RenderEmbedded(graph, leadIn, emptyMessage)),
+        });
+        return header + "\n" + tabs;
     }
 
     // ----- Story placeholder --------------------------------------------------------------------------------

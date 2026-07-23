@@ -507,10 +507,13 @@ public class FollowUpSurfacesTests : IDisposable
 
         var epic1 = File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html"));
         Assert.Contains("sb-followup-open", epic1);
-        // Epic-level peers (2 open actions) aggregate to the group page — no per-item action wedge/text.
+        // Epic-level peers (2 open actions) aggregate to the group page. The epic's Work Graph tab (Story 19.2)
+        // is a separate provenance surface that DOES link/name each action, so scope the sunburst-aggregation
+        // assertions to the page BEFORE that graph panel.
         Assert.Contains("href=\"../follow-ups/group-epic-1.html\"", epic1);
-        Assert.DoesNotContain("href=\"../follow-ups/action-", epic1);
-        Assert.DoesNotContain("Schedule retros promptly", epic1);
+        var epic1Sunburst = epic1.Split("ss-tabpanel--graph")[0];
+        Assert.DoesNotContain("href=\"../follow-ups/action-", epic1Sunburst);
+        Assert.DoesNotContain("Schedule retros promptly", epic1Sunburst);
         // Story-child deferred stays nested and unchanged — still climbs out of epics/ (not epics/follow-ups/…, 404).
         Assert.Contains("href=\"../follow-ups/deferred-", epic1);
         Assert.DoesNotContain("href=\"follow-ups/deferred-", epic1);

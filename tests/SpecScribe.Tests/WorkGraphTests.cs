@@ -317,10 +317,92 @@ public class WorkGraphTests
         var html = WorkGraphTemplater.RenderPage(model, nav);
 
         Assert.Contains("<main id=\"main-content\"", html);          // SPA capture seam / parity
-        Assert.Contains("work-graph-scope", html);                    // scope picker
-        Assert.Contains("href=\"#wg-epic-1\"", html);
+        Assert.Contains("work-graph-scope-select", html);             // scope-picker dropdown
+        Assert.Contains("<option value=\"wg-epic-1\"", html);
         Assert.Contains("work-graph nodes", html);                    // sr-only enumeration heading
         Assert.Contains("No circular or ambiguous provenance in this scope.", html); // honest empty query
+    }
+
+    // ---- Story-scoped subgraph + embedding (detail-page tabs) -------------------------------------------
+
+    [Fact]
+    public void BuildStory_ProjectsDeferredThatStemmedFromTheStory()
+    {
+        var story = TwoEpicModel().Epics.First(e => e.Number == 1).Stories.First(s => s.Id == "1.1");
+        var slot = Deferred("Debt out of 1.1", epic: 1, sourceStoryId: "1.1", sourceKey: "1-1-foundation");
+        var geo = Geometry(deferred: new[] { slot });
+
+        var g = WorkGraphBuilder.BuildStory(story, "Foundation", geo);
+
+        Assert.NotNull(g);
+        Assert.Contains(g!.Nodes, n => n.Kind == WorkNodeKind.Story && n.Id == "s1.1");
+        Assert.Contains(g.Nodes, n => n.Kind == WorkNodeKind.Deferred);
+        Assert.Contains(g.Edges, e => e.Kind == WorkEdgeKind.StemmedFrom && e.ToId == "s1.1");
+        Assert.Contains(g.Edges, e => e.Kind == WorkEdgeKind.Contains && e.FromId == "s1.1" && e.ToId == "e1");
+    }
+
+    [Fact]
+    public void BuildStory_NoDeferredFromStory_IsNull_NoTab()
+    {
+        var story = TwoEpicModel().Epics.First(e => e.Number == 2).Stories.First();
+        // Deferred belongs to a different story → nothing stemmed from story 2.1.
+        var geo = Geometry(deferred: new[] { Deferred("Elsewhere", epic: 1, sourceStoryId: "1.1") });
+        Assert.Null(WorkGraphBuilder.BuildStory(story, "Second", geo));
+    }
+
+    [Fact]
+    public void Reprefixed_RewritesNodeHrefsForDeeperPage()
+    {
+        var epic = OneDeferredEpic();               // root-relative hrefs
+        var deep = epic.Reprefixed("../");           // as embedded under epics/
+        Assert.All(
+            deep.Nodes.Where(n => n.Href is { Length: > 0 } && !n.Href!.StartsWith("http")),
+            n => Assert.StartsWith("../", n.Href!));
+        Assert.Same(epic, epic.Reprefixed("")); // "" is a no-op — returns the same instance
+    }
+
+    [Fact]
+    public void TabStrip_RendersRadioTabsWithFirstChecked()
+    {
+        var html = TabStrip.Render("grp", "Choose a view", new[]
+        {
+            new TabStrip.Tab("overview", "Overview", "", "<p>ov</p>"),
+            new TabStrip.Tab("graph", "Work Graph", "", "<p>gr</p>"),
+        });
+        Assert.Contains("ss-tabpanel--overview", html);
+        Assert.Contains("ss-tabpanel--graph", html);
+        Assert.Contains("name=\"grp\" checked", html);  // first tab pre-selected
+        Assert.Contains("ss-tab--graph", html);
+    }
+
+    [Fact]
+    public void EpicPage_WithSubgraph_WrapsContentInOverviewAndWorkGraphTabs()
+    {
+        var epic = TwoEpicModel().Epics.First(e => e.Number == 1);
+        var subgraph = OneDeferredEpic();
+        var nav = SiteNav.Build(new[] { "epics.md" }, "T", hasWorkGraph: true);
+
+        var html = EpicsTemplater.RenderEpic(epic, EmptyProgress(1), nav, CommandCatalog.Empty,
+            workGraph: subgraph);
+
+        Assert.Contains("ss-tab--overview", html);
+        Assert.Contains("ss-tab--graph", html);
+        Assert.Contains("work-graph", html);           // the embedded SVG
+        // The page <h1> stays OUTSIDE the tab control (header split).
+        var beforeTabs = html.Split("ss-tabs")[0];
+        Assert.Contains("<h1", beforeTabs);
+    }
+
+    [Fact]
+    public void EpicPage_WithoutSubgraph_ShowsEmptyStateTab()
+    {
+        // Owner decision: the Work Graph tab is a consistent control on EVERY epic page — an honest empty state
+        // when the epic has no provenance subgraph.
+        var epic = TwoEpicModel().Epics.First(e => e.Number == 1);
+        var nav = SiteNav.Build(new[] { "epics.md" }, "T");
+        var html = EpicsTemplater.RenderEpic(epic, EmptyProgress(1), nav, CommandCatalog.Empty);
+        Assert.Contains("ss-tab--graph", html);
+        Assert.Contains("No provenance graph for this epic yet", html);
     }
 
     // ---- Nav gate ---------------------------------------------------------------------------------------
@@ -365,6 +447,18 @@ public class WorkGraphTests
         OverviewHtml = string.Empty,
         RequirementsInventoryHtml = string.Empty,
         Epics = new[] { Epic(1, "Foundation", "1.1"), Epic(2, "Second", "2.1"), Epic(3, "Third", "3.1") },
+    };
+
+    private static EpicProgress EmptyProgress(int number) => new()
+    {
+        Number = number,
+        Title = $"Epic {number}",
+        StoryCount = 0,
+        StoriesWithArtifact = 0,
+        TasksDone = 0,
+        TasksTotal = 0,
+        Status = EpicStatus.Drafted,
+        StoryStatusCounts = new Dictionary<string, int>(),
     };
 
     private static EpicInfo Epic(int number, string title, params string[] storyIds) => new()

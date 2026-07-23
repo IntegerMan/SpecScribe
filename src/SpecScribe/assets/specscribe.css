@@ -1557,6 +1557,67 @@ a.ref-file-node:focus-visible {
 }
 
 /* ========================================================================
+   Standard tab control (Story 19.2) — the portal's reusable pure-CSS, no-JS
+   tabs (TabStrip.cs): the same radio + :has(:checked) idiom the code pages
+   use, generalized so detail pages (epic/story "Overview | Work Graph") can
+   reuse ONE control. Neutral ink/border/parchment/gold tokens only.
+   ======================================================================== */
+.ss-tabs { margin-top: 1.5rem; }
+
+.ss-tablist {
+  border: 0;
+  margin: 0 0 1.25rem;
+  display: inline-flex;
+  gap: 0.25rem;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.25rem;
+}
+
+.ss-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-light);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ss-tab .ss-icon { margin-right: 0; }
+
+.ss-tab-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ss-tab:hover { color: var(--ink); }
+
+.ss-tab:has(.ss-tab-input:checked) {
+  background: var(--ink);
+  color: var(--parchment);
+}
+
+.ss-tab:has(.ss-tab-input:focus-visible) {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Exactly one panel shows at a time. Shipped modifiers: overview, graph (add a reveal pair for any new one). */
+.ss-tabpanel { display: none; }
+.ss-tabs:has(.ss-tab--overview .ss-tab-input:checked) .ss-tabpanel--overview,
+.ss-tabs:has(.ss-tab--graph .ss-tab-input:checked) .ss-tabpanel--graph {
+  display: block;
+}
+
+/* ========================================================================
    Work graph (Story 19.2) — the epic-scoped provenance subgraph. A layered
    DIRECTED graph (Epic · Stories · Follow-ups · Origins), distinct from the
    hub-and-spoke reference graph above. Node kind is carried by SHAPE, edge
@@ -1565,7 +1626,6 @@ a.ref-file-node:focus-visible {
    ======================================================================== */
 .work-graph-intro {
   color: var(--ink-light);
-  max-width: 62ch;
   margin: 0 0 1rem;
 }
 
@@ -1664,12 +1724,12 @@ a.work-node:focus-visible {
   outline-offset: 2px;
 }
 
-/* Scope picker — the "jump to one epic at a time" affordance (AC #1). Plain anchor pills, no JS. */
+/* Scope picker — a dropdown to focus one epic's subgraph (AC #1). Progressive enhancement: JS-off shows all. */
 .work-graph-scope {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   margin: 0 0 1.5rem;
 }
 
@@ -1678,20 +1738,20 @@ a.work-node:focus-visible {
   font-size: 0.9rem;
 }
 
-.work-graph-scope-chip {
-  display: inline-block;
-  padding: 0.15rem 0.6rem;
+.work-graph-scope-select {
+  padding: 0.25rem 0.5rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.85rem;
-  text-decoration: none;
+  border-radius: 6px;
+  background: var(--parchment);
   color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
 }
 
-.work-graph-scope-chip:hover,
-.work-graph-scope-chip:focus-visible {
-  border-color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 12%, transparent);
+.work-graph-scope-select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
 }
 
 .work-graph-section {

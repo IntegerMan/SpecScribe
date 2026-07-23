@@ -94,6 +94,10 @@ public static class Icons
             // A scatter of dots against crossed axes — the shared glyph for the refactor-target risk quadrant
             // surface (nav item + dashboard quick link both reuse this ONE key). [Story 7.10]
             "Risk Quadrant" => Svg("<path d=\"M3 2.6v10.8h10.4\"/><circle cx=\"6.2\" cy=\"9.6\" r=\"0.9\"/><circle cx=\"8.4\" cy=\"7.2\" r=\"0.9\"/><circle cx=\"11.2\" cy=\"4.6\" r=\"1.1\"/>"),
+            // A small directed node graph — the epic-scoped work-graph surface (nav item + dashboard quick link
+            // reuse this ONE key). Nodes wired left → right to echo the page's carrier → target provenance flow.
+            // [Story 19.2]
+            "Work Graph" => Svg("<circle cx=\"3.4\" cy=\"8\" r=\"1.5\"/><circle cx=\"8\" cy=\"4.2\" r=\"1.5\"/><circle cx=\"8\" cy=\"11.8\" r=\"1.5\"/><circle cx=\"12.6\" cy=\"8\" r=\"1.5\"/><path d=\"M4.7 7.1 6.7 5.1M4.7 8.9 6.7 10.9M9.3 5.1 11.3 7.1M9.3 10.9 11.3 8.9\"/>"),
             "Planning Artifacts" => Svg("<path d=\"M8 2.6v1.8M8 11.6v1.8M2.6 8h1.8M11.6 8h1.8\"/><circle cx=\"8\" cy=\"8\" r=\"3.4\"/>"),
             "Spec Kernel" => Svg("<path d=\"M4.2 7.2h7.6v6H4.2Z\"/><path d=\"M5.8 7.2V5.4a2.2 2.2 0 0 1 4.4 0v1.8\"/>"),
             "Implementation Artifacts" => Svg("<path d=\"M9.6 2.9a3 3 0 0 1 3.5 3.5l-5.4 5.4-3.9.9.9-3.9Z\"/>"),

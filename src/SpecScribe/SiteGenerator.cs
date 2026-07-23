@@ -2320,7 +2320,7 @@ public sealed class SiteGenerator
             foreach (var epic in model.Epics)
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
+                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number)), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
 
                 foreach (var story in epic.Stories)
                 {
@@ -2338,7 +2338,7 @@ public sealed class SiteGenerator
 
                     // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                     var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact);
+                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps));
                     File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
                 }
             }
@@ -2535,7 +2535,7 @@ public sealed class SiteGenerator
                 foreach (var epic in model.Epics)
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact);
+                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number));
                     surfaces.Add(WebviewSurfaceFor(epicPage, _epicsSourcePath, skipEpicNumber: epic.Number));
 
                     var outlineStories = new List<OutlineStory>();
@@ -2560,7 +2560,7 @@ public sealed class SiteGenerator
                                 storyPage = EpicsTemplater.BuildStoryPage(
                                     epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                                     f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                                    _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact);
+                                    _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps));
                             }
                             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                             {
@@ -2800,7 +2800,7 @@ public sealed class SiteGenerator
             {
                 var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
                 AddSpaSurface(pages, familyPaths,
-                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact),
+                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number)),
                     skipEpicNumber: epic.Number);
 
                 foreach (var story in epic.Stories)
@@ -2818,7 +2818,7 @@ public sealed class SiteGenerator
                         EpicsTemplater.BuildStoryPage(
                             epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                             f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                            _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact),
+                            _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps)),
                         skipStoryId: story.Id);
                 }
             }
@@ -3226,6 +3226,18 @@ public sealed class SiteGenerator
             return WorkGraphModel.Empty;
         }
     }
+
+    /// <summary>The already-projected epic subgraph for an epic's own page tab (Story 19.2) — root-relative; the
+    /// templater re-prefixes it for the <c>epics/</c> page depth. Null when the epic carries no graph signal (no
+    /// tab is shown). Excludes the synthetic Unattributed bucket (it has no epic page).</summary>
+    private WorkGraphEpic? EpicSubgraph(int epicNumber) =>
+        _workGraph.Epics.FirstOrDefault(e => e.BucketLabel is null && e.EpicNumber == epicNumber);
+
+    /// <summary>A story-scoped provenance subgraph for a story's own page tab (Story 19.2): the deferred work that
+    /// stemmed from this story + resolvers. Null when nothing stemmed from it (no tab). Built on demand from the
+    /// caller's geometry (root-relative; the templater re-prefixes).</summary>
+    private static WorkGraphEpic? StorySubgraph(EpicInfo epic, StoryInfo story, FollowUpGeometry? followUps) =>
+        WorkGraphBuilder.BuildStory(story, PathUtil.StripHtmlTags(epic.Title), followUps);
 
     /// <summary>Writes <c>work-graph.html</c> — the epic-scoped provenance subgraph page (Story 19.2) — from the
     /// <see cref="_workGraph"/> model already projected + gated before nav. Empty model → no page (NFR8; the nav

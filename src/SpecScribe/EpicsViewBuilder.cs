@@ -58,7 +58,8 @@ public static class EpicsViewBuilder
         string? epicRetroPath,
         FollowUpGeometry? followUps = null,
         UnplannedWorkGeometry? unplanned = null,
-        PlanningCodeImpactData? impact = null)
+        PlanningCodeImpactData? impact = null,
+        WorkGraphEpic? workGraph = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var prefix = Prefix(outputPath);
@@ -136,6 +137,7 @@ public static class EpicsViewBuilder
             FollowUps = epicFollowUps,
             UnplannedWork = epicUnplanned,
             RetiredNoticesHtml = epic.RetiredNoticesHtml,
+            WorkGraph = workGraph,
         };
     }
 
@@ -193,7 +195,8 @@ public static class EpicsViewBuilder
         CommandCatalog commands,
         string? epicRetroPath,
         FollowUpGeometry? followUps = null,
-        PlanningCodeImpactData? impact = null)
+        PlanningCodeImpactData? impact = null,
+        WorkGraphEpic? workGraph = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"BuildStory called for story {story.Id} with no resolved artifact.");
@@ -227,6 +230,7 @@ public static class EpicsViewBuilder
                 prefix),
             DeferredFromThis = deferred,
             DeferredListHref = deferredListHref,
+            WorkGraph = workGraph,
         };
     }
 

@@ -63,6 +63,20 @@ public sealed record WorkGraphEpic(
 
     /// <summary>Stable in-page anchor / section id for the scope picker.</summary>
     public string Anchor => BucketLabel is null ? $"wg-epic-{EpicNumber}" : "wg-unattributed";
+
+    /// <summary>A copy with every node href re-prefixed for a deeper page (e.g. <c>"../"</c> for the epic/story
+    /// detail pages under <c>epics/</c>). The model is projected root-relative for <c>work-graph.html</c>; this
+    /// re-roots those hrefs when the same subgraph is embedded elsewhere. No-op for the root page. [Story 19.2]</summary>
+    public WorkGraphEpic Reprefixed(string linkPrefix)
+    {
+        if (string.IsNullOrEmpty(linkPrefix)) return this;
+        var nodes = Nodes
+            .Select(n => n.Href is { Length: > 0 } h
+                ? n with { Href = FollowUpGeometry.ApplyLinkPrefix(linkPrefix, h) }
+                : n)
+            .ToList();
+        return this with { Nodes = nodes };
+    }
 }
 
 /// <summary>The whole-portal work graph: one <see cref="WorkGraphEpic"/> per epic that carries a graph signal
@@ -281,6 +295,64 @@ public static class WorkGraphBuilder
 
         var cycles = FindCycles(nodes.Select(n => n.Id).ToList(), edges);
         return new WorkGraphEpic(epicNumber, epicTitle, nodes, edges, cycles, overflow) { BucketLabel = bucketLabel };
+    }
+
+    /// <summary>Projects a <em>story-scoped</em> subgraph for embedding on a story page (Story 19.2): the story
+    /// and the deferred items that <em>stemmed from it</em> (the reverse "Deferred from this" set —
+    /// <see cref="FollowUpGeometry.DeferredForSource"/>), plus each item's resolver, all under the story's epic
+    /// root so the layered layout reads Epic → Story → Deferred → Resolvers. Root-relative hrefs (caller re-prefixes
+    /// via <see cref="WorkGraphEpic.Reprefixed"/>). Returns null when nothing stemmed from the story — no tab.</summary>
+    public static WorkGraphEpic? BuildStory(StoryInfo story, string epicTitle, FollowUpGeometry? followUps)
+    {
+        if (followUps is null) return null;
+        var deferred = followUps.DeferredForSource(story.Id);
+        if (deferred.Count == 0) return null;
+
+        var nodes = new List<WorkNode>();
+        var byId = new HashSet<string>(StringComparer.Ordinal);
+        var edges = new List<WorkEdge>();
+
+        static string? Root(string? href) =>
+            string.IsNullOrEmpty(href) ? href : FollowUpGeometry.ApplyLinkPrefix("", href!);
+        string Add(WorkNodeKind kind, string id, string label, string? href, string? title = null)
+        {
+            if (byId.Add(id)) nodes.Add(new WorkNode(kind, id, label, Root(href), title));
+            return id;
+        }
+        void Link(string from, string to, WorkEdgeKind kind)
+        {
+            if (!string.Equals(from, to, StringComparison.Ordinal)) edges.Add(new WorkEdge(from, to, kind));
+        }
+
+        var epicId = Add(WorkNodeKind.Epic, $"e{story.EpicNumber}", $"Epic {story.EpicNumber}",
+            StoryEpicLinkifier.EpicPagePath(story.EpicNumber), epicTitle.Length > 0 ? epicTitle : null);
+        var sid = Add(WorkNodeKind.Story, $"s{story.Id}", $"Story {story.Id}",
+            StoryEpicLinkifier.StoryPagePath(story.Id), PathUtil.StripHtmlTags(story.Title));
+        Link(sid, epicId, WorkEdgeKind.Contains);
+
+        var overflow = 0;
+        for (var i = 0; i < deferred.Count; i++)
+        {
+            if (i >= MaxFollowUpsPerEpic) { overflow = deferred.Count - i; break; }
+            var slot = deferred[i];
+            var did = Add(WorkNodeKind.Deferred, $"d-{i}", Summarize(slot.Item.BodyHtml),
+                slot.DetailHref, slot.ProvenanceLabel);
+            Link(did, sid, WorkEdgeKind.StemmedFrom); // stemmed from THIS story
+
+            if (slot.Item.Resolved && !string.IsNullOrWhiteSpace(slot.Item.ResolvingRef))
+            {
+                var reff = slot.Item.ResolvingRef!.Trim();
+                var bare = System.IO.Path.GetFileName(reff.Replace('\\', '/'));
+                var kind = DottedStoryId.IsMatch(bare) ? WorkNodeKind.Story : WorkNodeKind.Spec;
+                var rid = Add(kind, $"res:{FollowUpGeometry.NormalizeSourceKey(reff)}",
+                    FollowUpRefs.ResolvingLabel(reff), slot.Item.ResolvingHref);
+                Link(did, rid, WorkEdgeKind.Resolves);
+            }
+        }
+
+        if (edges.Count == 0) return null;
+        var cycles = FindCycles(nodes.Select(n => n.Id).ToList(), edges);
+        return new WorkGraphEpic(story.EpicNumber, epicTitle, nodes, edges, cycles, overflow);
     }
 
     /// <summary>Short plain-text label for a deferred item's HTML body (tags stripped, whitespace collapsed,
