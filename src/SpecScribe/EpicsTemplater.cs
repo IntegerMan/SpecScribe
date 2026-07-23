@@ -50,12 +50,12 @@ public static class EpicsTemplater
         return page;
     }
 
-    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildEpicPage(epic, progress, nav, commands, epicRetroPath, pager, followUps, unplanned)).Content;
+    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, WorkGraphEpic? workGraph = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildEpicPage(epic, progress, nav, commands, epicRetroPath, pager, followUps, unplanned, workGraph)).Content;
 
     /// <summary>Builds an epic page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why the
     /// build/render split exists. [Story 6.4]</summary>
-    public static PageView BuildEpicPage(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
+    public static PageView BuildEpicPage(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, WorkGraphEpic? workGraph = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
@@ -67,7 +67,11 @@ public static class EpicsTemplater
             (EpicCrumbLabel(epic), null),
         });
 
-        var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath, followUps, unplanned);
+        // Story 19.2: pass this epic's provenance subgraph (re-prefixed for the epics/ depth) into the view so the
+        // body renderer wraps the content in the "Overview | Work Graph" tab (below the header, inside page-main).
+        // Absent subgraph → page unchanged (no empty tab).
+        var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath, followUps, unplanned,
+            workGraph?.Reprefixed(PathUtil.RelativePrefix(outputPath)));
         var body = HtmlRenderAdapter.Shared.RenderEpicBody(view);
 
         // An epic drills up to the epics index and down to each of its story pages (drafted → the story's
@@ -117,10 +121,11 @@ public static class EpicsTemplater
         CommandCatalog commands,
         string? epicRetroPath = null,
         EntityPager? pager = null,
-        FollowUpGeometry? followUps = null) =>
+        FollowUpGeometry? followUps = null,
+        WorkGraphEpic? workGraph = null) =>
         HtmlRenderAdapter.Shared.Render(BuildStoryPage(
             epic, story, artifactSourceRelativePath, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord,
-            tasks, reviewFindingsHtml, changeLogHtml, evidence, changeSurface, nav, commands, epicRetroPath, pager, followUps)).Content;
+            tasks, reviewFindingsHtml, changeLogHtml, evidence, changeSurface, nav, commands, epicRetroPath, pager, followUps, workGraph)).Content;
 
     /// <summary>Builds a drafted story page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why
     /// the build/render split exists. [Story 6.4]</summary>
@@ -141,7 +146,8 @@ public static class EpicsTemplater
         CommandCatalog commands,
         string? epicRetroPath = null,
         EntityPager? pager = null,
-        FollowUpGeometry? followUps = null)
+        FollowUpGeometry? followUps = null,
+        WorkGraphEpic? workGraph = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"RenderStory called for story {story.Id} with no resolved artifact.");
@@ -156,9 +162,12 @@ public static class EpicsTemplater
             ($"Story {story.Id}", null),
         });
 
+        // Story 19.2: pass this story's provenance subgraph (re-prefixed for the epics/ depth) into the view so the
+        // body renderer wraps the content in the "Overview | Work Graph" tab. Absent subgraph → page unchanged.
         var view = EpicsViewBuilder.BuildStory(
             epic, story, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, followUps);
+            reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, followUps,
+            workGraph?.Reprefixed(PathUtil.RelativePrefix(outputPath)));
         var body = HtmlRenderAdapter.Shared.RenderStoryBody(view);
 
         // A story is a drill leaf (no children); it drills up to its epic page. Its status stage is the story

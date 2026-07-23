@@ -1376,4 +1376,23 @@
     // the chart showing stale colors until the next manual interaction. [Review 2026-07-22]
     applyMode();
   }
+
+  // Work graph (Story 19.2): the scope <select> filters the page to one epic's subgraph (or "All epics").
+  // Progressive enhancement — with JS off every .work-graph-section stays visible (the server default); JS only
+  // focuses the chosen scope. Never throws: a failure leaves all sections shown.
+  Array.prototype.forEach.call(document.querySelectorAll(".work-graph-scope-select"), function (sel) {
+    try { initWorkGraphScope(sel); } catch (err) { /* degrade: all sections remain visible */ }
+  });
+  function initWorkGraphScope(sel) {
+    var sections = document.querySelectorAll(".work-graph-section");
+    if (!sections.length) return;
+    function apply() {
+      var v = sel.value;
+      Array.prototype.forEach.call(sections, function (s) {
+        s.hidden = v !== "__all__" && s.id !== v;
+      });
+    }
+    sel.addEventListener("change", apply);
+    apply(); // honor a restored (bfcache) selection on load
+  }
 })();

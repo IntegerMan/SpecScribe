@@ -32,12 +32,17 @@ public static class WorkGraphTemplater
 
         sb.Append(RenderLegend());
 
-        // Scope picker: jump to any single epic's subgraph (progressive-enhancement — plain anchors, no JS). AC #1.
-        sb.Append("<nav class=\"work-graph-scope\" aria-label=\"Jump to an epic's work graph\">\n");
-        sb.Append("  <span class=\"work-graph-scope-label\">Jump to:</span>\n");
+        // Scope picker: a dropdown to focus one epic's subgraph. Progressive enhancement — with JS off every
+        // section shows (the "All epics" default is server-rendered and the option is pre-selected); with JS on the
+        // select filters to the chosen scope. The <option> values match each section's id. [Story 19.2]
+        sb.Append("<div class=\"work-graph-scope\">\n");
+        sb.Append("  <label class=\"work-graph-scope-label\" for=\"wg-scope\">Show:</label>\n");
+        sb.Append("  <select class=\"work-graph-scope-select\" id=\"wg-scope\">\n");
+        sb.Append("    <option value=\"__all__\">All epics</option>\n");
         foreach (var e in model.Epics)
-            sb.Append($"  <a class=\"work-graph-scope-chip\" href=\"#{e.Anchor}\">{PathUtil.Html(e.DisplayName)}</a>\n");
-        sb.Append("</nav>\n\n");
+            sb.Append($"    <option value=\"{e.Anchor}\">{PathUtil.Html(e.DisplayName)}</option>\n");
+        sb.Append("  </select>\n");
+        sb.Append("</div>\n\n");
 
         foreach (var epic in model.Epics)
             sb.Append(RenderEpicSection(epic));
@@ -73,16 +78,38 @@ public static class WorkGraphTemplater
                 : $"Epic {epic.EpicNumber}";
         sb.Append($"<section class=\"work-graph-section\" id=\"{epic.Anchor}\" aria-labelledby=\"{epic.Anchor}-h\">\n");
         sb.Append($"  <h2 id=\"{epic.Anchor}-h\">{heading}</h2>\n");
+        sb.Append(RenderGraphPanel(epic));
+        sb.Append("</section>\n\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The graph itself — SVG + overflow note + complete sr-only enumeration + circular/ambiguous query
+    /// panel — WITHOUT the page-section chrome. Shared by the standalone page's per-epic sections and by the
+    /// embedded epic/story-page tabs (<see cref="RenderEmbedded"/>) so both stay identical. [Story 19.2]</summary>
+    public static string RenderGraphPanel(WorkGraphEpic epic)
+    {
+        var sb = new StringBuilder();
         sb.Append("  <div class=\"work-graph-wrap\">\n");
         sb.Append(Charts.WorkGraph(epic));
         sb.Append("  </div>\n");
-
         if (epic.Overflow > 0)
             sb.Append($"  <p class=\"work-graph-overflow\">+{epic.Overflow} more follow-up {Charts.Plural(epic.Overflow, "item", "items")} not drawn (listed below).</p>\n");
-
         sb.Append(RenderSrEnumeration(epic));
         sb.Append(RenderQueryPanel(epic));
-        sb.Append("</section>\n\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The graph panel wrapped for a detail-page tab: a short lead-in plus the shared
+    /// <see cref="RenderGraphPanel"/>. When <paramref name="epic"/> is null (the entity has no provenance
+    /// subgraph) the tab shows an honest <paramref name="emptyMessage"/> instead — so the "Work Graph" tab is a
+    /// consistent, discoverable control on every epic/story page (owner decision). [Story 19.2]</summary>
+    public static string RenderEmbedded(WorkGraphEpic? epic, string leadIn, string emptyMessage)
+    {
+        if (epic is null)
+            return $"<p class=\"work-graph-empty\">{PathUtil.Html(emptyMessage)}</p>\n";
+        var sb = new StringBuilder();
+        sb.Append($"<p class=\"work-graph-intro\">{PathUtil.Html(leadIn)}</p>\n");
+        sb.Append(RenderGraphPanel(epic));
         return sb.ToString();
     }
 

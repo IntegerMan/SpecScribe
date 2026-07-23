@@ -194,6 +194,10 @@ public sealed record EpicPageView
     /// <summary>Rendered retirement/superseded notices for this epic (Story 10.5, AC3) — rendered in a
     /// collapsed "Retired" section after the story cards; empty omits the section entirely (NFR8).</summary>
     public IReadOnlyList<string> RetiredNoticesHtml { get; init; } = Array.Empty<string>();
+
+    /// <summary>This epic's provenance subgraph, re-prefixed for the epic page depth, or null. When set, the body
+    /// renderer wraps the page content in the "Overview | Work Graph" tab control. [Story 19.2]</summary>
+    public WorkGraphEpic? WorkGraph { get; init; }
 }
 
 /// <summary>Compact verification facts for the story-page evidence strip — tasks (from
@@ -291,6 +295,11 @@ public sealed record StoryPageView
 
     /// <summary>Fallback href for reverse-panel rows whose detail URL is missing (deferred-work list).</summary>
     public string? DeferredListHref { get; init; }
+
+    /// <summary>This story's provenance subgraph (deferred that stemmed from it + resolvers), re-prefixed for the
+    /// story page depth, or null. When set, the body renderer wraps the page content in the "Overview | Work
+    /// Graph" tab control. [Story 19.2]</summary>
+    public WorkGraphEpic? WorkGraph { get; init; }
 }
 
 /// <summary>The host-neutral SECTION view model for a STORY PLACEHOLDER page body (a story listed in epics.md
