@@ -111,6 +111,10 @@ public sealed class SiteGenerator
     // Story 8.3: portal-wide count ledger — built once after progress/sprint/workInventory are known and
     // threaded into every summary surface so no render site recounts. Null until the index/work phase.
     private ProjectCounts? _counts;
+    // Story 21.2: delivery-cadence dataset (done-story completion days + cycle-times) — built ONCE in GenerateAll
+    // after ProgressCalculator has filled each story's LastUpdatedDate, then shared by WriteCadence and the
+    // dashboard strip so the (bounded, per-done-story) first-touch git lookups run only once. Null until built.
+    private DeliveryCadenceData? _cadence;
     private List<RetroModel> _retros = new();
     private ArtifactCoverage _coverage = ArtifactCoverage.Empty;
 
@@ -373,6 +377,11 @@ public sealed class SiteGenerator
             // The requirement traceability matrix (Story 21.1) — shares Requirements' hasEpics gate; needs
             // _counts (built just above) for its ledger-sourced legend/ranking caption.
             WriteTraceability(nav);
+            // Delivery cadence (Story 21.2) — built ONCE here (after ProgressCalculator filled LastUpdatedDate),
+            // then shared by WriteCadence and the dashboard strip (WriteIndex reads _cadence). The bounded
+            // per-done-story first-touch git lookups happen exactly once, in this build.
+            _cadence = DeliveryCadence.Build(_epicsModel, DeliveryCadence.GitFirstTouchResolver(_options.RepoRoot));
+            WriteCadence(nav);
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
             RefreshFollowUpSurfaces(nav, workInventory);
@@ -2477,7 +2486,7 @@ public sealed class SiteGenerator
             var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned);
+                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -2744,7 +2753,7 @@ public sealed class SiteGenerator
         var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
@@ -2915,7 +2924,7 @@ public sealed class SiteGenerator
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(inventory, counts);
         var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
@@ -3138,6 +3147,21 @@ public sealed class SiteGenerator
 
         var html = TraceabilityTemplater.RenderPage(_requirements, _epicsModel, nav, _counts);
         WriteOutput(SiteNav.TraceabilityOutputPath, ApplyReferenceLinks(html, SiteNav.TraceabilityOutputPath));
+    }
+
+    /// <summary>Writes <c>cadence.html</c> — the delivery-cadence page (story-completion heatmap + cycle-time
+    /// histogram, Story 21.2). Shares <see cref="SiteNav.RequirementsOutputPath"/>'s <c>hasEpics</c> gate (the
+    /// cadence reads the epics roster's done-story dates), so it omits exactly when Epics/Requirements would; when
+    /// <c>hasEpics</c> is true but no story is done yet, the page still writes with its honest empty-state charts.
+    /// Reads the shared <see cref="_cadence"/> dataset (built once in <see cref="GenerateAll"/>). Bounds the heatmap
+    /// grid with the single per-run "today" so a from-scratch regen is byte-identical (FR31).</summary>
+    private void WriteCadence(SiteNav nav)
+    {
+        if (_epicsModel is null || _cadence is null) return;
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var html = CadenceTemplater.RenderPage(_epicsModel, _cadence, nav, today);
+        WriteOutput(SiteNav.CadenceOutputPath, ApplyReferenceLinks(html, SiteNav.CadenceOutputPath));
     }
 
     /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the

@@ -1,6 +1,10 @@
+---
+baseline_commit: eaa2348370b18dd40cb0ab06afeef9701f9b03fc
+---
+
 # Story 21.2: Delivery Cadence & Story Cycle-Time
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -61,42 +65,42 @@ This is a rendering **and** light-computation story, not a brand-new git subsyst
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Delivery-cadence data builder (AC: #1, #2)**
-  - [ ] New static class (e.g. `src/SpecScribe/DeliveryCadence.cs`, mirroring the `ArtifactCoverage`/`WorkInventory` shape: static class + plain records, no DI) that, given `EpicsModel` + a repo root/git accessor:
+- [x] **Task 1 — Delivery-cadence data builder (AC: #1, #2)**
+  - [x] New static class (e.g. `src/SpecScribe/DeliveryCadence.cs`, mirroring the `ArtifactCoverage`/`WorkInventory` shape: static class + plain records, no DI) that, given `EpicsModel` + a repo root/git accessor:
     - Filters `epics.Epics.SelectMany(e => e.Stories)` to `StatusStyles.ForStory(s) == "done"`.
     - For each, resolves a completion day from `story.LastUpdatedDate` (skip — don't fabricate — when null).
     - Buckets completions by day into a `(DateOnly Day, int Count)` series (same shape `Charts.CommitHeatmap` already consumes) plus a day→story-list map (for cell links/tooltips, mirroring `commitsByDay`'s role).
     - For cycle-time: resolves first-touch via the new `GitMetrics.TryGetFirstCommitDate` (or equivalent) per story with a resolvable done-date; computes day-deltas; skips (never negative-clamps or fabricates) any story where first-touch fails to resolve or would produce a negative/zero-inflated result from a clearly bad match.
     - Returns something like `DeliveryCadenceData(IReadOnlyList<(DateOnly Day, int Count)> CompletionSeries, IReadOnlyDictionary<DateOnly, IReadOnlyList<StoryInfo>> CompletionsByDay, IReadOnlyList<(string StoryId, int Days)> CycleTimes)` — exact shape is your call, but keep it a plain, pure, git-repo-root-taking function (no `SiteGenerator` coupling) so it unit-tests like `GitMetrics.ParseNumstatLog` does (pure over pre-fetched/injectable data where feasible).
     - Never throws (AD-4/NFR2) — any resolution failure for a single story just excludes that story; total absence of data is a normal, expected empty-result case, not an exception.
-  - [ ] Add `GitMetrics.TryGetFirstCommitDate(string repoRoot, string repoRelativePath)` (or equivalent) per the "Data sources" section above — a bounded, per-file, never-throwing git shell-out using the existing `RunGit`/`Timeout` plumbing.
+  - [x] Add `GitMetrics.TryGetFirstCommitDate(string repoRoot, string repoRelativePath)` (or equivalent) per the "Data sources" section above — a bounded, per-file, never-throwing git shell-out using the existing `RunGit`/`Timeout` plumbing.
 
-- [ ] **Task 2 — Chart builders + Story 10.2 framing (AC: #1)**
-  - [ ] Add `ChartMetric.DeliveryCadence` to the enum ([`Charts.cs:13-26`]) + its `WhyText` case: a metric-generic (NFR8), framework-neutral sentence distinct from `ActivityCadence`'s copy — e.g. *"How often stories reach done reveals the project's real delivery rhythm — steady drips and bursts both tell you something commit activity alone doesn't."*
-  - [ ] **Cadence heatmap.** Either (a) extract a shared private grid-drawing engine out of `Charts.CommitHeatmap` that both it and a new `Charts.DeliveryCadenceHeatmap(...)` call (parameterized by per-day counts + a per-day href/tooltip resolver), or (b) write `Charts.DeliveryCadenceHeatmap` as its own sibling builder modeled closely on `CommitHeatmap`'s structure (grid sizing, week/month labels, `HeatLevel`/`HeatLevelRange` reuse, real-value legend, "never color-only" `<title>`s). **If you extract a shared engine, `CommitHeatmap`'s own existing output and its own tests must stay byte-identical** — that chart is live on `git-insights.html`/`timeline.html` today and any regression there is out of this story's scope. When in doubt, prefer (b) — a sibling builder — over a risky refactor of shipped code. Cells link to the completed story's page when exactly one story completed that day; multiple same-day completions get a rich tooltip listing all of them (mirror the `js-tip`/`data-tip` pattern, never CSS `::after` inside an overflow container — memory `tooltip-clipping-use-ss-tooltip-node`).
-  - [ ] **Cycle-time histogram.** New `Charts.CycleTimeHistogram(IReadOnlyList<(string StoryId, int Days)> cycleTimes, Func<string, string?>? storyHref = null)` modeled on `Charts.HotspotBars` ([`Charts.cs:1666-1684`]): bucket into human-readable day ranges, one bar per bucket, proportional width by count, real count label (never color/width-only). Degrades to a `chart-empty`-style note when no story has a derivable cycle-time (AC #2) — this is an expected, common case for young/small projects, not an error state.
-  - [ ] Render both through `Charts.Framed` with `ChartMeta(Title, Window, Ranking, Why: WhyText(ChartMetric.DeliveryCadence))` — separate `Framed` calls for the two charts (they have different windows: the heatmap's window is a date span like `CommitHeatmap`'s; the histogram's "window" is the set of completed stories it covers, e.g. `"{n} completed stories with a derivable cycle-time"`). The cycle-time frame's `Why`/caption text is where the "approximate — measured story-file age, not a tracked workflow timestamp" honesty caveat belongs (Note slot or folded into Why — your call, but it must be visible, not buried).
+- [x] **Task 2 — Chart builders + Story 10.2 framing (AC: #1)**
+  - [x] Add `ChartMetric.DeliveryCadence` to the enum ([`Charts.cs:13-26`]) + its `WhyText` case: a metric-generic (NFR8), framework-neutral sentence distinct from `ActivityCadence`'s copy — e.g. *"How often stories reach done reveals the project's real delivery rhythm — steady drips and bursts both tell you something commit activity alone doesn't."*
+  - [x] **Cadence heatmap.** Either (a) extract a shared private grid-drawing engine out of `Charts.CommitHeatmap` that both it and a new `Charts.DeliveryCadenceHeatmap(...)` call (parameterized by per-day counts + a per-day href/tooltip resolver), or (b) write `Charts.DeliveryCadenceHeatmap` as its own sibling builder modeled closely on `CommitHeatmap`'s structure (grid sizing, week/month labels, `HeatLevel`/`HeatLevelRange` reuse, real-value legend, "never color-only" `<title>`s). **If you extract a shared engine, `CommitHeatmap`'s own existing output and its own tests must stay byte-identical** — that chart is live on `git-insights.html`/`timeline.html` today and any regression there is out of this story's scope. When in doubt, prefer (b) — a sibling builder — over a risky refactor of shipped code. Cells link to the completed story's page when exactly one story completed that day; multiple same-day completions get a rich tooltip listing all of them (mirror the `js-tip`/`data-tip` pattern, never CSS `::after` inside an overflow container — memory `tooltip-clipping-use-ss-tooltip-node`).
+  - [x] **Cycle-time histogram.** New `Charts.CycleTimeHistogram(IReadOnlyList<(string StoryId, int Days)> cycleTimes, Func<string, string?>? storyHref = null)` modeled on `Charts.HotspotBars` ([`Charts.cs:1666-1684`]): bucket into human-readable day ranges, one bar per bucket, proportional width by count, real count label (never color/width-only). Degrades to a `chart-empty`-style note when no story has a derivable cycle-time (AC #2) — this is an expected, common case for young/small projects, not an error state.
+  - [x] Render both through `Charts.Framed` with `ChartMeta(Title, Window, Ranking, Why: WhyText(ChartMetric.DeliveryCadence))` — separate `Framed` calls for the two charts (they have different windows: the heatmap's window is a date span like `CommitHeatmap`'s; the histogram's "window" is the set of completed stories it covers, e.g. `"{n} completed stories with a derivable cycle-time"`). The cycle-time frame's `Why`/caption text is where the "approximate — measured story-file age, not a tracked workflow timestamp" honesty caveat belongs (Note slot or folded into Why — your call, but it must be visible, not buried).
 
-- [ ] **Task 3 — Dedicated `cadence.html` page (AC: #1)**
-  - [ ] Add `SiteNav.CadenceOutputPath = "cadence.html"` (doc-commented like its siblings, [`SiteNav.cs:8-50`]) and a new `CadenceTemplater.RenderPage(EpicsModel, DeliveryCadenceData?, SiteNav, Func<string,string?>? storyHref)` mirroring `RiskQuadrantTemplater`'s shell exactly (head open → nav bar → breadcrumb → `<main id="main-content">` → two framed charts → footer) — it is the freshest "new standalone insights page" precedent in this codebase. [Source: `src/SpecScribe/RiskQuadrantTemplater.cs`]
-  - [ ] Wire a `WriteCadence(nav, epics)` in `SiteGenerator`, called near `WriteSprint`/`WriteRiskQuadrant` (after `_epicsModel`/`_progress` are populated — `StoryInfo.LastUpdatedDate` is filled in by `ProgressCalculator`, which must have already run). `WriteOutput(SiteNav.CadenceOutputPath, ApplyReferenceLinks(html, SiteNav.CadenceOutputPath))` — auto-captured into `_spaCapture` for SPA/webview parity for free; add a coherence test asserting it's present (mirror Story 7.9's `code-map.html` coherence check). [Source: `SiteGenerator.cs:2702-2710` `WriteOutput`; `SiteGenerator.cs:3120-3126` `WriteRiskQuadrant` call-site precedent]
-  - [ ] **Nav registration — Delivery group, `hasEpics` gate (no new flag).** `StoryInfo`/`LastUpdatedDate` come from `EpicsModel`, so gate on the SAME `hasEpics` signal that already gates Epics/Requirements ([`SiteNav.cs:200-208`]) — mirror Story 21.1's shared-gate reasoning exactly. Do **not** add a `hasCadence`/`hasSprint`-style second flag; the page's own internal AC #2 degrade (honest empty-state) handles the case where `hasEpics` is true but zero stories are done or no dates resolve.
-  - [ ] Confirm `BuildInsightsLocalContext`/`BuildDeliveryLocalContext`-equivalent local-context sub-header still resolves for the new page if the Delivery group participates in one (mirror whichever of Sprint/Requirements does). [Source: `SiteNav.cs:411` `BuildNavLocalContextFor…`]
+- [x] **Task 3 — Dedicated `cadence.html` page (AC: #1)**
+  - [x] Add `SiteNav.CadenceOutputPath = "cadence.html"` (doc-commented like its siblings, [`SiteNav.cs:8-50`]) and a new `CadenceTemplater.RenderPage(EpicsModel, DeliveryCadenceData?, SiteNav, Func<string,string?>? storyHref)` mirroring `RiskQuadrantTemplater`'s shell exactly (head open → nav bar → breadcrumb → `<main id="main-content">` → two framed charts → footer) — it is the freshest "new standalone insights page" precedent in this codebase. [Source: `src/SpecScribe/RiskQuadrantTemplater.cs`]
+  - [x] Wire a `WriteCadence(nav, epics)` in `SiteGenerator`, called near `WriteSprint`/`WriteRiskQuadrant` (after `_epicsModel`/`_progress` are populated — `StoryInfo.LastUpdatedDate` is filled in by `ProgressCalculator`, which must have already run). `WriteOutput(SiteNav.CadenceOutputPath, ApplyReferenceLinks(html, SiteNav.CadenceOutputPath))` — auto-captured into `_spaCapture` for SPA/webview parity for free; add a coherence test asserting it's present (mirror Story 7.9's `code-map.html` coherence check). [Source: `SiteGenerator.cs:2702-2710` `WriteOutput`; `SiteGenerator.cs:3120-3126` `WriteRiskQuadrant` call-site precedent]
+  - [x] **Nav registration — Delivery group, `hasEpics` gate (no new flag).** `StoryInfo`/`LastUpdatedDate` come from `EpicsModel`, so gate on the SAME `hasEpics` signal that already gates Epics/Requirements ([`SiteNav.cs:200-208`]) — mirror Story 21.1's shared-gate reasoning exactly. Do **not** add a `hasCadence`/`hasSprint`-style second flag; the page's own internal AC #2 degrade (honest empty-state) handles the case where `hasEpics` is true but zero stories are done or no dates resolve.
+  - [x] Confirm `BuildInsightsLocalContext`/`BuildDeliveryLocalContext`-equivalent local-context sub-header still resolves for the new page if the Delivery group participates in one (mirror whichever of Sprint/Requirements does). [Source: `SiteNav.cs:411` `BuildNavLocalContextFor…`]
 
-- [ ] **Task 4 — Compact preview strip on the dashboard (AC: #1)**
-  - [ ] Add a small dashboard panel/strip (e.g. via `DashboardViewBuilder` producing a pre-rendered HTML fragment field on `DashboardView`, mirroring the existing `NextStepsHtml` fragment precedent, [`DashboardViewBuilder.cs:79-82`]) summarizing recent cadence — e.g. completions in the last N weeks + a link "View delivery cadence →" to `cadence.html`. Route through the section-view-model builder path so HTML/webview/SPA stay parity-identical (memory `story-6-2-section-view-models-live`) — do not hand-append raw HTML in one adapter only.
-  - [ ] Gated on the same signal as the page (at least one done story with a resolvable date); absent, not an empty panel, when there's nothing to show (NFR8).
+- [x] **Task 4 — Compact preview strip on the dashboard (AC: #1)**
+  - [x] Add a small dashboard panel/strip (e.g. via `DashboardViewBuilder` producing a pre-rendered HTML fragment field on `DashboardView`, mirroring the existing `NextStepsHtml` fragment precedent, [`DashboardViewBuilder.cs:79-82`]) summarizing recent cadence — e.g. completions in the last N weeks + a link "View delivery cadence →" to `cadence.html`. Route through the section-view-model builder path so HTML/webview/SPA stay parity-identical (memory `story-6-2-section-view-models-live`) — do not hand-append raw HTML in one adapter only.
+  - [x] Gated on the same signal as the page (at least one done story with a resolvable date); absent, not an empty panel, when there's nothing to show (NFR8).
 
-- [ ] **Task 5 — Tests (AC: #1, #2)**
-  - [ ] `DeliveryCadence`-builder tests (or wherever Task 1's class lands): correctly filters to `StatusStyles.ForStory == "done"`; excludes stories with a null `LastUpdatedDate`; excludes cycle-time entries where first-touch fails to resolve; never throws on a repo/story with zero done stories (returns an honest empty result).
-  - [ ] `GitMetrics.TryGetFirstCommitDate` (or equivalent): returns the correct earliest date for a file with multiple commits (assert against a fixture repo, not this real repo, so the test is hermetic); returns null (never throws) for a nonexistent path or non-repo directory.
-  - [ ] `ChartsTests`: `DeliveryCadenceHeatmap` — empty series → `chart-empty`; a day with one completion links to that story; a day with multiple completions gets a rich tooltip listing all; legend/window match the rendered grid. `CycleTimeHistogram` — empty → honest note; buckets sum to the total input count; never color-only (state/count text beside every bar). `WhyText(ChartMetric.DeliveryCadence)` returns a non-empty, framework-neutral, `ActivityCadence`-distinct sentence.
-  - [ ] Page + wiring: a `SiteGenerator*Tests` fixture with epics + done stories (with resolvable dates) writes `cadence.html`, appears in the Delivery nav, deep-links resolve; a fixture with **no** epics writes **no** `cadence.html` and shows no nav entry (shared `hasEpics` gate); a fixture with epics but zero done stories still writes the page with its honest empty-state (not omitted — matches the `hasEpics`-only gate decision above). SPA/webview coherence: `cadence.html` present in `_spaCapture`.
-  - [ ] Golden + parity: regenerate `GoldenContentFingerprint`/inventory (new page + dashboard strip change committed pages); eyeball the diff is scoped to this story's surfaces; confirm `CommitHeatmap`'s own existing tests are UNCHANGED and still green if you extracted a shared engine (Task 2 note). Keep `RenderParity`/SPA/webview suites green. [memory `golden-diff-normalization-gotchas`]
+- [x] **Task 5 — Tests (AC: #1, #2)**
+  - [x] `DeliveryCadence`-builder tests (or wherever Task 1's class lands): correctly filters to `StatusStyles.ForStory == "done"`; excludes stories with a null `LastUpdatedDate`; excludes cycle-time entries where first-touch fails to resolve; never throws on a repo/story with zero done stories (returns an honest empty result).
+  - [x] `GitMetrics.TryGetFirstCommitDate` (or equivalent): returns the correct earliest date for a file with multiple commits (assert against a fixture repo, not this real repo, so the test is hermetic); returns null (never throws) for a nonexistent path or non-repo directory.
+  - [x] `ChartsTests`: `DeliveryCadenceHeatmap` — empty series → `chart-empty`; a day with one completion links to that story; a day with multiple completions gets a rich tooltip listing all; legend/window match the rendered grid. `CycleTimeHistogram` — empty → honest note; buckets sum to the total input count; never color-only (state/count text beside every bar). `WhyText(ChartMetric.DeliveryCadence)` returns a non-empty, framework-neutral, `ActivityCadence`-distinct sentence.
+  - [x] Page + wiring: a `SiteGenerator*Tests` fixture with epics + done stories (with resolvable dates) writes `cadence.html`, appears in the Delivery nav, deep-links resolve; a fixture with **no** epics writes **no** `cadence.html` and shows no nav entry (shared `hasEpics` gate); a fixture with epics but zero done stories still writes the page with its honest empty-state (not omitted — matches the `hasEpics`-only gate decision above). SPA/webview coherence: `cadence.html` present in `_spaCapture`.
+  - [x] Golden + parity: regenerate `GoldenContentFingerprint`/inventory (new page + dashboard strip change committed pages); eyeball the diff is scoped to this story's surfaces; confirm `CommitHeatmap`'s own existing tests are UNCHANGED and still green if you extracted a shared engine (Task 2 note). Keep `RenderParity`/SPA/webview suites green. [memory `golden-diff-normalization-gotchas`]
 
-- [ ] **Task 6 — Verify end-to-end on this repo (AC: #1, #2)**
-  - [ ] `dotnet run` a full `--deep-git` generate to `SpecScribeOutput/` (never `--output docs/live` — memory `generate-output-dir-is-specscribeoutput`). Open `cadence.html`: the completion heatmap shows real done-story dates from this repo's own sprint-status/story-file history, cells link to the right story pages, the cycle-time histogram shows real buckets (or its honest empty/approximate state) with its "approximate" framing visible. Open `index.html`: the compact strip shows and links through. Confirm the same page renders correctly in `specscribe webview` and `--spa`.
-  - [ ] Spot-check at least 2-3 real completed stories' derived cycle-time against this repo's own git log by hand (the way this story's Dev Notes validated `7-9`'s 2026-07-19 → 2026-07-21 span) to confirm the first-touch/done-date resolution is actually correct, not just non-throwing.
+- [x] **Task 6 — Verify end-to-end on this repo (AC: #1, #2)**
+  - [x] `dotnet run` a full `--deep-git` generate to `SpecScribeOutput/` (never `--output docs/live` — memory `generate-output-dir-is-specscribeoutput`). Open `cadence.html`: the completion heatmap shows real done-story dates from this repo's own sprint-status/story-file history, cells link to the right story pages, the cycle-time histogram shows real buckets (or its honest empty/approximate state) with its "approximate" framing visible. Open `index.html`: the compact strip shows and links through. Confirm the same page renders correctly in `specscribe webview` and `--spa`.
+  - [x] Spot-check at least 2-3 real completed stories' derived cycle-time against this repo's own git log by hand (the way this story's Dev Notes validated `7-9`'s 2026-07-19 → 2026-07-21 span) to confirm the first-touch/done-date resolution is actually correct, not just non-throwing.
 
 ## Dev Notes
 
@@ -172,8 +176,45 @@ This is a rendering **and** light-computation story, not a brand-new git subsyst
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Code / bmad-dev-story)
+
 ### Debug Log References
+
+- Full `dotnet run -- generate --deep-git` on this repo: 644 pages, 0 errors. `cadence.html` renders 78 story completions across 16 active days (Jul 5–22 2026), a cycle-time histogram of 51/22/5/0/0 across the five buckets (78 total), and the visible "Approximate…" caveat.
+- Spot-checked first-touch/done resolution against real git history: 7.9 = 2026-07-19 → 2026-07-21 (2d, 0–3d bucket); 10.2 = 2026-07-12 → 2026-07-20 (8d, 8–14d); 19.1 = 2026-07-18 → 2026-07-22 (4d, 4–7d) — all correct.
+- Golden content fingerprint regenerated (`abbffbeff3ff96c1c694579a64c14eb107e963eb1a78aa71e67a7c19ef676a30`), verified stable across two repeated runs; golden output inventory gained `cadence.html`. Full suite: 2081 passed / 3 pre-existing skips.
 
 ### Completion Notes List
 
+- **Task 1** — `DeliveryCadence.Build` (new `DeliveryCadence.cs`): pure over `EpicsModel` + an injectable first-touch resolver. Done-classification routes only through `StatusStyles.ForStory`; completion days reuse the already-computed `StoryInfo.LastUpdatedDate` (zero new git work for the cadence half); a null date excludes the story (never fabricated). `GitMetrics.TryGetFirstCommitDate` added (bounded `git log --follow --diff-filter=A`, never-throws, mirrors `TryGetCurrentBranch`/`TryGetRemoteUrl`); cycle-time = done − first-touch, negative spans skipped (never clamped), zero-day spans kept.
+- **Task 2** — `ChartMetric.DeliveryCadence` + its distinct `WhyText`; `Charts.DeliveryCadenceHeatmap` written as an INDEPENDENT sibling of `CommitHeatmap` (reusing the private `HeatLevel`/`HeatLevelRange`/`IsHeatLevelUnreachable` helpers) so the shipped commit heatmap stays byte-identical. Single-completion days link to the story; multi-completion days carry a body-level `js-tip` rich tooltip; a text-equivalent completion log below the SVG is the a11y/no-JS twin. `Charts.CycleTimeHistogram` mirrors `HotspotBars` (proportional bars, real counts, never color-only); empty → honest note. `Charts.DeliveryCadenceStrip` for the dashboard reuses the Git Pulse signal-strip classes.
+- **Task 3** — new `CadenceTemplater` mirrors `TraceabilityTemplater`'s shell; both charts framed via `Charts.Framed`, the cycle-time frame carrying the "approximate — story-file age, not a tracked workflow timestamp" caveat in its Note slot. `SiteNav.CadenceOutputPath` + a "Cadence" Delivery nav entry on the shared `hasEpics` gate (no new flag); `SiteGenerator.WriteCadence` (auto-captured into `_spaCapture` for SPA/webview parity); `Icons.ForConcept("Cadence")` glyph.
+- **Task 4** — `DashboardView.CadenceStripHtml` fragment built by `DashboardViewBuilder` and rendered by the one `HtmlRenderAdapter`, so HTML/webview/SPA stay parity-identical; `cadence` threaded through `HtmlTemplater.RenderIndex`/`BuildIndexPage` and all three dashboard call-sites. Omitted (no empty panel) when there's nothing to show.
+- **Task 5** — new tests: `DeliveryCadenceTests` (builder honesty rules), `GitMetricsFirstCommitDateTests` (hermetic temp-repo, earliest-date + null degradation), `ChartsTests` additions (heatmap link/tooltip/log, histogram bucket-sum + never-color-only, why-text distinctness, strip), `SiteGeneratorCadenceTests` (page + nav gate + dashboard strip + no-broken-links + honest empty-state + SPA coherence). Fixtures updated: `SiteNavTests`, `RenderParityTests`, golden inventory + fingerprint.
+- **Task 6** — end-to-end verified on this repo (see Debug Log); dedicated page, dashboard strip, deep-links, cycle-time buckets, and the approximate framing all confirmed against real data.
+
 ### File List
+
+**Added**
+- `src/SpecScribe/DeliveryCadence.cs`
+- `src/SpecScribe/CadenceTemplater.cs`
+- `tests/SpecScribe.Tests/DeliveryCadenceTests.cs`
+- `tests/SpecScribe.Tests/GitMetricsFirstCommitDateTests.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorCadenceTests.cs`
+
+**Modified**
+- `src/SpecScribe/GitMetrics.cs` (`TryGetFirstCommitDate`)
+- `src/SpecScribe/Charts.cs` (`ChartMetric.DeliveryCadence` + `WhyText`; `DeliveryCadenceHeatmap` + `AppendCadenceLog`; `CycleTimeHistogram` + buckets; `DeliveryCadenceStrip`)
+- `src/SpecScribe/SiteNav.cs` (`CadenceOutputPath` + Delivery nav entry/quick-link)
+- `src/SpecScribe/SiteGenerator.cs` (`_cadence` field + build + `WriteCadence` + threading to WriteIndex/webview/SPA dashboards)
+- `src/SpecScribe/DashboardView.cs` (`CadenceStripHtml`)
+- `src/SpecScribe/DashboardViewBuilder.cs` (`cadence` param + strip build)
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` (cadence panel render)
+- `src/SpecScribe/HtmlTemplater.cs` (thread `cadence` through `RenderIndex`/`BuildIndexPage`)
+- `src/SpecScribe/Icons.cs` (`Cadence` glyph)
+- `src/SpecScribe/assets/specscribe.css` (cadence strip/log/histogram rules)
+- `tests/SpecScribe.Tests/ChartsTests.cs`, `SiteNavTests.cs`, `RenderParityTests.cs`, `SiteGeneratorAdapterTests.cs` (fixtures + new chart tests)
+
+## Change Log
+
+- 2026-07-22: Implemented Story 21.2 (Delivery Cadence & Story Cycle-Time) — dedicated `cadence.html` (story-completion heatmap + cycle-time histogram) + compact dashboard strip; new `DeliveryCadence` builder + `GitMetrics.TryGetFirstCommitDate`; `ChartMetric.DeliveryCadence`. 2081 tests green; golden fingerprint regenerated. Status → review.

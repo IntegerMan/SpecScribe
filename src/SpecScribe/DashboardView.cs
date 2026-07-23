@@ -118,4 +118,11 @@ public sealed record DashboardView
     /// suggestions / epics are absent. The dashboard adapter wraps this in the panel shell + work-mode
     /// classes. Named opaque fragment matching <see cref="EpicsView.NextStepsHtml"/>'s role. [Story 9.8]</summary>
     public string NextStepsHtml { get; init; } = string.Empty;
+
+    /// <summary>Pre-rendered compact delivery-cadence teaser strip (<see cref="Charts.DeliveryCadenceStrip"/>),
+    /// linking to the dedicated <c>cadence.html</c> page; empty when there is no cadence to show (no done story with
+    /// a resolvable date). The dashboard adapter wraps this in the panel shell — routed through this one builder →
+    /// adapter path (never hand-appended to one surface) so HTML/webview/SPA stay parity-identical (Story 6.2
+    /// discipline). Named opaque fragment matching <see cref="NextStepsHtml"/>'s role. [Story 21.2]</summary>
+    public string CadenceStripHtml { get; init; } = string.Empty;
 }

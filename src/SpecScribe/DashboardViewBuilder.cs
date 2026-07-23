@@ -48,7 +48,8 @@ public static class DashboardViewBuilder
         bool hasTimeline = false,
         ProjectCounts? counts = null,
         FollowUpGeometry? followUps = null,
-        UnplannedWorkGeometry? unplanned = null)
+        UnplannedWorkGeometry? unplanned = null,
+        DeliveryCadenceData? cadence = null)
     {
         // Production always passes the shared SiteGenerator ledger. Null → build an equivalent ephemeral
         // ledger from the same inputs so tests/stubs that omit counts keep correct Defined/Tracked numbers.
@@ -79,6 +80,10 @@ public static class DashboardViewBuilder
             // Body fragment only — HtmlRenderAdapter wraps with work-mode panel classes. [Story 9.8]
             NextStepsHtml = epicsModel is { } epics
                 ? BmadCommands.RenderProjectNextStepsBody(epics, commands)
+                : string.Empty,
+            // Compact delivery-cadence teaser → cadence.html. Empty (omitted) when there's nothing to show. [Story 21.2]
+            CadenceStripHtml = cadence is { IsEmpty: false } c
+                ? Charts.DeliveryCadenceStrip(c, SiteNav.CadenceOutputPath)
                 : string.Empty,
         };
     }

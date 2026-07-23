@@ -15,6 +15,14 @@ public sealed class SiteNav
     /// gate. Shared between the generator (writes the file) and the templater/nav (link to it) so the two can
     /// never disagree. [Story 21.1]</summary>
     public const string TraceabilityOutputPath = "traceability.html";
+
+    /// <summary>The dedicated delivery-cadence page (story-completion heatmap + cycle-time histogram). Reads
+    /// <see cref="StoryInfo.LastUpdatedDate"/> off the epics roster, so it shares the SAME <c>hasEpics</c> gate as
+    /// <see cref="RequirementsOutputPath"/>/<see cref="TraceabilityOutputPath"/> — no dedicated flag; the page's own
+    /// honest empty-state (Story 21.2 AC #2) covers the case where <c>hasEpics</c> is true but zero stories are done.
+    /// Shared between the generator (writes the file) and the templater/nav (link to it) so the two can never
+    /// disagree. [Story 21.2]</summary>
+    public const string CadenceOutputPath = "cadence.html";
     public const string SprintOutputPath = "sprint.html";
     public const string RetrosOutputPath = "retros.html";
     public const string ActionItemsOutputPath = "action-items.html";
@@ -213,9 +221,13 @@ public sealed class SiteNav
             // The traceability matrix is a sibling view over the same requirements + epics — shares this gate
             // rather than a dedicated flag so the page and its nav item can never dangle independently. [Story 21.1]
             delivery.Add(("Traceability", TraceabilityOutputPath));
+            // Delivery cadence is a sibling view over the same story roster (done-story dates) — shares this gate
+            // rather than a dedicated flag so the page and its nav item can never dangle independently. [Story 21.2]
+            delivery.Add(("Cadence", CadenceOutputPath));
             quickLinks.Add(("Epics", EpicsOutputPath, "Track epic and story delivery progress.", "Delivery"));
             quickLinks.Add(("Requirements", RequirementsOutputPath, "Review FR/NFR coverage and status.", "Delivery"));
             quickLinks.Add(("Traceability", TraceabilityOutputPath, "See the full requirement-to-epic coverage matrix.", "Delivery"));
+            quickLinks.Add(("Cadence", CadenceOutputPath, "See delivery cadence and story cycle-time.", "Delivery"));
         }
 
         // The sprint tracking file (sprint-status.yaml) is its own first-class delivery view, gated on the

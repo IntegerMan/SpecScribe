@@ -122,6 +122,17 @@ public sealed partial class HtmlRenderAdapter
         AppendRequirementsPanel(sb, view.Requirements, view.Epics, view.Counts);
         AppendTraceabilityPanel(sb, view.Requirements, view.Counts);
 
+        // Delivery cadence teaser — Track/Develop work-stage, a compact preview linking to cadence.html. Omitted
+        // (no empty panel) when there's nothing to show. Fragment built by DashboardViewBuilder so all three
+        // adapters render identical bytes. [Story 21.2]
+        if (view.CadenceStripHtml.Length > 0)
+        {
+            sb.Append("<div class=\"chart-panel cadence-panel wm-panel wm-show-develop wm-show-track\">\n");
+            sb.Append("<h3>Delivery Cadence</h3>\n");
+            sb.Append(view.CadenceStripHtml);
+            sb.Append("</div>\n\n");
+        }
+
         // Progress by Epic mosaic — Plan.
         if (p.PerEpic.Count > 0)
         {

@@ -75,7 +75,7 @@ public class RenderParityTests
         Assert.Equal("active", facts.StatusStage);
         Assert.Equal(ForgeOptions.StylesheetName, facts.Stylesheet); // "../" prefix + ?v= token folded away
         // Journey order: Home → Delivery → Project → Help (How to use / About SDD / About / Logs).
-        Assert.Equal(new[] { "index.html", "epics.html", "requirements.html", "traceability.html", "readme.html", "adrs/index.html", "how-to-read.html", "about-sdd.html", "about.html", "diagnostics.html" },
+        Assert.Equal(new[] { "index.html", "epics.html", "requirements.html", "traceability.html", "cadence.html", "readme.html", "adrs/index.html", "how-to-read.html", "about-sdd.html", "about.html", "diagnostics.html" },
             facts.Nav.Select(n => n.Target).ToList());
         Assert.DoesNotContain(facts.Nav, n => n.Active);
     }
@@ -91,7 +91,7 @@ public class RenderParityTests
         var facts = RenderParity.Extract(html, page);
 
         Assert.Equal(
-            new[] { "index.html", "epics.html", "requirements.html", "traceability.html", "sprint.html", "git-insights.html", "deep-analytics.html", "how-to-read.html", "about-sdd.html", "about.html", "diagnostics.html" },
+            new[] { "index.html", "epics.html", "requirements.html", "traceability.html", "cadence.html", "sprint.html", "git-insights.html", "deep-analytics.html", "how-to-read.html", "about-sdd.html", "about.html", "diagnostics.html" },
             facts.Nav.Select(n => n.Target).ToList());
         // Group headers are <summary>, not <a> — never mistaken for nav facts.
         Assert.DoesNotContain(facts.Nav, n => n.Label is "Delivery" or "Insights" or "Help");
@@ -115,7 +115,7 @@ public class RenderParityTests
         Assert.Equal(
             new[]
             {
-                "index.html", "epics.html", "requirements.html", "traceability.html", "sprint.html",
+                "index.html", "epics.html", "requirements.html", "traceability.html", "cadence.html", "sprint.html",
                 "git-insights.html", "deep-analytics.html",
                 "action-items.html", "deferred-work.html",
                 "readme.html", "adrs/index.html",

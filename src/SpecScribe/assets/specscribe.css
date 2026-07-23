@@ -4736,12 +4736,54 @@ a.satisfaction-chip:hover { filter: brightness(0.97); }
 .trace-strip-chips { gap: 0.4rem 0.6rem; }
 .trace-strip-link { white-space: nowrap; }
 
+/* Delivery cadence (Story 21.2). The dashboard teaser strip reuses the Git Pulse signal-strip figures
+   (.git-pulse-signals/.git-pulse-signal/.git-pulse-num/.git-pulse-caption) — only its own layout + link differ. */
+.cadence-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1.4rem; }
+.cadence-strip-link { white-space: nowrap; }
+
+/* The completion heatmap's text-equivalent log — the accessible/no-JS twin of the grid (every active day,
+   newest first, with links to the stories completed that day). */
+.cadence-log {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+.cadence-log-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) minmax(6rem, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.4rem 0.9rem;
+}
+.cadence-log-date { color: var(--ink); font-weight: 600; }
+.cadence-log-count { color: var(--ink-faded); white-space: nowrap; }
+.cadence-log-stories a { white-space: nowrap; }
+@media (max-width: 32rem) {
+  .cadence-log-row { grid-template-columns: 1fr; gap: 0.1rem; }
+}
+
+/* The cycle-time histogram reuses the Git Pulse proportional bars; its bucket labels are prose, not file
+   paths, so drop the monospace/ellipsis treatment so "0-3 days" reads naturally. */
+.cycle-time-histogram .git-pulse-bar-label { font-family: inherit; overflow: visible; text-overflow: clip; }
+
 /* The grid itself always scrolls inside its own container — the page body never scrolls horizontally, even
    with ~22 epic columns. contain: inline-size mirrors the git-insights .table-scroll pattern. Bounded to the
    viewport height (minus the chrome above it) with its own vertical scrollbar too, so a long requirement list
    scrolls internally with the epic-column header staying pinned in view, instead of the reader having to scroll
    all the way back up the page to see which column they're looking at. */
 .trace-matrix-wrap { margin-top: 0.4rem; max-height: calc(100vh - 16rem); overflow-y: auto; }
+/* Real bug, reproduced and diagnosed live: .table-scroll's inline-size-only containment, combined with a
+   BOUNDED (max-height + overflow-y) descendant, makes some browsers leak that descendant's full unclipped
+   content height into the root <html> element's own scrollable-overflow region — the page then scrolls far
+   past the footer into blank space, even though <body> itself measures correctly. Adding layout containment
+   stops that leak (verified: without it, html.scrollHeight tracked the unclipped ~2680px table height instead
+   of the actual ~960px page height). The two-class selector (matching the div's actual "table-scroll
+   trace-matrix-wrap" pairing) is needed to out-specificity .table-scroll's own later `contain: inline-size`
+   rule, which would otherwise win the cascade by source order and silently drop this override. */
+.table-scroll.trace-matrix-wrap { contain: layout inline-size; }
 .trace-matrix {
   border-collapse: separate;
   border-spacing: 0;

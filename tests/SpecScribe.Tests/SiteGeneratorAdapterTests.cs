@@ -210,6 +210,7 @@ public class SiteGeneratorAdapterTests : IDisposable
             "about-sdd-gsd.html",
             "about-sdd-gsd-pi.html",
             "about-sdd-superpowers.html",
+            "cadence.html",
             "implementation-artifacts/epic-1-retro-2026-07-06.html",
             "index.html",
             "requirements.html",
@@ -848,7 +849,24 @@ public class SiteGeneratorAdapterTests : IDisposable
         // own links. Non-git fixture doesn't render sprint.html/traceability.html itself in every variant, but
         // the shared nav-bar markup change reflects on every page this fixture DOES render. Verified stable
         // across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
-        const string expected = "b36f0bf1fc9ec6b0d55d86e9d9858cc5e8ececab00b5b182e3bd3d89b745e395";
+        // Regenerated for Story 21.2: new cadence.html page (delivery-cadence heatmap + cycle-time histogram) +
+        // its "Cadence" Delivery nav entry (shifts every rendered page's nav markup) + the new
+        // Icons.ForConcept("Cadence") glyph + new specscribe.css cadence rules. This fixture is NOT a git repo and
+        // its lone done story (2.1) has no ## Change Log date, so cadence.html renders its honest empty state with
+        // NO date-derived heatmap grid — the fingerprint stays wall-clock-independent (verified stable across 2
+        // repeated runs before locking in). [golden-diff-normalization-gotchas]
+        // Regenerated for a Story 21.1 owner-reported bug fix: a REAL browser bug, reproduced and diagnosed live
+        // against the deployed site (github.io/SpecScribe/traceability.html) — .trace-matrix-wrap's bounded
+        // max-height/overflow-y:auto scrollport, combined with .table-scroll's own `contain: inline-size`, made
+        // the browser leak the table's full UNCLIPPED content height into the root <html> element's own
+        // scrollable-overflow region, so the whole page scrolled far past the footer into blank space even
+        // though <body> itself measured correctly (confirmed via documentElement.scrollHeight vs
+        // body.scrollHeight diverging, then converging once `contain: layout` was added). Fixed with a new
+        // `.table-scroll.trace-matrix-wrap { contain: layout inline-size; }` override (needs the two-class
+        // selector to out-specificity .table-scroll's later same-property rule). CSS-only change; shifts the
+        // embedded specscribe.css bytes on every page. Verified stable across repeated runs before locking in.
+        // [golden-diff-normalization-gotchas]
+        const string expected = "7acbd7bd78c1d646ae9ec2363c23f715776f0fac7e74c18f80c8d67480dba2ea";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

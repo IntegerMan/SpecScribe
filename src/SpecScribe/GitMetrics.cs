@@ -1064,6 +1064,36 @@ public static class GitMetrics
         return string.IsNullOrWhiteSpace(url) ? null : url.Trim();
     }
 
+    /// <summary>The date a file was FIRST committed (its true creation, following renames), or null when the path
+    /// has no history / isn't tracked / there's no git — a bounded, per-file, never-throwing git shell-out mirroring
+    /// <see cref="TryGetCurrentBranch"/>/<see cref="TryGetRemoteUrl"/>'s single-purpose pattern. Used as the
+    /// "first-touch" start of a story's cycle-time (Story 21.2); called at most once per done story with a
+    /// resolvable done-date, never in a hot loop. <c>--follow</c> traces the file across renames so a moved story
+    /// file still reports its original creation; <c>--diff-filter=A</c> keeps only the add(s), and we take the
+    /// EARLIEST (min) parsed date so a delete-then-re-add can't understate the age. Deliberately NOT derived from
+    /// <see cref="FileInsight.History"/>, whose newest-first list is capped and would misreport the true first
+    /// commit for any file with more touches than the cap. Invariant date parse for the same non-Gregorian-calendar
+    /// reasons the rest of this class parses invariantly. [Story 21.2]</summary>
+    public static DateOnly? TryGetFirstCommitDate(string repoRoot, string repoRelativePath)
+    {
+        if (string.IsNullOrWhiteSpace(repoRelativePath)) return null;
+
+        // Quote the pathspec so a path with spaces stays a single argument; --follow requires exactly one path.
+        var output = RunGit(repoRoot, $"log --follow --diff-filter=A --format=%ad --date=short -- \"{repoRelativePath}\"");
+        if (output is null) return null;
+
+        DateOnly? earliest = null;
+        foreach (var line in output.Split('\n'))
+        {
+            var text = line.Trim();
+            if (text.Length == 0) continue;
+            if (!DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+                continue;
+            if (earliest is null || date < earliest.Value) earliest = date;
+        }
+        return earliest;
+    }
+
     /// <summary>The current branch name, or null in detached-HEAD state (or no git) so the caller can fall back to a
     /// default branch for the external-source base (Story 7.7).</summary>
     public static string? TryGetCurrentBranch(string repoRoot)

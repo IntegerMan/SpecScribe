@@ -4238,4 +4238,149 @@ public class ChartsTests
         Assert.Contains("tabindex=\"0\"", html);
         Assert.DoesNotContain("<a class=\"coverage-card", html);
     }
+
+    // ----- Delivery cadence (Story 21.2) --------------------------------------------------------------------
+
+    private static readonly DateOnly CadenceToday = new(2026, 7, 25);
+
+    private static IReadOnlyDictionary<DateOnly, IReadOnlyList<StoryInfo>> CompletionsByDay(
+        params (DateOnly Day, StoryInfo[] Stories)[] entries) =>
+        entries.ToDictionary(e => e.Day, e => (IReadOnlyList<StoryInfo>)e.Stories);
+
+    [Fact]
+    public void DeliveryCadenceHeatmap_EmptySeries_RendersChartEmpty()
+    {
+        var html = Charts.DeliveryCadenceHeatmap(Array.Empty<(DateOnly, int)>(), today: CadenceToday);
+        Assert.Contains("chart-empty", html);
+        Assert.DoesNotContain("<svg", html);
+    }
+
+    [Fact]
+    public void DeliveryCadenceHeatmap_SingleCompletionDay_LinksToThatStory()
+    {
+        var story = Story("1.1", "Foundation", "done", 3, 3);
+        var day = new DateOnly(2026, 7, 20);
+        var html = Charts.DeliveryCadenceHeatmap(
+            new[] { (day, 1) },
+            CompletionsByDay((day, new[] { story })),
+            s => $"epics/story-{s.Id.Replace('.', '-')}.html",
+            CadenceToday);
+
+        Assert.Contains("href=\"epics/story-1-1.html\"", html);
+        Assert.Contains("1 story completed", html);
+        // Whole-chart role becomes group once a day links.
+        Assert.Contains("role=\"group\"", html);
+    }
+
+    [Fact]
+    public void DeliveryCadenceHeatmap_MultipleSameDayCompletions_RichTooltipListsAll()
+    {
+        var day = new DateOnly(2026, 7, 20);
+        var stories = new[] { Story("1.1", "Alpha", "done", 1, 1), Story("1.2", "Beta", "done", 1, 1) };
+        var html = Charts.DeliveryCadenceHeatmap(
+            new[] { (day, 2) },
+            CompletionsByDay((day, stories)),
+            s => $"epics/story-{s.Id.Replace('.', '-')}.html",
+            CadenceToday);
+
+        // The multi-completion cell carries a body-level js-tip rich tooltip listing every story that day.
+        Assert.Contains("js-tip", html);
+        Assert.Contains("data-tip=", html);
+        Assert.Contains("Story 1.1", html);
+        Assert.Contains("Story 1.2", html);
+    }
+
+    [Fact]
+    public void DeliveryCadenceHeatmap_RendersTextEquivalentCompletionLog()
+    {
+        var day = new DateOnly(2026, 7, 20);
+        var story = Story("1.1", "Foundation", "done", 1, 1);
+        var html = Charts.DeliveryCadenceHeatmap(
+            new[] { (day, 1) },
+            CompletionsByDay((day, new[] { story })),
+            s => $"epics/story-{s.Id.Replace('.', '-')}.html",
+            CadenceToday);
+
+        // The accessible / no-JS twin below the SVG.
+        Assert.Contains("cadence-log", html);
+        Assert.Contains("cadence-log-date", html);
+        Assert.Contains("1 story completed", html);
+    }
+
+    [Fact]
+    public void CycleTimeHistogram_Empty_RendersHonestNote()
+    {
+        var html = Charts.CycleTimeHistogram(Array.Empty<(string, int)>());
+        Assert.Contains("chart-empty", html);
+        Assert.Contains("No story has a derivable cycle-time", html);
+    }
+
+    [Fact]
+    public void CycleTimeHistogram_BucketsSumToTheTotalInputCount()
+    {
+        var cycleTimes = new (string, int)[]
+        {
+            ("1.1", 0), ("1.2", 3),     // 0-3
+            ("1.3", 5),                 // 4-7
+            ("1.4", 10), ("1.5", 14),   // 8-14
+            ("1.6", 30),                // 15-30
+            ("1.7", 45), ("1.8", 900),  // 30+
+        };
+        var html = Charts.CycleTimeHistogram(cycleTimes);
+
+        // Every input story lands in exactly one bucket — the per-bucket counts sum to the input size.
+        var total = System.Text.RegularExpressions.Regex
+            .Matches(html, @"git-pulse-bar-count"">(\d+) stor")
+            .Sum(m => int.Parse(m.Groups[1].Value));
+        Assert.Equal(cycleTimes.Length, total);
+        // All five human-readable buckets render (the distribution's shape is the information).
+        Assert.Contains("0–3 days", html);
+        Assert.Contains("30+ days", html);
+    }
+
+    [Fact]
+    public void CycleTimeHistogram_NeverColorOnly_CountTextBesideEveryBar()
+    {
+        var html = Charts.CycleTimeHistogram(new (string, int)[] { ("1.1", 2) });
+        // The count is present in text next to the bar (not size/color-only).
+        Assert.Contains("git-pulse-bar-count", html);
+        Assert.Contains("1 story", html);
+        Assert.Contains("aria-label=", html);
+    }
+
+    [Fact]
+    public void WhyText_DeliveryCadence_IsNonEmptyFrameworkNeutralAndDistinctFromActivityCadence()
+    {
+        var cadence = Charts.WhyText(Charts.ChartMetric.DeliveryCadence);
+        var activity = Charts.WhyText(Charts.ChartMetric.ActivityCadence);
+
+        Assert.False(string.IsNullOrWhiteSpace(cadence));
+        Assert.NotEqual(activity, cadence);
+        // Framework-neutral (NFR8) — never names a specific project/repo.
+        Assert.DoesNotContain("SpecScribe", cadence);
+    }
+
+    [Fact]
+    public void DeliveryCadenceStrip_EmptyData_RendersNothing()
+    {
+        Assert.Equal(string.Empty, Charts.DeliveryCadenceStrip(DeliveryCadenceData.Empty, "cadence.html", CadenceToday));
+    }
+
+    [Fact]
+    public void DeliveryCadenceStrip_WithData_ShowsCountsAndLink()
+    {
+        var data = new DeliveryCadenceData(
+            new[] { (new DateOnly(2026, 7, 20), 2), (new DateOnly(2026, 3, 1), 1) },
+            new Dictionary<DateOnly, IReadOnlyList<StoryInfo>>(),
+            Array.Empty<(string, int)>());
+
+        var html = Charts.DeliveryCadenceStrip(data, "cadence.html", CadenceToday);
+
+        Assert.Contains("cadence-strip", html);
+        Assert.Contains("href=\"cadence.html\"", html);
+        Assert.Contains("View delivery cadence", html);
+        // Recent (last 8 weeks) counts only the Jul 20 completions; all-time counts both.
+        Assert.Contains(">2</span><span class=\"git-pulse-caption\">stories completed in the last 8 weeks", html);
+        Assert.Contains(">3</span><span class=\"git-pulse-caption\">completed all-time", html);
+    }
 }

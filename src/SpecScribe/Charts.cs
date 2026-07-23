@@ -26,6 +26,10 @@ public static class Charts
         /// <summary>Requirement-to-epic traceability: which requirements have a delivering epic, which are
         /// deliberately deferred, and which are gaps (Story 21.1).</summary>
         RequirementTraceability,
+        /// <summary>Delivery cadence: how often stories reach done over time, plus (where derivable) story
+        /// cycle-time. Distinct from <see cref="ActivityCadence"/> — that's raw commit activity; this is
+        /// story-completion rhythm (Story 21.2).</summary>
+        DeliveryCadence,
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
@@ -56,6 +60,8 @@ public static class Charts
             "Files with a single dominant author are a knowledge-silo risk if that person leaves or moves on.",
         ChartMetric.RequirementTraceability =>
             "A requirement with no delivering epic is a coverage gap; one that is deferred is a deliberate choice — the two look different so neither hides.",
+        ChartMetric.DeliveryCadence =>
+            "How often stories reach done reveals the project's real delivery rhythm — steady drips and bursts both tell you something commit activity alone doesn't.",
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
 
@@ -1321,6 +1327,318 @@ public static class Charts
         sb.Append($"<span class=\"chart-frame-window heatmap-window\">{Html(windowText)}</span>\n");
         sb.Append("</div>\n");
 
+        return sb.ToString();
+    }
+
+    // ----- Delivery cadence (Story 21.2) --------------------------------------------------------------------
+
+    /// <summary>Story-completion calendar heatmap — the delivery-cadence sibling of <see cref="CommitHeatmap"/>:
+    /// the SAME day-grid visual language (week columns, month labels, <see cref="HeatLevel"/> ramp, real-value
+    /// legend, young-repo trim) but keyed on the days stories reached <em>done</em>, not commit days. A day on which
+    /// exactly one story completed links to that story's page; a day with several completions carries a rich hover
+    /// tooltip (shared body-level <c>js-tip</c> node — never a clipped CSS <c>::after</c>) listing all of them. Every
+    /// cell pairs its shade with a <c>&lt;title&gt;</c>, and a full text-equivalent completion log renders below the
+    /// SVG so a screen-reader (or no-JS) reader learns every completion date without the graphic (never color-only).
+    /// Written as an INDEPENDENT builder rather than refactoring <see cref="CommitHeatmap"/> so that shipped chart's
+    /// output stays byte-identical (Story 21.2 guardrail). Empty series → a friendly empty state.
+    /// <paramref name="today"/> bounds the grid so it never runs past the generation date — pinnable for
+    /// deterministic tests, defaulting to the codebase's accepted single-call-per-run "today" (FR31). [Story 21.2]</summary>
+    public static string DeliveryCadenceHeatmap(
+        IReadOnlyList<(DateOnly Day, int Count)> series,
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<StoryInfo>>? completionsByDay = null,
+        Func<StoryInfo, string?>? storyHref = null,
+        DateOnly? today = null)
+    {
+        if (series.Count == 0) return "<div class=\"chart-empty\">No completed stories to chart yet.</div>";
+
+        var byDay = series.ToDictionary(s => s.Day, s => s.Count);
+        var firstDay = series.Min(s => s.Day);
+        var lastDay = series.Max(s => s.Day);
+        var todayValue = today ?? DateOnly.FromDateTime(DateTime.Now);
+
+        // Same windowing math as CommitHeatmap: never past today, ~15-week floor, young-repo lead-in trim.
+        var end = todayValue;
+        var minStart = end.AddDays(-7 * 15);
+        var isYoungRepo = firstDay >= minStart;
+        var start = isYoungRepo ? firstDay.AddDays(-7) : firstDay;
+        if (start > end) start = end;
+        start = start.AddDays(-(int)start.DayOfWeek);
+        end = end.AddDays(6 - (int)end.DayOfWeek);
+
+        var totalDays = end.DayNumber - start.DayNumber + 1;
+        var weeks = Math.Max(1, (int)Math.Ceiling(totalDays / 7.0));
+        var maxCount = series.Where(s => s.Day <= todayValue).Select(s => s.Count).DefaultIfEmpty(0).Max();
+
+        const int cell = 11;
+        const int gap = 3;
+        const int leftGutter = 26;
+        const int topGutter = 16;
+        var width = leftGutter + weeks * (cell + gap);
+        var height = topGutter + 7 * (cell + gap);
+        var maxRenderWidth = Math.Min(460, (int)Math.Round(width * 1.8));
+
+        var totalCompletions = series.Sum(s => s.Count);
+        var activeDays = series.Count(s => s.Count > 0);
+        var heatAria = $"Story completions: {totalCompletions} {Plural(totalCompletions, "story", "stories")} across {activeDays} active {Plural(activeDays, "day", "days")}, {DReadable(firstDay)} to {DReadable(lastDay)}";
+
+        // A day is linked only when EXACTLY one story completed that day AND its page resolves — an unambiguous
+        // single target. Multi-completion days get the tooltip + the text log instead of a guessed link.
+        var linkedSet = new HashSet<DateOnly>();
+        if (completionsByDay is not null && storyHref is not null)
+        {
+            foreach (var s in series)
+            {
+                if (s.Count == 1 && s.Day <= todayValue
+                    && completionsByDay.TryGetValue(s.Day, out var stories) && stories.Count == 1
+                    && storyHref(stories[0]) is { Length: > 0 })
+                {
+                    linkedSet.Add(s.Day);
+                }
+            }
+        }
+
+        var sb = new StringBuilder();
+        var role = linkedSet.Count > 0 ? "group" : "img";
+        sb.Append($"<svg class=\"heatmap\" viewBox=\"0 0 {width} {height}\" width=\"{width}\" height=\"{height}\" style=\"max-width:{maxRenderWidth}px\" role=\"{role}\" aria-label=\"{Html(heatAria)}\">\n");
+
+        var dayLabels = new (int Row, string Label)[] { (1, "Mon"), (3, "Wed"), (5, "Fri") };
+        foreach (var (row, label) in dayLabels)
+        {
+            var y = topGutter + row * (cell + gap) + cell - 2;
+            sb.Append($"  <text x=\"0\" y=\"{y}\" class=\"heatmap-daylabel\" aria-hidden=\"true\">{Html(label)}</text>\n");
+        }
+
+        string? lastMonth = null;
+        for (var w = 0; w < weeks; w++)
+        {
+            var weekStart = start.AddDays(w * 7);
+            var monthName = PortalDates.MonthShort(weekStart);
+            if (monthName != lastMonth)
+            {
+                var x = leftGutter + w * (cell + gap);
+                sb.Append($"  <text x=\"{x}\" y=\"{topGutter - 5}\" class=\"heatmap-monthlabel\" aria-hidden=\"true\">{Html(monthName)}</text>\n");
+                lastMonth = monthName;
+            }
+        }
+
+        for (var w = 0; w < weeks; w++)
+        {
+            for (var d = 0; d < 7; d++)
+            {
+                var day = start.AddDays(w * 7 + d);
+                if (day > end) continue;
+                if (day > todayValue) continue;
+
+                var count = byDay.GetValueOrDefault(day, 0);
+                var level = HeatLevel(count, maxCount);
+                var x = leftGutter + w * (cell + gap);
+                var y = topGutter + d * (cell + gap);
+                var stories = completionsByDay is not null && completionsByDay.TryGetValue(day, out var list)
+                    ? list
+                    : (IReadOnlyList<StoryInfo>)Array.Empty<StoryInfo>();
+
+                var linked = linkedSet.Contains(day);
+                var multi = count > 1;
+                var titleText = $"{DReadable(day)}: {count} {Plural(count, "story", "stories")} completed";
+
+                if (linked)
+                {
+                    var story = stories.Count == 1 ? stories[0] : null;
+                    var storyLabel = story is not null ? $" — {story.Title}" : string.Empty;
+                    sb.Append($"  <a href=\"{Html(storyHref!(stories[0])!)}\" aria-label=\"{Html($"{DReadable(day)}: 1 story completed{storyLabel} — view story")}\">");
+                    sb.Append($"<rect x=\"{x}\" y=\"{y}\" width=\"{cell}\" height=\"{cell}\" rx=\"2\" class=\"heatmap-cell level-{level}\" style=\"--col:{w}\">");
+                    sb.Append($"<title>{Html(titleText)}</title></rect></a>\n");
+                }
+                else if (multi)
+                {
+                    // Rich hover tooltip listing every story that day, via the shared body-level js-tip node
+                    // (pre-line plain text) — never a clipped CSS ::after. The completion log below is the
+                    // no-JS / screen-reader equivalent, so the cell itself stays aria-hidden like the zero cells.
+                    var tip = titleText + "\n" + string.Join("\n", stories.Select(s => $"Story {s.Id} — {s.Title}"));
+                    sb.Append($"  <rect aria-hidden=\"true\" x=\"{x}\" y=\"{y}\" width=\"{cell}\" height=\"{cell}\" rx=\"2\" class=\"heatmap-cell level-{level} js-tip\" data-tip=\"{Html(tip)}\" style=\"--col:{w}\">");
+                    sb.Append($"<title>{Html(titleText)}</title></rect>\n");
+                }
+                else
+                {
+                    sb.Append($"  <rect aria-hidden=\"true\" x=\"{x}\" y=\"{y}\" width=\"{cell}\" height=\"{cell}\" rx=\"2\" class=\"heatmap-cell level-{level}\" style=\"--col:{w}\">");
+                    sb.Append($"<title>{Html(titleText)}</title></rect>\n");
+                }
+            }
+        }
+
+        // First-completion accent (mirrors CommitHeatmap's first-commit marker), young-repo trim only.
+        var showFirstMark = false;
+        if (isYoungRepo)
+        {
+            var firstWeek = (firstDay.DayNumber - start.DayNumber) / 7;
+            showFirstMark = firstWeek is >= 0 && firstWeek < weeks;
+            if (showFirstMark)
+            {
+                var markX = leftGutter + firstWeek * (cell + gap) - gap / 2.0 - 1;
+                var markHeight = 7 * (cell + gap) - gap + 4;
+                sb.Append($"  <rect class=\"heatmap-first-commit-mark\" x=\"{F(markX)}\" y=\"{topGutter - 2}\" width=\"2\" height=\"{markHeight}\" aria-hidden=\"true\">" +
+                          $"<title>First completion {Html(DReadable(firstDay))}</title></rect>\n");
+            }
+        }
+
+        sb.Append("</svg>\n");
+
+        if (showFirstMark)
+        {
+            sb.Append($"<p class=\"heatmap-first-commit\">First completion {Html(DReadable(firstDay))}</p>\n");
+        }
+
+        // Real-value legend + window span — same HeatLevel thresholds the cells use, so shade and label can't
+        // disagree. The window is the grid's own date span (distinct from any commit-based window).
+        var windowText = $"{weeks.ToString(CultureInfo.InvariantCulture)} {Plural(weeks, "week", "weeks")} · {DReadable(firstDay)} – {DReadable(lastDay)}";
+        sb.Append("<div class=\"heatmap-meta\">\n");
+        sb.Append("<div class=\"heatmap-legend\">");
+        for (var l = 0; l <= 4; l++)
+        {
+            if (IsHeatLevelUnreachable(l, maxCount)) continue;
+            sb.Append($"<span class=\"heatmap-legend-item\"><span class=\"heatmap-legend-swatch level-{l}\"></span>" +
+                      $"<span class=\"heatmap-legend-label\">{Html(HeatLevelRange(l, maxCount))}</span></span>");
+        }
+        sb.Append("</div>\n");
+        sb.Append($"<span class=\"chart-frame-window heatmap-window\">{Html(windowText)}</span>\n");
+        sb.Append("</div>\n");
+
+        // Text-equivalent completion log — the accessible / no-JS twin of the grid: every active day (newest
+        // first), the count, and links to the stories completed that day. This is how a screen-reader reader (and
+        // any no-JS visitor) learns the completion dates the SVG shows (UX-DR17 "never color-only").
+        AppendCadenceLog(sb, series, completionsByDay, storyHref, todayValue);
+
+        return sb.ToString();
+    }
+
+    /// <summary>The newest-first text log paired with <see cref="DeliveryCadenceHeatmap"/> (its accessible twin).
+    /// Only active days on/before <paramref name="today"/> appear; each lists the stories completed that day,
+    /// linked when a page resolves.</summary>
+    private static void AppendCadenceLog(
+        StringBuilder sb,
+        IReadOnlyList<(DateOnly Day, int Count)> series,
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<StoryInfo>>? completionsByDay,
+        Func<StoryInfo, string?>? storyHref,
+        DateOnly today)
+    {
+        var activeDays = series
+            .Where(s => s.Count > 0 && s.Day <= today)
+            .OrderByDescending(s => s.Day)
+            .ToList();
+        if (activeDays.Count == 0) return;
+
+        sb.Append("<ol class=\"cadence-log\">\n");
+        foreach (var (day, count) in activeDays)
+        {
+            var stories = completionsByDay is not null && completionsByDay.TryGetValue(day, out var list)
+                ? list
+                : (IReadOnlyList<StoryInfo>)Array.Empty<StoryInfo>();
+            sb.Append("  <li class=\"cadence-log-row\">\n");
+            sb.Append($"    <span class=\"cadence-log-date\">{Html(DReadable(day))}</span>\n");
+            sb.Append($"    <span class=\"cadence-log-count\">{count} {Plural(count, "story", "stories")} completed</span>\n");
+            if (stories.Count > 0)
+            {
+                sb.Append("    <span class=\"cadence-log-stories\">");
+                for (var i = 0; i < stories.Count; i++)
+                {
+                    var story = stories[i];
+                    if (i > 0) sb.Append(", ");
+                    var href = storyHref?.Invoke(story);
+                    var label = $"Story {story.Id}";
+                    sb.Append(href is { Length: > 0 }
+                        ? $"<a href=\"{Html(href)}\" title=\"{Html(story.Title)}\">{Html(label)}</a>"
+                        : $"<span title=\"{Html(story.Title)}\">{Html(label)}</span>");
+                }
+                sb.Append("</span>\n");
+            }
+            sb.Append("  </li>\n");
+        }
+        sb.Append("</ol>\n");
+    }
+
+    /// <summary>The story cycle-time distribution as a bucketed bar chart (Story 21.2) — modeled on
+    /// <see cref="HotspotBars"/>' proportional-bar language: one bar per human-readable day-range bucket, width
+    /// relative to the busiest bucket, the real count in text beside every bar (never size/color-only). Buckets are
+    /// fixed and stated in the caller's caption. Degrades to a friendly note when no story has a derivable
+    /// cycle-time (a common, expected case for young/small projects — not an error). Cycle-time is
+    /// APPROXIMATE (story-file age, not a tracked workflow timestamp) — the caller's frame carries that caveat.
+    /// [Story 21.2]</summary>
+    public static string CycleTimeHistogram(IReadOnlyList<(string StoryId, int Days)> cycleTimes, Func<string, string?>? storyHref = null)
+    {
+        if (cycleTimes.Count == 0)
+            return "<div class=\"chart-empty\">No story has a derivable cycle-time yet.</div>\n";
+
+        var counts = new int[CycleTimeBuckets.Length];
+        foreach (var (_, days) in cycleTimes)
+        {
+            counts[CycleTimeBucketIndex(days)]++;
+        }
+
+        var maxCount = counts.Max();
+        var sb = new StringBuilder();
+        sb.Append("<ol class=\"git-pulse-bars cycle-time-histogram\">\n");
+        for (var i = 0; i < CycleTimeBuckets.Length; i++)
+        {
+            var (label, _) = CycleTimeBuckets[i];
+            var count = counts[i];
+            // Empty buckets still render (the distribution's shape is the information) at a hairline; a nonzero
+            // bucket floors at 6% so a lone story never renders as an invisible sliver.
+            var pct = maxCount <= 0 ? 0 : count == 0 ? 0 : Math.Clamp((int)Math.Round((double)count / maxCount * 100), 6, 100);
+            var countText = $"{count} {Plural(count, "story", "stories")}";
+            sb.Append(
+                $"  <li aria-label=\"{Html($"{label}: {countText}")}\"><span class=\"git-pulse-bar-label\">{Html(label)}</span>" +
+                $"<span class=\"git-pulse-bar-track\" aria-hidden=\"true\"><span class=\"git-pulse-bar-fill\" style=\"width:{pct}%\"></span></span>" +
+                $"<span class=\"git-pulse-bar-count\">{Html(countText)}</span></li>\n");
+        }
+        sb.Append("</ol>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The fixed, human-readable cycle-time buckets (inclusive lower bound, inclusive upper bound; the
+    /// last is open-ended). Stated in the chart's caption so the reader knows the edges. [Story 21.2]</summary>
+    private static readonly (string Label, int MaxDaysInclusive)[] CycleTimeBuckets =
+    {
+        ("0–3 days", 3),
+        ("4–7 days", 7),
+        ("8–14 days", 14),
+        ("15–30 days", 30),
+        ("30+ days", int.MaxValue),
+    };
+
+    /// <summary>The bucket a day-delta falls into. Non-negative by construction (the builder skips negatives).</summary>
+    private static int CycleTimeBucketIndex(int days)
+    {
+        for (var i = 0; i < CycleTimeBuckets.Length; i++)
+        {
+            if (days <= CycleTimeBuckets[i].MaxDaysInclusive) return i;
+        }
+        return CycleTimeBuckets.Length - 1;
+    }
+
+    /// <summary>The compact delivery-cadence teaser for the dashboard (Story 21.2 Task 4): recent + all-time
+    /// completion readings and a link to the dedicated <c>cadence.html</c> page. Not a second full heatmap — a
+    /// teaser. Reuses the Git Pulse signal-strip classes (the visuals genuinely match) rather than inventing
+    /// near-duplicates. Empty data renders nothing (NFR8 — omit, don't show an empty panel). [Story 21.2]</summary>
+    public static string DeliveryCadenceStrip(DeliveryCadenceData data, string cadenceHref, DateOnly? today = null)
+    {
+        if (data.IsEmpty) return string.Empty;
+
+        var todayValue = today ?? DateOnly.FromDateTime(DateTime.Now);
+        const int recentWeeks = 8;
+        var cutoff = todayValue.AddDays(-7 * recentWeeks);
+        var recent = data.CompletionSeries.Where(s => s.Day >= cutoff && s.Day <= todayValue).Sum(s => s.Count);
+        var total = data.TotalCompletions;
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"cadence-strip\">\n");
+        sb.Append("  <div class=\"git-pulse-signals\">\n");
+        sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-num\">{recent}</span>" +
+                  $"<span class=\"git-pulse-caption\">{Plural(recent, "story", "stories")} completed in the last {recentWeeks} weeks</span></div>\n");
+        sb.Append($"    <div class=\"git-pulse-signal\"><span class=\"git-pulse-num\">{total}</span>" +
+                  $"<span class=\"git-pulse-caption\">completed all-time</span></div>\n");
+        sb.Append("  </div>\n");
+        sb.Append($"  <a class=\"view-epic-link cadence-strip-link\" href=\"{Html(cadenceHref)}\">View delivery cadence &rarr;</a>\n");
+        sb.Append("</div>\n");
         return sb.ToString();
     }
 

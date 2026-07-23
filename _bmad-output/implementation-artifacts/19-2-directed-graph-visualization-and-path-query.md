@@ -1,6 +1,10 @@
+---
+baseline_commit: eaa2348370b18dd40cb0ab06afeef9701f9b03fc
+---
+
 # Story 19.2: Directed Graph Visualization and Path Query
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
