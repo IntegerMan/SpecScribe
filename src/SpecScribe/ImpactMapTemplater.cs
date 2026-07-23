@@ -80,27 +80,51 @@ public static class ImpactMapTemplater
 
         var sb = new StringBuilder();
 
-        // Controls: an epic multi-select + a size/color legend. Hidden until the script confirms it can drive the
-        // treemap (a no-JS visitor never sees dead checkboxes — the risk-quadrant pager's reveal pattern).
+        // Controls: an epic multi-select dropdown (the SAME sprint-epic-filter <details> component the sprint board
+        // uses), a Treemap|Sunburst view toggle (the board-tabs pure-CSS radio toggle used on the Code Map/Ownership
+        // pages), and a size/color legend. Hidden until the script confirms it can drive the shapes (a no-JS visitor
+        // never sees dead controls — the risk-quadrant pager's reveal pattern; the text list below is the fallback).
         sb.Append("<div class=\"impact-controls\" hidden>\n");
-        sb.Append("  <fieldset class=\"impact-epic-select\">\n");
-        sb.Append("    <legend>Show epics <span class=\"impact-select-actions\"><button type=\"button\" class=\"impact-select-all\">All</button> <button type=\"button\" class=\"impact-select-none\">None</button></span></legend>\n");
-        sb.Append("    <div class=\"impact-epic-chips\">\n");
+
+        // Epic multi-select — reuse the sprint board's dropdown markup + styles so it reads identically. Server-
+        // rendered (we know the epic roster at build time) and wired to the treemap/sunburst by the script.
+        sb.Append("  <details class=\"sprint-epic-filter impact-epic-filter\">\n");
+        sb.Append("    <summary class=\"sprint-epic-filter-summary\" aria-label=\"Choose which epics to include\">\n");
+        sb.Append("      <span class=\"sprint-epic-filter-label\">Epics</span>\n");
+        sb.Append("      <span class=\"sprint-epic-filter-count\"></span>\n");
+        sb.Append("    </summary>\n");
+        sb.Append("    <div class=\"sprint-epic-filter-panel\" role=\"group\" aria-label=\"Epics\">\n");
+        sb.Append("      <div class=\"impact-select-actions\"><button type=\"button\" class=\"sprint-epic-filter-all impact-select-all\">All</button> <button type=\"button\" class=\"sprint-epic-filter-all impact-select-none\">None</button></div>\n");
         foreach (var epic in attributedEpics)
         {
             var title = PathUtil.Html(PathUtil.StripHtmlTags(epic.Title));
-            sb.Append($"      <label class=\"impact-epic-chip\"><input type=\"checkbox\" class=\"impact-epic-toggle\" value=\"{epic.Number}\" checked> Epic {epic.Number} &middot; {title}</label>\n");
+            sb.Append($"      <label class=\"sprint-epic-filter-opt\"><input type=\"checkbox\" class=\"impact-epic-toggle\" value=\"{epic.Number}\" checked> Epic {epic.Number} &middot; {title}</label>\n");
         }
         sb.Append("    </div>\n");
-        sb.Append("  </fieldset>\n");
+        sb.Append("  </details>\n");
+
         sb.Append("  <div class=\"impact-legend\">\n");
-        sb.Append("    <span class=\"impact-legend-item\"><span class=\"impact-legend-size\"></span> Tile size = lines changed (churn)</span>\n");
+        sb.Append("    <span class=\"impact-legend-item\"><span class=\"impact-legend-size\"></span> Size = lines changed (churn)</span>\n");
         sb.Append("    <span class=\"impact-legend-item impact-legend-color\">Color = commits touching the area <span class=\"impact-legend-ramp\"><i class=\"impact-level-1\"></i><i class=\"impact-level-2\"></i><i class=\"impact-level-3\"></i><i class=\"impact-level-4\"></i><i class=\"impact-level-5\"></i></span> few &rarr; many</span>\n");
         sb.Append("  </div>\n");
         sb.Append("</div>\n");
 
-        // The treemap mount point — the script renders an SVG inside it; empty (and role/aria set) without JS.
-        sb.Append("<div class=\"impact-treemap\" id=\"impact-treemap\" role=\"img\" aria-label=\"Interactive treemap of code files touched, sized by lines changed and colored by commit count. The full list of files by epic is below.\"></div>\n");
+        // The two shape mount points, preceded by the Treemap|Sunburst view toggle. The toggle's radios live INSIDE
+        // this wrapper so the pure-CSS `:has(:checked)` visibility swap can see them (the Code Map's exact pattern —
+        // the radios must be a descendant of the element whose children they show/hide). The script renders an SVG
+        // into each mount; empty (with role/aria) without JS. [Story 21.3]
+        sb.Append("<div class=\"impact-shapes\">\n");
+        sb.Append("  <div class=\"board-tabs impact-shape-tabs\">\n");
+        sb.Append("    <input type=\"radio\" id=\"impact-view-treemap\" name=\"impact-view\" class=\"board-tab-radio\" checked>\n");
+        sb.Append("    <input type=\"radio\" id=\"impact-view-sunburst\" name=\"impact-view\" class=\"board-tab-radio impact-sunburst-radio\">\n");
+        sb.Append("    <div class=\"board-tabbar\">\n");
+        sb.Append("      <label for=\"impact-view-treemap\" class=\"board-tab\">Treemap</label>\n");
+        sb.Append("      <label for=\"impact-view-sunburst\" class=\"board-tab\">Sunburst</label>\n");
+        sb.Append("    </div>\n");
+        sb.Append("  </div>\n");
+        sb.Append("  <div class=\"impact-shape impact-shape-treemap\" id=\"impact-treemap\" role=\"img\" aria-label=\"Interactive treemap of code files touched, sized by lines changed and colored by commit count. The full list of files by epic is below.\"></div>\n");
+        sb.Append("  <div class=\"impact-shape impact-shape-sunburst\" id=\"impact-sunburst\" role=\"img\" aria-label=\"Interactive sunburst of code files touched, arcs sized by lines changed and colored by commit count. The full list of files by epic is below.\"></div>\n");
+        sb.Append("</div>\n");
 
         // The data payload the script reads. System.Text.Json's default encoder escapes <, >, & to \u00xx, so this
         // is safe to embed inside a <script> without breaking on a stray tag-like path. [Story 21.3]

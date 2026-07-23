@@ -5144,20 +5144,14 @@ tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pendin
 .impact-map-link { display: inline-block; margin-top: 0.5rem; font-size: 0.85rem; font-weight: 600; }
 .impact-fallback > summary { cursor: pointer; font-weight: 600; }
 
-/* --- interactive controls (revealed by the script; [hidden] with JS off) --- */
-.impact-controls { margin-bottom: 0.8rem; }
-.impact-epic-select { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem 0.7rem; margin: 0; }
-.impact-epic-select > legend { font-weight: 600; font-size: 0.85rem; padding: 0 0.35rem; }
-.impact-select-actions { font-weight: 400; }
-.impact-select-actions button,
-.impact-epic-select .impact-select-all,
-.impact-epic-select .impact-select-none {
-  font-size: 0.72rem; padding: 0.05rem 0.5rem; margin-left: 0.2rem; cursor: pointer;
-  border: 1px solid var(--border); border-radius: 999px; background: var(--warm-white); color: var(--ink);
+/* --- interactive controls (revealed by the script; [hidden] with JS off). The epic multi-select reuses the
+   sprint board's .sprint-epic-filter <details> dropdown; the view toggle reuses the .board-tabs radio pair. --- */
+.impact-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; margin-bottom: 0.8rem;
 }
-.impact-epic-chips { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; }
-.impact-epic-chip { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.82rem; cursor: pointer; }
-.impact-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin-top: 0.55rem; font-size: 0.78rem; color: var(--ink-light); }
+.impact-epic-filter .impact-select-actions { display: flex; gap: 0.3rem; margin-bottom: 0.15rem; }
+.impact-shape-tabs { flex-shrink: 0; }
+.impact-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; font-size: 0.78rem; color: var(--ink-light); margin-left: auto; }
 .impact-legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
 .impact-legend-size { width: 1.4rem; height: 0.85rem; border: 1px solid var(--border); background:
   linear-gradient(135deg, var(--parchment) 45%, var(--parchment-dark) 45%); display: inline-block; }
@@ -5185,6 +5179,29 @@ tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pendin
   paint-order: stroke; stroke: rgba(255, 255, 255, 0.75); stroke-width: 2px; stroke-linejoin: round;
 }
 .impact-treemap-empty { color: var(--ink-light); font-style: italic; padding: 2rem 0; text-align: center; }
+
+/* --- Treemap | Sunburst view toggle + the two shape panes (Code Map's board-tabs pattern) --- */
+.impact-shape-tabs { display: flex; justify-content: center; margin-bottom: 0.6rem; }
+.impact-shape { margin-top: 0.2rem; }
+.impact-shape-sunburst { display: none; }
+.impact-shapes:has(#impact-view-sunburst:checked) .impact-shape-treemap { display: none; }
+.impact-shapes:has(#impact-view-sunburst:checked) .impact-shape-sunburst { display: block; }
+#impact-view-treemap:checked ~ .board-tabbar label[for="impact-view-treemap"],
+#impact-view-sunburst:checked ~ .board-tabbar label[for="impact-view-sunburst"] {
+  background: var(--warm-white); color: var(--rust); box-shadow: 0 1px 2px var(--shadow);
+}
+#impact-view-treemap:focus-visible ~ .board-tabbar label[for="impact-view-treemap"],
+#impact-view-sunburst:focus-visible ~ .board-tabbar label[for="impact-view-sunburst"] { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* --- the sunburst SVG (arcs share the impact-level commit ramp; directory ring is neutral) --- */
+.impact-sb { display: block; width: 100%; height: auto; max-width: 560px; margin: 0 auto; }
+.impact-arc { stroke: var(--warm-white); stroke-width: 0.75; }
+.impact-arc-dir { fill: var(--parchment-dark); fill-opacity: 0.7; stroke: var(--warm-white); stroke-width: 0.75; }
+.impact-sb-link { cursor: pointer; }
+.impact-sb-link:hover .impact-arc { opacity: 0.82; }
+.impact-sb-link:focus-visible { outline: none; }
+.impact-sb-link:focus-visible .impact-arc { stroke: var(--ink); stroke-width: 1.6; }
+.impact-sb-center { font-size: 13px; font-weight: 700; fill: var(--ink-light); pointer-events: none; }
 
 /* ====================== STATUS LEGEND (Story 8.2 — on-demand) ======================
    "?" disclosure next to status-bearing headers/badges. Opens a single-column popover.

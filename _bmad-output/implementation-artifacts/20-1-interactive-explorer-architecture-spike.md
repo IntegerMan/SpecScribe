@@ -1,6 +1,10 @@
+---
+baseline_commit: 81897eada057de1062dfbdc9d628d9c87ec443e7
+---
+
 # Story 20.1: Interactive Explorer Architecture Spike
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -119,35 +123,35 @@ If a true surface-coverage gate is needed before 20.2/20.3, say so explicitly in
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Trace the geometry + destination seams the payload projects from (AC: #1)**
-  - [ ] Read `Charts.Sunburst` / `EpicSunburst` / `SunburstCompanionList` and `FollowUpGeometry` / `UnplannedWorkGeometry`; document the exact API the payload's node hierarchy + weights derive from. Confirm **no second geometry** is needed.
-  - [ ] Read `FollowUpGroupTemplater` + the Story 9.13 destination contract; record the precise leaf-vs-group open rule the explorer's terminal action must honor.
-  - [ ] Confirm the payload can carry existing canonical node ids (`EpicInfo.Number`, `StoryInfo.Id`, follow-up slug, code path) without a new identity scheme, and does **not** touch `ProjectCounts`.
+- [x] **Task 1 — Trace the geometry + destination seams the payload projects from (AC: #1)**
+  - [x] Read `Charts.Sunburst` / `EpicSunburst` / `SunburstCompanionList` and `FollowUpGeometry` / `UnplannedWorkGeometry`; document the exact API the payload's node hierarchy + weights derive from. Confirm **no second geometry** is needed.
+  - [x] Read `FollowUpGroupTemplater` + the Story 9.13 destination contract; record the precise leaf-vs-group open rule the explorer's terminal action must honor.
+  - [x] Confirm the payload can carry existing canonical node ids (`EpicInfo.Number`, `StoryInfo.Id`, follow-up slug, code path) without a new identity scheme, and does **not** touch `ProjectCounts`.
 
-- [ ] **Task 2 — Define the single generation-time payload shape (AC: #1)**
-  - [ ] Specify `{ nodes, edges }` (or the chosen shape): fields, ids, how ring hierarchy + related adjacency are expressed, and how it maps to the rendered SVG wedges.
-  - [ ] Decide delivery: inline JSON island vs sidecar `.json`; justify against the SPA precedent and static-host/`file://` safety.
-  - [ ] Affirm **no new authoring schema** and **no second count ledger**; list which existing parsers/geometry the emitter (in 20.2/20.3) must call, not fork.
+- [x] **Task 2 — Define the single generation-time payload shape (AC: #1)**
+  - [x] Specify `{ nodes, edges }` (or the chosen shape): fields, ids, how ring hierarchy + related adjacency are expressed, and how it maps to the rendered SVG wedges.
+  - [x] Decide delivery: inline JSON island vs sidecar `.json`; justify against the SPA precedent and static-host/`file://` safety.
+  - [x] Affirm **no new authoring schema** and **no second count ledger**; list which existing parsers/geometry the emitter (in 20.2/20.3) must call, not fork.
 
-- [ ] **Task 3 — Name the JS / dependency / framework budget (AC: #1)**
-  - [ ] Decide **new block in `specscribe.js` vs new embedded asset**; justify with a size estimate against the codemap block's footprint and the `specscribe-spa.js` precedent.
-  - [ ] State a concrete **added-KB ceiling** and **zero-runtime-dependency, no-build-step** stance; give a yes/no on **framework** (recommend no; if yes → ADR escalation, not a silent spike decision).
-  - [ ] Confirm the delivery mechanism (`CopyEmbeddedAsset` + `ForgeOptions.ScriptName` for a shared block, or a new `SpaDelivery.ScriptName`-style constant + guarded copy for a separate asset).
+- [x] **Task 3 — Name the JS / dependency / framework budget (AC: #1)**
+  - [x] Decide **new block in `specscribe.js` vs new embedded asset**; justify with a size estimate against the codemap block's footprint and the `specscribe-spa.js` precedent.
+  - [x] State a concrete **added-KB ceiling** and **zero-runtime-dependency, no-build-step** stance; give a yes/no on **framework** (recommend no; if yes → ADR escalation, not a silent spike decision).
+  - [x] Confirm the delivery mechanism (`CopyEmbeddedAsset` + `ForgeOptions.ScriptName` for a shared block, or a new `SpaDelivery.ScriptName`-style constant + guarded copy for a separate asset).
 
-- [ ] **Task 4 — Document the degrade + parity contract (AC: #2)**
-  - [ ] Write the JS-off / reduced-motion / keyboard-AT behaviors, each mapped to the existing pattern it mirrors (table above).
-  - [ ] Name the **HTML/SPA parity rules** for the new payload island (which `RenderParity` cases 20.2/20.3 owe), and the explicit webview/CLI non-goals.
-  - [ ] Confirm the interactive layer enhances the **exact** Story 10.7 sunburst + Story 9.13 linked-page markup — not a parallel render.
+- [x] **Task 4 — Document the degrade + parity contract (AC: #2)**
+  - [x] Write the JS-off / reduced-motion / keyboard-AT behaviors, each mapped to the existing pattern it mirrors (table above).
+  - [x] Name the **HTML/SPA parity rules** for the new payload island (which `RenderParity` cases 20.2/20.3 owe), and the explicit webview/CLI non-goals.
+  - [x] Confirm the interactive layer enhances the **exact** Story 10.7 sunburst + Story 9.13 linked-page markup — not a parallel render.
 
-- [ ] **Task 5 — Resolve the Epic 19 dependency + recommend build sequence (AC: #1/#2)**
-  - [ ] State the 20.3-needs-Epic-19-edges dependency and the SCP's 19.1-before-20.3 sequencing.
-  - [ ] Recommend the concrete order (20.2 unblocked by geometry alone; 20.3 gated on Epic 19) and a fallback edge set for 20.3 if Epic 19 slips.
-  - [ ] Cross-reference `19-1-work-graph-model-and-coverage-spike.md`'s edge vocabulary as the planned (not shipped) contract.
+- [x] **Task 5 — Resolve the Epic 19 dependency + recommend build sequence (AC: #1/#2)**
+  - [x] State the 20.3-needs-Epic-19-edges dependency and the SCP's 19.1-before-20.3 sequencing.
+  - [x] Recommend the concrete order (20.2 unblocked by geometry alone; 20.3 gated on Epic 19) and a fallback edge set for 20.3 if Epic 19 slips.
+  - [x] Cross-reference `19-1-work-graph-model-and-coverage-spike.md`'s edge vocabulary as the planned (not shipped) contract.
 
-- [ ] **Task 6 — Record findings; no production code (AC: #1, #2)**
-  - [ ] Write the payload contract + budget + degrade/parity contract + sequencing into this story's **Completion Notes** (same convention as Story 8.1 / 19.1).
-  - [ ] Do **not** land production `src/**` / `tests/**` changes from this story. Throwaway notes/fixtures under `_bmad-output/` are OK; Completion Notes are the canonical deliverable.
-  - [ ] Escalate via `correct-course` if the spike concludes a framework/build step is warranted (ADR-triggering fork). FR38 PRD sync remains "when convenient" — not a blocker for this spike.
+- [x] **Task 6 — Record findings; no production code (AC: #1, #2)**
+  - [x] Write the payload contract + budget + degrade/parity contract + sequencing into this story's **Completion Notes** (same convention as Story 8.1 / 19.1).
+  - [x] Do **not** land production `src/**` / `tests/**` changes from this story. Throwaway notes/fixtures under `_bmad-output/` are OK; Completion Notes are the canonical deliverable.
+  - [x] Escalate via `correct-course` if the spike concludes a framework/build step is warranted (ADR-triggering fork). FR38 PRD sync remains "when convenient" — not a blocker for this spike.
 
 ### Review Findings
 
@@ -239,14 +243,116 @@ Recent commits (as of create-story) landed Epic 7 code-insight work (7.9 coloriz
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Claude Opus 4.8) — dev-story workflow, 2026-07-23
 
 ### Debug Log References
 
+Seams traced against baseline `81897ea` (no production code changed):
+
+- `src/SpecScribe/Charts.cs` — `Sunburst(EpicsModel, int, FollowUpGeometry?, UnplannedWorkGeometry?)`; weight arithmetic is **local closures** `EpicWeight(EpicInfo)` / `StoryWeight(EpicInfo, StoryInfo)` (Charts.cs:372–380), unplanned via `unplannedGeo.SunburstUnplannedWeight`; wedges are `<path class="sb-seg sb-{class}">` drawn by `AnnularSector(c, inner, outer, InsetStart(angle,sweep,pad), InsetEnd(...))` (Charts.cs:420, 741, 766, 931, 1051). No `data-explorer` / explorer root marker exists yet (grep clean).
+- `src/SpecScribe/WorkGraph.cs` — **shipped** `enum WorkEdgeKind { Contains, StemmedFrom, Resolves, RaisedIn }` (4 kinds; **no** `Covers`/`Cites`); `WorkNode(Kind, Id, Label, Href, Title)`, `WorkEdge(FromId, ToId, Kind)`, `WorkGraphModel(Epics)`; built by `WorkGraphBuilder.Build`. Present at baseline (Epic 19 merged @ 38044b1).
+- `src/SpecScribe/SiteGenerator.cs` — `_workGraph` cached (:63, :206) and reused verbatim by `WriteWorkGraph` (:3251); `CopyEmbeddedAsset("SpecScribe.assets.specscribe.js", ForgeOptions.ScriptName)` (:3983, always shipped); `CopyEmbeddedAsset("SpecScribe.assets.specscribe-spa.js", SpaDelivery.ScriptName)` (:2890, `--spa` only).
+- `src/SpecScribe/assets/specscribe.js` — **1573 lines / 77 KB** at baseline (grew from the ~1058 quoted at draft — Epic 7 pagers landed since). Codemap interactivity block ~900–1170: `.codemap-view` opt-in, `motionFastMs()` (:1088), `setViewBox` tween/snap (:1099), `renderCrumbs` (:1115), `prefers-reduced-motion` branch (:925) — the closest existing precedent for the explorer.
+- `src/SpecScribe/RenderParity.cs` — `SemanticFacts` (already carries `ParentDrillTarget` / `ChildDrillTargets`) + `SectionFacts`; a **semantic** fact differ, not a byte differ.
+- `docs/adrs/0010-client-side-charting-js-for-opt-in-analytics-surfaces.md` — Accepted 2026-07-21; narrows this spike's scope (below).
+
 ### Completion Notes List
+
+**SPIKE — no production `src/**` or `tests/**` changes. The contract below is the deliverable; Stories 20.2/20.3 are built against it.**
+
+#### Reconciliation banner (what changed under this spike since it was drafted)
+
+This spike was drafted 2026-07-21 assuming Epic 19 was unshipped and the "is JS allowed at all" question was still open. Both moved. The contract below is written against **verified baseline `81897ea` reality**, not the draft's assumptions:
+
+1. **ADR 0010 (2026-07-21) already ratified that client-side charting JS is permitted** — but only for **opt-in deep-analytics surfaces** (Git Insights, Code Map colorize views, `--deep-git`-gated). This spike no longer litigates "is JS allowed"; it fixes the **size/dependency budget + the drill-in/exploration UX** for Epic 20 (ADR 0010 §5, §"Ratified" #4).
+2. **Epic 19's work-graph model is merged to main** (`WorkGraph.cs` @ 38044b1, present at baseline). The 20.3 pane's data source is **live now via `SiteGenerator._workGraph`** — 20.3 is **no longer blocked** on Epic 19. The draft's "Epic 19 not done, name a fallback" caveat is **resolved**: no fallback edge set is needed.
+3. **The shipped edge vocabulary is 4 kinds, not 5.** `WorkEdgeKind = { Contains, StemmedFrom, Resolves, RaisedIn }`. `Covers`/`Cites` from the draft's 5-kind prose are **deliberately out of the 19.2 MVP** and MUST NOT be assumed. The pane groups by the **4 real kinds, data-driven over the enum** — never a hardcoded 5-kind list.
+4. **The explorer enhances a BASELINE page, not an opt-in analytics page.** The dashboard remaining-work sunburst renders with no opt-in flag, so ADR 0010 §1 ("baseline pages stay zero-JS-required") governs it and ADR 0010 §6's "one shared `specscribe-analytics.js`" (opt-in-pages-only) is **the wrong home** — that asset never loads on the dashboard. → the explorer lives in the **always-shipped `specscribe.js`, guarded by an explorer-root marker** (decision table below).
+
+#### 1. Payload — `{ nodes, edges }`, ONE generation-time inline JSON island
+
+| Field | Source API (verified) | Reuses geometry? | Notes |
+|-------|-----------------------|------------------|-------|
+| `nodes[].id` | canonical: `"epic-{EpicInfo.Number}"` / `"{StoryInfo.Id}"` (e.g. `20.2`) / follow-up slug / code path | n/a (existing identity) | No new identity scheme. Must match `WorkNode.Id` grain so 20.3 edges join. |
+| `nodes[].parentId` | ring membership from `EpicsModel` + `FollowUpGeometry.StoryChildDeferred` / `EpicLevelDeferred` | ✅ | Expresses the epic→story→follow-up hierarchy the SVG rings already encode. |
+| `nodes[].weight` | `EpicWeight` / `StoryWeight` closures + `SunburstUnplannedWeight` (Charts.cs:372–380) | ✅ | **Same arithmetic that draws the SVG.** See emitter seam note below. |
+| `nodes[].label` | epic title / `StoryInfo` title / slot label | ✅ | — |
+| `nodes[].statusClass` | the `sb-{class}` status token already on each `<path>` | ✅ | Reuses the six `--status-*` tokens; no new palette. |
+| `nodes[].href` | Story 9.13 destination: **leaf → detail page; group → generated filtered list page** (`FollowUpGeometry.DetailHref` / `FollowUpsGroupHref`) | ✅ | The terminal open action; never the unfiltered whole-site dump. |
+| `nodes[].kind` | `epic` / `story` / `follow-up` / `unplanned` | ✅ | Drives leaf-vs-group behavior (zoom vs open). |
+| `edges[]` | **`SiteGenerator._workGraph`** (`WorkEdge{FromId,ToId,Kind}`, 4 kinds) | ✅ | **20.2 ships `edges: []`**; **20.3 fills it** from `_workGraph` verbatim. Data-driven over the real enum. |
+
+- **Delivery:** ONE inline `<script type="application/json">` island co-located in the sunburst host page (dashboard; also epics host where the sunburst appears). **No sidecar `.json`, no `fetch`/XHR** → `file://`- and static-host-safe (FR31 determinism preserved by embedding, per ADR 0010 §3). Mirrors how the SPA inlines its entry region.
+- **No second geometry, no second ledger, no authoring schema:** the emitter is a **pure projection** over `EpicsModel` + `FollowUpGeometry` + `UnplannedWorkGeometry` + `_workGraph`. It must NOT touch `ProjectCounts` and MUST NOT add YAML/frontmatter keys.
+- **Emitter seam note for 20.2 (load-bearing):** `EpicWeight`/`StoryWeight` are **local closures inside `Charts.Sunburst`**, not public. To honor "same weights draw the SVG and feed the payload" without drift, 20.2 should **extract those closures into a shared pure weight function** that both the SVG builder and the payload emitter call — not copy the arithmetic into JS or into a parallel C# path. Copy-paste of the weight math is the "second geometry" anti-pattern in disguise.
+
+#### 2. Budget — the named ceiling (the spike's core deliverable)
+
+| Dimension | Decision | Rationale |
+|-----------|----------|-----------|
+| **JS home** | **New guarded block in `specscribe.js`**, opt-in via presence of the explorer-root marker (`data-explorer`), mirroring the `.codemap-view` opt-in idiom. | Explorer enhances a **baseline page** → must ride the always-shipped script; ADR 0010's opt-in `specscribe-analytics.js` never loads on the dashboard. Codemap zoom is the closest precedent and already lives here. |
+| **JS size ceiling** | **≤ ~8–10 KB** of hand-written, ES5-compatible source (unminified, in-file), measured as added lines in `specscribe.js`. | Comparable to the codemap block's footprint; a *named* number is the antidote to "growth by accretion" (the SCP's stated fear). If 20.2+20.3 together exceed this, that is the trigger to reconsider a separate asset — not to silently overflow. |
+| **Dependencies** | **Zero runtime dependencies. No build step.** Hand-written `file://`-safe ES5, matching `specscribe.js`'s existing idiom. | The whole script is dependency-free by design; consistent with ADR 0010's zero-dep posture for analytics JS. |
+| **Framework** | **No.** | Introducing a framework/bundler here is an **ADR-triggering architectural fork** — escalate via `correct-course`, do not decide in a spike ([[adr-creation-trigger-gap-epic-10-retro]]). ADR 0009 already deferred a framework. |
+| **Delivery mechanism** | Existing `CopyEmbeddedAsset("SpecScribe.assets.specscribe.js", ForgeOptions.ScriptName)` (SiteGenerator.cs:3983). | No new embedded resource / no new `SpaDelivery.ScriptName`-style constant needed for the shared-block choice. |
+| **The Plotly question (owner-raised 2026-07-22)** | **Out of scope / weighed and declined for Epic 20.** Plotly is a real charting-library dependency — a materially bigger departure than anything else here and contrary to the zero-dep default + ADR 0010's posture. Epic 7's Code Ownership/Freshness sunbursts wanting the same drill are a **separate follow-on**, NOT piggybacked on Epic 20's budget. Adopting Plotly would be an ADR-triggering fork. | Keeps the crossing deliberate and single; prevents a second, heavier interaction stack sneaking in under Epic 20's name. |
+
+#### 3. Degrade contract (AC #2)
+
+| Mode | Required behavior | Mirrored pattern (verified) |
+|------|-------------------|-----------------------------|
+| **JS off (NFR8 / ADR 0010 §1)** | Static Story 10.7 sunburst renders fully; every `sb-seg` link resolves via the 9.13 destination contract; the related-work data ships as a **server-rendered "Related" block** (20.3 half #1), never JS-gated. | `.codemap-table` / `.js-listable`: complete server truth, JS never required. |
+| **Reduced motion** | Zoom/drill **snaps** instead of tweening; timing (when allowed) reads `--motion-*`. | codemap `motionFastMs()` + `setViewBox` reduce branch (specscribe.js:925, 1088, 1099). |
+| **Keyboard / AT** | Roving-tabindex wedges, Enter/Space activation, `aria` live announcement of zoom scope; terminal open still honors 9.13. | codemap dir rects `role=button` / `tabindex=0` / keydown Enter-Space; donut `tabindex` precedent. |
+
+- **Interactivity boundary:** the client only **re-arranges and reveals** server-rendered truth — it never fetches, never computes a count, never invents a destination. Every destination, weight, count, and edge is server-rendered first.
+
+#### 4. Parity (AC #2)
+
+| Surface | Expectation | `RenderParity` owed by 20.2/20.3 |
+|---------|-------------|----------------------------------|
+| **HTML** | Primary host; enhances the existing dashboard/epics sunburst host page. | — |
+| **SPA** | The inline JSON island + `data-explorer` root must survive SPA content-region extraction. | 20.2 adds a `SemanticFacts`/`SectionFacts` case (or documented equivalent) asserting the island + explorer-root markers appear in **both** HTML and SPA bodies. `RenderParity` is a semantic differ — a dropped island fact must make the forms differ. |
+| **Webview** | **Non-goal** (dashboard/epics chrome only today). | State explicitly; do not build. |
+| **CLI** | **Non-goal** (notices only). | State explicitly. |
+
+- **Golden-fingerprint note:** the new island + `data-explorer` markup **will move the golden HTML fingerprint**; 20.2 owns re-baselining. Per ADR 0010 §Consequences, golden fingerprints cover only the **no-JS baseline** — the JS-driven zoom/reveal states need their own DOM-level test strategy.
+
+#### 5. Sequencing (Epic 19 now merged)
+
+| Story | Depends on | Fallback |
+|-------|-----------|----------|
+| **20.1 (this)** | — | — (contract-only) |
+| **20.2 — zoom/drill-in** | geometry only (`Charts.Sunburst` weights + `data-explorer` root it introduces). **NOT** blocked on Epic 19. Ships `edges: []`. | none needed |
+| **20.3 — related pane** | **Epic 19 edges — ALREADY MERGED** (`_workGraph`). Server "Related" block (half #1) needs no 20.2; client reveal (half #2) gated on 20.2's selection seam. | **No Epic 19 fallback required** — the draft's "if 19 slips" caveat is void. |
+
+#### 6. Non-goals confirmed
+
+| Item | Rationale |
+|------|-----------|
+| Building the zoomable chart / side pane / payload emitter | Stories 20.2 / 20.3. |
+| A framework / bundler / build step | ADR fork; escalate ([[adr-creation-trigger-gap-epic-10-retro]]). |
+| Plotly or any charting-library dependency | Zero-dep default; ADR fork; Epic 7 sunbursts are a separate follow-on. |
+| A second geometry (re-deriving ring weights outside the shared weight fn) | Emitter is a pure projection; extract-don't-copy the weight closures. |
+| A second count ledger (re-counting vs `ProjectCounts`) | Single ledger invariant. |
+| A new authoring schema (YAML/frontmatter/graph DSL) | Epic 9/19 principle; AC #2. |
+| `fetch`/XHR for the payload | Breaks `file://`/static-host delivery; embed inline. |
+| A parallel navigation scheme | Reuse Story 9.13 leaf/group destinations. |
+| Webview/CLI explorer support | HTML+SPA only; recorded above. |
+| Retiring Story 10.7 static sunburst | Stays the no-JS baseline the explorer enhances. |
+
+**Surface-reach gate:** no separate cross-surface integration gate is needed before 20.2/20.3 — HTML is the primary host, SPA parity is covered by the `RenderParity` case above, webview/CLI are recorded non-goals. 20.1 is **not** expanded into building webview support.
 
 ### File List
 
+_No production files changed (spike — contract recorded in this story's Completion Notes only). Story tracking files touched:_
+
+- `_bmad-output/implementation-artifacts/20-1-interactive-explorer-architecture-spike.md` (this file — frontmatter `baseline_commit`, tasks, Dev Agent Record, Status)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (20-1 → in-progress → review)
+
 ## Change Log
+
+- 2026-07-23 — Story 20.1 dev pass (spike). Traced geometry/edge/JS/delivery/parity seams against baseline `81897ea`; recorded the explorer contract (payload `{nodes,edges}` inline island, ≤~8–10 KB zero-dep guarded block in `specscribe.js`, degrade/parity rules) in Completion Notes. **Reconciled 4 draft assumptions against shipped reality:** ADR 0010 already settled "is JS allowed"; Epic 19 merged (20.3 no longer blocked, no fallback needed); shipped `WorkEdgeKind` is 4 kinds not 5 (no covers/cites); explorer enhances a baseline page so it lives in always-shipped `specscribe.js`, not ADR 0010's opt-in analytics asset. Plotly weighed and declined (ADR fork; Epic 7 follow-on separate). No production code. Status → review.
+- 2026-07-21 — Story 20.1 drafted (create-story). Ultimate context engine analysis completed — comprehensive developer guide created. Spike-only: interactivity-boundary + single-payload contract + JS/dependency/framework budget + degrade-to-static & HTML/SPA parity contract + Epic 19 sequencing; no production code. Epic 20 → in-progress (first story).
 
 - 2026-07-21 — Story 20.1 drafted (create-story). Ultimate context engine analysis completed — comprehensive developer guide created. Spike-only: interactivity-boundary + single-payload contract + JS/dependency/framework budget + degrade-to-static & HTML/SPA parity contract + Epic 19 sequencing; no production code. Epic 20 → in-progress (first story).

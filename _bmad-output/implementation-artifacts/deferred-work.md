@@ -887,3 +887,21 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `19-1-work-graph-model-and-coverage-spike.md`
   summary: Consider a short ADR for the "carrier → target" edge-direction convention (§2 of the 19.1 coverage map). The spike consciously decided no architectural fork appeared — defensible for a single not-yet-built surface — but the convention is load-bearing for the work graph and Epic 24 (change-coupling graphs) now inherits it. Escalate to an ADR at 19.2 / Epic 24 create-story time if/when the convention spreads beyond Epic 19, per the standing "agents under-propose ADRs" retrospective lesson.
   evidence: Acceptance Auditor (soft observation). Not a gap in the spike; a process nudge for later stories.
+
+## Deferred from: code review of 19-2-directed-graph-visualization-and-path-query (2026-07-23)
+
+- source_spec: `19-2-directed-graph-visualization-and-path-query.md`
+  summary: No end-to-end `SiteGenerator` test exercises the real work-graph wiring (`BuildWorkGraphModel` → `WriteWorkGraph` → `EpicSubgraph`/`StorySubgraph`) with an actual graph signal present. All 29 `WorkGraphTests.cs` tests construct `WorkGraphBuilder`/`Charts.WorkGraph`/`WorkGraphTemplater`/`TabStrip` in isolation from hand-built fixtures; the one `SiteGenerator`-level golden test deliberately uses a zero-signal fixture. Today's only verification of the real wiring is a documented manual dogfood pass, not a regression-protected test.
+  evidence: Blind Hunter.
+- source_spec: `19-2-directed-graph-visualization-and-path-query.md`
+  summary: Task 5's "no broken local links on node hrefs" requirement isn't covered by this codebase's own `AssertNoBrokenLocalLinks` helper (already used by the cadence/traceability/code-map/sprint test suites) — link hygiene for work-graph node hrefs was verified manually instead ("272 local hrefs = 0 missing" per the Debug Log), with no automated regression protection against a future change reintroducing a dangling link.
+  evidence: Acceptance Auditor.
+- source_spec: `19-2-directed-graph-visualization-and-path-query.md`
+  summary: `Charts.WorkGraph` draws edges as plain straight `<line>` elements between fixed column x-coordinates with no curve or collision avoidance — action items and unrooted deferred items that connect straight back to the epic root (column 0) draw a line that geometrically passes through the Story column (column 1) between them, potentially overlapping an unrelated story's node. Cosmetic readability gap for a diagram whose whole purpose is legible provenance tracing.
+  evidence: Blind Hunter.
+- source_spec: `19-2-directed-graph-visualization-and-path-query.md`
+  summary: No cap on the number of epic sections concatenated onto the single standalone `work-graph.html` page — only the per-epic 40-follow-up draw cap (`WorkGraphBuilder.MaxFollowUpsPerEpic`) exists. This project has a documented history of exactly this class of perf debt on other single-page SVG-heavy surfaces (the prior 82.5MB `code-map.html` issue at scale); not yet triggered on this repo's own dogfood, but a plausible repeat at a larger project's scale.
+  evidence: Blind Hunter.
+- source_spec: `19-2-directed-graph-visualization-and-path-query.md`
+  summary: The `work-graph.html` scope-picker `<select>` renders unconditionally for JS-off users, who see a "Show:" control that visibly does nothing when changed (every section already renders without JS, so nothing is actually broken functionally — just a mildly misleading affordance with no `<noscript>` alternative pointing at the in-page anchors that already exist).
+  evidence: Blind Hunter.

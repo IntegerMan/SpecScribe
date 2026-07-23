@@ -128,16 +128,37 @@ public class SiteGeneratorImpactMapTests : IDisposable
         GenerateSite(deepGit: true);
 
         var impact = File.ReadAllText(ImpactMapPage);
-        // The interactive scaffold: the JSON data island the script reads, the epic multi-select, and the mount.
+        // The interactive scaffold: the JSON data island the script reads, the epic multi-select, and the mounts.
         Assert.Contains("id=\"impact-map-data\"", impact);
         Assert.Contains("application/json", impact);
         Assert.Contains("impact-epic-toggle", impact);
         Assert.Contains("id=\"impact-treemap\"", impact);
-        // The payload carries the weight fields the treemap draws with (churn 'c' + commits 'k').
+        // The payload carries the weight fields the shapes draw with (churn 'c' + commits 'k').
         Assert.Matches(new Regex("\"p\":\"src/Sample/Widget\\.cs\".*\"c\":\\d+.*\"k\":\\d+"), impact);
+        // The epic selector reuses the sprint board's multi-select dropdown component.
+        Assert.Contains("sprint-epic-filter impact-epic-filter", impact);
+        Assert.Contains("sprint-epic-filter-count", impact);
+        // The Treemap | Sunburst view toggle (board-tabs) + the sunburst mount both exist; the toggle radios sit
+        // inside .impact-shapes so the pure-CSS :has() visibility swap can reach them.
+        Assert.Contains("id=\"impact-view-treemap\"", impact);
+        Assert.Contains("id=\"impact-view-sunburst\"", impact);
+        Assert.Contains("id=\"impact-sunburst\"", impact);
+        Assert.Matches(new Regex("<div class=\"impact-shapes\">\\s*<div class=\"board-tabs impact-shape-tabs\">"), impact);
         // The no-JS / accessible text-equivalent fallback list is present (and the controls start hidden).
         Assert.Contains("impact-fallback", impact);
         Assert.Contains("class=\"impact-controls\" hidden", impact);
+    }
+
+    [Fact]
+    public void GenerateAll_WithDeepGit_ImpactMapNavEntryCarriesAnIcon()
+    {
+        Assert.True(TryCreateGitHistory("Story 1.1 foundation work"), "git CLI unavailable");
+        GenerateSite(deepGit: true);
+
+        // The Delivery nav entry for the impact map renders with its concept glyph, like every other nav item —
+        // an <svg class="ss-icon"> immediately precedes the "Impact Map" link label on the epics page.
+        var epicsHtml = File.ReadAllText(EpicsPage);
+        Assert.Contains(Icons.ForConcept("Impact Map"), epicsHtml);
     }
 
     [Fact]

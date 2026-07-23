@@ -77,6 +77,9 @@ public static class Icons
             "Traceability" => Svg("<path d=\"M2.8 2.8h10.4v10.4H2.8Z\"/><path d=\"M2.8 6.5h10.4M2.8 10.2h10.4M6.5 2.8v10.4M10.2 2.8v10.4\"/>"),
             // Ascending bars over a baseline — delivery cadence / completion rhythm over time. [Story 21.2]
             "Cadence" => Svg("<path d=\"M2.8 13.2h10.4\"/><path d=\"M4.2 13.2V9.4M7.3 13.2V6.2M10.4 13.2V3.4\"/>"),
+            // Nested rectangles — the planning↔code impact TREEMAP surface (nav item + dashboard quick link
+            // reuse this ONE key). Echoes the page's weighted-tile layout. [Story 21.3]
+            "Impact Map" => Svg("<path d=\"M2.8 2.8h10.4v10.4H2.8Z\"/><path d=\"M2.8 8h5.2V2.8M8 8v5.4M2.8 8h10.4\"/>"),
             "ADRs" => Svg("<path d=\"M8 3v9.5\"/><path d=\"M8 4.2 4.6 4.2 3 7.3h3.6ZM8 4.2 11.4 4.2 13 7.3H9.4Z\"/><path d=\"M4.6 13h6.8\"/>"),
             "Spec" => Svg("<path d=\"M6 3.2 2.7 8l3.3 4.8\"/><path d=\"M10 3.2 13.3 8 10 12.8\"/>"),
             "Sprint" or "Sprint Status" => Svg("<path d=\"M3.5 3.6h9v9.8h-9Z\"/><path d=\"M3.5 6.4h9M5.8 2.4v2.4M10.2 2.4v2.4\"/>"),

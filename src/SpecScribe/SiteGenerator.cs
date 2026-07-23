@@ -603,7 +603,15 @@ public sealed class SiteGenerator
             epicsEvents.AddRange(MapDiagnostics(navDiagnostics));
             if (ingest is { Epics: { } epicsModel, Requirements: { } requirementsModel } && progress is not null)
             {
+                // Refresh the work-graph model on every incremental pass too (Story 19.2 review) — it was
+                // previously cached ONCE per full GenerateAll() and never touched again here, so EpicSubgraph
+                // (reading _workGraph) could disagree with StorySubgraph (built fresh from followUps inside
+                // RenderEpicsPages below) after a single watch-mode edit to deferred/action attribution. Same
+                // partial-failure caching rule as elsewhere in this method: only refreshed when the re-ingest
+                // actually produced a usable model.
+                _workGraph = BuildWorkGraphModel(epicsModel, progress, requirementsModel, files);
                 epicsEvents.AddRange(RenderEpicsPages(ingest.SourceFullPath, files, ingest.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
+                WriteWorkGraph(nav);
             }
             RefreshCoverage();
             var followUpInventory = RefreshFollowUpSurfaces(nav, sourceFiles: files);

@@ -1383,11 +1383,11 @@
   // a deliberate crossing of the "pure-SVG, no JS" rule. Fully degrades: with JS off this block never runs, the
   // controls stay hidden, and the epic-grouped text list below is the content. [Story 21.3]
   var SVGNS = "http://www.w3.org/2000/svg";
-  Array.prototype.forEach.call(document.querySelectorAll("#impact-treemap"), function (mount) {
-    try { initImpactMap(mount); } catch (err) { /* degrade silently — the text list below stands */ }
-  });
+  if (document.getElementById("impact-treemap")) {
+    try { initImpactMap(); } catch (err) { /* degrade silently — the text list below stands */ }
+  }
 
-  function initImpactMap(mount) {
+  function initImpactMap() {
     var dataEl = document.getElementById("impact-map-data");
     if (!dataEl) return;
     var payload = null;
@@ -1396,12 +1396,33 @@
 
     var controls = document.querySelector(".impact-controls");
     var fallback = document.getElementById("impact-fallback");
+    var treemapMount = document.getElementById("impact-treemap");
+    var sunburstMount = document.getElementById("impact-sunburst");
+    var countEl = document.querySelector(".impact-epic-filter .sprint-epic-filter-count");
     var boxes = Array.prototype.slice.call(document.querySelectorAll(".impact-epic-toggle"));
-    if (!boxes.length) return;
+    if (!boxes.length || !treemapMount) return;
 
     // Reveal the interactive controls (emitted hidden for no-JS) and tuck the text list away (still one click).
     if (controls) controls.hidden = false;
     if (fallback) fallback.open = false;
+
+    function el(name, attrs) {
+      var e = document.createElementNS(SVGNS, name);
+      for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+    function dirOf(p) { var i = p.lastIndexOf("/"); return i < 0 ? "" : p.substring(0, i); }
+    function baseOf(p) { var i = p.lastIndexOf("/"); return i < 0 ? p : p.substring(i + 1); }
+    function fileTitle(f) {
+      return f.p + " — " + f.c + (f.c === 1 ? " line" : " lines") + " changed · " + f.k + (f.k === 1 ? " commit" : " commits");
+    }
+    function emptyNote(container) {
+      container.textContent = "";
+      var note = document.createElement("p");
+      note.className = "impact-treemap-empty";
+      note.textContent = "Select at least one epic to see the code areas it touched.";
+      container.appendChild(note);
+    }
 
     // Merge the checked epics' files into one path -> {churn, commits, href} map.
     function mergedFiles() {
@@ -1421,8 +1442,25 @@
       return arr;
     }
 
-    // Squarified treemap of {value} nodes into [x,y,x+w,y+h]; sets node.rect = {x,y,w,h}. Nodes must be
-    // pre-sorted desc by value. Classic Bruls et al. worst-aspect-ratio strips. [Story 21.3]
+    // Group the merged files into a shared directory hierarchy (one directory level, then files within). Both the
+    // group nodes AND the file nodes carry `.value` (churn) so the layout algorithms can size them.
+    function groupByDir(files) {
+      var map = {};
+      files.forEach(function (f) {
+        f.value = f.c;
+        var d = dirOf(f.p);
+        if (!map[d]) map[d] = { name: d, value: 0, files: [] };
+        map[d].value += f.c; map[d].files.push(f);
+      });
+      var groups = [];
+      for (var g in map) if (Object.prototype.hasOwnProperty.call(map, g)) groups.push(map[g]);
+      groups.sort(function (a, b) { return b.value - a.value; });
+      groups.forEach(function (grp) { grp.files.sort(function (a, b) { return b.c - a.c; }); });
+      return groups;
+    }
+
+    // Squarified treemap of {value} nodes into a rect; sets node.rect = {x,y,w,h}. Nodes pre-sorted desc by value.
+    // Classic Bruls et al. worst-aspect-ratio strips. [Story 21.3]
     function worst(areas, len) {
       var sum = 0, max = -Infinity, min = Infinity, i;
       for (i = 0; i < areas.length; i++) { sum += areas[i]; if (areas[i] > max) max = areas[i]; if (areas[i] < min) min = areas[i]; }
@@ -1459,45 +1497,9 @@
       }
     }
 
-    function el(name, attrs) {
-      var e = document.createElementNS(SVGNS, name);
-      for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) e.setAttribute(k, attrs[k]);
-      return e;
-    }
-    function dirOf(p) { var i = p.lastIndexOf("/"); return i < 0 ? "" : p.substring(0, i); }
-    function baseOf(p) { var i = p.lastIndexOf("/"); return i < 0 ? p : p.substring(i + 1); }
-
-    function render() {
-      var files = mergedFiles();
-      mount.textContent = "";
-      if (!files.length) {
-        var note = document.createElement("p");
-        note.className = "impact-treemap-empty";
-        note.textContent = "Select at least one epic to see the code areas it touched.";
-        mount.appendChild(note);
-        return;
-      }
-
-      // Color scale: commit count -> 1..5 buckets, relative to the current merged max (recomputed per view so a
-      // narrow selection still reads a full ramp).
-      var maxK = 1;
-      files.forEach(function (f) { if (f.k > maxK) maxK = f.k; });
-      function levelOf(k) { var lv = Math.ceil((5 * k) / maxK); return lv < 1 ? 1 : lv > 5 ? 5 : lv; }
-
-      // Group into a shared directory hierarchy (one level of directory grouping, then files within). Both the
-      // group nodes AND the file nodes need a `.value` (churn) for squarify to size them.
-      var groupsMap = {};
-      files.forEach(function (f) {
-        f.value = f.c;
-        var d = dirOf(f.p);
-        if (!groupsMap[d]) groupsMap[d] = { name: d, value: 0, files: [] };
-        groupsMap[d].value += f.c; groupsMap[d].files.push(f);
-      });
-      var groups = [];
-      for (var g in groupsMap) if (Object.prototype.hasOwnProperty.call(groupsMap, g)) groups.push(groupsMap[g]);
-      groups.sort(function (a, b) { return b.value - a.value; });
-
-      var W = Math.max(mount.clientWidth || 640, 320);
+    function renderTreemap(container, groups, levelOf) {
+      container.textContent = "";
+      var W = Math.max(container.clientWidth || 640, 320);
       var H = Math.max(Math.min(Math.round(W * 0.6), 620), 360);
       var svg = el("svg", { "class": "impact-tm", viewBox: "0 0 " + W + " " + H, width: "100%", height: H, preserveAspectRatio: "xMidYMid meet" });
 
@@ -1505,7 +1507,6 @@
       groups.forEach(function (grp) {
         if (!grp.rect || grp.rect.w < 2 || grp.rect.h < 2) return;
         var gx = grp.rect.x + 1, gy = grp.rect.y + 1, gw = grp.rect.w - 2, gh = grp.rect.h - 2;
-        // A directory label strip when the group is tall/wide enough; files fill the remainder.
         var labelH = (gw > 60 && gh > 30) ? 15 : 0;
         if (labelH) {
           var lbl = el("text", { "class": "impact-tm-dir", x: gx + 2, y: gy + 11 });
@@ -1513,17 +1514,13 @@
           svg.appendChild(el("rect", { "class": "impact-tm-dir-bg", x: gx, y: gy, width: gw, height: labelH }));
           svg.appendChild(lbl);
         }
-        grp.files.sort(function (a, b) { return b.c - a.c; });
         squarify(grp.files, gx, gy + labelH, gw, gh - labelH);
         grp.files.forEach(function (f) {
           if (!f.rect || f.rect.w < 1 || f.rect.h < 1) return;
           var host = f.h ? el("a", { href: f.h, "class": "impact-tm-link" }) : el("g", {});
           var rect = el("rect", { "class": "impact-tm-tile impact-level-" + levelOf(f.k), x: f.rect.x, y: f.rect.y, width: Math.max(f.rect.w - 1, 0.5), height: Math.max(f.rect.h - 1, 0.5) });
-          var title = el("title", {});
-          title.textContent = f.p + " — " + f.c + (f.c === 1 ? " line" : " lines") + " changed · " + f.k + (f.k === 1 ? " commit" : " commits");
-          rect.appendChild(title);
+          var title = el("title", {}); title.textContent = fileTitle(f); rect.appendChild(title);
           host.appendChild(rect);
-          // Filename label only when the tile is large enough to carry it legibly.
           if (f.rect.w > 46 && f.rect.h > 16) {
             var t = el("text", { "class": "impact-tm-label", x: f.rect.x + 3, y: f.rect.y + 12 });
             t.textContent = baseOf(f.p);
@@ -1532,8 +1529,85 @@
           svg.appendChild(host);
         });
       });
+      container.appendChild(svg);
+    }
 
-      mount.appendChild(svg);
+    // Two-ring radial sunburst of the SAME merged hierarchy: an inner directory ring and an outer file ring, arcs
+    // sized by churn (angular span) and — for files — colored by commit level. Same tooltips + click-through as the
+    // treemap; the shared view toggle above swaps between them. [Story 21.3]
+    var TAU = Math.PI * 2;
+    function renderSunburst(container, groups, levelOf, fileCount) {
+      container.textContent = "";
+      var total = 0; groups.forEach(function (g) { total += g.value; });
+      if (total <= 0) { emptyNote(container); return; }
+
+      var W = Math.max(container.clientWidth || 640, 320);
+      var size = Math.max(Math.min(W, 560), 320);
+      var cx = size / 2, cy = size / 2;
+      var rHole = size * 0.16, rDir = size * 0.30, rFile = size * 0.47;
+      var svg = el("svg", { "class": "impact-sb", viewBox: "0 0 " + size + " " + size, width: "100%", height: "auto", preserveAspectRatio: "xMidYMid meet" });
+
+      function polar(r, a) { return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+      function arcPath(r0, r1, a0, a1) {
+        if (a1 - a0 >= TAU) a1 = a0 + TAU - 1e-3; // a full circle can't be one arc segment — leave a hair's gap
+        var large = (a1 - a0) > Math.PI ? 1 : 0;
+        var p0 = polar(r1, a0), p1 = polar(r1, a1), p2 = polar(r0, a1), p3 = polar(r0, a0);
+        return "M" + p0[0].toFixed(2) + " " + p0[1].toFixed(2) +
+          "A" + r1.toFixed(2) + " " + r1.toFixed(2) + " 0 " + large + " 1 " + p1[0].toFixed(2) + " " + p1[1].toFixed(2) +
+          "L" + p2[0].toFixed(2) + " " + p2[1].toFixed(2) +
+          "A" + r0.toFixed(2) + " " + r0.toFixed(2) + " 0 " + large + " 0 " + p3[0].toFixed(2) + " " + p3[1].toFixed(2) + "Z";
+      }
+
+      var ang = -Math.PI / 2; // start at 12 o'clock
+      groups.forEach(function (grp) {
+        var gspan = (grp.value / total) * TAU;
+        var gEnd = ang + gspan;
+        var dseg = el("path", { "class": "impact-arc-dir", d: arcPath(rHole, rDir, ang, gEnd) });
+        var dt = el("title", {}); dt.textContent = (grp.name || "(root)") + " — " + grp.files.length + (grp.files.length === 1 ? " file" : " files");
+        dseg.appendChild(dt); svg.appendChild(dseg);
+
+        var fang = ang;
+        grp.files.forEach(function (f) {
+          var fspan = (f.c / grp.value) * gspan;
+          var fEnd = fang + fspan;
+          var host = f.h ? el("a", { href: f.h, "class": "impact-sb-link" }) : el("g", {});
+          var seg = el("path", { "class": "impact-arc impact-level-" + levelOf(f.k), d: arcPath(rDir, rFile, fang, fEnd) });
+          var t = el("title", {}); t.textContent = fileTitle(f); seg.appendChild(t);
+          host.appendChild(seg); svg.appendChild(host);
+          fang = fEnd;
+        });
+        ang = gEnd;
+      });
+
+      var center = el("text", { "class": "impact-sb-center", x: cx.toFixed(1), y: cy.toFixed(1), "text-anchor": "middle", "dominant-baseline": "central" });
+      center.textContent = fileCount + (fileCount === 1 ? " file" : " files");
+      svg.appendChild(center);
+      container.appendChild(svg);
+    }
+
+    function updateSummary() {
+      if (!countEl) return;
+      var n = 0; boxes.forEach(function (b) { if (b.checked) n++; });
+      countEl.textContent = n === 0 ? "none" : n === boxes.length ? "all (" + n + ")" : n + " selected";
+    }
+
+    function render() {
+      updateSummary();
+      var files = mergedFiles();
+      if (!files.length) {
+        emptyNote(treemapMount);
+        if (sunburstMount) emptyNote(sunburstMount);
+        return;
+      }
+      // Commit-count -> 1..5 color buckets, relative to the current selection's max so a narrow filter still
+      // reads a full ramp. Computed once and shared by both shapes so their colors agree.
+      var maxK = 1;
+      files.forEach(function (f) { if (f.k > maxK) maxK = f.k; });
+      function levelOf(k) { var lv = Math.ceil((5 * k) / maxK); return lv < 1 ? 1 : lv > 5 ? 5 : lv; }
+
+      var groups = groupByDir(files);
+      renderTreemap(treemapMount, groups, levelOf);
+      if (sunburstMount) renderSunburst(sunburstMount, groups, levelOf, files.length);
     }
 
     boxes.forEach(function (cb) { cb.addEventListener("change", render); });
@@ -1542,7 +1616,7 @@
     if (allBtn) allBtn.addEventListener("click", function () { boxes.forEach(function (c) { c.checked = true; }); render(); });
     if (noneBtn) noneBtn.addEventListener("click", function () { boxes.forEach(function (c) { c.checked = false; }); render(); });
 
-    // Re-layout on resize (debounced) so the treemap tracks the container width.
+    // Re-layout on resize (debounced) so both shapes track the container width.
     var resizeTimer = null;
     window.addEventListener("resize", function () {
       if (resizeTimer) clearTimeout(resizeTimer);

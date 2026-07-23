@@ -51,8 +51,14 @@ public sealed record WorkGraphEpic(
     IReadOnlyList<WorkNode> Nodes,
     IReadOnlyList<WorkEdge> Edges,
     IReadOnlyList<IReadOnlyList<string>> Cycles,
-    int Overflow = 0)
+    int Overflow = 0,
+    IReadOnlyList<string>? OverflowLabels = null)
 {
+    /// <summary>Plain-text labels for the follow-ups <see cref="Overflow"/> elided by the per-epic draw cap
+    /// (Story 19.2 review) — the sr-only enumeration lists these too, so the "not drawn (listed below)" overflow
+    /// note is actually true for assistive tech, not just sighted users. Empty when nothing overflowed.</summary>
+    public IReadOnlyList<string> OverflowLabelsOrEmpty => OverflowLabels ?? Array.Empty<string>();
+
     /// <summary>Non-null for the synthetic <em>Unattributed</em> bucket (Story 19.1 code-review D1) that hosts
     /// follow-ups belonging to no epic (<c>EpicNumber == null</c> or an unknown epic); its display name. Null for
     /// a real epic. [Story 19.2]</summary>
@@ -215,10 +221,21 @@ public static class WorkGraphBuilder
 
         var drawn = 0;
         var overflow = 0;
+        var overflowLabels = new List<string>();
 
         for (var i = 0; i < deferred.Count; i++)
         {
-            if (drawn >= MaxFollowUpsPerEpic) { overflow = (deferred.Count - i) + Math.Max(0, actions.Count); goto done; }
+            if (drawn >= MaxFollowUpsPerEpic)
+            {
+                // Elided items still get their full plain-text label recorded (Story 19.2 review) — the templater's
+                // sr-only enumeration lists them even though the SVG never draws them.
+                for (var k = i; k < deferred.Count; k++)
+                    overflowLabels.Add($"Deferred item: {Summarize(deferred[k].Item.BodyHtml)}");
+                foreach (var a in actions)
+                    overflowLabels.Add($"Action item: {FollowUpRow.SummarizePlainText(a.Action, 90)}");
+                overflow = (deferred.Count - i) + Math.Max(0, actions.Count);
+                goto done;
+            }
             var slot = deferred[i];
             drawn++;
             var did = Add(WorkNodeKind.Deferred, $"d{epicNumber}-{i}",
@@ -253,15 +270,27 @@ public static class WorkGraphBuilder
                 }
             }
 
-            // resolves: carrier (deferred) → its resolving story/spec.
+            // resolves: carrier (deferred) → its resolving story/spec. A story resolver reuses the SAME story-node
+            // id scheme as every other story reference in this graph (EnsureEpicStory / SourceStoryId linking
+            // above), so a story that both sources AND resolves a deferred item — or resolves its own — draws as
+            // ONE node, not two. [Story 19.2 review]
             if (slot.Item.Resolved && !string.IsNullOrWhiteSpace(slot.Item.ResolvingRef))
             {
                 var reff = slot.Item.ResolvingRef!.Trim();
                 var bare = System.IO.Path.GetFileName(reff.Replace('\\', '/'));
-                var kind = DottedStoryId.IsMatch(bare) ? WorkNodeKind.Story : WorkNodeKind.Spec;
-                var rid = Add(kind, $"res:{FollowUpGeometry.NormalizeSourceKey(reff)}",
-                    FollowUpRefs.ResolvingLabel(reff), slot.Item.ResolvingHref);
-                Link(did, rid, WorkEdgeKind.Resolves);
+                if (DottedStoryId.IsMatch(bare))
+                {
+                    var rid = Add(WorkNodeKind.Story, $"s{bare}", $"Story {bare}", StoryEpicLinkifier.StoryPagePath(bare));
+                    Link(did, rid, WorkEdgeKind.Resolves);
+                }
+                else if (slot.Item.ResolvingHref is { Length: > 0 })
+                {
+                    // D4 (Story 19.1 code review): never mint a node from raw resolver text without a real page to
+                    // land on — mirrors the SourceKey guard above. [Story 19.2 review]
+                    var rid = Add(WorkNodeKind.Spec, $"res:{FollowUpGeometry.NormalizeSourceKey(reff)}",
+                        FollowUpRefs.ResolvingLabel(reff), slot.Item.ResolvingHref);
+                    Link(did, rid, WorkEdgeKind.Resolves);
+                }
             }
 
             // Attribute the deferred item to the root when nothing anchored it to an in-scope story.
@@ -270,7 +299,13 @@ public static class WorkGraphBuilder
 
         for (var j = 0; j < actions.Count; j++)
         {
-            if (drawn >= MaxFollowUpsPerEpic) { overflow += actions.Count - j; break; }
+            if (drawn >= MaxFollowUpsPerEpic)
+            {
+                for (var k = j; k < actions.Count; k++)
+                    overflowLabels.Add($"Action item: {FollowUpRow.SummarizePlainText(actions[k].Action, 90)}");
+                overflow += actions.Count - j;
+                break;
+            }
             var action = actions[j];
             drawn++;
             var aid = Add(WorkNodeKind.Action, $"a{epicNumber}-{j}",
@@ -294,7 +329,7 @@ public static class WorkGraphBuilder
         if (nodes.Count <= 1 || edges.Count == 0) return null;
 
         var cycles = FindCycles(nodes.Select(n => n.Id).ToList(), edges);
-        return new WorkGraphEpic(epicNumber, epicTitle, nodes, edges, cycles, overflow) { BucketLabel = bucketLabel };
+        return new WorkGraphEpic(epicNumber, epicTitle, nodes, edges, cycles, overflow, overflowLabels) { BucketLabel = bucketLabel };
     }
 
     /// <summary>Projects a <em>story-scoped</em> subgraph for embedding on a story page (Story 19.2): the story
@@ -331,28 +366,43 @@ public static class WorkGraphBuilder
         Link(sid, epicId, WorkEdgeKind.Contains);
 
         var overflow = 0;
+        var overflowLabels = new List<string>();
         for (var i = 0; i < deferred.Count; i++)
         {
-            if (i >= MaxFollowUpsPerEpic) { overflow = deferred.Count - i; break; }
+            if (i >= MaxFollowUpsPerEpic)
+            {
+                for (var k = i; k < deferred.Count; k++)
+                    overflowLabels.Add($"Deferred item: {Summarize(deferred[k].Item.BodyHtml)}");
+                overflow = deferred.Count - i;
+                break;
+            }
             var slot = deferred[i];
             var did = Add(WorkNodeKind.Deferred, $"d-{i}", Summarize(slot.Item.BodyHtml),
                 slot.DetailHref, slot.ProvenanceLabel);
             Link(did, sid, WorkEdgeKind.StemmedFrom); // stemmed from THIS story
 
+            // Same story-node id reuse + D4 href guard as BuildSubgraph above. [Story 19.2 review]
             if (slot.Item.Resolved && !string.IsNullOrWhiteSpace(slot.Item.ResolvingRef))
             {
                 var reff = slot.Item.ResolvingRef!.Trim();
                 var bare = System.IO.Path.GetFileName(reff.Replace('\\', '/'));
-                var kind = DottedStoryId.IsMatch(bare) ? WorkNodeKind.Story : WorkNodeKind.Spec;
-                var rid = Add(kind, $"res:{FollowUpGeometry.NormalizeSourceKey(reff)}",
-                    FollowUpRefs.ResolvingLabel(reff), slot.Item.ResolvingHref);
-                Link(did, rid, WorkEdgeKind.Resolves);
+                if (DottedStoryId.IsMatch(bare))
+                {
+                    var rid = Add(WorkNodeKind.Story, $"s{bare}", $"Story {bare}", StoryEpicLinkifier.StoryPagePath(bare));
+                    Link(did, rid, WorkEdgeKind.Resolves);
+                }
+                else if (slot.Item.ResolvingHref is { Length: > 0 })
+                {
+                    var rid = Add(WorkNodeKind.Spec, $"res:{FollowUpGeometry.NormalizeSourceKey(reff)}",
+                        FollowUpRefs.ResolvingLabel(reff), slot.Item.ResolvingHref);
+                    Link(did, rid, WorkEdgeKind.Resolves);
+                }
             }
         }
 
         if (edges.Count == 0) return null;
         var cycles = FindCycles(nodes.Select(n => n.Id).ToList(), edges);
-        return new WorkGraphEpic(story.EpicNumber, epicTitle, nodes, edges, cycles, overflow);
+        return new WorkGraphEpic(story.EpicNumber, epicTitle, nodes, edges, cycles, overflow, overflowLabels);
     }
 
     /// <summary>Short plain-text label for a deferred item's HTML body (tags stripped, whitespace collapsed,

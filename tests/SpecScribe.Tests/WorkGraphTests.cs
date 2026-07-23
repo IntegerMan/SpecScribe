@@ -189,6 +189,69 @@ public class WorkGraphTests
             b.Epics.SelectMany(e => e.Nodes.Select(n => n.Id)));
     }
 
+    // ---- Draw-cap / overflow (Story 19.2 review) --------------------------------------------------------
+
+    [Fact]
+    public void Build_MoreThanMaxFollowUpsInEpic_ElidesExcessAndReportsOverflowLabels()
+    {
+        var deferred = Enumerable.Range(0, WorkGraphBuilder.MaxFollowUpsPerEpic + 5)
+            .Select(i => Deferred($"Debt number {i}", epic: 1))
+            .ToList();
+        var model = WorkGraphBuilder.Build(TwoEpicModel(), Geometry(deferred: deferred));
+
+        var epic = model.Epics.Single(e => e.EpicNumber == 1);
+        Assert.Equal(5, epic.Overflow);
+        Assert.Equal(5, epic.OverflowLabelsOrEmpty.Count);
+        Assert.All(epic.OverflowLabelsOrEmpty, l => Assert.StartsWith("Deferred item:", l));
+        Assert.Equal(WorkGraphBuilder.MaxFollowUpsPerEpic, epic.Nodes.Count(n => n.Kind == WorkNodeKind.Deferred));
+    }
+
+    [Fact]
+    public void Build_ActionsOverflowAfterDeferredFillsTheCap_ReportsActionOverflowLabels()
+    {
+        var deferred = Enumerable.Range(0, WorkGraphBuilder.MaxFollowUpsPerEpic)
+            .Select(i => Deferred($"Debt {i}", epic: 1))
+            .ToList();
+        var actions = new[] { new SprintActionItem("Overflow action", "open", 1, null) };
+        var model = WorkGraphBuilder.Build(TwoEpicModel(), Geometry(actions: actions, deferred: deferred));
+
+        var epic = model.Epics.Single(e => e.EpicNumber == 1);
+        Assert.Equal(1, epic.Overflow);
+        Assert.Equal(new[] { "Action item: Overflow action" }, epic.OverflowLabelsOrEmpty);
+    }
+
+    [Fact]
+    public void BuildStory_MoreThanMaxFollowUpsFromStory_ReportsOverflowLabels()
+    {
+        var story = TwoEpicModel().Epics.First(e => e.Number == 1).Stories.First(s => s.Id == "1.1");
+        var deferred = Enumerable.Range(0, WorkGraphBuilder.MaxFollowUpsPerEpic + 2)
+            .Select(i => Deferred($"Debt {i}", epic: 1, sourceStoryId: "1.1", sourceKey: "1-1-foundation"))
+            .ToList();
+
+        var g = WorkGraphBuilder.BuildStory(story, "Foundation", Geometry(deferred: deferred));
+
+        Assert.NotNull(g);
+        Assert.Equal(2, g!.Overflow);
+        Assert.Equal(2, g.OverflowLabelsOrEmpty.Count);
+    }
+
+    [Fact]
+    public void Templater_Overflow_SrEnumerationListsElidedFollowUps()
+    {
+        var deferred = Enumerable.Range(0, WorkGraphBuilder.MaxFollowUpsPerEpic + 1)
+            .Select(i => Deferred($"Debt {i}", epic: 1))
+            .ToList();
+        var model = WorkGraphBuilder.Build(TwoEpicModel(), Geometry(deferred: deferred));
+        var nav = SiteNav.Build(new[] { "epics.md" }, "TestProj", hasWorkGraph: true);
+
+        var html = WorkGraphTemplater.RenderPage(model, nav);
+
+        Assert.Contains("more follow-up item not drawn (listed below)", html);
+        // The sr-only enumeration actually lists the elided item — honors the "listed below" promise for AT users.
+        Assert.Contains("not drawn — beyond the per-epic draw limit", html);
+        Assert.Contains("Debt 40", html); // the one elided item (index 40, beyond the 40-item cap)
+    }
+
     // ---- Cycle query ------------------------------------------------------------------------------------
 
     [Fact]
@@ -246,6 +309,27 @@ public class WorkGraphTests
 
         var epic = Assert.Single(model.Epics.Where(e => e.EpicNumber == 1));
         Assert.Empty(epic.Cycles);
+        // Story 19.2 review: the resolving story (1.1) is the SAME story already drawn as the deferred item's
+        // in-epic source — must reuse that one node, not mint a second "res:1.1" node for the same story.
+        Assert.Single(epic.Nodes, n => n.Kind == WorkNodeKind.Story && n.Id == "s1.1");
+        Assert.Contains(epic.Edges, e => e.Kind == WorkEdgeKind.StemmedFrom && e.ToId == "s1.1");
+        Assert.Contains(epic.Edges, e => e.Kind == WorkEdgeKind.Resolves && e.ToId == "s1.1");
+    }
+
+    [Fact]
+    public void Build_ResolvingSpecWithNoResolvingHref_DoesNotMintPhantomNode()
+    {
+        // D4 (Story 19.1 code review) applies to the "resolves" edge too, not just "stemmed-from": a non-story
+        // resolver ref with no resolvable href must not mint a node from raw text. [Story 19.2 review]
+        var slot = new FollowUpDeferredSlot(
+            new DeferredWorkItem("<p>Debt resolved by an unresolvable spec</p>", Resolved: true,
+                ResolvingRef: "spec-since-deleted", ResolvingHref: null),
+            "Deferred work", EpicNumber: 1, "follow-ups/x.html");
+        var model = WorkGraphBuilder.Build(TwoEpicModel(), Geometry(deferred: new[] { slot }));
+
+        var epic = Assert.Single(model.Epics.Where(e => e.EpicNumber == 1));
+        Assert.DoesNotContain(epic.Edges, e => e.Kind == WorkEdgeKind.Resolves);
+        Assert.DoesNotContain(epic.Nodes, n => n.Label.Contains("spec-since-deleted"));
     }
 
     [Fact]

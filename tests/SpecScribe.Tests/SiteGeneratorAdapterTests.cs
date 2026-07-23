@@ -899,8 +899,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         // legend/level-ramp rules and specscribe.js gained the initImpactMap block. This non-git fixture has no
         // --deep-git commit data, so no impact-map.html page, no "Impact Map" nav entry, and no "Code Areas Touched"
         // widget render here — only the shared embedded stylesheet + script content shifted the hash (page/nav/widget/
-        // treemap behavior is covered by SiteGeneratorImpactMapTests). Verified stable across 2 repeated runs. [golden-diff-normalization-gotchas]
-        const string expected = "36cd7e64c13b256dff9ac79f8fc31bbb9191f9065f81cfd611e714404fb2b7ac";
+        // treemap behavior is covered by SiteGeneratorImpactMapTests). Regenerated ONCE MORE for the 21.3 follow-up
+        // (owner feedback): Impact Map nav icon (Icons.cs), the epic multi-select reworked to the sprint-epic-filter
+        // dropdown, and a Treemap|Sunburst board-tabs toggle + JS sunburst renderer — again CSS + JS asset-byte deltas
+        // only for this non-git fixture (no impact nav/icon renders). Verified stable across 2 repeated runs. [golden-diff-normalization-gotchas]
+        const string expected = "b5bc230a7a4ccf3f3c3d284ca99106fddfbb88f4e626873ebbeb5e182e464d20";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

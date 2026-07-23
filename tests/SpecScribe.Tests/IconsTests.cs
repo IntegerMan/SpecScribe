@@ -43,6 +43,7 @@ public class IconsTests
     [InlineData("Implementation Artifacts")]
     [InlineData("Deferred")]
     [InlineData("Code Map")]
+    [InlineData("Impact Map")]
     [InlineData("How to use SpecScribe")]
     [InlineData("About Spec-Driven Development")]
     [InlineData("Spec-Driven Development")] // alias for About Spec-Driven Development

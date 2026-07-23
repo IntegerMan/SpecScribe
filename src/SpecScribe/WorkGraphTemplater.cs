@@ -126,6 +126,10 @@ public static class WorkGraphTemplater
             var where = n.Href is { Length: > 0 } ? $" (links to {PathUtil.Html(n.Href)})" : " (no page)";
             sb.Append($"      <li>{PathUtil.Html(NodeText(n))}{where}</li>\n");
         }
+        // Follow-ups elided by the per-epic draw cap (Story 19.2 review) — listed here so the overflow note's
+        // "listed below" promise holds for assistive tech too, even though the SVG never draws them.
+        foreach (var label in epic.OverflowLabelsOrEmpty)
+            sb.Append($"      <li>{PathUtil.Html(label)} (not drawn — beyond the per-epic draw limit)</li>\n");
         sb.Append("    </ul>\n");
         sb.Append($"    <h3>{PathUtil.Html(epic.DisplayName)} work-graph links</h3>\n    <ul>\n");
         foreach (var e in epic.Edges)
