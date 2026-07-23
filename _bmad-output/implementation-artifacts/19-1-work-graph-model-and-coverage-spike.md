@@ -170,7 +170,7 @@ _Code review 2026-07-22 (3 parallel layers: Blind Hunter / Edge Case Hunter / Ac
 
 **Deferred (real, but belongs to a later story — not fixable in this spike):**
 
-- [x] [Review][Defer] Consider a short ADR for the carrier→target direction convention [19-1-…spike.md §2] — deferred, revisit at 19.2 / Epic 24 create-story. The spike consciously decided no fork appeared (defensible for a single not-yet-built surface), but the convention is load-bearing and Epic 24 now inherits it; repo memory records a standing "agents under-propose ADRs" lesson. Escalate to an ADR if/when the convention spreads beyond Epic 19.
+- [x] [Review][Defer] Consider a short ADR for the carrier→target direction convention [19-1-…spike.md §2] — deferred, revisit at 19.2 / Epic 24 create-story. The spike consciously decided no fork appeared (defensible for a single not-yet-built surface), but the convention is load-bearing and Epic 24 now inherits it; repo memory records a standing "agents under-propose ADRs" lesson. Escalate to an ADR if/when the convention spreads beyond Epic 19. **→ RESOLVED 2026-07-22 (quick-dev):** trigger met — Epic 24 (change-coupling graphs, FR40) now inherits it — so escalated to [ADR 0011 — Directed-Graph Edge Direction: Carrier → Target](../../docs/adrs/0011-directed-graph-edge-direction-carrier-to-target.md) (Accepted). The ADR promotes §2 to a cross-surface invariant and states how Epic 24's directional/symmetric coupling edges inherit the discipline. No `src/**` change (convention was already in force).
 
 **Dismissed (1):** multi-epic requirement duplicating its `covers` edge across per-epic subgraphs — for a deliberately per-epic surface, showing a shared requirement in each covering epic's subgraph is expected behavior, not a defect.
 
