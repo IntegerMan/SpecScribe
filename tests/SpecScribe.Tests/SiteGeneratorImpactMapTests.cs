@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -118,6 +119,25 @@ public class SiteGeneratorImpactMapTests : IDisposable
         // The honest best-effort caveat + a real correlated-commit count both render.
         Assert.Contains("analyzed commits correlated", impact);
         Assert.Contains("best-effort", impact, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GenerateAll_WithDeepGit_ImpactMapCarriesInteractiveTreemapAndNoScriptFallback()
+    {
+        Assert.True(TryCreateGitHistory("Story 1.1 foundation work"), "git CLI unavailable");
+        GenerateSite(deepGit: true);
+
+        var impact = File.ReadAllText(ImpactMapPage);
+        // The interactive scaffold: the JSON data island the script reads, the epic multi-select, and the mount.
+        Assert.Contains("id=\"impact-map-data\"", impact);
+        Assert.Contains("application/json", impact);
+        Assert.Contains("impact-epic-toggle", impact);
+        Assert.Contains("id=\"impact-treemap\"", impact);
+        // The payload carries the weight fields the treemap draws with (churn 'c' + commits 'k').
+        Assert.Matches(new Regex("\"p\":\"src/Sample/Widget\\.cs\".*\"c\":\\d+.*\"k\":\\d+"), impact);
+        // The no-JS / accessible text-equivalent fallback list is present (and the controls start hidden).
+        Assert.Contains("impact-fallback", impact);
+        Assert.Contains("class=\"impact-controls\" hidden", impact);
     }
 
     [Fact]

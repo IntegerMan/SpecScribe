@@ -5047,10 +5047,20 @@ tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pendin
 .trace-cell-link .ss-icon { width: 0.9rem; height: 0.9rem; }
 
 /* ====================== PLANNING <-> CODE IMPACT MAP (Story 21.3) ======================
-   The dedicated impact-map.html page groups touched code files by epic; the epic/story pages carry a compact
-   "Code areas touched" widget of the same links. Plain semantic lists of code-page links (never a chart the data
-   can't support), so styling is deliberately light. Links route through the shared --link tokens like the rest of
-   the portal. */
+   The dedicated impact-map.html page is an INTERACTIVE weighted treemap (owner-directed redesign): the visitor
+   multi-selects epics and the script merges their touched files into one squarified treemap, tiles SIZED by churn
+   and COLORED by commit count. With JS off, the epic-grouped text list (the .impact-fallback <details>) is the
+   content and the .impact-controls stay hidden. The epic/story pages still carry the compact "Code areas touched"
+   list widget (.code-areas-panel). Commit-intensity ramp mirrors the commit heatmap's gold sequence. */
+:root {
+  --impact-lvl-1: #f3e8c6;
+  --impact-lvl-2: #e9cd82;
+  --impact-lvl-3: #dcae4d;
+  --impact-lvl-4: #c8912b;
+  --impact-lvl-5: #a86f1e;
+}
+
+/* --- epic-grouped text list (fallback + text-equivalent, and the epic/story widgets) --- */
 .impact-epic { margin-bottom: 1.4rem; }
 .impact-epic:last-child { margin-bottom: 0; }
 .impact-epic-head { margin: 0 0 0.2rem; font-size: 1rem; }
@@ -5059,18 +5069,62 @@ tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pendin
 .impact-file-list {
   margin: 0.3rem 0 0;
   padding-left: 1.2rem;
-  columns: 2 22rem;
+  columns: 2 24rem;
   column-gap: 1.6rem;
 }
 .impact-file-list li {
   break-inside: avoid;
   font-family: 'Courier New', monospace;
   font-size: 0.8rem;
-  line-height: 1.5;
+  line-height: 1.6;
 }
+.impact-file-meta { color: var(--ink-light); font-size: 0.72rem; white-space: nowrap; }
 .code-areas-panel .impact-file-list { columns: 1; }
 .impact-more { margin: 0.3rem 0 0; font-size: 0.8rem; color: var(--ink-light); font-style: italic; }
 .impact-map-link { display: inline-block; margin-top: 0.5rem; font-size: 0.85rem; font-weight: 600; }
+.impact-fallback > summary { cursor: pointer; font-weight: 600; }
+
+/* --- interactive controls (revealed by the script; [hidden] with JS off) --- */
+.impact-controls { margin-bottom: 0.8rem; }
+.impact-epic-select { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem 0.7rem; margin: 0; }
+.impact-epic-select > legend { font-weight: 600; font-size: 0.85rem; padding: 0 0.35rem; }
+.impact-select-actions { font-weight: 400; }
+.impact-select-actions button,
+.impact-epic-select .impact-select-all,
+.impact-epic-select .impact-select-none {
+  font-size: 0.72rem; padding: 0.05rem 0.5rem; margin-left: 0.2rem; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--warm-white); color: var(--ink);
+}
+.impact-epic-chips { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; }
+.impact-epic-chip { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.82rem; cursor: pointer; }
+.impact-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin-top: 0.55rem; font-size: 0.78rem; color: var(--ink-light); }
+.impact-legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+.impact-legend-size { width: 1.4rem; height: 0.85rem; border: 1px solid var(--border); background:
+  linear-gradient(135deg, var(--parchment) 45%, var(--parchment-dark) 45%); display: inline-block; }
+.impact-legend-ramp { display: inline-flex; gap: 2px; }
+.impact-legend-ramp i { width: 0.8rem; height: 0.8rem; display: inline-block; border: 1px solid rgba(0,0,0,0.08); }
+
+/* --- the treemap SVG --- */
+.impact-treemap { margin-top: 0.4rem; }
+.impact-tm { display: block; width: 100%; height: auto; }
+.impact-tm-tile { stroke: var(--warm-white); stroke-width: 1; transition: opacity 0.1s ease; }
+.impact-tm-link { cursor: pointer; }
+.impact-tm-link:hover .impact-tm-tile { opacity: 0.82; }
+.impact-tm-link:focus-visible { outline: none; }
+.impact-tm-link:focus-visible .impact-tm-tile { stroke: var(--ink); stroke-width: 2; }
+.impact-level-1 { fill: var(--impact-lvl-1); }  .impact-legend-ramp i.impact-level-1 { background: var(--impact-lvl-1); }
+.impact-level-2 { fill: var(--impact-lvl-2); }  .impact-legend-ramp i.impact-level-2 { background: var(--impact-lvl-2); }
+.impact-level-3 { fill: var(--impact-lvl-3); }  .impact-legend-ramp i.impact-level-3 { background: var(--impact-lvl-3); }
+.impact-level-4 { fill: var(--impact-lvl-4); }  .impact-legend-ramp i.impact-level-4 { background: var(--impact-lvl-4); }
+.impact-level-5 { fill: var(--impact-lvl-5); }  .impact-legend-ramp i.impact-level-5 { background: var(--impact-lvl-5); }
+.impact-tm-dir-bg { fill: var(--parchment-dark); fill-opacity: 0.55; }
+.impact-tm-dir { font-size: 10px; font-weight: 700; fill: var(--ink); pointer-events: none; }
+/* A white halo (paint-order stroke) keeps the file label legible on any tile color. */
+.impact-tm-label {
+  font-size: 10px; fill: var(--ink); pointer-events: none;
+  paint-order: stroke; stroke: rgba(255, 255, 255, 0.75); stroke-width: 2px; stroke-linejoin: round;
+}
+.impact-treemap-empty { color: var(--ink-light); font-style: italic; padding: 2rem 0; text-align: center; }
 
 /* ====================== STATUS LEGEND (Story 8.2 — on-demand) ======================
    "?" disclosure next to status-bearing headers/badges. Opens a single-column popover.

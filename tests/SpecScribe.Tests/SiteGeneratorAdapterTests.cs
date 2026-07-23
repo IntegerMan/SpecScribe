@@ -878,12 +878,14 @@ public class SiteGeneratorAdapterTests : IDisposable
         // collapsible-log rules and recolored the cycle-time bars off rust. Still wall-clock-independent (the
         // fixture's lone done story has no Change Log date → empty-state cadence, no date-derived grid). Verified
         // stable across 2 repeated runs. [golden-diff-normalization-gotchas]
-        // Regenerated for Story 21.3: specscribe.css gained the planning↔code impact-map styles (.impact-epic /
-        // .impact-file-list / .impact-more / .impact-map-link / .code-areas-panel). This non-git fixture has no
+        // Regenerated for Story 21.3: specscribe.css gained the planning↔code impact-map styles + the epic/story
+        // "Code areas touched" widget list styles. Regenerated AGAIN for the owner-directed 21.3 redesign — the
+        // static link-list became an interactive weighted treemap: specscribe.css gained the treemap/selector/
+        // legend/level-ramp rules and specscribe.js gained the initImpactMap block. This non-git fixture has no
         // --deep-git commit data, so no impact-map.html page, no "Impact Map" nav entry, and no "Code Areas Touched"
-        // widget render here — only the shared embedded stylesheet content shifted the hash (page/nav/widget behavior
-        // is covered by SiteGeneratorImpactMapTests). Verified stable across 2 repeated runs. [golden-diff-normalization-gotchas]
-        const string expected = "0d818a3fb42163ccc85231cb709e2b132bddb6f149b823262bb1976aef584c61";
+        // widget render here — only the shared embedded stylesheet + script content shifted the hash (page/nav/widget/
+        // treemap behavior is covered by SiteGeneratorImpactMapTests). Verified stable across 2 repeated runs. [golden-diff-normalization-gotchas]
+        const string expected = "36cd7e64c13b256dff9ac79f8fc31bbb9191f9065f81cfd611e714404fb2b7ac";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

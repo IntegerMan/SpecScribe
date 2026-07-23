@@ -2,11 +2,13 @@ using System.Text.RegularExpressions;
 
 namespace SpecScribe;
 
-/// <summary>One code file attributed to an epic/story by the impact map: its repo-relative path plus the
-/// output-relative in-portal code-page href when one exists (<c>null</c> when the file has no code page — only
-/// possible in the resolver-less unit-test mode; production always filters those out). Rendering surfaces apply
-/// their own page prefix to <see cref="CodePageHref"/>. [Story 21.3]</summary>
-public sealed record ImpactFile(string Path, string? CodePageHref);
+/// <summary>One code file attributed to an epic/story by the impact map: its repo-relative path, the
+/// output-relative in-portal code-page href when one exists (<c>null</c> only in resolver-less unit-test mode;
+/// production filters those out), and the two weights the treemap draws with — <see cref="Churn"/> (Σ lines
+/// added+deleted across the attributed commits touching this file; sizes the tile) and <see cref="Commits"/>
+/// (distinct attributed commits touching it; colors the tile). Rendering surfaces apply their own page prefix to
+/// <see cref="CodePageHref"/>. [Story 21.3]</summary>
+public sealed record ImpactFile(string Path, string? CodePageHref, int Churn, int Commits);
 
 /// <summary>The best-effort correlation between planning items (epics/stories) and the code files their commits
 /// touched, mined from commit-message + merge-branch naming (Story 21.3). <see cref="FilesByEpic"/> is keyed by
@@ -135,14 +137,19 @@ public static class PlanningCodeImpact
             }
         }
 
-        // Raw path accumulators (dedup within each set); resolved/sorted/filtered at the end.
-        var epicFiles = new Dictionary<int, HashSet<string>>();
-        var storyFiles = new Dictionary<string, HashSet<string>>();
+        // Weighted path accumulators: key → (path → [churn, commits]). Resolved/sorted/link-gated at the end.
+        var epicFiles = new Dictionary<int, Dictionary<string, int[]>>();
+        var storyFiles = new Dictionary<string, Dictionary<string, int[]>>();
 
-        HashSet<string> EpicSet(int epic) =>
-            epicFiles.TryGetValue(epic, out var set) ? set : epicFiles[epic] = new HashSet<string>(StringComparer.Ordinal);
-        HashSet<string> StorySet(string id) =>
-            storyFiles.TryGetValue(id, out var set) ? set : storyFiles[id] = new HashSet<string>(StringComparer.Ordinal);
+        static Dictionary<string, int[]> Inner<TKey>(Dictionary<TKey, Dictionary<string, int[]>> map, TKey key)
+            where TKey : notnull =>
+            map.TryGetValue(key, out var inner) ? inner : map[key] = new Dictionary<string, int[]>(StringComparer.Ordinal);
+
+        static void AddWeight(Dictionary<string, int[]> inner, string path, int churn)
+        {
+            if (inner.TryGetValue(path, out var w)) { w[0] += churn; w[1] += 1; }
+            else inner[path] = new[] { churn, 1 };
+        }
 
         // Validate a raw candidate list against the roster: a story ref survives only when the exact "N.M" is a
         // real story; an epic-only ref only when the epic number is real. Nothing is guessed into existence.
@@ -166,24 +173,21 @@ public static class PlanningCodeImpact
         void Attribute(IReadOnlyList<WorkItemRef> refs, IReadOnlyList<DeepFileChange> files)
         {
             if (refs.Count == 0 || files.Count == 0) return;
-            foreach (var reference in refs)
+            // Dedup at the epic/story grain FIRST so one commit that names two stories in the same epic contributes
+            // its churn + a single commit-count to that epic ONCE, not twice (weights must not double-count). Story
+            // refs' epics are included here too, so a story attribution rolls up into its parent epic naturally.
+            var distinctEpics = refs.Select(r => r.Epic).Distinct().ToList();
+            var distinctStories = refs
+                .Where(r => r.Story is not null)
+                .Select(r => $"{r.Epic}.{r.Story}")
+                .Distinct()
+                .ToList();
+
+            foreach (var f in files)
             {
-                if (reference.Story is int s)
-                {
-                    var id = $"{reference.Epic}.{s}";
-                    var storySet = StorySet(id);
-                    var epicSet = EpicSet(reference.Epic); // story files roll up into the parent epic's set
-                    foreach (var f in files)
-                    {
-                        storySet.Add(f.Path);
-                        epicSet.Add(f.Path);
-                    }
-                }
-                else
-                {
-                    var epicSet = EpicSet(reference.Epic);
-                    foreach (var f in files) epicSet.Add(f.Path);
-                }
+                var churn = (f.Added ?? 0) + (f.Deleted ?? 0); // binary rows (null/null) contribute 0
+                foreach (var epic in distinctEpics) AddWeight(Inner(epicFiles, epic), f.Path, churn);
+                foreach (var story in distinctStories) AddWeight(Inner(storyFiles, story), f.Path, churn);
             }
         }
 
@@ -228,11 +232,12 @@ public static class PlanningCodeImpact
         return new PlanningCodeImpactData(filesByEpic, filesByStory, attributedCommits, commits.Count);
     }
 
-    /// <summary>Turns a raw path-set map into the final ordinal-sorted, link-gated <see cref="ImpactFile"/> lists.
-    /// When a resolver is supplied a file with no resolvable code page is dropped (never a dead link); empty
-    /// entries are omitted entirely so a key never survives with zero files.</summary>
+    /// <summary>Turns a weighted path map into the final ordinal-sorted, link-gated <see cref="ImpactFile"/> lists.
+    /// When a resolver is supplied a file with no resolvable code page is dropped (never a dead link, and it bounds
+    /// the treemap to the cited + top-N-analytics set that actually has a page); empty entries are omitted so a key
+    /// never survives with zero files.</summary>
     private static IReadOnlyDictionary<TKey, IReadOnlyList<ImpactFile>> Resolve<TKey>(
-        Dictionary<TKey, HashSet<string>> raw,
+        Dictionary<TKey, Dictionary<string, int[]>> raw,
         Func<string, string?>? codePageResolver)
         where TKey : notnull
     {
@@ -240,16 +245,19 @@ public static class PlanningCodeImpact
         foreach (var (key, paths) in raw)
         {
             var files = new List<ImpactFile>();
-            foreach (var path in paths.OrderBy(p => p, StringComparer.Ordinal))
+            foreach (var kv in paths.OrderBy(p => p.Key, StringComparer.Ordinal))
             {
+                var path = kv.Key;
+                var churn = kv.Value[0];
+                var commits = kv.Value[1];
                 if (codePageResolver is null)
                 {
-                    files.Add(new ImpactFile(path, null));
+                    files.Add(new ImpactFile(path, null, churn, commits));
                 }
                 else
                 {
                     var href = codePageResolver(path);
-                    if (href is { Length: > 0 }) files.Add(new ImpactFile(path, href));
+                    if (href is { Length: > 0 }) files.Add(new ImpactFile(path, href, churn, commits));
                 }
             }
             if (files.Count > 0) result[key] = files;

@@ -60,7 +60,7 @@ public class ChartsPlanningImpactTests
         var data = new PlanningCodeImpactData(
             new Dictionary<int, IReadOnlyList<ImpactFile>>
             {
-                [7] = new[] { new ImpactFile("src/GitMetrics.cs", "code/src/GitMetrics.cs.html") },
+                [7] = new[] { new ImpactFile("src/GitMetrics.cs", "code/src/GitMetrics.cs.html", Churn: 42, Commits: 3) },
             },
             new Dictionary<string, IReadOnlyList<ImpactFile>>(),
             AttributedCommitCount: 3,
@@ -80,7 +80,7 @@ public class ChartsPlanningImpactTests
         var data = new PlanningCodeImpactData(
             new Dictionary<int, IReadOnlyList<ImpactFile>>
             {
-                [1] = new[] { new ImpactFile("src/A.cs", "code/src/A.cs.html") },
+                [1] = new[] { new ImpactFile("src/A.cs", "code/src/A.cs.html", Churn: 10, Commits: 1) },
             },
             new Dictionary<string, IReadOnlyList<ImpactFile>>(),
             1, 1);
@@ -96,7 +96,7 @@ public class ChartsPlanningImpactTests
         var data = new PlanningCodeImpactData(
             new Dictionary<int, IReadOnlyList<ImpactFile>>
             {
-                [1] = new[] { new ImpactFile("src/A.cs", "code/src/A.cs.html") },
+                [1] = new[] { new ImpactFile("src/A.cs", "code/src/A.cs.html", Churn: 10, Commits: 1) },
             },
             new Dictionary<string, IReadOnlyList<ImpactFile>>(),
             1, 1);

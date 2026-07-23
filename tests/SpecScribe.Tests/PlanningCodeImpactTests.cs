@@ -51,6 +51,9 @@ public class PlanningCodeImpactTests
     private static DeepCommit Merge(string subject) =>
         new("merge123", "Author", null, subject, string.Empty, Array.Empty<DeepFileChange>());
 
+    private static DeepCommit CommitWith(string subject, params DeepFileChange[] files) =>
+        new("abc1234", "Author", null, subject, string.Empty, files);
+
     // ----- TryExtractWorkItemRefs (pure text) ---------------------------------------------------------------
 
     [Theory]
@@ -258,6 +261,54 @@ public class PlanningCodeImpactTests
         Assert.Equal(1, data.AttributedCommitCount);
         Assert.False(data.HasAnyFiles);
         Assert.False(data.FilesByStory.ContainsKey("7.11"));
+    }
+
+    // ----- Weights (churn + commit count) -----------------------------------------------------------------
+
+    [Fact]
+    public void Build_Churn_SumsAddedPlusDeletedAcrossCommits()
+    {
+        var data = PlanningCodeImpact.Build(
+            Roster(),
+            new[]
+            {
+                CommitWith("7.11 first", new DeepFileChange("src/A.cs", 10, 3)),  // churn 13
+                CommitWith("7.11 second", new DeepFileChange("src/A.cs", 2, 1)),   // churn 3
+            });
+
+        var file = Assert.Single(data.FilesByStory["7.11"]);
+        Assert.Equal(16, file.Churn);   // 13 + 3
+        Assert.Equal(2, file.Commits);  // two distinct commits touched it
+    }
+
+    [Fact]
+    public void Build_BinaryRow_ContributesZeroChurnButStillCounts()
+    {
+        var data = PlanningCodeImpact.Build(
+            Roster(),
+            new[] { CommitWith("7.11 asset", new DeepFileChange("assets/logo.png", null, null)) },
+            _ => "code/x.html"); // resolvable so it survives the gate
+
+        var file = Assert.Single(data.FilesByStory["7.11"]);
+        Assert.Equal(0, file.Churn);
+        Assert.Equal(1, file.Commits);
+    }
+
+    [Fact]
+    public void Build_CommitNamingTwoStoriesInSameEpic_CountsEpicWeightOnce()
+    {
+        // A single commit that names 7.8 AND 7.11 (both epic 7) must contribute its churn + one commit to epic 7
+        // ONCE, not twice — the per-commit epic-grain dedup.
+        var data = PlanningCodeImpact.Build(
+            Roster(),
+            new[] { CommitWith("Joint 7.8 and 7.11 work", new DeepFileChange("src/Shared.cs", 20, 0)) });
+
+        var epicFile = Assert.Single(data.FilesByEpic[7]);
+        Assert.Equal(20, epicFile.Churn);   // NOT 40
+        Assert.Equal(1, epicFile.Commits);  // NOT 2
+        // Each story still carries its own copy.
+        Assert.Equal(20, data.FilesByStory["7.8"].Single().Churn);
+        Assert.Equal(20, data.FilesByStory["7.11"].Single().Churn);
     }
 
     // ----- Determinism + empty results ---------------------------------------------------------------------

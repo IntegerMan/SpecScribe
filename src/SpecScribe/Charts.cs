@@ -105,10 +105,15 @@ public static class Charts
             sb.Append($"  <h4 class=\"impact-epic-head\"><a href=\"{Html(epicHref)}\">Epic {epic.Number} &middot; {epic.Title}</a></h4>\n");
             sb.Append($"  <p class=\"chart-lead\">{files.Count.ToString("N0", CultureInfo.InvariantCulture)} {Plural(files.Count, "code file", "code files")} touched.</p>\n");
             sb.Append("  <ul class=\"impact-file-list\">\n");
-            foreach (var f in files)
+            // Ranked by churn (most-changed first) so the text-equivalent leads with the same signal the treemap's
+            // tile size conveys; the churn/commit meta makes the weights legible without the visual.
+            foreach (var f in files.OrderByDescending(x => x.Churn).ThenBy(x => x.Path, StringComparer.Ordinal))
             {
-                var href = prefix + f.CodePageHref;
-                sb.Append($"    <li><a href=\"{Html(href)}\">{Html(f.Path)}</a></li>\n");
+                var link = f.CodePageHref is { Length: > 0 } h
+                    ? $"<a href=\"{Html(prefix + h)}\">{Html(f.Path)}</a>"
+                    : Html(f.Path);
+                var meta = $"<span class=\"impact-file-meta\">{f.Churn.ToString("N0", CultureInfo.InvariantCulture)} {Plural(f.Churn, "line", "lines")} &middot; {f.Commits.ToString("N0", CultureInfo.InvariantCulture)} {Plural(f.Commits, "commit", "commits")}</span>";
+                sb.Append($"    <li>{link} {meta}</li>\n");
             }
             sb.Append("  </ul>\n");
             sb.Append("</section>\n");
