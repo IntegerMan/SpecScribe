@@ -181,6 +181,36 @@ public class SiteGeneratorSpaTests : IDisposable
     }
 
     [Fact]
+    public void RelatedWorkPane_SurvivesSpaContentRegionCapture()
+    {
+        // Story 20.3 AC #2 / parity: the pane is the NO-JS delivery of the relationship data, so it must reach the
+        // SPA body byte-for-byte — an SPA visitor with scripting blocked mid-session gets the same server-rendered
+        // truth as a static-site one.
+        // SCOPE OF THIS TEST, stated plainly (the Story 20.2 review's lesson): it pins MARKUP surviving the capture.
+        // Whether the client re-reveals the selected scope after an innerHTML swap is a runtime concern SSR cannot
+        // observe — the swap fires `specscribe:content-swapped` and specscribe.js re-syncs the fresh pane against
+        // the explorer's published `data-sb-scope`. Do not read a green here as proof of live SPA parity.
+        var gen = GeneratedSite();
+
+        var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var spaIndex = gen.RenderSpaBundle().Pages.Single(p => p.OutputRelativePath == "index.html").ContentHtml;
+
+        // The fixture is only guaranteed to carry a pane when it has work-graph signal; when it does, both forms
+        // must agree, and when it does not, BOTH must omit it (NFR8 — absent data, absent surface, on every host).
+        var inStatic = staticIndex.Contains(RelatedWorkTemplater.PaneAttribute, StringComparison.Ordinal);
+        var inSpa = spaIndex.Contains(RelatedWorkTemplater.PaneAttribute, StringComparison.Ordinal);
+        Assert.Equal(inStatic, inSpa);
+
+        if (!inSpa) return;
+        Assert.Contains("data-related-node=", spaIndex);
+        Assert.Contains("No related work items for this selection.", spaIndex);
+        // Inside the captured <main> region, not stranded before it.
+        var mainStart = spaIndex.IndexOf("<main id=\"main-content\"", StringComparison.Ordinal);
+        Assert.True(mainStart >= 0
+            && spaIndex.IndexOf(RelatedWorkTemplater.PaneAttribute, StringComparison.Ordinal) > mainStart);
+    }
+
+    [Fact]
     public void GenerateWithSpa_EmitsABoundedFewFiles_FarFewerThanPages()
     {
         GeneratedSite();
@@ -321,7 +351,12 @@ public class SiteGeneratorSpaTests : IDisposable
         File.Delete(Path.Combine(Source, "planning-artifacts", "epics.md"));
         var ev = gen.RegenerateEpics();
 
-        Assert.Equal(GenerationOutcome.Skipped, ev.Outcome);
+        // Story 5.3 changed this outcome from Skipped to Removed: this exact scenario — epics.md deleted AFTER a
+        // full generation — now also tears down the stale epics output family it left behind, which is a real
+        // destructive change to the output tree rather than the no-op Skipped claimed. A project that never had an
+        // epics.md still reports Skipped. The subject of THIS test is unchanged (the SPA manifest's nav must not
+        // lag the rewritten index); only the pinned outcome moved. [Story 5.3 AC #3]
+        Assert.Equal(GenerationOutcome.Removed, ev.Outcome);
         Assert.DoesNotContain(NavLabels(), l => l == "Epics");
 
         List<string> NavLabels()

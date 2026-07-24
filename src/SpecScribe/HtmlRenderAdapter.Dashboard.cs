@@ -60,6 +60,12 @@ public sealed partial class HtmlRenderAdapter
                 followUps: view.FollowUps, unplanned: view.UnplannedWork));
             sb.Append("</div>\n\n");
 
+            // Related work (Story 20.3) — the explorer's sibling region. Server-rendered in full: with JS off every
+            // scope's connections are visible, and the client only reveals the slice matching the current selection
+            // (AC #2 / NFR8). Omitted entirely when the portal has no work-graph signal, so it never ships as dead
+            // chrome. Placed immediately after the explorer panel it describes. [Story 20.3]
+            sb.Append(view.RelatedWorkHtml);
+
             // Remaining Work by Epic — its own panel (Story 10.7 AC1 follow-up: owner asked for a distinct,
             // more polished panel rather than a plain list crammed under the sunburst).
             var companionGrid = Charts.SunburstCompanionList(epicsForSunburst, followUps: view.FollowUps, unplanned: view.UnplannedWork);

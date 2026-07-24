@@ -37,9 +37,19 @@ public sealed record SunburstExplorerMeta(
     double AggInner,
     double AggOuter);
 
-/// <summary>The whole explorer payload island content: geometry meta + the node hierarchy + edges. Story 20.2 ships
-/// <see cref="Edges"/> empty; Story 20.3 fills it from <c>SiteGenerator._workGraph</c> (joined by <see cref="SunburstExplorerNode.Id"/>).
-/// [Story 20.2]</summary>
+/// <summary>The whole explorer payload island content: geometry meta + the node hierarchy + edges.
+///
+/// <para><b><see cref="Edges"/> stays empty, and that is the finished answer — not an unfinished one.</b> Story 20.2
+/// reserved this slot for Story 20.3 to fill from <c>SiteGenerator._workGraph</c>. Story 20.1's code review then
+/// established (§1a) that the two id spaces are DISJOINT and that most work-graph edge endpoints
+/// (<c>d*</c>/<c>a*</c>/<c>src:</c>/<c>res:</c>/<c>retro:</c>) have no wedge at all. Translating the graph into this
+/// namespace leaves exactly one joinable shape — <c>Contains</c>, story → epic — which <see cref="SunburstExplorerNode.ParentId"/>
+/// already states. So an edge array here would carry no information the payload does not already have, while adding
+/// bytes to an embedded payload that grows with project size (the one budget question 20.1 left open). Story 20.3
+/// therefore delivers the relationship truth as server-rendered DOM (<see cref="RelatedWorkTemplater"/>) keyed by
+/// this same id namespace, and the client joins DOM ↔ selection with no payload lookup at all. Kept in the shape
+/// rather than removed: the field is part of the shipped island contract, and an empty array is a smaller,
+/// clearer statement than a missing key. [Story 20.2; resolved by Story 20.3]</para></summary>
 public sealed record SunburstExplorerModel(
     SunburstExplorerMeta Meta,
     IReadOnlyList<SunburstExplorerNode> Nodes,

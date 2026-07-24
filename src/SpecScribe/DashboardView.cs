@@ -131,4 +131,12 @@ public sealed record DashboardView
     /// through this one builder → adapter path (never hand-appended to one surface) so HTML/webview/SPA stay
     /// parity-identical (Story 6.2 discipline). Mirrors <see cref="CadenceStripHtml"/>. [Story 21.1; review]</summary>
     public string TraceabilityStripHtml { get; init; } = string.Empty;
+
+    /// <summary>Pre-rendered Story 20.3 <em>Related work</em> pane
+    /// (<see cref="RelatedWorkTemplater.RenderPane"/>) — the explorer's sibling region listing the work-graph nodes
+    /// related to the current selection, grouped by edge kind. Empty when the portal has no work-graph signal
+    /// (<see cref="RelatedWorkModel.IsEmpty"/>), which OMITS the panel entirely rather than shipping dead chrome.
+    /// Routed through this one builder → adapter path (never hand-appended to one surface) so HTML/webview/SPA stay
+    /// parity-identical (Story 6.2 discipline). Mirrors <see cref="TraceabilityStripHtml"/>. [Story 20.3]</summary>
+    public string RelatedWorkHtml { get; init; } = string.Empty;
 }

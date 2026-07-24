@@ -365,7 +365,7 @@ public class SprintTemplaterTests
         {
             new RetroModel
             {
-                EpicNumber = 1, Title = "Epic 1 Retrospective", DateText = "2026-07-07",
+                EpicNumbers = new[] { 1 }, Title = "Epic 1 Retrospective", DateText = "2026-07-07",
                 Participants = Array.Empty<string>(), BodyHtml = string.Empty,
                 SourceRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.md",
                 OutputRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.html",

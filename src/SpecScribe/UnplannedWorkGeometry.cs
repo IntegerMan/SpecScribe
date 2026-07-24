@@ -256,11 +256,19 @@ public sealed record UnplannedWorkGeometry(
             var retroHits = new HashSet<int>();
             foreach (var retro in retros)
             {
-                if (!epicNumbers.Contains(retro.EpicNumber)) continue;
                 if (retro.DateText is not { Length: > 0 } dt) continue;
                 if (!PortalDates.TryParseDay(dt, out var retroDay)) continue;
-                if (retroDay == authored)
-                    retroHits.Add(retro.EpicNumber);
+                if (retroDay != authored) continue;
+
+                // A JOINT retro dated this day names several epics at once: that is ONE piece of evidence which
+                // does not discriminate between them, so it ABSTAINS rather than voting. Letting it contribute
+                // every epic would trip the "ties → null" rule below and veto the Tier 2 story-date signal —
+                // strictly better evidence — turning work that used to resolve into "Unattributed". Two
+                // DIFFERENT single-epic retros on one day remains a real conflict and still returns null.
+                // [spec-multi-epic-retro-attribution]
+                var inScope = retro.EpicNumbers.Where(epicNumbers.Contains).ToList();
+                if (inScope.Count != 1) continue;
+                retroHits.Add(inScope[0]);
             }
             if (retroHits.Count == 1) return retroHits.First();
             if (retroHits.Count > 1) return null;

@@ -473,7 +473,7 @@ public class UnplannedWorkGeometryTests
         {
             new RetroModel
             {
-                EpicNumber = 1, Title = "Retro", DateText = "2026-07-10",
+                EpicNumbers = new[] { 1 }, Title = "Retro", DateText = "2026-07-10",
                 Participants = Array.Empty<string>(), BodyHtml = string.Empty,
                 SourceRelativePath = "x.md", OutputRelativePath = "x.html",
             },
@@ -606,7 +606,7 @@ public class UnplannedWorkGeometryTests
         {
             new RetroModel
             {
-                EpicNumber = 2, Title = "Retro 2", DateText = "2026-07-10",
+                EpicNumbers = new[] { 2 }, Title = "Retro 2", DateText = "2026-07-10",
                 Participants = Array.Empty<string>(), BodyHtml = string.Empty,
                 SourceRelativePath = "x.md", OutputRelativePath = "x.html",
             },
@@ -661,7 +661,7 @@ public class UnplannedWorkGeometryTests
         {
             new RetroModel
             {
-                EpicNumber = 1, Title = "Retro 1", DateText = "2026-07-10",
+                EpicNumbers = new[] { 1 }, Title = "Retro 1", DateText = "2026-07-10",
                 Participants = Array.Empty<string>(), BodyHtml = string.Empty,
                 SourceRelativePath = "r.md", OutputRelativePath = "r.html",
             },

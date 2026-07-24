@@ -206,20 +206,12 @@ public static class WorkGraphTemplater
 
     // Epic/Story/Retro labels are already self-describing ("Epic 7", "Story 7.11", "Epic 3 retro",
     // "Unattributed"); only the summary/key labels of the other kinds need a kind-word prefix.
-    private static string NodeText(WorkNode n) => n.Kind switch
-    {
-        WorkNodeKind.Deferred => $"Deferred item: {n.Label}",
-        WorkNodeKind.Action => $"Action item: {n.Label}",
-        WorkNodeKind.Spec => $"Source: {n.Label}",
-        _ => n.Label,
-    };
+    //
+    // Both vocabularies now live on RelatedWork so this page and the Story 20.3 related-work pane read from ONE
+    // source — two independent tables would have drifted into two names for the same node/edge the first time
+    // either was reworded. Delegating (rather than moving the call sites) keeps this page's bytes unchanged.
+    // [Story 19.2; single-sourced Story 20.3]
+    private static string NodeText(WorkNode n) => RelatedWork.NodeText(n);
 
-    private static string EdgeVerb(WorkEdgeKind kind) => kind switch
-    {
-        WorkEdgeKind.Contains => "is part of",
-        WorkEdgeKind.StemmedFrom => "stemmed from",
-        WorkEdgeKind.Resolves => "was resolved by",
-        WorkEdgeKind.RaisedIn => "was also raised in",
-        _ => "links to",
-    };
+    private static string EdgeVerb(WorkEdgeKind kind) => RelatedWork.EdgeVerb(kind);
 }

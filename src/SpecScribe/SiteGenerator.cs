@@ -565,13 +565,48 @@ public sealed class SiteGenerator
 
             if (ingest.SourceFullPath is null)
             {
+                // Story 5.3 AC #3: epics.md is GONE (deleted or renamed away) but — unlike a full GenerateAll, which
+                // wipes OutputRoot first — the incremental watch path never removed anything, so the ENTIRE
+                // epics-derived output family was left on disk pointing at a source that no longer exists, and the
+                // cached models kept claiming it did. Clear the epics state and delete those pages BEFORE the nav is
+                // rebuilt below (SiteNav's Work Graph gate reads _workGraph), so no nav entry can survive pointing at
+                // a page this branch just removed.
+                var removedPages = ClearEpicsFamilyOutputs();
+                // hasEpics is derived from the on-disk source list, so a fresh BuildNav is what actually drops the
+                // Epics/Requirements/Traceability/Cadence entries — the nav built above still had them.
+                nav = BuildNav(files.Select(ToSourceRelative).ToList());
+                _nav = nav;
+
                 RefreshCoverage();
                 // Still refresh deferred/follow-up HTML — deferred-work.md is under implementation-artifacts/
                 // and routes here, not GenerateOne. [spec-epic9-watch-followup-surface-refresh]
                 var skippedInventory = RefreshFollowUpSurfaces(nav, sourceFiles: files);
+                if (removedPages > 0)
+                {
+                    // Open Question #2's chosen default — the sprint / action-items pages DEGRADE IN PLACE rather
+                    // than disappearing (their own source, sprint-status.yaml, is still there). "In place" has to
+                    // mean re-rendered, not left alone: both were written with live links into the epics pages this
+                    // branch just deleted, so leaving the old bytes would swap one dangling-link class for another.
+                    // Both templaters already accept a null EpicsModel and simply drop the cross-links.
+                    // RefreshFollowUpSurfaces above rebuilt _counts against the now-null model, so these two pick up
+                    // the corrected tallies. [Story 5.3 AC #3]
+                    WriteSprint(nav);
+                    WriteActionItems(nav, skippedInventory);
+                }
                 RefreshDatePagesAndTimeline(nav, new List<GenerationEvent>());
                 WriteIndex(nav, skippedInventory);
                 if (_options.EmitSpa) EmitSpaSite(nav);
+
+                // Only a pass that actually tore down a stale output family reports Removed — a project that simply
+                // has no epics.md (and never did) keeps reporting the long-standing Skipped no-op, so the common
+                // "not a BMad epics project" case is behaviourally unchanged. [Story 5.3]
+                if (removedPages > 0)
+                {
+                    return new GenerationEvent(
+                        GenerationOutcome.Removed, BmadArtifactAdapter.EpicsFileName, sw.Elapsed,
+                        $"{BmadArtifactAdapter.EpicsFileName} removed; {removedPages} stale page(s) deleted");
+                }
+
                 var skippedMsg = $"{BmadArtifactAdapter.EpicsFileName} not found";
                 if (_counts is { HasDivergence: true } skippedDivergent)
                     skippedMsg += $"; [Unsupported] {skippedDivergent.DivergenceMessage()}";
@@ -643,6 +678,148 @@ public sealed class SiteGenerator
                 summary += $"; [Unsupported] {divergent.DivergenceMessage()}";
             return new GenerationEvent(GenerationOutcome.Updated, ToSourceRelative(ingest.SourceFullPath), sw.Elapsed, summary);
         }
+    }
+
+    /// <summary>Every output page whose write is gated on <see cref="_epicsModel"/> being non-null — the pages that
+    /// exist ONLY because epics.md was parsed. Deleted together when epics.md disappears (Story 5.3 AC #3). Kept as
+    /// the <see cref="SiteNav"/> path constants (never literals) so a page that gets renamed there can't silently
+    /// fall out of this cleanup set.</summary>
+    private static readonly string[] EpicsFamilyPages =
+    {
+        SiteNav.EpicsOutputPath,          // gated: RenderEpicsPages only runs with a parsed model
+        SiteNav.RequirementsOutputPath,   // gated: WriteRequirements is called from RenderEpicsPages
+        SiteNav.TraceabilityOutputPath,   // gated: _epicsModel is null || _requirements is null || _counts is null
+        SiteNav.CadenceOutputPath,        // gated: _epicsModel is null || _cadence is null
+        SiteNav.ImpactMapOutputPath,      // gated: _epicsModel is null || _progress?.DeepGit is null
+        SiteNav.WorkGraphOutputPath,      // gated: _workGraph.IsEmpty (and the graph is projected FROM epics)
+    };
+
+    /// <summary>Output subdirectories written only by the epics family — the per-epic/per-story pages and the
+    /// per-requirement detail pages.</summary>
+    private static readonly string[] EpicsFamilyDirectories = { "epics", "requirements" };
+
+    /// <summary>Drops the epics-derived models and deletes the output family they produced, returning how many files
+    /// were actually removed. The asymmetry this fixes: every writer above no-ops when its model is null, which
+    /// prevents WRITING a stale page but never REMOVES one already on disk — harmless under
+    /// <see cref="GenerateAll"/> (which wipes <see cref="ForgeOptions.OutputRoot"/> first) and precisely the watch-mode
+    /// gap in AC #3.
+    /// <para><see cref="_progress"/> is SPLIT rather than nulled, departing from the story task's literal
+    /// "<c>_progress = null</c>": it carries two unrelated payloads. The epic/story/task roll-ups are epics-derived
+    /// and must go — the dashboard's "Progress by Epic" mosaic reads <see cref="ProgressModel.PerEpic"/>, NOT
+    /// <see cref="_epicsModel"/>, so leaving them intact keeps a panel of cards linking into the <c>epics/</c>
+    /// subtree this method just deleted (the exact dangling-link class of AC #3, found by test). The
+    /// <see cref="ProgressModel.Git"/> / <see cref="ProgressModel.DeepGit"/> payloads are mined from the git repo,
+    /// not epics.md, and gate the git-insights / deep-analytics pages that are still valid and still on disk —
+    /// nulling those would strip their nav entries and orphan the pages, the same divergence pointing the other
+    /// way. So: zero the roll-ups, keep the git pulse. [Story 5.3]</para></summary>
+    private int ClearEpicsFamilyOutputs()
+    {
+        _epicsModel = null;
+        _requirements = null;
+        _counts = null;
+        _cadence = null;
+        _workGraph = WorkGraphModel.Empty;
+        _planningImpact = PlanningCodeImpactData.Empty;
+        _storyEpicByOutputPath = null;
+        _progress = _progress is null
+            ? null
+            : new ProgressModel
+            {
+                EpicsTotal = 0,
+                EpicsDrafted = 0,
+                EpicsPending = 0,
+                StoriesTotal = 0,
+                StoriesWithArtifact = 0,
+                TasksDone = 0,
+                TasksTotal = 0,
+                PerEpic = Array.Empty<EpicProgress>(),
+                Git = _progress.Git,
+                DeepGit = _progress.DeepGit,
+            };
+
+        var removed = 0;
+        foreach (var page in EpicsFamilyPages)
+        {
+            if (DeleteOutputFile(page)) removed++;
+        }
+        foreach (var dir in EpicsFamilyDirectories)
+        {
+            removed += DeleteOutputDirectory(dir);
+        }
+        return removed;
+    }
+
+    /// <summary>Deletes one output-relative page if present and evicts it from the SPA capture, so a removed page
+    /// can't linger in the next bundle (the same pairing <see cref="RemoveFor"/> already does). Returns whether a
+    /// file was actually deleted. Best-effort: an IO failure (file held open by a reader) is swallowed so a watch
+    /// pass degrades rather than crashing the loop (NFR2). [Story 5.3]</summary>
+    private bool DeleteOutputFile(string outputRelativePath)
+    {
+        _spaCapture?.Remove(PathUtil.NormalizeSlashes(outputRelativePath));
+        var full = Path.Combine(_options.OutputRoot, outputRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(full)) return false;
+        try
+        {
+            File.Delete(full);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Recursively deletes one output-relative subdirectory and evicts every captured page beneath it,
+    /// returning the file count removed. Mirrors the existing rebuild-the-whole-subtree pattern
+    /// (<c>GenerateAdrsInternal</c> / <c>RenderEpicsPages</c>) rather than inventing a second one. [Story 5.3]</summary>
+    private int DeleteOutputDirectory(string outputRelativeDir)
+    {
+        var full = Path.Combine(_options.OutputRoot, outputRelativeDir.Replace('/', Path.DirectorySeparatorChar));
+        if (!Directory.Exists(full)) return 0;
+
+        if (_spaCapture is not null)
+        {
+            var prefix = PathUtil.NormalizeSlashes(outputRelativeDir) + "/";
+            foreach (var key in _spaCapture.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                _spaCapture.Remove(key);
+            }
+        }
+
+        try
+        {
+            var count = Directory.GetFiles(full, "*", SearchOption.AllDirectories).Length;
+            Directory.Delete(full, recursive: true);
+            return count;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>Watch-mode route for a DIRECTORY-level topology change under a watched root — a folder created,
+    /// renamed, or deleted (Story 5.3 AC #2/#5). The per-file incremental routes structurally cannot handle this:
+    /// they key every decision off a single changed path, and a folder operation either reports no usable path at
+    /// all or (on a rename) strands every page beneath the old name with nothing to re-derive them from. The correct
+    /// scope escalation is the full rebuild <see cref="GenerateAll"/> already implements — wipe
+    /// <see cref="ForgeOptions.OutputRoot"/>, rescan, rebuild — so this is a thin collapse of its event list to the
+    /// single event the watch log shows, matching <see cref="RegenerateFromDataSource"/>'s shape and the
+    /// <c>Regenerate*</c> naming convention rather than calling <c>GenerateAll</c> from the watcher directly.</summary>
+    public GenerationEvent RegenerateTopology()
+    {
+        var sw = Stopwatch.StartNew();
+        // GenerateAll takes _gate itself, so no outer lock here — a full rebuild is the whole point of this route.
+        var events = GenerateAll();
+
+        var errored = events.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
+        if (errored is not null)
+        {
+            return errored;
+        }
+
+        return new GenerationEvent(
+            GenerationOutcome.Updated, FileWatcherService.TopologyEventLabel, sw.Elapsed, "full rebuild");
     }
 
     /// <summary>Watch-mode route for a non-markdown DATA SOURCE change (<c>sprint-status.yaml</c>,
@@ -2538,7 +2715,7 @@ public sealed class SiteGenerator
             var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence);
+                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -2805,7 +2982,7 @@ public sealed class SiteGenerator
         var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
@@ -2976,7 +3153,9 @@ public sealed class SiteGenerator
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(inventory, counts);
         var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence);
+        // `_workGraph` is handed in verbatim — the SAME instance WriteWorkGraph renders — so the Story 20.3
+        // related-work pane is a pure read over the already-computed model, never a second projection. [Story 20.3]
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 
@@ -3072,8 +3251,27 @@ public sealed class SiteGenerator
         _retros = retros.ToList();
         // Computed once here rather than on every access (EpicRetroMap used to be a computed property
         // re-grouping all retros on every epic in the epics render loop). [Story 2.3 review]
-        _epicRetroMap = _retros.GroupBy(r => r.EpicNumber)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase).First().OutputRelativePath);
+        //
+        // FANNED OUT over every epic a retro covers, not just one: a joint retrospective must appear against
+        // ALL its epics, or the ones it misses read as "In review" forever (StatusStyles.ForEpicWithRetrospective
+        // gates on HasRetrospective, which is stamped from this map). One retro can therefore be the value for
+        // several keys — that is the point, not a duplicate. [spec-multi-epic-retro-attribution]
+        // Winner is the LATEST retro for the epic, by DATE. Filename descending used to be a valid proxy for
+        // that, because every retro for an epic shared the `epic-N-retro-` prefix so name order was date order.
+        // Joint retros break that proxy: `epic-19-retro-2026-07-01` sorts ABOVE `epic-19-21-retro-2026-08-01`
+        // ('r' > '2'), so the name-only tiebreak would hand Epic 19 its OLDER retrospective. Date first, then
+        // filename descending as before, then Ordinal to break exact ties deterministically (OrdinalIgnoreCase
+        // alone can tie two real files on a case-sensitive filesystem and leave the winner to enumeration
+        // order — a nondeterminism the golden fingerprint would catch only intermittently).
+        _epicRetroMap = _retros
+            .SelectMany(r => r.EpicNumbers.Select(n => (Epic: n, Retro: r)))
+            .GroupBy(x => x.Epic)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(x => PortalDates.TryParseDay(x.Retro.DateText ?? string.Empty, out var d) ? d : DateOnly.MinValue)
+                      .ThenByDescending(x => x.Retro.SourceRelativePath, StringComparer.OrdinalIgnoreCase)
+                      .ThenByDescending(x => x.Retro.SourceRelativePath, StringComparer.Ordinal)
+                      .First().Retro.OutputRelativePath);
     }
 
     /// <summary>Stamps each epic's <see cref="EpicInfo.HasRetrospective"/> from <see cref="EpicRetroMap"/> — the
@@ -3098,7 +3296,7 @@ public sealed class SiteGenerator
     private void RenderRetroPages(SiteNav nav)
     {
         // Retros navigate in ascending epic order (Prev = lower epic, Next = higher); write order is unchanged. [Prev/next navigation]
-        var ordered = _retros.OrderBy(r => r.EpicNumber).ToList();
+        var ordered = _retros.OrderBy(r => r.PrimaryEpicNumber ?? int.MaxValue).ToList();
         foreach (var retro in _retros)
         {
             var outputRel = retro.OutputRelativePath;
@@ -3110,7 +3308,8 @@ public sealed class SiteGenerator
         }
     }
 
-    /// <summary>Maps an epic number to the output path of its (latest, by filename) retrospective page — the
+    /// <summary>Maps an epic number to the output path of its LATEST retrospective page (by authored date, then
+    /// filename) — one retro can be the value for SEVERAL epics when it is a joint retrospective. This is the
     /// link target for an open action item tagged with that epic. Computed once in <see cref="SetRetros"/>.
     /// [Story 2.3 retro pages]</summary>
     private IReadOnlyDictionary<int, string> _epicRetroMap = new Dictionary<int, string>();
@@ -4000,14 +4199,48 @@ public sealed class SiteGenerator
         CopyEmbeddedAsset("SpecScribe.assets.specscribe.js", ForgeOptions.ScriptName);
     }
 
+    /// <summary>Writes one embedded asset (the stylesheet / script) into the output root. Re-run by EVERY
+    /// regeneration route, so it is the one file a live watch session rewrites on every single save — and the one
+    /// most likely to lose a race with something else holding it open (a virus scanner sweeping the freshly-written
+    /// tree, a browser tab that has the script loaded, an editor previewing the site). A sharing violation there is
+    /// transient by nature, so retry briefly; if the file is still contended AND a usable copy is already on disk,
+    /// accept it rather than failing the whole pass over an asset that is already correct — its bytes are fixed at
+    /// build time, so an existing non-empty copy cannot be stale. Only a genuine first write that never succeeds
+    /// still throws. [Story 5.3 Task 5 — NFR2 graceful degradation]</summary>
     private void CopyEmbeddedAsset(string resourceName, string outputFileName)
     {
         var dest = Path.Combine(_options.OutputRoot, outputFileName);
         using var source = typeof(SiteGenerator).Assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException($"Embedded asset '{resourceName}' is missing from the assembly.");
-        using var destStream = File.Create(dest);
-        source.CopyTo(destStream);
+
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                using var destStream = File.Create(dest);
+                source.CopyTo(destStream);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= AssetWriteRetries)
+                {
+                    // Already present and non-empty → the contended write was a no-op anyway. Otherwise the asset
+                    // genuinely never landed and the caller must hear about it.
+                    if (new FileInfo(dest) is { Exists: true, Length: > 0 }) return;
+                    throw;
+                }
+
+                Thread.Sleep(AssetWriteRetryDelayMs);
+                source.Position = 0;
+            }
+        }
     }
+
+    // Bounded, deliberately small: enough to ride out a scanner's momentary handle, short enough that a real
+    // failure surfaces well inside one debounce interval rather than stalling the watch loop.
+    private const int AssetWriteRetries = 3;
+    private const int AssetWriteRetryDelayMs = 25;
 
     private List<string> EnumerateSourceFiles() =>
         Directory.Exists(_options.SourceRoot)

@@ -135,7 +135,7 @@ public class BmadArtifactAdapterTests : IDisposable
 
         Assert.NotNull(bundle.Sprint);
         var retro = Assert.Single(bundle.Retros);
-        Assert.Equal(1, retro.EpicNumber);
+        Assert.Equal(new[] { 1 }, retro.EpicNumbers.ToArray());
 
         // No _bmad install in this fixture → module degrades to None, exactly as ModuleContext.Detect does.
         Assert.Same(ModuleContext.None, bundle.Module);
@@ -205,7 +205,7 @@ public class BmadArtifactAdapterTests : IDisposable
         Assert.Equal(AdapterDiagnosticCategory.Malformed, diag.Category);
         Assert.Equal(Path.Combine("implementation-artifacts", "epic-2-retro-2026-07-07.md"), diag.RelativePath);
 
-        Assert.Equal(1, Assert.Single(bundle.Retros).EpicNumber); // valid sibling retro survived
+        Assert.Equal(new[] { 1 }, Assert.Single(bundle.Retros).EpicNumbers.ToArray()); // valid sibling retro survived
         Assert.NotNull(bundle.Epics);
         Assert.NotNull(bundle.Sprint);
     }

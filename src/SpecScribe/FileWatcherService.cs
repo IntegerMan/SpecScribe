@@ -13,6 +13,27 @@ public sealed class FileWatcherService : IDisposable
     /// set carries the non-markdown data sources (<c>sprint-status.yaml</c>, <c>_bmad/config.toml</c>) whose changes
     /// must refresh the live view too (the shipped R6.1 gap). [Story 6.11]</summary>
     private static readonly string[] WatchedExtensions = { ".md", ".yaml", ".yml", ".toml" };
+
+    /// <summary>The <see cref="_pending"/> key a DIRECTORY-level change debounces under (Story 5.3). Deliberately not
+    /// a path: a folder create/rename/delete has no single file whose fate could be classified, and the escalation is
+    /// whole-tree anyway, so every directory event in a burst must coalesce onto ONE key. <c>&lt;</c>/<c>&gt;</c> are
+    /// illegal in Windows paths and never produced by <see cref="Path.GetFullPath"/> elsewhere, so this can never
+    /// collide with a real watched file's key.</summary>
+    private const string TopologySentinelKey = "<topology>";
+
+    /// <summary>The relative-path label the escalated full rebuild is reported under, so the watch log names a
+    /// directory change as such instead of attributing it to some arbitrary contained file. Shared with
+    /// <see cref="SiteGenerator.RegenerateTopology"/> so the two can never drift. [Story 5.3]</summary>
+    internal const string TopologyEventLabel = "<directory change>";
+
+    /// <summary>Per-watcher labels for events that belong to a WATCHER rather than to any one artifact — used for
+    /// both the <see cref="FileSystemWatcher.Error"/> channel and the <see cref="SafeHandle"/> crash guard, so a
+    /// failure is attributable to the specific watcher that produced it rather than to a generic "<c>&lt;watcher&gt;</c>".
+    /// [Story 5.3 follow-up: promoted from scattered literals]</summary>
+    private const string FileWatcherLabel = "<watcher>";
+    private const string DirectoryWatcherLabel = "<directory-watcher>";
+    private const string BmadDirWatcherLabel = "<bmad-dir-watcher>";
+
     private readonly ForgeOptions _options;
     private readonly SiteGenerator _generator;
     private readonly Action<GenerationEvent> _onEvent;
@@ -43,6 +64,14 @@ public sealed class FileWatcherService : IDisposable
         // no data source lives here.
         Directory.CreateDirectory(options.AdrSourceRoot);
         _watchers.Add(CreateWatcher(options.AdrSourceRoot, "*.md"));
+
+        // DIRECTORY topology, per root (Story 5.3). The file watchers above cannot see this: their Filters match file
+        // NAMES, and a bare folder name matches none of them — so renaming/creating/deleting a whole directory of
+        // artifacts produces no watch event at all today, and on Windows a folder rename does not enumerate its
+        // children as separate file events either. Separate watchers rather than widening the pair above, so the
+        // NotifyFilter stays narrowly DirectoryName and ordinary file edits keep their existing per-file routing.
+        _watchers.Add(CreateDirectoryWatcher(options.SourceRoot));
+        _watchers.Add(CreateDirectoryWatcher(options.AdrSourceRoot));
 
         // _bmad/config.toml (project branding) lives at the repo root under _bmad — under NEITHER source root above.
         // Watch its containing dir when it exists so a config edit live-refreshes too; never CREATE _bmad (that would
@@ -76,13 +105,13 @@ public sealed class FileWatcherService : IDisposable
             InternalBufferSize = 65536,
         };
         watcher.Filters.Add(ForgeOptions.ConfigDirName);
-        watcher.Created += (_, e) => OnConfigDirCreated(e.FullPath);
-        watcher.Renamed += (_, e) => OnConfigDirCreated(e.FullPath);
+        watcher.Created += (_, e) => SafeHandle(() => OnConfigDirCreated(e.FullPath), BmadDirWatcherLabel);
+        watcher.Renamed += (_, e) => SafeHandle(() => OnConfigDirCreated(e.FullPath), BmadDirWatcherLabel);
         // Tagged distinctly from CreateWatcher's generic "<watcher>" label so a failure of this specific fallback
         // watcher (repo-root, directory-name events) is distinguishable from the source/ADR/config watchers'
         // errors in the emitted GenerationEvent. [Story 6.11 deferred-work cleanup]
         watcher.Error += (_, e) =>
-            _onEvent(new GenerationEvent(GenerationOutcome.Error, "<bmad-dir-watcher>", TimeSpan.Zero, e.GetException().Message));
+            SafeNotify(new GenerationEvent(GenerationOutcome.Error, BmadDirWatcherLabel, TimeSpan.Zero, e.GetException().Message));
         return watcher;
     }
 
@@ -125,7 +154,7 @@ public sealed class FileWatcherService : IDisposable
             {
                 // _bmad vanished again between the Directory.Exists check above and here — leave the flag clear so
                 // a future re-creation can retry; report the miss instead of crashing the watcher-event thread.
-                _onEvent(new GenerationEvent(GenerationOutcome.Error, "<bmad-dir-watcher>", TimeSpan.Zero, ex.Message));
+                SafeNotify(new GenerationEvent(GenerationOutcome.Error, BmadDirWatcherLabel, TimeSpan.Zero, ex.Message));
                 return;
             }
 
@@ -148,6 +177,33 @@ public sealed class FileWatcherService : IDisposable
         }
     }
 
+    /// <summary>A filter-less, DirectoryName-only watcher over <paramref name="root"/> whose create/rename/delete
+    /// events all debounce onto the single <see cref="TopologySentinelKey"/> and escalate to a full rebuild. No
+    /// <c>Filters</c> entries at all — the point is to match ANY directory name, which is exactly what the
+    /// name-filtered file watchers structurally cannot do. [Story 5.3]</summary>
+    private FileSystemWatcher CreateDirectoryWatcher(string root)
+    {
+        var watcher = new FileSystemWatcher(root)
+        {
+            IncludeSubdirectories = true,
+            NotifyFilter = NotifyFilters.DirectoryName,
+            InternalBufferSize = 65536,
+        };
+
+        watcher.Created += (_, e) => SafeHandle(() => DebounceTopology(e.FullPath), DirectoryWatcherLabel);
+        watcher.Deleted += (_, e) => SafeHandle(() => DebounceTopology(e.FullPath), DirectoryWatcherLabel);
+        watcher.Renamed += (_, e) => SafeHandle(() =>
+        {
+            DebounceTopology(e.OldFullPath);
+            DebounceTopology(e.FullPath);
+        }, DirectoryWatcherLabel);
+        // Tagged distinctly from CreateWatcher's generic "<watcher>" label so a directory-watcher failure (buffer
+        // overflow on a large rename-refactor is the realistic case) is distinguishable in the event stream.
+        watcher.Error += (_, e) =>
+            SafeNotify(new GenerationEvent(GenerationOutcome.Error, DirectoryWatcherLabel, TimeSpan.Zero, e.GetException().Message));
+        return watcher;
+    }
+
     private FileSystemWatcher CreateWatcher(string root, params string[] filters)
     {
         var watcher = new FileSystemWatcher(root)
@@ -163,16 +219,16 @@ public sealed class FileWatcherService : IDisposable
             watcher.Filters.Add(filter);
         }
 
-        watcher.Changed += (_, e) => Debounce(e.FullPath);
-        watcher.Created += (_, e) => Debounce(e.FullPath);
-        watcher.Deleted += (_, e) => Debounce(e.FullPath);
-        watcher.Renamed += (_, e) =>
+        watcher.Changed += (_, e) => SafeHandle(() => Debounce(e.FullPath), FileWatcherLabel);
+        watcher.Created += (_, e) => SafeHandle(() => Debounce(e.FullPath), FileWatcherLabel);
+        watcher.Deleted += (_, e) => SafeHandle(() => Debounce(e.FullPath), FileWatcherLabel);
+        watcher.Renamed += (_, e) => SafeHandle(() =>
         {
             Debounce(e.OldFullPath);
             Debounce(e.FullPath);
-        };
+        }, FileWatcherLabel);
         watcher.Error += (_, e) =>
-            _onEvent(new GenerationEvent(GenerationOutcome.Error, "<watcher>", TimeSpan.Zero, e.GetException().Message));
+            SafeNotify(new GenerationEvent(GenerationOutcome.Error, FileWatcherLabel, TimeSpan.Zero, e.GetException().Message));
         return watcher;
     }
 
@@ -213,6 +269,68 @@ public sealed class FileWatcherService : IDisposable
             });
     }
 
+    /// <summary>Coalesces every directory create/rename/delete in a burst onto one sentinel-keyed timer, reusing the
+    /// same <see cref="_pending"/> dictionary and <see cref="ForgeOptions.DebounceInterval"/> as the per-file path —
+    /// so an IDE rename-refactor touching many nested folders still settles into a single rebuild.
+    /// <para>Changes under the generated output root are ignored: <see cref="SiteGenerator.GenerateAll"/> recreates
+    /// that whole tree on every rebuild, so if a user points <c>--output</c> at a directory INSIDE a watched source
+    /// root, a self-triggered rebuild loop would otherwise run forever. The file watchers never had this hazard (they
+    /// admit only source extensions, and generation writes <c>.html</c>).</para></summary>
+    private void DebounceTopology(string fullPath)
+    {
+        if (IsUnderOutputRoot(fullPath))
+        {
+            return;
+        }
+
+        _pending.AddOrUpdate(
+            TopologySentinelKey,
+            addValueFactory: _ => CreateTopologyTimer(),
+            updateValueFactory: (_, existing) =>
+            {
+                existing.Change(ForgeOptions.DebounceInterval, Timeout.InfiniteTimeSpan);
+                return existing;
+            });
+    }
+
+    private bool IsUnderOutputRoot(string fullPath)
+    {
+        try
+        {
+            var full = Path.GetFullPath(fullPath);
+            var outputRoot = Path.GetFullPath(_options.OutputRoot);
+            return full.Equals(outputRoot, StringComparison.OrdinalIgnoreCase)
+                || full.StartsWith(outputRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
+        {
+            // An unresolvable path can't be shown to be inside the output root; treat it as watchable rather than
+            // silently dropping a real topology change (NFR2 — degrade, don't lose the event).
+            return false;
+        }
+    }
+
+    private Timer CreateTopologyTimer()
+    {
+        Timer? timer = null;
+        timer = new Timer(_ =>
+        {
+            _pending.TryRemove(TopologySentinelKey, out Timer? _);
+            timer?.Dispose();
+            RunTopologyPass();
+        }, null, ForgeOptions.DebounceInterval, Timeout.InfiniteTimeSpan);
+        return timer;
+    }
+
+    /// <summary>The topology timer's body, minus the timer bookkeeping. No single path is classified here by design —
+    /// a folder operation's "changed file" is every file beneath it — so this escalates to the full rebuild, the only
+    /// scope that stays coherent across a rename (pages appear at the new location AND the stale ones at the old are
+    /// gone). Internal so tests can drive it ON THE CALLING THREAD: see <see cref="RunDebouncedPass"/>'s remarks for
+    /// why exercising it through a real <see cref="Timer"/> would be a hostile way to test the crash guard.
+    /// [Story 5.3]</summary>
+    internal void RunTopologyPass() =>
+        SafeNotify(RunGuarded(() => _generator.RegenerateTopology(), TopologyEventLabel));
+
     private Timer CreateTimer(string fullPath)
     {
         Timer? timer = null;
@@ -220,28 +338,104 @@ public sealed class FileWatcherService : IDisposable
         {
             _pending.TryRemove(fullPath, out Timer? _);
             timer?.Dispose();
-
-            // Decide the action from ground truth at fire time, not from which event triggered it —
-            // a save can emit Changed/Created/Deleted in any order before the debounce settles.
-            // IsDataSource is checked FIRST: sprint-status.yaml is under implementation-artifacts/, so
-            // IsEpicsRelated would otherwise claim it and route to RegenerateEpics (which skips sprint state). [Story 6.11]
-            // The generic GenerateOne/RemoveFor fallback assumes a markdown artifact; the widened Filters/WatchedExtensions
-            // admit yaml/toml across the whole source root (not just the two named data sources), so a stray non-data-source
-            // yaml/toml file must be skipped here rather than mis-handled as markdown. [Story 6.11 review]
-            var ev = _generator.IsDataSource(fullPath)
-                ? _generator.RegenerateFromDataSource(fullPath)
-                : _generator.IsAdr(fullPath)
-                    ? _generator.RegenerateAdrs()
-                    : _generator.IsEpicsRelated(fullPath)
-                        ? _generator.RegenerateEpics()
-                        : !fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
-                            ? new GenerationEvent(GenerationOutcome.Skipped, Path.GetRelativePath(_options.RepoRoot, fullPath).Replace('\\', '/'), TimeSpan.Zero, "non-markdown, not a recognized data source")
-                            : File.Exists(fullPath)
-                                ? _generator.GenerateOne(fullPath)
-                                : _generator.RemoveFor(fullPath);
-            _onEvent(ev);
+            RunDebouncedPass(fullPath);
         }, null, ForgeOptions.DebounceInterval, Timeout.InfiniteTimeSpan);
         return timer;
+    }
+
+    /// <summary>The per-file timer's body, minus the timer bookkeeping. Decides the action from ground truth at fire
+    /// time, not from which event triggered it — a save can emit Changed/Created/Deleted in any order before the
+    /// debounce settles. <c>IsDataSource</c> is checked FIRST: <c>sprint-status.yaml</c> lives under
+    /// <c>implementation-artifacts/</c>, so <c>IsEpicsRelated</c> would otherwise claim it and route to
+    /// <c>RegenerateEpics</c> (which skips sprint state). [Story 6.11] The generic <c>GenerateOne</c>/<c>RemoveFor</c>
+    /// fallback assumes a markdown artifact; the widened Filters/WatchedExtensions admit yaml/toml across the whole
+    /// source root (not just the two named data sources), so a stray non-data-source yaml/toml file is skipped here
+    /// rather than mis-handled as markdown. [Story 6.11 review]
+    /// <para><b>Internal as a test seam.</b> The crash guards below only matter on a ThreadPool thread, where there is
+    /// no caller — which is precisely what makes them hostile to test through a real <see cref="Timer"/>: a
+    /// REGRESSION would not fail a test, it would take down the whole test host with it, turning one broken assertion
+    /// into a lost suite run. Driving the same body synchronously means an unguarded throw surfaces as an ordinary
+    /// test failure on the calling thread. Mirrors the <see cref="OnConfigDirCreated"/> seam Story 6.11 added for the
+    /// same reason. [Story 5.3 follow-up]</para></summary>
+    internal void RunDebouncedPass(string fullPath)
+    {
+        var relative = Path.GetRelativePath(_options.RepoRoot, fullPath).Replace('\\', '/');
+        var ev = RunGuarded(() => _generator.IsDataSource(fullPath)
+            ? _generator.RegenerateFromDataSource(fullPath)
+            : _generator.IsAdr(fullPath)
+                ? _generator.RegenerateAdrs()
+                : _generator.IsEpicsRelated(fullPath)
+                    ? _generator.RegenerateEpics()
+                    : !fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+                        ? new GenerationEvent(GenerationOutcome.Skipped, relative, TimeSpan.Zero, "non-markdown, not a recognized data source")
+                        : File.Exists(fullPath)
+                            ? _generator.GenerateOne(fullPath)
+                            : _generator.RemoveFor(fullPath), relative);
+        SafeNotify(ev);
+    }
+
+    /// <summary>Runs one regeneration route and converts any escaping exception into an
+    /// <see cref="GenerationOutcome.Error"/> event instead of letting it out.
+    /// <para>Load-bearing, not defensive decoration: these routes run on a <see cref="Timer"/> callback, i.e. a
+    /// ThreadPool thread with no caller to catch anything. An unhandled exception there does not fail one rebuild —
+    /// it terminates the whole <c>watch</c> process, losing the live-reload session over a transient the next save
+    /// would have fixed. The generator's per-file paths already swallow their own <see cref="IOException"/>s
+    /// ("file busy, will retry"), but the whole-tree routes reach filesystem work — the output-root wipe, the
+    /// embedded-asset copy — that a scanner, an editor, or an open browser tab can lose a race with. NFR2's
+    /// "degrades gracefully with non-fatal notices" is the contract; this is where it is enforced for watch mode.
+    /// [Story 5.3 Task 5]</para></summary>
+    private GenerationEvent RunGuarded(Func<GenerationEvent> route, string relativePath)
+    {
+        try
+        {
+            return route();
+        }
+        catch (Exception ex)
+        {
+            return new GenerationEvent(GenerationOutcome.Error, relativePath, TimeSpan.Zero, ex.Message);
+        }
+    }
+
+    /// <summary>The single exit through which every emitted event leaves this class, so a throwing REPORTER cannot
+    /// kill the watch loop either.
+    /// <para><see cref="RunGuarded"/> alone was an incomplete fix: it guards the generator call, then hands the
+    /// result to <c>_onEvent</c> — a caller-supplied delegate, invoked on the same unguarded ThreadPool thread. In
+    /// production that delegate is <c>ConsoleUi.LogEvent</c>, which writes to the console; a closed or broken stdout
+    /// (piping <c>specscribe watch</c> into a process that exits first is the ordinary way to get one) throws
+    /// <see cref="IOException"/> from the write and takes the process down. The failure is worse than the one
+    /// <see cref="RunGuarded"/> fixed, because it fires on the SUCCESS path — a perfectly good rebuild kills the
+    /// session while reporting itself.</para>
+    /// <para>The swallow is deliberate and has nowhere better to go: the reporting channel is the thing that just
+    /// failed, so re-reporting through it would be the same throw again. Losing one log line is strictly better than
+    /// losing the watch session. [Story 5.3 follow-up]</para></summary>
+    private void SafeNotify(GenerationEvent ev)
+    {
+        try
+        {
+            _onEvent(ev);
+        }
+        catch
+        {
+            // Intentionally swallowed — see remarks. The reporter is the failure; there is no second channel.
+        }
+    }
+
+    /// <summary>Wraps a raw <see cref="FileSystemWatcher"/> event handler body. These run on the watcher's own
+    /// event-dispatch thread — the same no-caller situation as the timer callbacks, so the same rule applies: an
+    /// escaping exception is a process kill, not a dropped event. Cheap because the bodies are tiny (classify the
+    /// path, arm a timer), but <c>new Timer</c> and the path helpers can throw under resource pressure or on a
+    /// pathological path, and "rare" is not "never" for a process that is meant to run for hours.
+    /// [Story 5.3 follow-up]</summary>
+    private void SafeHandle(Action handler, string label)
+    {
+        try
+        {
+            handler();
+        }
+        catch (Exception ex)
+        {
+            SafeNotify(new GenerationEvent(GenerationOutcome.Error, label, TimeSpan.Zero, ex.Message));
+        }
     }
 
     public void Dispose()

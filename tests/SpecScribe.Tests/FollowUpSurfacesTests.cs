@@ -588,7 +588,11 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("href=\"follow-ups/group-follow-ups.html\"", index);
         Assert.Contains("href=\"epics/epic-1.html\"", index);
         Assert.Contains("href=\"follow-ups/group-epic-", index);
-        Assert.DoesNotContain("href=\"follow-ups/action-", index);
+        // The "aggregated, never per-item" rule is a property of the SUNBURST'S leaf destinations (Story 9.13), not
+        // of the dashboard document — so assert it against the chart panel rather than the whole page. Story 20.3's
+        // related-work pane now also sits on index.html and links each related node to its OWN detail page, which
+        // its AC #1 requires; a document-wide assertion would read that correct behavior as a chart regression.
+        Assert.DoesNotContain("href=\"follow-ups/action-", SunburstPanelOf(index));
         // Orphan root must not dump into the whole-site action-items index.
         var orphanIdx = index.IndexOf("aria-label=\"Follow-ups:", StringComparison.Ordinal);
         Assert.True(orphanIdx >= 0);
@@ -597,6 +601,21 @@ public class FollowUpSurfacesTests : IDisposable
         var orphanAnchor = index[orphanAnchorStart..orphanAnchorEnd];
         Assert.Contains("href=\"follow-ups/group-follow-ups.html\"", orphanAnchor);
         Assert.DoesNotContain("href=\"action-items.html\"", orphanAnchor);
+    }
+
+    /// <summary>The dashboard's sunburst chart panel alone, so a destination-contract assertion tests the CHART and
+    /// not whatever else the dashboard grew. The panel ends where the next sibling panel begins — Story 20.3's
+    /// related-work aside, or the Remaining Work grid when the pane is omitted.</summary>
+    private static string SunburstPanelOf(string index)
+    {
+        var start = index.IndexOf("class=\"chart-panel sunburst-panel", StringComparison.Ordinal);
+        Assert.True(start >= 0, "dashboard has no sunburst panel");
+        var candidates = new[]
+        {
+            index.IndexOf("<aside class=\"chart-panel related-work-panel", start, StringComparison.Ordinal),
+            index.IndexOf("epic-remaining-panel", start, StringComparison.Ordinal),
+        }.Where(i => i >= 0).ToList();
+        return index[start..(candidates.Count > 0 ? candidates.Min() : index.Length)];
     }
 
     [Fact]

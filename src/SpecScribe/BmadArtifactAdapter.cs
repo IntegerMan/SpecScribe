@@ -284,6 +284,18 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
         ForgeOptions options, IReadOnlyList<string> sourceFiles, HashSet<string> consumed, List<AdapterDiagnostic> diagnostics)
     {
         var retros = new List<RetroModel>();
+
+        // An `epic…retro…` name we can't parse is reported, never silently dropped: a dropped retro also drops
+        // its epics' "Done" status on every visual surface, which is precisely the defect this path once had.
+        // Not consumed — it still renders through the generic pages pass. [spec-multi-epic-retro-attribution]
+        foreach (var file in sourceFiles.Where(RetroParser.LooksLikeUnrecognizedRetro))
+        {
+            diagnostics.Add(new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Unsupported, ToSourceRelative(options, file),
+                "filename reads like an epic retrospective but doesn't match the recognized "
+                + "epic-N-retro-* (or joint epic-N-M-retro-*) naming; not ingested as a retrospective"));
+        }
+
         foreach (var file in sourceFiles.Where(RetroParser.IsRetroFile))
         {
             var sourceRel = ToSourceRelative(options, file);
@@ -300,7 +312,7 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
         }
 
         return retros
-            .OrderBy(r => r.EpicNumber)
+            .OrderBy(r => r.PrimaryEpicNumber ?? int.MaxValue)
             .ThenBy(r => r.SourceRelativePath, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

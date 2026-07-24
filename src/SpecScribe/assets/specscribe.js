@@ -1715,8 +1715,10 @@
 
   function initSunburstExplorer(root) {
     var svg = root.querySelector("svg.sunburst");
-    // Select the island BY ID, not by first-match-on-type: Story 20.3 adds a second inline JSON island (the work-graph
-    // edges) inside this same panel, and document order must not decide which payload the explorer parses.
+    // Select the island BY ID, not by first-match-on-type: document order must not decide which payload the
+    // explorer parses if a second inline JSON island ever lands in this panel. (Story 20.3 was expected to add one
+    // for the work-graph edges and did NOT — see the `edges` note in Charts.SunburstExplorerIsland — but keeping
+    // the lookup id-anchored costs nothing and removes the hazard permanently.)
     var dataEl = root.querySelector('script[type="application/json"]#sunburst-explorer-data')
       || root.querySelector('script[type="application/json"]');
     if (!svg || !dataEl) return;
@@ -2052,7 +2054,26 @@
       renderCrumbs();
       setRoving();
       syncTextTwin();
+      publishSelection();
       if (animate) pulse();
+    }
+
+    // THE named selection seam [Story 20.3]. Story 20.1's contract reserved a selection signal but never named one,
+    // and 20.2 shipped without it — the explorer's only notion of "the item I am looking at" is its zoom scope. So
+    // that is what is published, under one name, from the ONE place every scope change funnels through (applyState
+    // covers click, Enter/Space, breadcrumb, centre control, hash and popstate alike). `nodeId` is null at the root
+    // scope. Story 20.5's component and Story 20.8's details pane inherit this event rather than minting a second.
+    // Guarded because a browser without the CustomEvent constructor must not break the drill-in the visitor
+    // actually asked for; the pane then keeps its server-rendered default, which is a correct view rather than a
+    // broken one. (A throwing listener does not need catching here — the DOM reports those to window.onerror
+    // instead of propagating to the dispatcher — but the guard costs nothing and covers both.)
+    function publishSelection() {
+      try {
+        root.dispatchEvent(new CustomEvent("specscribe:explorer-select", {
+          bubbles: true,
+          detail: { nodeId: scope, label: scope && byId[scope] ? byId[scope].label : null, root: root },
+        }));
+      } catch (e) { /* no CustomEvent, or a throwing listener — the pane's no-JS default stands */ }
     }
 
     // Rewrite location.hash's `sb=` pair WITHOUT destroying any other fragment the visitor arrived with — clearing
@@ -2124,4 +2145,103 @@
     window.addEventListener("popstate", applyHash);
     applyHash();
   }
+
+  // ---- Related-work pane: reveal the selected scope's groups [Story 20.3] -------------------
+  // Progressive enhancement ONLY (NFR8, AC #2). The server renders EVERY selectable scope's related-work groups
+  // into the pane, and with JS off all of them are visible — that is the documented default view, a compact
+  // per-scope digest of work-graph.html. This block adds exactly one thing over that markup: when the explorer
+  // publishes a selection (`specscribe:explorer-select`, raised by the Story 20.2 block above), reveal the matching
+  // scope's section and hide the rest. It NEVER fetches, never counts, and never invents a link — every anchor it
+  // shows was already in the DOM. Presentation is CSS: this sets `data-related-scope` on the pane plus one marker
+  // class, and the stylesheet decides what shows, so the pane keeps working if these rules are restyled.
+  // Re-runnable for the same reason the explorer is: the SPA replaces the content region with innerHTML.
+  // ONE document-level listener for the whole page, registered once — deliberately NOT one per pane. The pane is a
+  // SIBLING of the explorer root, so a bubbling event never passes through it and a pane-local listener is
+  // impossible; and re-registering inside the per-pane init would leak a listener holding a detached pane on every
+  // SPA content swap.
+  document.addEventListener("specscribe:explorer-select", function (e) {
+    var d = (e && e.detail) || {};
+    applyRelatedSelection(d.nodeId === undefined ? null : d.nodeId, d.label || null);
+  });
+
+  function initRelatedPanes(scope) {
+    var host = scope && scope.querySelectorAll ? scope : document;
+    var found = false;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-related-pane]"), function (pane) {
+      if (pane.getAttribute("data-related-ready")) return;
+      pane.setAttribute("data-related-ready", "1");
+      found = true;
+    });
+    // Sync a freshly-mounted pane to the scope the explorer is ALREADY in. The explorer block runs earlier in this
+    // IIFE, so its first `specscribe:explorer-select` has already fired by the time we get here — arriving on
+    // `#sb=epic-20` would otherwise leave the pane showing every scope while the chart shows one. The scope is read
+    // from the attribute Story 20.2 publishes, so this is not a second source of truth.
+    if (!found) return;
+    var drilled = document.querySelector("[data-explorer][data-sb-scope]");
+    applyRelatedSelection(drilled ? drilled.getAttribute("data-sb-scope") : null, null);
+  }
+
+  function applyRelatedSelection(nodeId, label) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-related-pane]"), function (pane) {
+      try { revealRelatedScope(pane, nodeId, label); } catch (err) { /* degrade: the full pane stands */ }
+    });
+  }
+
+  function revealRelatedScope(pane, nodeId, label) {
+    var sections = pane.querySelectorAll(".related-node[data-related-node]");
+    if (!sections.length) return;
+    var empty = pane.querySelector("[data-related-empty]");
+    var live = pane.querySelector(".related-work-live");
+    var selecting = nodeId !== null && nodeId !== undefined && nodeId !== "";
+
+    var match = null;
+    Array.prototype.forEach.call(sections, function (s) {
+      var hit = selecting && s.getAttribute("data-related-node") === nodeId;
+      if (hit) match = s;
+      // The class is the CSS hook; `hidden` additionally keeps a non-current section out of the accessibility tree
+      // AND out of the tab order, so its links can never become phantom tab stops for a scope that is not showing
+      // (the class of defect the Story 20.2 review found on hidden SVG <a> elements).
+      s.classList.toggle("is-related-current", hit);
+      s.hidden = selecting && !hit;
+    });
+
+    if (!selecting) {
+      // No selection → the documented default view: the whole server-rendered list, exactly what a JS-off visitor
+      // gets. Nothing is hidden, so nothing has to be restored.
+      pane.removeAttribute("data-related-scope");
+      if (empty) empty.hidden = true;
+      say(live, "Showing related work for every scope.");
+      return;
+    }
+
+    pane.setAttribute("data-related-scope", nodeId);
+    // A selection the server rendered no section for has no edges in the work graph — the DESIGNED empty state,
+    // never a blank region (AC #2).
+    if (empty) empty.hidden = !!match;
+    var name = label || (match ? titleOf(match) : null) || nodeId;
+    say(live, match
+      ? "Related work for " + name + ": " + countRows(match) + "."
+      : "No related work items for " + name + ".");
+  }
+
+  // Counted off the DOM already on screen — the pane never recomputes a project statistic, so this number can
+  // never disagree with what the visitor can see (and never reaches ProjectCounts). [Story 20.3]
+  function countRows(section) {
+    var n = section.querySelectorAll(".related-row").length;
+    return n + (n === 1 ? " item" : " items");
+  }
+  // The scope's NAME, for the announcement fallback when the explorer did not supply a label (the deep-link/init
+  // path). Prefers the heading's link text over the whole element, which is what the heading is.
+  function titleOf(section) {
+    var h = section.querySelector(".related-node-title");
+    if (!h) return null;
+    var link = h.querySelector("a");
+    return (link ? link.textContent : h.textContent).replace(/\s+/g, " ").trim() || null;
+  }
+  function say(live, msg) { if (live) live.textContent = msg; }
+
+  initRelatedPanes(document);
+  document.addEventListener("specscribe:content-swapped", function (e) {
+    initRelatedPanes(e && e.detail ? e.detail.root : document);
+  });
 })();

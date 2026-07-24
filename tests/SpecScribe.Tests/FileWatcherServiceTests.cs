@@ -1,0 +1,327 @@
+using SpecScribe;
+
+namespace SpecScribe.Tests;
+
+/// <summary>Story 5.3 end-to-end coverage for <see cref="FileWatcherService"/> driven by REAL filesystem events —
+/// the layer <see cref="SiteGeneratorEpicsRemovalTests"/> deliberately skips. What is under test here is the
+/// routing and debouncing that only a live <see cref="FileSystemWatcher"/> exercises: that a folder-level change is
+/// observed at all (the name-filtered file watchers structurally cannot see one), that a burst collapses to one
+/// rebuild, and that the whole thing survives an edit without taking a write lock on the file being edited.
+/// <para>These tests wait on real event delivery, so they are the slow, timing-sensitive corner of the suite. Every
+/// wait is bounded and polls for the OUTCOME rather than sleeping a fixed multiple of
+/// <see cref="ForgeOptions.DebounceInterval"/> — a fixed sleep is what makes this class of test flaky under a loaded
+/// CI machine.</para></summary>
+public class FileWatcherServiceTests : IDisposable
+{
+    private readonly string _root = Directory.CreateTempSubdirectory("specscribe-watcher-").FullName;
+    private readonly List<GenerationEvent> _events = new();
+    private readonly object _eventsLock = new();
+
+    private string Source => Path.Combine(_root, "_bmad-output");
+    private string Adrs => Path.Combine(_root, "docs", "adrs");
+    private string Site => Path.Combine(_root, "site");
+    private string EpicsPath => Path.Combine(Source, "planning-artifacts", "epics.md");
+    private string SprintPath => Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml");
+
+    // Generous relative to the 400ms debounce: FileSystemWatcher delivery latency is not bounded by anything we
+    // control, and the assertion is "this eventually happened", never "this happened within N ms".
+    private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(20);
+
+    private const string EpicsMd = """
+        # Epics
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Stand up the portal.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: Foundation Story
+
+        As a maintainer, I want the foundation.
+        """;
+
+    private const string SprintYaml = """
+        last_updated: MARKER-V1
+        development_status:
+          epic-1: in-progress
+          1-1-foundation: in-progress
+        """;
+
+    public FileWatcherServiceTests()
+    {
+        Directory.CreateDirectory(Path.Combine(Source, "planning-artifacts"));
+        Directory.CreateDirectory(Path.Combine(Source, "implementation-artifacts"));
+        Directory.CreateDirectory(Path.Combine(Source, "notes"));
+        Directory.CreateDirectory(Adrs);
+
+        File.WriteAllText(EpicsPath, EpicsMd);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"),
+            "# Story 1.1: Foundation Story\n\nStatus: in-progress\n\n## Story\n\nAs a maintainer, I want it.\n");
+        File.WriteAllText(Path.Combine(Source, "notes", "guide.md"), "# Guide\n\nORIGINAL-BODY\n");
+        File.WriteAllText(Path.Combine(Adrs, "README.md"), "# ADR Index\n\nRecords.\n");
+    }
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_root, recursive: true); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private ForgeOptions Options() => ForgeOptions.Resolve(
+        source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false);
+
+    private string SitePath(string relative) =>
+        Path.Combine(Site, relative.Replace('/', Path.DirectorySeparatorChar));
+
+    private SiteGenerator GeneratedSite()
+    {
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        return gen;
+    }
+
+    private FileWatcherService StartedWatcher(SiteGenerator gen)
+    {
+        var watcher = new FileWatcherService(Options(), gen, ev =>
+        {
+            lock (_eventsLock) { _events.Add(ev); }
+        });
+        watcher.Start();
+        return watcher;
+    }
+
+    private GenerationEvent[] Observed()
+    {
+        lock (_eventsLock) { return _events.ToArray(); }
+    }
+
+    /// <summary>Polls until <paramref name="condition"/> holds or the bound elapses, then returns whether it held.
+    /// Polling the real outcome (not sleeping a fixed interval) is what keeps these tests honest AND fast: a
+    /// machine that delivers the event in 450ms doesn't pay for the worst case.</summary>
+    private static bool WaitFor(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + SettleTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (Evaluate(condition)) return true;
+            Thread.Sleep(25);
+        }
+        return Evaluate(condition);
+    }
+
+    /// <summary>A poll predicate that reads generated files is racing a rebuild in progress — and the whole-tree
+    /// routes wipe the output root before repopulating it, so "file missing" and "file locked" are both NORMAL
+    /// transient states here, not failures. Swallowing them is what makes the poll mean "did this converge?"
+    /// rather than "was the very first read lucky?".</summary>
+    private static bool Evaluate(Func<bool> condition)
+    {
+        try { return condition(); }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>Waits for an emitted event to match. Event delivery is asynchronous, so asserting on
+    /// <see cref="Observed"/> synchronously right after the on-disk outcome lands is a race: the file-level and
+    /// topology routes run on independent timers and either can win.</summary>
+    private void AssertEventuallyObserved(Func<GenerationEvent, bool> predicate, string because)
+    {
+        Assert.True(WaitFor(() => Observed().Any(predicate)),
+            $"{because}\nObserved events: [{string.Join(", ", Observed().Select(e => $"{e.Outcome} {e.RelativePath} \"{e.Message}\""))}]");
+    }
+
+    [Fact]
+    public void EditingAStoryFile_RegeneratesThroughTheOrdinaryMarkdownRoute()
+    {
+        // Regression guard on the pre-existing route: this story ADDS watchers, it must not disturb the .md path.
+        var gen = GeneratedSite();
+        using var watcher = StartedWatcher(gen);
+
+        File.WriteAllText(Path.Combine(Source, "notes", "guide.md"), "# Guide\n\nEDITED-BODY\n");
+
+        Assert.True(WaitFor(() => File.Exists(SitePath("notes/guide.html"))
+                && File.ReadAllText(SitePath("notes/guide.html")).Contains("EDITED-BODY")),
+            "an ordinary .md save should regenerate its page");
+        Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
+    }
+
+    [Fact]
+    public void DeletingEpicsFile_RemovesTheStaleEpicsOutputFamily_WithoutThrowing()
+    {
+        // AC #3 through the real watcher: the delete is observed, debounced, routed to RegenerateEpics, and the
+        // stale subtree is gone. epics.md sits under planning-artifacts/, so this also proves the .md watcher's
+        // Deleted handler reaches the epics route.
+        var gen = GeneratedSite();
+        Assert.True(File.Exists(SitePath("epics.html")));
+        using var watcher = StartedWatcher(gen);
+
+        File.Delete(EpicsPath);
+
+        Assert.True(WaitFor(() => !File.Exists(SitePath("epics.html")) && !Directory.Exists(SitePath("epics"))),
+            "deleting epics.md should remove epics.html and the epics/ subtree");
+        Assert.False(File.Exists(SitePath("requirements.html")));
+        Assert.False(Directory.Exists(SitePath("requirements")));
+        Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
+    }
+
+    [Fact]
+    public void SprintStatusYaml_AddedThenEditedThenRemoved_RefreshesTheSprintSurfaceEachTime()
+    {
+        // AC #4. The watcher-side half of this was already closed by Story 6.11 (the widened Filters + the
+        // IsDataSource route); what was missing was any end-to-end proof that a real yaml event actually drives it —
+        // including the REMOVAL case, where the page must disappear rather than strand a board with no source.
+        var gen = GeneratedSite();
+        Assert.False(File.Exists(SitePath("sprint.html")), "no sprint page before the yaml exists");
+        using var watcher = StartedWatcher(gen);
+
+        File.WriteAllText(SprintPath, SprintYaml);
+        Assert.True(WaitFor(() => File.Exists(SitePath("sprint.html"))
+                && File.ReadAllText(SitePath("sprint.html")).Contains("MARKER-V1")),
+            "adding sprint-status.yaml should produce the sprint page");
+
+        File.WriteAllText(SprintPath, SprintYaml.Replace("MARKER-V1", "MARKER-V2"));
+        Assert.True(WaitFor(() => File.ReadAllText(SitePath("sprint.html")).Contains("MARKER-V2")),
+            "editing sprint-status.yaml should refresh the board");
+
+        File.Delete(SprintPath);
+        Assert.True(WaitFor(() => !File.Exists(SitePath("sprint.html"))),
+            "removing sprint-status.yaml should remove the sprint page");
+        Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
+    }
+
+    [Fact]
+    public void RenamingAWholeDirectory_EscalatesToAFullRebuild()
+    {
+        // AC #5 — the gap this story exists to close. Before the directory watcher, `Filters = "*.md"` matched no
+        // bare folder name, so this operation produced NO watcher event at all and the page silently stranded at
+        // its old path forever.
+        var gen = GeneratedSite();
+        Assert.True(File.Exists(SitePath("notes/guide.html")));
+        using var watcher = StartedWatcher(gen);
+
+        Directory.Move(Path.Combine(Source, "notes"), Path.Combine(Source, "handbook"));
+
+        Assert.True(WaitFor(() => File.Exists(SitePath("handbook/guide.html"))),
+            "a folder rename should rebuild the page at its new location");
+        Assert.True(WaitFor(() => !File.Exists(SitePath("notes/guide.html"))),
+            "no orphan page may survive at the old location");
+
+        AssertEventuallyObserved(
+            e => e.RelativePath == "<directory change>" && e.Message == "full rebuild",
+            "the folder rename should surface as a single escalated full-rebuild event");
+        Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
+    }
+
+    [Fact]
+    public void DeletingAWholeDirectory_EscalatesToAFullRebuild()
+    {
+        var gen = GeneratedSite();
+        Assert.True(File.Exists(SitePath("notes/guide.html")));
+        using var watcher = StartedWatcher(gen);
+
+        Directory.Delete(Path.Combine(Source, "notes"), recursive: true);
+
+        Assert.True(WaitFor(() => !File.Exists(SitePath("notes/guide.html"))),
+            "deleting a folder should remove the pages it produced");
+        Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
+    }
+
+    [Fact]
+    public void BurstOfSaves_CoalescesAndLeavesCoherentOutput()
+    {
+        // AC #1/#6 at the watcher layer: a bulk find/replace touching many files at once must settle into coherent
+        // output, and the per-file debounce must collapse the burst rather than emitting an event per raw FS
+        // notification (a single save alone typically produces several).
+        var gen = GeneratedSite();
+        var docs = Path.Combine(Source, "notes");
+        for (var i = 0; i < 8; i++)
+        {
+            File.WriteAllText(Path.Combine(docs, $"bulk-{i}.md"), $"# Bulk {i}\n\nORIGINAL\n");
+        }
+        gen.GenerateAll();
+
+        using var watcher = StartedWatcher(gen);
+
+        // The burst: rewrite all eight back-to-back, the shape a find/replace or a git checkout produces.
+        for (var i = 0; i < 8; i++)
+        {
+            File.WriteAllText(Path.Combine(docs, $"bulk-{i}.md"), $"# Bulk {i}\n\nREPLACED\n");
+        }
+
+        Assert.True(WaitFor(() => Enumerable.Range(0, 8).All(i =>
+                File.Exists(SitePath($"notes/bulk-{i}.html"))
+                && File.ReadAllText(SitePath($"notes/bulk-{i}.html")).Contains("REPLACED"))),
+            "every file in the burst should end up regenerated");
+
+        // Nothing was left mid-write by the overlapping regenerations — the single writer lock's job.
+        foreach (var page in Directory.GetFiles(Site, "*.html", SearchOption.AllDirectories))
+        {
+            var html = File.ReadAllText(page);
+            Assert.False(string.IsNullOrWhiteSpace(html), $"{page} is empty — a torn write");
+            Assert.Contains("</html>", html);
+        }
+        Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
+    }
+
+    [Fact]
+    public void WatchedSourceFileStaysWritableAndDeletableDuringRegeneration()
+    {
+        // NFR5 as a regression guard (AC #1's second clause): the generator reads through
+        // MarkdownConverter.ReadAllTextShared, so watch mode must never hold a write lock on an observed file.
+        // Asserted by doing the thing a lock would block: rewrite the same file repeatedly while rebuilds are in
+        // flight, then delete it outright.
+        var gen = GeneratedSite();
+        using var watcher = StartedWatcher(gen);
+
+        var doc = Path.Combine(Source, "notes", "guide.md");
+        for (var i = 0; i < 10; i++)
+        {
+            File.WriteAllText(doc, $"# Guide\n\nREVISION-{i}\n");
+            Thread.Sleep(30);
+        }
+
+        Assert.True(WaitFor(() => File.ReadAllText(SitePath("notes/guide.html")).Contains("REVISION-9")),
+            "the last revision should win");
+
+        // A delete would fail with a sharing violation if generation held the file open.
+        File.Delete(doc);
+        Assert.True(WaitFor(() => !File.Exists(SitePath("notes/guide.html"))),
+            "deleting the source should remove its page");
+        Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
+    }
+
+    [Fact]
+    public void OutputRootInsideTheSourceRoot_DoesNotSelfTriggerARebuildLoop()
+    {
+        // The hazard the directory watcher introduces and IsUnderOutputRoot closes: generation recreates the whole
+        // output tree on every full rebuild, so if --output points INSIDE a watched source root, each rebuild's own
+        // directory writes would re-arm the topology timer and the loop would never terminate. Asserted by letting
+        // it run well past several debounce windows and checking the rebuild count stops growing.
+        var nestedOutput = Path.Combine(Source, "site-output");
+        var options = ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: nestedOutput, projectName: "SpecScribe", includeReadme: false);
+        var gen = new SiteGenerator(options);
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        using var watcher = new FileWatcherService(options, gen, ev =>
+        {
+            lock (_eventsLock) { _events.Add(ev); }
+        });
+        watcher.Start();
+
+        // One genuine topology change to prove the watcher is live at all, then let everything settle.
+        Directory.CreateDirectory(Path.Combine(Source, "fresh-folder"));
+        AssertEventuallyObserved(
+            e => e.RelativePath == "<directory change>",
+            "a real directory change should still be observed when the output root is nested");
+
+        Thread.Sleep(ForgeOptions.DebounceInterval * 4);
+        var settled = Observed().Count(e => e.RelativePath == "<directory change>");
+        Thread.Sleep(ForgeOptions.DebounceInterval * 4);
+
+        Assert.Equal(settled, Observed().Count(e => e.RelativePath == "<directory change>"));
+    }
+}

@@ -49,7 +49,8 @@ public static class DashboardViewBuilder
         ProjectCounts? counts = null,
         FollowUpGeometry? followUps = null,
         UnplannedWorkGeometry? unplanned = null,
-        DeliveryCadenceData? cadence = null)
+        DeliveryCadenceData? cadence = null,
+        WorkGraphModel? workGraph = null)
     {
         // Production always passes the shared SiteGenerator ledger. Null → build an equivalent ephemeral
         // ledger from the same inputs so tests/stubs that omit counts keep correct Defined/Tracked numbers.
@@ -59,6 +60,7 @@ public static class DashboardViewBuilder
             ledger,
             work,
             epics: epicsModel);
+        var unplannedGeometry = unplanned ?? UnplannedWorkGeometry.From(work, geometry, epicsModel);
         return new DashboardView
         {
             SiteTitle = nav.SiteTitle,
@@ -76,7 +78,7 @@ public static class DashboardViewBuilder
             Counts = ledger,
             HasTimeline = hasTimeline,
             FollowUps = geometry,
-            UnplannedWork = unplanned ?? UnplannedWorkGeometry.From(work, geometry, epicsModel),
+            UnplannedWork = unplannedGeometry,
             // Body fragment only — HtmlRenderAdapter wraps with work-mode panel classes. [Story 9.8]
             NextStepsHtml = epicsModel is { } epics
                 ? BmadCommands.RenderProjectNextStepsBody(epics, commands)
@@ -90,7 +92,30 @@ public static class DashboardViewBuilder
             TraceabilityStripHtml = requirements is { } tr && tr.Everything.Any()
                 ? Charts.TraceabilityStrip(ledger.RequirementsOverall, SiteNav.TraceabilityOutputPath)
                 : string.Empty,
+            // Story 20.3's Related-work pane. `workGraph` is the generator's ALREADY-COMPUTED `_workGraph` handed
+            // in verbatim — never rebuilt here, and no ProjectCounts/Epic 9 parser is touched on this path. The
+            // island id set comes from the SAME Charts.SunburstExplorerNodes projection the explorer payload uses,
+            // so the pane can never key on a wedge the chart didn't draw. [Story 20.3; Story 20.1 spike §1a]
+            RelatedWorkHtml = BuildRelatedWorkHtml(workGraph, epicsModel, geometry, unplannedGeometry),
         };
+    }
+
+    /// <summary>Renders the Related-work pane, or "" when there is nothing to relate. Kept here (not in the
+    /// adapter) so every surface renders identical bytes from one path. [Story 20.3]</summary>
+    private static string BuildRelatedWorkHtml(
+        WorkGraphModel? workGraph,
+        EpicsModel? epicsModel,
+        FollowUpGeometry geometry,
+        UnplannedWorkGeometry unplannedGeometry)
+    {
+        if (workGraph is null || workGraph.IsEmpty || epicsModel is null) return string.Empty;
+        var islandIds = Charts.SunburstExplorerNodes(epicsModel, geometry, unplannedGeometry)
+            .Select(n => n.Id)
+            .ToList();
+        // linkPrefix "" — the dashboard is at the site root, so WorkGraphEpic.Reprefixed is a no-op there. The rule
+        // is applied rather than assumed away, so a nested host page stays correct. [Story 20.1 spike §1a rule 6]
+        var model = RelatedWork.Build(workGraph, islandIds, linkPrefix: string.Empty);
+        return RelatedWorkTemplater.RenderPane(model, SiteNav.WorkGraphOutputPath);
     }
 
     // ----- Stat tiles ---------------------------------------------------------------------------------------

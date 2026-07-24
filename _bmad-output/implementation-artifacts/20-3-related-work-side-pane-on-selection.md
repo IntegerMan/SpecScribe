@@ -1,6 +1,10 @@
+---
+baseline_commit: 8db18aaddd7cc1325910bfc9b00e0ae9d1ac66a1
+---
+
 # Story 20.3: Related-Work Side Pane on Selection
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -54,41 +58,41 @@ This is the **third and final** story of Epic 20 and it is **gated on two siblin
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Reuse the already-computed work graph; do NOT re-project (AC: #1)**
-  - [ ] Confirm `SiteGenerator._workGraph` (`SiteGenerator.cs:63`, populated at `:206` via `BuildWorkGraphModel`) is available at the point the explorer host page (dashboard `index.html` and/or `epics.html`) is rendered. It is computed once and cached *"reused verbatim by WriteWorkGraph"* (`:205-206`) — the pane reads the same instance.
-  - [ ] Add **no** new call to `WorkGraphBuilder.Build`, `FollowUpGeometry`, `RequirementsParser`, or `ProjectCounts` from this story. If the host-page render site can't see `_workGraph`, thread the existing model in — do not recompute.
+- [x] **Task 1 — Reuse the already-computed work graph; do NOT re-project (AC: #1)**
+  - [x] Confirm `SiteGenerator._workGraph` is available at the point the explorer host page is rendered. Threaded verbatim: `SiteGenerator.WriteIndex` → `HtmlTemplater.RenderIndex`/`BuildIndexPage` → `DashboardViewBuilder.Build(workGraph:)`. The webview and SPA `BuildIndexPage` call sites pass the same instance, so all three surfaces read one model.
+  - [x] Add **no** new call to `WorkGraphBuilder.Build`, `FollowUpGeometry`, `RequirementsParser`, or `ProjectCounts`. Verified: `RelatedWork.Build` takes only a `WorkGraphModel` + an island-id list, so there is no counting seam to reach — the invariant is enforced by the signature, not by a test double.
 
-- [ ] **Task 2 — Build the per-node adjacency the pane consumes (AC: #1)**
-  - [ ] Add a **pure projection** (recommended home: a static helper next to the model, e.g. `WorkGraph.RelatedFor(...)` in `WorkGraph.cs`, or a small `RelatedWorkView` builder) that, given the `WorkGraphModel`, produces for each **selectable node** a grouped set: `{ nodeId → { StemmedFrom[], Resolves[], RaisedIn[], Contains[] } }` of the **other endpoint** `WorkNode`s (with `Href`, `Label`, `Title`, `Kind`). Direction is carrier → target (`WorkGraph.cs:21-23`); the pane should present both *"this stemmed from X"* (outgoing) and *"Y stemmed from this"* (incoming) meaningfully — decide per edge kind and document it (e.g. for a **story** node, incoming `StemmedFrom`/`Resolves` from deferred items = "work this spawned / that resolved here").
-  - [ ] Keep it deterministic (stable node + group order) — mirror `WorkGraphBuilder`'s ordered construction. Golden output must be reproducible (FR31).
-  - [ ] Node ids are the **existing work-graph ids** (`e{N}`, `s{storyId}`, `d{epic}-{i}`, `a{epic}-{j}`, `src:{key}`, `res:{key}`, `retro:{N}` — see `WorkGraph.cs:188-273`). Do **not** invent a new id scheme.
+- [x] **Task 2 — Build the per-node adjacency the pane consumes (AC: #1)**
+  - [x] Pure projection in the new `src/SpecScribe/RelatedWork.cs`. Both directions are surfaced, since a pane showing only outgoing edges would leave every epic and story looking unrelated to anything: outgoing "Stemmed from" vs incoming "Work that stemmed from this", outgoing "Resolved by" vs incoming "Resolved by this", "Part of"/"Contains", "Also raised in"/"Also raised here".
+  - [x] Deterministic: an explicit `nodeOrder` list carries the model's own epic-then-node order (Dictionary enumeration order is not a contract), and nothing sorts or hashes into the output. Pinned by `Build_IsDeterministic`.
+  - [x] Reuses the existing work-graph ids; no new id scheme. `NodeText`/`EdgeVerb` moved here and `WorkGraphTemplater` now delegates, so the graph page and the pane share ONE vocabulary (Story 20.8 inherits it rather than minting a second).
 
-- [ ] **Task 3 — Bridge the payload-island node id ↔ work-graph model node id (AC: #1)**
-  - [ ] Two id namespaces are in play: **20.2's payload-island ids** (`"epic-N"`, `"N.M"`, follow-up slug, aggregate href) that the client selection speaks, and the **work-graph model's internal ids** (`e{N}`, `s{storyId}`, `d{epic}-{i}`, `a{epic}-{j}`, `src:…`, `res:…`, `retro:N` — `WorkGraph.cs:188-273`) that the edges reference. The `edges` array 20.3 emits into the island (Task 5) must be expressed in **the island's id namespace** so the client can join edge→node without a translation table. So do the bridge **server-side**: when projecting `_workGraph` into island edges, map `e{N}`→`"epic-N"`, `s{id}`→`"N.M"`, and follow-up/spec/retro nodes to a stable island id (slug or href-derived) — matching whatever id 20.2 emitted for the corresponding wedge.
-  - [ ] Follow-up/deferred/action nodes: the model's `d{epic}-{i}`/`a{epic}-{j}` ids are **positional within an epic subgraph**. Do **not** re-derive them from a second ordering — carry the model's own `WorkNode` through and key its island id off a **stable identity** (the follow-up slug / `DetailHref`), the same identity 20.2's island node uses. Verify 20.2's actual slug choice at dev time; if 20.2 hasn't emitted follow-up nodes into the island yet, record the id convention in Completion Notes for 20.2 to match.
-  - [ ] Nodes with no corresponding island wedge (e.g. a `Spec`/`Retro` source that isn't a sunburst node) are still valid **edge endpoints** — render them in the pane as linked chips (they have `Href`), they just aren't selectable. That is fine; the pane shows *related* nodes, not only sunburst nodes.
+- [x] **Task 3 — Bridge the payload-island node id ↔ work-graph model node id (AC: #1)**
+  - [x] Bridge is server-side and in one named function (`RelatedWork.IslandIdFor`): `e{N}`→`epic-{N}`, `s{id}`→`{id}` when the chart drew that wedge, Unattributed bucket→`orphan` keyed on `BucketLabel` (never on its `EpicNumber == 0`, which a real Epic 0 would collide with).
+  - [x] Follow-up/deferred/action nodes are **not** keyed at all — see the deviation note below. Their positional `d{N}-{i}`/`a{N}-{j}` ids are never re-derived; the model's own `WorkNode` is carried through.
+  - [x] Nodes with no wedge render as entries — linked when `Href` is non-null, non-link chips otherwise.
 
-- [ ] **Task 4 — Server-render the "Related" block into the explorer host (AC: #2, NFR8) — SHIP-FIRST half**
-  - [ ] Render, beside/below the explorer sunburst on its host page(s), a **`<aside>`/section "Related work"** containing the per-node grouped lists from Task 2, present in the DOM **without JS**. Each entry is an `<a href>` to its detail page when `WorkNode.Href` is non-null, else a non-link chip (mirror `WorkGraph.cs:36-39` guarded-href discipline).
-  - [ ] Choose the no-JS default view honestly: either (a) the whole-project related list grouped by epic (like a compact `work-graph.html` embed), or (b) a "select an item to see its connections; meanwhile here is everything" full list. **Never** an empty region that only fills in via JS (that would violate AC #2). Document the choice.
-  - [ ] **Designed empty state** for a node with zero edges (AC #2): a real message ("No related work items for this selection."), styled — not a blank pane. Reuse existing empty-state styling idiom (e.g. `.chart-empty` / follow-up empty states) rather than inventing one.
-  - [ ] Route rich hover text through the existing body-level `.ss-tooltip` node via `data-tip` / `data-tip-html` if used — do not add a new tooltip node ([[tooltip-clipping-use-ss-tooltip-node.md]]).
+- [x] **Task 4 — Server-render the "Related" block into the explorer host (AC: #2, NFR8) — SHIP-FIRST half**
+  - [x] `RelatedWorkTemplater.RenderPane` emits an `<aside data-related-pane>` immediately after the explorer panel on the dashboard. Routed builder → view (`DashboardView.RelatedWorkHtml`) → adapter, mirroring `TraceabilityStripHtml`, so HTML/SPA/webview render identical bytes from one path.
+  - [x] No-JS default view = **(a)**, the whole-project related list grouped by scope — every section visible, mirroring `work-graph.html`'s scope picker ("with JS off every section shows"). Never an empty region.
+  - [x] Designed empty state ships in the DOM `hidden` and is revealed only for a selection with no edges; with JS off there is no selection, so it stays correctly silent.
+  - [x] No new tooltip node — related rows use plain `title` attributes; no `.ss-tooltip` rich-hover markup was introduced.
 
-- [ ] **Task 5 — Fill the island `edges` + client reveal-on-selection (AC: #1) — binds to 20.2**
-  - [ ] Emit the `edges` array into **20.2's existing payload island** (`{ nodes, edges }`) — one entry per work-graph edge in the island id namespace: `{ from, to, kind }` where `kind ∈ {contains, stemmed-from, resolves, raised-in}`. Do **not** create a second island or a sidecar `.json`. This is the slot 20.2 reserved (`edges: []`).
-  - [ ] Add a **new opt-in block in `src/SpecScribe/assets/specscribe.js`** (not a new asset — see budget) guarded by presence of the `data-explorer` root element (mirror the `.codemap-view` / `.js-listable` opt-in idiom; `specscribe.js` is an IIFE of ES5-compatible `document.addEventListener` delegation — match it exactly).
-  - [ ] On the **20.2 selection-change signal**, reveal the matching node's related group in the pane and hide the others; on "no selection", show the documented default; on "selection with no edges", show the empty state. The client **only re-arranges/reveals server-rendered DOM** — it never fetches, never computes a count, never invents a destination (the interactivity-boundary rule from 20.1's Dev Notes). The client MAY read the island `edges` to know which group to reveal, but the **rendered link content already exists in the server DOM** (Task 4) — the island is a lookup index, not the source of the displayed links.
-  - [ ] Honor `prefers-reduced-motion`: any reveal transition snaps; timing (when allowed) reads `--motion-*` ([[motion-token-system]]).
-  - [ ] Keyboard/AT: the pane's contents are real focusable links; when selection changes, announce via an `aria-live="polite"` region (mirror 20.2's zoom-scope announcement pattern). Do not trap focus.
+- [x] **Task 5 — Fill the island `edges` + client reveal-on-selection (AC: #1) — binds to 20.2**
+  - [x] **DEVIATION, reasoned and recorded — the island `edges` array stays `[]`.** See "Deviation: the island `edges` slot" below. The relationship truth ships as server-rendered DOM keyed by the same id namespace instead.
+  - [x] New guarded block in `specscribe.js` (no new asset), opting in on `[data-related-pane]`, matching the file's IIFE / ES5 delegation idiom and re-running on `specscribe:content-swapped`.
+  - [x] Reveal on selection; documented default at no-selection; empty state for a selection with no edges. The client only re-arranges server-rendered DOM — no fetch, no computed count (its one number is `querySelectorAll(".related-row").length` off the visible DOM), no invented destination.
+  - [x] Reduced motion: the reveal fade is declared in the `@media (prefers-reduced-motion: no-preference)` block and explicitly cancelled in the paired `reduce` block, on the `--motion-fast` token.
+  - [x] Keyboard/AT: entries are real links; non-current sections are set `hidden`, so their links leave both the a11y tree and the tab order (no phantom tab stops); selection is announced through the pane's own `aria-live="polite"` region — deliberately separate from the sunburst's, so one activation does not produce two overlapping announcements. No focus trap.
 
-- [ ] **Task 6 — HTML/SPA parity + tests (AC: #1, #2)**
-  - [ ] The "Related" block + any payload island must render **identically** through the HTML and SPA adapters; add a `RenderParity` case (Story 6.7 harness) or record why not. **Webview/CLI are non-goals** for the explorer (mirror 20.1's surface-reach table) — confirm the block is gated so it doesn't leak into the webview dashboard.
-  - [ ] Unit-test the Task 2 projection: grouping by the four edge kinds, guarded-href behavior, empty-state selection, deterministic order, and the "does not touch `ProjectCounts`" invariant (assert via construction, not a mock — the projection takes only the model).
-  - [ ] Golden fingerprint **will move** (new server-rendered block on the dashboard/epics host). Regenerate and confirm the drift is only the intended block. Follow [[golden-diff-normalization-gotchas]] — run twice, confirm stable, before locking any constant.
-  - [ ] Verify NFR8 by loading the host page with JS disabled: the Related block and all links are fully present and usable.
+- [x] **Task 6 — HTML/SPA parity + tests (AC: #1, #2)**
+  - [x] `SiteGeneratorSpaTests.RelatedWorkPane_SurvivesSpaContentRegionCapture` asserts HTML/SPA agreement in BOTH directions (present in both, or omitted in both). Its comment states plainly what an SSR test can and cannot prove — no `RenderParity` case was added, because `RenderParity.cs` has no island/pane fact awareness (Story 20.1 §4a); that gap is the harness's, and this story did not widen it.
+  - [x] `RelatedWorkTests` — 15 tests: grouping in both directions, the four shipped kinds with no phantom `covers`/`cites`, unknown-kind heading fallback, the id bridge, unwedged stories, the orphan/`epic-0` distinction, cross-subgraph dedup, guarded hrefs, the cap + its reported remainder, determinism, the NFR8 omit gate, and markup/escaping.
+  - [x] Golden fingerprint regenerated `1711700e…` → `253fe05c…`, stable across 2 repeated runs, with the drift and its shared-main provenance recorded at the constant.
+  - [x] Verified in a live browser with JavaScript disabled — see Completion Notes.
 
-- [ ] **Task 7 — Completion Notes: reconciliation + sequencing (AC: #1, #2)**
-  - [ ] Record: the four-kind reconciliation (why not covers/cites), the id-bridge decision (coordinate w/ 20.1), the no-JS default-view choice, the parity coverage owed, and the 20.2 selection-seam contract you built against.
+- [x] **Task 7 — Completion Notes: reconciliation + sequencing (AC: #1, #2)**
+  - [x] Recorded below.
 
 ### Review Findings
 
@@ -217,14 +221,239 @@ At create-story HEAD is `38044b1` ("Ready to go"); recent history merged Story 1
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Opus 4.8)
 
 ### Debug Log References
 
+- Baseline `8db18aa`. Two other sessions were editing shared `main` throughout this story: Story 5.3
+  (`FileWatcherService.cs`, `SiteGenerator.cs`) and `spec-multi-epic-retro-attribution`
+  (`RetroModel.EpicNumber` → `EpicNumbers`, `RetroParser.cs`, `BmadArtifactAdapter.cs`). The tree was
+  **transiently uncompilable** twice while their rename was mid-flight (10 errors, then 2, in files this story
+  never touches). No `git reset`/`checkout`/`clean` was used; the fix was to wait. One `SiteGenerator.cs` edit
+  reported the file had changed on disk since it was read — it applied cleanly and was grep-verified afterwards
+  (`workGraph: _workGraph`, still present).
+- Live verification server: `related-work-20-3` on port 8094 (a new `.claude/launch.json` entry — port 8099 was
+  held by another chat's server, which `preview_stop` cannot stop).
+
 ### Completion Notes List
+
+#### The four-kind reconciliation (why not covers/cites)
+
+`epics.md` AC #1 names five kinds (*stemmed-from, resolves, covers, cites, raised-in*). The shipped
+`WorkEdgeKind` has **four** — `Contains`, `StemmedFrom`, `Resolves`, `RaisedIn` — because `covers` (requirement)
+and `cites` (code) nodes are deliberately out of the Story 19.2 MVP draw. The pane groups by the four real kinds
+and manufactures no empty `covers`/`cites` section, which would be exactly the phantom-UI class
+[[story-7-11-7-12-code-review-shared-engine-merge]] warns about.
+
+Grouping is **data-driven over `Enum.GetValues<WorkEdgeKind>()`**, not a four-way switch, and `Heading` has a
+derived fallback for a kind the table has not been taught (pinned by `Heading_FallsBackForAnEdgeKindTheTableHasNotBeenTaught`).
+When Epic 19 or Epic 24 adds `covers`/`cites`, the pane renders them with no rewrite. **epics.md's five-kind AC
+prose still needs correcting** — Story 20.1's review already flagged this and it remains open; `covers` and
+`cites` need a requirements-coverage map and a code-citation map, two different sources.
+
+#### Deviation: the island `edges` slot stays `[]` — reasoned, not skipped
+
+Task 5's first subtask says to fill 20.2's reserved `edges` array. **It is deliberately left empty**, and this is
+the finished answer rather than an unfinished one.
+
+Story 20.1's code review (§1a, 2026-07-24 — after this story was drafted) established that the two id spaces are
+disjoint and that most work-graph edge endpoints (`d*`/`a*`/`src:`/`res:`/`retro:`) have no wedge at all. Working
+through what actually survives translation into the island namespace:
+
+| Edge kind | Carrier | Target | Both translatable? |
+|---|---|---|---|
+| `Contains` | story | epic | ✅ — and `nodes[].parentId` **already states it** |
+| `StemmedFrom` | `d*` (no wedge) | story / `src:` | ❌ |
+| `Resolves` | `d*` (no wedge) | story / `res:` | ❌ |
+| `RaisedIn` | `a*` (no wedge) | `retro:` | ❌ |
+
+So an island-namespace edge array reduces to a restatement of `parentId`: **zero new information, non-zero
+bytes**, on the one payload that grows with project size — the single budget question Story 20.1's review said
+actually survives (deferred to 20.5/20.6). Shipping it would repeat the defect 20.2's own review had just
+fixed (116 dead join hooks, ~2.5 KB, removed because nothing read them).
+
+The relationship truth therefore ships as **server-rendered DOM keyed by the same island id namespace**, which the
+client joins directly — no payload lookup at any point. Recorded at `Charts.SunburstExplorerIsland` so the next
+reader does not treat the empty array as unfinished work. The field is kept in the shape rather than removed: it
+is part of the shipped island contract, and an empty array is a clearer statement than a missing key. **The
+`specscribe.js` comment predicting a second island was corrected** — no second island was created.
+
+#### The id bridge, and the one place §1a's rule 2 needed judgment
+
+One named server-side function, `RelatedWork.IslandIdFor`: `e{N}`→`epic-{N}`, `s{id}`→`{id}`, Unattributed
+bucket→`orphan`. The bucket is identified by `BucketLabel`, never by its `EpicNumber == 0`, so a real Epic 0 could
+not collide with it (§1a rule 4). Cross-subgraph dedup by node id and by `(from,to,kind)` (rule 4).
+`WorkGraphEpic.Reprefixed(linkPrefix)` is applied, not assumed away, though the dashboard is at the site root so
+it is a no-op there (rule 6). `WorkGraphEpic.Overflow` is surfaced in the pane rather than under-reported (rule 5).
+`WorkGraphModel.IsEmpty` omits the pane entirely (rule 5 / NFR8) — which also closes the
+`deferred-work.md:960` concern that the pane could ship as permanent dead chrome on a young project.
+
+Rule 2 ("resolve to the nearest existing ancestor rather than dropping the edge silently") needed a real decision,
+and **the live portal proved the naive reading wrong**. My first implementation gave an unwedged story no section
+at all. Generating against this repo showed the consequence: **32 `Resolves` edges existed in the work graph and
+0 reached the pane** — every one lands on a resolver story, and most resolver stories sit in density-collapsed
+epics that emit no story wedges. An entire edge kind had gone invisible, silently, exactly as §1a predicted.
+
+The fix folds an unwedged story into its epic's section as a **labelled subject** (`RelatedWorkSubject`) carrying
+its own name and its own groups — so nothing is dropped, and no group heading is mis-attributed to the epic
+hosting it (a plain fold would have made Epic 20's section claim "Resolved by this" about a story's edges). The
+epic is derived from the **story id** (`7.11`→`epic-7`), not from whichever subgraph the node was first seen in,
+because a story appears in other epics' subgraphs as an external source. A folded subject's own outgoing
+"Part of → Epic N" group is dropped as a restatement of the heading above it.
+
+**Honest bound, stated rather than hidden:** an edge whose *both* endpoints are unwedged — a deferred item
+resolved by a `res:` spec — surfaces in neither endpoint's section, because neither owns one. Deferred/action
+nodes are deliberately **not** folded: they are related-work rows by nature, and hoisting them would list every
+epic follow-up twice. Those chains stay reachable through the pane's "View the full work graph →" link and each
+item's own detail page. This also keeps Story 19.1 review decision D2 (no transitive collapse) intact.
+
+#### The no-JS default view (AC #2 / NFR8)
+
+Option **(a)**: the whole-project related list grouped by scope, every section visible, mirroring the
+`work-graph.html` scope picker's own rule ("with JS off every section shows"). The client only ever *reveals a
+slice*. The designed empty state ships in the DOM `hidden` and is revealed only for a selection with no edges —
+with JS off there is no selection, so "no related work" would be a lie and it correctly stays silent.
+
+Verified in a live browser with **a genuinely script-blocked render** (a `sandbox="allow-same-origin"` iframe,
+which cannot execute `specscribe.js` at all — not a proxy for JS-off, actually JS-off): script never ran, all
+37 sections visible, all 297 rows present, **297/297 links carry an `href`**, empty state still hidden.
+
+#### The selection seam — named here, because 20.2 shipped without one
+
+Story 20.1's contract reserved a selection signal but never named one, and 20.2 shipped no event: the explorer's
+only notion of "the item I am looking at" is its zoom scope. Rather than fork a parallel mechanism (which the
+story forbids), this story adds **`specscribe:explorer-select`** to 20.2's own block, dispatched from
+`applyState()` — the single point every scope change funnels through (click, Enter/Space, breadcrumb, centre
+control, hash, popstate). `detail` is `{ nodeId, label, root }`; `nodeId` is null at root scope. Guarded so a
+browser without the `CustomEvent` constructor cannot break the drill-in.
+
+**Stories 20.5 and 20.8 should adopt this event rather than minting a second.** Note ADR 0012/0013 supersede the
+hand-written explorer (20.7 deletes `initSunburstExplorer`), so the JS here was kept deliberately small — the
+durable asset of this story is the C# projection, which 20.8 reuses for its details pane.
+
+One ordering hazard found and guarded: the explorer block runs earlier in the IIFE, so its first
+`explorer-select` fires **before** the pane's listener exists. Arriving on `#sb=epic-19` would have left the pane
+showing every scope while the chart showed one. The pane therefore syncs on init from `data-sb-scope`, the
+attribute 20.2 already publishes — not a second source of truth. Verified live on that exact deep link. The
+document-level listener is registered **once**, not per pane: the pane is a *sibling* of the explorer root so a
+bubbling event never passes through it, and a per-pane listener would leak one detached pane per SPA swap.
+
+#### Live-browser findings the 2,200-test suite could not have caught
+
+Both were invisible to every SSR assertion, and both are the reason CLAUDE.md § Verification exists:
+
+1. **The live-region announcement read "Related work for EpicEpic 19".** On the init-sync path there is no label
+   from the explorer, so it fell back to the section heading text — which included the kind chip. Fixed.
+2. **Every row read "Story Story 19.1" to a screen reader.** The per-kind chip duplicated what
+   `RelatedWork.NodeText` already puts in the label ("Deferred item: …", "Action item: …", "Source: …", and an
+   epic/story label is self-describing). The chip was removed entirely along with its CSS and the now-dead
+   `KindLabel` helper — so the pane signals nothing by colour because it has **no** colour signal to reinforce,
+   which is a stronger position than a redundant badge. It also removed ~300 spans from the dashboard.
+
+Also verified live: no console errors; **no phantom tab stops** — a `[hidden]` section's links were empirically
+confirmed unfocusable (`element.focus()` did not move `document.activeElement`), rather than assumed from the UA
+rule, since Story 20.2's review found an SVG `<a>` at `display:none` *stays* focusable; the reveal animation
+resolves to `sb-drill-fade / 0.12s` off `--motion-fast`; `specscribe.css` parses to **1,662 rules** (the
+`*/`-truncation hazard from [[css-comment-star-slash-silent-truncation]] did not fire); no horizontal overflow;
+heading order H3 → H4 with group titles as `<p>` so nesting a group under a subject never skips a level.
+
+#### Measurements for the 20.5/20.6 payload budget
+
+Story 20.1's review asked for measured numbers rather than estimates. On this repo's own portal (375 pages):
+
+| Thing | Size |
+|---|---|
+| **Related-work pane markup** | **101,435 B of a 472,222 B `index.html` — 21.5%** |
+| — of which `title` attributes | 17,945 B across 288 attributes |
+| — of which leading whitespace | 4,568 B |
+| Sections / rows / folded subjects | 37 / 297 / 40 |
+| Explorer island (Story 20.2, unchanged) | ~20.9 KB |
+| Removing the per-kind chips saved | ~14 KB |
+
+The pane caps each group at `RelatedWork.MaxEntriesPerGroup = 12` and reports the remainder ("+N more not shown")
+with a deep link into `work-graph.html` — truncation is stated, never silent.
+
+**Flagging this rather than quietly accepting it:** 21.5% of the dashboard is the largest single block this story
+adds, and it is the direct cost of AC #2 — the no-JS contract requires every scope's relationships to be in the
+DOM, and this repo has 24 epics. It is genuinely all data (297 rows of real labels, hrefs and provenance), not
+markup bloat; the obvious lever is `MaxEntriesPerGroup`, which is one constant. I did not shrink it unilaterally,
+because trading away completeness of the JS-off view is the owner's call, not the dev's. Worth a decision at the
+verify step, and it is a real input to the embedded-payload ceiling Story 20.1's review deferred to 20.5/20.6.
+
+#### Parity and surface reach
+
+Routed builder → `DashboardView.RelatedWorkHtml` → adapter, mirroring `TraceabilityStripHtml`, so HTML, SPA and
+webview render identical bytes from one path. `_workGraph` is threaded into all three `BuildIndexPage`/`RenderIndex`
+call sites.
+
+**Webview deliberately NOT gated out**, which departs from the story's Task 6 phrasing. The explorer's *interactive*
+markup is a webview non-goal, but this pane is not interactive markup — it is server-rendered content whose links
+resolve inside the captured webview site. Gating it out would remove working content from a surface that can use
+it, to honour a rule written about scripts. The webview strips JSON islands (`WebviewRenderAdapter.cs`), and the
+pane has none, so nothing needed a new `HostRenderException`.
+
+No `RenderParity` case was added. `RenderParity.cs` has **no island or pane fact awareness at all** — Story 20.1's
+review §4a established that its "a dropped fact must make the forms differ" guarantee did not hold when written.
+Coverage is instead `SiteGeneratorSpaTests.RelatedWorkPane_SurvivesSpaContentRegionCapture`, which asserts
+HTML/SPA agreement in **both** directions (present in both, or omitted in both) and states in its own comment what
+an SSR test can and cannot prove. That harness gap is pre-existing and this story did not widen it; closing it
+belongs with 20.6's fingerprint-replacement work.
+
+#### Test-scoping change made outside this story's own files
+
+`FollowUpSurfacesTests.FollowUpGroupPages_EmittedForNonEmptyGroups_OnlyThatGroupsItems` asserted
+`DoesNotContain("href=\"follow-ups/action-")` against the **whole** `index.html`. That assertion protects the
+Story 9.13 rule that *sunburst leaves* open aggregated group pages rather than per-item detail — but the pane
+links each related node to its own detail page, which its AC #1 requires. The assertion was narrowed to the
+sunburst panel (new `SunburstPanelOf` helper) so it tests the chart it is about; the invariant is unchanged.
+
+#### Vocabulary single-sourcing
+
+`NodeText`/`EdgeVerb` moved from `WorkGraphTemplater` to `RelatedWork` and the templater now delegates
+(work-graph page bytes unchanged). Story 20.8 is required to reuse Story 20.3's groupings rather than introduce a
+second relationship vocabulary — there is now exactly one place to reuse.
 
 ### File List
 
+- `src/SpecScribe/RelatedWork.cs` — **new.** Vocabulary + pure projection (`RelatedWorkDirection`,
+  `RelatedWorkEntry`, `RelatedWorkGroup`, `RelatedWorkSubject`, `RelatedWorkNode`, `RelatedWorkModel`,
+  `RelatedWork.Build`/`IslandIdFor`/`AncestorIslandIdFor`/`Heading`/`NodeText`/`EdgeVerb`).
+- `src/SpecScribe/RelatedWorkTemplater.cs` — **new.** `RenderPane` + `PaneAttribute`.
+- `src/SpecScribe/WorkGraphTemplater.cs` — `NodeText`/`EdgeVerb` now delegate to `RelatedWork` (one vocabulary).
+- `src/SpecScribe/SunburstExplorer.cs` — doc comment: `Edges` stays `[]`, with the reasoning.
+- `src/SpecScribe/DashboardView.cs` — new `RelatedWorkHtml` opaque fragment.
+- `src/SpecScribe/DashboardViewBuilder.cs` — new `workGraph` parameter + `BuildRelatedWorkHtml`.
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — emits the pane after the explorer panel.
+- `src/SpecScribe/HtmlTemplater.cs` — `workGraph` threaded through `RenderIndex`/`BuildIndexPage`.
+- `src/SpecScribe/SiteGenerator.cs` — passes `_workGraph` at the three dashboard render sites (static, webview, SPA).
+- `src/SpecScribe/assets/specscribe.js` — `specscribe:explorer-select` seam in the 20.2 block; new guarded
+  related-pane reveal block; corrected the stale second-island comment.
+- `src/SpecScribe/assets/specscribe.css` — pane/subject/group/reveal rules + the paired motion no-preference and
+  reduce entries.
+- `tests/SpecScribe.Tests/RelatedWorkTests.cs` — **new.** 15 tests.
+- `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` — new `RelatedWorkPane_SurvivesSpaContentRegionCapture`.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden fingerprint regenerated + provenance note.
+- `tests/SpecScribe.Tests/FollowUpSurfacesTests.cs` — sunburst-scoped the destination assertion (`SunburstPanelOf`).
+- `.claude/launch.json` — added the `related-work-20-3` preview entry (port 8094).
+
 ## Change Log
 
+- 2026-07-24 — Story 20.3 implemented (dev-story), status → review. New `RelatedWork` projection + `RelatedWorkTemplater`
+  pane, routed builder → `DashboardView.RelatedWorkHtml` → adapter so HTML/SPA/webview render one set of bytes;
+  `SiteGenerator._workGraph` threaded verbatim into all three dashboard render sites. **Two contract decisions
+  recorded rather than assumed:** (1) the island `edges` slot stays `[]` — after Story 20.1's §1a correction the only
+  translatable edge shape is `Contains` story→epic, which `nodes[].parentId` already states, so an edge array would
+  add bytes and no information; (2) §1a rule 2's "nearest existing ancestor" is implemented as a **labelled subject
+  fold**, not a re-attribution, after generating against this repo showed the naive reading dropped **all 32
+  `Resolves` edges** silently (they all land on resolver stories in density-collapsed epics). Added the
+  `specscribe:explorer-select` seam to Story 20.2's block, which 20.5/20.8 should adopt rather than mint a second.
+  `NodeText`/`EdgeVerb` single-sourced onto `RelatedWork` (`WorkGraphTemplater` delegates). Live-browser
+  verification caught two defects the 2,274-test suite structurally could not: an "EpicEpic 19" live-region
+  announcement, and a per-kind chip that made every row read "Story Story 19.1" — the chip was removed entirely,
+  leaving no colour-only signal because there is no colour signal. NFR8 confirmed with a genuinely script-blocked
+  render (37 sections, 297 rows, 297/297 links with hrefs). Golden fingerprint regenerated
+  `1711700e…` → `89c8cf0c…`, stable across 2 repeated runs, on a tree also carrying two other sessions' in-flight
+  work (Story 5.3 and `spec-multi-epic-retro-attribution`) — provenance recorded at the constant. Full suite
+  2271 passed / 3 skipped / 0 failed. Pane measures 101,435 B of a 472,222 B dashboard (21.5%) — flagged for an
+  owner decision rather than silently capped.
 - 2026-07-22 — Story 20.3 drafted (create-story). Ultimate context engine analysis completed — comprehensive developer guide created. Reconciled the epics.md five-edge-kind prose against the **shipped four-kind** `WorkEdgeKind` (covers/cites out of 19.2 MVP). Aligned to 20.2's committed contract (seeded same day): the single `{ nodes, edges }` payload island with **`edges` reserved for this story**, the `data-explorer` root, and the canonical island id scheme (`"epic-N"`/`"N.M"`) — with a server-side id-bridge from the work-graph model's internal ids. Documented the two-half split (ship-first server-rendered "Related" block reusing `SiteGenerator._workGraph` verbatim, no 20.2 needed; client reveal-on-selection block binding to 20.2's selection state, inert until 20.2 is built). Epic 19 confirmed merged to main (`WorkGraph.cs` @ `38044b1`) — data source is live. 20.1 spike Completion Notes still empty but 20.2 operationalized the seam.

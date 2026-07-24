@@ -1,3 +1,4 @@
+using System.Globalization;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -47,9 +48,131 @@ public class RetroTests : IDisposable
     public void IsRetroFile_MatchesEpicRetroNamesOnly()
     {
         Assert.True(RetroParser.IsRetroFile("epic-1-retro-2026-07-07.md"));
-        Assert.Equal(1, RetroParser.EpicNumberOf("epic-1-retro-2026-07-07.md"));
+        Assert.Equal(new[] { 1 }, RetroParser.EpicNumbersOf("epic-1-retro-2026-07-07.md").ToArray());
         Assert.False(RetroParser.IsRetroFile("1-1-some-story.md"));
         Assert.False(RetroParser.IsRetroFile("epics.md"));
+    }
+
+    /// <summary>A JOINT retrospective covers several epics, and every one of them must be attributed — the
+    /// original `^epic-(\d+)-retro\b` matched `epic-19-21-retro-*` not at all, so the file was never ingested
+    /// and BOTH epics silently lost their "Done" status. [spec-multi-epic-retro-attribution]</summary>
+    [Theory]
+    // Single epic — the pre-existing shape, which must keep working untouched.
+    [InlineData("epic-1-retro-2026-07-07.md", new[] { 1 })]
+    // The real joint retro in this repo, plus the other spellings a user might reasonably reach for.
+    [InlineData("epic-19-21-retro-2026-07-23.md", new[] { 19, 21 })]
+    [InlineData("epic-19-20-21-retro-2026-07-23.md", new[] { 19, 20, 21 })]
+    [InlineData("epics-19-21-retro-2026-07-23.md", new[] { 19, 21 })]
+    [InlineData("epic-19-and-21-retro-2026-07-23.md", new[] { 19, 21 })]
+    [InlineData("epic-19+21-retro-2026-07-23.md", new[] { 19, 21 })]
+    // Out of order in the name, de-duplicated, and ascending on the way out.
+    [InlineData("epic-21-19-retro-2026-07-23.md", new[] { 19, 21 })]
+    [InlineData("epic-19-19-retro-2026-07-23.md", new[] { 19 })]
+    public void EpicNumbersOf_CoversEveryEpicNamed(string fileName, int[] expected)
+    {
+        Assert.True(RetroParser.IsRetroFile(fileName));
+        Assert.Equal(expected, RetroParser.EpicNumbersOf(fileName).ToArray());
+    }
+
+    /// <summary>The number run is anchored by the literal `-retro`; without that anchor a greedy match would
+    /// read the trailing DATE as epic numbers (1, 2026, 7, 7). This pins the anchor.</summary>
+    [Fact]
+    public void EpicNumbersOf_DoesNotAbsorbTheTrailingDate()
+    {
+        Assert.Equal(new[] { 1 }, RetroParser.EpicNumbersOf("epic-1-retro-2026-07-07.md").ToArray());
+        Assert.Equal(new[] { 19, 21 }, RetroParser.EpicNumbersOf("epic-19-21-retro-2026-07-23.md").ToArray());
+    }
+
+    [Fact]
+    public void EpicNumbersOf_IsEmptyForNonRetroNames()
+    {
+        Assert.Empty(RetroParser.EpicNumbersOf("1-1-some-story.md"));
+        Assert.Empty(RetroParser.EpicNumbersOf("epics.md"));
+    }
+
+    /// <summary>Names that must NOT be read as retros. Each was a real false-accept or silent-drop found in
+    /// review; the shared cure is bounding every epic token to 1-3 ASCII digits. Crucially each is still
+    /// REPORTED (see below) rather than consumed and attributed to nothing.
+    /// [spec-multi-epic-retro-attribution review]</summary>
+    [Theory]
+    // Date BEFORE `-retro`: the run would otherwise capture 1/2026/07/07 and mark the real Epic 7 retro'd.
+    [InlineData("epic-1-2026-07-07-retro.md")]
+    // Out of int range: would otherwise match, parse to nothing, and be consumed while attributing to no epic.
+    [InlineData("epic-99999999999-retro-2026-01-01.md")]
+    [InlineData("epic-19-99999999999-retro-2026-01-01.md")]
+    public void IsRetroFile_RejectsNamesThatWouldMisattribute(string fileName)
+    {
+        Assert.False(RetroParser.IsRetroFile(fileName));
+        Assert.Empty(RetroParser.EpicNumbersOf(fileName));
+        // Rejected is not the same as ignored — every one of these is surfaced to the user.
+        Assert.True(RetroParser.LooksLikeUnrecognizedRetro(fileName));
+    }
+
+    /// <summary>`IgnoreCase` alone folds using the CURRENT culture, so under tr-TR/az the dotted/dotless `I`
+    /// makes `EPIC-…` fail to match `epic` — a whole retro would go invisible on a Turkish-locale CI box, and
+    /// the safety net would miss it too because it shared the flag.</summary>
+    [Theory]
+    [InlineData("en-US")]
+    [InlineData("tr-TR")]
+    [InlineData("az-Latn-AZ")]
+    public void IsRetroFile_IsCultureInvariant(string culture)
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo(culture);
+            Assert.True(RetroParser.IsRetroFile("EPIC-19-21-RETRO-2026-07-23.md"));
+            Assert.Equal(new[] { 19, 21 }, RetroParser.EpicNumbersOf("EPIC-19-21-RETRO-2026-07-23.md").ToArray());
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    /// <summary>Unicode decimal digits satisfy `\d` but not `int.TryParse`, which would leave the file
+    /// recognized, consumed, and attributed to nothing. ASCII-only matching keeps recognition and parsing in
+    /// agreement.</summary>
+    [Fact]
+    public void IsRetroFile_IgnoresNonAsciiDigits()
+    {
+        Assert.False(RetroParser.IsRetroFile("epic-١٩-retro-2026-07-23.md"));
+    }
+
+    /// <summary>The covered set is normalized by the TYPE, not merely by the parser, so a hand-built model
+    /// cannot silently corrupt `PrimaryEpicNumber`, the adapter sort, or the retro pager.</summary>
+    [Fact]
+    public void EpicNumbers_AreNormalizedOnConstruction()
+    {
+        var retro = new RetroModel
+        {
+            EpicNumbers = new[] { 21, 19, 21 },
+            Title = "Joint", Participants = Array.Empty<string>(), BodyHtml = string.Empty,
+            SourceRelativePath = "a.md", OutputRelativePath = "a.html",
+        };
+
+        Assert.Equal(new[] { 19, 21 }, retro.EpicNumbers.ToArray());
+        Assert.Equal(19, retro.PrimaryEpicNumber);
+    }
+
+    /// <summary>An `epic…retro…` name we can't parse must be REPORTED, never silently dropped — a dropped retro
+    /// also drops its epics' "Done" status. Unrelated files that merely mention a retro must not trip it.</summary>
+    [Fact]
+    public void LooksLikeUnrecognizedRetro_FlagsOnlyUnparseableEpicRetroNames()
+    {
+        Assert.True(RetroParser.LooksLikeUnrecognizedRetro("epic-1-retrospective-2026-07-07.md"));
+        Assert.True(RetroParser.LooksLikeUnrecognizedRetro("epic-19_21-retro-2026-07-23.md"));
+
+        // Recognized names are not "unrecognized".
+        Assert.False(RetroParser.LooksLikeUnrecognizedRetro("epic-1-retro-2026-07-07.md"));
+        Assert.False(RetroParser.LooksLikeUnrecognizedRetro("epic-19-21-retro-2026-07-23.md"));
+
+        // Not an epic-retro file at all — a spec or process doc that merely discusses retros must stay silent,
+        // or the diagnostics page fills with noise the user cannot opt out of.
+        Assert.False(RetroParser.LooksLikeUnrecognizedRetro("spec-sunburst-retro-review-and-done-story-actions.md"));
+        Assert.False(RetroParser.LooksLikeUnrecognizedRetro("epics.md"));
+        Assert.False(RetroParser.LooksLikeUnrecognizedRetro("epics-retro-process.md"));
+        Assert.False(RetroParser.LooksLikeUnrecognizedRetro("epics-overview-retrospective-plan.md"));
     }
 
     [Fact]
@@ -57,7 +180,7 @@ public class RetroTests : IDisposable
     {
         var retro = Parse();
 
-        Assert.Equal(1, retro.EpicNumber);
+        Assert.Equal(new[] { 1 }, retro.EpicNumbers.ToArray());
         Assert.Equal("Epic 1 Retrospective: Foundation", retro.Title);
         Assert.Equal("2026-07-07", retro.DateText);
         Assert.Equal(new[] { "Matt (Lead)", "Amelia (Dev)", "Alice (PO)" }, retro.Participants.ToArray());
@@ -155,6 +278,223 @@ public class RetroTests : IDisposable
         Assert.DoesNotContain("retro-story-row", html);
     }
 
+    /// <summary>A joint retro's page must reach BOTH epics: both kicker names, both back-links, and the stories
+    /// of both epics merged into the one grid. [spec-multi-epic-retro-attribution]</summary>
+    [Fact]
+    public void RenderPage_JointRetroLinksEveryCoveredEpicAndMergesTheirStories()
+    {
+        var retro = new RetroModel
+        {
+            EpicNumbers = new[] { 19, 21 },
+            Title = "Joint Retrospective — Epic 19 + Epic 21",
+            DateText = "2026-07-23",
+            Participants = Array.Empty<string>(),
+            BodyHtml = string.Empty,
+            SourceRelativePath = "implementation-artifacts/epic-19-21-retro-2026-07-23.md",
+            OutputRelativePath = "implementation-artifacts/epic-19-21-retro-2026-07-23.html",
+        };
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 19, Title = "Directed Work Graph", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo { Id = "19.1", EpicNumber = 19, Title = "Work Graph Spike", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), ArtifactOutputPath = "epics/story-19-1.html", Status = "Done" },
+                    },
+                },
+                new EpicInfo
+                {
+                    Number = 21, Title = "Value & Correlation Insights", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = new[]
+                    {
+                        new StoryInfo { Id = "21.1", EpicNumber = 21, Title = "Traceability Matrix", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), ArtifactOutputPath = "epics/story-21-1.html", Status = "Done" },
+                    },
+                },
+            },
+        };
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = RetroTemplater.RenderPage(retro, epics, nav);
+
+        // Kicker names both epics (ampersand HTML-escaped exactly once, not double-encoded).
+        Assert.Contains("<div class=\"story-kicker\">Epics 19 &amp; 21 Retrospective</div>", html);
+        Assert.DoesNotContain("&amp;amp;", html);
+
+        // A back-link per covered epic.
+        Assert.Contains("href=\"../epics/epic-19.html\">Epic 19 &rarr;</a>", html);
+        Assert.Contains("href=\"../epics/epic-21.html\">Epic 21 &rarr;</a>", html);
+
+        // Both epics' stories in the one grid, under the plural heading.
+        Assert.Contains("Stories in these Epics", html);
+        Assert.Contains("<span class=\"sprint-card-id\">Story 19.1</span>", html);
+        Assert.Contains("<span class=\"sprint-card-id\">Story 21.1</span>", html);
+    }
+
+    /// <summary>An epic named by the retro but absent from the model contributes no link and no stories, rather
+    /// than throwing or emitting a dangling href.</summary>
+    [Fact]
+    public void RenderPage_SkipsCoveredEpicsMissingFromTheModel()
+    {
+        var retro = new RetroModel
+        {
+            EpicNumbers = new[] { 19, 99 },
+            Title = "Joint Retrospective",
+            DateText = "2026-07-23",
+            Participants = Array.Empty<string>(),
+            BodyHtml = string.Empty,
+            SourceRelativePath = "implementation-artifacts/epic-19-99-retro-2026-07-23.md",
+            OutputRelativePath = "implementation-artifacts/epic-19-99-retro-2026-07-23.html",
+        };
+        var epics = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[]
+            {
+                new EpicInfo
+                {
+                    Number = 19, Title = "Directed Work Graph", GoalHtml = string.Empty,
+                    Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+                    Stories = Array.Empty<StoryInfo>(),
+                },
+            },
+        };
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
+
+        var html = RetroTemplater.RenderPage(retro, epics, nav);
+
+        Assert.Contains("href=\"../epics/epic-19.html\">Epic 19 &rarr;</a>", html);
+        Assert.DoesNotContain("epics/epic-99.html", html);
+        // The kicker still names every epic the retro claims to cover, present in the model or not.
+        Assert.Contains("Epics 19 &amp; 99 Retrospective", html);
+    }
+
+    /// <summary>END-TO-END pin on the actual defect. Every other retro test stops at the parser or the
+    /// templater, and every existing <c>HasRetrospective</c> assertion in the suite sets that flag BY HAND — so
+    /// the one mechanism that turns "In review" into "Done" (adapter ingest → <c>SetRetros</c> fan-out →
+    /// <c>TagEpicRetrospectives</c> → <see cref="StatusStyles.ForEpicWithRetrospective"/>) was unverified, and a
+    /// regression that broke only the fan-out would have shipped green. Two all-done epics share ONE joint
+    /// retro; both must read Done. [spec-multi-epic-retro-attribution review]</summary>
+    [Fact]
+    public void GenerateAll_JointRetro_MarksEveryCoveredEpicRetrospected()
+    {
+        var root = Directory.CreateTempSubdirectory("specscribe-jointretro-").FullName;
+        try
+        {
+            var source = Path.Combine(root, "_bmad-output");
+            var adrs = Path.Combine(root, "docs", "adrs");
+            var site = Path.Combine(root, "site");
+            Directory.CreateDirectory(Path.Combine(source, "planning-artifacts"));
+            Directory.CreateDirectory(Path.Combine(source, "implementation-artifacts"));
+            Directory.CreateDirectory(adrs);
+
+            File.WriteAllText(Path.Combine(source, "planning-artifacts", "epics.md"), """
+                # Epics
+
+                ## Epic List
+
+                ### Epic 1: Foundation
+
+                Stand up the portal.
+
+                ### Epic 2: Delivery
+
+                Ship the portal.
+
+                ## Epic 1: Foundation
+
+                ### Story 1.1: Foundation Story
+
+                As a maintainer, I want the foundation.
+
+                ## Epic 2: Delivery
+
+                ### Story 2.1: Delivery Story
+
+                As a maintainer, I want delivery.
+                """);
+
+            foreach (var (file, id, title) in new[]
+                     {
+                         ("1-1-foundation.md", "1.1", "Foundation Story"),
+                         ("2-1-delivery.md", "2.1", "Delivery Story"),
+                     })
+            {
+                File.WriteAllText(Path.Combine(source, "implementation-artifacts", file), $"""
+                    # Story {id}: {title}
+
+                    Status: done
+
+                    ## Story
+
+                    As a maintainer, I want it.
+
+                    ## Acceptance Criteria
+
+                    1. It works.
+
+                    ## Tasks / Subtasks
+
+                    - [x] Task 1: Do it (AC: #1)
+                    """);
+            }
+
+            // ONE retro covering BOTH epics — the shape that was previously not recognized at all.
+            File.WriteAllText(Path.Combine(source, "implementation-artifacts", "epic-1-2-retro-2026-07-20.md"), """
+                # Joint Retrospective — Epic 1 + Epic 2
+
+                **Date:** 2026-07-20
+                **Participants:** Team
+
+                Went well.
+                """);
+
+            File.WriteAllText(Path.Combine(source, "implementation-artifacts", "sprint-status.yaml"), """
+                last_updated: 2026-07-20T22:00:00-04:00
+                development_status:
+                  epic-1: done
+                  1-1-foundation: done
+                  epic-2: done
+                  2-1-delivery: done
+                """);
+
+            var gen = new SiteGenerator(ForgeOptions.Resolve(
+                source: source, adrs: adrs, output: site, projectName: "SpecScribe", includeReadme: false));
+            Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+            // BOTH epics reach the retro-gated "done" tier. Before the fix neither did: the joint retro was
+            // never ingested, so both all-done epics read "In review".
+            foreach (var number in new[] { 1, 2 })
+            {
+                var epicHtml = File.ReadAllText(Path.Combine(site, "epics", $"epic-{number}.html"));
+                Assert.Contains("epic-1-2-retro-2026-07-20.html", epicHtml);
+                // The epic's OWN header badge — asserted on the badge class, not on the page text: the status
+                // legend renders the word "In review" on every page regardless of this epic's tier.
+                Assert.Contains("<span class=\"status-badge done js-tip\"", epicHtml);
+                Assert.DoesNotContain("<span class=\"status-badge review js-tip\"", epicHtml);
+            }
+
+            // And it is a first-class retro page naming both epics, not a generic document.
+            var retroHtml = File.ReadAllText(Path.Combine(site, "implementation-artifacts", "epic-1-2-retro-2026-07-20.html"));
+            Assert.Contains("<div class=\"story-kicker\">Epics 1 &amp; 2 Retrospective</div>", retroHtml);
+            Assert.Contains("epics/epic-1.html", retroHtml);
+            Assert.Contains("epics/epic-2.html", retroHtml);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
     [Fact]
     public void RenderIndex_ListsRetrosLinkingToTheirPages()
     {
@@ -162,7 +502,7 @@ public class RetroTests : IDisposable
         {
             new RetroModel
             {
-                EpicNumber = 1, Title = "Epic 1 Retrospective", DateText = "2026-07-07",
+                EpicNumbers = new[] { 1 }, Title = "Epic 1 Retrospective", DateText = "2026-07-07",
                 Participants = Array.Empty<string>(), BodyHtml = string.Empty,
                 SourceRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.md",
                 OutputRelativePath = "implementation-artifacts/epic-1-retro-2026-07-07.html",

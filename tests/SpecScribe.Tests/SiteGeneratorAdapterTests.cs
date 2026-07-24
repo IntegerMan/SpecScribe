@@ -926,7 +926,20 @@ public class SiteGeneratorAdapterTests : IDisposable
         // settings work (SettingsResolver/SettingsStore/SiteSettings/Commands/ConsoleUi) — none of which this fixture
         // renders, so it does not contribute. Verified stable across 2 repeated runs.
         // [Story 20.2 review; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "1711700ec5fed39a384d1612857a170d7153b5aa84cd52973a72f64f7cfce4dd";
+        // Regenerated for Story 20.3. Markup delta in this fixture: the dashboard gained the server-rendered
+        // "Related work" pane — an <aside data-related-pane> of one <section data-related-node="…"> per selectable
+        // explorer scope, each listing its work-graph neighbours grouped by edge kind, plus the hidden designed
+        // empty state. It appears only when the fixture has work-graph signal (NFR8 gate), and NOT in the explorer
+        // island: `edges` stays `[]` deliberately (see Charts.SunburstExplorerIsland). Plus specscribe.css asset
+        // bytes (pane + reveal rules) and specscribe.js asset bytes (the `specscribe:explorer-select` seam and the
+        // reveal block). No chart geometry moved.
+        // PROVENANCE (shared main): regenerated on a tree that ALSO carried two other sessions' in-flight work —
+        // Story 5.3 (FileWatcherService/SiteGenerator watch scoping) and `spec-multi-epic-retro-attribution`
+        // (RetroModel.EpicNumber → EpicNumbers, RetroParser, BmadArtifactAdapter). The retro-attribution change is
+        // rendering-visible in principle, so this hash is NOT attributable to Story 20.3 alone; it was captured
+        // after that session's build went green. Verified stable across 2 repeated runs.
+        // [Story 20.3; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "89c8cf0c62f968eb968b61721f2a3c271af94d9e4ebc7c6c97b1b3c311612c10";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
