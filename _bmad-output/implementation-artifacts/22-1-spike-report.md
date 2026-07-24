@@ -53,10 +53,16 @@ independent full generates agree byte-for-byte on all 701 shared pages (the `con
 | deep-git **OFF** | 27.6 s | 27.0 s |
 
 - The **deep-git increment** (the `--deep-git` numstat log, over and above the always-on baseline git pulse) is
-  **~4.5 s warm = 14.3 %** of gen-time at this scale. **This updates ADR 0008's premise.** ADR 0006/0008 measured
-  "gen-time ~3.2 s dominated by the git subprocess" at **198 pages**; at **1,211 pages** the site has grown ~6×, and
-  **page rendering now dominates — the deep-git increment is a minority share.** (Absolute times are inflated by this
-  environment; the *ratios* are what matter.)
+  **~4.5 s warm = 14.3 %** of gen-time at this scale. **This qualifies (does not overturn) ADR 0008's premise.** ADR
+  0006/0008 measured "gen-time ~3.2 s dominated by the git subprocess" at **198 pages**; at **1,211 pages** the site
+  has grown ~6×, and **on warm/cache-hot runs page rendering now dominates and the deep-git increment is a minority
+  share.**
+  **Caveat — the warm ratio is the favourable one, and the cold ratio still shows git dominance.** The *cold* figures
+  give a deep-git share of (52.6 − 27.6)/52.6 ≈ **47 %**, fully consistent with ADR 0008's "git-dominated." The gap is
+  not JIT (both ON and OFF run the same managed code) — it is the OS filesystem caching git objects across runs 2–3,
+  so the ~21 s ON warm-up understates the true git cost on a first/cold generation. **Read the "page rendering now
+  dominates" conclusion as warm-state only;** git-avoidance still matters for cold runs, and both are inflated by this
+  environment (the *ratios*, not the absolutes, are the point).
 
 **Incremental route latency (in the 702-file artifact sandbox; a full regen there = ~16 s):**
 
@@ -105,6 +111,14 @@ change ripple):**
 | Epic 6 | 57 / 76 | 51 / 54 |
 | Epic 9 | 51 / 72 | 44 / 48 |
 
+> **Provenance of these item/link counts.** The probe's `report.json` emits only the **stale / orphaned / missing
+> page-path sets** (and their counts) per change class — it does not extract work-graph nodes/edges. The 56-page
+> **divergence itself** and the **stranded page names** cited throughout Axis 2 fall directly out of those sets and
+> are reproducible via `dotnet run … report.json`. The **per-epic item/link numbers in the table above were derived
+> by hand** from the rendered epic-work-graph pages in the incremental vs. oracle output trees; they illustrate the
+> *shape* of the over-count and are **not** reproduced by the documented probe run. 22.5's parity fix should add a
+> node/edge assertion to the harness so this becomes a measured, regression-guarded number.
+
 Because this divergence is **change-independent** (it is present with a no-op), the 57/61 stale pages in
 content-story/delete-story are dominated by it, not by the edit. This is a **pre-existing watch-mode fidelity gap in
 the shipped tool** (the Story 19.2 work-graph on the incremental path), and it is a concrete instance of exactly the
@@ -136,6 +150,13 @@ cross-artifact surfaces no narrow route refreshes (Code Map, delivery cadence, r
 code-view pages).** A full-rebuild fallback (or targeted invalidation + a work-graph parity fix) is required for those
 classes.
 
+> **Scope caveat — the correctness matrix ran with deep-git OFF.** The sandbox copies `_bmad-output` + `docs` + the
+> README but **never `.git`** (so the incremental run and the oracle read identical inputs), which means every
+> **git-derived surface is structurally invisible to this diff**: per-commit pages, hotspot/coupling insights, the
+> planning-code impact map, and git-derived cadence data. Production runs `--deep-git`. **The stranded-surface list
+> above is therefore a lower bound, not the complete inventory.** 22.5 must size its topology-invalidation scope
+> against a deep-git-ON re-run of this harness, not this list alone.
+
 ### Axis 3 — IR-delta transport
 
 IR = the shipped `SpaDelivery` manifest + content chunks. Measured on the artifact sandbox with `--spa`:
@@ -160,13 +181,25 @@ that can exceed it (measured: a 3.08 MB chunk > the 2 MB guard).
 re-emits the entire `epics` + `root` chunk family. A useful IR-delta needs **page-level (or finer) addressing**, not
 chunk-level — the chunk is the wrong delta unit.
 
+> **Measurement caveat — both delta events were driven through `RegenerateEpics`, and its own no-op over-count
+> inflates the number.** The content-edit delta (39.9 %) and the topology-delete delta (25.3 %) both re-ran
+> `RegenerateEpics`, the exact route Axis 2 proves re-emits every epic page even with no change. So the 39.9 %
+> **conflates the one-line edit with the work-graph over-count** — it is a worst-case-route figure, not a clean
+> measure of "chunk granularity is too coarse." Critically, the route Axis 2 found byte-perfect (`GenerateOne`, a
+> content-only generic-doc edit) was **never delta-measured**; a `GenerateOne` edit likely re-ships a single small
+> chunk, which could substantially soften the "chunk is the wrong delta unit" conclusion. **22.6 should measure the
+> `GenerateOne` delta before treating chunk-granularity as the blocking problem;** the 39.9 %/25.3 % figures bound the
+> *epics-route* delta only.
+
 ---
 
 ## Findings
 
 1. **Latency: incremental is a large, real win (3×–84×).** The lever ADR 0008 chose is sound. At today's scale the
-   deep-git increment is only ~14 % of gen-time (page rendering dominates), which *reduces* the urgency of
-   git-avoidance and *raises* the value of not re-rendering unchanged pages.
+   deep-git increment is only ~14 % of gen-time **on warm/cache-hot runs** (page rendering dominates there), which
+   *reduces* the urgency of git-avoidance for warm regenerations and *raises* the value of not re-rendering unchanged
+   pages. **On a cold generation the deep-git share is still ~47 %** (git-dominated, per ADR 0008) — so git-avoidance
+   remains material for cold starts; see the Axis 1 caveat.
 2. **Correctness is the gating risk, exactly as ADR 0008 predicted — and it is already violated in the shipped
    watch mode.** `RegenerateEpics` is not oracle-faithful even with a no-op (56-page work-graph divergence).
    `GenerateOne` (content-only generic docs) is byte-perfect. Every topology change strands cross-artifact surfaces
@@ -184,9 +217,9 @@ chunk-level — the chunk is the wrong delta unit.
 |---|---|---|
 | **22.2 — Canonical IR schema + versioning** | **Proceed, RE-SCOPED** | The "byte-blind chunker" known-constraint is **already fixed** (2 MB cap shipped) — drop it. Re-aim 22.2's chunking work at **page-level (sub-chunk) delta addressing** + **capping single oversized pages** (a 3.08 MB chunk was measured over the 2 MB guard). Evidence: a 1-line edit re-ships 39.9 % of the IR at chunk granularity. |
 | **22.3 — Static HTML from the IR** | **Proceed as scoped** | Pure projection; not gated by incremental correctness. The golden byte-parity gate this spike leaned on is the same one 22.3 must hold. No blocker found. |
-| **22.4 — SPA + webview as IR consumers** | **Proceed as scoped** | Consumer-side of the IR; no incremental-correctness dependency surfaced. Note only that the SPA IR is large (48 MB / 1,211 pages) — 22.4 should consume chunks lazily, which the manifest already supports. |
-| **22.5 — Incremental event-driven regeneration engine** | **RE-SCOPE (required)** | The measured facts forbid building the engine on the current narrow routes as-is. 22.5 MUST: **(a)** fix `_workGraph` parity so `RegenerateEpics` matches `GenerateAll` (the 56-page no-op divergence); **(b)** add **topology-change invalidation** for the cross-artifact seams no route refreshes today — Code Map, delivery cadence, the reference/citation graph (`_referenceMap`/`_codeReverseMap`), ADR code-view pages — and prune orphaned output on delete; **(c)** until (a)+(b) are proven against the byte-parity oracle, **fall back to a full rebuild for topology changes and the epics/story family.** Content-only generic-doc edits (`GenerateOne`) are proven safe and may stay narrow now. The oracle-diff harness this spike built is the acceptance test 22.5 should adopt. |
-| **22.6 — (Spike-gated) client-server delta channel** | **Viable, but gated on 22.2** | A delta channel is only worthwhile atop a *small* delta. At chunk granularity a single edit is 25–40 % of a 48 MB IR — too coarse to justify a push channel. **Proceed only after 22.2 delivers page-level delta addressing;** then re-measure. Transport itself is a legitimate AD-8 concern and unblocked in principle. |
+| **22.4 — SPA + webview as IR consumers** | **Proceed as scoped** | Consumer-side of the IR; no incremental-correctness dependency surfaced. Note only that the SPA IR is large (48 MB across 23 chunks **on the ~702-file artifact sandbox, deep-git off** — the full 1,211-page repo with deep-git code/commit pages would be materially larger) — 22.4 should consume chunks lazily, which the manifest already supports. |
+| **22.5 — Incremental event-driven regeneration engine** | **RE-SCOPE (required)** | The measured facts forbid building the engine on the current narrow routes as-is. 22.5 MUST: **(a)** fix `_workGraph` parity so `RegenerateEpics` matches `GenerateAll` (the 56-page no-op divergence); **(b)** add **topology-change invalidation** for the cross-artifact seams no route refreshes today — Code Map, delivery cadence, the reference/citation graph (`_referenceMap`/`_codeReverseMap`), ADR code-view pages — and prune orphaned output on delete; **(c)** until (a)+(b) are proven against the byte-parity oracle, **fall back to a full rebuild for topology changes and the epics/story family.** Content-only generic-doc edits (`GenerateOne`) are proven safe and may stay narrow now. The oracle-diff harness this spike built is the acceptance test 22.5 should adopt — **but re-run it deep-git ON** (this spike ran deep-git OFF, so the stranded-surface list in Axis 2 is a lower bound; git-derived surfaces — per-commit, hotspot/coupling, impact-map, git cadence — must be added to the invalidation inventory). |
+| **22.6 — (Spike-gated) client-server delta channel** | **Viable, but gated on 22.2** | A delta channel is only worthwhile atop a *small* delta. At chunk granularity a single **epics-route** edit is 25–40 % of a 48 MB IR — too coarse to justify a push channel. **Caveat:** that figure was measured only through `RegenerateEpics` (whose no-op over-count inflates it); the byte-perfect `GenerateOne` route was never delta-measured and likely re-ships one small chunk. **Before treating chunk-granularity as blocking, 22.6 must measure the `GenerateOne` delta**; then **proceed only after 22.2 delivers page-level delta addressing** and re-measure. Transport itself is a legitimate AD-8 concern and unblocked in principle. |
 
 **No ADR amendment required.** These findings *scope* the implementation stories; they do not contradict ADR 0008's
 decision (they confirm its risk call). Per the ADR-creation-trigger discipline, if 22.5's parity work reveals the

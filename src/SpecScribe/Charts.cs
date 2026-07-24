@@ -384,18 +384,45 @@ public static partial class Charts
         return (open, Math.Max(0, slots - open));
     }
 
-    /// <summary>The project-glance middle-ring weight of one story: tasks + nested story-child deferred (min 1).
-    /// Extracted from the <see cref="Sunburst"/> local closure (per Story 20.1's contract) so the SVG builder and
-    /// the Story 20.2 explorer payload emit the SAME number — no second geometry. [Story 20.2]</summary>
-    internal static int SunburstStoryWeight(FollowUpGeometry geometry, int epicNumber, StoryInfo story) =>
-        Math.Max(1, story.TasksTotal + geometry.StoryChildDeferred(epicNumber, story.Id).Count);
+    /// <summary>The project-glance middle-ring weight of one story: tasks + nested story-child deferred. A story with
+    /// no plan yet (zero tasks, zero nested deferred) has an <em>unknown</em> true size, so rather than collapsing to a
+    /// hairline 1-unit sliver that reads as trivial it takes <paramref name="noPlanWeight"/> — the average weight of the
+    /// drafted stories (see <see cref="SunburstNoPlanStoryWeight"/>) — so un-drafted work renders at a typical size.
+    /// Drafted stories always keep their honest weight (this only lifts the floor, never shrinks a real wedge).
+    /// <paramref name="noPlanWeight"/> defaults to 1, which reproduces the historical <c>Math.Max(1, …)</c> floor for
+    /// callers that don't opt in. Extracted from the <see cref="Sunburst"/> local closure (per Story 20.1's contract) so
+    /// the SVG builder and the Story 20.2 explorer payload emit the SAME number — no second geometry.
+    /// [Story 20.2; no-plan average bump per owner 2026-07-24]</summary>
+    internal static int SunburstStoryWeight(FollowUpGeometry geometry, int epicNumber, StoryInfo story, int noPlanWeight = 1)
+    {
+        var raw = story.TasksTotal + geometry.StoryChildDeferred(epicNumber, story.Id).Count;
+        return raw > 0 ? raw : Math.Max(1, noPlanWeight);
+    }
+
+    /// <summary>The weight given to a "no plan yet" story wedge on the project glance: the rounded <em>mean</em> raw
+    /// weight (tasks + nested story-child deferred) of the DRAFTED stories across the whole model — so an un-drafted
+    /// story renders at a typical size instead of a hairline sliver that reads as trivial. Falls back to 1 when no
+    /// story has a plan yet (nothing to average against), which keeps a brand-new project's glance byte-identical to
+    /// the old floor. Mean (not median) matches the owner's "bump to average" choice. Computed once per chart and
+    /// threaded to <see cref="SunburstStoryWeight"/>/<see cref="SunburstEpicWeight"/> so the SVG and the Story 20.2
+    /// explorer payload share the exact number. [owner 2026-07-24]</summary>
+    internal static int SunburstNoPlanStoryWeight(EpicsModel model, FollowUpGeometry geometry)
+    {
+        var drafted = model.Epics
+            .SelectMany(e => e.Stories.Select(s => s.TasksTotal + geometry.StoryChildDeferred(e.Number, s.Id).Count))
+            .Where(raw => raw > 0)
+            .ToList();
+        return drafted.Count == 0 ? 1 : Math.Max(1, (int)Math.Round(drafted.Average(), MidpointRounding.AwayFromZero));
+    }
 
     /// <summary>The project-glance inner-ring weight of one epic: its story weights plus epic-level follow-up
     /// peers (actions / epic-level deferred / attributed quick-dev), min 1. Extracted from the
-    /// <see cref="Sunburst"/> local closure so the SVG builder and the explorer payload agree. [Story 20.2]</summary>
-    internal static int SunburstEpicWeight(FollowUpGeometry geometry, UnplannedWorkGeometry unplannedGeo, EpicInfo epic) =>
+    /// <see cref="Sunburst"/> local closure so the SVG builder and the explorer payload agree. <paramref name="noPlanWeight"/>
+    /// threads the same no-plan average through the story-weight sum so a plan-less epic reads as typically sized.
+    /// [Story 20.2]</summary>
+    internal static int SunburstEpicWeight(FollowUpGeometry geometry, UnplannedWorkGeometry unplannedGeo, EpicInfo epic, int noPlanWeight = 1) =>
         Math.Max(1,
-            epic.Stories.Sum(s => SunburstStoryWeight(geometry, epic.Number, s))
+            epic.Stories.Sum(s => SunburstStoryWeight(geometry, epic.Number, s, noPlanWeight))
             + geometry.ForEpicNumber(epic.Number).Count
             + geometry.EpicLevelDeferred(epic.Number, epic.Stories.Select(s => s.Id)).Count
             + unplannedGeo.ForEpic(epic.Number).Count);
@@ -430,8 +457,11 @@ public static partial class Charts
         // Nested story-child deferred grow story weight; glance epic weight also includes epic-level
         // peers (actions / epic-level deferred / attributed QD) matching EpicSunburst — never double-count
         // story-child deferred already inside StoryWeight. [spec-9-13-deferred-glance-weight-noplan-sourcekey]
-        int StoryWeight(EpicInfo e, StoryInfo s) => SunburstStoryWeight(geometry, e.Number, s);
-        int EpicWeight(EpicInfo e) => SunburstEpicWeight(geometry, unplannedGeo, e);
+        // No-plan stories are bumped to the average drafted-story weight so un-drafted work doesn't render as a
+        // misleadingly trivial sliver — the SAME number the explorer payload uses. [owner 2026-07-24]
+        var noPlanWeight = SunburstNoPlanStoryWeight(model, geometry);
+        int StoryWeight(EpicInfo e, StoryInfo s) => SunburstStoryWeight(geometry, e.Number, s, noPlanWeight);
+        int EpicWeight(EpicInfo e) => SunburstEpicWeight(geometry, unplannedGeo, e, noPlanWeight);
 
         var totalWeight = epics.Sum(EpicWeight)
             + (orphanSlots > 0 ? Math.Max(1, orphanSlots) : 0)
@@ -1256,23 +1286,28 @@ public static partial class Charts
     /// instead of padding months of empty pre-project cells; older repos start at the first commit. [Story 10.6 AC2a]
     /// <para>When <paramref name="commitsByDay"/> is provided, each active day's cell becomes an in-SVG link
     /// to an inline details panel below the chart (short hash + subject per commit, prev/next links between
-    /// active days). Panel visibility is pure-CSS <c>:target</c>, so the drill-down needs no JS.</para></summary>
+    /// active days). Panel visibility is pure-CSS <c>:target</c>, so the drill-down needs no JS.</para>
+    /// <para><paramref name="today"/> is the run's ONE policy-resolved cutoff day (<see cref="ResolveToday"/>),
+    /// threaded in by the <see cref="SiteGenerator"/> so the grid extent, the future-skew suppression, and the linked
+    /// cells all move together with the generated page set. Omitting it falls back to the machine-local day — the
+    /// status quo — so library/test callers are unaffected. [Story 5.5]</para></summary>
     public static string CommitHeatmap(
         IReadOnlyList<(DateOnly Day, int Count)> series,
         IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>>? commitsByDay = null,
-        bool showHeadline = true)
+        bool showHeadline = true,
+        DateOnly? today = null)
     {
         if (series.Count == 0) return "<div class=\"chart-empty\">No git history available.</div>";
 
         var byDay = series.ToDictionary(s => s.Day, s => s.Count);
         var firstCommit = series.Min(s => s.Day);
         var lastCommit = series.Max(s => s.Day);
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var todayValue = today ?? ResolveToday(DatePolicy.MachineLocal, series: null);
 
         // The grid never runs past the generation date: future-dated commits (clock/timezone skew) would
         // otherwise extend it into all-blank suppressed weeks and let the headline name a day the grid can't
         // show. [Story 1.5 A4 + review]
-        var end = today;
+        var end = todayValue;
         // The heatmap is the primary "how has the work gone" visual, so show a fuller ~15-week window (it
         // scales up to fill its panel via CSS) rather than the old 7-week postage stamp. [Story 1.5 E1]
         var minStart = end.AddDays(-7 * 15);
@@ -1294,7 +1329,7 @@ public static partial class Charts
         var weeks = Math.Max(1, (int)Math.Ceiling(totalDays / 7.0));
         // Scale the heat over only the days the grid actually renders (<= today). A future-dated commit is
         // suppressed from the cells, so it must not inflate maxCount and depress every visible cell's level. [review]
-        var maxCount = series.Where(s => s.Day <= today).Select(s => s.Count).DefaultIfEmpty(0).Max();
+        var maxCount = series.Where(s => s.Day <= todayValue).Select(s => s.Count).DefaultIfEmpty(0).Max();
 
         const int cell = 11;
         const int gap = 3;
@@ -1318,7 +1353,7 @@ public static partial class Charts
         // The linked days, resolved up front: they decide each cell's link wrapper and the SVG role. Each
         // links to its generated per-day page (commits/{date}.html). Shared with the SiteGenerator so the
         // set of linked cells and the set of generated pages can never disagree.
-        var linkedDays = LinkedCommitDays(series, commitsByDay, today);
+        var linkedDays = LinkedCommitDays(series, commitsByDay, todayValue);
         var linkedSet = new HashSet<DateOnly>(linkedDays);
 
         var sb = new StringBuilder();
@@ -1373,7 +1408,7 @@ public static partial class Charts
                 if (day > end) continue;
                 // Days after generation aren't zero-commit days, they haven't happened — render nothing (no
                 // fill, no tooltip) so a partial final week doesn't read as a run of inactivity. [Story 1.5 A4]
-                if (day > today) continue;
+                if (day > todayValue) continue;
 
                 var count = byDay.GetValueOrDefault(day, 0);
                 var level = HeatLevel(count, maxCount);
@@ -1786,7 +1821,7 @@ public static partial class Charts
     /// chart builders. When the bounded name-only git call came back empty but the rest of the pulse succeeded,
     /// the files section degrades to a graceful note rather than vanishing (partial data beats none; AD-4). The
     /// whole-panel null case (no git at all) is the caller's `p.Git is {}` fallback. [Story 3.1 + consolidation]</summary>
-    public static string GitPulsePanel(GitPulse git, Func<string, string?>? fileHref = null)
+    public static string GitPulsePanel(GitPulse git, Func<string, string?>? fileHref = null, DateOnly? today = null)
     {
         // The exact last-commit clock, routed through the single PortalDates formatter (Story 10.4): 24-hour,
         // no per-row zone suffix — the git clock's zone is explained once by the caption below (owner-chosen
@@ -1796,7 +1831,11 @@ public static partial class Charts
         // actual membership in the generated date-page set (the SAME LinkedCommitDays the heatmap uses) rather than
         // a bare date comparison, so this guard can never drift from what pages actually exist — never a dead link.
         var lastDay = DateOnly.FromDateTime(git.LastCommitTimestamp);
-        var linkedDays = LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now));
+        // The run's ONE policy-resolved cutoff (Story 5.5), threaded from the SiteGenerator — not a second
+        // independent clock read. This guard and the page generator must filter on the same day or this link can
+        // point at a page that was never written.
+        var todayValue = today ?? ResolveToday(DatePolicy.MachineLocal, series: null);
+        var linkedDays = LinkedCommitDays(git.DailySeries, git.CommitsByDay, todayValue);
         var lastLinked = linkedDays.Contains(lastDay)
             ? $"<a class=\"date-link\" href=\"commits/{D(lastDay)}.html\">{Html(last)}</a>"
             : Html(last);
@@ -1823,7 +1862,7 @@ public static partial class Charts
         // Activity heatmap (headline suppressed — the signal strip above already carries those numbers).
         // Window caption lives inside the heatmap builder; why-sentence from the shared ChartMeta source.
         sb.Append("    <div class=\"git-pulse-activity\">\n");
-        sb.Append(CommitHeatmap(git.DailySeries, git.CommitsByDay, showHeadline: false));
+        sb.Append(CommitHeatmap(git.DailySeries, git.CommitsByDay, showHeadline: false, today: todayValue));
         sb.Append(FrameWhySlot(WhyText(ChartMetric.ActivityCadence)));
         sb.Append("    </div>\n");
 
@@ -2774,6 +2813,25 @@ public static partial class Charts
     /// "Mon, Jul 6, 2026". Delegates to the single <see cref="PortalDates.DayWithWeekday"/> token so the heatmap's
     /// weekday-prefixed date can never drift from the portal-wide date format (Story 10.4).</summary>
     public static string DReadable(DateOnly day) => PortalDates.DayWithWeekday(day);
+
+    /// <summary>Resolves the ONE <see cref="DateOnly"/> a run treats as "today" for the date-page cutoff, from the
+    /// configured <paramref name="policy"/>. Pure: the only impurity is the wall clock the policy itself asks for.
+    /// <para>Deliberately co-located with <see cref="LinkedCommitDays"/>, the consumer whose guarantee this value
+    /// underwrites. A run must call this ONCE and share the result — the guarantee that a linked cell always has a
+    /// generated page holds only while every consumer filters on the SAME day, and independent re-resolution (a
+    /// <c>Utc</c> boundary crossed mid-run, a series re-read) is exactly how that would break. [Story 5.5]</para>
+    /// <para><see cref="DatePolicy.LastCommit"/> degrades to <see cref="DatePolicy.MachineLocal"/> when
+    /// <paramref name="series"/> is null or empty: with no git history (or an empty repo) there are no authored
+    /// commit days to derive a cutoff from, so the honest fallback is the machine's own day rather than a crash or a
+    /// default-date sentinel (NFR8).</para></summary>
+    public static DateOnly ResolveToday(DatePolicy policy, IReadOnlyList<(DateOnly Day, int Count)>? series) => policy switch
+    {
+        DatePolicy.Utc => DateOnly.FromDateTime(DateTime.UtcNow),
+        DatePolicy.LastCommit when series is { Count: > 0 } => series.Max(s => s.Day),
+        // MachineLocal, and the LastCommit-without-history fallback. Written exactly as the pre-5.5 status quo
+        // expressed it so the default policy is byte-identical, not merely equivalent.
+        _ => DateOnly.FromDateTime(DateTime.Now),
+    };
 
     /// <summary>The single source of truth for which days get a heatmap link AND a generated per-day page:
     /// active days (count &gt; 0), on or before <paramref name="today"/>, that carry a non-empty commit

@@ -603,6 +603,22 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         var codeUrl = AnsiConsole.Prompt(codePrompt);
         settings.CodeUrl = string.IsNullOrWhiteSpace(codeUrl) ? null : codeUrl.Trim();
 
+        // The date-page "today" policy is a configurable setting, so NFR7 (menu/CLI parity) requires it in the menu
+        // too, not just --today-policy. A SelectionPrompt rather than free text: the value set is closed and small,
+        // so there is nothing to typo. Seeded with the CURRENT policy as the first (pre-selected) choice so
+        // re-running Configure paths never silently flips it — same discipline as the --deep-git prompt above.
+        // [Story 5.5]
+        var currentPolicy = DatePolicies.TryParse(settings.TodayPolicy, out var parsed) ? parsed : DatePolicy.MachineLocal;
+        var policyChoices = new[] { currentPolicy }
+            .Concat(Enum.GetValues<DatePolicy>().Where(p => p != currentPolicy))
+            .ToArray();
+        var chosenPolicy = AnsiConsole.Prompt(
+            new SelectionPrompt<DatePolicy>()
+                .Title("Which calendar day counts as \"today\" for date pages?")
+                .UseConverter(p => $"{DatePolicies.Label(p)}{(p == DatePolicy.MachineLocal ? " (default)" : string.Empty)}")
+                .AddChoices(policyChoices));
+        settings.TodayPolicy = DatePolicies.Token(chosenPolicy);
+
         // Persist the choices so they're restored on the next run.
         if (SettingsStore.TrySave(settings) is not { } savedPath)
         {

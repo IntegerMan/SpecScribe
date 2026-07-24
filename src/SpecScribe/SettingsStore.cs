@@ -29,10 +29,16 @@ public sealed class SavedSettings
     /// <see cref="SettingsStore.Capture"/>. [Story 5.2 AC #4]</summary>
     public bool? IncludeReadme { get; set; }
 
+    /// <summary>Persisted date-page "today" policy (<c>--today-policy</c>). Tri-state like <see cref="DeepGit"/>:
+    /// null means "never configured" and keeps the machine-local default, so a <c>.specscribe</c> written by an
+    /// earlier version (where the property does not exist) deserializes to null and loads unchanged. Only a
+    /// NON-default policy is ever written — see <see cref="SettingsStore.Capture"/>. [Story 5.5]</summary>
+    public DatePolicy? TodayPolicy { get; set; }
+
     /// <summary>True when nothing was configured — an all-null file is not worth writing or logging.</summary>
     [JsonIgnore]
     public bool IsEmpty => Source is null && Adrs is null && Output is null && ProjectName is null
-        && DeepGit is null && CodeUrl is null && IncludeReadme is null;
+        && DeepGit is null && CodeUrl is null && IncludeReadme is null && TodayPolicy is null;
 }
 
 /// <summary>Reads and writes the optional <c>.specscribe</c> settings file in the current directory. Persistence
@@ -46,6 +52,10 @@ public static class SettingsStore
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // Persist DatePolicy as its NAME ("Utc"), not an ordinal — a `.specscribe` is a user-editable file, and a
+        // bare number would be opaque there and would silently re-map if the enum were ever reordered. The only
+        // enum in SavedSettings is TodayPolicy; strings/bools are unaffected. [Story 5.5]
+        Converters = { new JsonStringEnumConverter() },
     };
 
     /// <summary>The nearest existing <c>.specscribe</c> at or above <paramref name="startDirectory"/> (defaulting to
@@ -119,7 +129,21 @@ public static class SettingsStore
         // honors an explicit `true` (a hand-edited file), so the tri-state is preserved on the load side.
         // [Story 5.2 AC #4]
         IncludeReadme = settings.NoReadme ? false : null,
+        // Same persist-only-the-non-default rule again: machine-local IS the default, so it stays null (absent)
+        // rather than writing a value that would make every save produce a non-empty file and defeat IsEmpty.
+        // An explicitly persisted `MachineLocal` (hand-edited) still reads back fine — the tri-state is preserved
+        // on the load side. [Story 5.5]
+        TodayPolicy = ResolvePolicyOrNull(settings),
     };
+
+    /// <summary>The policy worth persisting for <paramref name="settings"/>, or null when there is nothing to save
+    /// (unset, the default, or an unparseable value). Never throws: <see cref="SiteSettings.ResolveDatePolicy"/>
+    /// rejects a typo loudly at RESOLVE time, which is the right moment for it — a save path must not additionally
+    /// blow up and lose the user's other, valid choices.</summary>
+    private static DatePolicy? ResolvePolicyOrNull(SiteSettings settings)
+        => DatePolicies.TryParse(settings.TodayPolicy, out var policy) && policy != DatePolicy.MachineLocal
+            ? policy
+            : null;
 
     /// <summary>Writes the configured path/name choices to <c>.specscribe</c>. Returns the file path on success,
     /// or null when there was nothing worth saving or the write failed. Targets the same file
@@ -161,5 +185,12 @@ public static class SettingsStore
         // restored; an explicit --no-readme stays on. A persisted `true` (include) needs no action — it agrees with
         // the default — but is still honored as an explicit source for provenance. [Story 5.2 AC #4]
         if (!settings.NoReadme && saved.IncludeReadme == false) settings.NoReadme = true;
+        // CLI wins: fill from the persisted policy only when no --today-policy was passed this run. Stored as the
+        // canonical token so the restored value round-trips through the same parser the command line uses — one
+        // parse path, so a saved value can never mean something the flag couldn't. [Story 5.5]
+        if (settings.TodayPolicy is not { Length: > 0 } && saved.TodayPolicy is { } savedPolicy)
+        {
+            settings.TodayPolicy = DatePolicies.Token(savedPolicy);
+        }
     }
 }

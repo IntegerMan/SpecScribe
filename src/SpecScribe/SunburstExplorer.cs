@@ -80,6 +80,10 @@ public static partial class Charts
         var unplannedGeo = unplanned ?? UnplannedWorkGeometry.Empty;
         var knownEpics = epics.Select(e => e.Number).ToHashSet();
 
+        // The no-plan average bump the SVG applies (Charts.Sunburst) must be the SAME number here, or the payload
+        // weight would disagree with the drawn wedge for every un-drafted story. [owner 2026-07-24]
+        var noPlanWeight = SunburstNoPlanStoryWeight(model, geometry);
+
         // Node ids come from author-controlled markdown (story ids are `### Story N.M:` headings, which nothing
         // dedupes), so a repeated heading would otherwise emit the same id twice — giving the client two payload
         // entries for one logical wedge and double-counting its weight when a ring is re-laid. Keep the FIRST, which
@@ -98,10 +102,10 @@ public static partial class Charts
             var (openCount, doneCount) = SunburstEpicAggregates(epic, geometry, unplannedGeo);
 
             Add(new SunburstExplorerNode(
-                epicId, null, SunburstEpicWeight(geometry, unplannedGeo, epic),
+                epicId, null, SunburstEpicWeight(geometry, unplannedGeo, epic, noPlanWeight),
                 $"Epic {epic.Number}: {epicTitle}", epicClass, $"epics/epic-{epic.Number}.html", "epic", "epic"));
 
-            var storyWeightSum = epic.Stories.Sum(s => SunburstStoryWeight(geometry, epic.Number, s));
+            var storyWeightSum = epic.Stories.Sum(s => SunburstStoryWeight(geometry, epic.Number, s, noPlanWeight));
             if (storyWeightSum > 0)
             {
                 if (epic.Stories.Count >= StoryDensityCollapseThreshold)
@@ -122,7 +126,7 @@ public static partial class Charts
                         var storyClass = noPlan ? "noplan" : StatusStyles.ForStory(story);
                         var storyHref = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
                         Add(new SunburstExplorerNode(
-                            story.Id, epicId, SunburstStoryWeight(geometry, epic.Number, story),
+                            story.Id, epicId, SunburstStoryWeight(geometry, epic.Number, story, noPlanWeight),
                             $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)}", storyClass, storyHref, "story", "story"));
                     }
                 }

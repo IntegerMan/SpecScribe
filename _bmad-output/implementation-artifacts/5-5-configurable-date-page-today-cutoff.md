@@ -1,6 +1,10 @@
+---
+baseline_commit: f9b52bd8557920e4f387d4017c924f63a5d38e19
+---
+
 # Story 5.5: Configurable Date-Page "Today" Cutoff (Timezone Policy)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -38,42 +42,42 @@ This story was **seeded 2026-07-20 from the Story 10.4 code review** ([10-4-cons
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Introduce the policy type and a single `today` resolver** (AC: #1, #2)
-  - [ ] Add a `DatePolicy` enum (values `MachineLocal`, `Utc`, `LastCommit`) — recommend a new small file `src/SpecScribe/DatePolicy.cs`, or co-locate on `ForgeOptions` if you prefer fewer files. `MachineLocal` MUST be the zero/first value so `default(DatePolicy)` == the status quo.
-  - [ ] Add one **pure static resolver** — recommend `Charts.ResolveToday(DatePolicy policy, IReadOnlyList<(DateOnly Day, int Count)>? series)` (co-locate next to `LinkedCommitDays` since that is the consumer the constraint centers on) — returning the `DateOnly` that means "today" for the run:
-    - `MachineLocal` → `DateOnly.FromDateTime(DateTime.Now)` (exactly today's expression — do not "improve" it).
+- [x] **Task 1 — Introduce the policy type and a single `today` resolver** (AC: #1, #2)
+  - [x] Add a `DatePolicy` enum (values `MachineLocal`, `Utc`, `LastCommit`) — new file `src/SpecScribe/DatePolicy.cs` (with a `DatePolicies` parse/label/token helper). `MachineLocal` is the zero/first value so `default(DatePolicy)` == the status quo.
+  - [x] Added pure static resolver `Charts.ResolveToday(DatePolicy policy, IReadOnlyList<(DateOnly Day, int Count)>? series)`, co-located next to `LinkedCommitDays`:
+    - `MachineLocal` → `DateOnly.FromDateTime(DateTime.Now)` (verbatim — the `_ =>` arm).
     - `Utc` → `DateOnly.FromDateTime(DateTime.UtcNow)`.
-    - `LastCommit` → `series` is non-null and non-empty ⇒ `series.Max(s => s.Day)`; **degrade to `MachineLocal` when `series` is null/empty** (no git, or an empty repo — there are no commit days to derive from). Document this fallback in the summary; record it in Completion Notes.
-  - [ ] Unit-test the resolver directly (see Testing Requirements): all three policies + the `LastCommit`-without-git fallback + the `LastCommit` value equals the series max.
+    - `LastCommit` → `series` non-null/non-empty ⇒ `series.Max(s => s.Day)`; **degrades to `MachineLocal` when `series` is null/empty** (documented on the method + in Completion Notes).
+  - [x] Unit-tested the resolver directly in `DatePolicyTests`: all three policies + the `LastCommit`-without-git fallback (both null and empty) + `LastCommit` == series max + the future-dated-max case.
 
-- [ ] **Task 2 — Compute the run's `today` once and thread it to all five call sites** (AC: #2 — this is the #1 review checkpoint)
-  - [ ] In `SiteGenerator`, compute the run's resolved `today` **once** (call `Charts.ResolveToday(_options.DatePolicy, _progress?.Git?.DailySeries)`) as soon as git metrics are known, and store it in a private field (e.g. `_today`). Git is already available at story-render time — `ChangeLogDayHref` reads `_progress?.Git` today — so the field is populated before any consumer runs.
-  - [ ] Replace **every** in-place `DateOnly.FromDateTime(DateTime.Now)` "today" computation on the date-cutoff path with the shared field / a threaded parameter. The five sites (verified present in the tree):
-    1. [SiteGenerator.cs:951](../../src/SpecScribe/SiteGenerator.cs) — `GenerateDatePagesInternal` → `Charts.LinkedCommitDays(..., DateOnly.FromDateTime(DateTime.Now))`.
-    2. [SiteGenerator.cs:1056](../../src/SpecScribe/SiteGenerator.cs) — artifact-by-day gather: `var today = DateOnly.FromDateTime(DateTime.Now);` (future-skew skip guard at :1065).
-    3. [SiteGenerator.cs:1364](../../src/SpecScribe/SiteGenerator.cs) — `ChangeLogDayHref` → `Charts.LinkedCommitDays(..., DateOnly.FromDateTime(DateTime.Now)).Contains(date)`.
-    4. [Charts.cs:1126](../../src/SpecScribe/Charts.cs) — `CommitHeatmap` computes `today` internally for **both** the grid extent and `LinkedCommitDays` (:1171). Add a `DateOnly today` parameter (default it to `DateOnly.FromDateTime(DateTime.Now)` so no other caller breaks) and pass the resolved value from the SiteGenerator call site.
-    5. [Charts.cs:1320](../../src/SpecScribe/Charts.cs) — the Git Pulse last-commit link computes `today` internally for its `LinkedCommitDays` guard. Thread the resolved value in the same way as (4).
-  - [ ] **Do not** change the grid-extent / future-skew *semantics* — a future-dated commit is still skipped, and the heatmap still never runs past "today". Only the *value* of "today" now flows from one policy-resolved source. Note in Dev Notes: under `Utc`/`LastCommit` the grid extent and the future-skew cutoff move together with the link/page set (this is the intended consistency, not a regression).
-  - [ ] Grep-verify zero remaining `DateOnly.FromDateTime(DateTime.Now)` on the date-cutoff path after the change (the footer/console *generation clock* `DateTime.Now` in `PathUtil`/`ConsoleUi` is a **different** concern — leave it alone; it is the machine build clock, not the date-page cutoff).
+- [x] **Task 2 — Compute the run's `today` once and thread it to all five call sites** (AC: #2 — this is the #1 review checkpoint)
+  - [x] `SiteGenerator` computes the run's resolved `today` **once** into a private `_today` field via `RefreshToday()`, called wherever `_progress` is (re)assigned (both `GenerateAll` and the incremental watch path) and seeded in the constructor.
+  - [x] Replaced every in-place `DateOnly.FromDateTime(DateTime.Now)` on the date-cutoff path with the shared field / a threaded parameter. The five sites:
+    1. `GenerateDatePagesInternal` → `Charts.LinkedCommitDays(..., _today)`.
+    2. artifact-by-day gather: `var today = _today;` (future-skew skip guard).
+    3. `ChangeLogDayHref` → `Charts.LinkedCommitDays(..., _today).Contains(date)`.
+    4. `Charts.CommitHeatmap` — added `DateOnly? today = null` param (defaults to machine-local), threaded from the SiteGenerator call sites via `TimelineTemplater.RenderPage` and `GitInsightsTemplater.RenderPage` and the dashboard's Git Pulse (`GitPulsePanel`).
+    5. `Charts.GitPulsePanel` — added `DateOnly? today = null` param; threads the resolved value into its `LinkedCommitDays` guard AND its embedded `CommitHeatmap`.
+  - [x] Grid-extent / future-skew *semantics* unchanged — only the *value* of "today" now flows from one policy-resolved source (noted in Dev Notes below).
+  - [x] Grep-verified: the remaining `DateOnly.FromDateTime(DateTime.Now)` occurrences are all OFF the date-cutoff path (artifact-staleness `today` in `BuildArtifactCoverage`, the cadence page's own bound, `GitMetrics.CountCommitsInLastDays`'s 30-day window, the two `Charts` `?? today` defaults for library callers, and the resolver's own machine-local arm). **Note:** the dashboard's existing `today` param drives artifact *staleness*, so I threaded the cutoff as a SEPARATE `dateCutoff` parameter through `RenderDashboardBody`/`BuildIndexPage` rather than conflating the two — folding them would let `last-commit` on an idle repo report every artifact as fresh.
 
-- [ ] **Task 3 — Thread the policy through the settings/options stack** (AC: #2 — follow the existing `--deep-git` / `--code-url` precedent exactly)
-  - [ ] `ForgeOptions`: add `public DatePolicy DatePolicy { get; init; }` (NOT `required` — default `MachineLocal` so every existing construction stays status quo, mirroring `EmitSpa`/`CodeSourceBaseUrl`). Add a `DatePolicy datePolicy = DatePolicy.MachineLocal` parameter to `Resolve(...)` and set it on the returned object.
-  - [ ] `SiteSettings`: add `[CommandOption("--today-policy <POLICY>")]` `public string? TodayPolicy { get; set; }` with a clear `[Description(...)]` listing the three accepted values and stating machine-local is the default and that it governs only the date-page day-cutoff (not commit-time display). Parse/validate the string → `DatePolicy` in `Resolve()` / `ResolveTolerant()` and pass it to `ForgeOptions.Resolve`. Reject an unrecognized value with an actionable message that lists the valid values (mirror `TryValidateCodeUrl`'s reject-don't-silently-accept discipline — a typo must not silently fall back to default). Accept a small set of forgiving spellings if trivial (`utc`/`UTC`, `machine-local`/`machine`, `last-commit`/`last`), but keep the canonical set documented.
-  - [ ] `SavedSettings` (`SettingsStore.cs`): add `public DatePolicy? TodayPolicy { get; set; }` (nullable for the tri-state "never configured", matching `DeepGit`'s pattern). Update `IsEmpty` to include it. In `TrySave`, persist only a **non-default** value (write `null` for `MachineLocal`, same "nothing to persist for the default" logic as `DeepGit`). In `ApplyTo`, fill `settings.TodayPolicy` from `saved` only when the CLI didn't pass one (CLI wins — same `??=` precedence as the other options).
-  - [ ] `ConfigurePaths` (`Commands.cs:378`): add an interactive prompt for the policy (a `SelectionPrompt<DatePolicy>` or a three-choice text prompt), defaulted to the current value so re-running Configure paths doesn't silently flip it — this is the NFR7 menu/CLI-parity requirement the `--deep-git` and `--code-url` prompts already satisfy. Persist via the existing `SettingsStore.TrySave(settings)` call.
+- [x] **Task 3 — Thread the policy through the settings/options stack** (AC: #2)
+  - [x] `ForgeOptions`: added `public DatePolicy DatePolicy { get; init; }` (not `required`, defaults `MachineLocal`) + a `DatePolicy datePolicy = DatePolicy.MachineLocal` parameter on `Resolve(...)`.
+  - [x] `SiteSettings`: added `[CommandOption("--today-policy <POLICY>")] public string? TodayPolicy`, wired into `Resolve`/`ResolveTolerant` via `ResolveDatePolicy()`. Rejection is done at Spectre's parse-time `Validate()` gate (cleanest surface) with `ResolveDatePolicy()` throwing as a backstop for the menu/library paths. Forgiving spellings accepted (`machine`/`local`, `utc`, `last`/`commit`); canonical set documented.
+  - [x] `SavedSettings`: added `public DatePolicy? TodayPolicy` (tri-state nullable), included in `IsEmpty`; `Capture`/`TrySave` persist only a non-default value; `ApplyTo` fills from saved only when the CLI didn't pass one (CLI wins). Enum persists as its NAME (added a scoped `JsonStringEnumConverter`) so `.specscribe` stays human-editable and reorder-proof.
+  - [x] `SettingsResolver`: added `Fields.TodayPolicy`, the `CliOverrides.TodayPolicy` snapshot, and the provenance entry (reported as the canonical token for the `--show-config` grep surface). `ConfigurePaths` (`Commands.cs`) gained a `SelectionPrompt<DatePolicy>` seeded with the current value first.
 
-- [ ] **Task 4 — Surface effective policy + provenance on the diagnostics page** (AC: #2)
-  - [ ] `DiagnosticsConfig` ([DiagnosticsTemplater.cs:109](../../src/SpecScribe/DiagnosticsTemplater.cs)): add a field for the policy display (e.g. `public required DatePolicy DatePolicy { get; init; }` or a pre-formatted `DatePolicyDisplay` string). Set it in `FromRun` from `options.DatePolicy` — pure field read, no I/O (preserve the local-first-by-construction invariant AC #2/NFR3 already guarantees).
-  - [ ] `RenderConfig` ([DiagnosticsTemplater.cs:256](../../src/SpecScribe/DiagnosticsTemplater.cs)): add one `AppendRow(sb, "Date-page \"today\" policy", ...)` row after "Deep-git analytics", rendering a human label — e.g. `machine-local (default)`, `UTC calendar day`, `latest authored commit day`. Provenance treatment: the display must make clear when the value is the default vs. an explicit override (mirror the existing `"on (--deep-git)"` vs `"off"` and ADR `"explicit (--adrs)"` vs `"default"` conventions). **The word/label must never be color-only** (it is text in the `<dl>`, so this is satisfied by construction — same rule as 4.8 AC #2d).
-  - [ ] This row is the **only** intentional byte delta on `diagnostics.html` at the default policy — confirm the golden diff shows exactly that.
+- [x] **Task 4 — Surface effective policy + provenance on the diagnostics page** (AC: #2)
+  - [x] `DiagnosticsConfig` gained `public required DatePolicy DatePolicy`, set in `FromRun` from `options.DatePolicy` (pure field read).
+  - [x] `RenderConfig` adds one `AppendRow(sb, "Date-page \"today\" policy", ...)` after "Deep-git analytics": `machine-local calendar day (default)` at the default, `… (--today-policy <token>)` for an override — mirroring the `on (--deep-git)` / ADR `explicit (--adrs)` provenance convention. Text in the `<dl>`, never color-only.
+  - [x] Confirmed via the golden fingerprint gate that this row is the ONLY byte delta on the site at the default policy.
 
-- [ ] **Task 5 — Tests, golden regen, and verification** (AC: #1, #2)
-  - [ ] Resolver unit tests (Task 1) + settings round-trip tests (Task 3: `TrySave` omits `MachineLocal`, persists non-default; `ApplyTo` CLI-precedence; unrecognized `--today-policy` string rejected).
-  - [ ] A generation-level test proving **AC #1**: with default policy the full site is byte-identical to the pre-story baseline **except** the one new diagnostics config row. Use the golden fingerprint gate (see the golden-diff gotcha below) to prove the delta is exactly that.
-  - [ ] A `DiagnosticsTemplaterTests` assertion that the config `<details>` contains the policy row (extend the existing test at the pattern noted in [4-8-…md:108](4-8-generation-diagnostics-and-configuration-log-page.md)).
-  - [ ] A focused test proving **AC #2 consistency**: for a non-default policy (`Utc` or `LastCommit`) the linked-day set (`LinkedCommitDays` via the resolved today) equals the generated date-page set — i.e. the resolver value drives both. A construct-a-series unit test on `ResolveToday` + `LinkedCommitDays` is sufficient and cheaper than a full generation; add it at the `Charts`/`SiteGenerator` seam.
-  - [ ] Regenerate the golden content fingerprint (one row on `diagnostics.html`) and record the new hash in Completion Notes. **Confirm with a repeated clean run before locking any constant** (stale-build first-captured-hash trap — see gotcha).
+- [x] **Task 5 — Tests, golden regen, and verification** (AC: #1, #2)
+  - [x] Resolver unit tests (`DatePolicyTests`) + settings round-trip tests (`SettingsStoreTests`: `TrySave` omits `MachineLocal`, persists/normalizes non-default, backward-compat load; `ApplyTo` CLI-precedence) + CLI rejection tests (`SettingsResolverTests`: `Validate` rejects a typo with the valid-value list, `ResolveDatePolicy` throws).
+  - [x] AC #1 proven by the golden fingerprint gate: default-policy site byte-identical except the one new diagnostics row. New hash `336e807c…`, stable across two clean runs.
+  - [x] `DiagnosticsTemplaterTests` asserts the config `<dl>` carries the policy row (default + both non-default provenance forms).
+  - [x] AC #2 consistency proven in `DatePolicyTests` (`ResolvedToday_DrivesTheLinkedDaySet_UnderLastCommitPolicy`, `OneResolvedToday_MakesEveryConsumerAgree`) AND live: a real `--deep-git --today-policy last-commit` generation produced 21 linked days == 21 generated date pages, zero dead links.
+  - [x] Golden content fingerprint regenerated + recorded; confirmed stable across two repeated clean runs (stale-build trap avoided).
 
 ## Dev Notes
 
@@ -158,8 +162,45 @@ No new script, no motion. The heatmap and date pages are pure server-rendered SV
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Code)
+
 ### Debug Log References
+
+- Full suite: 2336 passed / 3 skipped (pre-existing) / 0 failed.
+- Golden fingerprint regenerated `89c8cf0c…` → `336e807c…`; verified stable across two clean runs.
+- Live: `generate --deep-git --today-policy last-commit` → 679 pages, 0 errors; 21 linked days == 21 generated `commits/*.html`, 0 dead links; diagnostics row renders `latest authored commit day (--today-policy last-commit)`; `--show-config` emits `field=today_policy origin=commandline value=utc`; `--today-policy nope` rejected with the valid-values list.
 
 ### Completion Notes List
 
+- **Story landed after Story 5.2 merged**, so the settings stack this extends is now the `SettingsResolver` seam (Load/Resolve/provenance), not the raw `SettingsStore` the story's Dev Notes described. Threaded the policy through that seam: new `Fields.TodayPolicy`, `CliOverrides.TodayPolicy` snapshot, and provenance entry — so `--show-config` and the interactive paths block attribute it correctly (CLI > `.specscribe` > default), exactly like `--deep-git`/`--code-url`.
+- **`LastCommit` degradation:** with no git / empty repo the resolver falls back to `MachineLocal` (the `series is { Count: > 0 }` guard), so a git-less repo behaves exactly as today and never crashes or invents a sentinel date (NFR8).
+- **Cutoff vs. staleness are kept distinct.** The dashboard already had a `today` parameter that drives artifact-coverage *staleness*; I did NOT reuse it for the date-page cutoff. Instead I added a separate `dateCutoff` parameter through `RenderDashboardBody`/`BuildIndexPage`/`AppendDashboardSection`. Conflating them would let `--today-policy last-commit` on a long-idle repo report every planning artifact as freshly updated — a real bug this separation prevents. `Utc` policy still never re-zones a commit *timestamp* (Story 10.4 honesty preserved).
+- **Enum persistence format:** `DatePolicy` is written to `.specscribe` as its NAME (`"Utc"`) via a scoped `JsonStringEnumConverter`, not an ordinal — a hand-editable config shouldn't carry an opaque number, and a name is immune to enum reordering.
+- **Rejection is at Spectre's `Validate()` gate** (parse-time, clean CLI error) with `ResolveDatePolicy()` throwing as a backstop for the interactive menu / library callers that never pass through Spectre validation.
+- **Shared-main provenance:** regenerated the golden hash on a tree also carrying a concurrent session's untracked `23-2-component-library-and-design-token-bridge.md` (a doc, not code, not part of the temp fixture — does not affect the hash). All new symbols grep-verified present after the build.
+- **Owner questions (from story close) still open** — none blocked implementation; recommend confirming at epic-end review: (1) the `--today-policy` name + `machine-local`/`utc`/`last-commit` tokens; (2) `LastCommit` == series-max semantics (implemented as recommended); (3) whether a future `--as-of <date>` policy is wanted (left out of scope).
+
 ### File List
+
+- `src/SpecScribe/DatePolicy.cs` (NEW — `DatePolicy` enum + `DatePolicies` parse/label/token helper)
+- `src/SpecScribe/Charts.cs` (`ResolveToday` resolver; `CommitHeatmap` + `GitPulsePanel` gain a `today` param)
+- `src/SpecScribe/SiteGenerator.cs` (`_today` field + `RefreshToday()`; five call sites threaded; `dateCutoff` passed to the dashboard)
+- `src/SpecScribe/HtmlTemplater.cs` (`RenderIndex`/`BuildIndexPage` gain `dateCutoff`)
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` (`RenderDashboardBody`/`AppendDashboardSection` gain `dateCutoff`; Git Pulse threaded)
+- `src/SpecScribe/TimelineTemplater.cs` (`RenderPage` gains `today`, threaded to the heatmap)
+- `src/SpecScribe/GitInsightsTemplater.cs` (`RenderPage`/`AppendActivitySection` gain `today`, threaded to the heatmap)
+- `src/SpecScribe/ForgeOptions.cs` (`DatePolicy` property + `Resolve` parameter)
+- `src/SpecScribe/SiteSettings.cs` (`--today-policy` option; `Validate()`; `ResolveDatePolicy()`; both `Resolve` paths)
+- `src/SpecScribe/SettingsStore.cs` (`SavedSettings.TodayPolicy` tri-state; `IsEmpty`/`Capture`/`ApplyTo`; string-enum converter)
+- `src/SpecScribe/SettingsResolver.cs` (`Fields.TodayPolicy`; `CliOverrides.TodayPolicy`; provenance entry)
+- `src/SpecScribe/Commands.cs` (`ConfigurePaths` interactive `SelectionPrompt<DatePolicy>`)
+- `src/SpecScribe/DiagnosticsTemplater.cs` (`DiagnosticsConfig.DatePolicy`; `FromRun`; the config `<dl>` row)
+- `tests/SpecScribe.Tests/DatePolicyTests.cs` (NEW — resolver, consistency, parse/label/token)
+- `tests/SpecScribe.Tests/SettingsStoreTests.cs` (policy persistence round-trip + precedence)
+- `tests/SpecScribe.Tests/SettingsResolverTests.cs` (policy provenance + CLI rejection)
+- `tests/SpecScribe.Tests/DiagnosticsTemplaterTests.cs` (config-row assertions + `Config(datePolicy:)`)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` (golden fingerprint regenerated)
+
+## Change Log
+
+- 2026-07-24 — Story 5.5 implemented: configurable date-page "today" cutoff (`DatePolicy` MachineLocal/Utc/LastCommit; `--today-policy` + `.specscribe` persistence + interactive parity; one policy-resolved `_today` shared across all five date-cutoff consumers; diagnostics provenance row). Default byte-identical except the one diagnostics row (golden `336e807c…`). Status → review.

@@ -2,31 +2,26 @@ using System.Text;
 
 namespace SpecScribe;
 
-/// <summary>Renders the Story 20.3 <em>Related work</em> pane — the explorer's sibling region listing the
-/// work-graph nodes related to the current selection, grouped by edge kind.
+/// <summary>Renders the Story 20.3 details rail — a compact card beside the explorer sunburst that augments the
+/// current selection: the node's name, a one-line summary, a single most-relevant AI action (a read-only BMad
+/// command badge, AD-6), and a link to its full detail page. When nothing is selected it shows a project-level
+/// default card and a prompt to pick a node.
 ///
-/// <para><b>The server ships the whole truth (AC #2 / NFR8).</b> Every selectable node's groups are rendered into
-/// the DOM at generation time, and with JavaScript off ALL of them are visible — the pane reads as a compact
-/// per-epic digest of <c>work-graph.html</c>, which is the documented no-JS default view. The client
-/// (<c>specscribe.js</c>) only ever REVEALS a slice of this markup as the selection changes; it fetches nothing,
-/// counts nothing, and invents no destination. This mirrors the <c>work-graph-scope-select</c> idiom the work-graph
-/// page already uses ("with JS off every section shows").</para>
+/// <para><b>Progressive enhancement (AC #2 / NFR8).</b> Every card is server-rendered. With JavaScript OFF the rail
+/// shows the project card plus every scope's card stacked, and each card's relationship groups are expanded in a
+/// native <c>&lt;details&gt;</c> — the complete work-graph relationship data, never JS-gated. With JavaScript ON
+/// (<c>data-related-ready</c> on the pane) the CSS collapses that to the fancy single-card behaviour: the project
+/// card by default, one scope card on selection, its <c>&lt;details&gt;</c> hidden in favour of the "View details"
+/// link. The client only ever toggles which card is current; it fetches nothing and computes no count.</para>
 ///
-/// <para><b>Empty means absent, not blank.</b> A project with no work-graph signal renders NO pane at all
-/// (<see cref="RelatedWorkModel.IsEmpty"/> — the same NFR8 gate <c>work-graph.html</c> uses), so the panel can
-/// never ship as permanent dead chrome on a young project. The designed empty state is for the other case: a
-/// selection that exists but has no edges. [Story 20.3]</summary>
+/// <para><b>Empty means absent.</b> A project with no work-graph signal renders NO rail
+/// (<see cref="RelatedWorkPaneModel.IsEmpty"/>) — never dead chrome. [Story 20.3]</summary>
 public static class RelatedWorkTemplater
 {
-    /// <summary>DOM attribute marking the pane root — the one place the class ↔ script contract is named, mirroring
-    /// <see cref="Charts.SunburstExplorerDataId"/>. [Story 20.3]</summary>
+    /// <summary>DOM attribute marking the rail root — the one place the class ↔ script contract is named. [Story 20.3]</summary>
     public const string PaneAttribute = "data-related-pane";
 
-    /// <summary>Renders the whole pane, or "" when there is nothing to relate (NFR8: absent data → absent surface).
-    /// <paramref name="workGraphHref"/> is the host-relative path to <c>work-graph.html</c>, or null when that page
-    /// was not generated — in which case the "see the full graph" affordances are omitted rather than emitted as
-    /// links to a page that does not exist (Epic 7's guarded-href discipline).</summary>
-    public static string RenderPane(RelatedWorkModel model, string? workGraphHref)
+    public static string RenderPane(RelatedWorkPaneModel model)
     {
         if (model.IsEmpty) return string.Empty;
 
@@ -35,75 +30,82 @@ public static class RelatedWorkTemplater
         sb.Append(PaneAttribute);
         sb.Append(" aria-labelledby=\"related-work-h\">\n");
         sb.Append("<div class=\"chart-panel-header-row\"><h3 id=\"related-work-h\">Related work</h3>");
-        if (workGraphHref is { Length: > 0 })
-            sb.Append($"<a class=\"view-epic-link\" href=\"{PathUtil.Html(workGraphHref)}\">View the full work graph &rarr;</a>");
+        if (model.WorkGraphHref is { Length: > 0 } wg)
+            sb.Append($"<a class=\"view-epic-link\" href=\"{PathUtil.Html(wg)}\">View the full work graph &rarr;</a>");
         sb.Append("</div>\n");
-        sb.Append("<p class=\"related-work-intro\">Where each epic's follow-up work came from, and what closed it. Drill into the chart above to narrow this to one scope; with the whole project in view, every scope's connections are listed.</p>\n");
-        // Selection changes are announced here rather than on the sunburst's own live region: two live regions
-        // updating from one activation would talk over each other. [Story 20.3]
+        // Selection changes announce here, not on the sunburst's own live region — two live regions updating from
+        // one activation would talk over each other. [Story 20.3]
         sb.Append("<div class=\"related-work-live sr-only\" aria-live=\"polite\"></div>\n");
 
-        // `data-related-node` carries the island id verbatim (that is the join key); the derived DOM id is reduced
-        // to a safe alphabet, which can collide (`20.2` and `20-2` both reduce to `20-2`), so disambiguate here —
-        // a duplicate `id` would break the `aria-labelledby` pairing for one of the two sections.
-        var usedDomIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var node in model.Nodes)
-        {
-            var domId = "rw-" + DomSafe(node.IslandId);
-            var unique = domId;
-            for (var n = 2; !usedDomIds.Add(unique); n++) unique = $"{domId}-{n}";
-            sb.Append(RenderNode(node, unique, workGraphHref));
-        }
+        RenderProjectCard(sb, model.Project);
 
-        // Designed empty state (AC #2) for a selection that exists but has no edges. Server-rendered and hidden by
-        // default: with JS off there is no selection, so every scope above is showing and this would be a lie.
+        foreach (var card in model.Cards)
+            RenderCard(sb, card, model.WorkGraphHref);
+
+        // Designed empty state (AC #2) for a selection whose node has no card — revealed by JS only. Server-rendered
+        // hidden: with JS off there is no selection, so every scope's card is already showing.
         sb.Append("<p class=\"related-work-empty\" data-related-empty hidden>No related work items for this selection.</p>\n");
-
-        if (model.Overflow > 0)
-        {
-            var more = workGraphHref is { Length: > 0 }
-                ? $" They are listed on the <a href=\"{PathUtil.Html(workGraphHref)}\">work graph</a>."
-                : string.Empty;
-            sb.Append($"<p class=\"related-work-overflow\">{model.Overflow} further follow-up {Charts.Plural(model.Overflow, "item", "items")} sit beyond the work graph's per-epic draw limit and are not shown here.{more}</p>\n");
-        }
 
         sb.Append("</aside>\n\n");
         return sb.ToString();
     }
 
-    private static string RenderNode(RelatedWorkNode node, string domId, string? workGraphHref)
+    private static void RenderProjectCard(StringBuilder sb, RelatedProjectCard card)
     {
-        var sb = new StringBuilder();
-        sb.Append($"<section class=\"related-node\" data-related-node=\"{PathUtil.Html(node.IslandId)}\" aria-labelledby=\"{domId}-h\">\n");
-        sb.Append($"  <h4 class=\"related-node-title\" id=\"{domId}-h\">");
-        // Guarded href: a node the generator produced no page for renders as plain text, never a dead link.
-        if (node.Href is { Length: > 0 })
-            sb.Append($"<a href=\"{PathUtil.Html(node.Href)}\">{PathUtil.Html(node.Label)}</a>");
-        else
-            sb.Append(PathUtil.Html(node.Label));
-        sb.Append("</h4>\n");
+        sb.Append("<div class=\"related-card related-card-project\" data-related-default>\n");
+        sb.Append($"  <h4 class=\"related-card-title\">{PathUtil.Html(card.Title)}</h4>\n");
+        sb.Append($"  <p class=\"related-card-summary\">{PathUtil.Html(card.Summary)}</p>\n");
+        AppendAction(sb, card.PrimaryCommand);
+        sb.Append($"  <p class=\"related-card-hint\">{PathUtil.Html(card.Hint)}</p>\n");
+        sb.Append("</div>\n");
+    }
 
-        AppendGroups(sb, node.Groups, node.ScopeAnchor, workGraphHref, indent: "  ");
+    private static void RenderCard(StringBuilder sb, RelatedCard card, string? workGraphHref)
+    {
+        sb.Append($"<article class=\"related-card\" data-related-node=\"{PathUtil.Html(card.IslandId)}\">\n");
+        // Name. The KindWord leads as a muted eyebrow (stated in words, never colour) so an epic vs story reads at a
+        // glance without a coloured badge.
+        sb.Append($"  <p class=\"related-card-kind\">{PathUtil.Html(card.KindWord)}</p>\n");
+        sb.Append($"  <h4 class=\"related-card-title\">{PathUtil.Html(card.Title)}</h4>\n");
+        sb.Append($"  <p class=\"related-card-summary\">{PathUtil.Html(card.Summary)}</p>\n");
+        AppendAction(sb, card.PrimaryCommand);
+        // The "more details" link — a distinct button to the node's own page, where its full work-graph tab lives.
+        if (card.DetailHref is { Length: > 0 } href)
+            sb.Append($"  <a class=\"related-card-more\" href=\"{PathUtil.Html(href)}\">View details &rarr;</a>\n");
 
-        // Nodes the chart drew no wedge for but whose relationships belong in this scope — each under its OWN name,
-        // so a story's "Resolved by this" is never mis-attributed to the epic hosting it. Without this fold, every
-        // Resolves edge on the live portal would be invisible: they all land on resolver stories, and most of those
-        // sit in density-collapsed epics with no wedge. [Story 20.3; Story 20.1 spike §1a rule 2]
-        foreach (var subject in node.Subjects)
+        // The relationship groups — the JS-off relationship block (AC #2). A native <details>, expanded with JS off
+        // (CSS hides it entirely once JS takes over, since the "View details" link then carries the reader onward).
+        var rel = card.Relationships;
+        if (rel.Groups.Count > 0 || rel.Subjects.Count > 0)
         {
-            sb.Append("  <div class=\"related-subject\">\n");
-            sb.Append("    <h5 class=\"related-subject-title\">");
-            if (subject.Href is { Length: > 0 })
-                sb.Append($"<a href=\"{PathUtil.Html(subject.Href)}\">{PathUtil.Html(subject.Label)}</a>");
-            else
-                sb.Append(PathUtil.Html(subject.Label));
-            sb.Append("</h5>\n");
-            AppendGroups(sb, subject.Groups, node.ScopeAnchor, workGraphHref, indent: "    ");
-            sb.Append("  </div>\n");
+            sb.Append("  <details class=\"related-card-full\">\n");
+            sb.Append($"    <summary>Related items ({rel.EntryCount})</summary>\n");
+            AppendGroups(sb, rel.Groups, rel.ScopeAnchor, workGraphHref, indent: "    ");
+            foreach (var subject in rel.Subjects)
+            {
+                sb.Append("    <div class=\"related-subject\">\n");
+                sb.Append("      <p class=\"related-subject-title\">");
+                if (subject.Href is { Length: > 0 } sh)
+                    sb.Append($"<a href=\"{PathUtil.Html(sh)}\">{PathUtil.Html(subject.Label)}</a>");
+                else
+                    sb.Append(PathUtil.Html(subject.Label));
+                sb.Append("</p>\n");
+                AppendGroups(sb, subject.Groups, rel.ScopeAnchor, workGraphHref, indent: "      ");
+                sb.Append("    </div>\n");
+            }
+            sb.Append("  </details>\n");
         }
 
-        sb.Append("</section>\n");
-        return sb.ToString();
+        sb.Append("</article>\n");
+    }
+
+    private static void AppendAction(StringBuilder sb, string? command)
+    {
+        var badge = BmadCommands.RenderPrimaryActionBadge(command);
+        if (badge.Length == 0) return;
+        sb.Append("  <div class=\"related-card-action\">");
+        sb.Append(badge);
+        sb.Append("</div>\n");
     }
 
     private static void AppendGroups(
@@ -120,10 +122,8 @@ public static class RelatedWorkTemplater
             sb.Append($"{indent}  <ul class=\"related-list\">\n");
             foreach (var entry in group.Entries)
             {
-                // No kind chip, and no colour signal to reinforce: RelatedWork.NodeText already names the kind IN
-                // THE LABEL for exactly the kinds that need it ("Deferred item: …", "Action item: …", "Source: …")
-                // while an epic/story/retro label is self-describing. A separate chip repeated the word — a screen
-                // reader read "Story Story 19.1" — so it is the label, not decoration, that carries the type here.
+                // The node kind is already named in RelatedWork.NodeText where it matters ("Deferred item: …"),
+                // so no colour-only signal here.
                 sb.Append($"{indent}    <li class=\"related-row\">");
                 var title = entry.Title is { Length: > 0 } ? $" title=\"{PathUtil.Html(entry.Title)}\"" : string.Empty;
                 if (entry.Href is { Length: > 0 })
@@ -135,8 +135,6 @@ public static class RelatedWorkTemplater
             sb.Append($"{indent}  </ul>\n");
             if (group.Hidden > 0)
             {
-                // Truncation is reported, never silent: the pane caps rows so the dashboard stays readable, and
-                // says exactly how many it withheld. [Story 20.3]
                 var link = workGraphHref is { Length: > 0 }
                     ? $"<a href=\"{PathUtil.Html(workGraphHref)}#{PathUtil.Html(scopeAnchor)}\">See all on the work graph &rarr;</a>"
                     : string.Empty;
@@ -144,17 +142,5 @@ public static class RelatedWorkTemplater
             }
             sb.Append($"{indent}</div>\n");
         }
-    }
-
-    /// <summary>Island ids come from author-controlled markdown (a story id is a <c>### Story N.M:</c> heading), so
-    /// they can carry dots, spaces or worse. The id-namespace VALUE stays verbatim in <c>data-related-node</c> —
-    /// that is what the client joins on — and only the derived DOM <c>id</c> is reduced to a safe alphabet, so a
-    /// heading can never produce a malformed <c>aria-labelledby</c> pair. [Story 20.3]</summary>
-    private static string DomSafe(string islandId)
-    {
-        var sb = new StringBuilder(islandId.Length);
-        foreach (var ch in islandId)
-            sb.Append(char.IsAsciiLetterOrDigit(ch) || ch is '-' or '_' ? ch : '-');
-        return sb.Length > 0 ? sb.ToString() : "node";
     }
 }

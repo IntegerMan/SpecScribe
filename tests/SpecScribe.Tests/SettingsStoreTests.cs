@@ -265,4 +265,83 @@ public class SettingsStoreTests : IDisposable
 
         Assert.True(settings.NoReadme);
     }
+
+    // ---- Story 5.5: the date-page "today" policy joins the persistence stack ----
+
+    [Fact]
+    public void IsEmpty_IsFalseWhenOnlyTodayPolicySet()
+    {
+        Assert.False(new SavedSettings { TodayPolicy = DatePolicy.Utc }.IsEmpty);
+    }
+
+    /// <summary>Persist-only-the-non-default: a run at the default machine-local policy has nothing worth saving, so
+    /// it must not turn an otherwise-empty config into a written file. [Story 5.5]</summary>
+    [Fact]
+    public void TrySave_DoesNotPersistTheDefaultMachineLocalPolicy()
+    {
+        var repo = NewDir();
+
+        Assert.Null(SettingsStore.TrySave(new SiteSettings { TodayPolicy = "machine-local" }, repo));
+        Assert.False(File.Exists(Path.Combine(repo, SettingsStore.FileName)));
+    }
+
+    [Fact]
+    public void TrySaveThenTryLoad_RoundTripsANonDefaultPolicy()
+    {
+        var repo = NewDir();
+        SettingsStore.TrySave(new SiteSettings { TodayPolicy = "utc" }, repo);
+
+        var loaded = SettingsStore.TryLoad(repo);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(DatePolicy.Utc, loaded!.TodayPolicy);
+    }
+
+    /// <summary>A forgiving CLI spelling is normalized to the canonical policy on save, so what round-trips through
+    /// the file is exactly what the flag would parse. [Story 5.5]</summary>
+    [Fact]
+    public void TrySave_NormalizesAForgivingPolicySpelling()
+    {
+        var repo = NewDir();
+        SettingsStore.TrySave(new SiteSettings { TodayPolicy = "last" }, repo);
+
+        Assert.Equal(DatePolicy.LastCommit, SettingsStore.TryLoad(repo)!.TodayPolicy);
+    }
+
+    [Fact]
+    public void ApplyTo_RestoresPersistedPolicyWhenCliDidNotProvideOne()
+    {
+        var settings = new SiteSettings(); // no --today-policy this run
+
+        SettingsStore.ApplyTo(new SavedSettings { TodayPolicy = DatePolicy.LastCommit }, settings);
+
+        Assert.Equal(DatePolicy.LastCommit, settings.ResolveDatePolicy());
+    }
+
+    /// <summary>CLI wins: an explicit `--today-policy` is not overridden by a saved value. [Story 5.5 / AC #2]</summary>
+    [Fact]
+    public void ApplyTo_DoesNotOverrideAnExplicitCliPolicy()
+    {
+        var settings = new SiteSettings { TodayPolicy = "utc" };
+
+        SettingsStore.ApplyTo(new SavedSettings { TodayPolicy = DatePolicy.LastCommit }, settings);
+
+        Assert.Equal(DatePolicy.Utc, settings.ResolveDatePolicy());
+    }
+
+    /// <summary>Backward compatibility: a `.specscribe` written before this field existed loads cleanly with the
+    /// policy simply absent (null = never configured, keeps the default). [Story 5.5]</summary>
+    [Fact]
+    public void TryLoad_AcceptsASettingsFileWrittenWithoutTodayPolicy()
+    {
+        var repo = NewDir();
+        File.WriteAllText(
+            Path.Combine(repo, SettingsStore.FileName),
+            """{ "Output": "out", "ProjectName": "Legacy" }""");
+
+        var loaded = SettingsStore.TryLoad(repo);
+
+        Assert.NotNull(loaded);
+        Assert.Null(loaded!.TodayPolicy);
+    }
 }

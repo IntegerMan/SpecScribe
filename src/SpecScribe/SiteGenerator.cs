@@ -54,6 +54,24 @@ public sealed class SiteGenerator
     private ModuleContext _module = ModuleContext.None;
     private EpicsModel? _epicsModel;
     private ProgressModel? _progress;
+
+    /// <summary>The ONE calendar day this pass treats as "today" for the date-page cutoff, resolved from
+    /// <see cref="ForgeOptions.DatePolicy"/> by <see cref="Charts.ResolveToday"/> and shared by every consumer: the
+    /// linked-day set (<see cref="Charts.LinkedCommitDays"/>), the generated <c>commits/{date}.html</c> set, the
+    /// artifact-by-day future-skew guard, the heatmap grid extent, and every guarded date link.
+    /// <para>A field rather than five independent resolutions BY DESIGN. <see cref="Charts.LinkedCommitDays"/>'s
+    /// guarantee — a linked cell always has a generated page, and vice versa — holds only while every consumer
+    /// filters on the same value. Before Story 5.5 the sites agreed by accident (they all evaluated the same
+    /// <c>DateTime.Now</c> expression); once "today" is a POLICY, independent re-resolution becomes a real drift
+    /// hazard: a <c>Utc</c> midnight crossed mid-run, or a re-read series under <c>LastCommit</c>, would produce a
+    /// dead link or an orphaned page. Resolve once, thread everywhere. [Story 5.5]</para></summary>
+    private DateOnly _today;
+
+    /// <summary>Re-resolves <see cref="_today"/> from the current policy and git series. Called exactly where
+    /// <see cref="_progress"/> is (re)assigned — that is the moment git metrics become known, and it is BEFORE any
+    /// consumer runs on every path. Within a single pass the value never moves.</summary>
+    private void RefreshToday() => _today = Charts.ResolveToday(_options.DatePolicy, _progress?.Git?.DailySeries);
+
     private RequirementsModel? _requirements;
     private List<AdrEntry> _adrs = new();
 
@@ -147,6 +165,9 @@ public sealed class SiteGenerator
     public SiteGenerator(ForgeOptions options)
     {
         _options = options;
+        // Seeded before any pass runs so a consumer reached on a git-less path still reads a resolved day rather
+        // than default(DateOnly). RefreshToday() re-resolves once the series is known. [Story 5.5]
+        RefreshToday();
     }
 
     public IReadOnlyList<GenerationEvent> GenerateAll(IGenerationReporter? reporter = null)
@@ -251,6 +272,9 @@ public sealed class SiteGenerator
             {
                 _epicsModel = bundle.Epics;
                 _progress = progress;
+                // Git metrics are now known, so the run's one "today" can be resolved (it matters only under
+                // DatePolicy.LastCommit, which derives from the daily series). [Story 5.5]
+                RefreshToday();
                 TagEpicRetrospectives();
             }
             if (bundle.Requirements is not null)
@@ -619,6 +643,9 @@ public sealed class SiteGenerator
             {
                 _epicsModel = ingest.Epics;
                 _progress = progress;
+                // Same as the full-build path: re-resolve the pass's "today" as soon as git metrics land, so an
+                // incremental regen's linked set and generated set are filtered on one shared value. [Story 5.5]
+                RefreshToday();
                 // Watch-mode re-ingest also re-stamps HasRetrospective from the (preserved) retro map, so a retro'd
                 // all-done epic doesn't flip to "In review" on the sunburst/donut/badge after an unrelated story
                 // edit — the flag must not reset to false when the model is rebuilt. [spec-sunburst-retro]
@@ -1218,7 +1245,7 @@ public sealed class SiteGenerator
 
         var commitsByDay = git?.CommitsByDay ?? EmptyCommitsByDay;
         var commitDays = git is not null
-            ? Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now))
+            ? Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, _today)
             : (IReadOnlyList<DateOnly>)Array.Empty<DateOnly>();
         var days = ActivityModel.UnionDays(commitDays, artifactsByDay.Keys);
         if (days.Count == 0) return events;
@@ -1324,7 +1351,9 @@ public sealed class SiteGenerator
 
             if (repoRelToArtifact.Count == 0) return EmptyArtifactsByDay;
 
-            var today = DateOnly.FromDateTime(DateTime.Now);
+            // The run's shared cutoff, not a second clock read: this skip guard and LinkedCommitDays must exclude
+            // the same days or an artifact change lands on a date page that was never generated. [Story 5.5]
+            var today = _today;
             var labelCache = new Dictionary<string, string>(StringComparer.Ordinal);
             var items = new List<(DateOnly Day, string Label, string Href)>();
             foreach (var commit in deep.Commits)
@@ -1415,7 +1444,7 @@ public sealed class SiteGenerator
         try
         {
             var newestFirst = days.OrderByDescending(d => d).ToList();
-            var html = TimelineTemplater.RenderPage(git, newestFirst, commitsByDay, artifactsByDay, nav);
+            var html = TimelineTemplater.RenderPage(git, newestFirst, commitsByDay, artifactsByDay, nav, _today);
             WriteOutput(SiteNav.TimelineOutputPath, ApplyReferenceLinks(html, SiteNav.TimelineOutputPath));
             _timelinePath = SiteNav.TimelineOutputPath;
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.TimelineOutputPath, sw.Elapsed));
@@ -1636,7 +1665,7 @@ public sealed class SiteGenerator
     /// spec-change-log-date-links.md. [date links]</summary>
     private string? ChangeLogDayHref(DateOnly date) =>
         _progress?.Git is { } git &&
-        Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, DateOnly.FromDateTime(DateTime.Now)).Contains(date)
+        Charts.LinkedCommitDays(git.DailySeries, git.CommitsByDay, _today).Contains(date)
             ? DayPageOutputPath(date)
             : null;
 
@@ -2435,7 +2464,7 @@ public sealed class SiteGenerator
             // categorical scheme Story 7.9's file-type legend uses), a different bound than "how many contributors
             // show up per file."
             var topAuthors = GitMetrics.BuildTopAuthors(_progress.DeepGit.Commits, capN: Charts.OwnershipTopAuthorPaletteSize);
-            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref);
+            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref, today: _today);
             WriteOutput(SiteNav.GitInsightsOutputPath, ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
         }
@@ -2715,7 +2744,7 @@ public sealed class SiteGenerator
             var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph);
+                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -2982,7 +3011,7 @@ public sealed class SiteGenerator
         var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
@@ -3155,7 +3184,7 @@ public sealed class SiteGenerator
         var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
         // `_workGraph` is handed in verbatim — the SAME instance WriteWorkGraph renders — so the Story 20.3
         // related-work pane is a pure read over the already-computed model, never a second projection. [Story 20.3]
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
     }
 

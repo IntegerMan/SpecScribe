@@ -94,6 +94,27 @@ This is the **third and final** story of Epic 20 and it is **gated on two siblin
 - [x] **Task 7 — Completion Notes: reconciliation + sequencing (AC: #1, #2)**
   - [x] Recorded below.
 
+### Owner redesign — 2026-07-24 (verify-and-iterate)
+
+After seeing the first build, the owner redirected the surface: the pane should sit **to the right of the sunburst**
+(not below), and be a **very minimal "fancy card"** augmenting the selection — just the selected item's **name**, a
+**summary of what it contains**, **one most-relevant AI action**, and a **button link to more details**. When nothing
+is selected it shows **top-level project details + a prompt to click a node**. This pulls the Story 20.8 details-pane
+vision forward into 20.3 (see Completion Notes → *Overlap with Story 20.8*).
+
+Implemented:
+- **Layout:** the sunburst panel and the rail sit in a new `.explorer-layout` CSS grid — rail on the right on wide
+  viewports, stacked below ≤900px. Grid collapses to the chart alone when there is no work-graph signal.
+- **Card model:** new `RelatedWorkCards.cs` joins the (unchanged) `RelatedWork` relationship projection to the domain
+  models to produce one `RelatedCard` per scope — full title, a one-line summary, one primary BMad command, a
+  "View details →" link — plus a `RelatedProjectCard` default (project counts + "select a node" prompt).
+- **AI action:** a single read-only command badge (copies the slash command; AD-6 — never mutates an artifact),
+  reusing the existing `BmadCommands` surface via new `PrimaryEpicCommand`/`PrimaryProjectCommand` (the story primary
+  already existed). No new command vocabulary.
+- **NFR8 preserved:** each card still carries its full relationship groups in a native `<details>`, expanded with JS
+  off; CSS hides it (and the per-scope cards) only once JS sets `data-related-ready`, leaving the project card by
+  default and one scope card on selection.
+
 ### Review Findings
 
 _(populated during code-review)_
@@ -357,28 +378,67 @@ resolves to `sb-drill-fade / 0.12s` off `--motion-fast`; `specscribe.css` parses
 `*/`-truncation hazard from [[css-comment-star-slash-silent-truncation]] did not fire); no horizontal overflow;
 heading order H3 → H4 with group titles as `<p>` so nesting a group under a subject never skips a level.
 
+#### Owner redesign (2026-07-24 iterate) — from list to card rail
+
+After the first build, the owner redirected the surface (verbatim): the pane should be **to the right of the main
+view**, **very minimal** — "just the selected item's name, a summary of what it contains, an action button for the
+most relevant AI action inside of it, and a button link to more details" — a **"fancy card augmenting the
+selection."** With nothing selected: **top-level project details + a prompt to click a node.**
+
+What changed:
+
+- **Layout.** New `.explorer-layout` CSS grid puts the sunburst and the rail side by side — rail on the RIGHT on wide
+  viewports (`minmax(240px,320px)`), stacked below at ≤900px. Verified live: rail right-of-chart and top-aligned at
+  1280px, single-column below the chart at 375px, no horizontal overflow at either.
+- **Card model.** New `RelatedWorkCards.cs` joins the (unchanged) `RelatedWork` relationship projection to the
+  domain models → one `RelatedCard` per **selectable scope** + a `RelatedProjectCard` default. Each scope card:
+  kind eyebrow, full title, one-line summary ("N stories · M open follow-ups"), one AI action, "View details →".
+- **AI action = read-only command badge.** One primary BMad command per card, copied to clipboard via the existing
+  `cmd-badge`/`data-copy` surface — never mutates a planning artifact (AD-6). New `BmadCommands.PrimaryEpicCommand`
+  / `PrimaryProjectCommand` (the story primary already existed); no new command vocabulary. A done epic legitimately
+  has no next action, so its card omits the badge (verified: Epic 1's card has none, Epic 20's offers
+  `/bmad-sprint-status`).
+- **Cards are keyed to what the explorer can SELECT.** In Story 20.2's model a story wedge is a leaf that
+  *navigates* on click; only epics and the orphan/unplanned roots are zoom-selectable. So there are **no standalone
+  story cards** — each story folds into its epic's card as a labelled subject, so the epic you drill into carries
+  the full "what stemmed from what," and the rail's card set matches the selectable set (39 cards → 14). A story is
+  still one click from its own page (the "Contains" list + the wedge itself both link there).
+- **NFR8 / AC #2 preserved.** Every card still server-renders its relationship groups in a native `<details>`,
+  expanded with JS off; the CSS hides it (and the per-scope cards) only once JS sets `data-related-ready`, leaving
+  the project card by default and one scope card on selection. Verified with a genuinely script-blocked sandbox
+  render: 15 cards visible, all `<details>` expanded, **348 relationship links present**, empty state hidden.
+
+**Two defaults I chose (the owner's brief did not cover them) — flag at verify:**
+1. The AI action is a **copy-to-clipboard command**, not a navigation — per AD-6 and Story 20.8's read-only
+   prompt-button intent. If you'd rather it deep-links into an editor, the badge already carries a Cursor send-menu.
+2. The JS-off path keeps the **full relationship rows in a per-card `<details>`** to satisfy AC #2; with JS on they
+   are hidden in favour of the "View details" link. If you consider even the collapsed `<details>` too much for the
+   JS-on minimal card, say so — it is already `display:none` under `[data-related-ready]`, so this only affects the
+   JS-off view.
+
+#### Overlap with Story 20.8 (raise before Epic 20 review)
+
+This redesign delivers what Story 20.8 ("dashboard details pane") described — *"activating a node on the HOME screen
+populates a details pane BESIDE the chart… high-level details + the RECOMMENDED-PROMPT BUTTON + a VIEW-MORE link,"*
+reusing the `BmadCommands` surface and 20.3's groupings. 20.3 now ships that card on the **zoom-scope** selection
+20.2 already provides. What remains genuinely 20.8/20.5: true **select mode** (activating a node — including a
+**story leaf** — without navigating, per ADR 0012's navigate|select contract), which needs the Plotly component.
+So 20.8 should narrow to "make every node selectable via select mode and reuse this card," not "build the card."
+I did **not** renumber 20.8 or edit epics.md — that is the owner's call via `correct-course`; flagging it here.
+
 #### Measurements for the 20.5/20.6 payload budget
 
 Story 20.1's review asked for measured numbers rather than estimates. On this repo's own portal (375 pages):
 
-| Thing | Size |
-|---|---|
-| **Related-work pane markup** | **101,435 B of a 472,222 B `index.html` — 21.5%** |
-| — of which `title` attributes | 17,945 B across 288 attributes |
-| — of which leading whitespace | 4,568 B |
-| Sections / rows / folded subjects | 37 / 297 / 40 |
-| Explorer island (Story 20.2, unchanged) | ~20.9 KB |
-| Removing the per-kind chips saved | ~14 KB |
-
-The pane caps each group at `RelatedWork.MaxEntriesPerGroup = 12` and reports the remainder ("+N more not shown")
+The rail caps each group at `RelatedWork.MaxEntriesPerGroup = 12` and reports the remainder ("+N more not shown")
 with a deep link into `work-graph.html` — truncation is stated, never silent.
 
-**Flagging this rather than quietly accepting it:** 21.5% of the dashboard is the largest single block this story
-adds, and it is the direct cost of AC #2 — the no-JS contract requires every scope's relationships to be in the
-DOM, and this repo has 24 epics. It is genuinely all data (297 rows of real labels, hrefs and provenance), not
-markup bloat; the obvious lever is `MaxEntriesPerGroup`, which is one constant. I did not shrink it unilaterally,
-because trading away completeness of the JS-off view is the owner's call, not the dev's. Worth a decision at the
-verify step, and it is a real input to the embedded-payload ceiling Story 20.1's review deferred to 20.5/20.6.
+The card redesign changed the byte profile: the rail is now **14 cards** (one per selectable scope) rather than 37
+stacked sections, and per-kind chips are gone. The relationship rows still ship (in each card's `<details>`, for the
+JS-off path), so the total is still dominated by that data (348 relationship links on this portal). If the JS-off
+`<details>` block is judged too heavy, `MaxEntriesPerGroup` is still the one lever — not lowered unilaterally, same
+reasoning as before: trading away JS-off completeness is the owner's call. Real input to the embedded-payload
+ceiling Story 20.1's review deferred to 20.5/20.6.
 
 #### Parity and surface reach
 
@@ -418,7 +478,13 @@ second relationship vocabulary — there is now exactly one place to reuse.
 - `src/SpecScribe/RelatedWork.cs` — **new.** Vocabulary + pure projection (`RelatedWorkDirection`,
   `RelatedWorkEntry`, `RelatedWorkGroup`, `RelatedWorkSubject`, `RelatedWorkNode`, `RelatedWorkModel`,
   `RelatedWork.Build`/`IslandIdFor`/`AncestorIslandIdFor`/`Heading`/`NodeText`/`EdgeVerb`).
-- `src/SpecScribe/RelatedWorkTemplater.cs` — **new.** `RenderPane` + `PaneAttribute`.
+- `src/SpecScribe/RelatedWorkCards.cs` — **new (owner redesign).** The card layer: `RelatedCard`,
+  `RelatedProjectCard`, `RelatedWorkPaneModel`, `RelatedWorkCards.Build` (joins the projection to the domain models
+  for title/summary/primary-command; folds stories into their epic's card).
+- `src/SpecScribe/RelatedWorkTemplater.cs` — **new.** Renders the card rail (`RenderPane(RelatedWorkPaneModel)` +
+  `PaneAttribute`) — rewritten for the card model.
+- `src/SpecScribe/BmadCommands.cs` — new `PrimaryEpicCommand` / `PrimaryProjectCommand` / `RenderPrimaryActionBadge`
+  (one read-only AI action per card, reusing the existing command surface).
 - `src/SpecScribe/WorkGraphTemplater.cs` — `NodeText`/`EdgeVerb` now delegate to `RelatedWork` (one vocabulary).
 - `src/SpecScribe/SunburstExplorer.cs` — doc comment: `Edges` stays `[]`, with the reasoning.
 - `src/SpecScribe/DashboardView.cs` — new `RelatedWorkHtml` opaque fragment.
@@ -435,9 +501,31 @@ second relationship vocabulary — there is now exactly one place to reuse.
 - `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden fingerprint regenerated + provenance note.
 - `tests/SpecScribe.Tests/FollowUpSurfacesTests.cs` — sunburst-scoped the destination assertion (`SunburstPanelOf`).
 - `.claude/launch.json` — added the `related-work-20-3` preview entry (port 8094).
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — `.explorer-layout` grid wrapping the sunburst + rail.
+- `src/SpecScribe/DashboardView.cs` / `DashboardViewBuilder.cs` — `RelatedWorkHtml` now built via
+  `RelatedWorkCards.Build` + `RelatedWorkTemplater.RenderPane` (threads `commands` + `counts` + project title).
+- `src/SpecScribe/assets/specscribe.css` — card + layout styles (replaced the list styles); JS-on collapse rules.
+- `src/SpecScribe/assets/specscribe.js` — reveal block rewritten for the card model (project default / one scope
+  card / empty state; `data-related-ready` is now the CSS hook).
+- `tests/SpecScribe.Tests/RelatedWorkTests.cs` — card-rail tests replace the list-render tests.
 
 ## Change Log
 
+- 2026-07-24 — **Owner redesign (verify-and-iterate).** The pane became a **card rail to the RIGHT of the sunburst**
+  (`.explorer-layout` grid; stacks ≤900px) instead of a full-width list. New `RelatedWorkCards.cs` builds one minimal
+  card per **selectable scope** (kind · full title · one-line summary · one read-only AI-action command badge ·
+  "View details →") plus a **project default card** (top-level counts + "select a node" prompt) shown when nothing is
+  selected. Stories fold into their epic's card (no standalone story cards — a story wedge navigates, only
+  epics/roots are zoom-selectable), 39 cards → 14. AI action reuses `BmadCommands` via new
+  `PrimaryEpicCommand`/`PrimaryProjectCommand` (AD-6 read-only copy; done epics have none). NFR8/AC #2 preserved: each
+  card keeps its full relationship groups in a native `<details>` that shows with JS off and is hidden once JS sets
+  `data-related-ready`. Verified live: right-of-chart at 1280px / stacked at 375px, project-card default, one epic
+  card on real drill-click, empty state for a no-relationship scope, and a script-blocked sandbox render with all 15
+  cards + 348 relationship links present. specscribe.js reveal block + specscribe.css rewritten for cards. Golden
+  fingerprint unaffected (the fixture has no work-graph signal, so the rail is omitted there); stable + green on a
+  tree where a concurrent session had relocked it to `f9c79d98…`. Full suite 2341 passed / 3 skipped / 0 failed.
+  **Flagged for the owner:** the AI action is copy-to-clipboard (not navigation); this delivers the Story 20.8
+  details-pane concept early, so 20.8 should narrow to select-mode (not renumbered — owner's call).
 - 2026-07-24 — Story 20.3 implemented (dev-story), status → review. New `RelatedWork` projection + `RelatedWorkTemplater`
   pane, routed builder → `DashboardView.RelatedWorkHtml` → adapter so HTML/SPA/webview render one set of bytes;
   `SiteGenerator._workGraph` threaded verbatim into all three dashboard render sites. **Two contract decisions

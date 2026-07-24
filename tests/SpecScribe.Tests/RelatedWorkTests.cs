@@ -202,38 +202,69 @@ public class RelatedWorkTests
         // region — otherwise a young project ships permanent dead chrome on its home page.
         Assert.True(RelatedWork.Build(null).IsEmpty);
         Assert.True(RelatedWork.Build(WorkGraphModel.Empty).IsEmpty);
-        Assert.Equal(string.Empty, RelatedWorkTemplater.RenderPane(RelatedWorkModel.Empty, "work-graph.html"));
+        // The rail's own omit gate is covered by RenderPane_EmptyModel_RendersNothing.
     }
 
-    // ---- The pane markup ----------------------------------------------------------------------------------
+    // ---- The card rail (owner redesign 2026-07-24) --------------------------------------------------------
 
     [Fact]
-    public void RenderPane_ShipsEveryScopeServerRendered_WithTheDesignedEmptyState()
+    public void RenderPane_ShipsAProjectCardPlusOneCardPerScope_ServerRendered()
     {
-        var html = RelatedWorkTemplater.RenderPane(
-            Project(Geometry(deferred: new[] { Deferred("A debt", epic: 1, sourceStoryId: "1.1") })),
-            SiteNav.WorkGraphOutputPath);
+        var html = RenderRail(Geometry(deferred: new[] { Deferred("A debt", epic: 1, sourceStoryId: "1.1") }));
 
-        // AC #2 / NFR8: the relationship data is in the DOM, not behind a script.
         Assert.Contains(RelatedWorkTemplater.PaneAttribute, html);
+        // The default (no-selection) card carries project-level details + a prompt to pick a node.
+        Assert.Contains("related-card-project", html);
+        Assert.Contains("data-related-default", html);
+        Assert.Contains("Select a node", html);
+        // One card per SELECTABLE scope (epics + roots), full title — not the terse work-graph label.
         Assert.Contains("data-related-node=\"epic-1\"", html);
-        Assert.Contains("data-related-node=\"1.1\"", html);
+        Assert.Contains("Epic 1: Foundation", html);
+        // A story wedge navigates on click (Story 20.2), so there is no standalone story card — Story 1.1 folds into
+        // its epic's card as a subject instead.
+        Assert.DoesNotContain("data-related-node=\"1.1\"", html);
+        Assert.Contains("epics/story-1-1.html", html); // present as a folded subject inside epic-1's card
+        // The details link is a distinct button to the node's own page.
+        Assert.Contains("related-card-more", html);
+        Assert.Contains("epics/epic-1.html", html);
+    }
+
+    [Fact]
+    public void RenderPane_CardCarriesTheNodesSingleAiAction_AsAReadOnlyCommandBadge()
+    {
+        // AC #1 / owner: one most-relevant AI action per card. Epic 1 is drafted with an unplanned story, so its
+        // primary next step is create-story for that story, and the badge COPIES the command (AD-6 — read-only,
+        // never mutates a planning artifact).
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+        });
+        var html = RenderRail(Geometry(deferred: new[] { Deferred("A debt", epic: 1, sourceStoryId: "1.1") }), commands);
+
+        Assert.Contains("related-card-action", html);
+        Assert.Contains("data-copy=\"/bmad-create-story 1.1\"", html); // the epic's next-step command, copy-only
+    }
+
+    [Fact]
+    public void RenderPane_KeepsTheRelationshipsAsAJsOffDetailsBlock()
+    {
+        // AC #2 / NFR8: with JS off the full relationships must still be on-page. They ride a native <details> the
+        // CSS hides only once JS sets [data-related-ready]. The empty state ships hidden for the same reason as
+        // before — with JS off there is no selection.
+        var html = RenderRail(Geometry(deferred: new[] { Deferred("A debt", epic: 1, sourceStoryId: "1.1") }));
+
+        Assert.Contains("related-card-full", html);
         Assert.Contains("epics/story-1-1.html", html);
-        // The designed empty state ships hidden — with JS off there is no selection, so every scope is showing and
-        // "no related work" would be a lie.
         Assert.Contains("data-related-empty hidden", html);
-        Assert.Contains("No related work items for this selection.", html);
-        // Nothing is signalled by colour: the node kind is in the LABEL (the shared RelatedWork.NodeText
-        // vocabulary), so there is no badge or tint carrying meaning that words do not.
-        Assert.Contains("Deferred item: A debt", html);
-        Assert.DoesNotContain("related-kind", html);
+        // No colour-only signal: the node kind is in the label vocabulary, not a tinted badge.
+        Assert.DoesNotContain("related-kind ", html);
     }
 
     [Fact]
     public void RenderPane_WithoutAWorkGraphPage_OmitsTheLinkRatherThanEmittingADeadOne()
     {
-        var html = RelatedWorkTemplater.RenderPane(
-            Project(Geometry(deferred: new[] { Deferred("A debt", epic: 1, sourceStoryId: "1.1") })),
+        var html = RenderRail(
+            Geometry(deferred: new[] { Deferred("A debt", epic: 1, sourceStoryId: "1.1") }),
             workGraphHref: null);
 
         Assert.DoesNotContain(SiteNav.WorkGraphOutputPath, html);
@@ -243,24 +274,45 @@ public class RelatedWorkTests
     [Fact]
     public void RenderPane_NeverEmitsRawMarkupFromAuthorControlledArtifacts()
     {
-        // Two different defences, and the pane needs both. The LABEL arrives already tag-stripped (the work graph
-        // summarizes a deferred item's body HTML), so no markup reaches the pane through it; the TITLE is raw
-        // provenance text straight out of the artifact and is escaped on the way out. A deferred item quoting HTML
-        // in its provenance line is entirely ordinary in this repo's own artifacts.
+        // The LABEL arrives already tag-stripped (the work graph summarizes a deferred item's body HTML); the TITLE
+        // is raw provenance text escaped on the way out. A deferred item quoting HTML in its provenance line is
+        // entirely ordinary in this repo's own artifacts.
         var slot = new FollowUpDeferredSlot(
             new DeferredWorkItem("<p>Handle <script>alert(1)</script> in titles</p>", Resolved: false, null, null),
             ProvenanceLabel: "code review of <b>7.1</b> & friends",
             EpicNumber: 1, "follow-ups/x.html");
 
-        var html = RelatedWorkTemplater.RenderPane(Project(Geometry(deferred: new[] { slot })), null);
+        var html = RenderRail(Geometry(deferred: new[] { slot }));
 
         Assert.DoesNotContain("<script>", html);
         Assert.DoesNotContain("<b>7.1</b>", html);
         Assert.Contains("&lt;b&gt;7.1&lt;/b&gt; &amp; friends", html);
-        Assert.Contains("Handle alert(1) in titles", html); // the label survives, minus its markup
+        Assert.Contains("Handle alert(1) in titles", html);
+    }
+
+    [Fact]
+    public void RenderPane_EmptyModel_RendersNothing()
+    {
+        var pane = RelatedWorkCards.Build(
+            RelatedWorkModel.Empty, TwoEpicModel(), CommandCatalog.Empty, FollowUpGeometry.Empty,
+            ProjectCounts.Empty, "SpecScribe", SiteNav.WorkGraphOutputPath);
+        Assert.True(pane.IsEmpty);
+        Assert.Equal(string.Empty, RelatedWorkTemplater.RenderPane(pane));
     }
 
     // ---- Helpers ------------------------------------------------------------------------------------------
+
+    /// <summary>Builds the whole details rail exactly as the dashboard does — the relationship projection joined to
+    /// the domain models for the card titles + primary commands.</summary>
+    private static string RenderRail(
+        FollowUpGeometry geometry, CommandCatalog? commands = null, string? workGraphHref = "work-graph.html")
+    {
+        var epics = TwoEpicModel();
+        var rel = Project(geometry);
+        var pane = RelatedWorkCards.Build(
+            rel, epics, commands ?? CommandCatalog.Empty, geometry, ProjectCounts.Empty, "SpecScribe", workGraphHref);
+        return RelatedWorkTemplater.RenderPane(pane);
+    }
 
     /// <summary>Projects with the island id set the real dashboard would produce for <see cref="TwoEpicModel"/> —
     /// derived from <see cref="Charts.SunburstExplorerNodes"/> itself, so the test can never key on a wedge the

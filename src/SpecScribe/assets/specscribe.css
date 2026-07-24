@@ -208,47 +208,77 @@ body {
    seams like every other insight entrance: declared in the @media (no-preference) block and explicitly cancelled
    in the @media (reduce) block near the end of this sheet. [Story 20.2, [[motion-token-system]]] */
 
-/* ---- Story 20.3: related-work pane (the explorer's sibling region) ----
-   The server ships EVERY scope's groups, and with JS off all of them are visible — that is the documented no-JS
-   default view (AC #2 / NFR8), a compact per-scope digest of work-graph.html. specscribe.js only ever REVEALS the
-   slice matching the current selection by setting [data-related-scope] on the pane, so nothing below may make a
-   section's content depend on script having run. */
-.related-work-panel { display: block; }
-.related-work-intro { margin: 0 0 0.75rem; font-size: 0.82rem; color: var(--ink-light); }
+/* ---- Story 20.3: related-work details rail (a card beside the explorer) ----
+   The explorer chart and this rail sit side by side on wide viewports (rail to the RIGHT), stacking on narrow ones.
+   Every card is server-rendered; the CSS at the end of this block collapses the JS-off "all cards + expanded
+   relationships" view into the fancy single-card behaviour once specscribe.js sets [data-related-ready]. */
+.explorer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .explorer-layout { grid-template-columns: 1fr; }
+}
+.related-work-panel { text-align: left; align-self: stretch; }
 
-.related-node + .related-node { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
-.related-node-title { margin: 0 0 0.4rem; font-size: 0.9rem; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; }
-.related-group { margin: 0.45rem 0 0; }
-/* A folded subject (a story with no wedge) keeps its OWN name above its own groups, so a heading can never
-   mis-attribute one node's relationships to the scope hosting it. */
-.related-subject { margin: 0.55rem 0 0; padding-left: 0.6rem; border-left: 2px solid var(--border); }
-.related-subject-title { margin: 0 0 0.2rem; font-size: 0.82rem; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; }
+.related-card { margin: 0; }
+.related-card + .related-card { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+.related-card-kind {
+  margin: 0 0 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+}
+.related-card-title { margin: 0 0 0.3rem; font-size: 0.98rem; line-height: 1.25; }
+.related-card-summary { margin: 0 0 0.5rem; font-size: 0.84rem; color: var(--ink-light); }
+.related-card-hint { margin: 0.5rem 0 0; font-size: 0.78rem; color: var(--ink-light); font-style: italic; }
+.related-card-action { margin: 0 0 0.5rem; }
+.related-card-more {
+  display: inline-block;
+  font-size: 0.82rem;
+  color: var(--rust);
+  text-decoration: none;
+  font-weight: 600;
+}
+.related-card-more:hover { text-decoration: underline; }
+.related-card-more:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
+/* The relationship groups — the JS-off relationship block (AC #2 / NFR8). A native <details>. */
+.related-card-full { margin: 0.5rem 0 0; font-size: 0.82rem; }
+.related-card-full > summary { cursor: pointer; color: var(--ink-light); font-weight: 600; }
+.related-card-full > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+.related-group { margin: 0.4rem 0 0; }
+.related-subject { margin: 0.45rem 0 0; padding-left: 0.55rem; border-left: 2px solid var(--border); }
+.related-subject-title { margin: 0 0 0.15rem; font-size: 0.82rem; }
 /* A LABEL, not a document section: kept as a <p> so nesting a group under a subject never skips a heading level. */
 .related-group-title {
-  margin: 0 0 0.2rem;
-  font-size: 0.72rem;
+  margin: 0 0 0.15rem;
+  font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-light);
 }
-.related-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
-.related-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; font-size: 0.82rem; }
+.related-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.12rem; }
+.related-row { font-size: 0.8rem; }
 .related-row a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
 /* A node with no generated page is a plain chip, never a dead link (Epic 7 guarded-href discipline). */
 .related-chip { color: var(--ink-light); }
-
-/* No per-kind badge or tint: RelatedWork.NodeText already names the kind in the LABEL for the kinds that need it,
-   so nothing here is signalled by colour, and nothing has to be. */
-
 .related-more,
-.related-work-overflow,
 .related-work-empty { margin: 0.3rem 0 0; font-size: 0.78rem; color: var(--ink-light); font-style: italic; }
 
-/* Reveal-on-selection. `[data-related-scope]` is published by the client; the paired attribute selector means a
-   page whose script never ran keeps every section visible rather than collapsing to nothing. */
-[data-related-pane][data-related-scope] .related-node { display: none; }
-[data-related-pane][data-related-scope] .related-node.is-related-current { display: block; }
+/* ---- JS-on collapse. Without [data-related-ready] (script blocked / not yet run) every card and its expanded
+   relationships stay visible — that is the complete NFR8 view. Once the client takes over it shows the project
+   card by default, one scope card on selection, and hides the on-card relationship <details> (the "View details"
+   link carries the reader onward). `data-related-scope` is the current selection's island id. */
+[data-related-ready] .related-card-full { display: none; }
+[data-related-ready] .related-card[data-related-node] { display: none; }
+[data-related-ready][data-related-scope] .related-card-project { display: none; }
+[data-related-ready] .related-card[data-related-node].is-related-current { display: block; }
 
 /* ====================== NAV ====================== */
 /* Two-tier sticky chrome, one <nav class="site-nav">: a dark IDENTITY bar (project name + journey menu +
@@ -6192,9 +6222,9 @@ body:has(main.req-detail) .doc-header {
   .sunburst.is-anim .sb-seg { animation: sb-drill-fade var(--motion-fast) var(--motion-ease); }
   @keyframes sb-drill-fade { from { opacity: 0.35; } to { opacity: 1; } }
 
-  /* Story 20.3: the related-work pane's revealed scope fades in on the same token, so the pane and the wedges
+  /* Story 20.3: the related-work card that becomes current fades in on the same token, so the card and the wedge
      it describes settle together. Opacity only, one pass; cancelled in the reduce block below. */
-  [data-related-pane][data-related-scope] .related-node.is-related-current {
+  [data-related-ready] .related-card[data-related-node].is-related-current {
     animation: sb-drill-fade var(--motion-fast) var(--motion-ease);
   }
   @keyframes chart-enter {

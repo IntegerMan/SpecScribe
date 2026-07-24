@@ -122,6 +122,11 @@ public sealed record DiagnosticsConfig
     /// (detection ran at option-resolution time), so this surface stays I/O-free. [Story 7.7]</summary>
     public required string CodeSourceDisplay { get; init; }
 
+    /// <summary>The effective date-page "today" policy — which calendar day decides the <c>commits/{date}.html</c>
+    /// cutoff. A pure field read of an already-resolved option, so this surface stays I/O-free. Rendered as a WORD
+    /// in the config <c>&lt;dl&gt;</c>, so the state is never signalled by color alone (AC #2d). [Story 5.5]</summary>
+    public required DatePolicy DatePolicy { get; init; }
+
     /// <summary>The detected framework/module label (e.g. "BMad Method"), or "Unknown (not detected)" when no
     /// methodology module resolved — the AC #2 "detected framework/module" line.</summary>
     public required string ModuleDisplay { get; init; }
@@ -140,6 +145,7 @@ public sealed record DiagnosticsConfig
         DeepGitAnalytics = options.DeepGitAnalytics,
         IncludeReadme = options.IncludeReadme,
         CodeSourceDisplay = options.CodeSourceBaseUrl is { Length: > 0 } url ? url : "in-portal only",
+        DatePolicy = options.DatePolicy,
         ModuleDisplay = module.Module == BmadModule.Unknown
             ? "Unknown (not detected)"
             : module.Commands.ModuleLabel,
@@ -268,6 +274,13 @@ public static class DiagnosticsTemplater
         AppendRow(sb, "ADR location", $"{config.AdrSourceDisplay} ({adrNote})");
         AppendRow(sb, "Output directory", config.OutputRootDisplay);
         AppendRow(sb, "Deep-git analytics", config.DeepGitAnalytics ? "on (--deep-git)" : "off");
+        // Provenance follows the "on (--deep-git)" / ADR "explicit (--adrs)" convention already used above: the
+        // default says so, a non-default names the flag that produced it. Governs the day CUTOFF only — the
+        // parenthetical spells that out so a reader can't misread it as a timezone conversion of commit clocks.
+        // [Story 5.5]
+        AppendRow(sb, "Date-page \"today\" policy", config.DatePolicy == DatePolicy.MachineLocal
+            ? $"{DatePolicies.Label(config.DatePolicy)} (default)"
+            : $"{DatePolicies.Label(config.DatePolicy)} (--today-policy {DatePolicies.Token(config.DatePolicy)})");
         AppendRow(sb, "README included", config.IncludeReadme ? "yes" : "no");
         AppendRow(sb, "External source base", config.CodeSourceDisplay);
         sb.Append("  </dl>\n");

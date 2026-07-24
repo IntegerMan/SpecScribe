@@ -26,7 +26,8 @@ public static class GitInsightsTemplater
         SiteNav nav,
         CodeMap codeMap,
         IReadOnlyList<string> topAuthors,
-        Func<string, string?>? fileHref = null)
+        Func<string, string?>? fileHref = null,
+        DateOnly? today = null)
     {
         var outputPath = SiteNav.GitInsightsOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — git-insights.html is at the output root.
@@ -57,7 +58,7 @@ public static class GitInsightsTemplater
         sb.Append($"    <span class=\"pill\">{N(insights.ContributorCount)} {Charts.Plural(insights.ContributorCount, "contributor", "contributors")}</span>\n");
         sb.Append("  </div>\n</header>\n\n");
 
-        AppendActivitySection(sb, insights, git);
+        AppendActivitySection(sb, insights, git, today);
         AppendOwnershipSection(sb, insights, codeMap, topAuthors, fileHref);
 
         sb.Append("</main>\n\n");
@@ -199,7 +200,7 @@ public static class GitInsightsTemplater
     /// <c>CommitsByDay</c>) — never from <c>insights.Activity</c>'s separately-bounded deep-git window — so the
     /// sentence can never disagree with the chart directly below it. Falls back to the deep window's activity
     /// series only when no baseline pulse is available at all. [Review fix 2026-07-09]</summary>
-    private static void AppendActivitySection(StringBuilder sb, GitInsightsData insights, GitPulse? git)
+    private static void AppendActivitySection(StringBuilder sb, GitInsightsData insights, GitPulse? git, DateOnly? today)
     {
         sb.Append("<section class=\"deep-page-section git-insights-section\">\n");
         sb.Append("  <div class=\"chart-frame-head\"><h2>Activity Over Time</h2></div>\n");
@@ -212,7 +213,7 @@ public static class GitInsightsTemplater
         sb.Append("  <div class=\"chart-panel\">\n");
         if (git is not null && git.DailySeries.Count > 0)
         {
-            sb.Append(Charts.CommitHeatmap(git.DailySeries, git.CommitsByDay));
+            sb.Append(Charts.CommitHeatmap(git.DailySeries, git.CommitsByDay, today: today));
         }
         else
         {

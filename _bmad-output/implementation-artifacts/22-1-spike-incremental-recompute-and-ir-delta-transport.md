@@ -6,7 +6,7 @@ gates: [22-2, 22-3, 22-4, 22-5, 22-6] # spike findings decide whether these proc
 
 # Story 22.1: Spike — Incremental Recompute + IR-Delta Transport
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -68,7 +68,7 @@ Verbatim from [epics.md](../planning-artifacts/epics.md) Story 22.1, with measur
   - [x] Explicitly probe the **known invalidation seams** (`IsDataSource`/`IsEpicsRelated` routing; `_referenceMap`/`_codeReverseMap` cross-artifact graphs; coverage tallies + `EntityPager`). **Done:** delete-adr strands the citing story page (`epics/story-9-4.html`) + ADR code-view pages + orphans a README (reference-graph + code-tree seams); every topology change strands `code-map.html`; delete-story strands `cadence.html`. Reported.
 
 - [x] **Task 4 — Axis: IR-delta transport (payload size + latency)** (AC: #2)
-  - [x] Sketch a **minimal IR shape** reusing the real `SpaDelivery` manifest + content chunks (do not design the canonical schema — that is 22.2). **Done:** IR = shipped `SpaDelivery` output (23 chunks, 48.3 MB for 1,211 pages).
+  - [x] Sketch a **minimal IR shape** reusing the real `SpaDelivery` manifest + content chunks (do not design the canonical schema — that is 22.2). **Done:** IR = shipped `SpaDelivery` output (23 chunks, 48.3 MB — measured on the **~702-file artifact sandbox** with deep-git off, NOT the full 1,211-page repo; corrected per code review 2026-07-24).
   - [x] Process **≥2 change events** (one content-only, one topology) and measure delta payload size + latency vs re-shipping the whole affected chunk. **Done:** content edit → 9 chunks / **19.3 MB (39.9 % of IR)**; topology delete → 6 chunks / **12.2 MB (25.3 %)** — chunk-level delta is NOT small.
   - [x] Feed the measurement with the Story 6.6 at-scale finding (byte-blind chunker). **Done + premise corrected:** the byte-blind chunker is **already fixed** — `SpaDelivery.MaxChunkBytes = 2 MB` ships today ([SpaDelivery.cs:56,194](../../src/SpecScribe/SpaDelivery.cs)). Remaining gap: single oversized pages still exceed the cap (measured 3.08 MB chunk). This directly re-scopes 22.2 (from "add byte bounds" → "add page-level delta addressing").
 
@@ -155,11 +155,11 @@ claude-opus-4-8 (Claude Opus 4.8)
 - **Method:** the probe drives the REAL shipped `SiteGenerator` against a mutable copy of this repo's own artifacts. Correctness = incremental watch-route output diffed byte-for-byte against a cold full-regen oracle of the identical post-change tree, folding only the per-run/build noise the `GoldenContentFingerprint` gate folds. No `.md` re-model, no `.html` scrape (AD-1/AD-2). Determinism verified (two full generates agree on all 701 shared pages).
 - **Headline finding (AC #1):** `RegenerateEpics` is NOT oracle-faithful **even with no source change** — a 56-page work-graph over-count on every epic (e.g. Epic 1: 16 items/20 links incremental vs 13/12 oracle). This is a pre-existing watch-mode fidelity gap in the shipped tool (Story 19.2 work-graph on the incremental path) and the concrete form of the risk ADR 0008 flagged as primary. Probable cause: `GenerateAll` builds `_workGraph` from source before `_docs` is populated; `RegenerateEpics` rebuilds it after `_docs`+`SyncDeferredDocFromDisk`, from a different (doubled) follow-up inventory.
 - **Correctness verdict (AC #2):** holds only for content-only edits of generic docs (`GenerateOne` = byte-perfect). Does NOT hold for the epics/story family, nor any topology change — the latter strand the cross-artifact surfaces no narrow route refreshes: **Code Map, delivery cadence, reference-graph citations, ADR code-view pages**, plus orphan/prune gaps on delete. A full-rebuild fallback (or targeted invalidation + work-graph parity fix) is required for those classes.
-- **Latency:** incremental is a large real win (3×–84× vs full). At current scale (1,211 pages, ~6× the ADR-0006 measurement) the deep-git increment is only ~14 % of gen-time — page rendering now dominates, updating ADR 0008's "git-dominated ~3.2 s" premise.
-- **IR-delta:** the "byte-blind chunker" premise (from Story 6.6) is **stale** — `SpaDelivery.MaxChunkBytes = 2 MB` ships today. Remaining gap: single oversized pages still exceed the cap. Chunk-level delta is coarse (a 1-line edit re-ships 39.9 % of a 48 MB IR) → 22.6 needs 22.2 to deliver page-level delta addressing first.
+- **Latency:** incremental is a large real win (3×–84× vs full). At current scale (1,211 pages, ~6× the ADR-0006 measurement) the deep-git increment is only ~14 % of gen-time **on warm/cache-hot runs** — page rendering dominates there. **[Code review 2026-07-24: qualified — the ~14 % is the warm ratio; the COLD deep-git share is still ~47 % (git-dominated, per ADR 0008), because the warm win is OS filesystem caching of git objects, not JIT. So this qualifies rather than overturns ADR 0008's premise; git-avoidance still matters for cold starts.]**
+- **IR-delta:** the "byte-blind chunker" premise (from Story 6.6) is **stale** — `SpaDelivery.MaxChunkBytes = 2 MB` ships today. Remaining gap: single oversized pages still exceed the cap. Chunk-level delta is coarse (a 1-line edit re-ships 39.9 % of a 48 MB IR) → 22.6 needs 22.2 to deliver page-level delta addressing first. **[Code review 2026-07-24: the 39.9 %/25.3 % figures were measured only through `RegenerateEpics` (whose no-op over-count inflates them) on the ~702-file sandbox; the byte-perfect `GenerateOne` route was never delta-measured and likely re-ships one small chunk — 22.6 must measure that before treating chunk-granularity as blocking.]**
 - **Gate (AC #3):** 22.2 proceed RE-SCOPED (byte-cap done; aim at page-level delta granularity + oversized-page cap); 22.3 proceed as scoped; 22.4 proceed as scoped; **22.5 RE-SCOPE required** (fix `_workGraph` parity + add topology-change invalidation for the cross-artifact seams; full-rebuild fallback for topology/epics until proven — adopt this spike's oracle-diff harness as the acceptance test); 22.6 viable but gated on 22.2's finer delta.
 - **Follow-up outside Epic 22:** the `RegenerateEpics` work-graph over-count is a live `specscribe watch` defect today (independent of the IR pivot) — worth a standalone fix or folding into 22.5's parity task.
-- **AC #3 — no production code shipped:** `src/SpecScribe/**` and `tests/**` untouched (git-confirmed); probe quarantined under `spike/ir-incremental/`, not in `SpecScribe.slnx`/build/pack; site byte-identical (same golden hash before/after). Full suite: 2162 passed / 3 skipped / 1 pre-existing golden-constant failure reproduced on clean `main`.
+- **AC #3 — no production code shipped:** `src/SpecScribe/**` and `tests/**` untouched (git-confirmed); probe quarantined under `spike/ir-incremental/`, not in `SpecScribe.slnx`/build/pack; site byte-identical (same golden hash before/after). Full suite at dev time: 2162 passed / 3 skipped / 1 golden-constant failure argued pre-existing. **[Code review 2026-07-24 — resolved:** the failure does NOT reproduce on current `main` (`f9b52bd`); `GoldenContentFingerprint` passes (stable ×2) and the **full suite is green — 2336 passed / 3 skipped / 0 failed**. The spike-time failure was a transient shared-main golden drift (pin was `36cd7e64` at `b9582a4`, since re-blessed 5× to `89c8cf0c`); no constant bump and no code change were needed. See Review Findings above.**]**
 - **`baseline_commit`:** preserved at authoring value `21e41c5` per dev-story Step 4 (worktree actually branched off `b9582a4` = current `main` HEAD); immaterial for a spike that ships no `src/` change.
 
 ### File List
@@ -171,7 +171,104 @@ claude-opus-4-8 (Claude Opus 4.8)
 - `_bmad-output/implementation-artifacts/22-1-spike-incremental-recompute-and-ir-delta-transport.md` (this story record: tasks, Dev Agent Record, Change Log, Status)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (22-1 → review; epic-22 → in-progress)
 
+## Review Findings (Code Review 2026-07-24)
+
+Adversarial review (Blind Hunter + Edge Case Hunter + Acceptance Auditor, all Opus-4.8) scoped to this story's
+File List. Verdict: the probe's **architecture is sound** (drives the real `SiteGenerator`, oracle-diffs with the
+golden normalization) and its two load-bearing findings are genuine and source-verified — `RegenerateEpics` really
+does over-count the work-graph even at no-op (shipped code at [SiteGenerator.cs:668–674](../../src/SpecScribe/SiteGenerator.cs)
+was *added by Story 19.2's review* to fix this and did not reach parity), and the "byte-blind chunker" premise really
+is stale (`SpaDelivery.MaxChunkBytes = 2_000_000` ships). No production code shipped; quarantine + slnx exclusion
+confirmed. **But six of the durable report's published numbers/claims — the ones that gate 22.2–22.6 — are unsafe or
+mislabelled as stated.** Because the probe code is throwaway, robustness edge cases in it were dismissed unless they
+bias a number the report publishes.
+
+### Decision needed → RESOLVED (re-verify, 2026-07-24)
+
+- [x] [Review][Decision] **The two durable artifacts contradicted each other on the AC-#3-defining fact (test suite).**
+  The spike report's AC-coverage line asserted the suite is clean — "the full suite incl. `GoldenContentFingerprint`
+  is **green**" ([22-1-spike-report.md:210](22-1-spike-report.md)) — while the story record (Completion Notes, Task 6)
+  and the `sprint-status.yaml` 22-1 line recorded "**2162 passed / 3 skipped / 1 failed**" (`GoldenContentFingerprint`,
+  argued a pre-existing stale-constant drift reproducing as `3e0d2bd3…` on `main @ b9582a4`).
+  **RESOLUTION — owner chose (b) re-verify; the failure does NOT reproduce.** On current `main` (`f9b52bd`), `dotnet
+  test --filter GoldenContentFingerprint` **passes**, stable across two repeated runs, and the **full suite is green:
+  2336 passed / 3 skipped / 0 failed** — verified 2026-07-24, with Story 5.5's uncommitted rendering work present in
+  the tree. Root cause of the spike-time failure, confirmed from `git log -L` on the constant: it was a **transient
+  shared-main golden drift**, not a defect in this spike. At spike time (branched off `b9582a4`) the pinned constant
+  was `36cd7e64…` and the spike environment rendered `3e0d2bd3…`; the constant has since been **re-blessed five times**
+  in committed history as legitimate rendering-visible work landed (`9243de5`→`5816b332`, `2be7f6d`→`aaef12dd`,
+  `8db18aa`→`1711700e`, `f9b52bd`→`89c8cf0c`). **Disclosure (shared-main):** the verified-green working tree also carries
+  Story 5.5's *uncommitted* work, which re-blesses the constant a sixth step (`89c8cf0c` → `336e807c`) to match its own
+  date-policy diagnostics-row render — so the suite is green as a self-consistent pair; the committed `f9b52bd` tree is
+  independently green at `89c8cf0c`. Either way the golden test passes and the spike-time failure does not reproduce.
+  **No constant bump performed by this review** (nothing to bump — it matches) and **no production/test code touched by
+  22.1** (AC #3 stays intact; the `SiteGeneratorAdapterTests.cs` delta in the tree is Story 5.5's, not this story's).
+  The report's
+  "green" line is therefore the correct one; the "1 failed" lines in this record + sprint-status were true at spike time
+  and are now superseded — annotated as resolved below.
+
+### Patch
+
+- [x] [Review][Patch] "1,211 pages" mislabel on the 48.3 MB / 23-chunk IR — Axis 3 was measured on the ~702-file
+  artifact sandbox (deep-git off), which the report's Axis 3 body states correctly, but the story-record Task 4, the
+  Completion-Notes IR-delta bullet, and the report's 22.4 gate row ("48 MB / 1,211 pages") attach the figure to the
+  full repo; the 39.9 %/25.3 % deltas are sandbox figures too. Correct the three spots. [22-1-spike-report.md:187]
+  — **FIXED:** report 22.4 gate row + story Task 4 now say "~702-file artifact sandbox, deep-git off (full repo would be larger)".
+- [x] [Review][Patch] Headline per-epic work-graph counts aren't emitted by the probe — the load-bearing table
+  ("Epic 1 16 items/20 links incr vs 13/12 oracle", Epics 2/6/9) cannot come from `report.json`: `CaseResult`/
+  `RunControl` emit only stale/orphaned/missing page-path lists + counts, no node/edge extraction. The 56-page no-op
+  divergence and the stranded page names ARE substantiated (they fall out of the stale lists); the item/link counts
+  were hand-derived from the rendered pages and are not reproducible via the documented `dotnet run … report.json`.
+  Annotate the table with that provenance. [22-1-spike-report.md:101]
+  — **FIXED:** added a provenance blockquote under the table (divergence + page names reproducible; item/link counts hand-derived; 22.5 harness should assert node/edge counts).
+- [x] [Review][Patch] Correctness matrix ran deep-git OFF → the stranded-surface inventory is a lower bound presented
+  as complete. `CopyIngestedSources` never copies `.git` and `RunCase` resolves deep-git off, so every git-derived
+  surface (per-commit pages, hotspot/coupling, planning-code impact-map, git-derived cadence data) was invisible to the
+  oracle diff. The 22.5 gate enumerates "Code Map, delivery cadence, reference-graph, ADR code-view" as *the* surfaces
+  needing invalidation with no such caveat. Add it so 22.5's invalidation scope isn't sized from an incomplete list.
+  [22-1-spike-report.md:188]
+  — **FIXED:** added a scope-caveat blockquote to Axis 2 + a "re-run deep-git ON" clause to the 22.5 gate row.
+- [x] [Review][Patch] Latency "updates ADR 0008's premise" rests on the warm number only — the 14.3 % deep-git share
+  is `onWarm − offWarm` (31.5−27.0), but the cold figures give (52.6−27.6)/52.6 ≈ **47 %**, consistent with ADR 0008's
+  "git-dominated." The 21 s ON warm-up vs ~0 s OFF is OS filesystem caching of git objects, not JIT (same managed
+  code), so the warm number understates git cost. Qualify Finding 1 / "page rendering now dominates" / "reduces urgency
+  of git-avoidance" as holding on cache-hot ratios only. [22-1-spike-report.md:55]
+  — **FIXED:** Axis 1 now says "qualifies (does not overturn)" with a cold-ratio caveat; Finding 1 + the Completion-Notes latency bullet carry the same qualifier.
+- [x] [Review][Patch] IR-delta measured only through `RegenerateEpics` (the over-emitting route), never through
+  `GenerateOne` — both delta events drive `RegenerateEpics`, the exact route Axis 2 proves rewrites every epic page
+  even at no-op, so the 39.9 % content-edit delta conflates the edit with the work-graph over-count. `GenerateOne`
+  ("byte-perfect / safe base case") is never delta-measured and would likely re-ship one small chunk, potentially
+  contradicting the "chunk is the wrong delta unit" conclusion that gates 22.6. Caveat the conclusion; flag the
+  `GenerateOne` delta as the missing 22.6 control. [22-1-spike-report.md:159]
+  — **FIXED:** added a measurement-caveat blockquote to Axis 3 + a "measure the `GenerateOne` delta first" clause to the 22.6 gate row.
+
+### Deferred (pre-existing / throwaway-probe; not blocking)
+
+- [x] [Review][Defer] `ChunkDelta` never counts chunks that DISAPPEAR between snapshots — the loop iterates `after`
+  only, so a topology delete that removes a whole chunk file contributes 0 bytes; the Axis-3 "delete = 25.3 %" figure
+  under-reports what a delta channel must transmit (it must still drop the vanished chunk). Conservative w.r.t. the
+  "delta is coarse" conclusion; probe is throwaway. [spike/ir-incremental/Program.cs:371] — deferred, note for a 22.6 re-measure.
+- [x] [Review][Defer] Non-deterministic story selection makes the content-story / content-edit numbers non-reproducible
+  — `.First()` over an unordered `Directory.EnumerateFiles` picks a different story per run/machine (the delete cases
+  sort `OrderByDescending`), so the Axis-2 content-story stale set and the Axis-3 content delta vary run-to-run.
+  [spike/ir-incremental/Program.cs:249] — deferred, throwaway probe.
+- [x] [Review][Defer] Minor report accuracy: (a) determinism is attributed to the wrong control (the report cites the
+  `content-doc` incremental-vs-oracle case; the actual determinism control is `noop-generate-all`, uncited); (b)
+  `ReadSpaChunks` globs `spa/*.json` so `manifest.json` is counted among the "23 chunks" and re-counted in every delta;
+  (c) the `add-doc` "cached-`_nav` stranding disproven" claim is only valid if the added doc surfaces in the nav tree,
+  which the probe never asserts. [22-1-spike-report.md:39] — deferred, report polish.
+
+### Dismissed as noise (12) — throwaway-probe robustness with no effect on this run's numbers
+
+`GetOption` `--`-value / `--out=` empty-throw handling; `--mode` not validated (typo silently runs the full matrix);
+per-case `try/catch` silently drops a change class; `MeasureIrDelta` unguarded (a story-less repo crashes before
+`report.json`); `CopyDir` unanchored `string.Replace`; `SnapshotNormalized` date-in-key collision; `NormalizeVolatile`
+prefix-substring fold; `Dispatch` data-source-delete path (unexercised); `ReadSpaChunks` non-recursive (output is flat
+today); `SnapshotNormalized` reads binary assets as UTF-8; warm = `Min()` mislabeled `warmMedian`; `baseline_commit`
+stale (disclosed + immaterial for a no-`src` spike).
+
 ## Change Log
 
+- 2026-07-24 — Code review (bmad-code-review, 3 adversarial layers). 1 decision-needed, 5 patch, 3 deferred, 12 dismissed. No production code involved (spike). Findings recorded above; sibling stories none (this commit `44424ce` carried only 22.1's File List — no bundling). **Decision-needed RESOLVED (re-verify):** the `GoldenContentFingerprint` failure does not reproduce — full suite green on current `main` `f9b52bd` (2336 passed / 3 skipped / 0 failed, stable ×2); spike-time failure was a transient shared-main golden drift (pin `36cd7e64` at `b9582a4`, since re-blessed 5× to `89c8cf0c`), no constant bump or code change needed. Report's "green" line confirmed correct; the stale "1 failed" lines in this record + sprint-status annotated as resolved. The 5 patch findings remain open action items (report/record corrections only); the 3 deferred items logged to `deferred-work.md`.
 - 2026-07-23 — Story 22.1 developed (dev-story). Built the quarantined measurement probe `spike/ir-incremental/` driving the real `SiteGenerator`; measured incremental-recompute correctness (6 change classes + 2 no-op controls, incremental-route output diffed byte-for-byte against a cold full-regen oracle), full-vs-incremental latency, and IR-delta payload size via the shipped `SpaDelivery` chunks. Authored the durable [spike report](22-1-spike-report.md) that gates 22.2–22.6 (22.2 re-scoped; 22.3/22.4 as scoped; 22.5 re-scope required; 22.6 gated on 22.2). Headline: `RegenerateEpics` diverges from the full-regen oracle even with no change (56-page work-graph over-count) — the primary correctness risk ADR 0008 named, measured. No production code shipped (`src`/`tests` untouched; site byte-identical). Status → review.
 - 2026-07-21 — Story 22.1 drafted (create-story). Epic 22 opened (backlog → in-progress) with its ADR-0008-mandated measurement spike — the Story-6.6-style de-risking of **incremental-recompute correctness** (incl. AD-5 topology-change/rename/delete invalidation) and **IR-delta transport** (payload size + latency for one topology change + one content-only change), measured against this repo. Decision-first, throwaway, no production code ships; the durable deliverable is a **spike report** (NOT a new ADR — ADR 0008 already decided the direction) whose findings **gate** whether Stories 22.2–22.6 proceed as scoped or are re-scoped. Grounded in ADR 0006/0008's already-settled numbers (git-dominated gen-time, SVG-heavy bodies, TS port deferred); measures against the real shipped incremental machinery (`SiteGenerator.Regenerate*` routes + `IsDataSource`/`IsEpicsRelated` routing) and the byte-blind SPA chunker (`SpaDelivery.MaxPagesPerChunk=75`) whose 112.9 MB/82.5 MB at-scale defect the delta measurement informs (fixing it is 22.2's job). Does not disturb Epic 7.

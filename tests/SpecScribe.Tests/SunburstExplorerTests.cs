@@ -105,15 +105,48 @@ public class SunburstExplorerTests
     [Fact]
     public void Projector_NoPlanStory_IsStillADrillableStoryNode()
     {
-        // A zero-task "no plan yet" story is still drawn as its own (min-weight) story wedge — so it stays a `story`
-        // node and keeps its epic drillable.
+        // A zero-task "no plan yet" story is still drawn as its own story wedge — so it stays a `story` node and keeps
+        // its epic drillable — but it is now sized to the AVERAGE drafted-story weight instead of a 1-unit sliver, so
+        // un-drafted work doesn't read as misleadingly trivial. Here the one drafted story has raw weight 4 (4 tasks),
+        // so the no-plan story is bumped to 4 — the SAME number the SVG sizes its wedge by. [owner 2026-07-24]
         var model = Model(Epic(1, "Alpha", Story("1.1", "Planned", "in progress", 1, 4), Story("1.2", "NoPlan", null, 0, 0)));
 
         var nodes = Charts.SunburstExplorerNodes(model).ToDictionary(n => n.Id);
 
         Assert.Equal("story", nodes["1.2"].Kind);
         Assert.Equal("noplan", nodes["1.2"].StatusClass);
-        Assert.Equal(1, nodes["1.2"].Weight); // Math.Max(1, 0 tasks) — same floor the SVG uses
+        Assert.Equal(4, nodes["1.2"].Weight); // bumped to the average drafted-story weight (4), not a 1-unit sliver
+        Assert.Equal(Charts.SunburstNoPlanStoryWeight(model, FollowUpGeometry.Empty), nodes["1.2"].Weight);
+    }
+
+    [Fact]
+    public void NoPlanStoryWeight_IsTheRoundedMeanOfDraftedStories_AndOnlyLiftsTheFloor()
+    {
+        // The bump is the rounded MEAN raw weight of the drafted stories, and it only LIFTS a no-plan wedge — it never
+        // shrinks a real one. Drafted weights {2, 5} → mean 3.5 → 4; the no-plan story takes 4 while the drafted
+        // stories keep their honest 2 and 5. [owner 2026-07-24 "bump to average"]
+        var drafted2 = Story("1.1", "Two", "in progress", 0, 2);
+        var drafted5 = Story("1.2", "Five", "in progress", 0, 5);
+        var noPlan = Story("1.3", "NoPlan", null, 0, 0);
+        var model = Model(Epic(1, "Alpha", drafted2, drafted5, noPlan));
+
+        Assert.Equal(4, Charts.SunburstNoPlanStoryWeight(model, FollowUpGeometry.Empty)); // Round(3.5) away-from-zero
+        Assert.Equal(2, Charts.SunburstStoryWeight(FollowUpGeometry.Empty, 1, drafted2, noPlanWeight: 4)); // honest, unlifted
+        Assert.Equal(5, Charts.SunburstStoryWeight(FollowUpGeometry.Empty, 1, drafted5, noPlanWeight: 4)); // honest, unlifted
+        Assert.Equal(4, Charts.SunburstStoryWeight(FollowUpGeometry.Empty, 1, noPlan, noPlanWeight: 4)); // lifted to the mean
+    }
+
+    [Fact]
+    public void NoPlanStoryWeight_FallsBackToOne_WhenNothingIsDraftedYet()
+    {
+        // A brand-new project where nothing has a plan yet has no drafted weights to average — the bump falls back to
+        // the historical 1-unit floor, so the glance is byte-identical to the pre-bump behavior in that case.
+        var model = Model(Epic(1, "Alpha", Story("1.1", "A", null, 0, 0), Story("1.2", "B", null, 0, 0)));
+
+        Assert.Equal(1, Charts.SunburstNoPlanStoryWeight(model, FollowUpGeometry.Empty));
+        var nodes = Charts.SunburstExplorerNodes(model).ToDictionary(n => n.Id);
+        Assert.Equal(1, nodes["1.1"].Weight);
+        Assert.Equal(1, nodes["1.2"].Weight);
     }
 
     [Fact]

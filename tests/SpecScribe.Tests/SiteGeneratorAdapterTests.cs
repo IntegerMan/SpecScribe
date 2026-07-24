@@ -939,7 +939,30 @@ public class SiteGeneratorAdapterTests : IDisposable
         // rendering-visible in principle, so this hash is NOT attributable to Story 20.3 alone; it was captured
         // after that session's build went green. Verified stable across 2 repeated runs.
         // [Story 20.3; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "89c8cf0c62f968eb968b61721f2a3c271af94d9e4ebc7c6c97b1b3c311612c10";
+        // Regenerated for Story 5.5 (configurable date-page "today" policy): the ONLY rendered-byte delta is one new
+        // config row on diagnostics.html — `Date-page "today" policy : machine-local calendar day (default)` — added
+        // between "Deep-git analytics" and "README included". Every other page is byte-for-byte unchanged: at the
+        // default MachineLocal policy the run's shared `_today` resolves to `DateOnly.FromDateTime(DateTime.Now)`,
+        // exactly the expression the five threaded call sites used before, so LinkedCommitDays / the heatmap grid /
+        // the date-cutoff guards all produce identical output (this non-git fixture renders none of those anyway).
+        // The new row's content + provenance was verified live for all three policies before locking in, and the
+        // hash was confirmed stable across two repeated clean runs (stale-build first-hash trap). PROVENANCE
+        // (shared main): regenerated on a tree also carrying a concurrent session's untracked
+        // 23-2-component-library-and-design-token-bridge.md — a doc, not code, and not part of this temp fixture,
+        // so it does not contribute to the hash. [Story 5.5; golden-diff-normalization-gotchas]
+        // Regenerated for the no-plan average-bump (owner 2026-07-24): a "no plan yet" story wedge on the project
+        // glance (Charts.Sunburst) is now sized to the AVERAGE drafted-story weight instead of collapsing to a
+        // 1-unit sliver that read as misleadingly trivial (Charts.SunburstNoPlanStoryWeight, threaded through
+        // SunburstStoryWeight/SunburstEpicWeight and the Story 20.2 explorer island). This fixture has a no-plan +
+        // drafted story mix, so its glance SVG geometry moved (wider un-drafted wedges → the epic weight sums and
+        // total-angle scale shifted) AND the embedded sunburst-explorer JSON weights shifted by the same number.
+        // PROVENANCE (shared main): this hash was captured on a tree that ALSO carried a concurrent session's
+        // in-flight "Related work" refactor (new RelatedWorkCards.cs, modified RelatedWorkTemplater.cs /
+        // DashboardViewBuilder.cs / specscribe.css). Those asset + dashboard bytes are rendering-visible in this
+        // fixture, so this hash is NOT attributable to the sunburst bump alone; it was captured after that session's
+        // build went green and verified stable across two repeated runs. [owner 2026-07-24 sunburst no-plan bump;
+        // CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "f9c79d98c369e389abab275d485d42ee5bffccfd01ca579eee18e4f10613eaba";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -30,7 +30,7 @@ public sealed record ConfigProvenance(string Field, string Option, string Effect
 /// Load-bearing ordering: <see cref="SettingsStore.ApplyTo"/> fills nulls in place, so once it has run there is no
 /// way to tell a CLI-supplied value from a restored one — the distinction has to be captured first or it is lost.
 /// [Story 5.2 AC #3]</summary>
-public sealed record CliOverrides(bool Source, bool Adrs, bool Output, bool ProjectName, bool NoReadme, bool DeepGit, bool CodeUrl)
+public sealed record CliOverrides(bool Source, bool Adrs, bool Output, bool ProjectName, bool NoReadme, bool DeepGit, bool CodeUrl, bool TodayPolicy)
 {
     public static CliOverrides Capture(SiteSettings settings) => new(
         Source: settings.Source is { Length: > 0 },
@@ -41,7 +41,9 @@ public sealed record CliOverrides(bool Source, bool Adrs, bool Output, bool Proj
         // only the on-state can be claimed as a CLI override. Same reasoning as SettingsStore.ApplyTo's tri-state.
         NoReadme: settings.NoReadme,
         DeepGit: settings.DeepGit,
-        CodeUrl: settings.CodeUrl is { Length: > 0 });
+        CodeUrl: settings.CodeUrl is { Length: > 0 },
+        // A value-carrying option like the paths, not a bare flag: present means explicitly chosen. [Story 5.5]
+        TodayPolicy: settings.TodayPolicy is { Length: > 0 });
 }
 
 /// <summary>The outcome of loading <c>.specscribe</c> for a run: what was found, where, and — captured before the
@@ -71,6 +73,7 @@ public static class SettingsResolver
         public const string Readme = "readme";
         public const string DeepGit = "deep_git";
         public const string CodeUrl = "code_url";
+        public const string TodayPolicy = "today_policy";
     }
 
     /// <summary>Leading token of the machine-parseable config lines, mirroring
@@ -135,6 +138,9 @@ public static class SettingsResolver
             // An auto-detected code URL is genuinely neither CLI nor saved — it is discovery, so it reports Default
             // exactly like an auto-discovered path does.
             Entry(Fields.CodeUrl, "--code-url", options.CodeSourceBaseUrl ?? string.Empty, cli.CodeUrl, saved?.CodeUrl is not null),
+            // Reported as the canonical token (not the display label) — this is the machine surface a CI script
+            // greps, and the token is exactly what could be passed back to --today-policy. [Story 5.5]
+            Entry(Fields.TodayPolicy, "--today-policy", DatePolicies.Token(options.DatePolicy), cli.TodayPolicy, saved?.TodayPolicy is not null),
         };
     }
 

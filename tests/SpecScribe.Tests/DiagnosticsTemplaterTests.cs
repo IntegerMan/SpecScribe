@@ -10,8 +10,9 @@ public class DiagnosticsTemplaterTests
     private static SiteNav Nav() =>
         SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-    private static DiagnosticsConfig Config(bool deepGit = false, bool adrExplicit = false) => new()
+    private static DiagnosticsConfig Config(bool deepGit = false, bool adrExplicit = false, DatePolicy datePolicy = DatePolicy.MachineLocal) => new()
     {
+        DatePolicy = datePolicy,
         SiteTitle = "SpecScribe",
         RepoRoot = "C:/Dev/SpecScribe",
         SourceRootDisplay = "_bmad-output",
@@ -103,6 +104,19 @@ public class DiagnosticsTemplaterTests
         Assert.Contains("<dt>ADR location</dt><dd>docs/adrs (default)</dd>", html);
         Assert.Contains("<dt>Output directory</dt><dd>SpecScribeOutput</dd>", html);
         Assert.Contains("<dt>Deep-git analytics</dt><dd>on (--deep-git)</dd>", html);
+        // The default date-page policy reads as machine-local, marked "(default)" — text, never color-only. [Story 5.5]
+        Assert.Contains("<dt>Date-page &quot;today&quot; policy</dt><dd>machine-local calendar day (default)</dd>", html);
+    }
+
+    [Theory]
+    [InlineData(DatePolicy.Utc, "UTC calendar day (--today-policy utc)")]
+    [InlineData(DatePolicy.LastCommit, "latest authored commit day (--today-policy last-commit)")]
+    public void RenderPage_NonDefaultDatePolicy_NamesTheOverridingFlag(DatePolicy policy, string expected)
+    {
+        // A non-default policy states the flag that produced it, mirroring "on (--deep-git)" / ADR "explicit
+        // (--adrs)" provenance — so a reader can tell an override from the default at a glance. [Story 5.5]
+        var html = DiagnosticsTemplater.RenderPage(Array.Empty<DiagnosticNotice>(), Config(datePolicy: policy), Nav());
+        Assert.Contains($"<dt>Date-page &quot;today&quot; policy</dt><dd>{expected}</dd>", html);
     }
 
     [Fact]

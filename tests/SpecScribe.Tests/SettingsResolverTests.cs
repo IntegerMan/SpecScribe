@@ -195,6 +195,72 @@ public class SettingsResolverTests : IDisposable
         Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.DeepGit));
     }
 
+    // --- Story 5.5: the date-page "today" policy joins the resolution seam ---
+
+    [Fact]
+    public void Resolve_CommandLineTodayPolicyBeatsSavedAndReportsCommandLine()
+    {
+        var repo = NewRepo();
+        WriteSettings(repo, """{ "TodayPolicy": "LastCommit" }""");
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings { TodayPolicy = "utc" }, repo);
+
+        Assert.Equal(DatePolicy.Utc, resolved.Options.DatePolicy);
+        Assert.Equal(ConfigSource.CommandLine, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
+        // Reported as the canonical token — the grep surface a CI script consumes.
+        Assert.Equal("utc", resolved.For(SettingsResolver.Fields.TodayPolicy)!.EffectiveValue);
+    }
+
+    [Fact]
+    public void Resolve_RestoresAndAttributesAPersistedTodayPolicy()
+    {
+        var repo = NewRepo();
+        WriteSettings(repo, """{ "TodayPolicy": "Utc" }""");
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings(), repo);
+
+        Assert.Equal(DatePolicy.Utc, resolved.Options.DatePolicy);
+        Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
+    }
+
+    [Fact]
+    public void Resolve_DefaultsTodayPolicyToMachineLocalReportedAsDefault()
+    {
+        var repo = NewRepo();
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings(), repo);
+
+        Assert.Equal(DatePolicy.MachineLocal, resolved.Options.DatePolicy);
+        Assert.Equal(ConfigSource.Default, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
+        Assert.Equal("machine-local", resolved.For(SettingsResolver.Fields.TodayPolicy)!.EffectiveValue);
+    }
+
+    /// <summary>Reject-don't-silently-accept: a typo'd policy fails Spectre's parse-time validation gate rather than
+    /// falling back to the default, and the message lists every valid value. [Story 5.5]</summary>
+    [Fact]
+    public void Validate_RejectsAnUnrecognizedTodayPolicyWithAnActionableMessage()
+    {
+        var result = new SiteSettings { TodayPolicy = "yesterday" }.Validate();
+
+        Assert.False(result.Successful);
+        Assert.Contains("yesterday", result.Message!, StringComparison.Ordinal);
+        Assert.All(DatePolicies.CanonicalTokens, t => Assert.Contains(t, result.Message!, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_AcceptsACanonicalTodayPolicy_AndAnAbsentOne()
+    {
+        Assert.True(new SiteSettings { TodayPolicy = "utc" }.Validate().Successful);
+        Assert.True(new SiteSettings().Validate().Successful);
+    }
+
+    [Fact]
+    public void ResolveDatePolicy_ThrowsOnAnUnrecognizedValue()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new SiteSettings { TodayPolicy = "nope" }.ResolveDatePolicy());
+        Assert.Contains("nope", ex.Message, StringComparison.Ordinal);
+    }
+
     // --- Resolve once (AC #2, "resolve effective settings once per run, preserving provenance") ---
 
     /// <summary>The requirement's real risk is not the cost of a second resolve but its ability to DISAGREE with the

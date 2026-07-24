@@ -14,8 +14,13 @@ public sealed partial class HtmlRenderAdapter
     /// <summary>Renders the full <c>&lt;main&gt;…&lt;/main&gt;</c> dashboard body from its section view model —
     /// the string that becomes <see cref="PageView.BodyHtml"/>. <paramref name="today"/> defaults to the real
     /// wall clock for production generation; callers (tests) may pin it so the coverage panel's staleness
-    /// computation is hermetic instead of depending on when the test happens to run. [Story 6.2]</summary>
-    public string RenderDashboardBody(DashboardView view, Func<string, string?>? codeItemHref = null, DateOnly? today = null)
+    /// computation is hermetic instead of depending on when the test happens to run. [Story 6.2]
+    /// <para><paramref name="dateCutoff"/> is a DIFFERENT clock and deliberately a separate parameter: it is the
+    /// run's policy-resolved date-page cutoff (<see cref="Charts.ResolveToday"/>), which governs only which commit
+    /// days have generated pages — never artifact staleness. Folding the two together would let
+    /// <c>--today-policy last-commit</c> on a long-idle repo report every planning artifact as freshly updated.
+    /// [Story 5.5]</para></summary>
+    public string RenderDashboardBody(DashboardView view, Func<string, string?>? codeItemHref = null, DateOnly? today = null, DateOnly? dateCutoff = null)
     {
         var sb = new StringBuilder();
 
@@ -24,13 +29,13 @@ public sealed partial class HtmlRenderAdapter
         // Explore Key Views strip), so the dashboard body carries only a visually-hidden H1 — a screen reader still
         // hears the page's name, without a redundant visible title band eating vertical space above the stats.
         sb.Append($"<h1 class=\"sr-only\">{PathUtil.Html(view.SiteTitle)} — project dashboard</h1>\n");
-        AppendDashboardSection(sb, view, codeItemHref, today);
+        AppendDashboardSection(sb, view, codeItemHref, today, dateCutoff);
 
         sb.Append("</main>\n\n");
         return sb.ToString();
     }
 
-    private void AppendDashboardSection(StringBuilder sb, DashboardView view, Func<string, string?>? codeItemHref = null, DateOnly? today = null)
+    private void AppendDashboardSection(StringBuilder sb, DashboardView view, Func<string, string?>? codeItemHref = null, DateOnly? today = null, DateOnly? dateCutoff = null)
     {
         var p = view.Progress;
 
@@ -48,6 +53,13 @@ public sealed partial class HtmlRenderAdapter
             // the static Story 10.7 sunburst below is the whole, correct chart (NFR8). The inline JSON island is the
             // client's only data source (no fetch); placed INSIDE <main id="main-content"> so it survives the SPA
             // content-region capture (Story 6.7 parity). [Story 20.2]
+            // Story 20.3: the explorer sunburst and its details rail sit side by side (rail to the RIGHT on wide
+            // viewports, stacked below on narrow ones — owner layout). The rail is a sibling, not a child of the
+            // chart panel, so the grid can place it. When there is no work-graph signal the rail HTML is "" and the
+            // grid collapses to the chart alone. [Story 20.3]
+            var hasRail = view.RelatedWorkHtml.Length > 0;
+            sb.Append(hasRail ? "<div class=\"explorer-layout\">\n" : string.Empty);
+
             sb.Append("<div class=\"chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track\" data-explorer>\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
             sb.Append("<div class=\"sb-explorer-drill\" hidden><ol class=\"sb-explorer-breadcrumb\" aria-label=\"Zoom scope\"></ol></div>\n");
@@ -60,11 +72,12 @@ public sealed partial class HtmlRenderAdapter
                 followUps: view.FollowUps, unplanned: view.UnplannedWork));
             sb.Append("</div>\n\n");
 
-            // Related work (Story 20.3) — the explorer's sibling region. Server-rendered in full: with JS off every
-            // scope's connections are visible, and the client only reveals the slice matching the current selection
-            // (AC #2 / NFR8). Omitted entirely when the portal has no work-graph signal, so it never ships as dead
-            // chrome. Placed immediately after the explorer panel it describes. [Story 20.3]
+            // Related-work details rail (Story 20.3) — augments the current selection with a compact card. With JS
+            // off every scope's card is server-rendered and its relationships expanded (AC #2 / NFR8); with JS on the
+            // card behaviour is the fancy single-selection view. "" when the portal has no work-graph signal.
             sb.Append(view.RelatedWorkHtml);
+
+            sb.Append(hasRail ? "</div>\n\n" : string.Empty);
 
             // Remaining Work by Epic — its own panel (Story 10.7 AC1 follow-up: owner asked for a distinct,
             // more polished panel rather than a plain list crammed under the sunburst).
@@ -122,7 +135,7 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("<h3>Git Pulse</h3>\n");
         }
         sb.Append(p.Git is { } pulse
-            ? Charts.GitPulsePanel(pulse, codeItemHref)
+            ? Charts.GitPulsePanel(pulse, codeItemHref, dateCutoff)
             : "<div class=\"chart-empty git-pulse-empty\" data-tooltip=\"Run in a git repository to enable commit stats\" tabindex=\"0\">—</div>\n");
         sb.Append("</div>\n\n");
 

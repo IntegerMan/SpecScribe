@@ -113,6 +113,29 @@ public static class BmadCommands
         return StoryCommands(story, commands, openDeferred).FirstOrDefault()?.Command;
     }
 
+    /// <summary>The single most-actionable slash command for an epic — the first entry of <see cref="ForEpic"/>
+    /// in its priority order (create-epics-and-stories when pending, retrospective when review, sprint-planning /
+    /// create-story mid-flight), or null for a done epic / a module exposing none. The epic-page analogue of
+    /// <see cref="PrimaryStoryCommand"/>, exposed so the Story 20.3 related-work card can offer one AI action per
+    /// node without re-deriving this gating in a second place (AD-2). [Story 20.3]</summary>
+    public static string? PrimaryEpicCommand(
+        EpicInfo epic, CommandCatalog commands,
+        IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null) =>
+        ForEpic(epic, commands, openDeferred).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.Command))?.Command;
+
+    /// <summary>The single most-actionable project-level slash command — the first entry of <see cref="ForProject"/>
+    /// (review a story awaiting review, build the front line, draft the next story, break down the next epic, else
+    /// a project retrospective). The default the Story 20.3 card offers when nothing is selected. [Story 20.3]</summary>
+    public static string? PrimaryProjectCommand(EpicsModel model, CommandCatalog commands) =>
+        ForProject(model, commands).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.Command))?.Command;
+
+    /// <summary>A single primary command badge (copy / send-to-editor), for callers that want ONE AI action rather
+    /// than the full Next Steps panel — the Story 20.3 card. Returns "" when the command is null/blank, so the card
+    /// simply omits its action row (never a dead button). Read-only by construction: the badge copies a prompt and
+    /// never mutates a planning artifact (AD-6). [Story 20.3]</summary>
+    public static string RenderPrimaryActionBadge(string? command) =>
+        string.IsNullOrWhiteSpace(command) ? string.Empty : RenderCommandBadge(command!);
+
     public static string RenderEpicNextSteps(
         EpicInfo epic, CommandCatalog commands,
         IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)

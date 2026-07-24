@@ -92,21 +92,27 @@ public static class DashboardViewBuilder
             TraceabilityStripHtml = requirements is { } tr && tr.Everything.Any()
                 ? Charts.TraceabilityStrip(ledger.RequirementsOverall, SiteNav.TraceabilityOutputPath)
                 : string.Empty,
-            // Story 20.3's Related-work pane. `workGraph` is the generator's ALREADY-COMPUTED `_workGraph` handed
-            // in verbatim — never rebuilt here, and no ProjectCounts/Epic 9 parser is touched on this path. The
-            // island id set comes from the SAME Charts.SunburstExplorerNodes projection the explorer payload uses,
-            // so the pane can never key on a wedge the chart didn't draw. [Story 20.3; Story 20.1 spike §1a]
-            RelatedWorkHtml = BuildRelatedWorkHtml(workGraph, epicsModel, geometry, unplannedGeometry),
+            // Story 20.3's Related-work rail. `workGraph` is the generator's ALREADY-COMPUTED `_workGraph` handed
+            // in verbatim — never rebuilt here, and no ProjectCounts/Epic 9 parser is touched for the relationship
+            // half. The island id set comes from the SAME Charts.SunburstExplorerNodes projection the explorer
+            // payload uses, so the rail can never key on a wedge the chart didn't draw. [Story 20.3; Story 20.1 §1a]
+            RelatedWorkHtml = BuildRelatedWorkHtml(
+                workGraph, epicsModel, commands, geometry, unplannedGeometry, ledger, nav.SiteTitle),
         };
     }
 
-    /// <summary>Renders the Related-work pane, or "" when there is nothing to relate. Kept here (not in the
-    /// adapter) so every surface renders identical bytes from one path. [Story 20.3]</summary>
+    /// <summary>Renders the Related-work details rail, or "" when there is nothing to relate. Kept here (not in the
+    /// adapter) so every surface renders identical bytes from one path. The relationship half is a pure read of the
+    /// cached work graph; the card layer adds the per-node title + one primary BMad command, both reused from the
+    /// existing command surface (AD-2), never re-derived. [Story 20.3]</summary>
     private static string BuildRelatedWorkHtml(
         WorkGraphModel? workGraph,
         EpicsModel? epicsModel,
+        CommandCatalog commands,
         FollowUpGeometry geometry,
-        UnplannedWorkGeometry unplannedGeometry)
+        UnplannedWorkGeometry unplannedGeometry,
+        ProjectCounts counts,
+        string projectTitle)
     {
         if (workGraph is null || workGraph.IsEmpty || epicsModel is null) return string.Empty;
         var islandIds = Charts.SunburstExplorerNodes(epicsModel, geometry, unplannedGeometry)
@@ -114,8 +120,10 @@ public static class DashboardViewBuilder
             .ToList();
         // linkPrefix "" — the dashboard is at the site root, so WorkGraphEpic.Reprefixed is a no-op there. The rule
         // is applied rather than assumed away, so a nested host page stays correct. [Story 20.1 spike §1a rule 6]
-        var model = RelatedWork.Build(workGraph, islandIds, linkPrefix: string.Empty);
-        return RelatedWorkTemplater.RenderPane(model, SiteNav.WorkGraphOutputPath);
+        var relationships = RelatedWork.Build(workGraph, islandIds, linkPrefix: string.Empty);
+        var pane = RelatedWorkCards.Build(
+            relationships, epicsModel, commands, geometry, counts, projectTitle, SiteNav.WorkGraphOutputPath);
+        return RelatedWorkTemplater.RenderPane(pane);
     }
 
     // ----- Stat tiles ---------------------------------------------------------------------------------------

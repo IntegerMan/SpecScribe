@@ -17,7 +17,8 @@ public static class TimelineTemplater
         IReadOnlyList<DateOnly> daysNewestFirst,
         IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> commitsByDay,
         IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> artifactsByDay,
-        SiteNav nav)
+        SiteNav nav,
+        DateOnly? today = null)
     {
         var outputPath = SiteNav.TimelineOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -49,7 +50,7 @@ public static class TimelineTemplater
         if (git is { DailySeries.Count: > 0 })
         {
             sb.Append("<div class=\"chart-panel timeline-heatmap\">\n");
-            sb.Append(Charts.CommitHeatmap(git.DailySeries, git.CommitsByDay));
+            sb.Append(Charts.CommitHeatmap(git.DailySeries, git.CommitsByDay, today: today));
             sb.Append(Charts.FrameWhySlot(Charts.WhyText(Charts.ChartMetric.ActivityCadence)));
             sb.Append("</div>\n");
         }

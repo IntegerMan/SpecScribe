@@ -3240,6 +3240,12 @@ So that every hierarchy surface shares one implementation, one interaction gramm
 **Then** drill-in is a **distinct affordance** from activation — a node never silently both drills and activates — and breadcrumb drill-up plus URL-hash deep-linking work per UX-DR5/UX-DR6
 **And** keyboard traversal, reduced-motion, and non-color status signalling all hold (UX-DR7, UX-DR17, UX-DR18), verified in a live browser.
 
+4.
+**Given** a node with no plan yet (a story with zero tasks and no nested deferred, whose true size is unknown) and the owner's 2026-07-24 "bump to average" decision
+**When** the datasource projects that node's weight
+**Then** the node is sized to the **average weight of the drafted nodes** — not a 1-unit sliver that reads as misleadingly trivial — while every drafted node keeps its honest weight (the floor only lifts, it never shrinks a real wedge), and a project with nothing drafted yet falls back to the historical 1-unit floor
+**And** the component **preserves** this policy rather than re-deriving it: the interim SVG glance + Story 20.2 explorer island already ship it via `Charts.SunburstNoPlanStoryWeight` (threaded through `SunburstStoryWeight`/`SunburstEpicWeight`), so Story 20.7's conversion must carry the average-bump forward — verified in a live browser that un-drafted stories render at a typical, clickable size, not a hairline.
+
 ### Story 20.6: Text-Twin Audit and Golden-Fingerprint Replacement — the ADR 0013 Gate
 
 As a maintainer retiring server-rendered chart SVG,
